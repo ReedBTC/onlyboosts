@@ -265,6 +265,8 @@ def cmd_push(args):
     ssh_cmd = f"ssh -i {VPS_KEY_FILE} -p {port} -o StrictHostKeyChecking=accept-new"
     dest = f"{user}@{host}:{VPS_REMOTE_NS}/"       # relative to the rrsync-forced root
     cmd = ["rsync", "-a", "-e", ssh_cmd, f"{shards}/", dest]
+    if args.delete:
+        cmd[1:1] = ["--delete"]     # mirror: prune stale files WITHIN onlyboosts/ only
     if args.dry_run:
         cmd[1:1] = ["-n", "-v", "--stats"]
     print(f"{'DRY-RUN ' if args.dry_run else ''}rsync {n} json files → {VPS_REMOTE_NS}/ on the VPS")
@@ -318,6 +320,8 @@ def main():
                     help="shards directory to push")
     pu.add_argument("--dry-run", action="store_true",
                     help="show what would transfer without writing anything")
+    pu.add_argument("--delete", action="store_true",
+                    help="prune remote files no longer exported (within onlyboosts/ only)")
     pu.set_defaults(func=cmd_push)
 
     s = sub.add_parser("stats", help="print index counts")

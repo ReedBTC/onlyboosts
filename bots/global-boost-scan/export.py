@@ -84,9 +84,12 @@ def export(conn, out_dir, latest_n=1000, per_show=False, log=print):
     total = len(records)
     generated = int(time.time())
 
-    # ── boost feed: latest + monthly pages + an index ─────────────────────────
+    # ── boost feed: latest (root) + monthly pages under boosts/ ───────────────
+    # Layout matches the served contract: /onlyboosts/latest.json (recent),
+    # /onlyboosts/boosts/YYYY-MM.json (archives), /onlyboosts/index.json (manifest,
+    # written at the end once the podcasts count is known).
     latest = records[:latest_n]
-    write_json(out / "boosts" / "latest.json",
+    write_json(out / "latest.json",
                {"generated_at": generated, "count": len(latest), "boosts": latest})
 
     months = {}
@@ -97,11 +100,6 @@ def export(conn, out_dir, latest_n=1000, per_show=False, log=print):
         write_json(out / "boosts" / f"{key}.json",
                    {"generated_at": generated, "month": key,
                     "count": len(recs), "boosts": recs})
-    write_json(out / "boosts" / "index.json", {
-        "generated_at": generated, "total": total, "latest_n": len(latest),
-        "months": [{"month": k, "count": len(months[k])}
-                   for k in sorted(months, reverse=True)],
-    })
     log(f"  boost feed: {total} records, {len(months)} monthly pages")
 
     # ── podcasts index (per-show aggregates) ──────────────────────────────────
@@ -171,8 +169,23 @@ def export(conn, out_dir, latest_n=1000, per_show=False, log=print):
             n += 1
         log(f"  per-show detail shards: {n}")
 
-    # ── meta ──────────────────────────────────────────────────────────────────
+    # ── manifest (root index.json) — directories aren't browsable on the VPS,
+    # so this is how a consumer discovers exact filenames/months up front ──────
     s = db.stats(conn)
+    write_json(out / "index.json", {
+        "generated_at": generated,
+        "totals": s,
+        "boosts": {
+            "latest": "latest.json",
+            "months": [{"month": k, "count": len(months[k]),
+                        "file": f"boosts/{k}.json"}
+                       for k in sorted(months, reverse=True)],
+        },
+        "podcasts": {"index": "podcasts/index.json", "count": len(podcasts)},
+        "profiles": "profiles.json",
+    })
+
+    # ── meta ──────────────────────────────────────────────────────────────────
     write_json(out / "meta.json", {"generated_at": generated, **s})
     log(f"  exported to {out}")
     return total
