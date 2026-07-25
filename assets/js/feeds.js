@@ -1036,7 +1036,7 @@ async function hydrate(panelId, mod, scope) {
   try {
     const m = await import(mod)
     if (mod.includes('boosts-feed')) await m.renderBoosts({ list, scope })
-    else await m.renderPodcasts({ list, scope })
+    else await m.renderPodcasts({ panel, list, scope })
   } catch (e) {
     console.error('[feeds] load failed', mod, scope, e)
     renderPlaceholder(list, 'Couldn\u2019t load this feed', 'Something went wrong reaching the boosts data \u2014 please try again later.')
@@ -1045,7 +1045,7 @@ async function hydrate(panelId, mod, scope) {
 
 // ── Lazy per-feed dispatch ───────────────────────────────────────────
 const BOOSTS = '/assets/js/boosts-feed.js'
-const PODCASTS = '/assets/js/podcasts-feed.js'
+const PODCASTS = '/assets/js/feeds-podcasts.js'
 const LOADERS = {
   'boosts-global':    () => hydrate('panel-boosts-global', BOOSTS, 'global'),
   'boosts-follows':   () => hydrate('panel-boosts-follows', BOOSTS, 'follows'),

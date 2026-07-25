@@ -105,15 +105,58 @@ export async function onRequest(context) {
   }
 
   const params = new URL(request.url).searchParams;
-  const feedId = params.get("feedId");
+  let feedId = params.get("feedId");
   const guid = params.get("guid");
-  if (!feedId || !/^\d+$/.test(feedId)) {
-    return new Response(JSON.stringify({ error: "feedId required" }), {
+  // The OnlyBoosts data feed carries a show's RSS URL and podcast guid but not
+  // Podcast Index's numeric feed id, so callers may pass either of those
+  // instead and we resolve the id here. Doing it server-side keeps the PI
+  // credentials off the client and lets the lookup share this Function's
+  // edge cache.
+  const feedUrl = params.get("feedUrl");
+  const podcastGuid = params.get("podcastGuid");
+
+  if (!feedId && !feedUrl && !podcastGuid) {
+    return new Response(JSON.stringify({ error: "feedId, feedUrl or podcastGuid required" }), {
+      status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+  if (feedId && !/^\d+$/.test(feedId)) {
+    return new Response(JSON.stringify({ error: "feedId must be numeric" }), {
       status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
   const headers = await piHeaders(key, secret);
+
+  if (!feedId) {
+    // podcastGuid first: it's a stable identifier, where a feed URL can move.
+    let resolved = null;
+    if (podcastGuid) {
+      const r = await piGet(`/podcasts/byguid?guid=${encodeURIComponent(podcastGuid)}`, headers);
+      resolved = r?.feed?.id ?? null;
+    }
+    if (!resolved && feedUrl) {
+      // Bound what we'll forward — this string reaches an upstream API.
+      let ok = false;
+      try {
+        const u = new URL(feedUrl);
+        ok = (u.protocol === "http:" || u.protocol === "https:") && feedUrl.length <= 2048;
+      } catch {}
+      if (ok) {
+        const r = await piGet(`/podcasts/byfeedurl?url=${encodeURIComponent(feedUrl)}`, headers);
+        resolved = r?.feed?.id ?? null;
+      }
+    }
+    if (!resolved) {
+      // Not an error — plenty of feeds simply aren't in Podcast Index. The
+      // caller shows "no value block" rather than a failure.
+      return new Response(JSON.stringify({ value: null, reason: "feed not found in Podcast Index" }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "public, max-age=600" },
+      });
+    }
+    feedId = String(resolved);
+  }
   const json = (body) => new Response(JSON.stringify(body), {
     status: 200,
     headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "public, max-age=600" },

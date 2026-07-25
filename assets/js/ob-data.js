@@ -173,6 +173,89 @@ function normalizeBoosts(d) {
   return out
 }
 
+/**
+ * Project normalized rows into the flat {boosts, episodes, shows} shape the
+ * episode feed was written against.
+ *
+ * feeds-podcasts.js predates this data feed: it groups a flat boost list by
+ * `item_guid` and looks episode/show metadata up in side tables. The new feed
+ * embeds that metadata in every boost instead. Rather than rewrite a working
+ * UI around the new shape — and lose the boost drawer, range filters and sort
+ * menu with it — this adapts the data to the consumer.
+ *
+ * Two fields the new feed doesn't carry, and what happens without them:
+ *   - `feed_id` / `itunes_id` (Podcast Index numerics) — drive the "listen on"
+ *     links and the /api/value split lookup. The proxy resolves a feed id from
+ *     `feedUrl` instead, so boosting still works; the pod.link / PI links are
+ *     simply omitted for shows we can't identify.
+ *   - `description` / `enclosure_type` — only in the per-show shard, which is
+ *     too expensive to fetch per card. The card degrades to no blurb and lets
+ *     the browser sniff the audio type.
+ */
+export function toEpisodeShape(rows) {
+  const boosts = []
+  const episodes = {}
+  const shows = {}
+  // Booster identities ride along in every record now, so the consumer can
+  // seed its profile map from this and skip the network lookup entirely.
+  const profiles = new Map()
+
+  for (const b of rows) {
+    const itemGuid = b.episode.guid
+    // The episode feed keys everything off item_guid; a boost without one
+    // can't be grouped into a card at all.
+    if (!itemGuid) continue
+    const podGuid = b.podcast.guid || `unknown:${itemGuid}`
+
+    boosts.push({
+      event_id: b.id,
+      booster_pubkey: b.booster.pk,
+      booster_npub: b.booster.npub,
+      created_at: b.ts,
+      sats: b.sats || 0,
+      message: b.msg || '',
+      item_guid: itemGuid,
+      podcast_guid: podGuid,
+      item_url: b.episode.url,
+      show_url: b.podcast.feed,
+      client: b.client,
+    })
+
+    if (!episodes[itemGuid]) {
+      episodes[itemGuid] = {
+        item_guid: itemGuid,
+        podcast_guid: podGuid,
+        title: b.episode.title,
+        image: b.episode.img || b.podcast.img,
+        published: b.episode.date,
+        episode_number: b.episode.num,
+        enclosure_url: b.episode.url,
+        // Deliberately absent: description, enclosure_type, feed_id.
+      }
+    }
+    if (b.booster.name || b.booster.pic) {
+      if (!profiles.has(b.booster.pk)) {
+        profiles.set(b.booster.pk, {
+          pubkey: b.booster.pk,
+          name: b.booster.name,
+          picture: b.booster.pic,
+          npub: b.booster.npub,
+        })
+      }
+    }
+
+    if (!shows[podGuid]) {
+      shows[podGuid] = {
+        podcast_guid: podGuid,
+        title: b.podcast.title,
+        image: b.podcast.img,
+        feed_url: b.podcast.feed,
+      }
+    }
+  }
+  return { boosts, episodes, shows, profiles }
+}
+
 /** Short, human display name for a booster with the documented fallback. */
 export function boosterLabel(booster) {
   if (booster?.name) return booster.name

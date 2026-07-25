@@ -272,7 +272,7 @@ renderer on first view.
 | Feed | Module | Source |
 |---|---|---|
 | `boosts-*` | `boosts-feed.js` | `latest.json`, paging back through month archives |
-| `podcasts-*` | `podcasts-feed.js` | `podcasts/index.json` (global) |
+| `podcasts-*` | `feeds-podcasts.js` | `latest.json` + 3 recent months, rolled up by episode |
 
 **Follows scoping** lives in `assets/js/follow-set.js`. `resolveFollows()`
 reads the signed-in pubkey straight out of `localStorage.lb_nostr_session` —
@@ -290,11 +290,37 @@ Two scoping details that aren't obvious:
   can legitimately match nothing in the most recent 1,000 boosts while having
   plenty further back, so "no results" has to mean "we looked", not "the first
   page was empty".
-- **Podcasts · Follows can't use `podcasts/index.json`.** That index is
-  computed over everyone, so its counts would be wrong for a filtered
-  audience. It rolls up the boost feed itself instead — bounded to
-  `latest.json` + the two most recent months, because pulling all 22 archives
-  would be ~20MB to build one view.
+- **The Podcasts tabs don't use `podcasts/index.json`.** The cards are
+  *episodes*, not shows, and the published index is a show-level rollup
+  computed over everyone — so its counts would also be wrong for a Follows
+  audience. Both tabs roll the boost feed up by episode instead, via
+  `ob-data.js#toEpisodeShape`, bounded to `latest.json` + the three most
+  recent months (the range filter offers "All", which needs more than the
+  recent 1,000 boosts to mean anything; all 22 archives would be ~20MB).
+
+### The episode feed adapter
+
+`feeds-podcasts.js` predates this data feed: it groups a flat boost list by
+`item_guid` and looks episode/show metadata up in side tables, where the new
+feed embeds that metadata in every boost. `ob-data.js#toEpisodeShape` adapts
+the data to the consumer rather than the reverse — rewriting the UI around
+the new shape would have cost the boost drawer, the 1W/1M/All range filter
+and the five-way sort menu, which are the point of that view.
+
+Two fields the feed doesn't carry:
+
+- **`feed_id` / `itunes_id`** (Podcast Index numerics) drive the "listen on"
+  links and the `/api/value` split lookup. `/api/value` now also accepts
+  `feedUrl` or `podcastGuid` and resolves the id server-side, so boosting
+  works; the pod.link / PI links are omitted for shows we can't identify.
+- **`description` / `enclosure_type`** only exist in the per-show shard,
+  which is too expensive to fetch per card. Cards degrade to no blurb and let
+  the browser sniff the audio type.
+
+`toEpisodeShape` also returns a `profiles` map built from the embedded
+booster identities, which `renderPodcasts` seeds before first paint — so the
+batched Primal lookup now only runs for stragglers the collector couldn't
+resolve.
 
 ### Snapshot → card
 
