@@ -124,6 +124,7 @@ def export(conn, out_dir, latest_n=1000, per_show=False, log=print):
         "boosters": a["boosters"],
         "episodes": a["episodes"],
         "latest":   a["latest"],
+        "file":     f"podcasts/{_safe(a['podcast_guid'])}.json",   # exact per-show shard path
     } for a in agg]
     write_json(out / "podcasts" / "index.json",
                {"generated_at": generated, "count": len(podcasts), "podcasts": podcasts})
