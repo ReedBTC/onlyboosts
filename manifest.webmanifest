@@ -26,10 +26,10 @@
   ],
   "shortcuts": [
     {
-      "name": "Global Boosts",
-      "short_name": "Boosts",
-      "description": "The global boost feed",
-      "url": "/#boosts-global"
+      "name": "Global Podcasts",
+      "short_name": "Podcasts",
+      "description": "The global podcast feed",
+      "url": "/#podcasts-global"
     }
   ]
 }

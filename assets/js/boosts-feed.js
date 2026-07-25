@@ -57,6 +57,36 @@ function relTime(ts) {
   return new Date(ts * 1000).toLocaleDateString()
 }
 
+// The `client` tag as published by the boosting app, tidied for display.
+// Apps write it inconsistently — a bare name ("BoostMeBitch"), a domain
+// ("localbitcoiners.com"), sometimes with a version suffix — so known values
+// get a canonical label and anything else is shown as-is minus a domain
+// suffix. Unknown clients are still worth surfacing: seeing an unfamiliar app
+// name is more useful than hiding it.
+const CLIENT_LABELS = {
+  'boostmebitch': 'Boost Me Bitch',
+  'localbitcoiners.com': 'Local Bitcoiners',
+  'onlyboosts.social': 'OnlyBoosts',
+  'fountain': 'Fountain',
+  'fountain.fm': 'Fountain',
+  'castamatic': 'Castamatic',
+  'podverse': 'Podverse',
+  'truefans': 'TrueFans',
+  'curiocaster': 'CurioCaster',
+  'podcastguru': 'Podcast Guru',
+}
+function clientLabel(raw) {
+  if (!raw) return null
+  const key = String(raw).trim().toLowerCase()
+  if (!key) return null
+  if (CLIENT_LABELS[key]) return CLIENT_LABELS[key]
+  const bare = key.replace(/^www\./, '').replace(/\.(com|fm|social|app|net|io|org)$/, '')
+  if (CLIENT_LABELS[bare]) return CLIENT_LABELS[bare]
+  // Fall back to the raw value with its original casing, trimmed of a version
+  // suffix like "SomeApp/1.2.3".
+  return String(raw).trim().split('/')[0].slice(0, 32)
+}
+
 function fmtSats(n) {
   if (!Number.isFinite(n) || n <= 0) return ''
   if (n >= 1000000) return `${(n / 1000000).toFixed(n % 1000000 ? 1 : 0)}M`
@@ -121,6 +151,18 @@ function renderBoostCard(b) {
   }
   if (b.podcast.title) bits.push(h('span', { class: 'ob-boost-show', text: b.podcast.title }))
   if (bits.length) card.appendChild(h('div', { class: 'ob-boost-meta' }, bits))
+
+  // Where the boost was sent from. Only ~3.5% of records carry a client tag
+  // (Fountain, the largest source, doesn't emit one), so the line is omitted
+  // rather than rendered as "Unknown" on the other 96% — a column of
+  // "Unknown" would be noise, not information.
+  const via = clientLabel(b.client)
+  if (via) {
+    card.appendChild(h('div', { class: 'ob-boost-via' }, [
+      h('span', { class: 'ob-via-label', text: 'via ' }),
+      h('span', { class: 'ob-via-name', text: via }),
+    ]))
+  }
 
   if (b.msg) {
     const body = h('div', { class: 'note-body' })

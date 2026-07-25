@@ -826,6 +826,19 @@ const RANGE_OPTIONS = [
   ['1m', '1M', 30],
   ['all', 'All', null],
 ]
+
+// The panel heading restates the active range in words, so the h2 and the
+// 1W/1M/All buttons can't disagree. Same wording on Global and Follows —
+// the tab already says whose feed it is.
+const RANGE_TITLES = {
+  '1w': 'Podcasts Aired This Week',
+  '1m': 'Podcasts Aired This Month',
+  'all': 'Podcasts All',
+}
+function setPanelTitle(panel, rangeKey) {
+  const el = panel?.querySelector('[data-pcast-title]')
+  if (el) el.textContent = RANGE_TITLES[rangeKey] || RANGE_TITLES['1w']
+}
 function filterItems(items, key) {
   const days = (RANGE_OPTIONS.find((o) => o[0] === key) || [])[2]
   if (!days) return items
@@ -922,6 +935,10 @@ function mountControls(panel, { sortKey, rangeKey, onSort, onRange }) {
  * @param {string}  opts.scope  'global' | 'follows'
  */
 export async function renderPodcasts({ panel, list, scope = 'global' }) {
+  // Ranks are meaningful on Global, where the ordering is a leaderboard over
+  // the whole network. On Follows the population is just "whoever you happen
+  // to follow", so a #1 would imply a standing that doesn't exist.
+  const showRanks = scope !== 'follows'
   // Follows scoping is applied to the raw boost rows, BEFORE the episode
   // rollup: an episode should only appear if someone you follow boosted it,
   // and its booster counts / sat totals must reflect only those boosts.
@@ -1028,7 +1045,7 @@ export async function renderPodcasts({ panel, list, scope = 'global' }) {
     next.forEach((it, i) => {
       // Continue the numbering across "Show more" pages rather than
       // restarting at 1 each time.
-      const el = episodeCard(it, RANKED_SORTS.has(sortKey) ? shown + i + 1 : null)
+      const el = episodeCard(it, (showRanks && RANKED_SORTS.has(sortKey)) ? shown + i + 1 : null)
       el._pcastItem = it   // lets repaintProfiles map avatars regardless of sort order
       cards.appendChild(el)
     })
@@ -1064,9 +1081,11 @@ export async function renderPodcasts({ panel, list, scope = 'global' }) {
   function applyRange(key) {
     if (key === rangeKey) return
     rangeKey = key
+    setPanelTitle(panel, rangeKey)
     rebuild()
   }
 
+  setPanelTitle(panel, rangeKey)
   mountControls(panel, { sortKey, rangeKey, onSort: applySort, onRange: applyRange })
 
   list.className = ''
