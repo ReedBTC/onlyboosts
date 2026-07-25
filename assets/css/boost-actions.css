@@ -20,7 +20,7 @@
   min-height: 32px;
 }
 .lb-boost-placeholder {
-  background: #f7931a;
+  background: var(--orange);
   color: #ffffff;
   border: none;
   cursor: pointer;
@@ -34,7 +34,7 @@
   gap: 0.35rem;
   transition: background 0.15s;
 }
-.lb-boost-placeholder:hover { background: #d97b0e; }
+.lb-boost-placeholder:hover { background: var(--orange-d); }
 .lb-boost-placeholder:disabled { opacity: 0.6; cursor: wait; }
 .lb-boost-placeholder svg { width: 11px; height: 11px; flex-shrink: 0; }
 .lb-boost-placeholder .lb-label-long { display: inline; }

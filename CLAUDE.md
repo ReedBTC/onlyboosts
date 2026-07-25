@@ -1,10 +1,24 @@
 # OnlyBoosts — Claude Code Notes
 
-A Nostr client for podcast boosts. Four feeds: **Global Boosts**, **Follows
-Boosts**, **Global Podcasts**, **Follows Podcasts**. At heart it's an
-ordinary kind-1 client — the difference is that it does **not** query relays
-for the feed. It reads a pre-built JSON snapshot off the VPS
-(`relay.mynostr.app`), the same way localbitcoiners' community feeds work.
+A Nostr client for podcast boosts. At heart it's an ordinary kind-1 client —
+the difference is that it does **not** query relays for the feed. It reads a
+pre-built JSON snapshot off the VPS (`relay.mynostr.app`), the same way
+localbitcoiners' community feeds work.
+
+**It is a single page.** `index.html` is the whole site: four hash-routed
+tabs on two axes — what (boosts / podcasts) x whose (global / your follows).
+
+| Tab | Hash | Renders |
+|---|---|---|
+| Boosts · Global | `#boosts-global` | the kind-1 boost notes themselves |
+| Boosts · Follows | `#boosts-follows` | same, filtered to your kind-3 contacts |
+| Podcasts · Global | `#podcasts-global` | episode/show rollup by boosts received |
+| Podcasts · Follows | `#podcasts-follows` | same, filtered to your kind-3 contacts |
+
+The inline tab controller in `index.html` owns activation and dispatches
+`lb:feed-activate`; `assets/js/feeds.js` listens and lazily hydrates.
+`feeds.html` and `boosts.html` were folded into this page and deleted —
+their markup is the ancestor of the Podcasts and Boosts panels respectively.
 
 ## Where this code came from
 
@@ -56,6 +70,28 @@ Local dev: `wrangler pages dev .` (so `/api/*` Functions resolve).
 - **`isSafeUrl()` before any user-supplied URL** reaches `href`/`src`.
 - **Bump `VERSION` in `sw.js`** when shipping changed assets that returning
   visitors must get on the *first* navigation rather than the second.
+
+## Theming
+
+The shared stylesheets (`nav.css`, `footer.css`, `boosts-thread.css`,
+`boost-actions.css`) read their colors as CSS custom properties off `:root`,
+which the *page* defines. So `index.html`'s `:root` block is the single place
+the theme lives.
+
+Those stylesheets were written against localbitcoiners' token names
+(`--cream`, `--navy`, `--orange`, `--green-d` …). Rather than rename ~300
+usages across five files, the old names are kept as **aliases repointed at
+the OnlyBoosts palette**. Trust the values, not the words — `--orange` is
+brand cyan. New code should prefer `--brand` / `--ink` / `--surface`.
+
+Brand colors are sampled from the supplied art: `--brand: #00aff0` (the
+mark's cyan) and `--brand-d: #068ace` (its broadcast waves). The four feed
+accents sit on one cyan→indigo ramp so the tab row reads as a single system.
+
+One ordering trap: `.feed-tab { --tab: var(--muted) }` is a default that
+appears *after* the per-tab `--tab` rules would naturally go. Same
+specificity, so the per-tab rules must stay below it or every tab renders
+grey.
 
 ## Site identity
 
@@ -125,23 +161,27 @@ event, or that moves sats.** Published events can't be unpublished.
 
 **Still to build:**
 
-1. **The four feeds.** `feeds.html` / `assets/js/feeds.js` are still LB's
-   tab shell (Events / Marketplace / Podcast Boosts / Articles) — kept
-   deliberately as the template. Rework to the OnlyBoosts four. The tab
-   controller, lazy per-tab loading, and the `lb:feed-activate` event
-   pattern all transfer.
+1. **Three of the four feed loaders.** The tab shell, routing, and panels are
+   done. `assets/js/feeds.js` only maps `podcasts-global` (which reads the
+   snapshot and renders the episode rollup through `feeds-podcasts.js`); an
+   unmapped feed is a no-op that leaves its static placeholder visible.
+   `feeds.js` still carries LB's supporter-scoped data layer — that's the
+   substance of items 2 and 3 below. The Events / Marketplace / Articles
+   modules were deleted.
 
 2. **"Follows" scoping.** LB filters feeds to *supporters* — the union of
    p-tags across the show's follow packs (`assets/js/supporter-set.js`).
    OnlyBoosts filters to the logged-in user's own **kind-3 follow list**.
    Same downstream filter, different source; `supporter-set.js` is the file
-   to replace.
+   to replace. Both `*-follows` panels currently show a "sign in" placeholder,
+   which will stay correct — the feed genuinely needs a signed-in npub.
 
-3. **The snapshot data source.** `boosts.html` currently reads one kind-1
-   megathread root nevent from Primal (`ROOT_NEVENT` in
-   `boosts-thread.js`). OnlyBoosts reads the VPS JSON instead. Replace
-   `fetchBoostThread()` with a snapshot loader that feeds the *same*
-   `renderChildCards()` — the card UI comes along free.
+3. **The snapshot data source for the Boosts feeds.** `boosts-thread.js`
+   still fetches one kind-1 megathread root nevent from Primal
+   (`ROOT_NEVENT`) — that was LB's boost wall. OnlyBoosts reads the VPS JSON
+   instead. Write a snapshot loader that feeds the *same* `renderChildCards()`
+   and the card UI comes along free. `ROOT_NEVENT` and `EXCLUDED_NOTE_IDS`
+   in that file are both LB leftovers.
 
 4. **The collector bot.** `bots/community-scan/` is scoped to LB's
    supporters and skips LB's own show. OnlyBoosts wants network-wide
@@ -154,15 +194,16 @@ event, or that moves sats.** Published events can't be unpublished.
    whitelist that literal string. **VPS-side change — reports are silently
    rejected until it's made.**
 
-6. **Branding.** No logo, favicon, or OG image exists yet (LB's were
-   stripped). Colors and fonts are still LB's cream/navy/orange — see the
-   TODO in `index.html`. Three places stand in a ⚡ glyph for missing art
-   and should be revisited together: the PWA install prompt
-   (`assets/widgets/pwa-install.js`), the login modal
-   (`login-widget/src/components/LoginScreen.jsx`), and the manifest icons
-   (currently absent, so installed-PWA icons fall back to a screenshot).
-   `assets/avatar-fallback.svg` is *not* branding — it stands in for a
-   person when a kind-0 has no picture, so keep it neutral.
+6. **Typography.** The brand wordmark is a bold sans; the site is still on
+   LB's Playfair Display / Source Serif 4 pairing. It reads fine, but the
+   serif is inherited, not chosen — worth a deliberate decision. Only those
+   two families are self-hosted in `assets/fonts/`.
+
+   Branding art is otherwise done: `onlyboosts_pfp.png` (nav mark, apple-touch
+   icon, PWA prompt, login modal, manifest), `onlyboosts_favicon.png`
+   (favicon, manifest), `onlyboosts_banner.png` (masthead, OG image).
+   `assets/avatar-fallback.svg` is *not* branding — it stands in for a person
+   when a kind-0 has no picture, so keep it neutral.
 
 ## Naming note
 

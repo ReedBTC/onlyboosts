@@ -6,16 +6,30 @@
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "theme_color": "#3a3125",
-  "background_color": "#f5eedc",
+  "theme_color": "#00aff0",
+  "background_color": "#eef6fb",
   "lang": "en",
   "categories": ["news", "social", "entertainment"],
+  "icons": [
+    {
+      "src": "/assets/onlyboosts_pfp.png",
+      "sizes": "400x400",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/onlyboosts_favicon.png",
+      "sizes": "256x256",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
   "shortcuts": [
     {
       "name": "Global Boosts",
       "short_name": "Boosts",
       "description": "The global boost feed",
-      "url": "/feeds#boosts-global"
+      "url": "/#boosts-global"
     }
   ]
 }

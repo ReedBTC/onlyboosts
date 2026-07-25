@@ -9,10 +9,11 @@
 
 const SITE_ORIGIN = "https://onlyboosts.social";
 
+// One page. The four feeds are hash routes on "/" (#boosts-global etc.),
+// and crawlers don't index fragments separately — listing them here would
+// just be four duplicate entries for the same URL.
 const STATIC_URLS = [
-  { loc: "/", changefreq: "weekly", priority: "1.0" },
-  { loc: "/feeds", changefreq: "hourly", priority: "0.9" },
-  { loc: "/boosts.html", changefreq: "daily", priority: "0.8" },
+  { loc: "/", changefreq: "hourly", priority: "1.0" },
 ];
 
 export async function onRequest() {

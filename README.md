@@ -62,9 +62,11 @@ node scripts/sync-partials.js
 
 ## Status
 
-Early scaffold. The chrome, the kind-1 renderer, and the login/boost/wallet
-stack are in place; the four feeds and the network-wide collector are not
-wired up yet. See `CLAUDE.md` for the current build list.
+Early scaffold. The site is a single page with the four feeds routed and
+laid out, plus the kind-1 renderer and the login/boost/wallet stack. Only
+the Podcasts · Global feed reads real data so far; the other three show
+placeholders, and the network-wide collector isn't built. See `CLAUDE.md`
+for the current build list.
 
 ## Credits
 

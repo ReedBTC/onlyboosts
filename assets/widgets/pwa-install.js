@@ -137,9 +137,7 @@
     var iconHtml =
       '<div style="flex:0 0 auto;width:38px;height:38px;border-radius:9px;background:rgba(247,147,26,0.18);' +
       'border:1px solid rgba(247,147,26,0.45);display:flex;align-items:center;justify-content:center;">' +
-      // TODO(onlyboosts): swap in the app icon once branding art exists.
-      // A bolt glyph stands in so the prompt isn't a broken image.
-      '<span aria-hidden="true" style="font-size:20px;line-height:1;">⚡</span>' +
+      '<img src="/assets/onlyboosts_pfp.png" alt="" width="28" height="28" style="border-radius:6px;display:block;" />' +
       '</div>';
 
     var titleHtml =

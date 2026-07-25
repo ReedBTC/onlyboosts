@@ -1,20 +1,25 @@
-/* Community Feeds page — per-tab Nostr feeds, scoped to the show's
- * supporters.
+/* Feed hydration for the four tabs on the homepage.
  *
- * "Supporters" = every pubkey listed in the show's own follow packs
- * (following.space kind-39089, published by bots/follow-packs from the
- * show account). We union the p-tags across all of the show's packs
- * (100k / 69k / 21k / other / guests / coders) into one membership set,
- * then each feed only shows content authored by those pubkeys.
+ * ⚠️  MID-PORT. This module still carries localbitcoiners' data layer, which
+ * scoped every feed to the show's *supporters* — the union of p-tags across
+ * the show's follow packs (kind-39089), resolved by supporter-set.js.
+ * OnlyBoosts scopes differently: "Global" is unscoped, and "Follows" is the
+ * signed-in user's own kind-3 contact list. That swap is the main piece of
+ * work left here; see CLAUDE.md.
  *
- * The EVENTS tab (NIP-52 calendar events, kinds 31922/31923) is rendered
- * with the same card as the Meetups page via the shared renderer in
- * calendar-events.js; Marketplace, Podcast Boosts, and Articles each lazy-
- * import their own module (feeds-market / feeds-podcasts / feeds-articles).
+ * What's live today: 'podcasts-global', which reads the pre-computed
+ * /api/community-boosts snapshot and renders the episode rollup via
+ * feeds-podcasts.js. The other three tabs have no loader yet and fall
+ * through to the static placeholder in index.html.
+ *
+ * The Events / Marketplace / Articles tabs and their modules were removed on
+ * fork; the calendar-events.js machinery below is what's left of the Events
+ * path and is retained only because boosts-thread.js still imports it to
+ * render calendar-event quotes embedded in boost notes.
  *
  * Feeds load lazily: a tab's fetch only fires the first time that tab
  * becomes active (driven by the `lb:feed-activate` event dispatched from
- * the inline tab controller in feeds.html, plus a load of whichever feed
+ * the inline tab controller in index.html, plus a load of whichever feed
  * is active when this module first runs).
  */
 import { STATIC_RELAYS, fetchProfilesFromPrimal } from '/assets/js/boosts-thread.js'
@@ -1020,39 +1025,13 @@ async function loadEvents() {
   }
 }
 
-// ── Marketplace tab loader ───────────────────────────────────────────
-// Lazy-imports the heavier marketplace module (which pulls in merch.js's cart
-// / checkout / gift-wrap send) only when the tab is actually opened, then hands
-// off to renderMarket. Like the Events tab, the listings now come from the
-// hourly snapshot (renderMarket → loadMarketItems fetches it), so there's no
-// supporter/outbox resolution here — that only runs inside the relay fallback.
-async function loadMarket() {
-  const panel = document.getElementById('panel-market')
-  if (!panel) return
-  const list = panel.querySelector('[data-feed-list]')
-  if (!list) return
-
-  // Replace the static placeholder with skeletons up front — lazy-importing the
-  // market module (which pulls in merch.js) takes a moment, and renderMarket
-  // only paints its own skeletons afterwards.
-  showSkeletons(list)
-
-  try {
-    const mod = await import('/assets/js/feeds-market.js')
-    await mod.renderMarket({ panel, list })
-  } catch (e) {
-    console.error('[feeds] market load failed', e)
-    renderPlaceholder(list, 'Couldn’t load the marketplace', 'Something went wrong reaching the community marketplace — please try again later.')
-  }
-}
-
 // Podcast Boosts — episodes the community has boosted on Nostr. Unlike the
 // other tabs this isn't a live relay subscription: it reads the pre-computed
 // /api/community-boosts snapshot (built hourly by bots/community-boosts), so
 // there's no supporter/relay resolution here — just hand the panel to the
 // module and let it fetch. Lazy-imported on first view like the market feed.
-async function loadPodcasts() {
-  const panel = document.getElementById('panel-podcasts')
+async function loadPodcasts(panelId = 'panel-podcasts-global') {
+  const panel = document.getElementById(panelId)
   if (!panel) return
   const list = panel.querySelector('[data-feed-list]')
   showSkeletons(list)
@@ -1065,29 +1044,18 @@ async function loadPodcasts() {
   }
 }
 
-// Articles — NIP-23 long-form (kind 30023) from the community. Like the market
-// and podcast feeds this reads a pre-computed snapshot (/api/community-articles,
-// built hourly by bots/community-feeds) rather than a live subscription, so
-// there's no supporter/relay resolution here — the module fetches, verifies, and
-// renders the list plus its in-panel reader. Lazy-imported on first view (it
-// pulls in the vendored marked + DOMPurify for the reader body).
-async function loadArticles() {
-  const panel = document.getElementById('panel-articles')
-  if (!panel) return
-  const list = panel.querySelector('[data-feed-list]')
-  if (!list) return
-  showSkeletons(list)
-  try {
-    const mod = await import('/assets/js/feeds-articles.js')
-    await mod.renderArticles({ panel, list })
-  } catch (e) {
-    console.error('[feeds] articles load failed', e)
-    renderPlaceholder(list, 'Couldn’t load articles', 'Something went wrong reaching the community articles feed — please try again later.')
-  }
-}
-
 // ── Lazy per-feed dispatch ───────────────────────────────────────────
-const LOADERS = { events: loadEvents, market: loadMarket, podcasts: loadPodcasts, articles: loadArticles }
+// Only the feeds that actually have a data path are listed. An unlisted
+// feed is a no-op, which leaves its panel showing the static placeholder
+// already in the HTML — the honest result while the loader is unbuilt.
+//
+// TODO(onlyboosts): 'boosts-global' needs a snapshot loader that renders the
+// kind-1 boost notes themselves (boosts-thread.js#renderChildCards) rather
+// than the episode rollup. The two '*-follows' feeds additionally need the
+// signed-in user's kind-3 contact list as a filter — see CLAUDE.md.
+const LOADERS = {
+  'podcasts-global': () => loadPodcasts('panel-podcasts-global'),
+}
 const loaded = new Set()
 
 function loadFeed(feed) {
@@ -1105,4 +1073,4 @@ document.addEventListener('lb:feed-activate', (e) => {
 // Load whichever feed is active when this module first runs (the inline
 // tab controller has already set body[data-active-feed] and may have
 // dispatched its activation event before this listener attached).
-loadFeed(document.body.dataset.activeFeed || 'events')
+loadFeed(document.body.dataset.activeFeed || 'boosts-global')

@@ -21,28 +21,38 @@
   " />
 
   <title>OnlyBoosts — podcast boosts on Nostr</title>
-  <meta name="description" content="A Nostr client for podcast boosts. Read boostagrams from across the podcasting-2.0 network — globally or filtered to who you follow — and boost back with Lightning." />
+  <meta name="description" content="Podcast boosts as a Nostr feed. Read the boostagrams flowing across the podcasting-2.0 network — globally or filtered to who you follow — and boost back with Lightning." />
   <link rel="canonical" href="https://onlyboosts.social/" />
+  <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
 
   <!-- PWA -->
   <link rel="manifest" href="/manifest.webmanifest" />
-  <meta name="theme-color" content="#3a3125" />
+  <meta name="theme-color" content="#00aff0" />
+  <link rel="apple-touch-icon" href="/assets/onlyboosts_pfp.png" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="OnlyBoosts" />
 
-  <!-- Open Graph. TODO(onlyboosts): add og:image once branding art exists. -->
+  <!-- Open Graph -->
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://onlyboosts.social/" />
   <meta property="og:title" content="OnlyBoosts — podcast boosts on Nostr" />
-  <meta property="og:description" content="Read boostagrams from across the podcasting-2.0 network — globally or filtered to who you follow — and boost back with Lightning." />
+  <meta property="og:description" content="Read the boostagrams flowing across the podcasting-2.0 network — globally or filtered to who you follow — and boost back with Lightning." />
   <meta property="og:site_name" content="OnlyBoosts" />
-  <meta name="twitter:card" content="summary" />
+  <meta property="og:image" content="https://onlyboosts.social/assets/onlyboosts_banner.png" />
+  <meta name="twitter:card" content="summary_large_image" />
 
   <!-- Self-hosted fonts. Variable WOFF2s — one file per family per
        style covers all needed weights. -->
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
+
+  <!-- Shared note / card styles (.note-card, .embed-note) — the boosts
+       feeds render through the same kind-1 card as boosts-thread.js. -->
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css" />
+  <!-- Action bar, toast, and zap-modal styles for the cards' reply /
+       like / repost / zap buttons (renderer reuses boost-actions.js). -->
+  <link rel="stylesheet" href="/assets/css/boost-actions.css" />
 
   <style>
     @font-face {
@@ -60,25 +70,68 @@
       src: url('/assets/fonts/source-serif-4.woff2') format('woff2');
     }
 
-    /* ── Reset & Base ── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { overflow-x: hidden; max-width: 100vw; }
 
-    /* Palette inherited from localbitcoiners. TODO(onlyboosts): retheme
-       once OnlyBoosts has its own visual identity. */
     :root {
-      --cream:   #f5eedc;
-      --cream-d: #ede3c8;
-      --navy:    #3a3125;
-      --green:   #5e7d3a;
-      --green-d: #46602c;
-      --orange:  #f7931a;
-      --orange-d:#d97b0e;
-      --text:    #2d2010;
-      --muted:   #6b5a3e;
-      --border:  #d4c4a0;
-      --white:   #fffdf7;
+      /* ── Brand ────────────────────────────────────────────────────
+         Sampled from assets/onlyboosts_pfp.png: the mark's cyan and the
+         darker blue of its broadcast waves. These two are the whole
+         identity — everything below is derived from them. */
+      --brand:    #00aff0;
+      --brand-d:  #068ace;
+      --brand-dd: #0a6fa8;
+
+      /* ── Legacy token aliases ─────────────────────────────────────
+         The shared stylesheets (nav.css, footer.css, boosts-thread.css,
+         boost-actions.css) were written against localbitcoiners' token
+         names and read them straight off :root. Rather than rename ~300
+         usages across five files, the old names are kept as aliases and
+         repointed at the OnlyBoosts palette here — so this block is the
+         single place the theme is defined. Names like --cream / --orange
+         are historical; trust the values, not the words. New code should
+         prefer --brand / --ink / --surface below. */
+      --cream:   #eef6fb;   /* page background      */
+      --cream-d: #e2eef7;   /* sunken background    */
+      --navy:    #0b3a52;   /* nav + footer bar     */
+      --navy-l:  #12455f;
+      --green:   #068ace;   /* link                 */
+      --green-d: #0a6fa8;   /* link, hover          */
+      --orange:  #00aff0;   /* primary action       */
+      --orange-d:#068ace;
+      --text:    #0f2733;
+      --muted:   #5a7488;
+      --border:  #cfe2ee;
+      --white:   #ffffff;
+      --bg:      #e2eef7;
+
+      /* Preferred names for anything written from here on. */
+      --ink:     #0f2733;
+      --surface: #ffffff;
+
+      /* ── Per-feed theme palette ──────────────────────────────────
+         Each of the four feeds owns an accent (used for its tab and the
+         active-panel wash). The four sit on one cyan→indigo ramp so the
+         tab row reads as a single system rather than four unrelated
+         colors. The active feed's trio is mirrored into --accent /
+         --accent-d / --tint by the [data-active-feed] rules below, so
+         the shared chrome can just read --accent. */
+      --bg-accent:   #00aff0;  --bg-accent-d:   #0090cc;  --bg-tint:   #e2f6fd;
+      --bf-accent:   #068ace;  --bf-accent-d:   #0570ab;  --bf-tint:   #e0f0fa;
+      --pg-accent:   #2f6bb5;  --pg-accent-d:   #255696;  --pg-tint:   #e7eefa;
+      --pf-accent:   #4a4f9e;  --pf-accent-d:   #3b3f80;  --pf-tint:   #eaebf7;
+
+      /* Defaults (Boosts · Global is the landing tab). */
+      --accent:   var(--bg-accent);
+      --accent-d: var(--bg-accent-d);
+      --tint:     var(--bg-tint);
     }
+
+    /* Active-feed → accent mapping. Set on <body data-active-feed>. */
+    body[data-active-feed="boosts-global"]    { --accent: var(--bg-accent); --accent-d: var(--bg-accent-d); --tint: var(--bg-tint); }
+    body[data-active-feed="boosts-follows"]   { --accent: var(--bf-accent); --accent-d: var(--bf-accent-d); --tint: var(--bf-tint); }
+    body[data-active-feed="podcasts-global"]  { --accent: var(--pg-accent); --accent-d: var(--pg-accent-d); --tint: var(--pg-tint); }
+    body[data-active-feed="podcasts-follows"] { --accent: var(--pf-accent); --accent-d: var(--pf-accent-d); --tint: var(--pf-tint); }
 
     html { scroll-behavior: smooth; }
 
@@ -88,72 +141,678 @@
       color: var(--text);
       line-height: 1.65;
       font-size: 17px;
+      color-scheme: light;
     }
-
     a { color: var(--green-d); text-decoration: underline; text-underline-offset: 3px; }
     img { display: block; max-width: 100%; }
 
-    main { max-width: 900px; margin: 0 auto; padding: 3rem 1.25rem 4rem; }
-
-    .hero { text-align: center; padding: 2rem 0 3rem; }
-    .hero h1 {
-      font-family: 'Playfair Display', Georgia, serif;
-      font-size: clamp(2.25rem, 7vw, 3.5rem);
-      line-height: 1.1;
-      color: var(--navy);
-      margin-bottom: 1rem;
+    @keyframes skeleton-shimmer {
+      0% { background-position: 100% 0; }
+      100% { background-position: -100% 0; }
     }
-    .hero p {
-      font-size: 1.15rem;
-      color: var(--muted);
-      max-width: 34rem;
+
+    /* ── Masthead ────────────────────────────────────────────────────
+       Wordmark banner sits above the sticky tab row. It scrolls away;
+       the tabs are what stays pinned. */
+    .masthead {
+      background: var(--white);
+      border-bottom: 1px solid var(--border);
+      padding: 1.4rem 1.25rem 1.2rem;
+      text-align: center;
+    }
+    .masthead img {
+      width: 100%;
+      max-width: 330px;
+      height: auto;
       margin: 0 auto;
     }
-
-    .feed-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
-      gap: 1rem;
-      margin-top: 2.5rem;
+    .masthead p {
+      margin: 0.5rem auto 0;
+      max-width: 34rem;
+      font-size: 0.98rem;
+      color: var(--muted);
+      line-height: 1.5;
     }
-    .feed-card {
-      display: block;
+    @media (max-width: 640px) {
+      .masthead { padding: 1rem 1rem 0.9rem; }
+      .masthead img { max-width: 240px; }
+      .masthead p { font-size: 0.9rem; }
+    }
+    /* ── Page header ── */
+    .page-header {
+      background: var(--navy);
+      color: var(--cream);
+      padding: 2.75rem 1.5rem 2.25rem;
+      text-align: center;
+    }
+    .page-header h1 {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: clamp(1.8rem, 4vw, 2.6rem);
+      font-weight: 700;
+      color: var(--white);
+      line-height: 1.2;
+    }
+    .page-header p {
+      max-width: 640px;
+      margin: 0.6rem auto 0;
+      font-size: clamp(0.95rem, 2vw, 1.1rem);
+      color: var(--cream);
+      font-style: italic;
+    }
+
+    /* ── Feed tabs ──────────────────────────────────────────────────
+       Desktop: a row of four equal-width tabs, each carrying its own
+       feed color. The active tab fills with its accent; inactive tabs
+       show a colored icon + a thin colored top rule. The whole bar is
+       sticky under the nav so the tabs stay reachable while scrolling
+       a long feed.
+       Mobile: the bar collapses into a horizontally-scrollable row of
+       colored chips (icon + short name). */
+    .feed-tabs-wrap {
+      position: sticky;
+      top: 64px; /* height of #top-nav */
+      z-index: 40;
+      background: var(--cream);
+      border-bottom: 1px solid var(--border);
+    }
+    .feed-tabs {
+      max-width: 1000px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0;
+    }
+    .feed-tab {
+      --tab: var(--muted);
+      appearance: none;
+      background: transparent;
+      border: 0;
+      border-top: 3px solid transparent;
+      font: inherit;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.35rem;
+      padding: 0.95rem 0.75rem 0.85rem;
+      color: var(--muted);
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    /* Per-tab accent. Must stay AFTER the `.feed-tab { --tab: var(--muted) }`
+       default above — same specificity, so source order decides. */
+    .feed-tab--boosts-global    { --tab: var(--bg-accent); }
+    .feed-tab--boosts-follows   { --tab: var(--bf-accent); }
+    .feed-tab--podcasts-global  { --tab: var(--pg-accent); }
+    .feed-tab--podcasts-follows { --tab: var(--pf-accent); }
+
+    .feed-tab-icon {
+      width: 26px;
+      height: 26px;
+      color: var(--tab);
+      transition: color 0.15s;
+    }
+    .feed-tab-icon svg { width: 100%; height: 100%; display: block; }
+    .feed-tab-label {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-weight: 700;
+      font-size: 1rem;
+      letter-spacing: 0.01em;
+    }
+    .feed-tab-sub {
+      font-size: 0.72rem;
+      color: var(--muted);
+      opacity: 0.85;
+    }
+    .feed-tab:hover { background: rgba(0,0,0,0.03); }
+    .feed-tab:focus-visible {
+      outline: 2px solid var(--tab);
+      outline-offset: -2px;
+    }
+    .feed-tab[aria-selected="true"] {
+      background: var(--tab);
+      border-top-color: var(--tab);
+      color: var(--white);
+    }
+    .feed-tab[aria-selected="true"] .feed-tab-icon,
+    .feed-tab[aria-selected="true"] .feed-tab-sub { color: #fff; opacity: 0.95; }
+
+    /* ── Panels ── */
+    .feed-panels {
+      background: var(--tint);
+      transition: background 0.25s ease;
+      min-height: 60vh;
+    }
+    .feed-panels-inner {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 2rem 1.25rem 3rem;
+    }
+    .feed-panel { display: none; }
+    .feed-panel.is-active { display: block; }
+
+    /* Panel intro row — feed name + a short "what am I looking at" line,
+       plus a right-aligned live count once feeds hydrate. */
+    .feed-panel-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+    }
+    .feed-panel-head h2 {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--accent-d);
+    }
+    .feed-panel-head p {
+      margin-top: 0.15rem;
+      font-size: 0.9rem;
+      color: var(--muted);
+      font-style: italic;
+    }
+    .feed-count {
+      flex-shrink: 0;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--accent-d);
       background: var(--white);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 1.25rem 1.35rem;
-      text-decoration: none;
-      color: inherit;
-      transition: transform .12s ease, box-shadow .12s ease;
+      border-radius: 999px;
+      padding: 0.15rem 0.7rem;
+      white-space: nowrap;
     }
-    .feed-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 18px rgba(58, 49, 37, 0.12);
-      color: inherit;
-    }
-    .feed-card .icon { font-size: 1.6rem; display: block; margin-bottom: .5rem; }
-    .feed-card h2 {
-      font-family: 'Playfair Display', Georgia, serif;
-      font-size: 1.2rem;
-      color: var(--navy);
-      margin-bottom: .3rem;
-    }
-    .feed-card p { font-size: .95rem; color: var(--muted); line-height: 1.5; }
 
-    .scaffold-note {
-      margin-top: 3rem;
-      padding: 1rem 1.25rem;
-      border-left: 3px solid var(--orange);
-      background: var(--cream-d);
-      border-radius: 0 8px 8px 0;
-      font-size: .95rem;
+    /* Loading skeletons + states (feed content wired up in a later phase). */
+    .feed-list { display: grid; gap: 0.6rem; }
+    /* The shared .embed-note card carries its own vertical margin; drop it
+       inside a feed list so the grid gap is the only spacing between cards. */
+    .feed-list .embed-note { margin: 0; }
+    .feed-skeleton {
+      height: 104px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: linear-gradient(90deg,
+        rgba(0,0,0,0.03) 0%,
+        rgba(0,0,0,0.08) 50%,
+        rgba(0,0,0,0.03) 100%);
+      background-size: 200% 100%;
+      animation: skeleton-shimmer 1.4s ease-in-out infinite;
+    }
+    .feed-placeholder {
+      background: var(--white);
+      border: 1px dashed var(--border);
+      border-radius: 12px;
+      padding: 2.25rem 1.5rem;
+      text-align: center;
       color: var(--muted);
+    }
+    .feed-placeholder strong {
+      display: block;
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 1.1rem;
+      color: var(--accent-d);
+      margin-bottom: 0.35rem;
+    }
+
+    /* Collapsed "Past events / older posts" section under a feed's list. */
+    .feed-past {
+      margin-top: 1.75rem;
+      border-top: 1px solid var(--border);
+      padding-top: 1.1rem;
+    }
+    .feed-past > summary {
+      cursor: pointer;
+      list-style: none;
+      user-select: none;
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-family: 'Playfair Display', Georgia, serif;
+      font-weight: 700;
+      font-size: 1.05rem;
+      color: var(--accent-d);
+      padding: 0.3rem 0;
+    }
+    .feed-past > summary::-webkit-details-marker { display: none; }
+    .feed-past > summary::marker { content: ''; }
+    .feed-past > summary::before {
+      content: '▸';
+      font-size: 0.85em;
+      transition: transform 0.15s;
+    }
+    .feed-past[open] > summary::before { transform: rotate(90deg); }
+    .feed-past .feed-list { margin-top: 1rem; }
+
+    /* ── Podcast Boosts cards ─────────────────────────────────────────
+       Episodes the community has boosted on Nostr. The card head shows the
+       art, show name, the episode title (a link to the Fountain episode), a
+       meta row of booster avatars / recency / sats, and a ⋮ menu of
+       show-level subscribe links. A low-profile drawer bar under the head
+       toggles the inline boost thread. Rendered by feeds-podcasts.js. */
+    /* Air-date range buttons + sort dropdown in the panel head (they replace
+       the episode-count pill). */
+    .pcast-controls {
+      display: flex; align-items: center; gap: 0.5rem;
+      flex-shrink: 0; align-self: center;
+    }
+    /* 1W / 1M / All — deliberately borderless and touching: the faint tint on
+       the selected segment is the only chrome, and it's what reveals that the
+       neighbours are buttons with the same footprint. */
+    .pcast-range { display: flex; flex-shrink: 0; }
+    .pcast-range-btn {
+      /* Near-square: the min-width and the vertical padding are tuned to land
+         the box at roughly 32x30, so the three read as one tight block. */
+      min-width: 2rem; padding: 0.5rem 0.35rem;
+      font: inherit; font-size: 0.72rem; font-weight: 700; line-height: 1.2;
+      color: var(--muted); background: transparent;
+      border: none; border-radius: 6px; cursor: pointer;
+      transition: background 0.12s, color 0.12s;
+    }
+    /* Tint of the active feed's accent. The solid --tint is the fallback for
+       engines without color-mix; it lands in the same place visually. */
+    .pcast-range-btn:hover {
+      color: var(--accent-d);
+      background: var(--tint);
+      background: color-mix(in srgb, var(--accent) 7%, transparent);
+    }
+    .pcast-range-btn.is-active {
+      color: var(--accent-d);
+      background: var(--tint);
+      background: color-mix(in srgb, var(--accent) 14%, transparent);
+    }
+
+    .pcast-sort { position: relative; flex-shrink: 0; align-self: center; }
+    .pcast-sort-btn {
+      display: inline-flex; align-items: center; gap: 0.25rem;
+      padding: 0.3rem 0.7rem; font: inherit; font-size: 0.78rem; font-weight: 600;
+      color: var(--text); background: var(--white);
+      border: 1px solid var(--border); border-radius: 999px; cursor: pointer;
+      white-space: nowrap; transition: border-color 0.12s, background 0.12s;
+    }
+    .pcast-sort-btn:hover { border-color: var(--accent); background: var(--tint); }
+    .pcast-sort-tag { color: var(--muted); }
+    .pcast-sort-cur { color: var(--accent-d); font-weight: 700; }
+    .pcast-sort-caret { color: var(--muted); font-size: 0.85em; }
+    .pcast-sort-menu {
+      position: absolute; top: calc(100% + 4px); right: 0; z-index: 6;
+      min-width: 175px; background: var(--white);
+      border: 1px solid var(--border); border-radius: 10px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.18); padding: 0.35rem;
+    }
+    .pcast-sort-menu[hidden] { display: none; }
+    .pcast-sort-item {
+      display: block; width: 100%; text-align: left;
+      padding: 0.45rem 0.6rem; font: inherit; font-size: 0.85rem; font-weight: 600;
+      color: var(--text); background: transparent; border: none; border-radius: 6px; cursor: pointer;
+    }
+    .pcast-sort-item:hover { background: var(--tint); color: var(--accent-d); }
+    .pcast-sort-item.is-active { color: var(--accent-d); background: var(--tint); }
+    .pcast-sort-item.is-active::after { content: ' ✓'; float: right; }
+    /* Events type dropdown — squarer corners than the podcast sort pill. */
+    .feed-type-sort .pcast-sort-btn { border-radius: 7px; }
+    .feed-type-sort .pcast-sort-menu { border-radius: 8px; }
+
+    /* minmax(0,1fr) — without the 0 min, a grid item's min-width is its
+       content, so long shownotes/URLs would blow the column (and card) far
+       wider than the container. */
+    .pcast-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.6rem; }
+    .pcast-card {
+      min-width: 0;
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      /* No overflow:hidden here — it would clip the ⋮ subscribe dropdown when
+         it opens past the bottom of the card. The media clips its own corners,
+         and the drawer rounds its bottom corners when it's the last child. */
+      transition: box-shadow 0.12s, border-color 0.12s;
+    }
+    .pcast-card:hover { box-shadow: 0 6px 18px rgba(0,0,0,0.08); }
+    .pcast-card.is-open { border-color: var(--accent); box-shadow: 0 6px 18px rgba(0,0,0,0.10); }
+    .pcast-card-head {
+      display: flex;
+      gap: 0.7rem;
+      align-items: flex-start;
+      /* tight right padding so the ⋮ menu hugs the corner */
+      padding: 0.7rem 0.4rem 0.5rem 0.7rem;
+    }
+    .pcast-card-media {
+      display: block; /* also correct when the media is an <a> link */
+      flex-shrink: 0;
+      width: 68px; height: 68px;
+      border-radius: 8px; overflow: hidden;
+      background: var(--tint);
+    }
+    a.pcast-card-media { cursor: pointer; }
+    a.pcast-card-media:hover { box-shadow: 0 0 0 2px var(--podcasts-accent); }
+    .pcast-card-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .pcast-card-media--none {
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.7rem; opacity: 0.55;
+    }
+    .pcast-card-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; justify-content: center; }
+    .pcast-show {
+      font-size: 0.72rem; font-weight: 700; letter-spacing: 0.02em;
+      text-transform: uppercase; color: var(--accent-d);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    a.pcast-show-link { text-decoration: none; cursor: pointer; display: block; }
+    a.pcast-show-link:hover { text-decoration: underline; }
+    .pcast-title {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 0.98rem; font-weight: 700; line-height: 1.25; color: var(--text);
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .pcast-meta {
+      display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;
+      margin-top: 0.25rem; font-size: 0.78rem; color: var(--muted);
+    }
+
+    /* Shownotes teaser (first ~2 lines) + a links row ("see full description"
+       and a compact "Listen on Fountain") beneath it. */
+    .pcast-desc {
+      margin: 0.35rem 0 0; font-size: 0.82rem; line-height: 1.4; color: var(--muted);
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+      overflow-wrap: anywhere; word-break: break-word;
+    }
+    .pcast-links { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.35rem; }
+    .pcast-fountain-link {
+      font-size: 0.78rem; font-weight: 700; color: var(--accent-d); text-decoration: none; white-space: nowrap;
+    }
+    .pcast-fountain-link:hover { text-decoration: underline; }
+
+    /* Inline audio player. */
+    .pcast-player-row { padding: 0.1rem 0.7rem 0.2rem; }
+    .pcast-player { width: 100%; display: block; }
+
+    /* Download + Boost action buttons. */
+    .pcast-card-buttons {
+      display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+      padding: 0.4rem 0.7rem 0.65rem;
+    }
+    .pcast-btn {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      padding: 0.5rem 0.95rem;
+      font: inherit; font-size: 0.85rem; font-weight: 700;
+      border: 1px solid transparent; border-radius: 999px; cursor: pointer;
+      transition: background 0.12s, border-color 0.12s, color 0.12s;
+    }
+    .pcast-btn-boost { color: #fff; background: #f7931a; border-color: #f7931a; }
+    .pcast-btn-boost:hover { background: #d97b0e; border-color: #d97b0e; }
+    .pcast-btn-bolt { display: inline-flex; width: 15px; height: 15px; }
+    .pcast-btn-bolt svg { width: 100%; height: 100%; display: block; }
+    .pcast-btn-download { color: var(--accent-d); background: var(--white); border-color: var(--border); }
+    .pcast-btn-download:hover { background: var(--tint); border-color: var(--accent); }
+    .pcast-btn-download:disabled { opacity: 0.6; cursor: default; }
+    .pcast-dot { opacity: 0.6; }
+    .pcast-sats { font-weight: 700; color: var(--accent-d); white-space: nowrap; }
+    .pcast-bolt { font-size: 0.85em; }
+
+    /* Avatars — stacked on cards, single on modal rows. Size via --pcast-av. */
+    .pcast-avatars { display: inline-flex; align-items: center; }
+    .pcast-avatars .pcast-avatar + .pcast-avatar { margin-left: -8px; }
+    .pcast-avatar {
+      width: var(--pcast-av, 26px); height: var(--pcast-av, 26px);
+      border-radius: 50%; object-fit: cover; flex-shrink: 0;
+      border: 2px solid var(--white); background: var(--tint);
+      box-sizing: border-box;
+    }
+    .pcast-avatar--none {
+      display: inline-flex; align-items: center; justify-content: center;
+      background: var(--cream-d); color: var(--muted);
+      font-size: 0.6rem; font-weight: 700;
+    }
+    .pcast-avatar.is-interactive { cursor: pointer; }
+    .pcast-avatar.is-interactive:hover { border-color: var(--accent); }
+    .pcast-avatar.is-interactive:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+    .pcast-more-wrap { display: flex; justify-content: center; margin-top: 1.1rem; }
+    .pcast-more-group { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; }
+    .pcast-more-count { font-size: 0.75rem; color: var(--muted); }
+    .pcast-showmore {
+      padding: 0.5rem 1.4rem;
+      font: inherit; font-size: 0.85rem; font-weight: 700;
+      color: var(--accent-d); background: var(--white);
+      border: 1px solid var(--border); border-radius: 999px; cursor: pointer;
+      transition: background 0.12s, border-color 0.12s;
+    }
+    .pcast-showmore:hover { background: var(--tint); border-color: var(--accent); }
+
+    /* Episode title links out to the Fountain episode. */
+    .pcast-title-link { color: var(--text); text-decoration: none; }
+    .pcast-title-link:hover { color: var(--accent-d); text-decoration: underline; }
+
+    /* Media column: episode art with the air date tucked directly beneath it. */
+    .pcast-media-col { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; flex-shrink: 0; }
+    .pcast-card-aired { font-size: 0.66rem; color: var(--muted); white-space: nowrap; text-align: center; }
+
+    /* ⋮ subscribe menu on the card head (top-right) — show-level app links. */
+    .pcast-cardmenu { position: relative; flex-shrink: 0; align-self: flex-start; }
+    .pcast-cardmenu-btn {
+      width: 30px; height: 30px; border-radius: 50%;
+      border: none; background: transparent; color: var(--muted); cursor: pointer;
+      font-size: 1.2rem; line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .pcast-cardmenu-btn:hover { background: var(--tint); color: var(--text); }
+    .pcast-cardmenu-menu {
+      position: absolute; top: 34px; right: 0; z-index: 6;
+      min-width: 190px;
+      background: var(--white);
+      border: 1px solid var(--border); border-radius: 10px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+      padding: 0.35rem;
+    }
+    .pcast-cardmenu-menu[hidden] { display: none; }
+    .pcast-cardmenu-label {
+      padding: 0.4rem 0.6rem 0.25rem;
+      font-size: 0.66rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.05em; color: var(--muted);
+    }
+    .pcast-cardmenu-item {
+      display: block; padding: 0.45rem 0.6rem;
+      font-size: 0.85rem; font-weight: 600; color: var(--text);
+      text-decoration: none; border-radius: 6px;
+    }
+    .pcast-cardmenu-item:hover { background: var(--tint); color: var(--accent-d); }
+
+    /* ── Boost drawer — a low-profile full-width toggle under the head. ── */
+    .pcast-drawer {
+      display: flex; align-items: center; gap: 0.4rem; width: 100%;
+      padding: 0.45rem 0.7rem 0.5rem;
+      font: inherit; font-size: 0.78rem; font-weight: 600;
+      color: var(--muted); background: transparent;
+      border: none; border-top: 1px solid var(--border);
+      cursor: pointer; text-align: left;
+      transition: color 0.12s, background 0.12s;
+    }
+    .pcast-drawer:hover { color: var(--accent-d); background: rgba(0,0,0,0.02); }
+    .pcast-drawer:last-child { border-radius: 0 0 10px 10px; }
+    .pcast-drawer-caret { font-size: 0.85em; transition: transform 0.18s; }
+    /* Booster faces + total sats, sitting just after the "N boosts" label. */
+    .pcast-drawer-meta { display: inline-flex; align-items: center; gap: 0.5rem; }
+    .pcast-drawer-meta .pcast-sats { font-weight: 700; color: var(--accent-d); white-space: nowrap; }
+    .pcast-card.is-open .pcast-drawer > .pcast-drawer-caret { transform: rotate(180deg); }
+
+    /* "Hide boosts" control at the bottom of a card's thread. */
+    .pcast-drawer-close {
+      justify-self: start;
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      padding: 0.35rem 0;
+      font: inherit; font-size: 0.8rem; font-weight: 700;
+      color: var(--muted); background: transparent; border: none; cursor: pointer;
+    }
+    .pcast-drawer-close:hover { text-decoration: underline; color: var(--accent-d); }
+
+    /* Thread footer: "see all boosts" (Boost Me Bitch) on the left, hide on the right. */
+    .pcast-details-foot {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 0.75rem; flex-wrap: wrap;
+    }
+    .pcast-seeall {
+      font-size: 0.8rem; font-weight: 700; color: var(--accent-d); text-decoration: none;
+    }
+    .pcast-seeall:hover { text-decoration: underline; }
+
+    /* ── Inline boost details — indented under the card like a child/thread,
+       marked by a left accent rule and kept tight vertically. ── */
+    .pcast-details {
+      display: grid; gap: 0.6rem;
+      margin: 0 0.7rem 0.85rem 3.3rem;
+      padding: 0.15rem 0 0.15rem 0.95rem;
+      border-left: 2px solid var(--accent);
+    }
+    .pcast-details[hidden] { display: none; }
+    .pcast-boost { border-top: 1px solid var(--border); padding-top: 0.6rem; }
+    .pcast-boost:first-child { border-top: none; padding-top: 0; }
+    .pcast-boost-head { display: flex; align-items: center; gap: 0.55rem; }
+    .pcast-boost-who { min-width: 0; flex: 1; display: flex; flex-direction: column; }
+    .pcast-boost-name {
+      align-self: flex-start;
+      font: inherit; font-size: 0.9rem; font-weight: 700; color: var(--text);
+      background: transparent; border: none; padding: 0; cursor: pointer;
+      max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .pcast-boost-name:hover { color: var(--accent-d); text-decoration: underline; }
+    .pcast-boost-when { font-size: 0.74rem; color: var(--muted); }
+    .pcast-boost-sats { flex-shrink: 0; font-size: 0.88rem; font-weight: 700; color: var(--accent-d); white-space: nowrap; }
+    .pcast-boost-msg {
+      margin-top: 0.3rem; font-size: 0.88rem; line-height: 1.35; color: var(--text);
+      white-space: pre-wrap; word-break: break-word;
+    }
+    .pcast-boost-msg a { color: var(--accent-d); }
+    /* Shared reply/repost/like/zap bar (boost-actions.css) under each comment —
+       scoped-down here: no divider line, smaller + tighter than the boosts page. */
+    .pcast-boost .note-actions {
+      margin-top: 0.15rem; padding-top: 0; border-top: none; gap: 0.05rem;
+    }
+    .pcast-boost .note-actions button { font-size: 0.72rem; padding: 0.2rem 0.4rem; gap: 0.25rem; }
+    .pcast-boost .note-actions .lb-icon { font-size: 0.82rem; }
+
+    /* Per-boost ⋮ overflow menu */
+    .pcast-more { position: relative; flex-shrink: 0; }
+    .pcast-more-btn {
+      width: 30px; height: 30px; border-radius: 50%;
+      border: none; background: transparent; color: var(--muted); cursor: pointer;
+      font-size: 1.1rem; line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .pcast-more-btn:hover { background: var(--tint); color: var(--text); }
+    .pcast-more-menu {
+      position: absolute; top: 34px; right: 0; z-index: 5;
+      min-width: 160px;
+      background: var(--white);
+      border: 1px solid var(--border); border-radius: 10px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+      padding: 0.35rem;
+    }
+    .pcast-more-menu[hidden] { display: none; }
+    .pcast-more-item {
+      display: block; width: 100%; box-sizing: border-box; text-align: left;
+      padding: 0.45rem 0.6rem; font: inherit; font-size: 0.85rem; color: var(--text);
+      background: transparent; border: none; border-radius: 6px; cursor: pointer;
+    }
+    .pcast-more-item:hover { background: var(--tint); }
+
+    /* Copy toast */
+    .pcast-toast {
+      position: fixed; left: 50%; bottom: 1.5rem; transform: translate(-50%, 1rem);
+      z-index: 1100;
+      background: var(--text, #1e160a); color: #fff;
+      padding: 0.55rem 1.1rem; border-radius: 999px;
+      font-size: 0.85rem; font-weight: 600;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.18s, transform 0.18s;
+    }
+    .pcast-toast.is-visible { opacity: 1; transform: translate(-50%, 0); }
+    .pcast-toast.is-error { background: #9b2c2c; }
+
+    /* ── Shared feed toggle pill (panel head) ─────────────────────────
+       A default-off switch that widens a feed. Carried over from LB unused
+       — kept because the Follows feeds will likely want one ("include
+       boosts from follows-of-follows"). Accent is contextual via
+       body[data-active-feed]. */
+    .feed-toggle {
+      display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer;
+      user-select: none;
+    }
+    .feed-toggle-input {
+      position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none;
+    }
+    .feed-toggle-track {
+      position: relative; flex-shrink: 0;
+      width: 38px; height: 22px; border-radius: 999px;
+      background: var(--border); transition: background 0.15s;
+    }
+    .feed-toggle-thumb {
+      position: absolute; top: 2px; left: 2px;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: var(--white); box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+      transition: transform 0.15s;
+    }
+    .feed-toggle-input:checked + .feed-toggle-track { background: var(--accent); }
+    .feed-toggle-input:checked + .feed-toggle-track .feed-toggle-thumb { transform: translateX(16px); }
+    .feed-toggle-input:focus-visible + .feed-toggle-track { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .feed-toggle-label { font-size: 0.82rem; font-weight: 600; color: var(--text); white-space: nowrap; }
+
+    /* ── Mobile: tabs become a scrollable chip row ── */
+    @media (max-width: 640px) {
+      .feed-tabs-wrap { top: 56px; } /* nav shrinks on mobile */
+      /* Icon-only chips that all fit across the row (no horizontal scroll). */
+      .feed-tabs {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.5rem;
+        padding: 0.6rem 0.85rem;
+      }
+      .feed-tab {
+        flex-direction: row;
+        justify-content: center;
+        gap: 0;
+        border-top: 0;
+        border: 1px solid var(--tab);
+        border-radius: 999px;
+        padding: 0.5rem 0;
+        color: var(--tab);
+      }
+      .feed-tab { gap: 0.35rem; padding: 0.45rem 0; }
+      .feed-tab-icon { width: 17px; height: 17px; flex-shrink: 0; }
+      /* Hide the family label visually but keep it for screen readers (the
+         icon is aria-hidden, so label + sub are the tab's accessible name). */
+      .feed-tab-label {
+        position: absolute;
+        width: 1px; height: 1px;
+        padding: 0; margin: -1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+        border: 0;
+      }
+      .feed-tab-sub {
+        font-size: 0.75rem;
+        font-weight: 600;
+        opacity: 1;
+        color: inherit;
+      }
+      .feed-tab[aria-selected="true"] { border-color: var(--tab); }
+      .feed-panels-inner { padding: 1.5rem 1rem 2.5rem; }
+      /* Shallower child indent on narrow screens. */
+      .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
+      /* Let a long panel title and its controls wrap rather than squeeze. */
+      .feed-panel-head { flex-wrap: wrap; align-items: flex-start; }
+      /* Podcast Boosts: the title block is too wide to share a row here, so the
+         range buttons + sort pill wrap onto their own line together. Left-
+         aligned they'd sit at the panel's left edge, and the sort menu's
+         right-anchored popover (min-width 175px) would open past the left edge
+         of the screen — so pin the group right. */
+      .pcast-controls { margin-left: auto; }
     }
   </style>
   <link rel="stylesheet" href="/assets/css/nav.css" />
   <link rel="stylesheet" href="/assets/css/footer.css" />
 </head>
-<body>
+<body data-active-feed="boosts-global">
 
 <!-- NAV:START (generated by scripts/sync-partials.js — edit the partial) -->
 <!-- ══════════════════════════════ NAV ══════════════════════════════
@@ -163,6 +822,9 @@
      Styles live in /assets/css/nav.css; behavior in /assets/js/nav.js. -->
 <header id="top-nav">
   <div class="nav-inner">
+    <a class="nav-logo" href="/" aria-label="OnlyBoosts home">
+      <img src="/assets/onlyboosts_pfp.png" alt="" />
+    </a>
     <a class="nav-site-name" href="/">OnlyBoosts</a>
     <nav aria-label="Main navigation">
       <!-- Single "Explore" menu = the whole site map. Grouped dropdown on
@@ -182,13 +844,13 @@
           <div class="nav-explore-groups">
             <div class="nav-explore-group">
               <h4>Boosts</h4>
-              <a href="/feeds#boosts-global"><span aria-hidden="true">⚡</span> Global Boosts</a>
-              <a href="/feeds#boosts-follows"><span aria-hidden="true">👥</span> Follows Boosts</a>
+              <a href="/#boosts-global"><span aria-hidden="true">⚡</span> Global Boosts</a>
+              <a href="/#boosts-follows"><span aria-hidden="true">👥</span> Follows Boosts</a>
             </div>
             <div class="nav-explore-group">
               <h4>Podcasts</h4>
-              <a href="/feeds#podcasts-global"><span aria-hidden="true">🎧</span> Global Podcasts</a>
-              <a href="/feeds#podcasts-follows"><span aria-hidden="true">🎙</span> Follows Podcasts</a>
+              <a href="/#podcasts-global"><span aria-hidden="true">🎧</span> Global Podcasts</a>
+              <a href="/#podcasts-follows"><span aria-hidden="true">🎙</span> Follows Podcasts</a>
             </div>
             <div class="nav-explore-group">
               <h4>More</h4>
@@ -222,44 +884,175 @@
 </header>
 <!-- NAV:END -->
 
-<main>
-  <section class="hero">
-    <h1>OnlyBoosts</h1>
-    <p>
-      Podcast boosts, as a Nostr feed. Read the boostagrams flowing across the
-      whole podcasting-2.0 network — or just the ones from people you follow —
-      and boost back with Lightning.
-    </p>
-  </section>
+<!-- ══════════════════════════════ MASTHEAD ══════════════════════════════ -->
+<div class="masthead">
+  <img src="/assets/onlyboosts_banner.png" alt="OnlyBoosts" width="1200" height="400" />
+  <p>Podcast boosts, as a Nostr feed. Read the boostagrams flowing across the
+     podcasting&#8209;2.0 network, then boost back with Lightning.</p>
+</div>
 
-  <div class="feed-grid">
-    <a class="feed-card" href="/feeds#boosts-global">
-      <span class="icon" aria-hidden="true">⚡</span>
-      <h2>Global Boosts</h2>
-      <p>Every podcast boost we can find on Nostr, newest first.</p>
-    </a>
-    <a class="feed-card" href="/feeds#boosts-follows">
-      <span class="icon" aria-hidden="true">👥</span>
-      <h2>Follows Boosts</h2>
-      <p>The same wall, narrowed to the npubs you follow.</p>
-    </a>
-    <a class="feed-card" href="/feeds#podcasts-global">
-      <span class="icon" aria-hidden="true">🎧</span>
-      <h2>Global Podcasts</h2>
-      <p>Shows and episodes ranked by the boosts they're pulling in.</p>
-    </a>
-    <a class="feed-card" href="/feeds#podcasts-follows">
-      <span class="icon" aria-hidden="true">🎙</span>
-      <h2>Follows Podcasts</h2>
-      <p>What the people you follow are actually listening to.</p>
-    </a>
+<!-- ══════════════════════════════ TABS ══════════════════════════════
+     Four feeds on two axes: what (boosts / podcasts) x whose (everyone /
+     the npubs you follow). The label carries the "what", the sub-label
+     the "whose" — so the row reads as two pairs rather than four
+     unrelated destinations. -->
+<div class="feed-tabs-wrap">
+  <div class="feed-tabs" role="tablist" aria-label="Boost feeds">
+
+    <button
+      type="button"
+      class="feed-tab feed-tab--boosts-global"
+      role="tab"
+      id="tab-boosts-global"
+      aria-controls="panel-boosts-global"
+      aria-selected="true"
+      data-feed="boosts-global"
+    >
+      <span class="feed-tab-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd"/>
+        </svg>
+      </span>
+      <span class="feed-tab-label">Boosts</span>
+      <span class="feed-tab-sub">Global</span>
+    </button>
+
+    <button
+      type="button"
+      class="feed-tab feed-tab--boosts-follows"
+      role="tab"
+      id="tab-boosts-follows"
+      aria-controls="panel-boosts-follows"
+      aria-selected="false"
+      data-feed="boosts-follows"
+    >
+      <span class="feed-tab-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd"/>
+        </svg>
+      </span>
+      <span class="feed-tab-label">Boosts</span>
+      <span class="feed-tab-sub">Follows</span>
+    </button>
+
+    <button
+      type="button"
+      class="feed-tab feed-tab--podcasts-global"
+      role="tab"
+      id="tab-podcasts-global"
+      aria-controls="panel-podcasts-global"
+      aria-selected="false"
+      data-feed="podcasts-global"
+    >
+      <span class="feed-tab-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="2" width="6" height="12" rx="3"/>
+          <path d="M5 10a7 7 0 0 0 14 0"/>
+          <line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/>
+        </svg>
+      </span>
+      <span class="feed-tab-label">Podcasts</span>
+      <span class="feed-tab-sub">Global</span>
+    </button>
+
+    <button
+      type="button"
+      class="feed-tab feed-tab--podcasts-follows"
+      role="tab"
+      id="tab-podcasts-follows"
+      aria-controls="panel-podcasts-follows"
+      aria-selected="false"
+      data-feed="podcasts-follows"
+    >
+      <span class="feed-tab-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="2" width="6" height="12" rx="3"/>
+          <path d="M5 10a7 7 0 0 0 14 0"/>
+          <line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/>
+        </svg>
+      </span>
+      <span class="feed-tab-label">Podcasts</span>
+      <span class="feed-tab-sub">Follows</span>
+    </button>
+
   </div>
+</div>
 
-  <p class="scaffold-note">
-    <strong>Scaffold.</strong> This page is a placeholder landing built on the
-    forked localbitcoiners chrome. The four feeds above are not wired up yet —
-    see <code>CLAUDE.md</code> for what's still to build.
-  </p>
+<!-- ══════════════════════════════ PANELS ══════════════════════════════
+     The two Boosts panels render the kind-1 boost note itself, through the
+     same card renderer as localbitcoiners' boost wall (boosts-thread.js →
+     renderChildCards). The two Podcasts panels render the episode-level
+     rollup, through the podcast-boost card (feeds-podcasts.js). Global vs
+     Follows is a filter over the same data in both cases — Follows narrows
+     to the signed-in user's kind-3 contact list. -->
+<main class="feed-panels">
+  <div class="feed-panels-inner">
+
+    <section class="feed-panel is-active" id="panel-boosts-global" role="tabpanel" aria-labelledby="tab-boosts-global" data-feed="boosts-global" data-source="community-boosts" data-scope="global" data-render="notes" tabindex="0">
+      <div class="feed-panel-head">
+        <div>
+          <h2>Boosts</h2>
+          <p>Every podcast boost we can find on Nostr, newest first</p>
+        </div>
+        <span class="feed-count" hidden></span>
+      </div>
+      <div class="feed-list" data-feed-list>
+        <div class="feed-placeholder">
+          <strong>Global boosts feed coming online</strong>
+          The layout is ready — boost notes load here once the snapshot loader lands.
+        </div>
+      </div>
+    </section>
+
+    <section class="feed-panel" id="panel-boosts-follows" role="tabpanel" aria-labelledby="tab-boosts-follows" data-feed="boosts-follows" data-source="community-boosts" data-scope="follows" data-render="notes" tabindex="0" hidden>
+      <div class="feed-panel-head">
+        <div>
+          <h2>Boosts from your follows</h2>
+          <p>The same wall, narrowed to the npubs you follow</p>
+        </div>
+        <span class="feed-count" hidden></span>
+      </div>
+      <div class="feed-list" data-feed-list>
+        <div class="feed-placeholder">
+          <strong>Sign in to see this feed</strong>
+          Follows feeds read your kind&#8209;3 contact list, so they need a signed-in npub.
+        </div>
+      </div>
+    </section>
+
+    <section class="feed-panel" id="panel-podcasts-global" role="tabpanel" aria-labelledby="tab-podcasts-global" data-feed="podcasts-global" data-source="community-boosts" data-scope="global" data-render="episodes" tabindex="0" hidden>
+      <div class="feed-panel-head">
+        <div>
+          <h2>Podcasts</h2>
+          <p>Shows and episodes ranked by the boosts they're pulling in</p>
+        </div>
+        <span class="feed-count" hidden></span>
+      </div>
+      <div class="feed-list" data-feed-list>
+        <div class="feed-placeholder">
+          <strong>Global podcasts feed coming online</strong>
+          The layout is ready — boosted episodes load here once the snapshot loader lands.
+        </div>
+      </div>
+    </section>
+
+    <section class="feed-panel" id="panel-podcasts-follows" role="tabpanel" aria-labelledby="tab-podcasts-follows" data-feed="podcasts-follows" data-source="community-boosts" data-scope="follows" data-render="episodes" tabindex="0" hidden>
+      <div class="feed-panel-head">
+        <div>
+          <h2>Podcasts your follows boost</h2>
+          <p>What the people you follow are actually listening to</p>
+        </div>
+        <span class="feed-count" hidden></span>
+      </div>
+      <div class="feed-list" data-feed-list>
+        <div class="feed-placeholder">
+          <strong>Sign in to see this feed</strong>
+          Follows feeds read your kind&#8209;3 contact list, so they need a signed-in npub.
+        </div>
+      </div>
+    </section>
+
+  </div>
 </main>
 
 <!-- FOOTER:START (generated by scripts/sync-partials.js — edit the partial) -->
@@ -279,10 +1072,10 @@
     <div class="footer-col">
       <h3>Feeds</h3>
       <ul>
-        <li><a href="/feeds#boosts-global">⚡ Global Boosts</a></li>
-        <li><a href="/feeds#boosts-follows">👥 Follows Boosts</a></li>
-        <li><a href="/feeds#podcasts-global">🎧 Global Podcasts</a></li>
-        <li><a href="/feeds#podcasts-follows">🎙 Follows Podcasts</a></li>
+        <li><a href="/#boosts-global">⚡ Global Boosts</a></li>
+        <li><a href="/#boosts-follows">👥 Follows Boosts</a></li>
+        <li><a href="/#podcasts-global">🎧 Global Podcasts</a></li>
+        <li><a href="/#podcasts-follows">🎙 Follows Podcasts</a></li>
       </ul>
     </div>
 
@@ -301,13 +1094,181 @@
 </footer>
 <!-- FOOTER:END -->
 
-<!-- Login / boost / bug-report widget (shared) -->
-<script src="/assets/widgets/login-widget.js" defer></script>
+<!-- ══════════════════════════════ TAB CONTROLLER ══════════════════════════════ -->
+<script>
+(function () {
+  'use strict';
+  const FEEDS = ['boosts-global', 'boosts-follows', 'podcasts-global', 'podcasts-follows'];
+  const DEFAULT_FEED = 'boosts-global';
+  const tablist = document.querySelector('.feed-tabs');
+  if (!tablist) return;
+  const tabs = Array.from(tablist.querySelectorAll('[role="tab"]'));
+
+  function panelFor(feed) { return document.getElementById('panel-' + feed); }
+
+  function activate(feed, { focus = false, updateHash = true } = {}) {
+    if (!FEEDS.includes(feed)) feed = DEFAULT_FEED;
+    document.body.setAttribute('data-active-feed', feed);
+    tabs.forEach((tab) => {
+      const isActive = tab.dataset.feed === feed;
+      tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+      tab.tabIndex = isActive ? 0 : -1;
+      const panel = panelFor(tab.dataset.feed);
+      if (panel) {
+        panel.classList.toggle('is-active', isActive);
+        panel.hidden = !isActive;
+      }
+      if (isActive && focus) tab.focus();
+    });
+    if (updateHash && ('#' + feed) !== location.hash) {
+      history.replaceState(null, '', '#' + feed);
+    }
+    // Tell feeds.js (if loaded) to lazily hydrate this feed on first view.
+    document.dispatchEvent(new CustomEvent('lb:feed-activate', { detail: { feed } }));
+  }
+
+  tabs.forEach((tab) => {
+    tab.addEventListener('click', () => activate(tab.dataset.feed));
+  });
+
+  // Roving-tabindex arrow-key navigation across the tablist.
+  tablist.addEventListener('keydown', (e) => {
+    const idx = tabs.findIndex((t) => t.dataset.feed === document.body.dataset.activeFeed);
+    if (idx < 0) return;
+    let next = null;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (idx + 1) % tabs.length;
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = (idx - 1 + tabs.length) % tabs.length;
+    else if (e.key === 'Home') next = 0;
+    else if (e.key === 'End') next = tabs.length - 1;
+    if (next === null) return;
+    e.preventDefault();
+    activate(tabs[next].dataset.feed, { focus: true });
+  });
+
+  window.addEventListener('hashchange', () => {
+    activate((location.hash || '').replace('#', ''), { updateHash: false });
+  });
+
+  // Deep-link support: /#podcasts-global lands on the Podcasts · Global tab.
+  const initial = (location.hash || '').replace('#', '');
+  activate(FEEDS.includes(initial) ? initial : DEFAULT_FEED, { updateHash: false });
+})();
+</script>
+
+<!-- ───────────────── NOSTR LOGIN WIDGET (lazy) ─────────────────
+     The ~1MB bundle is deferred until a returning user's session restore
+     or a nav boost / sign-in click actually needs it. -->
+<script>
+(function () {
+  'use strict';
+
+  // Shares one promise (window.__lbWidgetLoad) with every other trigger on
+  // this page — assets/js/widget-loader.js for the module-side callers,
+  // nav.js for the bug-report item. This page has the most competing
+  // triggers of any, and the bundle is 1MB: without a shared promise, a
+  // podcast-boost click (which awaits /api/value before injecting) racing a
+  // nav Boost click appends a second <script> for a bundle already in flight.
+  // The HTTP cache serves that duplicate, but the ~1MB parse+execute is paid
+  // twice — on the click where the user is waiting on the modal. Keep this in
+  // sync with widget-loader.js.
+  function ensureWidgetLoaded() {
+    if (window.LBLogin) return Promise.resolve();
+    if (window.__lbWidgetLoad) return window.__lbWidgetLoad;
+
+    window.__lbWidgetLoad = new Promise((resolve, reject) => {
+      const existing = document.querySelector('script[src*="login-widget.js"]');
+      if (existing) {
+        const started = Date.now();
+        const iv = setInterval(() => {
+          if (window.LBLogin) { clearInterval(iv); resolve(); return; }
+          if (Date.now() - started > 15000) {
+            clearInterval(iv);
+            window.__lbWidgetLoad = null;
+            reject(new Error('login widget load timed out'));
+          }
+        }, 60);
+        return;
+      }
+      const s = document.createElement('script');
+      s.src = 'assets/widgets/login-widget.js';
+      s.async = true;
+      s.onload = () => { Promise.resolve().then(resolve); };
+      s.onerror = () => {
+        window.__lbWidgetLoad = null;
+        reject(new Error('Failed to load login widget'));
+      };
+      document.head.appendChild(s);
+    });
+    return window.__lbWidgetLoad;
+  }
+
+  const boostPh = document.querySelector('[data-lb-boost-trigger="show"]');
+  if (boostPh) {
+    boostPh.addEventListener('click', async () => {
+      boostPh.disabled = true;
+      const long = boostPh.querySelector('.lb-label-long');
+      const short = boostPh.querySelector('.lb-label-short');
+      const prevLong = long ? long.textContent : '';
+      const prevShort = short ? short.textContent : '';
+      if (long) long.textContent = 'Loading…';
+      if (short) short.textContent = '…';
+      try {
+        await ensureWidgetLoaded();
+        if (window.LBLogin?.openShowBoost) window.LBLogin.openShowBoost();
+      } catch (e) {
+        if (long) long.textContent = prevLong;
+        if (short) short.textContent = prevShort;
+        boostPh.disabled = false;
+        console.error('[lb] widget load failed', e);
+      }
+    });
+  }
+
+  const identitySlot = document.getElementById('lb-identity-slot');
+  function renderIdentitySignIn() {
+    if (!identitySlot) return;
+    identitySlot.innerHTML =
+      '<button type="button" class="lb-identity-placeholder" aria-label="Sign in with Nostr">Sign in</button>';
+    const btn = identitySlot.querySelector('button');
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      const prev = btn.textContent;
+      btn.textContent = '…';
+      try {
+        await ensureWidgetLoaded();
+        if (window.LBLogin?.requestLogin) window.LBLogin.requestLogin();
+      } catch (e) {
+        btn.textContent = prev;
+        btn.disabled = false;
+        console.error('[lb] widget load failed', e);
+      }
+    });
+  }
+  if (identitySlot) {
+    let hasSession = false;
+    try { hasSession = !!localStorage.getItem('lb_nostr_session'); } catch {}
+    if (hasSession) {
+      identitySlot.innerHTML = '<div class="lb-identity-restoring" aria-label="Loading account"></div>';
+      ensureWidgetLoaded().catch((e) => {
+        console.warn('[lb] eager widget load failed', e);
+        renderIdentitySignIn();
+      });
+    } else {
+      renderIdentitySignIn();
+    }
+  }
+})();
+</script>
 
 <!-- PWA service worker -->
 <script src="/assets/js/sw-register.js" defer></script>
+
+<!-- PWA install affordance -->
 <script src="/assets/widgets/pwa-install.js" defer></script>
 
+<!-- Feed hydration — lazily loads the active feed on first view. -->
+<script type="module" src="/assets/js/feeds.js"></script>
 <script src="/assets/js/nav.js" defer></script>
+
 </body>
 </html>
