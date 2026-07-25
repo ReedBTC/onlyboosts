@@ -39,6 +39,7 @@ from classify import classify_boost, decode_note_or_nevent, _QUOTE_RE  # noqa: E
 from relays import CORE_RELAYS, PROFILE_RELAYS, RECEIPT_RELAYS, expand_via_outbox  # noqa: E402
 from scan import (scan_relay_backward, scan_relay_incremental,   # noqa: E402
                   fetch_events_by_ids)
+from collector_common import query_relay                        # noqa: E402
 from nostr_utils import load_config                             # noqa: E402
 
 DB_PATH = str(HERE / "data" / "onlyboosts.db")
@@ -269,6 +270,54 @@ def cmd_outbox(args):
     _print_stats(conn)
 
 
+# ── targeted re-scan of one feed ──────────────────────────────────────────────
+def cmd_rescan(args):
+    """Re-fetch one feed's kind-1 notes by its NIP-73 podcast:guid tag and
+    re-classify with the current rules. Use after a classifier change or once a
+    client starts tagging correctly. Dedup leaves already-stored boosts untouched;
+    only newly-classifiable notes are added."""
+    conn = db.connect(DB_PATH, check_same_thread=False)
+    i_val = f"podcast:guid:{args.feed}"
+    now = int(time.time())
+    log = lambda m: print(m, flush=True)
+    relays = args.relays or CORE_RELAYS
+    log(f"Re-scanning {i_val} across {len(relays)} relays back to "
+        f"{time.strftime('%Y-%m-%d', time.gmtime(args.floor))}")
+
+    seen = {}
+    for relay in relays:
+        cursor, pages = now, 0
+        while cursor > args.floor:
+            page = query_relay(relay, {"kinds": [1], "#i": [i_val],
+                                       "until": cursor, "limit": 500},
+                               max_wall_seconds=45)
+            pages += 1
+            if not page:
+                break
+            for ev in page:
+                if ev.get("id"):
+                    seen[ev["id"]] = ev
+            oldest = min(ev.get("created_at", cursor) for ev in page)
+            if oldest >= cursor or len(page) < 500:
+                break
+            cursor = oldest - 1
+        log(f"  {relay}: {pages} page(s)")
+    events = list(seen.values())
+    log(f"fetched {len(events)} distinct kind-1 notes tagged {i_val}")
+
+    receipt_cache = {}
+    cand = _candidate_receipt_ids(events)
+    fetched = fetch_events_by_ids(list(cand), RECEIPT_RELAYS)
+    for c in cand:
+        receipt_cache[c] = fetched.get(c)
+    boosts = [b for b in (classify_boost(ev, receipt_cache,
+                          receipt_fetch=lambda cid: receipt_cache.get(cid))
+                          for ev in events) if b]
+    new = db.upsert_boosts(conn, boosts)
+    log(f"{len(boosts)} classified as boosts, {new} NEW rows added")
+    _print_stats(conn)
+
+
 # ── enrichment ────────────────────────────────────────────────────────────────
 def cmd_enrich(args):
     conn = db.connect(DB_PATH, check_same_thread=False)
@@ -402,6 +451,12 @@ def main():
     o.add_argument("--refresh", action="store_true",
                    help="force re-resolve the outbox relay set (ignore the cache)")
     o.set_defaults(func=cmd_outbox)
+
+    rs = sub.add_parser("rescan", help="re-fetch + re-classify one feed's notes by podcast:guid")
+    rs.add_argument("--feed", required=True, help="the feed's podcast:guid value")
+    rs.add_argument("--floor", type=int, default=FLOOR_2025)
+    rs.add_argument("--relays", nargs="*")
+    rs.set_defaults(func=cmd_rescan)
 
     e = sub.add_parser("enrich", help="Podcast Index + profile enrichment")
     e.set_defaults(func=cmd_enrich)

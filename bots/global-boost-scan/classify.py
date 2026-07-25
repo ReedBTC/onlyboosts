@@ -27,6 +27,31 @@ _QUOTE_RE = re.compile(
     r'(?:nostr:)?(?<!\w)(note1[02-9ac-hj-np-z]+|nevent1[02-9ac-hj-np-z]+)',
     re.IGNORECASE)
 
+# Topic tags that signal a note is a boost. `boost` is here for clients (e.g. the
+# localbitcoiners.com website widget) that tag t=boost rather than t=boostagram.
+BOOST_TOPIC_TAGS = {"boostagram", "value4value", "boost"}
+
+# Some clients put the sats amount only in the note text (no amount tag, no zap
+# receipt). Prefer a number sitting next to "boost"/⚡; fall back to any "N sats".
+_SATS_NEAR = re.compile(r'(?:boost\w*|⚡)[^\d]{0,6}([\d][\d,]{0,15})\s*sats', re.IGNORECASE)
+_SATS_ANY = re.compile(r'([\d][\d,]{0,15})\s*sats\b', re.IGNORECASE)
+
+
+def parse_content_sats(content):
+    """Best-effort integer sats parsed from a boost note's text, or None."""
+    if not content:
+        return None
+    for rx in (_SATS_NEAR, _SATS_ANY):
+        m = rx.search(content)
+        if m:
+            try:
+                v = int(m.group(1).replace(",", ""))
+                if v > 0:
+                    return v
+            except ValueError:
+                pass
+    return None
+
 
 # ── Fountain trailer stripping (copied verbatim from boost_formatter) ─────────
 _FOUNTAIN_TRAILER_RE = re.compile(
@@ -149,7 +174,7 @@ def classify_boost(event, receipt_cache, receipt_fetch=None):
     t_vals = {t[1] for t in tags if len(t) >= 2 and t[0] == "t"}
     amount_msats = None
     amount_source = None
-    is_boost = bool(t_vals & {"boostagram", "value4value"})
+    is_boost = bool(t_vals & BOOST_TOPIC_TAGS)
     if is_boost:
         amount_source = "t_tag"
 
@@ -179,6 +204,13 @@ def classify_boost(event, receipt_cache, receipt_fetch=None):
                 if v:
                     amount_msats, amount_source = v, "zap_receipt"
                 break
+
+    # Last-resort amount: a boost-tagged note whose sats live only in its text
+    # (localbitcoiners.com website widget: t=boost, no amount tag, no receipt).
+    if is_boost and amount_msats is None:
+        sats = parse_content_sats(event.get("content", "") or "")
+        if sats:
+            amount_msats, amount_source = sats * 1000, "content"
 
     if not is_boost:
         return None
