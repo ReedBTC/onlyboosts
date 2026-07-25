@@ -50,3 +50,7 @@ scratchpad/
 # dashboard; this file is the machine-local equivalent and is a real secret.
 .dev.vars
 .dev.vars.*
+wrangler.toml
+
+# OnlyBoosts collector: SQLite index, exported shards, logs — machine-local
+bots/**/data/
