@@ -1,35 +1,29 @@
 /* Boosts feed — the note-level view behind the two Boosts tabs.
  *
- * Where feeds-podcasts.js rolls the snapshot up *by episode* (one card per
- * episode, boosts nested inside), this renders the boosts themselves: one card
- * per kind-1 boost note, newest first. Same snapshot, different axis.
+ * One card per kind-1 boost note, newest first. The Podcasts tabs render the
+ * same data rolled up by show; this renders the boosts themselves.
  *
- * On the note shape: the snapshot carries each boost's identity and content
- * (event_id / booster_pubkey / created_at / message / sats) but not the signed
- * event. That's enough — the card only needs those fields, and reply / repost
- * / like / zap only need id + pubkey. We deliberately do NOT synthesize a
- * fake event object and pass it around as if it were real; the projection
- * below is named for what it is and never leaves this module except as the
- * minimal {id, pubkey, kind, content, created_at, tags} the action bar wants.
+ * Data comes from ob-data.js: latest.json for the first page, then month
+ * archives from the manifest for paging back. Booster names and avatars are
+ * embedded in each record, so unlike the old LB feed there is no profile
+ * round-trip and nothing to repaint — the first paint is the final one.
  *
- * Global vs Follows is a filter over the same rows — see follow-set.js.
+ * On the note shape: the feed carries each boost's identity and content
+ * (id / booster.pk / ts / msg / sats) but not the signed event. That's
+ * enough — the card needs only those fields, and reply / repost / like / zap
+ * need only id + pubkey. The object handed to buildActionBar below is a
+ * projection, not a verified event; don't pass it anywhere that assumes one.
  */
-import {
-  parseSegments,
-  renderSegmentsInto,
-  fetchProfilesFromPrimal,
-  setCachedProfile,
-  getCachedProfile,
-} from '/assets/js/boosts-thread.js'
 import { buildActionBar, configureBoostActions } from '/assets/js/boost-actions.js'
+import { parseSegments, renderSegmentsInto } from '/assets/js/boosts-thread.js'
 import { ensureLoginWidget } from '/assets/js/widget-loader.js'
 import { resolveFollows } from '/assets/js/follow-set.js'
+import {
+  getLatestBoosts, getBoostMonths, getBoostMonth, boosterLabel,
+} from '/assets/js/ob-data.js'
 
-const API_URL = '/api/community-boosts'
 const PAGE_SIZE = 30
-const PROFILE_CHUNK = 80   // Primal user_infos drops results on larger batches
 
-// ── tiny DOM helper (same shape as feeds-podcasts.js's) ───────────────
 function h(tag, attrs = {}, kids = []) {
   const el = document.createElement(tag)
   for (const [k, v] of Object.entries(attrs)) {
@@ -76,101 +70,71 @@ function renderPlaceholder(list, title, body) {
   ]))
 }
 
-// ── snapshot → renderable rows ────────────────────────────────────────
-// Keeps only rows with the identity fields a card and its action bar need.
-// A row missing event_id or booster_pubkey can't be replied to or linked, so
-// it's dropped rather than rendered as a dead-end card.
-function buildRows(data) {
-  const boosts = Array.isArray(data?.boosts) ? data.boosts : []
-  const episodes = (data?.episodes && typeof data.episodes === 'object') ? data.episodes : {}
-  const shows = (data?.shows && typeof data.shows === 'object') ? data.shows : {}
-
-  const rows = []
-  for (const b of boosts) {
-    if (!b?.event_id || !b?.booster_pubkey) continue
-    if (!Number.isFinite(b.created_at)) continue
-    rows.push({
-      id: String(b.event_id).toLowerCase(),
-      pubkey: String(b.booster_pubkey).toLowerCase(),
-      created_at: b.created_at,
-      message: typeof b.message === 'string' ? b.message : '',
-      sats: Number.isFinite(b.sats) ? b.sats : 0,
-      episode: episodes[b.item_guid] || null,
-      show: shows[b.podcast_guid] || null,
-      itemUrl: isSafeUrl(b.item_url) ? b.item_url : null,
-      showUrl: isSafeUrl(b.show_url) ? b.show_url : null,
-    })
-  }
-  // Newest first. The snapshot's own order isn't guaranteed — it's appended to
-  // hourly by the collector, and episodes/shows get deduped across runs.
-  rows.sort((a, b) => b.created_at - a.created_at)
-  return rows
-}
-
 // ── card ──────────────────────────────────────────────────────────────
-// Structure mirrors boosts-thread.js#renderNoteCard so the shared .note-card
-// CSS applies, plus a boost-meta row (sats + what was boosted) that a plain
-// kind-1 card has no concept of. Not calling renderNoteCard directly: it
-// caches cards by event id and appends the action bar itself, so appending
-// our meta row afterwards would double up on a cached repaint.
-function renderBoostCard(row) {
-  const profile = getCachedProfile(row.pubkey)
+// Mirrors boosts-thread.js#renderNoteCard's structure so the shared
+// .note-card CSS applies, plus a boost-meta row (sats + what was boosted)
+// that a plain kind-1 card has no concept of. Not calling renderNoteCard
+// directly: it caches by event id and appends its own action bar, so our
+// meta row would double up on a cached repaint.
+function renderBoostCard(b) {
+  // Avatar falls back to the show art before the generic placeholder — for a
+  // booster with no kind-0 picture, the podcast they boosted is more
+  // informative than an anonymous silhouette.
+  const avatar = (isSafeUrl(b.booster.pic) && b.booster.pic)
+    || (isSafeUrl(b.podcast.img) && b.podcast.img)
+    || '/assets/avatar-fallback.svg'
 
   const img = h('img', { alt: '', referrerpolicy: 'no-referrer' })
-  img.src = profile?.picture || '/assets/avatar-fallback.svg'
+  img.src = avatar
   img.onerror = () => { img.src = '/assets/avatar-fallback.svg' }
 
   const nameWrap = h('div', { class: 'note-author-name-wrap' }, [
-    h('span', { class: 'author-name', text: profile?.name || (row.pubkey.slice(0, 8) + '…') }),
-    profile?.nip05 ? h('span', { class: 'author-handle', text: profile.nip05 }) : null,
+    h('span', { class: 'author-name', text: boosterLabel(b.booster) }),
   ])
 
   const time = h('time', {
-    datetime: new Date(row.created_at * 1000).toISOString(),
-    title: new Date(row.created_at * 1000).toLocaleString(),
-    text: relTime(row.created_at),
+    datetime: new Date(b.ts * 1000).toISOString(),
+    title: new Date(b.ts * 1000).toLocaleString(),
+    text: relTime(b.ts),
   })
 
   const card = h('article', { class: 'note-card' }, [
     h('div', { class: 'note-author' }, [img, nameWrap, time]),
   ])
 
-  // What was boosted. The episode title links out to the listening URL; the
-  // show name is context. Both are optional — the collector can know about a
-  // boost before Podcast Index has resolved its episode.
-  const epTitle = row.episode?.title || ''
-  const showTitle = row.show?.title || ''
-  if (epTitle || showTitle || row.sats > 0) {
-    const bits = []
-    if (row.sats > 0) {
-      bits.push(h('span', { class: 'ob-boost-sats' }, [
-        fmtSats(row.sats), h('span', { class: 'ob-bolt', 'aria-hidden': 'true', text: '⚡' }),
-      ]))
-    }
-    if (epTitle) {
-      bits.push(row.itemUrl
-        ? h('a', { class: 'ob-boost-ep', href: row.itemUrl, target: '_blank', rel: 'noopener noreferrer', text: epTitle })
-        : h('span', { class: 'ob-boost-ep', text: epTitle }))
-    }
-    if (showTitle) bits.push(h('span', { class: 'ob-boost-show', text: showTitle }))
-    card.appendChild(h('div', { class: 'ob-boost-meta' }, bits))
+  // What was boosted. Every part is optional: podcast.guid is null on ~2% of
+  // rows and episode.title on ~11%, so the row renders whatever it has and
+  // is skipped entirely when it has nothing.
+  const bits = []
+  if (b.sats > 0) {
+    bits.push(h('span', { class: 'ob-boost-sats' }, [
+      fmtSats(b.sats), h('span', { class: 'ob-bolt', 'aria-hidden': 'true', text: '⚡' }),
+    ]))
   }
+  if (b.episode.title) {
+    bits.push(isSafeUrl(b.episode.url)
+      ? h('a', {
+          class: 'ob-boost-ep', href: b.episode.url,
+          target: '_blank', rel: 'noopener noreferrer', text: b.episode.title,
+        })
+      : h('span', { class: 'ob-boost-ep', text: b.episode.title }))
+  }
+  if (b.podcast.title) bits.push(h('span', { class: 'ob-boost-show', text: b.podcast.title }))
+  if (bits.length) card.appendChild(h('div', { class: 'ob-boost-meta' }, bits))
 
-  const msg = (row.message || '').trim()
-  if (msg) {
+  if (b.msg) {
     const body = h('div', { class: 'note-body' })
     // Shared tokenizer: nostr: mentions → chips, URLs → links, rest as text.
+    // msg is verbatim from the boosting client and routinely contains both.
     // inEmbed keeps a quoted note as a chip rather than firing an embed fetch
-    // for every card in a 30-card page.
-    renderSegmentsInto(body, parseSegments(msg), { inEmbed: true })
+    // for every card on the page.
+    renderSegmentsInto(body, parseSegments(b.msg), { inEmbed: true })
     card.appendChild(body)
   }
 
-  // Reply / repost / like / zap. The boost IS a kind-1 note, so id + pubkey is
-  // all these need — same projection feeds-podcasts.js uses.
   const ev = {
-    id: row.id, pubkey: row.pubkey, kind: 1,
-    content: row.message || '', created_at: row.created_at, tags: [],
+    id: b.id, pubkey: b.booster.pk, kind: 1,
+    content: b.msg || '', created_at: b.ts, tags: [],
   }
   try { card.appendChild(buildActionBar(ev, card)) }
   catch (e) { console.warn('[boosts] action bar failed', e) }
@@ -178,28 +142,16 @@ function renderBoostCard(row) {
   return card
 }
 
-// ── profiles ──────────────────────────────────────────────────────────
-async function loadProfiles(pubkeys) {
-  const unique = [...new Set(pubkeys)].filter((pk) => !getCachedProfile(pk))
-  for (let i = 0; i < unique.length; i += PROFILE_CHUNK) {
-    try {
-      const got = await fetchProfilesFromPrimal(unique.slice(i, i + PROFILE_CHUNK))
-      for (const [pk, prof] of got) setCachedProfile(pk, prof)
-    } catch { /* this chunk degrades to a truncated pubkey + fallback avatar */ }
-  }
-}
-
 // ── entry point ───────────────────────────────────────────────────────
 /**
- * @param {object}   opts
- * @param {Element}  opts.list   the [data-feed-list] container to fill
- * @param {string}   opts.scope  'global' | 'follows'
+ * @param {Element} opts.list   the [data-feed-list] container to fill
+ * @param {string}  opts.scope  'global' | 'follows'
  */
 export async function renderBoosts({ list, scope = 'global' }) {
   if (!list) return
 
   // Resolve the audience first — a signed-out Follows tab should say so
-  // rather than download a 1.4MB snapshot it can't filter.
+  // rather than download a 1MB shard it can't filter.
   let follows = null
   if (scope === 'follows') {
     const res = await resolveFollows()
@@ -221,11 +173,9 @@ export async function renderBoosts({ list, scope = 'global' }) {
     follows = new Set(res.follows)
   }
 
-  let data
+  let all, months
   try {
-    const resp = await fetch(API_URL, { headers: { Accept: 'application/json' } })
-    if (!resp.ok) throw new Error('HTTP ' + resp.status)
-    data = await resp.json()
+    ;[all, months] = await Promise.all([getLatestBoosts(), getBoostMonths()])
   } catch (e) {
     console.error('[boosts] fetch failed', e)
     renderPlaceholder(list, 'Couldn’t load boosts',
@@ -233,23 +183,20 @@ export async function renderBoosts({ list, scope = 'global' }) {
     return
   }
 
-  let rows = buildRows(data)
-  if (follows) rows = rows.filter((r) => follows.has(r.pubkey))
+  const match = (b) => !follows || follows.has(b.booster.pk)
+  let rows = all.filter(match)
+  // Month archives already covered by latest.json. latest.json is the most
+  // recent ~1,000 boosts regardless of month, so the newest archive overlaps
+  // it — dedupe by id when pulling more in rather than trusting boundaries.
+  const seen = new Set(all.map((b) => b.id))
+  let monthIdx = 0
 
-  if (!rows.length) {
-    if (follows) {
-      renderPlaceholder(list, 'No boosts from your follows yet',
-        ' Nobody you follow has boosted a podcast on Nostr in this snapshot. The Global tab shows everyone.')
-    } else {
-      renderPlaceholder(list, 'No boosts yet',
-        ' When someone boosts a podcast episode on Nostr, it’ll show up here.')
-    }
+  if (!rows.length && !months.length) {
+    renderPlaceholder(list, 'No boosts yet',
+      ' When someone boosts a podcast episode on Nostr, it’ll show up here.')
     return
   }
 
-  // Pre-warm the boost widget once the feed is up so the first Reply/Zap click
-  // doesn't pay the cold-start cost. Deferred so it can't compete with first
-  // paint. Same pattern as feeds-podcasts.js.
   setTimeout(() => {
     ensureLoginWidget()
       .then(() => { try { configureBoostActions({}) } catch {} })
@@ -260,34 +207,93 @@ export async function renderBoosts({ list, scope = 'global' }) {
   const moreWrap = h('div', { class: 'pcast-more-wrap' })
   let shown = 0
 
-  function renderMore() {
-    const slice = rows.slice(shown, shown + PAGE_SIZE)
-    for (const row of slice) cards.appendChild(renderBoostCard(row))
-    shown += slice.length
-
-    moreWrap.replaceChildren()
-    if (shown < rows.length) {
-      moreWrap.appendChild(h('button', {
-        class: 'pcast-showmore', type: 'button',
-        onclick: () => renderMore(),
-      }, `Show more (${rows.length - shown} left)`))
+  // Pull older months until we have something to show. A Follows feed can
+  // legitimately match nothing in the most recent 1,000 boosts while having
+  // plenty further back, so "no results" must mean "we looked", not "the
+  // first page was empty".
+  async function pullOlder() {
+    while (monthIdx < months.length) {
+      const m = months[monthIdx++]
+      let batch
+      try {
+        batch = await getBoostMonth(m.file)
+      } catch (e) {
+        console.warn('[boosts] month load failed', m.file, e)
+        continue
+      }
+      let added = 0
+      for (const b of batch) {
+        if (seen.has(b.id)) continue
+        seen.add(b.id)
+        if (!match(b)) continue
+        rows.push(b)
+        added++
+      }
+      if (added) {
+        rows.sort((a, b) => b.ts - a.ts)
+        return true
+      }
     }
+    return false
+  }
 
-    // Names and avatars enrich the cards but shouldn't gate first paint:
-    // render with truncated pubkeys, then repaint this page once profiles land.
-    loadProfiles(slice.map((r) => r.pubkey)).then(() => {
-      const repainted = h('div', { class: 'ob-boost-list' })
-      for (const row of rows.slice(0, shown)) repainted.appendChild(renderBoostCard(row))
-      cards.replaceChildren(...repainted.childNodes)
+  function paintMore() {
+    const slice = rows.slice(shown, shown + PAGE_SIZE)
+    for (const b of slice) cards.appendChild(renderBoostCard(b))
+    shown += slice.length
+    updateMoreButton()
+  }
+
+  function updateMoreButton() {
+    moreWrap.replaceChildren()
+    const remaining = rows.length - shown
+    const canPage = remaining > 0 || monthIdx < months.length
+    if (!canPage) return
+    const label = remaining > 0
+      ? `Show more (${remaining} loaded)`
+      : `Load older boosts (${months[monthIdx].month})`
+    const btn = h('button', { class: 'pcast-showmore', type: 'button' }, label)
+    btn.addEventListener('click', async () => {
+      if (remaining > 0) { paintMore(); return }
+      btn.disabled = true
+      btn.textContent = 'Loading…'
+      const got = await pullOlder()
+      if (got) paintMore()
+      else updateMoreButton()
     })
+    moreWrap.appendChild(btn)
   }
 
   list.replaceChildren(cards, moreWrap)
-  renderMore()
+
+  if (!rows.length) {
+    // Nothing in the recent page — go looking before declaring it empty.
+    const spinner = h('div', { class: 'feed-placeholder' }, [
+      h('strong', { text: 'Looking further back…' }),
+      ' No matches in the most recent boosts, checking the archives.',
+    ])
+    list.replaceChildren(spinner)
+    const got = await pullOlder()
+    if (!got) {
+      renderPlaceholder(list,
+        follows ? 'No boosts from your follows yet' : 'No boosts yet',
+        follows
+          ? ' Nobody you follow has boosted a podcast on Nostr yet. The Global tab shows everyone.'
+          : ' When someone boosts a podcast episode on Nostr, it’ll show up here.')
+      return
+    }
+    list.replaceChildren(cards, moreWrap)
+  }
+
+  paintMore()
 
   const count = list.closest('.feed-panel')?.querySelector('.feed-count')
   if (count) {
-    count.textContent = `${rows.length} boost${rows.length === 1 ? '' : 's'}`
+    // Deliberately "N+" while archives remain unread — the number is what
+    // we've loaded, not the feed's total, and claiming otherwise would be a
+    // lie that shrinks as you page.
+    const more = monthIdx < months.length ? '+' : ''
+    count.textContent = `${rows.length}${more} boost${rows.length === 1 ? '' : 's'}`
     count.hidden = false
   }
 }

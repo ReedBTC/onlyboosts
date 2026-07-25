@@ -4,9 +4,9 @@
  * kind-3 contact list, resolved by follow-set.js.
  *
  * All four tabs have loaders (see LOADERS at the bottom); each lazy-imports
- * its renderer on first view. Both renderers read the same pre-computed
- * /api/community-boosts snapshot — boosts-feed.js renders the boost notes
- * themselves, feeds-podcasts.js rolls them up by episode.
+ * its renderer on first view. Both read the collector's published feed
+ * through ob-data.js (/api/data/*) — boosts-feed.js renders the boost notes
+ * themselves, podcasts-feed.js the per-show rollup.
  *
  * The Events / Marketplace / Articles tabs and their modules were removed on
  * fork. What's left of the Events path below — loadEvents, the supporter-set
@@ -1023,73 +1023,34 @@ async function loadEvents() {
   }
 }
 
-// ── Boosts tabs ──────────────────────────────────────────────────────
-// One card per kind-1 boost note. Lazy-imported on first view.
-async function loadBoosts(panelId, scope) {
+// ── Feed loaders ─────────────────────────────────────────────────────
+// Both renderers read the collector's published feed through ob-data.js.
+// Lazy-imported on first view so a visitor who only opens one tab doesn't
+// pay for the other's module.
+async function hydrate(panelId, mod, scope) {
   const panel = document.getElementById(panelId)
   if (!panel) return
   const list = panel.querySelector('[data-feed-list]')
   if (!list) return
   showSkeletons(list)
   try {
-    const mod = await import('/assets/js/boosts-feed.js')
-    await mod.renderBoosts({ list, scope })
+    const m = await import(mod)
+    if (mod.includes('boosts-feed')) await m.renderBoosts({ list, scope })
+    else await m.renderPodcasts({ list, scope })
   } catch (e) {
-    console.error('[feeds] boosts load failed', e)
-    renderPlaceholder(list, 'Couldn\u2019t load boosts', 'Something went wrong reaching the boosts feed \u2014 please try again later.')
-  }
-}
-
-// ── Podcasts tabs ────────────────────────────────────────────────────
-// The episode rollup over the same snapshot. Not a live relay subscription:
-// it reads the pre-computed /api/community-boosts file, so there's no relay
-// resolution here — hand the panel to the module and let it fetch.
-//
-// The Follows variant resolves the viewer's kind-3 contact list first and
-// passes a row-level predicate down, so the rollup is computed from only
-// those boosts (see the note on boostFilter in feeds-podcasts.js).
-async function loadPodcasts(panelId = 'panel-podcasts-global', scope = 'global') {
-  const panel = document.getElementById(panelId)
-  if (!panel) return
-  const list = panel.querySelector('[data-feed-list]')
-  if (!list) return
-  showSkeletons(list)
-
-  let boostFilter = null
-  if (scope === 'follows') {
-    const { resolveFollows } = await import('/assets/js/follow-set.js')
-    const res = await resolveFollows()
-    if (res.status === 'signed-out') {
-      renderPlaceholder(list, 'Sign in to see this feed', 'Follows feeds read your kind-3 contact list, so they need a signed-in npub.')
-      return
-    }
-    if (res.status === 'unavailable') {
-      renderPlaceholder(list, 'Couldn\u2019t load your follow list', 'We couldn\u2019t reach a relay holding your kind-3 contact list \u2014 please try again later.')
-      return
-    }
-    if (res.status === 'empty') {
-      renderPlaceholder(list, 'You\u2019re not following anyone yet', 'Follow some npubs in any Nostr client and the podcasts they boost will show up here.')
-      return
-    }
-    const follows = new Set(res.follows)
-    boostFilter = (b) => follows.has(String(b?.booster_pubkey || '').toLowerCase())
-  }
-
-  try {
-    const mod = await import('/assets/js/feeds-podcasts.js')
-    await mod.renderPodcasts({ panel, list, boostFilter })
-  } catch (e) {
-    console.error('[feeds] podcast boosts load failed', e)
-    renderPlaceholder(list, 'Couldn\u2019t load podcast boosts', 'Something went wrong reaching the boosts feed \u2014 please try again later.')
+    console.error('[feeds] load failed', mod, scope, e)
+    renderPlaceholder(list, 'Couldn\u2019t load this feed', 'Something went wrong reaching the boosts data \u2014 please try again later.')
   }
 }
 
 // ── Lazy per-feed dispatch ───────────────────────────────────────────
+const BOOSTS = '/assets/js/boosts-feed.js'
+const PODCASTS = '/assets/js/podcasts-feed.js'
 const LOADERS = {
-  'boosts-global':     () => loadBoosts('panel-boosts-global', 'global'),
-  'boosts-follows':    () => loadBoosts('panel-boosts-follows', 'follows'),
-  'podcasts-global':   () => loadPodcasts('panel-podcasts-global', 'global'),
-  'podcasts-follows':  () => loadPodcasts('panel-podcasts-follows', 'follows'),
+  'boosts-global':    () => hydrate('panel-boosts-global', BOOSTS, 'global'),
+  'boosts-follows':   () => hydrate('panel-boosts-follows', BOOSTS, 'follows'),
+  'podcasts-global':  () => hydrate('panel-podcasts-global', PODCASTS, 'global'),
+  'podcasts-follows': () => hydrate('panel-podcasts-follows', PODCASTS, 'follows'),
 }
 const loaded = new Set()
 

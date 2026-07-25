@@ -20,10 +20,13 @@ Four feeds:
 ## How it works
 
 Unlike a general-purpose Nostr client, OnlyBoosts doesn't fan out to relays
-on page load. A collector bot does the expensive network-wide scan on a
-timer, classifies which kind-1 notes are genuinely podcast boosts, enriches
-them from the Podcast Index, and writes a JSON snapshot to a VPS. The site
-reads that one cached file through a Cloudflare Pages Function.
+on page load. A collector does the expensive network-wide scan on a timer,
+classifies which kind-1 notes are genuinely podcast boosts, enriches them
+from the Podcast Index, and publishes static JSON — a manifest, a recent-boost
+file, month archives, and one shard per show. The site reads those through a
+Cloudflare Pages Function that validates and caches them.
+
+Roughly 22,000 boosts across 1,376 shows at the time of writing.
 
 A boost qualifies when it carries a NIP-73 `podcast:item:guid:<guid>` tag
 *and* real payment signal — a `boostagram`/`value4value` topic tag, a
@@ -62,11 +65,8 @@ node scripts/sync-partials.js
 
 ## Status
 
-All four feeds are wired and reading live data, with sign-in-aware scoping
-on the Follows tabs. The gap is upstream: the collector that would build a
-*network-wide* snapshot isn't written yet, so the site currently reads the
-Local Bitcoiners community snapshot — real boosts, but a narrower slice than
-the whole network. See `CLAUDE.md` for the build list.
+All four feeds are wired and reading the live network-wide feed, with
+sign-in-aware scoping on the Follows tabs. See `CLAUDE.md` for what's left.
 
 ## Credits
 

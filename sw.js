@@ -25,6 +25,11 @@
 // login-widget.js and nostr-tools.js were both rebuilt, so bump to evict the
 // stale stale-while-revalidate copies — a returning visitor holding the
 // previous widget bundle would otherwise boost the old recipient.
+// ob-v5: new collector data feed. The site now reads /api/data/* (manifest,
+// latest.json, month archives, per-show shards) instead of the single
+// /api/community-boosts snapshot, which is gone along with feeds-podcasts.js.
+// A returning visitor holding the old bundle would request an endpoint that
+// no longer exists, so this bump is required, not cosmetic.
 // ob-v4: all four feed loaders wired — boosts-feed.js and follow-set.js are
 // new modules, feeds.js and feeds-podcasts.js changed. Bump so a returning
 // visitor doesn't hold a stale feeds.js whose LOADERS map only had one entry.
@@ -33,7 +38,7 @@
 // returning visitor's precache still lists two URLs that now 404 — the bump
 // is what drops them. Also picks up the new palette and the logo/favicon/
 // banner PNGs.
-const VERSION = 'ob-v4';
+const VERSION = 'ob-v5';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;
@@ -106,7 +111,7 @@ function isWidgetRequest(url) {
 }
 
 function isSnapshotRequest(url) {
-  return url.pathname === '/api/community-boosts';
+  return url.pathname.startsWith('/api/data/');
 }
 
 // Stale-while-revalidate helper: serve cached immediately if present,

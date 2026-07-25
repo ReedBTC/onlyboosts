@@ -26,8 +26,12 @@ bots/CLAUDE.md
 # the collector bot via rsync and served by Caddy — deliberately NOT
 # committed, that's the whole point of the VPS-push design (it avoids an
 # hourly git push + Pages rebuild). The site reads it through
-# functions/api/community-boosts.js.
-data/
+# functions/api/data/[[path]].js.
+#
+# Anchored with a leading slash on purpose: a bare `data/` matches ANY
+# directory named data at any depth, which silently swallowed
+# functions/api/data/ (the proxy Function) on first commit.
+/data/
 
 # --- Python ---
 bots/**/__pycache__/
