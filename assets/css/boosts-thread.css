@@ -358,3 +358,13 @@ a.event-title:hover { color: var(--orange); }
     margin-right: 0;
   }
 }
+
+/* Name + nip05 stack inside .note-author. boosts-thread.js#renderNoteCard
+   sets these three properties inline; boosts-feed.js uses this class so the
+   two card builders stay visually identical without duplicating the inline
+   style. Safe to switch renderNoteCard over to it too. */
+.note-author .note-author-name-wrap {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}

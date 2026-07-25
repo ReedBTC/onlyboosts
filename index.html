@@ -729,6 +729,48 @@
     .pcast-toast.is-visible { opacity: 1; transform: translate(-50%, 0); }
     .pcast-toast.is-error { background: #9b2c2c; }
 
+    /* ── Boosts feed ──────────────────────────────────────────────────
+       One card per kind-1 boost note. The card chrome itself is the shared
+       .note-card from boosts-thread.css; these rules only cover the
+       boost-meta row (sats + what was boosted), which a plain note has no
+       concept of. */
+    .ob-boost-list { display: flex; flex-direction: column; gap: 0.85rem; }
+    .ob-boost-list .note-card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.15rem;
+    }
+    .ob-boost-meta {
+      display: flex;
+      align-items: baseline;
+      flex-wrap: wrap;
+      gap: 0.35rem 0.6rem;
+      margin-bottom: 0.5rem;
+      font-size: 0.84rem;
+      line-height: 1.4;
+    }
+    .ob-boost-sats {
+      font-weight: 700;
+      color: var(--accent-d);
+      white-space: nowrap;
+    }
+    .ob-bolt { margin-left: 0.1rem; }
+    .ob-boost-ep {
+      font-weight: 600;
+      color: var(--text);
+      text-decoration: none;
+      /* Titles run long; keep the row to a sane width on desktop and let it
+         wrap rather than pushing the show name off the card. */
+      max-width: 100%;
+    }
+    a.ob-boost-ep:hover { color: var(--accent-d); text-decoration: underline; }
+    .ob-boost-show {
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+    .ob-boost-show::before { content: '· '; }
+
     /* ── Shared feed toggle pill (panel head) ─────────────────────────
        A default-off switch that widens a feed. Carried over from LB unused
        — kept because the Follows feeds will likely want one ("include

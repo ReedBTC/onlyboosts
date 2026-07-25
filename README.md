@@ -62,11 +62,11 @@ node scripts/sync-partials.js
 
 ## Status
 
-Early scaffold. The site is a single page with the four feeds routed and
-laid out, plus the kind-1 renderer and the login/boost/wallet stack. Only
-the Podcasts · Global feed reads real data so far; the other three show
-placeholders, and the network-wide collector isn't built. See `CLAUDE.md`
-for the current build list.
+All four feeds are wired and reading live data, with sign-in-aware scoping
+on the Follows tabs. The gap is upstream: the collector that would build a
+*network-wide* snapshot isn't written yet, so the site currently reads the
+Local Bitcoiners community snapshot — real boosts, but a narrower slice than
+the whole network. See `CLAUDE.md` for the build list.
 
 ## Credits
 

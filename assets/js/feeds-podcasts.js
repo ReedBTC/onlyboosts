@@ -897,7 +897,7 @@ function mountControls(panel, { sortKey, rangeKey, onSort, onRange }) {
 }
 
 // ── Entry point ──────────────────────────────────────────────────────
-export async function renderPodcasts({ panel, list }) {
+export async function renderPodcasts({ panel, list, boostFilter = null }) {
   let data
   try {
     const resp = await fetch(API_URL, { headers: { Accept: 'application/json' } })
@@ -907,6 +907,14 @@ export async function renderPodcasts({ panel, list }) {
     console.error('[podcasts] fetch failed', e)
     renderPlaceholder(list, 'Couldn’t load podcast boosts', 'The community boosts feed is unavailable right now — please try again later.')
     return
+  }
+
+  // Follows scoping happens on the raw boost rows, before the episode
+  // rollup: an episode should only appear if someone you follow boosted it,
+  // and its booster counts/sat totals should reflect only those boosts.
+  // Filtering after the rollup would show correct episodes with wrong numbers.
+  if (typeof boostFilter === 'function' && Array.isArray(data?.boosts)) {
+    data = { ...data, boosts: data.boosts.filter(boostFilter) }
   }
 
   const items = buildEpisodes(data)

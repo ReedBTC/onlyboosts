@@ -1,21 +1,19 @@
 /* Feed hydration for the four tabs on the homepage.
  *
- * ⚠️  MID-PORT. This module still carries localbitcoiners' data layer, which
- * scoped every feed to the show's *supporters* — the union of p-tags across
- * the show's follow packs (kind-39089), resolved by supporter-set.js.
- * OnlyBoosts scopes differently: "Global" is unscoped, and "Follows" is the
- * signed-in user's own kind-3 contact list. That swap is the main piece of
- * work left here; see CLAUDE.md.
+ * Scoping: "Global" is unscoped; "Follows" is the signed-in user's own
+ * kind-3 contact list, resolved by follow-set.js.
  *
- * What's live today: 'podcasts-global', which reads the pre-computed
- * /api/community-boosts snapshot and renders the episode rollup via
- * feeds-podcasts.js. The other three tabs have no loader yet and fall
- * through to the static placeholder in index.html.
+ * All four tabs have loaders (see LOADERS at the bottom); each lazy-imports
+ * its renderer on first view. Both renderers read the same pre-computed
+ * /api/community-boosts snapshot — boosts-feed.js renders the boost notes
+ * themselves, feeds-podcasts.js rolls them up by episode.
  *
  * The Events / Marketplace / Articles tabs and their modules were removed on
- * fork; the calendar-events.js machinery below is what's left of the Events
- * path and is retained only because boosts-thread.js still imports it to
- * render calendar-event quotes embedded in boost notes.
+ * fork. What's left of the Events path below — loadEvents, the supporter-set
+ * import, the calendar machinery — is unreachable (LOADERS doesn't map it)
+ * and retained only because boosts-thread.js still imports calendar-events.js
+ * to render calendar-event quotes embedded in boost notes. That circular
+ * import is what makes removing it fiddly; see CLAUDE.md.
  *
  * Feeds load lazily: a tab's fetch only fires the first time that tab
  * becomes active (driven by the `lb:feed-activate` event dispatched from
@@ -1025,36 +1023,73 @@ async function loadEvents() {
   }
 }
 
-// Podcast Boosts — episodes the community has boosted on Nostr. Unlike the
-// other tabs this isn't a live relay subscription: it reads the pre-computed
-// /api/community-boosts snapshot (built hourly by bots/community-boosts), so
-// there's no supporter/relay resolution here — just hand the panel to the
-// module and let it fetch. Lazy-imported on first view like the market feed.
-async function loadPodcasts(panelId = 'panel-podcasts-global') {
+// ── Boosts tabs ──────────────────────────────────────────────────────
+// One card per kind-1 boost note. Lazy-imported on first view.
+async function loadBoosts(panelId, scope) {
   const panel = document.getElementById(panelId)
   if (!panel) return
   const list = panel.querySelector('[data-feed-list]')
+  if (!list) return
   showSkeletons(list)
   try {
+    const mod = await import('/assets/js/boosts-feed.js')
+    await mod.renderBoosts({ list, scope })
+  } catch (e) {
+    console.error('[feeds] boosts load failed', e)
+    renderPlaceholder(list, 'Couldn\u2019t load boosts', 'Something went wrong reaching the boosts feed \u2014 please try again later.')
+  }
+}
+
+// ── Podcasts tabs ────────────────────────────────────────────────────
+// The episode rollup over the same snapshot. Not a live relay subscription:
+// it reads the pre-computed /api/community-boosts file, so there's no relay
+// resolution here — hand the panel to the module and let it fetch.
+//
+// The Follows variant resolves the viewer's kind-3 contact list first and
+// passes a row-level predicate down, so the rollup is computed from only
+// those boosts (see the note on boostFilter in feeds-podcasts.js).
+async function loadPodcasts(panelId = 'panel-podcasts-global', scope = 'global') {
+  const panel = document.getElementById(panelId)
+  if (!panel) return
+  const list = panel.querySelector('[data-feed-list]')
+  if (!list) return
+  showSkeletons(list)
+
+  let boostFilter = null
+  if (scope === 'follows') {
+    const { resolveFollows } = await import('/assets/js/follow-set.js')
+    const res = await resolveFollows()
+    if (res.status === 'signed-out') {
+      renderPlaceholder(list, 'Sign in to see this feed', 'Follows feeds read your kind-3 contact list, so they need a signed-in npub.')
+      return
+    }
+    if (res.status === 'unavailable') {
+      renderPlaceholder(list, 'Couldn\u2019t load your follow list', 'We couldn\u2019t reach a relay holding your kind-3 contact list \u2014 please try again later.')
+      return
+    }
+    if (res.status === 'empty') {
+      renderPlaceholder(list, 'You\u2019re not following anyone yet', 'Follow some npubs in any Nostr client and the podcasts they boost will show up here.')
+      return
+    }
+    const follows = new Set(res.follows)
+    boostFilter = (b) => follows.has(String(b?.booster_pubkey || '').toLowerCase())
+  }
+
+  try {
     const mod = await import('/assets/js/feeds-podcasts.js')
-    await mod.renderPodcasts({ panel, list })
+    await mod.renderPodcasts({ panel, list, boostFilter })
   } catch (e) {
     console.error('[feeds] podcast boosts load failed', e)
-    renderPlaceholder(list, 'Couldn’t load podcast boosts', 'Something went wrong reaching the community boosts feed — please try again later.')
+    renderPlaceholder(list, 'Couldn\u2019t load podcast boosts', 'Something went wrong reaching the boosts feed \u2014 please try again later.')
   }
 }
 
 // ── Lazy per-feed dispatch ───────────────────────────────────────────
-// Only the feeds that actually have a data path are listed. An unlisted
-// feed is a no-op, which leaves its panel showing the static placeholder
-// already in the HTML — the honest result while the loader is unbuilt.
-//
-// TODO(onlyboosts): 'boosts-global' needs a snapshot loader that renders the
-// kind-1 boost notes themselves (boosts-thread.js#renderChildCards) rather
-// than the episode rollup. The two '*-follows' feeds additionally need the
-// signed-in user's kind-3 contact list as a filter — see CLAUDE.md.
 const LOADERS = {
-  'podcasts-global': () => loadPodcasts('panel-podcasts-global'),
+  'boosts-global':     () => loadBoosts('panel-boosts-global', 'global'),
+  'boosts-follows':    () => loadBoosts('panel-boosts-follows', 'follows'),
+  'podcasts-global':   () => loadPodcasts('panel-podcasts-global', 'global'),
+  'podcasts-follows':  () => loadPodcasts('panel-podcasts-follows', 'follows'),
 }
 const loaded = new Set()
 

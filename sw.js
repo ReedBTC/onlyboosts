@@ -25,12 +25,15 @@
 // login-widget.js and nostr-tools.js were both rebuilt, so bump to evict the
 // stale stale-while-revalidate copies — a returning visitor holding the
 // previous widget bundle would otherwise boost the old recipient.
+// ob-v4: all four feed loaders wired — boosts-feed.js and follow-set.js are
+// new modules, feeds.js and feeds-podcasts.js changed. Bump so a returning
+// visitor doesn't hold a stale feeds.js whose LOADERS map only had one entry.
 // ob-v3: brand art + single-page rework. feeds.html and boosts.html were
 // folded into index.html as four hash-routed tabs and deleted, so a
 // returning visitor's precache still lists two URLs that now 404 — the bump
 // is what drops them. Also picks up the new palette and the logo/favicon/
 // banner PNGs.
-const VERSION = 'ob-v3';
+const VERSION = 'ob-v4';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;

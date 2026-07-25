@@ -179,49 +179,83 @@ Carried from the scaffold commit and the LB suite:
 
 **Still to build:**
 
-1. **Three of the four feed loaders.** The tab shell, routing, and panels are
-   done. `assets/js/feeds.js` only maps `podcasts-global` (which reads the
-   snapshot and renders the episode rollup through `feeds-podcasts.js`); an
-   unmapped feed is a no-op that leaves its static placeholder visible.
-   `feeds.js` still carries LB's supporter-scoped data layer — that's the
-   substance of items 2 and 3 below. The Events / Marketplace / Articles
-   modules were deleted.
+1. **The collector bot.** `bots/community-scan/` is scoped to LB's supporters
+   and skips LB's own show. OnlyBoosts wants network-wide coverage and skips
+   nothing. Until that lands, `COMMUNITY_BOOSTS_URL` in
+   `functions/api/community-boosts.js` still points at LB's
+   `community_boosts.json` — so the feeds today show LB-community boosts, not
+   the whole network. This is the biggest remaining gap and it's invisible
+   from the frontend, which looks finished.
 
-2. **"Follows" scoping.** LB filters feeds to *supporters* — the union of
-   p-tags across the show's follow packs (`assets/js/supporter-set.js`).
-   OnlyBoosts filters to the logged-in user's own **kind-3 follow list**.
-   Same downstream filter, different source; `supporter-set.js` is the file
-   to replace. Both `*-follows` panels currently show a "sign in" placeholder,
-   which will stay correct — the feed genuinely needs a signed-in npub.
+2. **Podcast Index credentials.** `/api/value` needs `PODCAST_INDEX_KEY` and
+   `PODCAST_INDEX_SECRET` in the Cloudflare env. Without them it returns a
+   clean 503 and "Boost episode" can't resolve a show's splits. Locally, put
+   them in `.dev.vars` (gitignored).
 
-3. **The snapshot data source for the Boosts feeds.** `boosts-thread.js`
-   still fetches one kind-1 megathread root nevent from Primal
-   (`ROOT_NEVENT`) — that was LB's boost wall. OnlyBoosts reads the VPS JSON
-   instead. Write a snapshot loader that feeds the *same* `renderChildCards()`
-   and the card UI comes along free. `ROOT_NEVENT` and `EXCLUDED_NOTE_IDS`
-   in that file are both LB leftovers.
+3. **Bug relay write-policy.** `BUG_TAG` is `onlyboosts-alpha` in both
+   `login-widget/src/lib/bugReport.js` and `bots/bug-watcher/watcher.js`, but
+   `relay.mynostr.app`'s strfry write-policy plugin still has to whitelist
+   that literal string. **VPS-side — reports are silently rejected until
+   it's made.**
 
-4. **The collector bot.** `bots/community-scan/` is scoped to LB's
-   supporters and skips LB's own show. OnlyBoosts wants network-wide
-   coverage and skips nothing. Then point `COMMUNITY_BOOSTS_URL` in
-   `functions/api/community-boosts.js` at the new file.
+4. **Dead LB code still in the tree.** `feeds.js` keeps `loadEvents` and the
+   NIP-52 calendar machinery, unreachable since the Events tab went away
+   (`LOADERS` doesn't map it). `boosts-thread.js` still has LB's
+   `ROOT_NEVENT` and `EXCLUDED_NOTE_IDS`, and `fetchBoostThread` now has no
+   caller. `calendar-events.js` is only retained because `boosts-thread.js`
+   imports it to render calendar-event quotes inside boost notes — that
+   circular import is what makes the cleanup fiddly.
 
-5. **Bug relay write-policy.** `BUG_TAG` is now `onlyboosts-alpha` in both
-   `login-widget/src/lib/bugReport.js` and `bots/bug-watcher/watcher.js`,
-   but `relay.mynostr.app`'s strfry write-policy plugin still has to
-   whitelist that literal string. **VPS-side change — reports are silently
-   rejected until it's made.**
+5. **Typography.** The brand wordmark is a bold sans; the site is still on
+   LB's Playfair Display / Source Serif 4. It reads fine, but the serif is
+   inherited, not chosen. Only those two families are self-hosted in
+   `assets/fonts/`.
 
-6. **Typography.** The brand wordmark is a bold sans; the site is still on
-   LB's Playfair Display / Source Serif 4 pairing. It reads fine, but the
-   serif is inherited, not chosen — worth a deliberate decision. Only those
-   two families are self-hosted in `assets/fonts/`.
+## Feed loaders
 
-   Branding art is otherwise done: `onlyboosts_pfp.png` (nav mark, apple-touch
-   icon, PWA prompt, login modal, manifest), `onlyboosts_favicon.png`
-   (favicon, manifest), `onlyboosts_banner.png` (masthead, OG image).
-   `assets/avatar-fallback.svg` is *not* branding — it stands in for a person
-   when a kind-0 has no picture, so keep it neutral.
+All four tabs have a data path. `assets/js/feeds.js` maps every feed key in
+`LOADERS`; the loaders lazy-import their renderer on first view.
+
+| Feed | Module | Shape |
+|---|---|---|
+| `boosts-*` | `boosts-feed.js` | one card per kind-1 boost note |
+| `podcasts-*` | `feeds-podcasts.js` | episode rollup, boosts nested |
+
+Both read the same `/api/community-boosts` snapshot; Global vs Follows is a
+filter over the same rows.
+
+**Follows scoping** lives in `assets/js/follow-set.js`, which replaces LB's
+`supporter-set.js`. `resolveFollows()` reads the signed-in pubkey straight
+out of `localStorage.lb_nostr_session` — deliberately *not* by loading the
+1MB login widget, since all we need is an identity, not a signer — then
+fetches that user's newest kind-3 across the static relays and unions its
+p-tags. Cached 30 min, keyed by pubkey so an account switch can't serve the
+previous user's list, and an empty result is never cached (one relay hiccup
+would otherwise show a signed-in user an empty feed for half an hour).
+
+It returns a `status` the callers branch on: `signed-out` / `ok` / `empty` /
+`unavailable`, each with its own placeholder. The user's own pubkey is
+included in the follow set, so your own boosts appear in your Follows feed.
+
+For the Podcasts tabs the filter is applied to the **raw boost rows before
+the episode rollup** (`boostFilter` in `renderPodcasts`). Filtering after the
+rollup would list the right episodes with wrong booster counts and sat
+totals.
+
+### Snapshot → card
+
+The snapshot carries each boost's identity and content (`event_id`,
+`booster_pubkey`, `created_at`, `message`, `sats`) but **not the signed
+event**. That's enough: the card needs only those fields, and reply / repost
+/ like / zap need only `id` + `pubkey`. Both renderers build a minimal
+`{id, pubkey, kind, content, created_at, tags}` object purely to hand to
+`buildActionBar` — it is a projection, not a verified event, and shouldn't
+be passed anywhere that assumes a real one.
+
+`boosts-feed.js` builds its own card rather than calling
+`boosts-thread.js#renderNoteCard`, because that function caches cards by
+event id and appends the action bar itself — appending the boost-meta row
+(sats + what was boosted) afterwards would double up on a cached repaint.
 
 ## Naming note
 
