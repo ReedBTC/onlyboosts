@@ -19,6 +19,7 @@ classifying.
 """
 
 import argparse
+import json
 import re
 import subprocess
 import sys
@@ -49,6 +50,9 @@ VPS_KEY_FILE = str(Path.home() / ".ssh" / "relay_mynostr_ed25519")
 VPS_REMOTE_NS = "onlyboosts"
 FLOOR_2025 = 1735689600          # 2025-01-01T00:00:00Z
 INCREMENTAL_OVERLAP = 3 * 3600   # re-scan a 3h overlap so nothing slips the seam
+OUTBOX_CACHE_TTL = 6 * 3600      # re-resolve the booster outbox relay set at most this often
+OUTBOX_WINDOW = 26 * 3600        # freshness sweep window over known outbox relays (covers a daily gap)
+OUTBOX_RELAYS_CACHE = str(HERE / "data" / "outbox_relays.json")
 
 
 def _pi_creds():
@@ -187,6 +191,84 @@ def cmd_incremental(args):
     _print_stats(conn)
 
 
+# ── outbox expansion ──────────────────────────────────────────────────────────
+def _resolve_outbox_relays(conn, now, refresh, log):
+    """Core relays ∪ every booster's NIP-65 write relays, cached to disk. Resolving
+    ~2k boosters' relay lists is the expensive part, so it's reused within the TTL."""
+    if not refresh and Path(OUTBOX_RELAYS_CACHE).exists():
+        c = json.loads(Path(OUTBOX_RELAYS_CACHE).read_text())
+        if now - c.get("resolved_at", 0) < OUTBOX_CACHE_TTL:
+            log(f"Reusing cached outbox set: {len(c['relays'])} relays "
+                f"({(now - c['resolved_at']) // 3600}h old)")
+            return c["relays"]
+    boosters = [r[0] for r in conn.execute("SELECT DISTINCT booster_pubkey FROM boosts").fetchall()]
+    log(f"Resolving NIP-65 outbox relays for {len(boosters)} boosters...")
+    relays = expand_via_outbox(boosters, CORE_RELAYS, log=log)
+    Path(OUTBOX_RELAYS_CACHE).write_text(json.dumps({"resolved_at": now, "relays": relays}))
+    return relays
+
+
+def cmd_outbox(args):
+    """Widen coverage beyond the core relays: discover every booster's own write
+    relays, deep-walk any we've never scanned (full history, resumable via
+    scan_state), then a windowed sweep for recent boosts on the known ones. The
+    core relays are already covered by the 15-min incremental, so they're skipped."""
+    conn = db.connect(DB_PATH, check_same_thread=False)
+    lock = threading.Lock()
+    receipt_cache = {}
+    totals = {"seen": 0, "boosts": 0, "new": 0}
+    now = int(time.time())
+    log = lambda m: print(m, flush=True)
+
+    relays = _resolve_outbox_relays(conn, now, args.refresh, log)
+    core = {r.rstrip("/") for r in CORE_RELAYS}
+    non_core = [r for r in relays if r.rstrip("/") not in core]
+    log(f"{len(non_core)} non-core outbox relays (core handled by the incremental timer)")
+    on_page = _make_page_handler(conn, lock, receipt_cache, totals)
+
+    def checkpoint_for(relay):
+        def cp(cursor, oldest):
+            with lock:
+                db.set_backfill_cursor(conn, relay, cursor, oldest)
+        return cp
+
+    # deep-walk relays not yet completed (new ones since last run get full history)
+    to_walk = []
+    for r in non_core:
+        st = db.get_scan_state(conn, r)
+        if st and st.get("backfill_cursor") is None and st.get("backfilled_to"):
+            continue
+        to_walk.append((r, st.get("backfill_cursor") if st and st.get("backfill_cursor") else now))
+    log(f"deep-walking {len(to_walk)} new/unfinished relays to floor")
+    if to_walk:
+        with ThreadPoolExecutor(max_workers=min(24, len(to_walk))) as ex:
+            futs = {ex.submit(scan_relay_backward, r, args.floor, s, on_page,
+                              checkpoint_for(r), log): r for r, s in to_walk}
+            for f in as_completed(futs):
+                try:
+                    f.result()
+                except Exception as e:
+                    print(f"[error] {futs[f]}: {e}", flush=True)
+
+    # windowed freshness sweep over all known outbox relays
+    since = now - OUTBOX_WINDOW
+    log(f"windowed sweep since {time.strftime('%Y-%m-%d %H:%M', time.gmtime(since))} "
+        f"over {len(non_core)} relays")
+    if non_core:
+        with ThreadPoolExecutor(max_workers=24) as ex:
+            futs = [ex.submit(scan_relay_incremental, r, since, on_page, lambda m: None)
+                    for r in non_core]
+            for f in as_completed(futs):
+                try:
+                    f.result()
+                except Exception:
+                    pass
+
+    print(f"\nOutbox pass: {totals['seen']} scanned, {totals['boosts']} boosts, "
+          f"{totals['new']} new rows.")
+    _print_stats(conn)
+
+
 # ── enrichment ────────────────────────────────────────────────────────────────
 def cmd_enrich(args):
     conn = db.connect(DB_PATH, check_same_thread=False)
@@ -314,6 +396,12 @@ def main():
     inc.add_argument("--floor", type=int, default=FLOOR_2025)
     inc.add_argument("--relays", nargs="*")
     inc.set_defaults(func=cmd_incremental)
+
+    o = sub.add_parser("outbox", help="widen coverage via booster NIP-65 write relays")
+    o.add_argument("--floor", type=int, default=FLOOR_2025)
+    o.add_argument("--refresh", action="store_true",
+                   help="force re-resolve the outbox relay set (ignore the cache)")
+    o.set_defaults(func=cmd_outbox)
 
     e = sub.add_parser("enrich", help="Podcast Index + profile enrichment")
     e.set_defaults(func=cmd_enrich)

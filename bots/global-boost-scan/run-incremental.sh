@@ -8,9 +8,10 @@ cd "$(dirname "$0")"
 PY=/usr/bin/python3
 BOT=onlyboosts_globalscan.py
 
-# Don't let a slow run overlap the next tick.
-exec 9>data/incremental.lock
-flock -n 9 || { echo "[skip] another incremental run holds the lock"; exit 0; }
+# One pipeline lock shared with the outbox job so exports/pushes never overlap.
+# Incremental is frequent + cheap, so it just skips this tick if the pipeline is busy.
+exec 9>data/pipeline.lock
+flock -n 9 || { echo "[skip] pipeline busy — another run holds the lock"; exit 0; }
 
 echo "=== $(date -u +%FT%TZ) OnlyBoosts incremental cycle ==="
 "$PY" "$BOT" incremental          # new boosts since last run → SQLite
