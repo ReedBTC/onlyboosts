@@ -20,8 +20,7 @@ a much slower/flakier network-wide relay scan that shouldn't risk that path.
 A kind:1 note qualifies as a community podcast boost when ALL of:
   1. It carries a NIP-73 `i` tag `podcast:item:guid:<guid>` (episode-level —
      bare `podcast:guid:<guid>` show-level mentions don't qualify).
-  2. Its `podcast:guid` isn't LB_FEED_GUID (LB's own show).
-  3. It has actual payment signal, one of:
+  2. It has actual payment signal, one of:
        - a `t` tag of `boostagram` or `value4value`
        - a positive `amount` tag (msats)
        - it quote-references a kind:9735 zap receipt via a `q`/`e` tag or an
@@ -73,7 +72,7 @@ from pynostr.key import PrivateKey  # noqa: F401  (kept consistent with other bo
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "shared"))
 from nostr_utils import load_config, hex_to_npub, NOSTR_RELAYS
-from boost_formatter import strip_fountain_trailer, LB_FEED_GUID
+from boost_formatter import strip_fountain_trailer
 from collector_common import fetch_events_by_authors
 
 REPO_ROOT         = Path(__file__).resolve().parent.parent.parent
@@ -238,8 +237,10 @@ def classify_boost(event, receipt_cache):
 
     if not item_guid:            # episode-level only, no show-level mentions
         return None
-    if podcast_guid == LB_FEED_GUID:   # exclude LB's own show
-        return None
+    # No show is excluded. LB's collector dropped its own feed here because
+    # the LB site already covered those boosts on its episode pages; on
+    # OnlyBoosts, Local Bitcoiners is just another podcast on the network and
+    # belongs in the feed like any other.
 
     t_vals = {t[1] for t in tags if len(t) >= 2 and t[0] == "t"}
     amount_msats = None

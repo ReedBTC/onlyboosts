@@ -22,7 +22,7 @@ import requests
 import websocket
 
 from nostr_utils import hex_to_npub, NOSTR_RELAYS
-from boost_formatter import strip_fountain_trailer, LB_FEED_GUID
+from boost_formatter import strip_fountain_trailer
 
 PODCAST_INDEX_BASE = "https://api.podcastindex.org/api/1.0"
 
@@ -138,8 +138,10 @@ def classify_boost(event, receipt_cache):
 
     if not item_guid:            # episode-level only, no show-level mentions
         return None
-    if podcast_guid == LB_FEED_GUID:   # exclude LB's own show
-        return None
+    # No show is excluded. LB's collector dropped its own feed here because
+    # the LB site already covered those boosts on its episode pages; on
+    # OnlyBoosts, Local Bitcoiners is just another podcast on the network and
+    # belongs in the feed like any other.
 
     t_vals = {t[1] for t in tags if len(t) >= 2 and t[0] == "t"}
     amount_msats = None
