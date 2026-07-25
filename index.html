@@ -288,6 +288,29 @@
       color: var(--accent-d);
       margin-bottom: 0.35rem;
     }
+    /* Sign in, inside a signed-out Follows placeholder (sign-in-prompt.js).
+       Wears the active feed's accent, so it reads as part of the tab you're
+       on rather than generic chrome. */
+    .feed-signin-btn {
+      display: inline-block;
+      margin-top: 1.1rem;
+      padding: 0.55rem 1.4rem;
+      border: 0;
+      border-radius: 999px;
+      background: var(--accent);
+      color: var(--white);
+      font: inherit;
+      font-size: 0.92rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s, opacity 0.15s;
+    }
+    .feed-signin-btn:hover { background: var(--accent-d); }
+    .feed-signin-btn:focus-visible {
+      outline: 2px solid var(--accent-d);
+      outline-offset: 2px;
+    }
+    .feed-signin-btn:disabled { opacity: 0.65; cursor: wait; }
 
     /* Collapsed "Past events / older posts" section under a feed's list. */
     .feed-past {

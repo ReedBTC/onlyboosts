@@ -33,6 +33,7 @@ import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js'
 import { buildActionBar, configureBoostActions } from '/assets/js/boost-actions.js'
 import { ensureLoginWidget } from '/assets/js/widget-loader.js'
 import { resolveFollows } from '/assets/js/follow-set.js'
+import { signInButton } from '/assets/js/sign-in-prompt.js'
 import { getLatestBoosts, getBoostMonths, getBoostMonth, toEpisodeShape } from '/assets/js/ob-data.js'
 
 const VALUE_API = '/api/value'   // Podcast Index value-block proxy (splits)
@@ -55,12 +56,15 @@ function h(tag, attrs = {}, children = []) {
   return el
 }
 
-function renderPlaceholder(list, title, body) {
+// `extra` is an optional node appended under the body text — the signed-out
+// Follows state puts its Sign in button there.
+function renderPlaceholder(list, title, body, extra = null) {
   list.className = ''
   list.innerHTML = ''
   list.appendChild(h('div', { class: 'feed-placeholder' }, [
     h('strong', { text: title }),
     document.createTextNode(body),
+    extra,
   ]))
 }
 
@@ -948,7 +952,7 @@ export async function renderPodcasts({ panel, list, scope = 'global' }) {
   if (scope === 'follows') {
     const res = await resolveFollows()
     if (res.status === 'signed-out') {
-      renderPlaceholder(list, 'Sign in to see this feed', 'Follows feeds read your kind-3 contact list, so they need a signed-in npub.')
+      renderPlaceholder(list, 'Sign in to see this feed', 'Follows feeds read your kind-3 contact list, so they need a signed-in npub.', signInButton())
       return
     }
     if (res.status === 'unavailable') {

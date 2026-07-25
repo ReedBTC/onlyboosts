@@ -18,6 +18,7 @@ import { buildActionBar, configureBoostActions } from '/assets/js/boost-actions.
 import { parseSegments, renderSegmentsInto } from '/assets/js/boosts-thread.js'
 import { ensureLoginWidget } from '/assets/js/widget-loader.js'
 import { resolveFollows } from '/assets/js/follow-set.js'
+import { signInButton } from '/assets/js/sign-in-prompt.js'
 import {
   getLatestBoosts, getBoostMonths, getBoostMonth, boosterLabel,
 } from '/assets/js/ob-data.js'
@@ -94,9 +95,11 @@ function fmtSats(n) {
   return String(n)
 }
 
-function renderPlaceholder(list, title, body) {
+// `extra` is an optional node appended under the body text — the signed-out
+// Follows state puts its Sign in button there.
+function renderPlaceholder(list, title, body, extra = null) {
   list.replaceChildren(h('div', { class: 'feed-placeholder' }, [
-    h('strong', { text: title }), document.createTextNode(body || ''),
+    h('strong', { text: title }), document.createTextNode(body || ''), extra,
   ]))
 }
 
@@ -199,7 +202,8 @@ export async function renderBoosts({ list, scope = 'global' }) {
     const res = await resolveFollows()
     if (res.status === 'signed-out') {
       renderPlaceholder(list, 'Sign in to see this feed',
-        ' Follows feeds read your kind-3 contact list, so they need a signed-in npub.')
+        ' Follows feeds read your kind-3 contact list, so they need a signed-in npub.',
+        signInButton())
       return
     }
     if (res.status === 'unavailable') {
