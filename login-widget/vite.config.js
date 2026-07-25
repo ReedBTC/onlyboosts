@@ -4,7 +4,7 @@ import cssInjectedByJsPlugin from 'vite-plugin-css-injected-by-js'
 import { resolve } from 'path'
 
 // Build the login widget as a single self-contained IIFE that ships
-// alongside the static localbitcoiners index.html. CSS is injected at
+// alongside the static OnlyBoosts index.html. CSS is injected at
 // runtime so consumers only need <script src="login-widget.js">.
 export default defineConfig({
   plugins: [react(), cssInjectedByJsPlugin()],

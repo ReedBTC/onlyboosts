@@ -1,0 +1,10 @@
+<!-- Default avatar. Used by the boost/profile renderers whenever a kind-0
+     has no picture, and as the onerror fallback when a remote picture
+     fails to load. Deliberately neutral — it stands in for a *person*,
+     not for the site, so it should stay brand-agnostic even after
+     OnlyBoosts gets its own visual identity. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Default avatar">
+  <circle cx="32" cy="32" r="32" fill="#ede3c8"/>
+  <circle cx="32" cy="25" r="11" fill="#b9a67e"/>
+  <path d="M32 39c-11 0-20 7.2-20 16.1V64h40v-8.9C52 46.2 43 39 32 39Z" fill="#b9a67e"/>
+</svg>

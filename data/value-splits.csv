@@ -1,6 +1,0 @@
-scope,era,era_start,era_end,reed_pct,rev_pct,aquafox_pct,guests_pct,fountain_pct,confidence,notes
-episode_default,1,2026-02-02T00:00:00Z,2026-03-29T13:10:00Z,49,49,0,0,2,high,"Node received 98%; Reed/Rev split it 49/49 after the fact. Fountain 2%. Applies to any episode boost that settled in this window."
-episode_default,2,2026-03-29T13:10:00Z,2026-04-20T20:23:25Z,49,49,0,0,2,high,"Node received 49% (=Reed); Rev's 49% routed directly. Confirmed by Reed: no aquafox/guest slice yet in this era."
-show,1,2026-02-02T00:00:00Z,2026-03-29T13:10:00Z,49,49,0,0,2,high,"Show-level boosts (Fountain channel value block + keysend apps). Same as episode_default era 1, confirmed by Reed."
-show,2,2026-03-29T13:10:00Z,2026-04-20T20:23:25Z,49,49,0,0,2,high,"Show-level boosts. Same as episode_default era 2, confirmed by Reed."
-lb_donation,all,2026-02-02T00:00:00Z,,50,50,0,0,0,high,"General donations direct to the LB lightning address — no value split. Reed splits these 50/50 with Rev after the fact."

@@ -327,10 +327,10 @@ function buildEmbedNoteEl(seg) {
   const profile = profileCache.get(ev.pubkey)
 
   const img = document.createElement('img')
-  img.src = profile?.picture || '/assets/LocalBitcoiners.png'
+  img.src = profile?.picture || '/assets/avatar-fallback.svg'
   img.alt = ''
   img.referrerPolicy = 'no-referrer'
-  img.onerror = () => { img.src = '/assets/LocalBitcoiners.png' }
+  img.onerror = () => { img.src = '/assets/avatar-fallback.svg' }
   authorRow.appendChild(img)
 
   const nameEl = document.createElement('span')
@@ -525,10 +525,10 @@ export function renderNoteCard(ev, { isRoot = false } = {}) {
   authorRow.className = 'note-author'
 
   const img = document.createElement('img')
-  img.src = profile?.picture || '/assets/LocalBitcoiners.png'
+  img.src = profile?.picture || '/assets/avatar-fallback.svg'
   img.alt = ''
   img.referrerPolicy = 'no-referrer'
-  img.onerror = () => { img.src = '/assets/LocalBitcoiners.png' }
+  img.onerror = () => { img.src = '/assets/avatar-fallback.svg' }
   authorRow.appendChild(img)
 
   const nameWrap = document.createElement('div')

@@ -2,7 +2,7 @@
  * PWA install affordance.
  *
  * Adds a small bottom-pinned banner on mobile browsers that surfaces
- * "Install Local Bitcoiners" as a real, tappable thing — most users
+ * "Install OnlyBoosts" as a real, tappable thing — most users
  * have no idea browsers can install web apps without app stores, so
  * an explicit prompt is the only way they'll discover it.
  *
@@ -123,7 +123,7 @@
     var wrap = document.createElement('div');
     wrap.id = 'lb-pwa-install-banner';
     wrap.setAttribute('role', 'dialog');
-    wrap.setAttribute('aria-label', 'Install Local Bitcoiners app');
+    wrap.setAttribute('aria-label', 'Install OnlyBoosts app');
     wrap.style.cssText =
       'position:fixed;left:12px;right:12px;bottom:max(12px, env(safe-area-inset-bottom, 12px));' +
       'z-index:88;padding:14px 16px;border-radius:12px;' +
@@ -137,12 +137,14 @@
     var iconHtml =
       '<div style="flex:0 0 auto;width:38px;height:38px;border-radius:9px;background:rgba(247,147,26,0.18);' +
       'border:1px solid rgba(247,147,26,0.45);display:flex;align-items:center;justify-content:center;">' +
-      '<img src="/assets/LocalBitcoiners.png" alt="" width="28" height="28" style="border-radius:6px;display:block;" />' +
+      // TODO(onlyboosts): swap in the app icon once branding art exists.
+      // A bolt glyph stands in so the prompt isn't a broken image.
+      '<span aria-hidden="true" style="font-size:20px;line-height:1;">⚡</span>' +
       '</div>';
 
     var titleHtml =
       '<div style="flex:1 1 auto;min-width:0;">' +
-      '<div style="font-weight:600;color:#fff;line-height:1.25;">Install Local Bitcoiners</div>' +
+      '<div style="font-weight:600;color:#fff;line-height:1.25;">Install OnlyBoosts</div>' +
       '<div style="font-size:12px;color:rgba(245,238,220,0.75);margin-top:2px;line-height:1.3;">' +
       (iosFlow
         ? 'Tap <strong>Share</strong> &nbsp;<span aria-hidden="true">⬆︎</span>&nbsp; then <strong>Add to Home Screen</strong>'

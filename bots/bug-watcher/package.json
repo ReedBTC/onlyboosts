@@ -1,8 +1,8 @@
 {
-  "name": "localbitcoiners-bug-watcher",
+  "name": "onlyboosts-bug-watcher",
   "private": true,
   "type": "module",
-  "description": "Polls the bug relay for localbitcoiners-alpha reports and opens GitHub issues. Self-contained — its only runtime dep is nostr-tools (Node 18+ provides a global WebSocket).",
+  "description": "Polls the bug relay for onlyboosts-alpha reports and opens GitHub issues. Self-contained — its only runtime dep is nostr-tools (Node 18+ provides a global WebSocket).",
   "dependencies": {
     "nostr-tools": "^2"
   }

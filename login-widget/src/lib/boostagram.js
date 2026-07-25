@@ -32,6 +32,18 @@ import { getNDK, signWithTimeout } from './ndk.js'
 import { withTimeout } from './utils.js'
 
 // ─── Recipient constants ────────────────────────────────────────────────────
+// ⚠️  TODO(onlyboosts) — MUST CHANGE BEFORE ANY DEPLOY. ⚠️
+// These are still Local Bitcoiners' live payment/identity values, inherited
+// from the fork. This module is the "boost the show" path: a boost sent
+// through it pays RECIPIENT_LUD16 with REAL SATS. Shipping as-is would
+// route OnlyBoosts users' boosts into the LB wallet.
+//
+// Decide first what "boost" means on OnlyBoosts. If boosts always go to the
+// *podcast being boosted* (via its own value split), this whole show-boost
+// path is dead code and should be deleted rather than repointed — the live
+// path is externalBoost.js / externalBoostagram.js. Only repoint these if
+// OnlyBoosts genuinely has a house wallet to boost.
+//
 // Hardcoded lightning address for the show. No runtime kind-0 lookup —
 // boosts always go to one place, and a network round-trip on modal-open
 // just adds latency + a failure surface.
@@ -40,7 +52,7 @@ export const RECIPIENT_LUD16 = 'localbitcoiners@getalby.com'
 // Recipient npub for the optional kind 1 share-to-feed note. Decoded once
 // at module load; the hex pubkey populates the kind 1 `p` tag and the
 // raw npub goes into the `nostr:` mention so followers can click through
-// to the show's profile.
+// to the show's profile. Same TODO as above — still LB's npub.
 export const RECIPIENT_NPUB = 'npub1cvcgs83gw6pcrhvtmlf8gdqaegx93qkznwry96jteqhh2cexgkfq45rtya'
 export const RECIPIENT_PUBKEY_HEX = (() => {
   try {
@@ -52,7 +64,7 @@ export const RECIPIENT_PUBKEY_HEX = (() => {
 // Site URL used in event tags + kind 1 share body. Hardcoded prod URL
 // regardless of where the modal was authored from — readers should land
 // on the live site, not localhost / preview env.
-export const SITE_URL = 'https://localbitcoiners.com'
+export const SITE_URL = 'https://onlyboosts.com'
 
 // RSS <podcast:guid> for the Local Bitcoiners feed. Used for NIP-73
 // external-content identity tags (i/k) on the kind 1 boost share notes so
@@ -333,8 +345,8 @@ export function buildDonationBoostagramTemplate({
     : ''
   const baseTags = [
     ['d', paymentHash],
-    ['app', 'localbitcoiners.com', '1.0.0'],
-    ['client', 'localbitcoiners.com'],
+    ['app', 'onlyboosts.com', '1.0.0'],
+    ['client', 'onlyboosts.com'],
     ['type', 'donation_boostagram'],
     ['sender', donorNpub],
     ['recipient', recipientLud16],
@@ -534,8 +546,8 @@ export function buildBoostReceiptTemplate({
 
   const tags = [
     ['d', boostSession],
-    ['app', 'localbitcoiners.com', '1.0.0'],
-    ['client', 'localbitcoiners.com'],
+    ['app', 'onlyboosts.com', '1.0.0'],
+    ['client', 'onlyboosts.com'],
     ['type', 'boost_receipt'],
     ['boost_session', boostSession],
     ['sender', donorNpub || ''],
@@ -653,11 +665,11 @@ export function buildEpisodeBoostShareTemplate({
   const content = lines.join('\n')
 
   const tags = [
-    ['t', 'localbitcoiners'],
+    ['t', 'onlyboosts'],
     ['t', 'boost'],
     ['t', 'podcast'],
     ['r', pageUrl],
-    ['client', 'localbitcoiners.com'],
+    ['client', 'onlyboosts.com'],
   ]
   if (RECIPIENT_PUBKEY_HEX) tags.push(['p', RECIPIENT_PUBKEY_HEX])
   if (fountainUrl) tags.push(['r', fountainUrl])
@@ -749,10 +761,10 @@ export async function publishBoostShareNote({
   const content = lines.join('\n')
 
   const tags = [
-    ['t', 'localbitcoiners'],
+    ['t', 'onlyboosts'],
     ['t', 'boost'],
     ['r', pageUrl],
-    ['client', 'localbitcoiners.com'],
+    ['client', 'onlyboosts.com'],
   ]
   if (RECIPIENT_PUBKEY_HEX) tags.push(['p', RECIPIENT_PUBKEY_HEX])
   // NIP-73 external-content tags. Show-level share: feed GUID only.

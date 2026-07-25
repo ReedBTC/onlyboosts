@@ -365,7 +365,7 @@ function buildReplyTags(parent) {
   if (parent.pubkey && !seenP.has(parent.pubkey)) {
     tags.push(['p', parent.pubkey])
   }
-  tags.push(['client', 'localbitcoiners.com'])
+  tags.push(['client', 'onlyboosts.com'])
   return tags
 }
 
@@ -442,7 +442,7 @@ async function handleLike(ev, btn) {
     const isAddressable = kind >= 30000 && kind < 40000
     const tags = [['e', ev.id]]
     if (isAddressable && ev.dTag) tags.push(['a', `${kind}:${ev.pubkey}:${ev.dTag}`])
-    tags.push(['p', ev.pubkey], ['k', String(kind)], ['client', 'localbitcoiners.com'])
+    tags.push(['p', ev.pubkey], ['k', String(kind)], ['client', 'onlyboosts.com'])
     await window.LBLogin.signAndPublish({ kind: 7, content: '+', tags })
   } catch (e) {
     likedIds.delete(id)
@@ -487,7 +487,7 @@ async function handleRepost(ev, btn) {
     const isAddressable = kind >= 30000 && kind < 40000
     const tags = [['e', ev.id, '']]
     if (isAddressable && ev.dTag) tags.push(['a', `${kind}:${ev.pubkey}:${ev.dTag}`, ''])
-    tags.push(['p', ev.pubkey], ['k', String(kind)], ['client', 'localbitcoiners.com'])
+    tags.push(['p', ev.pubkey], ['k', String(kind)], ['client', 'onlyboosts.com'])
     await window.LBLogin.signAndPublish({
       kind: kind === 1 ? 6 : 16,
       content,
@@ -526,7 +526,7 @@ export async function repostAnyEvent(ev, btn) {
     if (isAddressable && ev.dTag) {
       tags.push(['a', `${kind}:${ev.pubkey}:${ev.dTag}`, ''])
     }
-    tags.push(['p', ev.pubkey], ['k', String(kind)], ['client', 'localbitcoiners.com'])
+    tags.push(['p', ev.pubkey], ['k', String(kind)], ['client', 'onlyboosts.com'])
 
     await window.LBLogin.signAndPublish({
       kind: kind === 1 ? 6 : 16,
@@ -596,10 +596,10 @@ function buildZapModal(targetEvent, recipientProfile) {
   const recRow = document.createElement('div')
   recRow.className = 'zap-recipient'
   const pic = document.createElement('img')
-  pic.src = recipientProfile.picture || '/assets/LocalBitcoiners.png'
+  pic.src = recipientProfile.picture || '/assets/avatar-fallback.svg'
   pic.alt = ''
   pic.referrerPolicy = 'no-referrer'
-  pic.onerror = () => { pic.src = '/assets/LocalBitcoiners.png' }
+  pic.onerror = () => { pic.src = '/assets/avatar-fallback.svg' }
   recRow.appendChild(pic)
   // No innerHTML on attacker-controlled fields (display name, lud16).
   const recName = document.createElement('div')
@@ -809,7 +809,7 @@ async function performZap({
       ['amount', String(msats)],
       ['p', recipientPubkey],
       ['e', targetEvent.id],
-      ['client', 'localbitcoiners.com'],
+      ['client', 'onlyboosts.com'],
     ],
   })
 

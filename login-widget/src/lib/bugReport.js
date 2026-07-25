@@ -6,9 +6,9 @@
  * Plebeian Market's bug-report widget. https://plebeian.market — thanks
  * to that team for the pattern.
  *
- * LB's bug-report channel rides the same dedicated relay mynostr uses
- * (`wss://relay.mynostr.app`), which only accepts events tagged with the
- * literal `["t", "localbitcoiners-alpha"]` (enforced by the relay's
+ * OnlyBoosts' bug-report channel rides the same dedicated relay mynostr and
+ * LB use (`wss://relay.mynostr.app`), which only accepts events tagged with
+ * the literal `["t", "onlyboosts-alpha"]` (enforced by the relay's
  * strfry write-policy plugin). Reports are kind 1 notes signed by the
  * user's logged-in key, published *only* to that one relay — never to
  * outbox, never to the pool. Isolation is the whole point: bug reports
@@ -26,7 +26,7 @@ import { getNDK, signWithTimeout } from './ndk.js'
 import { withTimeout } from './utils.js'
 
 export const BUG_RELAY = 'wss://relay.mynostr.app'
-export const BUG_TAG   = 'localbitcoiners-alpha'
+export const BUG_TAG   = 'onlyboosts-alpha'
 
 const PUBLISH_TIMEOUT_MS = 10_000
 
@@ -50,7 +50,7 @@ export async function publishBugReport(content) {
   const ev = new NDKEvent(ndk)
   ev.kind    = 1
   ev.content = content
-  ev.tags    = [['t', BUG_TAG], ['client', 'localbitcoiners']]
+  ev.tags    = [['t', BUG_TAG], ['client', 'onlyboosts']]
 
   if (ndk?.signer) {
     await signWithTimeout(ev)

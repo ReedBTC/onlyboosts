@@ -1,10 +1,12 @@
-CLAUDE_CODE_HANDOFF.md
 .DS_Store
+
+# --- Claude Code local settings ---
+.claude/settings.local.json
 
 # --- Wrangler local dev server scratch (created by `wrangler pages dev`) ---
 .wrangler/
 
-# --- Bots: operational state (regenerable from Alby Hub / Nostr) ---
+# --- Bots: operational state (regenerable from Nostr) ---
 bots/**/state.json
 bots/**/state.json.bak
 bots/**/state.json.before-*
@@ -12,70 +14,30 @@ bots/**/*.lock
 bots/**/state_*.json
 bots/**/last_seen.txt
 bots/**/last_seen.txt.bak
-bots/**/published_events.json
-bots/**/published_events.json.bak
-bots/**/donation_events.json
-bots/**/boostleaders_by_episode.csv
-bots/shared/lb_episode_ids.json
-
-# --- Bots: testing artifacts (contain payment hashes) ---
-bots/dry-run/
 
 # --- Bots: local backup dirs created before refactors ---
 bots/**/*.bak/
-bots/leaderboards.bak-*/
 
-# --- Bots: working files (private docs, scratch, leaderboard publish log) ---
+# --- Bots: working files / private docs ---
 bots/tmp/
-
-# --- Bots: private docs ---
 bots/CLAUDE.md
 
-# --- Community-boosts data: lives on the VPS (relay.mynostr.app), pushed by
-# the hourly bot via rsync and served by Caddy — deliberately NOT committed,
-# that's the whole point of the VPS-push design (avoids an hourly git
-# push/rebuild). The website reads it via functions/api/community-boosts.js.
-data/community_boosts.json
-
-# --- Community feeds data: same VPS-hosted pattern as community_boosts, one
-# file per kind (NIP-52 events / NIP-99 market / NIP-23 articles), written by
-# bots/community-feeds and served off the VPS — not committed.
-data/community_events.json
-data/community_market.json
-data/community_articles.json
-
-# --- Supporter data (VPS migration, Phase 4): served to the site from the VPS
-# via /api/{sats,zaps,meetups} and backed up there by sats-log's push_data_to_vps
-# — no longer committed, so the pipeline can run every few minutes without a
-# Cloudflare rebuild per run. sats-log still commits data/leaderboards.csv (the
-# published-notes ledger) and data/value-splits.csv stays tracked (a hand-edited
-# INPUT, not derived). The .bak copy of the non-regenerable zap-note cache lives
-# on the VPS. NOTE: git rm --cached was run once when these were first ignored;
-# the working-tree files remain and are still written each run.
-data/sats.json
-data/zaps.json
-data/meetups.json
-data/sats.csv
-data/fountain-api.csv
-data/zaps.csv
-data/meetups.csv
-data/zapped-notes-cache.json
-
-# Atomic-write temp files (sats-log writes via mkstemp + os.replace; a crash
-# mid-write could leave one behind — never commit it).
-data/*.tmp
+# --- Boost snapshot data: lives on the VPS (relay.mynostr.app), pushed by
+# the collector bot via rsync and served by Caddy — deliberately NOT
+# committed, that's the whole point of the VPS-push design (it avoids an
+# hourly git push + Pages rebuild). The site reads it through
+# functions/api/community-boosts.js.
+data/
 
 # --- Python ---
 bots/**/__pycache__/
 bots/**/*.pyc
 bots/.claude/
 
+# --- Node ---
+node_modules/
+
 # --- Local-only scratch + secrets (never commit) ---
 tmp/
-*creds*.env
-pi-creds.env
-
-# --- Frontend verification harness: LAN preview server that fakes the CF Pages
-# Functions (/api/*) plus saved snapshot JSON and headless-Chrome CDP drivers.
-# Machine-local and regenerable — snapshots are re-pulled from prod on demand.
 scratchpad/
+*creds*.env

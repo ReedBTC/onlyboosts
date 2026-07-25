@@ -266,7 +266,7 @@ export function formToEventTemplate(form, { pubkey = '' } = {}) {
   if (lowered.image)    tags.push(['image', lowered.image])
   if (lowered.location) tags.push(['location', lowered.location])
   for (const h of lowered.hashtags) tags.push(['t', h])
-  tags.push(['client', 'localbitcoiners.com'])
+  tags.push(['client', 'onlyboosts.com'])
   return {
     kind: lowered.kind,
     pubkey,

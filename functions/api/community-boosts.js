@@ -1,3 +1,7 @@
+// TODO(onlyboosts): point at the OnlyBoosts snapshot once the collector
+// bot writes one. Still reading LB's community_boosts.json so the feed
+// has real data to develop against — that file is scoped to LB's
+// supporters, where OnlyBoosts wants network-wide coverage.
 const COMMUNITY_BOOSTS_URL = "https://relay.mynostr.app/community_boosts.json";
 
 // Bound the upstream fetch: 10s wall-clock, 10 MB body cap. Same rationale
@@ -12,7 +16,7 @@ const RESPONSE_MAX_BYTES = 10 * 1024 * 1024; // 10 MB
 // lookalike origins get reflected into Access-Control-Allow-Origin, so this
 // stays an exact Set match, not a prefix check.
 const ALLOWED_ORIGINS = new Set([
-  "https://localbitcoiners.com",
+  "https://onlyboosts.com",
   "http://localhost:8765",
   "http://127.0.0.1:8765",
   "http://localhost:5173",
@@ -23,7 +27,7 @@ function pickCorsOrigin(originHeader) {
   if (typeof originHeader === "string" && ALLOWED_ORIGINS.has(originHeader)) {
     return originHeader;
   }
-  return "https://localbitcoiners.com";
+  return "https://onlyboosts.com";
 }
 
 export async function onRequest(context) {
@@ -46,7 +50,7 @@ export async function onRequest(context) {
 
   try {
     const resp = await fetch(COMMUNITY_BOOSTS_URL, {
-      headers: { "User-Agent": "LocalBitcoiners-CommunityBoosts-Proxy/1.0" },
+      headers: { "User-Agent": "OnlyBoosts-CommunityBoosts-Proxy/1.0" },
       cf: { cacheTtl: 300, cacheEverything: true },
       signal: ctrl.signal,
     });

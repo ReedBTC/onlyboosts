@@ -1,6 +1,6 @@
 [Unit]
-Description=localbitcoiners — periodic bug-relay watcher
-Documentation=file://%h/localbitcoiners/bots/bug-watcher/README.md
+Description=onlyboosts — periodic bug-relay watcher
+Documentation=file://%h/onlyboosts/bots/bug-watcher/README.md
 
 [Timer]
 # Wait a beat after boot before the first run so the network is up.
@@ -12,7 +12,7 @@ OnUnitActiveSec=10min
 RandomizedDelaySec=30s
 # Run once on wake if the machine was off when the timer would have fired.
 Persistent=true
-Unit=localbitcoiners-bug-watcher.service
+Unit=onlyboosts-bug-watcher.service
 
 [Install]
 WantedBy=timers.target

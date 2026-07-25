@@ -27,12 +27,13 @@ import { fileURLToPath } from 'node:url'
 import { nip19 } from 'nostr-tools'
 
 const CONFIG = {
-  // Shared bug relay (same one mynostr uses); LB reports are isolated by
-  // the `tag` below, which the relay's strfry write-policy must whitelist.
+  // Shared bug relay (same one mynostr and LB use); OnlyBoosts reports are
+  // isolated by the `tag` below, which the relay's strfry write-policy must
+  // whitelist — see README, this is a VPS-side change, not a code change.
   relay:  'wss://relay.mynostr.app',
-  tag:    'localbitcoiners-alpha',  // strict — events without this exact tag are ignored
-  repo:   'ReedBTC/localbitcoiners',
-  // No in-app Known Issues viewer on LB (yet), so just label + route.
+  tag:    'onlyboosts-alpha',  // strict — events without this exact tag are ignored
+  repo:   'ReedBTC/onlyboosts',
+  // No in-app Known Issues viewer on OnlyBoosts (yet), so just label + route.
   labels: ['bug', 'from-relay'],
   // First run: pull events from this many days back to seed the
   // seen-ids set without creating issues. Tune up if you have older

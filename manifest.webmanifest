@@ -1,7 +1,7 @@
 {
-  "name": "Local Bitcoiners",
-  "short_name": "Local Bitcoiners",
-  "description": "Local Bitcoiners is a Bitcoin podcast about Bitcoin meetup culture. Hosts Reed and Rev Hodl talk with meetup organizers about finding, building, and growing grassroots Bitcoin communities.",
+  "name": "OnlyBoosts",
+  "short_name": "OnlyBoosts",
+  "description": "A Nostr client for podcast boosts. Read boostagrams from across the podcasting-2.0 network — globally or filtered to who you follow — and boost back with Lightning.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -9,27 +9,13 @@
   "theme_color": "#3a3125",
   "background_color": "#f5eedc",
   "lang": "en",
-  "categories": ["news", "entertainment", "education"],
-  "icons": [
-    {
-      "src": "/assets/LocalBitcoiners.png",
-      "sizes": "1024x1024",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/assets/LocalBitcoiners.png",
-      "sizes": "1024x1024",
-      "type": "image/png",
-      "purpose": "maskable"
-    }
-  ],
+  "categories": ["news", "social", "entertainment"],
   "shortcuts": [
     {
-      "name": "Podcast Boosts",
+      "name": "Global Boosts",
       "short_name": "Boosts",
-      "description": "View the boost wall",
-      "url": "/boosts.html"
+      "description": "The global boost feed",
+      "url": "/feeds#boosts-global"
     }
   ]
 }

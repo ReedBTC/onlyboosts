@@ -1,7 +1,8 @@
-// Local Bitcoiners service worker
+// OnlyBoosts service worker
 // - HTML: network-first (always try fresh, fall back to cache offline)
-// - RSS (/api/rss): stale-while-revalidate (returning visitors see cached
-//   episodes instantly; fresh feed loads in background for next visit)
+// - Boost snapshot (/api/community-boosts): stale-while-revalidate (returning
+//   visitors see cached boosts instantly; the fresh snapshot loads in the
+//   background for the next visit)
 // - Widget bundles (/assets/widgets/*): stale-while-revalidate (serve
 //   cached immediately, refresh in background, next page picks up new code)
 // - Other same-origin static assets: stale-while-revalidate (serve cached
@@ -95,38 +96,36 @@
 // outliers: adminpacman + sovreign both dwarf the field, so both are torn and
 // the rest scale against #3. buildBarSvg generalized from single-outlier to a
 // cliff-detected break group. stats.js only.
-const VERSION = 'lb-v43';
+// ── OnlyBoosts ───────────────────────────────────────────────────────
+// ob-v1: forked from localbitcoiners at lb-v43. The LB version history
+// above is kept for the rationale behind the caching strategies (it
+// explains *why* each one is shaped the way it is); the version counter
+// restarts here. Cache keys are namespaced by VERSION, so the `ob-`
+// prefix also guarantees no collision with an LB cache on a shared
+// origin during local dev.
+const VERSION = 'ob-v1';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;
-const RSS_CACHE = `${VERSION}-rss`;
+const SNAPSHOT_CACHE = `${VERSION}-snapshot`;
 
 // What we precache on SW install. Widget bundle deliberately excluded —
 // it's only needed when a user clicks Boost, not on every visit. Lazy
 // loading the bundle on first interaction keeps cold-load lighter.
 //
-// The /ep### page assets are precached too: they're not referenced by
-// the homepage, so without this they'd be uncached on a visitor's first
-// episode-page hit — and an uncached asset that hits a transient network
-// error has no fallback, which is what made episode pages intermittently
-// render unstyled / without their chart. data/sats.json is excluded
-// (large, changes daily — stale-while-revalidate handles it instead).
+// The boost-feed snapshot (/api/community-boosts) is excluded too: it's
+// large and refreshes hourly, so stale-while-revalidate handles it
+// better than precaching a copy that's stale by first paint.
 const PRECACHE_URLS = [
   '/',
   '/index.html',
+  '/feeds.html',
   '/boosts.html',
   '/manifest.webmanifest',
-  '/assets/LocalBitcoiners.png',
-  '/assets/favicon.png',
-  '/assets/LocalBitcoiners_banner.png',
   '/assets/css/nav.css',
   '/assets/css/footer.css',
-  '/assets/css/episode.css',
   '/assets/css/boosts-thread.css',
   '/assets/css/boost-actions.css',
-  '/assets/js/episode-enhance.js',
-  '/assets/js/ep-sats.js',
-  '/assets/js/ep-boosts.js',
   '/assets/js/boosts-thread.js',
   '/assets/js/calendar-events.js',
   '/assets/js/boost-actions.js',
@@ -174,8 +173,8 @@ function isWidgetRequest(url) {
   return url.pathname.startsWith('/assets/widgets/');
 }
 
-function isRssRequest(url) {
-  return url.pathname === '/api/rss';
+function isSnapshotRequest(url) {
+  return url.pathname === '/api/community-boosts';
 }
 
 // Stale-while-revalidate helper: serve cached immediately if present,
@@ -232,11 +231,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  if (isRssRequest(url)) {
-    // Episode list shows up instantly on repeat visits via cached XML;
-    // fresh feed updates the cache in background. Cloudflare worker
+  if (isSnapshotRequest(url)) {
+    // Boosts show up instantly on repeat visits from the cached snapshot;
+    // the fresh one updates the cache in background. The Pages Function
     // already caches upstream for 5 min, so freshness is bounded.
-    event.respondWith(staleWhileRevalidate(request, RSS_CACHE));
+    event.respondWith(staleWhileRevalidate(request, SNAPSHOT_CACHE));
     return;
   }
 

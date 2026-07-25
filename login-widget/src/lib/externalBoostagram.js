@@ -102,7 +102,7 @@ export function buildExternalNoteTemplate({
   const showEp = episodeTitle
     ? `${showTitle || 'a podcast'} • ${episodeTitle}`
     : (showTitle || 'a podcast')
-  const lines = [`⚡Just boosted ${sats.toLocaleString()} sats 📱 via localbitcoiners.com`]
+  const lines = [`⚡Just boosted ${sats.toLocaleString()} sats 📱 via onlyboosts.com`]
   if (msg) lines.push(`💬 "${msg.slice(0, MAX_MESSAGE_CHARS)}"`)
   lines.push('')
   lines.push(`🎙️ ${showEp}`)
@@ -111,7 +111,7 @@ export function buildExternalNoteTemplate({
   const tags = [
     ['t', 'boost'],
     ['t', 'podcast'],
-    ['client', 'localbitcoiners.com'],
+    ['client', 'onlyboosts.com'],
   ]
   if (bmbUrl) tags.push(['r', bmbUrl])
   if (podcastGuid) { tags.push(['i', `podcast:guid:${podcastGuid}`]); tags.push(['k', 'podcast:guid']) }

@@ -1,0 +1,17 @@
+[Unit]
+Description=onlyboosts — poll relay.mynostr.app for new bug reports and create GitHub issues
+Documentation=file://%h/onlyboosts/bots/bug-watcher/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# ⚠️ Adjust these two paths to wherever the onlyboosts repo lives on
+# the server (mirrors mynostr's unit, which uses its own repo path).
+WorkingDirectory=%h/onlyboosts
+ExecStart=%h/onlyboosts/bots/bug-watcher/run.sh
+# Bound runtime — a stuck WS connection should never stall the timer.
+TimeoutStartSec=60s
+Nice=10
+StandardOutput=journal
+StandardError=journal

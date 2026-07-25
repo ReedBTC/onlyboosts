@@ -263,10 +263,10 @@ export function renderCalendarCard(parsed, { bech32 = '', profile = null, action
   }
 
   const img = document.createElement('img')
-  img.src = profile?.picture || '/assets/LocalBitcoiners.png'
+  img.src = profile?.picture || '/assets/avatar-fallback.svg'
   img.alt = ''
   img.referrerPolicy = 'no-referrer'
-  img.onerror = () => { img.src = '/assets/LocalBitcoiners.png' }
+  img.onerror = () => { img.src = '/assets/avatar-fallback.svg' }
   idEl.appendChild(img)
 
   const nameEl = document.createElement('span')
@@ -427,10 +427,10 @@ function buildFeaturedBy(info) {
   // paints at its natural (huge) size.
   img.width = 18
   img.height = 18
-  img.src = info.picture || '/assets/LocalBitcoiners.png'
+  img.src = info.picture || '/assets/avatar-fallback.svg'
   img.alt = ''
   img.referrerPolicy = 'no-referrer'
-  img.onerror = () => { img.src = '/assets/LocalBitcoiners.png' }
+  img.onerror = () => { img.src = '/assets/avatar-fallback.svg' }
   el.appendChild(img)
 
   const name = document.createElement('span')

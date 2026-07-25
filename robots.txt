@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://localbitcoiners.com/sitemap.xml
+Sitemap: https://onlyboosts.com/sitemap.xml
