@@ -20,6 +20,7 @@ classifying.
 
 import argparse
 import re
+import subprocess
 import sys
 import threading
 import time
@@ -41,6 +42,11 @@ from nostr_utils import load_config                             # noqa: E402
 
 DB_PATH = str(HERE / "data" / "onlyboosts.db")
 CREDENTIALS = "/home/reed/.config/nostr-bots/credentials.env"
+# Same restricted-rrsync key + VPS LB uses; shards land UNDER an onlyboosts/
+# subdir of the rrsync-locked deploy root so they can never collide with LB's
+# files sharing that host (relay.mynostr.app, Caddy-served).
+VPS_KEY_FILE = str(Path.home() / ".ssh" / "relay_mynostr_ed25519")
+VPS_REMOTE_NS = "onlyboosts"
 FLOOR_2025 = 1735689600          # 2025-01-01T00:00:00Z
 INCREMENTAL_OVERLAP = 3 * 3600   # re-scan a 3h overlap so nothing slips the seam
 
@@ -239,6 +245,42 @@ def cmd_export(args):
     print(f"Export done: {n} boost records.")
 
 
+def cmd_push(args):
+    """rsync the whole shards/ tree to the VPS under the onlyboosts/ namespace.
+    Reads VPS host/port/user from credentials.env (never printed). Dry-run first
+    is strongly recommended on a host shared with LB's live data."""
+    cfg = load_config(CREDENTIALS)
+    host, port, user = cfg.get("RELAY_VPS_HOST"), cfg.get("RELAY_VPS_PORT"), cfg.get("RELAY_VPS_USER")
+    if not all([host, port, user]):
+        print("[error] RELAY_VPS_HOST/PORT/USER missing from credentials.env")
+        return
+    if not Path(VPS_KEY_FILE).exists():
+        print(f"[error] SSH key not found: {VPS_KEY_FILE}")
+        return
+    shards = Path(args.out)
+    if not shards.exists():
+        print(f"[error] no shards at {shards} — run `export` first")
+        return
+    n = sum(1 for _ in shards.rglob("*.json"))
+    ssh_cmd = f"ssh -i {VPS_KEY_FILE} -p {port} -o StrictHostKeyChecking=accept-new"
+    dest = f"{user}@{host}:{VPS_REMOTE_NS}/"       # relative to the rrsync-forced root
+    cmd = ["rsync", "-a", "-e", ssh_cmd, f"{shards}/", dest]
+    if args.dry_run:
+        cmd[1:1] = ["-n", "-v", "--stats"]
+    print(f"{'DRY-RUN ' if args.dry_run else ''}rsync {n} json files → {VPS_REMOTE_NS}/ on the VPS")
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+    except Exception as e:
+        print(f"[error] rsync failed to launch: {e}")
+        return
+    tail = "\n".join(r.stdout.splitlines()[-25:])
+    print(tail)
+    if r.returncode != 0:
+        print(f"[error] rsync exit {r.returncode}: {r.stderr.strip()[-600:]}")
+    else:
+        print("push OK" if not args.dry_run else "dry-run OK (nothing written)")
+
+
 def cmd_stats(args):
     _print_stats(db.connect(DB_PATH, check_same_thread=False))
 
@@ -270,6 +312,13 @@ def main():
     x.add_argument("--per-show", action="store_true",
                    help="also write per-show detail shards (full shownotes)")
     x.set_defaults(func=cmd_export)
+
+    pu = sub.add_parser("push", help="rsync shards to the VPS (onlyboosts/ namespace)")
+    pu.add_argument("--out", default=str(HERE / "data" / "shards"),
+                    help="shards directory to push")
+    pu.add_argument("--dry-run", action="store_true",
+                    help="show what would transfer without writing anything")
+    pu.set_defaults(func=cmd_push)
 
     s = sub.add_parser("stats", help="print index counts")
     s.set_defaults(func=cmd_stats)
