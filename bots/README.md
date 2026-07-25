@@ -13,22 +13,17 @@ as the Local Bitcoiners bot suite (`~/localbitcoiners/bots/`):
 
 ## What's here
 
-Carried over from the Local Bitcoiners fork and still LB-scoped — these are
-starting points, not finished OnlyBoosts bots:
-
+- **`global-boost-scan/`** — the collector. Scans Nostr network-wide for
+  podcast boosts, classifies them, enriches from the Podcast Index, and
+  publishes the static JSON the website reads. `DATA-API.md` in that
+  directory is the schema contract for consumers.
 - **`bug-watcher/`** — polls the bug relay for `onlyboosts-alpha` reports and
-  opens GitHub issues. Node, not Python; already repointed at this repo. The
-  one bot that works as-is. Needs `onlyboosts-alpha` whitelisted in
-  relay.mynostr.app's strfry write-policy before reports get through.
-- **`community-scan/`** — the boost classifier: NIP-73 `podcast:item:guid`
-  detection, zap-receipt unwrapping for Fountain-style notes that carry no
-  `amount` tag, and Podcast Index enrichment. Read-only; never publishes.
-  Still scoped to LB's supporters and skips LB's own show — OnlyBoosts wants
-  network-wide coverage and skips nothing.
-- **`community-boosts/`, `community-feeds/`** — the standalone collectors
-  community-scan replaced. Kept for reference.
-- **`shared/`** — `nostr_utils` (relay list), `boost_formatter`,
-  `collector_common`.
+  opens GitHub issues. Node, not Python. Needs `onlyboosts-alpha` whitelisted
+  in relay.mynostr.app's strfry write-policy before reports get through.
+- **`shared/`** — `nostr_utils` (relay list, npub helpers, outbox lookup) and
+  `collector_common` (bounded relay queries, VPS push).
 
-The collector that writes the OnlyBoosts snapshot to the VPS isn't built
-yet; the site currently reads LB's `community_boosts.json`.
+The Local Bitcoiners collectors this project forked from — `community-scan`,
+`community-boosts`, `community-feeds`, and `shared/boost_formatter.py` — were
+removed once `global-boost-scan` superseded them. They're still readable at
+`git show lb/main:bots/<name>` if any of that logic is ever wanted back.

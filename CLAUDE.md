@@ -63,7 +63,7 @@ Local dev: `wrangler pages dev .` (so `/api/*` Functions resolve).
   markers and get overwritten.
 - **Pages Functions bound every upstream fetch**: wall-clock timeout, byte
   cap, *and* a streamed read (`resp.text()` buffers before you can check
-  size). See `functions/api/community-boosts.js` for the reference shape.
+  size). See `functions/api/data/[[path]].js` for the reference shape.
 - **CORS origin allowlists are exact-match `Set` lookups**, never
   `startsWith` — a prefix check lets a lookalike origin get reflected into
   `Access-Control-Allow-Origin`.
@@ -104,7 +104,7 @@ grey.
 
 The domain appears in `robots.txt`, `manifest.webmanifest`,
 `functions/sitemap.xml.js`, the CORS allowlist in
-`functions/api/community-boosts.js`, page canonical/OG tags, and the
+`functions/api/data/[[path]].js`, page canonical/OG tags, and the
 `client` tags on published events — change them together. The npub is also
 served for NIP-05 from `.well-known/nostr.json`.
 
@@ -174,9 +174,10 @@ Carried from the scaffold commit and the LB suite:
 - `partials/` + `scripts/sync-partials.js` — shared nav/footer
 - `functions/api/data/[[path]].js` + `assets/js/ob-data.js` — the data feed
 - `bots/bug-watcher/` — polls the bug relay, opens GitHub issues
-- `bots/community-scan/` + `bots/shared/` — the boost classifier: NIP-73
-  `podcast:item:guid` tags, zap-receipt unwrapping for Fountain-style notes
-  with no `amount` tag, Podcast Index enrichment
+- `bots/global-boost-scan/` — the network-wide collector: NIP-73
+  `podcast:item:guid` detection, zap-receipt unwrapping for Fountain-style
+  notes with no `amount` tag, Podcast Index enrichment, and the static-JSON
+  export the site reads. `DATA-API.md` there is the schema contract.
 
 **Still to build:**
 
