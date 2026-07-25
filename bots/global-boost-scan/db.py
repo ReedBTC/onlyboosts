@@ -84,7 +84,21 @@ CREATE TABLE IF NOT EXISTS meta (
     key    TEXT PRIMARY KEY,
     value  TEXT
 );
+
+-- Negative cache: guids/pubkeys we tried to enrich and couldn't (Podcast Index
+-- has no record, or a URL/opaque guid it rejects; no kind-0 anywhere). Without
+-- this, every incremental run re-queries every permanently-unresolvable id and
+-- hammers Podcast Index. Retried only after a cooldown, in case data appears.
+CREATE TABLE IF NOT EXISTS enrich_failed (
+    kind      TEXT,          -- 'show' | 'episode' | 'profile'
+    id        TEXT,
+    last_try  INTEGER,
+    PRIMARY KEY (kind, id)
+);
 """
+
+# Re-attempt a failed enrichment at most this often.
+ENRICH_RETRY_COOLDOWN = 7 * 24 * 60 * 60
 
 
 def connect(db_path, check_same_thread=True):
@@ -179,11 +193,18 @@ def upsert_profile(conn, pubkey, prof):
 
 
 # ── work queues for the enrichment pass ───────────────────────────────────────
+# Each excludes ids that failed enrichment within the cooldown (see enrich_failed).
+def _cutoff():
+    return int(time.time()) - ENRICH_RETRY_COOLDOWN
+
+
 def guids_needing_show(conn):
     rows = conn.execute(
         """SELECT DISTINCT b.podcast_guid FROM boosts b
            LEFT JOIN shows s ON s.podcast_guid = b.podcast_guid
-           WHERE b.podcast_guid IS NOT NULL AND s.podcast_guid IS NULL""").fetchall()
+           LEFT JOIN enrich_failed f ON f.kind='show' AND f.id = b.podcast_guid
+           WHERE b.podcast_guid IS NOT NULL AND s.podcast_guid IS NULL
+             AND (f.id IS NULL OR f.last_try < ?)""", (_cutoff(),)).fetchall()
     return [r[0] for r in rows]
 
 
@@ -191,7 +212,9 @@ def guids_needing_episode(conn):
     rows = conn.execute(
         """SELECT DISTINCT b.item_guid FROM boosts b
            LEFT JOIN episodes e ON e.item_guid = b.item_guid
-           WHERE b.item_guid IS NOT NULL AND e.item_guid IS NULL""").fetchall()
+           LEFT JOIN enrich_failed f ON f.kind='episode' AND f.id = b.item_guid
+           WHERE b.item_guid IS NOT NULL AND e.item_guid IS NULL
+             AND (f.id IS NULL OR f.last_try < ?)""", (_cutoff(),)).fetchall()
     return [r[0] for r in rows]
 
 
@@ -199,8 +222,23 @@ def pubkeys_needing_profile(conn):
     rows = conn.execute(
         """SELECT DISTINCT b.booster_pubkey FROM boosts b
            LEFT JOIN profiles p ON p.pubkey = b.booster_pubkey
-           WHERE p.pubkey IS NULL""").fetchall()
+           LEFT JOIN enrich_failed f ON f.kind='profile' AND f.id = b.booster_pubkey
+           WHERE p.pubkey IS NULL
+             AND (f.id IS NULL OR f.last_try < ?)""", (_cutoff(),)).fetchall()
     return [r[0] for r in rows]
+
+
+def mark_enrich_failed(conn, kind, ids):
+    """Record that these ids failed enrichment now, so they aren't retried until
+    the cooldown lapses. `ids` may be a single id or an iterable."""
+    if isinstance(ids, str):
+        ids = [ids]
+    now = int(time.time())
+    conn.executemany(
+        """INSERT INTO enrich_failed (kind, id, last_try) VALUES (?, ?, ?)
+           ON CONFLICT(kind, id) DO UPDATE SET last_try=excluded.last_try""",
+        [(kind, i, now) for i in ids])
+    conn.commit()
 
 
 def feed_id_for_guid(conn, podcast_guid):

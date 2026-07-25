@@ -97,9 +97,11 @@ def export(conn, out_dir, latest_n=1000, per_show=False, log=print):
         key = time.strftime("%Y-%m", time.gmtime(rec["ts"]))
         months.setdefault(key, []).append(rec)
     for key, recs in months.items():
+        # No generated_at in the per-month bodies: a past month's file is then
+        # byte-identical run to run, so the incremental push (rsync) skips it and
+        # only re-ships the current month. Freshness lives in the manifest.
         write_json(out / "boosts" / f"{key}.json",
-                   {"generated_at": generated, "month": key,
-                    "count": len(recs), "boosts": recs})
+                   {"month": key, "count": len(recs), "boosts": recs})
     log(f"  boost feed: {total} records, {len(months)} monthly pages")
 
     # ── podcasts index (per-show aggregates) ──────────────────────────────────
@@ -155,8 +157,9 @@ def export(conn, out_dir, latest_n=1000, per_show=False, log=print):
             show_boosts = [_record(r) for r in
                            conn.execute(_FEED_SQL + " WHERE b.podcast_guid = ? "
                                         "ORDER BY b.created_at DESC", (pg,)).fetchall()]
+            # No generated_at here either — a show's file changes only when that
+            # show gets a new boost, so rsync ships just the handful that moved.
             write_json(out / "podcasts" / f"{_safe(pg)}.json", {
-                "generated_at": generated,
                 "show": {"guid": pg, "title": a["title"], "img": a["image"],
                          "feed": a["feed_url"], "medium": a["medium"]},
                 "episodes": [{

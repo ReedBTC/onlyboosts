@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# One incremental cycle for the OnlyBoosts feed: tail-scan new boosts, enrich any
+# newly-seen shows/episodes/profiles, re-export the JSON shards, and push the
+# changed ones to the VPS. Read-only against Nostr + Podcast Index; the only
+# outward write is the rsync of static JSON. Driven by onlyboosts-incremental.timer.
+set -euo pipefail
+cd "$(dirname "$0")"
+PY=/usr/bin/python3
+BOT=onlyboosts_globalscan.py
+
+# Don't let a slow run overlap the next tick.
+exec 9>data/incremental.lock
+flock -n 9 || { echo "[skip] another incremental run holds the lock"; exit 0; }
+
+echo "=== $(date -u +%FT%TZ) OnlyBoosts incremental cycle ==="
+"$PY" "$BOT" incremental          # new boosts since last run → SQLite
+"$PY" "$BOT" enrich               # fill metadata/profiles for anything new
+"$PY" "$BOT" export --per-show    # rebuild the JSON shards
+"$PY" "$BOT" push                 # rsync changed shards to the VPS (no --delete: nothing is removed on a tail run)
+echo "=== $(date -u +%FT%TZ) cycle done ==="

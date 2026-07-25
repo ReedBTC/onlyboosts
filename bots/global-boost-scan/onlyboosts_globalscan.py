@@ -165,7 +165,12 @@ def cmd_incremental(args):
     on_page = _make_page_handler(conn, lock, receipt_cache, totals)
 
     global_since = int(db.get_meta(conn, "last_incremental", 0) or 0)
-    since = max(0, global_since - INCREMENTAL_OVERLAP) if global_since else args.floor
+    if not global_since:
+        # Never run: seed from the newest boost the backfill already stored, so the
+        # first tail scan is a small window — not a re-walk from the floor.
+        row = conn.execute("SELECT MAX(created_at) FROM boosts").fetchone()
+        global_since = int(row[0]) if row and row[0] else 0
+    since = max(args.floor, global_since - INCREMENTAL_OVERLAP) if global_since else args.floor
     print(f"Incremental since {time.strftime('%Y-%m-%d %H:%M', time.gmtime(since))}")
 
     newest_overall = since
@@ -194,6 +199,8 @@ def cmd_enrich(args):
             info = enrich.resolve_show(pg, key, secret)
             if info:
                 db.upsert_show(conn, info)
+            else:
+                db.mark_enrich_failed(conn, "show", pg)   # negative-cache: don't re-query weekly+
             if i % 25 == 0:
                 print(f"  shows {i}/{len(shows)}")
 
@@ -208,6 +215,8 @@ def cmd_enrich(args):
             info = enrich.resolve_episode(ig, feed_id, key, secret)
             if info:
                 db.upsert_episode(conn, info)
+            else:
+                db.mark_enrich_failed(conn, "episode", ig)
             if i % 50 == 0:
                 print(f"  episodes {i}/{len(eps)}")
     else:
@@ -219,7 +228,10 @@ def cmd_enrich(args):
                                     log=lambda m: print(m, flush=True))
     for pk, prof in profs.items():
         db.upsert_profile(conn, pk, prof)
-    print(f"Enrichment done: {len(profs)} profiles resolved.")
+    missed = [pk for pk in pubkeys if pk not in profs]
+    if missed:
+        db.mark_enrich_failed(conn, "profile", missed)     # no kind-0 found this pass
+    print(f"Enrichment done: {len(profs)} profiles resolved, {len(missed)} negative-cached.")
     _print_stats(conn)
 
 
