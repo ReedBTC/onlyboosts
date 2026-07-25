@@ -617,6 +617,26 @@
     }
     .pcast-cardmenu-item:hover { background: var(--tint); color: var(--accent-d); }
 
+    /* Rank badge — only rendered on the quantitative sorts (most boosters /
+       boosts / sats), where position is a ranking rather than chronology.
+       Tabular figures keep the column steady from 1 to 999. */
+    .pcast-rank {
+      flex: 0 0 auto;
+      align-self: flex-start;
+      min-width: 1.6rem;
+      padding-top: 0.15rem;
+      font-family: 'Playfair Display', Georgia, serif;
+      font-weight: 700;
+      font-size: 1.05rem;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.2;
+      color: var(--accent);
+      text-align: right;
+    }
+    @media (max-width: 640px) {
+      .pcast-rank { min-width: 1.2rem; font-size: 0.95rem; }
+    }
+
     /* ── Boost drawer — a low-profile full-width toggle under the head. ── */
     .pcast-drawer {
       display: flex; align-items: center; gap: 0.4rem; width: 100%;

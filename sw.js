@@ -25,6 +25,7 @@
 // login-widget.js and nostr-tools.js were both rebuilt, so bump to evict the
 // stale stale-while-revalidate copies — a returning visitor holding the
 // previous widget bundle would otherwise boost the old recipient.
+// ob-v7: rank numbers on the ranked Podcasts sorts.
 // ob-v6: Podcasts tabs restored to the episode-card feed (drawer, range
 // filter, sort menu) on top of the new data, via ob-data.js#toEpisodeShape.
 // podcasts-feed.js is gone; feeds-podcasts.js is back. Bump so a returning
@@ -42,7 +43,7 @@
 // returning visitor's precache still lists two URLs that now 404 — the bump
 // is what drops them. Also picks up the new palette and the logo/favicon/
 // banner PNGs.
-const VERSION = 'ob-v6';
+const VERSION = 'ob-v7';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;

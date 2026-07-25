@@ -447,7 +447,11 @@ async function onBoostClick(item, btn) {
 // carries its own "hide" control so a long thread is easy to close without
 // scrolling back up.
 let cardUid = 0
-function episodeCard(item) {
+// `rank` is the card's 1-based position under the current sort, or null when
+// the sort isn't a ranking. Only the quantitative sorts (most boosters / most
+// boosts / most sats) get a number — on "Latest boost" or "Latest episode" a
+// rank would read as a score when it's really just chronology.
+function episodeCard(item, rank = null) {
   const { ep, show, boosts, distinctBoosters, totalSats, latest } = item
   const detailsId = 'pcast-d-' + (++cardUid)
 
@@ -514,7 +518,12 @@ function episodeCard(item) {
     media,
     ep.published ? h('div', { class: 'pcast-card-aired', title: 'Episode aired' }, fullDate(ep.published)) : null,
   ])
-  const head = h('div', { class: 'pcast-card-head' }, [mediaCol, body, subscribeMenu(item)])
+  // Rank badge sits at the head of the row on ranked sorts. aria-hidden
+  // because the visual order already conveys it to a screen reader, and an
+  // announced "1." before every episode title is noise.
+  const rankEl = rank == null ? null
+    : h('div', { class: 'pcast-rank', 'aria-hidden': 'true', text: String(rank) })
+  const head = h('div', { class: 'pcast-card-head' }, [rankEl, mediaCol, body, subscribeMenu(item)])
 
   // Inline audio player (native controls, no preload until played).
   const audioUrl = safeHttpUrl(ep.enclosure_url)
@@ -781,6 +790,10 @@ async function loadMentionProfiles(items) {
 }
 
 // ── Sorting ──────────────────────────────────────────────────────────
+// Sorts where a position means something. Kept next to SORT_OPTIONS so the
+// two can't drift — adding a quantitative sort means adding it here too.
+const RANKED_SORTS = new Set(['count', 'boosts', 'sats'])
+
 const SORT_OPTIONS = [
   ['recent', 'Latest boost'],
   ['episode', 'Latest episode'],
@@ -1012,11 +1025,13 @@ export async function renderPodcasts({ panel, list, scope = 'global' }) {
       return
     }
     const next = sorted.slice(shown, shown + INITIAL_CARDS)
-    for (const it of next) {
-      const el = episodeCard(it)
+    next.forEach((it, i) => {
+      // Continue the numbering across "Show more" pages rather than
+      // restarting at 1 each time.
+      const el = episodeCard(it, RANKED_SORTS.has(sortKey) ? shown + i + 1 : null)
       el._pcastItem = it   // lets repaintProfiles map avatars regardless of sort order
       cards.appendChild(el)
-    }
+    })
     shown += next.length
     moreWrap.innerHTML = ''
     const remaining = sorted.length - shown
