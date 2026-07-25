@@ -23,20 +23,37 @@ const CACHE_KEY = 'ob_follows_v1'
 const CACHE_MAX_AGE_MS = 30 * 60 * 1000   // 30 min
 const FETCH_TIMEOUT_MS = 6000
 
+const isHexPubkey = (pk) => typeof pk === 'string' && /^[0-9a-f]{64}$/i.test(pk)
+
 /**
  * Hex pubkey of the signed-in user, or null. Cheap and synchronous — safe to
  * call on every render to decide between the feed and the "sign in" state.
+ *
+ * Two sources, in order:
+ *  1. the persisted session in localStorage — works on a cold load, before
+ *     the login widget has been fetched;
+ *  2. the widget's in-memory user, *if* the bundle happens to be loaded.
+ *
+ * (2) is not redundant: an nsec login is deliberately never persisted (the
+ * key stays in memory for the tab's lifetime — see LoginScreen.jsx), so
+ * localStorage is empty for a user who is very much signed in. Without this
+ * fallback the Follows tabs tell them to sign in while their npub is right
+ * there in the nav. Reading `window.LBLogin` is free; this must never *load*
+ * the widget, which is the whole reason this module exists.
  */
 export function getSessionPubkey() {
   try {
     const raw = localStorage.getItem(SESSION_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw)
-    const pk = parsed?.pubkey
-    return (typeof pk === 'string' && /^[0-9a-f]{64}$/i.test(pk)) ? pk.toLowerCase() : null
-  } catch {
-    return null
-  }
+    if (raw) {
+      const pk = JSON.parse(raw)?.pubkey
+      if (isHexPubkey(pk)) return pk.toLowerCase()
+    }
+  } catch {}
+  try {
+    const pk = window.LBLogin?.getUser?.()?.pubkey
+    if (isHexPubkey(pk)) return pk.toLowerCase()
+  } catch {}
+  return null
 }
 
 // Cache is keyed by pubkey so switching accounts can't serve the previous

@@ -831,9 +831,9 @@ const RANGE_OPTIONS = [
 // 1W/1M/All buttons can't disagree. Same wording on Global and Follows —
 // the tab already says whose feed it is.
 const RANGE_TITLES = {
-  '1w': 'Podcasts Aired This Week',
-  '1m': 'Podcasts Aired This Month',
-  'all': 'Podcasts All',
+  '1w': 'Podcasts: Last 7 Days',
+  '1m': 'Podcasts: Last 30 Days',
+  'all': 'Podcasts: All',
 }
 function setPanelTitle(panel, rangeKey) {
   const el = panel?.querySelector('[data-pcast-title]')

@@ -53,62 +53,13 @@
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
   <link rel="stylesheet" href="/assets/css/boost-actions.css" />
+  <!-- Palette + base type. Every page links this; it's where the tokens
+       the shared stylesheets read off :root are defined. Must stay last
+       among the stylesheets so the inline block below still wins. -->
+  <link rel="stylesheet" href="/assets/css/theme.css" />
 
   <style>
-    @font-face {
-      font-family: 'Playfair Display';
-      font-style: normal;
-      font-weight: 400 700;
-      font-display: swap;
-      src: url('/assets/fonts/playfair-display.woff2') format('woff2');
-    }
-    @font-face {
-      font-family: 'Source Serif 4';
-      font-style: normal;
-      font-weight: 300 600;
-      font-display: swap;
-      src: url('/assets/fonts/source-serif-4.woff2') format('woff2');
-    }
-
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { overflow-x: hidden; max-width: 100vw; }
-
     :root {
-      /* ── Brand ────────────────────────────────────────────────────
-         Sampled from assets/onlyboosts_pfp.png: the mark's cyan and the
-         darker blue of its broadcast waves. These two are the whole
-         identity — everything below is derived from them. */
-      --brand:    #00aff0;
-      --brand-d:  #068ace;
-      --brand-dd: #0a6fa8;
-
-      /* ── Legacy token aliases ─────────────────────────────────────
-         The shared stylesheets (nav.css, footer.css, boosts-thread.css,
-         boost-actions.css) were written against localbitcoiners' token
-         names and read them straight off :root. Rather than rename ~300
-         usages across five files, the old names are kept as aliases and
-         repointed at the OnlyBoosts palette here — so this block is the
-         single place the theme is defined. Names like --cream / --orange
-         are historical; trust the values, not the words. New code should
-         prefer --brand / --ink / --surface below. */
-      --cream:   #eef6fb;   /* page background      */
-      --cream-d: #e2eef7;   /* sunken background    */
-      --navy:    #0b3a52;   /* nav + footer bar     */
-      --navy-l:  #12455f;
-      --green:   #068ace;   /* link                 */
-      --green-d: #0a6fa8;   /* link, hover          */
-      --orange:  #00aff0;   /* primary action       */
-      --orange-d:#068ace;
-      --text:    #0f2733;
-      --muted:   #5a7488;
-      --border:  #cfe2ee;
-      --white:   #ffffff;
-      --bg:      #e2eef7;
-
-      /* Preferred names for anything written from here on. */
-      --ink:     #0f2733;
-      --surface: #ffffff;
-
       /* ── Per-feed theme palette ──────────────────────────────────
          Each of the four feeds owns an accent (used for its tab and the
          active-panel wash). The four sit on one cyan→indigo ramp so the
@@ -132,24 +83,6 @@
     body[data-active-feed="boosts-follows"]   { --accent: var(--bf-accent); --accent-d: var(--bf-accent-d); --tint: var(--bf-tint); }
     body[data-active-feed="podcasts-global"]  { --accent: var(--pg-accent); --accent-d: var(--pg-accent-d); --tint: var(--pg-tint); }
     body[data-active-feed="podcasts-follows"] { --accent: var(--pf-accent); --accent-d: var(--pf-accent-d); --tint: var(--pf-tint); }
-
-    html { scroll-behavior: smooth; }
-
-    body {
-      font-family: 'Source Serif 4', Georgia, serif;
-      background: var(--cream);
-      color: var(--text);
-      line-height: 1.65;
-      font-size: 17px;
-      color-scheme: light;
-    }
-    a { color: var(--green-d); text-decoration: underline; text-underline-offset: 3px; }
-    img { display: block; max-width: 100%; }
-
-    @keyframes skeleton-shimmer {
-      0% { background-position: 100% 0; }
-      100% { background-position: -100% 0; }
-    }
 
     /* ── Masthead ────────────────────────────────────────────────────
        Wordmark banner sits above the sticky tab row. It scrolls away;
@@ -918,17 +851,20 @@
           <a class="nav-explore-home" href="/"><span aria-hidden="true">🏠</span> Home</a>
           <div class="nav-explore-groups">
             <div class="nav-explore-group">
-              <h4>Podcasts</h4>
-              <a href="/#podcasts-global"><span aria-hidden="true">🎙</span> Global Podcasts</a>
-              <a href="/#podcasts-follows"><span aria-hidden="true">🎧</span> Follows Podcasts</a>
+              <h4>Feeds</h4>
+              <a href="/#podcasts-global"><span aria-hidden="true">🎙</span> Podcasts: Global</a>
+              <a href="/#podcasts-follows"><span aria-hidden="true">🎧</span> Podcasts: Follows</a>
+              <a href="/#boosts-global"><span aria-hidden="true">⚡</span> Boosts: Global</a>
+              <a href="/#boosts-follows"><span aria-hidden="true">👥</span> Boosts: Follows</a>
             </div>
             <div class="nav-explore-group">
-              <h4>Boosts</h4>
-              <a href="/#boosts-global"><span aria-hidden="true">⚡</span> Global Boosts</a>
-              <a href="/#boosts-follows"><span aria-hidden="true">👥</span> Follows Boosts</a>
+              <h4>Community</h4>
+              <a href="/boosters"><span aria-hidden="true">🧑‍🤝‍🧑</span> Boosters</a>
+              <a href="/podcasts"><span aria-hidden="true">📻</span> Podcasts</a>
             </div>
             <div class="nav-explore-group">
               <h4>More</h4>
+              <a href="/about"><span aria-hidden="true">ℹ️</span> About</a>
               <a href="https://github.com/ReedBTC/onlyboosts" target="_blank" rel="noopener"><span aria-hidden="true">💻</span> Source</a>
               <a href="#" data-lb-bug-trigger><span aria-hidden="true">🐞</span> Report a bug</a>
             </div>
@@ -936,18 +872,18 @@
         </div>
       </details>
     </nav>
-    <div id="lb-boost-slot" aria-label="Boost">
+    <div id="lb-boost-slot" aria-label="Donate">
       <button
         type="button"
         class="lb-boost-placeholder"
         data-lb-boost-trigger="show"
-        aria-label="Boost"
+        aria-label="Donate to OnlyBoosts"
       >
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
           <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd"/>
         </svg>
-        <span class="lb-label-long">Boost</span>
-        <span class="lb-label-short">Boost</span>
+        <span class="lb-label-long">Donate</span>
+        <span class="lb-label-short">Donate</span>
       </button>
     </div>
     <div id="lb-identity-slot" aria-label="Account">
@@ -1226,109 +1162,10 @@
 </script>
 
 <!-- ───────────────── NOSTR LOGIN WIDGET (lazy) ─────────────────
-     The ~1MB bundle is deferred until a returning user's session restore
-     or a nav boost / sign-in click actually needs it. -->
-<script>
-(function () {
-  'use strict';
-
-  // Shares one promise (window.__lbWidgetLoad) with every other trigger on
-  // this page — assets/js/widget-loader.js for the module-side callers,
-  // nav.js for the bug-report item. This page has the most competing
-  // triggers of any, and the bundle is 1MB: without a shared promise, a
-  // podcast-boost click (which awaits /api/value before injecting) racing a
-  // nav Boost click appends a second <script> for a bundle already in flight.
-  // The HTTP cache serves that duplicate, but the ~1MB parse+execute is paid
-  // twice — on the click where the user is waiting on the modal. Keep this in
-  // sync with widget-loader.js.
-  function ensureWidgetLoaded() {
-    if (window.LBLogin) return Promise.resolve();
-    if (window.__lbWidgetLoad) return window.__lbWidgetLoad;
-
-    window.__lbWidgetLoad = new Promise((resolve, reject) => {
-      const existing = document.querySelector('script[src*="login-widget.js"]');
-      if (existing) {
-        const started = Date.now();
-        const iv = setInterval(() => {
-          if (window.LBLogin) { clearInterval(iv); resolve(); return; }
-          if (Date.now() - started > 15000) {
-            clearInterval(iv);
-            window.__lbWidgetLoad = null;
-            reject(new Error('login widget load timed out'));
-          }
-        }, 60);
-        return;
-      }
-      const s = document.createElement('script');
-      s.src = 'assets/widgets/login-widget.js';
-      s.async = true;
-      s.onload = () => { Promise.resolve().then(resolve); };
-      s.onerror = () => {
-        window.__lbWidgetLoad = null;
-        reject(new Error('Failed to load login widget'));
-      };
-      document.head.appendChild(s);
-    });
-    return window.__lbWidgetLoad;
-  }
-
-  const boostPh = document.querySelector('[data-lb-boost-trigger="show"]');
-  if (boostPh) {
-    boostPh.addEventListener('click', async () => {
-      boostPh.disabled = true;
-      const long = boostPh.querySelector('.lb-label-long');
-      const short = boostPh.querySelector('.lb-label-short');
-      const prevLong = long ? long.textContent : '';
-      const prevShort = short ? short.textContent : '';
-      if (long) long.textContent = 'Loading…';
-      if (short) short.textContent = '…';
-      try {
-        await ensureWidgetLoaded();
-        if (window.LBLogin?.openShowBoost) window.LBLogin.openShowBoost();
-      } catch (e) {
-        if (long) long.textContent = prevLong;
-        if (short) short.textContent = prevShort;
-        boostPh.disabled = false;
-        console.error('[lb] widget load failed', e);
-      }
-    });
-  }
-
-  const identitySlot = document.getElementById('lb-identity-slot');
-  function renderIdentitySignIn() {
-    if (!identitySlot) return;
-    identitySlot.innerHTML =
-      '<button type="button" class="lb-identity-placeholder" aria-label="Sign in with Nostr">Sign in</button>';
-    const btn = identitySlot.querySelector('button');
-    btn.addEventListener('click', async () => {
-      btn.disabled = true;
-      const prev = btn.textContent;
-      btn.textContent = '…';
-      try {
-        await ensureWidgetLoaded();
-        if (window.LBLogin?.requestLogin) window.LBLogin.requestLogin();
-      } catch (e) {
-        btn.textContent = prev;
-        btn.disabled = false;
-        console.error('[lb] widget load failed', e);
-      }
-    });
-  }
-  if (identitySlot) {
-    let hasSession = false;
-    try { hasSession = !!localStorage.getItem('lb_nostr_session'); } catch {}
-    if (hasSession) {
-      identitySlot.innerHTML = '<div class="lb-identity-restoring" aria-label="Loading account"></div>';
-      ensureWidgetLoaded().catch((e) => {
-        console.warn('[lb] eager widget load failed', e);
-        renderIdentitySignIn();
-      });
-    } else {
-      renderIdentitySignIn();
-    }
-  }
-})();
-</script>
+     Wires the nav's Donate button + identity slot to the ~1MB bundle,
+     which stays unloaded until a session restore or a click needs it.
+     Shared by every page — see assets/js/nav-widget-boot.js. -->
+<script src="/assets/js/nav-widget-boot.js"></script>
 
 <!-- PWA service worker -->
 <script src="/assets/js/sw-register.js" defer></script>

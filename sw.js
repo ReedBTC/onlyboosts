@@ -25,6 +25,16 @@
 // login-widget.js and nostr-tools.js were both rebuilt, so bump to evict the
 // stale stale-while-revalidate copies — a returning visitor holding the
 // previous widget bundle would otherwise boost the old recipient.
+// ob-v10: the Follows feeds now repaint on sign-in. The fix spans the widget
+// bundle (which dispatches lb:session-change) and feeds.js/follow-set.js
+// (which listen), so a returning visitor holding one half and not the other
+// would still see the stale "Sign in to see this feed" for a navigation.
+// ob-v9: nav rework — Donate button (login-widget.js rebuilt), Feeds /
+// Community / More groups in Explore, and the coming-soon pages. The theme
+// tokens and the widget bootstrap moved out of index.html into
+// assets/css/theme.css and assets/js/nav-widget-boot.js; a returning visitor
+// holding the precached index.html would otherwise render unstyled until
+// those two new files fetched.
 // ob-v8: feed order (Podcasts first), range-driven Podcasts titles, ranks
 // restricted to Global, boost source line, subtitles removed.
 // ob-v7: rank numbers on the ranked Podcasts sorts.
@@ -45,7 +55,7 @@
 // returning visitor's precache still lists two URLs that now 404 — the bump
 // is what drops them. Also picks up the new palette and the logo/favicon/
 // banner PNGs.
-const VERSION = 'ob-v8';
+const VERSION = 'ob-v10';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;
@@ -66,6 +76,8 @@ const PRECACHE_URLS = [
   '/assets/onlyboosts_pfp.png',
   '/assets/onlyboosts_banner.png',
   '/assets/avatar-fallback.svg',
+  '/assets/css/theme.css',
+  '/assets/css/page.css',
   '/assets/css/nav.css',
   '/assets/css/footer.css',
   '/assets/css/boosts-thread.css',
@@ -74,6 +86,7 @@ const PRECACHE_URLS = [
   '/assets/js/calendar-events.js',
   '/assets/js/boost-actions.js',
   '/assets/js/nav.js',
+  '/assets/js/nav-widget-boot.js',
   '/assets/js/widget-loader.js',
   '/assets/js/sw-register.js',
 ];

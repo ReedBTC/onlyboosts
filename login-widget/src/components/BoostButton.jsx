@@ -21,8 +21,8 @@ export default function BoostButton({ onOpen }) {
         color: '#ffffff',
       }}
       className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[0.78rem] font-semibold transition-colors hover:!bg-[#068ace]"
-      aria-label="Boost OnlyBoosts"
-      title="Boost OnlyBoosts"
+      aria-label="Donate to OnlyBoosts"
+      title="Donate to OnlyBoosts"
     >
       <svg
         viewBox="0 0 24 24"
@@ -38,8 +38,8 @@ export default function BoostButton({ onOpen }) {
           clipRule="evenodd"
         />
       </svg>
-      <span className="hidden sm:inline">Boost</span>
-      <span className="sm:hidden">Boost</span>
+      <span className="hidden sm:inline">Donate</span>
+      <span className="sm:hidden">Donate</span>
     </button>
   )
 }

@@ -95,6 +95,11 @@ let currentUser = initialUser()
 // background restore finishes.
 wallet.setUserContext(currentUser || null)
 
+// Last pubkey broadcast on `lb:session-change` (see setUser). Seeded from
+// the restored session so a stub→real upgrade on page boot isn't announced
+// as a login — the identity didn't change, only the profile filled in.
+let lastBroadcastPubkey = (currentUser && currentUser.pubkey) || null
+
 function setUser(u) {
   // Coerce any falsy non-undefined value to null so consumers can
   // discriminate "restoring" (undefined) from "logged out" (null).
@@ -119,6 +124,24 @@ function setUser(u) {
     })
   } else if (u === null) {
     clearProfile()
+  }
+  // Tell the non-React half of the site that the identity changed. The
+  // Follows feeds (assets/js/feeds.js) are scoped to the signed-in npub
+  // and render long before the bundle loads, so this event is their only
+  // way to learn about a sign-in that happens after they've painted —
+  // otherwise "Sign in to see this feed" survives the login until reload.
+  //
+  // Fires on identity changes only. setUser also runs for profile
+  // refreshes and stub→real restores, which don't invalidate a feed;
+  // `undefined` means "restoring" and isn't an identity at all.
+  if (currentUser !== undefined) {
+    const pk = (currentUser && currentUser.pubkey) || null
+    if (pk !== lastBroadcastPubkey) {
+      lastBroadcastPubkey = pk
+      try {
+        window.dispatchEvent(new CustomEvent('lb:session-change', { detail: { pubkey: pk } }))
+      } catch {}
+    }
   }
 }
 

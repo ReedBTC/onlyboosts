@@ -5,8 +5,11 @@ the difference is that it does **not** query relays for the feed. It reads a
 pre-built JSON snapshot off the VPS (`relay.mynostr.app`), the same way
 localbitcoiners' community feeds work.
 
-**It is a single page.** `index.html` is the whole site: four hash-routed
-tabs on two axes — what (boosts / podcasts) x whose (global / your follows).
+**The whole feed experience is one page.** `index.html` carries four
+hash-routed tabs on two axes — what (boosts / podcasts) x whose (global /
+your follows). Three other pages exist (`about.html`, `boosters.html`,
+`podcasts.html`) but are coming-soon placeholders with no feature behind
+them yet; they're nav + header + card + footer and nothing else.
 
 | Tab | Hash | Renders |
 |---|---|---|
@@ -60,7 +63,15 @@ Local dev: `wrangler pages dev .` (so `/api/*` Functions resolve).
 - **Shared nav/footer are generated.** Edit `partials/nav.html` /
   `partials/footer.html`, then run `node scripts/sync-partials.js`. Never
   edit the copies inside page files — they're between `NAV:START`/`NAV:END`
-  markers and get overwritten.
+  markers and get overwritten. A new page only needs the empty marker pair;
+  the script fills it and adds the css/js tags.
+- **The nav's lazy-widget bootstrap is `assets/js/nav-widget-boot.js`**, not
+  inline — it wires the Donate button and the identity slot to the 1MB
+  login-widget bundle and every page loads it as a plain (non-defer) script
+  at the end of `<body>`.
+- **Link pages without the `.html`.** Cloudflare Pages serves `/about` and
+  308-redirects `/about.html` to it, so an in-site link with the extension
+  costs a redirect hop.
 - **Pages Functions bound every upstream fetch**: wall-clock timeout, byte
   cap, *and* a streamed read (`resp.text()` buffers before you can check
   size). See `functions/api/data/[[path]].js` for the reference shape.
@@ -74,9 +85,16 @@ Local dev: `wrangler pages dev .` (so `/api/*` Functions resolve).
 ## Theming
 
 The shared stylesheets (`nav.css`, `footer.css`, `boosts-thread.css`,
-`boost-actions.css`) read their colors as CSS custom properties off `:root`,
-which the *page* defines. So `index.html`'s `:root` block is the single place
-the theme lives.
+`boost-actions.css`) read their colors as CSS custom properties off `:root`
+and don't define them — every page has to supply the tokens. That supply is
+`assets/css/theme.css`: the palette, the `@font-face` rules, and the base
+`body`/`a`/`img` styles. **Link it from every page, last among the shared
+stylesheets** so a page's own inline `<style>` still wins.
+
+`index.html` keeps one theme block of its own — the four per-feed accents and
+the `body[data-active-feed]` mapping — because those only mean anything on
+the page that has the tabs. `assets/css/page.css` is the counterpart for the
+plain content pages (`.page-header`, `.soon-card`).
 
 Those stylesheets were written against localbitcoiners' token names
 (`--cream`, `--navy`, `--orange`, `--green-d` …). Rather than rename ~300
@@ -181,6 +199,12 @@ Carried from the scaffold commit and the LB suite:
 
 **Still to build:**
 
+0. **The three coming-soon pages have no feature behind them.** `/boosters`
+   (a directory of the npubs sending boosts), `/podcasts` (a show-level
+   directory — the feed tabs are episode-level), and `/about`. They're
+   `noindex` and out of `functions/sitemap.xml.js` until there's something
+   on them.
+
 1. **Podcast Index credentials.** `/api/value` needs `PODCAST_INDEX_KEY` and
    `PODCAST_INDEX_SECRET` in the Cloudflare env. Without them it returns a
    clean 503 and "Boost episode" can't resolve a show's splits. Locally, put
@@ -276,14 +300,28 @@ renderer on first view.
 | `podcasts-*` | `feeds-podcasts.js` | `latest.json` + 3 recent months, rolled up by episode |
 
 **Follows scoping** lives in `assets/js/follow-set.js`. `resolveFollows()`
-reads the signed-in pubkey straight out of `localStorage.lb_nostr_session` —
+reads the signed-in pubkey from `localStorage.lb_nostr_session` —
 deliberately *not* by loading the 1MB login widget, since all we need is an
 identity, not a signer — then fetches that user's newest kind-3 across the
-static relays and unions its p-tags. Cached 30 min, keyed by pubkey so an
+static relays and unions its p-tags.
+
+**An nsec login is never persisted** (`LoginScreen.jsx` keeps the key in
+memory only), so localStorage is empty for a user who is genuinely signed
+in. `getSessionPubkey()` therefore falls back to
+`window.LBLogin?.getUser?.()?.pubkey` — read only if the bundle is *already*
+loaded; it must never load it, which is the whole reason this module exists. Cached 30 min, keyed by pubkey so an
 account switch can't serve the previous user's list; an empty result is never
 cached. Returns `signed-out` / `ok` / `empty` / `unavailable`, each with its
 own placeholder. The user's own pubkey is in the set, so your own boosts
 appear in your Follows feed.
+
+**Signing in repaints the Follows feeds.** `setUser` in the widget dispatches
+`lb:session-change` on the window whenever the *identity* changes (not on
+profile refreshes or stub→real restores); `feeds.js` listens, drops both
+`*-follows` keys from its `loaded` set, and re-runs whichever one is on
+screen. A `storage` listener covers the same thing happening in another tab.
+Without it the "Sign in to see this feed" placeholder outlives the login,
+because `loaded` is what makes each feed hydrate exactly once.
 
 Two scoping details that aren't obvious:
 

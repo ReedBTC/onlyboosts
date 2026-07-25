@@ -36,6 +36,8 @@ import { SimplePool, verifyEvent, nip19 } from '/assets/widgets/nostr-tools.js'
 // Supporter-set resolution lives in one shared module; re-exported below so
 // home-feeds.js keeps importing resolveSupporters from feeds.js unchanged.
 import { resolveSupporters } from '/assets/js/supporter-set.js'
+// Identity, for keeping the Follows feeds in sync with who's signed in.
+import { getSessionPubkey, clearFollowCache } from '/assets/js/follow-set.js'
 
 // Hourly events snapshot (Cloudflare Pages Function proxying the file
 // bots/community-feeds pushes to the VPS). It carries the same raw signed
@@ -1064,6 +1066,41 @@ function loadFeed(feed) {
 document.addEventListener('lb:feed-activate', (e) => {
   const feed = e?.detail?.feed
   if (feed) loadFeed(feed)
+})
+
+// ── Session-driven refresh ───────────────────────────────────────────
+// The two Follows feeds are scoped to the signed-in npub, so signing in,
+// signing out, or switching accounts invalidates whatever they last
+// rendered. `loaded` makes every feed load exactly once, which is right
+// for the Global feeds and wrong for these: without this, signing in from
+// the nav while looking at "Sign in to see this feed" leaves that
+// placeholder on screen until a manual reload.
+//
+// Dropping them from `loaded` re-arms both — the visible one reloads now,
+// the other on its next activation, so an account switch can't leave a
+// stale list behind the tab you aren't looking at.
+const FOLLOWS_FEEDS = ['boosts-follows', 'podcasts-follows']
+let lastSessionPubkey = getSessionPubkey()
+
+function onSessionChange() {
+  const pubkey = getSessionPubkey()
+  if (pubkey === lastSessionPubkey) return
+  lastSessionPubkey = pubkey
+  // On sign-out, drop the cached follow list outright. (An account switch
+  // needs no clearing — the cache is keyed by pubkey and simply misses.)
+  if (!pubkey) clearFollowCache()
+  for (const feed of FOLLOWS_FEEDS) loaded.delete(feed)
+  const active = document.body.dataset.activeFeed
+  if (FOLLOWS_FEEDS.includes(active)) loadFeed(active)
+}
+
+// Same-tab: the login widget announces every identity change (index.jsx).
+window.addEventListener('lb:session-change', onSessionChange)
+// Other tabs: `storage` only fires on *other* documents, so this is purely
+// the "signed in on another tab" case. A null key means the whole store was
+// cleared, which counts.
+window.addEventListener('storage', (e) => {
+  if (!e || e.key === null || e.key === 'lb_nostr_session') onSessionChange()
 })
 
 // Load whichever feed is active when this module first runs (the inline

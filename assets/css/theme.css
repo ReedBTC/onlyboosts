@@ -1,0 +1,86 @@
+/* ══════════════════════════════ THEME ══════════════════════════════
+   The single place the OnlyBoosts palette lives.
+
+   The shared stylesheets (nav.css, footer.css, boosts-thread.css,
+   boost-actions.css) read their colors as custom properties off :root
+   and do NOT define them — every page has to supply the tokens. This
+   file is that supply: link it from every page, LAST among the shared
+   stylesheets, so a page's own <style> block can still override it.
+
+   Feed-specific tokens (the four per-feed accents and the
+   [data-active-feed] mapping) stay inline in index.html — they only
+   mean anything on the page that has the tabs. */
+
+/* Self-hosted variable WOFF2s — one file per family covers all weights.
+   Pages preload these; the @font-face rules live here so a page only has
+   to link one stylesheet to get the site's type. */
+@font-face {
+  font-family: 'Playfair Display';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('/assets/fonts/playfair-display.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Source Serif 4';
+  font-style: normal;
+  font-weight: 300 600;
+  font-display: swap;
+  src: url('/assets/fonts/source-serif-4.woff2') format('woff2');
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { overflow-x: hidden; max-width: 100vw; }
+
+:root {
+  /* ── Brand ────────────────────────────────────────────────────
+     Sampled from assets/onlyboosts_pfp.png: the mark's cyan and the
+     darker blue of its broadcast waves. These two are the whole
+     identity — everything below is derived from them. */
+  --brand:    #00aff0;
+  --brand-d:  #068ace;
+  --brand-dd: #0a6fa8;
+
+  /* ── Legacy token aliases ─────────────────────────────────────
+     The shared stylesheets were written against localbitcoiners'
+     token names and read them straight off :root. Rather than rename
+     ~300 usages across five files, the old names are kept as aliases
+     and repointed at the OnlyBoosts palette. Names like --cream /
+     --orange are historical; trust the values, not the words. New
+     code should prefer --brand / --ink / --surface below. */
+  --cream:   #eef6fb;   /* page background      */
+  --cream-d: #e2eef7;   /* sunken background    */
+  --navy:    #0b3a52;   /* nav + footer bar     */
+  --navy-l:  #12455f;
+  --green:   #068ace;   /* link                 */
+  --green-d: #0a6fa8;   /* link, hover          */
+  --orange:  #00aff0;   /* primary action       */
+  --orange-d:#068ace;
+  --text:    #0f2733;
+  --muted:   #5a7488;
+  --border:  #cfe2ee;
+  --white:   #ffffff;
+  --bg:      #e2eef7;
+
+  /* Preferred names for anything written from here on. */
+  --ink:     #0f2733;
+  --surface: #ffffff;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Source Serif 4', Georgia, serif;
+  background: var(--cream);
+  color: var(--text);
+  line-height: 1.65;
+  font-size: 17px;
+  color-scheme: light;
+}
+a { color: var(--green-d); text-decoration: underline; text-underline-offset: 3px; }
+img { display: block; max-width: 100%; }
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
