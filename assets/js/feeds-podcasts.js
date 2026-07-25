@@ -554,13 +554,16 @@ function episodeCard(item) {
   // Label the drawer by distinct boosters (matching the faces beside it), and
   // append the raw boost total only when it differs — on ~84% of episodes the
   // two are equal, so always showing it would just echo the same number.
-  // Both halves say "local": these counts cover only the LB community's boosts,
-  // not the episode's total, and the card links out to Boost Me Bitch's full
-  // feed — so an unqualified "11 boosts" here would read as that superset.
+  // LB qualified both halves as "local" because its counts covered only that
+  // show's community, so a bare "11 boosts" would have read as the episode's
+  // true total. OnlyBoosts is network-wide, so the qualifier is dropped — but
+  // note the counts are still bounded by what the collector actually found on
+  // Nostr, which is not every boost the episode received. Revisit the wording
+  // if that gap ever becomes user-visible.
   const nBoosters = distinctBoosters.length
   const nBoosts = boosts.length
-  const drawerLabel = `${nBoosters} local booster${nBoosters === 1 ? '' : 's'}`
-    + (nBoosts !== nBoosters ? ` · ${nBoosts} local boosts` : '')
+  const drawerLabel = `${nBoosters} booster${nBoosters === 1 ? "" : "s"}`
+    + (nBoosts !== nBoosters ? ` · ${nBoosts} boosts` : '')
   const drawerMeta = h('span', { class: 'pcast-drawer-meta' }, [
     avatars,
     totalSats > 0 ? h('span', { class: 'pcast-sats' }, [`${fmtSats(totalSats)} `, h('span', { class: 'pcast-bolt', 'aria-hidden': 'true', text: '⚡' })]) : null,

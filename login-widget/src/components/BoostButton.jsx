@@ -11,18 +11,18 @@ export default function BoostButton({ onOpen }) {
       type="button"
       onClick={onOpen}
       // Inline style for the orange — Tailwind's `bg-orange-500` is a
-      // slightly different hue. Keeping the exact #f7931a Bitcoin
+      // slightly different hue. Keeping the exact brand cyan
       // orange so the placeholder→React swap doesn't flicker color.
       style={{
-        background: '#f7931a',
+        background: '#00aff0',
         border: 'none',
         cursor: 'pointer',
         font: 'inherit',
         color: '#ffffff',
       }}
-      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[0.78rem] font-semibold transition-colors hover:!bg-[#d97b0e]"
-      aria-label="Boost the Show"
-      title="Boost the Show"
+      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[0.78rem] font-semibold transition-colors hover:!bg-[#068ace]"
+      aria-label="Boost OnlyBoosts"
+      title="Boost OnlyBoosts"
     >
       <svg
         viewBox="0 0 24 24"
@@ -38,7 +38,7 @@ export default function BoostButton({ onOpen }) {
           clipRule="evenodd"
         />
       </svg>
-      <span className="hidden sm:inline">Boost the Show</span>
+      <span className="hidden sm:inline">Boost</span>
       <span className="sm:hidden">Boost</span>
     </button>
   )

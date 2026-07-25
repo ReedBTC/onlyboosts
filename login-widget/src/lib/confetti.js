@@ -14,7 +14,7 @@
  * confetti is skipped).
  */
 
-const COLORS = ['#f7931a', '#cc2d97', '#ffd166', '#ffffff', '#ff7847']
+const COLORS = ['#00aff0', '#068ace', '#7fd7f8', '#ffffff', '#0a6fa8']
 
 export function fireConfetti({ count = 90, durationMs = 2400 } = {}) {
   if (typeof window === 'undefined' || typeof document === 'undefined') return

@@ -1,23 +1,21 @@
 /**
- * BoostModal — site-wide "Boost the Show" form.
+ * BoostModal — site-wide "Boost OnlyBoosts" tip form.
  *
  * Thin wrapper around <MultiLegBoostForm>: just owns the modal chrome
  * (backdrop, transitions, scroll lock, header + close X) and supplies
  * the show-level inputs:
- *   - hardcoded splitsBundle (channel-level value block from the RSS,
- *     baked into the bundle so the home-page boost button has no
- *     dependency on the RSS proxy at click time)
+ *   - hardcoded splitsBundle (a single 100% leg to the site's own
+ *     lightning address, baked into the bundle so the nav boost button
+ *     has no network dependency at click time)
  *   - episodeMeta with `kind: 'show'` so the in-flight dropdown reads
  *     "Show" and the bot can distinguish show-level boosts from
  *     episode boosts via empty episode/title/guid tags
  *   - sat presets (100/420/3333/21000)
- *   - "Boost the Show" button label
+ *   - "Boost OnlyBoosts" button label
  *
  * applyRecipientOverrides runs at module init for symmetry with the
- * episode flow — today the override map only redirects fountain.fm
- * addresses (not in the show splits), but pre-applying means a future
- * override that targets one of these addresses won't silently skip
- * the show-boost path.
+ * episode flow. The override map is empty on OnlyBoosts (see
+ * recipientOverrides.js for why), so this is currently a pass-through.
  */
 
 import { useEffect, useState } from 'react'
@@ -87,11 +85,11 @@ export default function BoostModal({ user, onClose, prefillMessage = '', onSettl
       <div
         className="fixed inset-0 z-[71] flex items-center justify-center p-3 sm:p-4 overflow-hidden"
         role="dialog"
-        aria-label="Boost the Show"
+        aria-label="Boost OnlyBoosts"
       >
         <div className={`relative bg-neutral-900 border border-neutral-700 rounded-lg w-full max-w-lg max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2rem)] flex flex-col shadow-[0_25px_60px_-12px_rgba(0,0,0,0.8),0_0_0_1px_rgba(255,255,255,0.04)] transition-[opacity,transform] duration-200 ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}>
           <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-neutral-800 shrink-0">
-            <h2 className="text-sm font-semibold text-neutral-200">⚡ Boost the Show</h2>
+            <h2 className="text-sm font-semibold text-neutral-200">⚡ Boost OnlyBoosts</h2>
             <button
               onClick={guardedClose}
               className="text-neutral-500 hover:text-neutral-300 transition-colors text-lg leading-none"
@@ -108,7 +106,7 @@ export default function BoostModal({ user, onClose, prefillMessage = '', onSettl
               episodeMeta={SHOW_EPISODE_META}
               presets={SHOW_PRESETS}
               shareTagline={SHOW_SHARE_TAGLINE}
-              buttonLabel="Boost the Show"
+              buttonLabel="Boost OnlyBoosts"
               defaultMessage={prefillMessage}
               onCancelled={requestClose}
               onBoostState={setBoostState}
