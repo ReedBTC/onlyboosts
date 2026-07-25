@@ -41,3 +41,8 @@ node_modules/
 tmp/
 scratchpad/
 *creds*.env
+# wrangler's local env file — holds PODCAST_INDEX_KEY / PODCAST_INDEX_SECRET
+# for `wrangler pages dev`. The deployed values live in the Cloudflare
+# dashboard; this file is the machine-local equivalent and is a real secret.
+.dev.vars
+.dev.vars.*
