@@ -142,7 +142,25 @@ polluted LB's own collector, which filters on exactly that GUID.
 
 Code edits, dry runs, and read-only inspection are fine without asking.
 **Confirm with Reed before running anything that signs or publishes a Nostr
-event, or that moves sats.** Published events can't be unpublished.
+event, or that moves sats.** Published events can't be unpublished. **New
+bots start with `DRY_RUN = True`.**
+
+## Bot conventions
+
+Carried from the scaffold commit and the LB suite:
+
+- One bot per subdirectory, script named `onlyboosts_{function}.py`.
+- Shared utilities live in `bots/shared/` — import from there, never
+  copy/paste relay lists or publish helpers into individual bots.
+- State files (`state.json`, `last_seen.txt`, `published_events.json`) sit
+  next to each bot and are gitignored.
+- Prefer a clean copy of an LB `shared/` utility over importing across
+  repos — the two projects push to different remotes and must stay
+  independently cloneable.
+- Relay note that carries over: Fountain boosts are heavily
+  `wss://relay.fountain.fm`-only (~90%), which is why it's in the
+  `NOSTR_RELAYS` list in `bots/shared/nostr_utils.py` despite not being a
+  general-purpose relay. Don't prune it.
 
 ## What's built vs. what isn't
 
