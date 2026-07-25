@@ -1,0 +1,31 @@
+# --- Bots: operational state (regenerable) ---
+bots/**/state.json
+bots/**/state.json.bak
+bots/**/state.json.before-*
+bots/**/state_*.json
+bots/**/*.lock
+bots/**/last_seen.txt
+bots/**/last_seen.txt.bak
+bots/**/published_events.json
+bots/**/published_events.json.bak
+
+# --- Bots: testing artifacts (may contain payment hashes) ---
+bots/dry-run/
+
+# --- Bots: local backup dirs created before refactors ---
+bots/**/*.bak/
+
+# --- Bots: private docs + scratch (machine-local agent context) ---
+bots/CLAUDE.md
+bots/tmp/
+
+# --- Python ---
+bots/**/__pycache__/
+bots/**/*.pyc
+.claude/
+
+# --- Local-only scratch + secrets (never commit) ---
+tmp/
+scratchpad/
+*creds*.env
+.DS_Store
