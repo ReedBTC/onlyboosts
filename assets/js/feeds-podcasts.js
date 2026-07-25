@@ -849,9 +849,17 @@ function filterItems(items, key) {
   const cutoff = Date.now() / 1000 - days * 86400
   return items.filter((it) => (it.ep.published || 0) >= cutoff)
 }
-// Pick the opening range: 1W unless it's empty (a quiet week would leave the
-// feed blank), then widen until something's there.
-function defaultRange(items) {
+// Pick the opening range.
+//
+// Global opens on All: that tab's whole job is the network-wide picture, and
+// a 7-day air-date window hides most of what the community has boosted —
+// including every boost on an older episode, which is a lot of them.
+//
+// Follows opens on 1W and widens until something's there (a quiet week would
+// otherwise leave the feed blank). A personal feed is small enough to read
+// week by week, and "nothing this week" is useful information there.
+function defaultRange(items, scope) {
+  if (scope !== 'follows') return 'all'
   for (const [key] of RANGE_OPTIONS) {
     if (filterItems(items, key).length) return key
   }
@@ -1030,8 +1038,11 @@ export async function renderPodcasts({ panel, list, scope = 'global' }) {
   const profilesReady = loadBoosterProfiles(items)
   loadMentionProfiles(items)
 
-  let sortKey = 'count'
-  let rangeKey = defaultRange(items)
+  // Most boosts is the opening sort on both tabs — raw boost volume is the
+  // ranking the feed is *for*. ('count' ranks by distinct boosters instead;
+  // the two differ on the ~16% of episodes someone boosted more than once.)
+  let sortKey = 'boosts'
+  let rangeKey = defaultRange(items, scope)
   let sorted = sortItems(filterItems(items, rangeKey), sortKey)
   let shown = 0
   const cards = h('div', { class: 'pcast-list' })

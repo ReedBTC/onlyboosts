@@ -106,6 +106,13 @@
       color: var(--muted);
       line-height: 1.5;
     }
+    /* "Public Nostr Podcasting 2.0 Boosts" links to the About page — the
+       phrase most first-time visitors won't recognise is the thing that
+       explains itself. Deliberately the site's ordinary link treatment
+       (underlined, link-coloured) rather than a bespoke affordance: the
+       point is that it's obviously clickable. */
+    .masthead p a:hover,
+    .masthead p a:focus-visible { color: var(--brand); }
     @media (max-width: 640px) {
       .masthead { padding: 1rem 1rem 0.9rem; }
       .masthead img { max-width: 240px; }
@@ -921,7 +928,7 @@
 <!-- ══════════════════════════════ MASTHEAD ══════════════════════════════ -->
 <div class="masthead">
   <img src="/assets/onlyboosts_banner.png" alt="OnlyBoosts" width="1800" height="600" />
-  <p>Public Nostr Podcasting&nbsp;2.0 Boosts: Feeds, Rankings and Discoverability</p>
+  <p><a href="/about">Public Nostr Podcasting&nbsp;2.0 Boosts</a>: Feeds, Rankings and Discoverability</p>
 </div>
 
 <!-- ══════════════════════════════ TABS ══════════════════════════════
