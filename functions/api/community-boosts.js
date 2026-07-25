@@ -16,7 +16,7 @@ const RESPONSE_MAX_BYTES = 10 * 1024 * 1024; // 10 MB
 // lookalike origins get reflected into Access-Control-Allow-Origin, so this
 // stays an exact Set match, not a prefix check.
 const ALLOWED_ORIGINS = new Set([
-  "https://onlyboosts.com",
+  "https://onlyboosts.social",
   "http://localhost:8765",
   "http://127.0.0.1:8765",
   "http://localhost:5173",
@@ -27,7 +27,7 @@ function pickCorsOrigin(originHeader) {
   if (typeof originHeader === "string" && ALLOWED_ORIGINS.has(originHeader)) {
     return originHeader;
   }
-  return "https://onlyboosts.com";
+  return "https://onlyboosts.social";
 }
 
 export async function onRequest(context) {

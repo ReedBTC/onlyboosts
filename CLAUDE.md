@@ -57,30 +57,56 @@ Local dev: `wrangler pages dev .` (so `/api/*` Functions resolve).
 - **Bump `VERSION` in `sw.js`** when shipping changed assets that returning
   visitors must get on the *first* navigation rather than the second.
 
-## ⚠️ Before any deploy
+## Site identity
 
-The **"boost the show" path still carries Local Bitcoiners' live payment and
-identity values**, inherited from the fork. It moves **real sats** — shipping
-it unchanged routes OnlyBoosts users' boosts into the LB wallet. The files:
+| | |
+|---|---|
+| Domain | `onlyboosts.social` |
+| npub | `npub1nmd7u4f5ewsjn6wp4zd9pc4jnadtmluanfhm2g0xryrdga7e7xxq0as4ck` |
+| pubkey (hex) | `9edbee5534cba129e9c1a89a50e2b29f5abdff9d9a6fb521e61906d477d9f18c` |
+| Lightning | `onlyboosts@getalby.com` |
 
-- `login-widget/src/lib/boostagram.js` — `RECIPIENT_LUD16`
-  (`localbitcoiners@getalby.com`) and `RECIPIENT_NPUB`
-- `login-widget/src/lib/recipientOverrides.js` — LB lightning addresses
-- `login-widget/src/lib/episodeData.js` — builds `LocalBitcoinersEpNNN`
-  invoice-comment markers, which `payAllLegs.js` filters on
+The domain appears in `robots.txt`, `manifest.webmanifest`,
+`functions/sitemap.xml.js`, the CORS allowlist in
+`functions/api/community-boosts.js`, page canonical/OG tags, and the
+`client` tags on published events — change them together. The npub is also
+served for NIP-05 from `.well-known/nostr.json`.
 
-Decide what "boost" means here first. If boosts always go to the *podcast
-being boosted* via its own value split, this whole path is dead code and
-should be **deleted**, not repointed — the live path is `externalBoost.js` /
-`externalBoostagram.js`. Only repoint the constants if OnlyBoosts has its own
-house wallet. Client/app identification tags were already repointed to
-`onlyboosts.com`; the money values deliberately were not, so they stay
-visible.
+## ⚠️ Money paths
 
-More generally: code edits, dry runs, and read-only inspection are fine
-without asking. **Confirm with Reed before running anything that signs or
-publishes a Nostr event, or that moves sats.** Published events can't be
-unpublished.
+Two separate things are both called "boost":
+
+- **Boosting a podcast** — sats go to that show's own value split, parsed
+  from its RSS feed. `externalBoost.js` / `externalBoostagram.js` /
+  `payAllLegs.js`. This is the main event and it pays third parties.
+- **Boosting the site** — a tip to OnlyBoosts, one leg at 100% to
+  `RECIPIENT_LUD16`. `boostagram.js` + `BoostModal.jsx`, behind the nav's
+  Boost button.
+
+All LB payment and identity values were replaced on fork and the shipped
+`assets/widgets/login-widget.js` was rebuilt — verified zero occurrences of
+LB's address, npub, feed GUID, or host addresses. **`login-widget/` is a
+build artifact: editing `login-widget/src/` changes nothing until you run
+`npm run build`.** Verify after any change to a money path:
+
+```sh
+grep -c "onlyboosts@getalby.com" assets/widgets/login-widget.js   # expect >= 1
+```
+
+`LNADDRESS_OVERRIDES` in `recipientOverrides.js` is deliberately empty. An
+entry there silently reroutes sats away from the address a show's RSS names,
+without telling donor or recipient. That was defensible on LB (Reed's own
+feed); here it would divert money from third-party shows. Only add one for a
+feed OnlyBoosts owns.
+
+`FEED_GUID` in `boostagram.js` is deliberately `null` — OnlyBoosts is a
+client, not a podcast, so it has no feed to claim. Inheriting LB's GUID
+would have mis-tagged every share note as a Local Bitcoiners boost and
+polluted LB's own collector, which filters on exactly that GUID.
+
+Code edits, dry runs, and read-only inspection are fine without asking.
+**Confirm with Reed before running anything that signs or publishes a Nostr
+event, or that moves sats.** Published events can't be unpublished.
 
 ## What's built vs. what isn't
 
@@ -130,9 +156,13 @@ unpublished.
 
 6. **Branding.** No logo, favicon, or OG image exists yet (LB's were
    stripped). Colors and fonts are still LB's cream/navy/orange — see the
-   TODO in `index.html`. The domain is assumed to be `onlyboosts.com` in
-   `robots.txt`, `manifest.webmanifest`, `functions/sitemap.xml.js`, and the
-   CORS allowlist — change all four together if that's wrong.
+   TODO in `index.html`. Three places stand in a ⚡ glyph for missing art
+   and should be revisited together: the PWA install prompt
+   (`assets/widgets/pwa-install.js`), the login modal
+   (`login-widget/src/components/LoginScreen.jsx`), and the manifest icons
+   (currently absent, so installed-PWA icons fall back to a screenshot).
+   `assets/avatar-fallback.svg` is *not* branding — it stands in for a
+   person when a kind-0 has no picture, so keep it neutral.
 
 ## Naming note
 

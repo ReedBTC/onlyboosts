@@ -24,13 +24,21 @@ import { useEffect, useState } from 'react'
 import { lockBodyScroll, unlockBodyScroll } from '../lib/scrollLock.js'
 import { useModalTransition } from '../lib/useModalTransition.js'
 import { applyRecipientOverrides } from '../lib/recipientOverrides.js'
+import { RECIPIENT_LUD16 } from '../lib/boostagram.js'
 import MultiLegBoostForm from './MultiLegBoostForm.jsx'
 import ConfirmLeaveOverlay from './ConfirmLeaveOverlay.jsx'
 
+// Where the nav's "Boost" button sends sats — a tip to OnlyBoosts itself,
+// not to any podcast. One leg at 100%; the address is sourced from
+// boostagram.js so there is a single place to change where the money goes.
+//
+// LB's version split this three ways between the two hosts and the show
+// wallet (reed / revhodl / aquafox30). That was replaced, not reweighted,
+// on fork — those are real people's addresses and none of them are the
+// recipient here. The multi-leg machinery is retained because the *podcast*
+// boost path genuinely fans out across a show's value block.
 const _SHOW_RECIPIENTS = applyRecipientOverrides([
-  { name: 'Reed',      address: 'reed@getalby.com',      splitWeight: 33, type: 'lnaddress' },
-  { name: 'RevHodl',   address: 'revhodl@minibits.cash', splitWeight: 33, type: 'lnaddress' },
-  { name: 'aquafox30', address: 'aquafox30@primal.net',  splitWeight: 34, type: 'lnaddress' },
+  { name: 'OnlyBoosts', address: RECIPIENT_LUD16, splitWeight: 100, type: 'lnaddress' },
 ])
 const SHOW_SPLITS = {
   recipients: _SHOW_RECIPIENTS,
@@ -42,7 +50,7 @@ const SHOW_SPLITS = {
 // instead of falling through to the "Episode" defensive default. The
 // other episode fields stay empty — payAllLegs's tag builder writes
 // them through as empty strings, which is exactly the show-level
-// signal the bot needs (paired with the "LocalBitcoinersShow" LNURL
+// signal the bot needs (paired with the "OnlyBoostsSite" LNURL
 // comment from formatEpisodeComment(null)).
 const SHOW_EPISODE_META = { number: null, title: '', guid: '', kind: 'show' }
 const SHOW_PRESETS = [100, 420, 3333, 21000]

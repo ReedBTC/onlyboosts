@@ -7,7 +7,7 @@
  *   2. For each leg in order:
  *      a. Resolve the recipient's lud16 → LNURL endpoint (.well-known/lnurlp)
  *         (or skip if the modal pre-fetched the invoice during presign).
- *      b. Request a bolt11 invoice with comment = LocalBitcoinersEpNNN
+ *      b. Request a bolt11 invoice with comment = OnlyBoostsEpNNN
  *         (skipped for pre-fetched legs).
  *      c. Extract payment_hash from the bolt11.
  *      d. Maybe publish a kind 30078 metadata event:
@@ -265,7 +265,7 @@ async function runLeg({
       // commentAllowed=0 means comments are not supported; we skip rather
       // than send a comment the endpoint will refuse on. The bot can still
       // pick this boost up via the kind 30078 lookup keyed on payment_hash;
-      // it just won't have the LocalBitcoinersEp prefix as a fast filter.
+      // it just won't have the OnlyBoostsEp prefix as a fast filter.
       const allowed = meta.commentAllowed || 0
       const sendComment = allowed > 0 ? comment.slice(0, allowed) : ''
 

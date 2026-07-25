@@ -5,7 +5,7 @@
  * (kind 30078 metadata for the LB bot, LB-branded kind-1 share). This file has
  * nothing to do with LB stats/bots: external boosts publish no 30078, and the
  * kind-1 note carries the *external* show's guid tags — none of the
- * LocalBitcoinersEp/LB-feed markers the LB pipeline filters on.
+ * OnlyBoostsEp / site-feed markers the site pipeline filters on.
  *
  * Wire format mirrors Boost Me Bitch / the Podcasting 2.0 boostagram spec so
  * the podcasters' tooling (Helipad, etc.) parses our boosts like any other.
@@ -90,7 +90,7 @@ export function toWeblnRecords(boostagram, recipient) {
 /**
  * Unsigned kind-1 "I boosted" note for an external episode. Uses the external
  * show's NIP-73 guid tags + the Boost Me Bitch episode URL; keeps
- * client=localbitcoiners.com; NO `nostr:` mention (external shows have no
+ * client=onlyboosts.social; NO `nostr:` mention (external shows have no
  * Nostr identity we can vouch for). Published only when the booster is signed
  * in (user-signed), after settlement confirms — the caller enforces that.
  */
@@ -102,7 +102,7 @@ export function buildExternalNoteTemplate({
   const showEp = episodeTitle
     ? `${showTitle || 'a podcast'} • ${episodeTitle}`
     : (showTitle || 'a podcast')
-  const lines = [`⚡Just boosted ${sats.toLocaleString()} sats 📱 via onlyboosts.com`]
+  const lines = [`⚡Just boosted ${sats.toLocaleString()} sats 📱 via onlyboosts.social`]
   if (msg) lines.push(`💬 "${msg.slice(0, MAX_MESSAGE_CHARS)}"`)
   lines.push('')
   lines.push(`🎙️ ${showEp}`)
@@ -111,7 +111,7 @@ export function buildExternalNoteTemplate({
   const tags = [
     ['t', 'boost'],
     ['t', 'podcast'],
-    ['client', 'onlyboosts.com'],
+    ['client', 'onlyboosts.social'],
   ]
   if (bmbUrl) tags.push(['r', bmbUrl])
   if (podcastGuid) { tags.push(['i', `podcast:guid:${podcastGuid}`]); tags.push(['k', 'podcast:guid']) }

@@ -7,7 +7,7 @@
 // pages, the dynamic half is recoverable from upstream:
 //   git show lb/main:functions/sitemap.xml.js
 
-const SITE_ORIGIN = "https://onlyboosts.com";
+const SITE_ORIGIN = "https://onlyboosts.social";
 
 const STATIC_URLS = [
   { loc: "/", changefreq: "weekly", priority: "1.0" },

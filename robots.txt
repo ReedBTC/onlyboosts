@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://onlyboosts.com/sitemap.xml
+Sitemap: https://onlyboosts.social/sitemap.xml

@@ -21,16 +21,16 @@ const NADDR_PLACEHOLDER = '{naddr}'
 // {naddr} placeholder in their edit), so we don't need to embed
 // `nostr:{naddr}` in the template itself.
 export const DEFAULT_KIND1_TEMPLATE =
-  `I just posted a meetup on localbitcoiners.com/feeds!`
+  `I just posted a meetup on onlyboosts.social/feeds!`
 
 export const DEFAULT_BOOST_TEMPLATE =
-  `I just posted a meetup on localbitcoiners.com/feeds!`
+  `I just posted a meetup on onlyboosts.social/feeds!`
 
 // Default for the "boost an existing meetup" flows (My Meetups + Search
 // modals). Reads as "I have one already, here it comes" rather than the
 // just-published framing of DEFAULT_BOOST_TEMPLATE.
 export const BOOST_EXISTING_TEMPLATE =
-  `Boosting my meetup from https://localbitcoiners.com/feeds`
+  `Boosting my meetup from https://onlyboosts.social/feeds`
 
 /**
  * Replace {naddr} placeholders with the real naddr1… string. If the
@@ -53,7 +53,7 @@ export function interpolateNaddr(text, naddr) {
  * Tags:
  *   - ['a', '<kind>:<authorpk>:<dtag>'] — addressable coordinate
  *   - ['k', '31922'|'31923']            — kind reference
- *   - ['client', 'localbitcoiners.com'] — attribution
+ *   - ['client', 'onlyboosts.social'] — attribution
  *
  * @param {object} args
  * @param {string} args.text   — the (editable, possibly placeholder-bearing) note body
@@ -68,7 +68,7 @@ export function buildEventAnnouncementTemplate({ text, naddr, kind, pubkey, dTag
   const tags = [
     ['a', `${k}:${pubkey}:${dTag}`],
     ['k', k],
-    ['client', 'localbitcoiners.com'],
+    ['client', 'onlyboosts.social'],
   ]
   return {
     kind: 1,

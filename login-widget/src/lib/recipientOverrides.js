@@ -5,23 +5,27 @@ import { getNDK } from './ndk.js'
  * Per-host substitutions applied to RSS-derived split recipients before
  * any LNURL fetch, payment, or kind 30078 publish.
  *
- * Why this exists: the Local Bitcoiners show is self-hosting boost
- * infrastructure rather than depending on Fountain's tooling, so the
- * 2% leg the RSS feed attributes to Fountain's boostbot is rerouted to
- * aquafox30@primal.net before payment. The RSS feed itself stays
- * untouched (Fountain still generates it from the show config).
+ * ⚠️  EMPTY ON ONLYBOOSTS, DELIBERATELY — think hard before adding one.
+ *
+ * An override silently reroutes sats away from the address a show's own
+ * RSS value block names, at the donor's client, without telling either
+ * party. On localbitcoiners that was defensible: it was Reed's own show,
+ * rerouting his own feed's 2% Fountain-tooling leg to his own address.
+ *
+ * OnlyBoosts boosts *other people's* podcasts. An entry here would divert
+ * money from third-party shows that never agreed to it — so the LB entry
+ * (`boostbot@fountain.fm` → `aquafox30@primal.net`) was removed on fork
+ * rather than carried over. Only add an override for a feed OnlyBoosts
+ * itself owns.
  *
  * Keyed by source lud16; values replace the matching recipient's
  * `name` and `address` while preserving the original split weight.
  *
  * Merge semantics:
  *   When the override target address is *already* a recipient in the
- *   current splits — e.g. the channel-level fallback splits include
- *   aquafox30@primal.net at 32% AND Fountain at 2%, both of which
- *   route to aquafox30 after the override — the two legs are merged
- *   into one with combined weight (34%). Avoids paying the same
- *   address twice in one boost (extra LN fees, two kind 30078 events
- *   for the same recipient).
+ *   current splits, the two legs are merged into one with combined
+ *   weight. Avoids paying the same address twice in one boost (extra LN
+ *   fees, two kind 30078 events for the same recipient).
  *
  * Audit note: any address listed here is a *redirect at the donor's
  * client*. The kind 30078 `recipient` tag will reflect the redirected
@@ -29,19 +33,14 @@ import { getNDK } from './ndk.js'
  * normal leg with no special signaling. The original RSS recipient
  * never sees the payment.
  */
-export const LNADDRESS_OVERRIDES = {
-  'boostbot@fountain.fm': {
-    name: 'aquafox30@primal.net',
-    address: 'aquafox30@primal.net',
-  },
-}
+export const LNADDRESS_OVERRIDES = {}
 
 /**
- * Lightning addresses whose recipients run the LB podcast boost bot
- * (i.e. care about kind 30078 metadata events). For every other
- * recipient — Fountain, Albyhub end users, guest personal addresses —
- * the kind 30078 publish is skipped: they don't subscribe to our
- * boost relays for it, so it would just be relay noise.
+ * Lightning addresses whose recipients run a boost bot that cares about
+ * kind 30078 metadata events. For every other recipient — Fountain,
+ * Albyhub end users, third-party show addresses — the kind 30078 publish
+ * is skipped: they don't subscribe to our boost relays for it, so it
+ * would just be relay noise.
  *
  * Boosts to addresses in this set:
  *   - Always publish a kind 30078 (so the bot has a record).
@@ -57,13 +56,7 @@ export const LNADDRESS_OVERRIDES = {
  * miss the metadata publish.
  */
 export const META_PUBLISH_ALLOWLIST = new Set([
-  'localbitcoiners@getalby.com',
-  // Reed's host leg. Both addresses are allowlisted so the show's boost
-  // splits can point at either one — they're never both live in a single
-  // episode's splits; the second is a hot standby if the primary's LNURL
-  // host is down, so the kind 30078 publish keeps working after a swap.
-  'reed@getalby.com',
-  'reed@localbitcoiners.com',
+  'onlyboosts@getalby.com',
 ])
 
 export function shouldPublishMetadata(address) {
@@ -123,19 +116,21 @@ export function applyRecipientOverrides(recipients) {
 // rest), we try to redirect it to a Lightning address and otherwise mark it
 // unpayable so the leg fails honestly without sending or crediting those sats.
 //
-// On the Local Bitcoiners feed, every value recipient other than reed/rev/
-// aquafox is a GUEST, and guests are identified by npub in the episode's
-// `[guests: npub1...]` marker. A Lightning node pubkey is NOT a Nostr pubkey,
-// so we can't derive the npub from the node pubkey — but we can either look it
-// up in the curated map below or, when an episode has exactly one guest, assume
-// that's who the node recipient is. From the npub we resolve the guest's
-// current lud16 off their kind-0 profile (so a profile address change is picked
-// up automatically), then pay it as an ordinary lnaddress leg.
+// A Lightning node pubkey is NOT a Nostr pubkey, so we can't derive an npub
+// from it. We can only look it up in the curated map below. From the npub we
+// resolve that person's current lud16 off their kind-0 profile (so a profile
+// address change is picked up automatically), then pay it as an ordinary
+// lnaddress leg. Unmapped node recipients are marked unpayable.
+//
+// The `guestNpubs` sole-guest auto-match below is inherited from LB, where
+// every non-host recipient was a guest named in the episode's
+// `[guests: npub1...]` marker. OnlyBoosts boosts arbitrary third-party feeds
+// that carry no such marker, so callers pass nothing and that path is inert.
+// Don't guess an identity from an unrelated feed's metadata — a wrong guess
+// sends someone else's sats to the wrong person.
 
-// Curated Lightning-node-pubkey → npub map. Seeded from the `[guests:]` marker
-// on the episodes where each guest appears (the npub is always in the feed).
-// Add an entry whenever a new guest is listed as type=node and the episode has
-// more than one guest (single-guest episodes resolve automatically below).
+// Curated Lightning-node-pubkey → npub map. Add an entry when a known
+// person's node pubkey shows up as a type=node recipient.
 export const NODE_RECIPIENT_NPUBS = {
   // Sir Spencer — Wolf of KC (BowlAfterBowl). node pubkey → his npub.
   '03ecb3ee55ba6324d40bea174de096dc9134cb35d990235723b37ae9b5c49f4f53':

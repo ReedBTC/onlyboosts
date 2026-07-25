@@ -1,5 +1,5 @@
 /**
- * EventComposer — single-shot meetup publisher for localbitcoiners.com/newevent.
+ * EventComposer — single-shot meetup publisher for onlyboosts.social/newevent.
  *
  * Visually styled with the LB cream-card design system (defined in
  * styles.css under "/newevent cream-card design system") so the
@@ -464,7 +464,7 @@ export default function EventComposer({
           type="search"
           value={form.hashtags}
           onChange={e => updateForm({ hashtags: e.target.value })}
-          placeholder="#meetup #localbitcoiners"
+          placeholder="#meetup #onlyboosts"
           className="lb-input"
           {...NO_AUTOFILL}
         />

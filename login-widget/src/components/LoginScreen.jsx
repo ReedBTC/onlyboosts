@@ -413,8 +413,8 @@ export default function LoginScreen({ onLogin, embedded = false }) {
           clientPubkey,
           relays: NC_RELAYS,
           secret,
-          name: 'Local Bitcoiners',
-          url: 'https://localbitcoiners.com',
+          name: 'OnlyBoosts',
+          url: 'https://onlyboosts.social',
         })
         savePendingNip46({ clientSecret, nostrConnectUri })
       }
@@ -932,10 +932,12 @@ export default function LoginScreen({ onLogin, embedded = false }) {
     <div className={outerClass}>
       <div className="w-full max-w-md space-y-6">
 
-        {/* Logo */}
+        {/* Logo. TODO(onlyboosts): swap the wordmark for real art once
+            branding exists — LB's logo image was removed on fork. */}
         <div className="text-center">
-          <img src="/assets/LocalBitcoiners.png" alt="Local Bitcoiners" className="h-16 w-16 mx-auto mb-2 rounded-full" />
-          <p className="mt-2 text-neutral-400 text-sm">Sign in with Nostr</p>
+          <div className="h-16 w-16 mx-auto mb-2 rounded-full bg-[#f7931a]/20 border border-[#f7931a]/45 flex items-center justify-center text-3xl" aria-hidden="true">⚡</div>
+          <p className="font-semibold text-neutral-100">OnlyBoosts</p>
+          <p className="mt-1 text-neutral-400 text-sm">Sign in with Nostr</p>
         </div>
 
         {isMobile ? (

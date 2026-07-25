@@ -17,17 +17,21 @@
 /**
  * Format the episode tag we send in the LNURL comment. Bots can
  * match on a fixed regex:
- *   /^LocalBitcoiners(Show|Ep\d{3})$/
+ *   /^OnlyBoosts(Site|Ep\d{3})$/
  *
  * Examples:
- *   8       -> "LocalBitcoinersEp008"
- *   42      -> "LocalBitcoinersEp042"
- *   null    -> "LocalBitcoinersShow"   (show-level boost from the
- *              site's "Boost the Show" button; no episode context)
+ *   8       -> "OnlyBoostsEp008"
+ *   42      -> "OnlyBoostsEp042"
+ *   null    -> "OnlyBoostsSite"   (site-level boost from the nav's
+ *              "Boost" button; no episode context)
+ *
+ * Renamed from LB's `LocalBitcoiners(Show|EpNNN)` on fork. The string is a
+ * wire contract with whatever bot reads the invoice comment — if a receiver
+ * is already matching the old prefix, update it there in the same change.
  */
 export function formatEpisodeComment(episodeNumber) {
-  if (episodeNumber == null) return 'LocalBitcoinersShow'
+  if (episodeNumber == null) return 'OnlyBoostsSite'
   const n = parseInt(episodeNumber, 10)
-  if (!Number.isFinite(n) || n <= 0) return 'LocalBitcoinersShow'
-  return `LocalBitcoinersEp${String(n).padStart(3, '0')}`
+  if (!Number.isFinite(n) || n <= 0) return 'OnlyBoostsSite'
+  return `OnlyBoostsEp${String(n).padStart(3, '0')}`
 }

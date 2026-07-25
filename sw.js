@@ -103,7 +103,11 @@
 // restarts here. Cache keys are namespaced by VERSION, so the `ob-`
 // prefix also guarantees no collision with an LB cache on a shared
 // origin during local dev.
-const VERSION = 'ob-v1';
+// ob-v2: site identity wired in (onlyboosts.social, npub, lightning address).
+// login-widget.js and nostr-tools.js were both rebuilt, so bump to evict the
+// stale stale-while-revalidate copies — a returning visitor holding the
+// previous widget bundle would otherwise boost the old recipient.
+const VERSION = 'ob-v2';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;

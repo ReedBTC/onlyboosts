@@ -70,7 +70,7 @@ function buildCalendarEventTags(form) {
   }
   // Client-attribution tag — matches buildDonationBoostagramTemplate
   // and buildEpisodeBoostShareTemplate over in boostagram.js.
-  tags.push(['client', 'onlyboosts.com'])
+  tags.push(['client', 'onlyboosts.social'])
   return { tags, dTag }
 }
 

@@ -365,7 +365,7 @@ function buildReplyTags(parent) {
   if (parent.pubkey && !seenP.has(parent.pubkey)) {
     tags.push(['p', parent.pubkey])
   }
-  tags.push(['client', 'onlyboosts.com'])
+  tags.push(['client', 'onlyboosts.social'])
   return tags
 }
 
@@ -442,7 +442,7 @@ async function handleLike(ev, btn) {
     const isAddressable = kind >= 30000 && kind < 40000
     const tags = [['e', ev.id]]
     if (isAddressable && ev.dTag) tags.push(['a', `${kind}:${ev.pubkey}:${ev.dTag}`])
-    tags.push(['p', ev.pubkey], ['k', String(kind)], ['client', 'onlyboosts.com'])
+    tags.push(['p', ev.pubkey], ['k', String(kind)], ['client', 'onlyboosts.social'])
     await window.LBLogin.signAndPublish({ kind: 7, content: '+', tags })
   } catch (e) {
     likedIds.delete(id)
@@ -487,7 +487,7 @@ async function handleRepost(ev, btn) {
     const isAddressable = kind >= 30000 && kind < 40000
     const tags = [['e', ev.id, '']]
     if (isAddressable && ev.dTag) tags.push(['a', `${kind}:${ev.pubkey}:${ev.dTag}`, ''])
-    tags.push(['p', ev.pubkey], ['k', String(kind)], ['client', 'onlyboosts.com'])
+    tags.push(['p', ev.pubkey], ['k', String(kind)], ['client', 'onlyboosts.social'])
     await window.LBLogin.signAndPublish({
       kind: kind === 1 ? 6 : 16,
       content,
@@ -526,7 +526,7 @@ export async function repostAnyEvent(ev, btn) {
     if (isAddressable && ev.dTag) {
       tags.push(['a', `${kind}:${ev.pubkey}:${ev.dTag}`, ''])
     }
-    tags.push(['p', ev.pubkey], ['k', String(kind)], ['client', 'onlyboosts.com'])
+    tags.push(['p', ev.pubkey], ['k', String(kind)], ['client', 'onlyboosts.social'])
 
     await window.LBLogin.signAndPublish({
       kind: kind === 1 ? 6 : 16,
@@ -809,7 +809,7 @@ async function performZap({
       ['amount', String(msats)],
       ['p', recipientPubkey],
       ['e', targetEvent.id],
-      ['client', 'onlyboosts.com'],
+      ['client', 'onlyboosts.social'],
     ],
   })
 

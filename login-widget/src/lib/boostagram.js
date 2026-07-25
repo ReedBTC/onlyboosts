@@ -32,28 +32,22 @@ import { getNDK, signWithTimeout } from './ndk.js'
 import { withTimeout } from './utils.js'
 
 // ─── Recipient constants ────────────────────────────────────────────────────
-// ⚠️  TODO(onlyboosts) — MUST CHANGE BEFORE ANY DEPLOY. ⚠️
-// These are still Local Bitcoiners' live payment/identity values, inherited
-// from the fork. This module is the "boost the show" path: a boost sent
-// through it pays RECIPIENT_LUD16 with REAL SATS. Shipping as-is would
-// route OnlyBoosts users' boosts into the LB wallet.
+// ⚠️  These move REAL SATS. Any change here changes where users' money goes.
 //
-// Decide first what "boost" means on OnlyBoosts. If boosts always go to the
-// *podcast being boosted* (via its own value split), this whole show-boost
-// path is dead code and should be deleted rather than repointed — the live
-// path is externalBoost.js / externalBoostagram.js. Only repoint these if
-// OnlyBoosts genuinely has a house wallet to boost.
+// This module is the "boost the site" path — a tip to OnlyBoosts itself,
+// distinct from boosting a podcast (that goes to the show's own value split
+// via externalBoost.js / externalBoostagram.js and never touches these).
 //
-// Hardcoded lightning address for the show. No runtime kind-0 lookup —
+// Hardcoded lightning address for the site. No runtime kind-0 lookup —
 // boosts always go to one place, and a network round-trip on modal-open
 // just adds latency + a failure surface.
-export const RECIPIENT_LUD16 = 'localbitcoiners@getalby.com'
+export const RECIPIENT_LUD16 = 'onlyboosts@getalby.com'
 
 // Recipient npub for the optional kind 1 share-to-feed note. Decoded once
 // at module load; the hex pubkey populates the kind 1 `p` tag and the
 // raw npub goes into the `nostr:` mention so followers can click through
-// to the show's profile. Same TODO as above — still LB's npub.
-export const RECIPIENT_NPUB = 'npub1cvcgs83gw6pcrhvtmlf8gdqaegx93qkznwry96jteqhh2cexgkfq45rtya'
+// to the site's profile.
+export const RECIPIENT_NPUB = 'npub1nmd7u4f5ewsjn6wp4zd9pc4jnadtmluanfhm2g0xryrdga7e7xxq0as4ck'
 export const RECIPIENT_PUBKEY_HEX = (() => {
   try {
     const d = nip19.decode(RECIPIENT_NPUB)
@@ -64,13 +58,22 @@ export const RECIPIENT_PUBKEY_HEX = (() => {
 // Site URL used in event tags + kind 1 share body. Hardcoded prod URL
 // regardless of where the modal was authored from — readers should land
 // on the live site, not localhost / preview env.
-export const SITE_URL = 'https://onlyboosts.com'
+export const SITE_URL = 'https://onlyboosts.social'
 
-// RSS <podcast:guid> for the Local Bitcoiners feed. Used for NIP-73
-// external-content identity tags (i/k) on the kind 1 boost share notes so
-// GUID-aware podcast clients (Fountain, Primal, BoostMeBitch) can associate
-// the note with the show / episode.
-export const FEED_GUID = '56fbb1aa-da79-5e4b-bebc-3b934ab8914c'
+// RSS <podcast:guid> of *this site's own* podcast feed, used for the NIP-73
+// show-level identity tag (i/k) on kind 1 share notes.
+//
+// null on OnlyBoosts, deliberately: OnlyBoosts is a client, not a podcast,
+// so it has no feed of its own to claim. Inheriting LB's GUID here would
+// have tagged every OnlyBoosts share note as a boost to the Local
+// Bitcoiners show — misattributing it to GUID-aware clients (Fountain,
+// Primal, BoostMeBitch) and polluting LB's own collector, which filters on
+// exactly that GUID.
+//
+// Episode-level `podcast:item:guid` tags are unaffected — those come from
+// the podcast actually being boosted and stay correct. The show-level tag
+// is skipped while this is null.
+export const FEED_GUID = null
 
 // Validate that a lud16 looks like a valid lightning address. Tightened
 // from `[a-zA-Z0-9.-]+` for the host to a real(ish) hostname rule —
@@ -345,8 +348,8 @@ export function buildDonationBoostagramTemplate({
     : ''
   const baseTags = [
     ['d', paymentHash],
-    ['app', 'onlyboosts.com', '1.0.0'],
-    ['client', 'onlyboosts.com'],
+    ['app', 'onlyboosts.social', '1.0.0'],
+    ['client', 'onlyboosts.social'],
     ['type', 'donation_boostagram'],
     ['sender', donorNpub],
     ['recipient', recipientLud16],
@@ -546,8 +549,8 @@ export function buildBoostReceiptTemplate({
 
   const tags = [
     ['d', boostSession],
-    ['app', 'onlyboosts.com', '1.0.0'],
-    ['client', 'onlyboosts.com'],
+    ['app', 'onlyboosts.social', '1.0.0'],
+    ['client', 'onlyboosts.social'],
     ['type', 'boost_receipt'],
     ['boost_session', boostSession],
     ['sender', donorNpub || ''],
@@ -669,13 +672,16 @@ export function buildEpisodeBoostShareTemplate({
     ['t', 'boost'],
     ['t', 'podcast'],
     ['r', pageUrl],
-    ['client', 'onlyboosts.com'],
+    ['client', 'onlyboosts.social'],
   ]
   if (RECIPIENT_PUBKEY_HEX) tags.push(['p', RECIPIENT_PUBKEY_HEX])
   if (fountainUrl) tags.push(['r', fountainUrl])
-  // NIP-73 external-content tags: feed GUID always, episode item GUID when known.
-  tags.push(['i', `podcast:guid:${FEED_GUID}`])
-  tags.push(['k', 'podcast:guid'])
+  // NIP-73 external-content tags: show-level GUID only when this site has a
+  // feed of its own (it doesn't — see FEED_GUID), episode item GUID when known.
+  if (FEED_GUID) {
+    tags.push(['i', `podcast:guid:${FEED_GUID}`])
+    tags.push(['k', 'podcast:guid'])
+  }
   const epGuid = (episode?.guid || '').trim()
   if (epGuid) {
     tags.push(['i', `podcast:item:guid:${epGuid}`])
@@ -764,12 +770,15 @@ export async function publishBoostShareNote({
     ['t', 'onlyboosts'],
     ['t', 'boost'],
     ['r', pageUrl],
-    ['client', 'onlyboosts.com'],
+    ['client', 'onlyboosts.social'],
   ]
   if (RECIPIENT_PUBKEY_HEX) tags.push(['p', RECIPIENT_PUBKEY_HEX])
-  // NIP-73 external-content tags. Show-level share: feed GUID only.
-  tags.push(['i', `podcast:guid:${FEED_GUID}`])
-  tags.push(['k', 'podcast:guid'])
+  // NIP-73 external-content tags. Show-level share: feed GUID only, and only
+  // when this site has a feed of its own (it doesn't — see FEED_GUID).
+  if (FEED_GUID) {
+    tags.push(['i', `podcast:guid:${FEED_GUID}`])
+    tags.push(['k', 'podcast:guid'])
+  }
 
   const ev = new NDKEvent(ndk, {
     kind: 1,
