@@ -1,24 +1,26 @@
-/* Feed hydration for the four tabs on the homepage.
+/* Feed hydration for the homepage's feeds.
  *
- * Scoping: "Global" is unscoped; "Follows" is the signed-in user's own
- * kind-3 contact list, resolved by follow-set.js.
+ * Which feed is on screen is picked by the two dropdowns in the sticky feed
+ * bar — what (Podcasts / Shows / Boosts) x whose (Global / Follows). Scoping:
+ * "Global" is unscoped; "Follows" is the signed-in user's own kind-3 contact
+ * list, resolved by follow-set.js. Shows is a placeholder with no loader.
  *
- * All four tabs have loaders (see LOADERS at the bottom); each lazy-imports
- * its renderer on first view. Both read the collector's published feed
- * through ob-data.js (/api/data/*) — boosts-feed.js renders the boost notes
- * themselves, podcasts-feed.js the per-show rollup.
+ * All four live feeds have loaders (see LOADERS at the bottom); each
+ * lazy-imports its renderer on first view. Both read the collector's published
+ * feed through ob-data.js (/api/data/*) — boosts-feed.js renders the boost
+ * notes themselves, feeds-podcasts.js the per-episode rollup.
  *
- * The Events / Marketplace / Articles tabs and their modules were removed on
+ * The Events / Marketplace / Articles feeds and their modules were removed on
  * fork. What's left of the Events path below — loadEvents, the supporter-set
  * import, the calendar machinery — is unreachable (LOADERS doesn't map it)
  * and retained only because boosts-thread.js still imports calendar-events.js
  * to render calendar-event quotes embedded in boost notes. That circular
  * import is what makes removing it fiddly; see CLAUDE.md.
  *
- * Feeds load lazily: a tab's fetch only fires the first time that tab
- * becomes active (driven by the `lb:feed-activate` event dispatched from
- * the inline tab controller in index.html, plus a load of whichever feed
- * is active when this module first runs).
+ * Feeds load lazily: a feed's fetch only fires the first time it becomes
+ * active (driven by the `lb:feed-activate` event dispatched from the inline
+ * feed-bar controller in index.html, plus a load of whichever feed is active
+ * when this module first runs).
  */
 import { STATIC_RELAYS, fetchProfilesFromPrimal } from '/assets/js/boosts-thread.js'
 import {
@@ -79,13 +81,6 @@ function appendPlaceholder(list, title, body) {
   ph.appendChild(strong)
   ph.appendChild(document.createTextNode(body))
   list.appendChild(ph)
-}
-
-function setCount(panel, n) {
-  const c = panel.querySelector('.feed-count')
-  if (!c) return
-  c.textContent = n === 1 ? '1 upcoming' : `${n} upcoming`
-  c.hidden = false
 }
 
 const KIND_DELETION = 5
@@ -1037,7 +1032,9 @@ async function hydrate(panelId, mod, scope) {
   showSkeletons(list)
   try {
     const m = await import(mod)
-    if (mod.includes('boosts-feed')) await m.renderBoosts({ list, scope })
+    // Both renderers take the panel: it carries the feed key their range/sort
+    // controls are tagged with in the sticky bar.
+    if (mod.includes('boosts-feed')) await m.renderBoosts({ panel, list, scope })
     else await m.renderPodcasts({ panel, list, scope })
   } catch (e) {
     console.error('[feeds] load failed', mod, scope, e)
@@ -1104,6 +1101,6 @@ window.addEventListener('storage', (e) => {
 })
 
 // Load whichever feed is active when this module first runs (the inline
-// tab controller has already set body[data-active-feed] and may have
+// feed-bar controller has already set body[data-active-feed] and may have
 // dispatched its activation event before this listener attached).
-loadFeed(document.body.dataset.activeFeed || 'boosts-global')
+loadFeed(document.body.dataset.activeFeed || 'podcasts-global')

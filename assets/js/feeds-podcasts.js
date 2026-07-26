@@ -1,10 +1,9 @@
-/* Podcast Boosts feed — the "Podcast Boosts" tab on /feeds.
+/* Podcasts feed — the per-episode rollup behind the two Podcasts feeds.
  *
- * A list of *other* podcasts' episodes that the Local Bitcoiners community
- * has boosted on Nostr — framed as "here's what the community is boosting,"
- * not a leaderboard. The card is the EPISODE; clicking it opens a modal with
- * the individual boosts (who, how many sats, their message, when) plus a
- * "listen" link out to the episode.
+ * A list of podcast episodes the network has boosted on Nostr — framed as
+ * "here's what the community is boosting," not a leaderboard. The card is the
+ * EPISODE; clicking it opens a modal with the individual boosts (who, how many
+ * sats, their message, when) plus a "listen" link out to the episode.
  *
  * Unlike Events / Marketplace this feed is NOT a live relay subscription. It
  * reads the collector's published feed via ob-data.js (a Cloudflare Pages
@@ -14,13 +13,13 @@
  * batched profile lookup only runs for the stragglers the collector couldn't
  * resolve. "Follows" narrows by the viewer's kind-3 contact list.
  *
- * Ordering: episodes are ranked by how many distinct people boosted them,
- * with total sats as the tiebreaker, and scoped by default to episodes that
- * aired in the last week — so the feed reads as "what the community is
- * boosting right now." Both are user-switchable in the panel head.
+ * Ordering: episodes are ranked by raw boost volume, with total sats as the
+ * tiebreaker. The opening air-date window differs by scope — see
+ * defaultRange. Both are user-switchable from the sticky feed bar, whose
+ * range/sort chrome is shared with the note feed (feed-controls.js).
  *
  * Entry point: renderPodcasts({ panel, list }) — lazy-imported by feeds.js
- * the first time the tab is opened.
+ * the first time the feed is opened.
  */
 import { nip19 } from '/assets/widgets/nostr-tools.js'
 import {
@@ -36,6 +35,10 @@ import { resolveFollows } from '/assets/js/follow-set.js'
 import { getLatestBoosts, getBoostMonths, getBoostMonth, toEpisodeShape } from '/assets/js/ob-data.js'
 import { getFollowsBoosts } from '/assets/js/ob-live.js'
 import { copyText, showToast, copyNpub } from '/assets/js/copy-npub.js'
+import {
+  RANGE_OPTIONS, rangeDays, rangeCutoff,
+  rangeControl, sortControl, mountFeedControls,
+} from '/assets/js/feed-controls.js'
 
 const VALUE_API = '/api/value'   // Podcast Index value-block proxy (splits)
 const INITIAL_CARDS = 30       // episodes rendered per "load more" batch
@@ -784,29 +787,16 @@ function sortItems(items, key) {
 // ── Air-date range filter ────────────────────────────────────────────
 // Scopes the feed to episodes that *aired* recently (ep.published), which is
 // independent of when they were boosted — an old episode boosted today is in
-// the feed's data but out of the 1W view.
-const RANGE_OPTIONS = [
-  ['1w', '1W', 7],
-  ['1m', '1M', 30],
-  ['all', 'All', null],
-]
-
-// The panel heading restates the active range in words, so the h2 and the
-// 1W/1M/All buttons can't disagree. Same wording on Global and Follows —
-// the tab already says whose feed it is.
-const RANGE_TITLES = {
-  '1w': 'Podcasts: Last 7 Days',
-  '1m': 'Podcasts: Last 30 Days',
-  'all': 'Podcasts: All',
-}
-function setPanelTitle(panel, rangeKey) {
-  const el = panel?.querySelector('[data-pcast-title]')
-  if (el) el.textContent = RANGE_TITLES[rangeKey] || RANGE_TITLES['1w']
+// the feed's data but out of the 1W view. The note feed's identical-looking
+// buttons filter on boost time instead, which is why the tooltips are written
+// per feed rather than in feed-controls.js.
+function rangeTitle(key) {
+  const days = rangeDays(key)
+  return days ? `Episodes aired in the last ${days} days` : 'All episodes'
 }
 function filterItems(items, key) {
-  const days = (RANGE_OPTIONS.find((o) => o[0] === key) || [])[2]
-  if (!days) return items
-  const cutoff = Date.now() / 1000 - days * 86400
+  const cutoff = rangeCutoff(key)
+  if (!cutoff) return items
   return items.filter((it) => (it.ep.published || 0) >= cutoff)
 }
 // Pick the opening range.
@@ -826,79 +816,14 @@ function defaultRange(items, scope) {
   return 'all'
 }
 
-// Borderless 1W/1M/All segmented control — the selected segment's faint tint
-// is the only chrome, which is what gives the group its shape.
-function rangeControl(initialKey, onPick) {
-  const wrap = h('div', { class: 'pcast-range', role: 'group', 'aria-label': 'Filter by episode air date' })
-  const btns = RANGE_OPTIONS.map(([key, label]) =>
-    h('button', {
-      class: 'pcast-range-btn', type: 'button',
-      title: label === 'All' ? 'All episodes' : `Episodes aired in the last ${label === '1W' ? '7 days' : '30 days'}`,
-      onclick: () => { setActive(key); onPick(key) },
-    }, label))
-  function setActive(key) {
-    btns.forEach((el, i) => {
-      const on = RANGE_OPTIONS[i][0] === key
-      el.classList.toggle('is-active', on)
-      el.setAttribute('aria-pressed', on ? 'true' : 'false')
-    })
-  }
-  setActive(initialKey)
-  wrap.append(...btns)
-  return wrap
-}
-
-// "Sort: X ▾" dropdown for the panel head — matches the card ⋮ menus
-// (outside-click / Escape to close). Calls onPick(key) on selection.
-function sortControl(initialKey, onPick) {
-  const labelFor = (k) => (SORT_OPTIONS.find((o) => o[0] === k) || SORT_OPTIONS[0])[1]
-  const wrap = h('div', { class: 'pcast-sort' })
-  const curEl = h('span', { class: 'pcast-sort-cur', text: labelFor(initialKey) })
-  const btn = h('button', {
-    class: 'pcast-sort-btn', type: 'button',
-    'aria-haspopup': 'true', 'aria-expanded': 'false', title: 'Sort episodes',
-  }, [h('span', { class: 'pcast-sort-tag', text: 'Sort: ' }), curEl, h('span', { class: 'pcast-sort-caret', 'aria-hidden': 'true', text: '▾' })])
-
-  let activeKey = initialKey
-  const items = SORT_OPTIONS.map(([k, label]) =>
-    h('button', {
-      class: 'pcast-sort-item', type: 'button',
-      onclick: () => { activeKey = k; curEl.textContent = label; close(); onPick(k) },
-    }, label))
-  const menu = h('div', { class: 'pcast-sort-menu', hidden: 'hidden' }, items)
-  wrap.append(btn, menu)
-
-  function refreshActive() {
-    items.forEach((el, i) => el.classList.toggle('is-active', SORT_OPTIONS[i][0] === activeKey))
-  }
-  function onDoc(e) { if (!wrap.contains(e.target)) close() }
-  function onKey(e) { if (e.key === 'Escape') close() }
-  function open() {
-    refreshActive()
-    menu.hidden = false; btn.setAttribute('aria-expanded', 'true')
-    document.addEventListener('click', onDoc, true); document.addEventListener('keydown', onKey)
-  }
-  function close() {
-    menu.hidden = true; btn.setAttribute('aria-expanded', 'false')
-    document.removeEventListener('click', onDoc, true); document.removeEventListener('keydown', onKey)
-  }
-  btn.addEventListener('click', () => { menu.hidden ? open() : close() })
-  return wrap
-}
-
-// Put the range buttons + sort dropdown in the panel head (replacing the
-// episode-count pill), as one right-aligned group.
-function mountControls(panel, { sortKey, rangeKey, onSort, onRange }) {
-  const head = panel.querySelector('.feed-panel-head')
-  if (!head) return
-  const count = head.querySelector('.feed-count')
-  if (count) count.hidden = true
-  const existing = head.querySelector('.pcast-controls')
-  if (existing) existing.remove()
-  head.appendChild(h('div', { class: 'pcast-controls' }, [
-    rangeControl(rangeKey, onRange),
-    sortControl(sortKey, onSort),
-  ]))
+// Put this feed's range buttons + sort dropdown in the sticky feed bar.
+function mountControls(feed, { sortKey, rangeKey, onSort, onRange }) {
+  mountFeedControls(feed, [
+    rangeControl(rangeKey, onRange, {
+      label: 'Filter by episode air date', titleFor: rangeTitle,
+    }),
+    sortControl(SORT_OPTIONS, sortKey, onSort, { title: 'Sort episodes' }),
+  ])
 }
 
 // ── Boost corpus ─────────────────────────────────────────────────────
@@ -1009,7 +934,7 @@ export async function renderPodcasts({ panel, list, scope = 'global' }) {
   const items = buildEpisodes(data)
   if (!items.length) {
     if (follows) {
-      renderPlaceholder(list, 'No episodes from your follows yet', 'Nobody you follow has boosted a podcast episode recently. The Global tab shows everyone.')
+      renderPlaceholder(list, 'No episodes from your follows yet', 'Nobody you follow has boosted a podcast episode recently. Switch to Global to see everyone.')
     } else {
       renderPlaceholder(list, 'No boosted episodes yet', 'When someone boosts a podcast episode on Nostr, it’ll show up here.')
     }
@@ -1092,12 +1017,11 @@ export async function renderPodcasts({ panel, list, scope = 'global' }) {
   function applyRange(key) {
     if (key === rangeKey) return
     rangeKey = key
-    setPanelTitle(panel, rangeKey)
     rebuild()
   }
 
-  setPanelTitle(panel, rangeKey)
-  mountControls(panel, { sortKey, rangeKey, onSort: applySort, onRange: applyRange })
+  mountControls(panel?.dataset.feed || `podcasts-${scope}`,
+    { sortKey, rangeKey, onSort: applySort, onRange: applyRange })
 
   list.className = ''
   list.innerHTML = ''

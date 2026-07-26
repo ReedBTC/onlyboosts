@@ -5,32 +5,49 @@ the difference is that it does **not** query relays for the feed. It reads a
 pre-built JSON snapshot off the VPS (`relay.mynostr.app`), the same way
 localbitcoiners' community feeds work.
 
-**The whole feed experience is one page.** `index.html` carries four
-hash-routed tabs on two axes — what (boosts / podcasts) x whose (global /
-your follows). `about.html` is a real content page — the project's own
-explanation of what the data is and isn't. `boosters.html` and
-`shows.html` are still coming-soon placeholders with no feature behind
-them; they're nav + header + card + footer and nothing else.
+**The whole feed experience is one page.** `index.html` carries the
+hash-routed feeds, picked by two dropdowns on two axes — what (podcasts /
+shows / boosts) x whose (global / your follows). `about.html` is a real
+content page — the project's own explanation of what the data is and isn't.
+`boosters.html` and `shows.html` are still coming-soon placeholders with no
+feature behind them; they're nav + header + card + footer and nothing else.
 
-| Tab | Hash | Renders |
+| Feed | Hash | Renders |
 |---|---|---|
+| Podcasts · Global | `#podcasts-global` | per-episode rollup by boosts received |
+| Podcasts · Follows | `#podcasts-follows` | same, filtered to your kind-3 contacts |
 | Boosts · Global | `#boosts-global` | the kind-1 boost notes themselves |
 | Boosts · Follows | `#boosts-follows` | same, filtered to your kind-3 contacts |
-| Podcasts · Global | `#podcasts-global` | episode/show rollup by boosts received |
-| Podcasts · Follows | `#podcasts-follows` | same, filtered to your kind-3 contacts |
+| Shows | `#shows` | coming-soon placeholder, no loader |
 
-**The two Follows tabs only exist for a signed-in npub.** Signed out they're
-`hidden`, the row collapses to the two Global tabs (hence `grid-auto-flow:
-column` rather than `repeat(4, 1fr)` — a `display:none` grid item creates no
-track), and a `#podcasts-follows` deep link is coerced to the default with
-the hash rewritten to match. `.feed-tab[hidden] { display: none }` is
-load-bearing: `.feed-tab` sets `display:flex`, which otherwise beats the UA's
-`[hidden]` rule.
+**The feed bar replaced a row of four tabs**, one per feed. Two dropdowns
+instead of four buttons is what makes room for a third `what` (Shows, and
+whatever follows it) without the row growing to six tabs. The hash keys are
+unchanged, so every `/#boosts-global` link — including the nav's and the
+footer's — still lands where it did.
 
-The inline tab controller in `index.html` owns activation and dispatches
-`lb:feed-activate`; `assets/js/feeds.js` listens and lazily hydrates.
-`feeds.html` and `boosts.html` were folded into this page and deleted —
-their markup is the ancestor of the Podcasts and Boosts panels respectively.
+Shows has no whose-axis, so its key is the bare `shows` rather than
+`shows-global`. Picking it leaves the scope *state* alone, so going Boosts ·
+Follows → Shows → Podcasts returns you to Follows.
+
+**Follows only exists for a signed-in npub.** Signed out, the scope menu is
+`hidden` outright (a one-option dropdown is worse than none — it's hidden on
+Shows for the same reason), and a `#podcasts-follows` deep link is coerced to
+Global with the hash rewritten to match.
+
+The inline feed-bar controller in `index.html` owns the menus, which panel is
+on screen, and the hash, and dispatches `lb:feed-activate`;
+`assets/js/feeds.js` listens and lazily hydrates. `feeds.html` and
+`boosts.html` were folded into this page and deleted — their markup is the
+ancestor of the Podcasts and Boosts panels respectively.
+
+**Each feed's range + sort controls mount into the bar's third slot**
+(`[data-feed-controls]`), tagged `data-controls-for="<feed>"`. Which group is
+visible is **CSS off `body[data-active-feed]`**, not JS: feeds hydrate once and
+keep their controls forever, so an imperative swap is the version that can
+leave a feed you come back to showing another feed's controls, or none. The
+panels have no head of their own any more — the bar names the feed, so a
+heading under it would only restate the dropdown.
 
 ## Where this code came from
 
@@ -100,9 +117,9 @@ and don't define them — every page has to supply the tokens. That supply is
 `body`/`a`/`img` styles. **Link it from every page, last among the shared
 stylesheets** so a page's own inline `<style>` still wins.
 
-`index.html` keeps one theme block of its own — the four per-feed accents and
+`index.html` keeps one theme block of its own — the five per-feed accents and
 the `body[data-active-feed]` mapping — because those only mean anything on
-the page that has the tabs. `assets/css/page.css` is the counterpart for the
+the page that has the feeds. `assets/css/page.css` is the counterpart for the
 plain content pages (`.page-header`, `.soon-card`).
 
 Those stylesheets were written against localbitcoiners' token names
@@ -112,13 +129,12 @@ the OnlyBoosts palette**. Trust the values, not the words — `--orange` is
 brand cyan. New code should prefer `--brand` / `--ink` / `--surface`.
 
 Brand colors are sampled from the supplied art: `--brand: #00aff0` (the
-mark's cyan) and `--brand-d: #068ace` (its broadcast waves). The four feed
-accents sit on one cyan→indigo ramp so the tab row reads as a single system.
-
-One ordering trap: `.feed-tab { --tab: var(--muted) }` is a default that
-appears *after* the per-tab `--tab` rules would naturally go. Same
-specificity, so the per-tab rules must stay below it or every tab renders
-grey.
+mark's cyan) and `--brand-d: #068ace` (its broadcast waves). The five feed
+accents sit on one cyan→indigo ramp, so switching feed shifts the page wash
+along a single system rather than to an unrelated color. Since the tab row
+went away, that accent is read by the panel wash, the menus and the range /
+sort controls; `--accent` / `--accent-d` / `--tint` are the only names the
+shared chrome sees.
 
 ## Site identity
 
@@ -192,7 +208,8 @@ Carried from the scaffold commit and the LB suite:
 ## What's built vs. what isn't
 
 **Working, ported from LB:**
-- `assets/js/boosts-feed.js` / `podcasts-feed.js` — the four feeds
+- `assets/js/boosts-feed.js` / `feeds-podcasts.js` — the four feeds
+- `assets/js/feed-controls.js` — the range/sort chrome both share
 - `assets/js/boosts-thread.js` — the content tokenizer (nostr: mentions,
   URLs, quoted notes) the boost cards render through
 - `assets/js/boost-actions.js` — reply / like / repost / zap
@@ -208,11 +225,18 @@ Carried from the scaffold commit and the LB suite:
 
 **Still to build:**
 
-0. **Two coming-soon pages have no feature behind them.** `/boosters` (a
-   directory of the npubs sending boosts) and `/shows` (a show-level
-   directory — the feed tabs are episode-level). Both are `noindex` and out
-   of `functions/sitemap.xml.js` until there's something on them. `/shows`
-   was `/podcasts` until the nav grouped the feeds under a Podcasts heading;
+0. **The Shows feed and two coming-soon pages have no feature behind them.**
+   `#shows` is a selectable option in the feed bar's what-menu (badged
+   `Soon`), with a placeholder panel and deliberately no entry in `LOADERS`.
+   It's the show-level counterpart of the Podcasts feeds, which are
+   episode-level. **This is the next thing to build.** `/shows` is the
+   standalone page that currently says the same thing — decide whether it
+   redirects to `/#shows` or keeps a page of its own before building either.
+
+   `/boosters` (a directory of the npubs sending boosts) is the other
+   placeholder. Both pages are `noindex` and out of
+   `functions/sitemap.xml.js` until there's something on them. `/shows` was
+   `/podcasts` until the nav grouped the feeds under a Podcasts heading;
    `_redirects` carries the 301.
 
    `/about` is done. Its copy is distilled from
@@ -319,6 +343,42 @@ renderer on first view.
 | `podcasts-global` | `feeds-podcasts.js` | `latest.json` + 3 recent months, rolled up by episode |
 | `podcasts-follows` | `feeds-podcasts.js` | `POST /api/v1/boosts/follows`, same rollup |
 
+### Range and sort
+
+All four live feeds carry a 1W/1M/All range and a sort dropdown, built by
+`assets/js/feed-controls.js` and mounted into the feed bar. The chrome is
+shared; **what the range means is not**, which is why each renderer passes its
+own tooltips:
+
+| | Range filters on | Sorts |
+|---|---|---|
+| Podcasts | when the episode **aired** (`ep.published`) | latest boost / latest episode / most boosters / most boosts / most sats |
+| Boosts | when the boost was **sent** (`b.ts`) | latest boost / latest episode / largest boost |
+
+The two are different axes on purpose: an old episode boosted today is in the
+Podcasts data but out of its 1W view, whereas the note feed is a list of boosts
+and "the last 7 days" can only mean the boosts sent in them. Filtering the note
+feed by air date instead would drop most of it, since most boosts land on back
+catalogue.
+
+The note feed's shorter menu is not an omission — a card there is one boost, so
+"most boosters" has nothing to count. Its `episode` sort has to sink undated
+rows explicitly: `episode.date` is null on ~12% of records, and a `0` fallback
+would float them to the top.
+
+**Sorting is over the selected window, so a bounded window is paged in
+completely before it's painted** (`ensureCoverage` in `boosts-feed.js`) —
+otherwise "largest boost" would rank whichever pages happened to be loaded.
+This is cheap by construction: `latest.json` is ~1,000 boosts spanning ~26
+days, so 1W needs no extra fetch and 1M needs at most one archive; on Follows
+the first cursor page usually already reaches back months. A bounded window
+that's fully covered therefore has **no** load-older button — there is nothing
+left in it. On All the button stays, and a non-chronological order can only
+rank what's loaded, so the count line under it says so rather than implying the
+whole 22k archive. Loading older rows re-sorts in place under those sorts
+(newer pages can outrank painted cards); under `recent` it appends, as it
+always did.
+
 **Two backends, one record shape.** `ob-data.js` is the static half (immutable
 CDN shards under `/api/data/*`); `ob-live.js` is the live half (D1 query API
 under `/api/v1/*`). The split is not stylistic: a Global view is the same bytes
@@ -375,15 +435,15 @@ widget dispatches it on the window whenever the *identity* changes (not on
 profile refreshes or stub→real restores). Two listeners, both also watching
 `storage` for the same thing happening in another tab:
 
-- the inline tab controller shows/hides the Follows tabs, and bounces you to
-  the default feed if you sign out while reading one;
+- the inline feed-bar controller shows/hides the scope menu, and drops you
+  back to Global if you sign out while reading a Follows feed;
 - `feeds.js` drops both `*-follows` keys from its `loaded` set and re-runs
   whichever is on screen — `loaded` is what makes each feed hydrate exactly
   once, so without this a Follows feed would keep the previous account's
   results after a switch.
 
 The renderers still carry a `signed-out` branch. It's unreachable through the
-tabs now and kept as a fallback — if the hiding logic ever fails, the feed
+feed bar now and kept as a fallback — if the hiding logic ever fails, the feed
 says something sane instead of rendering an empty list.
 
 Two scoping details that aren't obvious:
@@ -394,10 +454,10 @@ Two scoping details that aren't obvious:
   something turned up. The D1 query answers that in one indexed hit, so an
   empty first page now genuinely means empty. The archive-walk branch survives
   on the Global path, where `latest.json` can lag.
-- **The Podcasts tabs don't use `podcasts/index.json`.** The cards are
+- **The Podcasts feeds don't use `podcasts/index.json`.** The cards are
   *episodes*, not shows, and the published index is a show-level rollup
   computed over everyone — so its counts would also be wrong for a Follows
-  audience. Both tabs roll the boost feed up by episode instead, via
+  audience. Both roll the boost feed up by episode instead, via
   `ob-data.js#toEpisodeShape`. Global bounds that at `latest.json` + the three
   most recent months (the range filter offers "All", which needs more than the
   recent 1,000 boosts to mean anything; all 22 archives would be ~20MB).

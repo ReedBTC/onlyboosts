@@ -82,7 +82,14 @@
 // old module is what pins the request to 200 rows a page, so a returning
 // visitor holding it keeps paying ~2s of serial round trips even though the
 // deployed Function would answer in one.
-const VERSION = 'ob-v15';
+// ob-v16: the four-tab ribbon became two dropdowns in a sticky feed bar, and
+// the range/sort controls moved out of the panel heads into it. Required: the
+// bar's markup lives in index.html while the controls that mount into it come
+// from the new assets/js/feed-controls.js, so a returning visitor holding the
+// old index.html would render a page whose feeds can't find their slot (and
+// one holding the old feeds-podcasts.js would look for a panel head that is no
+// longer there).
+const VERSION = 'ob-v16';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;

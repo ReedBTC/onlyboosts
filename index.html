@@ -69,24 +69,26 @@
          the shared chrome can just read --accent. */
       --bg-accent:   #00aff0;  --bg-accent-d:   #0090cc;  --bg-tint:   #e2f6fd;
       --bf-accent:   #068ace;  --bf-accent-d:   #0570ab;  --bf-tint:   #e0f0fa;
+      --sh-accent:   #1b7bc1;  --sh-accent-d:   #15629b;  --sh-tint:   #e4f1fb;
       --pg-accent:   #2f6bb5;  --pg-accent-d:   #255696;  --pg-tint:   #e7eefa;
       --pf-accent:   #4a4f9e;  --pf-accent-d:   #3b3f80;  --pf-tint:   #eaebf7;
 
-      /* Defaults (Boosts · Global is the landing tab). */
-      --accent:   var(--bg-accent);
-      --accent-d: var(--bg-accent-d);
-      --tint:     var(--bg-tint);
+      /* Defaults (Podcasts · Global is the landing feed). */
+      --accent:   var(--pg-accent);
+      --accent-d: var(--pg-accent-d);
+      --tint:     var(--pg-tint);
     }
 
     /* Active-feed → accent mapping. Set on <body data-active-feed>. */
     body[data-active-feed="boosts-global"]    { --accent: var(--bg-accent); --accent-d: var(--bg-accent-d); --tint: var(--bg-tint); }
     body[data-active-feed="boosts-follows"]   { --accent: var(--bf-accent); --accent-d: var(--bf-accent-d); --tint: var(--bf-tint); }
+    body[data-active-feed="shows"]            { --accent: var(--sh-accent); --accent-d: var(--sh-accent-d); --tint: var(--sh-tint); }
     body[data-active-feed="podcasts-global"]  { --accent: var(--pg-accent); --accent-d: var(--pg-accent-d); --tint: var(--pg-tint); }
     body[data-active-feed="podcasts-follows"] { --accent: var(--pf-accent); --accent-d: var(--pf-accent-d); --tint: var(--pf-tint); }
 
     /* ── Masthead ────────────────────────────────────────────────────
-       Wordmark banner sits above the sticky tab row. It scrolls away;
-       the tabs are what stays pinned. */
+       Wordmark banner sits above the sticky feed bar. It scrolls away;
+       the bar is what stays pinned. */
     .masthead {
       background: var(--white);
       border-bottom: 1px solid var(--border);
@@ -140,104 +142,99 @@
       font-style: italic;
     }
 
-    /* ── Feed tabs ──────────────────────────────────────────────────
-       Desktop: a row of four equal-width tabs, each carrying its own
-       feed color. The active tab fills with its accent; inactive tabs
-       show a colored icon + a thin colored top rule, separated by
-       hairlines so each one's edges are visible. The whole bar is
-       sticky under the nav so the tabs stay reachable while scrolling
-       a long feed.
-       Mobile: the bar collapses into a horizontally-scrollable row of
-       colored chips (icon + short name). */
-    .feed-tabs-wrap {
+    /* ── Feed bar ────────────────────────────────────────────────────
+       One row that picks the feed and controls it. Two dropdowns carry the
+       two axes — what (Podcasts / Shows / Boosts) x whose (Global /
+       Follows) — and each feed mounts its own 1W/1M/All + sort group into
+       the right-hand slot (feed-controls.js). Sticky under the nav, as the
+       four-tab ribbon it replaced was, so switching feed, window or order
+       doesn't mean scrolling back to the top of a long list.
+
+       Width matches .feed-panels-inner rather than the old ribbon's wider
+       track, so the menus line up with the left edge of the cards below. */
+    .feed-bar-wrap {
       position: sticky;
       top: 64px; /* height of #top-nav */
       z-index: 40;
       background: var(--cream);
       border-bottom: 1px solid var(--border);
     }
-    .feed-tabs {
-      max-width: 1000px;
+    .feed-bar {
+      max-width: 720px;
       margin: 0 auto;
-      display: grid;
-      /* Auto columns, not repeat(4, 1fr): the two Follows tabs are hidden
-         while signed out, and a display:none grid item creates no track —
-         so the remaining tabs fill the row on their own. */
-      grid-auto-flow: column;
-      grid-auto-columns: 1fr;
-      /* Dividers, drawn by the container rather than the tabs: 1px gaps
-         over a --border-coloured track show through as hairlines while
-         the tabs still touch edge to edge. A border-left on the tabs
-         themselves would land inside the active tab's fill, and would
-         need a :not([hidden]) sibling selector to skip whichever tab is
-         visually first. Requires the tabs to be opaque, hence their
-         --cream background below (the wrap's own colour). The matching
-         rules on the two outer ends are borders on the container, since
-         there is no gap out there to show it through. */
-      gap: 1px;
-      background: var(--border);
-      border-left: 1px solid var(--border);
-      border-right: 1px solid var(--border);
-    }
-    /* Must be explicit: .feed-tab sets display:flex, which would otherwise
-       beat the UA's [hidden] { display: none } and leave hidden tabs on
-       screen. */
-    .feed-tab[hidden] { display: none; }
-    .feed-tab {
-      --tab: var(--muted);
-      appearance: none;
-      background: var(--cream);
-      border: 0;
-      border-top: 3px solid transparent;
-      font: inherit;
-      cursor: pointer;
+      padding: 0.55rem 1.25rem;
       display: flex;
-      flex-direction: column;
       align-items: center;
-      justify-content: center;
-      gap: 0.35rem;
-      padding: 0.95rem 0.75rem 0.85rem;
-      color: var(--muted);
-      transition: background 0.15s, color 0.15s, border-color 0.15s;
+      gap: 0.5rem;
+      flex-wrap: wrap;
     }
-    /* Per-tab accent. Must stay AFTER the `.feed-tab { --tab: var(--muted) }`
-       default above — same specificity, so source order decides. */
-    .feed-tab--boosts-global    { --tab: var(--bg-accent); }
-    .feed-tab--boosts-follows   { --tab: var(--bf-accent); }
-    .feed-tab--podcasts-global  { --tab: var(--pg-accent); }
-    .feed-tab--podcasts-follows { --tab: var(--pf-accent); }
+    /* The active feed's range/sort group, pinned to the right of the menus. */
+    .feed-bar-controls {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+    }
+    /* Only the active feed's controls are on screen. Each renderer mounts its
+       group once, on first hydration, and leaves it there — so the swap is a
+       declarative rule off body[data-active-feed] rather than something JS has
+       to remember to do. Any imperative version can leave a feed you come back
+       to showing another feed's controls, or none at all.
+       The `> [data-controls-for]` selector has to outrank .pcast-controls's own
+       display:flex, which it does on specificity (class + attribute). */
+    .feed-bar-controls > [data-controls-for] { display: none; }
+    body[data-active-feed="podcasts-global"]  .feed-bar-controls > [data-controls-for="podcasts-global"],
+    body[data-active-feed="podcasts-follows"] .feed-bar-controls > [data-controls-for="podcasts-follows"],
+    body[data-active-feed="boosts-global"]    .feed-bar-controls > [data-controls-for="boosts-global"],
+    body[data-active-feed="boosts-follows"]   .feed-bar-controls > [data-controls-for="boosts-follows"] {
+      display: flex;
+    }
 
-    .feed-tab-icon {
-      width: 26px;
-      height: 26px;
-      color: var(--tab);
-      transition: color 0.15s;
+    /* ── Feed menus ──
+       Same popover mechanics as the sort dropdown (.pcast-sort), sized up:
+       the "what" menu is the page's primary choice and carries the display
+       face the panel heading used to. */
+    .feed-menu { position: relative; flex-shrink: 0; }
+    .feed-menu[hidden] { display: none; }
+    .feed-menu-btn {
+      display: inline-flex; align-items: center; gap: 0.3rem;
+      padding: 0.3rem 0.75rem; font: inherit;
+      color: var(--text); background: var(--white);
+      border: 1px solid var(--border); border-radius: 999px; cursor: pointer;
+      white-space: nowrap; transition: border-color 0.12s, background 0.12s;
     }
-    .feed-tab-icon svg { width: 100%; height: 100%; display: block; }
-    .feed-tab-label {
+    .feed-menu-btn:hover { border-color: var(--accent); background: var(--tint); }
+    .feed-menu-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+    .feed-menu-cur { font-weight: 700; color: var(--accent-d); }
+    .feed-menu-caret { color: var(--muted); font-size: 0.85em; }
+    .feed-menu--type .feed-menu-cur {
       font-family: 'Playfair Display', Georgia, serif;
-      font-weight: 700;
-      font-size: 1rem;
-      letter-spacing: 0.01em;
+      font-size: 1.2rem; line-height: 1.25;
     }
-    .feed-tab-sub {
-      font-size: 0.72rem;
-      color: var(--muted);
-      opacity: 0.85;
+    .feed-menu--scope .feed-menu-cur { font-size: 0.82rem; }
+    .feed-menu-list {
+      position: absolute; top: calc(100% + 4px); left: 0; z-index: 6;
+      min-width: 170px; background: var(--white);
+      border: 1px solid var(--border); border-radius: 10px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.18); padding: 0.35rem;
     }
-    /* Opaque, so it can't reveal the divider track underneath. */
-    .feed-tab:hover { background: var(--cream-d); }
-    .feed-tab:focus-visible {
-      outline: 2px solid var(--tab);
-      outline-offset: -2px;
+    .feed-menu-list[hidden] { display: none; }
+    .feed-menu-item {
+      display: flex; align-items: center; gap: 0.45rem;
+      width: 100%; text-align: left;
+      padding: 0.45rem 0.6rem; font: inherit; font-size: 0.9rem; font-weight: 600;
+      color: var(--text); background: transparent;
+      border: none; border-radius: 6px; cursor: pointer;
     }
-    .feed-tab[aria-selected="true"] {
-      background: var(--tab);
-      border-top-color: var(--tab);
-      color: var(--white);
+    .feed-menu-item:hover { background: var(--tint); color: var(--accent-d); }
+    .feed-menu-item[aria-checked="true"] { color: var(--accent-d); background: var(--tint); }
+    .feed-menu-item[aria-checked="true"]::after { content: '✓'; margin-left: auto; }
+    /* "Soon" on an option that's selectable but has nothing behind it yet. */
+    .feed-menu-soon {
+      font-size: 0.62rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.05em; color: var(--muted);
+      border: 1px solid var(--border); border-radius: 999px;
+      padding: 0.05rem 0.4rem;
     }
-    .feed-tab[aria-selected="true"] .feed-tab-icon,
-    .feed-tab[aria-selected="true"] .feed-tab-sub { color: #fff; opacity: 0.95; }
 
     /* ── Panels ── */
     .feed-panels {
@@ -253,45 +250,11 @@
     .feed-panel { display: none; }
     .feed-panel.is-active { display: block; }
 
-    /* Panel intro row — feed name + a short "what am I looking at" line.
-       The Podcasts panels also carry a right-aligned episode count; the
-       Boosts panels don't, since the number there is only what's been
-       paged in so far and grows as you scroll. */
-    .feed-panel-head {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 1rem;
-      margin-bottom: 1.25rem;
-    }
-    .feed-panel-head h2 {
-      font-family: 'Playfair Display', Georgia, serif;
-      font-size: 1.4rem;
-      font-weight: 700;
-      color: var(--accent-d);
-    }
-    .feed-panel-head p {
-      margin-top: 0.15rem;
-      font-size: 0.9rem;
-      color: var(--muted);
-      font-style: italic;
-    }
-    /* Empty until its feed hydrates, and an empty pill is still a pill —
-       the border and padding would render as a small blank capsule. */
-    .feed-count:empty { display: none; }
-    .feed-count {
-      flex-shrink: 0;
-      font-size: 0.8rem;
-      font-weight: 600;
-      color: var(--accent-d);
-      background: var(--white);
-      border: 1px solid var(--border);
-      border-radius: 999px;
-      padding: 0.15rem 0.7rem;
-      white-space: nowrap;
-    }
+    /* The panels have no head of their own: the feed bar above names the feed
+       and carries its controls, so a heading under it would only restate the
+       dropdown. Each panel is just its list. */
 
-    /* Loading skeletons + states (feed content wired up in a later phase). */
+    /* Loading skeletons + states. */
     .feed-list { display: grid; gap: 0.6rem; }
     /* The shared .embed-note card carries its own vertical margin; drop it
        inside a feed list so the grid gap is the only spacing between cards. */
@@ -358,8 +321,7 @@
        meta row of booster avatars / recency / sats, and a ⋮ menu of
        show-level subscribe links. A low-profile drawer bar under the head
        toggles the inline boost thread. Rendered by feeds-podcasts.js. */
-    /* Air-date range buttons + sort dropdown in the panel head (they replace
-       the episode-count pill). */
+    /* Range buttons + sort dropdown, as mounted into the feed bar's slot. */
     .pcast-controls {
       display: flex; align-items: center; gap: 0.5rem;
       flex-shrink: 0; align-self: center;
@@ -813,61 +775,19 @@
     .feed-toggle-input:focus-visible + .feed-toggle-track { outline: 2px solid var(--accent); outline-offset: 2px; }
     .feed-toggle-label { font-size: 0.82rem; font-weight: 600; color: var(--text); white-space: nowrap; }
 
-    /* ── Mobile: tabs become a scrollable chip row ── */
+    /* ── Mobile ── */
     @media (max-width: 640px) {
-      .feed-tabs-wrap { top: 56px; } /* nav shrinks on mobile */
-      /* Icon-only chips that all fit across the row (no horizontal scroll).
-         Column sizing is inherited from the base rule so hidden tabs drop
-         out here too. The chips carry their own outline, so the desktop
-         divider track is dropped — at this gap it would read as a band,
-         not a hairline. */
-      .feed-tabs {
-        gap: 0.5rem;
-        padding: 0.6rem 0.85rem;
-        background: transparent;
-        border-left: 0;
-        border-right: 0;
-      }
-      .feed-tab {
-        flex-direction: row;
-        justify-content: center;
-        gap: 0.35rem;
-        border-top: 0;
-        border: 1px solid var(--tab);
-        border-radius: 999px;
-        padding: 0.45rem 0;
-        color: var(--tab);
-      }
-      .feed-tab-icon { width: 17px; height: 17px; flex-shrink: 0; }
-      /* Hide the family label visually but keep it for screen readers (the
-         icon is aria-hidden, so label + sub are the tab's accessible name). */
-      .feed-tab-label {
-        position: absolute;
-        width: 1px; height: 1px;
-        padding: 0; margin: -1px;
-        overflow: hidden;
-        clip: rect(0 0 0 0);
-        white-space: nowrap;
-        border: 0;
-      }
-      .feed-tab-sub {
-        font-size: 0.75rem;
-        font-weight: 600;
-        opacity: 1;
-        color: inherit;
-      }
-      .feed-tab[aria-selected="true"] { border-color: var(--tab); }
+      .feed-bar-wrap { top: 56px; } /* nav shrinks on mobile */
+      .feed-bar { padding: 0.5rem 1rem; gap: 0.4rem; }
+      .feed-menu--type .feed-menu-cur { font-size: 1.05rem; }
+      /* All four controls rarely fit one line here, so the range + sort group
+         wraps onto its own. Kept right-aligned: left-aligned it would sit at
+         the screen edge and the sort menu's right-anchored popover (min-width
+         175px) would open off-screen. */
+      .feed-bar-controls { margin-left: auto; }
       .feed-panels-inner { padding: 1.5rem 1rem 2.5rem; }
       /* Shallower child indent on narrow screens. */
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
-      /* Let a long panel title and its controls wrap rather than squeeze. */
-      .feed-panel-head { flex-wrap: wrap; align-items: flex-start; }
-      /* Podcast Boosts: the title block is too wide to share a row here, so the
-         range buttons + sort pill wrap onto their own line together. Left-
-         aligned they'd sit at the panel's left edge, and the sort menu's
-         right-anchored popover (min-width 175px) would open past the left edge
-         of the screen — so pin the group right. */
-      .pcast-controls { margin-left: auto; }
     }
   </style>
   <link rel="stylesheet" href="/assets/css/nav.css" />
@@ -954,108 +874,60 @@
   <p><a href="/about">Public Nostr Podcasting&nbsp;2.0 Boosts</a>: Feeds, Rankings and Discoverability</p>
 </div>
 
-<!-- ══════════════════════════════ TABS ══════════════════════════════
-     Four feeds on two axes: what (boosts / podcasts) x whose (everyone /
-     the npubs you follow). The label carries the "what", the sub-label
-     the "whose" — so the row reads as two pairs rather than four
-     unrelated destinations. -->
-<div class="feed-tabs-wrap">
-  <div class="feed-tabs" role="tablist" aria-label="Boost feeds">
+<!-- ══════════════════════════════ FEED BAR ══════════════════════════════
+     Two dropdowns pick the feed on two axes: what (podcasts / shows /
+     boosts) x whose (everyone / the npubs you follow). The scope menu is
+     dropped whenever it has only one real option — signed out, or on Shows,
+     which has no whose-axis. The third slot is filled by whichever feed is
+     active, with its own range + sort controls (feed-controls.js).
 
-    <button
-      type="button"
-      class="feed-tab feed-tab--podcasts-global"
-      role="tab"
-      id="tab-podcasts-global"
-      aria-controls="panel-podcasts-global"
-      aria-selected="false"
-      data-feed="podcasts-global"
-    >
-      <span class="feed-tab-icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="9" y="2" width="6" height="12" rx="3"/>
-          <path d="M5 10a7 7 0 0 0 14 0"/>
-          <line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/>
-        </svg>
-      </span>
-      <span class="feed-tab-label">Podcasts</span>
-      <span class="feed-tab-sub">Global</span>
-    </button>
+     Static markup, wired by the controller at the bottom of the page: the
+     bar is above the fold on every visit, so it shouldn't wait on script to
+     exist. -->
+<div class="feed-bar-wrap">
+  <div class="feed-bar">
 
-    <button
-      type="button"
-      class="feed-tab feed-tab--boosts-global"
-      role="tab"
-      id="tab-boosts-global"
-      aria-controls="panel-boosts-global"
-      aria-selected="true"
-      data-feed="boosts-global"
-    >
-      <span class="feed-tab-icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="currentColor">
-          <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd"/>
-        </svg>
-      </span>
-      <span class="feed-tab-label">Boosts</span>
-      <span class="feed-tab-sub">Global</span>
-    </button>
+    <div class="feed-menu feed-menu--type" data-feed-menu="type">
+      <button type="button" class="feed-menu-btn" aria-haspopup="true" aria-expanded="false" aria-label="Choose feed">
+        <span class="feed-menu-cur" data-feed-menu-cur>Podcasts</span>
+        <span class="feed-menu-caret" aria-hidden="true">▾</span>
+      </button>
+      <div class="feed-menu-list" role="menu" aria-label="Feed" hidden>
+        <button type="button" class="feed-menu-item" role="menuitemradio" aria-checked="true" data-value="podcasts">Podcasts</button>
+        <button type="button" class="feed-menu-item" role="menuitemradio" aria-checked="false" data-value="shows">
+          Shows <span class="feed-menu-soon">Soon</span>
+        </button>
+        <button type="button" class="feed-menu-item" role="menuitemradio" aria-checked="false" data-value="boosts">Boosts</button>
+      </div>
+    </div>
 
-    <button
-      type="button"
-      class="feed-tab feed-tab--podcasts-follows"
-      role="tab"
-      id="tab-podcasts-follows"
-      aria-controls="panel-podcasts-follows"
-      aria-selected="false"
-      data-feed="podcasts-follows"
-    >
-      <span class="feed-tab-icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="9" y="2" width="6" height="12" rx="3"/>
-          <path d="M5 10a7 7 0 0 0 14 0"/>
-          <line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/>
-        </svg>
-      </span>
-      <span class="feed-tab-label">Podcasts</span>
-      <span class="feed-tab-sub">Follows</span>
-    </button>
+    <div class="feed-menu feed-menu--scope" data-feed-menu="scope" hidden>
+      <button type="button" class="feed-menu-btn" aria-haspopup="true" aria-expanded="false" aria-label="Choose whose boosts">
+        <span class="feed-menu-cur" data-feed-menu-cur>Global</span>
+        <span class="feed-menu-caret" aria-hidden="true">▾</span>
+      </button>
+      <div class="feed-menu-list" role="menu" aria-label="Whose boosts" hidden>
+        <button type="button" class="feed-menu-item" role="menuitemradio" aria-checked="true" data-value="global">Global</button>
+        <button type="button" class="feed-menu-item" role="menuitemradio" aria-checked="false" data-value="follows">Follows</button>
+      </div>
+    </div>
 
-    <button
-      type="button"
-      class="feed-tab feed-tab--boosts-follows"
-      role="tab"
-      id="tab-boosts-follows"
-      aria-controls="panel-boosts-follows"
-      aria-selected="false"
-      data-feed="boosts-follows"
-    >
-      <span class="feed-tab-icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="currentColor">
-          <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd"/>
-        </svg>
-      </span>
-      <span class="feed-tab-label">Boosts</span>
-      <span class="feed-tab-sub">Follows</span>
-    </button>
+    <!-- Filled by each feed's renderer on first hydration; CSS shows only the
+         active feed's group. -->
+    <div class="feed-bar-controls" data-feed-controls></div>
   </div>
 </div>
 
 <!-- ══════════════════════════════ PANELS ══════════════════════════════
      The two Boosts panels render the kind-1 boost note itself
-     (boosts-feed.js). The two Podcasts panels render the show-level
-     rollup, from the collector's pre-computed per-show index
-     (podcasts-feed.js). Global vs Follows narrows to the signed-in user's
-     kind-3 contact list — see follow-set.js. -->
+     (boosts-feed.js). The two Podcasts panels render the per-episode
+     rollup (feeds-podcasts.js). Global vs Follows narrows to the signed-in
+     user's kind-3 contact list — see follow-set.js. Shows is a placeholder:
+     it has no loader in feeds.js, so its markup is all there is. -->
 <main class="feed-panels">
   <div class="feed-panels-inner">
 
-    <section class="feed-panel is-active" id="panel-podcasts-global" role="tabpanel" aria-labelledby="tab-podcasts-global" data-feed="podcasts-global" data-scope="global" tabindex="0">
-      <div class="feed-panel-head">
-        <div>
-          <h2 data-pcast-title>Podcasts Aired This Week</h2>
-        </div>
-        <span class="feed-count"></span>
-      </div>
+    <section class="feed-panel is-active" id="panel-podcasts-global" role="region" aria-label="Podcasts, global" data-feed="podcasts-global" data-scope="global">
       <div class="feed-list" data-feed-list>
         <div class="feed-placeholder">
           <strong>Global podcasts feed coming online</strong>
@@ -1064,12 +936,7 @@
       </div>
     </section>
 
-    <section class="feed-panel" id="panel-boosts-global" role="tabpanel" aria-labelledby="tab-boosts-global" data-feed="boosts-global" data-scope="global" tabindex="0" hidden>
-      <div class="feed-panel-head">
-        <div>
-          <h2>Boosts</h2>
-        </div>
-      </div>
+    <section class="feed-panel" id="panel-boosts-global" role="region" aria-label="Boosts, global" data-feed="boosts-global" data-scope="global" hidden>
       <div class="feed-list" data-feed-list>
         <div class="feed-placeholder">
           <strong>Global boosts feed coming online</strong>
@@ -1078,13 +945,7 @@
       </div>
     </section>
 
-    <section class="feed-panel" id="panel-podcasts-follows" role="tabpanel" aria-labelledby="tab-podcasts-follows" data-feed="podcasts-follows" data-scope="follows" tabindex="0" hidden>
-      <div class="feed-panel-head">
-        <div>
-          <h2 data-pcast-title>Podcasts Aired This Week</h2>
-        </div>
-        <span class="feed-count"></span>
-      </div>
+    <section class="feed-panel" id="panel-podcasts-follows" role="region" aria-label="Podcasts from your follows" data-feed="podcasts-follows" data-scope="follows" hidden>
       <div class="feed-list" data-feed-list>
         <div class="feed-placeholder">
           <strong>Sign in to see this feed</strong>
@@ -1093,16 +954,23 @@
       </div>
     </section>
 
-    <section class="feed-panel" id="panel-boosts-follows" role="tabpanel" aria-labelledby="tab-boosts-follows" data-feed="boosts-follows" data-scope="follows" tabindex="0" hidden>
-      <div class="feed-panel-head">
-        <div>
-          <h2>Boosts from your follows</h2>
-        </div>
-      </div>
+    <section class="feed-panel" id="panel-boosts-follows" role="region" aria-label="Boosts from your follows" data-feed="boosts-follows" data-scope="follows" hidden>
       <div class="feed-list" data-feed-list>
         <div class="feed-placeholder">
           <strong>Sign in to see this feed</strong>
           Follows feeds read your kind&#8209;3 contact list, so they need a signed-in npub.
+        </div>
+      </div>
+    </section>
+
+    <!-- Shows: a show-level directory, where the Podcasts feeds are
+         episode-level. Nothing behind it yet — the /shows page carries the
+         same notice. -->
+    <section class="feed-panel" id="panel-shows" role="region" aria-label="Shows" data-feed="shows" data-scope="global" hidden>
+      <div class="feed-list" data-feed-list>
+        <div class="feed-placeholder">
+          <strong>Shows is coming soon</strong>
+          A directory of the podcasts receiving boosts, ranked and searchable at the show level. The Podcasts feed already covers individual episodes.
         </div>
       </div>
     </section>
@@ -1158,24 +1026,40 @@
 </footer>
 <!-- FOOTER:END -->
 
-<!-- ══════════════════════════════ TAB CONTROLLER ══════════════════════════════ -->
+<!-- ══════════════════════════════ FEED BAR CONTROLLER ══════════════════════════════
+     Owns the two menus, which panel is on screen, and the hash. The feed key
+     is still `<type>-<scope>` (Shows excepted), so every existing
+     /#boosts-global style link and the nav's own menu keep working
+     unchanged. -->
 <script>
 (function () {
   'use strict';
-  // Order matters: it drives arrow-key navigation across the tablist and must
-  // match the DOM order of the buttons.
-  const FEEDS = ['podcasts-global', 'boosts-global', 'podcasts-follows', 'boosts-follows'];
-  const FOLLOWS_FEEDS = ['podcasts-follows', 'boosts-follows'];
-  const DEFAULT_FEED = 'podcasts-global';
-  const tablist = document.querySelector('.feed-tabs');
-  if (!tablist) return;
-  const tabs = Array.from(tablist.querySelectorAll('[role="tab"]'));
+  // The feed each hash names, and the two axes it decomposes into. Shows has
+  // no whose-axis — it's a placeholder, so its key is bare and its scope is
+  // only here to keep the shape uniform.
+  const FEEDS = {
+    'podcasts-global':  { type: 'podcasts', scope: 'global' },
+    'podcasts-follows': { type: 'podcasts', scope: 'follows' },
+    'boosts-global':    { type: 'boosts',   scope: 'global' },
+    'boosts-follows':   { type: 'boosts',   scope: 'follows' },
+    'shows':            { type: 'shows',    scope: 'global' },
+  };
+  const DEFAULT_TYPE = 'podcasts';
+  const DEFAULT_SCOPE = 'global';
+  const bar = document.querySelector('.feed-bar');
+  if (!bar) return;
+  const panels = Array.from(document.querySelectorAll('.feed-panel[data-feed]'));
+  const menus = {};
+  bar.querySelectorAll('[data-feed-menu]').forEach((el) => { menus[el.dataset.feedMenu] = el; });
 
-  function panelFor(feed) { return document.getElementById('panel-' + feed); }
+  let type = DEFAULT_TYPE;
+  let scope = DEFAULT_SCOPE;
 
-  // The Follows tabs are scoped to a signed-in npub, so signed out they have
-  // nothing to show — they're dropped from the row entirely rather than kept
-  // around as tabs whose only content is a sign-in prompt.
+  function feedKey(t, s) { return t === 'shows' ? 'shows' : t + '-' + s; }
+
+  // Follows is scoped to a signed-in npub, so signed out it has nothing to
+  // show — the option is dropped rather than kept around as a menu entry whose
+  // only content is a sign-in prompt.
   function isSignedIn() {
     try {
       const raw = localStorage.getItem('lb_nostr_session');
@@ -1188,35 +1072,43 @@
     catch (e) { return false; }
   }
 
-  function isVisible(feed) {
-    if (!FEEDS.includes(feed)) return false;
-    return FOLLOWS_FEEDS.indexOf(feed) === -1 || isSignedIn();
-  }
-
-  function syncTabVisibility() {
-    const signedIn = isSignedIn();
-    tabs.forEach((tab) => {
-      if (FOLLOWS_FEEDS.indexOf(tab.dataset.feed) !== -1) tab.hidden = !signedIn;
+  function syncMenus() {
+    Object.entries(menus).forEach(([axis, root]) => {
+      const value = axis === 'type' ? type : scope;
+      let label = '';
+      root.querySelectorAll('.feed-menu-item').forEach((item) => {
+        const on = item.dataset.value === value;
+        item.setAttribute('aria-checked', on ? 'true' : 'false');
+        // The item can carry a "Soon" badge, so take the first text node
+        // rather than its whole textContent.
+        if (on) label = (item.firstChild && item.firstChild.textContent || item.textContent).trim();
+      });
+      const cur = root.querySelector('[data-feed-menu-cur]');
+      if (cur && label) cur.textContent = label;
     });
+    // A one-option dropdown is worse than none: hide the scope menu while
+    // signed out, and on Shows, which has no whose-axis.
+    if (menus.scope) menus.scope.hidden = (type === 'shows') || !isSignedIn();
   }
 
-  function activate(feed, { focus = false, updateHash = true } = {}) {
-    // Covers both an unknown hash and a #...-follows deep link while signed
-    // out. Force the hash rewrite on that path so the URL can't keep naming
-    // a tab that isn't on screen.
-    if (!isVisible(feed)) { feed = DEFAULT_FEED; updateHash = true; }
+  function setFeed(nextType, nextScope, opts) {
+    let updateHash = !opts || opts.updateHash !== false;
+    if (!nextType || !Object.values(FEEDS).some((f) => f.type === nextType)) nextType = DEFAULT_TYPE;
+    if (nextScope !== 'global' && nextScope !== 'follows') nextScope = DEFAULT_SCOPE;
+    // Covers a #...-follows deep link while signed out. Force the hash rewrite
+    // on that path so the URL can't keep naming a feed that isn't on screen.
+    if (nextScope === 'follows' && !isSignedIn()) { nextScope = 'global'; updateHash = true; }
+    type = nextType;
+    scope = nextScope;
+
+    const feed = feedKey(type, scope);
     document.body.setAttribute('data-active-feed', feed);
-    tabs.forEach((tab) => {
-      const isActive = tab.dataset.feed === feed;
-      tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
-      tab.tabIndex = isActive ? 0 : -1;
-      const panel = panelFor(tab.dataset.feed);
-      if (panel) {
-        panel.classList.toggle('is-active', isActive);
-        panel.hidden = !isActive;
-      }
-      if (isActive && focus) tab.focus();
+    panels.forEach((panel) => {
+      const isActive = panel.dataset.feed === feed;
+      panel.classList.toggle('is-active', isActive);
+      panel.hidden = !isActive;
     });
+    syncMenus();
     if (updateHash && ('#' + feed) !== location.hash) {
       history.replaceState(null, '', '#' + feed);
     }
@@ -1224,47 +1116,79 @@
     document.dispatchEvent(new CustomEvent('lb:feed-activate', { detail: { feed } }));
   }
 
-  tabs.forEach((tab) => {
-    tab.addEventListener('click', () => activate(tab.dataset.feed));
-  });
+  function fromHash(updateHash) {
+    const cfg = FEEDS[(location.hash || '').replace('#', '')];
+    // An unknown hash falls back to the default *and* rewrites, so the URL
+    // never keeps naming something that isn't on screen.
+    if (!cfg) { setFeed(DEFAULT_TYPE, DEFAULT_SCOPE, { updateHash: true }); return; }
+    setFeed(cfg.type, cfg.scope, { updateHash: updateHash });
+  }
 
-  // Roving-tabindex arrow-key navigation across the tablist. Walks the
-  // *visible* tabs, so arrowing off the end wraps to the right one whether
-  // there are two tabs or four.
-  tablist.addEventListener('keydown', (e) => {
-    const vis = tabs.filter((t) => !t.hidden);
-    const idx = vis.findIndex((t) => t.dataset.feed === document.body.dataset.activeFeed);
-    if (idx < 0) return;
-    let next = null;
-    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (idx + 1) % vis.length;
-    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = (idx - 1 + vis.length) % vis.length;
-    else if (e.key === 'Home') next = 0;
-    else if (e.key === 'End') next = vis.length - 1;
-    if (next === null) return;
-    e.preventDefault();
-    activate(vis[next].dataset.feed, { focus: true });
-  });
+  // Menu behaviour, shared by both: click to toggle, outside-click or Escape
+  // to close, arrows to move within an open list. Same mechanics as the sort
+  // dropdown in feed-controls.js.
+  function wireMenu(root, onPick) {
+    const btn = root.querySelector('.feed-menu-btn');
+    const list = root.querySelector('.feed-menu-list');
+    const items = Array.from(root.querySelectorAll('.feed-menu-item'));
+    function onDoc(e) { if (!root.contains(e.target)) close(); }
+    function onKey(e) { if (e.key === 'Escape') { close(); btn.focus(); } }
+    function open(focusFirst) {
+      list.hidden = false;
+      btn.setAttribute('aria-expanded', 'true');
+      document.addEventListener('click', onDoc, true);
+      document.addEventListener('keydown', onKey);
+      if (focusFirst) {
+        const checked = items.find((i) => i.getAttribute('aria-checked') === 'true');
+        (checked || items[0]).focus();
+      }
+    }
+    function close() {
+      list.hidden = true;
+      btn.setAttribute('aria-expanded', 'false');
+      document.removeEventListener('click', onDoc, true);
+      document.removeEventListener('keydown', onKey);
+    }
+    btn.addEventListener('click', () => { list.hidden ? open(false) : close(); });
+    btn.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown') { e.preventDefault(); open(true); }
+    });
+    items.forEach((item) => {
+      item.addEventListener('click', () => { close(); btn.focus(); onPick(item.dataset.value); });
+    });
+    list.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+      e.preventDefault();
+      const i = items.indexOf(document.activeElement);
+      const next = e.key === 'ArrowDown' ? i + 1 : i - 1;
+      items[(next + items.length) % items.length].focus();
+    });
+    return { close: close };
+  }
 
-  window.addEventListener('hashchange', () => {
-    activate((location.hash || '').replace('#', ''), { updateHash: false });
-  });
+  const wired = [];
+  if (menus.type) wired.push(wireMenu(menus.type, (v) => setFeed(v, scope)));
+  if (menus.scope) wired.push(wireMenu(menus.scope, (v) => setFeed(type, v)));
 
-  // Show/hide the Follows tabs as the session changes. The widget dispatches
+  window.addEventListener('hashchange', () => { fromHash(false); });
+
+  // Keep the scope menu in step with the session. The widget dispatches
   // lb:session-change on every identity change; `storage` covers signing in
   // on another tab. Signing out while reading a Follows feed drops you back
-  // to the default rather than leaving a row with nothing selected.
+  // to Global rather than leaving a feed you can no longer scope.
   function onSessionChange() {
-    syncTabVisibility();
-    if (!isVisible(document.body.dataset.activeFeed)) activate(DEFAULT_FEED);
+    // A menu left open across a sign-out would be showing stale options.
+    wired.forEach((m) => m.close());
+    if (scope === 'follows' && !isSignedIn()) setFeed(type, 'global');
+    else syncMenus();
   }
   window.addEventListener('lb:session-change', onSessionChange);
   window.addEventListener('storage', (e) => {
     if (!e || e.key === null || e.key === 'lb_nostr_session') onSessionChange();
   });
 
-  // Deep-link support: /#boosts-global lands on the Boosts · Global tab.
-  syncTabVisibility();
-  activate((location.hash || '').replace('#', ''), { updateHash: false });
+  // Deep-link support: /#boosts-global lands on Boosts · Global.
+  fromHash(false);
 })();
 </script>
 

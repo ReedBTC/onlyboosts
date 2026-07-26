@@ -1,14 +1,19 @@
-/* Boosts feed — the note-level view behind the two Boosts tabs.
+/* Boosts feed — the note-level view behind the two Boosts feeds.
  *
- * One card per kind-1 boost note, newest first. The Podcasts tabs render the
- * same data rolled up by show; this renders the boosts themselves.
+ * One card per kind-1 boost note, newest first. The Podcasts feeds render the
+ * same data rolled up by episode; this renders the boosts themselves.
  *
- * The two tabs read different backends. Global comes from ob-data.js: the
+ * The two scopes read different backends. Global comes from ob-data.js: the
  * latest.json shard for the first page, then month archives from the manifest
  * for paging back. Follows comes from ob-live.js — the D1 query API filters to
  * the contact list server-side and pages by cursor, because the shards are
  * global by construction and scoping them client-side meant downloading months
  * of boosts to keep the handful that matched.
+ *
+ * Range and sort (feed-controls.js, shared with the Podcasts rollup): the
+ * range filters on when the boost was SENT, which is the axis a note feed is
+ * ordered by. Sorting applies to the selected window, so a bounded window is
+ * paged in completely before it's painted — see ensureCoverage below.
  *
  * Booster names and avatars are embedded in each record on both paths, so
  * unlike the old LB feed there is no profile round-trip and nothing to
@@ -30,8 +35,49 @@ import {
   getLatestBoosts, getBoostMonths, getBoostMonth, boosterLabel,
 } from '/assets/js/ob-data.js'
 import { followsBoostReader } from '/assets/js/ob-live.js'
+import {
+  rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls,
+} from '/assets/js/feed-controls.js'
 
 const PAGE_SIZE = 30
+
+// ── Range + sort ──────────────────────────────────────────────────────
+// The range filters on boost time (b.ts), not on when the episode aired — a
+// card here is one boost, so "the last 7 days" means the boosts sent in them.
+// The Podcasts rollup's identical buttons mean air date instead, which is why
+// each feed writes its own tooltips.
+function rangeTitle(key) {
+  const days = rangeDays(key)
+  return days ? `Boosts sent in the last ${days} days` : 'All boosts'
+}
+
+// Deliberately shorter than the Podcasts rollup's menu: an episode card
+// aggregates many boosts and can be ranked by boosters / boosts / sats, but a
+// single boost's only quantitative axis is its own size.
+const SORT_OPTIONS = [
+  ['recent', 'Latest boost'],
+  ['episode', 'Latest episode'],
+  ['sats', 'Largest boost'],
+]
+
+// `episode.date` is null on ~12% of records (and on every record with no
+// episode metadata at all), so undated boosts sort to the bottom of the
+// episode order rather than to the top, where a 0 would put them.
+function epTime(b) {
+  const t = b.episode?.date
+  return Number.isFinite(t) ? t : -Infinity
+}
+const SORTERS = {
+  recent: (a, b) => b.ts - a.ts,
+  // Compared before subtracting: two undated rows would otherwise be
+  // -Infinity - -Infinity, i.e. NaN, in the comparator.
+  episode: (a, b) => {
+    const ea = epTime(a)
+    const eb = epTime(b)
+    return ea === eb ? b.ts - a.ts : eb - ea
+  },
+  sats: (a, b) => ((b.sats || 0) - (a.sats || 0)) || (b.ts - a.ts),
+}
 
 function h(tag, attrs = {}, kids = []) {
   const el = document.createElement(tag)
@@ -276,10 +322,11 @@ async function createFollowsSource(authors) {
 
 // ── entry point ───────────────────────────────────────────────────────
 /**
+ * @param {Element} [opts.panel] the feed's panel, for its feed key
  * @param {Element} opts.list   the [data-feed-list] container to fill
  * @param {string}  opts.scope  'global' | 'follows'
  */
-export async function renderBoosts({ list, scope = 'global' }) {
+export async function renderBoosts({ panel, list, scope = 'global' }) {
   if (!list) return
 
   // Resolve the audience first — a signed-out Follows tab should say so
@@ -326,7 +373,7 @@ export async function renderBoosts({ list, scope = 'global' }) {
     renderPlaceholder(list,
       follows ? 'No boosts from your follows yet' : 'No boosts yet',
       follows
-        ? ' Nobody you follow has boosted a podcast on Nostr yet. The Global tab shows everyone.'
+        ? ' Nobody you follow has boosted a podcast on Nostr yet. Switch to Global to see everyone.'
         : ' When someone boosts a podcast episode on Nostr, it’ll show up here.')
     return
   }
@@ -339,10 +386,73 @@ export async function renderBoosts({ list, scope = 'global' }) {
 
   const cards = h('div', { class: 'ob-boost-list' })
   const moreWrap = h('div', { class: 'pcast-more-wrap' })
+  // Opening view is the whole feed, newest first — what this feed showed
+  // before it had controls.
+  let rangeKey = 'all'
+  let sortKey = 'recent'
+  let view = rows
   let shown = 0
+  // Guards an in-flight coverage fetch against a newer selection landing
+  // while it's still running.
+  let seq = 0
 
-  function paintMore() {
-    const slice = rows.slice(shown, shown + PAGE_SIZE)
+  // The rows in the selected window, in the selected order. 'recent' over
+  // 'all' is the source's own order, so the default view is the source's own
+  // array — paging appends to it and nothing has to be copied or re-sorted.
+  function buildView() {
+    const cutoff = rangeCutoff(rangeKey)
+    const scoped = cutoff ? rows.filter((b) => b.ts >= cutoff) : rows
+    return sortKey === 'recent' ? scoped : [...scoped].sort(SORTERS[sortKey])
+  }
+
+  function oldestTs() { return rows.length ? rows[rows.length - 1].ts : Infinity }
+
+  // Whether the loaded corpus stops short of the window's cutoff. A bounded
+  // range has to be paged in completely before it's sorted, or the order would
+  // be over whichever pages happened to be loaded rather than over the window
+  // the user asked for.
+  function needsCoverage() {
+    const cutoff = rangeCutoff(rangeKey)
+    return !!cutoff && source.hasMore && oldestTs() > cutoff
+  }
+
+  // Cheap by construction. On Global, latest.json alone spans ~26 days, so 1W
+  // needs no fetch at all and 1M needs at most one month archive.
+  //
+  // On Follows it's a page walk at ob-live.js's 200 rows a request, which is
+  // left alone deliberately. The network publishes ~38 boosts a day, so even a
+  // follow set covering every booster alive bounds 1W at ~280 rows (2 requests)
+  // and 1M at ~1,140 (6). A real contact list is a fraction of that, and pages
+  // sized to the *worst* case would mean fetching thousands of rows to fill a
+  // window holding a couple of hundred. /api/v1/boosts/follows does take a
+  // `since`, which would answer any window in one query — but on a short page
+  // it returns no cursor, and the client can't mint the opaque cursor it would
+  // then need to keep paging *past* the window when the range widens again.
+  async function ensureCoverage() {
+    while (needsCoverage()) {
+      let got = 0
+      try {
+        got = await source.loadMore()
+      } catch (e) {
+        console.warn('[boosts] coverage load failed', e)
+        break
+      }
+      if (!got) break
+    }
+  }
+
+  function paint({ reset = false } = {}) {
+    if (reset) { shown = 0; cards.replaceChildren() }
+    view = buildView()
+    if (!view.length) {
+      cards.replaceChildren(h('div', { class: 'feed-placeholder' }, [
+        h('strong', { text: 'No boosts in this window' }),
+        ' Nothing was boosted in this time range — try a wider one.',
+      ]))
+      moreWrap.replaceChildren()
+      return
+    }
+    const slice = view.slice(shown, shown + PAGE_SIZE)
     for (const b of slice) cards.appendChild(renderBoostCard(b))
     shown += slice.length
     updateMoreButton()
@@ -350,15 +460,17 @@ export async function renderBoosts({ list, scope = 'global' }) {
 
   function updateMoreButton() {
     moreWrap.replaceChildren()
-    const remaining = rows.length - shown
-    const canPage = remaining > 0 || source.hasMore
-    if (!canPage) return
-    const label = remaining > 0
-      ? `Show more (${remaining} loaded)`
-      : source.moreLabel
-    const btn = h('button', { class: 'pcast-showmore', type: 'button' }, label)
+    const remaining = view.length - shown
+    // Paging further back only means anything on All: a bounded window is
+    // already covered in full, so once it's all on screen there is nothing
+    // left to fetch *for that window*.
+    const canLoadOlder = rangeKey === 'all' && source.hasMore
+    if (remaining <= 0 && !canLoadOlder) return
+
+    const btn = h('button', { class: 'pcast-showmore', type: 'button' },
+      remaining > 0 ? `Show more (${remaining} more)` : source.moreLabel)
     btn.addEventListener('click', async () => {
-      if (remaining > 0) { paintMore(); return }
+      if (remaining > 0) { paint(); return }
       btn.disabled = true
       btn.textContent = 'Loading…'
       let got = 0
@@ -367,11 +479,51 @@ export async function renderBoosts({ list, scope = 'global' }) {
       } catch (e) {
         console.warn('[boosts] load more failed', e)
       }
-      if (got) paintMore()
+      // Older rows land after everything on screen in the chronological
+      // order, so that page can just be appended. Under any other sort they
+      // can outrank what's painted, so the list is rebuilt instead.
+      if (got) paint({ reset: sortKey !== 'recent' })
       else updateMoreButton()
     })
-    moreWrap.appendChild(btn)
+
+    // On All, a non-chronological order can only rank what's been loaded, so
+    // say what that is rather than implying it's the whole archive.
+    const note = rangeKey !== 'all'
+      ? `Showing ${shown} of ${view.length} in this window`
+      : (sortKey === 'recent'
+          ? `Showing ${shown} of ${view.length} loaded`
+          : `Ranked over the ${view.length} boosts loaded so far`)
+    moreWrap.appendChild(h('div', { class: 'pcast-more-group' }, [
+      btn, h('div', { class: 'pcast-more-count', text: note }),
+    ]))
   }
+
+  // Range/sort changes both go through here: widen the corpus first if the new
+  // window reaches past it, then repaint from the top.
+  async function apply(fn) {
+    fn()
+    const mine = ++seq
+    if (needsCoverage()) {
+      shown = 0
+      cards.replaceChildren(h('div', { class: 'feed-placeholder' }, [
+        h('strong', { text: 'Loading this window…' }),
+        ' Fetching the rest of the boosts in this range so the order is complete.',
+      ]))
+      moreWrap.replaceChildren()
+      await ensureCoverage()
+      if (mine !== seq) return
+    }
+    paint({ reset: true })
+  }
+
+  mountFeedControls(panel?.dataset.feed || `boosts-${scope}`, [
+    rangeControl(rangeKey, (key) => {
+      if (key !== rangeKey) apply(() => { rangeKey = key })
+    }, { label: 'Filter by when the boost was sent', titleFor: rangeTitle }),
+    sortControl(SORT_OPTIONS, sortKey, (key) => {
+      if (key !== sortKey) apply(() => { sortKey = key })
+    }, { title: 'Sort boosts' }),
+  ])
 
   list.replaceChildren(cards, moreWrap)
 
@@ -395,12 +547,12 @@ export async function renderBoosts({ list, scope = 'global' }) {
       renderPlaceholder(list,
         follows ? 'No boosts from your follows yet' : 'No boosts yet',
         follows
-          ? ' Nobody you follow has boosted a podcast on Nostr yet. The Global tab shows everyone.'
+          ? ' Nobody you follow has boosted a podcast on Nostr yet. Switch to Global to see everyone.'
           : ' When someone boosts a podcast episode on Nostr, it’ll show up here.')
       return
     }
     list.replaceChildren(cards, moreWrap)
   }
 
-  paintMore()
+  paint()
 }
