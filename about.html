@@ -21,11 +21,9 @@
   " />
 
   <title>About — OnlyBoosts</title>
-  <meta name="description" content="What OnlyBoosts is, who built it, and how podcast boosts end up on Nostr." />
+  <meta name="description" content="An index of podcast boosts published to Nostr. How NIP-73 links a note to a show, why keysend boosts are not included, and what the data can and cannot tell you." />
   <link rel="canonical" href="https://onlyboosts.social/about" />
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <!-- Nothing to index until the page has its feature. -->
-  <meta name="robots" content="noindex, follow" />
 
   <!-- PWA -->
   <link rel="manifest" href="/manifest.webmanifest" />
@@ -36,10 +34,10 @@
   <meta name="apple-mobile-web-app-title" content="OnlyBoosts" />
 
   <!-- Open Graph -->
-  <meta property="og:type" content="website" />
+  <meta property="og:type" content="article" />
   <meta property="og:url" content="https://onlyboosts.social/about" />
   <meta property="og:title" content="About — OnlyBoosts" />
-  <meta property="og:description" content="What OnlyBoosts is, who built it, and how podcast boosts end up on Nostr." />
+  <meta property="og:description" content="How NIP-73 links a Nostr note to a podcast, why keysend boosts are not included, and what this data can and cannot tell you." />
   <meta property="og:site_name" content="OnlyBoosts" />
   <meta property="og:image" content="https://onlyboosts.social/assets/onlyboosts_banner.png" />
   <meta name="twitter:card" content="summary_large_image" />
@@ -132,24 +130,246 @@
 <!-- NAV:END -->
 
 <header class="page-header">
-  <span class="page-eyebrow">More</span>
   <h1>About</h1>
-  <p>What this is and how it works.</p>
 </header>
 
 <main class="page-main">
-  <div class="page-inner">
-    <section class="soon-card">
-      <div class="soon-mark" aria-hidden="true">ℹ️</div>
-      <h2>Coming soon</h2>
-      <p>OnlyBoosts is a Nostr client for podcast boosts. When someone boosts a show from a podcasting 2.0 app, the boostagram is often published as a Nostr note — this site collects those notes network-wide, enriches them with show and episode data, and puts them in one feed you can read globally or scoped to the people you follow.</p>
-      <p>The full story — how the collector works, what it does and doesn't store, and how to boost a show back through the site — goes here.</p>
-      <span class="soon-badge">In progress</span>
-      <div class="soon-links">
-        <a href="/#podcasts-global"><span aria-hidden="true">🎙</span> Podcasts: Global</a>
-        <a href="/#boosts-global"><span aria-hidden="true">⚡</span> Boosts: Global</a>
-      </div>
-    </section>
+  <div class="page-inner page-inner--wide">
+
+    <!-- Filled from /api/data/meta.json by the script at the foot of the
+         page; stays hidden if that fetch fails, so no empty shell. -->
+    <div class="stat-strip" id="stat-strip" hidden>
+      <div class="stat"><span class="stat-num" data-stat="boosts">&mdash;</span><span class="stat-label">Boosts</span></div>
+      <div class="stat"><span class="stat-num" data-stat="shows">&mdash;</span><span class="stat-label">Shows</span></div>
+      <div class="stat"><span class="stat-num" data-stat="boosters">&mdash;</span><span class="stat-label">Boosters</span></div>
+      <div class="stat"><span class="stat-num" data-stat="sats">&mdash;</span><span class="stat-label">Sats</span></div>
+      <div class="stat"><span class="stat-num" data-stat="since">&mdash;</span><span class="stat-label">Since</span></div>
+    </div>
+
+    <nav class="toc" aria-label="On this page">
+      <a href="#overview">Overview</a>
+      <a href="#nostr">Nostr Fundamentals</a>
+      <a href="#nip73">NIP-73</a>
+      <a href="#keysend">Keysend Boosts</a>
+      <a href="#pipeline">How the Index Is Built</a>
+      <a href="#amounts">Amounts</a>
+      <a href="#limits">Limitations</a>
+      <a href="#faq">Questions</a>
+    </nav>
+
+    <div class="prose">
+
+      <section id="overview">
+        <h2>Overview</h2>
+        <p class="lede">OnlyBoosts is an index of podcast boosts that have been published to Nostr. Boost notes are collected from relays across the network, cross-referenced against the Podcast Index for show and episode metadata, and served as an open feed.</p>
+        <p>Boosting requires no Nostr at all. A listener sends sats to a show through the Podcasting 2.0 value block, the payment is split among the recipients the podcaster has named in the RSS feed, and a boostagram message frequently travels with it. That process predates this site by years and it remains the mechanism behind the large majority of boosts sent today.</p>
+        <p>What this site indexes is considerably narrower. A small number of podcast applications now publish a public note to Nostr when a boost is sent, announcing that the boost occurred. Those notes, and only those notes, are what OnlyBoosts collects. The result is a cross-application view of boost activity assembled entirely from what the applications themselves have chosen to broadcast.</p>
+      </section>
+
+      <section id="nostr">
+        <h2>Nostr Fundamentals</h2>
+        <p>Nostr is an open protocol for publishing cryptographically signed messages to a network of independent servers. Four of its properties are relevant to how this index works.</p>
+
+        <h3>Relays</h3>
+        <p>A relay is a server that accepts signed messages and serves them back to anyone who requests them. Anyone can operate one and there are hundreds in operation. There is no central authority, no account database and no algorithmic distribution. A given message may be stored on many relays or on very few, so retrieving it is a matter of querying the right ones. Relays are also under no obligation to retain messages indefinitely, which places a practical limit on how far back this index can reach.</p>
+
+        <h3>Keys and Identity</h3>
+        <p>Nostr has no usernames and no accounts. An identity is a cryptographic keypair; the public half is referred to as an npub and serves as the identifier for everything that key publishes. Every message is signed with the private half, so any reader can independently verify that a message originated from a particular npub. No authority can revoke that identity and no third party can forge messages from it.</p>
+
+        <h3>Event Kinds</h3>
+        <p>Every Nostr message, referred to as an event, carries a kind number declaring what type of message it is. Kind 1 is the standard short text note. A boost note is a kind 1 event that carries additional tags describing the boost.</p>
+
+        <h3>Tags</h3>
+        <p>Alongside its text, an event carries a list of tags. Most tags serve social functions such as mentions and replies. One convention, NIP-73, allows an event to reference something that does not exist on Nostr at all. That convention is what makes this index possible.</p>
+      </section>
+
+      <section id="nip73">
+        <h2>NIP-73 and External Content IDs</h2>
+        <p>NIPs, or Nostr Implementation Possibilities, are the protocol&rsquo;s specification documents. They are numbered, publicly maintained and open for any developer to implement. NIP-73, titled &ldquo;External Content IDs,&rdquo; addresses a single question: how does a Nostr event declare that it refers to something outside of Nostr?</p>
+        <p>The specification defines two tags for this purpose. An <code>i</code> tag carries the external identifier and a <code>k</code> tag declares what kind of identifier it is. NIP-73 covers books by ISBN, papers by DOI, films by ISAN, web URLs, geohashes and blockchain transactions, among others. Three of its identifier types apply to podcasting.</p>
+        <div class="tagblock"><span class="c">// the show</span>
+["i", "podcast:guid:<span class="s">c90e609a-df1e-596a-bd5e-57bcc8aad6cc</span>"]
+["k", "podcast:guid"]
+
+<span class="c">// the episode</span>
+["i", "podcast:item:guid:<span class="s">d98d189b-dc7b-45b1-8720-d4b98690f31f</span>"]
+["k", "podcast:item:guid"]
+
+<span class="c">// the publisher</span>
+["i", "podcast:publisher:guid:<span class="s">18bcbf10-6701-4ffb-b255-bc057390d738</span>"]
+["k", "podcast:publisher:guid"]</div>
+        <p>The significance of these identifiers is that none of them are new. The show GUID is the <code>&lt;podcast:guid&gt;</code> value published in the RSS feed, the namespaced UUID that Podcasting 2.0 introduced so that a show retains a stable identity across host migrations. The episode GUID is the episode&rsquo;s own <code>&lt;guid&gt;</code> element.</p>
+        <p>Because the Nostr event and the Podcast Index entry both reference the same values from the same feed, a note published by any application to any relay can be matched to a specific show and episode without a registry, a mapping table or any coordination between the parties involved. That match is what allows this site to attach the correct title, artwork and air date to a boost that arrived carrying none of them.</p>
+        <p>For the purposes of this index, a boost note is a kind 1 event satisfying two conditions: it carries the NIP-73 podcast tags, and it carries evidence that a payment occurred. That evidence takes the form of an amount tag, a reference to a Lightning zap receipt, or a topic tag identifying the note as a boostagram.</p>
+      </section>
+
+      <section id="keysend">
+        <h2>Keysend Boosts and What Is Not Indexed</h2>
+        <div class="callout callout--warn">
+          <p><strong>The majority of boosting activity in Podcasting 2.0 is not visible to this site.</strong> Boosts sent by the conventional method never touch Nostr, and there is consequently no record for this index to collect.</p>
+        </div>
+        <p>The original boost mechanism involves no social network. The listener&rsquo;s application reads the value block from the podcast&rsquo;s RSS feed, calculates the splits and sends a keysend payment to each recipient&rsquo;s Lightning node. Keysend is a spontaneous payment method requiring no invoice from the recipient. The boostagram travels inside a custom TLV record attached to that payment (record <code>7629169</code>, defined by the Satoshis.Stream convention), carrying the sender name, message, application, episode and total amount.</p>
+        <p>That design works well and it is entirely opaque to any third party. A keysend payment moves between two nodes and its TLV record is delivered only to the recipient. There is no public broadcast and no intermediary with visibility into the transaction. The only parties aware that the boost occurred are the sending application and the receiving nodes.</p>
+        <p>A boost sent from an application that does not publish to Nostr is therefore not missing from this index; it was never observable in the first place. The same applies to streaming sats, which are sent by the same keysend mechanism on a per-minute basis and are not announced individually.</p>
+
+        <h3>Interpreting the Numbers</h3>
+        <p>The practical consequence is that this data should be treated as a sample rather than a census. A show with no boosts recorded here may be receiving substantial support through keysend. A show ranked highly here may simply have an audience concentrated in an application that publishes to Nostr. The rankings measure boosts published to Nostr, which is a meaningful quantity and one that was not previously measured anywhere, but it is not equivalent to total boost activity.</p>
+        <p>Stated plainly: absence from OnlyBoosts indicates nothing. Presence indicates something.</p>
+      </section>
+
+      <section id="pipeline">
+        <h2>How the Index Is Built</h2>
+        <ul>
+          <li><strong>Scan.</strong> A collector continuously queries a curated set of relays, along with the personal relays of every npub previously observed boosting, for events carrying podcast tags.</li>
+          <li><strong>Classify.</strong> Events carrying a NIP-73 podcast tag and a payment signal are retained. Everything else is discarded.</li>
+          <li><strong>Enrich.</strong> Each show and episode is looked up in the Podcast Index by GUID to attach its title, artwork and air date, and the booster&rsquo;s public Nostr profile is resolved for a display name and avatar.</li>
+          <li><strong>Serve.</strong> The result is written out as plain JSON and served openly. This website reads exactly the same files that are available to anyone else.</li>
+        </ul>
+        <p>An initial backfill reached as far back as relays still retain these events, approximately October 2024. An incremental scan runs roughly every fifteen minutes to keep the index current, and a daily pass widens the set of relays queried.</p>
+
+        <h3>Applications Publishing Boost Notes</h3>
+        <p>Three sources are known to be publishing NIP-73 boost notes at present.</p>
+        <ul>
+          <li><strong><a href="https://fountain.fm" target="_blank" rel="noopener noreferrer">Fountain</a></strong> publishes a note referencing a Lightning zap receipt for the amount. This accounts for the bulk of the data.</li>
+          <li><strong><a href="https://boostmebitch.com" target="_blank" rel="noopener noreferrer">BoostMeBitch</a></strong> publishes a note carrying an explicit <code>amount</code> tag.</li>
+          <li><strong><a href="https://localbitcoiners.com" target="_blank" rel="noopener noreferrer">Local Bitcoiners</a></strong> publishes a note carrying an <code>amount</code> tag from its website boost widget.</li>
+        </ul>
+        <p>That is a short list and it is the single largest constraint on this data. Nothing about the index is specific to those three applications, however. NIP-73 is an open standard, so any application that begins publishing boost notes in the same format will appear here automatically, without registration or coordination. The coverage of this index improves as adoption grows; that is the premise the site is built on.</p>
+      </section>
+
+      <section id="amounts">
+        <h2>How Amounts Are Determined</h2>
+        <p>Boost notes do not all state their amounts the same way, and some do not state an amount at all. Every record carries the method used so that the figure can be weighed accordingly.</p>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr><th>Source</th><th>Definition</th><th>Confidence</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>amount_tag</code></td>
+                <td>The note carries a structured <code>amount</code> tag, denominated in millisats.</td>
+                <td>Strongest. An explicit machine-readable figure supplied by the application.</td>
+              </tr>
+              <tr>
+                <td><code>zap_receipt</code></td>
+                <td>The amount is read from a Lightning zap receipt referenced by the note.</td>
+                <td>Strong. A receipt exists for a paid invoice, though it is per-leg and is not proof that the full split settled.</td>
+              </tr>
+              <tr>
+                <td><code>content</code></td>
+                <td>The amount was parsed from the text of the note because no tag or receipt was present.</td>
+                <td>Weakest. A human-readable figure with no structured backing.</td>
+              </tr>
+              <tr>
+                <td><code>t_tag</code> / <code>none</code></td>
+                <td>The event was recognized as a boost, but no amount could be determined.</td>
+                <td>Displayed with no sats figure.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="limits">
+        <h2>Limitations and Disclaimers</h2>
+        <p>The constraints below are material to how the figures on this site should be interpreted, and they are worth reading in full.</p>
+
+        <div class="callout callout--warn">
+          <p><strong>A boost note is a claim, not a receipt.</strong> Nostr and Lightning are independent systems. A boost note contains no cryptographic link proving that a payment was attempted, that it settled, or that any recipient received it. The note is the sending application&rsquo;s assertion that a boost occurred, signed with the sender&rsquo;s key. The amounts shown here are a strong social signal; they are not audited settlement data.</p>
+        </div>
+
+        <h3>Amounts Reflect Intent, Not Delivery</h3>
+        <p>A boost is split across every recipient named in the value block, and individual legs fail routinely when a node is offline or no route can be found. The sats that actually arrive can therefore be less than the total the note claims. The figure generally reflects what was attempted rather than what was delivered.</p>
+
+        <h3>The Record Is Incomplete</h3>
+        <p>This index contains only those boosts that an application chose to publish to Nostr and that reached a relay included in the scan. Keysend boosts, streaming sats and every application that does not publish to Nostr are absent entirely. See <a href="#keysend">Keysend Boosts</a> above; this is the most significant limitation on the data.</p>
+
+        <h3>Identity Is a Key, Not a Verified Person</h3>
+        <p>The booster is whoever controls the signing key. In Fountain&rsquo;s case that is frequently an application-managed key rather than the individual&rsquo;s primary Nostr identity, and some boosts are anonymous. Display names and avatars are self-declared profile data; no identity here is verified, and nothing prevents two npubs from claiming the same name.</p>
+
+        <h3>Podcast Metadata Can Be Missing or Incorrect</h3>
+        <p>Titles, artwork and air dates are drawn from the Podcast Index and keyed by GUID. Feeds that are not present in the Index display limited information, and some episode GUIDs cannot be resolved at all, as the specification permits any opaque string and many feeds use a URL. The boost is still counted; it simply cannot be presented with metadata.</p>
+
+        <h3>History Is Bounded by Relay Retention</h3>
+        <p>The index reaches back only as far as relays still hold these events, approximately October 2024. Boosts older than that have aged off the network and are unrecoverable. Relays are under no obligation to retain anything.</p>
+
+        <h3>Deletions May Persist Briefly</h3>
+        <p>If a boost note is deleted on Nostr, a copy may remain in this index for a period before it clears.</p>
+
+        <h3>All Indexed Data Was Already Public</h3>
+        <p>OnlyBoosts publishes nothing private. Every event indexed here was openly broadcast to public relays by the application that sent it, which is what publishing to Nostr means. This site gathers and organizes that data; it does not disclose anything that was not already accessible.</p>
+      </section>
+
+      <section id="faq">
+        <h2>Frequently Asked Questions</h2>
+        <div class="faq">
+
+          <details>
+            <summary>Why is my boost not listed?</summary>
+            <div class="faq-body">
+              <p>In most cases because the application sent it over keysend and never published it to Nostr, which is how the majority of boosting works. Nothing was lost; there was simply no public note to collect.</p>
+              <p>The remaining possibilities are that the note reached only relays outside the scan, that it predates relay retention, or that it carried podcast tags but no detectable payment signal and was discarded during classification.</p>
+            </div>
+          </details>
+
+          <details>
+            <summary>How current is the data?</summary>
+            <div class="faq-body">
+              <p>An incremental scan runs roughly every fifteen minutes, so a boost note typically appears here within minutes of being published. A daily pass queries a wider set of relays and picks up anything the incremental scan missed.</p>
+              <p>The site itself reads a static snapshot that is regenerated on the same cycle, which is why the feeds load without querying relays from your browser.</p>
+            </div>
+          </details>
+
+          <details>
+            <summary>Does OnlyBoosts take custody of any funds?</summary>
+            <div class="faq-body">
+              <p>The index does not. It takes no custody of funds and processes no payments; it reads notes that already exist publicly on Nostr.</p>
+              <p>Boosting from this website is a separate feature. When a boost is sent from here, the site reads the value block from the show&rsquo;s own RSS feed and pays those recipients directly from your wallet. The sats go where the podcaster&rsquo;s feed specifies.</p>
+            </div>
+          </details>
+
+          <details>
+            <summary>How does a podcast app get its boosts included here?</summary>
+            <div class="faq-body">
+              <p>Publish a kind 1 note when a boost is sent, carrying the NIP-73 podcast tags (<code>podcast:guid</code> for the show and <code>podcast:item:guid</code> for the episode) along with a payment signal. An <code>amount</code> tag denominated in millisats is the strongest option; a <code>t</code> tag identifying the note as a boostagram is also recognized.</p>
+              <p>That is the entire integration. There is no registration, no API key and no permission required from this site; the notes are collected on the next scan. That is the advantage of building on an open standard rather than a platform.</p>
+            </div>
+          </details>
+
+          <details>
+            <summary>Why do the rankings look wrong for a show I know is doing well?</summary>
+            <div class="faq-body">
+              <p>Because the rankings measure boosts published to Nostr rather than boosts sent. A show whose audience uses keysend-only applications can be very well supported and still barely register here. The figures should be read as a floor, not a total.</p>
+            </div>
+          </details>
+
+          <details>
+            <summary>Why is my boost listed when I never posted anything to Nostr?</summary>
+            <div class="faq-body">
+              <p>Because the application you boosted from published the note on your behalf. Some podcast apps create and manage a Nostr key for each user and publish a boost note automatically when a boost is sent; the note is signed with that key and broadcast to public relays, where it is readable by anyone who requests it.</p>
+              <p>That happened before this site observed anything, and OnlyBoosts adds no private data to it. If publishing on your behalf is not the behavior you expected, that is a reasonable question to raise with the application&rsquo;s developers.</p>
+            </div>
+          </details>
+
+          <details>
+            <summary>Is the underlying data available to build on?</summary>
+            <div class="faq-body">
+              <p>Yes. The index is served as plain JSON over an open endpoint, and this website reads exactly the same files that are available to anyone else. The data was public before it was collected here, and organizing it does not make it proprietary.</p>
+            </div>
+          </details>
+
+          <details>
+            <summary>Something here is incorrect. Where should it be reported?</summary>
+            <div class="faq-body">
+              <p>Use <a href="#" data-lb-bug-trigger>Report a bug</a> in the menu. It publishes a note that is monitored and opens an issue on the repository. Incorrect metadata, a misattributed boost or a show that should not be listed are all appropriate to report.</p>
+            </div>
+          </details>
+
+        </div>
+      </section>
+
+    </div>
   </div>
 </main>
 
@@ -191,6 +411,47 @@
   </div>
 </footer>
 <!-- FOOTER:END -->
+
+<!-- Live index stats. Best-effort: the strip stays hidden unless the whole
+     fetch-and-parse succeeds, so a slow or broken endpoint costs a row of
+     numbers, never a broken page. Same /api/data proxy the feeds read. -->
+<script>
+(function () {
+  'use strict';
+  var strip = document.getElementById('stat-strip');
+  if (!strip || !window.fetch) return;
+
+  function compact(n) {
+    if (n >= 1e9) return (n / 1e9).toFixed(1).replace(/\.0$/, '') + 'B';
+    if (n >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M';
+    if (n >= 1e3) return (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'k';
+    return String(n);
+  }
+
+  fetch('/api/data/meta.json', { headers: { accept: 'application/json' } })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (m) {
+      // Require the headline number — a manifest that parsed but carries
+      // nothing useful shouldn't render a row of zeroes.
+      if (!m || !m.boosts) return;
+      var vals = {
+        boosts: compact(m.boosts),
+        shows: compact(m.distinct_shows || 0),
+        boosters: compact(m.distinct_boosters || 0),
+        sats: compact(m.total_sats || 0),
+        since: m.earliest
+          ? new Date(m.earliest * 1000).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })
+          : '—',
+      };
+      Object.keys(vals).forEach(function (k) {
+        var el = strip.querySelector('[data-stat="' + k + '"]');
+        if (el) el.textContent = vals[k];
+      });
+      strip.hidden = false;
+    })
+    .catch(function (e) { console.warn('[about] stats unavailable', e); });
+})();
+</script>
 
 <!-- ───────────────── NOSTR LOGIN WIDGET (lazy) ─────────────────
      Wires the nav's Donate button + identity slot to the ~1MB bundle,

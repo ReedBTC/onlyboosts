@@ -25,6 +25,11 @@
 // login-widget.js and nostr-tools.js were both rebuilt, so bump to evict the
 // stale stale-while-revalidate copies — a returning visitor holding the
 // previous widget bundle would otherwise boost the old recipient.
+// ob-v11: the Follows tabs are hidden while signed out. Required bump, not
+// cosmetic: assets/js/sign-in-prompt.js was deleted, and a returning visitor
+// holding the previous boosts-feed.js / feeds-podcasts.js would still carry a
+// static import of it — a 404 on that import fails the whole module and the
+// feed renders "couldn't load" instead of boosts.
 // ob-v10: the Follows feeds now repaint on sign-in. The fix spans the widget
 // bundle (which dispatches lb:session-change) and feeds.js/follow-set.js
 // (which listen), so a returning visitor holding one half and not the other
@@ -55,7 +60,7 @@
 // returning visitor's precache still lists two URLs that now 404 — the bump
 // is what drops them. Also picks up the new palette and the logo/favicon/
 // banner PNGs.
-const VERSION = 'ob-v10';
+const VERSION = 'ob-v11';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;

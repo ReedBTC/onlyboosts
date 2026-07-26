@@ -9,11 +9,16 @@
 
 const SITE_ORIGIN = "https://onlyboosts.social";
 
-// One page. The four feeds are hash routes on "/" (#boosts-global etc.),
-// and crawlers don't index fragments separately — listing them here would
-// just be four duplicate entries for the same URL.
+// The four feeds are hash routes on "/" (#boosts-global etc.), and crawlers
+// don't index fragments separately — listing them would just be four
+// duplicate entries for the same URL.
+//
+// /boosters and /podcasts are deliberately absent: they're coming-soon
+// placeholders and carry `noindex` themselves. Add them here when they have
+// a feature behind them.
 const STATIC_URLS = [
   { loc: "/", changefreq: "hourly", priority: "1.0" },
+  { loc: "/about", changefreq: "monthly", priority: "0.6" },
 ];
 
 export async function onRequest() {

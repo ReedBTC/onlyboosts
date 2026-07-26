@@ -7,9 +7,10 @@ localbitcoiners' community feeds work.
 
 **The whole feed experience is one page.** `index.html` carries four
 hash-routed tabs on two axes — what (boosts / podcasts) x whose (global /
-your follows). Three other pages exist (`about.html`, `boosters.html`,
-`podcasts.html`) but are coming-soon placeholders with no feature behind
-them yet; they're nav + header + card + footer and nothing else.
+your follows). `about.html` is a real content page — the project's own
+explanation of what the data is and isn't. `boosters.html` and
+`podcasts.html` are still coming-soon placeholders with no feature behind
+them; they're nav + header + card + footer and nothing else.
 
 | Tab | Hash | Renders |
 |---|---|---|
@@ -17,6 +18,14 @@ them yet; they're nav + header + card + footer and nothing else.
 | Boosts · Follows | `#boosts-follows` | same, filtered to your kind-3 contacts |
 | Podcasts · Global | `#podcasts-global` | episode/show rollup by boosts received |
 | Podcasts · Follows | `#podcasts-follows` | same, filtered to your kind-3 contacts |
+
+**The two Follows tabs only exist for a signed-in npub.** Signed out they're
+`hidden`, the row collapses to the two Global tabs (hence `grid-auto-flow:
+column` rather than `repeat(4, 1fr)` — a `display:none` grid item creates no
+track), and a `#podcasts-follows` deep link is coerced to the default with
+the hash rewritten to match. `.feed-tab[hidden] { display: none }` is
+load-bearing: `.feed-tab` sets `display:flex`, which otherwise beats the UA's
+`[hidden]` rule.
 
 The inline tab controller in `index.html` owns activation and dispatches
 `lb:feed-activate`; `assets/js/feeds.js` listens and lazily hydrates.
@@ -199,11 +208,17 @@ Carried from the scaffold commit and the LB suite:
 
 **Still to build:**
 
-0. **The three coming-soon pages have no feature behind them.** `/boosters`
-   (a directory of the npubs sending boosts), `/podcasts` (a show-level
-   directory — the feed tabs are episode-level), and `/about`. They're
-   `noindex` and out of `functions/sitemap.xml.js` until there's something
-   on them.
+0. **Two coming-soon pages have no feature behind them.** `/boosters` (a
+   directory of the npubs sending boosts) and `/podcasts` (a show-level
+   directory — the feed tabs are episode-level). Both are `noindex` and out
+   of `functions/sitemap.xml.js` until there's something on them.
+
+   `/about` is done. Its copy is distilled from
+   `docs/about-and-faq-source.md`, written by the collector-side agent —
+   **that file is the factual source of record**, so correct it there first
+   if the pipeline's behaviour changes. The page's live stat strip reads
+   `/api/data/meta.json` and stays hidden if the fetch fails, so the numbers
+   can never go stale in the markup.
 
 1. **Podcast Index credentials.** `/api/value` needs `PODCAST_INDEX_KEY` and
    `PODCAST_INDEX_SECRET` in the Cloudflare env. Without them it returns a
@@ -315,13 +330,21 @@ cached. Returns `signed-out` / `ok` / `empty` / `unavailable`, each with its
 own placeholder. The user's own pubkey is in the set, so your own boosts
 appear in your Follows feed.
 
-**Signing in repaints the Follows feeds.** `setUser` in the widget dispatches
-`lb:session-change` on the window whenever the *identity* changes (not on
-profile refreshes or stub→real restores); `feeds.js` listens, drops both
-`*-follows` keys from its `loaded` set, and re-runs whichever one is on
-screen. A `storage` listener covers the same thing happening in another tab.
-Without it the "Sign in to see this feed" placeholder outlives the login,
-because `loaded` is what makes each feed hydrate exactly once.
+**`lb:session-change` is what keeps all of this in sync.** `setUser` in the
+widget dispatches it on the window whenever the *identity* changes (not on
+profile refreshes or stub→real restores). Two listeners, both also watching
+`storage` for the same thing happening in another tab:
+
+- the inline tab controller shows/hides the Follows tabs, and bounces you to
+  the default feed if you sign out while reading one;
+- `feeds.js` drops both `*-follows` keys from its `loaded` set and re-runs
+  whichever is on screen — `loaded` is what makes each feed hydrate exactly
+  once, so without this a Follows feed would keep the previous account's
+  results after a switch.
+
+The renderers still carry a `signed-out` branch. It's unreachable through the
+tabs now and kept as a fallback — if the hiding logic ever fails, the feed
+says something sane instead of rendering an empty list.
 
 Two scoping details that aren't obvious:
 
@@ -369,6 +392,12 @@ like / zap need only `id` + `pubkey`. Both renderers build a minimal
 `{id, pubkey, kind, content, created_at, tags}` object purely to hand to
 `buildActionBar` — a projection, not a verified event. Don't pass it anywhere
 that assumes a real one.
+
+On both feeds a booster's avatar and display name copy their npub —
+`assets/js/copy-npub.js` holds the clipboard + toast helpers (the toast keeps
+its historical `.pcast-toast` class; it's the site's only one). `booster.npub`
+is nullable where `booster.pk` isn't, so `boosts-feed.js` derives the npub
+from the hex pubkey when the record has none.
 
 `boosts-feed.js` builds its own card rather than calling
 `boosts-thread.js#renderNoteCard`, because that function caches cards by event

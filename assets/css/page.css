@@ -126,3 +126,191 @@
   .page-main { padding: 2rem 1rem 3rem; }
   .soon-card { padding: 2rem 1.25rem; }
 }
+
+/* ══════════════════════ LONG-FORM CONTENT ══════════════════════
+   Used by about.html. The coming-soon pages above don't need any of
+   this; it loads with page.css because splitting one more stylesheet
+   for a single page costs more than it saves. */
+
+.page-inner--wide { max-width: 46rem; }
+
+/* ── Live stat strip ───────────────────────────────────────────────
+   Hidden until the numbers land (about.html fills it from
+   /api/data/meta.json), so a failed fetch leaves no empty shell. */
+.stat-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 2.25rem;
+}
+.stat-strip[hidden] { display: none; }
+.stat {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.85rem 0.5rem;
+  text-align: center;
+}
+.stat-num {
+  display: block;
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--brand-d);
+  line-height: 1.1;
+}
+.stat-label {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ── Jump links ── */
+.toc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-bottom: 2.5rem;
+}
+.toc a {
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  background: var(--white);
+  border: 1px solid var(--border);
+  color: var(--brand-d);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.toc a:hover { background: var(--brand); border-color: var(--brand); color: var(--white); }
+
+/* ── Prose ── */
+.prose > section { margin-bottom: 2.75rem; scroll-margin-top: 5rem; }
+.prose h2 {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.25;
+  margin-bottom: 0.7rem;
+  padding-bottom: 0.45rem;
+  border-bottom: 2px solid var(--brand);
+}
+.prose h3 {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--brand-dd);
+  margin: 1.5rem 0 0.45rem;
+}
+.prose p { margin-bottom: 0.9rem; }
+.prose ul { margin: 0 0 1rem 1.15rem; }
+.prose li { margin-bottom: 0.5rem; }
+.prose strong { color: var(--ink); }
+.prose code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.88em;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.08em 0.35em;
+}
+.prose .lede {
+  font-size: 1.12rem;
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+/* ── Tag / code sample ──────────────────────────────────────────── */
+.tagblock {
+  background: var(--navy);
+  color: #dceefa;
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+  margin: 0 0 1rem;
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.82rem;
+  line-height: 1.7;
+}
+.tagblock .c { color: #7fb6d4; }   /* comment */
+.tagblock .s { color: #9ee6b8; }   /* string value */
+
+/* ── Callouts ───────────────────────────────────────────────────── */
+.callout {
+  border-left: 4px solid var(--brand);
+  background: var(--white);
+  border-radius: 0 10px 10px 0;
+  padding: 1rem 1.15rem;
+  margin: 0 0 1.25rem;
+}
+.callout p:last-child { margin-bottom: 0; }
+.callout--warn { border-left-color: #c2410c; }
+.callout--warn strong { color: #9a3412; }
+
+/* ── Amount table ── */
+.table-wrap { overflow-x: auto; margin-bottom: 1.1rem; }
+.data-table {
+  width: 100%;
+  min-width: 34rem;
+  border-collapse: collapse;
+  background: var(--white);
+  font-size: 0.9rem;
+}
+.data-table th, .data-table td {
+  border: 1px solid var(--border);
+  padding: 0.6rem 0.7rem;
+  text-align: left;
+  vertical-align: top;
+}
+.data-table th {
+  background: var(--bg);
+  font-weight: 700;
+  color: var(--ink);
+  font-size: 0.82rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.data-table code { white-space: nowrap; }
+
+/* ── FAQ ── */
+.faq { display: grid; gap: 0.6rem; }
+.faq details {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.faq summary {
+  cursor: pointer;
+  padding: 0.85rem 1.1rem;
+  font-weight: 700;
+  color: var(--ink);
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after {
+  content: '+';
+  color: var(--brand-d);
+  font-size: 1.2rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.faq details[open] summary::after { content: '−'; }
+.faq summary:hover { color: var(--brand-d); }
+.faq-body { padding: 0 1.1rem 1rem; color: var(--muted); }
+.faq-body p { margin-bottom: 0.7rem; }
+.faq-body p:last-child { margin-bottom: 0; }
+
+@media (max-width: 640px) {
+  .prose h2 { font-size: 1.3rem; }
+  .stat-num { font-size: 1.15rem; }
+}

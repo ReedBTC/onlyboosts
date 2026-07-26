@@ -14,11 +14,12 @@
  * need only id + pubkey. The object handed to buildActionBar below is a
  * projection, not a verified event; don't pass it anywhere that assumes one.
  */
+import { nip19 } from '/assets/widgets/nostr-tools.js'
 import { buildActionBar, configureBoostActions } from '/assets/js/boost-actions.js'
+import { wireNpubCopy } from '/assets/js/copy-npub.js'
 import { parseSegments, renderSegmentsInto } from '/assets/js/boosts-thread.js'
 import { ensureLoginWidget } from '/assets/js/widget-loader.js'
 import { resolveFollows } from '/assets/js/follow-set.js'
-import { signInButton } from '/assets/js/sign-in-prompt.js'
 import {
   getLatestBoosts, getBoostMonths, getBoostMonth, boosterLabel,
 } from '/assets/js/ob-data.js'
@@ -95,11 +96,17 @@ function fmtSats(n) {
   return String(n)
 }
 
-// `extra` is an optional node appended under the body text — the signed-out
-// Follows state puts its Sign in button there.
-function renderPlaceholder(list, title, body, extra = null) {
+// The npub to copy for a booster. The feed carries one on most records, but
+// `booster.npub` is nullable where `booster.pk` is not — so derive it from the
+// hex pubkey when it's missing rather than leaving those cards inert.
+function boosterNpub(booster) {
+  if (booster?.npub) return booster.npub
+  try { return nip19.npubEncode(booster.pk) } catch { return '' }
+}
+
+function renderPlaceholder(list, title, body) {
   list.replaceChildren(h('div', { class: 'feed-placeholder' }, [
-    h('strong', { text: title }), document.createTextNode(body || ''), extra,
+    h('strong', { text: title }), document.createTextNode(body || ''),
   ]))
 }
 
@@ -121,9 +128,14 @@ function renderBoostCard(b) {
   img.src = avatar
   img.onerror = () => { img.src = '/assets/avatar-fallback.svg' }
 
-  const nameWrap = h('div', { class: 'note-author-name-wrap' }, [
-    h('span', { class: 'author-name', text: boosterLabel(b.booster) }),
-  ])
+  const nameEl = h('span', { class: 'author-name', text: boosterLabel(b.booster) })
+  const nameWrap = h('div', { class: 'note-author-name-wrap' }, [nameEl])
+
+  // Avatar and name both copy the booster's npub — the same gesture the
+  // Podcasts feed's booster avatars already offer.
+  const npub = boosterNpub(b.booster)
+  wireNpubCopy(img, npub)
+  wireNpubCopy(nameEl, npub)
 
   const time = h('time', {
     datetime: new Date(b.ts * 1000).toISOString(),
@@ -202,8 +214,7 @@ export async function renderBoosts({ list, scope = 'global' }) {
     const res = await resolveFollows()
     if (res.status === 'signed-out') {
       renderPlaceholder(list, 'Sign in to see this feed',
-        ' Follows feeds read your kind-3 contact list, so they need a signed-in npub.',
-        signInButton())
+        ' Follows feeds read your kind-3 contact list, so they need a signed-in npub.')
       return
     }
     if (res.status === 'unavailable') {

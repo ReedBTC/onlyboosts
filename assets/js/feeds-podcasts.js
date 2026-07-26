@@ -33,8 +33,8 @@ import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js'
 import { buildActionBar, configureBoostActions } from '/assets/js/boost-actions.js'
 import { ensureLoginWidget } from '/assets/js/widget-loader.js'
 import { resolveFollows } from '/assets/js/follow-set.js'
-import { signInButton } from '/assets/js/sign-in-prompt.js'
 import { getLatestBoosts, getBoostMonths, getBoostMonth, toEpisodeShape } from '/assets/js/ob-data.js'
+import { copyText, showToast, copyNpub } from '/assets/js/copy-npub.js'
 
 const VALUE_API = '/api/value'   // Podcast Index value-block proxy (splits)
 const INITIAL_CARDS = 30       // episodes rendered per "load more" batch
@@ -56,15 +56,12 @@ function h(tag, attrs = {}, children = []) {
   return el
 }
 
-// `extra` is an optional node appended under the body text — the signed-out
-// Follows state puts its Sign in button there.
-function renderPlaceholder(list, title, body, extra = null) {
+function renderPlaceholder(list, title, body) {
   list.className = ''
   list.innerHTML = ''
   list.appendChild(h('div', { class: 'feed-placeholder' }, [
     h('strong', { text: title }),
     document.createTextNode(body),
-    extra,
   ]))
 }
 
@@ -84,47 +81,9 @@ function fullDate(unixSec) {
 }
 
 // ── Clipboard + toast ────────────────────────────────────────────────
-// navigator.clipboard only exists in secure contexts (HTTPS / localhost);
-// fall back to the legacy execCommand path for plain-HTTP LAN previews.
-async function copyText(text) {
-  try {
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(text)
-      return true
-    }
-  } catch {}
-  try {
-    const ta = document.createElement('textarea')
-    ta.value = text
-    ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;'
-    document.body.appendChild(ta)
-    ta.select()
-    const ok = document.execCommand('copy')
-    ta.remove()
-    return ok
-  } catch { return false }
-}
-
-let toastTimer = null
-function showToast(msg, isError = false) {
-  let t = document.querySelector('.pcast-toast')
-  if (!t) {
-    t = h('div', { class: 'pcast-toast', role: 'status', 'aria-live': 'polite' })
-    document.body.appendChild(t)
-  }
-  t.textContent = msg
-  t.classList.toggle('is-error', !!isError)
-  t.classList.add('is-visible')
-  clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => t.classList.remove('is-visible'), 2200)
-}
-
-async function copyNpub(npub) {
-  if (!npub) { showToast('No npub for this account', true); return }
-  const ok = await copyText(npub)
-  showToast(ok ? 'npub copied' : 'Copy failed — clipboard blocked', !ok)
-}
-
+// copyText / showToast / copyNpub live in copy-npub.js — the boosts feed
+// needs the same gesture. copyNevent stays here; it's specific to the boost
+// drawer and is the only caller that needs nip19.
 async function copyNevent(eventId, author) {
   let nevent = ''
   try { nevent = nip19.neventEncode({ id: eventId, author: author || undefined }) } catch {}
@@ -960,7 +919,7 @@ export async function renderPodcasts({ panel, list, scope = 'global' }) {
   if (scope === 'follows') {
     const res = await resolveFollows()
     if (res.status === 'signed-out') {
-      renderPlaceholder(list, 'Sign in to see this feed', 'Follows feeds read your kind-3 contact list, so they need a signed-in npub.', signInButton())
+      renderPlaceholder(list, 'Sign in to see this feed', 'Follows feeds read your kind-3 contact list, so they need a signed-in npub.')
       return
     }
     if (res.status === 'unavailable') {
