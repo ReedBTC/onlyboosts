@@ -1,4 +1,11 @@
-/* Podcasts feed — the per-episode rollup behind the two Podcasts feeds.
+/* Episodes feed — the per-episode rollup behind the two Episodes feeds.
+ *
+ * The file and its `renderPodcasts` export keep the old name on purpose: the
+ * feed the UI calls Episodes was called Podcasts until Shows arrived and made
+ * that ambiguous. The user-facing name, the feed key and the URL hash all
+ * renamed; a module filename is not a URL, and renaming it would only cost the
+ * git history that follows it. The two stay a matched pair, so this is not a
+ * half-rename — see the naming note in CLAUDE.md.
  *
  * A list of podcast episodes the network has boosted on Nostr — framed as
  * "here's what the community is boosting," not a leaderboard. The card is the
@@ -1020,7 +1027,7 @@ export async function renderPodcasts({ panel, list, scope = 'global' }) {
     rebuild()
   }
 
-  mountControls(panel?.dataset.feed || `podcasts-${scope}`,
+  mountControls(panel?.dataset.feed || `episodes-${scope}`,
     { sortKey, rangeKey, onSort: applySort, onRange: applyRange })
 
   list.className = ''

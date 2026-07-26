@@ -89,7 +89,26 @@
 // old index.html would render a page whose feeds can't find their slot (and
 // one holding the old feeds-podcasts.js would look for a panel head that is no
 // longer there).
-const VERSION = 'ob-v16';
+// ob-v17: the Shows feed is real. assets/js/shows-feed.js is a new module and
+// feeds.js is what maps `shows` to it, so a returning visitor holding the old
+// feeds.js would pick Shows from the menu and get a placeholder. Also carries
+// the nav/footer change pointing Shows at /#shows instead of the /shows
+// coming-soon page, which is cached HTML on every page of the site.
+// ob-v18: the episode feed is called Episodes, not Podcasts — Shows made the
+// old name ambiguous. Feed keys, panel ids and URL hashes went with it
+// (#podcasts-* is aliased, not dropped). Required: the keys live in index.html's
+// markup and in feeds.js's LOADERS, so a returning visitor holding one half
+// without the other would find no panel for the feed it activates. Every page
+// is also re-cached for the nav/footer's new hashes.
+// ob-v19: the Explore menu and footer are regrouped into Feeds / Stats / More,
+// and /stats is a new coming-soon page. Required: the nav and footer are baked
+// into every page's HTML, so a returning visitor keeps the old grouping (with
+// its Global/Follows entries and no Stats column) until the cache turns over.
+// ob-v20: the about page's live stat strip is back (restored from 7f35bf4^).
+// Required: the markup is in about.html and the .stat-* rules are in page.css,
+// so a returning visitor holding one without the other gets either an unstyled
+// row of numbers or nothing at all.
+const VERSION = 'ob-v20';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;

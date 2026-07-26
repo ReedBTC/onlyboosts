@@ -61,30 +61,31 @@
   <style>
     :root {
       /* ── Per-feed theme palette ──────────────────────────────────
-         Each of the four feeds owns an accent (used for its tab and the
-         active-panel wash). The four sit on one cyan→indigo ramp so the
-         tab row reads as a single system rather than four unrelated
-         colors. The active feed's trio is mirrored into --accent /
-         --accent-d / --tint by the [data-active-feed] rules below, so
-         the shared chrome can just read --accent. */
+         Each feed owns an accent, read by the panel wash, the feed-bar
+         menus and the range/sort controls. The five sit on one
+         cyan→indigo ramp, so switching feed shifts the page along a
+         single system rather than to an unrelated color. The active
+         feed's trio is mirrored into --accent / --accent-d / --tint by
+         the [data-active-feed] rules below, so the shared chrome can
+         just read --accent. */
       --bg-accent:   #00aff0;  --bg-accent-d:   #0090cc;  --bg-tint:   #e2f6fd;
       --bf-accent:   #068ace;  --bf-accent-d:   #0570ab;  --bf-tint:   #e0f0fa;
       --sh-accent:   #1b7bc1;  --sh-accent-d:   #15629b;  --sh-tint:   #e4f1fb;
-      --pg-accent:   #2f6bb5;  --pg-accent-d:   #255696;  --pg-tint:   #e7eefa;
-      --pf-accent:   #4a4f9e;  --pf-accent-d:   #3b3f80;  --pf-tint:   #eaebf7;
+      --eg-accent:   #2f6bb5;  --eg-accent-d:   #255696;  --eg-tint:   #e7eefa;
+      --ef-accent:   #4a4f9e;  --ef-accent-d:   #3b3f80;  --ef-tint:   #eaebf7;
 
-      /* Defaults (Podcasts · Global is the landing feed). */
-      --accent:   var(--pg-accent);
-      --accent-d: var(--pg-accent-d);
-      --tint:     var(--pg-tint);
+      /* Defaults (Episodes · Global is the landing feed). */
+      --accent:   var(--eg-accent);
+      --accent-d: var(--eg-accent-d);
+      --tint:     var(--eg-tint);
     }
 
     /* Active-feed → accent mapping. Set on <body data-active-feed>. */
     body[data-active-feed="boosts-global"]    { --accent: var(--bg-accent); --accent-d: var(--bg-accent-d); --tint: var(--bg-tint); }
     body[data-active-feed="boosts-follows"]   { --accent: var(--bf-accent); --accent-d: var(--bf-accent-d); --tint: var(--bf-tint); }
     body[data-active-feed="shows"]            { --accent: var(--sh-accent); --accent-d: var(--sh-accent-d); --tint: var(--sh-tint); }
-    body[data-active-feed="podcasts-global"]  { --accent: var(--pg-accent); --accent-d: var(--pg-accent-d); --tint: var(--pg-tint); }
-    body[data-active-feed="podcasts-follows"] { --accent: var(--pf-accent); --accent-d: var(--pf-accent-d); --tint: var(--pf-tint); }
+    body[data-active-feed="episodes-global"]  { --accent: var(--eg-accent); --accent-d: var(--eg-accent-d); --tint: var(--eg-tint); }
+    body[data-active-feed="episodes-follows"] { --accent: var(--ef-accent); --accent-d: var(--ef-accent-d); --tint: var(--ef-tint); }
 
     /* ── Masthead ────────────────────────────────────────────────────
        Wordmark banner sits above the sticky feed bar. It scrolls away;
@@ -144,7 +145,7 @@
 
     /* ── Feed bar ────────────────────────────────────────────────────
        One row that picks the feed and controls it. Two dropdowns carry the
-       two axes — what (Podcasts / Shows / Boosts) x whose (Global /
+       two axes — what (Episodes / Shows / Boosts) x whose (Global /
        Follows) — and each feed mounts its own 1W/1M/All + sort group into
        the right-hand slot (feed-controls.js). Sticky under the nav, as the
        four-tab ribbon it replaced was, so switching feed, window or order
@@ -182,10 +183,11 @@
        The `> [data-controls-for]` selector has to outrank .pcast-controls's own
        display:flex, which it does on specificity (class + attribute). */
     .feed-bar-controls > [data-controls-for] { display: none; }
-    body[data-active-feed="podcasts-global"]  .feed-bar-controls > [data-controls-for="podcasts-global"],
-    body[data-active-feed="podcasts-follows"] .feed-bar-controls > [data-controls-for="podcasts-follows"],
+    body[data-active-feed="episodes-global"]  .feed-bar-controls > [data-controls-for="episodes-global"],
+    body[data-active-feed="episodes-follows"] .feed-bar-controls > [data-controls-for="episodes-follows"],
     body[data-active-feed="boosts-global"]    .feed-bar-controls > [data-controls-for="boosts-global"],
-    body[data-active-feed="boosts-follows"]   .feed-bar-controls > [data-controls-for="boosts-follows"] {
+    body[data-active-feed="boosts-follows"]   .feed-bar-controls > [data-controls-for="boosts-follows"],
+    body[data-active-feed="shows"]            .feed-bar-controls > [data-controls-for="shows"] {
       display: flex;
     }
 
@@ -228,13 +230,6 @@
     .feed-menu-item:hover { background: var(--tint); color: var(--accent-d); }
     .feed-menu-item[aria-checked="true"] { color: var(--accent-d); background: var(--tint); }
     .feed-menu-item[aria-checked="true"]::after { content: '✓'; margin-left: auto; }
-    /* "Soon" on an option that's selectable but has nothing behind it yet. */
-    .feed-menu-soon {
-      font-size: 0.62rem; font-weight: 700; text-transform: uppercase;
-      letter-spacing: 0.05em; color: var(--muted);
-      border: 1px solid var(--border); border-radius: 999px;
-      padding: 0.05rem 0.4rem;
-    }
 
     /* ── Panels ── */
     .feed-panels {
@@ -414,7 +409,11 @@
       background: var(--tint);
     }
     a.pcast-card-media { cursor: pointer; }
-    a.pcast-card-media:hover { box-shadow: 0 0 0 2px var(--podcasts-accent); }
+    /* --podcasts-accent until now, which was never defined — the token has
+       always been --pg-/--eg-accent, so the whole declaration was invalid at
+       computed-value time and the hover did nothing. --accent is the active
+       feed's, which is what it was reaching for. */
+    a.pcast-card-media:hover { box-shadow: 0 0 0 2px var(--accent); }
     .pcast-card-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .pcast-card-media--none {
       display: flex; align-items: center; justify-content: center;
@@ -678,6 +677,64 @@
     .pcast-toast.is-visible { opacity: 1; transform: translate(-50%, 0); }
     .pcast-toast.is-error { background: #9b2c2c; }
 
+    /* ── Shows feed ───────────────────────────────────────────────────
+       The show-level rollup (shows-feed.js). The card is deliberately built
+       out of the episode card's chrome above — .pcast-card, .pcast-card-head,
+       .pcast-card-media, .pcast-title, .pcast-meta, .pcast-drawer,
+       .pcast-details, .pcast-rank — so the two feeds read as one system and
+       there is one set of card rules to maintain. Only what a show card has
+       and an episode card doesn't is below. */
+    /* Stat row: sats · boosts · boosters · episodes. Inherits .pcast-meta;
+       the tabular figures stop the numbers jittering between cards. */
+    .ob-show-stats { font-variant-numeric: tabular-nums; }
+    /* A show the collector holds boosts for but Podcast Index can't identify:
+       no title, no art. A third of the index, all of it long tail. Quieter
+       than a named show, with the guid standing in for the name. */
+    .ob-show-unnamed { color: var(--muted); font-style: italic; }
+    .ob-show-guid {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.68rem;
+      color: var(--muted);
+      opacity: 0.8;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .ob-show-latest {
+      margin-top: 0.15rem;
+      font-size: 0.72rem;
+      color: var(--muted);
+      opacity: 0.85;
+    }
+    /* Episode list inside an expanded card. Sits in .pcast-details, so it
+       already carries that block's left accent rule and indent. */
+    .ob-ep-list { list-style: none; display: grid; gap: 0.1rem; }
+    .ob-ep {
+      display: flex; align-items: baseline; gap: 0.6rem;
+      padding: 0.4rem 0;
+      border-top: 1px solid var(--border);
+    }
+    .ob-ep:first-child { border-top: none; }
+    /* minmax(0) equivalent for flex: without it a long episode title sets the
+       item's min-width and pushes the sats column off the card. */
+    .ob-ep-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; }
+    .ob-ep-title {
+      font-size: 0.86rem; font-weight: 600; line-height: 1.3; color: var(--text);
+      text-decoration: none;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+      overflow-wrap: anywhere;
+    }
+    a.ob-ep-title:hover { color: var(--accent-d); text-decoration: underline; }
+    .ob-ep-meta { font-size: 0.72rem; color: var(--muted); }
+    .ob-ep-sats {
+      flex-shrink: 0;
+      font-size: 0.82rem; font-weight: 700; color: var(--accent-d);
+      white-space: nowrap; font-variant-numeric: tabular-nums;
+    }
+    /* Loading / truncation / error line inside a drawer. */
+    .ob-show-note {
+      padding: 0.45rem 0;
+      font-size: 0.78rem; color: var(--muted); font-style: italic;
+    }
+
     /* ── Boosts feed ──────────────────────────────────────────────────
        One card per kind-1 boost note. The card chrome itself is the shared
        .note-card from boosts-thread.css; these rules only cover the
@@ -793,7 +850,7 @@
   <link rel="stylesheet" href="/assets/css/nav.css" />
   <link rel="stylesheet" href="/assets/css/footer.css" />
 </head>
-<body data-active-feed="podcasts-global">
+<body data-active-feed="episodes-global">
 
 <!-- NAV:START (generated by scripts/sync-partials.js — edit the partial) -->
 <!-- ══════════════════════════════ NAV ══════════════════════════════
@@ -823,16 +880,22 @@
           </div>
           <a class="nav-explore-home" href="/"><span aria-hidden="true">🏠</span> Home</a>
           <div class="nav-explore-groups">
+            <!-- Feeds: one entry per feed, matching the homepage's what-menu
+                 exactly (Episodes / Shows / Boosts). The Global vs Follows
+                 axis is deliberately absent — it's the second dropdown on the
+                 page itself, and listing both scopes here made the nav a
+                 six-item grid restating a control the page already has. -->
             <div class="nav-explore-group">
-              <h4>Podcasts</h4>
-              <a href="/#podcasts-global"><span aria-hidden="true">🎙</span> Global</a>
-              <a href="/#podcasts-follows"><span aria-hidden="true">🎧</span> Follows</a>
-              <a href="/shows"><span aria-hidden="true">📻</span> Shows</a>
+              <h4>Feeds</h4>
+              <a href="/#episodes-global"><span aria-hidden="true">🎙</span> Episodes</a>
+              <a href="/#shows"><span aria-hidden="true">📻</span> Shows</a>
+              <a href="/#boosts-global"><span aria-hidden="true">⚡</span> Boosts</a>
             </div>
+            <!-- Stats: the aggregate views over the same data. Both are
+                 coming-soon pages for now (noindex, out of the sitemap). -->
             <div class="nav-explore-group">
-              <h4>Boosts</h4>
-              <a href="/#boosts-global"><span aria-hidden="true">⚡</span> Global</a>
-              <a href="/#boosts-follows"><span aria-hidden="true">👥</span> Follows</a>
+              <h4>Stats</h4>
+              <a href="/stats"><span aria-hidden="true">📊</span> Boost Stats</a>
               <a href="/boosters"><span aria-hidden="true">🧑‍🤝‍🧑</span> Boosters</a>
             </div>
             <div class="nav-explore-group">
@@ -875,7 +938,7 @@
 </div>
 
 <!-- ══════════════════════════════ FEED BAR ══════════════════════════════
-     Two dropdowns pick the feed on two axes: what (podcasts / shows /
+     Two dropdowns pick the feed on two axes: what (episodes / shows /
      boosts) x whose (everyone / the npubs you follow). The scope menu is
      dropped whenever it has only one real option — signed out, or on Shows,
      which has no whose-axis. The third slot is filled by whichever feed is
@@ -889,14 +952,12 @@
 
     <div class="feed-menu feed-menu--type" data-feed-menu="type">
       <button type="button" class="feed-menu-btn" aria-haspopup="true" aria-expanded="false" aria-label="Choose feed">
-        <span class="feed-menu-cur" data-feed-menu-cur>Podcasts</span>
+        <span class="feed-menu-cur" data-feed-menu-cur>Episodes</span>
         <span class="feed-menu-caret" aria-hidden="true">▾</span>
       </button>
       <div class="feed-menu-list" role="menu" aria-label="Feed" hidden>
-        <button type="button" class="feed-menu-item" role="menuitemradio" aria-checked="true" data-value="podcasts">Podcasts</button>
-        <button type="button" class="feed-menu-item" role="menuitemradio" aria-checked="false" data-value="shows">
-          Shows <span class="feed-menu-soon">Soon</span>
-        </button>
+        <button type="button" class="feed-menu-item" role="menuitemradio" aria-checked="true" data-value="episodes">Episodes</button>
+        <button type="button" class="feed-menu-item" role="menuitemradio" aria-checked="false" data-value="shows">Shows</button>
         <button type="button" class="feed-menu-item" role="menuitemradio" aria-checked="false" data-value="boosts">Boosts</button>
       </div>
     </div>
@@ -920,17 +981,17 @@
 
 <!-- ══════════════════════════════ PANELS ══════════════════════════════
      The two Boosts panels render the kind-1 boost note itself
-     (boosts-feed.js). The two Podcasts panels render the per-episode
+     (boosts-feed.js). The two Episodes panels render the per-episode
      rollup (feeds-podcasts.js). Global vs Follows narrows to the signed-in
      user's kind-3 contact list — see follow-set.js. Shows is a placeholder:
      it has no loader in feeds.js, so its markup is all there is. -->
 <main class="feed-panels">
   <div class="feed-panels-inner">
 
-    <section class="feed-panel is-active" id="panel-podcasts-global" role="region" aria-label="Podcasts, global" data-feed="podcasts-global" data-scope="global">
+    <section class="feed-panel is-active" id="panel-episodes-global" role="region" aria-label="Episodes, global" data-feed="episodes-global" data-scope="global">
       <div class="feed-list" data-feed-list>
         <div class="feed-placeholder">
-          <strong>Global podcasts feed coming online</strong>
+          <strong>Global episodes feed coming online</strong>
           The layout is ready — boosted episodes load here once the snapshot loader lands.
         </div>
       </div>
@@ -945,7 +1006,7 @@
       </div>
     </section>
 
-    <section class="feed-panel" id="panel-podcasts-follows" role="region" aria-label="Podcasts from your follows" data-feed="podcasts-follows" data-scope="follows" hidden>
+    <section class="feed-panel" id="panel-episodes-follows" role="region" aria-label="Episodes from your follows" data-feed="episodes-follows" data-scope="follows" hidden>
       <div class="feed-list" data-feed-list>
         <div class="feed-placeholder">
           <strong>Sign in to see this feed</strong>
@@ -963,14 +1024,14 @@
       </div>
     </section>
 
-    <!-- Shows: a show-level directory, where the Podcasts feeds are
-         episode-level. Nothing behind it yet — the /shows page carries the
-         same notice. -->
+    <!-- Shows: the show-level rollup, where the Episodes feeds are
+         episode-level. Global only — podcasts/index.json is computed over
+         everyone, so it can't serve a Follows audience (shows-feed.js). -->
     <section class="feed-panel" id="panel-shows" role="region" aria-label="Shows" data-feed="shows" data-scope="global" hidden>
       <div class="feed-list" data-feed-list>
         <div class="feed-placeholder">
-          <strong>Shows is coming soon</strong>
-          A directory of the podcasts receiving boosts, ranked and searchable at the show level. The Podcasts feed already covers individual episodes.
+          <strong>Shows feed coming online</strong>
+          The layout is ready — boosted shows load here once the rollup lands.
         </div>
       </div>
     </section>
@@ -992,20 +1053,22 @@
       <p>A Nostr client for podcast boosts. Read the boostagrams flowing across the whole podcasting-2.0 network — globally, or filtered to just the people you follow — and boost back with Lightning.</p>
     </div>
 
+    <!-- Same two groups as the nav's Explore menu, in the same order — the
+         footer is the nav's site map repeated, so they're regrouped together
+         or not at all. -->
     <div class="footer-col">
-      <h3>Podcasts</h3>
+      <h3>Feeds</h3>
       <ul>
-        <li><a href="/#podcasts-global">🎙 Global</a></li>
-        <li><a href="/#podcasts-follows">🎧 Follows</a></li>
-        <li><a href="/shows">📻 Shows</a></li>
+        <li><a href="/#episodes-global">🎙 Episodes</a></li>
+        <li><a href="/#shows">📻 Shows</a></li>
+        <li><a href="/#boosts-global">⚡ Boosts</a></li>
       </ul>
     </div>
 
     <div class="footer-col">
-      <h3>Boosts</h3>
+      <h3>Stats</h3>
       <ul>
-        <li><a href="/#boosts-global">⚡ Global</a></li>
-        <li><a href="/#boosts-follows">👥 Follows</a></li>
+        <li><a href="/stats">📊 Boost Stats</a></li>
         <li><a href="/boosters">🧑‍🤝‍🧑 Boosters</a></li>
       </ul>
     </div>
@@ -1028,9 +1091,8 @@
 
 <!-- ══════════════════════════════ FEED BAR CONTROLLER ══════════════════════════════
      Owns the two menus, which panel is on screen, and the hash. The feed key
-     is still `<type>-<scope>` (Shows excepted), so every existing
-     /#boosts-global style link and the nav's own menu keep working
-     unchanged. -->
+     is `<type>-<scope>` (Shows excepted). ALIASES below keeps the retired
+     `#podcasts-*` hashes working and upgrades them in place. -->
 <script>
 (function () {
   'use strict';
@@ -1038,13 +1100,22 @@
   // no whose-axis — it's a placeholder, so its key is bare and its scope is
   // only here to keep the shape uniform.
   const FEEDS = {
-    'podcasts-global':  { type: 'podcasts', scope: 'global' },
-    'podcasts-follows': { type: 'podcasts', scope: 'follows' },
+    'episodes-global':  { type: 'episodes', scope: 'global' },
+    'episodes-follows': { type: 'episodes', scope: 'follows' },
     'boosts-global':    { type: 'boosts',   scope: 'global' },
     'boosts-follows':   { type: 'boosts',   scope: 'follows' },
     'shows':            { type: 'shows',    scope: 'global' },
   };
-  const DEFAULT_TYPE = 'podcasts';
+  // Retired hashes, kept working permanently. The episodes feed was called
+  // "podcasts" until Shows arrived and made the name ambiguous — both are
+  // podcasts; one is episode-level. An old link resolves to the new feed and
+  // the hash is rewritten, so the URL upgrades itself the way a 301 would.
+  // Never remove an entry: these are in the wild.
+  const ALIASES = {
+    'podcasts-global':  'episodes-global',
+    'podcasts-follows': 'episodes-follows',
+  };
+  const DEFAULT_TYPE = 'episodes';
   const DEFAULT_SCOPE = 'global';
   const bar = document.querySelector('.feed-bar');
   if (!bar) return;
@@ -1117,11 +1188,15 @@
   }
 
   function fromHash(updateHash) {
-    const cfg = FEEDS[(location.hash || '').replace('#', '')];
+    const raw = (location.hash || '').replace('#', '');
+    const key = ALIASES[raw] || raw;
+    const cfg = FEEDS[key];
     // An unknown hash falls back to the default *and* rewrites, so the URL
     // never keeps naming something that isn't on screen.
     if (!cfg) { setFeed(DEFAULT_TYPE, DEFAULT_SCOPE, { updateHash: true }); return; }
-    setFeed(cfg.type, cfg.scope, { updateHash: updateHash });
+    // An aliased hash always rewrites, whatever the caller asked for — that's
+    // what upgrades an old link's URL to the current name.
+    setFeed(cfg.type, cfg.scope, { updateHash: key !== raw ? true : updateHash });
   }
 
   // Menu behaviour, shared by both: click to toggle, outside-click or Escape

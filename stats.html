@@ -20,9 +20,9 @@
     object-src 'none';
   " />
 
-  <title>Boosters — OnlyBoosts</title>
-  <meta name="description" content="The people sending boosts. A directory of the npubs behind the boostagrams flowing across podcasting 2.0 — coming soon to OnlyBoosts." />
-  <link rel="canonical" href="https://onlyboosts.social/boosters" />
+  <title>Boost Stats — OnlyBoosts</title>
+  <meta name="description" content="Charts and totals over every podcast boost on Nostr — sats over time, the shows earning most, who is sending. Coming soon to OnlyBoosts." />
+  <link rel="canonical" href="https://onlyboosts.social/stats" />
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
   <!-- Nothing to index until the page has its feature. -->
   <meta name="robots" content="noindex, follow" />
@@ -37,9 +37,9 @@
 
   <!-- Open Graph -->
   <meta property="og:type" content="website" />
-  <meta property="og:url" content="https://onlyboosts.social/boosters" />
-  <meta property="og:title" content="Boosters — OnlyBoosts" />
-  <meta property="og:description" content="The people sending boosts. A directory of the npubs behind the boostagrams flowing across podcasting 2.0 — coming soon to OnlyBoosts." />
+  <meta property="og:url" content="https://onlyboosts.social/stats" />
+  <meta property="og:title" content="Boost Stats — OnlyBoosts" />
+  <meta property="og:description" content="Charts and totals over every podcast boost on Nostr — sats over time, the shows earning most, who is sending. Coming soon to OnlyBoosts." />
   <meta property="og:site_name" content="OnlyBoosts" />
   <meta property="og:image" content="https://onlyboosts.social/assets/onlyboosts_banner.png" />
   <meta name="twitter:card" content="summary_large_image" />
@@ -48,7 +48,6 @@
        style covers all needed weights. -->
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
-
   <link rel="stylesheet" href="/assets/css/nav.css" />
   <link rel="stylesheet" href="/assets/css/footer.css" />
   <!-- Palette + base type. Every page links this; it's where the tokens
@@ -138,22 +137,22 @@
 <!-- NAV:END -->
 
 <header class="page-header">
-  <span class="page-eyebrow">Boosts</span>
-  <h1>Boosters</h1>
-  <p>The people behind the boostagrams.</p>
+  <span class="page-eyebrow">Stats</span>
+  <h1>Boost Stats</h1>
+  <p>The numbers under the feeds.</p>
 </header>
 
 <main class="page-main">
   <div class="page-inner">
     <section class="soon-card">
-      <div class="soon-mark" aria-hidden="true">🧑‍🤝‍🧑</div>
+      <div class="soon-mark" aria-hidden="true">📊</div>
       <h2>Coming soon</h2>
-      <p>Every boost in the feeds carries the npub that sent it. This page will roll those up into a directory of the community's boosters — who's sending, what they're supporting, and how to follow them on Nostr.</p>
-      <p>Until then, every booster's name and avatar on a boost card links straight through to their profile.</p>
+      <p>The collector holds every public podcast boost on Nostr back to October 2024 (around 22,000 of them, 45 million sats, across some 1,380 shows). This page will chart that: sats over time, the shows and episodes earning most, and how the network&rsquo;s boosting habits shift month to month.</p>
+      <p>Until then the feeds carry the same data one card at a time, and the Shows feed already ranks every show by what it has taken.</p>
       <span class="soon-badge">In progress</span>
       <div class="soon-links">
-        <a href="/#episodes-global"><span aria-hidden="true">🎙</span> Episodes: Global</a>
-        <a href="/#boosts-global"><span aria-hidden="true">⚡</span> Boosts: Global</a>
+        <a href="/#shows"><span aria-hidden="true">📻</span> Shows</a>
+        <a href="/#boosts-global"><span aria-hidden="true">⚡</span> Boosts</a>
       </div>
     </section>
   </div>
@@ -222,6 +221,5 @@
 <script src="/assets/widgets/pwa-install.js" defer></script>
 
 <script src="/assets/js/nav.js" defer></script>
-
 </body>
 </html>

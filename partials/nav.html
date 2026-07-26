@@ -25,16 +25,22 @@
           </div>
           <a class="nav-explore-home" href="/"><span aria-hidden="true">🏠</span> Home</a>
           <div class="nav-explore-groups">
+            <!-- Feeds: one entry per feed, matching the homepage's what-menu
+                 exactly (Episodes / Shows / Boosts). The Global vs Follows
+                 axis is deliberately absent — it's the second dropdown on the
+                 page itself, and listing both scopes here made the nav a
+                 six-item grid restating a control the page already has. -->
             <div class="nav-explore-group">
-              <h4>Podcasts</h4>
-              <a href="/#podcasts-global"><span aria-hidden="true">🎙</span> Global</a>
-              <a href="/#podcasts-follows"><span aria-hidden="true">🎧</span> Follows</a>
-              <a href="/shows"><span aria-hidden="true">📻</span> Shows</a>
+              <h4>Feeds</h4>
+              <a href="/#episodes-global"><span aria-hidden="true">🎙</span> Episodes</a>
+              <a href="/#shows"><span aria-hidden="true">📻</span> Shows</a>
+              <a href="/#boosts-global"><span aria-hidden="true">⚡</span> Boosts</a>
             </div>
+            <!-- Stats: the aggregate views over the same data. Both are
+                 coming-soon pages for now (noindex, out of the sitemap). -->
             <div class="nav-explore-group">
-              <h4>Boosts</h4>
-              <a href="/#boosts-global"><span aria-hidden="true">⚡</span> Global</a>
-              <a href="/#boosts-follows"><span aria-hidden="true">👥</span> Follows</a>
+              <h4>Stats</h4>
+              <a href="/stats"><span aria-hidden="true">📊</span> Boost Stats</a>
               <a href="/boosters"><span aria-hidden="true">🧑‍🤝‍🧑</span> Boosters</a>
             </div>
             <div class="nav-explore-group">

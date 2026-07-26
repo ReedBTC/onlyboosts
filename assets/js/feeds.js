@@ -1,14 +1,15 @@
 /* Feed hydration for the homepage's feeds.
  *
  * Which feed is on screen is picked by the two dropdowns in the sticky feed
- * bar — what (Podcasts / Shows / Boosts) x whose (Global / Follows). Scoping:
+ * bar — what (Episodes / Shows / Boosts) x whose (Global / Follows). Scoping:
  * "Global" is unscoped; "Follows" is the signed-in user's own kind-3 contact
- * list, resolved by follow-set.js. Shows is a placeholder with no loader.
+ * list, resolved by follow-set.js. Shows is Global-only for now.
  *
- * All four live feeds have loaders (see LOADERS at the bottom); each
- * lazy-imports its renderer on first view. Both read the collector's published
- * feed through ob-data.js (/api/data/*) — boosts-feed.js renders the boost
- * notes themselves, feeds-podcasts.js the per-episode rollup.
+ * Every feed has a loader (see LOADERS at the bottom); each lazy-imports its
+ * renderer on first view. All of them read the collector's published feed
+ * through ob-data.js (/api/data/*) — boosts-feed.js renders the boost notes
+ * themselves, feeds-podcasts.js the per-episode rollup, shows-feed.js the
+ * per-show one.
  *
  * The Events / Marketplace / Articles feeds and their modules were removed on
  * fork. What's left of the Events path below — loadEvents, the supporter-set
@@ -1021,9 +1022,9 @@ async function loadEvents() {
 }
 
 // ── Feed loaders ─────────────────────────────────────────────────────
-// Both renderers read the collector's published feed through ob-data.js.
-// Lazy-imported on first view so a visitor who only opens one tab doesn't
-// pay for the other's module.
+// Every renderer reads the collector's published feed through ob-data.js
+// (Follows also through ob-live.js). Lazy-imported on first view so a visitor
+// who only opens one feed doesn't pay for the others' modules.
 async function hydrate(panelId, mod, scope) {
   const panel = document.getElementById(panelId)
   if (!panel) return
@@ -1032,10 +1033,11 @@ async function hydrate(panelId, mod, scope) {
   showSkeletons(list)
   try {
     const m = await import(mod)
-    // Both renderers take the panel: it carries the feed key their range/sort
+    const fn = m[RENDERERS[mod]]
+    if (typeof fn !== 'function') throw new Error(`no renderer export for ${mod}`)
+    // Every renderer takes the panel: it carries the feed key their range/sort
     // controls are tagged with in the sticky bar.
-    if (mod.includes('boosts-feed')) await m.renderBoosts({ panel, list, scope })
-    else await m.renderPodcasts({ panel, list, scope })
+    await fn({ panel, list, scope })
   } catch (e) {
     console.error('[feeds] load failed', mod, scope, e)
     renderPlaceholder(list, 'Couldn\u2019t load this feed', 'Something went wrong reaching the boosts data \u2014 please try again later.')
@@ -1045,11 +1047,21 @@ async function hydrate(panelId, mod, scope) {
 // ── Lazy per-feed dispatch ───────────────────────────────────────────
 const BOOSTS = '/assets/js/boosts-feed.js'
 const PODCASTS = '/assets/js/feeds-podcasts.js'
+const SHOWS = '/assets/js/shows-feed.js'
+// Each module's entry point, by module. Named rather than sniffed out of the
+// path, so adding a feed is one line here instead of another branch.
+const RENDERERS = {
+  [BOOSTS]: 'renderBoosts',
+  [PODCASTS]: 'renderPodcasts',
+  [SHOWS]: 'renderShows',
+}
 const LOADERS = {
   'boosts-global':    () => hydrate('panel-boosts-global', BOOSTS, 'global'),
   'boosts-follows':   () => hydrate('panel-boosts-follows', BOOSTS, 'follows'),
-  'podcasts-global':  () => hydrate('panel-podcasts-global', PODCASTS, 'global'),
-  'podcasts-follows': () => hydrate('panel-podcasts-follows', PODCASTS, 'follows'),
+  'episodes-global':  () => hydrate('panel-episodes-global', PODCASTS, 'global'),
+  'episodes-follows': () => hydrate('panel-episodes-follows', PODCASTS, 'follows'),
+  // Global only — see the scope note at the top of shows-feed.js.
+  'shows':            () => hydrate('panel-shows', SHOWS, 'global'),
 }
 const loaded = new Set()
 
@@ -1076,7 +1088,7 @@ document.addEventListener('lb:feed-activate', (e) => {
 // Dropping them from `loaded` re-arms both — the visible one reloads now,
 // the other on its next activation, so an account switch can't leave a
 // stale list behind the tab you aren't looking at.
-const FOLLOWS_FEEDS = ['boosts-follows', 'podcasts-follows']
+const FOLLOWS_FEEDS = ['boosts-follows', 'episodes-follows']
 let lastSessionPubkey = getSessionPubkey()
 
 function onSessionChange() {
@@ -1103,4 +1115,4 @@ window.addEventListener('storage', (e) => {
 // Load whichever feed is active when this module first runs (the inline
 // feed-bar controller has already set body[data-active-feed] and may have
 // dispatched its activation event before this listener attached).
-loadFeed(document.body.dataset.activeFeed || 'podcasts-global')
+loadFeed(document.body.dataset.activeFeed || 'episodes-global')

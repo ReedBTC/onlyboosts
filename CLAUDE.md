@@ -6,40 +6,59 @@ pre-built JSON snapshot off the VPS (`relay.mynostr.app`), the same way
 localbitcoiners' community feeds work.
 
 **The whole feed experience is one page.** `index.html` carries the
-hash-routed feeds, picked by two dropdowns on two axes — what (podcasts /
+hash-routed feeds, picked by two dropdowns on two axes — what (episodes /
 shows / boosts) x whose (global / your follows). `about.html` is a real
 content page — the project's own explanation of what the data is and isn't.
-`boosters.html` and `shows.html` are still coming-soon placeholders with no
-feature behind them; they're nav + header + card + footer and nothing else.
+`stats.html` and `boosters.html` are coming-soon placeholders with no feature
+behind them; they're nav + header + soon-card + footer and nothing else.
+`shows.html` is the same, and is now unlinked — the Shows feed replaced it.
+
+## Site map
+
+The nav's Explore menu and the footer carry the same three groups, in the same
+order. They are the site map, so **they're regrouped together or not at all**:
+
+| Group | Items |
+|---|---|
+| **Feeds** | Episodes `/#episodes-global` · Shows `/#shows` · Boosts `/#boosts-global` |
+| **Stats** | Boost Stats `/stats` · Boosters `/boosters` — both coming soon |
+| **More** (footer: *Connect*) | About · Source · Report a bug |
+
+Feeds has one entry per feed, matching the homepage's what-menu exactly.
+**The Global/Follows axis is deliberately not in the nav**: it's the second
+dropdown on the page, and listing both scopes made this a six-item grid
+restating a control the page already has. The two `*-follows` feeds are
+reachable from that dropdown, and by direct link.
 
 | Feed | Hash | Renders |
 |---|---|---|
-| Podcasts · Global | `#podcasts-global` | per-episode rollup by boosts received |
-| Podcasts · Follows | `#podcasts-follows` | same, filtered to your kind-3 contacts |
+| Episodes · Global | `#episodes-global` | per-episode rollup by boosts received |
+| Episodes · Follows | `#episodes-follows` | same, filtered to your kind-3 contacts |
 | Boosts · Global | `#boosts-global` | the kind-1 boost notes themselves |
 | Boosts · Follows | `#boosts-follows` | same, filtered to your kind-3 contacts |
-| Shows | `#shows` | coming-soon placeholder, no loader |
+| Shows | `#shows` | per-show rollup, Global only |
 
 **The feed bar replaced a row of four tabs**, one per feed. Two dropdowns
 instead of four buttons is what makes room for a third `what` (Shows, and
-whatever follows it) without the row growing to six tabs. The hash keys are
-unchanged, so every `/#boosts-global` link — including the nav's and the
-footer's — still lands where it did.
+whatever follows it) without the row growing to six tabs. The Boosts hashes are
+unchanged; the episodes feed's renamed from `#podcasts-*` and the old form is
+permanently aliased — see the naming note.
 
-Shows has no whose-axis, so its key is the bare `shows` rather than
+Shows has no whose-axis **yet**, so its key is the bare `shows` rather than
 `shows-global`. Picking it leaves the scope *state* alone, so going Boosts ·
-Follows → Shows → Podcasts returns you to Follows.
+Follows → Shows → Episodes returns you to Follows. Adding Shows · Follows means
+renaming the key and keeping `#shows` as an alias.
 
 **Follows only exists for a signed-in npub.** Signed out, the scope menu is
 `hidden` outright (a one-option dropdown is worse than none — it's hidden on
-Shows for the same reason), and a `#podcasts-follows` deep link is coerced to
+Shows for the same reason), and a `#episodes-follows` deep link is coerced to
 Global with the hash rewritten to match.
 
 The inline feed-bar controller in `index.html` owns the menus, which panel is
 on screen, and the hash, and dispatches `lb:feed-activate`;
 `assets/js/feeds.js` listens and lazily hydrates. `feeds.html` and
 `boosts.html` were folded into this page and deleted — their markup is the
-ancestor of the Podcasts and Boosts panels respectively.
+ancestor of the Episodes and Boosts panels respectively.
 
 **Each feed's range + sort controls mount into the bar's third slot**
 (`[data-feed-controls]`), tagged `data-controls-for="<feed>"`. Which group is
@@ -208,8 +227,10 @@ Carried from the scaffold commit and the LB suite:
 ## What's built vs. what isn't
 
 **Working, ported from LB:**
-- `assets/js/boosts-feed.js` / `feeds-podcasts.js` — the four feeds
-- `assets/js/feed-controls.js` — the range/sort chrome both share
+- `assets/js/boosts-feed.js` / `feeds-podcasts.js` — the four boost/episode feeds
+  (the latter is the Episodes feed; see the naming note)
+- `assets/js/shows-feed.js` — the show-level rollup (written here, not ported)
+- `assets/js/feed-controls.js` — the range/sort chrome they all share
 - `assets/js/boosts-thread.js` — the content tokenizer (nostr: mentions,
   URLs, quoted notes) the boost cards render through
 - `assets/js/boost-actions.js` — reply / like / repost / zap
@@ -225,27 +246,60 @@ Carried from the scaffold commit and the LB suite:
 
 **Still to build:**
 
-0. **The Shows feed and two coming-soon pages have no feature behind them.**
-   `#shows` is a selectable option in the feed bar's what-menu (badged
-   `Soon`), with a placeholder panel and deliberately no entry in `LOADERS`.
-   It's the show-level counterpart of the Podcasts feeds, which are
-   episode-level. **This is the next thing to build.** `/shows` is the
-   standalone page that currently says the same thing — decide whether it
-   redirects to `/#shows` or keeps a page of its own before building either.
+0. **The two Stats pages.** `/stats` (Boost Stats) and `/boosters` are
+   coming-soon placeholders — `noindex`, out of `functions/sitemap.xml.js`,
+   nav + header + soon-card and nothing else. They're the whole Stats column
+   of the Explore menu, so both are visible to a visitor and both promise
+   something.
 
-   `/boosters` (a directory of the npubs sending boosts) is the other
-   placeholder. Both pages are `noindex` and out of
-   `functions/sitemap.xml.js` until there's something on them. `/shows` was
-   `/podcasts` until the nav grouped the feeds under a Podcasts heading;
-   `_redirects` carries the 301.
+   **`/stats` has a rich ancestor upstream.** LB shipped a full stats page and
+   it's the thing to pull from rather than starting over:
+
+   ```
+   git show lb/main:stats.html            # 38KB, the charts + view switcher
+   git show lb/main:assets/js/stats.js
+   git show lb/main:assets/js/stats-boosts.js
+   ```
+
+   It was built against LB's own sats log, so the data layer is wrong for us —
+   but the chart code, the broken-axis outlier handling and the view switcher
+   are all directly relevant, and `/api/data/*` now carries far more to plot
+   (22k boosts, 45M sats, 1,384 shows, month archives back to 2024-10).
+
+   **`shows.html` is a leftover.** The Shows *feed* (`#shows`) is built and the
+   nav and footer point at it, so nothing links to the page any more. Decide
+   whether to redirect it to `/#shows` and delete the file, or keep a page — and
+   note `_redirects` already carries `/podcasts → /shows`, so that hop would
+   chain.
+
+   **Shows · Follows** is the other unbuilt half: the scope menu is hidden on
+   Shows because `podcasts/index.json` is computed over everyone. See the
+   scope note at the top of `shows-feed.js` for what building it takes.
 
    `/about` is done. Its copy is distilled from
    `docs/about-and-faq-source.md`, written by the collector-side agent —
    **that file is the factual source of record**, so correct it there first
-   if the pipeline's behaviour changes. It carried a live stat strip off
-   `/api/data/meta.json` until those two pages claimed the numbers; the
-   markup, the fetch and the `.stat-*` rules all came out together, so
-   recover them from git rather than rewriting if a stat block is wanted.
+   if the pipeline's behaviour changes.
+
+   Its **live stat strip** (`.stat-strip`, five cards) was removed in
+   `7f35bf4` on the reasoning that `/boosters` and `/shows` were where the
+   numbers belonged, then restored — those two are still placeholders, and
+   the about page is where a reader asking "how big is this index" actually
+   is. It no longer floats above the table of contents; it sits inside an
+   **Indexer Stats** section of its own, second in the page order, so the
+   copy qualifying the figures is next to them rather than absent.
+
+   Four pieces that live or die together: the section markup in
+   `about.html`, its TOC entry, the `.stat-*` rules in `page.css`
+   (including a `.prose .stat-strip` re-space and a 640px `.stat-num`
+   step-down), and the inline `/api/data/meta.json` fetch at the foot of
+   the page. It is **best-effort by design**: the strip ships `hidden` and
+   reveals itself only if the whole fetch-and-parse succeeds *and*
+   `m.boosts` is truthy, so a broken endpoint costs a row of numbers rather
+   than rendering a shell of em-dashes or zeroes. Verified against all five
+   failure modes (HTTP error, network error, non-JSON body, empty manifest,
+   zero boosts). `auto-fit` columns mean a sixth figure needs no media
+   query; `distinct_eps` (~7,100) is the obvious candidate.
 
 1. **Podcast Index credentials.** `/api/value` needs `PODCAST_INDEX_KEY` and
    `PODCAST_INDEX_SECRET` in the Cloudflare env. Without them it returns a
@@ -340,26 +394,28 @@ renderer on first view.
 |---|---|---|
 | `boosts-global` | `boosts-feed.js` | `latest.json`, paging back through month archives |
 | `boosts-follows` | `boosts-feed.js` | `POST /api/v1/boosts/follows`, cursor-paged |
-| `podcasts-global` | `feeds-podcasts.js` | `latest.json` + 3 recent months, rolled up by episode |
-| `podcasts-follows` | `feeds-podcasts.js` | `POST /api/v1/boosts/follows`, same rollup |
+| `episodes-global` | `feeds-podcasts.js` | `latest.json` + 3 recent months, rolled up by episode |
+| `episodes-follows` | `feeds-podcasts.js` | `POST /api/v1/boosts/follows`, same rollup |
+| `shows` | `shows-feed.js` | `podcasts/index.json` on All; the boost corpus rolled up by show on 1W/1M |
 
 ### Range and sort
 
-All four live feeds carry a 1W/1M/All range and a sort dropdown, built by
+Every feed carries a 1W/1M/All range and a sort dropdown, built by
 `assets/js/feed-controls.js` and mounted into the feed bar. The chrome is
 shared; **what the range means is not**, which is why each renderer passes its
 own tooltips:
 
 | | Range filters on | Sorts |
 |---|---|---|
-| Podcasts | when the episode **aired** (`ep.published`) | latest boost / latest episode / most boosters / most boosts / most sats |
+| Episodes | when the episode **aired** (`ep.published`) | latest boost / latest episode / most boosters / most boosts / most sats |
 | Boosts | when the boost was **sent** (`b.ts`) | latest boost / latest episode / largest boost |
+| Shows | when the show was **boosted** (`b.ts`) | most boosts / sats / boosters / episodes / recently boosted |
 
-The two are different axes on purpose: an old episode boosted today is in the
-Podcasts data but out of its 1W view, whereas the note feed is a list of boosts
-and "the last 7 days" can only mean the boosts sent in them. Filtering the note
-feed by air date instead would drop most of it, since most boosts land on back
-catalogue.
+Air date and boost time are different axes on purpose: an old episode boosted
+today is in the Episodes data but out of its 1W view, whereas the note and show
+feeds are lists of boosts, where "the last 7 days" can only mean the boosts sent
+in them. Filtering those by air date instead would drop most of what they hold,
+since most boosts land on back catalogue.
 
 The note feed's shorter menu is not an omission — a card there is one boost, so
 "most boosters" has nothing to count. Its `episode` sort has to sink undated
@@ -389,7 +445,7 @@ shared. `ob-live.js` caches nothing in-process — the shard cache is safe only
 because those files are immutable.
 
 Two shapes on the live side: `followsBoostReader()` pages incrementally for the
-note feed, `getFollowsBoosts()` pulls a bounded corpus for the podcasts rollup,
+note feed, `getFollowsBoosts()` pulls a bounded corpus for the episodes rollup,
 which has to group and range-filter before it can paint anything. The corpus is
 capped (`MAX_EAGER_ROWS` / `MAX_EAGER_PAGES`) and reports `truncated`. That cap
 is about how many *boosts* to roll up, and is unrelated to the follow set's
@@ -454,7 +510,7 @@ Two scoping details that aren't obvious:
   something turned up. The D1 query answers that in one indexed hit, so an
   empty first page now genuinely means empty. The archive-walk branch survives
   on the Global path, where `latest.json` can lag.
-- **The Podcasts feeds don't use `podcasts/index.json`.** The cards are
+- **The Episodes feeds don't use `podcasts/index.json`.** The cards are
   *episodes*, not shows, and the published index is a show-level rollup
   computed over everyone — so its counts would also be wrong for a Follows
   audience. Both roll the boost feed up by episode instead, via
@@ -465,6 +521,51 @@ Two scoping details that aren't obvious:
   same table, so the query walks its own history and stops on `ob-live.js`'s
   row budget instead of at an archive boundary. "All" therefore reaches further
   back on Follows than on Global, which is the right way round.
+
+### The Shows feed
+
+`assets/js/shows-feed.js`. The card is the SHOW where the Episodes card is one
+EPISODE — same boosts, rolled up a level. An earlier pass at this *replaced* the
+episode feed and was reverted (`1f24c77`); it has its own slot now, so nothing is
+displaced. The reverted renderer is still readable at
+`git show 7995db0:assets/js/podcasts-feed.js`.
+
+**The range decides the source, because only one source can answer each range.**
+
+- **All** → `podcasts/index.json`, the collector's own per-show rollup: 1,384
+  shows with genuinely all-time counts in one ~440KB request, nothing
+  aggregated in the browser. This is the file CLAUDE.md tells the *episode*
+  feed not to use, and the reason is the same one that makes it right here —
+  it's a show-level rollup, so a show-level view is exactly its consumer.
+- **1W / 1M** → the boost corpus, grouped by `podcast.guid` in the browser. The
+  published index has no per-window breakdown, so a windowed card can only be
+  built from the boosts; and it must be, or "last 7 days" would be showing
+  all-time sat totals.
+
+The windowed path walks `latest.json` plus archives until the oldest row passes
+the cutoff, so it's **0 extra requests for 1W and 1 for 1M** — and those are the
+same shards the Episodes feeds pull, cached by `ob-data.js`, so opening Episodes
+first makes it free. Verified against production: 1W = 309 rows → 93 shows, 1M =
+1,092 rows → 170 shows, every one of them present in the all-time index with no
+windowed count exceeding its all-time count.
+
+Two data facts that shaped the UI, both measured over the live index:
+
+- **462 of 1,384 shows (33%) have no title and no art.** The collector holds
+  boosts tagged with their guid but Podcast Index doesn't know the feed. They're
+  long tail — median 1 boost, 3.8% of all sats — and the first one doesn't
+  appear until #28 on *any* sort, so they never reach the first page. They're
+  kept rather than filtered (real boosts to real shows) and labelled
+  "Unidentified show" with the guid, so an unnamed card reads as incomplete data
+  rather than a bug.
+- **Detail shards run 3.5KB at the median, 15KB at p90, and 1.95MB for the
+  single most-boosted show.** That's why the episode drawer is an explicit
+  expand on the All path. On a windowed range it costs nothing — the rollup
+  already holds every boost, so the episode list is built in memory and no shard
+  is fetched at all.
+
+`byRange` caches the *grouping* per range for the page's lifetime, on top of
+ob-data.js's HTTP cache, so toggling 1M → All → 1M repaints instantly.
 
 ### The episode feed adapter
 
@@ -516,3 +617,29 @@ Internal identifiers still use LB's `lb` prefix — `window.LBLogin`,
 `lb_nostr_session` in localStorage, `lb-*` CSS classes, `lb:feed-activate`
 events. Renaming is cosmetic and touches many files; it's deliberately not
 done. Don't half-rename it.
+
+### Podcasts → Episodes
+
+The episode-level feed was called **Podcasts** until Shows arrived and made the
+name ambiguous: both are podcasts, one is episode-level. Renamed to Episodes,
+and the line drawn was **the product surface renames, the module does not**:
+
+| Renamed | Kept |
+|---|---|
+| the dropdown label, panel `aria-label`s | `assets/js/feeds-podcasts.js` |
+| feed keys `episodes-global` / `episodes-follows` | its `renderPodcasts` export |
+| URL hashes `#episodes-*` | its `[podcasts]` console prefixes |
+| panel ids `panel-episodes-*` | `PODCASTS` const in `feeds.js` |
+| accent tokens `--eg-*` / `--ef-*` | `podcasts/*.json` data paths (collector-owned) |
+
+The file and its export renamed *together or not at all*, and not at all was
+the choice — a module filename isn't a URL, and renaming it costs the git
+history that follows the file. So this is not a half-rename; the seam is
+between the surface and the module, and it's a seam, not a gap.
+
+`ALIASES` in the index.html controller maps `#podcasts-global` and
+`#podcasts-follows` to the new keys and rewrites the hash in place, the way a
+301 would. **Never remove an entry** — those links are in the wild.
+
+The nav and footer no longer have a **Podcasts** heading at all — see the site
+map below.

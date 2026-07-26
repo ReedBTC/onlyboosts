@@ -1,6 +1,6 @@
 /* Boosts feed — the note-level view behind the two Boosts feeds.
  *
- * One card per kind-1 boost note, newest first. The Podcasts feeds render the
+ * One card per kind-1 boost note, newest first. The Episodes feeds render the
  * same data rolled up by episode; this renders the boosts themselves.
  *
  * The two scopes read different backends. Global comes from ob-data.js: the
@@ -10,7 +10,7 @@
  * global by construction and scoping them client-side meant downloading months
  * of boosts to keep the handful that matched.
  *
- * Range and sort (feed-controls.js, shared with the Podcasts rollup): the
+ * Range and sort (feed-controls.js, shared with the Episodes rollup): the
  * range filters on when the boost was SENT, which is the axis a note feed is
  * ordered by. Sorting applies to the selected window, so a bounded window is
  * paged in completely before it's painted — see ensureCoverage below.
@@ -44,14 +44,14 @@ const PAGE_SIZE = 30
 // ── Range + sort ──────────────────────────────────────────────────────
 // The range filters on boost time (b.ts), not on when the episode aired — a
 // card here is one boost, so "the last 7 days" means the boosts sent in them.
-// The Podcasts rollup's identical buttons mean air date instead, which is why
+// The Episodes rollup's identical buttons mean air date instead, which is why
 // each feed writes its own tooltips.
 function rangeTitle(key) {
   const days = rangeDays(key)
   return days ? `Boosts sent in the last ${days} days` : 'All boosts'
 }
 
-// Deliberately shorter than the Podcasts rollup's menu: an episode card
+// Deliberately shorter than the Episodes rollup's menu: an episode card
 // aggregates many boosts and can be ranked by boosters / boosts / sats, but a
 // single boost's only quantitative axis is its own size.
 const SORT_OPTIONS = [
@@ -185,7 +185,7 @@ function renderBoostCard(b) {
   const nameWrap = h('div', { class: 'note-author-name-wrap' }, [nameEl])
 
   // Avatar and name both copy the booster's npub — the same gesture the
-  // Podcasts feed's booster avatars already offer.
+  // Episodes feed's booster avatars already offer.
   const npub = boosterNpub(b.booster)
   wireNpubCopy(img, npub)
   wireNpubCopy(nameEl, npub)

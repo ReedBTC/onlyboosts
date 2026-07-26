@@ -1,12 +1,12 @@
 /* Shared feed controls — the 1W/1M/All range buttons, the "Sort: X ▾"
  * dropdown, and the sticky bar both mount into.
  *
- * These started out inside feeds-podcasts.js, where the Podcasts rollup was
+ * These started out inside feeds-podcasts.js, where the Episodes rollup was
  * the only view with a range filter. The Boosts note feed now carries the same
  * two controls, so the chrome lives here and each renderer supplies its own
  * options and semantics:
  *
- *   Podcasts  range filters on when the episode AIRED, sorts include the
+ *   Episodes  range filters on when the episode AIRED, sorts include the
  *             per-episode aggregates (most boosters / boosts / sats)
  *   Boosts    range filters on when the BOOST was sent, and the only
  *             quantitative axis one boost has is its own size
