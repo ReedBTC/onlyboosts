@@ -46,23 +46,56 @@ def clean_html(raw):
     return text or None
 
 
+def _show_from_feed(feed, podcast_guid=None):
+    """Normalize a Podcast Index `feed` object into our shows-table shape. When
+    `podcast_guid` is omitted it's taken from the feed's own podcastGuid (used when
+    we looked the feed up by id/url and are learning its real guid)."""
+    if not feed:
+        return None
+    guid = podcast_guid or feed.get("podcastGuid")
+    if not guid:
+        return None
+    return {
+        "podcast_guid": guid,
+        "title":     feed.get("title"),
+        "image":     feed.get("image") or feed.get("artwork"),
+        "feed_url":  feed.get("url"),
+        "itunes_id": feed.get("itunesId"),
+        "feed_id":   feed.get("id"),
+        "medium":    feed.get("medium") or "podcast",
+    }
+
+
 def resolve_show(podcast_guid, key, secret):
     try:
         feed = (pi_get("podcasts/byguid", {"guid": podcast_guid}, key, secret)
                 .get("feed") or {})
-        if not feed:
-            return None
-        return {
-            "podcast_guid": podcast_guid,
-            "title":     feed.get("title"),
-            "image":     feed.get("image") or feed.get("artwork"),
-            "feed_url":  feed.get("url"),
-            "itunes_id": feed.get("itunesId"),
-            "feed_id":   feed.get("id"),
-            "medium":    feed.get("medium") or "podcast",
-        }
+        return _show_from_feed(feed, podcast_guid)
     except Exception as e:
         print(f"  [warn] PI show lookup failed for {podcast_guid}: {e}")
+        return None
+
+
+def resolve_feed_by_id(feed_id, key, secret):
+    """Resolve a Podcast Index feed id → our shows-table dict (its real podcastGuid
+    included). For phantom guids that are actually PI feed ids."""
+    try:
+        feed = (pi_get("podcasts/byfeedid", {"id": feed_id}, key, secret)
+                .get("feed") or {})
+        return _show_from_feed(feed)
+    except Exception as e:
+        print(f"  [warn] PI byfeedid lookup failed for {feed_id}: {e}")
+        return None
+
+
+def resolve_feed_by_url(feed_url, key, secret):
+    """Resolve a feed URL → our shows-table dict (its real podcastGuid included)."""
+    try:
+        feed = (pi_get("podcasts/byfeedurl", {"url": feed_url}, key, secret)
+                .get("feed") or {})
+        return _show_from_feed(feed)
+    except Exception as e:
+        print(f"  [warn] PI byfeedurl lookup failed for {feed_url}: {e}")
         return None
 
 

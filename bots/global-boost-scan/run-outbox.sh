@@ -15,6 +15,7 @@ flock -w 600 9 || { echo "[skip] pipeline still busy after 10min — skipping th
 
 echo "=== $(date -u +%FT%TZ) OnlyBoosts outbox expansion ==="
 "$PY" "$BOT" outbox --refresh     # re-resolve outbox relays, deep-walk new, sweep known
+"$PY" "$BOT" resolve-guids        # canonicalize phantom guids (feed ids / item guids / slugs)
 "$PY" "$BOT" enrich               # metadata/profiles for anything new the wider scan found
 "$PY" "$BOT" export --per-show
 "$PY" "$BOT" push

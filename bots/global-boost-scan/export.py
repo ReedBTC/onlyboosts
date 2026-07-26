@@ -30,10 +30,13 @@ def write_json(path, obj):
     return path.stat().st_size
 
 
-# denormalized boost record for the feed (lean — no shownotes)
-_FEED_SQL = """
+# denormalized boost record for the feed (lean — no shownotes).
+# podcast identity is the CANONICAL guid (falls back to the as-signed one), so
+# phantom-guid boosts join to their real show and carry the real guid to the site.
+_EFF = db.effective_guid("b")
+_FEED_SQL = f"""
 SELECT b.event_id, b.booster_pubkey, b.booster_npub, b.created_at, b.sats,
-       b.amount_source, b.message, b.client, b.podcast_guid, b.item_guid,
+       b.amount_source, b.message, b.client, {_EFF} AS podcast_guid, b.item_guid,
        b.item_url, b.show_url,
        e.title AS ep_title, e.image AS ep_image, e.published AS ep_pub,
        e.enclosure_url AS ep_url, e.episode_number AS ep_num,
@@ -41,7 +44,7 @@ SELECT b.event_id, b.booster_pubkey, b.booster_npub, b.created_at, b.sats,
        p.name AS p_name, p.picture AS p_pic
 FROM boosts b
 LEFT JOIN episodes e ON e.item_guid    = b.item_guid
-LEFT JOIN shows    s ON s.podcast_guid = b.podcast_guid
+LEFT JOIN shows    s ON s.podcast_guid = {_EFF}
 LEFT JOIN profiles p ON p.pubkey       = b.booster_pubkey
 """
 
@@ -105,16 +108,16 @@ def export(conn, out_dir, latest_n=1000, per_show=False, log=print):
     log(f"  boost feed: {total} records, {len(months)} monthly pages")
 
     # ── podcasts index (per-show aggregates) ──────────────────────────────────
-    agg = conn.execute("""
-        SELECT b.podcast_guid,
+    agg = conn.execute(f"""
+        SELECT {_EFF} AS podcast_guid,
                COUNT(*) AS boosts, COALESCE(SUM(b.sats),0) AS sats,
                COUNT(DISTINCT b.booster_pubkey) AS boosters,
                COUNT(DISTINCT b.item_guid) AS episodes,
                MAX(b.created_at) AS latest,
                s.title, s.image, s.feed_url, s.medium
-        FROM boosts b LEFT JOIN shows s ON s.podcast_guid = b.podcast_guid
-        WHERE b.podcast_guid IS NOT NULL
-        GROUP BY b.podcast_guid
+        FROM boosts b LEFT JOIN shows s ON s.podcast_guid = {_EFF}
+        WHERE {_EFF} IS NOT NULL
+        GROUP BY {_EFF}
         ORDER BY latest DESC""").fetchall()
     podcasts = [{
         "guid":     a["podcast_guid"],
@@ -148,14 +151,14 @@ def export(conn, out_dir, latest_n=1000, per_show=False, log=print):
         n = 0
         for a in agg:
             pg = a["podcast_guid"]
-            eps = conn.execute("""
+            eps = conn.execute(f"""
                 SELECT e.*, COUNT(b.event_id) AS boosts,
                        COALESCE(SUM(b.sats),0) AS sats
                 FROM boosts b LEFT JOIN episodes e ON e.item_guid = b.item_guid
-                WHERE b.podcast_guid = ? AND b.item_guid IS NOT NULL
+                WHERE {_EFF} = ? AND b.item_guid IS NOT NULL
                 GROUP BY b.item_guid ORDER BY MAX(b.created_at) DESC""", (pg,)).fetchall()
             show_boosts = [_record(r) for r in
-                           conn.execute(_FEED_SQL + " WHERE b.podcast_guid = ? "
+                           conn.execute(_FEED_SQL + f" WHERE {_EFF} = ? "
                                         "ORDER BY b.created_at DESC", (pg,)).fetchall()]
             # No generated_at here either — a show's file changes only when that
             # show gets a new boost, so rsync ships just the handful that moved.

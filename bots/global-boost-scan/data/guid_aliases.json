@@ -1,0 +1,19 @@
+{
+  "_readme": [
+    "Hand-maintained map for FREEFORM phantom guids that have no reliable anchor",
+    "in the boost event itself (episode slugs like 'homegrownhits-100' or",
+    "'20250508FH'). The resolver applies these; numeric feed-ids and '<uuid>-<n>'",
+    "suffixes are handled automatically and do NOT belong here.",
+    "",
+    "'exact'  maps one raw guid string to the show's real podcast:guid.",
+    "'prefix' maps every raw guid starting with 'prefix' to one canonical guid —",
+    "         use only when a slug family is unambiguously one show. Beware: some",
+    "         families are ambiguous (e.g. 'homegrownhits-*' spans both the main",
+    "         Homegrown Hits feed and SXWorldwide), so prefer 'exact' when unsure.",
+    "",
+    "After editing this file, run `resolve-guids` then a FULL D1 reload so the",
+    "corrected mapping reaches the website (a delta won't recompute the old rows)."
+  ],
+  "exact": {},
+  "prefix": []
+}

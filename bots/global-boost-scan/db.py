@@ -24,7 +24,8 @@ CREATE TABLE IF NOT EXISTS boosts (
     created_at      INTEGER NOT NULL,
     sats            INTEGER,
     amount_source   TEXT,
-    podcast_guid    TEXT,
+    podcast_guid    TEXT,          -- as-signed by the note (may be a phantom: feed id / item guid / slug)
+    canonical_guid  TEXT,          -- resolved real podcast guid when podcast_guid is a phantom; NULL = trust podcast_guid
     item_guid       TEXT,
     item_url        TEXT,
     show_url        TEXT,
@@ -37,6 +38,20 @@ CREATE INDEX IF NOT EXISTS idx_boosts_created  ON boosts(created_at);
 CREATE INDEX IF NOT EXISTS idx_boosts_booster  ON boosts(booster_pubkey);
 CREATE INDEX IF NOT EXISTS idx_boosts_podcast  ON boosts(podcast_guid);
 CREATE INDEX IF NOT EXISTS idx_boosts_item     ON boosts(item_guid);
+
+-- Phantom-guid canonicalization. A client sometimes puts a value that is NOT a
+-- podcast:guid (a Podcast Index feed id, an item guid, or a freeform episode
+-- slug) into the NIP-73 podcast:guid tag, fragmenting one real show into many
+-- phantom rows. This maps a raw (as-signed) guid onto the real podcast guid.
+-- The boost row keeps its as-signed podcast_guid; canonical_guid is materialized
+-- from this table by the resolver, and everything downstream reads
+-- COALESCE(canonical_guid, podcast_guid). See resolve_guids.py.
+CREATE TABLE IF NOT EXISTS guid_aliases (
+    raw_guid        TEXT PRIMARY KEY,   -- the phantom value as it appears in the tag
+    canonical_guid  TEXT NOT NULL,      -- the real podcast:guid it belongs to
+    method          TEXT,               -- how it was resolved (feedurl-local, pi-byfeedid, suffix-strip, curated, ...)
+    resolved_at     INTEGER
+);
 
 CREATE TABLE IF NOT EXISTS shows (
     podcast_guid  TEXT PRIMARY KEY,
@@ -100,6 +115,22 @@ CREATE TABLE IF NOT EXISTS enrich_failed (
 # Re-attempt a failed enrichment at most this often.
 ENRICH_RETRY_COOLDOWN = 7 * 24 * 60 * 60
 
+# The show a boost really belongs to: its resolved canonical guid if the as-signed
+# podcast_guid was a phantom, else the as-signed value. Used everywhere boosts are
+# grouped by show or joined to `shows`. `b` is the `boosts` table alias in the query.
+def effective_guid(alias="b"):
+    p = f"{alias}." if alias else ""
+    return f"COALESCE({p}canonical_guid, {p}podcast_guid)"
+
+
+def _migrate(conn):
+    """Additive migrations for DBs created before a column existed."""
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(boosts)")}
+    if "canonical_guid" not in cols:
+        conn.execute("ALTER TABLE boosts ADD COLUMN canonical_guid TEXT")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_boosts_canonical ON boosts(canonical_guid)")
+    conn.commit()
+
 
 def connect(db_path, check_same_thread=True):
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)
@@ -108,6 +139,7 @@ def connect(db_path, check_same_thread=True):
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
     conn.executescript(SCHEMA)
+    _migrate(conn)
     return conn
 
 
@@ -199,11 +231,12 @@ def _cutoff():
 
 
 def guids_needing_show(conn):
+    eg = effective_guid("b")
     rows = conn.execute(
-        """SELECT DISTINCT b.podcast_guid FROM boosts b
-           LEFT JOIN shows s ON s.podcast_guid = b.podcast_guid
-           LEFT JOIN enrich_failed f ON f.kind='show' AND f.id = b.podcast_guid
-           WHERE b.podcast_guid IS NOT NULL AND s.podcast_guid IS NULL
+        f"""SELECT DISTINCT {eg} AS g FROM boosts b
+           LEFT JOIN shows s ON s.podcast_guid = {eg}
+           LEFT JOIN enrich_failed f ON f.kind='show' AND f.id = {eg}
+           WHERE {eg} IS NOT NULL AND s.podcast_guid IS NULL
              AND (f.id IS NULL OR f.last_try < ?)""", (_cutoff(),)).fetchall()
     return [r[0] for r in rows]
 
@@ -245,6 +278,86 @@ def feed_id_for_guid(conn, podcast_guid):
     row = conn.execute("SELECT feed_id FROM shows WHERE podcast_guid=?",
                        (podcast_guid,)).fetchone()
     return row[0] if row else None
+
+
+# ── phantom-guid aliasing ─────────────────────────────────────────────────────
+def raw_guids_needing_alias(conn):
+    """Distinct as-signed podcast_guids that carry no alias yet. The resolver looks
+    at each and decides whether it's a phantom that maps to a real guid."""
+    rows = conn.execute(
+        """SELECT DISTINCT b.podcast_guid FROM boosts b
+           LEFT JOIN guid_aliases a ON a.raw_guid = b.podcast_guid
+           WHERE b.podcast_guid IS NOT NULL AND a.raw_guid IS NULL""").fetchall()
+    return [r[0] for r in rows]
+
+
+def sample_tag_url(conn, raw_guid):
+    """The url (3rd element) of the `podcast:guid` i-tag for one boost carrying this
+    raw guid — often the real feed URL, which is enough to resolve the show."""
+    import json
+    row = conn.execute(
+        "SELECT raw_json FROM boosts WHERE podcast_guid=? AND raw_json IS NOT NULL LIMIT 1",
+        (raw_guid,)).fetchone()
+    if not row:
+        return None
+    try:
+        ev = json.loads(row[0])
+    except Exception:
+        return None
+    for t in ev.get("tags", []):
+        if len(t) >= 3 and t[0] == "i" and isinstance(t[1], str) \
+                and t[1] == f"podcast:guid:{raw_guid}":
+            return t[2] or None
+    return None
+
+
+def feed_url_to_guid(conn, feed_url):
+    """The real podcast_guid of an already-known show with this feed URL, or None."""
+    if not feed_url:
+        return None
+    row = conn.execute("SELECT podcast_guid FROM shows WHERE feed_url=?",
+                       (feed_url,)).fetchone()
+    return row[0] if row else None
+
+
+def upsert_alias(conn, raw_guid, canonical_guid, method):
+    conn.execute(
+        """INSERT INTO guid_aliases (raw_guid, canonical_guid, method, resolved_at)
+           VALUES (?, ?, ?, ?)
+           ON CONFLICT(raw_guid) DO UPDATE SET
+             canonical_guid=excluded.canonical_guid, method=excluded.method,
+             resolved_at=excluded.resolved_at""",
+        (raw_guid, canonical_guid, method, int(time.time())))
+    conn.commit()
+
+
+def _has_table(conn, name):
+    return conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)).fetchone() is not None
+
+
+def apply_aliases(conn):
+    """Materialize guid_aliases onto boosts.canonical_guid. Only rows whose value
+    actually changes are touched; those are also un-marked in the D1 sync table (if
+    present) so the next delta re-pushes them under the corrected guid. Returns the
+    number of boost rows re-keyed."""
+    to_change = [r[0] for r in conn.execute(
+        """SELECT b.event_id FROM boosts b JOIN guid_aliases a ON a.raw_guid = b.podcast_guid
+           WHERE b.canonical_guid IS NOT a.canonical_guid""").fetchall()]
+    if not to_change:
+        return 0
+    conn.execute(
+        """UPDATE boosts
+           SET canonical_guid = (SELECT a.canonical_guid FROM guid_aliases a
+                                 WHERE a.raw_guid = boosts.podcast_guid)
+           WHERE event_id IN (
+             SELECT b.event_id FROM boosts b JOIN guid_aliases a ON a.raw_guid = b.podcast_guid
+             WHERE b.canonical_guid IS NOT a.canonical_guid)""")
+    if _has_table(conn, "d1_boosts_synced"):
+        conn.executemany("DELETE FROM d1_boosts_synced WHERE event_id=?",
+                         [(i,) for i in to_change])
+    conn.commit()
+    return len(to_change)
 
 
 # ── scan cursors ──────────────────────────────────────────────────────────────
@@ -292,7 +405,8 @@ def stats(conn):
         return conn.execute(q).fetchone()[0]
     return {
         "boosts":          one("SELECT COUNT(*) FROM boosts"),
-        "distinct_shows":  one("SELECT COUNT(DISTINCT podcast_guid) FROM boosts WHERE podcast_guid IS NOT NULL"),
+        "distinct_shows":  one("SELECT COUNT(DISTINCT COALESCE(canonical_guid, podcast_guid)) "
+                               "FROM boosts WHERE podcast_guid IS NOT NULL"),
         "distinct_eps":    one("SELECT COUNT(DISTINCT item_guid) FROM boosts WHERE item_guid IS NOT NULL"),
         "distinct_boosters": one("SELECT COUNT(DISTINCT booster_pubkey) FROM boosts"),
         "total_sats":      one("SELECT COALESCE(SUM(sats),0) FROM boosts"),

@@ -42,9 +42,12 @@ def q(v):
 
 # ── projection builders (return list of SQL statements) ───────────────────────
 def _boost_rows(conn):
+    # Project the CANONICAL guid as podcast_guid so D1 (and the show pages'
+    # GROUP BY podcast_guid) see de-fragmented shows, not the as-signed phantoms.
+    eg = db.effective_guid("")
     rows = conn.execute(
-        """SELECT event_id, booster_pubkey, booster_npub, created_at, sats, amount_source,
-                  podcast_guid, item_guid, item_url, client, message
+        f"""SELECT event_id, booster_pubkey, booster_npub, created_at, sats, amount_source,
+                  {eg} AS podcast_guid, item_guid, item_url, client, message
            FROM boosts""").fetchall()
     for r in rows:
         yield r
@@ -71,15 +74,16 @@ def build_full_sql(conn):
                        f"{q(r['event_id'])},{q(r['message'])});")
 
     # podcasts (aggregates joined with show metadata)
-    for a in conn.execute("""
-        SELECT b.podcast_guid AS guid,
+    eg = db.effective_guid("b")
+    for a in conn.execute(f"""
+        SELECT {eg} AS guid,
                COUNT(*) AS boost_count, COALESCE(SUM(b.sats),0) AS total_sats,
                COUNT(DISTINCT b.booster_pubkey) AS booster_count,
                COUNT(DISTINCT b.item_guid) AS episode_count,
                MAX(b.created_at) AS latest_ts,
                s.title, s.image, s.feed_url, s.medium
-        FROM boosts b LEFT JOIN shows s ON s.podcast_guid=b.podcast_guid
-        WHERE b.podcast_guid IS NOT NULL GROUP BY b.podcast_guid""").fetchall():
+        FROM boosts b LEFT JOIN shows s ON s.podcast_guid={eg}
+        WHERE {eg} IS NOT NULL GROUP BY {eg}""").fetchall():
         out.append(
             "INSERT INTO podcasts (podcast_guid,title,image,feed_url,medium,"
             "boost_count,total_sats,booster_count,episode_count,latest_ts) VALUES ("
@@ -144,16 +148,17 @@ def build_delta_sql(conn, rows):
             items.add(r["item_guid"])
         pubs.add(r["booster_pubkey"])
 
+    eg = db.effective_guid("b")
     for pg in pods:
         a = conn.execute(
-            """SELECT b.podcast_guid AS guid, COUNT(*) AS boost_count,
+            f"""SELECT {eg} AS guid, COUNT(*) AS boost_count,
                       COALESCE(SUM(b.sats),0) AS total_sats,
                       COUNT(DISTINCT b.booster_pubkey) AS booster_count,
                       COUNT(DISTINCT b.item_guid) AS episode_count,
                       MAX(b.created_at) AS latest_ts,
                       s.title, s.image, s.feed_url, s.medium
-               FROM boosts b LEFT JOIN shows s ON s.podcast_guid=b.podcast_guid
-               WHERE b.podcast_guid=? GROUP BY b.podcast_guid""", (pg,)).fetchone()
+               FROM boosts b LEFT JOIN shows s ON s.podcast_guid={eg}
+               WHERE {eg}=? GROUP BY {eg}""", (pg,)).fetchone()
         if not a:
             continue
         out.append(
@@ -207,9 +212,10 @@ def _ensure_sync_table(conn):
 
 
 def _unsynced_boosts(conn):
+    eg = db.effective_guid("b")
     return conn.execute(
-        """SELECT b.event_id,b.booster_pubkey,b.booster_npub,b.created_at,b.sats,
-                  b.amount_source,b.podcast_guid,b.item_guid,b.item_url,b.client,b.message
+        f"""SELECT b.event_id,b.booster_pubkey,b.booster_npub,b.created_at,b.sats,
+                  b.amount_source,{eg} AS podcast_guid,b.item_guid,b.item_url,b.client,b.message
            FROM boosts b LEFT JOIN d1_boosts_synced d ON d.event_id=b.event_id
            WHERE d.event_id IS NULL""").fetchall()
 

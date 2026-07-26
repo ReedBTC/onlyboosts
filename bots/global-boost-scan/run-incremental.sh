@@ -15,6 +15,7 @@ flock -n 9 || { echo "[skip] pipeline busy — another run holds the lock"; exit
 
 echo "=== $(date -u +%FT%TZ) OnlyBoosts incremental cycle ==="
 "$PY" "$BOT" incremental          # new boosts since last run → SQLite
+"$PY" "$BOT" resolve-guids        # canonicalize phantom guids (feed ids / item guids / slugs)
 "$PY" "$BOT" enrich               # fill metadata/profiles for anything new
 "$PY" "$BOT" export --per-show    # rebuild the JSON shards
 "$PY" "$BOT" push                 # rsync changed shards to the VPS (no --delete: nothing is removed on a tail run)

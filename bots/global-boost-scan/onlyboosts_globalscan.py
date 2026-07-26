@@ -35,6 +35,7 @@ sys.path.insert(0, str(HERE.parent / "shared"))
 import db                                                       # noqa: E402
 import enrich                                                   # noqa: E402
 import export as export_mod                                     # noqa: E402
+import resolve_guids                                            # noqa: E402
 from classify import classify_boost, decode_note_or_nevent, _QUOTE_RE  # noqa: E402
 from relays import CORE_RELAYS, PROFILE_RELAYS, RECEIPT_RELAYS, expand_via_outbox  # noqa: E402
 from scan import (scan_relay_backward, scan_relay_incremental,   # noqa: E402
@@ -318,6 +319,17 @@ def cmd_rescan(args):
     _print_stats(conn)
 
 
+# ── phantom-guid resolution ───────────────────────────────────────────────────
+def cmd_resolve_guids(args):
+    """Map phantom podcast_guids (feed ids / item guids / freeform slugs) onto the
+    real show guid and materialize them onto boosts.canonical_guid. Runs before
+    enrich/export/d1_sync so corrections flow through the same cycle."""
+    conn = db.connect(DB_PATH, check_same_thread=False)
+    key, secret = _pi_creds()
+    resolve_guids.resolve_all(conn, key, secret, log=lambda m: print(m, flush=True))
+    _print_stats(conn)
+
+
 # ── enrichment ────────────────────────────────────────────────────────────────
 def cmd_enrich(args):
     conn = db.connect(DB_PATH, check_same_thread=False)
@@ -337,10 +349,11 @@ def cmd_enrich(args):
 
         eps = db.guids_needing_episode(conn)
         print(f"Enriching {len(eps)} episode(s)...")
-        # map item_guid -> a podcast_guid so we can pass feedid
+        # map item_guid -> its show's canonical guid so we can pass feedid
+        eg = db.effective_guid("boosts")
         for i, ig in enumerate(eps, 1):
             row = conn.execute(
-                "SELECT podcast_guid FROM boosts WHERE item_guid=? AND podcast_guid IS NOT NULL LIMIT 1",
+                f"SELECT {eg} AS g FROM boosts WHERE item_guid=? AND {eg} IS NOT NULL LIMIT 1",
                 (ig,)).fetchone()
             feed_id = db.feed_id_for_guid(conn, row[0]) if row else None
             info = enrich.resolve_episode(ig, feed_id, key, secret)
@@ -457,6 +470,10 @@ def main():
     rs.add_argument("--floor", type=int, default=FLOOR_2025)
     rs.add_argument("--relays", nargs="*")
     rs.set_defaults(func=cmd_rescan)
+
+    rg = sub.add_parser("resolve-guids",
+                        help="canonicalize phantom podcast_guids (feed ids / item guids / slugs)")
+    rg.set_defaults(func=cmd_resolve_guids)
 
     e = sub.add_parser("enrich", help="Podcast Index + profile enrichment")
     e.set_defaults(func=cmd_enrich)
