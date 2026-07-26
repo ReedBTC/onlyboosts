@@ -328,15 +328,28 @@ because those files are immutable.
 Two shapes on the live side: `followsBoostReader()` pages incrementally for the
 note feed, `getFollowsBoosts()` pulls a bounded corpus for the podcasts rollup,
 which has to group and range-filter before it can paint anything. The corpus is
-capped (`MAX_EAGER_ROWS` / `MAX_EAGER_PAGES`) and reports `truncated`.
+capped (`MAX_EAGER_ROWS` / `MAX_EAGER_PAGES`) and reports `truncated`. That cap
+is about how many *boosts* to roll up, and is unrelated to the follow set's
+size, which is no longer capped in any way that matters.
 
-**`/api/v1/boosts/follows` interpolates its author list into the SQL rather
-than binding it.** D1 rejects a statement with more than 100 bound parameters,
-so one bind per author broke at 99 follows — an ordinary follow list — and
-broke *harder* on page two, where the cursor adds three more binds. Safe
-because `toHexPubkey` provably returns `/^[0-9a-f]{64}$/` or null and the
-endpoint re-tests that before interpolating. Do not generalize the pattern;
-everything else stays bound.
+**`/api/v1/boosts/follows` passes its whole author list as one bound JSON
+array, unrolled by `json_each`.** D1 imposes two limits a large `IN (...)` hits
+from opposite sides: 100 bound parameters per statement, and 100,000 bytes of
+statement text. One bind per author breaks at 99 follows (worse mid-pagination,
+where the cursor adds three binds); interpolating the authors instead trades
+that for the text limit, which runs out around 1,480. The JSON array escapes
+both — the statement is a fixed ~180 bytes however many authors there are, and
+parameter *values* don't count toward statement length. Verified on SQLite 3.51
+that the plan still resolves through `idx_boosts_booster` rather than degrading
+to a scan.
+
+Cloudflare documents JSON1 support but doesn't enumerate the table-valued
+functions, so the endpoint keeps an interpolated fallback that reproduces the
+old truncate-at-1,000 behaviour if D1 rejects `json_each`. The fallback is the
+only place SQL is built by concatenation; it's safe because every value has been
+through `toHexPubkey` and re-tested against `HEX64`, both of which yield hex-only
+strings. Don't generalize the pattern. `MAX_AUTHORS` (10,000) is an abuse guard,
+not a technical ceiling.
 
 **Follows scoping** lives in `assets/js/follow-set.js`. `resolveFollows()`
 reads the signed-in pubkey from `localStorage.lb_nostr_session` —
