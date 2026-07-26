@@ -38,6 +38,7 @@ import { followsBoostReader } from '/assets/js/ob-live.js'
 import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls,
 } from '/assets/js/feed-controls.js'
+import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js'
 
 const PAGE_SIZE = 30
 
@@ -328,6 +329,9 @@ async function createFollowsSource(authors) {
  */
 export async function renderBoosts({ panel, list, scope = 'global' }) {
   if (!list) return
+  // A re-render (account switch) may end on a placeholder, so clear any box a
+  // previous run left behind before deciding whether this one gets one.
+  resetFeedSearch(panel)
 
   // Resolve the audience first — a signed-out Follows tab should say so
   // without touching the network, and the query below can't be built at all
@@ -395,14 +399,60 @@ export async function renderBoosts({ panel, list, scope = 'global' }) {
   // Guards an in-flight coverage fetch against a newer selection landing
   // while it's still running.
   let seq = 0
+  let search = null
+  // The window's rows before the search narrows them — what the booster index
+  // is built over, so a suggestion is always someone this window can show.
+  let scopedRows = rows
 
   // The rows in the selected window, in the selected order. 'recent' over
   // 'all' is the source's own order, so the default view is the source's own
   // array — paging appends to it and nothing has to be copied or re-sorted.
+  //
+  // A search here narrows to one BOOSTER rather than one card: this feed's
+  // subject is the person, and a single note is not something anyone knows the
+  // name of. There's no rank to retain — a card is one boost, so the feed has
+  // no ranked sort and never paints a rank badge.
   function buildView() {
     const cutoff = rangeCutoff(rangeKey)
-    const scoped = cutoff ? rows.filter((b) => b.ts >= cutoff) : rows
+    scopedRows = cutoff ? rows.filter((b) => b.ts >= cutoff) : rows
+    // The corpus behind the index just changed (new window, or a page of older
+    // rows landed), so drop it; it rebuilds on the next keystroke.
+    search?.refresh()
+    const picked = search?.selection || null
+    const scoped = picked
+      ? scopedRows.filter((b) => b.booster.pk === picked.key)
+      : scopedRows
     return sortKey === 'recent' ? scoped : [...scoped].sort(SORTERS[sortKey])
+  }
+
+  /** Distinct boosters in the current window, most boosts first. */
+  function boosterEntries() {
+    const by = new Map()
+    for (const b of scopedRows) {
+      const pk = b.booster?.pk
+      if (!pk) continue
+      let e = by.get(pk)
+      if (!e) {
+        e = { pk, label: boosterLabel(b.booster), npub: boosterNpub(b.booster), pic: b.booster.pic, n: 0, sats: 0 }
+        by.set(pk, e)
+      }
+      // Names and avatars are embedded per record and a given row can be
+      // missing either, so fill from whichever row has one.
+      if (!e.pic && b.booster.pic) e.pic = b.booster.pic
+      e.n++
+      e.sats += b.sats || 0
+    }
+    return [...by.values()]
+      .sort((a, b) => b.n - a.n || b.sats - a.sats)
+      .map((e) => ({
+        key: e.pk,
+        label: e.label,
+        sub: `${e.npub ? e.npub.slice(0, 12) + '…' : ''}${e.npub ? ' · ' : ''}${e.n.toLocaleString()} boost${e.n === 1 ? '' : 's'}`,
+        // Matchable, not shown: a pasted npub or hex pubkey finds its booster
+        // even though the row displays a truncated one.
+        extra: `${e.npub} ${e.pk}`,
+        img: e.pic,
+      }))
   }
 
   function oldestTs() { return rows.length ? rows[rows.length - 1].ts : Infinity }
@@ -445,10 +495,16 @@ export async function renderBoosts({ panel, list, scope = 'global' }) {
     if (reset) { shown = 0; cards.replaceChildren() }
     view = buildView()
     if (!view.length) {
-      cards.replaceChildren(h('div', { class: 'feed-placeholder' }, [
-        h('strong', { text: 'No boosts in this window' }),
-        ' Nothing was boosted in this time range — try a wider one.',
-      ]))
+      const picked = search?.selection || null
+      cards.replaceChildren(picked
+        ? h('div', { class: 'feed-placeholder' }, [
+            h('strong', { text: 'Nothing in this window' }),
+            ` ${picked.label} sent no boosts in this time range — widen the range, or clear the search.`,
+          ])
+        : h('div', { class: 'feed-placeholder' }, [
+            h('strong', { text: 'No boosts in this window' }),
+            ' Nothing was boosted in this time range — try a wider one.',
+          ]))
       moreWrap.replaceChildren()
       return
     }
@@ -524,6 +580,17 @@ export async function renderBoosts({ panel, list, scope = 'global' }) {
       if (key !== sortKey) apply(() => { sortKey = key })
     }, { title: 'Sort boosts' }),
   ])
+
+  // Boosters, not boosts: see buildView. The index covers the loaded window,
+  // so on All it grows as older pages land.
+  search = mountFeedSearch(panel, {
+    placeholder: 'Search boosters by name or npub…',
+    label: 'Search boosters',
+    noun: 'booster',
+    glyph: '👤',
+    onPick: () => paint({ reset: true }),
+    getEntries: boosterEntries,
+  })
 
   list.replaceChildren(cards, moreWrap)
 

@@ -46,6 +46,7 @@ import {
   RANGE_OPTIONS, rangeDays, rangeCutoff,
   rangeControl, sortControl, mountFeedControls,
 } from '/assets/js/feed-controls.js'
+import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js'
 
 const VALUE_API = '/api/value'   // Podcast Index value-block proxy (splits)
 const INITIAL_CARDS = 30       // episodes rendered per "load more" batch
@@ -897,6 +898,9 @@ export async function renderPodcasts({ panel, list, scope = 'global' }) {
   // the whole network. On Follows the population is just "whoever you happen
   // to follow", so a #1 would imply a standing that doesn't exist.
   const showRanks = scope !== 'follows'
+  // A re-render (account switch) may end on a placeholder, so clear any box a
+  // previous run left behind before deciding whether this one gets one.
+  resetFeedSearch(panel)
   // Follows scoping applies to the raw boost rows, BEFORE the episode rollup:
   // an episode should only appear if someone you follow boosted it, and its
   // booster counts / sat totals must reflect only those boosts. Scoping after
@@ -971,43 +975,62 @@ export async function renderPodcasts({ panel, list, scope = 'global' }) {
   // the two differ on the ~16% of episodes someone boosted more than once.)
   let sortKey = 'boosts'
   let rangeKey = defaultRange(items, scope)
-  let sorted = sortItems(filterItems(items, rangeKey), sortKey)
+  let search = null
+  // `sorted` is every episode in the range, ranked. `view` is what's painted:
+  // the same list, or the single episode the search box picked out of it.
+  let sorted = []
+  let view = []
   let shown = 0
   const cards = h('div', { class: 'pcast-list' })
   const moreWrap = h('div', { class: 'pcast-more-wrap' })
 
   function renderMore() {
-    if (!sorted.length) {
-      cards.appendChild(h('div', { class: 'feed-placeholder' }, [
-        h('strong', { text: 'No episodes in this window' }),
-        'Nothing the community boosted aired in this time range — try a wider one.',
-      ]))
+    if (!view.length) {
+      const picked = search?.selection || null
+      cards.appendChild(picked
+        ? h('div', { class: 'feed-placeholder' }, [
+            h('strong', { text: 'Not in this range' }),
+            `${picked.label} aired outside this time range — widen the range, or clear the search.`,
+          ])
+        : h('div', { class: 'feed-placeholder' }, [
+            h('strong', { text: 'No episodes in this window' }),
+            'Nothing the community boosted aired in this time range — try a wider one.',
+          ]))
       return
     }
-    const next = sorted.slice(shown, shown + INITIAL_CARDS)
-    next.forEach((it, i) => {
-      // Continue the numbering across "Show more" pages rather than
-      // restarting at 1 each time.
-      const el = episodeCard(it, (showRanks && RANKED_SORTS.has(sortKey)) ? shown + i + 1 : null)
+    const next = view.slice(shown, shown + INITIAL_CARDS)
+    next.forEach((it) => {
+      // The rank was stamped in rebuild(), over the whole ranked list and
+      // before any search filter narrowed it — so a searched episode keeps the
+      // standing it has in the feed. Numbering continues across "Show more"
+      // pages rather than restarting at 1 each time.
+      const el = episodeCard(it, (showRanks && RANKED_SORTS.has(sortKey)) ? it._rank : null)
       el._pcastItem = it   // lets repaintProfiles map avatars regardless of sort order
       cards.appendChild(el)
     })
     shown += next.length
     moreWrap.innerHTML = ''
-    const remaining = sorted.length - shown
+    const remaining = view.length - shown
     if (remaining > 0) {
       const batch = Math.min(INITIAL_CARDS, remaining)
       moreWrap.appendChild(h('div', { class: 'pcast-more-group' }, [
         h('button', {
           class: 'pcast-showmore', type: 'button', onclick: renderMore,
         }, `Load ${batch} more episode${batch === 1 ? '' : 's'}`),
-        h('div', { class: 'pcast-more-count', text: `Showing ${shown} of ${sorted.length}` }),
+        h('div', { class: 'pcast-more-count', text: `Showing ${shown} of ${view.length}` }),
       ]))
     }
   }
 
+  // Rank first, filter second: ranking the filtered list instead would tell a
+  // searched episode it's #1 of 1, which is the opposite of what the search is
+  // being asked.
   function rebuild() {
     sorted = sortItems(filterItems(items, rangeKey), sortKey)
+    sorted.forEach((it, i) => { it._rank = i + 1 })
+    search?.refresh()
+    const picked = search?.selection || null
+    view = picked ? sorted.filter((it) => it.guid === picked.key) : sorted
     shown = 0
     cards.innerHTML = ''
     moreWrap.innerHTML = ''
@@ -1030,10 +1053,30 @@ export async function renderPodcasts({ panel, list, scope = 'global' }) {
   mountControls(panel?.dataset.feed || `episodes-${scope}`,
     { sortKey, rangeKey, onSort: applySort, onRange: applyRange })
 
+  // Search the episodes in the current range. The show's name is the sub-line
+  // because episode titles repeat across shows far more than they collide
+  // within one ("Episode 42", "Weekly Roundup"), so the show is what tells two
+  // hits apart.
+  search = mountFeedSearch(panel, {
+    placeholder: 'Search episodes…',
+    label: 'Search episodes',
+    noun: 'episode',
+    onPick: () => rebuild(),
+    getEntries: () => sorted.map((it) => ({
+      key: it.guid,
+      label: it.ep.title || 'Untitled episode',
+      sub: it.show?.title || '',
+      // The show name matches as well as showing: "no agenda" should find that
+      // show's episodes whatever their own titles are.
+      extra: it.show?.title || '',
+      img: it.ep.image,
+    })),
+  })
+
   list.className = ''
   list.innerHTML = ''
   list.append(cards, moreWrap)
-  renderMore()
+  rebuild()
 
   // Repaint avatars/names in place once profiles land. repaintProfiles reads
   // each card's _pcastItem, so it's correct even after a re-sort rebuilds the

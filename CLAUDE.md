@@ -68,6 +68,11 @@ leave a feed you come back to showing another feed's controls, or none. The
 panels have no head of their own any more — the bar names the feed, so a
 heading under it would only restate the dropdown.
 
+**Each panel's own first child is a `[data-feed-search]` slot**, filled by
+`feed-search.js` and left hidden until it is. It's inside the panel rather than
+in the bar, so it scrolls away with the cards it filters. See the search note
+under Feed loaders.
+
 ## Where this code came from
 
 This repo is a hard fork of **ReedBTC/localbitcoiners** (cloned at `lb-v43`,
@@ -231,6 +236,7 @@ Carried from the scaffold commit and the LB suite:
   (the latter is the Episodes feed; see the naming note)
 - `assets/js/shows-feed.js` — the show-level rollup (written here, not ported)
 - `assets/js/feed-controls.js` — the range/sort chrome they all share
+- `assets/js/feed-search.js` — the per-feed typeahead at the head of each panel
 - `assets/js/boosts-thread.js` — the content tokenizer (nostr: mentions,
   URLs, quoted notes) the boost cards render through
 - `assets/js/boost-actions.js` — reply / like / repost / zap
@@ -434,6 +440,54 @@ rank what's loaded, so the count line under it says so rather than implying the
 whole 22k archive. Loading older rows re-sorts in place under those sorts
 (newer pages can outrank painted cards); under `recent` it appends, as it
 always did.
+
+### Search
+
+`assets/js/feed-search.js` is the typeahead at the head of every panel. Each
+panel ships an empty `[data-feed-search]` slot as its first child and the
+renderer fills it; the slot stays `hidden` until one does, so a feed showing
+"sign in" or an error never grows a search box over a list that isn't there.
+**It sits inside the panel, not in the sticky bar** — range and sort are read
+while scrolling a long list, a search is a thing you do at the top, and the bar
+has no room for a text field beside two dropdowns on a phone.
+
+Each feed searches its own subject, and picks exactly one:
+
+| Feed | Searches | Filters to |
+|---|---|---|
+| Episodes | episode title, plus the show behind it | that one episode |
+| Shows | show title, plus the guid | that one show |
+| Boosts | booster display name, npub or hex pubkey | that booster's boosts |
+
+**Typing suggests, picking filters.** Five hits, and nothing in the list moves
+until one is chosen. That's what a ranked feed needs: the question is "where
+does my show stand", and the answer is one card carrying its rank, not a
+shortlist whose positions would have to be renumbered.
+
+**Rank retention is the renderer's half of the contract**, and it is an
+ordering: sort the range's full corpus, stamp each row with its position, *then*
+filter to the picked key, then paint from the stamp. All three renderers do it
+in that order in their rebuild/repaint function. Reversing the middle two steps
+renumbers the survivor to #1, which answers a different question. The note feed
+has no rank to retain — a card there is one boost, so it has no ranked sort.
+
+Two fields, and they are deliberately not the same one: `label` is shown and
+matched, `sub` is shown only, `extra` is matched only. Matching what's displayed
+sounds friendlier and isn't. The Shows sub-line reads "506 boosts · 12k sats",
+which made every show in the index a weak hit for "boost" and pushed the real
+ones out of a five-row menu; the boosters' sub-line carries a truncated npub,
+while `extra` holds the full one so a pasted npub still resolves.
+
+Scoring is a ladder (exact / prefix / word-start / substring / label before
+`extra`), not a fuzzy distance — these queries are the opening words of a name
+the user already knows, so *where* a match lands beats how many characters it
+shares. Ties break on the entry's position in the feed's current order, so a
+one-letter query offers the biggest shows first. Measured at 12ms for 200
+queries over the 1,384-show index, which is why there's no debounce.
+
+The index is built lazily on the first keystroke after each `refresh()`, and
+every renderer refreshes on repaint — range, sort, an account switch and a page
+of older boosts all change what's searchable.
 
 **Two backends, one record shape.** `ob-data.js` is the static half (immutable
 CDN shards under `/api/data/*`); `ob-live.js` is the live half (D1 query API

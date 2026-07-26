@@ -108,7 +108,12 @@
 // Required: the markup is in about.html and the .stat-* rules are in page.css,
 // so a returning visitor holding one without the other gets either an unstyled
 // row of numbers or nothing at all.
-const VERSION = 'ob-v20';
+// ob-v21: every feed has a search box at the head of its panel. Not required
+// for correctness — the slot is in index.html and the new
+// assets/js/feed-search.js only fills a slot it finds, so either half alone
+// degrades to the feed as it is today — but the feature is invisible until
+// both land, and index.html is the cached half.
+const VERSION = 'ob-v21';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;

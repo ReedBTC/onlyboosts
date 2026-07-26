@@ -41,6 +41,7 @@ import {
 import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls,
 } from '/assets/js/feed-controls.js'
+import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js'
 
 const PAGE_SIZE = 25       // show cards per "load more" batch
 const DRAWER_EPISODES = 50 // episodes listed per expanded show
@@ -443,6 +444,10 @@ function renderShowCard(s, rank) {
  */
 export async function renderShows({ panel, list }) {
   if (!list) return
+  // Shows never re-renders today (Global only, so no account switch reaches
+  // it), but the reset is what makes that a fact about the feed rather than an
+  // assumption baked into this one.
+  resetFeedSearch(panel)
 
   // All time is the opening view: it's the one request that needs no archive
   // walk, and the all-time leaderboard is the question a show-level feed is
@@ -453,44 +458,62 @@ export async function renderShows({ panel, list }) {
   // wherever someone boosts the same show repeatedly (most of them).
   let sortKey = 'boosts'
   let shows = []
-  let sorted = []
+  let sorted = []   // every show in the range, in sort order, rank stamped
+  let view = []     // what's painted: `sorted`, or the one searched show
   let shown = 0
   let seq = 0
+  let search = null
 
   const cards = h('div', { class: 'pcast-list' })
   const moreWrap = h('div', { class: 'pcast-more-wrap' })
 
   function paintMore() {
-    const slice = sorted.slice(shown, shown + PAGE_SIZE)
-    slice.forEach((s, i) => {
-      // Numbering continues across pages rather than restarting at 1.
-      cards.appendChild(renderShowCard(s, RANKED_SORTS.has(sortKey) ? shown + i + 1 : null))
+    const slice = view.slice(shown, shown + PAGE_SIZE)
+    slice.forEach((s) => {
+      // The rank is the show's position in the full sorted list, stamped in
+      // repaint() before any search filter narrowed it — so a searched show
+      // still reads #47 rather than #1. Numbering continues across pages.
+      cards.appendChild(renderShowCard(s, RANKED_SORTS.has(sortKey) ? s._rank : null))
     })
     shown += slice.length
     moreWrap.replaceChildren()
-    const remaining = sorted.length - shown
+    const remaining = view.length - shown
     if (remaining <= 0) return
     const batch = Math.min(PAGE_SIZE, remaining)
     moreWrap.appendChild(h('div', { class: 'pcast-more-group' }, [
       h('button', {
         class: 'pcast-showmore', type: 'button', onclick: paintMore,
       }, `Load ${batch} more show${batch === 1 ? '' : 's'}`),
-      h('div', { class: 'pcast-more-count', text: `Showing ${shown} of ${sorted.length}` }),
+      h('div', { class: 'pcast-more-count', text: `Showing ${shown} of ${view.length}` }),
     ]))
   }
 
   function repaint() {
+    // Rank first, filter second. Stamping the position before the search
+    // narrows the list is what lets one searched card carry its standing in
+    // the whole ranking; ranking the filtered list would renumber it to #1.
     sorted = [...shows].sort(SORTERS[sortKey] || SORTERS.boosts)
+    sorted.forEach((s, i) => { s._rank = i + 1 })
+    // The index is the current range in the current order, so it's dropped
+    // whenever either changes. Rebuilt lazily on the next keystroke.
+    search?.refresh()
+    const picked = search?.selection || null
+    view = picked ? sorted.filter((s) => s.guid === picked.key) : sorted
     shown = 0
     cards.replaceChildren()
     moreWrap.replaceChildren()
-    if (!sorted.length) {
-      cards.appendChild(h('div', { class: 'feed-placeholder' }, [
-        h('strong', { text: 'No shows in this window' }),
-        rangeKey === 'all'
-          ? ' When someone boosts a podcast episode on Nostr, its show will appear here.'
-          : ' Nothing was boosted in this time range — try a wider one.',
-      ]))
+    if (!view.length) {
+      cards.appendChild(picked
+        ? h('div', { class: 'feed-placeholder' }, [
+            h('strong', { text: 'Not in this range' }),
+            ` ${picked.label} wasn’t boosted in this time range — widen the range, or clear the search.`,
+          ])
+        : h('div', { class: 'feed-placeholder' }, [
+            h('strong', { text: 'No shows in this window' }),
+            rangeKey === 'all'
+              ? ' When someone boosts a podcast episode on Nostr, its show will appear here.'
+              : ' Nothing was boosted in this time range — try a wider one.',
+          ]))
       return
     }
     paintMore()
@@ -544,6 +567,28 @@ export async function renderShows({ panel, list }) {
       repaint()
     }, { title: 'Sort shows' }),
   ])
+
+  // Search the shows in the current range. The sub-line is the show's own
+  // numbers, so two similarly-named feeds are told apart by their size rather
+  // than by a guid nobody recognises — except on the 33% with no title at all,
+  // where the guid is the only handle there is.
+  search = mountFeedSearch(panel, {
+    placeholder: 'Search shows…',
+    label: 'Search shows',
+    noun: 'show',
+    onPick: () => repaint(),
+    getEntries: () => sorted.map((s) => ({
+      key: s.guid,
+      label: s.title || 'Unidentified show',
+      sub: s.title
+        ? `${plural(s.boosts, 'boost', 'boosts')} · ${fmtSats(s.sats)} sats`
+        : s.guid,
+      // Matched, not shown. The guid is the only handle on the 33% of shows
+      // with no title, and it's what you'd have copied off one of their cards.
+      extra: s.guid,
+      img: s.img,
+    })),
+  })
 
   list.className = ''
   list.replaceChildren(cards, moreWrap)

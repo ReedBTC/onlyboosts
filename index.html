@@ -281,6 +281,100 @@
       margin-bottom: 0.35rem;
     }
 
+    /* ── Feed search ──────────────────────────────────────────────────
+       The typeahead at the head of each panel (feed-search.js). Inside the
+       panel rather than in the sticky bar above it, deliberately: the range
+       and sort controls are read while scrolling a long list, but a search
+       is a thing you do at the top, and the bar has no room for a text field
+       beside two dropdowns on a phone.
+
+       Each panel ships the empty [data-feed-search] slot and the renderer
+       fills it, so a feed showing "sign in" or an error never grows a search
+       box over a list that isn't there. */
+    .feed-search { margin-bottom: 1rem; }
+    .feed-search[hidden] { display: none; }
+    .feed-search-wrap { position: relative; }
+    .feed-search-field {
+      display: flex; align-items: center; gap: 0.5rem;
+      padding: 0.45rem 0.85rem;
+      background: var(--white);
+      border: 1px solid var(--border); border-radius: 999px;
+      transition: border-color 0.12s, box-shadow 0.12s;
+    }
+    .feed-search-field:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--tint);
+    }
+    /* An active filter is a state the page is in, so the field carries the
+       accent while it holds one — the cleared box and the filtering box
+       shouldn't look alike. */
+    .feed-search-field.is-filtered {
+      border-color: var(--accent);
+      background: var(--tint);
+    }
+    .feed-search-icon { flex-shrink: 0; color: var(--muted); }
+    .feed-search-field:focus-within .feed-search-icon,
+    .feed-search-field.is-filtered .feed-search-icon { color: var(--accent-d); }
+    .feed-search-input {
+      flex: 1; min-width: 0;
+      font: inherit; font-size: 0.9rem;
+      color: var(--text); background: transparent;
+      border: none; outline: none;
+    }
+    .feed-search-input::placeholder { color: var(--muted); }
+    .feed-search-clear {
+      flex-shrink: 0;
+      width: 1.4rem; height: 1.4rem; padding: 0;
+      display: flex; align-items: center; justify-content: center;
+      font: inherit; font-size: 1.05rem; line-height: 1;
+      color: var(--muted); background: transparent;
+      border: none; border-radius: 999px; cursor: pointer;
+    }
+    .feed-search-clear:hover { color: var(--accent-d); background: var(--tint); }
+    .feed-search-clear[hidden] { display: none; }
+
+    .feed-search-menu {
+      position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 6;
+      background: var(--white);
+      border: 1px solid var(--border); border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+      padding: 0.35rem;
+    }
+    .feed-search-menu[hidden] { display: none; }
+    .feed-search-item {
+      display: flex; align-items: center; gap: 0.6rem;
+      width: 100%; text-align: left;
+      padding: 0.4rem 0.5rem;
+      font: inherit; color: var(--text);
+      background: transparent; border: none; border-radius: 8px; cursor: pointer;
+    }
+    .feed-search-item:hover, .feed-search-item.is-active { background: var(--tint); }
+    .feed-search-thumb {
+      flex-shrink: 0;
+      width: 34px; height: 34px;
+      border-radius: 6px; object-fit: cover;
+      background: var(--tint);
+    }
+    .feed-search-thumb--none {
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem;
+    }
+    /* minmax(0,…) territory: without the min-width the flex item is as wide as
+       its longest title and the row spills out of the menu. */
+    .feed-search-text { min-width: 0; display: flex; flex-direction: column; }
+    .feed-search-label {
+      font-size: 0.86rem; font-weight: 600; color: var(--text);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .feed-search-sub {
+      font-size: 0.74rem; color: var(--muted);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .feed-search-empty {
+      padding: 0.6rem 0.55rem;
+      font-size: 0.85rem; color: var(--muted);
+    }
+
     /* Collapsed "Past events / older posts" section under a feed's list. */
     .feed-past {
       margin-top: 1.75rem;
@@ -984,11 +1078,18 @@
      (boosts-feed.js). The two Episodes panels render the per-episode
      rollup (feeds-podcasts.js). Global vs Follows narrows to the signed-in
      user's kind-3 contact list — see follow-set.js. Shows is a placeholder:
-     it has no loader in feeds.js, so its markup is all there is. -->
+     it has no loader in feeds.js, so its markup is all there is.
+
+     Each panel leads with an empty [data-feed-search] slot, filled by that
+     feed's renderer through feed-search.js and left hidden until it is. It
+     sits below the sticky bar and scrolls away with the cards it filters;
+     picking a suggestion narrows the list to one subject while keeping the
+     rank that subject holds under the current sort. -->
 <main class="feed-panels">
   <div class="feed-panels-inner">
 
     <section class="feed-panel is-active" id="panel-episodes-global" role="region" aria-label="Episodes, global" data-feed="episodes-global" data-scope="global">
+      <div class="feed-search" data-feed-search hidden></div>
       <div class="feed-list" data-feed-list>
         <div class="feed-placeholder">
           <strong>Global episodes feed coming online</strong>
@@ -998,6 +1099,7 @@
     </section>
 
     <section class="feed-panel" id="panel-boosts-global" role="region" aria-label="Boosts, global" data-feed="boosts-global" data-scope="global" hidden>
+      <div class="feed-search" data-feed-search hidden></div>
       <div class="feed-list" data-feed-list>
         <div class="feed-placeholder">
           <strong>Global boosts feed coming online</strong>
@@ -1007,6 +1109,7 @@
     </section>
 
     <section class="feed-panel" id="panel-episodes-follows" role="region" aria-label="Episodes from your follows" data-feed="episodes-follows" data-scope="follows" hidden>
+      <div class="feed-search" data-feed-search hidden></div>
       <div class="feed-list" data-feed-list>
         <div class="feed-placeholder">
           <strong>Sign in to see this feed</strong>
@@ -1016,6 +1119,7 @@
     </section>
 
     <section class="feed-panel" id="panel-boosts-follows" role="region" aria-label="Boosts from your follows" data-feed="boosts-follows" data-scope="follows" hidden>
+      <div class="feed-search" data-feed-search hidden></div>
       <div class="feed-list" data-feed-list>
         <div class="feed-placeholder">
           <strong>Sign in to see this feed</strong>
@@ -1028,6 +1132,7 @@
          episode-level. Global only — podcasts/index.json is computed over
          everyone, so it can't serve a Follows audience (shows-feed.js). -->
     <section class="feed-panel" id="panel-shows" role="region" aria-label="Shows" data-feed="shows" data-scope="global" hidden>
+      <div class="feed-search" data-feed-search hidden></div>
       <div class="feed-list" data-feed-list>
         <div class="feed-placeholder">
           <strong>Shows feed coming online</strong>
