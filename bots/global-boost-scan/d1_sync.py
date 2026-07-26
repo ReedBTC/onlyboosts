@@ -120,6 +120,106 @@ def build_full_sql(conn):
     return out
 
 
+# ── delta projection (only what changed since last sync) ──────────────────────
+def build_delta_sql(conn, rows):
+    """SQL for `rows` (boosts not yet in D1): the new boosts (OR IGNORE, immutable)
+    + FTS, plus a recomputed upsert of every podcast/episode they touched (an
+    aggregate depends on ALL its boosts, so it's recomputed from the box DB) +
+    the boosters' profiles + refreshed meta."""
+    out = []
+    pods, items, pubs = set(), set(), set()
+    for r in rows:
+        out.append(
+            "INSERT OR IGNORE INTO boosts (event_id,booster_pubkey,booster_npub,created_at,sats,"
+            "amount_source,podcast_guid,item_guid,item_url,client,message) VALUES ("
+            f"{q(r['event_id'])},{q(r['booster_pubkey'])},{q(r['booster_npub'])},{q(r['created_at'])},"
+            f"{q(r['sats'])},{q(r['amount_source'])},{q(r['podcast_guid'])},"
+            f"{q(r['item_guid'])},{q(r['item_url'])},{q(r['client'])},{q(r['message'])});")
+        if r["message"]:
+            out.append("INSERT INTO boosts_fts (event_id,message) VALUES ("
+                       f"{q(r['event_id'])},{q(r['message'])});")
+        if r["podcast_guid"]:
+            pods.add(r["podcast_guid"])
+        if r["item_guid"]:
+            items.add(r["item_guid"])
+        pubs.add(r["booster_pubkey"])
+
+    for pg in pods:
+        a = conn.execute(
+            """SELECT b.podcast_guid AS guid, COUNT(*) AS boost_count,
+                      COALESCE(SUM(b.sats),0) AS total_sats,
+                      COUNT(DISTINCT b.booster_pubkey) AS booster_count,
+                      COUNT(DISTINCT b.item_guid) AS episode_count,
+                      MAX(b.created_at) AS latest_ts,
+                      s.title, s.image, s.feed_url, s.medium
+               FROM boosts b LEFT JOIN shows s ON s.podcast_guid=b.podcast_guid
+               WHERE b.podcast_guid=? GROUP BY b.podcast_guid""", (pg,)).fetchone()
+        if not a:
+            continue
+        out.append(
+            "INSERT OR REPLACE INTO podcasts (podcast_guid,title,image,feed_url,medium,"
+            "boost_count,total_sats,booster_count,episode_count,latest_ts) VALUES ("
+            f"{q(a['guid'])},{q(a['title'])},{q(a['image'])},{q(a['feed_url'])},{q(a['medium'])},"
+            f"{q(a['boost_count'])},{q(a['total_sats'])},{q(a['booster_count'])},"
+            f"{q(a['episode_count'])},{q(a['latest_ts'])});")
+        out.append(f"DELETE FROM podcasts_fts WHERE podcast_guid={q(pg)};")
+        if a["title"]:
+            out.append("INSERT INTO podcasts_fts (podcast_guid,title) VALUES ("
+                       f"{q(pg)},{q(a['title'])});")
+
+    for ig in items:
+        e = conn.execute(
+            """SELECT e.item_guid,e.podcast_guid,e.title,e.image,e.published,e.duration,
+                      e.episode_number,e.enclosure_url,e.description,
+                      (SELECT COUNT(*) FROM boosts WHERE item_guid=e.item_guid) AS boost_count,
+                      (SELECT COALESCE(SUM(sats),0) FROM boosts WHERE item_guid=e.item_guid) AS total_sats
+               FROM episodes e WHERE e.item_guid=?""", (ig,)).fetchone()
+        if not e:
+            continue
+        out.append(
+            "INSERT OR REPLACE INTO episodes (item_guid,podcast_guid,title,image,published,"
+            "duration,episode_number,enclosure_url,description,boost_count,total_sats) VALUES ("
+            f"{q(e['item_guid'])},{q(e['podcast_guid'])},{q(e['title'])},{q(e['image'])},"
+            f"{q(e['published'])},{q(e['duration'])},{q(e['episode_number'])},"
+            f"{q(e['enclosure_url'])},{q(e['description'])},{q(e['boost_count'])},{q(e['total_sats'])});")
+
+    if pubs:
+        ph = ",".join("?" * len(pubs))
+        for p in conn.execute(
+            f"SELECT pubkey,name,display_name,picture,nip05 FROM profiles WHERE pubkey IN ({ph})",
+                tuple(pubs)).fetchall():
+            out.append(
+                "INSERT OR REPLACE INTO profiles (pubkey,name,display_name,picture,nip05) VALUES ("
+                f"{q(p['pubkey'])},{q(p['name'])},{q(p['display_name'])},{q(p['picture'])},{q(p['nip05'])});")
+
+    s = db.stats(conn)
+    for k, v in {"generated_at": int(time.time()), "boosts": s["boosts"],
+                 "total_sats": s["total_sats"], "distinct_shows": s["distinct_shows"],
+                 "distinct_boosters": s["distinct_boosters"]}.items():
+        out.append(f"INSERT OR REPLACE INTO meta (key,value) VALUES ({q(k)},{q(v)});")
+    return out
+
+
+# ── which boosts are already in D1 (marker table in the box DB) ───────────────
+def _ensure_sync_table(conn):
+    conn.execute("CREATE TABLE IF NOT EXISTS d1_boosts_synced (event_id TEXT PRIMARY KEY)")
+    conn.commit()
+
+
+def _unsynced_boosts(conn):
+    return conn.execute(
+        """SELECT b.event_id,b.booster_pubkey,b.booster_npub,b.created_at,b.sats,
+                  b.amount_source,b.podcast_guid,b.item_guid,b.item_url,b.client,b.message
+           FROM boosts b LEFT JOIN d1_boosts_synced d ON d.event_id=b.event_id
+           WHERE d.event_id IS NULL""").fetchall()
+
+
+def _mark_synced(conn, ids):
+    conn.executemany("INSERT OR IGNORE INTO d1_boosts_synced (event_id) VALUES (?)",
+                     [(i,) for i in ids])
+    conn.commit()
+
+
 def cmd_emit_sql(args):
     conn = db.connect(DB_PATH)
     stmts = build_full_sql(conn)
@@ -186,7 +286,41 @@ def cmd_remote(args):
         sent += len(stmts[i:i + BATCH])
         if (i // BATCH) % 50 == 0:
             print(f"  …{sent}/{len(stmts)} statements", flush=True)
-    print(f"pushed {sent} statements to D1 (remote, full load)")
+    _ensure_sync_table(conn)
+    _mark_synced(conn, [r["event_id"] for r in conn.execute("SELECT event_id FROM boosts").fetchall()])
+    print(f"pushed {sent} statements to D1 (remote, full load); marked all boosts synced")
+
+
+def cmd_remote_delta(args):
+    cf = _cf(load_config(CREDENTIALS))
+    if not cf:
+        print("[error] CF_ACCOUNT_ID / CF_D1_DATABASE_ID / CF_API_TOKEN missing from credentials.env")
+        return
+    conn = db.connect(DB_PATH)
+    _ensure_sync_table(conn)
+    rows = _unsynced_boosts(conn)
+    if not rows:
+        print("D1 delta: nothing new to sync")
+        return
+    stmts = build_delta_sql(conn, rows)
+    BATCH = 100
+    for i in range(0, len(stmts), BATCH):
+        ok, detail = _d1_exec(*cf, "\n".join(stmts[i:i + BATCH]))
+        if not ok:
+            print(f"[error] delta batch {i // BATCH} failed: {detail}")
+            return
+    _mark_synced(conn, [r["event_id"] for r in rows])
+    print(f"D1 delta: pushed {len(rows)} new boost(s) ({len(stmts)} statements)")
+
+
+def cmd_mark_all_synced(args):
+    """One-time reconcile after an out-of-band full seed: mark every current boost
+    as already in D1 so the first delta run doesn't re-push everything."""
+    conn = db.connect(DB_PATH)
+    _ensure_sync_table(conn)
+    ids = [r[0] for r in conn.execute("SELECT event_id FROM boosts").fetchall()]
+    _mark_synced(conn, ids)
+    print(f"marked {len(ids)} boosts as already-synced to D1")
 
 
 def main():
@@ -194,6 +328,8 @@ def main():
     ap.add_argument("--emit-sql", metavar="FILE", help="write a full-load SQL file")
     ap.add_argument("--apply-schema", action="store_true", help="apply d1/schema.sql to the remote D1")
     ap.add_argument("--remote", action="store_true", help="full-load the projection to the remote D1")
+    ap.add_argument("--remote-delta", action="store_true", help="push only boosts new since last sync (for the timer)")
+    ap.add_argument("--mark-all-synced", action="store_true", help="one-time: mark all current boosts as already in D1")
     args = ap.parse_args()
     if args.emit_sql:
         cmd_emit_sql(args)
@@ -201,8 +337,12 @@ def main():
         cmd_apply_schema(args)
     elif args.remote:
         cmd_remote(args)
+    elif args.remote_delta:
+        cmd_remote_delta(args)
+    elif args.mark_all_synced:
+        cmd_mark_all_synced(args)
     else:
-        ap.error("choose --emit-sql <file>, --apply-schema, or --remote")
+        ap.error("choose --emit-sql <file>, --apply-schema, --remote, --remote-delta, or --mark-all-synced")
 
 
 if __name__ == "__main__":

@@ -18,4 +18,5 @@ echo "=== $(date -u +%FT%TZ) OnlyBoosts outbox expansion ==="
 "$PY" "$BOT" enrich               # metadata/profiles for anything new the wider scan found
 "$PY" "$BOT" export --per-show
 "$PY" "$BOT" push
+"$PY" d1_sync.py --remote-delta   # push newly-found boosts to the D1 query layer (/api/v1)
 echo "=== $(date -u +%FT%TZ) outbox cycle done ==="

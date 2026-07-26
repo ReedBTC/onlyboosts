@@ -18,4 +18,5 @@ echo "=== $(date -u +%FT%TZ) OnlyBoosts incremental cycle ==="
 "$PY" "$BOT" enrich               # fill metadata/profiles for anything new
 "$PY" "$BOT" export --per-show    # rebuild the JSON shards
 "$PY" "$BOT" push                 # rsync changed shards to the VPS (no --delete: nothing is removed on a tail run)
+"$PY" d1_sync.py --remote-delta   # push new boosts to the D1 query layer (/api/v1); no-op if none / no CF creds
 echo "=== $(date -u +%FT%TZ) cycle done ==="
