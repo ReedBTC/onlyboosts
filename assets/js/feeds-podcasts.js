@@ -47,6 +47,7 @@ import {
   rangeControl, sortControl, mountFeedControls,
 } from '/assets/js/feed-controls.js'
 import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js'
+import { showPageHref } from '/assets/js/show-link.js'
 
 const VALUE_API = '/api/value'   // Podcast Index value-block proxy (splits)
 const INITIAL_CARDS = 30       // episodes rendered per "load more" batch
@@ -480,10 +481,15 @@ function episodeCard(item, rank = null) {
       ])
     : null
 
-  // Show name — links to the Boost Me Bitch page like the art + title.
+  // Show name — links to the show's landing page on OnlyBoosts. It used to
+  // point at Boost Me Bitch alongside the art and the episode title; those two
+  // still do, so the outbound affordance is intact and the show NAME now goes
+  // to the show page, which is what it names. Falls back to plain text for a
+  // show with no page (no guid, or a synthetic one) — see show-link.js.
+  const showHref = showPageHref(show?.podcast_guid)
   const showEl = show?.title
-    ? (bmbUrl
-        ? h('a', { class: 'pcast-show pcast-show-link', href: bmbUrl, target: '_blank', rel: 'noopener noreferrer', title: 'See all boosts on Boost Me Bitch' }, show.title)
+    ? (showHref
+        ? h('a', { class: 'pcast-show pcast-show-link', href: showHref, title: `Boosts and supporters for ${show.title}` }, show.title)
         : h('div', { class: 'pcast-show', text: show.title }))
     : null
 

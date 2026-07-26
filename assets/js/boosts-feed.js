@@ -39,6 +39,7 @@ import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls,
 } from '/assets/js/feed-controls.js'
 import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js'
+import { showPageHref } from '/assets/js/show-link.js'
 
 const PAGE_SIZE = 30
 
@@ -218,7 +219,19 @@ function renderBoostCard(b) {
         })
       : h('span', { class: 'ob-boost-ep', text: b.episode.title }))
   }
-  if (b.podcast.title) bits.push(h('span', { class: 'ob-boost-show', text: b.podcast.title }))
+  // The show name links to its landing page on OnlyBoosts. The episode title
+  // above it still points out to the audio, so the two aren't competing for
+  // the same destination.
+  if (b.podcast.title) {
+    const href = showPageHref(b.podcast.guid)
+    bits.push(href
+      ? h('a', {
+          class: 'ob-boost-show ob-boost-show-link', href,
+          title: `Boosts and supporters for ${b.podcast.title}`,
+          text: b.podcast.title,
+        })
+      : h('span', { class: 'ob-boost-show', text: b.podcast.title }))
+  }
   if (bits.length) card.appendChild(h('div', { class: 'ob-boost-meta' }, bits))
 
   // Where the boost was sent from. Only ~3.5% of records carry a client tag

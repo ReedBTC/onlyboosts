@@ -307,10 +307,12 @@ Carried from the scaffold commit and the LB suite:
    zero boosts). `auto-fit` columns mean a sixth figure needs no media
    query; `distinct_eps` (~7,100) is the obvious candidate.
 
-1. **Podcast Index credentials.** `/api/value` needs `PODCAST_INDEX_KEY` and
-   `PODCAST_INDEX_SECRET` in the Cloudflare env. Without them it returns a
-   clean 503 and "Boost episode" can't resolve a show's splits. Locally, put
-   them in `.dev.vars` (gitignored).
+1. ~~**Podcast Index credentials.**~~ **Done.** `PODCAST_INDEX_KEY` and
+   `PODCAST_INDEX_SECRET` are set as secrets in both the production and preview
+   Cloudflare environments; verified 2026-07-26 against production, where
+   `/api/value?podcastGuid=…` returns live feed-level splits. Without them
+   `/api/value` returns a clean 503 and "Boost episode" can't resolve a show's
+   splits, so locally you still need them in `.dev.vars` (gitignored).
 
 2. **Bug relay write-policy.** `BUG_TAG` is `onlyboosts-alpha` in both
    `login-widget/src/lib/bugReport.js` and `bots/bug-watcher/watcher.js`, but

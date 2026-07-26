@@ -42,6 +42,7 @@ import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls,
 } from '/assets/js/feed-controls.js'
 import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js'
+import { showPageHref } from '/assets/js/show-link.js'
 
 const PAGE_SIZE = 25       // show cards per "load more" batch
 const DRAWER_EPISODES = 50 // episodes listed per expanded show
@@ -367,10 +368,14 @@ function renderShowCard(s, rank) {
     rank ? h('div', { class: 'pcast-rank', text: String(rank) }) : null,
     media,
     h('div', { class: 'pcast-card-body' }, [
+      // Named shows link to their landing page (/show/<guid>); unnamed ones
+      // don't, because there is no page — the qualifying rule for a landing
+      // page is exactly "has a title". See docs/show-pages-spec.md.
       h('h3', {
         class: 'pcast-title' + (named ? '' : ' ob-show-unnamed'),
-        text: named ? s.title : 'Unidentified show',
-      }),
+      }, named && showPageHref(s.guid)
+        ? [h('a', { class: 'ob-show-link', href: showPageHref(s.guid), text: s.title })]
+        : (named ? s.title : 'Unidentified show')),
       // The guid stands in for a name we don't have. It's the only handle on
       // the show, and it's what you'd search the collector for.
       named ? null : h('div', { class: 'ob-show-guid', text: s.guid }),

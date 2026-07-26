@@ -799,6 +799,11 @@
        no title, no art. A third of the index, all of it long tail. Quieter
        than a named show, with the guid standing in for the name. */
     .ob-show-unnamed { color: var(--muted); font-style: italic; }
+    /* A named show's title links to its landing page (/show/<guid>). Inherits
+       the title's own weight and color — it reads as the heading it is, not as
+       a link sitting inside one. Unnamed shows have no page, so no link. */
+    a.ob-show-link { color: inherit; text-decoration: none; }
+    a.ob-show-link:hover { color: var(--accent-d); text-decoration: underline; }
     .ob-show-guid {
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       font-size: 0.68rem;
@@ -898,6 +903,11 @@
       font-size: 0.8rem;
     }
     .ob-boost-show::before { content: '· '; }
+    /* The show name links to its landing page. Stays as quiet as the plain
+       span it replaced — this row is metadata under the boost, and a second
+       accent-colored link next to the episode link would fight it. */
+    a.ob-boost-show { text-decoration: none; }
+    a.ob-boost-show:hover { color: var(--accent-d); text-decoration: underline; }
 
     /* "via <app>" — sits directly under the sats/episode row and is
        deliberately quieter than it. Only rendered when the boost carried a

@@ -54,3 +54,7 @@ wrangler.toml
 
 # OnlyBoosts collector: SQLite index, exported shards, logs — machine-local
 bots/**/data/
+
+# Local visual-check snapshots of the /show/<guid> pages, rendered from
+# production data by hand. Not part of the site — see docs/show-pages-spec.md.
+preview-snapshot/
