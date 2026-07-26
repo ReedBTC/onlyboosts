@@ -149,6 +149,7 @@
         <li><a href="#stats">Indexer Stats</a></li>
         <li><a href="#nostr">Nostr Fundamentals</a></li>
         <li><a href="#nip73">NIP-73 and External Content IDs</a></li>
+        <li><a href="#show-identity">When the Show Tag Is Not a Show GUID</a></li>
         <li><a href="#keysend">What Is Not Indexed</a></li>
         <li><a href="#pipeline">How the Index Is Built</a></li>
         <li><a href="#amounts">How Amounts Are Determined</a></li>
@@ -216,6 +217,23 @@
         <p>The significance of these identifiers is that none of them are new. The show GUID is the <code>&lt;podcast:guid&gt;</code> value published in the RSS feed, the namespaced UUID that Podcasting 2.0 introduced so that a show retains a stable identity across host migrations. The episode GUID is the episode&rsquo;s own <code>&lt;guid&gt;</code> element.</p>
         <p>Because the Nostr event and the Podcast Index entry both reference the same values from the same feed, a note published by any application to any relay can be matched to a specific show and episode without a registry, a mapping table or any coordination between the parties involved. That match is what allows this site to attach the correct title, artwork and air date to a boost that arrived carrying none of them.</p>
         <p>For the purposes of this index, a boost note is a kind 1 event satisfying two conditions: it carries the NIP-73 podcast tags, and it carries evidence that a payment occurred. That evidence takes the form of an amount tag, a reference to a Lightning zap receipt, or a topic tag identifying the note as a boostagram.</p>
+      </section>
+
+      <section id="show-identity">
+        <h2>When the Show Tag Is Not a Show GUID</h2>
+        <p>The matching described above depends on the <code>podcast:guid</code> tag actually carrying the show&rsquo;s RSS GUID &mdash; the stable UUID that identifies the feed. Some applications put something else there. The note is a genuine boost; only the value naming the show is malformed. Three shapes account for nearly all of it.</p>
+        <div class="tagblock"><span class="c">// a Podcast Index feed number, not a GUID</span>
+["i", "podcast:guid:<span class="s">946122</span>"]
+
+<span class="c">// a show GUID with an episode number appended</span>
+["i", "podcast:guid:<span class="s">b2f4a5a4-96a6-4414-bd78-2d76b367352c-45</span>"]
+
+<span class="c">// a freeform label the app invented for the episode</span>
+["i", "podcast:guid:<span class="s">20250508FH</span>"]</div>
+        <p>Left untouched, every distinct wrong value looks like a separate show. One real podcast fragments into a scatter of phantom entries, each holding a slice of its boosts. That understates the show&rsquo;s totals, lowers where it ranks, and inflates the count of shows overall.</p>
+        <p>The index repairs the shapes it can resolve with confidence. A numeric feed identifier is looked up &mdash; usually against the feed address the same note also carries, otherwise through the Podcast Index directly &mdash; and mapped to the show it belongs to. A GUID with an episode number stuck on the end has the suffix removed to recover the underlying show. In both cases the stray boosts are folded back into the real podcast and the phantom entries disappear.</p>
+        <p>A freeform label cannot be repaired the same way. A value such as <code>20250508FH</code> holds no reliable link back to a show&rsquo;s real GUID; it is a name one application chose for one episode, and inferring the show from it by pattern-matching would risk filing boosts under the wrong podcast. These are therefore left as they stand: each remains a separate entry marked as an unidentified show, reunited with its real feed only when that mapping is established by hand. This is the least resolvable of the three, and for now the largest.</p>
+        <p>In every one of these cases the boost itself is indexed and counted. What a malformed identifier costs is attribution &mdash; the boost may sit under an unidentified show rather than alongside the rest of that podcast&rsquo;s support &mdash; never the record that the boost occurred.</p>
       </section>
 
       <section id="keysend">
@@ -311,7 +329,7 @@
         <p>The booster is whoever controls the signing key. In Fountain&rsquo;s case that is frequently an application-managed key rather than the individual&rsquo;s primary Nostr identity, and some boosts are anonymous. Display names and avatars are self-declared profile data; no identity here is verified, and nothing prevents two npubs from claiming the same name.</p>
 
         <h3>Podcast Metadata Can Be Missing or Incorrect</h3>
-        <p>Titles, artwork and air dates are drawn from the Podcast Index and keyed by GUID. Feeds that are not present in the Index display limited information, and some episode GUIDs cannot be resolved at all, as the specification permits any opaque string and many feeds use a URL. The boost is still counted; it simply cannot be presented with metadata.</p>
+        <p>Titles, artwork and air dates are drawn from the Podcast Index and keyed by GUID. Feeds that are not present in the Index display limited information, and some episode GUIDs cannot be resolved at all, as the specification permits any opaque string and many feeds use a URL. The boost is still counted; it simply cannot be presented with metadata. A related case, in which the tag naming the show is not a valid show GUID in the first place, is covered under <a href="#show-identity">When the Show Tag Is Not a Show GUID</a>.</p>
 
         <h3>History Is Bounded by Relay Retention</h3>
         <p>The index reaches back only as far as relays still hold these events, approximately October 2024. Boosts older than that have aged off the network and are unrecoverable. Relays are under no obligation to retain anything.</p>
