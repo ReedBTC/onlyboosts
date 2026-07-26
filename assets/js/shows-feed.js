@@ -122,19 +122,36 @@ function rangeTitle(key) {
   return days ? `Shows boosted in the last ${days} days` : 'All time'
 }
 
-// Same five axes as the episode rollup, one level up. `episodes` is the axis
-// that only exists here — an episode card can't have an episode count.
+// ── On the absence of an episode count ────────────────────────────────
+// There used to be a fifth axis here, 'Most episodes', and a matching figure
+// on every card. Both are gone, and the data behind them is still loaded (the
+// drawer needs it) but never displayed as a number.
+//
+// The reason: sats, boosts and boosters are measures of boost activity and
+// have no meaning outside it, so "as published to Nostr" is the only available
+// reading of them. An episode count is different in kind — it is a property of
+// the podcast, with a true value out in the world — so printing one next to a
+// show's name reads as a claim about the show. Ours is not that claim. It
+// counts episodes carrying at least one boost we indexed, which excludes
+// keysend boosts entirely and any boost published before NIP-73 tagging was
+// in use.
+//
+// Measured against the shows' own RSS: we held 70 for Rabbit Hole Recap
+// against 415 real episodes, and 64 for LINUX Unplugged against 676. It also
+// runs the other way — 22 against 21 for Local Bitcoiners — because episodes
+// are keyed off item_guid from boosts and a feed can drop or re-guid an item.
+// So the number was not even reliably a subset, and no label short enough to
+// fit a card could have fixed it.
 const SORT_OPTIONS = [
   ['boosts', 'Most boosts'],
   ['sats', 'Most sats'],
   ['boosters', 'Most boosters'],
-  ['episodes', 'Most episodes'],
   ['latest', 'Recently boosted'],
 ]
 
 // Sorts where a position means something, so the card gets a rank number.
 // 'latest' is chronology, not standing.
-const RANKED_SORTS = new Set(['boosts', 'sats', 'boosters', 'episodes'])
+const RANKED_SORTS = new Set(['boosts', 'sats', 'boosters'])
 
 // Every comparator breaks ties on sats, then on most-recent boost, so the
 // order is stable across repaints.
@@ -143,7 +160,6 @@ const SORTERS = {
   boosts: (a, b) => b.boosts - a.boosts || bySats(a, b),
   sats: bySats,
   boosters: (a, b) => b.boosters - a.boosters || bySats(a, b),
-  episodes: (a, b) => b.episodes - a.episodes || bySats(a, b),
   latest: (a, b) => b.latest - a.latest || bySats(a, b),
 }
 
@@ -360,8 +376,9 @@ function renderShowCard(s, rank) {
     h('span', { text: plural(s.boosts, 'boost', 'boosts') }),
     h('span', { class: 'pcast-dot', 'aria-hidden': 'true', text: '·' }),
     h('span', { text: plural(s.boosters, 'booster', 'boosters') }),
-    h('span', { class: 'pcast-dot', 'aria-hidden': 'true', text: '·' }),
-    h('span', { text: plural(s.episodes, 'episode', 'episodes') }),
+    // No episode count. See the note above SORT_OPTIONS: sats, boosts and
+    // boosters are measures of boost activity, but an episode count reads as a
+    // fact about the show, and ours isn't one.
   ])
 
   const head = h('div', { class: 'pcast-card-head' }, [
@@ -395,7 +412,10 @@ function renderShowCard(s, rank) {
   const caret = h('span', { class: 'pcast-drawer-caret', 'aria-hidden': 'true', text: '▾' })
   const drawer = h('button', {
     class: 'pcast-drawer', type: 'button', 'aria-expanded': 'false',
-  }, [caret, h('span', { text: plural(s.episodes, 'episode', 'episodes') })])
+  // Named, not counted — see the note above SORT_OPTIONS. The drawer bar is
+  // full-width, so it has room to say exactly what the rows are rather than
+  // leaving "Episodes" to imply the show's catalogue.
+  }, [caret, h('span', { text: 'Episodes with NIP-73 Boosts' })])
 
   const card = h('article', { class: 'pcast-card' }, [head, drawer, details])
   let loaded = false

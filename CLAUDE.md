@@ -305,7 +305,11 @@ Carried from the scaffold commit and the LB suite:
    than rendering a shell of em-dashes or zeroes. Verified against all five
    failure modes (HTTP error, network error, non-JSON body, empty manifest,
    zero boosts). `auto-fit` columns mean a sixth figure needs no media
-   query; `distinct_eps` (~7,100) is the obvious candidate.
+   query, but **`distinct_eps` is not the candidate to add** — it counts
+   episodes carrying at least one indexed boost, not episodes, and reads as a
+   claim about catalogues we don't have. Every per-show episode count was
+   removed from the UI for that reason; see the "No Episode Counts, Anywhere"
+   section of `docs/show-pages-spec.md`.
 
 1. ~~**Podcast Index credentials.**~~ **Done.** `PODCAST_INDEX_KEY` and
    `PODCAST_INDEX_SECRET` are set as secrets in both the production and preview

@@ -207,6 +207,57 @@ is dead code in this repository and should be deleted rather than adapted.
 
 ---
 
+## No Episode Counts, Anywhere
+
+The show page shows three stat tiles, not four, and the Shows feed cards show
+three figures, not four. There is no "Most episodes" sort. This is deliberate
+and should not be undone without reading what follows.
+
+**Sats, boosts and supporters are measures of boost activity.** They have no
+meaning outside boosting, so "as published to Nostr" is the only reading
+available, and the data caveat under the stats covers them.
+
+**An episode count is a property of the podcast.** It has a true value out in
+the world whether or not anyone ever boosted. Printed beside a show's name and
+artwork it reads as a claim about the show, and ours was not that claim: it
+counted episodes carrying at least one boost we indexed, which excludes keysend
+boosts entirely and any boost published before NIP-73 tagging was in use.
+
+Measured against the shows' own RSS feeds:
+
+| Show | We showed | Feed actually has |
+|---|---|---|
+| LINUX Unplugged | 64 | 676 |
+| Rabbit Hole Recap | 70 | 415 |
+| Podcasting 2.0 | 47 | 199 |
+| Citadel Dispatch | 62 | 251 |
+| This Week in Bitcoin | 65 | 116 |
+| Local Bitcoiners | 22 | **21** |
+
+Note the last row. Episodes are keyed off `item_guid` from boosts, and a feed
+can drop or re-guid an old item, so our count can **exceed** the real
+catalogue. It was not reliably a subset, which means no short label could have
+rescued it. "Episodes boosted" would still have overclaimed.
+
+**The alternative was rejected on product grounds.** Pulling each show's full
+catalogue would make the number true, and would also turn OnlyBoosts into a
+podcast directory. That is BMB's job and BMB already does it. This site is for
+seeing what people on Nostr are boosting and finding others with the same
+taste; an episode nobody boosted is, here, not information. It would also cost
+a per-show RSS or Podcast Index fetch across every qualifying show, and put
+LINUX Unplugged's 612 unboosted episodes into a drawer where each one reads
+"none".
+
+The underlying figure is still loaded and still returned by
+`/api/v1/podcasts/:guid`, because the Shows feed uses it to decide whether a
+card gets an episode drawer at all. It is simply never rendered as a number.
+`functions/show/[guid].js` does not even select the column, so that a future
+edit has to go and fetch it deliberately rather than finding it to hand.
+
+**Do not add `distinct_eps` to the About page stat strip.** CLAUDE.md formerly
+named it the obvious candidate for a sixth card. It is the same number with the
+same problem, one level up.
+
 ## Recent Boosts
 
 The page carries a Recent Boosts section: booster, sats, message, and what it

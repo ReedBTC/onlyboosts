@@ -55,6 +55,31 @@
 .footer-bottom a { color: var(--orange); text-decoration: none; }
 .footer-bottom a:hover { text-decoration: underline; }
 
+/* "Made with 💜 by [avatar] Reed" — replaced the copyright line. Flex on the
+   <p> so the avatar sits on the text baseline row rather than being dropped
+   below it when the line wraps on a narrow screen. */
+.footer-made {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.footer-maker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+/* Served at 96px for retina; a fixed box keeps the footer from reflowing if
+   the image is slow or missing. */
+.footer-maker img {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: block;
+  background: rgba(255, 255, 255, 0.08);
+}
+
 /* Silent-payment / paynym code blocks in the Support column. */
 .payment-code {
   font-family: monospace;

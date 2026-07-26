@@ -5,9 +5,9 @@
 // WHY SERVER-RENDERED, when every other page on this site is static HTML plus a
 // client fetch: the Open Graph card. This page exists to be shared by the
 // podcaster whose supporters it lists, and a crawler handed an empty shell
-// produces a blank preview, which defeats the point. Search indexing of ~922
-// pages is a second and lesser reason. BMB reached the same conclusion for its
-// own show view (see the spec).
+// produces a blank preview, which defeats the point. Search indexing of the
+// ~930 qualifying shows is a second and lesser reason. BMB reached the same
+// conclusion for its own show view (see the spec).
 //
 // The URL key is the bare `podcast:guid` — the show's own RSS-declared
 // identifier, which is what boosts carry via NIP-73 and what D1 is keyed on. It
@@ -40,16 +40,21 @@ export async function onRequestGet({ request, env, params }) {
   if (!guid || guid.length > GUID_MAX) return notFound(guid);
 
   const show = await env.DB.prepare(
+    // No episode_count: it is deliberately never displayed (see the stats
+    // block below), and selecting it invites someone to put the tile back.
     `SELECT podcast_guid, title, image, feed_url, medium, boost_count, total_sats,
-            booster_count, episode_count, latest_ts
+            booster_count, latest_ts
      FROM podcasts WHERE podcast_guid = ?`
   ).bind(guid).first();
 
   // The qualifying rule, and the whole of it: a show with no title has no
   // artwork, no feed URL and no Podcast Index record either, so there is
-  // nothing to render. 462 of 1,384 rows are in that state. They stay visible
-  // in the Shows feed as unlinked "Unidentified show" cards; they just have no
-  // page. See the collector handoff for why most of them are phantoms.
+  // nothing to render. They stay visible in the Shows feed as unlinked
+  // "Unidentified show" cards; they just have no page.
+  //
+  // The split moves as the collector repairs malformed show identifiers (927
+  // of 1,285 qualified after its 2026-07-26 pass, up from 922 of 1,384), which
+  // is why nothing here is counted or capped — the rule does the work.
   if (!show || !show.title) return notFound(guid);
 
   const [eps, sups, boosts] = await Promise.all([
@@ -399,7 +404,7 @@ function renderShowPage({ show, episodes, supporters, boosts }) {
 
     <div class="footer-col footer-about">
       <h3>OnlyBoosts</h3>
-      <p>A Nostr client for podcast boosts. Read the boostagrams flowing across the whole podcasting-2.0 network — globally, or filtered to just the people you follow — and boost back with Lightning.</p>
+      <p>A Nostr client for only podcast boosts. Every Podcasting 2.0 boostagram published to Nostr, cached and indexed for stats by episode, show and supporter. Sort, filter, search, view all or just see boosts from your follows on Nostr.</p>
     </div>
 
     <!-- Same two groups as the nav's Explore menu, in the same order — the
@@ -433,7 +438,13 @@ function renderShowPage({ show, episodes, supporters, boosts }) {
 
   </div>
   <div class="footer-bottom">
-    <p>© 2026 OnlyBoosts</p>
+    <p class="footer-made">
+      Made with <span role="img" aria-label="love">💜</span> by
+      <a class="footer-maker" href="https://njump.me/npub1xgyjasdztryl9sg6nfdm2wcj0j3qjs03sq7a0an32pg0lr5l6yaqxhgu7s" target="_blank" rel="noopener">
+        <img src="/assets/reed_pfp.png" alt="" width="24" height="24" loading="lazy" />
+        Reed
+      </a>
+    </p>
   </div>
 </footer>
 <!-- FOOTER:END -->
@@ -451,11 +462,20 @@ function renderShowPage({ show, episodes, supporters, boosts }) {
 }
 
 function renderHeader(show, art, title) {
+  // Three tiles, not four. There was an episode count here and it was removed
+  // deliberately: sats, boosts and supporters are measures of boost activity
+  // and have no meaning outside it, so "as published to Nostr" is the only
+  // reading available. An episode count is a property of the PODCAST, with a
+  // true value in the world, so printing one beside the show's name reads as a
+  // claim about the show. Ours counted episodes carrying at least one boost we
+  // indexed, which excludes keysend entirely and anything published before
+  // NIP-73 tagging. Measured against RSS: 70 shown vs 415 real for Rabbit Hole
+  // Recap, 64 vs 676 for LINUX Unplugged, and 22 vs 21 for Local Bitcoiners,
+  // so not even reliably a subset. See docs/show-pages-spec.md.
   const stats = [
     { label: "sats", value: compact(show.total_sats), exact: num(show.total_sats) },
     { label: show.boost_count === 1 ? "boost" : "boosts", value: num(show.boost_count), exact: num(show.boost_count) },
     { label: show.booster_count === 1 ? "supporter" : "supporters", value: num(show.booster_count), exact: num(show.booster_count) },
-    { label: show.episode_count === 1 ? "episode" : "episodes", value: num(show.episode_count), exact: num(show.episode_count) },
   ];
 
   return `<header class="show-hero">
@@ -617,7 +637,7 @@ function renderEpisodes(rows, show) {
   // "62 episodes", so a section title above it would only say it again.
   return `<section class="show-section show-section--bare" id="episodes">
     <details class="ep-drawer">
-      <summary>${num(rows.length)} episode${rows.length === 1 ? "" : "s"}, newest first</summary>
+      <summary>Episodes with NIP-73 Boosts, newest first</summary>
       <ul class="ep-list">
         ${rows.map(episodeRow).join("\n        ")}
       </ul>
