@@ -127,48 +127,82 @@ def cmd_emit_sql(args):
     print(f"wrote {len(stmts)} statements → {args.emit_sql}")
 
 
-def cmd_remote(args):
-    import json
-    import urllib.request
-    cfg = load_config(CREDENTIALS)
+def _cf(cfg):
+    """(url, headers) for the D1 HTTP query API, or None if creds are missing.
+    The token lives only in the header — never logged."""
     acct, dbid, token = (cfg.get("CF_ACCOUNT_ID"), cfg.get("CF_D1_DATABASE_ID"),
                          cfg.get("CF_API_TOKEN"))
     if not all([acct, dbid, token]):
+        return None
+    return (f"https://api.cloudflare.com/client/v4/accounts/{acct}/d1/database/{dbid}/query",
+            {"Authorization": f"Bearer {token}", "Content-Type": "application/json"})
+
+
+def _d1_exec(url, hdr, sql):
+    """POST one SQL chunk to D1. Returns (ok, detail). Errors surface CF's own
+    message (no secrets) — the URL/token are never included."""
+    import json
+    import urllib.error
+    import urllib.request
+    req = urllib.request.Request(url, data=json.dumps({"sql": sql}).encode(),
+                                 headers=hdr, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            data = json.loads(resp.read())
+            return bool(data.get("success")), data.get("errors") or data.get("messages")
+    except urllib.error.HTTPError as e:
+        try:
+            return False, json.loads(e.read()).get("errors")
+        except Exception:
+            return False, f"HTTP {e.code}"
+    except Exception as e:
+        return False, type(e).__name__
+
+
+def cmd_apply_schema(args):
+    cf = _cf(load_config(CREDENTIALS))
+    if not cf:
+        print("[error] CF_ACCOUNT_ID / CF_D1_DATABASE_ID / CF_API_TOKEN missing from credentials.env")
+        return
+    schema = (HERE / "d1" / "schema.sql").read_text()
+    ok, detail = _d1_exec(*cf, schema)
+    print("schema applied to remote D1" if ok else f"[error] schema apply failed: {detail}")
+
+
+def cmd_remote(args):
+    cf = _cf(load_config(CREDENTIALS))
+    if not cf:
         print("[error] CF_ACCOUNT_ID / CF_D1_DATABASE_ID / CF_API_TOKEN missing from credentials.env")
         return
     conn = db.connect(DB_PATH)
     stmts = build_full_sql(conn)   # NOTE: full load for now; delta mode is a follow-up
-    url = f"https://api.cloudflare.com/client/v4/accounts/{acct}/d1/database/{dbid}/query"
-    hdr = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     BATCH = 100
     sent = 0
     for i in range(0, len(stmts), BATCH):
-        chunk = "\n".join(stmts[i:i + BATCH])
-        body = json.dumps({"sql": chunk}).encode()
-        req = urllib.request.Request(url, data=body, headers=hdr, method="POST")
-        try:
-            with urllib.request.urlopen(req, timeout=60) as resp:
-                ok = json.loads(resp.read()).get("success")
-                if not ok:
-                    print(f"[warn] batch {i//BATCH} not successful")
-        except Exception as e:
-            print(f"[error] batch {i//BATCH} failed: {e}")
+        ok, detail = _d1_exec(*cf, "\n".join(stmts[i:i + BATCH]))
+        if not ok:
+            print(f"[error] batch {i // BATCH} failed: {detail}")
             return
         sent += len(stmts[i:i + BATCH])
+        if (i // BATCH) % 50 == 0:
+            print(f"  …{sent}/{len(stmts)} statements", flush=True)
     print(f"pushed {sent} statements to D1 (remote, full load)")
 
 
 def main():
     ap = argparse.ArgumentParser(description="Sync box SQLite → Cloudflare D1")
     ap.add_argument("--emit-sql", metavar="FILE", help="write a full-load SQL file")
-    ap.add_argument("--remote", action="store_true", help="push to the D1 HTTP API")
+    ap.add_argument("--apply-schema", action="store_true", help="apply d1/schema.sql to the remote D1")
+    ap.add_argument("--remote", action="store_true", help="full-load the projection to the remote D1")
     args = ap.parse_args()
     if args.emit_sql:
         cmd_emit_sql(args)
+    elif args.apply_schema:
+        cmd_apply_schema(args)
     elif args.remote:
         cmd_remote(args)
     else:
-        ap.error("choose --emit-sql <file> or --remote")
+        ap.error("choose --emit-sql <file>, --apply-schema, or --remote")
 
 
 if __name__ == "__main__":
