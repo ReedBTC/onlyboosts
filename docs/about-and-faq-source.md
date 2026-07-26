@@ -96,17 +96,22 @@ a daily pass widens the relay net.
 
 ## Who's publishing boost notes today
 
-As far as we can tell, three sources are publishing NIP-73 podcast-boost notes
-right now:
+As far as we can tell, five sources are publishing NIP-73 podcast-boost notes
+right now, one of which is this site:
 
 - **Fountain** — publishes a note that references a Lightning **zap receipt** for
   the amount. (This is the bulk of the data.)
 - **BoostMeBitch (BMB)** — publishes a note with an explicit `amount` tag.
 - **Local Bitcoiners** — its website boost widget publishes a note with an
   `amount` tag.
+- **Bowl After Bowl** — its own site publishes a note in the same shape as BMB's.
+- **OnlyBoosts** — a boost sent from this site publishes a note when the booster
+  is signed in and chooses to share it. We index our own output on the same terms
+  as everyone else's: a boost sent from here and not shared to Nostr is not
+  counted, the same as a boost sent from any app that publishes nothing.
 
 That's it, today. But **NIP-73 is an open standard — any podcast app can adopt
-it.** Nothing about OnlyBoosts is specific to these three; the moment another app
+it.** Nothing about OnlyBoosts is specific to these five; the moment another app
 starts publishing boost notes the same way, they show up here automatically, and
 the picture of value-for-value across podcasting gets richer and more accurate.
 **The data will get better as adoption grows.**

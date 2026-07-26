@@ -43,6 +43,13 @@ import { withTimeout } from './utils.js'
 // just adds latency + a failure surface.
 export const RECIPIENT_LUD16 = 'onlyboosts@getalby.com'
 
+// The `show` tag stamped on every kind-30078 boost receipt and per-leg
+// metadata event. LB's value was carried across on fork and left there, which
+// attributed OnlyBoosts' own tips to the Local Bitcoiners show and put them
+// in front of LB's collector. Same class of mistake FEED_GUID is null to
+// avoid; see the note there.
+export const SHOW_TAG = 'OnlyBoosts'
+
 // Recipient npub for the optional kind 1 share-to-feed note. Decoded once
 // at module load; the hex pubkey populates the kind 1 `p` tag and the
 // raw npub goes into the `nostr:` mention so followers can click through
@@ -561,7 +568,7 @@ export function buildBoostReceiptTemplate({
     ['episode', String(episodeMeta?.number ?? '')],
     ['episode_title', episodeMeta?.title || ''],
     ['item_guid', episodeMeta?.guid || ''],
-    ['show', 'Local Bitcoiners'],
+    ['show', SHOW_TAG],
     ['amount', String(totalMsatsRequested || 0)],
     ['amount_paid', String(amountPaid)],
     ['amount_uncertain', String(amountUncertain)],

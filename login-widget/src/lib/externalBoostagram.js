@@ -13,7 +13,10 @@
 
 const TLV_BOOSTAGRAM = 7629169  // Podcasting 2.0 TLV record for the boostagram JSON
 export const MAX_MESSAGE_CHARS = 200  // match Boost Me Bitch's message cap
-const APP_NAME = 'Local Bitcoiners'
+// Rides in the TLV record, so it is what the recipient's Helipad (or any other
+// boostagram reader) shows as the sending app. Left as LB's on fork; every
+// boost sent before this was mislabelled to the podcaster.
+const APP_NAME = 'OnlyBoosts'
 
 // Hex-encode a UTF-8 string (browser — no Buffer).
 export function hexEncode(str) {
@@ -111,6 +114,12 @@ export function buildExternalNoteTemplate({
   const tags = [
     ['t', 'boost'],
     ['t', 'podcast'],
+    // Topic tags NIP-73 boost consumers key on to tell a boost note from any
+    // other kind 1. Our own collector also accepts a bare `t=boost`
+    // (classify.py#BOOST_TOPIC_TAGS), but nothing else does, so a note without
+    // these is invisible to every indexer but ours.
+    ['t', 'boostagram'],
+    ['t', 'value4value'],
     ['client', 'onlyboosts.social'],
   ]
   if (bmbUrl) tags.push(['r', bmbUrl])

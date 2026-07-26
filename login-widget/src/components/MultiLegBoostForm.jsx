@@ -54,6 +54,10 @@ export default function MultiLegBoostForm({
   lnurlCache = {},
   subtitle = null,
   defaultMessage = '',
+  // Who the free-text message is addressed to. The default names the show
+  // because the episode flow is this form's usual host; the site-tip wrapper
+  // overrides it, where there is no show and the note goes to OnlyBoosts.
+  messagePlaceholder = 'Leave a note for the show + guests',
   onCancelled,
   // Reports the in-modal boost lifecycle up to the wrapper so it can
   // guard its close button: null when idle/settled, or
@@ -558,7 +562,7 @@ export default function MultiLegBoostForm({
           rows={4}
           maxLength={10000}
           className="w-full bg-neutral-800 border border-neutral-700 rounded px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30 resize-none max-h-40 overflow-y-auto leading-relaxed"
-          placeholder="Leave a note for the show + guests"
+          placeholder={messagePlaceholder}
         />
       </div>
 

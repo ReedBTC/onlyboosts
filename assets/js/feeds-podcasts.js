@@ -116,6 +116,14 @@ function initials(profile, npub) {
   return (npub || '').replace(/^npub1/, '').slice(0, 2).toUpperCase() || '👤'
 }
 
+// How many booster faces the drawer bar stacks. The row is one non-wrapping
+// flex line at a fixed 14px stride, so an uncapped stack on a heavily boosted
+// episode (55 boosters ≈ 780px) is wider than the 720px panel and spills the
+// card out of the feed. The exact count is already stated in the drawer label
+// beside it, so the faces are decorative and safe to truncate; CSS trims the
+// row further on narrow viewports.
+const MAX_FACES = 10
+
 // A booster avatar. `interactive` wires click/keyboard to copy the npub.
 // Avatars load eagerly (they're tiny, and `loading=lazy` left off-screen
 // ones perpetually unloaded → looked broken); a picture that fails to load
@@ -442,9 +450,9 @@ function episodeCard(item, rank = null) {
     ? h('a', { class: mediaClass, href: bmbUrl, target: '_blank', rel: 'noopener noreferrer', title: 'See all boosts on Boost Me Bitch' }, mediaImg || '🎙')
     : h('div', { class: mediaClass }, mediaImg || '🎙')
 
-  // Booster faces on the drawer bar — every distinct booster, stacked.
+  // Booster faces on the drawer bar, stacked — the first MAX_FACES of them.
   const avatars = h('span', { class: 'pcast-avatars' },
-    distinctBoosters.map((b) =>
+    distinctBoosters.slice(0, MAX_FACES).map((b) =>
       avatarEl(profileFor(b.booster_pubkey), b.booster_npub, { size: 22 })))
 
   // A Fountain episode URL, when we have one (present on ~98% of episodes).
@@ -1094,7 +1102,7 @@ function repaintProfiles(cards) {
     const holder = cardEl.querySelector('.pcast-avatars')
     if (!holder) return
     holder.innerHTML = ''
-    for (const b of it.distinctBoosters) {
+    for (const b of it.distinctBoosters.slice(0, MAX_FACES)) {
       holder.appendChild(avatarEl(profileFor(b.booster_pubkey), b.booster_npub, { size: 22 }))
     }
   })

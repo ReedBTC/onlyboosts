@@ -64,6 +64,7 @@ import {
   signDonationBoostagramWithBurner,
   publishSignedBoostagram,
   confirmInvoiceSettled,
+  SHOW_TAG,
 } from './boostagram.js'
 import { formatEpisodeComment } from './episodeData.js'
 import { shouldPublishMetadata } from './recipientOverrides.js'
@@ -160,7 +161,7 @@ function buildLegExtraTags({ episodeMeta, boostSession, legIndex, legCount, tota
     ['episode', String(episodeMeta?.number ?? '')],
     ['episode_title', episodeMeta?.title || ''],
     ['item_guid', episodeMeta?.guid || ''],
-    ['show', 'Local Bitcoiners'],
+    ['show', SHOW_TAG],
     ['boost_session', boostSession],
     ['leg', `${legIndex + 1}/${legCount}`],
     // Donor's full intended total (msats) for the WHOLE boost, stamped on

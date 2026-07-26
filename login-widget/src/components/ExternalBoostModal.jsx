@@ -279,7 +279,11 @@ export default function ExternalBoostModal({ user, onClose, episode, recipientsB
                   <label className="flex items-start gap-2 text-xs text-neutral-400 cursor-pointer select-none">
                     <input type="checkbox" checked={shareToFeed} onChange={(e) => setShareToFeed(e.target.checked)} className="accent-orange-500 mt-0.5" />
                     <span className="leading-snug">Share to my feed
-                      <span className="block text-[10px] text-neutral-600 mt-0.5">Posts a kind-1 note tagged to this episode with a link back.</span>
+                      <span className="block text-[10px] text-neutral-600 mt-0.5">
+                        Posts a kind-1 note tagged to this episode with a link back.
+                        OnlyBoosts counts boosts it can find on Nostr, so this is what
+                        puts yours in the feeds and the totals.
+                      </span>
                     </span>
                   </label>
                 )}

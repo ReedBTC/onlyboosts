@@ -113,7 +113,7 @@
 // assets/js/feed-search.js only fills a slot it finds, so either half alone
 // degrades to the feed as it is today — but the feature is invisible until
 // both land, and index.html is the cached half.
-const VERSION = 'ob-v21';
+const VERSION = 'ob-v22';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;

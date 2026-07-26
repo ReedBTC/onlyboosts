@@ -671,10 +671,24 @@
     }
     .pcast-drawer:hover { color: var(--accent-d); background: rgba(0,0,0,0.02); }
     .pcast-drawer:last-child { border-radius: 0 0 10px 10px; }
-    .pcast-drawer-caret { font-size: 0.85em; transition: transform 0.18s; }
-    /* Booster faces + total sats, sitting just after the "N boosts" label. */
-    .pcast-drawer-meta { display: inline-flex; align-items: center; gap: 0.5rem; }
-    .pcast-drawer-meta .pcast-sats { font-weight: 700; color: var(--accent-d); white-space: nowrap; }
+    .pcast-drawer-caret { font-size: 0.85em; flex-shrink: 0; transition: transform 0.18s; }
+    .pcast-drawer-label { flex-shrink: 0; }
+    /* Booster faces + total sats, sitting just after the "N boosts" label.
+       The faces are the only part of the bar allowed to shrink: the label and
+       the sats total are the information, the stack is decoration, and it is
+       the one child whose width grows with the data. Without this the row
+       overflows the card on a heavily boosted episode and the whole feed
+       column gets a horizontal scrollbar. MAX_FACES in feeds-podcasts.js caps
+       the stack so the clip below is insurance rather than the usual case. */
+    .pcast-drawer-meta { display: inline-flex; align-items: center; gap: 0.5rem; min-width: 0; }
+    .pcast-drawer-meta .pcast-avatars { min-width: 0; overflow: hidden; }
+    .pcast-drawer-meta .pcast-sats { flex-shrink: 0; font-weight: 700; color: var(--accent-d); white-space: nowrap; }
+    /* Narrow viewports have room for far fewer faces than the DOM cap. The
+       drawer label states the real booster count, so trimming the stack loses
+       nothing. */
+    @media (max-width: 560px) {
+      .pcast-avatars .pcast-avatar:nth-child(n+6) { display: none; }
+    }
     .pcast-card.is-open .pcast-drawer > .pcast-drawer-caret { transform: rotate(180deg); }
 
     /* "Hide boosts" control at the bottom of a card's thread. */
