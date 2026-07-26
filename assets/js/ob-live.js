@@ -23,9 +23,9 @@ import { normalizeBoosts } from '/assets/js/ob-data.js'
 
 const BASE = '/api/v1/'
 
-// The server clamps to 200 (clampLimit in functions/api/v1/_common.js). Ask
-// for that: these are same-origin round trips against an indexed query, so
-// fewer, larger pages beat more, smaller ones.
+// Page size for the incremental note feed. A screenful at a time is the point
+// there — the reader paints what it has and fetches more on demand — so this
+// stays at the shared clampLimit default.
 const PAGE_LIMIT = 200
 
 // Guard against a runaway follow set quietly pulling the whole table. The
@@ -33,6 +33,19 @@ const PAGE_LIMIT = 200
 // group and range-filter over, not a screenful), and this bounds it.
 const MAX_EAGER_ROWS = 1600
 const MAX_EAGER_PAGES = 8
+
+// The eager corpus asks for all of MAX_EAGER_ROWS in a single request, because
+// on this endpoint a round trip costs ~270ms whether it carries 10 rows or 200
+// — the time is the worker plus the edge→D1 hop, not the query. Fetching the
+// corpus in eight serial pages therefore spent ~2.2s on latency alone to move
+// data one request could have moved in ~0.3s. /api/v1/boosts/follows raises its
+// own clamp (MAX_CORPUS_LIMIT) to allow it.
+//
+// If the server clamps lower than this — an older deploy, or a future decision
+// to bring the ceiling back down — the page loop below simply runs more times
+// and behaves exactly as it did before. Nothing here depends on getting the
+// whole corpus in one response.
+const EAGER_PAGE_LIMIT = MAX_EAGER_ROWS
 
 /**
  * POST a JSON body to an /api/v1 path and return the parsed response.
@@ -70,8 +83,8 @@ export async function getFollowsBoostPage(authors, { cursor = null, limit = PAGE
   return {
     rows: normalizeBoosts(data),
     cursor: typeof data?.next_cursor === 'string' ? data.next_cursor : null,
-    // The endpoint caps the author list at 2,000 (MAX_AUTHORS). Reporting what
-    // it actually matched lets a caller tell a truncated follow set apart from
+    // The endpoint caps the author list at MAX_AUTHORS. Reporting what it
+    // actually matched lets a caller tell a truncated follow set apart from
     // a complete one; see the note on getFollowsBoosts.
     matchedAuthors: Number.isFinite(data?.matched_authors) ? data.matched_authors : authors.length,
   }
@@ -127,6 +140,10 @@ export function followsBoostReader(authors) {
  * entire table. Stops at MAX_EAGER_ROWS / MAX_EAGER_PAGES, whichever comes
  * first, and reports whether it stopped early so the caller can say so.
  *
+ * Normally one request: EAGER_PAGE_LIMIT asks for the whole budget at once, so
+ * the loop exists for the case where the server hands back less than it was
+ * asked for. See the note on EAGER_PAGE_LIMIT.
+ *
  * @returns {Promise<{rows: object[], truncated: boolean, matchedAuthors: number}>}
  */
 export async function getFollowsBoosts(authors, { maxRows = MAX_EAGER_ROWS, signal } = {}) {
@@ -138,7 +155,9 @@ export async function getFollowsBoosts(authors, { maxRows = MAX_EAGER_ROWS, sign
   let truncated = false
 
   while (pages < MAX_EAGER_PAGES && rows.length < maxRows) {
-    const page = await getFollowsBoostPage(authors, { cursor, signal })
+    const page = await getFollowsBoostPage(authors, {
+      cursor, signal, limit: Math.min(EAGER_PAGE_LIMIT, maxRows - rows.length),
+    })
     pages++
     matchedAuthors = page.matchedAuthors
     for (const b of page.rows) {

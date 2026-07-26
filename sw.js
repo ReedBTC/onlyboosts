@@ -76,7 +76,13 @@
 // ob-v14: the boost-count pill came off the two Boosts panels. The markup
 // and the code that filled it went together, so a returning visitor holding
 // one half without the other would render an empty capsule.
-const VERSION = 'ob-v14';
+// ob-v15: the Podcasts · Follows corpus is now one request instead of eight.
+// assets/js/ob-live.js asks /api/v1/boosts/follows for the whole row budget
+// at once, and the endpoint raises its own clamp to allow it. Required: the
+// old module is what pins the request to 200 rows a page, so a returning
+// visitor holding it keeps paying ~2s of serial round trips even though the
+// deployed Function would answer in one.
+const VERSION = 'ob-v15';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;
