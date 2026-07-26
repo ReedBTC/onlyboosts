@@ -73,7 +73,10 @@
 // links became a numbered table of contents and the live stat strip came
 // out entirely, and index.html's feed tabs, which now have hairline
 // dividers between them.
-const VERSION = 'ob-v13';
+// ob-v14: the boost-count pill came off the two Boosts panels. The markup
+// and the code that filled it went together, so a returning visitor holding
+// one half without the other would render an empty capsule.
+const VERSION = 'ob-v14';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;

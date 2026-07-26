@@ -403,14 +403,4 @@ export async function renderBoosts({ list, scope = 'global' }) {
   }
 
   paintMore()
-
-  const count = list.closest('.feed-panel')?.querySelector('.feed-count')
-  if (count) {
-    // Deliberately "N+" while more remains unread — the number is what we've
-    // loaded, not the feed's total, and claiming otherwise would be a lie that
-    // shrinks as you page.
-    const more = source.hasMore ? '+' : ''
-    count.textContent = `${rows.length}${more} boost${rows.length === 1 ? '' : 's'}`
-    count.hidden = false
-  }
 }

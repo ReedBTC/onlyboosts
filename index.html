@@ -253,8 +253,10 @@
     .feed-panel { display: none; }
     .feed-panel.is-active { display: block; }
 
-    /* Panel intro row — feed name + a short "what am I looking at" line,
-       plus a right-aligned live count once feeds hydrate. */
+    /* Panel intro row — feed name + a short "what am I looking at" line.
+       The Podcasts panels also carry a right-aligned episode count; the
+       Boosts panels don't, since the number there is only what's been
+       paged in so far and grows as you scroll. */
     .feed-panel-head {
       display: flex;
       align-items: baseline;
@@ -274,6 +276,9 @@
       color: var(--muted);
       font-style: italic;
     }
+    /* Empty until its feed hydrates, and an empty pill is still a pill —
+       the border and padding would render as a small blank capsule. */
+    .feed-count:empty { display: none; }
     .feed-count {
       flex-shrink: 0;
       font-size: 0.8rem;
@@ -1064,7 +1069,6 @@
         <div>
           <h2>Boosts</h2>
         </div>
-        <span class="feed-count"></span>
       </div>
       <div class="feed-list" data-feed-list>
         <div class="feed-placeholder">
@@ -1094,7 +1098,6 @@
         <div>
           <h2>Boosts from your follows</h2>
         </div>
-        <span class="feed-count"></span>
       </div>
       <div class="feed-list" data-feed-list>
         <div class="feed-placeholder">
