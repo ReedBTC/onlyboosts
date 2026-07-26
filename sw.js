@@ -113,7 +113,11 @@
 // assets/js/feed-search.js only fills a slot it finds, so either half alone
 // degrades to the feed as it is today — but the feature is invisible until
 // both land, and index.html is the cached half.
-const VERSION = 'ob-v22';
+// ob-v23: the about page's publisher list drops Bowl After Bowl. Required
+// because it is a factual correction about a named third party: HTML is served
+// stale-while-revalidate, so without a bump a returning visitor reads the
+// wrong list once more before the cache turns over.
+const VERSION = 'ob-v23';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;

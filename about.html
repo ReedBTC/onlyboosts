@@ -243,16 +243,15 @@
         <p>An initial backfill reached as far back as relays still retain these events, approximately October 2024. An incremental scan runs roughly every fifteen minutes to keep the index current, and a daily pass widens the set of relays queried.</p>
 
         <h3>Applications Publishing Boost Notes</h3>
-        <p>Five sources are known to be publishing NIP-73 boost notes at present, one of which is this site.</p>
+        <p>Four sources are known to be publishing NIP-73 boost notes at present, one of which is this site.</p>
         <ul>
           <li><strong><a href="https://fountain.fm" target="_blank" rel="noopener noreferrer">Fountain</a></strong> publishes a note referencing a Lightning zap receipt for the amount. This accounts for the bulk of the data.</li>
           <li><strong><a href="https://boostmebitch.com" target="_blank" rel="noopener noreferrer">BoostMeBitch</a></strong> publishes a note carrying an explicit <code>amount</code> tag.</li>
           <li><strong><a href="https://localbitcoiners.com" target="_blank" rel="noopener noreferrer">Local Bitcoiners</a></strong> publishes a note carrying an <code>amount</code> tag from its website boost widget.</li>
-          <li><strong><a href="https://bowlafterbowl.com" target="_blank" rel="noopener noreferrer">Bowl After Bowl</a></strong> publishes a note in the same form from its own site.</li>
-          <li><strong>OnlyBoosts</strong> publishes a note for a boost sent from this site, when the booster is signed in and elects to share it.</li>
+          <li><strong><a href="/">OnlyBoosts</a></strong> publishes a note for a boost sent from this site, when the booster is signed in and elects to share it.</li>
         </ul>
         <p>This site indexes its own output on the same terms as every other source; it receives no precedence in the feeds or the totals, and a boost sent from here that is not shared to Nostr is not counted, exactly as for an application that publishes nothing.</p>
-        <p>That is a short list and it is the single largest constraint on this data. Nothing about the index is specific to those five applications, however. NIP-73 is an open standard, so any application that begins publishing boost notes in the same format will appear here automatically, without registration or coordination. The coverage of this index improves as adoption grows; that is the premise the site is built on.</p>
+        <p>That is a short list and it is the single largest constraint on this data. Nothing about the index is specific to those four applications, however. NIP-73 is an open standard, so any application that begins publishing boost notes in the same format will appear here automatically, without registration or coordination. The coverage of this index improves as adoption grows; that is the premise the site is built on.</p>
       </section>
 
       <section id="amounts">
