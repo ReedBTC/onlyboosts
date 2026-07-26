@@ -311,8 +311,32 @@ renderer on first view.
 
 | Feed | Module | Source |
 |---|---|---|
-| `boosts-*` | `boosts-feed.js` | `latest.json`, paging back through month archives |
-| `podcasts-*` | `feeds-podcasts.js` | `latest.json` + 3 recent months, rolled up by episode |
+| `boosts-global` | `boosts-feed.js` | `latest.json`, paging back through month archives |
+| `boosts-follows` | `boosts-feed.js` | `POST /api/v1/boosts/follows`, cursor-paged |
+| `podcasts-global` | `feeds-podcasts.js` | `latest.json` + 3 recent months, rolled up by episode |
+| `podcasts-follows` | `feeds-podcasts.js` | `POST /api/v1/boosts/follows`, same rollup |
+
+**Two backends, one record shape.** `ob-data.js` is the static half (immutable
+CDN shards under `/api/data/*`); `ob-live.js` is the live half (D1 query API
+under `/api/v1/*`). The split is not stylistic: a Global view is the same bytes
+for every visitor and caches, a Follows view is scoped to the signed-in user's
+contact list and cannot. Both normalize through `ob-data.js#normalizeBoosts`,
+so everything downstream of the fetch sees one model and the card renderers are
+shared. `ob-live.js` caches nothing in-process — the shard cache is safe only
+because those files are immutable.
+
+Two shapes on the live side: `followsBoostReader()` pages incrementally for the
+note feed, `getFollowsBoosts()` pulls a bounded corpus for the podcasts rollup,
+which has to group and range-filter before it can paint anything. The corpus is
+capped (`MAX_EAGER_ROWS` / `MAX_EAGER_PAGES`) and reports `truncated`.
+
+**`/api/v1/boosts/follows` interpolates its author list into the SQL rather
+than binding it.** D1 rejects a statement with more than 100 bound parameters,
+so one bind per author broke at 99 follows — an ordinary follow list — and
+broke *harder* on page two, where the cursor adds three more binds. Safe
+because `toHexPubkey` provably returns `/^[0-9a-f]{64}$/` or null and the
+endpoint re-tests that before interpolating. Do not generalize the pattern;
+everything else stays bound.
 
 **Follows scoping** lives in `assets/js/follow-set.js`. `resolveFollows()`
 reads the signed-in pubkey from `localStorage.lb_nostr_session` —
@@ -348,17 +372,23 @@ says something sane instead of rendering an empty list.
 
 Two scoping details that aren't obvious:
 
-- **Boosts · Follows pages backwards until it finds something.** A follow set
-  can legitimately match nothing in the most recent 1,000 boosts while having
-  plenty further back, so "no results" has to mean "we looked", not "the first
-  page was empty".
+- **Boosts · Follows no longer pages backwards hunting for matches.** It used
+  to: a follow set can match nothing in the most recent 1,000 boosts while
+  having plenty further back, so the client walked month archives until
+  something turned up. The D1 query answers that in one indexed hit, so an
+  empty first page now genuinely means empty. The archive-walk branch survives
+  on the Global path, where `latest.json` can lag.
 - **The Podcasts tabs don't use `podcasts/index.json`.** The cards are
   *episodes*, not shows, and the published index is a show-level rollup
   computed over everyone — so its counts would also be wrong for a Follows
   audience. Both tabs roll the boost feed up by episode instead, via
-  `ob-data.js#toEpisodeShape`, bounded to `latest.json` + the three most
-  recent months (the range filter offers "All", which needs more than the
+  `ob-data.js#toEpisodeShape`. Global bounds that at `latest.json` + the three
+  most recent months (the range filter offers "All", which needs more than the
   recent 1,000 boosts to mean anything; all 22 archives would be ~20MB).
+  Follows has no month window — a follow set's boosts are a thin slice of the
+  same table, so the query walks its own history and stops on `ob-live.js`'s
+  row budget instead of at an archive boundary. "All" therefore reaches further
+  back on Follows than on Global, which is the right way round.
 
 ### The episode feed adapter
 

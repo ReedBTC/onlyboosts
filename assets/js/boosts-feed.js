@@ -3,10 +3,16 @@
  * One card per kind-1 boost note, newest first. The Podcasts tabs render the
  * same data rolled up by show; this renders the boosts themselves.
  *
- * Data comes from ob-data.js: latest.json for the first page, then month
- * archives from the manifest for paging back. Booster names and avatars are
- * embedded in each record, so unlike the old LB feed there is no profile
- * round-trip and nothing to repaint — the first paint is the final one.
+ * The two tabs read different backends. Global comes from ob-data.js: the
+ * latest.json shard for the first page, then month archives from the manifest
+ * for paging back. Follows comes from ob-live.js — the D1 query API filters to
+ * the contact list server-side and pages by cursor, because the shards are
+ * global by construction and scoping them client-side meant downloading months
+ * of boosts to keep the handful that matched.
+ *
+ * Booster names and avatars are embedded in each record on both paths, so
+ * unlike the old LB feed there is no profile round-trip and nothing to
+ * repaint — the first paint is the final one.
  *
  * On the note shape: the feed carries each boost's identity and content
  * (id / booster.pk / ts / msg / sats) but not the signed event. That's
@@ -23,6 +29,7 @@ import { resolveFollows } from '/assets/js/follow-set.js'
 import {
   getLatestBoosts, getBoostMonths, getBoostMonth, boosterLabel,
 } from '/assets/js/ob-data.js'
+import { followsBoostReader } from '/assets/js/ob-live.js'
 
 const PAGE_SIZE = 30
 
@@ -199,6 +206,74 @@ function renderBoostCard(b) {
   return card
 }
 
+// ── paging sources ────────────────────────────────────────────────────
+// Global pages through immutable month shards; Follows pages through a D1
+// cursor. The rendering below shouldn't care which, so both are wrapped in one
+// interface:
+//
+//   rows        accumulated rows, newest-first (a stable array, mutated in place)
+//   hasMore     whether anything is left to fetch
+//   loadMore()  fetch the next batch, resolving to how many rows it added
+//   moreLabel   what the "load older" button says
+//
+// loadMore() resolving to 0 means "nothing left", so both implementations keep
+// pulling until they add something rather than returning 0 on a batch that
+// happened to be all duplicates.
+
+async function createGlobalSource() {
+  const [all, months] = await Promise.all([getLatestBoosts(), getBoostMonths()])
+  // latest.json is the most recent ~1,000 boosts regardless of month, so the
+  // newest archive overlaps it. Dedupe by id rather than trusting boundaries.
+  const seen = new Set(all.map((b) => b.id))
+  let monthIdx = 0
+
+  const src = {
+    rows: all.slice(),
+    get hasMore() { return monthIdx < months.length },
+    get moreLabel() { return `Load older boosts (${months[monthIdx].month})` },
+    async loadMore() {
+      while (monthIdx < months.length) {
+        const m = months[monthIdx++]
+        let batch
+        try {
+          batch = await getBoostMonth(m.file)
+        } catch (e) {
+          console.warn('[boosts] month load failed', m.file, e)
+          continue
+        }
+        let added = 0
+        for (const b of batch) {
+          if (seen.has(b.id)) continue
+          seen.add(b.id)
+          src.rows.push(b)
+          added++
+        }
+        if (added) {
+          src.rows.sort((a, b) => b.ts - a.ts)
+          return added
+        }
+      }
+      return 0
+    },
+  }
+  return src
+}
+
+async function createFollowsSource(authors) {
+  const reader = followsBoostReader(authors)
+  // Pull the first page here so a fetch failure surfaces as "couldn't load"
+  // alongside the Global path's, rather than after the empty list is painted.
+  await reader.loadMore()
+  return {
+    rows: reader.rows,
+    get hasMore() { return reader.hasMore },
+    // No month to name: the cursor walks the follow set's own history, which
+    // doesn't line up with archive boundaries.
+    get moreLabel() { return 'Load older boosts' },
+    loadMore: () => reader.loadMore(),
+  }
+}
+
 // ── entry point ───────────────────────────────────────────────────────
 /**
  * @param {Element} opts.list   the [data-feed-list] container to fill
@@ -208,7 +283,8 @@ export async function renderBoosts({ list, scope = 'global' }) {
   if (!list) return
 
   // Resolve the audience first — a signed-out Follows tab should say so
-  // rather than download a 1MB shard it can't filter.
+  // without touching the network, and the query below can't be built at all
+  // until we know who to scope it to.
   let follows = null
   if (scope === 'follows') {
     const res = await resolveFollows()
@@ -227,12 +303,16 @@ export async function renderBoosts({ list, scope = 'global' }) {
         ' Follow some npubs in any Nostr client and their boosts will show up here.')
       return
     }
-    follows = new Set(res.follows)
+    // Kept as the array the API takes, not a Set — the filtering that used to
+    // need fast membership tests now happens in SQL.
+    follows = res.follows
   }
 
-  let all, months
+  let source
   try {
-    ;[all, months] = await Promise.all([getLatestBoosts(), getBoostMonths()])
+    source = follows
+      ? await createFollowsSource(follows)
+      : await createGlobalSource()
   } catch (e) {
     console.error('[boosts] fetch failed', e)
     renderPlaceholder(list, 'Couldn’t load boosts',
@@ -240,17 +320,14 @@ export async function renderBoosts({ list, scope = 'global' }) {
     return
   }
 
-  const match = (b) => !follows || follows.has(b.booster.pk)
-  let rows = all.filter(match)
-  // Month archives already covered by latest.json. latest.json is the most
-  // recent ~1,000 boosts regardless of month, so the newest archive overlaps
-  // it — dedupe by id when pulling more in rather than trusting boundaries.
-  const seen = new Set(all.map((b) => b.id))
-  let monthIdx = 0
+  const rows = source.rows
 
-  if (!rows.length && !months.length) {
-    renderPlaceholder(list, 'No boosts yet',
-      ' When someone boosts a podcast episode on Nostr, it’ll show up here.')
+  if (!rows.length && !source.hasMore) {
+    renderPlaceholder(list,
+      follows ? 'No boosts from your follows yet' : 'No boosts yet',
+      follows
+        ? ' Nobody you follow has boosted a podcast on Nostr yet. The Global tab shows everyone.'
+        : ' When someone boosts a podcast episode on Nostr, it’ll show up here.')
     return
   }
 
@@ -264,36 +341,6 @@ export async function renderBoosts({ list, scope = 'global' }) {
   const moreWrap = h('div', { class: 'pcast-more-wrap' })
   let shown = 0
 
-  // Pull older months until we have something to show. A Follows feed can
-  // legitimately match nothing in the most recent 1,000 boosts while having
-  // plenty further back, so "no results" must mean "we looked", not "the
-  // first page was empty".
-  async function pullOlder() {
-    while (monthIdx < months.length) {
-      const m = months[monthIdx++]
-      let batch
-      try {
-        batch = await getBoostMonth(m.file)
-      } catch (e) {
-        console.warn('[boosts] month load failed', m.file, e)
-        continue
-      }
-      let added = 0
-      for (const b of batch) {
-        if (seen.has(b.id)) continue
-        seen.add(b.id)
-        if (!match(b)) continue
-        rows.push(b)
-        added++
-      }
-      if (added) {
-        rows.sort((a, b) => b.ts - a.ts)
-        return true
-      }
-    }
-    return false
-  }
-
   function paintMore() {
     const slice = rows.slice(shown, shown + PAGE_SIZE)
     for (const b of slice) cards.appendChild(renderBoostCard(b))
@@ -304,17 +351,22 @@ export async function renderBoosts({ list, scope = 'global' }) {
   function updateMoreButton() {
     moreWrap.replaceChildren()
     const remaining = rows.length - shown
-    const canPage = remaining > 0 || monthIdx < months.length
+    const canPage = remaining > 0 || source.hasMore
     if (!canPage) return
     const label = remaining > 0
       ? `Show more (${remaining} loaded)`
-      : `Load older boosts (${months[monthIdx].month})`
+      : source.moreLabel
     const btn = h('button', { class: 'pcast-showmore', type: 'button' }, label)
     btn.addEventListener('click', async () => {
       if (remaining > 0) { paintMore(); return }
       btn.disabled = true
       btn.textContent = 'Loading…'
-      const got = await pullOlder()
+      let got = 0
+      try {
+        got = await source.loadMore()
+      } catch (e) {
+        console.warn('[boosts] load more failed', e)
+      }
       if (got) paintMore()
       else updateMoreButton()
     })
@@ -324,13 +376,21 @@ export async function renderBoosts({ list, scope = 'global' }) {
   list.replaceChildren(cards, moreWrap)
 
   if (!rows.length) {
-    // Nothing in the recent page — go looking before declaring it empty.
+    // Nothing in the first batch — go looking before declaring it empty.
+    // Reachable on Global, where latest.json can lag the archives. The
+    // Follows reader already walks until it finds something or runs out, so
+    // an empty rows[] there means hasMore is false and we returned above.
     const spinner = h('div', { class: 'feed-placeholder' }, [
       h('strong', { text: 'Looking further back…' }),
       ' No matches in the most recent boosts, checking the archives.',
     ])
     list.replaceChildren(spinner)
-    const got = await pullOlder()
+    let got = 0
+    try {
+      got = await source.loadMore()
+    } catch (e) {
+      console.warn('[boosts] archive walk failed', e)
+    }
     if (!got) {
       renderPlaceholder(list,
         follows ? 'No boosts from your follows yet' : 'No boosts yet',
@@ -346,10 +406,10 @@ export async function renderBoosts({ list, scope = 'global' }) {
 
   const count = list.closest('.feed-panel')?.querySelector('.feed-count')
   if (count) {
-    // Deliberately "N+" while archives remain unread — the number is what
-    // we've loaded, not the feed's total, and claiming otherwise would be a
-    // lie that shrinks as you page.
-    const more = monthIdx < months.length ? '+' : ''
+    // Deliberately "N+" while more remains unread — the number is what we've
+    // loaded, not the feed's total, and claiming otherwise would be a lie that
+    // shrinks as you page.
+    const more = source.hasMore ? '+' : ''
     count.textContent = `${rows.length}${more} boost${rows.length === 1 ? '' : 's'}`
     count.hidden = false
   }

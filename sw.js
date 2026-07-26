@@ -60,7 +60,12 @@
 // returning visitor's precache still lists two URLs that now 404 — the bump
 // is what drops them. Also picks up the new palette and the logo/favicon/
 // banner PNGs.
-const VERSION = 'ob-v11';
+// ob-v12: the two Follows tabs moved off the static shards onto the D1 query
+// API (/api/v1/boosts/follows) via the new assets/js/ob-live.js. Required, not
+// cosmetic: a returning visitor holding the previous boosts-feed.js /
+// feeds-podcasts.js would keep downloading month archives to filter them
+// client-side, and neither bundle imports the new module.
+const VERSION = 'ob-v12';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;

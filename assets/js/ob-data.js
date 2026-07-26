@@ -1,7 +1,14 @@
-/* OnlyBoosts data client.
+/* OnlyBoosts data client — the static half.
  *
  * One place that knows how to talk to the collector's feed, so the four
  * views don't each re-derive paths or re-handle the upstream's quirks.
+ *
+ * There are two backends. This module is the static one: immutable JSON
+ * shards on the CDN, which is where the two Global views get their data.
+ * The live query API (D1, /api/v1/*) is `ob-live.js` — it exists because a
+ * follow-scoped feed can't be served from a cacheable shard, since the
+ * audience differs per visitor. Both return the same record shape, and
+ * `normalizeBoosts` below is exported so both normalize it identically.
  *
  * Everything goes through /api/data/* (functions/api/data/[[path]].js), which
  * validates the path and guarantees the body is real JSON. That matters
@@ -128,7 +135,7 @@ function str(v) {
   return (typeof v === 'string' && v.trim()) ? v : null
 }
 
-function normalizeBoosts(d) {
+export function normalizeBoosts(d) {
   const arr = Array.isArray(d?.boosts) ? d.boosts : (Array.isArray(d) ? d : [])
   const out = []
   for (const b of arr) {

@@ -34,6 +34,7 @@ import { buildActionBar, configureBoostActions } from '/assets/js/boost-actions.
 import { ensureLoginWidget } from '/assets/js/widget-loader.js'
 import { resolveFollows } from '/assets/js/follow-set.js'
 import { getLatestBoosts, getBoostMonths, getBoostMonth, toEpisodeShape } from '/assets/js/ob-data.js'
+import { getFollowsBoosts } from '/assets/js/ob-live.js'
 import { copyText, showToast, copyNpub } from '/assets/js/copy-npub.js'
 
 const VALUE_API = '/api/value'   // Podcast Index value-block proxy (splits)
@@ -900,6 +901,60 @@ function mountControls(panel, { sortKey, rangeKey, onSort, onRange }) {
   ]))
 }
 
+// ── Boost corpus ─────────────────────────────────────────────────────
+// Both tabs group boosts by episode, so unlike the note feed neither can
+// paint until it holds a corpus to roll up and range-filter over. What
+// differs is where that corpus comes from.
+
+/**
+ * Global: latest.json plus the three most recent month archives.
+ *
+ * The range filter offers 1W / 1M / All, so "All" needs more than the recent
+ * 1,000 boosts to mean anything — but pulling all 22 archives would be ~20MB.
+ * Three months keeps the default views honest at ~4MB worst case.
+ */
+async function loadGlobalRows() {
+  const [latest, months] = await Promise.all([getLatestBoosts(), getBoostMonths()])
+  const seen = new Set()
+  const rows = []
+  const take = (arr) => {
+    for (const b of arr) {
+      if (seen.has(b.id)) continue
+      seen.add(b.id)
+      rows.push(b)
+    }
+  }
+  take(latest)
+  const archives = await Promise.all(
+    months.slice(0, 3).map((m) => getBoostMonth(m.file).catch((e) => {
+      console.warn('[podcasts] month load failed', m.file, e)
+      return []
+    }))
+  )
+  for (const a of archives) take(a)
+  return rows
+}
+
+/**
+ * Follows: the D1 query API, filtered to the contact list server-side.
+ *
+ * No month window here. The three-month bound above exists because the shards
+ * are global and big; a follow set's boosts are a thin slice of the same
+ * table, so the query walks the follow set's own history and stops on the row
+ * budget in ob-live.js rather than at an archive boundary. That makes "All"
+ * mean more on this tab than on Global, which is the right way round — a
+ * Follows audience is exactly the one whose older boosts are worth finding.
+ */
+async function loadFollowsRows(authors) {
+  const { rows, truncated } = await getFollowsBoosts(authors)
+  if (truncated) {
+    // Worth knowing when tuning the budget: the rollup is over a prefix of the
+    // follow set's history, not all of it.
+    console.info('[podcasts] follows corpus truncated at', rows.length, 'boosts')
+  }
+  return rows
+}
+
 // ── Entry point ──────────────────────────────────────────────────────
 /**
  * @param {Element} opts.list   the [data-feed-list] container
@@ -910,11 +965,12 @@ export async function renderPodcasts({ panel, list, scope = 'global' }) {
   // the whole network. On Follows the population is just "whoever you happen
   // to follow", so a #1 would imply a standing that doesn't exist.
   const showRanks = scope !== 'follows'
-  // Follows scoping is applied to the raw boost rows, BEFORE the episode
-  // rollup: an episode should only appear if someone you follow boosted it,
-  // and its booster counts / sat totals must reflect only those boosts.
-  // Filtering after the rollup would list the right episodes with wrong
-  // numbers.
+  // Follows scoping applies to the raw boost rows, BEFORE the episode rollup:
+  // an episode should only appear if someone you follow boosted it, and its
+  // booster counts / sat totals must reflect only those boosts. Scoping after
+  // the rollup would list the right episodes with wrong numbers — which is
+  // also why the published podcasts/index.json can't serve this tab, since its
+  // aggregates are computed over everyone.
   let follows = null
   if (scope === 'follows') {
     const res = await resolveFollows()
@@ -930,33 +986,14 @@ export async function renderPodcasts({ panel, list, scope = 'global' }) {
       renderPlaceholder(list, 'You’re not following anyone yet', 'Follow some npubs in any Nostr client and the episodes they boost will show up here.')
       return
     }
-    follows = new Set(res.follows)
+    // The array the query API takes. The membership testing this used to do
+    // client-side is now an indexed IN over the follow set.
+    follows = res.follows
   }
 
   let data
   try {
-    // latest.json plus the three most recent month archives. The range filter
-    // below offers 1W / 1M / All, so "All" needs more than the recent 1,000
-    // boosts to mean anything — but pulling all 22 archives would be ~20MB.
-    // Three months keeps the default views honest at ~4MB worst case.
-    const [latest, months] = await Promise.all([getLatestBoosts(), getBoostMonths()])
-    const seen = new Set()
-    const rows = []
-    const take = (arr) => {
-      for (const b of arr) {
-        if (seen.has(b.id)) continue
-        seen.add(b.id)
-        if (!follows || follows.has(b.booster.pk)) rows.push(b)
-      }
-    }
-    take(latest)
-    const archives = await Promise.all(
-      months.slice(0, 3).map((m) => getBoostMonth(m.file).catch((e) => {
-        console.warn('[podcasts] month load failed', m.file, e)
-        return []
-      }))
-    )
-    for (const a of archives) take(a)
+    const rows = follows ? await loadFollowsRows(follows) : await loadGlobalRows()
     data = toEpisodeShape(rows)
     // Seed from the embedded identities so the cards paint with real names
     // and avatars immediately — no profile round-trip, no repaint.
