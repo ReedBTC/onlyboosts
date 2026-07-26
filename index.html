@@ -143,7 +143,8 @@
     /* ── Feed tabs ──────────────────────────────────────────────────
        Desktop: a row of four equal-width tabs, each carrying its own
        feed color. The active tab fills with its accent; inactive tabs
-       show a colored icon + a thin colored top rule. The whole bar is
+       show a colored icon + a thin colored top rule, separated by
+       hairlines so each one's edges are visible. The whole bar is
        sticky under the nav so the tabs stay reachable while scrolling
        a long feed.
        Mobile: the bar collapses into a horizontally-scrollable row of
@@ -164,7 +165,19 @@
          so the remaining tabs fill the row on their own. */
       grid-auto-flow: column;
       grid-auto-columns: 1fr;
-      gap: 0;
+      /* Dividers, drawn by the container rather than the tabs: 1px gaps
+         over a --border-coloured track show through as hairlines while
+         the tabs still touch edge to edge. A border-left on the tabs
+         themselves would land inside the active tab's fill, and would
+         need a :not([hidden]) sibling selector to skip whichever tab is
+         visually first. Requires the tabs to be opaque, hence their
+         --cream background below (the wrap's own colour). The matching
+         rules on the two outer ends are borders on the container, since
+         there is no gap out there to show it through. */
+      gap: 1px;
+      background: var(--border);
+      border-left: 1px solid var(--border);
+      border-right: 1px solid var(--border);
     }
     /* Must be explicit: .feed-tab sets display:flex, which would otherwise
        beat the UA's [hidden] { display: none } and leave hidden tabs on
@@ -173,7 +186,7 @@
     .feed-tab {
       --tab: var(--muted);
       appearance: none;
-      background: transparent;
+      background: var(--cream);
       border: 0;
       border-top: 3px solid transparent;
       font: inherit;
@@ -212,7 +225,8 @@
       color: var(--muted);
       opacity: 0.85;
     }
-    .feed-tab:hover { background: rgba(0,0,0,0.03); }
+    /* Opaque, so it can't reveal the divider track underneath. */
+    .feed-tab:hover { background: var(--cream-d); }
     .feed-tab:focus-visible {
       outline: 2px solid var(--tab);
       outline-offset: -2px;
@@ -799,22 +813,26 @@
       .feed-tabs-wrap { top: 56px; } /* nav shrinks on mobile */
       /* Icon-only chips that all fit across the row (no horizontal scroll).
          Column sizing is inherited from the base rule so hidden tabs drop
-         out here too. */
+         out here too. The chips carry their own outline, so the desktop
+         divider track is dropped — at this gap it would read as a band,
+         not a hairline. */
       .feed-tabs {
         gap: 0.5rem;
         padding: 0.6rem 0.85rem;
+        background: transparent;
+        border-left: 0;
+        border-right: 0;
       }
       .feed-tab {
         flex-direction: row;
         justify-content: center;
-        gap: 0;
+        gap: 0.35rem;
         border-top: 0;
         border: 1px solid var(--tab);
         border-radius: 999px;
-        padding: 0.5rem 0;
+        padding: 0.45rem 0;
         color: var(--tab);
       }
-      .feed-tab { gap: 0.35rem; padding: 0.45rem 0; }
       .feed-tab-icon { width: 17px; height: 17px; flex-shrink: 0; }
       /* Hide the family label visually but keep it for screen readers (the
          icon is aria-hidden, so label + sub are the tab's accessible name). */
@@ -881,16 +899,16 @@
           <a class="nav-explore-home" href="/"><span aria-hidden="true">🏠</span> Home</a>
           <div class="nav-explore-groups">
             <div class="nav-explore-group">
-              <h4>Feeds</h4>
-              <a href="/#podcasts-global"><span aria-hidden="true">🎙</span> Podcasts: Global</a>
-              <a href="/#podcasts-follows"><span aria-hidden="true">🎧</span> Podcasts: Follows</a>
-              <a href="/#boosts-global"><span aria-hidden="true">⚡</span> Boosts: Global</a>
-              <a href="/#boosts-follows"><span aria-hidden="true">👥</span> Boosts: Follows</a>
+              <h4>Podcasts</h4>
+              <a href="/#podcasts-global"><span aria-hidden="true">🎙</span> Global</a>
+              <a href="/#podcasts-follows"><span aria-hidden="true">🎧</span> Follows</a>
+              <a href="/shows"><span aria-hidden="true">📻</span> Shows</a>
             </div>
             <div class="nav-explore-group">
-              <h4>Community</h4>
+              <h4>Boosts</h4>
+              <a href="/#boosts-global"><span aria-hidden="true">⚡</span> Global</a>
+              <a href="/#boosts-follows"><span aria-hidden="true">👥</span> Follows</a>
               <a href="/boosters"><span aria-hidden="true">🧑‍🤝‍🧑</span> Boosters</a>
-              <a href="/podcasts"><span aria-hidden="true">📻</span> Podcasts</a>
             </div>
             <div class="nav-explore-group">
               <h4>More</h4>
@@ -1104,18 +1122,27 @@
     </div>
 
     <div class="footer-col">
-      <h3>Feeds</h3>
+      <h3>Podcasts</h3>
       <ul>
-        <li><a href="/#podcasts-global">🎙 Global Podcasts</a></li>
-        <li><a href="/#boosts-global">⚡ Global Boosts</a></li>
-        <li><a href="/#podcasts-follows">🎧 Follows Podcasts</a></li>
-        <li><a href="/#boosts-follows">👥 Follows Boosts</a></li>
+        <li><a href="/#podcasts-global">🎙 Global</a></li>
+        <li><a href="/#podcasts-follows">🎧 Follows</a></li>
+        <li><a href="/shows">📻 Shows</a></li>
+      </ul>
+    </div>
+
+    <div class="footer-col">
+      <h3>Boosts</h3>
+      <ul>
+        <li><a href="/#boosts-global">⚡ Global</a></li>
+        <li><a href="/#boosts-follows">👥 Follows</a></li>
+        <li><a href="/boosters">🧑‍🤝‍🧑 Boosters</a></li>
       </ul>
     </div>
 
     <div class="footer-col">
       <h3>Connect</h3>
       <ul>
+        <li><a href="/about">ℹ️ About</a></li>
         <li><a href="https://github.com/ReedBTC/onlyboosts" target="_blank" rel="noopener">💻 Site Source</a></li>
         <li><a href="#" data-lb-bug-trigger">🐞 Report a bug</a></li>
       </ul>

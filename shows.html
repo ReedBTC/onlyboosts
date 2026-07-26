@@ -20,9 +20,9 @@
     object-src 'none';
   " />
 
-  <title>Podcasts — OnlyBoosts</title>
+  <title>Shows — OnlyBoosts</title>
   <meta name="description" content="A directory of the shows receiving boosts on podcasting 2.0, with their value splits and Nostr presence — coming soon to OnlyBoosts." />
-  <link rel="canonical" href="https://onlyboosts.social/podcasts" />
+  <link rel="canonical" href="https://onlyboosts.social/shows" />
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
   <!-- Nothing to index until the page has its feature. -->
   <meta name="robots" content="noindex, follow" />
@@ -37,8 +37,8 @@
 
   <!-- Open Graph -->
   <meta property="og:type" content="website" />
-  <meta property="og:url" content="https://onlyboosts.social/podcasts" />
-  <meta property="og:title" content="Podcasts — OnlyBoosts" />
+  <meta property="og:url" content="https://onlyboosts.social/shows" />
+  <meta property="og:title" content="Shows — OnlyBoosts" />
   <meta property="og:description" content="A directory of the shows receiving boosts on podcasting 2.0, with their value splits and Nostr presence — coming soon to OnlyBoosts." />
   <meta property="og:site_name" content="OnlyBoosts" />
   <meta property="og:image" content="https://onlyboosts.social/assets/onlyboosts_banner.png" />
@@ -87,16 +87,16 @@
           <a class="nav-explore-home" href="/"><span aria-hidden="true">🏠</span> Home</a>
           <div class="nav-explore-groups">
             <div class="nav-explore-group">
-              <h4>Feeds</h4>
-              <a href="/#podcasts-global"><span aria-hidden="true">🎙</span> Podcasts: Global</a>
-              <a href="/#podcasts-follows"><span aria-hidden="true">🎧</span> Podcasts: Follows</a>
-              <a href="/#boosts-global"><span aria-hidden="true">⚡</span> Boosts: Global</a>
-              <a href="/#boosts-follows"><span aria-hidden="true">👥</span> Boosts: Follows</a>
+              <h4>Podcasts</h4>
+              <a href="/#podcasts-global"><span aria-hidden="true">🎙</span> Global</a>
+              <a href="/#podcasts-follows"><span aria-hidden="true">🎧</span> Follows</a>
+              <a href="/shows"><span aria-hidden="true">📻</span> Shows</a>
             </div>
             <div class="nav-explore-group">
-              <h4>Community</h4>
+              <h4>Boosts</h4>
+              <a href="/#boosts-global"><span aria-hidden="true">⚡</span> Global</a>
+              <a href="/#boosts-follows"><span aria-hidden="true">👥</span> Follows</a>
               <a href="/boosters"><span aria-hidden="true">🧑‍🤝‍🧑</span> Boosters</a>
-              <a href="/podcasts"><span aria-hidden="true">📻</span> Podcasts</a>
             </div>
             <div class="nav-explore-group">
               <h4>More</h4>
@@ -132,8 +132,8 @@
 <!-- NAV:END -->
 
 <header class="page-header">
-  <span class="page-eyebrow">Community</span>
-  <h1>Podcasts</h1>
+  <span class="page-eyebrow">Podcasts</span>
+  <h1>Shows</h1>
   <p>The shows on the receiving end.</p>
 </header>
 
@@ -168,18 +168,27 @@
     </div>
 
     <div class="footer-col">
-      <h3>Feeds</h3>
+      <h3>Podcasts</h3>
       <ul>
-        <li><a href="/#podcasts-global">🎙 Global Podcasts</a></li>
-        <li><a href="/#boosts-global">⚡ Global Boosts</a></li>
-        <li><a href="/#podcasts-follows">🎧 Follows Podcasts</a></li>
-        <li><a href="/#boosts-follows">👥 Follows Boosts</a></li>
+        <li><a href="/#podcasts-global">🎙 Global</a></li>
+        <li><a href="/#podcasts-follows">🎧 Follows</a></li>
+        <li><a href="/shows">📻 Shows</a></li>
+      </ul>
+    </div>
+
+    <div class="footer-col">
+      <h3>Boosts</h3>
+      <ul>
+        <li><a href="/#boosts-global">⚡ Global</a></li>
+        <li><a href="/#boosts-follows">👥 Follows</a></li>
+        <li><a href="/boosters">🧑‍🤝‍🧑 Boosters</a></li>
       </ul>
     </div>
 
     <div class="footer-col">
       <h3>Connect</h3>
       <ul>
+        <li><a href="/about">ℹ️ About</a></li>
         <li><a href="https://github.com/ReedBTC/onlyboosts" target="_blank" rel="noopener">💻 Site Source</a></li>
         <li><a href="#" data-lb-bug-trigger">🐞 Report a bug</a></li>
       </ul>

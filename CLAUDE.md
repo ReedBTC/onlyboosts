@@ -9,7 +9,7 @@ localbitcoiners' community feeds work.
 hash-routed tabs on two axes — what (boosts / podcasts) x whose (global /
 your follows). `about.html` is a real content page — the project's own
 explanation of what the data is and isn't. `boosters.html` and
-`podcasts.html` are still coming-soon placeholders with no feature behind
+`shows.html` are still coming-soon placeholders with no feature behind
 them; they're nav + header + card + footer and nothing else.
 
 | Tab | Hash | Renders |
@@ -209,16 +209,19 @@ Carried from the scaffold commit and the LB suite:
 **Still to build:**
 
 0. **Two coming-soon pages have no feature behind them.** `/boosters` (a
-   directory of the npubs sending boosts) and `/podcasts` (a show-level
+   directory of the npubs sending boosts) and `/shows` (a show-level
    directory — the feed tabs are episode-level). Both are `noindex` and out
-   of `functions/sitemap.xml.js` until there's something on them.
+   of `functions/sitemap.xml.js` until there's something on them. `/shows`
+   was `/podcasts` until the nav grouped the feeds under a Podcasts heading;
+   `_redirects` carries the 301.
 
    `/about` is done. Its copy is distilled from
    `docs/about-and-faq-source.md`, written by the collector-side agent —
    **that file is the factual source of record**, so correct it there first
-   if the pipeline's behaviour changes. The page's live stat strip reads
-   `/api/data/meta.json` and stays hidden if the fetch fails, so the numbers
-   can never go stale in the markup.
+   if the pipeline's behaviour changes. It carried a live stat strip off
+   `/api/data/meta.json` until those two pages claimed the numbers; the
+   markup, the fetch and the `.stat-*` rules all came out together, so
+   recover them from git rather than rewriting if a stat block is wanted.
 
 1. **Podcast Index credentials.** `/api/value` needs `PODCAST_INDEX_KEY` and
    `PODCAST_INDEX_SECRET` in the Cloudflare env. Without them it returns a

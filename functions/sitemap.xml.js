@@ -13,7 +13,7 @@ const SITE_ORIGIN = "https://onlyboosts.social";
 // don't index fragments separately — listing them would just be four
 // duplicate entries for the same URL.
 //
-// /boosters and /podcasts are deliberately absent: they're coming-soon
+// /boosters and /shows are deliberately absent: they're coming-soon
 // placeholders and carry `noindex` themselves. Add them here when they have
 // a feature behind them.
 const STATIC_URLS = [

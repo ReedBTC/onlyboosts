@@ -85,16 +85,16 @@
           <a class="nav-explore-home" href="/"><span aria-hidden="true">🏠</span> Home</a>
           <div class="nav-explore-groups">
             <div class="nav-explore-group">
-              <h4>Feeds</h4>
-              <a href="/#podcasts-global"><span aria-hidden="true">🎙</span> Podcasts: Global</a>
-              <a href="/#podcasts-follows"><span aria-hidden="true">🎧</span> Podcasts: Follows</a>
-              <a href="/#boosts-global"><span aria-hidden="true">⚡</span> Boosts: Global</a>
-              <a href="/#boosts-follows"><span aria-hidden="true">👥</span> Boosts: Follows</a>
+              <h4>Podcasts</h4>
+              <a href="/#podcasts-global"><span aria-hidden="true">🎙</span> Global</a>
+              <a href="/#podcasts-follows"><span aria-hidden="true">🎧</span> Follows</a>
+              <a href="/shows"><span aria-hidden="true">📻</span> Shows</a>
             </div>
             <div class="nav-explore-group">
-              <h4>Community</h4>
+              <h4>Boosts</h4>
+              <a href="/#boosts-global"><span aria-hidden="true">⚡</span> Global</a>
+              <a href="/#boosts-follows"><span aria-hidden="true">👥</span> Follows</a>
               <a href="/boosters"><span aria-hidden="true">🧑‍🤝‍🧑</span> Boosters</a>
-              <a href="/podcasts"><span aria-hidden="true">📻</span> Podcasts</a>
             </div>
             <div class="nav-explore-group">
               <h4>More</h4>
@@ -136,25 +136,18 @@
 <main class="page-main">
   <div class="page-inner page-inner--wide">
 
-    <!-- Filled from /api/data/meta.json by the script at the foot of the
-         page; stays hidden if that fetch fails, so no empty shell. -->
-    <div class="stat-strip" id="stat-strip" hidden>
-      <div class="stat"><span class="stat-num" data-stat="boosts">&mdash;</span><span class="stat-label">Boosts</span></div>
-      <div class="stat"><span class="stat-num" data-stat="shows">&mdash;</span><span class="stat-label">Shows</span></div>
-      <div class="stat"><span class="stat-num" data-stat="boosters">&mdash;</span><span class="stat-label">Boosters</span></div>
-      <div class="stat"><span class="stat-num" data-stat="sats">&mdash;</span><span class="stat-label">Sats</span></div>
-      <div class="stat"><span class="stat-num" data-stat="since">&mdash;</span><span class="stat-label">Since</span></div>
-    </div>
-
-    <nav class="toc" aria-label="On this page">
-      <a href="#overview">Overview</a>
-      <a href="#nostr">Nostr Fundamentals</a>
-      <a href="#nip73">NIP-73</a>
-      <a href="#keysend">Keysend Boosts</a>
-      <a href="#pipeline">How the Index Is Built</a>
-      <a href="#amounts">Amounts</a>
-      <a href="#limits">Limitations</a>
-      <a href="#faq">Questions</a>
+    <nav class="toc" aria-labelledby="toc-title">
+      <h2 class="toc-title" id="toc-title">Contents</h2>
+      <ol class="toc-list">
+        <li><a href="#overview">Overview</a></li>
+        <li><a href="#nostr">Nostr Fundamentals</a></li>
+        <li><a href="#nip73">NIP-73 and External Content IDs</a></li>
+        <li><a href="#keysend">Keysend Boosts and What Is Not Indexed</a></li>
+        <li><a href="#pipeline">How the Index Is Built</a></li>
+        <li><a href="#amounts">How Amounts Are Determined</a></li>
+        <li><a href="#limits">Limitations and Disclaimers</a></li>
+        <li><a href="#faq">Frequently Asked Questions</a></li>
+      </ol>
     </nav>
 
     <div class="prose">
@@ -388,18 +381,27 @@
     </div>
 
     <div class="footer-col">
-      <h3>Feeds</h3>
+      <h3>Podcasts</h3>
       <ul>
-        <li><a href="/#podcasts-global">🎙 Global Podcasts</a></li>
-        <li><a href="/#boosts-global">⚡ Global Boosts</a></li>
-        <li><a href="/#podcasts-follows">🎧 Follows Podcasts</a></li>
-        <li><a href="/#boosts-follows">👥 Follows Boosts</a></li>
+        <li><a href="/#podcasts-global">🎙 Global</a></li>
+        <li><a href="/#podcasts-follows">🎧 Follows</a></li>
+        <li><a href="/shows">📻 Shows</a></li>
+      </ul>
+    </div>
+
+    <div class="footer-col">
+      <h3>Boosts</h3>
+      <ul>
+        <li><a href="/#boosts-global">⚡ Global</a></li>
+        <li><a href="/#boosts-follows">👥 Follows</a></li>
+        <li><a href="/boosters">🧑‍🤝‍🧑 Boosters</a></li>
       </ul>
     </div>
 
     <div class="footer-col">
       <h3>Connect</h3>
       <ul>
+        <li><a href="/about">ℹ️ About</a></li>
         <li><a href="https://github.com/ReedBTC/onlyboosts" target="_blank" rel="noopener">💻 Site Source</a></li>
         <li><a href="#" data-lb-bug-trigger">🐞 Report a bug</a></li>
       </ul>
@@ -411,47 +413,6 @@
   </div>
 </footer>
 <!-- FOOTER:END -->
-
-<!-- Live index stats. Best-effort: the strip stays hidden unless the whole
-     fetch-and-parse succeeds, so a slow or broken endpoint costs a row of
-     numbers, never a broken page. Same /api/data proxy the feeds read. -->
-<script>
-(function () {
-  'use strict';
-  var strip = document.getElementById('stat-strip');
-  if (!strip || !window.fetch) return;
-
-  function compact(n) {
-    if (n >= 1e9) return (n / 1e9).toFixed(1).replace(/\.0$/, '') + 'B';
-    if (n >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M';
-    if (n >= 1e3) return (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'k';
-    return String(n);
-  }
-
-  fetch('/api/data/meta.json', { headers: { accept: 'application/json' } })
-    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
-    .then(function (m) {
-      // Require the headline number — a manifest that parsed but carries
-      // nothing useful shouldn't render a row of zeroes.
-      if (!m || !m.boosts) return;
-      var vals = {
-        boosts: compact(m.boosts),
-        shows: compact(m.distinct_shows || 0),
-        boosters: compact(m.distinct_boosters || 0),
-        sats: compact(m.total_sats || 0),
-        since: m.earliest
-          ? new Date(m.earliest * 1000).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })
-          : '—',
-      };
-      Object.keys(vals).forEach(function (k) {
-        var el = strip.querySelector('[data-stat="' + k + '"]');
-        if (el) el.textContent = vals[k];
-      });
-      strip.hidden = false;
-    })
-    .catch(function (e) { console.warn('[about] stats unavailable', e); });
-})();
-</script>
 
 <!-- ───────────────── NOSTR LOGIN WIDGET (lazy) ─────────────────
      Wires the nav's Donate button + identity slot to the ~1MB bundle,

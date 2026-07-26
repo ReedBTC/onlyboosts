@@ -65,7 +65,15 @@
 // cosmetic: a returning visitor holding the previous boosts-feed.js /
 // feeds-podcasts.js would keep downloading month archives to filter them
 // client-side, and neither bundle imports the new module.
-const VERSION = 'ob-v12';
+// ob-v13: nav and footer regrouped into Podcasts / Boosts columns, and
+// /podcasts renamed to /shows. Required: a returning visitor's HTML cache
+// holds pages whose links still point at /podcasts, which now costs a 301
+// hop, and the runtime cache may hold the old page itself under a URL that
+// no longer serves it. Also picks up page.css, where the about page's jump
+// links became a numbered table of contents and the live stat strip came
+// out entirely, and index.html's feed tabs, which now have hairline
+// dividers between them.
+const VERSION = 'ob-v13';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;

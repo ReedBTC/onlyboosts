@@ -1,2 +1,6 @@
-# Cloudflare Pages redirects. Empty for now — OnlyBoosts has no legacy
-# URLs yet. Add entries here as pages move.
+# Cloudflare Pages redirects. Add entries here as pages move.
+
+# The show directory lived at /podcasts until the nav grouped the two feeds
+# under a "Podcasts" heading; the page is /shows now. Only the site page
+# moves — the /api/v1/podcasts endpoints are a different path, unaffected.
+/podcasts /shows 301

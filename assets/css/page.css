@@ -1,6 +1,6 @@
 /* ══════════════════════ SIMPLE CONTENT PAGES ══════════════════════
    Shared chrome for the non-feed pages (about.html, boosters.html,
-   podcasts.html): the navy page header and the centered card the
+   shows.html): the navy page header and the centered card the
    "coming soon" copy sits in. Feed pages don't use this — index.html
    has its own masthead + tab layout.
 
@@ -134,59 +134,65 @@
 
 .page-inner--wide { max-width: 46rem; }
 
-/* ── Live stat strip ───────────────────────────────────────────────
-   Hidden until the numbers land (about.html fills it from
-   /api/data/meta.json), so a failed fetch leaves no empty shell. */
-.stat-strip {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
-  gap: 0.75rem;
-  margin-bottom: 2.25rem;
-}
-.stat-strip[hidden] { display: none; }
-.stat {
+/* The live stat strip that sat above the about page's contents (a grid of
+   /api/data/meta.json figures) was removed with it; /boosters and /shows
+   are where the numbers belong. Recover the rules with
+   `git show <sha>:assets/css/page.css` rather than rewriting them. */
+
+/* ── Table of contents ──
+   Entries carry the section's full heading, so the numbering is the only
+   thing distinguishing them; `counter` rather than a real marker keeps the
+   digits outside the link's hit area and lets them be styled down. */
+.toc {
+  margin-bottom: 2.5rem;
+  padding: 1.1rem 1.35rem 1.2rem;
   background: var(--white);
   border: 1px solid var(--border);
+  border-left: 3px solid var(--brand);
   border-radius: 10px;
-  padding: 0.85rem 0.5rem;
-  text-align: center;
 }
-.stat-num {
-  display: block;
+.toc-title {
   font-family: 'Playfair Display', Georgia, serif;
-  font-size: 1.35rem;
+  font-size: 0.75rem;
   font-weight: 700;
-  color: var(--brand-d);
-  line-height: 1.1;
-}
-.stat-label {
-  display: block;
-  margin-top: 0.2rem;
-  font-size: 0.72rem;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--muted);
+  margin-bottom: 0.55rem;
 }
-
-/* ── Jump links ── */
-.toc {
+.toc-list {
+  list-style: none;
+  counter-reset: toc;
+}
+.toc-list li { counter-increment: toc; break-inside: avoid; }
+.toc-list a {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-  margin-bottom: 2.5rem;
-}
-.toc a {
-  padding: 0.35rem 0.8rem;
-  border-radius: 999px;
-  background: var(--white);
-  border: 1px solid var(--border);
+  gap: 0.55rem;
+  padding: 0.28rem 0;
   color: var(--brand-d);
-  font-size: 0.82rem;
+  font-size: 0.95rem;
   font-weight: 600;
+  line-height: 1.35;
   text-decoration: none;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  transition: color 0.15s;
 }
-.toc a:hover { background: var(--brand); border-color: var(--brand); color: var(--white); }
+.toc-list a::before {
+  content: counter(toc) ".";
+  flex: none;
+  min-width: 1.1rem;
+  color: var(--muted);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.toc-list a:hover { color: var(--brand); text-decoration: underline; }
+.toc-list a:hover::before { color: var(--brand); }
+
+/* Two columns once there's room. `columns` flows top-to-bottom before
+   wrapping, so 1-4 sit above 5-8 in reading order; a grid would give
+   1-2 / 3-4 across. */
+@media (min-width: 620px) {
+  .toc-list { columns: 2; column-gap: 2rem; }
+}
 
 /* ── Prose ── */
 .prose > section { margin-bottom: 2.75rem; scroll-margin-top: 5rem; }
@@ -312,5 +318,4 @@
 
 @media (max-width: 640px) {
   .prose h2 { font-size: 1.3rem; }
-  .stat-num { font-size: 1.15rem; }
 }
