@@ -240,7 +240,12 @@
           <li><strong>Enrich.</strong> Each show and episode is looked up in the Podcast Index by GUID to attach its title, artwork and air date, and the booster&rsquo;s public Nostr profile is resolved for a display name and avatar.</li>
           <li><strong>Serve.</strong> The result is written out as plain JSON and served openly. This website reads exactly the same files that are available to anyone else.</li>
         </ul>
-        <p>An initial backfill reached as far back as relays still retain these events, approximately October 2024. An incremental scan runs roughly every fifteen minutes to keep the index current, and a daily pass widens the set of relays queried.</p>
+        <p>An initial backfill reached as far back as relays still retain these events, approximately October 2024. Two collectors have kept the index current since.</p>
+        <ul>
+          <li><strong>An incremental scan, every five minutes.</strong> It queries a core set of roughly a dozen relays selected for boost density, enriches whatever is new, rebuilds the JSON and refreshes the query layer behind the Follows feeds. A run completes in about fifteen seconds. This is what makes a new boost appear.</li>
+          <li><strong>A deep sweep, once daily.</strong> It resolves each booster&rsquo;s own declared write relays and queries those as well, recovering boosts that landed only on a relay the core set does not reach. The core relays already carry approximately 99.6% of what is found, so this pass is a completeness backstop rather than the mechanism that keeps the site current.</li>
+        </ul>
+        <p>Published files are then held at the content delivery network for five minutes, so what you are reading may be one cache period behind what the collector holds. A boost note therefore reaches this site in five to six minutes typically, and in about ten minutes in the worst case, where a note misses a scan by seconds and then waits out a full cache period.</p>
 
         <h3>Applications Publishing Boost Notes</h3>
         <p>Four sources are known to be publishing NIP-73 boost notes at present, one of which is this site.</p>
@@ -333,8 +338,9 @@
           <details>
             <summary>How current is the data?</summary>
             <div class="faq-body">
-              <p>An incremental scan runs roughly every fifteen minutes, so a boost note typically appears here within minutes of being published. A daily pass queries a wider set of relays and picks up anything the incremental scan missed.</p>
-              <p>The site itself reads a static snapshot that is regenerated on the same cycle, which is why the feeds load without querying relays from your browser.</p>
+              <p>A boost note usually appears here five to six minutes after it is published, and within about ten minutes in the worst case. The incremental scan runs every five minutes and takes roughly fifteen seconds; the files it writes are then cached at the content delivery network for a further five minutes, and those two intervals are the whole of the delay.</p>
+              <p>A daily deep sweep queries a wider set of relays and recovers anything the five-minute scan could not reach, so a boost that surfaces late is generally one that was published to an unusual relay rather than one the site was slow to notice.</p>
+              <p>The site itself reads a static snapshot regenerated on that cycle, which is why the feeds load without your browser querying any relay.</p>
             </div>
           </details>
 

@@ -89,8 +89,25 @@ or a boost-type topic tag).
 4. **Serve.** The result is written out as plain JSON files and served openly.
 
 A backfill reached back to roughly **October 2024** (as far as relays still
-retain these notes); an incremental scan keeps it current every ~15 minutes, and
-a daily pass widens the relay net.
+retain these notes). Two collectors keep it current after that:
+
+- **Incremental scan — every 5 minutes.** Scans the curated core relay set
+  (~12, chosen for boost density), enriches the new boosts, rebuilds the JSON
+  shards, pushes them out, and delta-syncs the query layer behind the Follows
+  feeds. A run takes about 15 seconds. This is the one that makes new boosts
+  appear.
+- **Outbox deep sweep — once daily, ~08:30 UTC.** Resolves each booster's own
+  NIP-65 write relays and sweeps those too, catching boosts that only landed
+  somewhere the core set doesn't reach. The core relays already carry ~99.6% of
+  what we find, so this is a completeness backstop rather than the freshness
+  path.
+
+The published files are then CDN-cached for 5 minutes (10 for the value-split
+lookup), so what a visitor sees can be one cache period behind what the
+collector has. End to end: **typically 5 to 6 minutes** from a boost note being
+published to it appearing on the site, and about **10 minutes** in the worst
+case, where a note misses a scan by seconds and then waits out a full cache
+period.
 
 ---
 
