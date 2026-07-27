@@ -961,9 +961,10 @@ const api = {
   /**
    * Open the EXTERNAL-episode boost modal (another podcast's episode, from
    * /feeds). Same login → real-user → signer → wallet gate chain as
-   * openEpisodeBoost, but renders ExternalBoostModal and applies NO LB
-   * recipient overrides — external recipients + the Fountain→aquafox
-   * redirect are already resolved by the caller (value-block.js).
+   * openEpisodeBoost, but renders ExternalBoostModal and applies NO recipient
+   * overrides. Nothing here rewrites a leg: the caller (value-block.js) hands
+   * over the show's published value block verbatim, and its own override map
+   * is empty by design. See the warning there before adding one.
    *
    * @param {object} args
    * @param {object} args.episode          - { showTitle, episodeTitle, podcastGuid, itemGuid, bmbUrl }

@@ -263,6 +263,18 @@ without telling donor or recipient. That was defensible on LB (Reed's own
 feed); here it would divert money from third-party shows. Only add one for a
 feed OnlyBoosts owns.
 
+**It has a twin: `EXTERNAL_OVERRIDES` in `assets/js/value-block.js`, and both
+must stay empty.** They are two separate maps on two sides of the fork's strip,
+which is how the LB entry survived: `recipientOverrides.js` was emptied, then
+`8bc4cf9` restored `value-block.js` wholesale with
+`boostbot@fountain.fm → aquafox30@primal.net` still in it, labelled "Local
+Bitcoiners". It shipped, and rewrote Fountain's 2% leg on a live external boost
+before being caught on 2026-07-27. **No leg of a third party's value block is
+ever rewritten, renamed, merged or dropped** — `applyExternalOverrides` is now a
+documented passthrough, and the external boost pays exactly what the show
+published. If OnlyBoosts ever takes a cut it gets its own leg under its own
+name. Grep both maps after any restore from `lb/main`.
+
 `FEED_GUID` in `boostagram.js` is deliberately `null` — OnlyBoosts is a
 client, not a podcast, so it has no feed to claim. Inheriting LB's GUID
 would have mis-tagged every share note as a Local Bitcoiners boost and

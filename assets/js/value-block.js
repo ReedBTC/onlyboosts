@@ -123,29 +123,33 @@ export function fromApiValue(apiResp) {
 }
 
 // Per-address redirects applied to external recipients before payment.
-// Fountain's 2% boostbot leg is rerouted into our aquafox wallet — our cut for
-// letting boosters pay the show from here instead of going to Fountain. Mirrors
-// the LB LNADDRESS_OVERRIDES intent but is kept local to this feature.
-const EXTERNAL_OVERRIDES = {
-  'boostbot@fountain.fm': { name: 'Local Bitcoiners', address: 'aquafox30@primal.net' },
-}
+//
+// ⚠️  EMPTY ON ONLYBOOSTS, DELIBERATELY. Do not add an entry here.
+//
+// This is the site-side twin of the widget's LNADDRESS_OVERRIDES, and the same
+// reasoning applies: an override silently reroutes sats away from the address a
+// show's own value block names, at the donor's client, telling neither party.
+// OnlyBoosts boosts other people's podcasts, so an entry would divert money
+// from a third party that never agreed to it.
+//
+// The LB entry (`boostbot@fountain.fm` → `aquafox30@primal.net`, labelled
+// "Local Bitcoiners") survived the fork here after being removed from
+// recipientOverrides.js, and shipped one live boost before it was caught. It is
+// gone. **Fountain's leg stays Fountain's.** If OnlyBoosts ever takes a cut of
+// an external boost it gets its own leg under its own name, not somebody
+// else's rewritten.
+const EXTERNAL_OVERRIDES = {}
 
 /**
- * Apply external recipient overrides. Pure — returns a new array. Merges by
- * weight if a redirect lands on an address that's already a recipient.
+ * Apply external recipient overrides. Pure — returns a new array.
+ *
+ * With EXTERNAL_OVERRIDES empty this is a passthrough by design, and the
+ * passthrough is total: recipients reach the wallet exactly as the show
+ * published them, in order, with no leg rewritten, renamed, merged or dropped.
+ * The seam is kept so the two call sites keep one place to look, and so this
+ * warning sits where an override would otherwise be added.
  */
 export function applyExternalOverrides(recipients) {
   if (!Array.isArray(recipients)) return recipients
-  const out = []
-  for (const r of recipients) {
-    const ov = EXTERNAL_OVERRIDES[(r.address || '').toLowerCase()]
-    const next = ov ? { ...r, name: ov.name, address: ov.address, type: 'lnaddress' } : { ...r }
-    // Overridden legs pay a plain Lightning address, so drop any node-only
-    // custom records that no longer apply.
-    if (ov) { delete next.customKey; delete next.customValue }
-    const dup = out.find((x) => x.type === next.type && x.address.toLowerCase() === next.address.toLowerCase())
-    if (dup) dup.splitWeight += next.splitWeight
-    else out.push(next)
-  }
-  return out
+  return recipients.map((r) => ({ ...r }))
 }

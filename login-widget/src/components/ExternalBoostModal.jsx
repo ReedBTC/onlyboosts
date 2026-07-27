@@ -30,11 +30,29 @@ const WORKING = STATUS.PAYING
 
 function fmtSats(n) { return Number(n || 0).toLocaleString() }
 
+/**
+ * Can this leg actually be retried?
+ *
+ * A FAILED leg definitively never left the wallet, so it always can. An
+ * UNCERTAIN one can only be re-paid after confirming it didn't settle, which
+ * needs a LUD-21 verify URL — keysend has none, and neither does an lnaddress
+ * whose provider didn't hand one back. Offering the button anyway produced a
+ * click whose only effect was to rewrite an error message that was rendered
+ * `sr-only`, so it read as a dead button.
+ */
+function canRetryLeg(recipient, leg) {
+  const status = leg?.status
+  if (status === STATUS.FAILED) return true
+  if (status !== STATUS.UNCERTAIN) return false
+  return recipient?.type === 'lnaddress' && !!leg.verifyUrl && !!leg.paymentHash
+}
+
 // One per-recipient row in the progress list.
 function LegRow({ recipient, leg, onRetry }) {
   const status = leg?.status || STATUS.PENDING
   const sats = leg?.sats
-  const canRetry = (status === STATUS.FAILED || status === STATUS.UNCERTAIN) && onRetry
+  const canRetry = !!onRetry && canRetryLeg(recipient, leg)
+  const showError = (status === STATUS.FAILED || status === STATUS.UNCERTAIN) && !!leg?.error
   let icon = <span className="inline-block w-3.5 h-3.5 rounded-full border border-neutral-600" aria-hidden="true" />
   if (status === STATUS.PAID) icon = <span className="text-green-400" aria-hidden="true">✓</span>
   else if (status === STATUS.FAILED) icon = <span className="text-red-400" aria-hidden="true">✕</span>
@@ -46,17 +64,24 @@ function LegRow({ recipient, leg, onRetry }) {
     </svg>
   )
   return (
-    <li className="flex items-center gap-2 py-1.5 text-xs">
-      <span className="w-4 flex justify-center shrink-0">{icon}</span>
-      <span className="flex-1 min-w-0 truncate text-neutral-300">{recipient?.name || recipient?.address || 'Recipient'}</span>
-      {sats != null && <span className="shrink-0 tabular-nums text-neutral-500">{fmtSats(sats)} sats</span>}
-      {canRetry && (
-        <button onClick={onRetry} className="shrink-0 text-[11px] px-2 py-0.5 rounded border border-neutral-700 text-neutral-300 hover:border-orange-500 hover:text-orange-300 transition-colors">
-          Retry
-        </button>
-      )}
-      {(status === STATUS.FAILED || status === STATUS.UNCERTAIN) && leg?.error && (
-        <span className="sr-only">{leg.error}</span>
+    <li className="py-1.5 text-xs">
+      <div className="flex items-center gap-2">
+        <span className="w-4 flex justify-center shrink-0">{icon}</span>
+        <span className="flex-1 min-w-0 truncate text-neutral-300">{recipient?.name || recipient?.address || 'Recipient'}</span>
+        {sats != null && <span className="shrink-0 tabular-nums text-neutral-500">{fmtSats(sats)} sats</span>}
+        {canRetry && (
+          <button onClick={onRetry} className="shrink-0 text-[11px] px-2 py-0.5 rounded border border-neutral-700 text-neutral-300 hover:border-orange-500 hover:text-orange-300 transition-colors">
+            Retry
+          </button>
+        )}
+      </div>
+      {/* The wallet's own reason, shown rather than hidden: it is the only
+          account of why a leg didn't land, and on a leg with no Retry button
+          it is the entire response the row has to give. */}
+      {showError && (
+        <p className={`mt-1 ml-6 text-[11px] leading-snug ${status === STATUS.UNCERTAIN ? 'text-amber-400/90' : 'text-red-400/90'}`}>
+          {leg.error}
+        </p>
       )}
     </li>
   )
@@ -187,7 +212,10 @@ export default function ExternalBoostModal({ user, onClose, episode, recipientsB
         }
         // 'unsettled' → safe to re-pay, fall through.
       } else {
-        updateLeg(index, { status: STATUS.UNCERTAIN, error: 'Can’t auto-confirm a keysend — check your wallet directly.' })
+        // Backstop only: canRetryLeg no longer offers a button in this case,
+        // so reaching here means the guard was bypassed. Leave the leg's own
+        // error in place rather than overwriting the wallet's account of it.
+        updateLeg(index, { status: STATUS.UNCERTAIN })
         return
       }
     }
@@ -218,6 +246,16 @@ export default function ExternalBoostModal({ user, onClose, episode, recipientsB
   const paidCount = legs.filter((l) => l?.status === STATUS.PAID).length
   const activeCount = visibleLegs.length
   const allPaid = phase === 'done' && activeCount > 0 && paidCount === activeCount
+
+  // Only tell the booster to retry when a row can actually be retried. An
+  // uncertain keysend never can, so on a boost whose only shortfall is one of
+  // those the summary has to point at the wallet instead of at a button that
+  // isn't there.
+  const retryableCount = visibleLegs.filter(({ r, leg }) => canRetryLeg(r, leg)).length
+  const summaryLine = paidCount > 0
+    ? `${paidCount} of ${activeCount} legs sent. ` +
+      (retryableCount > 0 ? 'Retry any that didn’t.' : 'Check your wallet for the rest.')
+    : 'Boost didn’t go through. Check your wallet' + (retryableCount > 0 ? ', then retry.' : '.')
 
   return (
     <>
@@ -306,7 +344,7 @@ export default function ExternalBoostModal({ user, onClose, episode, recipientsB
                 {allPaid && <p className="text-base font-semibold text-green-400">⚡ Boost delivered!</p>}
                 {phase === 'done' && !allPaid && (
                   <p className="text-sm font-semibold text-amber-400">
-                    {paidCount > 0 ? `${paidCount} of ${activeCount} legs sent — retry any that didn't.` : 'Boost didn’t go through — check your wallet and retry.'}
+                    {summaryLine}
                   </p>
                 )}
                 <ul className="flex-1 min-h-0 overflow-y-auto divide-y divide-neutral-800">

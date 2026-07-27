@@ -145,7 +145,7 @@
 // boosts-thread.js lost its own copy of the Primal client, so a returning
 // visitor holding the precached old boosts-thread.js alongside a new
 // boosts-feed.js would import a module the cache has never seen.
-const VERSION = 'ob-v29';
+const VERSION = 'ob-v30';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;
