@@ -221,7 +221,7 @@
 
       <section id="show-identity">
         <h2>When the Show Tag Is Not a Show GUID</h2>
-        <p>The matching described above depends on the <code>podcast:guid</code> tag actually carrying the show&rsquo;s RSS GUID &mdash; the stable UUID that identifies the feed. Some applications put something else there. The note is a genuine boost; only the value naming the show is malformed. Three shapes account for nearly all of it.</p>
+        <p>The matching described above depends on the <code>podcast:guid</code> tag actually carrying the show&rsquo;s RSS GUID, the stable UUID that identifies the feed. Some applications put something else there. The note is a genuine boost; only the value naming the show is malformed. Three shapes account for nearly all of it.</p>
         <div class="tagblock"><span class="c">// a Podcast Index feed number, not a GUID</span>
 ["i", "podcast:guid:<span class="s">946122</span>"]
 
@@ -231,9 +231,9 @@
 <span class="c">// a freeform label the app invented for the episode</span>
 ["i", "podcast:guid:<span class="s">20250508FH</span>"]</div>
         <p>Left untouched, every distinct wrong value looks like a separate show. One real podcast fragments into a scatter of phantom entries, each holding a slice of its boosts. That understates the show&rsquo;s totals, lowers where it ranks, and inflates the count of shows overall.</p>
-        <p>The index repairs the shapes it can resolve with confidence. A numeric feed identifier is looked up &mdash; usually against the feed address the same note also carries, otherwise through the Podcast Index directly &mdash; and mapped to the show it belongs to. A GUID with an episode number stuck on the end has the suffix removed to recover the underlying show. In both cases the stray boosts are folded back into the real podcast and the phantom entries disappear.</p>
+        <p>The index repairs the shapes it can resolve with confidence. A numeric feed identifier is looked up (usually against the feed address the same note also carries, otherwise through the Podcast Index directly) and mapped to the show it belongs to. A GUID with an episode number stuck on the end has the suffix removed to recover the underlying show. In both cases the stray boosts are folded back into the real podcast and the phantom entries disappear.</p>
         <p>A freeform label cannot be repaired the same way. A value such as <code>20250508FH</code> holds no reliable link back to a show&rsquo;s real GUID; it is a name one application chose for one episode, and inferring the show from it by pattern-matching would risk filing boosts under the wrong podcast. These are therefore left as they stand: each remains a separate entry marked as an unidentified show, reunited with its real feed only when that mapping is established by hand. This is the least resolvable of the three, and for now the largest.</p>
-        <p>In every one of these cases the boost itself is indexed and counted. What a malformed identifier costs is attribution &mdash; the boost may sit under an unidentified show rather than alongside the rest of that podcast&rsquo;s support &mdash; never the record that the boost occurred.</p>
+        <p>In every one of these cases the boost itself is indexed and counted. What a malformed identifier costs is attribution; the boost may sit under an unidentified show rather than alongside the rest of that podcast&rsquo;s support. What it never costs is the record that the boost occurred.</p>
       </section>
 
       <section id="keysend">
