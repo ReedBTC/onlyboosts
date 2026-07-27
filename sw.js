@@ -156,7 +156,7 @@
 // the markup comes from the Function, which the SW never caches, but the
 // .show-credit rules are new in show-page.css, which it does — so without the
 // bump a returning visitor reads the credit as unstyled body text.
-const VERSION = 'ob-v31';
+const VERSION = 'ob-v32';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;

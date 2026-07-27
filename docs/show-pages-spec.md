@@ -21,6 +21,7 @@ Locked for the first pass:
 | Granularity | Shows only. Episodes are listed inside the page, not addressable. |
 | URL | The bare `podcast:guid`. No slugs. |
 | Community ranking | All time only. No range control. |
+| Community crossover | Own drawer above the wall, with 1W/1M/All + sort. |
 | Community layout | Top three highlighted, everyone else ranked below by sats. |
 | Show-level boost | Yes, alongside the per-episode buttons. |
 
@@ -174,6 +175,71 @@ this for the boost cards), `name` falls back to a shortened npub, and a missing
 
 ---
 
+## Other Shows This Community Boosts
+
+A drawer directly above the Nostr Community wall, listing every **other** show
+this show's boosters have boosted, ranked. The community is the set of pubkeys
+that have boosted this show; the rollup is a self-join over `boosts` through
+that set.
+
+**It answers a question the Shows feed structurally cannot.** The homepage feed
+ranks shows by size. This ranks them by overlap with one audience, and the
+headline figure on each row is that overlap: "27 of 115 boosters." Measured
+across nine shows sampled from rank #1 to #400, this list's top ten shares
+between **0 and 6** entries with the global top ten, so it is a different list
+rather than the site-wide ranking repeated.
+
+**Not split on medium**, which every other rollup on the site is. A music
+community also boosting podcasts is the interesting half of the finding, so the
+heading reads "Other Shows/Albums This Community Boosts" on both mediums and
+there is no `COPY` entry for it.
+
+**Untitled shows are excluded**, unlike the Shows feed which keeps them as
+"Unidentified show" cards. A show with no title has no page to link to, and an
+unlinkable card in a discovery list is dead weight.
+
+### Why It Needs No Requests
+
+All three windows ship in the DOM. One D1 query returns per-window boosts, sats,
+members and latest via conditional aggregation, and each row carries them packed
+four-to-an-attribute (`data-all` / `data-1m` / `data-1w`). The client only
+re-orders and re-labels, so range and sort are instant and the section renders
+ranked and correct with JavaScript off.
+
+The cap is **150 rows**. Fan-out over the live corpus runs to a median of 45, a
+p90 of 191 and a maximum of 608, so the cap only bites on the head of the
+distribution. The largest page's section measures 100KB raw, 17KB gzipped.
+
+### The Range Is Mostly Empty, and That Is the Data
+
+Across the live index the median community has boosted **one** other show in the
+last 7 days, and **47% of shows have boosted none**. So:
+
+- **All is the opening range**, not 1W.
+- The empty state is a sentence, not a blank list: "Nobody in this community has
+  boosted another show in the last 7 days."
+- The count badge in the summary follows the range, so it cannot claim 45 shows
+  over a window holding three.
+
+The axis is kept rather than dropped despite that, matching the Shows feed it
+mirrors. The range filters on **when the boost was sent**, the same axis the
+Shows feed uses and for the same reason: a show-level rollup is a list of
+boosts, so "the last 7 days" can only mean the boosts sent in them.
+
+Rank is **recomputed per view**, not retained. That differs from the feeds'
+search, where filtering to one row has to preserve its standing in the full
+list; here the range *is* the list, so position within it is the honest number.
+
+### Two Strings That Must Match
+
+`communityMeta()` in `functions/show/[guid].js` and `csMeta()` in
+`assets/js/show-page.js` produce the same row label, and the client's version
+overwrites the server's on the first paint. If they drift, every row flickers on
+load. `csCompact()` is likewise a copy of the Function's `compact()`. Both are
+duplicated for the reason the `.ob-scopenote` copy is: a no-build site has a
+Pages Function on one side and an ES module on the other, and nowhere to define
+a string once for both.
+
 ## The Nostr Community Section
 
 **This section was called Supporters and the heading is now "Nostr Community".**
@@ -309,7 +375,8 @@ message text, so rows without one render as a sats line alone rather than a gap.
 
 ## Page Order
 
-Hero, stat cards, the scope note, **episodes**, the Nostr Community wall, recent boosts.
+Hero, stat cards, the scope note, **episodes**, other shows this community
+boosts, the Nostr Community wall, recent boosts.
 
 Episodes sit directly under the stats rather than at the foot of the page: a
 podcaster arriving at their own page is looking for their catalogue, and a

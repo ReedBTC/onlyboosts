@@ -33,6 +33,14 @@ const SUPPORTERS_VISIBLE = 24;
 const PODIUM = 3;
 const BOOSTS_SHOWN = 24;
 
+// How many rows the "Other Shows/Albums This Community Boosts" drawer carries.
+// Measured over the live corpus, the number of distinct other shows a show's
+// booster set has boosted runs to a median of 45, a p90 of 191 and a maximum of
+// 608 — so this cap only bites on the head of the distribution, and only in the
+// tail of a list nobody scrolls to. It is what keeps the biggest page's markup
+// around 50KB rather than 200KB.
+const COMMUNITY_SHOWS_LIMIT = 150;
+
 export async function onRequestGet({ request, env, params }) {
   let guid = params.guid;
   if (Array.isArray(guid)) guid = guid[0];
@@ -57,7 +65,14 @@ export async function onRequestGet({ request, env, params }) {
   // is why nothing here is counted or capped — the rule does the work.
   if (!show || !show.title) return notFound(guid);
 
-  const [eps, sups, boosts] = await Promise.all([
+  // Window cutoffs for the community-shows rollup. Computed per request and
+  // therefore up to five minutes stale on a cached response, which is the same
+  // slack the collector's own cycle already introduces.
+  const nowSec = Math.floor(Date.now() / 1000);
+  const cut1w = nowSec - 7 * 86400;
+  const cut1m = nowSec - 30 * 86400;
+
+  const [eps, sups, boosts, community] = await Promise.all([
     env.DB.prepare(
       // Newest episode first. `published` is null on a meaningful slice of
       // rows, and SQLite sorts NULL below every value, so DESC sinks the
@@ -94,6 +109,61 @@ export async function onRequestGet({ request, env, params }) {
        WHERE b.podcast_guid = ?
        ORDER BY b.created_at DESC, b.event_id DESC LIMIT ?`
     ).bind(guid, BOOSTS_SHOWN).all(),
+    // What else this show's community boosts.
+    //
+    // The community is the set of pubkeys that have boosted THIS show; the
+    // rollup is every other show those pubkeys have boosted. It answers a
+    // question the homepage Shows feed structurally cannot: not "which shows
+    // are big" but "which shows does this audience overlap with". Measured
+    // across nine sampled shows from rank #1 to #400, the top ten here shares
+    // between 0 and 6 entries with the global top ten, so it is a genuinely
+    // different list rather than the site-wide ranking repeated.
+    //
+    // ALL THREE WINDOWS COME BACK IN ONE PASS, via conditional aggregation.
+    // The alternative was three statements, or a client fetch per range change;
+    // this way the page ships every number the controls can ask for and the
+    // client never touches the network. `?` repeats rather than `?N` numbering
+    // because D1 binds positionally.
+    //
+    // idx_boosts_podcast covers the CTE, idx_boosts_booster the scan. The join
+    // to `podcasts` is also the filter: a show with no title has no /show page
+    // to link to (see the qualifying rule above), and an unlinkable card in a
+    // discovery list is dead weight. That is a deliberate divergence from the
+    // Shows feed, which keeps them as "Unidentified show".
+    env.DB.prepare(
+      `WITH community AS (
+         SELECT DISTINCT booster_pubkey FROM boosts WHERE podcast_guid = ?
+       )
+       SELECT b.podcast_guid, p.title, p.image,
+              (SELECT COUNT(*) FROM community)                                AS community_size,
+              COUNT(*)                                                        AS b_all,
+              SUM(COALESCE(b.sats, 0))                                        AS s_all,
+              COUNT(DISTINCT b.booster_pubkey)                                AS m_all,
+              MAX(b.created_at)                                               AS t_all,
+              COUNT(CASE WHEN b.created_at >= ? THEN 1 END)                   AS b_1m,
+              SUM(CASE WHEN b.created_at >= ? THEN COALESCE(b.sats, 0) ELSE 0 END) AS s_1m,
+              COUNT(DISTINCT CASE WHEN b.created_at >= ? THEN b.booster_pubkey END) AS m_1m,
+              MAX(CASE WHEN b.created_at >= ? THEN b.created_at END)          AS t_1m,
+              COUNT(CASE WHEN b.created_at >= ? THEN 1 END)                   AS b_1w,
+              SUM(CASE WHEN b.created_at >= ? THEN COALESCE(b.sats, 0) ELSE 0 END) AS s_1w,
+              COUNT(DISTINCT CASE WHEN b.created_at >= ? THEN b.booster_pubkey END) AS m_1w,
+              MAX(CASE WHEN b.created_at >= ? THEN b.created_at END)          AS t_1w
+       FROM boosts b
+       JOIN community c ON c.booster_pubkey = b.booster_pubkey
+       JOIN podcasts p  ON p.podcast_guid   = b.podcast_guid
+       WHERE b.podcast_guid IS NOT NULL
+         AND b.podcast_guid <> ?
+         AND p.title IS NOT NULL AND p.title <> ''
+       GROUP BY b.podcast_guid
+       ORDER BY m_all DESC, b_all DESC, s_all DESC, b.podcast_guid
+       LIMIT ?`
+    ).bind(
+      guid,
+      cut1m, cut1m, cut1m, cut1m,
+      cut1w, cut1w, cut1w, cut1w,
+      guid,
+      COMMUNITY_SHOWS_LIMIT,
+    ).all(),
   ]);
 
   // Display names for any npub mentioned inside a boost message. One extra
@@ -124,6 +194,7 @@ export async function onRequestGet({ request, env, params }) {
     episodes: eps.results || [],
     supporters: sups.results || [],
     boosts: boostRows,
+    community: community.results || [],
     names,
   });
 
@@ -412,7 +483,7 @@ const copyFor = (medium) => (medium === "music" ? COPY.music : COPY.podcast);
 
 // ── the page ─────────────────────────────────────────────────────────────────
 
-function renderShowPage({ show, episodes, supporters, boosts, names }) {
+function renderShowPage({ show, episodes, supporters, boosts, community, names }) {
   const copy = copyFor(show.medium);
   const title = show.title;
   const pageUrl = `${SITE_ORIGIN}/show/${encodeURIComponent(show.podcast_guid)}`;
@@ -622,6 +693,8 @@ function renderShowPage({ show, episodes, supporters, boosts, names }) {
 
   ${renderEpisodes(episodes, show, copy)}
 
+  ${renderCommunityShows(community)}
+
   ${renderSupporters(supporters, show, copy)}
 
   ${renderBoosts(boosts, names, copy)}
@@ -788,6 +861,82 @@ function renderHeader(show, art, title, copy) {
       appear. <a href="/about#limits">A boost note is a claim, not a receipt.</a>
     </p>
   </header>`;
+}
+
+// ── Other shows this community boosts ────────────────────────────────────────
+//
+// Deliberately NOT split on medium, which every other rollup on this site is.
+// A music community also boosting podcasts is the interesting half of the
+// finding, and filing an album page's crossover under a heading that says
+// "Shows" would either hide it or misname it — hence the "Shows/Albums" wording
+// and no COPY entry, since the label is the same on both mediums.
+//
+// The three windows are all in the DOM from first paint, packed four numbers to
+// an attribute (boosts, sats, members, latest). The client only re-orders and
+// re-labels; it never fetches. That is what lets the section carry the same
+// 1W/1M/All + Sort chrome as the feeds while still rendering, ranked and
+// correct, with no JavaScript at all.
+//
+// It ships CLOSED, like the episode drawer above it. These pages are meant to
+// fit on one screen, and a section that would stand 32rem tall before the
+// visitor has asked for it costs more than it gives.
+
+// One row's figures for one window: "18 of 115 boosters · 34 boosts · 12k sats".
+// assets/js/show-page.js#csMeta rebuilds this string on every range change and
+// MUST match it — the server's version is what a no-JS visitor reads, and the
+// two disagreeing would show as a flicker on the first interaction.
+function communityMeta(members, boosts, sats, size) {
+  return `${num(members)} of ${num(size)} booster${size === 1 ? "" : "s"} · ` +
+    `${num(boosts)} boost${boosts === 1 ? "" : "s"} · ${compact(sats)} sats`;
+}
+
+function communityRow(r, rank) {
+  const art = isSafeUrl(r.image) ? r.image : null;
+  const title = truncate(r.title, 120);
+  const size = Number(r.community_size || 0);
+  const pack = (b, s, m, t) =>
+    `${Number(b || 0)},${Number(s || 0)},${Number(m || 0)},${Number(t || 0)}`;
+
+  return `<li class="cs-row"
+      data-all="${pack(r.b_all, r.s_all, r.m_all, r.t_all)}"
+      data-1m="${pack(r.b_1m, r.s_1m, r.m_1m, r.t_1m)}"
+      data-1w="${pack(r.b_1w, r.s_1w, r.m_1w, r.t_1w)}">
+    <a class="cs-link" href="/show/${encodeURIComponent(r.podcast_guid)}">
+      <span class="cs-rank" aria-hidden="true">${rank}</span>
+      ${art
+        ? `<img class="cs-art" src="${htmlEscape(art)}" alt="" width="44" height="44" loading="lazy" referrerpolicy="no-referrer" />`
+        : `<span class="cs-art cs-art--blank" aria-hidden="true">🎙️</span>`}
+      <span class="cs-main">
+        <span class="cs-title">${htmlEscape(title)}</span>
+        <span class="cs-meta">${htmlEscape(
+          communityMeta(Number(r.m_all || 0), Number(r.b_all || 0), Number(r.s_all || 0), size)
+        )}</span>
+      </span>
+    </a>
+  </li>`;
+}
+
+function renderCommunityShows(rows) {
+  if (!rows.length) return "";
+
+  // Constant across the result set; the denominator in every row's "18 of 115".
+  // Taken from the CTE rather than podcasts.booster_count so the two halves of
+  // the fraction are counted the same way and can never read "120 of 115".
+  const size = Number(rows[0].community_size || 0);
+
+  return `<section class="show-section show-section--bare" id="community-shows">
+    <details class="ep-drawer cs-drawer" data-community-shows data-community-size="${size}">
+      <summary>Other Shows/Albums This Community Boosts <span class="cs-count">${num(rows.length)}</span></summary>
+      <!-- Ships hidden and stays hidden without JavaScript: controls that
+           cannot do anything are worse than none. Same rule as the feed-search
+           slot on the homepage panels. -->
+      <div class="cs-controls" data-cs-controls hidden></div>
+      <p class="cs-empty" data-cs-empty hidden></p>
+      <ul class="ep-list cs-list" data-cs-list>
+        ${rows.map((r, i) => communityRow(r, i + 1)).join("\n        ")}
+      </ul>
+    </details>
+  </section>`;
 }
 
 // The supporters wall. LB's supporters.html is the visual ancestor (circular

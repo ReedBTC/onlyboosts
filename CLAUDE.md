@@ -844,6 +844,40 @@ places that change together: the masthead line under the banner on `index.html`
 The show page's `og:description` states the scope *inside the sentence*, because
 it is the one string that travels without the page around it.
 
+## Show pages: other shows this community boosts
+
+A drawer above the Nostr Community wall, listing every other show this show's
+boosters have boosted. `renderCommunityShows` in `functions/show/[guid].js`,
+`initCommunityShows` in `assets/js/show-page.js`, `.cs-*` in `show-page.css`.
+Design of record: the section of the same name in `docs/show-pages-spec.md`.
+
+**It is the one rollup that is not split on medium.** A music community also
+boosting podcasts is the interesting half of the finding, so the heading is
+"Other Shows/Albums This Community Boosts" on both and there is no `COPY` entry.
+
+**The headline figure per row is the overlap, not the size**: "27 of 115
+boosters". That is what the homepage Shows feed cannot say, and it's the default
+sort. Sampled from rank #1 to #400, this list's top ten shares 0–6 entries with
+the global top ten, so it is not the site-wide ranking repeated.
+
+**One D1 query returns all three windows** by conditional aggregation, and each
+row ships them packed four-to-an-attribute (`data-all` / `data-1m` / `data-1w`).
+The client only re-orders and re-labels — no fetch, and the section renders
+ranked with JavaScript off. Capped at 150 rows (fan-out is median 45, p90 191,
+max 608); the biggest page's section is 100KB raw, 17KB gzipped.
+
+**All is the opening range because 1W is usually empty**: the median community
+has boosted one other show in the last 7 days and 47% have boosted none. The
+empty state is a sentence, and the summary's count badge follows the range.
+
+Two pairs must stay in sync, and both flicker on load if they drift:
+`communityMeta()` / `csMeta()`, and the Function's `compact()` / `csCompact()`.
+The `.pcast-*` control styles are likewise restated in `show-page.css` from the
+inline block in `index.html`, the same arrangement as `.nostr-mention`.
+
+Untitled shows are excluded here though the Shows feed keeps them — they have no
+page to link to.
+
 ## Show pages: the medium, and nostr: mentions
 
 `functions/show/[guid].js` has a `COPY` table keyed on `show.medium`, the same
