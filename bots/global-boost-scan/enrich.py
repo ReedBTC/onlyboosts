@@ -63,6 +63,11 @@ def _show_from_feed(feed, podcast_guid=None):
         "itunes_id": feed.get("itunesId"),
         "feed_id":   feed.get("id"),
         "medium":    feed.get("medium") or "podcast",
+        # <itunes:author>: the artist on music feeds, a weak "by" line on podcasts.
+        # Raw, un-filtered — the site decides whether it's worth showing (hidden when
+        # it just repeats the title). NOT a podcast:person credit; PI exposes no
+        # channel-level person data, and it's present on only ~6% of feeds anyway.
+        "author":    (feed.get("author") or "").strip() or None,
     }
 
 

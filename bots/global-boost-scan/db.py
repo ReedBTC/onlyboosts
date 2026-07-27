@@ -61,6 +61,10 @@ CREATE TABLE IF NOT EXISTS shows (
     feed_id       INTEGER,
     itunes_id     INTEGER,
     medium        TEXT,
+    author        TEXT,          -- <itunes:author>: artist on music feeds, a weak
+                                 -- "by" line on podcasts (may be a network/publisher,
+                                 -- not a host). Raw string; the site hides it when it
+                                 -- just repeats the title. NOT a podcast:person credit.
     updated_at    INTEGER
 );
 
@@ -129,6 +133,9 @@ def _migrate(conn):
     if "canonical_guid" not in cols:
         conn.execute("ALTER TABLE boosts ADD COLUMN canonical_guid TEXT")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_boosts_canonical ON boosts(canonical_guid)")
+    show_cols = {r[1] for r in conn.execute("PRAGMA table_info(shows)")}
+    if "author" not in show_cols:
+        conn.execute("ALTER TABLE shows ADD COLUMN author TEXT")
     conn.commit()
 
 
@@ -181,13 +188,14 @@ def upsert_boosts(conn, boosts):
 def upsert_show(conn, show):
     conn.execute(
         """INSERT INTO shows (podcast_guid, title, image, feed_url, feed_id,
-                              itunes_id, medium, updated_at)
+                              itunes_id, medium, author, updated_at)
            VALUES (:podcast_guid, :title, :image, :feed_url, :feed_id,
-                   :itunes_id, :medium, :updated_at)
+                   :itunes_id, :medium, :author, :updated_at)
            ON CONFLICT(podcast_guid) DO UPDATE SET
              title=excluded.title, image=excluded.image, feed_url=excluded.feed_url,
              feed_id=excluded.feed_id, itunes_id=excluded.itunes_id,
-             medium=excluded.medium, updated_at=excluded.updated_at""",
+             medium=excluded.medium, author=excluded.author,
+             updated_at=excluded.updated_at""",
         {**show, "updated_at": int(time.time())})
     conn.commit()
 

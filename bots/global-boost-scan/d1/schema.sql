@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS podcasts (
   image         TEXT,
   feed_url      TEXT,
   medium        TEXT,
+  author        TEXT,               -- <itunes:author>: 'Artist' on music, weak 'by' on podcasts; raw string
   boost_count   INTEGER,
   total_sats    INTEGER,
   booster_count INTEGER,

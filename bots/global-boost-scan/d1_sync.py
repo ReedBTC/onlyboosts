@@ -74,6 +74,11 @@ def build_full_sql(conn):
                        f"{q(r['event_id'])},{q(r['message'])});")
 
     # podcasts (aggregates joined with show metadata)
+    # NOTE: shows.author (and the podcasts.author column in schema.sql) is deliberately
+    # NOT synced here yet. The show-page credit line reads the per-show shard, which
+    # carries author; D1 author is only needed for author-in-search, which is unbuilt.
+    # Enabling it = migrate the remote column, re-add s.author to these two SELECT/INSERTs,
+    # then a FULL reload (a delta can't backfill author onto existing rows).
     eg = db.effective_guid("b")
     for a in conn.execute(f"""
         SELECT {eg} AS guid,

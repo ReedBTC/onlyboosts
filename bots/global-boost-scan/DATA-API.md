@@ -104,6 +104,8 @@ Boosts within a file are newest-first.
     {
       "guid": "856cd618-…", "title": "No Agenda Show",
       "img": "https://…", "feed": "https://…/rss.xml",
+      "medium": "podcast",             // podcast:medium — 'music', 'video', … ; defaults to 'podcast'
+      "author": "Adam Curry & John C. Dvorak", // <itunes:author>; nullable. See the author note below.
       "boosts": 542, "sats": 487214, "boosters": 96, "episodes": 130,
       "latest": 1784980386,            // unix seconds of newest boost
       "file": "podcasts/856cd618-….json"   // exact per-show shard path — use this, don't build it
@@ -118,7 +120,8 @@ sanitized — always use `file`, don't assemble it yourself).
 ```jsonc
 {
   "generated_at": …,
-  "show": { "guid": …, "title": …, "img": …, "feed": …, "medium": "podcast" },
+  "show": { "guid": …, "title": …, "img": …, "feed": …, "medium": "podcast",
+            "author": "Adam Curry & John C. Dvorak" },   // nullable; see the author note below
   "episodes": [
     { "guid": …, "title": …, "img": …, "date": …, "num": …, "url": …,
       "shownotes": "full plain-text shownotes…",   // uncapped; nullable
@@ -168,4 +171,15 @@ Follows views light up only once someone signs in.
 - **`episode.guid` may be a URL**, not a UUID — don't parse it as one.
 - **`msg` is verbatim** — may contain `nostr:` mentions and links; render/escape accordingly (don't strip).
 - **Timestamps are unix seconds** (multiply by 1000 for JS `Date`).
+- **`author` is `<itunes:author>`, not a credit list.** Present on ~99.6% of *identified*
+  shows (924/928). On **music** it's the artist (~97% distinct from the title — treat it as
+  "Artist"). On **podcasts** it's a weak "by" line (~88% distinct): often a real host, but
+  sometimes a network or publisher ("Jupiter Broadcasting"), so label it "By …", never
+  "Host"/"Creator". It is **not** `<podcast:person>` — PI exposes no channel-level person
+  data, and persons appear on only ~13% of feeds, so there is no persons/host-role field.
+  The value is raw: hide it when it just repeats the title (normalize case, whitespace and a
+  leading "The" before comparing) and when it's null. Because `medium` defaults to `podcast`,
+  an untagged music feed reads as "By" rather than "Artist" — expected, not a bug.
+  (In the D1 `/api/v1` layer this column is reserved but not yet populated — the show-page
+  credit line reads the per-show shard, which has it; D1 `author` lands with the search work.)
 - Data updates when the collector's timer runs; `generated_at` tells you how fresh a file is.

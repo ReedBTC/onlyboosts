@@ -114,7 +114,7 @@ def export(conn, out_dir, latest_n=1000, per_show=False, log=print):
                COUNT(DISTINCT b.booster_pubkey) AS boosters,
                COUNT(DISTINCT b.item_guid) AS episodes,
                MAX(b.created_at) AS latest,
-               s.title, s.image, s.feed_url, s.medium
+               s.title, s.image, s.feed_url, s.medium, s.author
         FROM boosts b LEFT JOIN shows s ON s.podcast_guid = {_EFF}
         WHERE {_EFF} IS NOT NULL
         GROUP BY {_EFF}
@@ -125,6 +125,7 @@ def export(conn, out_dir, latest_n=1000, per_show=False, log=print):
         "img":      a["image"],
         "feed":     a["feed_url"],
         "medium":   a["medium"] or "podcast",   # podcast:medium — 'music' etc.; default per the namespace
+        "author":   a["author"],                # <itunes:author>: 'Artist' on music, weak 'by' on podcasts; raw
         "boosts":   a["boosts"],
         "sats":     a["sats"],
         "boosters": a["boosters"],
@@ -165,7 +166,8 @@ def export(conn, out_dir, latest_n=1000, per_show=False, log=print):
             # show gets a new boost, so rsync ships just the handful that moved.
             write_json(out / "podcasts" / f"{_safe(pg)}.json", {
                 "show": {"guid": pg, "title": a["title"], "img": a["image"],
-                         "feed": a["feed_url"], "medium": a["medium"]},
+                         "feed": a["feed_url"], "medium": a["medium"],
+                         "author": a["author"]},
                 "episodes": [{
                     "guid": e["item_guid"], "title": e["title"],
                     "img": e["image"] or a["image"], "date": e["published"],
