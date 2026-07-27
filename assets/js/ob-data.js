@@ -93,6 +93,65 @@ export async function getPodcastIndex() {
   return rows.filter((p) => p && typeof p.guid === 'string')
 }
 
+// ── podcast:medium ────────────────────────────────────────────────────
+//
+// <podcast:medium> is what separates a podcast from a music release: a "music"
+// feed's items are tracks on an album, not episodes of a show. The collector
+// projects the tag onto every row of podcasts/index.json, defaulting to
+// "podcast" per the namespace where a feed carries none. Measured against the
+// live index: 818 podcast, 465 music, 2 video.
+//
+// It is a property of the SHOW, so it is deliberately not on the boost record —
+// the alternative is the collector stamping one show-level fact onto 22k boosts
+// and rewriting every month archive. The episode-level feeds join through the
+// published rollup instead. That file is ~103KB over the wire, cached for the
+// page's lifetime by fetchJson above, and the show-level feeds load it anyway,
+// so the join costs one request the first time and nothing after.
+
+/** guid → medium, lowercased, from the published per-show rollup. */
+export async function getShowMediums() {
+  const rows = await getPodcastIndex()
+  const map = new Map()
+  for (const p of rows) {
+    const m = str(p.medium)
+    if (m) map.set(p.guid, m.toLowerCase())
+  }
+  return map
+}
+
+/**
+ * A guid → boolean test for one side of the music / not-music split.
+ *
+ * `want` is 'music' (the Songs and Albums feeds) or 'other' (Episodes and
+ * Shows — podcasts, plus the two video feeds, plus every show the collector
+ * holds boosts for but Podcast Index can't identify). Anything falsy keeps
+ * everything and costs no fetch, which is what the unsplit Boosts feeds pass.
+ *
+ * A show with no medium counts as not-music: the namespace's default is
+ * "podcast", and filing an unidentified feed under Albums would be a claim
+ * about it we can't support.
+ *
+ * @returns {Promise<{test:(guid:string|null)=>boolean, ok:boolean}>} `ok` is
+ *   false when the rollup couldn't be read. The test then keeps everything on
+ *   the 'other' side and nothing on the 'music' side, which is the right
+ *   failure for each: an Episodes feed carrying a few stray tracks beats no
+ *   feed at all, whereas an empty Songs feed is indistinguishable from a quiet
+ *   week — so the music callers read `ok` and say what actually happened.
+ */
+export async function mediumPredicate(want) {
+  if (!want) return { test: () => true, ok: true }
+  const music = want === 'music'
+  let mediums = new Map()
+  let ok = true
+  try {
+    mediums = await getShowMediums()
+  } catch (e) {
+    console.warn('[ob-data] medium join unavailable', e)
+    ok = false
+  }
+  return { test: (guid) => (mediums.get(guid) === 'music') === music, ok }
+}
+
 /** One show: { show, episodes[], boosts[] }. Takes the rollup's `file`. */
 export async function getPodcastDetail(file) {
   const d = await fetchJson(file)

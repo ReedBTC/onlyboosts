@@ -1,9 +1,25 @@
-/* Shows feed — the show-level view behind the Shows option in the feed bar.
+/* Show-level feed — the rollup behind both Shows and Albums in the feed bar.
  *
  * The card is the SHOW, where the Episodes feeds' card is one EPISODE. Same
  * boosts underneath, rolled up a level: how much a show has taken, how many
  * people sent it, across how many episodes. Expanding a card lists that show's
  * episodes with their own boost totals.
+ *
+ * ── Shows vs Albums ──────────────────────────────────────────────────
+ *
+ * One renderer serves both, split on <podcast:medium>: a "music" feed is an
+ * album whose items are tracks, everything else is a show whose items are
+ * episodes. The rollup, the ranking and the card are identical, so the two
+ * differ only in the copy table below and in which half of the corpus they
+ * keep. Measured against the live index: 818 podcast, 465 music, 2 video.
+ *
+ * The split is a hard dependency on podcasts/index.json, which is where the
+ * medium is published (it's a property of the show, not of a boost — see
+ * ob-data.js#mediumPredicate). That's free on the All range, which reads that
+ * file anyway, and it makes the windowed ranges need one request they used to
+ * do without. Acceptable because All is the opening range on both feeds: a
+ * visitor who reaches 1W has already loaded the index, and one that couldn't
+ * load it never got past the first paint either.
  *
  * An earlier pass at this replaced the episode feed with it and was reverted
  * (1f24c77) — correctly, since the two views answer different questions and the
@@ -27,15 +43,16 @@
  * latest.json + month archives the Episodes feeds already pull, and ob-data.js
  * caches them for the page's lifetime. Opening Episodes first makes this free.
  *
- * Scope: Global only, deliberately. podcasts/index.json is computed over
- * everyone, so it cannot serve a Follows audience — its counts would be wrong
- * for a filtered one. A Shows · Follows would have to roll the D1 corpus up by
- * show (ob-live.js#getFollowsBoosts, the way feeds-podcasts.js does by
+ * Scope: Global only on both, deliberately. podcasts/index.json is computed
+ * over everyone, so it cannot serve a Follows audience — its counts would be
+ * wrong for a filtered one. A Shows · Follows would have to roll the D1 corpus
+ * up by show (ob-live.js#getFollowsBoosts, the way feeds-podcasts.js does by
  * episode); it just isn't built yet, which is why the scope menu stays hidden
- * on this feed.
+ * on both of these feeds. The two Songs feeds have the axis because they are
+ * episode-level and go through feeds-podcasts.js, which never reads this file.
  */
 import {
-  getPodcastIndex, getPodcastDetail,
+  getPodcastIndex, getPodcastDetail, getShowMediums,
   getLatestBoosts, getBoostMonths, getBoostMonth,
 } from '/assets/js/ob-data.js'
 import {
@@ -112,15 +129,60 @@ function renderPlaceholder(list, title, body) {
   ]))
 }
 
+// ── Copy ──────────────────────────────────────────────────────────────
+// Everything that differs between Shows and Albums. Nothing structural does.
+const COPY = {
+  other: {
+    glyph: '🎙',
+    unidentified: 'Unidentified show',
+    drawer: 'Episodes with NIP-73 Boosts',
+    noItems: 'No episodes recorded for this show yet.',
+    truncated: (n, total) => `Showing the ${n} most recent of ${total} episodes.`,
+    untitledItem: 'Untitled episode',
+    rangeLabel: 'Filter by when the show was boosted',
+    rangeTitle: (days) => (days ? `Shows boosted in the last ${days} days` : 'All time'),
+    sortTitle: 'Sort shows',
+    moreLabel: (n) => `Load ${n} more show${n === 1 ? '' : 's'}`,
+    countLine: (shown, total) => `Showing ${shown} of ${total}`,
+    searchPlaceholder: 'Search shows…',
+    searchLabel: 'Search shows',
+    searchNoun: 'show',
+    loadFail: ['Couldn’t load shows', ' The podcast index is unavailable right now — please try again later.'],
+    rangeFail: ['Couldn’t load shows', ' The boosts feed is unavailable right now — please try again later.'],
+    loading: ['Loading this window…', ' Rolling the boosts in this range up by show.'],
+    emptyAll: ['No shows in this window', ' When someone boosts a podcast episode on Nostr, its show will appear here.'],
+    emptyWindow: ['No shows in this window', ' Nothing was boosted in this time range — try a wider one.'],
+    outOfRange: (label) => ` ${label} wasn’t boosted in this time range — widen the range, or clear the search.`,
+  },
+  music: {
+    glyph: '💿',
+    unidentified: 'Unidentified release',
+    drawer: 'Tracks with NIP-73 Boosts',
+    noItems: 'No tracks recorded for this release yet.',
+    truncated: (n, total) => `Showing the ${n} most recent of ${total} tracks.`,
+    untitledItem: 'Untitled track',
+    rangeLabel: 'Filter by when the album was boosted',
+    rangeTitle: (days) => (days ? `Albums boosted in the last ${days} days` : 'All time'),
+    sortTitle: 'Sort albums',
+    moreLabel: (n) => `Load ${n} more album${n === 1 ? '' : 's'}`,
+    countLine: (shown, total) => `Showing ${shown} of ${total}`,
+    searchPlaceholder: 'Search albums…',
+    searchLabel: 'Search albums',
+    searchNoun: 'album',
+    loadFail: ['Couldn’t load albums', ' The podcast index is unavailable right now — please try again later.'],
+    rangeFail: ['Couldn’t load albums', ' The boosts feed is unavailable right now — please try again later.'],
+    loading: ['Loading this window…', ' Rolling the boosts in this range up by album.'],
+    emptyAll: ['No albums in this window', ' When someone boosts a track from a music feed on Nostr, its album will appear here.'],
+    emptyWindow: ['No albums in this window', ' Nothing was boosted in this time range — try a wider one.'],
+    outOfRange: (label) => ` ${label} wasn’t boosted in this time range — widen the range, or clear the search.`,
+  },
+}
+
 // ── Range + sort ──────────────────────────────────────────────────────
 // The range filters on boost time: a show is in the 1W view if it was boosted
 // in the last 7 days, and its numbers are that week's numbers. (The Episodes
 // feeds' identical buttons mean episode air date, which is a different axis —
 // each feed writes its own tooltips for exactly that reason.)
-function rangeTitle(key) {
-  const days = rangeDays(key)
-  return days ? `Shows boosted in the last ${days} days` : 'All time'
-}
 
 // ── On the absence of an episode count ────────────────────────────────
 // There used to be a fifth axis here, 'Most episodes', and a matching figure
@@ -178,6 +240,10 @@ async function loadAllTime() {
   const rows = await getPodcastIndex()
   return rows.map((p) => ({
     guid: p.guid,
+    // <podcast:medium>, straight off the rollup — which is why the all-time
+    // range gets the Shows/Albums split for free. The collector already
+    // defaults an un-enriched feed to "podcast" per the namespace.
+    music: typeof p.medium === 'string' && p.medium.toLowerCase() === 'music',
     title: typeof p.title === 'string' ? p.title : '',
     img: typeof p.img === 'string' ? p.img : '',
     feed: typeof p.feed === 'string' ? p.feed : '',
@@ -227,7 +293,12 @@ async function loadRowsSince(cutoff) {
 
 /** A window: the boosts in it, grouped by show. */
 async function loadWindow(cutoff) {
-  const rows = await loadRowsSince(cutoff)
+  // A boost record carries no medium (it's a property of the show), so the
+  // windowed path joins it in from the same rollup the all-time path reads
+  // wholesale. Deliberately not caught: a group with no medium would land in
+  // Shows and never in Albums, so a silent failure is a feed that quietly
+  // hides every album. The caller's error placeholder is the honest answer.
+  const [rows, mediums] = await Promise.all([loadRowsSince(cutoff), getShowMediums()])
   const byShow = new Map()
 
   for (const b of rows) {
@@ -241,6 +312,7 @@ async function loadWindow(cutoff) {
       s = {
         guid, title: b.podcast.title || '', img: b.podcast.img || '',
         feed: b.podcast.feed || '', file: `podcasts/${guid}.json`,
+        music: mediums.get(guid) === 'music',
         boosts: 0, sats: 0, boosters: 0, episodes: 0, latest: 0,
         eps: [],
         _boosters: new Set(),
@@ -293,6 +365,10 @@ async function loadWindow(cutoff) {
 // One entry per range for the page's lifetime. The HTTP layer is already
 // cached by ob-data.js; this caches the *grouping*, so toggling 1M → All → 1M
 // repaints instantly instead of re-walking a few thousand rows.
+//
+// Keyed by range alone, NOT by medium: every row carries its own `music` flag
+// and the renderer filters after the fact, so Shows and Albums share one
+// grouping per range. Opening either makes the other free.
 const byRange = new Map()
 
 function loadRange(key) {
@@ -309,14 +385,14 @@ function loadRange(key) {
 // Newest episode first: the list reads as the show's recent catalogue, with
 // each row carrying what it took. The episode-level ranking question is what
 // the Episodes feeds are for.
-function renderEpisodes(into, eps, { truncatedFrom = 0 } = {}) {
+function renderEpisodes(into, eps, copy, { truncatedFrom = 0 } = {}) {
   if (!eps.length) {
-    into.replaceChildren(h('div', { class: 'ob-show-note', text: 'No episodes recorded for this show yet.' }))
+    into.replaceChildren(h('div', { class: 'ob-show-note', text: copy.noItems }))
     return
   }
   const list = h('ul', { class: 'ob-ep-list' })
   for (const e of eps) {
-    const title = e.title || 'Untitled episode'
+    const title = e.title || copy.untitledItem
     const meta = [shortDate(e.date), e.boosts ? plural(e.boosts, 'boost', 'boosts') : null]
       .filter(Boolean).join(' · ')
     list.appendChild(h('li', { class: 'ob-ep' }, [
@@ -334,8 +410,7 @@ function renderEpisodes(into, eps, { truncatedFrom = 0 } = {}) {
   }
   into.replaceChildren(list)
   if (truncatedFrom > eps.length) {
-    into.appendChild(h('div', { class: 'ob-show-note',
-      text: `Showing the ${eps.length} most recent of ${truncatedFrom} episodes.` }))
+    into.appendChild(h('div', { class: 'ob-show-note', text: copy.truncated(eps.length, truncatedFrom) }))
   }
 }
 
@@ -347,7 +422,7 @@ function sortEpisodes(eps) {
 // Built out of the episode card's chrome (.pcast-card and friends) rather than
 // a parallel set of its own, so the two feeds read as one system. Only the
 // stat row and the episode list are new.
-function renderShowCard(s, rank) {
+function renderShowCard(s, rank, copy) {
   // 462 of the 1,384 shows in the index (33%) have no title and no art: the
   // collector holds a boost tagged with their guid but Podcast Index doesn't
   // know the feed, so there is nothing to enrich from. They're the long tail —
@@ -360,13 +435,13 @@ function renderShowCard(s, rank) {
   const art = isSafeUrl(s.img)
     ? h('img', { src: s.img, alt: '', referrerpolicy: 'no-referrer', loading: 'lazy' })
     : null
-  const media = h('div', { class: 'pcast-card-media' + (art ? '' : ' pcast-card-media--none') }, art || '🎙')
+  const media = h('div', { class: 'pcast-card-media' + (art ? '' : ' pcast-card-media--none') }, art || copy.glyph)
   // A dead host or a hotlink block falls back to the same glyph a show with no
   // art gets, rather than leaving an empty box.
   if (art) {
     art.onerror = () => {
       media.classList.add('pcast-card-media--none')
-      media.replaceChildren(document.createTextNode('🎙'))
+      media.replaceChildren(document.createTextNode(copy.glyph))
     }
   }
 
@@ -392,7 +467,7 @@ function renderShowCard(s, rank) {
         class: 'pcast-title' + (named ? '' : ' ob-show-unnamed'),
       }, named && showPageHref(s.guid)
         ? [h('a', { class: 'ob-show-link', href: showPageHref(s.guid), text: s.title })]
-        : (named ? s.title : 'Unidentified show')),
+        : (named ? s.title : copy.unidentified)),
       // The guid stands in for a name we don't have. It's the only handle on
       // the show, and it's what you'd search the collector for.
       named ? null : h('div', { class: 'ob-show-guid', text: s.guid }),
@@ -415,7 +490,7 @@ function renderShowCard(s, rank) {
   // Named, not counted — see the note above SORT_OPTIONS. The drawer bar is
   // full-width, so it has room to say exactly what the rows are rather than
   // leaving "Episodes" to imply the show's catalogue.
-  }, [caret, h('span', { text: 'Episodes with NIP-73 Boosts' })])
+  }, [caret, h('span', { text: copy.drawer })])
 
   const card = h('article', { class: 'pcast-card' }, [head, drawer, details])
   let loaded = false
@@ -436,11 +511,11 @@ function renderShowCard(s, rank) {
     // every show, which is why it's an explicit expand rather than eager, and
     // ob-data.js caches it for the rest of the session.
     if (s.eps) {
-      renderEpisodes(details, sortEpisodes(s.eps).slice(0, DRAWER_EPISODES), { truncatedFrom: s.eps.length })
+      renderEpisodes(details, sortEpisodes(s.eps).slice(0, DRAWER_EPISODES), copy, { truncatedFrom: s.eps.length })
       return
     }
     if (!s.file) {
-      renderEpisodes(details, [])
+      renderEpisodes(details, [], copy)
       return
     }
     details.replaceChildren(h('div', { class: 'ob-show-note', text: 'Loading episodes…' }))
@@ -451,7 +526,7 @@ function renderShowCard(s, rank) {
         date: num(e.date), num: num(e.num), url: e.url || '',
         boosts: num(e.boosts), sats: num(e.sats),
       }))
-      renderEpisodes(details, sortEpisodes(eps).slice(0, DRAWER_EPISODES), { truncatedFrom: eps.length })
+      renderEpisodes(details, sortEpisodes(eps).slice(0, DRAWER_EPISODES), copy, { truncatedFrom: eps.length })
     } catch (e) {
       console.warn('[shows] detail load failed', s.file, e)
       loaded = false   // collapsing and reopening retries
@@ -464,14 +539,20 @@ function renderShowCard(s, rank) {
 
 // ── entry point ───────────────────────────────────────────────────────
 /**
- * @param {Element} [opts.panel] the feed's panel, for its feed key
- * @param {Element} opts.list    the [data-feed-list] container to fill
+ * @param {Element} [opts.panel]  the feed's panel, for its feed key
+ * @param {Element} opts.list     the [data-feed-list] container to fill
+ * @param {string}  opts.medium   'other' (Shows) | 'music' (Albums)
  */
-export async function renderShows({ panel, list }) {
+export async function renderShows({ panel, list, medium = 'other' }) {
   if (!list) return
-  // Shows never re-renders today (Global only, so no account switch reaches
-  // it), but the reset is what makes that a fact about the feed rather than an
-  // assumption baked into this one.
+  const copy = COPY[medium] || COPY.other
+  const wantMusic = medium === 'music'
+  // Every row carries its own medium, so the shared per-range grouping is
+  // narrowed here rather than at load time.
+  const inMedium = (rows) => rows.filter((s) => s.music === wantMusic)
+  // Neither of these re-renders today (Global only, so no account switch
+  // reaches them), but the reset is what makes that a fact about the feed
+  // rather than an assumption baked into this one.
   resetFeedSearch(panel)
 
   // All time is the opening view: it's the one request that needs no archive
@@ -498,7 +579,7 @@ export async function renderShows({ panel, list }) {
       // The rank is the show's position in the full sorted list, stamped in
       // repaint() before any search filter narrowed it — so a searched show
       // still reads #47 rather than #1. Numbering continues across pages.
-      cards.appendChild(renderShowCard(s, RANKED_SORTS.has(sortKey) ? s._rank : null))
+      cards.appendChild(renderShowCard(s, RANKED_SORTS.has(sortKey) ? s._rank : null, copy))
     })
     shown += slice.length
     moreWrap.replaceChildren()
@@ -508,8 +589,8 @@ export async function renderShows({ panel, list }) {
     moreWrap.appendChild(h('div', { class: 'pcast-more-group' }, [
       h('button', {
         class: 'pcast-showmore', type: 'button', onclick: paintMore,
-      }, `Load ${batch} more show${batch === 1 ? '' : 's'}`),
-      h('div', { class: 'pcast-more-count', text: `Showing ${shown} of ${view.length}` }),
+      }, copy.moreLabel(batch)),
+      h('div', { class: 'pcast-more-count', text: copy.countLine(shown, view.length) }),
     ]))
   }
 
@@ -528,16 +609,14 @@ export async function renderShows({ panel, list }) {
     cards.replaceChildren()
     moreWrap.replaceChildren()
     if (!view.length) {
+      const empty = rangeKey === 'all' ? copy.emptyAll : copy.emptyWindow
       cards.appendChild(picked
         ? h('div', { class: 'feed-placeholder' }, [
             h('strong', { text: 'Not in this range' }),
-            ` ${picked.label} wasn’t boosted in this time range — widen the range, or clear the search.`,
+            copy.outOfRange(picked.label),
           ])
         : h('div', { class: 'feed-placeholder' }, [
-            h('strong', { text: 'No shows in this window' }),
-            rangeKey === 'all'
-              ? ' When someone boosts a podcast episode on Nostr, its show will appear here.'
-              : ' Nothing was boosted in this time range — try a wider one.',
+            h('strong', { text: empty[0] }), empty[1],
           ]))
       return
     }
@@ -553,8 +632,7 @@ export async function renderShows({ panel, list }) {
     if (!byRange.has(key)) {
       list.className = ''
       list.replaceChildren(h('div', { class: 'feed-placeholder' }, [
-        h('strong', { text: 'Loading this window…' }),
-        ' Rolling the boosts in this range up by show.',
+        h('strong', { text: copy.loading[0] }), copy.loading[1],
       ]))
     }
     let next
@@ -563,34 +641,32 @@ export async function renderShows({ panel, list }) {
     } catch (e) {
       console.error('[shows] range load failed', key, e)
       if (mine !== seq) return
-      renderPlaceholder(list, 'Couldn’t load shows',
-        ' The boosts feed is unavailable right now — please try again later.')
+      renderPlaceholder(list, ...copy.rangeFail)
       return
     }
     if (mine !== seq) return
-    shows = next
+    shows = inMedium(next)
     list.replaceChildren(cards, moreWrap)
     repaint()
   }
 
   try {
-    shows = await loadRange(rangeKey)
+    shows = inMedium(await loadRange(rangeKey))
   } catch (e) {
     console.error('[shows] index fetch failed', e)
-    renderPlaceholder(list, 'Couldn’t load shows',
-      ' The podcast index is unavailable right now — please try again later.')
+    renderPlaceholder(list, ...copy.loadFail)
     return
   }
 
-  mountFeedControls(panel?.dataset.feed || 'shows', [
+  mountFeedControls(panel?.dataset.feed || (wantMusic ? 'albums' : 'shows'), [
     rangeControl(rangeKey, applyRange, {
-      label: 'Filter by when the show was boosted', titleFor: rangeTitle,
+      label: copy.rangeLabel, titleFor: (key) => copy.rangeTitle(rangeDays(key)),
     }),
     sortControl(SORT_OPTIONS, sortKey, (key) => {
       if (key === sortKey) return
       sortKey = key
       repaint()
-    }, { title: 'Sort shows' }),
+    }, { title: copy.sortTitle }),
   ])
 
   // Search the shows in the current range. The sub-line is the show's own
@@ -598,13 +674,13 @@ export async function renderShows({ panel, list }) {
   // than by a guid nobody recognises — except on the 33% with no title at all,
   // where the guid is the only handle there is.
   search = mountFeedSearch(panel, {
-    placeholder: 'Search shows…',
-    label: 'Search shows',
-    noun: 'show',
+    placeholder: copy.searchPlaceholder,
+    label: copy.searchLabel,
+    noun: copy.searchNoun,
     onPick: () => repaint(),
     getEntries: () => sorted.map((s) => ({
       key: s.guid,
-      label: s.title || 'Unidentified show',
+      label: s.title || copy.unidentified,
       sub: s.title
         ? `${plural(s.boosts, 'boost', 'boosts')} · ${fmtSats(s.sats)} sats`
         : s.guid,

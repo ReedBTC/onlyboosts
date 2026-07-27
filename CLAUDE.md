@@ -20,38 +20,96 @@ order. They are the site map, so **they're regrouped together or not at all**:
 
 | Group | Items |
 |---|---|
-| **Feeds** | Episodes `/#episodes-global` · Shows `/#shows` · Boosts `/#boosts-global` |
+| **Feeds** | Episodes `/#episodes-global` · Shows `/#shows` · Songs `/#songs-global` · Albums `/#albums` · Boosts `/#boosts-global` |
 | **Stats** | Boost Stats `/stats` · Boosters `/boosters` — both coming soon |
 | **More** (footer: *Connect*) | About · Source · Report a bug |
 
 Feeds has one entry per feed, matching the homepage's what-menu exactly.
 **The Global/Follows axis is deliberately not in the nav**: it's the second
-dropdown on the page, and listing both scopes made this a six-item grid
-restating a control the page already has. The two `*-follows` feeds are
+dropdown on the page, and listing both scopes would double the group into a
+grid restating a control the page already has. The three `*-follows` feeds are
 reachable from that dropdown, and by direct link.
 
 | Feed | Hash | Renders |
 |---|---|---|
 | Episodes · Global | `#episodes-global` | per-episode rollup by boosts received |
 | Episodes · Follows | `#episodes-follows` | same, filtered to your kind-3 contacts |
+| Songs · Global | `#songs-global` | the same rollup, music feeds only |
+| Songs · Follows | `#songs-follows` | same, filtered to your kind-3 contacts |
 | Boosts · Global | `#boosts-global` | the kind-1 boost notes themselves |
 | Boosts · Follows | `#boosts-follows` | same, filtered to your kind-3 contacts |
 | Shows | `#shows` | per-show rollup, Global only |
+| Albums | `#albums` | the same rollup, music feeds only, Global only |
+
+## The medium split
+
+`<podcast:medium>` is what separates a podcast from a music release: a `music`
+feed's items are tracks on an album, not episodes of a show. The collector
+projects it onto every row of `podcasts/index.json` (`4982533`), defaulting to
+`podcast` per the namespace where a feed carries none. Live counts: **818
+podcast, 465 music, 2 video**.
+
+**Two renderers serve five what-options.** Episodes and Songs are one
+episode-level rollup; Shows and Albums are one show-level rollup. Each pair
+splits on the medium and differs *only* by a copy table at the top of its
+module — the grouping, ranking, cards and drawers are identical code. Adding a
+third medium is a third entry in those tables, not a third renderer.
+
+**The split is a partition, not a narrowing.** `music` goes to Songs and
+Albums; **everything else** goes to Episodes and Shows — podcasts, the two
+video feeds, and every show the collector holds boosts for but Podcast Index
+can't identify. So Albums is never a subset of Shows under a second name. A
+show with no known medium counts as not-music: filing an unidentified feed
+under Albums would be a claim about it we can't support. The Boosts feeds take
+no medium at all and stay the unsplit firehose.
+
+**The medium is a property of the SHOW, so it is not on the boost record.** The
+alternative was the collector stamping one show-level fact onto 22k boosts and
+rewriting every month archive; instead `ob-data.js#mediumPredicate` joins
+guid → medium through `podcasts/index.json`. That file is ~103KB over the wire
+and cached for the page's lifetime, and the show-level feeds load it anyway, so
+the join costs one request the first time and nothing after. `mediumPredicate`
+returns `{ test, ok }`: on a failed join `test` keeps everything, so Episodes
+degrades to an unsplit feed while the music callers read `ok` and say the index
+is unavailable — an empty Songs feed is indistinguishable from a quiet week, so
+it must not be the failure mode.
+
+The one cost this imposes is on the **show-level windowed ranges**, which used
+to need no extra request. `All` is the opening range on both Shows and Albums
+and reads that file anyway, so a visitor who reaches 1W has already loaded it.
+
+Songs has the Global/Follows axis and Albums doesn't. That asymmetry is about
+the data source, not the medium: `feeds-podcasts.js` never reads the
+show-level rollup, so its follows path works unchanged, while
+`podcasts/index.json` is computed over everyone and cannot serve a filtered
+audience. See the scope note in `shows-feed.js`.
+
+**Songs · Global pays for the full boost corpus to paint ~120 cards** — it
+filters the same `latest.json` + 3 months (~4.7MB) the Episodes feed pulls, of
+which ~5% is music. Those shards are shared and cached, so opening Episodes
+first makes it free, but a direct landing on `#songs-global` is expensive for
+what it shows. A collector-side `boosts/music.json` shard would fix it; not
+built.
 
 **The feed bar replaced a row of four tabs**, one per feed. Two dropdowns
-instead of four buttons is what makes room for a third `what` (Shows, and
-whatever follows it) without the row growing to six tabs. The Boosts hashes are
+instead of four buttons is what makes room for more `what` options (Shows, then
+Songs and Albums) without the row growing a button per feed; it is now five
+options over eight feeds. The Boosts hashes are
 unchanged; the episodes feed's renamed from `#podcasts-*` and the old form is
 permanently aliased — see the naming note.
 
-Shows has no whose-axis **yet**, so its key is the bare `shows` rather than
-`shows-global`. Picking it leaves the scope *state* alone, so going Boosts ·
-Follows → Shows → Episodes returns you to Follows. Adding Shows · Follows means
+Shows and Albums have no whose-axis **yet**, so their keys are the bare `shows`
+and `albums` rather than `*-global`. Picking one leaves the scope *state*
+alone, so going Boosts · Follows → Shows → Episodes returns you to Follows.
+
+`SCOPELESS` in the controller is the set of types with no whose-axis (`shows`,
+`albums`) — their key is the bare type, and picking one leaves the scope
+*state* alone. Adding Shows · Follows means dropping it from that set,
 renaming the key and keeping `#shows` as an alias.
 
 **Follows only exists for a signed-in npub.** Signed out, the scope menu is
 `hidden` outright (a one-option dropdown is worse than none — it's hidden on
-Shows for the same reason), and a `#episodes-follows` deep link is coerced to
+Shows and Albums for the same reason), and a `#episodes-follows` deep link is coerced to
 Global with the hash rewritten to match.
 
 The inline feed-bar controller in `index.html` owns the menus, which panel is
@@ -141,7 +199,7 @@ and don't define them — every page has to supply the tokens. That supply is
 `body`/`a`/`img` styles. **Link it from every page, last among the shared
 stylesheets** so a page's own inline `<style>` still wins.
 
-`index.html` keeps one theme block of its own — the five per-feed accents and
+`index.html` keeps one theme block of its own — the eight per-feed accents and
 the `body[data-active-feed]` mapping — because those only mean anything on
 the page that has the feeds. `assets/css/page.css` is the counterpart for the
 plain content pages (`.page-header`, `.soon-card`).
@@ -153,9 +211,12 @@ the OnlyBoosts palette**. Trust the values, not the words — `--orange` is
 brand cyan. New code should prefer `--brand` / `--ink` / `--surface`.
 
 Brand colors are sampled from the supplied art: `--brand: #00aff0` (the
-mark's cyan) and `--brand-d: #068ace` (its broadcast waves). The five feed
-accents sit on one cyan→indigo ramp, so switching feed shifts the page wash
-along a single system rather than to an unrelated color. Since the tab row
+mark's cyan) and `--brand-d: #068ace` (its broadcast waves). The eight feed
+accents sit on one cyan→indigo→violet ramp, so switching feed shifts the page
+wash along a single system rather than to an unrelated color. The violet tail
+is the music half of the medium split — Songs and Albums are the same two
+rollups as Episodes and Shows, so the color family is what says which side
+you're on rather than the position in the menu. Since the tab row
 went away, that accent is read by the panel wash, the menus and the range /
 sort controls; `--accent` / `--accent-d` / `--tint` are the only names the
 shared chrome sees.
@@ -232,9 +293,10 @@ Carried from the scaffold commit and the LB suite:
 ## What's built vs. what isn't
 
 **Working, ported from LB:**
-- `assets/js/boosts-feed.js` / `feeds-podcasts.js` — the four boost/episode feeds
-  (the latter is the Episodes feed; see the naming note)
-- `assets/js/shows-feed.js` — the show-level rollup (written here, not ported)
+- `assets/js/boosts-feed.js` / `feeds-podcasts.js` — the boost feeds and the
+  episode-level rollup behind both Episodes and Songs (see the naming note)
+- `assets/js/shows-feed.js` — the show-level rollup behind Shows and Albums
+  (written here, not ported)
 - `assets/js/feed-controls.js` — the range/sort chrome they all share
 - `assets/js/feed-search.js` — the per-feed typeahead at the head of each panel
 - `assets/js/boosts-thread.js` — the content tokenizer (nostr: mentions,
@@ -408,7 +470,10 @@ renderer on first view.
 | `boosts-follows` | `boosts-feed.js` | `POST /api/v1/boosts/follows`, cursor-paged |
 | `episodes-global` | `feeds-podcasts.js` | `latest.json` + 3 recent months, rolled up by episode |
 | `episodes-follows` | `feeds-podcasts.js` | `POST /api/v1/boosts/follows`, same rollup |
+| `songs-global` | `feeds-podcasts.js` | same as `episodes-global`, `medium: 'music'` |
+| `songs-follows` | `feeds-podcasts.js` | same as `episodes-follows`, `medium: 'music'` |
 | `shows` | `shows-feed.js` | `podcasts/index.json` on All; the boost corpus rolled up by show on 1W/1M |
+| `albums` | `shows-feed.js` | same as `shows`, `medium: 'music'` |
 
 ### Range and sort
 
@@ -419,9 +484,13 @@ own tooltips:
 
 | | Range filters on | Sorts |
 |---|---|---|
-| Episodes | when the episode **aired** (`ep.published`) | latest boost / latest episode / most boosters / most boosts / most sats |
+| Episodes / Songs | when the episode **aired** (`ep.published`) | latest boost / latest episode / most boosters / most boosts / most sats |
 | Boosts | when the boost was **sent** (`b.ts`) | latest boost / latest episode / largest boost |
-| Shows | when the show was **boosted** (`b.ts`) | most boosts / sats / boosters / episodes / recently boosted |
+| Shows / Albums | when the show was **boosted** (`b.ts`) | most boosts / sats / boosters / episodes / recently boosted |
+
+Songs and Albums use the same axes as the feeds they mirror; only the wording
+changes (the air date is a track's release date, the sort menu says "Latest
+release"). Both come out of the copy tables.
 
 Air date and boost time are different axes on purpose: an old episode boosted
 today is in the Episodes data but out of its 1W view, whereas the note and show
@@ -461,8 +530,8 @@ Each feed searches its own subject, and picks exactly one:
 
 | Feed | Searches | Filters to |
 |---|---|---|
-| Episodes | episode title, plus the show behind it | that one episode |
-| Shows | show title, plus the guid | that one show |
+| Episodes / Songs | episode title, plus the show behind it | that one episode |
+| Shows / Albums | show title, plus the guid | that one show |
 | Boosts | booster display name, npub or hex pubkey | that booster's boosts |
 
 **Typing suggests, picking filters.** Five hits, and nothing in the list moves

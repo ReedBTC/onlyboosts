@@ -19,7 +19,7 @@ const SITE_ORIGIN = "https://onlyboosts.social";
 // Far above the current 922; if it's ever hit, it's time for a sitemap index.
 const MAX_SHOWS = 20000;
 
-// The five feeds are hash routes on "/" (#boosts-global etc.), and crawlers
+// The eight feeds are hash routes on "/" (#boosts-global etc.), and crawlers
 // don't index fragments separately — listing them would just be duplicate
 // entries for the same URL.
 //

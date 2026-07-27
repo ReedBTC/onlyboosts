@@ -331,14 +331,19 @@ function renderShowPage({ show, episodes, supporters, boosts }) {
           <a class="nav-explore-home" href="/"><span aria-hidden="true">🏠</span> Home</a>
           <div class="nav-explore-groups">
             <!-- Feeds: one entry per feed, matching the homepage's what-menu
-                 exactly (Episodes / Shows / Boosts). The Global vs Follows
-                 axis is deliberately absent — it's the second dropdown on the
-                 page itself, and listing both scopes here made the nav a
-                 six-item grid restating a control the page already has. -->
+                 exactly (Episodes / Shows / Songs / Albums / Boosts). The
+                 Global vs Follows axis is deliberately absent — it's the
+                 second dropdown on the page itself, and listing both scopes
+                 here made the nav a grid restating a control the page already
+                 has. Songs and Albums are the music half of Episodes and
+                 Shows, split on <podcast:medium>; they sit next to the feeds
+                 they mirror rather than in a group of their own. -->
             <div class="nav-explore-group">
               <h4>Feeds</h4>
               <a href="/#episodes-global"><span aria-hidden="true">🎙</span> Episodes</a>
               <a href="/#shows"><span aria-hidden="true">📻</span> Shows</a>
+              <a href="/#songs-global"><span aria-hidden="true">🎵</span> Songs</a>
+              <a href="/#albums"><span aria-hidden="true">💿</span> Albums</a>
               <a href="/#boosts-global"><span aria-hidden="true">⚡</span> Boosts</a>
             </div>
             <!-- Stats: the aggregate views over the same data. Both are
@@ -415,6 +420,8 @@ function renderShowPage({ show, episodes, supporters, boosts }) {
       <ul>
         <li><a href="/#episodes-global">🎙 Episodes</a></li>
         <li><a href="/#shows">📻 Shows</a></li>
+        <li><a href="/#songs-global">🎵 Songs</a></li>
+        <li><a href="/#albums">💿 Albums</a></li>
         <li><a href="/#boosts-global">⚡ Boosts</a></li>
       </ul>
     </div>

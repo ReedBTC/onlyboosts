@@ -62,17 +62,25 @@
     :root {
       /* ── Per-feed theme palette ──────────────────────────────────
          Each feed owns an accent, read by the panel wash, the feed-bar
-         menus and the range/sort controls. The five sit on one
-         cyan→indigo ramp, so switching feed shifts the page along a
-         single system rather than to an unrelated color. The active
+         menus and the range/sort controls. The eight sit on one
+         cyan→indigo→violet ramp, so switching feed shifts the page along
+         a single system rather than to an unrelated color. The active
          feed's trio is mirrored into --accent / --accent-d / --tint by
          the [data-active-feed] rules below, so the shared chrome can
-         just read --accent. */
+         just read --accent.
+
+         The ramp's violet tail is the music half of <podcast:medium>:
+         Songs and Albums are the same two rollups as Episodes and Shows,
+         so the color family is what says which side you're on rather
+         than the position in the menu. */
       --bg-accent:   #00aff0;  --bg-accent-d:   #0090cc;  --bg-tint:   #e2f6fd;
       --bf-accent:   #068ace;  --bf-accent-d:   #0570ab;  --bf-tint:   #e0f0fa;
       --sh-accent:   #1b7bc1;  --sh-accent-d:   #15629b;  --sh-tint:   #e4f1fb;
       --eg-accent:   #2f6bb5;  --eg-accent-d:   #255696;  --eg-tint:   #e7eefa;
       --ef-accent:   #4a4f9e;  --ef-accent-d:   #3b3f80;  --ef-tint:   #eaebf7;
+      --sng-accent:  #5c4aa0;  --sng-accent-d:  #4a3b83;  --sng-tint:  #edebf8;
+      --snf-accent:  #6d489b;  --snf-accent-d:  #583a7e;  --snf-tint:  #f0eaf7;
+      --alb-accent:  #7f4694;  --alb-accent-d:  #663878;  --alb-tint:  #f4e9f5;
 
       /* Defaults (Episodes · Global is the landing feed). */
       --accent:   var(--eg-accent);
@@ -86,6 +94,9 @@
     body[data-active-feed="shows"]            { --accent: var(--sh-accent); --accent-d: var(--sh-accent-d); --tint: var(--sh-tint); }
     body[data-active-feed="episodes-global"]  { --accent: var(--eg-accent); --accent-d: var(--eg-accent-d); --tint: var(--eg-tint); }
     body[data-active-feed="episodes-follows"] { --accent: var(--ef-accent); --accent-d: var(--ef-accent-d); --tint: var(--ef-tint); }
+    body[data-active-feed="songs-global"]     { --accent: var(--sng-accent); --accent-d: var(--sng-accent-d); --tint: var(--sng-tint); }
+    body[data-active-feed="songs-follows"]    { --accent: var(--snf-accent); --accent-d: var(--snf-accent-d); --tint: var(--snf-tint); }
+    body[data-active-feed="albums"]           { --accent: var(--alb-accent); --accent-d: var(--alb-accent-d); --tint: var(--alb-tint); }
 
     /* ── Masthead ────────────────────────────────────────────────────
        Wordmark banner sits above the sticky feed bar. It scrolls away;
@@ -145,8 +156,8 @@
 
     /* ── Feed bar ────────────────────────────────────────────────────
        One row that picks the feed and controls it. Two dropdowns carry the
-       two axes — what (Episodes / Shows / Boosts) x whose (Global /
-       Follows) — and each feed mounts its own 1W/1M/All + sort group into
+       two axes — what (Episodes / Shows / Songs / Albums / Boosts) x whose
+       (Global / Follows) — and each feed mounts its own 1W/1M/All + sort into
        the right-hand slot (feed-controls.js). Sticky under the nav, as the
        four-tab ribbon it replaced was, so switching feed, window or order
        doesn't mean scrolling back to the top of a long list.
@@ -185,9 +196,12 @@
     .feed-bar-controls > [data-controls-for] { display: none; }
     body[data-active-feed="episodes-global"]  .feed-bar-controls > [data-controls-for="episodes-global"],
     body[data-active-feed="episodes-follows"] .feed-bar-controls > [data-controls-for="episodes-follows"],
+    body[data-active-feed="songs-global"]     .feed-bar-controls > [data-controls-for="songs-global"],
+    body[data-active-feed="songs-follows"]    .feed-bar-controls > [data-controls-for="songs-follows"],
     body[data-active-feed="boosts-global"]    .feed-bar-controls > [data-controls-for="boosts-global"],
     body[data-active-feed="boosts-follows"]   .feed-bar-controls > [data-controls-for="boosts-follows"],
-    body[data-active-feed="shows"]            .feed-bar-controls > [data-controls-for="shows"] {
+    body[data-active-feed="shows"]            .feed-bar-controls > [data-controls-for="shows"],
+    body[data-active-feed="albums"]           .feed-bar-controls > [data-controls-for="albums"] {
       display: flex;
     }
 
@@ -999,14 +1013,19 @@
           <a class="nav-explore-home" href="/"><span aria-hidden="true">🏠</span> Home</a>
           <div class="nav-explore-groups">
             <!-- Feeds: one entry per feed, matching the homepage's what-menu
-                 exactly (Episodes / Shows / Boosts). The Global vs Follows
-                 axis is deliberately absent — it's the second dropdown on the
-                 page itself, and listing both scopes here made the nav a
-                 six-item grid restating a control the page already has. -->
+                 exactly (Episodes / Shows / Songs / Albums / Boosts). The
+                 Global vs Follows axis is deliberately absent — it's the
+                 second dropdown on the page itself, and listing both scopes
+                 here made the nav a grid restating a control the page already
+                 has. Songs and Albums are the music half of Episodes and
+                 Shows, split on <podcast:medium>; they sit next to the feeds
+                 they mirror rather than in a group of their own. -->
             <div class="nav-explore-group">
               <h4>Feeds</h4>
               <a href="/#episodes-global"><span aria-hidden="true">🎙</span> Episodes</a>
               <a href="/#shows"><span aria-hidden="true">📻</span> Shows</a>
+              <a href="/#songs-global"><span aria-hidden="true">🎵</span> Songs</a>
+              <a href="/#albums"><span aria-hidden="true">💿</span> Albums</a>
               <a href="/#boosts-global"><span aria-hidden="true">⚡</span> Boosts</a>
             </div>
             <!-- Stats: the aggregate views over the same data. Both are
@@ -1057,10 +1076,12 @@
 
 <!-- ══════════════════════════════ FEED BAR ══════════════════════════════
      Two dropdowns pick the feed on two axes: what (episodes / shows /
-     boosts) x whose (everyone / the npubs you follow). The scope menu is
-     dropped whenever it has only one real option — signed out, or on Shows,
-     which has no whose-axis. The third slot is filled by whichever feed is
-     active, with its own range + sort controls (feed-controls.js).
+     boosts) x whose (everyone / the npubs you follow). Songs and Albums are
+     the music half of the first two, split on <podcast:medium>. The scope
+     menu is dropped whenever it has only one real option — signed out, or on
+     Shows and Albums, which have no whose-axis. The third slot is filled by
+     whichever feed is active, with its own range + sort controls
+     (feed-controls.js).
 
      Static markup, wired by the controller at the bottom of the page: the
      bar is above the fold on every visit, so it shouldn't wait on script to
@@ -1076,6 +1097,8 @@
       <div class="feed-menu-list" role="menu" aria-label="Feed" hidden>
         <button type="button" class="feed-menu-item" role="menuitemradio" aria-checked="true" data-value="episodes">Episodes</button>
         <button type="button" class="feed-menu-item" role="menuitemradio" aria-checked="false" data-value="shows">Shows</button>
+        <button type="button" class="feed-menu-item" role="menuitemradio" aria-checked="false" data-value="songs">Songs</button>
+        <button type="button" class="feed-menu-item" role="menuitemradio" aria-checked="false" data-value="albums">Albums</button>
         <button type="button" class="feed-menu-item" role="menuitemradio" aria-checked="false" data-value="boosts">Boosts</button>
       </div>
     </div>
@@ -1099,10 +1122,12 @@
 
 <!-- ══════════════════════════════ PANELS ══════════════════════════════
      The two Boosts panels render the kind-1 boost note itself
-     (boosts-feed.js). The two Episodes panels render the per-episode
-     rollup (feeds-podcasts.js). Global vs Follows narrows to the signed-in
-     user's kind-3 contact list — see follow-set.js. Shows is a placeholder:
-     it has no loader in feeds.js, so its markup is all there is.
+     (boosts-feed.js). Episodes and Songs are the same per-episode rollup
+     (feeds-podcasts.js); Shows and Albums the same per-show one
+     (shows-feed.js). Each pair is split on <podcast:medium> — music feeds
+     to Songs and Albums, everything else to Episodes and Shows. Global vs
+     Follows narrows to the signed-in user's kind-3 contact list — see
+     follow-set.js.
 
      Each panel leads with an empty [data-feed-search] slot, filled by that
      feed's renderer through feed-search.js and left hidden until it is. It
@@ -1152,6 +1177,30 @@
       </div>
     </section>
 
+    <!-- Songs: the same per-episode rollup as Episodes, narrowed to feeds
+         whose <podcast:medium> is "music" — so a card is a track, not an
+         episode. Both scopes, because this path never reads the show-level
+         rollup that keeps Shows and Albums Global-only. -->
+    <section class="feed-panel" id="panel-songs-global" role="region" aria-label="Songs, global" data-feed="songs-global" data-scope="global" hidden>
+      <div class="feed-search" data-feed-search hidden></div>
+      <div class="feed-list" data-feed-list>
+        <div class="feed-placeholder">
+          <strong>Global songs feed coming online</strong>
+          The layout is ready — boosted tracks load here once the snapshot loader lands.
+        </div>
+      </div>
+    </section>
+
+    <section class="feed-panel" id="panel-songs-follows" role="region" aria-label="Songs from your follows" data-feed="songs-follows" data-scope="follows" hidden>
+      <div class="feed-search" data-feed-search hidden></div>
+      <div class="feed-list" data-feed-list>
+        <div class="feed-placeholder">
+          <strong>Sign in to see this feed</strong>
+          Follows feeds read your kind&#8209;3 contact list, so they need a signed-in npub.
+        </div>
+      </div>
+    </section>
+
     <!-- Shows: the show-level rollup, where the Episodes feeds are
          episode-level. Global only — podcasts/index.json is computed over
          everyone, so it can't serve a Follows audience (shows-feed.js). -->
@@ -1161,6 +1210,18 @@
         <div class="feed-placeholder">
           <strong>Shows feed coming online</strong>
           The layout is ready — boosted shows load here once the rollup lands.
+        </div>
+      </div>
+    </section>
+
+    <!-- Albums: Shows, narrowed to the music side of the same rollup. Global
+         only for the same reason Shows is. -->
+    <section class="feed-panel" id="panel-albums" role="region" aria-label="Albums" data-feed="albums" data-scope="global" hidden>
+      <div class="feed-search" data-feed-search hidden></div>
+      <div class="feed-list" data-feed-list>
+        <div class="feed-placeholder">
+          <strong>Albums feed coming online</strong>
+          The layout is ready — boosted albums load here once the rollup lands.
         </div>
       </div>
     </section>
@@ -1190,6 +1251,8 @@
       <ul>
         <li><a href="/#episodes-global">🎙 Episodes</a></li>
         <li><a href="/#shows">📻 Shows</a></li>
+        <li><a href="/#songs-global">🎵 Songs</a></li>
+        <li><a href="/#albums">💿 Albums</a></li>
         <li><a href="/#boosts-global">⚡ Boosts</a></li>
       </ul>
     </div>
@@ -1231,16 +1294,24 @@
 <script>
 (function () {
   'use strict';
-  // The feed each hash names, and the two axes it decomposes into. Shows has
-  // no whose-axis — it's a placeholder, so its key is bare and its scope is
-  // only here to keep the shape uniform.
+  // The feed each hash names, and the two axes it decomposes into. Shows and
+  // Albums have no whose-axis, so their keys are bare and their scope is only
+  // here to keep the shape uniform.
   const FEEDS = {
     'episodes-global':  { type: 'episodes', scope: 'global' },
     'episodes-follows': { type: 'episodes', scope: 'follows' },
+    'songs-global':     { type: 'songs',    scope: 'global' },
+    'songs-follows':    { type: 'songs',    scope: 'follows' },
     'boosts-global':    { type: 'boosts',   scope: 'global' },
     'boosts-follows':   { type: 'boosts',   scope: 'follows' },
     'shows':            { type: 'shows',    scope: 'global' },
+    'albums':           { type: 'albums',   scope: 'global' },
   };
+  // The two show-level feeds have no whose-axis, so their key is the bare type
+  // rather than `<type>-global`. Songs is episode-level and does have one — the
+  // asymmetry is about which data source each reads, not about medium; see the
+  // scope note at the top of shows-feed.js.
+  const SCOPELESS = { shows: true, albums: true };
   // Retired hashes, kept working permanently. The episodes feed was called
   // "podcasts" until Shows arrived and made the name ambiguous — both are
   // podcasts; one is episode-level. An old link resolves to the new feed and
@@ -1261,7 +1332,7 @@
   let type = DEFAULT_TYPE;
   let scope = DEFAULT_SCOPE;
 
-  function feedKey(t, s) { return t === 'shows' ? 'shows' : t + '-' + s; }
+  function feedKey(t, s) { return SCOPELESS[t] ? t : t + '-' + s; }
 
   // Follows is scoped to a signed-in npub, so signed out it has nothing to
   // show — the option is dropped rather than kept around as a menu entry whose
@@ -1293,8 +1364,8 @@
       if (cur && label) cur.textContent = label;
     });
     // A one-option dropdown is worse than none: hide the scope menu while
-    // signed out, and on Shows, which has no whose-axis.
-    if (menus.scope) menus.scope.hidden = (type === 'shows') || !isSignedIn();
+    // signed out, and on the feeds that have no whose-axis.
+    if (menus.scope) menus.scope.hidden = !!SCOPELESS[type] || !isSignedIn();
   }
 
   function setFeed(nextType, nextScope, opts) {

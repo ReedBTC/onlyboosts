@@ -39,7 +39,9 @@ import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js'
 import { buildActionBar, configureBoostActions } from '/assets/js/boost-actions.js'
 import { ensureLoginWidget } from '/assets/js/widget-loader.js'
 import { resolveFollows } from '/assets/js/follow-set.js'
-import { getLatestBoosts, getBoostMonths, getBoostMonth, toEpisodeShape } from '/assets/js/ob-data.js'
+import {
+  getLatestBoosts, getBoostMonths, getBoostMonth, toEpisodeShape, mediumPredicate,
+} from '/assets/js/ob-data.js'
 import { getFollowsBoosts } from '/assets/js/ob-live.js'
 import { copyText, showToast, copyNpub } from '/assets/js/copy-npub.js'
 import {
@@ -51,6 +53,62 @@ import { showPageHref } from '/assets/js/show-link.js'
 
 const VALUE_API = '/api/value'   // Podcast Index value-block proxy (splits)
 const INITIAL_CARDS = 30       // episodes rendered per "load more" batch
+
+// ── Episodes vs Songs ────────────────────────────────────────────────
+// This module renders two of the feed bar's options, and they differ by one
+// thing: which side of <podcast:medium> a boost's show falls on. A music feed's
+// item is a track on an album, not an episode of a show, so the rollup, the
+// ranking and the card are all identical and only the words change. That makes
+// the difference a copy table rather than a second renderer — see
+// ob-data.js#mediumPredicate for the split itself.
+const COPY = {
+  other: {
+    untitled: 'Untitled episode',
+    listen: 'Listen to this episode',
+    dated: 'Episode aired',
+    boostBtn: 'Boost episode',
+    seeAllTitle: 'Open this episode on Boost Me Bitch',
+    fileStem: 'episode',
+    noun: 'episode',
+    searchPlaceholder: 'Search episodes…',
+    searchLabel: 'Search episodes',
+    searchNoun: 'episode',
+    rangeLabel: 'Filter by episode air date',
+    rangeTitle: (days) => (days ? `Episodes aired in the last ${days} days` : 'All episodes'),
+    sortTitle: 'Sort episodes',
+    sortDateLabel: 'Latest episode',
+    moreLabel: (n) => `Load ${n} more episode${n === 1 ? '' : 's'}`,
+    loadFail: ['Couldn’t load podcast boosts', 'The boosts feed is unavailable right now — please try again later.'],
+    noFollows: ['You’re not following anyone yet', 'Follow some npubs in any Nostr client and the episodes they boost will show up here.'],
+    emptyFollows: ['No episodes from your follows yet', 'Nobody you follow has boosted a podcast episode recently. Switch to Global to see everyone.'],
+    emptyGlobal: ['No boosted episodes yet', 'When someone boosts a podcast episode on Nostr, it’ll show up here.'],
+    emptyWindow: ['No episodes in this window', 'Nothing the community boosted aired in this time range — try a wider one.'],
+    outOfRange: 'aired outside this time range — widen the range, or clear the search.',
+  },
+  music: {
+    untitled: 'Untitled track',
+    listen: 'Listen to this track',
+    dated: 'Released',
+    boostBtn: 'Boost track',
+    seeAllTitle: 'Open this track on Boost Me Bitch',
+    fileStem: 'track',
+    noun: 'track',
+    searchPlaceholder: 'Search songs…',
+    searchLabel: 'Search songs',
+    searchNoun: 'song',
+    rangeLabel: 'Filter by release date',
+    rangeTitle: (days) => (days ? `Songs released in the last ${days} days` : 'All songs'),
+    sortTitle: 'Sort songs',
+    sortDateLabel: 'Latest release',
+    moreLabel: (n) => `Load ${n} more song${n === 1 ? '' : 's'}`,
+    loadFail: ['Couldn’t load music boosts', 'The boosts feed is unavailable right now — please try again later.'],
+    noFollows: ['You’re not following anyone yet', 'Follow some npubs in any Nostr client and the songs they boost will show up here.'],
+    emptyFollows: ['No songs from your follows yet', 'Nobody you follow has boosted a music track recently. Switch to Global to see everyone.'],
+    emptyGlobal: ['No boosted songs yet', 'When someone boosts a track from a music feed on Nostr, it’ll show up here.'],
+    emptyWindow: ['No songs in this window', 'Nothing the community boosted was released in this time range — try a wider one.'],
+    outOfRange: 'was released outside this time range — widen the range, or clear the search.',
+  },
+}
 
 // ── Tiny DOM helper (same contract as feeds-market.js / merch.js's h) ──
 function h(tag, attrs = {}, children = []) {
@@ -160,12 +218,12 @@ function avatarEl(profile, npub, { size = 26, interactive = false, cls = '' } = 
 // Prefer a per-boost Fountain episode URL (present on ~98% of episodes);
 // otherwise fall back to a show-level smart link, and label the button so a
 // show fallback never poses as an episode link.
-function episodeLink(boosts, show) {
+function episodeLink(boosts, show, copy) {
   const withUrl = boosts.find((b) => b.item_url)
   if (withUrl && isSafeImg(withUrl.item_url)) {
     // Every episode URL in the snapshot is a fountain.fm link, so name the
     // app; keep a generic label as a defensive fallback if that ever changes.
-    let label = 'Listen to this episode'
+    let label = copy.listen
     try {
       if (new URL(withUrl.item_url).hostname.replace(/^www\./, '') === 'fountain.fm') label = 'Listen on Fountain'
     } catch {}
@@ -305,9 +363,9 @@ function boltSvg() {
 // when the CDN doesn't send Content-Disposition). External podcast CDNs often
 // lack permissive CORS, so on any failure we fall back to opening the URL so
 // the listener can still save it manually.
-function downloadMp3Button(url, ep) {
-  const base = (ep.title || 'episode').toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'episode'
+function downloadMp3Button(url, ep, stem) {
+  const base = (ep.title || stem).toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || stem
   const filename = base + '.mp3'
   const label = '↓ Download MP3'
   const dl = h('button', { class: 'pcast-btn pcast-btn-download', type: 'button' }, label)
@@ -357,7 +415,7 @@ function waitForModal(timeoutMs = 40000) {
 // Boost click: resolve the episode's value block live from Podcast Index (via
 // /api/value), apply the external overrides, then hand off to the widget's
 // external-boost modal. No value block → a toast, no modal.
-async function onBoostClick(item, btn) {
+async function onBoostClick(item, btn, copy = COPY.other) {
   const { ep, show } = item
   // The data feed has no Podcast Index numeric id, so identify the show by
   // its guid / RSS URL and let /api/value resolve the id server-side.
@@ -393,11 +451,11 @@ async function onBoostClick(item, btn) {
     } catch { showToast('Couldn’t load boost splits — please try again in a moment.', true); return }
     if (data && data.error) { showToast('Boost splits are unavailable right now.', true); return }
     const parsed = fromApiValue(data)
-    if (!parsed) { showToast('This episode has no value block to boost.', true); return }
+    if (!parsed) { showToast(`This ${copy.noun} has no value block to boost.`, true); return }
 
     const recipients = applyExternalOverrides(parsed.recipients)
     const totalWeight = recipients.reduce((a, r) => a + (r.splitWeight || 0), 0)
-    if (!recipients.length || totalWeight <= 0) { showToast('This episode has no payable recipients.', true); return }
+    if (!recipients.length || totalWeight <= 0) { showToast(`This ${copy.noun} has no payable recipients.`, true); return }
 
     await ensureWidgetLoaded()
     if (!window.LBLogin?.openExternalBoost) { showToast('Boost is unavailable right now.', true); return }
@@ -435,7 +493,7 @@ let cardUid = 0
 // the sort isn't a ranking. Only the quantitative sorts (most boosters / most
 // boosts / most sats) get a number — on "Latest boost" or "Latest episode" a
 // rank would read as a score when it's really just chronology.
-function episodeCard(item, rank = null) {
+function episodeCard(item, rank = null, copy = COPY.other) {
   const { ep, show, boosts, distinctBoosters, totalSats, latest } = item
   const detailsId = 'pcast-d-' + (++cardUid)
 
@@ -457,12 +515,12 @@ function episodeCard(item, rank = null) {
       avatarEl(profileFor(b.booster_pubkey), b.booster_npub, { size: 22 })))
 
   // A Fountain episode URL, when we have one (present on ~98% of episodes).
-  const link = episodeLink(boosts, show)
+  const link = episodeLink(boosts, show, copy)
   const fountainUrl = link && link.episode ? link.url : null
 
   // Title links to the episode's Boost Me Bitch page (its full boost feed);
   // plain text if we can't build that link.
-  const titleText = ep.title || 'Untitled episode'
+  const titleText = ep.title || copy.untitled
   const titleEl = bmbUrl
     ? h('a', { class: 'pcast-title pcast-title-link', href: bmbUrl, target: '_blank', rel: 'noopener noreferrer', title: 'See all boosts on Boost Me Bitch' }, titleText)
     : h('div', { class: 'pcast-title', text: titleText })
@@ -505,7 +563,7 @@ function episodeCard(item, rank = null) {
   // and the body reclaims the width.
   const mediaCol = h('div', { class: 'pcast-media-col' }, [
     media,
-    ep.published ? h('div', { class: 'pcast-card-aired', title: 'Episode aired' }, fullDate(ep.published)) : null,
+    ep.published ? h('div', { class: 'pcast-card-aired', title: copy.dated }, fullDate(ep.published)) : null,
   ])
   // Rank badge sits at the head of the row on ranked sorts. aria-hidden
   // because the visual order already conveys it to a screen reader, and an
@@ -527,11 +585,11 @@ function episodeCard(item, rank = null) {
   // Action buttons: Boost (opens the external-boost modal) + Download MP3.
   const boostBtn = h('button', {
     class: 'pcast-btn pcast-btn-boost', type: 'button',
-    onclick: (e) => onBoostClick(item, e.currentTarget),
-  }, [boltSvg(), h('span', { class: 'pcast-boost-label' }, 'Boost episode')])
+    onclick: (e) => onBoostClick(item, e.currentTarget, copy),
+  }, [boltSvg(), h('span', { class: 'pcast-boost-label' }, copy.boostBtn)])
   const buttons = h('div', { class: 'pcast-card-buttons' }, [
     boostBtn,
-    audioUrl ? downloadMp3Button(audioUrl, ep) : null,
+    audioUrl ? downloadMp3Button(audioUrl, ep, copy.fileStem) : null,
   ])
 
   const details = h('div', { class: 'pcast-details', id: detailsId, hidden: 'hidden' })
@@ -543,7 +601,7 @@ function episodeCard(item, rank = null) {
       details.hidden = true
       card.classList.remove('is-open')
     } else {
-      if (!built) { built = true; buildDetails(details, boosts, toggle, () => card, bmbUrl) }
+      if (!built) { built = true; buildDetails(details, boosts, toggle, () => card, bmbUrl, copy) }
       drawer.setAttribute('aria-expanded', 'true')
       details.hidden = false
       card.classList.add('is-open')
@@ -584,7 +642,7 @@ function episodeCard(item, rank = null) {
 // comments implied some weren't worth showing), then a bottom "hide" that
 // collapses the drawer and brings the card head back into view so a long
 // thread is easy to close without scrolling all the way back up.
-function buildDetails(details, boosts, toggle, getCard, bmbUrl) {
+function buildDetails(details, boosts, toggle, getCard, bmbUrl, copy) {
   for (const b of boosts) details.appendChild(boostRow(b))
   const hide = h('button', {
     class: 'pcast-drawer-close', type: 'button',
@@ -593,7 +651,7 @@ function buildDetails(details, boosts, toggle, getCard, bmbUrl) {
   const seeAll = bmbUrl
     ? h('a', {
         class: 'pcast-seeall', href: bmbUrl, target: '_blank', rel: 'noopener noreferrer',
-        title: 'Open this episode on Boost Me Bitch',
+        title: copy.seeAllTitle,
       }, ['See all boosts', h('span', { 'aria-hidden': 'true', text: ' ↗' })])
     : null
   details.appendChild(h('div', { class: 'pcast-details-foot' }, [seeAll, hide]))
@@ -812,10 +870,9 @@ function sortItems(items, key) {
 // the feed's data but out of the 1W view. The note feed's identical-looking
 // buttons filter on boost time instead, which is why the tooltips are written
 // per feed rather than in feed-controls.js.
-function rangeTitle(key) {
-  const days = rangeDays(key)
-  return days ? `Episodes aired in the last ${days} days` : 'All episodes'
-}
+//
+// On the music side the same field is the track's release date, which is why
+// the tooltips come out of the copy table rather than being written here.
 function filterItems(items, key) {
   const cutoff = rangeCutoff(key)
   if (!cutoff) return items
@@ -839,12 +896,17 @@ function defaultRange(items, scope) {
 }
 
 // Put this feed's range buttons + sort dropdown in the sticky feed bar.
-function mountControls(feed, { sortKey, rangeKey, onSort, onRange }) {
+function mountControls(feed, { sortKey, rangeKey, onSort, onRange, copy }) {
   mountFeedControls(feed, [
     rangeControl(rangeKey, onRange, {
-      label: 'Filter by episode air date', titleFor: rangeTitle,
+      label: copy.rangeLabel, titleFor: (key) => copy.rangeTitle(rangeDays(key)),
     }),
-    sortControl(SORT_OPTIONS, sortKey, onSort, { title: 'Sort episodes' }),
+    // Only the date sort's label changes between the two feeds; the rest are
+    // measures of boost activity and read the same either way.
+    sortControl(
+      SORT_OPTIONS.map(([k, label]) => [k, k === 'episode' ? copy.sortDateLabel : label]),
+      sortKey, onSort, { title: copy.sortTitle },
+    ),
   ])
 }
 
@@ -904,10 +966,13 @@ async function loadFollowsRows(authors) {
 
 // ── Entry point ──────────────────────────────────────────────────────
 /**
- * @param {Element} opts.list   the [data-feed-list] container
- * @param {string}  opts.scope  'global' | 'follows'
+ * @param {Element} opts.list    the [data-feed-list] container
+ * @param {string}  opts.scope   'global' | 'follows'
+ * @param {string}  opts.medium  'other' (Episodes) | 'music' (Songs) — which
+ *                               side of <podcast:medium> this feed shows
  */
-export async function renderPodcasts({ panel, list, scope = 'global' }) {
+export async function renderPodcasts({ panel, list, scope = 'global', medium = 'other' }) {
+  const copy = COPY[medium] || COPY.other
   // Ranks are meaningful on Global, where the ordering is a leaderboard over
   // the whole network. On Follows the population is just "whoever you happen
   // to follow", so a #1 would imply a standing that doesn't exist.
@@ -933,7 +998,7 @@ export async function renderPodcasts({ panel, list, scope = 'global' }) {
       return
     }
     if (res.status === 'empty') {
-      renderPlaceholder(list, 'You’re not following anyone yet', 'Follow some npubs in any Nostr client and the episodes they boost will show up here.')
+      renderPlaceholder(list, ...copy.noFollows)
       return
     }
     // The array the query API takes. The membership testing this used to do
@@ -943,8 +1008,26 @@ export async function renderPodcasts({ panel, list, scope = 'global' }) {
 
   let data
   try {
-    const rows = follows ? await loadFollowsRows(follows) : await loadGlobalRows()
-    data = toEpisodeShape(rows)
+    // Which side of <podcast:medium> this feed shows. The corpus is the same
+    // boosts either way; the medium is a property of the show, so it's joined
+    // in from the published rollup rather than read off the boost — see
+    // ob-data.js#mediumPredicate. Fetched alongside the corpus rather than
+    // before it: the two are independent requests and serializing them would
+    // put a whole round-trip in front of every feed's first paint.
+    const [{ test: inMedium, ok: mediumOk }, rows] = await Promise.all([
+      mediumPredicate(medium),
+      follows ? loadFollowsRows(follows) : loadGlobalRows(),
+    ])
+    // `ok` is false when the rollup is unreachable, in which case `test` keeps
+    // everything — so Episodes degrades to an unsplit feed, while Songs would
+    // silently look empty. Only the music side treats that as an error,
+    // because only there is "no results" a lie.
+    if (!mediumOk && medium === 'music') {
+      renderPlaceholder(list, 'Couldn’t sort podcasts from music',
+        ' The show index that says which feeds are music is unavailable right now — please try again later.')
+      return
+    }
+    data = toEpisodeShape(rows.filter((b) => inMedium(b.podcast.guid)))
     // Seed from the embedded identities so the cards paint with real names
     // and avatars immediately — no profile round-trip, no repaint.
     for (const [pk, prof] of data.profiles) {
@@ -952,17 +1035,13 @@ export async function renderPodcasts({ panel, list, scope = 'global' }) {
     }
   } catch (e) {
     console.error('[podcasts] fetch failed', e)
-    renderPlaceholder(list, 'Couldn’t load podcast boosts', 'The boosts feed is unavailable right now — please try again later.')
+    renderPlaceholder(list, ...copy.loadFail)
     return
   }
 
   const items = buildEpisodes(data)
   if (!items.length) {
-    if (follows) {
-      renderPlaceholder(list, 'No episodes from your follows yet', 'Nobody you follow has boosted a podcast episode recently. Switch to Global to see everyone.')
-    } else {
-      renderPlaceholder(list, 'No boosted episodes yet', 'When someone boosts a podcast episode on Nostr, it’ll show up here.')
-    }
+    renderPlaceholder(list, ...(follows ? copy.emptyFollows : copy.emptyGlobal))
     return
   }
 
@@ -1004,11 +1083,11 @@ export async function renderPodcasts({ panel, list, scope = 'global' }) {
       cards.appendChild(picked
         ? h('div', { class: 'feed-placeholder' }, [
             h('strong', { text: 'Not in this range' }),
-            `${picked.label} aired outside this time range — widen the range, or clear the search.`,
+            `${picked.label} ${copy.outOfRange}`,
           ])
         : h('div', { class: 'feed-placeholder' }, [
-            h('strong', { text: 'No episodes in this window' }),
-            'Nothing the community boosted aired in this time range — try a wider one.',
+            h('strong', { text: copy.emptyWindow[0] }),
+            copy.emptyWindow[1],
           ]))
       return
     }
@@ -1018,7 +1097,7 @@ export async function renderPodcasts({ panel, list, scope = 'global' }) {
       // before any search filter narrowed it — so a searched episode keeps the
       // standing it has in the feed. Numbering continues across "Show more"
       // pages rather than restarting at 1 each time.
-      const el = episodeCard(it, (showRanks && RANKED_SORTS.has(sortKey)) ? it._rank : null)
+      const el = episodeCard(it, (showRanks && RANKED_SORTS.has(sortKey)) ? it._rank : null, copy)
       el._pcastItem = it   // lets repaintProfiles map avatars regardless of sort order
       cards.appendChild(el)
     })
@@ -1030,7 +1109,7 @@ export async function renderPodcasts({ panel, list, scope = 'global' }) {
       moreWrap.appendChild(h('div', { class: 'pcast-more-group' }, [
         h('button', {
           class: 'pcast-showmore', type: 'button', onclick: renderMore,
-        }, `Load ${batch} more episode${batch === 1 ? '' : 's'}`),
+        }, copy.moreLabel(batch)),
         h('div', { class: 'pcast-more-count', text: `Showing ${shown} of ${view.length}` }),
       ]))
     }
@@ -1065,20 +1144,20 @@ export async function renderPodcasts({ panel, list, scope = 'global' }) {
   }
 
   mountControls(panel?.dataset.feed || `episodes-${scope}`,
-    { sortKey, rangeKey, onSort: applySort, onRange: applyRange })
+    { sortKey, rangeKey, onSort: applySort, onRange: applyRange, copy })
 
   // Search the episodes in the current range. The show's name is the sub-line
   // because episode titles repeat across shows far more than they collide
   // within one ("Episode 42", "Weekly Roundup"), so the show is what tells two
   // hits apart.
   search = mountFeedSearch(panel, {
-    placeholder: 'Search episodes…',
-    label: 'Search episodes',
-    noun: 'episode',
+    placeholder: copy.searchPlaceholder,
+    label: copy.searchLabel,
+    noun: copy.searchNoun,
     onPick: () => rebuild(),
     getEntries: () => sorted.map((it) => ({
       key: it.guid,
-      label: it.ep.title || 'Untitled episode',
+      label: it.ep.title || copy.untitled,
       sub: it.show?.title || '',
       // The show name matches as well as showing: "no agenda" should find that
       // show's episodes whatever their own titles are.

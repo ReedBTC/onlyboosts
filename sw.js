@@ -120,7 +120,7 @@
 // ob-v24: the about page's collector cadence was three times too slow (the
 // incremental scan is every 5 minutes, not 15). Same reason as v23 — a stale
 // page states a wrong figure to a returning visitor for one more navigation.
-const VERSION = 'ob-v25';
+const VERSION = 'ob-v26';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;

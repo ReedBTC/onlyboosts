@@ -1,15 +1,24 @@
 /* Feed hydration for the homepage's feeds.
  *
  * Which feed is on screen is picked by the two dropdowns in the sticky feed
- * bar — what (Episodes / Shows / Boosts) x whose (Global / Follows). Scoping:
- * "Global" is unscoped; "Follows" is the signed-in user's own kind-3 contact
- * list, resolved by follow-set.js. Shows is Global-only for now.
+ * bar — what (Episodes / Shows / Songs / Albums / Boosts) x whose (Global /
+ * Follows). Scoping: "Global" is unscoped; "Follows" is the signed-in user's
+ * own kind-3 contact list, resolved by follow-set.js. Shows and Albums are
+ * Global-only for now.
  *
  * Every feed has a loader (see LOADERS at the bottom); each lazy-imports its
  * renderer on first view. All of them read the collector's published feed
  * through ob-data.js (/api/data/*) — boosts-feed.js renders the boost notes
  * themselves, feeds-podcasts.js the per-episode rollup, shows-feed.js the
  * per-show one.
+ *
+ * Two renderers, five what-options: Episodes and Songs are the same
+ * episode-level rollup, Shows and Albums the same show-level one, split on
+ * <podcast:medium>. A "music" feed's items are tracks on an album; everything
+ * else is episodes of a show. That's the `medium` argument threaded through
+ * hydrate() below — see ob-data.js#mediumPredicate for the split itself. The
+ * Boosts feeds take no medium: a boost note is a boost note, so they stay the
+ * unsplit firehose.
  *
  * The Events / Marketplace / Articles feeds and their modules were removed on
  * fork. What's left of the Events path below — loadEvents, the supporter-set
@@ -1025,7 +1034,7 @@ async function loadEvents() {
 // Every renderer reads the collector's published feed through ob-data.js
 // (Follows also through ob-live.js). Lazy-imported on first view so a visitor
 // who only opens one feed doesn't pay for the others' modules.
-async function hydrate(panelId, mod, scope) {
+async function hydrate(panelId, mod, scope, medium) {
   const panel = document.getElementById(panelId)
   if (!panel) return
   const list = panel.querySelector('[data-feed-list]')
@@ -1036,10 +1045,11 @@ async function hydrate(panelId, mod, scope) {
     const fn = m[RENDERERS[mod]]
     if (typeof fn !== 'function') throw new Error(`no renderer export for ${mod}`)
     // Every renderer takes the panel: it carries the feed key their range/sort
-    // controls are tagged with in the sticky bar.
-    await fn({ panel, list, scope })
+    // controls are tagged with in the sticky bar. `medium` is undefined for
+    // the Boosts feeds, which don't split.
+    await fn({ panel, list, scope, medium })
   } catch (e) {
-    console.error('[feeds] load failed', mod, scope, e)
+    console.error('[feeds] load failed', mod, scope, medium, e)
     renderPlaceholder(list, 'Couldn\u2019t load this feed', 'Something went wrong reaching the boosts data \u2014 please try again later.')
   }
 }
@@ -1058,10 +1068,13 @@ const RENDERERS = {
 const LOADERS = {
   'boosts-global':    () => hydrate('panel-boosts-global', BOOSTS, 'global'),
   'boosts-follows':   () => hydrate('panel-boosts-follows', BOOSTS, 'follows'),
-  'episodes-global':  () => hydrate('panel-episodes-global', PODCASTS, 'global'),
-  'episodes-follows': () => hydrate('panel-episodes-follows', PODCASTS, 'follows'),
-  // Global only — see the scope note at the top of shows-feed.js.
-  'shows':            () => hydrate('panel-shows', SHOWS, 'global'),
+  'episodes-global':  () => hydrate('panel-episodes-global', PODCASTS, 'global', 'other'),
+  'episodes-follows': () => hydrate('panel-episodes-follows', PODCASTS, 'follows', 'other'),
+  'songs-global':     () => hydrate('panel-songs-global', PODCASTS, 'global', 'music'),
+  'songs-follows':    () => hydrate('panel-songs-follows', PODCASTS, 'follows', 'music'),
+  // Both Global only — see the scope note at the top of shows-feed.js.
+  'shows':            () => hydrate('panel-shows', SHOWS, 'global', 'other'),
+  'albums':           () => hydrate('panel-albums', SHOWS, 'global', 'music'),
 }
 const loaded = new Set()
 
@@ -1088,7 +1101,7 @@ document.addEventListener('lb:feed-activate', (e) => {
 // Dropping them from `loaded` re-arms both — the visible one reloads now,
 // the other on its next activation, so an account switch can't leave a
 // stale list behind the tab you aren't looking at.
-const FOLLOWS_FEEDS = ['boosts-follows', 'episodes-follows']
+const FOLLOWS_FEEDS = ['boosts-follows', 'episodes-follows', 'songs-follows']
 let lastSessionPubkey = getSessionPubkey()
 
 function onSessionChange() {
