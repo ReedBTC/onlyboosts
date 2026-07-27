@@ -124,6 +124,7 @@ def export(conn, out_dir, latest_n=1000, per_show=False, log=print):
         "title":    a["title"],
         "img":      a["image"],
         "feed":     a["feed_url"],
+        "medium":   a["medium"] or "podcast",   # podcast:medium — 'music' etc.; default per the namespace
         "boosts":   a["boosts"],
         "sats":     a["sats"],
         "boosters": a["boosters"],
