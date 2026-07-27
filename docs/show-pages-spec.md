@@ -21,8 +21,8 @@ Locked for the first pass:
 | Granularity | Shows only. Episodes are listed inside the page, not addressable. |
 | URL | The bare `podcast:guid`. No slugs. |
 | Community ranking | All time only. No range control. |
-| Community crossover | Own drawer above the wall, with 1W/1M/All + sort. |
-| Community layout | Top three highlighted, everyone else ranked below by sats. |
+| Community crossover | Own drawer above the wall, all-time, sort only. |
+| Community layout | Top five highlighted, everyone else ranked below by sats; 21 shown. |
 | Show-level boost | Yes, alongside the per-episode buttons. |
 
 Episode pages and per-npub pages are both expected later. The shapes below are
@@ -189,56 +189,70 @@ across nine shows sampled from rank #1 to #400, this list's top ten shares
 between **0 and 6** entries with the global top ten, so it is a different list
 rather than the site-wide ranking repeated.
 
+Every figure is community-scoped by construction: the join means only boosts
+sent *by a member* are counted, so a row's boosts and sats are what these people
+sent that show, never its global totals. The sort menu says so — "Most boosts
+here", "Most sats here" — and there are only three sorts, all of them measures
+of this audience.
+
 **Not split on medium**, which every other rollup on the site is. A music
 community also boosting podcasts is the interesting half of the finding, so the
 heading reads "Other Shows/Albums This Community Boosts" on both mediums and
 there is no `COPY` entry for it.
 
 **Untitled shows are excluded**, unlike the Shows feed which keeps them as
-"Unidentified show" cards. A show with no title has no page to link to, and an
-unlinkable card in a discovery list is dead weight.
+"Unidentified show" cards. A show with no title has no page to link to and no
+Podcast Index record, so its row would be an unlinkable card with a boost button
+that could only fail.
+
+**It ships open.** The episode drawer above it is closed because a catalogue is
+something you consult; this is a recommendation, and a closed recommendation is
+one nobody sees.
+
+### All Time Only
+
+A 1W/1M/All range shipped in the first pass and was removed. A time window is an
+**episode-level** question — what is this show doing lately — where which shows
+an audience overlaps with is a standing fact about the audience. The data agreed:
+across the live index the median community had boosted **one** other show in the
+last 7 days and **47% of shows had boosted none**, so two of the three ranges
+were empty on half the site.
+
+Dropping it removed the empty states, the per-range count badge, and the
+duplicated server/client label formatter along with them: with no range, a row's
+text is fixed at render time and the client only moves nodes.
+
+Rank is **recomputed per sort**, not retained. That differs from the feeds'
+search, where filtering to one row has to preserve its standing in the full list;
+here the list is never filtered, so position under the current sort is the rank.
 
 ### Why It Needs No Requests
 
-All three windows ship in the DOM. One D1 query returns per-window boosts, sats,
-members and latest via conditional aggregation, and each row carries them packed
-four-to-an-attribute (`data-all` / `data-1m` / `data-1w`). The client only
-re-orders and re-labels, so range and sort are instant and the section renders
-ranked and correct with JavaScript off.
+One D1 query returns each row's boosts, sats and members, and the row carries
+them in a single `data-cs` attribute. Sorting is a re-order and a renumber, so
+the section is instant and renders ranked and correct with JavaScript off.
 
 The cap is **150 rows**. Fan-out over the live corpus runs to a median of 45, a
 p90 of 191 and a maximum of 608, so the cap only bites on the head of the
-distribution. The largest page's section measures 100KB raw, 17KB gzipped.
+distribution. The largest page's section measures ~154KB raw, ~21KB gzipped.
 
-### The Range Is Mostly Empty, and That Is the Data
+The bolt icon is one `<symbol>` at the top of the section, referenced by every
+row's button through `<use href="#cs-bolt">`. Inlining the path 150 times cost
+49KB of markup and 150 identical SVG subtrees to parse; gzip hid most of the
+bytes but not the parse.
 
-Across the live index the median community has boosted **one** other show in the
-last 7 days, and **47% of shows have boosted none**. So:
+### The Per-Row Boost Button
 
-- **All is the opening range**, not 1W.
-- The empty state is a sentence, not a blank list: "Nobody in this community has
-  boosted another show in the last 7 days."
-- The count badge in the summary follows the range, so it cannot claim 45 shows
-  over a window holding three.
+**MONEY PATH.** Each row carries a compact icon button that boosts *that* show —
+the only place on the site that pays a show other than the one the surface is
+about. See the show-level boosting section of CLAUDE.md for the full contract.
+Two things specific to here:
 
-The axis is kept rather than dropped despite that, matching the Shows feed it
-mirrors. The range filters on **when the boost was sent**, the same axis the
-Shows feed uses and for the same reason: a show-level rollup is a list of
-boosts, so "the last 7 days" can only mean the boosts sent in them.
-
-Rank is **recomputed per view**, not retained. That differs from the feeds'
-search, where filtering to one row has to preserve its standing in the full
-list; here the range *is* the list, so position within it is the honest number.
-
-### Two Strings That Must Match
-
-`communityMeta()` in `functions/show/[guid].js` and `csMeta()` in
-`assets/js/show-page.js` produce the same row label, and the client's version
-overwrites the server's on the first paint. If they drift, every row flickers on
-load. `csCompact()` is likewise a copy of the Function's `compact()`. Both are
-duplicated for the reason the `.ob-scopenote` copy is: a no-build site has a
-Pages Function on one side and an ES module on the other, and nowhere to define
-a string once for both.
+- The button is a **sibling** of the row's link, not a child. A button inside an
+  anchor is invalid, and nesting one would make the row swallow its clicks.
+- It is **icon-only**, because the row already carries art, a title, three
+  figures and a rank, and a labelled button pushes the title into an ellipsis on
+  a phone. The homepage's Shows/Albums cards have room, so theirs are labelled.
 
 ## The Nostr Community Section
 

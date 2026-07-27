@@ -846,7 +846,7 @@ it is the one string that travels without the page around it.
 
 ## Show pages: other shows this community boosts
 
-A drawer above the Nostr Community wall, listing every other show this show's
+A drawer above the Nostr Community wall listing every other show this show's
 boosters have boosted. `renderCommunityShows` in `functions/show/[guid].js`,
 `initCommunityShows` in `assets/js/show-page.js`, `.cs-*` in `show-page.css`.
 Design of record: the section of the same name in `docs/show-pages-spec.md`.
@@ -860,23 +860,69 @@ boosters". That is what the homepage Shows feed cannot say, and it's the default
 sort. Sampled from rank #1 to #400, this list's top ten shares 0–6 entries with
 the global top ten, so it is not the site-wide ranking repeated.
 
-**One D1 query returns all three windows** by conditional aggregation, and each
-row ships them packed four-to-an-attribute (`data-all` / `data-1m` / `data-1w`).
-The client only re-orders and re-labels — no fetch, and the section renders
-ranked with JavaScript off. Capped at 150 rows (fan-out is median 45, p90 191,
-max 608); the biggest page's section is 100KB raw, 17KB gzipped.
+**Every figure is community-scoped by construction.** The query joins through
+the set of this show's boosters, so a row's boosts and sats are what *these*
+people sent that show, never its global totals. The sort labels say so — "Most
+boosts here", "Most sats here".
 
-**All is the opening range because 1W is usually empty**: the median community
-has boosted one other show in the last 7 days and 47% have boosted none. The
-empty state is a sentence, and the summary's count badge follows the range.
+**All time only. There is no range control, and that is a decision.** One
+shipped first and came out: a time window is an episode-level question, where
+which shows an audience overlaps with is a standing fact. The data agreed —
+median community had boosted one other show in the last 7 days, 47% had boosted
+none, so two of three ranges were empty on half the site. Rank is recomputed per
+sort rather than retained, because the list is never filtered.
 
-Two pairs must stay in sync, and both flicker on load if they drift:
-`communityMeta()` / `csMeta()`, and the Function's `compact()` / `csCompact()`.
-The `.pcast-*` control styles are likewise restated in `show-page.css` from the
-inline block in `index.html`, the same arrangement as `.nostr-mention`.
+**It ships open**, unlike the episode drawer above it: a catalogue is something
+you consult, a recommendation is something you browse.
 
-Untitled shows are excluded here though the Shows feed keeps them — they have no
-page to link to.
+Each row ships its three figures in one `data-cs` attribute, so sorting is a
+re-order and a renumber — no fetch, no re-label, and the section renders ranked
+with JavaScript off. Capped at 150 rows (fan-out is median 45, p90 191, max
+608); the biggest page's section is ~154KB raw, ~21KB gzipped. The bolt icon is
+one `<symbol>` referenced by every row — inlining it 150 times cost 49KB of
+markup and 150 identical subtrees to parse.
+
+The `.pcast-sort` control styles are restated in `show-page.css` from the inline
+block in `index.html`, the same arrangement as `.nostr-mention`. Only the sort
+half is carried; there is no range control here.
+
+Untitled shows are excluded though the Shows feed keeps them — they have no page
+to link to, and no Podcast Index record, so their boost button could only fail.
+
+**The community wall's podium is five cards, and 21 boosters show before the
+toggle** (`PODIUM` / `SUPPORTERS_VISIBLE`). `.sup-podium` is `repeat(5,
+minmax(0,1fr))` rather than auto-fit: the count is always `PODIUM`, and auto-fit
+reflowed five cards into 4+1 as soon as the column got tight.
+
+## ⚠️ Show-level boosting
+
+Boosting a SHOW (as opposed to an episode) pays the **feed-level** value block —
+`/api/value` with a `podcastGuid` and/or `feedUrl` and no `guid`. Three surfaces
+now do it, and all three resolve through the same
+`fromApiValue` → `applyExternalOverrides` pair, which is the only place split
+logic lives:
+
+| Surface | Handler |
+|---|---|
+| `/show` hero button | `show-page.js#initBoosting`, one probe on load |
+| `/show` community drawer rows | `show-page.js#onCommunityBoost` |
+| Shows / Albums feed cards | `shows-feed.js#onShowBoost` |
+
+**The community drawer is the only place on the site that pays a show other than
+the one the surface is about.** The target guid and feed URL come off the row's
+own data attributes and are threaded through `resolveValue` *and* `openBoost`
+together — passing a guid to one and not the other would resolve one show's
+splits and label the published note with another's.
+
+**It does not probe.** The hero button reveals itself only after a value block
+resolves; a page can carry 150 community rows, so those reveal optimistically
+and resolve on click, reporting an unpayable show in a toast at that point. That
+asymmetry is deliberate, not an oversight.
+
+Verified against production for a live feed: five legs parsed, five legs after
+overrides, identical leg for leg — including the `boostbot@fountain.fm` leg that
+the LB override in `8bc4cf9` used to rewrite. Re-run that check after any
+restore from `lb/main`.
 
 ## Show pages: the medium, and nostr: mentions
 

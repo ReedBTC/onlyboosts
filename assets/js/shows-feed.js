@@ -60,6 +60,14 @@ import {
 } from '/assets/js/feed-controls.js'
 import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js'
 import { showPageHref } from '/assets/js/show-link.js'
+// Show-level boosting. Same four pieces the episode feed uses, and deliberately
+// the same ones: fromApiValue / applyExternalOverrides are where the split
+// logic lives, and sharing them is what keeps every surface paying the value
+// block a feed actually published.
+import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js'
+import { ensureLoginWidget } from '/assets/js/widget-loader.js'
+import { episodeBoostLink } from '/assets/js/episode-link.js'
+import { showToast } from '/assets/js/copy-npub.js'
 
 const PAGE_SIZE = 25       // show cards per "load more" batch
 const DRAWER_EPISODES = 50 // episodes listed per expanded show
@@ -135,6 +143,8 @@ const COPY = {
   other: {
     glyph: '🎙',
     unidentified: 'Unidentified show',
+    noun: 'show',
+    boostBtn: 'Boost this Show',
     drawer: 'Episodes with Nostr Boosts',
     noItems: 'No episodes recorded for this show yet.',
     truncated: (n, total) => `Showing the ${n} most recent of ${total} episodes.`,
@@ -157,6 +167,8 @@ const COPY = {
   music: {
     glyph: '💿',
     unidentified: 'Unidentified release',
+    noun: 'album',
+    boostBtn: 'Boost this Album',
     drawer: 'Tracks with Nostr Boosts',
     noItems: 'No tracks recorded for this release yet.',
     truncated: (n, total) => `Showing the ${n} most recent of ${total} tracks.`,
@@ -427,6 +439,98 @@ function sortEpisodes(eps) {
   return [...eps].sort((a, b) => num(b.date) - num(a.date))
 }
 
+// ── Boost wiring ──────────────────────────────────────────────────────
+//
+// MONEY PATH. A show-level boost: it resolves the FEED-level value block (no
+// `guid` parameter) and pays exactly the split that feed published. The episode
+// feed's equivalent is feeds-podcasts.js#onBoostClick, which this deliberately
+// mirrors rather than imports — that module is the episode renderer, and
+// pulling it in here would drag the whole feed with it. The two share
+// fromApiValue / applyExternalOverrides, which is where the split logic lives.
+//
+// applyExternalOverrides is a documented passthrough and must stay one. No leg
+// of a third party's value block is ever rewritten, renamed, merged or dropped;
+// see the money-paths section of CLAUDE.md.
+const VALUE_API = '/api/value'
+
+function boltSvg() {
+  const s = h('span', { class: 'pcast-btn-bolt', 'aria-hidden': 'true' })
+  s.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd"/></svg>'
+  return s
+}
+
+// Hold the loading state until the widget actually shows something: its gate
+// chain (session restore, wallet unlock) can run for seconds on a cold bundle,
+// and a button that reverts before then reads as a click that did nothing.
+function waitForModal(timeoutMs = 40000) {
+  return new Promise((resolve) => {
+    const t0 = Date.now()
+    const tick = () => {
+      if (document.querySelector('[role="dialog"]')) return resolve('modal')
+      if (Date.now() - t0 > timeoutMs) return resolve('timeout')
+      setTimeout(tick, 200)
+    }
+    tick()
+  })
+}
+
+async function onShowBoost(s, btn, copy) {
+  // The rollup carries no Podcast Index numeric id, so the show is identified
+  // by guid and/or feed URL and /api/value resolves the id server-side.
+  if (!s.guid && !s.feed) { showToast(`Can’t identify this ${copy.noun}’s feed`, true); return }
+
+  const label = btn.querySelector('.pcast-boost-label')
+  const prevLabel = label ? label.textContent : ''
+  if (label) label.textContent = 'Loading…'
+  btn.disabled = true
+  try {
+    const qs = new URLSearchParams()
+    if (s.guid) qs.set('podcastGuid', s.guid)
+    if (s.feed) qs.set('feedUrl', s.feed)
+
+    let data = null
+    try {
+      const resp = await fetch(`${VALUE_API}?${qs}`, { headers: { Accept: 'application/json' } })
+      // A server/config failure and "this show has no value block" are
+      // different outcomes and must not be conflated — otherwise an outage
+      // reads as every show being un-boostable.
+      if (!resp.ok) { showToast('Couldn’t load boost splits — please try again in a moment.', true); return }
+      data = await resp.json()
+    } catch { showToast('Couldn’t load boost splits — please try again in a moment.', true); return }
+    if (data && data.error) { showToast('Boost splits are unavailable right now.', true); return }
+
+    const parsed = fromApiValue(data)
+    if (!parsed) { showToast(`This ${copy.noun} has no value block to boost.`, true); return }
+
+    const recipients = applyExternalOverrides(parsed.recipients)
+    const totalWeight = recipients.reduce((a, r) => a + (r.splitWeight || 0), 0)
+    if (!recipients.length || totalWeight <= 0) { showToast(`This ${copy.noun} has no payable recipients.`, true); return }
+
+    await ensureLoginWidget()
+    if (!window.LBLogin?.openExternalBoost) { showToast('Boost is unavailable right now.', true); return }
+    window.LBLogin.openExternalBoost({
+      episode: {
+        showTitle: s.title || '',
+        // No episode: this is the show itself. The note template drops the
+        // link line and the `r` tag when there's no item to point at.
+        episodeTitle: '',
+        podcastGuid: s.guid || '',
+        itemGuid: '',
+        bmbUrl: episodeBoostLink({ itemGuid: '', podcastGuid: s.guid || null, feedId: null }) || '',
+      },
+      recipientsBundle: { recipients, totalWeight },
+    })
+    if (label) label.textContent = 'Opening…'
+    await waitForModal()
+  } catch (e) {
+    console.warn('[shows] boost failed', e)
+    showToast('Couldn’t start the boost — try again.', true)
+  } finally {
+    btn.disabled = false
+    if (label) label.textContent = prevLabel
+  }
+}
+
 // ── Card ──────────────────────────────────────────────────────────────
 // Built out of the episode card's chrome (.pcast-card and friends) rather than
 // a parallel set of its own, so the two feeds read as one system. Only the
@@ -490,12 +594,26 @@ function renderShowCard(s, rank, copy) {
     ]),
   ])
 
+  // Boosting a show pays its FEED-level value split, so this needs nothing but
+  // a way to identify the feed. Withheld from unidentified shows for the same
+  // reason they get no landing page: Podcast Index doesn't know the feed, so
+  // there is no block to resolve and the button could only ever fail.
+  const buttons = named && (s.guid || s.feed)
+    ? h('div', { class: 'pcast-card-buttons' }, [
+        h('button', {
+          class: 'pcast-btn pcast-btn-boost', type: 'button',
+          title: `${copy.boostBtn} — pays the split its feed publishes`,
+          onclick: (e) => onShowBoost(s, e.currentTarget, copy),
+        }, [boltSvg(), h('span', { class: 'pcast-boost-label' }, copy.boostBtn)]),
+      ])
+    : null
+
   // No drawer when there's nothing to put in it. A show can legitimately have
   // boosts and no episodes: the all-time index reports 0 for shows whose boosts
   // never carried an episode guid, and the windowed rollup counts distinct
   // guids, so the same holds there. Offering a drawer would spend a shard fetch
   // to say "no episodes".
-  if (!s.episodes) return h('article', { class: 'pcast-card' }, [head])
+  if (!s.episodes) return h('article', { class: 'pcast-card' }, [head, buttons])
 
   const details = h('div', { class: 'pcast-details', hidden: 'hidden' })
   const caret = h('span', { class: 'pcast-drawer-caret', 'aria-hidden': 'true', text: '▾' })
@@ -506,7 +624,9 @@ function renderShowCard(s, rank, copy) {
   // leaving "Episodes" to imply the show's catalogue.
   }, [caret, h('span', { text: copy.drawer })])
 
-  const card = h('article', { class: 'pcast-card' }, [head, drawer, details])
+  // Buttons sit above the drawer bar, matching the episode card, where the
+  // drawer is always the last thing before the details it opens.
+  const card = h('article', { class: 'pcast-card' }, [head, buttons, drawer, details])
   let loaded = false
 
   drawer.addEventListener('click', async () => {

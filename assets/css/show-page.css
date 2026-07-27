@@ -228,8 +228,14 @@
   gap: 0.9rem;
 }
 
+/* Exactly five across, at every width. This was auto-fit/minmax, which is the
+   right tool when the count is unknown — here it is always PODIUM, and auto-fit
+   would reflow five cards into 4+1 the moment the column got tight. The cards
+   shrink instead; the responsive block at the foot of this file takes the
+   avatar down with them. minmax(0,1fr) rather than 1fr so a long display name
+   cannot force a track wider than its share. */
 .sup-podium {
-  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   margin-bottom: 1.1rem;
 }
 
@@ -468,41 +474,73 @@
   font-weight: 700;
 }
 
+/* Sort only — there is no range control here. See the note in the Function. */
 .cs-controls {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem 0.5rem 0.6rem;
+  justify-content: flex-end;
+  padding: 0.5rem 0.75rem;
   border-top: 1px solid var(--border);
   background: var(--cream);
 }
 .cs-controls[hidden] { display: none; }
 
-.cs-empty {
-  margin: 0;
-  padding: 1.1rem 1rem;
-  border-top: 1px solid var(--border);
-  font-size: 0.85rem;
-  color: var(--muted);
+/* The row is the link plus a boost button beside it, so the border that used
+   to sit on the link moves out to the row. */
+.cs-row {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
 }
-.cs-empty[hidden] { display: none; }
-
-.cs-list[hidden] { display: none; }
-.cs-row[hidden] { display: none; }
+.cs-row:last-child { border-bottom: 0; }
+.cs-row:hover { background: var(--tint); }
 
 .cs-link {
   display: flex;
   align-items: center;
   gap: 0.7rem;
-  padding: 0.6rem 1rem 0.6rem 0.6rem;
-  border-bottom: 1px solid var(--border);
+  flex: 1;
+  min-width: 0;
+  padding: 0.6rem 0.5rem 0.6rem 0.6rem;
   color: inherit;
   text-decoration: none;
 }
-.cs-row:last-child .cs-link { border-bottom: 0; }
-.cs-link:hover { background: var(--tint); }
 .cs-link:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+
+/* Icon-only, because the row already carries art, a title, three figures and a
+   rank, and a labelled button would push the title into an ellipsis on a phone.
+   It ships `hidden` and is revealed only for shows whose value block resolves,
+   the same contract as the hero's Boost button. */
+.cs-boost {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin-right: 0.6rem;
+  padding: 0;
+  color: var(--brand-d);
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.cs-boost[hidden] { display: none; }
+.cs-boost:hover:not(:disabled) {
+  color: #fff;
+  background: var(--brand);
+  border-color: var(--brand);
+}
+.cs-boost:disabled { opacity: 0.5; cursor: default; }
+.cs-boost:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.cs-boost.is-busy { animation: cs-boost-pulse 1s ease-in-out infinite; }
+
+@keyframes cs-boost-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
 
 .cs-rank {
   flex-shrink: 0;
@@ -551,37 +589,11 @@
 }
 
 /* ── Feed controls ────────────────────────────────────────────────────────
-   The 1W/1M/All segmented control and the "Sort: X ▾" pill, built by
-   assets/js/feed-controls.js. Those rules live inline in index.html, which this
-   page does not load, so they are restated here — the same arrangement as
-   .nostr-mention, which show-page.css restates from boosts-thread.css for the
-   same reason. KEEP THE TWO MATCHING. */
-
-.cs-controls .pcast-range { display: flex; flex-shrink: 0; }
-.cs-controls .pcast-range-btn {
-  min-width: 2rem;
-  padding: 0.5rem 0.35rem;
-  font: inherit;
-  font-size: 0.72rem;
-  font-weight: 700;
-  line-height: 1.2;
-  color: var(--muted);
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background 0.12s, color 0.12s;
-}
-.cs-controls .pcast-range-btn:hover {
-  color: var(--accent-d);
-  background: var(--tint);
-  background: color-mix(in srgb, var(--accent) 7%, transparent);
-}
-.cs-controls .pcast-range-btn.is-active {
-  color: var(--accent-d);
-  background: var(--tint);
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-}
+   The "Sort: X ▾" pill, built by assets/js/feed-controls.js. Those rules live
+   inline in index.html, which this page does not load, so they are restated
+   here — the same arrangement as .nostr-mention, which show-page.css restates
+   from boosts-thread.css for the same reason. KEEP THE TWO MATCHING.
+   (Only the sort half is carried: this drawer has no range control.) */
 
 .cs-controls .pcast-sort { position: relative; flex-shrink: 0; align-self: center; }
 .cs-controls .pcast-sort-btn {
@@ -648,15 +660,14 @@
   .show-stat dd { font-size: 1.2rem; }
   .sup-grid { grid-template-columns: repeat(auto-fill, minmax(5rem, 1fr)); }
   .sup-avatar { width: 44px; height: 44px; }
-  .sup-card--podium .sup-avatar { width: 62px; height: 62px; }
+  /* Five podium cards have to share a phone's width, so the gap and the card
+     padding give way before the column count does. */
+  .sup-podium { gap: 0.5rem; }
+  .sup-card--podium { padding: 0.9rem 0.35rem; }
+  .sup-card--podium .sup-avatar { width: 54px; height: 54px; }
+  .sup-card--podium .sup-rank { top: 0.3rem; left: 0.35rem; font-size: 0.75rem; }
   .boost-when { margin-left: 0; }
-  /* The drawer summary wraps to two lines at this width; the controls row is
-     what has to give, so the sort pill drops under the range buttons rather
-     than squeezing both. */
-  .cs-controls {
-    flex-wrap: wrap;
-    justify-content: flex-start;
-  }
   .cs-art { width: 38px; height: 38px; }
-  .cs-link { gap: 0.55rem; padding-right: 0.7rem; }
+  .cs-link { gap: 0.55rem; padding-left: 0.4rem; }
+  .cs-boost { margin-right: 0.4rem; }
 }

@@ -29,8 +29,13 @@ const GUID_MAX = 200;
 // How many supporters paint above the fold. The rest render behind a toggle
 // rather than being dropped — a supporters wall that hides supporters is worse
 // than a long page.
-const SUPPORTERS_VISIBLE = 24;
-const PODIUM = 3;
+//
+// PODIUM is the top row of larger cards. Five rather than three: the wall sits
+// in a 60rem column, which fits five 9rem cards across with room to spare, so
+// three left the row looking sparse against the grid beneath it. VISIBLE counts
+// the podium, so the grid under it holds SUPPORTERS_VISIBLE - PODIUM.
+const SUPPORTERS_VISIBLE = 21;
+const PODIUM = 5;
 const BOOSTS_SHOWN = 24;
 
 // How many rows the "Other Shows/Albums This Community Boosts" drawer carries.
@@ -64,13 +69,6 @@ export async function onRequestGet({ request, env, params }) {
   // of 1,285 qualified after its 2026-07-26 pass, up from 922 of 1,384), which
   // is why nothing here is counted or capped — the rule does the work.
   if (!show || !show.title) return notFound(guid);
-
-  // Window cutoffs for the community-shows rollup. Computed per request and
-  // therefore up to five minutes stale on a cached response, which is the same
-  // slack the collector's own cycle already introduces.
-  const nowSec = Math.floor(Date.now() / 1000);
-  const cut1w = nowSec - 7 * 86400;
-  const cut1m = nowSec - 30 * 86400;
 
   const [eps, sups, boosts, community] = await Promise.all([
     env.DB.prepare(
@@ -119,11 +117,17 @@ export async function onRequestGet({ request, env, params }) {
     // between 0 and 6 entries with the global top ten, so it is a genuinely
     // different list rather than the site-wide ranking repeated.
     //
-    // ALL THREE WINDOWS COME BACK IN ONE PASS, via conditional aggregation.
-    // The alternative was three statements, or a client fetch per range change;
-    // this way the page ships every number the controls can ask for and the
-    // client never touches the network. `?` repeats rather than `?N` numbering
-    // because D1 binds positionally.
+    // ALL TIME ONLY, and deliberately so. A 1W/1M/All range shipped here first
+    // and was removed: a time window is an episode-level question ("what is
+    // this show doing lately"), where this is a show-level one ("who does this
+    // audience overlap with"), and the answer to that is a standing fact rather
+    // than a recent one. The data agreed — the median community had boosted
+    // exactly one other show in the last 7 days and 47% had boosted none, so
+    // two of the three ranges were empty on half the site.
+    //
+    // Every figure is scoped to the community by construction: the join means
+    // only boosts sent BY a member are counted, so a row's boosts, sats and
+    // members are this audience's, never the show's global totals.
     //
     // idx_boosts_podcast covers the CTE, idx_boosts_booster the scan. The join
     // to `podcasts` is also the filter: a show with no title has no /show page
@@ -134,20 +138,11 @@ export async function onRequestGet({ request, env, params }) {
       `WITH community AS (
          SELECT DISTINCT booster_pubkey FROM boosts WHERE podcast_guid = ?
        )
-       SELECT b.podcast_guid, p.title, p.image,
-              (SELECT COUNT(*) FROM community)                                AS community_size,
-              COUNT(*)                                                        AS b_all,
-              SUM(COALESCE(b.sats, 0))                                        AS s_all,
-              COUNT(DISTINCT b.booster_pubkey)                                AS m_all,
-              MAX(b.created_at)                                               AS t_all,
-              COUNT(CASE WHEN b.created_at >= ? THEN 1 END)                   AS b_1m,
-              SUM(CASE WHEN b.created_at >= ? THEN COALESCE(b.sats, 0) ELSE 0 END) AS s_1m,
-              COUNT(DISTINCT CASE WHEN b.created_at >= ? THEN b.booster_pubkey END) AS m_1m,
-              MAX(CASE WHEN b.created_at >= ? THEN b.created_at END)          AS t_1m,
-              COUNT(CASE WHEN b.created_at >= ? THEN 1 END)                   AS b_1w,
-              SUM(CASE WHEN b.created_at >= ? THEN COALESCE(b.sats, 0) ELSE 0 END) AS s_1w,
-              COUNT(DISTINCT CASE WHEN b.created_at >= ? THEN b.booster_pubkey END) AS m_1w,
-              MAX(CASE WHEN b.created_at >= ? THEN b.created_at END)          AS t_1w
+       SELECT b.podcast_guid, p.title, p.image, p.feed_url,
+              (SELECT COUNT(*) FROM community) AS community_size,
+              COUNT(*)                         AS cs_boosts,
+              SUM(COALESCE(b.sats, 0))         AS cs_sats,
+              COUNT(DISTINCT b.booster_pubkey) AS cs_members
        FROM boosts b
        JOIN community c ON c.booster_pubkey = b.booster_pubkey
        JOIN podcasts p  ON p.podcast_guid   = b.podcast_guid
@@ -155,15 +150,9 @@ export async function onRequestGet({ request, env, params }) {
          AND b.podcast_guid <> ?
          AND p.title IS NOT NULL AND p.title <> ''
        GROUP BY b.podcast_guid
-       ORDER BY m_all DESC, b_all DESC, s_all DESC, b.podcast_guid
+       ORDER BY cs_members DESC, cs_boosts DESC, cs_sats DESC, b.podcast_guid
        LIMIT ?`
-    ).bind(
-      guid,
-      cut1m, cut1m, cut1m, cut1m,
-      cut1w, cut1w, cut1w, cut1w,
-      guid,
-      COMMUNITY_SHOWS_LIMIT,
-    ).all(),
+    ).bind(guid, guid, COMMUNITY_SHOWS_LIMIT).all(),
   ]);
 
   // Display names for any npub mentioned inside a boost message. One extra
@@ -871,36 +860,35 @@ function renderHeader(show, art, title, copy) {
 // "Shows" would either hide it or misname it — hence the "Shows/Albums" wording
 // and no COPY entry, since the label is the same on both mediums.
 //
-// The three windows are all in the DOM from first paint, packed four numbers to
-// an attribute (boosts, sats, members, latest). The client only re-orders and
-// re-labels; it never fetches. That is what lets the section carry the same
-// 1W/1M/All + Sort chrome as the feeds while still rendering, ranked and
-// correct, with no JavaScript at all.
+// Every row's three figures are in the DOM from first paint, packed into one
+// attribute. Sorting is therefore a re-order and a renumber, never a fetch and
+// never a re-label — with no range, a row's text is fixed once and the client
+// only moves nodes. The section renders ranked and complete with no JavaScript.
 //
-// It ships CLOSED, like the episode drawer above it. These pages are meant to
-// fit on one screen, and a section that would stand 32rem tall before the
-// visitor has asked for it costs more than it gives.
+// It ships OPEN, unlike the episode drawer above it. The episode list is a
+// catalogue you consult; this is a recommendation you browse, and a closed
+// drawer is a recommendation nobody sees.
 
-// One row's figures for one window: "18 of 115 boosters · 34 boosts · 12k sats".
-// assets/js/show-page.js#csMeta rebuilds this string on every range change and
-// MUST match it — the server's version is what a no-JS visitor reads, and the
-// two disagreeing would show as a flicker on the first interaction.
+// One row's figures: "18 of 115 boosters · 34 boosts · 12k sats". All three are
+// scoped to this community by the query's join — the boosts and sats are what
+// THESE boosters sent that show, not its global totals.
 function communityMeta(members, boosts, sats, size) {
   return `${num(members)} of ${num(size)} booster${size === 1 ? "" : "s"} · ` +
     `${num(boosts)} boost${boosts === 1 ? "" : "s"} · ${compact(sats)} sats`;
 }
 
-function communityRow(r, rank) {
+function communityRow(r, rank, size) {
   const art = isSafeUrl(r.image) ? r.image : null;
   const title = truncate(r.title, 120);
-  const size = Number(r.community_size || 0);
-  const pack = (b, s, m, t) =>
-    `${Number(b || 0)},${Number(s || 0)},${Number(m || 0)},${Number(t || 0)}`;
+  const members = Number(r.cs_members || 0);
+  const boosts = Number(r.cs_boosts || 0);
+  const sats = Number(r.cs_sats || 0);
 
-  return `<li class="cs-row"
-      data-all="${pack(r.b_all, r.s_all, r.m_all, r.t_all)}"
-      data-1m="${pack(r.b_1m, r.s_1m, r.m_1m, r.t_1m)}"
-      data-1w="${pack(r.b_1w, r.s_1w, r.m_1w, r.t_1w)}">
+  // The boost button is a SIBLING of the link, not a child: a button inside an
+  // anchor is invalid, and nesting one would also make the whole row swallow
+  // its clicks. MONEY PATH — the guid and feed here are what /api/value
+  // resolves that show's own splits from, and nothing rewrites them.
+  return `<li class="cs-row" data-cs="${boosts},${sats},${members}">
     <a class="cs-link" href="/show/${encodeURIComponent(r.podcast_guid)}">
       <span class="cs-rank" aria-hidden="true">${rank}</span>
       ${art
@@ -908,11 +896,16 @@ function communityRow(r, rank) {
         : `<span class="cs-art cs-art--blank" aria-hidden="true">🎙️</span>`}
       <span class="cs-main">
         <span class="cs-title">${htmlEscape(title)}</span>
-        <span class="cs-meta">${htmlEscape(
-          communityMeta(Number(r.m_all || 0), Number(r.b_all || 0), Number(r.s_all || 0), size)
-        )}</span>
+        <span class="cs-meta">${htmlEscape(communityMeta(members, boosts, sats, size))}</span>
       </span>
     </a>
+    <button type="button" class="cs-boost" hidden
+      data-cs-boost="${htmlEscape(r.podcast_guid)}"
+      data-cs-feed="${htmlEscape(isSafeUrl(r.feed_url) ? r.feed_url : "")}"
+      data-cs-title="${htmlEscape(title)}"
+      aria-label="Boost ${htmlEscape(title)}" title="Boost ${htmlEscape(title)}">
+      <svg width="13" height="13" fill="currentColor" aria-hidden="true"><use href="#cs-bolt" /></svg>
+    </button>
   </li>`;
 }
 
@@ -924,16 +917,23 @@ function renderCommunityShows(rows) {
   // the fraction are counted the same way and can never read "120 of 115".
   const size = Number(rows[0].community_size || 0);
 
+  // The bolt, defined once and referenced by every row's button through
+  // <use href="#cs-bolt">. Inlining the path 150 times cost 49KB of markup and
+  // 150 identical SVG subtrees to parse; gzip hid most of the bytes but not the
+  // parse. Same-document reference, so the page's default-src 'self' CSP is
+  // untouched.
   return `<section class="show-section show-section--bare" id="community-shows">
-    <details class="ep-drawer cs-drawer" data-community-shows data-community-size="${size}">
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+      <symbol id="cs-bolt" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd"/></symbol>
+    </svg>
+    <details class="ep-drawer cs-drawer" open data-community-shows>
       <summary>Other Shows/Albums This Community Boosts <span class="cs-count">${num(rows.length)}</span></summary>
-      <!-- Ships hidden and stays hidden without JavaScript: controls that
-           cannot do anything are worse than none. Same rule as the feed-search
-           slot on the homepage panels. -->
+      <!-- Ships hidden and stays hidden without JavaScript: a sort control that
+           cannot sort is worse than none. Same rule as the feed-search slot on
+           the homepage panels. -->
       <div class="cs-controls" data-cs-controls hidden></div>
-      <p class="cs-empty" data-cs-empty hidden></p>
       <ul class="ep-list cs-list" data-cs-list>
-        ${rows.map((r, i) => communityRow(r, i + 1)).join("\n        ")}
+        ${rows.map((r, i) => communityRow(r, i + 1, size)).join("\n        ")}
       </ul>
     </details>
   </section>`;
@@ -945,7 +945,7 @@ function renderCommunityShows(rows) {
 // (100k / 69k / 21k), which works across one show's whole audience and
 // collapses per show. The median show here has one booster and only 209 of
 // 1,384 have five or more, so absolute thresholds would file nearly everyone in
-// the bottom tier. Relative standing replaces it: a podium for the top three,
+// the bottom tier. Relative standing replaces it: a podium for the top five,
 // then a ranked grid.
 // "Nostr Community" rather than "Supporters", and the distinction is the point.
 // "Supporters" is a claim about who supports the show, and the wall cannot make

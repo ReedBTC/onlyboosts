@@ -156,7 +156,20 @@
 // the markup comes from the Function, which the SW never caches, but the
 // .show-credit rules are new in show-page.css, which it does — so without the
 // bump a returning visitor reads the credit as unstyled body text.
-const VERSION = 'ob-v32';
+// ob-v32: show pages gained the "Other Shows/Albums This Community Boosts"
+// drawer. The markup comes from the Function (never cached here), but its
+// .cs-* rules are new in show-page.css and the sort wiring is new in
+// show-page.js, both of which are — so a returning visitor would get an
+// unstyled list that doesn't sort.
+// ob-v33: that drawer lost its range control and gained a per-row boost button,
+// and the Shows/Albums feed cards gained one too. Required, and for the same
+// reason ob-v31 was: shows-feed.js gains STATIC imports of value-block.js,
+// widget-loader.js, episode-link.js and copy-npub.js. A returning visitor
+// holding a new shows-feed.js against a cache that has never seen one of those
+// fails the import binding at link time and the whole Shows feed dies. Also
+// carries the community wall's five-card podium (top 21 shown, not 24), whose
+// grid rule is in show-page.css while the counts are in the Function.
+const VERSION = 'ob-v33';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;

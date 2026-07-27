@@ -18,11 +18,11 @@ import { copyNpub, copyText, showToast } from '/assets/js/copy-npub.js'
 import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js'
 import { episodeBoostLink } from '/assets/js/episode-link.js'
 import { ensureLoginWidget } from '/assets/js/widget-loader.js'
-// The same 1W/1M/All segmented control and "Sort: X ▾" dropdown the feeds use.
-// feed-controls.js imports nothing, so this costs the page ~4KB and no
-// transitive dependencies; mountFeedControls is not used here (that one is for
-// the homepage's sticky bar, which this page has no equivalent of).
-import { rangeControl, sortControl } from '/assets/js/feed-controls.js'
+// The same "Sort: X ▾" dropdown the feeds use. feed-controls.js imports
+// nothing, so this costs the page ~4KB and no transitive dependencies;
+// rangeControl and mountFeedControls are deliberately not used (no range here,
+// and no sticky bar to mount into).
+import { sortControl } from '/assets/js/feed-controls.js'
 // Fallback identity lookup for what the index didn't have — see the profile
 // hydration at the foot of this file.
 import { fetchProfiles } from '/assets/js/primal-profiles.js'
@@ -66,136 +66,70 @@ document.querySelector('[data-share-page]')?.addEventListener('click', async () 
 
 // ── Other shows this community boosts ────────────────────────────────
 //
-// The server ships every row with all three windows' figures packed into data
-// attributes (see renderCommunityShows in functions/show/[guid].js), so this
-// never fetches anything: a range or sort change is a re-order and a re-label
-// of nodes already in the DOM.
+// Every row ships its three figures packed into one `data-cs` attribute (see
+// renderCommunityShows in functions/show/[guid].js), so this never fetches and
+// never re-labels: a sort is a re-order and a renumber of nodes already in the
+// DOM, and the text on a row is fixed at render time.
 //
-// The range means what it means on the Shows feed — when the boost was SENT,
-// not when anything aired. A show-level rollup is a list of boosts, so the last
-// seven days can only be the boosts sent in them.
+// THERE IS NO RANGE CONTROL, and that is a decision rather than an omission. A
+// time window is an episode-level question; which shows an audience overlaps
+// with is a standing fact, not a recent one. The data agreed — the median
+// community had boosted one other show in the last 7 days and 47% had boosted
+// none, so two of three ranges were empty on half the site.
 //
-// One measured fact drives the empty state: across the live index the median
-// community has boosted exactly ONE other show in the last 7 days, and 47% of
-// shows have boosted none. So 1W being empty is the normal case, not a fault,
-// and it has to read as an answer rather than as a broken list. All is the
-// opening range for the same reason.
+// Every sort is scoped to this community, because every figure is: the query
+// counts only boosts sent by a member, so "most sats" means most sats from
+// these boosters, never the show's global total.
 
 const CS_SORTS = [
   ['members', 'Most of this community'],
-  ['boosts', 'Most boosts'],
-  ['sats', 'Most sats'],
-  ['recent', 'Recently boosted'],
+  ['boosts', 'Most boosts here'],
+  ['sats', 'Most sats here'],
 ]
-
-const CS_RANGE_TITLE = {
-  '1w': 'Boosted by this community in the last 7 days',
-  '1m': 'Boosted by this community in the last 30 days',
-  all: 'Every show this community has boosted',
-}
-
-const CS_EMPTY = {
-  '1w': 'Nobody in this community has boosted another show in the last 7 days.',
-  '1m': 'Nobody in this community has boosted another show in the last 30 days.',
-  all: 'This community has not boosted anything else.',
-}
-
-// Mirrors compact() in functions/show/[guid].js. Duplicated rather than shared
-// because this is a no-build site with a Pages Function on one side and an ES
-// module on the other, and there is nowhere to define it once — the same reason
-// the .ob-scopenote copy is duplicated. Keep the two matching.
-function csCompact(n) {
-  const v = Number(n || 0)
-  if (v >= 1e9) return (v / 1e9).toFixed(v >= 1e10 ? 0 : 1).replace(/\.0$/, '') + 'B'
-  if (v >= 1e6) return (v / 1e6).toFixed(v >= 1e7 ? 0 : 1).replace(/\.0$/, '') + 'M'
-  if (v >= 1e4) return Math.round(v / 1e3) + 'k'
-  if (v >= 1e3) return (v / 1e3).toFixed(1).replace(/\.0$/, '') + 'k'
-  return String(v)
-}
-
-const csNum = (n) => Number(n || 0).toLocaleString('en-US')
-
-// Must produce byte-for-byte what communityMeta() renders server-side.
-function csMeta(members, boosts, sats, size) {
-  return `${csNum(members)} of ${csNum(size)} booster${size === 1 ? '' : 's'} · ` +
-    `${csNum(boosts)} boost${boosts === 1 ? '' : 's'} · ${csCompact(sats)} sats`
-}
 
 function initCommunityShows() {
   const root = document.querySelector('[data-community-shows]')
   if (!root) return
   const list = root.querySelector('[data-cs-list]')
   const slot = root.querySelector('[data-cs-controls]')
-  const emptyEl = root.querySelector('[data-cs-empty]')
-  if (!list || !slot || !emptyEl) return
+  if (!list || !slot) return
 
-  // [boosts, sats, members, latest] per window, parsed once.
   const rows = Array.from(list.querySelectorAll('.cs-row')).map((el) => {
-    const win = (key) => {
-      const [b, s, m, t] = String(el.dataset[key] || '').split(',').map(Number)
-      return { boosts: b || 0, sats: s || 0, members: m || 0, latest: t || 0 }
-    }
+    const [boosts, sats, members] = String(el.dataset.cs || '').split(',').map(Number)
     return {
       el,
       rankEl: el.querySelector('.cs-rank'),
-      metaEl: el.querySelector('.cs-meta'),
-      w: { all: win('all'), '1m': win('1m'), '1w': win('1w') },
+      boosts: boosts || 0,
+      sats: sats || 0,
+      members: members || 0,
     }
   })
   if (!rows.length) return
 
-  const size = Number(root.dataset.communitySize || 0)
-
-  let range = 'all'
   let sort = 'members'
 
   function paint() {
-    // Rank is recomputed per view rather than retained. This is not the feeds'
-    // search, where a filter has to preserve a row's standing in the full list
-    // — here the range IS the list, so a show's position within it is the
-    // honest number.
-    const visible = rows.filter((r) => r.w[range].boosts > 0)
-    visible.sort((a, b) => {
-      const x = a.w[range]
-      const y = b.w[range]
-      if (sort === 'boosts') return y.boosts - x.boosts || y.sats - x.sats
-      if (sort === 'sats') return y.sats - x.sats || y.boosts - x.boosts
-      if (sort === 'recent') return y.latest - x.latest || y.boosts - x.boosts
-      return y.members - x.members || y.boosts - x.boosts || y.sats - x.sats
+    // Rank is recomputed per sort rather than retained. That differs from the
+    // feeds' search, where filtering to one row has to preserve its standing in
+    // the full list; here the list is never filtered, so a row's position under
+    // the current sort IS its rank.
+    const order = rows.slice().sort((a, b) => {
+      if (sort === 'boosts') return b.boosts - a.boosts || b.sats - a.sats
+      if (sort === 'sats') return b.sats - a.sats || b.boosts - a.boosts
+      return b.members - a.members || b.boosts - a.boosts || b.sats - a.sats
     })
-
-    for (const r of rows) r.el.hidden = true
-
     const frag = document.createDocumentFragment()
-    visible.forEach((r, i) => {
-      const w = r.w[range]
-      r.el.hidden = false
+    order.forEach((r, i) => {
       if (r.rankEl) r.rankEl.textContent = String(i + 1)
-      if (r.metaEl) r.metaEl.textContent = csMeta(w.members, w.boosts, w.sats, size)
       frag.appendChild(r.el)
     })
     list.appendChild(frag)
-
-    emptyEl.textContent = visible.length ? '' : CS_EMPTY[range]
-    emptyEl.hidden = !!visible.length
-    list.hidden = !visible.length
-    // The drawer's own count follows the range, so the summary can't claim 45
-    // shows over a window holding three.
-    const countEl = root.querySelector('.cs-count')
-    if (countEl) countEl.textContent = csNum(visible.length)
   }
 
-  slot.append(
-    rangeControl(range, (key) => { range = key; paint() }, {
-      label: 'Filter by when the boost was sent',
-      titleFor: (key) => CS_RANGE_TITLE[key] || key,
-    }),
-    sortControl(CS_SORTS, sort, (key) => { sort = key; paint() }, {
-      title: 'Change how these shows are ranked',
-    }),
-  )
+  slot.appendChild(sortControl(CS_SORTS, sort, (key) => { sort = key; paint() }, {
+    title: 'Change how these shows are ranked',
+  }))
   slot.hidden = false
-  paint()
 }
 
 initCommunityShows()
@@ -213,12 +147,18 @@ initCommunityShows()
  * the actual split logic lives.
  *
  * `itemGuid` null asks for the feed-level block (boosting the show itself).
+ *
+ * `target` names WHICH show to resolve, defaulting to this page's. The
+ * community-shows drawer passes another show's guid and feed URL, and it is the
+ * only caller that does — those two values come straight from the D1 row the
+ * server rendered, and are the same identifiers Podcast Index keys that show's
+ * own splits on. Nothing here rewrites a leg; see applyExternalOverrides.
  */
-async function resolveValue(itemGuid) {
-  if (!SHOW) return null
+async function resolveValue(itemGuid, target = SHOW) {
+  if (!target) return null
   const qs = new URLSearchParams()
-  if (SHOW.guid) qs.set('podcastGuid', SHOW.guid)
-  if (SHOW.feed) qs.set('feedUrl', SHOW.feed)
+  if (target.guid) qs.set('podcastGuid', target.guid)
+  if (target.feed) qs.set('feedUrl', target.feed)
   if (itemGuid) qs.set('guid', itemGuid)
   if (![...qs.keys()].length) return null
 
@@ -242,7 +182,7 @@ async function resolveValue(itemGuid) {
   return { recipients, totalWeight }
 }
 
-async function openBoost(bundle, { itemGuid = '', episodeTitle = '' } = {}) {
+async function openBoost(bundle, { itemGuid = '', episodeTitle = '', target = SHOW } = {}) {
   await ensureLoginWidget()
   if (!window.LBLogin?.openExternalBoost) {
     showToast('Boost is unavailable right now.', true)
@@ -250,9 +190,9 @@ async function openBoost(bundle, { itemGuid = '', episodeTitle = '' } = {}) {
   }
   window.LBLogin.openExternalBoost({
     episode: {
-      showTitle: SHOW?.title || '',
+      showTitle: target?.title || '',
       episodeTitle,
-      podcastGuid: SHOW?.guid || '',
+      podcastGuid: target?.guid || '',
       itemGuid,
       // Same builder the Episodes feed uses, so an episode boosted from here
       // publishes the same note it would from the feed. Null on a show-level
@@ -260,7 +200,7 @@ async function openBoost(bundle, { itemGuid = '', episodeTitle = '' } = {}) {
       // template omits both the link line and the `r` tag.
       bmbUrl: episodeBoostLink({
         itemGuid,
-        podcastGuid: SHOW?.guid || null,
+        podcastGuid: target?.guid || null,
         // The show payload carries no Podcast Index numeric id (see the
         // "two fields the feed doesn't carry" note in CLAUDE.md), so this
         // always resolves through ?podcast=<guid>.
@@ -270,6 +210,63 @@ async function openBoost(bundle, { itemGuid = '', episodeTitle = '' } = {}) {
     recipientsBundle: bundle,
   })
 }
+
+/* Boost another show, from a row of the community-shows drawer.
+ *
+ * MONEY PATH, and the one place on this page that pays a show other than the
+ * one it is about — so the target is read off the row's own data attributes and
+ * threaded through resolveValue and openBoost together. Passing a guid to one
+ * and not the other would resolve one show's splits and label the note with
+ * another's.
+ *
+ * Unlike the hero button there is no up-front probe: a page can carry 150 rows
+ * and probing each would be 150 requests to Podcast Index on load. So these
+ * reveal themselves optimistically and resolve on click, and a show with no
+ * payable block reports it in a toast at that point.
+ */
+async function onCommunityBoost(btn) {
+  const target = {
+    guid: btn.getAttribute('data-cs-boost') || '',
+    feed: btn.getAttribute('data-cs-feed') || '',
+    title: btn.getAttribute('data-cs-title') || '',
+  }
+  if (!target.guid && !target.feed) return
+  if (btn.disabled) return
+
+  btn.disabled = true
+  btn.classList.add('is-busy')
+  try {
+    const bundle = await resolveValue(null, target)
+    if (!bundle) {
+      showToast(`${target.title || 'This show'} has no value block to boost.`, true)
+      return
+    }
+    if (bundle.error) {
+      showToast('Couldn’t load boost splits — please try again in a moment.', true)
+      return
+    }
+    await openBoost(bundle, { target })
+  } catch (err) {
+    console.warn('[show] community boost failed', err)
+    showToast('Couldn’t start the boost — try again.', true)
+  } finally {
+    btn.disabled = false
+    btn.classList.remove('is-busy')
+  }
+}
+
+// Delegated, and revealed in one pass: 150 rows means 150 listeners otherwise.
+function initCommunityBoosts() {
+  const btns = document.querySelectorAll('[data-cs-boost]')
+  if (!btns.length) return
+  for (const b of btns) b.hidden = false
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest?.('[data-cs-boost]')
+    if (btn) onCommunityBoost(btn)
+  })
+}
+
+initCommunityBoosts()
 
 function wireBoostButton(btn, itemGuid, episodeTitle) {
   btn.hidden = false
