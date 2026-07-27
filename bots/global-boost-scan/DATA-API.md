@@ -180,6 +180,6 @@ Follows views light up only once someone signs in.
   The value is raw: hide it when it just repeats the title (normalize case, whitespace and a
   leading "The" before comparing) and when it's null. Because `medium` defaults to `podcast`,
   an untagged music feed reads as "By" rather than "Artist" — expected, not a bug.
-  (In the D1 `/api/v1` layer this column is reserved but not yet populated — the show-page
-  credit line reads the per-show shard, which has it; D1 `author` lands with the search work.)
+  (Available in both paths: the per-show shard `show` object and the D1 `/api/v1` `podcasts`
+  table — the latter enables author-in-search as a matched-only field.)
 - Data updates when the collector's timer runs; `generated_at` tells you how fresh a file is.

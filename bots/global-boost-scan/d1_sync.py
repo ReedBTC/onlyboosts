@@ -74,11 +74,6 @@ def build_full_sql(conn):
                        f"{q(r['event_id'])},{q(r['message'])});")
 
     # podcasts (aggregates joined with show metadata)
-    # NOTE: shows.author (and the podcasts.author column in schema.sql) is deliberately
-    # NOT synced here yet. The show-page credit line reads the per-show shard, which
-    # carries author; D1 author is only needed for author-in-search, which is unbuilt.
-    # Enabling it = migrate the remote column, re-add s.author to these two SELECT/INSERTs,
-    # then a FULL reload (a delta can't backfill author onto existing rows).
     eg = db.effective_guid("b")
     for a in conn.execute(f"""
         SELECT {eg} AS guid,
@@ -86,14 +81,14 @@ def build_full_sql(conn):
                COUNT(DISTINCT b.booster_pubkey) AS booster_count,
                COUNT(DISTINCT b.item_guid) AS episode_count,
                MAX(b.created_at) AS latest_ts,
-               s.title, s.image, s.feed_url, s.medium
+               s.title, s.image, s.feed_url, s.medium, s.author
         FROM boosts b LEFT JOIN shows s ON s.podcast_guid={eg}
         WHERE {eg} IS NOT NULL GROUP BY {eg}""").fetchall():
         out.append(
-            "INSERT INTO podcasts (podcast_guid,title,image,feed_url,medium,"
+            "INSERT INTO podcasts (podcast_guid,title,image,feed_url,medium,author,"
             "boost_count,total_sats,booster_count,episode_count,latest_ts) VALUES ("
             f"{q(a['guid'])},{q(a['title'])},{q(a['image'])},{q(a['feed_url'])},"
-            f"{q(a['medium'])},{q(a['boost_count'])},{q(a['total_sats'])},"
+            f"{q(a['medium'])},{q(a['author'])},{q(a['boost_count'])},{q(a['total_sats'])},"
             f"{q(a['booster_count'])},{q(a['episode_count'])},{q(a['latest_ts'])});")
         if a["title"]:
             out.append("INSERT INTO podcasts_fts (podcast_guid,title) VALUES ("
@@ -161,16 +156,16 @@ def build_delta_sql(conn, rows):
                       COUNT(DISTINCT b.booster_pubkey) AS booster_count,
                       COUNT(DISTINCT b.item_guid) AS episode_count,
                       MAX(b.created_at) AS latest_ts,
-                      s.title, s.image, s.feed_url, s.medium
+                      s.title, s.image, s.feed_url, s.medium, s.author
                FROM boosts b LEFT JOIN shows s ON s.podcast_guid={eg}
                WHERE {eg}=? GROUP BY {eg}""", (pg,)).fetchone()
         if not a:
             continue
         out.append(
-            "INSERT OR REPLACE INTO podcasts (podcast_guid,title,image,feed_url,medium,"
+            "INSERT OR REPLACE INTO podcasts (podcast_guid,title,image,feed_url,medium,author,"
             "boost_count,total_sats,booster_count,episode_count,latest_ts) VALUES ("
             f"{q(a['guid'])},{q(a['title'])},{q(a['image'])},{q(a['feed_url'])},{q(a['medium'])},"
-            f"{q(a['boost_count'])},{q(a['total_sats'])},{q(a['booster_count'])},"
+            f"{q(a['author'])},{q(a['boost_count'])},{q(a['total_sats'])},{q(a['booster_count'])},"
             f"{q(a['episode_count'])},{q(a['latest_ts'])});")
         out.append(f"DELETE FROM podcasts_fts WHERE podcast_guid={q(pg)};")
         if a["title"]:
