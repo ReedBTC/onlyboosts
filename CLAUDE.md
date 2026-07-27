@@ -734,6 +734,31 @@ booster identities, which `renderPodcasts` seeds before first paint — so the
 batched Primal lookup now only runs for stragglers the collector couldn't
 resolve.
 
+### The Boost Note's Episode Link
+
+**Two surfaces start an external boost, and they must publish the same note.**
+`feeds-podcasts.js` (the Episodes/Songs cards) and `show-page.js` (the
+`/show/<guid>` episode rows) both call `LBLogin.openExternalBoost`, so they
+share one modal (`ExternalBoostModal.jsx`) and one orchestrator
+(`externalBoost.js`). What they did *not* share was the `bmbUrl` field:
+the feed built a link inline while the show page passed `''`, and
+`buildExternalNoteTemplate` gates both the content link line and the `r` tag on
+it. The same episode boosted from the two pages therefore produced two
+different notes. Fixed by `assets/js/episode-link.js#episodeBoostLink`, which
+both now import.
+
+**That module is the single owner of the target, and the target is temporary.**
+It resolves to boostmebitch.com only because OnlyBoosts has no per-episode page
+yet; when one lands, this function changes and every boost note follows. That is
+the entire reason it exists as a shared function rather than as two inline URL
+builders. `/show/<guid>` is **not** the replacement: a boost note is about one
+episode, so pointing it at the show would drop the part the reader wants.
+
+It returns null (caller sends `''`, template omits both) when there is no
+episode to point at, which is also what a **show-level** boost from
+`/show/<guid>` gets. Show pages carry no Podcast Index numeric id, so they
+always resolve through `?podcast=<guid>` where the feed can prefer `?feed=`.
+
 ### Snapshot → card
 
 The feed carries each boost's identity and content but **not the signed

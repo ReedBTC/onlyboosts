@@ -36,6 +36,7 @@ import {
   renderSegmentsInto,
 } from '/assets/js/boosts-thread.js'
 import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js'
+import { episodeBoostLink } from '/assets/js/episode-link.js'
 import { buildActionBar, configureBoostActions } from '/assets/js/boost-actions.js'
 import { ensureLoginWidget } from '/assets/js/widget-loader.js'
 import { resolveFollows } from '/assets/js/follow-set.js'
@@ -310,27 +311,16 @@ function subscribeLinks(item) {
   return out
 }
 
-// ── "See all boosts" (Boost Me Bitch) link ───────────────────────────
-// Boost Me Bitch (boostmebitch.com) restores a detail view from URL
-// params: ?feed=<podcastIndexFeedId> (or ?podcast=<podcastGuid>) picks the
-// show, +?episode=<episodeGuid> opens that episode — where episodeGuid is the
-// RSS item guid, i.e. exactly our item_guid. So we can deep-link straight to
-// the episode's page, which shows its full (whole-network) Nostr boost feed —
-// a superset of the LB-community boosts in our own drawer. Prefer ?feed (a
-// direct PI feed lookup) and fall back to the podcast guid. Episodes older
-// than a show's latest ~50 aren't in BMB's feed list, so those gracefully
-// land on the show instead of the exact episode.
+// ── "See all boosts" link ────────────────────────────────────────────
+// Adapter onto episode-link.js, which owns the target. Only the item→primitives
+// mapping lives here, because only this module knows the rollup's shape; the URL
+// itself is shared with show-page.js so both surfaces publish the same link.
 function boostMeBitchLink(item) {
-  const epGuid = item.guid
-  if (!epGuid) return null
-  const feedId = item.ep?.feed_id || item.show?.feed_id || null
-  const guid = item.ep?.podcast_guid || item.show?.podcast_guid || null
-  const p = new URLSearchParams()
-  if (feedId) p.set('feed', String(feedId))
-  else if (guid) p.set('podcast', guid)
-  else return null
-  p.set('episode', epGuid)
-  return 'https://boostmebitch.com/?' + p.toString()
+  return episodeBoostLink({
+    itemGuid: item.guid,
+    podcastGuid: item.ep?.podcast_guid || item.show?.podcast_guid || null,
+    feedId: item.ep?.feed_id || item.show?.feed_id || null,
+  })
 }
 
 // ── Episode media helpers ────────────────────────────────────────────

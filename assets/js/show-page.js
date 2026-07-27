@@ -15,6 +15,7 @@
  */
 import { copyNpub, copyText, showToast } from '/assets/js/copy-npub.js'
 import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js'
+import { episodeBoostLink } from '/assets/js/episode-link.js'
 import { ensureLoginWidget } from '/assets/js/widget-loader.js'
 // Fallback identity lookup for what the index didn't have — see the profile
 // hydration at the foot of this file.
@@ -111,7 +112,18 @@ async function openBoost(bundle, { itemGuid = '', episodeTitle = '' } = {}) {
       episodeTitle,
       podcastGuid: SHOW?.guid || '',
       itemGuid,
-      bmbUrl: '',
+      // Same builder the Episodes feed uses, so an episode boosted from here
+      // publishes the same note it would from the feed. Null on a show-level
+      // boost (no itemGuid), where there is no episode to point at; the note
+      // template omits both the link line and the `r` tag.
+      bmbUrl: episodeBoostLink({
+        itemGuid,
+        podcastGuid: SHOW?.guid || null,
+        // The show payload carries no Podcast Index numeric id (see the
+        // "two fields the feed doesn't carry" note in CLAUDE.md), so this
+        // always resolves through ?podcast=<guid>.
+        feedId: null,
+      }) || '',
     },
     recipientsBundle: bundle,
   })
