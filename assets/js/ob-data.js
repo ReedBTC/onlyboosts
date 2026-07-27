@@ -120,6 +120,29 @@ export async function getShowMediums() {
 }
 
 /**
+ * guid → author, from the same rollup. `<itunes:author>`, which on a music
+ * feed is the artist and on a podcast is whoever the publisher named there:
+ * often the host, sometimes a network, occasionally a tagline.
+ *
+ * Verbatim, INCLUDING rows where the author merely repeats the show title
+ * (~7% of them). The collector publishes it raw on purpose and each consumer
+ * decides: a display surface hides the repeats, a search index does not care,
+ * because matching a show by its own title is a no-op rather than a wrong hit.
+ *
+ * A second pass over the rows getShowMediums() already walked. Both read the
+ * same cached file, so this costs no request.
+ */
+export async function getShowAuthors() {
+  const rows = await getPodcastIndex()
+  const map = new Map()
+  for (const p of rows) {
+    const a = str(p.author)
+    if (a) map.set(p.guid, a)
+  }
+  return map
+}
+
+/**
  * A guid → boolean test for one side of the music / not-music split.
  *
  * `want` is 'music' (the Songs and Albums feeds) or 'other' (Episodes and

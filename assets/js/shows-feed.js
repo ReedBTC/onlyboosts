@@ -52,7 +52,7 @@
  * episode-level and go through feeds-podcasts.js, which never reads this file.
  */
 import {
-  getPodcastIndex, getPodcastDetail, getShowMediums,
+  getPodcastIndex, getPodcastDetail, getShowMediums, getShowAuthors,
   getLatestBoosts, getBoostMonths, getBoostMonth,
 } from '/assets/js/ob-data.js'
 import {
@@ -247,6 +247,10 @@ async function loadAllTime() {
     title: typeof p.title === 'string' ? p.title : '',
     img: typeof p.img === 'string' ? p.img : '',
     feed: typeof p.feed === 'string' ? p.feed : '',
+    // <itunes:author>: the artist on a music feed, the host or publisher on a
+    // podcast. Matched by the search box, never displayed here — the credit
+    // line belongs on the show's own page, next to its name.
+    author: typeof p.author === 'string' ? p.author : '',
     // Verbatim from the rollup — the collector owns its own layout, so a
     // shard path is never built by hand from the guid.
     file: typeof p.file === 'string' ? p.file : '',
@@ -298,7 +302,9 @@ async function loadWindow(cutoff) {
   // wholesale. Deliberately not caught: a group with no medium would land in
   // Shows and never in Albums, so a silent failure is a feed that quietly
   // hides every album. The caller's error placeholder is the honest answer.
-  const [rows, mediums] = await Promise.all([loadRowsSince(cutoff), getShowMediums()])
+  const [rows, mediums, authors] = await Promise.all([
+    loadRowsSince(cutoff), getShowMediums(), getShowAuthors(),
+  ])
   const byShow = new Map()
 
   for (const b of rows) {
@@ -313,6 +319,9 @@ async function loadWindow(cutoff) {
         guid, title: b.podcast.title || '', img: b.podcast.img || '',
         feed: b.podcast.feed || '', file: `podcasts/${guid}.json`,
         music: mediums.get(guid) === 'music',
+        // Boost records carry no author (it's a show-level fact, same as the
+        // medium), so it joins through the rollup those rows already loaded.
+        author: authors.get(guid) || '',
         boosts: 0, sats: 0, boosters: 0, episodes: 0, latest: 0,
         eps: [],
         _boosters: new Set(),
@@ -691,7 +700,13 @@ export async function renderShows({ panel, list, medium = 'other' }) {
         : s.guid,
       // Matched, not shown. The guid is the only handle on the 33% of shows
       // with no title, and it's what you'd have copied off one of their cards.
-      extra: s.guid,
+      // The author joins it so an artist or host finds their own work: "Theo
+      // Katzman" reaches the album, "Guy Swann" reaches Bitcoin Audible.
+      // Deliberately not in `sub` — it would push the show's own numbers off a
+      // narrow card, and a name is a way in rather than a way to tell two
+      // similar results apart. An author hit ranks below every title hit,
+      // which is what the scoring ladder in feed-search.js already does.
+      extra: [s.guid, s.author].filter(Boolean).join(' '),
       img: s.img,
     })),
   })

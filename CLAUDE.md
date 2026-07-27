@@ -900,15 +900,86 @@ The Boosts feed **rebuilds the card** rather than patching it, seeding
 `setCachedProfile` first so the mention chips inside the message body agree with
 the avatar and the display name above them.
 
-## Not indexed: show credits
+## Show credits: `author`
 
-There is **no creator, host, author or `podcast:person` data anywhere** in this
-pipeline: not in the `podcasts` table (`d1/schema.sql`), not in
-`podcasts/index.json`, and not in the per-show shards, whose `show` object is
-exactly `{guid, title, img, feed, medium}`. `enrich.py#_show_from_feed` maps six
-fields off the Podcast Index feed object and `author` / `ownerName` are not
-among them. Adding a credits section to the show pages is blocked on the
-collector; see the note in `docs/show-pages-spec.md`.
+`podcasts/index.json` carries **`author`** (`<itunes:author>`), added by the
+collector on `47d9469` and backfilled across all 924 identified shows. Measured
+over the shipped index, counting non-empty values that aren't just the title
+repeated:
+
+| | pages | usable | coverage |
+|---|---|---|---|
+| music | 466 | 454 | **97.4%** |
+| podcast | 460 | 405 | **88.0%** |
+
+The collector's own scoping probe put this at ~38% / ~52%; the gap is that it
+judged *quality* (excluding networks and taglines by eye) where the table above
+applies the mechanical rule the site actually implements. **Measure off the
+shipped index, not the probe.**
+
+On a music feed `author` is the artist and is clean. On a podcast it is whoever
+the publisher named there: usually the host (`Guy Swann` → Bitcoin Audible),
+sometimes a network (`Jupiter Broadcasting`), occasionally a tagline. So:
+
+- **Never label it "Host" or "Creator".** `Artist` on music, a softer `By` on
+  podcasts. "By Jupiter Broadcasting" is true; "Host: Jupiter Broadcasting" is
+  not.
+- **The only filter is the title repeat** (normalize case, whitespace and a
+  leading "The"). Do not build a tagline detector: any rule sharp enough to
+  catch "Bitcoin is for Everyone" also eats real names, and a wrongly suppressed
+  credit is worse than an odd-looking one.
+- `medium` defaults to `podcast` for a feed that declares none, so an untagged
+  music feed gets `By` rather than `Artist`. Consistent with the partition rule
+  in the medium-split section, and a known consequence rather than a bug.
+
+**Built: search.** `ob-data.js#getShowAuthors` joins guid → author off the same
+cached rollup `getShowMediums` reads, so it costs no request, and `shows-feed.js`
+puts it in the search entry's `extra` — matched, never displayed. An author hit
+scores below every title hit through the existing ladder. Not in `sub`: it would
+push the show's own numbers off a narrow card, and a name is a way *in* rather
+than a way to tell two similar results apart.
+
+**Built: the credit line on `/show/<guid>`.** `creditLine()` in
+`functions/show/[guid].js`, between the `<h1>` and the "Last boosted" sub-line,
+labelled off the `COPY` table's `credit` field. The page reads **D1**, not the
+shards, so this needed the collector's `cf6ac14` migration before it could
+render at all; the search half shipped first precisely because it reads the
+static rollup instead.
+
+It prints nothing at all in two cases, and both matter more than they look: an
+empty author, and one that merely repeats the show title (~7% of rows) after
+normalizing case, punctuation and a leading "The". `.show-credit` has no
+reserved space, so a suppressed credit costs no layout.
+
+**`author` is also returned by three `/api/v1/*` endpoints** (`podcasts`,
+`podcasts/<guid>`, `search`). Nothing on this site consumes those — they are the
+public API surface — so that is about keeping the API consistent with the shards,
+not about a feature.
+
+**One thing the handoff asked for that is NOT in this lane:** making author
+*matchable* in `/api/v1/search`. That endpoint matches through `podcasts_fts`,
+an FTS5 virtual table declared `fts5(podcast_guid UNINDEXED, title)` in
+`d1/schema.sql`. Adding author to the index is a collector-side schema change
+plus a repopulate; a SELECT cannot do it. The client feeds are unaffected, since
+they match on the static rollup.
+
+Still open: `og:title` for music becoming "<artist> — <album>", which would
+improve the share card on ~97% of album pages.
+
+## Not indexed: `podcast:person`
+
+`<podcast:person>` is **not** in this pipeline and deliberately isn't being
+added. The collector probed it and found ~6% coverage, confirmed against raw
+feeds rather than the API, so it is not a Podcast Index limitation: the tags
+genuinely aren't in the feeds. A credits section built on that is the near-empty
+block that is worse than nothing. Revisit only if we ever parse channel-level
+RSS ourselves *and* a wider scan changes the number.
+
+`ownerName` is also not indexed, and that is the more useful finding: every show
+carrying one **also** carries an `author`, so it never fills a blank. It is not
+a fallback. Don't re-add it.
+
+`author` itself did ship; see the section above.
 
 ## Naming note
 

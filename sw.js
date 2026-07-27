@@ -145,7 +145,18 @@
 // boosts-thread.js lost its own copy of the Primal client, so a returning
 // visitor holding the precached old boosts-thread.js alongside a new
 // boosts-feed.js would import a module the cache has never seen.
-const VERSION = 'ob-v30';
+// ob-v31: the Shows and Albums search matches a show's author, so an artist or
+// host finds their own work ("Theo Katzman" reached nothing before). Required,
+// and for the sharpest reason in this list: shows-feed.js gains a STATIC import
+// of getShowAuthors from ob-data.js. A returning visitor holding a new
+// shows-feed.js against a cached old ob-data.js fails that import binding at
+// link time, which kills the whole module — the Shows feed would render its
+// placeholder and nothing else. The two files ship together or not at all.
+// Also carries the show-page credit line ("Artist" on music, "By" on podcasts):
+// the markup comes from the Function, which the SW never caches, but the
+// .show-credit rules are new in show-page.css, which it does — so without the
+// bump a returning visitor reads the credit as unstyled body text.
+const VERSION = 'ob-v31';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;

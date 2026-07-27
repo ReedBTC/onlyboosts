@@ -42,8 +42,8 @@ export async function onRequestGet({ request, env, params }) {
   const show = await env.DB.prepare(
     // No episode_count: it is deliberately never displayed (see the stats
     // block below), and selecting it invites someone to put the tile back.
-    `SELECT podcast_guid, title, image, feed_url, medium, boost_count, total_sats,
-            booster_count, latest_ts
+    `SELECT podcast_guid, title, image, feed_url, medium, author, boost_count,
+            total_sats, booster_count, latest_ts
      FROM podcasts WHERE podcast_guid = ?`
   ).bind(guid).first();
 
@@ -385,6 +385,11 @@ const COPY = {
     drawer: "Episodes with Nostr Boosts, newest first",
     noItems: "No episodes with Nostr boosts yet.",
     ldType: "PodcastSeries",
+    // Deliberately "By", never "Host" or "Creator". The source is
+    // <itunes:author>, whoever the publisher named there: usually the host,
+    // sometimes a network ("Jupiter Broadcasting"), occasionally a tagline.
+    // "By Jupiter Broadcasting" is true of all three; "Host:" is true of one.
+    credit: "By",
   },
   music: {
     eyebrow: "Album",
@@ -396,6 +401,10 @@ const COPY = {
     drawer: "Tracks with Nostr Boosts, newest first",
     noItems: "No tracks with Nostr boosts yet.",
     ldType: "MusicAlbum",
+    // On a music feed <itunes:author> IS the artist, and cleanly so: 97.4% of
+    // album pages carry a usable one. The stronger label is earned here in a
+    // way it is not on the podcast side.
+    credit: "Artist",
   },
 };
 
@@ -408,7 +417,19 @@ function renderShowPage({ show, episodes, supporters, boosts, names }) {
   const title = show.title;
   const pageUrl = `${SITE_ORIGIN}/show/${encodeURIComponent(show.podcast_guid)}`;
   const art = isSafeUrl(show.image) ? show.image : null;
-  const ogTitle = `${title} — Boosts on Nostr | OnlyBoosts`;
+  // A music release leads with its artist, the way every music service titles
+  // one: "Haleen — Midnight Signal" is what a listener recognises in a shared
+  // link, where "Midnight Signal — Boosts on Nostr" buries the name that
+  // identifies it. 97.4% of album pages carry a usable artist; the rest fall
+  // back to the standard form rather than printing a dangling separator.
+  //
+  // Dropping "Boosts on Nostr" from those titles costs no honesty: og:description
+  // still opens with the booster count and closes with the coverage caveat, so
+  // the preview card says what the page is either side of this line.
+  const artist = copy.ldType === "MusicAlbum" ? usableAuthor(show) : "";
+  const ogTitle = artist
+    ? `${artist} — ${title} | OnlyBoosts`
+    : `${title} — Boosts on Nostr | OnlyBoosts`;
 
   // The description is synthesized from the boost data rather than copied from
   // the show's own blurb. D1 doesn't carry the blurb (it lives only in the
@@ -433,6 +454,9 @@ function renderShowPage({ show, episodes, supporters, boosts, names }) {
     "@type": copy.ldType,
     name: title,
     url: pageUrl,
+    // byArtist is MusicAlbum-only in schema.org; PodcastSeries has no
+    // equivalent that <itunes:author> can honestly fill, so podcasts get none.
+    ...(artist ? { byArtist: { "@type": "MusicGroup", name: artist } } : {}),
     ...(art ? { image: art } : {}),
     ...(isSafeUrl(show.feed_url) ? { webFeed: show.feed_url } : {}),
   };
@@ -674,6 +698,35 @@ function renderShowPage({ show, episodes, supporters, boosts, names }) {
 </html>`;
 }
 
+
+// The show's credit line, or "" when there is nothing honest to print.
+//
+// Two rejections, both deliberate. An EMPTY author prints nothing rather than a
+// placeholder. An author that merely REPEATS the show title prints nothing
+// either: "Artist: Stay Awhile" under a heading already reading "Stay Awhile"
+// is noise, and ~7% of rows are exactly that. Normalizing case, punctuation and
+// a leading "The" before comparing catches the near-misses too.
+//
+// Nothing else is filtered. A tagline like "Bitcoin is for Everyone" reads
+// oddly and still ships, because any rule sharp enough to catch it also eats
+// real names, and a wrongly suppressed credit is worse than an awkward one.
+// The author, or "" when there is nothing honest to print. Shared by the
+// on-page credit and the share-card title so the two can never disagree — if
+// they drifted, a music page could title itself "Midnight Signal — Midnight
+// Signal" while the body correctly showed no credit at all.
+function usableAuthor(show) {
+  const author = String(show.author || "").trim();
+  if (!author) return "";
+  const norm = (v) => String(v || "").toLowerCase().replace(/^the\s+/, "").replace(/[^a-z0-9]+/g, "");
+  return norm(author) === norm(show.title) ? "" : author;
+}
+
+function creditLine(show, copy) {
+  const author = usableAuthor(show);
+  if (!author) return "";
+  return `<p class="show-credit"><span class="show-credit-label">${htmlEscape(copy.credit)}</span> ${htmlEscape(truncate(author, 120))}</p>`;
+}
+
 function renderHeader(show, art, title, copy) {
   // Three tiles, not four. There was an episode count here and it was removed
   // deliberately: sats, boosts and boosters are measures of boost activity
@@ -701,6 +754,7 @@ function renderHeader(show, art, title, copy) {
       <div class="show-ident">
         <p class="show-eyebrow">${copy.eyebrow}</p>
         <h1>${htmlEscape(title)}</h1>
+        ${creditLine(show, copy)}
         <p class="show-sub">${
           show.latest_ts ? `Last boosted ${htmlEscape(relTime(show.latest_ts))}` : "No boosts recorded yet"
         }</p>

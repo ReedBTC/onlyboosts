@@ -145,6 +145,24 @@
   color: var(--muted);
 }
 
+/* The credit line, between the show's name and its "last boosted" sub-line.
+   Sits closer to the h1 than the sub-line does, because it belongs to the
+   name rather than to the boost data. Absent entirely when the collector has
+   no usable author, so nothing here reserves space. */
+.show-credit {
+  margin: 0.2rem 0 0;
+  font-size: 0.92rem;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.show-credit-label {
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-right: 0.35rem;
+}
+
 /* dt before dd in the DOM is the correct <dl> pairing; flex-column reverses
    the visual order so the number reads first. */
 .show-stat {

@@ -493,16 +493,35 @@ different one, and what the coverage actually is across the ~930 identified
 shows. Coverage is the question that decides whether the section ships at all;
 a credits block present on 5% of pages is worse than none.
 
-**What to ask the collector for**, in priority order:
+**OUTCOME (this section is now settled; the ask above is history).**
 
-1. A `persons` array on the show record: `[{name, role, group, href, img}]`,
-   channel-level only to begin with, from `<podcast:person>`.
-2. `author` and `owner_name` columns on `podcasts`, as the fallback line.
-3. A coverage figure for both, measured over the identified shows, reported
-   before any UI is built.
+The collector probed all three and the answers inverted the priority:
 
-Item 3 is not optional. It is what determines whether this becomes a section, a
-single line under the show title, or nothing.
+1. **`podcast:person` was dropped.** ~6% coverage, and confirmed against raw
+   feeds rather than the API, so it is not a Podcast Index limitation: the tags
+   genuinely aren't in the feeds. Exactly the near-empty block this section
+   warned against. Revisit only if we parse channel-level RSS ourselves and a
+   wider scan moves the number.
+2. **`owner_name` was dropped.** Every show carrying one also carries an
+   `author`, on both mediums, so it never fills a blank. It is not a fallback.
+3. **`author` shipped** (`47d9469`), backfilled across all 924 identified shows
+   into `podcasts/index.json` and the per-show shards.
+
+**The coverage figure that matters is measured off the shipped index, not the
+probe.** Counting non-empty values that are not merely the title repeated:
+97.4% of music pages (454/466) and 88.0% of podcast pages (405/460). The
+probe's ~52% / ~38% judged *quality*, excluding networks and taglines by eye,
+where these numbers apply the mechanical rule the site implements. At ~90% this
+is a line that is essentially always present rather than an occasional one.
+
+Consequences for this page, all recorded in CLAUDE.md under *Show credits*:
+label it `Artist` on music and `By` on podcasts, **never** `Host` or `Creator`;
+filter only the title repeat; expect an untagged music feed to read `By`.
+
+**Still blocked: the credit line itself.** This page renders from D1 and
+`author` is only in the shards, so the column needs a production migration plus
+a full reload before anything can appear here. Search shipped first because it
+reads the shards. Do not work around the gap with a render-time fetch.
 
 **Note the value block is a separate thing and is already available.**
 `/api/value?podcastGuid=<guid>` returns the show's Lightning recipients with
