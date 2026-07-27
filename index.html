@@ -20,8 +20,8 @@
     object-src 'none';
   " />
 
-  <title>OnlyBoosts — podcast boosts on Nostr</title>
-  <meta name="description" content="Podcast boosts as a Nostr feed. Read the boostagrams flowing across the podcasting-2.0 network — globally or filtered to who you follow — and boost back with Lightning." />
+  <title>OnlyBoosts — Podcasting 2.0 Boosts on Nostr</title>
+  <meta name="description" content="An index of the Podcasting 2.0 boosts published to Nostr. Read the boostagrams as they are sent, globally or filtered to who you follow, and boost back with Lightning." />
   <link rel="canonical" href="https://onlyboosts.social/" />
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
 
@@ -36,8 +36,8 @@
   <!-- Open Graph -->
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://onlyboosts.social/" />
-  <meta property="og:title" content="OnlyBoosts — podcast boosts on Nostr" />
-  <meta property="og:description" content="Read the boostagrams flowing across the podcasting-2.0 network — globally or filtered to who you follow — and boost back with Lightning." />
+  <meta property="og:title" content="OnlyBoosts — Podcasting 2.0 Boosts on Nostr" />
+  <meta property="og:description" content="An index of the Podcasting 2.0 boosts published to Nostr. Read the boostagrams as they are sent, globally or filtered to who you follow, and boost back with Lightning." />
   <meta property="og:site_name" content="OnlyBoosts" />
   <meta property="og:image" content="https://onlyboosts.social/assets/onlyboosts_banner.png" />
   <meta name="twitter:card" content="summary_large_image" />
@@ -120,9 +120,11 @@
       color: var(--muted);
       line-height: 1.5;
     }
-    /* "Public Nostr Podcasting 2.0 Boosts" links to the About page — the
+    /* "Podcasting 2.0 Boosts on Nostr" links to the About page — the
        phrase most first-time visitors won't recognise is the thing that
-       explains itself. Deliberately the site's ordinary link treatment
+       explains itself. It is also the site's subtitle of record, matching
+       the <title> and og:title; change them together.
+       Deliberately the site's ordinary link treatment
        (underlined, link-coloured) rather than a bespoke affordance: the
        point is that it's obviously clickable. */
     .masthead p a:hover,
@@ -258,6 +260,11 @@
     }
     .feed-panel { display: none; }
     .feed-panel.is-active { display: block; }
+
+    /* "Nostr Stats:" / "Nostr Interactions" — the two-word qualifier that
+       replaced the scope-note paragraph at the head of these panels. Quiet
+       enough to read as a label rather than a figure. */
+    .ob-stats-label { color: var(--muted); font-weight: 600; }
 
     /* The panels have no head of their own: the feed bar above names the feed
        and carries its controls, so a heading under it would only restate the
@@ -553,6 +560,10 @@
       overflow-wrap: anywhere; word-break: break-word;
     }
     .pcast-links { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.35rem; }
+    /* The episode card's "Nostr Stats:" line, directly under the Fountain
+       link. Inherits .pcast-meta; tabular figures so the counts line up
+       down a column of cards. */
+    .pcast-nstats { font-variant-numeric: tabular-nums; margin-top: 0.35rem; }
     .pcast-fountain-link {
       font-size: 0.78rem; font-weight: 700; color: var(--accent-d); text-decoration: none; white-space: nowrap;
     }
@@ -1033,7 +1044,7 @@
             <div class="nav-explore-group">
               <h4>Stats</h4>
               <a href="/stats"><span aria-hidden="true">📊</span> Boost Stats</a>
-              <a href="/boosters"><span aria-hidden="true">🧑‍🤝‍🧑</span> Boosters</a>
+              <a href="/boosters"><span aria-hidden="true">🧑‍🤝‍🧑</span> Community</a>
             </div>
             <div class="nav-explore-group">
               <h4>More</h4>
@@ -1071,7 +1082,7 @@
 <!-- ══════════════════════════════ MASTHEAD ══════════════════════════════ -->
 <div class="masthead">
   <img src="/assets/onlyboosts_banner.png" alt="OnlyBoosts" width="1800" height="600" />
-  <p><a href="/about">Public Nostr Podcasting&nbsp;2.0 Boosts</a>: Feeds, Rankings and Discoverability</p>
+  <p><a href="/about">Podcasting&nbsp;2.0 Boosts on Nostr</a>: Feeds, Rankings and Discoverability</p>
 </div>
 
 <!-- ══════════════════════════════ FEED BAR ══════════════════════════════
@@ -1136,6 +1147,16 @@
      rank that subject holds under the current sort. -->
 <main class="feed-panels">
   <div class="feed-panels-inner">
+
+    <!-- No .ob-scopenote here. A paragraph of caveat above every feed was
+         tried and removed: it is the first thing on the page, it is three
+         lines on a phone, and it pushes the feed itself below the fold to say
+         something a browsing visitor has not yet asked. The qualifier moved
+         into the cards instead, where it costs two words — every rollup card
+         labels its figures "Nostr Stats" and every boost drawer is titled
+         "Nostr Interactions". The full sentence still lives on each /show
+         page, which is the surface that gets shared and the one where the
+         numbers read as a claim about somebody's audience. -->
 
     <section class="feed-panel is-active" id="panel-episodes-global" role="region" aria-label="Episodes, global" data-feed="episodes-global" data-scope="global">
       <div class="feed-search" data-feed-search hidden></div>
@@ -1240,7 +1261,7 @@
 
     <div class="footer-col footer-about">
       <h3>OnlyBoosts</h3>
-      <p>A Nostr client for only podcast boosts. Every Podcasting 2.0 boostagram published to Nostr, cached and indexed for stats by episode, show and supporter. Sort, filter, search, view all or just see boosts from your follows on Nostr.</p>
+      <p>A Nostr client for only podcast boosts. Every Podcasting 2.0 boostagram published to Nostr, cached and indexed for stats by episode, show and booster. Sort, filter, search, view all or just see boosts from your follows on Nostr.</p>
     </div>
 
     <!-- Same two groups as the nav's Explore menu, in the same order — the
@@ -1261,7 +1282,7 @@
       <h3>Stats</h3>
       <ul>
         <li><a href="/stats">📊 Boost Stats</a></li>
-        <li><a href="/boosters">🧑‍🤝‍🧑 Boosters</a></li>
+        <li><a href="/boosters">🧑‍🤝‍🧑 Community</a></li>
       </ul>
     </div>
 

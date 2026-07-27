@@ -16,6 +16,9 @@
 import { copyNpub, copyText, showToast } from '/assets/js/copy-npub.js'
 import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js'
 import { ensureLoginWidget } from '/assets/js/widget-loader.js'
+// Fallback identity lookup for what the index didn't have — see the profile
+// hydration at the foot of this file.
+import { fetchProfiles } from '/assets/js/primal-profiles.js'
 
 const VALUE_API = '/api/value'
 
@@ -169,3 +172,74 @@ async function initBoosting() {
 }
 
 initBoosting()
+
+// ── Profile fallback ─────────────────────────────────────────────────
+//
+// The server renders every identity it can from the D1 `profiles` table, which
+// the collector fills from kind-0 events for people who have BOOSTED. Two gaps
+// survive that, and both paint as a shortened npub and a blank circle:
+//
+//   - a booster whose kind-0 the collector hadn't resolved when it last ran
+//   - an npub MENTIONED inside a boost message, who need never have boosted
+//     anything and so is not in that table at all
+//
+// A normal Nostr client would ask the relays. This asks Primal's cache, which
+// answers a batch of pubkeys in one round trip instead of a fan-out, and is the
+// same fallback the Episodes feed already uses. The index stays the fast path;
+// this only fills what the index missed.
+//
+// Everything here is post-paint and best-effort. The server output is complete
+// and readable on its own, a visitor with no JavaScript keeps exactly what
+// shipped before, and an unreachable cache changes nothing.
+
+async function hydrateProfiles() {
+  const els = Array.from(document.querySelectorAll('[data-pk][data-missing]'))
+  if (!els.length) return
+
+  const found = await fetchProfiles(els.map((el) => el.getAttribute('data-pk')))
+  if (!found.size) return
+
+  for (const el of els) {
+    const prof = found.get(el.getAttribute('data-pk'))
+    if (!prof) continue
+    const missing = (el.getAttribute('data-missing') || '').split(' ')
+
+    // A mention chip is the element itself; a supporter card and a boost row
+    // are containers holding the pieces to patch.
+    if (el.classList.contains('nostr-mention')) {
+      if (prof.name) el.textContent = '@' + prof.name
+      el.removeAttribute('data-missing')
+      continue
+    }
+
+    if (missing.includes('name') && prof.name) {
+      const nameEl = el.querySelector('.sup-name, .boost-who')
+      if (nameEl) {
+        nameEl.textContent = prof.name
+        nameEl.setAttribute('title', prof.name)
+      }
+      // The avatar's aria-label names the person it belongs to.
+      const btn = el.querySelector('.sup-avatar')
+      if (btn) btn.setAttribute('aria-label', `Copy npub for ${prof.name}`)
+    }
+
+    if (missing.includes('pic') && prof.picture) {
+      const btn = el.querySelector('.sup-avatar')
+      if (btn && !btn.querySelector('img')) {
+        const img = document.createElement('img')
+        img.alt = ''
+        img.loading = 'lazy'
+        img.referrerPolicy = 'no-referrer'
+        // A dead hotlink returns the card to the blank circle it already had.
+        img.onerror = () => { img.remove(); btn.classList.add('is-blank') }
+        img.src = prof.picture
+        btn.classList.remove('is-blank')
+        btn.appendChild(img)
+      }
+    }
+
+    el.removeAttribute('data-missing')
+  }
+}
+
+hydrateProfiles()

@@ -135,7 +135,7 @@ const COPY = {
   other: {
     glyph: '🎙',
     unidentified: 'Unidentified show',
-    drawer: 'Episodes with NIP-73 Boosts',
+    drawer: 'Episodes with Nostr Boosts',
     noItems: 'No episodes recorded for this show yet.',
     truncated: (n, total) => `Showing the ${n} most recent of ${total} episodes.`,
     untitledItem: 'Untitled episode',
@@ -157,7 +157,7 @@ const COPY = {
   music: {
     glyph: '💿',
     unidentified: 'Unidentified release',
-    drawer: 'Tracks with NIP-73 Boosts',
+    drawer: 'Tracks with Nostr Boosts',
     noItems: 'No tracks recorded for this release yet.',
     truncated: (n, total) => `Showing the ${n} most recent of ${total} tracks.`,
     untitledItem: 'Untitled track',
@@ -445,7 +445,12 @@ function renderShowCard(s, rank, copy) {
     }
   }
 
+  // "Nostr Stats:" carries the qualifier that used to sit in a paragraph above
+  // the whole feed. Two words on the line the figures are already on, rather
+  // than three lines of caveat before the first card. It says what the numbers
+  // are counted from, which is the only reading of them that is true.
   const stats = h('div', { class: 'pcast-meta ob-show-stats' }, [
+    h('span', { class: 'ob-stats-label', text: 'Nostr Stats:' }),
     h('span', { class: 'pcast-sats' }, [fmtSats(s.sats), h('span', { class: 'pcast-bolt', 'aria-hidden': 'true', text: ' ⚡' })]),
     h('span', { class: 'pcast-dot', 'aria-hidden': 'true', text: '·' }),
     h('span', { text: plural(s.boosts, 'boost', 'boosts') }),

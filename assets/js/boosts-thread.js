@@ -16,6 +16,9 @@
  * mutating repaints.
  */
 import { SimplePool, nip19, verifyEvent } from '/assets/widgets/nostr-tools.js'
+// Primal profile lookup lives in its own module so /show pages can use it
+// without importing this one. See primal-profiles.js.
+import { primalQuery, fetchProfilesFromPrimal, parseProfileEvent } from '/assets/js/primal-profiles.js'
 import {
   KIND_DATE_EVENT,
   KIND_TIME_EVENT,
@@ -26,8 +29,6 @@ import {
 // ── Config ───────────────────────────────────────────────────────────
 export const ROOT_NEVENT = 'nevent1qvzqqqqqqypzpses3q0zsa5rs8wchh7jws6pmjsvtzpv9xuxgt4yhjp0w43jv3vjqyd8wumn8ghj7urewfsk66ty9enxjct5dfskvtnrdakj7qgwwaehxw309ahx7uewd3hkctcqyr3keved458q3n7x7839r86vj4dx0s4xh0p8j7fzvf4nq7824ulagy77tpj'
 
-const PRIMAL_WS_URL = 'wss://cache1.primal.net/v1'
-const PRIMAL_TIMEOUT_MS = 6000
 const STATIC_RELAYS = [
   'wss://relay.damus.io',
   'wss://nos.lol',
@@ -375,55 +376,11 @@ function renderContentInto(el, text) {
 }
 
 // ── Profile parsing ──────────────────────────────────────────────────
-function parseProfileEvent(ev) {
-  try {
-    const meta = JSON.parse(ev.content)
-    return {
-      pubkey:  ev.pubkey,
-      name:    meta.display_name || meta.name || '',
-      picture: isSafeUrl(meta.picture) ? meta.picture : null,
-      nip05:   meta.nip05 || '',
-      lud16:   typeof meta.lud16 === 'string' ? meta.lud16.trim() : '',
-      lud06:   typeof meta.lud06 === 'string' ? meta.lud06.trim() : '',
-    }
-  } catch {
-    return { pubkey: ev.pubkey }
-  }
-}
 
-// ── Primal cache: low-level query ────────────────────────────────────
-function primalQuery(op, params, timeoutMs = PRIMAL_TIMEOUT_MS) {
-  return new Promise((resolve, reject) => {
-    let settled = false
-    const events = []
-    const finish = (val, err) => {
-      if (settled) return
-      settled = true
-      clearTimeout(timer)
-      try { ws.close() } catch {}
-      if (err) reject(err); else resolve(val)
-    }
-    const ws = new WebSocket(PRIMAL_WS_URL)
-    const subId = `lb_${op}_${Date.now()}`
-    const timer = setTimeout(
-      () => finish(null, new Error(`Primal "${op}" timed out`)),
-      timeoutMs,
-    )
-    ws.onopen = () => {
-      ws.send(JSON.stringify(['REQ', subId, { cache: [op, params] }]))
-    }
-    ws.onerror = () => finish(null, new Error(`Primal WS error (${op})`))
-    // If close fires before EOSE, treat whatever we have as the result.
-    ws.onclose = () => { if (!settled) finish(events) }
-    ws.onmessage = (e) => {
-      let msg; try { msg = JSON.parse(e.data) } catch { return }
-      const [type, , payload] = msg
-      if (type === 'EVENT' && payload) events.push(payload)
-      else if (type === 'EOSE') finish(events)
-    }
-  })
-}
-
+// ── Primal cache: thread + event lookups ─────────────────────────────
+// The profile half of this moved to primal-profiles.js (the show pages need it
+// without the rest of this module). These two stay here: they are thread
+// machinery, and nothing outside this file asks for them.
 async function fetchThreadFromPrimal(rootId) {
   const events = await primalQuery('thread_view', { event_id: rootId, limit: 400 })
   const notes = []
@@ -433,16 +390,6 @@ async function fetchThreadFromPrimal(rootId) {
     else if (ev.kind === 0) profiles.set(ev.pubkey, parseProfileEvent(ev))
   }
   return { notes, profiles }
-}
-
-async function fetchProfilesFromPrimal(pubkeys) {
-  if (!pubkeys.length) return new Map()
-  try {
-    const evs = await primalQuery('user_infos', { pubkeys })
-    const out = new Map()
-    for (const ev of evs) if (ev.kind === 0) out.set(ev.pubkey, parseProfileEvent(ev))
-    return out
-  } catch { return new Map() }
 }
 
 async function fetchEventsFromPrimal(eventIds) {
@@ -459,8 +406,8 @@ async function fetchEventsFromPrimal(eventIds) {
   } catch { return { notes: new Map(), profiles: new Map() } }
 }
 
-// Expose Primal lookups for page-level handlers (e.g. /boosts.html zap flow
-// needs to fetch a recipient's lud16 on demand if not cached).
+// Re-exported so existing importers (feeds-podcasts.js) keep working; the
+// implementation now lives in primal-profiles.js.
 export { fetchProfilesFromPrimal }
 
 // ── Direct-relay fetch (untrusted source — verify everything) ────────

@@ -210,6 +210,16 @@ In every case, remember the top-line caveat: this is the amount **claimed**, not
 
 ## FAQ (seed questions — expand/trim as you like)
 
+> **These are seeds, and the shipped set has moved past them.** `about.html` is
+> what visitors read; this section is the factual backing for it, not a mirror.
+> Differences that are deliberate, so nobody "restores" them from here:
+> the custody question was dropped from the site (the answer is true, but the
+> question is one nobody was asking); four questions were added covering why a
+> show, an episode or a music release is missing and why a sats total disagrees
+> with the figure a podcaster announces on air; and the app-integration question
+> now leads with which apps actually publish today. Correct the *facts* here
+> first, then carry them into the page.
+
 **Is OnlyBoosts an official podcast directory or the Podcast Index?**
 No. We *use* the Podcast Index for metadata, but OnlyBoosts is an independent index
 of boost *activity* published to Nostr.

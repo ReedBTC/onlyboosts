@@ -547,15 +547,32 @@ function episodeCard(item, rank = null, copy = COPY.other) {
   const showHref = showPageHref(show?.podcast_guid)
   const showEl = show?.title
     ? (showHref
-        ? h('a', { class: 'pcast-show pcast-show-link', href: showHref, title: `Boosts and supporters for ${show.title}` }, show.title)
+        ? h('a', { class: 'pcast-show pcast-show-link', href: showHref, title: `Nostr boosts to ${show.title}` }, show.title)
         : h('div', { class: 'pcast-show', text: show.title }))
     : null
+
+  // The counts sit in the card body, under the Fountain link, rather than on
+  // the drawer bar where they used to be. Two reasons: the drawer is now named
+  // for what it opens ("Nostr Interactions") instead of doubling as a stat
+  // line, and these figures need the "Nostr Stats:" qualifier, which is the
+  // per-card replacement for the scope-note paragraph that used to sit above
+  // the whole feed. The sats stay on the drawer bar beside the booster faces;
+  // they are the visual anchor there and repeating them here would only echo.
+  const nBoosters = distinctBoosters.length
+  const nBoosts = boosts.length
+  const statsRow = h('div', { class: 'pcast-meta pcast-nstats' }, [
+    h('span', { class: 'ob-stats-label', text: 'Nostr Stats:' }),
+    h('span', { text: `${nBoosters.toLocaleString()} booster${nBoosters === 1 ? '' : 's'}` }),
+    h('span', { class: 'pcast-dot', 'aria-hidden': 'true', text: '·' }),
+    h('span', { text: `${nBoosts.toLocaleString()} boost${nBoosts === 1 ? '' : 's'}` }),
+  ])
 
   const body = h('div', { class: 'pcast-card-body' }, [
     showEl,
     titleEl,
     descP,
     linksRow,
+    statsRow,
   ])
 
   // Media column: episode art with the air date tucked directly beneath it —
@@ -608,19 +625,16 @@ function episodeCard(item, rank = null, copy = COPY.other) {
     }
   }
 
-  // Label the drawer by distinct boosters (matching the faces beside it), and
-  // append the raw boost total only when it differs — on ~84% of episodes the
-  // two are equal, so always showing it would just echo the same number.
-  // LB qualified both halves as "local" because its counts covered only that
-  // show's community, so a bare "11 boosts" would have read as the episode's
-  // true total. OnlyBoosts is network-wide, so the qualifier is dropped — but
-  // note the counts are still bounded by what the collector actually found on
-  // Nostr, which is not every boost the episode received. Revisit the wording
-  // if that gap ever becomes user-visible.
-  const nBoosters = distinctBoosters.length
-  const nBoosts = boosts.length
-  const drawerLabel = `${nBoosters} booster${nBoosters === 1 ? "" : "s"}`
-    + (nBoosts !== nBoosters ? ` · ${nBoosts} boosts` : '')
+  // The drawer is named for what it opens rather than for a count. It holds
+  // the boost notes themselves, each with a reply / like / repost / zap bar,
+  // so "Nostr Interactions" describes the contents and carries the qualifier
+  // at the same time. The counts it used to carry moved up into the card body
+  // as the "Nostr Stats:" line; LB's older "N local boosters" label is two
+  // renames back.
+  // The colon is load-bearing: the booster faces and the sats sit immediately
+  // to the right, so the label reads as introducing them rather than as a
+  // heading floating above an unexplained row of avatars.
+  const drawerLabel = 'Nostr Interactions:'
   const drawerMeta = h('span', { class: 'pcast-drawer-meta' }, [
     avatars,
     totalSats > 0 ? h('span', { class: 'pcast-sats' }, [`${fmtSats(totalSats)} `, h('span', { class: 'pcast-bolt', 'aria-hidden': 'true', text: '⚡' })]) : null,

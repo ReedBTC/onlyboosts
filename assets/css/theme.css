@@ -84,3 +84,30 @@ img { display: block; max-width: 100%; }
   0% { background-position: 100% 0; }
   100% { background-position: -100% 0; }
 }
+
+/* ── The scope note ──────────────────────────────────────────────────────
+   One sentence, printed wherever the site shows an aggregate: the feed
+   panels on /, the stat strip on /about, and the hero of every /show page.
+   It names what the counts cover, because sats, boosts and booster totals
+   are all bounded by the handful of apps that publish boost notes to Nostr,
+   and a reader who doesn't know that reads them as the show's real numbers.
+
+   It lives in theme.css rather than page.css because theme.css is the only
+   stylesheet all three of those pages load. Quiet enough not to compete with
+   the numbers, close enough that nobody reads them without it.
+
+   The copy itself is duplicated at each mount point (this is a no-build
+   site, so there is nowhere to define a string once for both a static page
+   and a Pages Function). Grep ob-scopenote before changing the wording. */
+.ob-scopenote {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.ob-scopenote a {
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.ob-scopenote a:hover { color: var(--brand-d); }

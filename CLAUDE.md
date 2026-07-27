@@ -21,7 +21,7 @@ order. They are the site map, so **they're regrouped together or not at all**:
 | Group | Items |
 |---|---|
 | **Feeds** | Episodes `/#episodes-global` · Shows `/#shows` · Songs `/#songs-global` · Albums `/#albums` · Boosts `/#boosts-global` |
-| **Stats** | Boost Stats `/stats` · Boosters `/boosters` — both coming soon |
+| **Stats** | Boost Stats `/stats` · Community `/boosters` — both coming soon |
 | **More** (footer: *Connect*) | About · Source · Report a bug |
 
 Feeds has one entry per feed, matching the homepage's what-menu exactly.
@@ -314,11 +314,13 @@ Carried from the scaffold commit and the LB suite:
 
 **Still to build:**
 
-0. **The two Stats pages.** `/stats` (Boost Stats) and `/boosters` are
-   coming-soon placeholders — `noindex`, out of `functions/sitemap.xml.js`,
+0. **The two Stats pages.** `/stats` (Boost Stats) and `/boosters` (Community)
+   are coming-soon placeholders — `noindex`, out of `functions/sitemap.xml.js`,
    nav + header + soon-card and nothing else. They're the whole Stats column
    of the Explore menu, so both are visible to a visitor and both promise
-   something.
+   something. **The path stayed `/boosters` when the label became Community**:
+   the URL is in the wild and the rename was a label change, so renaming the
+   file would have bought a redirect hop and nothing else.
 
    **`/stats` has a rich ancestor upstream.** LB shipped a full stats page and
    it's the thing to pull from rather than starting over:
@@ -739,6 +741,162 @@ from the hex pubkey when the record has none.
 `boosts-thread.js#renderNoteCard`, because that function caches cards by event
 id and appends the action bar itself — appending the boost-meta row (sats +
 what was boosted) afterwards would double up on a cached repaint.
+
+## Vocabulary and the scope note
+
+Every number on this site is bounded by the handful of apps that publish boost
+notes to Nostr. A reader who does not know that reads them as the show's real
+numbers, and the failure mode is a podcaster seeing our figure as a verdict on
+their audience. Two mechanisms carry the qualifier, and they divide the work:
+
+| | |
+|---|---|
+| **A Nostr boost** | an indexed boost. Bare "boost" is fine inside a surface the scope note already covers. |
+| **A booster** | one person who sent one. This is the count noun everywhere: cards, hero tiles, drawer bars. |
+| **The Nostr Community** | the *set* of them. Names a group, never counts one — the show page section, the `/boosters` page, the nav entry. |
+| **Sats** | never qualified inline. `Sats (Public)` was considered and rejected: it reads as a claim about the payment rather than the record, and invites a private counterpart we never explain. |
+| ~~Supporter~~ | **removed from every user-visible string.** It is a claim about who supports a show, and this data cannot make it: a show with 200 keysend supporters and 3 Nostr boosters would read as having 3 supporters. That is the single highest-risk word the site had, and it was on the page shows share. |
+
+**NIP-73 is deliberately *not* the qualifier**, and the drawer summaries that
+used to say "Episodes with NIP-73 Boosts" now say "Nostr Boosts". NIP-73 is the
+tag linking a note to a show; what actually excludes a boost from this index is
+that nobody published a note at all. A reader who learns what NIP-73 is still
+does not understand why their community is missing. The term survives in exactly
+one place, `/about#nip73`, where it is the subject.
+
+**The qualifier is carried two ways, and which one depends on the surface.**
+
+**A two-word label, on the feeds.** Every rollup card prefixes its figures with
+`Nostr Stats:` (`.ob-stats-label`, styled in `index.html`), and the boost drawer
+on an Episodes/Songs card is titled `Nostr Interactions:`. **Both keep the
+colon**: the booster faces and the sats sit immediately to the right of the
+drawer label, so without it the label reads as a heading over an unexplained row
+of avatars rather than as introducing them. The Episodes card's
+counts moved out of that drawer bar and into the card body under the Fountain
+link to make room for it; the sats stayed on the drawer bar beside the booster
+faces.
+
+**The full sentence, on `/show`.** `.ob-scopenote` is defined in `theme.css` and
+mounted in the show page hero. That is the page shows share, where the numbers
+land in front of people who don't know what this site indexes, so it earns the
+paragraph.
+
+**`/about` gets neither.** Its Indexer Stats paragraph says more than the
+sentence does and says it first; only the lead stat tile carries the word.
+
+**A scope-note paragraph above the feed panels was built and removed.** It was
+the first thing on the homepage, three lines on a phone, and it pushed the feed
+below the fold to answer a question a browsing visitor had not asked yet. The
+per-card label says the same thing in two words, at the point of the numbers.
+Don't reintroduce it; if the qualifier ever needs more weight on `/`, the place
+to add it is the masthead line, which already links to `/about`.
+
+The `/boosts` cards carry no qualifier at all: one card is one boost, and its
+sats figure is that note's own claim rather than an aggregate.
+
+**The rename is a surface rename only.** `supporterCard`, `renderSupporters`,
+`SUPPORTERS_VISIBLE`, `data-show-more="supporter"`, `data-supporter-grid`, the
+`.sup-*` CSS classes and `assets/js/supporter-set.js` all keep their names — the
+same seam as Podcasts → Episodes below. The section's anchor did move
+(`#supporters` → `#community`), which was safe because nothing linked to it.
+
+The site subtitle is **"Podcasting 2.0 Boosts on Nostr"** and it appears in four
+places that change together: the masthead line under the banner on `index.html`
+(where it links to `/about`), the homepage `<title>` and `og:title`, and
+`manifest.webmanifest`. Show pages use `<title> — Boosts on Nostr | OnlyBoosts`.
+The show page's `og:description` states the scope *inside the sentence*, because
+it is the one string that travels without the page around it.
+
+## Show pages: the medium, and nostr: mentions
+
+`functions/show/[guid].js` has a `COPY` table keyed on `show.medium`, the same
+arrangement as `shows-feed.js` and `feeds-podcasts.js`: a `music` feed says
+Album / album / "Boost this Album" / Tracks / "Track 3" / `MusicAlbum` JSON-LD,
+everything else says Show / show / Episodes / "Ep. 3" / `PodcastSeries`. The
+medium changes the words and never the layout, so a third medium is a third
+entry in that table rather than a second page. `copyFor()` defaults to
+`podcast`, matching the namespace default and the reasoning in the medium-split
+section above.
+
+**Boost messages render `nostr:` URIs server-side.** The two client feeds get
+this from `boosts-thread.js#parseSegments`; the show page cannot, because
+importing that module means shipping `boosts-thread.js` (30KB) +
+`calendar-events.js` (24KB) + `nostr-tools` (102KB) to a page whose whole design
+is that it reads with no JavaScript. So `[guid].js` carries a ~70-line bech32
+decoder and a `renderMessage()` that emits the identical `.nostr-mention` chip.
+
+Three things about it that are load-bearing:
+
+- **The checksum is verified**, and an identifier that fails it renders as plain
+  text rather than a link. A corrupted npub would otherwise resolve to somebody
+  else's profile. It also resolves the one tokenizing edge case for free: `n` is
+  in the bech32 charset, so two mentions run together with no space match one
+  character too many, and that over-long capture fails the checksum.
+- **Nothing is re-encoded.** Links use the identifier exactly as it appeared in
+  the note, so only decode is implemented; the decode exists purely to look a
+  display name up in `profiles`.
+- **The name lookup is one extra query, bound with placeholders, not
+  `json_each`.** `BOOSTS_SHOWN` is 24, so the list is always far inside D1's
+  100-parameter ceiling (and it is sliced at 90 regardless). The follows
+  endpoint needs `json_each` because its author list runs to thousands; here it
+  would only add a dependency on a table-valued function Cloudflare does not
+  document.
+
+`.nostr-mention` inside `.boost-msg` is styled in `show-page.css`, restating
+what `boosts-thread.css` does under `.note-body`, because the show page does not
+load that stylesheet. **Keep the two matching.**
+
+## Profile fallback
+
+**An identity the index doesn't have falls back to Primal's cache before it is
+allowed to render as `@npub1abc…`.** `assets/js/primal-profiles.js` owns that
+lookup (`fetchProfiles`, chunked at 100, never throws). It was extracted from
+`boosts-thread.js` — which now imports it, and still owns `profileCache`, the
+thread queries and the chip builder — so `/show` pages can use it without
+pulling in 156KB of thread machinery.
+
+The index stays the fast path. The collector embeds a booster's name and
+picture in every record, which is what makes first paint final; this only fills
+two holes it cannot cover:
+
+- a booster whose kind-0 was unresolved when the collector last ran;
+- **an npub mentioned inside a boost message**, who need never have boosted
+  anything and so is in no table of ours at all. This is the common case.
+
+| Surface | Boosters | Mentions |
+|---|---|---|
+| Episodes / Songs | Primal (`loadBoosterProfiles`) | Primal (`loadMentionProfiles`) |
+| Boosts | Primal (`hydrateProfiles`, post-paint per page) | same pass |
+| `/show/<guid>` | Primal (`hydrateProfiles` in `show-page.js`) | same pass |
+
+Primal is a **cache, not a relay fan-out**: one WebSocket, one batch, ~6s
+timeout. A normal client would ask relays; this answers a page of pubkeys in a
+single round trip, and it's the same fallback localbitcoiners.com leans on.
+
+Two invariants worth keeping:
+
+- **It is always post-paint and best-effort.** Every surface renders complete
+  and readable from the index alone; an unreachable cache changes nothing, and
+  the show pages still work with JavaScript off. Never make a first paint wait
+  on it.
+- **The show page marks its own gaps.** The Function emits `data-pk` +
+  `data-missing="name pic"` on exactly the supporter cards, boost rows and
+  mention chips it couldn't fill, and `show-page.js` patches those and removes
+  the attribute. Don't let the client re-derive what the server already knows.
+
+The Boosts feed **rebuilds the card** rather than patching it, seeding
+`setCachedProfile` first so the mention chips inside the message body agree with
+the avatar and the display name above them.
+
+## Not indexed: show credits
+
+There is **no creator, host, author or `podcast:person` data anywhere** in this
+pipeline: not in the `podcasts` table (`d1/schema.sql`), not in
+`podcasts/index.json`, and not in the per-show shards, whose `show` object is
+exactly `{guid, title, img, feed, medium}`. `enrich.py#_show_from_feed` maps six
+fields off the Podcast Index feed object and `author` / `ownerName` are not
+among them. Adding a credits section to the show pages is blocked on the
+collector; see the note in `docs/show-pages-spec.md`.
 
 ## Naming note
 

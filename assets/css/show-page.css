@@ -153,20 +153,10 @@
   justify-content: center;
 }
 
-/* Caveat line under the stat cards. Quiet enough not to compete with the
-   numbers, close enough that nobody reads them without it. */
-.show-datanote {
-  margin: 0.85rem 0 0;
-  font-size: 0.8rem;
-  line-height: 1.55;
-  color: var(--muted);
-}
-.show-datanote a {
-  color: var(--muted);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-.show-datanote a:hover { color: var(--brand-d); }
+/* The caveat line under the stat cards is .ob-scopenote, defined in theme.css
+   because the feed panels and the about page print the same sentence. Only its
+   spacing inside the hero belongs here. */
+.show-hero .ob-scopenote { margin-top: 0.85rem; }
 
 /* ── Sections ─────────────────────────────────────────────────────────── */
 
@@ -355,6 +345,14 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+/* nostr: mentions and bare URLs inside a boost message, rendered server-side
+   by functions/show/[guid].js. The feeds get the identical treatment from
+   boosts-thread.css, but that stylesheet is scoped to .note-body and this page
+   does not load it, so the rule is restated here rather than the two surfaces
+   being made to share a file neither of them fully needs. Keep them matching. */
+.boost-msg a { color: var(--brand-d); text-decoration: none; overflow-wrap: anywhere; }
+.boost-msg a:hover { text-decoration: underline; }
+.boost-msg a.nostr-mention { font-weight: 600; }
 
 .boost-target {
   margin: 0.4rem 0 0;

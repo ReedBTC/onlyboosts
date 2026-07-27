@@ -20,8 +20,8 @@ Locked for the first pass:
 |---|---|
 | Granularity | Shows only. Episodes are listed inside the page, not addressable. |
 | URL | The bare `podcast:guid`. No slugs. |
-| Supporters ranking | All time only. No range control. |
-| Supporter layout | Top three highlighted, everyone else ranked below by sats. |
+| Community ranking | All time only. No range control. |
+| Community layout | Top three highlighted, everyone else ranked below by sats. |
 | Show-level boost | Yes, alongside the per-episode buttons. |
 
 Episode pages and per-npub pages are both expected later. The shapes below are
@@ -174,7 +174,23 @@ this for the boost cards), `name` falls back to a shortened npub, and a missing
 
 ---
 
-## The Supporters Section
+## The Nostr Community Section
+
+**This section was called Supporters and the heading is now "Nostr Community".**
+The reasoning is set out under *Vocabulary and the scope note* in `CLAUDE.md`
+and is worth restating once here, because it is the point of the section:
+"supporters" is a claim about who supports the show, and this page cannot make
+it. A show with two hundred keysend supporters and three Nostr boosters would
+have read as having three supporters. "Community" names the group the page can
+actually see, and "Nostr" says which group that is. The count noun stays
+**booster** everywhere else, since a person is a booster and only the set of
+them is a community.
+
+The section's anchor moved from `#supporters` to `#community`; nothing linked to
+it. Every internal identifier below (`renderSupporters`, `supporterCard`,
+`SUPPORTERS_VISIBLE`, `data-supporter-grid`, the `.sup-*` classes) deliberately
+kept its name, so the prose that follows still uses the old word for them.
+
 
 Ported from `git show lb/main:supporters.html` in look, not in structure.
 
@@ -213,9 +229,9 @@ The show page shows three stat tiles, not four, and the Shows feed cards show
 three figures, not four. There is no "Most episodes" sort. This is deliberate
 and should not be undone without reading what follows.
 
-**Sats, boosts and supporters are measures of boost activity.** They have no
+**Sats, boosts and boosters are measures of boost activity.** They have no
 meaning outside boosting, so "as published to Nostr" is the only reading
-available, and the data caveat under the stats covers them.
+available, and the scope note under the stats covers them.
 
 **An episode count is a property of the podcast.** It has a true value out in
 the world whether or not anyone ever boosted. Printed beside a show's name and
@@ -293,7 +309,7 @@ message text, so rows without one render as a sats line alone rather than a gap.
 
 ## Page Order
 
-Hero, stat cards, the data caveat, **episodes**, supporters, recent boosts.
+Hero, stat cards, the scope note, **episodes**, the Nostr Community wall, recent boosts.
 
 Episodes sit directly under the stats rather than at the foot of the page: a
 podcaster arriving at their own page is looking for their catalogue, and a
@@ -444,3 +460,56 @@ Homegrown Hits +13,995, Podcasting 2.0 +6,331, Local Bitcoiners +666.
 What remains is the 209 freeform slugs, deliberately left alone: a label like
 `20250508FH` carries no reliable link back to a show's GUID, and pattern-matching
 it would misattribute boosts. Those resolve by hand via `guid_aliases.json`.
+
+---
+
+## Show Credits (Blocked on the Collector)
+
+A credits section naming a show's hosts and contributors is wanted on these
+pages and **cannot be built yet, because none of that data is indexed.** The
+`podcasts` table carries `title`, `image`, `feed_url`, `medium` and the three
+boost aggregates; `enrich.py#_show_from_feed` maps six fields off the Podcast
+Index feed object, and no person, author or owner field is among them. The
+per-show shards are no richer: their `show` object is exactly
+`{guid, title, img, feed, medium}`.
+
+Two sources could supply it, and they are not equivalent.
+
+**`feed.author` and `feed.ownerName`**, already present on the Podcast Index
+`podcasts/byguid` response the collector calls today. This is the cheap option:
+no new API call, two new columns, and it is available for every show already
+enriched. It is also weak data. `author` is the `<itunes:author>` string, which
+is frequently a network name, a show name repeated, or blank, and `ownerName`
+is an administrative contact rather than a credit. Useful as a fallback line,
+not as a credits list.
+
+**`<podcast:person>`**, the Podcasting 2.0 namespace tag built for exactly this.
+It carries a name, a role (Host, Guest, Producer, Writer), a group, an optional
+`href` and an optional `img`, and it can appear at the channel level or on an
+individual item. This is the right source and it is the one to ask for. It
+needs verification rather than assumption on two points: whether Podcast Index
+returns these tags on the endpoints the collector already uses or requires a
+different one, and what the coverage actually is across the ~930 identified
+shows. Coverage is the question that decides whether the section ships at all;
+a credits block present on 5% of pages is worse than none.
+
+**What to ask the collector for**, in priority order:
+
+1. A `persons` array on the show record: `[{name, role, group, href, img}]`,
+   channel-level only to begin with, from `<podcast:person>`.
+2. `author` and `owner_name` columns on `podcasts`, as the fallback line.
+3. A coverage figure for both, measured over the identified shows, reported
+   before any UI is built.
+
+Item 3 is not optional. It is what determines whether this becomes a section, a
+single line under the show title, or nothing.
+
+**Note the value block is a separate thing and is already available.**
+`/api/value?podcastGuid=<guid>` returns the show's Lightning recipients with
+their `name`, `split` and `fee` fields, resolved live from Podcast Index, and
+the show page already calls it to enable the boost button. Those names are who
+the sats actually reach, which is a genuinely useful thing to show on a boost
+site, but they are payment destinations rather than credits: the list mixes
+people with apps and index fees (`Fountain` at 2%, `Podcastindex.org` at 1%,
+both flagged `fee: true`). If a "where your sats go" block is wanted it can be
+built today with no collector change; it should not be labelled as credits.

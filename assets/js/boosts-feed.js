@@ -28,7 +28,8 @@
 import { nip19 } from '/assets/widgets/nostr-tools.js'
 import { buildActionBar, configureBoostActions } from '/assets/js/boost-actions.js'
 import { wireNpubCopy } from '/assets/js/copy-npub.js'
-import { parseSegments, renderSegmentsInto } from '/assets/js/boosts-thread.js'
+import { parseSegments, renderSegmentsInto, setCachedProfile } from '/assets/js/boosts-thread.js'
+import { fetchProfiles } from '/assets/js/primal-profiles.js'
 import { ensureLoginWidget } from '/assets/js/widget-loader.js'
 import { resolveFollows } from '/assets/js/follow-set.js'
 import {
@@ -227,7 +228,7 @@ function renderBoostCard(b) {
     bits.push(href
       ? h('a', {
           class: 'ob-boost-show ob-boost-show-link', href,
-          title: `Boosts and supporters for ${b.podcast.title}`,
+          title: `Nostr boosts to ${b.podcast.title}`,
           text: b.podcast.title,
         })
       : h('span', { class: 'ob-boost-show', text: b.podcast.title }))
@@ -522,9 +523,14 @@ export async function renderBoosts({ panel, list, scope = 'global' }) {
       return
     }
     const slice = view.slice(shown, shown + PAGE_SIZE)
-    for (const b of slice) cards.appendChild(renderBoostCard(b))
+    const painted = slice.map((b) => {
+      const el = renderBoostCard(b)
+      cards.appendChild(el)
+      return { b, el }
+    })
     shown += slice.length
     updateMoreButton()
+    hydrateProfiles(painted)
   }
 
   function updateMoreButton() {
@@ -636,3 +642,62 @@ export async function renderBoosts({ panel, list, scope = 'global' }) {
 
   paint()
 }
+
+// ── Profile fallback ─────────────────────────────────────────────────
+//
+// The collector embeds a booster's name and picture in every record, so cards
+// normally paint complete and first paint is final. Two things it can't cover,
+// both of which would otherwise read as `@npub1abc…`:
+//
+//   - a booster whose kind-0 hadn't been resolved when the collector last ran
+//   - an npub MENTIONED inside a boost message, who need never have boosted
+//     anything and so is in no index of ours at all
+//
+// Both fall back to Primal's cache, which is what the Episodes feed has always
+// done for the same two gaps (feeds-podcasts.js#loadMentionProfiles). One batch
+// per page of cards, post-paint and best-effort: an unreachable cache leaves
+// the cards exactly as they rendered.
+function mentionPubkeys(text) {
+  const out = []
+  for (const m of String(text || '').matchAll(/nostr:((?:npub|nprofile)1[023456789acdefghjklmnpqrstuvwxyz]+)/gi)) {
+    try {
+      const d = nip19.decode(m[1])
+      if (d.type === 'npub') out.push(d.data)
+      else if (d.type === 'nprofile') out.push(d.data.pubkey)
+    } catch { /* not a valid identifier; the tokenizer renders it as text */ }
+  }
+  return out
+}
+
+async function hydrateProfiles(painted) {
+  const want = new Set()
+  for (const { b } of painted) {
+    if (b.booster?.pk && (!b.booster.name || !b.booster.pic)) want.add(b.booster.pk)
+    for (const pk of mentionPubkeys(b.msg)) want.add(pk)
+  }
+  if (!want.size) return
+
+  const found = await fetchProfiles([...want])
+  if (!found.size) return
+
+  // Seed the tokenizer's cache first: mention chips read from it at render
+  // time, so it has to be warm before any card is rebuilt.
+  for (const [pk, prof] of found) setCachedProfile(pk, prof)
+
+  for (const { b, el } of painted) {
+    const prof = b.booster?.pk ? found.get(b.booster.pk) : null
+    const mentionsResolved = mentionPubkeys(b.msg).some((pk) => found.has(pk))
+    const boosterImproved = prof && ((!b.booster.name && prof.name) || (!b.booster.pic && prof.picture))
+    if (!mentionsResolved && !boosterImproved) continue
+
+    if (boosterImproved) {
+      if (!b.booster.name && prof.name) b.booster.name = prof.name
+      if (!b.booster.pic && prof.picture) b.booster.pic = prof.picture
+    }
+    // Rebuild rather than patch: the card is one function of the record, so
+    // re-running it is the only way to be sure the avatar, the display name and
+    // the mention chips inside the message all agree.
+    if (el.isConnected) el.replaceWith(renderBoostCard(b))
+  }
+}
+

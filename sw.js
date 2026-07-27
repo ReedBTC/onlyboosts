@@ -120,7 +120,32 @@
 // ob-v24: the about page's collector cadence was three times too slow (the
 // incremental scan is every 5 minutes, not 15). Same reason as v23 — a stale
 // page states a wrong figure to a returning visitor for one more navigation.
-const VERSION = 'ob-v26';
+// ob-v27: the scope-qualifier pass. "Supporters" is gone from every visible
+// string (it claimed an audience this data cannot see), the show page's wall is
+// "Nostr Community", rollup cards label their figures "Nostr Stats:" and the
+// episode drawer is "Nostr Interactions". Required on two counts, not
+// cosmetic. The show page's own numbers are re-described, and it is the page
+// podcasters share, so a stale copy misstates a third party's figures for one
+// more navigation (same reason as v23). And the Episodes card moved its counts
+// out of the drawer bar into the body: that markup comes from feeds-podcasts.js
+// while the .pcast-nstats / .ob-stats-label rules are inline in index.html, so a
+// returning visitor holding one half without the other renders the new line
+// unstyled. Also carries the masthead subtitle, the FAQ rewrite and the
+// manifest description.
+// ob-v28: show pages speak the medium (a music feed says Album / Tracks /
+// "Boost this Album" / MusicAlbum JSON-LD), boost messages on those pages
+// render nostr: mentions as @Name chips, and the episode drawer label gained
+// its colon. Required for the mentions: the markup comes from the Function
+// while the .boost-msg a rules are new in show-page.css, so a returning visitor
+// holding the old stylesheet renders the chips as unstyled body text.
+// ob-v29: an identity the index doesn't have now falls back to Primal's cache
+// instead of painting as `@npub1abc…`. New module assets/js/primal-profiles.js
+// (extracted from boosts-thread.js, which now imports it), wired into the
+// Boosts feed and the show pages; the Episodes feed already did this. Required:
+// boosts-thread.js lost its own copy of the Primal client, so a returning
+// visitor holding the precached old boosts-thread.js alongside a new
+// boosts-feed.js would import a module the cache has never seen.
+const VERSION = 'ob-v29';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;
@@ -148,6 +173,9 @@ const PRECACHE_URLS = [
   '/assets/css/boosts-thread.css',
   '/assets/css/boost-actions.css',
   '/assets/js/boosts-thread.js',
+  // A static import of boosts-thread.js, so precaching that without this one
+  // leaves a returning visitor fetching half the graph from the network.
+  '/assets/js/primal-profiles.js',
   '/assets/js/calendar-events.js',
   '/assets/js/boost-actions.js',
   '/assets/js/nav.js',

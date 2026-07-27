@@ -105,7 +105,7 @@
             <div class="nav-explore-group">
               <h4>Stats</h4>
               <a href="/stats"><span aria-hidden="true">📊</span> Boost Stats</a>
-              <a href="/boosters"><span aria-hidden="true">🧑‍🤝‍🧑</span> Boosters</a>
+              <a href="/boosters"><span aria-hidden="true">🧑‍🤝‍🧑</span> Community</a>
             </div>
             <div class="nav-explore-group">
               <h4>More</h4>
@@ -177,9 +177,16 @@
         <p>The figures below are the indexer&rsquo;s own totals, recomputed each time the collector publishes. They describe what this index holds rather than what the podcasting network has sent: every count is bounded by the small number of applications publishing boost notes to Nostr and by the relays the collector reaches. The Since figure is the earliest note the initial backfill could recover, which relay retention placed at around October 2024, rather than the date on which boosting began; <a href="#limits">Limitations and Disclaimers</a> sets out what these numbers do and do not account for.</p>
 
         <!-- Filled from /api/data/meta.json by the script at the foot of the
-             page; stays hidden if that fetch fails, so no empty shell. -->
+             page; stays hidden if that fetch fails, so no empty shell.
+
+             This is the one place the site prints aggregates without the
+             shared .ob-scopenote beneath them. The paragraph above says more
+             than that sentence does, and says it first; repeating it under the
+             row would only restate what the reader has just been told. The
+             lead tile carries the qualifier so a screenshot of the strip
+             alone still names its scope. -->
         <div class="stat-strip" id="stat-strip" hidden>
-          <div class="stat"><span class="stat-num" data-stat="boosts">&mdash;</span><span class="stat-label">Boosts</span></div>
+          <div class="stat"><span class="stat-num" data-stat="boosts">&mdash;</span><span class="stat-label">Nostr Boosts</span></div>
           <div class="stat"><span class="stat-num" data-stat="shows">&mdash;</span><span class="stat-label">Shows</span></div>
           <div class="stat"><span class="stat-num" data-stat="boosters">&mdash;</span><span class="stat-label">Boosters</span></div>
           <div class="stat"><span class="stat-num" data-stat="sats">&mdash;</span><span class="stat-label">Sats</span></div>
@@ -359,27 +366,55 @@
           </details>
 
           <details>
-            <summary>How current is the data?</summary>
+            <summary>Why is my show not listed?</summary>
             <div class="faq-body">
-              <p>A boost note usually appears here five to six minutes after it is published, and within about ten minutes in the worst case. The incremental scan runs every five minutes and takes roughly fifteen seconds; the files it writes are then cached at the content delivery network for a further five minutes, and those two intervals are the whole of the delay.</p>
+              <p>In most cases because no boost carrying its <code>podcast:guid</code> has been published to Nostr. There is nothing to index until one is, and the show appears on the next scan after that happens.</p>
+              <p>The other possibility is that boosts to the show have been collected but the Podcast Index holds no feed matching the identifier those boosts carry, which occurs when an application sends a malformed or non-standard show tag. Such shows are not discarded; the boosts are real, so they appear in the Shows feed as &ldquo;Unidentified show&rdquo; cards labelled with the raw identifier. They gain a title and artwork as soon as the identifier resolves, and <a href="#show-identity">When the Show Tag Is Not a Show GUID</a> covers why some of them cannot be merged automatically.</p>
+            </div>
+          </details>
+
+          <details>
+            <summary>Why are only some of my episodes listed?</summary>
+            <div class="faq-body">
+              <p>An episode appears here once at least one boost tagged with its <code>podcast:item:guid</code> has been published to Nostr. Episodes that received no such boost are absent, which for most catalogues is the majority of them. This index maintains no episode list of its own and does not read your RSS feed to build one; it knows only the episodes that boosts have pointed at.</p>
+              <p>That is also why no episode count appears anywhere on this site. Such a figure would count episodes carrying an indexed boost rather than episodes published, and measured against the shows&rsquo; own feeds it was not even reliably a subset of the true number.</p>
+            </div>
+          </details>
+
+          <details>
+            <summary>Why is my music release filed under Shows rather than Albums?</summary>
+            <div class="faq-body">
+              <p>The Songs and Albums feeds are separated from Episodes and Shows by the <code>&lt;podcast:medium&gt;</code> tag in the RSS feed. A feed declaring <code>music</code> is treated as a release whose items are tracks; everything else is treated as a podcast whose items are episodes.</p>
+              <p>The namespace default is <code>podcast</code>, so a music feed that declares no medium at all is filed with the podcasts. That default is deliberate on this site as well as in the specification: filing an unidentified feed under Albums would assert something about it that the data does not support. Adding <code>&lt;podcast:medium&gt;music&lt;/podcast:medium&gt;</code> to the feed moves it once the Podcast Index has re-read the feed.</p>
+            </div>
+          </details>
+
+          <details>
+            <summary>Why is the sats total here different from what my show actually received?</summary>
+            <div class="faq-body">
+              <p>Two distinct effects apply, and they do not run in the same direction, so the figure should not be read as a simple undercount.</p>
+              <p><strong>Coverage understates.</strong> Only boosts published to Nostr are counted, and <a href="#keysend">the majority of boosting is sent by keysend</a>, which leaves no public record. A show whose audience uses keysend-only applications can be very well supported and barely register here.</p>
+              <p><strong>Per-boost amounts are what was sent, not what any one recipient received.</strong> A Podcasting 2.0 value block divides a boost among every recipient the feed names, so a show holding a 90 percent split receives less than the amount attached to the boost. Where the amount is read from a zap receipt it is a per-leg figure instead, which measures a different thing again. <a href="#amounts">How Amounts Are Determined</a> sets out which method produced each record.</p>
+              <p>A figure announced on air is normally what the show&rsquo;s own wallet received across every boost from every application. That is a different measurement from this one, and the two are not expected to agree.</p>
+            </div>
+          </details>
+
+          <details>
+            <summary>When will my boost appear?</summary>
+            <div class="faq-body">
+              <p>Five to six minutes after the note is published, and within about ten minutes in the worst case. The incremental scan runs every five minutes and takes roughly fifteen seconds; the files it writes are then cached at the content delivery network for a further five minutes, and those two intervals are the whole of the delay.</p>
               <p>A daily deep sweep queries a wider set of relays and recovers anything the five-minute scan could not reach, so a boost that surfaces late is generally one that was published to an unusual relay rather than one the site was slow to notice.</p>
-              <p>The site itself reads a static snapshot regenerated on that cycle, which is why the feeds load without your browser querying any relay.</p>
+              <p>If it has not appeared after a day, the likely explanation is that no note was published at all, which the first entry above covers.</p>
             </div>
           </details>
 
           <details>
-            <summary>Does OnlyBoosts take custody of any funds?</summary>
+            <summary>Which Podcasting 2.0 apps push boosts to Nostr?</summary>
             <div class="faq-body">
-              <p>The index does not. It takes no custody of funds and processes no payments; it reads notes that already exist publicly on Nostr.</p>
-              <p>Boosting from this website is a separate feature. When a boost is sent from here, the site reads the value block from the show&rsquo;s own RSS feed and pays those recipients directly from your wallet. The sats go where the podcaster&rsquo;s feed specifies.</p>
-            </div>
-          </details>
-
-          <details>
-            <summary>How does a podcast app get its boosts included here?</summary>
-            <div class="faq-body">
-              <p>Publish a kind 1 note when a boost is sent, carrying the NIP-73 podcast tags (<code>podcast:guid</code> for the show and <code>podcast:item:guid</code> for the episode) along with a payment signal. An <code>amount</code> tag denominated in millisats is the strongest option; a <code>t</code> tag identifying the note as a boostagram is also recognized.</p>
-              <p>That is the entire integration. There is no registration, no API key and no permission required from this site; the notes are collected on the next scan. That is the advantage of building on an open standard rather than a platform.</p>
+              <p>Four sources at present: <a href="https://fountain.fm" target="_blank" rel="noopener noreferrer">Fountain</a>, which accounts for the bulk of the data, <a href="https://boostmebitch.com" target="_blank" rel="noopener noreferrer">BoostMeBitch</a>, <a href="https://localbitcoiners.com" target="_blank" rel="noopener noreferrer">Local Bitcoiners</a>, and OnlyBoosts itself for boosts sent from this site by a signed-in booster who elects to share them. <a href="#pipeline">How the Index Is Built</a> describes what each one publishes.</p>
+              <p>That is a short list and it is the single largest constraint on this data.</p>
+              <p><strong>Adding support takes no coordination with this site.</strong> An application publishes a kind 1 note when a boost is sent, carrying the NIP-73 podcast tags (<code>podcast:guid</code> for the show and <code>podcast:item:guid</code> for the episode) along with a payment signal. An <code>amount</code> tag denominated in millisats is the strongest option; a reference to a Lightning zap receipt or a <code>t</code> tag identifying the note as a boostagram are both recognized as well.</p>
+              <p>That is the entire integration. There is no registration, no API key and no permission required from this site, and the notes are collected on the next scan. Any application publishing in that format appears here automatically, which is the advantage of building on an open standard rather than a platform.</p>
             </div>
           </details>
 
@@ -399,9 +434,10 @@
           </details>
 
           <details>
-            <summary>Is the underlying data available to build on?</summary>
+            <summary>Can I access the OnlyBoosts index?</summary>
             <div class="faq-body">
-              <p>Yes. The index is served as plain JSON over an open endpoint, and this website reads exactly the same files that are available to anyone else. The data was public before it was collected here, and organizing it does not make it proprietary.</p>
+              <p>A documented public API is in progress and will be announced when its paths are stable. Until it ships there is no supported endpoint for third-party use, and the file layout this site reads may change without notice, so it is not something to build against yet.</p>
+              <p>The position behind that work is settled, however. The index is served as plain JSON and this website reads exactly the same files it will publish; nothing is held back for the site&rsquo;s own use. The data was public on Nostr before it was collected here, and organizing it does not make it proprietary.</p>
             </div>
           </details>
 
@@ -430,7 +466,7 @@
 
     <div class="footer-col footer-about">
       <h3>OnlyBoosts</h3>
-      <p>A Nostr client for only podcast boosts. Every Podcasting 2.0 boostagram published to Nostr, cached and indexed for stats by episode, show and supporter. Sort, filter, search, view all or just see boosts from your follows on Nostr.</p>
+      <p>A Nostr client for only podcast boosts. Every Podcasting 2.0 boostagram published to Nostr, cached and indexed for stats by episode, show and booster. Sort, filter, search, view all or just see boosts from your follows on Nostr.</p>
     </div>
 
     <!-- Same two groups as the nav's Explore menu, in the same order — the
@@ -451,7 +487,7 @@
       <h3>Stats</h3>
       <ul>
         <li><a href="/stats">📊 Boost Stats</a></li>
-        <li><a href="/boosters">🧑‍🤝‍🧑 Boosters</a></li>
+        <li><a href="/boosters">🧑‍🤝‍🧑 Community</a></li>
       </ul>
     </div>
 

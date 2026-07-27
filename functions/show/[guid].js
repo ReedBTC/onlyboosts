@@ -96,11 +96,35 @@ export async function onRequestGet({ request, env, params }) {
     ).bind(guid, BOOSTS_SHOWN).all(),
   ]);
 
+  // Display names for any npub mentioned inside a boost message. One extra
+  // query, and only when a message actually carries a mention — most don't.
+  // A mentioned npub need not be a booster, so a miss here is normal and the
+  // chip falls back to a truncated identifier.
+  const boostRows = boosts.results || [];
+  // Placeholders rather than json_each: BOOSTS_SHOWN is 24, so this list is
+  // tiny and always far inside D1's 100-bound-parameter ceiling. The follows
+  // endpoint needs json_each because its author list runs to thousands; here it
+  // would only add a dependency on a table-valued function Cloudflare does not
+  // document. Sliced anyway, so a pathological message can't blow the limit.
+  const mentioned = mentionedPubkeys(boostRows.map((r) => r.message)).slice(0, 90);
+  const names = new Map();
+  if (mentioned.length) {
+    const rows = await env.DB.prepare(
+      `SELECT pubkey, name, display_name FROM profiles
+       WHERE pubkey IN (${mentioned.map(() => "?").join(",")})`
+    ).bind(...mentioned).all();
+    for (const p of rows.results || []) {
+      const n = p.display_name || p.name;
+      if (n) names.set(p.pubkey, n);
+    }
+  }
+
   const html = renderShowPage({
     show,
     episodes: eps.results || [],
     supporters: sups.results || [],
-    boosts: boosts.results || [],
+    boosts: boostRows,
+    names,
   });
 
   return new Response(html, {
@@ -142,6 +166,143 @@ function isSafeUrl(url) {
 
 function num(n) {
   return Number(n || 0).toLocaleString("en-US");
+}
+
+// ── nostr: URIs in boost messages ────────────────────────────────────────────
+//
+// The two client feeds render mentions through boosts-thread.js#parseSegments,
+// which decodes with nostr-tools and paints an @Name chip. This page cannot:
+// importing that module here would mean shipping boosts-thread.js (30KB),
+// calendar-events.js (24KB) and nostr-tools (102KB) to a page whose stated
+// design is that it reads with no JavaScript at all. So the same job is done
+// server-side, and the output is deliberately the same `.nostr-mention` chip
+// so the two surfaces look identical.
+//
+// Only bech32 DECODE is implemented, and only far enough to recover a pubkey.
+// Links use the identifier exactly as it appeared in the note, so nothing has
+// to be re-encoded; the decode exists purely to look a display name up.
+
+const BECH32_CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
+
+// Returns the data part as bytes, or null. The checksum is verified: an
+// identifier that fails it is left as plain text rather than being linked,
+// since a corrupted npub would otherwise resolve to somebody else's profile.
+function bech32ToBytes(str) {
+  const s = String(str).toLowerCase();
+  const sep = s.lastIndexOf("1");
+  if (sep < 1 || sep + 7 > s.length || s.length > 2000) return null;
+
+  const words = [];
+  for (let i = sep + 1; i < s.length; i++) {
+    const v = BECH32_CHARSET.indexOf(s[i]);
+    if (v === -1) return null;
+    words.push(v);
+  }
+
+  // bech32 (not bech32m): the polymod of hrp-expansion ++ data must be 1.
+  const hrp = s.slice(0, sep);
+  const expanded = [];
+  for (let i = 0; i < hrp.length; i++) expanded.push(hrp.charCodeAt(i) >> 5);
+  expanded.push(0);
+  for (let i = 0; i < hrp.length; i++) expanded.push(hrp.charCodeAt(i) & 31);
+  let chk = 1;
+  for (const v of expanded.concat(words)) {
+    const top = chk >>> 25;
+    chk = ((chk & 0x1ffffff) << 5) ^ v;
+    for (let i = 0; i < 5; i++) if ((top >>> i) & 1) chk ^= [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3][i];
+  }
+  if (chk !== 1) return null;
+
+  // 5-bit groups back to 8-bit, dropping the 6-word checksum.
+  const data = words.slice(0, -6);
+  const out = [];
+  let acc = 0, bits = 0;
+  for (const v of data) {
+    acc = (acc << 5) | v;
+    bits += 5;
+    while (bits >= 8) { bits -= 8; out.push((acc >> bits) & 0xff); }
+  }
+  // Any leftover must be zero padding, per the spec.
+  if (bits >= 5 || ((acc << (8 - bits)) & 0xff)) return null;
+  return out;
+}
+
+const toHex = (bytes) => bytes.map((b) => b.toString(16).padStart(2, "0")).join("");
+
+// npub → the pubkey. nprofile → the pubkey in its TLV type-0 record.
+function pubkeyFromBech32(id) {
+  const bytes = bech32ToBytes(id);
+  if (!bytes) return null;
+  if (/^npub1/i.test(id)) return bytes.length === 32 ? toHex(bytes) : null;
+  if (/^nprofile1/i.test(id)) {
+    for (let i = 0; i + 2 <= bytes.length; ) {
+      const type = bytes[i], len = bytes[i + 1];
+      if (i + 2 + len > bytes.length) return null;
+      if (type === 0) return len === 32 ? toHex(bytes.slice(i + 2, i + 34)) : null;
+      i += 2 + len;
+    }
+  }
+  return null;
+}
+
+const NOSTR_URI_RE = /nostr:((?:npub|nprofile|note|nevent|naddr)1[023456789acdefghjklmnpqrstuvwxyz]+)/gi;
+const URL_RE = /https?:\/\/[^\s<>"']+/gi;
+
+// Every pubkey mentioned across a set of boost messages, for the name lookup.
+function mentionedPubkeys(messages) {
+  const out = new Set();
+  for (const m of messages) {
+    for (const match of String(m || "").matchAll(NOSTR_URI_RE)) {
+      const pk = pubkeyFromBech32(match[1]);
+      if (pk) out.add(pk);
+    }
+  }
+  return [...out];
+}
+
+// A boost message as HTML: nostr: URIs become @Name chips, bare URLs become
+// links, everything else is escaped text. Mirrors buildMentionEl() in
+// boosts-thread.js, including the .nostr-mention class and the njump target.
+function renderMessage(text, names) {
+  const src = truncate(String(text || ""), 420);
+  const spans = [];
+  for (const m of src.matchAll(NOSTR_URI_RE)) spans.push({ start: m.index, end: m.index + m[0].length, id: m[1], value: m[0], kind: "nostr" });
+  for (const m of src.matchAll(URL_RE)) {
+    if (spans.some((s) => m.index >= s.start && m.index < s.end)) continue;
+    spans.push({ start: m.index, end: m.index + m[0].length, id: m[0], kind: "url" });
+  }
+  spans.sort((a, b) => a.start - b.start);
+
+  let out = "", cursor = 0;
+  for (const s of spans) {
+    if (s.start < cursor) continue;
+    out += htmlEscape(src.slice(cursor, s.start));
+    cursor = s.end;
+    if (s.kind === "url") {
+      out += isSafeUrl(s.id)
+        ? `<a href="${htmlEscape(s.id)}" target="_blank" rel="noopener noreferrer">${htmlEscape(truncate(s.id, 60))}</a>`
+        : htmlEscape(s.id);
+      continue;
+    }
+    // An identifier that fails its checksum is left as plain text rather than
+    // linked. It would only ever open an empty njump tab, and it is also how
+    // the one tokenizing edge case resolves itself: bech32's charset includes
+    // `n`, so two mentions run together with no space ("…ckn ostr:npub1…")
+    // greedily match one character too many. That over-long capture fails the
+    // checksum, so it degrades to text instead of pointing at the wrong person.
+    if (!bech32ToBytes(s.id)) { out += htmlEscape(s.value ?? s.id); continue; }
+    const pk = pubkeyFromBech32(s.id);
+    const name = pk ? names.get(pk) : null;
+    const label = name ? "@" + name : "@" + s.id.slice(0, 14) + "…";
+    // An unresolved mention carries its pubkey so show-page.js can ask Primal
+    // for the name and swap the label in. A mentioned npub need never have
+    // boosted anything, so missing from `profiles` is the normal case here
+    // rather than the exceptional one.
+    const hook = !name && pk ? ` data-pk="${htmlEscape(pk)}" data-missing="name"` : "";
+    out += `<a class="nostr-mention" href="https://njump.me/${htmlEscape(s.id)}" target="_blank" rel="noopener noreferrer"${hook}>${htmlEscape(label)}</a>`;
+  }
+  out += htmlEscape(src.slice(cursor));
+  return out;
 }
 
 // Compact sats for the stat tiles: 45,045,439 reads worse than 45.0M at a
@@ -202,29 +363,74 @@ function displayName(r) {
   return r.display_name || r.pr_dname || r.name || r.pr_name || null;
 }
 
+// ── Copy ─────────────────────────────────────────────────────────────────────
+//
+// Everything that differs between a podcast page and a music page. Nothing
+// structural does, which is the same arrangement as the COPY tables in
+// shows-feed.js and feeds-podcasts.js: the medium changes the words, never the
+// layout, so a third medium is a third entry here rather than a second page.
+//
+// The medium comes from `<podcast:medium>` in the show's own RSS, projected
+// onto the podcasts table by the collector. The namespace default is `podcast`,
+// and so is ours: a feed that declares nothing is not called an album, because
+// filing an unidentified feed under Albums asserts something we can't support.
+const COPY = {
+  podcast: {
+    eyebrow: "Show",
+    noun: "show",
+    boostBtn: "Boost this Show",
+    itemsPlural: "Episodes",
+    itemAbbr: "Ep.",
+    untitledItem: "Untitled episode",
+    drawer: "Episodes with Nostr Boosts, newest first",
+    noItems: "No episodes with Nostr boosts yet.",
+    ldType: "PodcastSeries",
+  },
+  music: {
+    eyebrow: "Album",
+    noun: "album",
+    boostBtn: "Boost this Album",
+    itemsPlural: "Tracks",
+    itemAbbr: "Track",
+    untitledItem: "Untitled track",
+    drawer: "Tracks with Nostr Boosts, newest first",
+    noItems: "No tracks with Nostr boosts yet.",
+    ldType: "MusicAlbum",
+  },
+};
+
+const copyFor = (medium) => (medium === "music" ? COPY.music : COPY.podcast);
+
 // ── the page ─────────────────────────────────────────────────────────────────
 
-function renderShowPage({ show, episodes, supporters, boosts }) {
+function renderShowPage({ show, episodes, supporters, boosts, names }) {
+  const copy = copyFor(show.medium);
   const title = show.title;
   const pageUrl = `${SITE_ORIGIN}/show/${encodeURIComponent(show.podcast_guid)}`;
   const art = isSafeUrl(show.image) ? show.image : null;
-  const ogTitle = `${title} — Boosts & Supporters | OnlyBoosts`;
+  const ogTitle = `${title} — Boosts on Nostr | OnlyBoosts`;
 
   // The description is synthesized from the boost data rather than copied from
   // the show's own blurb. D1 doesn't carry the blurb (it lives only in the
   // per-show shard, too heavy to fetch per page), but more importantly this
   // page is about the boosts, not the podcast, so the stats are the honest
   // summary and they differentiate the preview from every podcast directory.
+  // The scope has to be inside the sentence, not merely on the page. This is
+  // the one string that travels without the page around it, into a Nostr
+  // client's preview card or a group chat, where the .ob-scopenote under the
+  // stats is not there to qualify them. A bare "3 supporters have sent…" reads
+  // as a verdict on the show's whole audience.
   const one = show.booster_count === 1;
   const ogDesc = show.booster_count
-    ? `${num(show.booster_count)} supporter${one ? " has" : "s have"} sent ` +
+    ? `${num(show.booster_count)} Nostr booster${one ? " has" : "s have"} sent ` +
       `${num(show.total_sats)} sats to ${title} across ${num(show.boost_count)} ` +
-      `boost${show.boost_count === 1 ? "" : "s"}, indexed from Nostr by OnlyBoosts.`
-    : `Boosts and supporters for ${title}, indexed from Nostr by OnlyBoosts.`;
+      `boost${show.boost_count === 1 ? "" : "s"}. Counts cover only boosts ` +
+      `published to Nostr; most boosting is keysend and never appears.`
+    : `Boosts published to Nostr for ${title}, indexed by OnlyBoosts.`;
 
   const ld = {
     "@context": "https://schema.org",
-    "@type": "PodcastSeries",
+    "@type": copy.ldType,
     name: title,
     url: pageUrl,
     ...(art ? { image: art } : {}),
@@ -351,7 +557,7 @@ function renderShowPage({ show, episodes, supporters, boosts }) {
             <div class="nav-explore-group">
               <h4>Stats</h4>
               <a href="/stats"><span aria-hidden="true">📊</span> Boost Stats</a>
-              <a href="/boosters"><span aria-hidden="true">🧑‍🤝‍🧑</span> Boosters</a>
+              <a href="/boosters"><span aria-hidden="true">🧑‍🤝‍🧑</span> Community</a>
             </div>
             <div class="nav-explore-group">
               <h4>More</h4>
@@ -388,13 +594,13 @@ function renderShowPage({ show, episodes, supporters, boosts }) {
 
 <main class="show-main">
 
-  ${renderHeader(show, art, title)}
+  ${renderHeader(show, art, title, copy)}
 
-  ${renderEpisodes(episodes, show)}
+  ${renderEpisodes(episodes, show, copy)}
 
-  ${renderSupporters(supporters, show)}
+  ${renderSupporters(supporters, show, copy)}
 
-  ${renderBoosts(boosts)}
+  ${renderBoosts(boosts, names, copy)}
 
 </main>
 
@@ -409,7 +615,7 @@ function renderShowPage({ show, episodes, supporters, boosts }) {
 
     <div class="footer-col footer-about">
       <h3>OnlyBoosts</h3>
-      <p>A Nostr client for only podcast boosts. Every Podcasting 2.0 boostagram published to Nostr, cached and indexed for stats by episode, show and supporter. Sort, filter, search, view all or just see boosts from your follows on Nostr.</p>
+      <p>A Nostr client for only podcast boosts. Every Podcasting 2.0 boostagram published to Nostr, cached and indexed for stats by episode, show and booster. Sort, filter, search, view all or just see boosts from your follows on Nostr.</p>
     </div>
 
     <!-- Same two groups as the nav's Explore menu, in the same order — the
@@ -430,7 +636,7 @@ function renderShowPage({ show, episodes, supporters, boosts }) {
       <h3>Stats</h3>
       <ul>
         <li><a href="/stats">📊 Boost Stats</a></li>
-        <li><a href="/boosters">🧑‍🤝‍🧑 Boosters</a></li>
+        <li><a href="/boosters">🧑‍🤝‍🧑 Community</a></li>
       </ul>
     </div>
 
@@ -468,9 +674,9 @@ function renderShowPage({ show, episodes, supporters, boosts }) {
 </html>`;
 }
 
-function renderHeader(show, art, title) {
+function renderHeader(show, art, title, copy) {
   // Three tiles, not four. There was an episode count here and it was removed
-  // deliberately: sats, boosts and supporters are measures of boost activity
+  // deliberately: sats, boosts and boosters are measures of boost activity
   // and have no meaning outside it, so "as published to Nostr" is the only
   // reading available. An episode count is a property of the PODCAST, with a
   // true value in the world, so printing one beside the show's name reads as a
@@ -482,7 +688,7 @@ function renderHeader(show, art, title) {
   const stats = [
     { label: "sats", value: compact(show.total_sats), exact: num(show.total_sats) },
     { label: show.boost_count === 1 ? "boost" : "boosts", value: num(show.boost_count), exact: num(show.boost_count) },
-    { label: show.booster_count === 1 ? "supporter" : "supporters", value: num(show.booster_count), exact: num(show.booster_count) },
+    { label: show.booster_count === 1 ? "booster" : "boosters", value: num(show.booster_count), exact: num(show.booster_count) },
   ];
 
   return `<header class="show-hero">
@@ -493,7 +699,7 @@ function renderHeader(show, art, title) {
           : `<div class="show-art-blank" aria-hidden="true">🎙️</div>`
       }</div>
       <div class="show-ident">
-        <p class="show-eyebrow">Show</p>
+        <p class="show-eyebrow">${copy.eyebrow}</p>
         <h1>${htmlEscape(title)}</h1>
         <p class="show-sub">${
           show.latest_ts ? `Last boosted ${htmlEscape(relTime(show.latest_ts))}` : "No boosts recorded yet"
@@ -501,7 +707,7 @@ function renderHeader(show, art, title) {
         <div class="show-actions">
           <button type="button" class="btn btn-boost" data-show-boost hidden>
             <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" width="14" height="14"><path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd"/></svg>
-            Boost this show
+            ${copy.boostBtn}
           </button>
           ${isSafeUrl(show.feed_url)
             ? `<a class="btn btn-quiet" href="${htmlEscape(show.feed_url)}" target="_blank" rel="noopener">RSS feed</a>`
@@ -518,12 +724,13 @@ function renderHeader(show, art, title) {
          The caveat belongs next to the numbers that prompt the question, not
          buried in the footer: most boosting is keysend and never touches
          Nostr, so a show's real total is higher than what's shown here, and a
-         supporter can be missing entirely. Both anchors are real sections of
-         /about. -->
-    <p class="show-datanote">
+         booster can be missing entirely. Both anchors are real sections of
+         /about. The .ob-scopenote class is shared with the feed panels on / and
+         the stat strip on /about, and is defined once in theme.css. -->
+    <p class="ob-scopenote">
       These counts cover only boosts published to Nostr.
       <a href="/about#keysend">Most boosts are sent by keysend</a> and leave no
-      public record, so the real totals are higher and some supporters won't
+      public record, so the real totals are higher and some boosters won't
       appear. <a href="/about#limits">A boost note is a claim, not a receipt.</a>
     </p>
   </header>`;
@@ -537,11 +744,19 @@ function renderHeader(show, art, title) {
 // 1,384 have five or more, so absolute thresholds would file nearly everyone in
 // the bottom tier. Relative standing replaces it: a podium for the top three,
 // then a ranked grid.
-function renderSupporters(rows, show) {
+// "Nostr Community" rather than "Supporters", and the distinction is the point.
+// "Supporters" is a claim about who supports the show, and the wall cannot make
+// it: a show with two hundred keysend supporters and three Nostr boosters would
+// read as having three supporters. "Community" names the group this page can
+// actually see, and the qualifier says which group that is. The count noun
+// elsewhere on the page stays "booster", because a person is a booster and only
+// the set of them is a community. See the site-wide vocabulary note in
+// CLAUDE.md.
+function renderSupporters(rows, show, copy) {
   if (!rows.length) {
-    return `<section class="show-section" id="supporters">
-      <h2>Supporters</h2>
-      <p class="show-empty">No supporters recorded for this show yet.</p>
+    return `<section class="show-section" id="community">
+      <h2>Nostr Community</h2>
+      <p class="show-empty">No boosters recorded for this ${copy.noun} yet.</p>
     </section>`;
   }
 
@@ -549,10 +764,10 @@ function renderSupporters(rows, show) {
   const rest = rows.slice(PODIUM);
   const hidden = Math.max(0, rest.length - (SUPPORTERS_VISIBLE - PODIUM));
 
-  return `<section class="show-section" id="supporters">
+  return `<section class="show-section" id="community">
     <div class="show-section-head">
-      <h2>Supporters <span class="show-count">${num(rows.length)}</span></h2>
-      <p class="show-section-sub">Ranked by sats sent to ${htmlEscape(show.title)}, all time.</p>
+      <h2>Nostr Community <span class="show-count">${num(rows.length)}</span></h2>
+      <p class="show-section-sub">Everyone who has boosted ${htmlEscape(show.title)} on Nostr, ranked by sats sent, all time.</p>
     </div>
 
     <ol class="sup-podium">
@@ -564,7 +779,7 @@ function renderSupporters(rows, show) {
     </ol>` : ""}
 
     ${hidden > 0 ? `<button type="button" class="btn btn-quiet show-more" data-show-more="supporter">
-      Show ${num(hidden)} more supporter${hidden === 1 ? "" : "s"}
+      Show ${num(hidden)} more booster${hidden === 1 ? "" : "s"}
     </button>` : ""}
   </section>`;
 }
@@ -577,7 +792,14 @@ function supporterCard(r, rank, isPodium, hidden = false) {
   // so the control is never dead.
   const copyVal = r.booster_npub || r.booster_pubkey;
 
-  return `<li class="sup-card${isPodium ? " sup-card--podium" : ""}"${hidden ? " hidden data-overflow" : ""}>
+  // What the index couldn't supply is declared for the client to fill from
+  // Primal (show-page.js). Nothing here waits on that: the card is complete
+  // and readable as rendered, and a visitor with no JavaScript keeps the
+  // shortened npub and the blank circle, which is what always shipped.
+  const missing = [name ? null : "name", pic ? null : "pic"].filter(Boolean).join(" ");
+
+  return `<li class="sup-card${isPodium ? " sup-card--podium" : ""}"${hidden ? " hidden data-overflow" : ""}${
+        missing ? ` data-pk="${htmlEscape(r.booster_pubkey)}" data-missing="${missing}"` : ""}>
         <span class="sup-rank">${rank}</span>
         <button type="button" class="sup-avatar${pic ? "" : " is-blank"}" data-copy-npub="${htmlEscape(copyVal)}" title="Copy npub" aria-label="Copy npub for ${htmlEscape(label)}">
           ${pic ? `<img src="${htmlEscape(pic)}" alt="" loading="lazy" />` : ""}
@@ -595,29 +817,31 @@ function supporterCard(r, rank, isPodium, hidden = false) {
 // show an empty section despite carrying 130+ boosts apiece. Whether a show
 // accumulates them is an artifact of how listeners' apps build a boost, not a
 // fact about the show. See the spec.
-function renderBoosts(rows) {
+function renderBoosts(rows, names, copy) {
   if (!rows.length) return "";
 
   return `<section class="show-section" id="boosts">
     <div class="show-section-head">
       <h2>Recent Boosts</h2>
-      <p class="show-section-sub">The most recent boosts sent to this show, as published to Nostr.</p>
+      <p class="show-section-sub">The most recent boosts sent to this ${copy.noun}, as published to Nostr.</p>
     </div>
     <ul class="boost-list">
-      ${rows.map(boostRow).join("\n      ")}
+      ${rows.map((r) => boostRow(r, names, copy)).join("\n      ")}
     </ul>
   </section>`;
 }
 
-function boostRow(r) {
-  const name = displayName(r) || shortId(r.booster_npub, r.booster_pubkey);
+function boostRow(r, names, copy) {
+  const realName = displayName(r);
+  const name = realName || shortId(r.booster_npub, r.booster_pubkey);
   const pic = isSafeUrl(r.pr_pic) ? r.pr_pic : null;
   const copyVal = r.booster_npub || r.booster_pubkey;
+  const missing = [realName ? null : "name", pic ? null : "pic"].filter(Boolean).join(" ");
   const target = r.e_title
-    ? (r.e_num ? `Ep. ${htmlEscape(r.e_num)} · ${htmlEscape(truncate(r.e_title, 70))}` : htmlEscape(truncate(r.e_title, 70)))
-    : "the show";
+    ? (r.e_num ? `${copy.itemAbbr} ${htmlEscape(r.e_num)} · ${htmlEscape(truncate(r.e_title, 70))}` : htmlEscape(truncate(r.e_title, 70)))
+    : `the ${copy.noun}`;
 
-  return `<li class="boost-row">
+  return `<li class="boost-row"${missing ? ` data-pk="${htmlEscape(r.booster_pubkey)}" data-missing="${missing}"` : ""}>
         <button type="button" class="sup-avatar sup-avatar--sm${pic ? "" : " is-blank"}" data-copy-npub="${htmlEscape(copyVal)}" title="Copy npub" aria-label="Copy npub for ${htmlEscape(name)}">
           ${pic ? `<img src="${htmlEscape(pic)}" alt="" loading="lazy" />` : ""}
         </button>
@@ -627,16 +851,16 @@ function boostRow(r) {
             <span class="boost-amt">${htmlEscape(num(r.sats))} sats</span>
             <span class="boost-when">${htmlEscape(relTime(r.created_at))}</span>
           </p>
-          ${r.message ? `<p class="boost-msg">${htmlEscape(truncate(r.message, 420))}</p>` : ""}
+          ${r.message ? `<p class="boost-msg">${renderMessage(r.message, names)}</p>` : ""}
           <p class="boost-target">→ ${target}</p>
         </div>
       </li>`;
 }
 
-function renderEpisodes(rows, show) {
+function renderEpisodes(rows, show, copy) {
   if (!rows.length) {
     return `<section class="show-section show-section--bare" id="episodes">
-      <p class="show-empty">No episodes with recorded boosts yet.</p>
+      <p class="show-empty">${copy.noItems}</p>
     </section>`;
   }
 
@@ -644,19 +868,19 @@ function renderEpisodes(rows, show) {
   // "62 episodes", so a section title above it would only say it again.
   return `<section class="show-section show-section--bare" id="episodes">
     <details class="ep-drawer">
-      <summary>Episodes with NIP-73 Boosts, newest first</summary>
+      <summary>${copy.drawer}</summary>
       <ul class="ep-list">
-        ${rows.map(episodeRow).join("\n        ")}
+        ${rows.map((e) => episodeRow(e, copy)).join("\n        ")}
       </ul>
     </details>
   </section>`;
 }
 
-function episodeRow(e) {
+function episodeRow(e, copy) {
   const bits = [fmtDate(e.published), fmtDuration(e.duration)].filter(Boolean);
   return `<li class="ep-row">
           <div class="ep-main">
-            <p class="ep-title">${e.episode_number ? `<span class="ep-num">Ep. ${htmlEscape(e.episode_number)}</span> ` : ""}${htmlEscape(e.title || "Untitled episode")}</p>
+            <p class="ep-title">${e.episode_number ? `<span class="ep-num">${copy.itemAbbr} ${htmlEscape(e.episode_number)}</span> ` : ""}${htmlEscape(e.title || copy.untitledItem)}</p>
             <p class="ep-meta">${bits.map(htmlEscape).join(" · ")}${bits.length ? " · " : ""}${htmlEscape(num(e.total_sats))} sats · ${htmlEscape(num(e.boost_count))} boost${e.boost_count === 1 ? "" : "s"}</p>
           </div>
           <button type="button" class="btn btn-boost btn-sm" data-ep-boost="${htmlEscape(e.item_guid || "")}" data-ep-title="${htmlEscape(e.title || "")}" hidden>Boost</button>

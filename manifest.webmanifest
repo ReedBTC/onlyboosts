@@ -1,7 +1,7 @@
 {
   "name": "OnlyBoosts",
   "short_name": "OnlyBoosts",
-  "description": "A Nostr client for podcast boosts. Read boostagrams from across the podcasting-2.0 network — globally or filtered to who you follow — and boost back with Lightning.",
+  "description": "Podcasting 2.0 Boosts on Nostr. Read the boostagrams as they are sent, globally or filtered to who you follow, and boost back with Lightning.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
