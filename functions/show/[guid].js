@@ -457,6 +457,11 @@ const COPY = {
     drawer: "Episodes with Nostr Boosts",
     noItems: "No episodes with Nostr boosts yet.",
     ldType: "PodcastSeries",
+    // Where the back link points for a visitor who has nowhere to go back TO
+    // (a shared link, a search result). show-page.js swaps it for history.back()
+    // when the previous document was ours; see the note over .show-back.
+    backHref: "/#shows",
+    backLabel: "All Shows",
     // Deliberately "By", never "Host" or "Creator". The source is
     // <itunes:author>, whoever the publisher named there: usually the host,
     // sometimes a network ("Jupiter Broadcasting"), occasionally a tagline.
@@ -474,6 +479,8 @@ const COPY = {
     drawer: "Tracks with Nostr Boosts",
     noItems: "No tracks with Nostr boosts yet.",
     ldType: "MusicAlbum",
+    backHref: "/#albums",
+    backLabel: "All Albums",
     // On a music feed <itunes:author> IS the artist, and cleanly so: 97.4% of
     // album pages carry a usable one. The stronger label is earned here in a
     // way it is not on the podcast side.
@@ -700,6 +707,14 @@ function renderShowPage({ show, episodes, supporters, boosts, community, names }
 <!-- NAV:END -->
 
 <main class="show-main">
+
+  <!-- Ships as a real link to the feed, which is what a visitor who arrived on
+       a shared link should get; show-page.js relabels it "Back" and wires
+       history.back() when the previous document was one of ours. The href stays
+       either way, so a middle-click still opens the feed in a new tab. -->
+  <a class="show-back" href="${copy.backHref}" data-show-back>
+    <span class="show-back-arrow" aria-hidden="true">←</span><span data-back-label>${copy.backLabel}</span>
+  </a>
 
   ${renderHeader(show, art, title, copy, art2)}
 
@@ -944,7 +959,10 @@ function renderCommunityShows(rows) {
   // 150 times.
   return `<section class="show-section show-section--bare" id="community-shows">
     <details class="ep-drawer cs-drawer" open data-community-shows>
-      <summary>Other Shows/Albums This Community Boosts</summary>
+      <!-- The hint is aria-hidden: <details> announces its own expanded state,
+           so a screen reader reading "Hide" as well is noise. It is empty here
+           and filled from CSS off [open] — see .drawer-hint in show-page.css. -->
+      <summary>Other Shows/Albums This Community Boosts<span class="drawer-hint" aria-hidden="true"></span></summary>
       <!-- Ships hidden and stays hidden without JavaScript: a sort control that
            cannot sort is worse than none. Same rule as the feed-search slot on
            the homepage panels. -->
@@ -1086,11 +1104,12 @@ function renderEpisodes(rows, show, copy) {
     </section>`;
   }
 
-  // No heading or sub-line: the drawer's own summary already reads
-  // "62 episodes", so a section title above it would only say it again.
+  // No heading or sub-line of its own: the summary IS this section's heading,
+  // and show-page.css styles it as one (Playfair, the .show-stats-title size).
+  // An <h2> above it would only say the same words a second time.
   return `<section class="show-section show-section--bare" id="episodes">
     <details class="ep-drawer" data-episode-drawer>
-      <summary>${copy.drawer}</summary>
+      <summary>${copy.drawer}<span class="drawer-hint" aria-hidden="true"></span></summary>
       <!-- Ships hidden and stays hidden without JavaScript: a sort control that
            cannot sort is worse than none. The server's own order is the default
            the control offers, so a no-JS visitor loses nothing but the choice. -->

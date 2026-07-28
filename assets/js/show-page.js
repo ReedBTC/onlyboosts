@@ -3,6 +3,7 @@
  * The page is server-rendered (functions/show/[guid].js) and readable with no
  * JavaScript at all — this module only adds the interactive parts:
  *
+ *   - the back link's history.back() upgrade
  *   - copy-npub on every supporter avatar and boost row
  *   - the "show N more supporters" toggle
  *   - share (copy the canonical URL)
@@ -67,6 +68,50 @@ document.querySelector('[data-share-page]')?.addEventListener('click', async () 
   const ok = await copyText(url)
   showToast(ok ? 'Link copied' : 'Copy failed — clipboard blocked', !ok)
 })
+
+// ── Back ─────────────────────────────────────────────────────────────
+//
+// The show pages are a graph, not a tree: a community row on one page links to
+// another show page, whose community rows link on again. Someone reading their
+// way from the homepage through four shows has a real chain behind them, and
+// manifest.webmanifest declares display:standalone, so an installed OnlyBoosts
+// has no browser back button to walk it with.
+//
+// The server renders a link to the feed, which is the honest destination when
+// there is no chain — a visitor who opened a shared link has nothing behind
+// them, and history.back() would take them out of the site or nowhere at all.
+// This only upgrades that link to history.back() when the previous document was
+// one of ours, which is the case the chain is made of.
+//
+// document.referrer is the signal. Same-origin navigations pass the full URL
+// under the default referrer policy, and no page here sets a document-level one
+// (the no-referrer attributes on this site are on <img>, for hotlinked artwork).
+
+function initBackLink() {
+  const link = document.querySelector('[data-show-back]')
+  if (!link) return
+
+  let ref = null
+  try { ref = document.referrer ? new URL(document.referrer) : null } catch { ref = null }
+  // No referrer, another site, or ourselves (a reload keeps the referrer, and
+  // going "back" to the page you are on is worse than the feed link).
+  if (!ref || ref.origin !== location.origin || ref.href === location.href) return
+  if (history.length <= 1) return
+
+  const label = link.querySelector('[data-back-label]')
+  if (label) label.textContent = 'Back'
+  link.title = 'Back to the previous page'
+
+  link.addEventListener('click', (e) => {
+    // A modified click is a request for a new tab, and the href is still the
+    // feed — let the browser have it rather than backing the current one.
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+    e.preventDefault()
+    history.back()
+  })
+}
+
+initBackLink()
 
 // ── Hero artwork fallback ────────────────────────────────────────────
 //

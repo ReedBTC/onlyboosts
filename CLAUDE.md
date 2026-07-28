@@ -856,6 +856,46 @@ places that change together: the masthead line under the banner on `index.html`
 The show page's `og:description` states the scope *inside the sentence*, because
 it is the one string that travels without the page around it.
 
+## Show pages: the drawer chrome, and the back link
+
+Both `<details>` on `/show` share `.ep-drawer`, and the affordance work is in
+`show-page.css` rather than in either renderer. **A collapsed drawer has to
+announce that it opens**, which three cues carry: a `--cream-d` header band so
+the box has a lid, a **SHOW / HIDE** word at the right end drawn from CSS off
+`[open]`, and a chevron built from two borders that rotates. The word is the one
+a first-time visitor reads; the chevron confirms it. The `.drawer-hint` span is
+`aria-hidden` — `<details>` announces its own expanded state and does not need
+to say it twice.
+
+The summary label is `--ink`, not brand: a full heading in link blue promises
+navigation, and these expand in place. Playfair at the `.show-stats-title` size,
+because these summaries **stand in for the `<h2>` their sections don't have**.
+
+**Neither summary carries a count and neither may gain one.** The affordance is
+form, not information; see "No Episode Counts, Anywhere" in the spec for why the
+episode one in particular cannot.
+
+`.cs-controls` (the sort row, mounted by **both** drawers) is `--cream-d`, not
+`--cream`. On the page background it read as a gap punched through the card, so
+an open drawer looked severed at the sort row. The `--accent` / `--tint` supply
+those controls need moved from `.cs-drawer` up to `.show-main` at the same time:
+only the community drawer carried that class, so the **episode** drawer's sort
+pill had been reading an undefined `--accent`, which drops every declaration
+using one at computed-value time.
+
+**The back link** (`.show-back`, above the hero) exists because the show pages
+are a graph rather than a tree — a community row links to another show page,
+whose rows link on again — and because `manifest.webmanifest` declares
+`display: standalone`, so an installed OnlyBoosts has no browser back button at
+all.
+
+It is **server-rendered as a real link to the feed** (`/#shows`, or `/#albums`
+off the `COPY` table) and `show-page.js#initBackLink` upgrades it to
+`history.back()` **only when `document.referrer` is same-origin**. That split is
+the point: a visitor who opened a shared link has no chain behind them, and
+`history.back()` would take them off the site or nowhere. The `href` survives the
+upgrade, so a modified click still opens the feed in a new tab.
+
 ## Show pages: other shows this community boosts
 
 A drawer above the Nostr Community wall listing every other show this show's

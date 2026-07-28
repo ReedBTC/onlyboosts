@@ -206,7 +206,14 @@
 // cover-art.js, so a returning visitor holding a new show-page.js against a
 // cache without that module fails the import and loses every interactive part
 // of the page — the sorts, copy-npub and the boost buttons together.
-const VERSION = 'ob-v39';
+// ob-v40: the /show drawers get a real header band, a rotating chevron and a
+// SHOW/HIDE hint so a collapsed one reads as openable, the sort row moves off
+// the page background that made it look like a gap punched through the card,
+// and a back link lands above the hero. Required on both halves: .drawer-hint
+// and .show-back are new rules in show-page.css against markup the Function now
+// emits, so a returning visitor on the old stylesheet gets an unstyled "Back"
+// and an empty span in each summary; initBackLink is new in show-page.js.
+const VERSION = 'ob-v40';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;

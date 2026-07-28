@@ -15,12 +15,53 @@
   max-width: 60rem;
   margin: 0 auto;
   padding: 0 1.25rem 4rem;
+
+  /* The sort control and the drawer chrome read --accent / --accent-d / --tint,
+     which only index.html defines (one per feed, off body[data-active-feed]).
+     A show page has no active feed, so it supplies the brand as the accent for
+     the whole main.
+     This used to sit on .cs-drawer, which was wrong: BOTH drawers mount a
+     .cs-controls sort row, and the episode drawer does not carry that class, so
+     its pill was reading an undefined --accent — every declaration that used one
+     was dropped at computed-value time, which is why its "Sort: Latest Episode"
+     rendered in body text rather than brand. */
+  --accent: var(--brand);
+  --accent-d: var(--brand-d);
+  --tint: rgba(0, 175, 240, 0.1);
 }
+
+/* ── Back ─────────────────────────────────────────────────────────────── */
+
+/* Above the hero, and load-bearing rather than decorative: manifest.webmanifest
+   sets display:standalone, so an installed OnlyBoosts has no browser chrome and
+   no back button of its own. A visitor walking show → community row → show →
+   community row otherwise has no way to reverse at all.
+   It ships as a real link to the feed, which is the right destination for
+   someone who arrived on a shared link or a search result and has nothing to go
+   back TO. show-page.js upgrades it to history.back() only when it can see that
+   the previous document was ours. */
+.show-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 1.25rem;
+  padding: 0.32rem 0.75rem 0.32rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  font: 600 0.78rem/1 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.show-back:hover { color: var(--brand-d); border-color: var(--brand); background: var(--tint); }
+.show-back:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.show-back-arrow { font-size: 0.95rem; line-height: 1; }
 
 /* ── Hero ─────────────────────────────────────────────────────────────── */
 
 .show-hero {
-  margin: 1.75rem 0 2.5rem;
+  margin: 1rem 0 2.5rem;
 }
 
 .show-hero-inner {
@@ -409,20 +450,76 @@
   overflow: hidden;
 }
 
+/* The drawer's HEADER, and it has to read as one. Collapsed, this box is the
+   only thing between the stat tiles and the community wall, and a line of small
+   blue text on the same white as the body gave no sign there was a lid to lift.
+   Three cues carry it now, in order of what a visitor actually notices:
+
+   1. A sunken band, so the box has a header at all rather than being a bordered
+      rectangle with a caption in it. This is also what stops the open drawer
+      reading as two disconnected pieces.
+   2. A SHOW / HIDE word at the right end. A word is what a first-time visitor
+      reads; the chevron only confirms it. It is drawn in CSS off [open] and the
+      span carrying it is aria-hidden, because <details> already announces its
+      own expanded state and a screen reader does not need to hear both.
+   3. A chevron that ROTATES rather than a text bullet that swaps glyphs. Drawn
+      from two borders, so it does not depend on how a font renders ▸ or where
+      that glyph sits on the baseline.
+
+   The label is --ink, not brand. A whole heading in link blue reads as a link to
+   somewhere else, which is the wrong promise for a control that expands in
+   place; the brand sits on the chevron and the hint, which are the parts that
+   ARE the control. Playfair at the .show-stats-title size because these two
+   summaries stand in for the <h2> their sections don't have — every band down
+   the page is then the same typeface. */
 .ep-drawer > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
   cursor: pointer;
-  padding: 0.75rem 1rem;
-  font: 600 0.85rem/1 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  color: var(--brand-d);
+  padding: 0.8rem 1rem;
+  background: var(--cream-d);
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: clamp(1.05rem, 2.6vw, 1.3rem);
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--ink);
   list-style: none;
+  transition: background 0.15s, color 0.15s;
 }
 .ep-drawer > summary::-webkit-details-marker { display: none; }
+
+/* Two borders and a rotation. The translate on each state is optical centering:
+   the visible shape is a corner, so its mass sits off the box's own center. */
 .ep-drawer > summary::before {
-  content: "▸ ";
-  display: inline-block;
-  transition: transform 0.15s;
+  content: "";
+  flex: none;
+  width: 0.46rem;
+  height: 0.46rem;
+  margin-left: 0.15rem;
+  border-right: 2px solid var(--brand-d);
+  border-bottom: 2px solid var(--brand-d);
+  transform: translateX(-1px) rotate(-45deg);
+  transition: transform 0.18s, border-color 0.15s;
 }
-.ep-drawer[open] > summary::before { content: "▾ "; }
+.ep-drawer[open] > summary::before { transform: translateY(-2px) rotate(45deg); }
+
+.drawer-hint {
+  flex: none;
+  margin-left: auto;
+  font: 700 0.68rem/1 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--brand-d);
+}
+.ep-drawer > summary .drawer-hint::after { content: "Show"; }
+.ep-drawer[open] > summary .drawer-hint::after { content: "Hide"; }
+
+/* Hover is how a mouse user tests whether a thing is a thing, and the summary
+   had none — cursor:pointer was the only feedback, and it arrives too late. */
+.ep-drawer > summary:hover { background: rgba(0, 175, 240, 0.18); color: var(--brand-dd); }
+.ep-drawer > summary:hover::before { border-color: var(--brand); }
+.ep-drawer > summary:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 
 .ep-list {
   list-style: none;
@@ -486,26 +583,26 @@
    same capped-and-scrolling body. Only the row differs, because these rows are
    links to other show pages where an episode row is not. */
 
-.cs-drawer {
-  /* The feed controls below read --accent / --accent-d / --tint, which only
-     index.html defines (one per feed, off body[data-active-feed]). A show page
-     has no active feed, so it supplies the brand as the accent here rather than
-     leaving the controls unstyled. */
-  --accent: var(--brand);
-  --accent-d: var(--brand-d);
-  --tint: rgba(0, 175, 240, 0.1);
-}
+/* (The --accent supply that used to sit here is on .show-main now — both
+   drawers mount a .cs-controls, and only one of them had this class.) */
 
 /* The sort row, shared by BOTH drawers on this page — the community one and
    the episode one above it. No range control in either; see the note in the
-   Function. */
+   Function.
+
+   --cream-d, NOT --cream. It was the page background, which meant the toolbar
+   band read as a gap punched through the card to the page behind it: the drawer
+   looked severed at the sort row rather than open. Matching the summary's band
+   makes the open drawer a header / toolbar / list stack, one component, and it
+   gives the white sort pill a surface to sit on that it isn't already the same
+   color as. */
 .cs-controls {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   padding: 0.5rem 0.75rem;
   border-top: 1px solid var(--border);
-  background: var(--cream);
+  background: var(--cream-d);
 }
 .cs-controls[hidden] { display: none; }
 
@@ -669,6 +766,11 @@
   .sup-name { font-size: 0.76rem; }
   .sup-sats { font-size: 0.68rem; }
   .boost-when { margin-left: 0; }
+  /* "Other Shows/Albums This Community Boosts" is a long label; keep the hint
+     on the same line as the last word of it rather than letting the two
+     compete for a narrow row. */
+  .ep-drawer > summary { padding: 0.7rem 0.8rem; gap: 0.5rem; }
+  .drawer-hint { font-size: 0.62rem; letter-spacing: 0.08em; }
   .cs-art,
   .ep-art { width: 38px; height: 38px; }
   .cs-link { gap: 0.55rem; padding-left: 0.4rem; }

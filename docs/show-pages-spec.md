@@ -405,14 +405,99 @@ message text, so rows without one render as a sats line alone rather than a gap.
 
 ## Page Order
 
-Hero, stat cards, the scope note, **episodes**, other shows this community
-boosts, the Nostr Community wall, recent boosts.
+The back link, the hero, the "Nostr Boost Stats" heading and its tiles,
+**episodes**, other shows this community boosts, the Nostr Community wall,
+recent boosts.
 
 Episodes sit directly under the stats rather than at the foot of the page: a
 podcaster arriving at their own page is looking for their catalogue, and a
 visitor sent here by that podcaster wants somewhere to boost before they want a
 leaderboard. The drawer is **collapsed by default**, so it costs one line of
 height and the supporters wall still opens the page's body.
+
+## Reversing Out
+
+These pages are a **graph, not a tree**. A row in the community drawer links to
+another show page, whose own rows link on again, so a reader who follows an
+interesting overlap from the homepage through four shows has a genuine chain
+behind them and every intent to walk back down it. Two facts make that chain a
+dead end without a control on the page: `manifest.webmanifest` declares
+`display: standalone`, so an installed OnlyBoosts has no browser chrome and no
+back button of its own, and the pages carry no other upward link than the nav's
+Explore menu, which restarts rather than reverses.
+
+`.show-back` sits above the hero, and it is **two different controls in one
+element**:
+
+| Arrival | Renders | Does |
+|---|---|---|
+| Followed a link from within the site | "← Back" | `history.back()` |
+| Shared link, search result, direct URL | "← All Shows" / "← All Albums" | Navigates to `/#shows` or `/#albums` |
+
+The distinction is `document.referrer`, read in `show-page.js#initBackLink`, and
+it matters in both directions. A visitor who opened a shared link has nothing
+behind them, and `history.back()` would take them off the site entirely or do
+nothing at all; a visitor four shows deep does not want the feed, they want the
+show they just left. Same-origin navigations pass a full referrer under the
+default policy, and no page here sets a document-level one.
+
+**The server renders the feed link and the client upgrades it**, rather than the
+reverse. That order is what makes the control work with JavaScript off, keeps its
+label honest for a crawler, and leaves the `href` intact so a modified click
+still opens the feed in a new tab. A self-referrer (a reload keeps one) is
+excluded: "back" to the page you are on is worse than the feed.
+
+The destination of the no-chain case comes off the `COPY` table, so an album
+page offers Albums rather than Shows.
+
+## Drawer Affordance
+
+Both `<details>` on the page share `.ep-drawer`, and a collapsed one has to
+announce that it opens. The first version did not: the summary was a line of
+small blue text on the same white as the body, with a `▸` text bullet, and no
+hover state at all beyond `cursor: pointer`, which arrives too late to be a cue.
+A visitor read the whole box as a caption on a bordered rectangle.
+
+Three cues carry it, in the order a visitor notices them:
+
+1. **A `--cream-d` header band**, so the box has a lid rather than being a
+   rectangle with a caption in it.
+2. **A SHOW / HIDE word** at the right end, drawn in CSS off `[open]`. This is
+   the cue that actually does the work — a word is unambiguous where an icon is
+   a convention the reader has to already hold. Its span is `aria-hidden`,
+   because `<details>` announces its own expanded state and a screen reader
+   should not hear both.
+3. **A chevron that rotates**, built from two borders rather than set as `▸`/`▾`
+   so it does not depend on how a font renders those glyphs or where it sits
+   them on the baseline.
+
+The label is `--ink`, not brand. A whole heading in link blue promises
+navigation somewhere else, which is the wrong promise for a control that expands
+in place; the brand sits on the chevron and the hint, which are the parts that
+are the control. Playfair at the `.show-stats-title` size, because these two
+summaries **stand in for the `<h2>` their sections do not have** — with that,
+every band down the page is the same typeface.
+
+**Neither summary carries a count, and the affordance work did not add one.**
+The community drawer's was removed deliberately, and the episode drawer's cannot
+be honest at all; see No Episode Counts, Anywhere. The cues above are form
+rather than information, which is why they were available.
+
+### The Sort Row
+
+`.cs-controls` is mounted by **both** drawers and was painted `--cream`, the page
+background. Inside a white card that reads as a gap punched through to the page
+behind it, so an open drawer looked severed at the sort row rather than open. It
+is `--cream-d` now, matching the header band: the open drawer is a header /
+toolbar / list stack, one component, and the white sort pill has a surface to sit
+on that it is not already the same color as.
+
+The `--accent` / `--accent-d` / `--tint` supply those controls read moved from
+`.cs-drawer` to `.show-main` in the same pass. Only the community drawer carried
+`.cs-drawer`, so the **episode** drawer's pill had been reading an undefined
+`--accent` — an undefined custom property invalidates the declaration using it at
+computed-value time, which is why its current sort value rendered in body text
+instead of brand and its active menu item had no highlight.
 
 ## Episodes and Boosting
 
