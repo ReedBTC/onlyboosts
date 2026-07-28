@@ -23,6 +23,9 @@ import { ensureLoginWidget } from '/assets/js/widget-loader.js'
 // rangeControl and mountFeedControls are deliberately not used (no range here,
 // and no sticky bar to mount into).
 import { sortControl } from '/assets/js/feed-controls.js'
+// The drawer's per-row buttons are server-rendered, so only the busy-state
+// helper is needed here — the builder is for the feeds, which make theirs in JS.
+import { withBoostBusy } from '/assets/js/boost-button.js'
 // Fallback identity lookup for what the index didn't have — see the profile
 // hydration at the foot of this file.
 import { fetchProfiles } from '/assets/js/primal-profiles.js'
@@ -233,26 +236,23 @@ async function onCommunityBoost(btn) {
   if (!target.guid && !target.feed) return
   if (btn.disabled) return
 
-  btn.disabled = true
-  btn.classList.add('is-busy')
-  try {
-    const bundle = await resolveValue(null, target)
-    if (!bundle) {
-      showToast(`${target.title || 'This show'} has no value block to boost.`, true)
-      return
+  await withBoostBusy(btn, async () => {
+    try {
+      const bundle = await resolveValue(null, target)
+      if (!bundle) {
+        showToast(`${target.title || 'This show'} has no value block to boost.`, true)
+        return
+      }
+      if (bundle.error) {
+        showToast('Couldn’t load boost splits — please try again in a moment.', true)
+        return
+      }
+      await openBoost(bundle, { target })
+    } catch (err) {
+      console.warn('[show] community boost failed', err)
+      showToast('Couldn’t start the boost — try again.', true)
     }
-    if (bundle.error) {
-      showToast('Couldn’t load boost splits — please try again in a moment.', true)
-      return
-    }
-    await openBoost(bundle, { target })
-  } catch (err) {
-    console.warn('[show] community boost failed', err)
-    showToast('Couldn’t start the boost — try again.', true)
-  } finally {
-    btn.disabled = false
-    btn.classList.remove('is-busy')
-  }
+  })
 }
 
 // Delegated, and revealed in one pass: 150 rows means 150 listeners otherwise.

@@ -23,6 +23,7 @@
  * one exception is the per-show shard, and even there the rollup carries a
  * `file` pointer we use verbatim.
  */
+import { coverChain } from '/assets/js/cover-art.js'
 
 const BASE = '/api/data/'
 
@@ -244,6 +245,10 @@ export function normalizeBoosts(d) {
         guid: str(b?.podcast?.guid),
         title: str(b?.podcast?.title),
         img: str(b?.podcast?.img),
+        // Second-chance artwork: the OTHER of the feed's two artwork URLs
+        // (RSS <image><url> vs <itunes:image>), published only when it differs
+        // from `img`. Nullable like everything else here. See cover-art.js.
+        art2: str(b?.podcast?.art2),
         feed: str(b?.podcast?.feed),
       },
       episode: {
@@ -315,7 +320,11 @@ export function toEpisodeShape(rows) {
         item_guid: itemGuid,
         podcast_guid: podGuid,
         title: b.episode.title,
+        // `image` stays the single primary URL every existing consumer reads.
+        // `imageChain` is the ordered fallback for the ones that want it: an
+        // episode's own art first, then the show's two. cover-art.js walks it.
         image: b.episode.img || b.podcast.img,
+        imageChain: coverChain(b.episode.img, b.podcast.img, b.podcast.art2),
         published: b.episode.date,
         episode_number: b.episode.num,
         enclosure_url: b.episode.url,
@@ -338,6 +347,7 @@ export function toEpisodeShape(rows) {
         podcast_guid: podGuid,
         title: b.podcast.title,
         image: b.podcast.img,
+        imageChain: coverChain(b.podcast.img, b.podcast.art2),
         feed_url: b.podcast.feed,
       }
     }

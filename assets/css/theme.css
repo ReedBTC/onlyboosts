@@ -111,3 +111,53 @@ img { display: block; max-width: 100%; }
   text-underline-offset: 2px;
 }
 .ob-scopenote a:hover { color: var(--brand-d); }
+
+/* ── The circle boost button ─────────────────────────────────────────────
+   One compact, icon-only boost affordance, used on every card that boosts a
+   SHOW or an EPISODE: the Episodes and Songs cards, the Shows and Albums
+   cards, and every row of the community drawer on a /show page.
+
+   It lives here, in theme.css, for the same reason .ob-scopenote does — that
+   is the only stylesheet the homepage and the show pages both load, so this
+   is a single definition rather than a rule restated in index.html's inline
+   block and again in show-page.css. It therefore reads --brand, never
+   --accent: the feed accents only exist on index.html, and a button styled
+   off one would be unstyled everywhere else.
+
+   Icon-only is the point. It sits at the right end of a card's stats line,
+   where a labelled button would either wrap the line or squeeze the figures
+   off a phone. The tooltip and the aria-label carry what it boosts. */
+.ob-boost-circle {
+  flex-shrink: 0;
+  /* Right-aligned on whatever flex row it is dropped into. */
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  color: var(--brand-d);
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.ob-boost-circle[hidden] { display: none; }
+.ob-boost-circle svg { display: block; }
+.ob-boost-circle:hover:not(:disabled) {
+  color: #fff;
+  background: var(--brand);
+  border-color: var(--brand);
+}
+.ob-boost-circle:disabled { opacity: 0.5; cursor: default; }
+.ob-boost-circle:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+/* Held while /api/value resolves and the widget's gate chain runs, which can
+   take seconds on a cold bundle. Without it the button looks inert. */
+.ob-boost-circle.is-busy { animation: ob-boost-pulse 1s ease-in-out infinite; }
+
+@keyframes ob-boost-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}

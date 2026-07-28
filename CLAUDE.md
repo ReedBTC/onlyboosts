@@ -391,7 +391,7 @@ Carried from the scaffold commit and the LB suite:
    `PODCAST_INDEX_SECRET` are set as secrets in both the production and preview
    Cloudflare environments; verified 2026-07-26 against production, where
    `/api/value?podcastGuid=…` returns live feed-level splits. Without them
-   `/api/value` returns a clean 503 and "Boost episode" can't resolve a show's
+   `/api/value` returns a clean 503 and no boost button can resolve a show's
    splits, so locally you still need them in `.dev.vars` (gitignored).
 
 2. **Bug relay write-policy.** `BUG_TAG` is `onlyboosts-alpha` in both
@@ -894,19 +894,40 @@ toggle** (`PODIUM` / `SUPPORTERS_VISIBLE`). `.sup-podium` is `repeat(5,
 minmax(0,1fr))` rather than auto-fit: the count is always `PODIUM`, and auto-fit
 reflowed five cards into 4+1 as soon as the column got tight.
 
-## ⚠️ Show-level boosting
+## ⚠️ Show-level boosting, and the one boost button
 
 Boosting a SHOW (as opposed to an episode) pays the **feed-level** value block —
-`/api/value` with a `podcastGuid` and/or `feedUrl` and no `guid`. Three surfaces
-now do it, and all three resolve through the same
-`fromApiValue` → `applyExternalOverrides` pair, which is the only place split
-logic lives:
+`/api/value` with a `podcastGuid` and/or `feedUrl` and no `guid`.
 
-| Surface | Handler |
-|---|---|
-| `/show` hero button | `show-page.js#initBoosting`, one probe on load |
-| `/show` community drawer rows | `show-page.js#onCommunityBoost` |
-| Shows / Albums feed cards | `shows-feed.js#onShowBoost` |
+**Every boost affordance on a card is now the same control**: the circle button
+built by `assets/js/boost-button.js`, styled as `.ob-boost-circle` in
+**theme.css** (there, not in a page's own stylesheet, because it is the one
+class the homepage and the show pages both need — same reasoning as
+`.ob-scopenote`). It reads `--brand`, never `--accent`: the feed accents only
+exist on `index.html`.
+
+It rides the **right end of the card's Nostr Stats line**, pinned there by its
+own `margin-left: auto`. It replaced a labelled pill in a button row of its own,
+which cost a whole band of card height; icon-only is what lets it share a line
+with the figures on a phone.
+
+| Surface | Handler | Pays |
+|---|---|---|
+| Episodes / Songs cards | `feeds-podcasts.js#onBoostClick` | that episode |
+| Shows / Albums cards | `shows-feed.js#onShowBoost` | that show's feed block |
+| `/show` community drawer rows | `show-page.js#onCommunityBoost` | another show's |
+| `/show` hero button | `show-page.js#initBoosting` | this show's |
+
+**`boost-button.js` is chrome, not a money path.** It builds a button and
+reports clicks; each caller owns its own resolve-and-pay sequence, because what
+a boost pays differs by surface. All of them go through
+`fromApiValue` → `applyExternalOverrides`, which is where split logic belongs.
+Sharing the button and not the handler is the seam on purpose — do not fold the
+handlers together here.
+
+The show page's drawer rows are server-rendered, so `functions/show/[guid].js`
+emits the same markup by hand rather than calling the builder; the class name
+and the busy/disabled states are the contract between the two.
 
 **The community drawer is the only place on the site that pays a show other than
 the one the surface is about.** The target guid and feed URL come off the row's
@@ -916,13 +937,59 @@ splits and label the published note with another's.
 
 **It does not probe.** The hero button reveals itself only after a value block
 resolves; a page can carry 150 community rows, so those reveal optimistically
-and resolve on click, reporting an unpayable show in a toast at that point. That
-asymmetry is deliberate, not an oversight.
+and resolve on click, reporting an unpayable show in a toast at that point. The
+feed cards likewise. Withheld entirely from unidentified shows, which have no
+Podcast Index record to resolve.
 
 Verified against production for a live feed: five legs parsed, five legs after
 overrides, identical leg for leg — including the `boostbot@fountain.fm` leg that
 the LB override in `8bc4cf9` used to rewrite. Re-run that check after any
 restore from `lb/main`.
+
+**The episode cards' "↓ Download MP3" button is gone.** Every browser's native
+audio controls already carry Download in their ⋮ menu, and it cost a full row of
+card height to duplicate that. The blob-fetch trick it used (a plain
+`<a download>` is ignored cross-origin without `Content-Disposition`) is in git
+history if a surface ever needs it again.
+
+## Show artwork: the `art2` fallback
+
+Some feeds publish two different artwork URLs, RSS `<image><url>` and
+`<itunes:image>`, and the first is sometimes dead while the second resolves.
+Homegrown Hits is the case that prompted it. The collector now publishes the
+second as **`art2`**, null when identical to `img`, and
+`assets/js/cover-art.js` walks the chain on error.
+
+```
+episode art  →  show art (img)  →  show art2  →  glyph / placeholder
+```
+
+`coverChain()` filters to http(s) and **dedupes** — `art2` is meant to be null
+when it equals `img`, but the shards are third-party data and a repeat would
+cost a second request for the URL that just failed. `wireCoverFallback()`
+advances on each error and clears its own handler at the end, so an unreachable
+placeholder cannot loop; it returns `false` for an empty chain, which is the
+caller's cue to render its no-art state rather than an empty `<img>`.
+
+Wired at four sites: `ob-data.js` carries `podcast.art2` through
+`normalizeBoosts` and builds `imageChain` in `toEpisodeShape`; `shows-feed.js`
+reads `art2` off both the all-time rollup and the windowed grouping;
+`boosts-feed.js` puts it in the booster-avatar chain; `feeds-podcasts.js` uses
+the episode chain.
+
+**⚠️ `art2` is in the static shards only.** The collector's `shows.artwork`
+column and its `art2` projection landed in `cc68da3`, but the **remote D1
+`podcasts` table has no artwork column**, so `d1_sync.py` deliberately does not
+project it — see the `NOTE` in both of its INSERT paths, which is the thing to
+read before touching this. `/api/v1/*` and the server-rendered `/show` pages
+therefore get nothing until an out-of-band `ALTER TABLE podcasts ADD COLUMN
+artwork TEXT` plus a backfill ships, the same rollout order `author` used. Don't
+assume it exists on that side; when it lands, wire the same chain into
+`functions/show/[guid].js` and the hero. The field is specified in
+`bots/global-boost-scan/DATA-API.md`.
+
+Live coverage is small and real: 5 of 1,287 shows in the index, 20–31 boosts per
+recent month archive.
 
 ## Show pages: the medium, and nostr: mentions
 

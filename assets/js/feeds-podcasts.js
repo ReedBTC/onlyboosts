@@ -45,12 +45,14 @@ import {
 } from '/assets/js/ob-data.js'
 import { getFollowsBoosts } from '/assets/js/ob-live.js'
 import { copyText, showToast, copyNpub } from '/assets/js/copy-npub.js'
+import { circleBoostButton, withBoostBusy } from '/assets/js/boost-button.js'
 import {
   RANGE_OPTIONS, rangeDays, rangeCutoff,
   rangeControl, sortControl, mountFeedControls,
 } from '/assets/js/feed-controls.js'
 import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js'
 import { showPageHref } from '/assets/js/show-link.js'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js'
 
 const VALUE_API = '/api/value'   // Podcast Index value-block proxy (splits)
 const INITIAL_CARDS = 30       // episodes rendered per "load more" batch
@@ -67,9 +69,7 @@ const COPY = {
     untitled: 'Untitled episode',
     listen: 'Listen to this episode',
     dated: 'Episode aired',
-    boostBtn: 'Boost episode',
     seeAllTitle: 'Open this episode on Boost Me Bitch',
-    fileStem: 'episode',
     noun: 'episode',
     searchPlaceholder: 'Search episodes…',
     searchLabel: 'Search episodes',
@@ -90,9 +90,7 @@ const COPY = {
     untitled: 'Untitled track',
     listen: 'Listen to this track',
     dated: 'Released',
-    boostBtn: 'Boost track',
     seeAllTitle: 'Open this track on Boost Me Bitch',
-    fileStem: 'track',
     noun: 'track',
     searchPlaceholder: 'Search songs…',
     searchLabel: 'Search songs',
@@ -340,43 +338,12 @@ function safeHttpUrl(u) {
   catch { return null }
 }
 
-// Filled lightning bolt (Heroicons) — matches the boost buttons elsewhere on
-// the site; renders white on the orange Boost button via fill:currentColor.
-function boltSvg() {
-  const s = h('span', { class: 'pcast-btn-bolt', 'aria-hidden': 'true' })
-  s.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd"/></svg>'
-  return s
-}
+// The "↓ Download MP3" button was removed. Every browser's native audio
+// controls already carry Download in their ⋮ menu, and the button cost a full
+// row of card height to duplicate it. The blob-fetch trick it used (a plain
+// <a download> is ignored cross-origin without Content-Disposition) is
+// recoverable from git history if a surface ever needs it again.
 
-// Download the episode audio. Same approach as our own episode pages: fetch
-// the bytes and save via a Blob (a plain <a download> is ignored cross-origin
-// when the CDN doesn't send Content-Disposition). External podcast CDNs often
-// lack permissive CORS, so on any failure we fall back to opening the URL so
-// the listener can still save it manually.
-function downloadMp3Button(url, ep, stem) {
-  const base = (ep.title || stem).toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || stem
-  const filename = base + '.mp3'
-  const label = '↓ Download MP3'
-  const dl = h('button', { class: 'pcast-btn pcast-btn-download', type: 'button' }, label)
-  dl.addEventListener('click', async () => {
-    dl.disabled = true; dl.textContent = 'Downloading…'
-    try {
-      const resp = await fetch(url)
-      if (!resp.ok) throw new Error('HTTP ' + resp.status)
-      const blobUrl = URL.createObjectURL(await resp.blob())
-      const a = document.createElement('a')
-      a.href = blobUrl; a.download = filename
-      document.body.appendChild(a); a.click(); a.remove()
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 200)
-    } catch {
-      window.open(url, '_blank', 'noopener')
-    } finally {
-      dl.textContent = label; dl.disabled = false
-    }
-  })
-  return dl
-}
 
 // ── Boost wiring ─────────────────────────────────────────────────────
 // The boost modal + payment live in the login-widget bundle (window.LBLogin),
@@ -417,10 +384,7 @@ async function onBoostClick(item, btn, copy = COPY.other) {
     showToast('Can’t identify this show’s feed', true); return
   }
 
-  const label = btn.querySelector('.pcast-boost-label')
-  const prevLabel = label ? label.textContent : ''
-  if (label) label.textContent = 'Loading…'
-  btn.disabled = true
+  await withBoostBusy(btn, async () => {
   try {
     const qs = new URLSearchParams()
     if (feedId) qs.set('feedId', String(feedId))
@@ -459,16 +423,13 @@ async function onBoostClick(item, btn, copy = COPY.other) {
       },
       recipientsBundle: { recipients, totalWeight },
     })
-    // Hold the loading state until a modal (boost / login / wallet) opens.
-    if (label) label.textContent = 'Opening…'
+    // Hold the busy state until a modal (boost / login / wallet) opens.
     await waitForModal()
   } catch (e) {
     console.warn('[podcasts] boost failed', e)
     showToast('Couldn’t start the boost — try again.', true)
-  } finally {
-    btn.disabled = false
-    if (label) label.textContent = prevLabel
   }
+  })
 }
 
 // ── Card ─────────────────────────────────────────────────────────────
@@ -491,13 +452,24 @@ function episodeCard(item, rank = null, copy = COPY.other) {
 
   // Episode art — links to the episode's Boost Me Bitch page (its full boost
   // feed), the same target as the episode title and show name below.
-  const mediaImg = isSafeImg(ep.image)
-    ? h('img', { src: ep.image, alt: '', loading: 'lazy', referrerpolicy: 'no-referrer' })
-    : null
-  const mediaClass = 'pcast-card-media' + (mediaImg ? '' : ' pcast-card-media--none')
+  //
+  // Episode art first, then the show's primary and second-chance artwork. That
+  // last link is what `art2` bought: a feed whose channel art 404s still paints
+  // the URL the same feed also published. An exhausted chain drops to the glyph
+  // rather than leaving a broken image, which is what the old single-URL
+  // version showed. The callback closes over `media`, declared just below —
+  // safe because an image error is always dispatched asynchronously, long after
+  // the binding is initialised.
+  const mediaImg = h('img', { alt: '', loading: 'lazy', referrerpolicy: 'no-referrer' })
+  const hasArt = wireCoverFallback(mediaImg, ep.imageChain || coverChain(ep.image), () => {
+    mediaImg.remove()
+    media.classList.add('pcast-card-media--none')
+    media.appendChild(document.createTextNode('🎙'))
+  })
+  const mediaClass = 'pcast-card-media' + (hasArt ? '' : ' pcast-card-media--none')
   const media = bmbUrl
-    ? h('a', { class: mediaClass, href: bmbUrl, target: '_blank', rel: 'noopener noreferrer', title: 'See all boosts on Boost Me Bitch' }, mediaImg || '🎙')
-    : h('div', { class: mediaClass }, mediaImg || '🎙')
+    ? h('a', { class: mediaClass, href: bmbUrl, target: '_blank', rel: 'noopener noreferrer', title: 'See all boosts on Boost Me Bitch' }, hasArt ? mediaImg : '🎙')
+    : h('div', { class: mediaClass }, hasArt ? mediaImg : '🎙')
 
   // Booster faces on the drawer bar, stacked — the first MAX_FACES of them.
   const avatars = h('span', { class: 'pcast-avatars' },
@@ -555,6 +527,16 @@ function episodeCard(item, rank = null, copy = COPY.other) {
     h('span', { text: `${nBoosters.toLocaleString()} booster${nBoosters === 1 ? '' : 's'}` }),
     h('span', { class: 'pcast-dot', 'aria-hidden': 'true', text: '·' }),
     h('span', { text: `${nBoosts.toLocaleString()} boost${nBoosts === 1 ? '' : 's'}` }),
+    // Boost rides the end of this line. It used to be a labelled button in a
+    // row of its own beneath the player, alongside "↓ Download MP3"; that row
+    // cost a full band of card height for two controls, and the download
+    // duplicated what every browser's own audio ⋮ menu already offers. The
+    // circle is the same one the Shows cards and the /show community drawer
+    // use, right-aligned by .ob-boost-circle's own margin-left.
+    circleBoostButton({
+      label: ep.title || copy.untitled,
+      onClick: (btn) => onBoostClick(item, btn, copy),
+    }),
   ])
 
   const body = h('div', { class: 'pcast-card-body' }, [
@@ -588,16 +570,6 @@ function episodeCard(item, rank = null, copy = COPY.other) {
     else a.src = audioUrl
     player = h('div', { class: 'pcast-player-row' }, a)
   }
-
-  // Action buttons: Boost (opens the external-boost modal) + Download MP3.
-  const boostBtn = h('button', {
-    class: 'pcast-btn pcast-btn-boost', type: 'button',
-    onclick: (e) => onBoostClick(item, e.currentTarget, copy),
-  }, [boltSvg(), h('span', { class: 'pcast-boost-label' }, copy.boostBtn)])
-  const buttons = h('div', { class: 'pcast-card-buttons' }, [
-    boostBtn,
-    audioUrl ? downloadMp3Button(audioUrl, ep, copy.fileStem) : null,
-  ])
 
   const details = h('div', { class: 'pcast-details', id: detailsId, hidden: 'hidden' })
   let built = false
@@ -638,7 +610,7 @@ function episodeCard(item, rank = null, copy = COPY.other) {
     drawerMeta,
   ])
 
-  const card = h('div', { class: 'pcast-card' }, [head, player, buttons, drawer, details])
+  const card = h('div', { class: 'pcast-card' }, [head, player, drawer, details])
   return card
 }
 

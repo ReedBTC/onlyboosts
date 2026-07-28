@@ -573,25 +573,12 @@
     .pcast-player-row { padding: 0.1rem 0.7rem 0.2rem; }
     .pcast-player { width: 100%; display: block; }
 
-    /* Download + Boost action buttons. */
-    .pcast-card-buttons {
-      display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
-      padding: 0.4rem 0.7rem 0.65rem;
-    }
-    .pcast-btn {
-      display: inline-flex; align-items: center; gap: 0.4rem;
-      padding: 0.5rem 0.95rem;
-      font: inherit; font-size: 0.85rem; font-weight: 700;
-      border: 1px solid transparent; border-radius: 999px; cursor: pointer;
-      transition: background 0.12s, border-color 0.12s, color 0.12s;
-    }
-    .pcast-btn-boost { color: #fff; background: var(--brand); border-color: var(--brand); }
-    .pcast-btn-boost:hover { background: var(--brand-d); border-color: var(--brand-d); }
-    .pcast-btn-bolt { display: inline-flex; width: 15px; height: 15px; }
-    .pcast-btn-bolt svg { width: 100%; height: 100%; display: block; }
-    .pcast-btn-download { color: var(--accent-d); background: var(--white); border-color: var(--border); }
-    .pcast-btn-download:hover { background: var(--tint); border-color: var(--accent); }
-    .pcast-btn-download:disabled { opacity: 0.6; cursor: default; }
+    /* The card action row (a pill Boost button beside "↓ Download MP3") is
+       gone. Boost is now the .ob-boost-circle at the right end of the Nostr
+       Stats line — defined in theme.css, since the show pages use the same
+       one — and the download duplicated what the audio element's own ⋮ menu
+       already offers. That row cost a full band of card height for two
+       controls, which is the whole argument on a phone. */
     .pcast-dot { opacity: 0.6; }
     .pcast-sats { font-weight: 700; color: var(--accent-d); white-space: nowrap; }
     .pcast-bolt { font-size: 0.85em; }

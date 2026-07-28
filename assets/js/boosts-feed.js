@@ -41,6 +41,7 @@ import {
 } from '/assets/js/feed-controls.js'
 import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js'
 import { showPageHref } from '/assets/js/show-link.js'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js'
 
 const PAGE_SIZE = 30
 
@@ -175,14 +176,13 @@ function renderPlaceholder(list, title, body) {
 function renderBoostCard(b) {
   // Avatar falls back to the show art before the generic placeholder — for a
   // booster with no kind-0 picture, the podcast they boosted is more
-  // informative than an anonymous silhouette.
-  const avatar = (isSafeUrl(b.booster.pic) && b.booster.pic)
-    || (isSafeUrl(b.podcast.img) && b.podcast.img)
-    || '/assets/avatar-fallback.svg'
-
+  // informative than an anonymous silhouette. Four links in the chain, and the
+  // last is guaranteed, so this always resolves to something: the booster's
+  // own picture, the show's primary art, its second-chance art, the silhouette.
   const img = h('img', { alt: '', referrerpolicy: 'no-referrer' })
-  img.src = avatar
-  img.onerror = () => { img.src = '/assets/avatar-fallback.svg' }
+  wireCoverFallback(img, coverChain(
+    b.booster.pic, b.podcast.img, b.podcast.art2, '/assets/avatar-fallback.svg',
+  ))
 
   const nameEl = h('span', { class: 'author-name', text: boosterLabel(b.booster) })
   const nameWrap = h('div', { class: 'note-author-name-wrap' }, [nameEl])

@@ -68,6 +68,8 @@ import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js'
 import { ensureLoginWidget } from '/assets/js/widget-loader.js'
 import { episodeBoostLink } from '/assets/js/episode-link.js'
 import { showToast } from '/assets/js/copy-npub.js'
+import { circleBoostButton, withBoostBusy } from '/assets/js/boost-button.js'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js'
 
 const PAGE_SIZE = 25       // show cards per "load more" batch
 const DRAWER_EPISODES = 50 // episodes listed per expanded show
@@ -144,7 +146,6 @@ const COPY = {
     glyph: '🎙',
     unidentified: 'Unidentified show',
     noun: 'show',
-    boostBtn: 'Boost this Show',
     drawer: 'Episodes with Nostr Boosts',
     noItems: 'No episodes recorded for this show yet.',
     truncated: (n, total) => `Showing the ${n} most recent of ${total} episodes.`,
@@ -168,7 +169,6 @@ const COPY = {
     glyph: '💿',
     unidentified: 'Unidentified release',
     noun: 'album',
-    boostBtn: 'Boost this Album',
     drawer: 'Tracks with Nostr Boosts',
     noItems: 'No tracks recorded for this release yet.',
     truncated: (n, total) => `Showing the ${n} most recent of ${total} tracks.`,
@@ -258,6 +258,10 @@ async function loadAllTime() {
     music: typeof p.medium === 'string' && p.medium.toLowerCase() === 'music',
     title: typeof p.title === 'string' ? p.title : '',
     img: typeof p.img === 'string' ? p.img : '',
+    // The feed's OTHER artwork URL, published only when it differs from `img`.
+    // A handful of shows have a dead primary and a live second — see
+    // cover-art.js.
+    art2: typeof p.art2 === 'string' ? p.art2 : '',
     feed: typeof p.feed === 'string' ? p.feed : '',
     // <itunes:author>: the artist on a music feed, the host or publisher on a
     // podcast. Matched by the search box, never displayed here — the credit
@@ -329,6 +333,7 @@ async function loadWindow(cutoff) {
     if (!s) {
       s = {
         guid, title: b.podcast.title || '', img: b.podcast.img || '',
+        art2: b.podcast.art2 || '',
         feed: b.podcast.feed || '', file: `podcasts/${guid}.json`,
         music: mediums.get(guid) === 'music',
         // Boost records carry no author (it's a show-level fact, same as the
@@ -345,6 +350,7 @@ async function loadWindow(cutoff) {
     // so fill from whichever row has it.
     if (!s.title && b.podcast.title) s.title = b.podcast.title
     if (!s.img && b.podcast.img) s.img = b.podcast.img
+    if (!s.art2 && b.podcast.art2) s.art2 = b.podcast.art2
     if (!s.feed && b.podcast.feed) s.feed = b.podcast.feed
 
     s.boosts++
@@ -453,12 +459,6 @@ function sortEpisodes(eps) {
 // see the money-paths section of CLAUDE.md.
 const VALUE_API = '/api/value'
 
-function boltSvg() {
-  const s = h('span', { class: 'pcast-btn-bolt', 'aria-hidden': 'true' })
-  s.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd"/></svg>'
-  return s
-}
-
 // Hold the loading state until the widget actually shows something: its gate
 // chain (session restore, wallet unlock) can run for seconds on a cold bundle,
 // and a button that reverts before then reads as a click that did nothing.
@@ -479,10 +479,7 @@ async function onShowBoost(s, btn, copy) {
   // by guid and/or feed URL and /api/value resolves the id server-side.
   if (!s.guid && !s.feed) { showToast(`Can’t identify this ${copy.noun}’s feed`, true); return }
 
-  const label = btn.querySelector('.pcast-boost-label')
-  const prevLabel = label ? label.textContent : ''
-  if (label) label.textContent = 'Loading…'
-  btn.disabled = true
+  await withBoostBusy(btn, async () => {
   try {
     const qs = new URLSearchParams()
     if (s.guid) qs.set('podcastGuid', s.guid)
@@ -520,15 +517,12 @@ async function onShowBoost(s, btn, copy) {
       },
       recipientsBundle: { recipients, totalWeight },
     })
-    if (label) label.textContent = 'Opening…'
     await waitForModal()
   } catch (e) {
     console.warn('[shows] boost failed', e)
     showToast('Couldn’t start the boost — try again.', true)
-  } finally {
-    btn.disabled = false
-    if (label) label.textContent = prevLabel
   }
+  })
 }
 
 // ── Card ──────────────────────────────────────────────────────────────
@@ -545,17 +539,19 @@ function renderShowCard(s, rank, copy) {
   // are, with the guid shown, so an unnamed card reads as incomplete data
   // rather than a broken site.
   const named = !!s.title
-  const art = isSafeUrl(s.img)
-    ? h('img', { src: s.img, alt: '', referrerpolicy: 'no-referrer', loading: 'lazy' })
-    : null
-  const media = h('div', { class: 'pcast-card-media' + (art ? '' : ' pcast-card-media--none') }, art || copy.glyph)
-  // A dead host or a hotlink block falls back to the same glyph a show with no
-  // art gets, rather than leaving an empty box.
-  if (art) {
-    art.onerror = () => {
-      media.classList.add('pcast-card-media--none')
-      media.replaceChildren(document.createTextNode(copy.glyph))
-    }
+  // Primary artwork, then the feed's second-chance URL, then the glyph. A dead
+  // host or a hotlink block falls back to the same glyph a show with no art
+  // gets, rather than leaving an empty box — `art2` just gives it one more real
+  // URL to try first. See cover-art.js.
+  const art = h('img', { alt: '', referrerpolicy: 'no-referrer', loading: 'lazy' })
+  const media = h('div', { class: 'pcast-card-media' }, art)
+  const hasArt = wireCoverFallback(art, coverChain(s.img, s.art2), () => {
+    media.classList.add('pcast-card-media--none')
+    media.replaceChildren(document.createTextNode(copy.glyph))
+  })
+  if (!hasArt) {
+    media.classList.add('pcast-card-media--none')
+    media.replaceChildren(document.createTextNode(copy.glyph))
   }
 
   // "Nostr Stats:" carries the qualifier that used to sit in a paragraph above
@@ -572,6 +568,20 @@ function renderShowCard(s, rank, copy) {
     // No episode count. See the note above SORT_OPTIONS: sats, boosts and
     // boosters are measures of boost activity, but an episode count reads as a
     // fact about the show, and ours isn't one.
+    //
+    // The boost button rides the end of this line rather than sitting in a
+    // button row of its own. It's the same circle the community drawer on a
+    // /show page uses, right-aligned by .ob-boost-circle's own margin-left,
+    // which is what keeps it off the figures on a narrow card. Withheld from
+    // unidentified shows for the same reason they get no landing page: Podcast
+    // Index doesn't know the feed, so there is no block to resolve and the
+    // button could only ever fail.
+    named && (s.guid || s.feed)
+      ? circleBoostButton({
+          label: s.title || copy.noun,
+          onClick: (btn) => onShowBoost(s, btn, copy),
+        })
+      : null,
   ])
 
   const head = h('div', { class: 'pcast-card-head' }, [
@@ -594,26 +604,12 @@ function renderShowCard(s, rank, copy) {
     ]),
   ])
 
-  // Boosting a show pays its FEED-level value split, so this needs nothing but
-  // a way to identify the feed. Withheld from unidentified shows for the same
-  // reason they get no landing page: Podcast Index doesn't know the feed, so
-  // there is no block to resolve and the button could only ever fail.
-  const buttons = named && (s.guid || s.feed)
-    ? h('div', { class: 'pcast-card-buttons' }, [
-        h('button', {
-          class: 'pcast-btn pcast-btn-boost', type: 'button',
-          title: `${copy.boostBtn} — pays the split its feed publishes`,
-          onclick: (e) => onShowBoost(s, e.currentTarget, copy),
-        }, [boltSvg(), h('span', { class: 'pcast-boost-label' }, copy.boostBtn)]),
-      ])
-    : null
-
   // No drawer when there's nothing to put in it. A show can legitimately have
   // boosts and no episodes: the all-time index reports 0 for shows whose boosts
   // never carried an episode guid, and the windowed rollup counts distinct
   // guids, so the same holds there. Offering a drawer would spend a shard fetch
   // to say "no episodes".
-  if (!s.episodes) return h('article', { class: 'pcast-card' }, [head, buttons])
+  if (!s.episodes) return h('article', { class: 'pcast-card' }, [head])
 
   const details = h('div', { class: 'pcast-details', hidden: 'hidden' })
   const caret = h('span', { class: 'pcast-drawer-caret', 'aria-hidden': 'true', text: '▾' })
@@ -624,9 +620,7 @@ function renderShowCard(s, rank, copy) {
   // leaving "Episodes" to imply the show's catalogue.
   }, [caret, h('span', { text: copy.drawer })])
 
-  // Buttons sit above the drawer bar, matching the episode card, where the
-  // drawer is always the last thing before the details it opens.
-  const card = h('article', { class: 'pcast-card' }, [head, buttons, drawer, details])
+  const card = h('article', { class: 'pcast-card' }, [head, drawer, details])
   let loaded = false
 
   drawer.addEventListener('click', async () => {

@@ -899,7 +899,7 @@ function communityRow(r, rank, size) {
         <span class="cs-meta">${htmlEscape(communityMeta(members, boosts, sats, size))}</span>
       </span>
     </a>
-    <button type="button" class="cs-boost" hidden
+    <button type="button" class="ob-boost-circle" hidden
       data-cs-boost="${htmlEscape(r.podcast_guid)}"
       data-cs-feed="${htmlEscape(isSafeUrl(r.feed_url) ? r.feed_url : "")}"
       data-cs-title="${htmlEscape(title)}"

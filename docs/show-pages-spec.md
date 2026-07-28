@@ -252,7 +252,11 @@ Two things specific to here:
   anchor is invalid, and nesting one would make the row swallow its clicks.
 - It is **icon-only**, because the row already carries art, a title, three
   figures and a rank, and a labelled button pushes the title into an ellipsis on
-  a phone. The homepage's Shows/Albums cards have room, so theirs are labelled.
+  a phone. The homepage's Episodes, Songs, Shows and Albums cards now carry the
+  same control at the right end of their own stats line, built by
+  `assets/js/boost-button.js` and styled once in `theme.css` — so the server
+  builds this markup by hand, and the class name plus the busy/disabled states
+  are the contract between the two.
 
 ## The Nostr Community Section
 

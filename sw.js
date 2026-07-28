@@ -169,7 +169,16 @@
 // fails the import binding at link time and the whole Shows feed dies. Also
 // carries the community wall's five-card podium (top 21 shown, not 24), whose
 // grid rule is in show-page.css while the counts are in the Function.
-const VERSION = 'ob-v33';
+// ob-v34: one circle boost button everywhere (Episodes, Songs, Shows, Albums
+// and the /show community drawer), the episode cards' "↓ Download MP3" row
+// removed, and show artwork gained a second-chance URL. Required on both
+// counts: feeds-podcasts.js and shows-feed.js gain STATIC imports of two new
+// modules (boost-button.js, cover-art.js) and ob-data.js gains one, so a
+// returning visitor holding a new renderer against a cache that has never seen
+// them fails the import binding and the feed dies. The .ob-boost-circle rules
+// are new in theme.css, which every page loads, and the .pcast-btn block that
+// index.html no longer needs came out of it.
+const VERSION = 'ob-v34';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;
