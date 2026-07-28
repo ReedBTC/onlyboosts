@@ -22,7 +22,7 @@ Locked for the first pass:
 | URL | The bare `podcast:guid`. No slugs. |
 | Community ranking | All time only. No range control. |
 | Community crossover | Own drawer above the wall, all-time, sort only. |
-| Community layout | Top five highlighted, everyone else ranked below by sats; 21 shown. |
+| Community layout | Top five highlighted (three on mobile), rest by sats; 21 shown, no numerals. |
 | Show-level boost | Yes, alongside the per-episode buttons. |
 
 Episode pages and per-npub pages are both expected later. The shapes below are
@@ -184,7 +184,7 @@ that set.
 
 **It answers a question the Shows feed structurally cannot.** The homepage feed
 ranks shows by size. This ranks them by overlap with one audience, and the
-headline figure on each row is that overlap: "27 of 115 boosters." Measured
+headline figure on each row is that overlap: "27 community boosters." Measured
 across nine shows sampled from rank #1 to #400, this list's top ten shares
 between **0 and 6** entries with the global top ten, so it is a different list
 rather than the site-wide ranking repeated.
@@ -278,7 +278,22 @@ Ported from `git show lb/main:supporters.html` in look, not in structure.
 **What carries over:** the circular-avatar grid, the count badge on the heading,
 the name beneath each avatar, click-to-copy npub with the shared `.pcast-toast`,
 the blank circle for a supporter with a name but no picture, and the skeleton
-loaders.
+loaders. Also, as of the rebuild, LB's **absence of card chrome** — no border,
+no background, no rounded panel. A first pass boxed each supporter and it
+competed with the avatars, which are the pattern. Sats sit centered under the
+name.
+
+**No rank numerals.** The wall is ordered by sats, so position says standing; a
+number on every face turned a community into a scoreboard. Size and a brand ring
+mark the podium instead.
+
+**The podium wraps rather than counting** — five across on desktop, three on a
+phone with the last two centered beneath. `PODIUM` is decided server-side and
+CSS cannot move a card into the grid below, so `.sup-podium` is a centered
+flex-wrap and `.sup-card--podium` is an exact fraction of the row
+(`calc((100% - 4 * 1.3rem) / 5)`, and `/ 3` under 640px). A pixel width would
+leave the break to viewport arithmetic: a 430px phone fits four 84px cards where
+a 375px one fits three.
 
 **What does not:** LB's tier system. It bucketed supporters by absolute lifetime
 sats (100k / 69k / 21k / rest), which works across one show's entire audience

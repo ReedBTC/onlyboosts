@@ -184,7 +184,13 @@
 // a show-page.css whose .cs-rank / .cs-art / .cs-title / .cs-meta rules had been
 // deleted by accident, so the community drawer rendered at the 17px body serif
 // with unstyled art. A returning visitor holds that stylesheet until this bump.
-const VERSION = 'ob-v35';
+// ob-v36: the Nostr Community wall is rebuilt on localbitcoiners' supporters.html
+// pattern — bare centered avatars, no card chrome, no rank numerals — and its
+// podium wraps to three across on a phone. Required: the .sup-rank markup came
+// out of the Function while the whole .sup-* block was rewritten in
+// show-page.css, so a returning visitor holding the old stylesheet against the
+// new markup gets boxed cards with no numbers in them.
+const VERSION = 'ob-v36';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;

@@ -139,7 +139,6 @@ export async function onRequestGet({ request, env, params }) {
          SELECT DISTINCT booster_pubkey FROM boosts WHERE podcast_guid = ?
        )
        SELECT b.podcast_guid, p.title, p.image, p.feed_url,
-              (SELECT COUNT(*) FROM community) AS community_size,
               COUNT(*)                         AS cs_boosts,
               SUM(COALESCE(b.sats, 0))         AS cs_sats,
               COUNT(DISTINCT b.booster_pubkey) AS cs_members
@@ -869,15 +868,20 @@ function renderHeader(show, art, title, copy) {
 // catalogue you consult; this is a recommendation you browse, and a closed
 // drawer is a recommendation nobody sees.
 
-// One row's figures: "18 of 115 boosters · 34 boosts · 12k sats". All three are
-// scoped to this community by the query's join — the boosts and sats are what
-// THESE boosters sent that show, not its global totals.
-function communityMeta(members, boosts, sats, size) {
-  return `${num(members)} of ${num(size)} booster${size === 1 ? "" : "s"} · ` +
+// One row's figures: "18 community boosters · 34 boosts · 12k sats". All three
+// are scoped to this community by the query's join — the boosts and sats are
+// what THESE boosters sent that show, not its global totals.
+//
+// This read "18 of 115 boosters" and the fraction was a puzzle: the denominator
+// is this show's own booster count, which is on the page but not next to it, so
+// the reader had to go find what they were 18 of. Naming the set says the same
+// thing in one number.
+function communityMeta(members, boosts, sats) {
+  return `${num(members)} community booster${members === 1 ? "" : "s"} · ` +
     `${num(boosts)} boost${boosts === 1 ? "" : "s"} · ${compact(sats)} sats`;
 }
 
-function communityRow(r, rank, size) {
+function communityRow(r, rank) {
   const art = isSafeUrl(r.image) ? r.image : null;
   const title = truncate(r.title, 120);
   const members = Number(r.cs_members || 0);
@@ -896,7 +900,7 @@ function communityRow(r, rank, size) {
         : `<span class="cs-art cs-art--blank" aria-hidden="true">🎙️</span>`}
       <span class="cs-main">
         <span class="cs-title">${htmlEscape(title)}</span>
-        <span class="cs-meta">${htmlEscape(communityMeta(members, boosts, sats, size))}</span>
+        <span class="cs-meta">${htmlEscape(communityMeta(members, boosts, sats))}</span>
       </span>
     </a>
     <button type="button" class="ob-boost-pill" hidden
@@ -910,11 +914,6 @@ function communityRow(r, rank, size) {
 function renderCommunityShows(rows) {
   if (!rows.length) return "";
 
-  // Constant across the result set; the denominator in every row's "18 of 115".
-  // Taken from the CTE rather than podcasts.booster_count so the two halves of
-  // the fraction are counted the same way and can never read "120 of 115".
-  const size = Number(rows[0].community_size || 0);
-
   // The bolt symbol sheet that used to sit here went with the icon button: the
   // pill is the word alone, so there is no glyph to define once and reference
   // 150 times.
@@ -926,7 +925,7 @@ function renderCommunityShows(rows) {
            the homepage panels. -->
       <div class="cs-controls" data-cs-controls hidden></div>
       <ul class="ep-list cs-list" data-cs-list>
-        ${rows.map((r, i) => communityRow(r, i + 1, size)).join("\n        ")}
+        ${rows.map((r, i) => communityRow(r, i + 1)).join("\n        ")}
       </ul>
     </details>
   </section>`;
@@ -967,11 +966,11 @@ function renderSupporters(rows, show, copy) {
     </div>
 
     <ol class="sup-podium">
-      ${podium.map((r, i) => supporterCard(r, i + 1, true)).join("\n      ")}
+      ${podium.map((r) => supporterCard(r, true)).join("\n      ")}
     </ol>
 
     ${rest.length ? `<ol class="sup-grid" data-supporter-grid>
-      ${rest.map((r, i) => supporterCard(r, i + 1 + PODIUM, false, i >= SUPPORTERS_VISIBLE - PODIUM)).join("\n      ")}
+      ${rest.map((r, i) => supporterCard(r, false, i >= SUPPORTERS_VISIBLE - PODIUM)).join("\n      ")}
     </ol>` : ""}
 
     ${hidden > 0 ? `<button type="button" class="btn btn-quiet show-more" data-show-more="supporter">
@@ -980,7 +979,10 @@ function renderSupporters(rows, show, copy) {
   </section>`;
 }
 
-function supporterCard(r, rank, isPodium, hidden = false) {
+// No rank number. The wall is ordered by sats, so position already says
+// standing, and a numeral on every avatar turned a community into a scoreboard.
+// The podium's larger avatars are what mark the top of the order now.
+function supporterCard(r, isPodium, hidden = false) {
   const name = displayName(r);
   const label = name || shortId(r.booster_npub, r.booster_pubkey);
   const pic = isSafeUrl(r.picture) ? r.picture : null;
@@ -996,7 +998,6 @@ function supporterCard(r, rank, isPodium, hidden = false) {
 
   return `<li class="sup-card${isPodium ? " sup-card--podium" : ""}"${hidden ? " hidden data-overflow" : ""}${
         missing ? ` data-pk="${htmlEscape(r.booster_pubkey)}" data-missing="${missing}"` : ""}>
-        <span class="sup-rank">${rank}</span>
         <button type="button" class="sup-avatar${pic ? "" : " is-blank"}" data-copy-npub="${htmlEscape(copyVal)}" title="Copy npub" aria-label="Copy npub for ${htmlEscape(label)}">
           ${pic ? `<img src="${htmlEscape(pic)}" alt="" loading="lazy" />` : ""}
         </button>

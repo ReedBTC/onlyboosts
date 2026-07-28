@@ -855,9 +855,11 @@ Design of record: the section of the same name in `docs/show-pages-spec.md`.
 boosting podcasts is the interesting half of the finding, so the heading is
 "Other Shows/Albums This Community Boosts" on both and there is no `COPY` entry.
 
-**The headline figure per row is the overlap, not the size**: "27 of 115
+**The headline figure per row is the overlap, not the size**: "27 community
 boosters". That is what the homepage Shows feed cannot say, and it's the default
-sort. Sampled from rank #1 to #400, this list's top ten shares 0–6 entries with
+sort. It read "27 of 115 boosters" first and the fraction was a puzzle — the
+denominator is this show's own booster count, which is on the page but not next
+to it, so the reader had to go find what they were 27 of. Sampled from rank #1 to #400, this list's top ten shares 0–6 entries with
 the global top ten, so it is not the site-wide ranking repeated.
 
 **Every figure is community-scoped by construction.** The query joins through
@@ -889,10 +891,26 @@ half is carried; there is no range control here.
 Untitled shows are excluded though the Shows feed keeps them — they have no page
 to link to, and no Podcast Index record, so their boost button could only fail.
 
-**The community wall's podium is five cards, and 21 boosters show before the
-toggle** (`PODIUM` / `SUPPORTERS_VISIBLE`). `.sup-podium` is `repeat(5,
-minmax(0,1fr))` rather than auto-fit: the count is always `PODIUM`, and auto-fit
-reflowed five cards into 4+1 as soon as the column got tight.
+**The community wall follows localbitcoiners' `supporters.html`**, which is its
+visual ancestor and reads better than the boxed grid that came first. The card
+has **no chrome** — no border, no background, no panel — just a circular avatar,
+the name, and the sats centered beneath. The avatars are the pattern, and a grid
+of bordered boxes competed with them. `git show lb/main:supporters.html` is the
+reference.
+
+**No rank numerals.** The wall is ordered by sats, so position already says
+standing; a numeral on every face turned a community into a scoreboard. The
+podium is marked by size and a brand ring instead.
+
+**The podium wraps rather than counting**: five across on desktop, three on a
+phone with the last two centered beneath. `PODIUM` is a server-side constant and
+CSS cannot move a card into the grid below, so the row is a centered flex-wrap
+and `.sup-card--podium` is an exact fraction of it —
+`calc((100% - 4 * 1.3rem) / 5)`, and `/ 3` in the 640px block. A pixel width
+would put the break at the mercy of viewport arithmetic: a 430px phone fits four
+84px cards where a 375px one fits three, so one rule would give two different
+counts on two phones. 21 boosters show before the toggle
+(`SUPPORTERS_VISIBLE`).
 
 ## ⚠️ Show-level boosting, and the one boost button
 
