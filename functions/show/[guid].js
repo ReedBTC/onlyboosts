@@ -437,6 +437,8 @@ const COPY = {
   podcast: {
     eyebrow: "Show",
     noun: "show",
+    // Stand-in for an episode row with no artwork, matching shows-feed.js.
+    glyph: "🎙",
     boostBtn: "Boost this Show",
     itemsPlural: "Episodes",
     itemAbbr: "Ep.",
@@ -453,6 +455,7 @@ const COPY = {
   music: {
     eyebrow: "Album",
     noun: "album",
+    glyph: "💿",
     boostBtn: "Boost this Album",
     itemsPlural: "Tracks",
     itemAbbr: "Track",
@@ -497,9 +500,11 @@ function renderShowPage({ show, episodes, supporters, boosts, community, names }
   // summary and they differentiate the preview from every podcast directory.
   // The scope has to be inside the sentence, not merely on the page. This is
   // the one string that travels without the page around it, into a Nostr
-  // client's preview card or a group chat, where the .ob-scopenote under the
-  // stats is not there to qualify them. A bare "3 supporters have sent…" reads
-  // as a verdict on the show's whole audience.
+  // client's preview card or a group chat, where neither the stat heading's
+  // link nor anything else on the page is there to qualify it. A bare "3
+  // supporters have sent…" reads as a verdict on the show's whole audience.
+  // It is now the ONLY place the full sentence survives — the paragraph that
+  // used to sit under the stat tiles is gone — so don't trim it.
   const one = show.booster_count === 1;
   const ogDesc = show.booster_count
     ? `${num(show.booster_count)} Nostr booster${one ? " has" : "s have"} sent ` +
@@ -799,6 +804,18 @@ function renderHeader(show, art, title, copy) {
   // NIP-73 tagging. Measured against RSS: 70 shown vs 415 real for Rabbit Hole
   // Recap, 64 vs 676 for LINUX Unplugged, and 22 vs 21 for Local Bitcoiners,
   // so not even reliably a subset. See docs/show-pages-spec.md.
+  // THE STAT HEADING IS THIS PAGE'S QUALIFIER, and it replaced a paragraph.
+  // A caveat sentence used to sit under these tiles (.ob-scopenote, now unused
+  // site-wide) saying the counts cover only boosts published to Nostr. It said
+  // more than two words can, but it said it after the numbers and ran three
+  // lines on a phone, on a page whose whole design is to fit one screen.
+  // "Nostr Boost Stats" above them, with the link carrying the rest, is the
+  // same trade the feeds already make with their "Nostr Stats:" label. The
+  // link goes to /about#keysend — "What Is Not Indexed" — because what these
+  // numbers exclude is the substance the paragraph carried.
+  //
+  // og:description still states the scope inside the sentence and is now the
+  // ONLY place the full wording survives. See the note above ogDesc.
   const stats = [
     { label: "sats", value: compact(show.total_sats), exact: num(show.total_sats) },
     { label: show.boost_count === 1 ? "boost" : "boosts", value: num(show.boost_count), exact: num(show.boost_count) },
@@ -831,23 +848,12 @@ function renderHeader(show, art, title, copy) {
         </div>
       </div>
     </div>
+    <h2 class="show-stats-title">
+      <a href="/about#keysend">Nostr Boost</a> Stats
+    </h2>
     <dl class="show-stats">
       ${stats.map((s) => `<div class="show-stat"><dt>${htmlEscape(s.label)}</dt><dd title="${htmlEscape(s.exact)}">${htmlEscape(s.value)}</dd></div>`).join("\n      ")}
     </dl>
-    <!-- These pages are meant to be shared by the shows themselves, so the
-         figures land in front of people with no idea what this site indexes.
-         The caveat belongs next to the numbers that prompt the question, not
-         buried in the footer: most boosting is keysend and never touches
-         Nostr, so a show's real total is higher than what's shown here, and a
-         booster can be missing entirely. Both anchors are real sections of
-         /about. The .ob-scopenote class is shared with the feed panels on / and
-         the stat strip on /about, and is defined once in theme.css. -->
-    <p class="ob-scopenote">
-      These counts cover only boosts published to Nostr.
-      <a href="/about#keysend">Most boosts are sent by keysend</a> and leave no
-      public record, so the real totals are higher and some boosters won't
-      appear. <a href="/about#limits">A boost note is a claim, not a receipt.</a>
-    </p>
   </header>`;
 }
 
@@ -1067,15 +1073,24 @@ function renderEpisodes(rows, show, copy) {
     <details class="ep-drawer">
       <summary>${copy.drawer}</summary>
       <ul class="ep-list">
-        ${rows.map((e) => episodeRow(e, copy)).join("\n        ")}
+        ${rows.map((e) => episodeRow(e, copy, isSafeUrl(show.image) ? show.image : null)).join("\n        ")}
       </ul>
     </details>
   </section>`;
 }
 
-function episodeRow(e, copy) {
+// `fallbackArt` is the show's own artwork. Episode art is near-universal in the
+// index (100% on every show sampled), but where a row has none the show's art
+// is a truer stand-in than a glyph — it is what that episode's art would almost
+// certainly have been. D1 carries no second-chance URL (see the art2 note in
+// CLAUDE.md), so this is a single src with the glyph behind it.
+function episodeRow(e, copy, fallbackArt) {
   const bits = [fmtDate(e.published), fmtDuration(e.duration)].filter(Boolean);
+  const art = (isSafeUrl(e.image) && e.image) || fallbackArt || null;
   return `<li class="ep-row">
+          ${art
+            ? `<img class="ep-art" src="${htmlEscape(art)}" alt="" width="44" height="44" loading="lazy" referrerpolicy="no-referrer" />`
+            : `<span class="ep-art ep-art--blank" aria-hidden="true">${copy.glyph}</span>`}
           <div class="ep-main">
             <p class="ep-title">${e.episode_number ? `<span class="ep-num">${copy.itemAbbr} ${htmlEscape(e.episode_number)}</span> ` : ""}${htmlEscape(e.title || copy.untitledItem)}</p>
             <p class="ep-meta">${bits.map(htmlEscape).join(" · ")}${bits.length ? " · " : ""}${htmlEscape(num(e.total_sats))} sats · ${htmlEscape(num(e.boost_count))} boost${e.boost_count === 1 ? "" : "s"}</p>

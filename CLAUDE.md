@@ -813,20 +813,32 @@ counts moved out of that drawer bar and into the card body under the Fountain
 link to make room for it; the sats stayed on the drawer bar beside the booster
 faces.
 
-**The full sentence, on `/show`.** `.ob-scopenote` is defined in `theme.css` and
-mounted in the show page hero. That is the page shows share, where the numbers
-land in front of people who don't know what this site indexes, so it earns the
-paragraph.
+**A linked heading, on `/show`.** The stat tiles sit under
+`<h2 class="show-stats-title">`, reading **"Nostr Boost Stats"** with *Nostr
+Boost* linking to `/about#keysend` — "What Is Not Indexed", the section that
+explains what the numbers exclude. The qualifier is above the figures rather
+than after them, and the link carries the rest.
 
-**`/about` gets neither.** Its Indexer Stats paragraph says more than the
-sentence does and says it first; only the lead stat tile carries the word.
+**The full sentence now survives in exactly one place: `og:description`.** That
+is the string that travels without the page around it, into a preview card or a
+group chat where nothing else qualifies it, so **don't trim it**.
 
-**A scope-note paragraph above the feed panels was built and removed.** It was
-the first thing on the homepage, three lines on a phone, and it pushed the feed
-below the fold to answer a question a browsing visitor had not asked yet. The
-per-card label says the same thing in two words, at the point of the numbers.
-Don't reintroduce it; if the qualifier ever needs more weight on `/`, the place
-to add it is the masthead line, which already links to `/about`.
+**`.ob-scopenote` is gone.** It was the shared one-sentence paragraph, and it
+had three intended homes; none are left. The feed panels dropped it (first
+thing on the homepage, three lines on a phone, pushing the feed below the fold
+to answer a question a browsing visitor had not asked yet). `/about` never took
+it — its Indexer Stats paragraph says more and says it first, and only the lead
+tile carries the word. `/show` was the last mount, replaced by the heading
+above: it said more than two words can, but it said it *after* the numbers, on
+a page whose whole design is to fit one screen. The rule is deleted from
+`theme.css`; `git show f0c5f66:assets/css/theme.css` has it.
+
+**The pattern across every surface is now the same**: a short label at the
+point of the numbers, not a paragraph near them — `Nostr Stats:` on the rollup
+cards, `Nostr Interactions:` on the boost drawer, `Nostr Boost Stats` over the
+show hero's tiles. Don't reintroduce the paragraph; if the qualifier ever needs
+more weight on `/`, the place to add it is the masthead line, which already
+links to `/about`.
 
 The `/boosts` cards carry no qualifier at all: one card is one boost, and its
 sats figure is that note's own claim rather than an aggregate.

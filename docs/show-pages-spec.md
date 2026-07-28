@@ -452,16 +452,23 @@ and letting most of them fail at click time.
 
 ## The Data Caveat
 
-A short note sits directly under the stat cards, linking `/about#keysend` and
-`/about#limits`.
+The stat tiles carry a heading, **"Nostr Boost Stats"**, with *Nostr Boost*
+linked to `/about#keysend`.
 
 It is there because of who these pages are for. A show sharing its own page puts
 these figures in front of an audience with no idea what the site indexes, and
 the two questions that follow are "why is this number so low" and "where is my
 regular booster". Both answers are on the About page: most boosting is keysend
-and never touches Nostr, and a boost note is a claim rather than a receipt. The
-note goes next to the numbers that prompt the question rather than in the
-footer.
+and never touches Nostr, and a boost note is a claim rather than a receipt.
+
+**This began as a paragraph under the tiles** (`.ob-scopenote`, linking
+`#keysend` and `#limits`) and became a heading over them. The paragraph said
+more than two words can, but it said it *after* the numbers and ran three lines
+on a phone, on a page whose whole design is to fit one screen. Above the figures
+is also simply the better place for a qualifier on them. `og:description` still
+states the scope inside its sentence and is now the only place the full wording
+survives, which matters more than the on-page copy: it is the string that
+travels into a preview card with no page around it.
 
 ---
 

@@ -171,10 +171,26 @@
   justify-content: center;
 }
 
-/* The caveat line under the stat cards is .ob-scopenote, defined in theme.css
-   because the feed panels and the about page print the same sentence. Only its
-   spacing inside the hero belongs here. */
-.show-hero .ob-scopenote { margin-top: 0.85rem; }
+/* "Nostr Boost Stats" over the three tiles. Same Playfair treatment as a
+   section h2, a step down in size — it labels three cards, not a section of the
+   page. The linked half is the page's qualifier now (a caveat paragraph used to
+   sit under the tiles instead), so it has to read as a link without shouting:
+   brand color, underline on hover only. */
+.show-stats-title {
+  margin: 1.75rem 0 0.6rem;
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: clamp(1.05rem, 2.6vw, 1.3rem);
+  font-weight: 700;
+  color: var(--ink);
+}
+.show-stats-title a {
+  color: var(--brand-d);
+  text-decoration: none;
+}
+.show-stats-title a:hover,
+.show-stats-title a:focus-visible { text-decoration: underline; text-underline-offset: 3px; }
+
+.show-stats { margin-top: 0; }
 
 /* ── Sections ─────────────────────────────────────────────────────────── */
 
@@ -428,6 +444,24 @@
 }
 .ep-row:last-child { border-bottom: 0; }
 
+/* Same 44px rounded square as .cs-art in the drawer below, deliberately: the
+   two lists sit in matching boxes on the same page and should read as one
+   pattern. Episode art is near-universal in the index; a row without it falls
+   back to the show's own art, and only then to the glyph. */
+.ep-art {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--cream-d);
+}
+.ep-art--blank {
+  display: grid;
+  place-items: center;
+  font-size: 1.1rem;
+}
+
 .ep-main { min-width: 0; flex: 1; }
 
 .ep-title {
@@ -644,7 +678,8 @@
   .sup-name { font-size: 0.76rem; }
   .sup-sats { font-size: 0.68rem; }
   .boost-when { margin-left: 0; }
-  .cs-art { width: 38px; height: 38px; }
+  .cs-art,
+  .ep-art { width: 38px; height: 38px; }
   .cs-link { gap: 0.55rem; padding-left: 0.4rem; }
   .cs-row .ob-boost-pill { margin-right: 0.4rem; }
 }

@@ -194,7 +194,13 @@
 // Episodes sections and the .show-more rule, deleted by the same over-broad
 // slice that cost the .cs-* rules in ob-v34. Boost cards rendered as plain
 // text and both drawers lost their box and their scroll. Restored verbatim.
-const VERSION = 'ob-v37';
+// ob-v38: episode artwork in the /show episode drawer, and the stat tiles gain
+// a "Nostr Boost Stats" heading in place of the caveat paragraph beneath them.
+// Required: .ep-art and .show-stats-title are new in show-page.css while the
+// markup comes from the Function, so a returning visitor on the old stylesheet
+// gets full-bleed episode art and an unstyled heading. Also drops .ob-scopenote
+// from theme.css, which every page loads and none now mount.
+const VERSION = 'ob-v38';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;

@@ -85,42 +85,27 @@ img { display: block; max-width: 100%; }
   100% { background-position: -100% 0; }
 }
 
-/* ── The scope note ──────────────────────────────────────────────────────
-   One sentence, printed wherever the site shows an aggregate: the feed
-   panels on /, the stat strip on /about, and the hero of every /show page.
-   It names what the counts cover, because sats, boosts and booster totals
-   are all bounded by the handful of apps that publish boost notes to Nostr,
-   and a reader who doesn't know that reads them as the show's real numbers.
+/* ── The scope note (removed) ────────────────────────────────────────────
+   `.ob-scopenote` was the one-sentence qualifier printed wherever the site
+   showed an aggregate. It has no mount point left and the rule is deleted:
+   the feed panels dropped it (it pushed the feed below the fold to answer a
+   question nobody had asked yet), /about never used it (its Indexer Stats
+   paragraph says more and says it first), and /show replaced it with the
+   linked "Nostr Boost Stats" heading over the tiles.
 
-   It lives in theme.css rather than page.css because theme.css is the only
-   stylesheet all three of those pages load. Quiet enough not to compete with
-   the numbers, close enough that nobody reads them without it.
-
-   The copy itself is duplicated at each mount point (this is a no-build
-   site, so there is nowhere to define a string once for both a static page
-   and a Pages Function). Grep ob-scopenote before changing the wording. */
-.ob-scopenote {
-  margin: 0;
-  font-size: 0.8rem;
-  line-height: 1.55;
-  color: var(--muted);
-}
-.ob-scopenote a {
-  color: var(--muted);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-.ob-scopenote a:hover { color: var(--brand-d); }
+   The qualifier itself did not go away, it changed form — see the vocabulary
+   section of CLAUDE.md. `git show f0c5f66:assets/css/theme.css` has the rule
+   if a surface ever needs the paragraph back. */
 
 /* ── The boost button ────────────────────────────────────────────────────
    One compact boost affordance, used on every card that boosts a SHOW or an
    EPISODE: the Episodes and Songs cards, the Shows and Albums cards, and every
    row of the community drawer on a /show page.
 
-   It lives here, in theme.css, for the same reason .ob-scopenote does — that
-   is the only stylesheet the homepage and the show pages both load, so this is
-   a single definition rather than a rule restated in index.html's inline block
-   and again in show-page.css. It therefore reads --brand, never --accent: the
+   It lives here, in theme.css, because that is the only stylesheet the
+   homepage and the show pages both load, so this is a single definition rather
+   than a rule restated in index.html's inline block and again in
+   show-page.css. It therefore reads --brand, never --accent: the
    feed accents only exist on index.html, and a button styled off one would be
    unstyled everywhere else.
 
