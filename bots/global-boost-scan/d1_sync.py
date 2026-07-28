@@ -84,6 +84,12 @@ def build_full_sql(conn):
                s.title, s.image, s.feed_url, s.medium, s.author
         FROM boosts b LEFT JOIN shows s ON s.podcast_guid={eg}
         WHERE {eg} IS NOT NULL GROUP BY {eg}""").fetchall():
+        # NOTE: `artwork` is intentionally NOT projected yet. The remote D1
+        # `podcasts` table has no artwork column until an out-of-band
+        # `ALTER TABLE podcasts ADD COLUMN artwork TEXT` (+ backfill) runs — same
+        # rollout order as `author`. Add s.artwork to the SELECT and the INSERT
+        # here (and in the --remote-delta path below) only after that ships, or
+        # the autonomous timer's delta push will fail on an unknown column.
         out.append(
             "INSERT INTO podcasts (podcast_guid,title,image,feed_url,medium,author,"
             "boost_count,total_sats,booster_count,episode_count,latest_ts) VALUES ("
@@ -161,6 +167,8 @@ def build_delta_sql(conn, rows):
                WHERE {eg}=? GROUP BY {eg}""", (pg,)).fetchone()
         if not a:
             continue
+        # See the note in the full-load path above: add `artwork` here only after
+        # the remote D1 column exists, else this delta push fails mid-run.
         out.append(
             "INSERT OR REPLACE INTO podcasts (podcast_guid,title,image,feed_url,medium,author,"
             "boost_count,total_sats,booster_count,episode_count,latest_ts) VALUES ("

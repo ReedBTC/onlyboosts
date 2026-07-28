@@ -82,6 +82,7 @@ Boosts within a file are newest-first.
     "guid":  "856cd618-…",    // podcast:guid (RFC-4122 UUID)
     "title": "No Agenda Show",// nullable if the show isn't in Podcast Index
     "img":   "https://…",     // nullable
+    "art2":  "https://…",     // nullable fallback art URL; render `img`, on 404 try `art2`. See the art2 note.
     "feed":  "https://…/rss.xml" // nullable
   },
   "episode": {
@@ -103,7 +104,8 @@ Boosts within a file are newest-first.
   "podcasts": [                        // sorted by `latest` desc (most recent boost first)
     {
       "guid": "856cd618-…", "title": "No Agenda Show",
-      "img": "https://…", "feed": "https://…/rss.xml",
+      "img": "https://…", "art2": "https://…", // art2 nullable; fallback when `img` 404s — see the art2 note
+      "feed": "https://…/rss.xml",
       "medium": "podcast",             // podcast:medium — 'music', 'video', … ; defaults to 'podcast'
       "author": "Adam Curry & John C. Dvorak", // <itunes:author>; nullable. See the author note below.
       "boosts": 542, "sats": 487214, "boosters": 96, "episodes": 130,
@@ -120,8 +122,8 @@ sanitized — always use `file`, don't assemble it yourself).
 ```jsonc
 {
   "generated_at": …,
-  "show": { "guid": …, "title": …, "img": …, "feed": …, "medium": "podcast",
-            "author": "Adam Curry & John C. Dvorak" },   // nullable; see the author note below
+  "show": { "guid": …, "title": …, "img": …, "art2": …, "feed": …, "medium": "podcast",
+            "author": "Adam Curry & John C. Dvorak" },   // art2/author nullable; see notes below
   "episodes": [
     { "guid": …, "title": …, "img": …, "date": …, "num": …, "url": …,
       "shownotes": "full plain-text shownotes…",   // uncapped; nullable
@@ -168,6 +170,16 @@ Follows views light up only once someone signs in.
 ## Field gotchas worth coding for
 - **`sats` can be `null`** — show the boost without an amount, or hide it; small fraction.
 - **`name`/`pic`/`title`/`img`/`date`/`url` are nullable** — always have a fallback (npub short form, show image, "Unknown show", etc.).
+- **`art2` is a second-chance art URL — render `img`, fall back to `art2` on error.** PI
+  splits a feed's channel art across `image` (RSS `<image><url>`) and `artwork`
+  (`<itunes:image>`); `img` is the former, `art2` the latter, carried **only when it
+  differs** from `img` (else null). Some feeds list a rotted `<image>` beside a live
+  `<itunes:image>` (e.g. Homegrown Hits, whose `<image>` 404s), so an `<img>` that just
+  points at `img` shows nothing. Wire an `onError` that advances `img → art2 → placeholder`
+  tile (see BMB's `PodcastCover`). Present in the boost-feed `podcast` object and the
+  per-show `show` object; **not yet in the D1 `/api/v1` `podcasts` table** (pending a remote
+  `ALTER TABLE podcasts ADD COLUMN artwork TEXT` + backfill), so SSR/API consumers get null
+  there until that ships.
 - **`episode.guid` may be a URL**, not a UUID — don't parse it as one.
 - **`msg` is verbatim** — may contain `nostr:` mentions and links; render/escape accordingly (don't strip).
 - **Timestamps are unix seconds** (multiply by 1000 for JS `Date`).

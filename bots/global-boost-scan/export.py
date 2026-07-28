@@ -40,7 +40,8 @@ SELECT b.event_id, b.booster_pubkey, b.booster_npub, b.created_at, b.sats,
        b.item_url, b.show_url,
        e.title AS ep_title, e.image AS ep_image, e.published AS ep_pub,
        e.enclosure_url AS ep_url, e.episode_number AS ep_num,
-       s.title AS show_title, s.image AS show_image, s.feed_url AS show_feed,
+       s.title AS show_title, s.image AS show_image, s.artwork AS show_artwork,
+       s.feed_url AS show_feed,
        p.name AS p_name, p.picture AS p_pic
 FROM boosts b
 LEFT JOIN episodes e ON e.item_guid    = b.item_guid
@@ -67,6 +68,7 @@ def _record(r):
             "guid":  r["podcast_guid"],
             "title": r["show_title"],
             "img":   r["show_image"],
+            "art2":  r["show_artwork"],   # fallback art URL when `img` 404s (may be null)
             "feed":  r["show_feed"],
         },
         "episode": {
@@ -114,7 +116,7 @@ def export(conn, out_dir, latest_n=1000, per_show=False, log=print):
                COUNT(DISTINCT b.booster_pubkey) AS boosters,
                COUNT(DISTINCT b.item_guid) AS episodes,
                MAX(b.created_at) AS latest,
-               s.title, s.image, s.feed_url, s.medium, s.author
+               s.title, s.image, s.artwork, s.feed_url, s.medium, s.author
         FROM boosts b LEFT JOIN shows s ON s.podcast_guid = {_EFF}
         WHERE {_EFF} IS NOT NULL
         GROUP BY {_EFF}
@@ -123,6 +125,7 @@ def export(conn, out_dir, latest_n=1000, per_show=False, log=print):
         "guid":     a["podcast_guid"],
         "title":    a["title"],
         "img":      a["image"],
+        "art2":     a["artwork"],                # fallback art URL when `img` 404s (may be null)
         "feed":     a["feed_url"],
         "medium":   a["medium"] or "podcast",   # podcast:medium — 'music' etc.; default per the namespace
         "author":   a["author"],                # <itunes:author>: 'Artist' on music, weak 'by' on podcasts; raw
@@ -166,6 +169,7 @@ def export(conn, out_dir, latest_n=1000, per_show=False, log=print):
             # show gets a new boost, so rsync ships just the handful that moved.
             write_json(out / "podcasts" / f"{_safe(pg)}.json", {
                 "show": {"guid": pg, "title": a["title"], "img": a["image"],
+                         "art2": a["artwork"],   # fallback art URL when `img` 404s (may be null)
                          "feed": a["feed_url"], "medium": a["medium"],
                          "author": a["author"]},
                 "episodes": [{

@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS podcasts (
   podcast_guid  TEXT PRIMARY KEY,
   title         TEXT,
   image         TEXT,
+  artwork       TEXT,               -- second-chance art URL (<itunes:image> when it differs from <image>); site falls back when `image` 404s
   feed_url      TEXT,
   medium        TEXT,
   author        TEXT,               -- <itunes:author>: 'Artist' on music, weak 'by' on podcasts; raw string

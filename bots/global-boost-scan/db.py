@@ -57,6 +57,10 @@ CREATE TABLE IF NOT EXISTS shows (
     podcast_guid  TEXT PRIMARY KEY,
     title         TEXT,
     image         TEXT,
+    artwork       TEXT,          -- second-chance art URL (<itunes:image> when it
+                                 -- differs from <image>); the site falls back to it
+                                 -- when `image` 404s. NULL when there's no distinct
+                                 -- alternate. See enrich._show_from_feed.
     feed_url      TEXT,
     feed_id       INTEGER,
     itunes_id     INTEGER,
@@ -136,6 +140,8 @@ def _migrate(conn):
     show_cols = {r[1] for r in conn.execute("PRAGMA table_info(shows)")}
     if "author" not in show_cols:
         conn.execute("ALTER TABLE shows ADD COLUMN author TEXT")
+    if "artwork" not in show_cols:
+        conn.execute("ALTER TABLE shows ADD COLUMN artwork TEXT")
     conn.commit()
 
 
@@ -187,12 +193,13 @@ def upsert_boosts(conn, boosts):
 # ── enrichment caches ─────────────────────────────────────────────────────────
 def upsert_show(conn, show):
     conn.execute(
-        """INSERT INTO shows (podcast_guid, title, image, feed_url, feed_id,
+        """INSERT INTO shows (podcast_guid, title, image, artwork, feed_url, feed_id,
                               itunes_id, medium, author, updated_at)
-           VALUES (:podcast_guid, :title, :image, :feed_url, :feed_id,
+           VALUES (:podcast_guid, :title, :image, :artwork, :feed_url, :feed_id,
                    :itunes_id, :medium, :author, :updated_at)
            ON CONFLICT(podcast_guid) DO UPDATE SET
-             title=excluded.title, image=excluded.image, feed_url=excluded.feed_url,
+             title=excluded.title, image=excluded.image, artwork=excluded.artwork,
+             feed_url=excluded.feed_url,
              feed_id=excluded.feed_id, itunes_id=excluded.itunes_id,
              medium=excluded.medium, author=excluded.author,
              updated_at=excluded.updated_at""",

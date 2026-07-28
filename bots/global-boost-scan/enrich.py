@@ -55,10 +55,18 @@ def _show_from_feed(feed, podcast_guid=None):
     guid = podcast_guid or feed.get("podcastGuid")
     if not guid:
         return None
+    # PI maps RSS channel <image><url> to `image` and <itunes:image> to `artwork`.
+    # Prefer `image` but keep `artwork` as a distinct second-chance URL: some feeds
+    # (e.g. Homegrown Hits) list a rotted <image> alongside a live <itunes:image>,
+    # so the site's <img> can fall back on a 404 instead of showing nothing. Only
+    # carried when it actually differs from the chosen primary.
+    image = feed.get("image") or feed.get("artwork")
+    artwork = feed.get("artwork")
     return {
         "podcast_guid": guid,
         "title":     feed.get("title"),
-        "image":     feed.get("image") or feed.get("artwork"),
+        "image":     image,
+        "artwork":   artwork if (artwork and artwork != image) else None,
         "feed_url":  feed.get("url"),
         "itunes_id": feed.get("itunesId"),
         "feed_id":   feed.get("id"),
