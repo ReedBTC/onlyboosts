@@ -81,19 +81,17 @@ def build_full_sql(conn):
                COUNT(DISTINCT b.booster_pubkey) AS booster_count,
                COUNT(DISTINCT b.item_guid) AS episode_count,
                MAX(b.created_at) AS latest_ts,
-               s.title, s.image, s.feed_url, s.medium, s.author
+               s.title, s.image, s.artwork, s.feed_url, s.medium, s.author
         FROM boosts b LEFT JOIN shows s ON s.podcast_guid={eg}
         WHERE {eg} IS NOT NULL GROUP BY {eg}""").fetchall():
-        # NOTE: `artwork` is intentionally NOT projected yet. The remote D1
-        # `podcasts` table has no artwork column until an out-of-band
-        # `ALTER TABLE podcasts ADD COLUMN artwork TEXT` (+ backfill) runs — same
-        # rollout order as `author`. Add s.artwork to the SELECT and the INSERT
-        # here (and in the --remote-delta path below) only after that ships, or
-        # the autonomous timer's delta push will fail on an unknown column.
+        # `artwork` is the second-chance art URL (<itunes:image> when it differs
+        # from <image>); the show page falls back to it when `image` 404s. The
+        # remote D1 `podcasts.artwork` column shipped out-of-band (ALTER + backfill),
+        # so it's projected here and in the --remote-delta path below.
         out.append(
-            "INSERT INTO podcasts (podcast_guid,title,image,feed_url,medium,author,"
+            "INSERT INTO podcasts (podcast_guid,title,image,artwork,feed_url,medium,author,"
             "boost_count,total_sats,booster_count,episode_count,latest_ts) VALUES ("
-            f"{q(a['guid'])},{q(a['title'])},{q(a['image'])},{q(a['feed_url'])},"
+            f"{q(a['guid'])},{q(a['title'])},{q(a['image'])},{q(a['artwork'])},{q(a['feed_url'])},"
             f"{q(a['medium'])},{q(a['author'])},{q(a['boost_count'])},{q(a['total_sats'])},"
             f"{q(a['booster_count'])},{q(a['episode_count'])},{q(a['latest_ts'])});")
         if a["title"]:
@@ -162,17 +160,17 @@ def build_delta_sql(conn, rows):
                       COUNT(DISTINCT b.booster_pubkey) AS booster_count,
                       COUNT(DISTINCT b.item_guid) AS episode_count,
                       MAX(b.created_at) AS latest_ts,
-                      s.title, s.image, s.feed_url, s.medium, s.author
+                      s.title, s.image, s.artwork, s.feed_url, s.medium, s.author
                FROM boosts b LEFT JOIN shows s ON s.podcast_guid={eg}
                WHERE {eg}=? GROUP BY {eg}""", (pg,)).fetchone()
         if not a:
             continue
-        # See the note in the full-load path above: add `artwork` here only after
-        # the remote D1 column exists, else this delta push fails mid-run.
+        # `artwork` (second-chance art URL) is now projected — see the full-load
+        # path above; the remote D1 column exists.
         out.append(
-            "INSERT OR REPLACE INTO podcasts (podcast_guid,title,image,feed_url,medium,author,"
+            "INSERT OR REPLACE INTO podcasts (podcast_guid,title,image,artwork,feed_url,medium,author,"
             "boost_count,total_sats,booster_count,episode_count,latest_ts) VALUES ("
-            f"{q(a['guid'])},{q(a['title'])},{q(a['image'])},{q(a['feed_url'])},{q(a['medium'])},"
+            f"{q(a['guid'])},{q(a['title'])},{q(a['image'])},{q(a['artwork'])},{q(a['feed_url'])},{q(a['medium'])},"
             f"{q(a['author'])},{q(a['boost_count'])},{q(a['total_sats'])},{q(a['booster_count'])},"
             f"{q(a['episode_count'])},{q(a['latest_ts'])});")
         out.append(f"DELETE FROM podcasts_fts WHERE podcast_guid={q(pg)};")
