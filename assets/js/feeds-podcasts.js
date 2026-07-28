@@ -45,7 +45,7 @@ import {
 } from '/assets/js/ob-data.js'
 import { getFollowsBoosts } from '/assets/js/ob-live.js'
 import { copyText, showToast, copyNpub } from '/assets/js/copy-npub.js'
-import { circleBoostButton, withBoostBusy } from '/assets/js/boost-button.js'
+import { boostButton, withBoostBusy } from '/assets/js/boost-button.js'
 import {
   RANGE_OPTIONS, rangeDays, rangeCutoff,
   rangeControl, sortControl, mountFeedControls,
@@ -531,9 +531,9 @@ function episodeCard(item, rank = null, copy = COPY.other) {
     // row of its own beneath the player, alongside "↓ Download MP3"; that row
     // cost a full band of card height for two controls, and the download
     // duplicated what every browser's own audio ⋮ menu already offers. The
-    // circle is the same one the Shows cards and the /show community drawer
-    // use, right-aligned by .ob-boost-circle's own margin-left.
-    circleBoostButton({
+    // pill is the same one the Shows cards and the /show community drawer
+    // use, right-aligned by .ob-boost-pill's own margin-left.
+    boostButton({
       label: ep.title || copy.untitled,
       onClick: (btn) => onBoostClick(item, btn, copy),
     }),

@@ -899,17 +899,20 @@ reflowed five cards into 4+1 as soon as the column got tight.
 Boosting a SHOW (as opposed to an episode) pays the **feed-level** value block —
 `/api/value` with a `podcastGuid` and/or `feedUrl` and no `guid`.
 
-**Every boost affordance on a card is now the same control**: the circle button
-built by `assets/js/boost-button.js`, styled as `.ob-boost-circle` in
-**theme.css** (there, not in a page's own stylesheet, because it is the one
-class the homepage and the show pages both need — same reasoning as
-`.ob-scopenote`). It reads `--brand`, never `--accent`: the feed accents only
-exist on `index.html`.
+**Every boost affordance on a card is the same control**: the button built by
+`assets/js/boost-button.js`, styled as `.ob-boost-pill` in **theme.css** (there,
+not in a page's own stylesheet, because it is the one class the homepage and the
+show pages both need — same reasoning as `.ob-scopenote`). It reads `--brand`,
+never `--accent`: the feed accents only exist on `index.html`.
 
 It rides the **right end of the card's Nostr Stats line**, pinned there by its
-own `margin-left: auto`. It replaced a labelled pill in a button row of its own,
-which cost a whole band of card height; icon-only is what lets it share a line
-with the figures on a phone.
+own `margin-left: auto`, which is what let it replace a labelled pill in a button
+row of its own that cost a whole band of card height.
+
+**Solid brand blue, the word "Boost", and no bolt.** An icon-only circle was
+tried between those two and was too small a target to read as the card's primary
+action; the bolt inside it bought nothing the label doesn't say. Tight padding is
+what keeps it on the stats line instead of taking a row.
 
 | Surface | Handler | Pays |
 |---|---|---|

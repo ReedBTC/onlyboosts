@@ -68,7 +68,7 @@ import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js'
 import { ensureLoginWidget } from '/assets/js/widget-loader.js'
 import { episodeBoostLink } from '/assets/js/episode-link.js'
 import { showToast } from '/assets/js/copy-npub.js'
-import { circleBoostButton, withBoostBusy } from '/assets/js/boost-button.js'
+import { boostButton, withBoostBusy } from '/assets/js/boost-button.js'
 import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js'
 
 const PAGE_SIZE = 25       // show cards per "load more" batch
@@ -570,14 +570,14 @@ function renderShowCard(s, rank, copy) {
     // fact about the show, and ours isn't one.
     //
     // The boost button rides the end of this line rather than sitting in a
-    // button row of its own. It's the same circle the community drawer on a
-    // /show page uses, right-aligned by .ob-boost-circle's own margin-left,
+    // button row of its own. It's the same pill the community drawer on a
+    // /show page uses, right-aligned by .ob-boost-pill's own margin-left,
     // which is what keeps it off the figures on a narrow card. Withheld from
     // unidentified shows for the same reason they get no landing page: Podcast
     // Index doesn't know the feed, so there is no block to resolve and the
     // button could only ever fail.
     named && (s.guid || s.feed)
-      ? circleBoostButton({
+      ? boostButton({
           label: s.title || copy.noun,
           onClick: (btn) => onShowBoost(s, btn, copy),
         })

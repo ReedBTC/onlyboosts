@@ -507,12 +507,60 @@
 }
 .cs-link:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 
-.cs-row .ob-boost-circle { margin-right: 0.6rem; }
+.cs-rank {
+  flex-shrink: 0;
+  min-width: 1.6rem;
+  text-align: right;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
 
-/* The row's boost button is .ob-boost-circle, defined once in theme.css and
+.cs-art {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--cream-d);
+}
+.cs-art--blank {
+  display: grid;
+  place-items: center;
+  font-size: 1.1rem;
+}
+
+.cs-main { min-width: 0; flex: 1; }
+
+.cs-title,
+.cs-meta { display: block; }
+
+/* Deliberately the same size as .ep-title in the episode drawer above — these
+   are two lists of the same kind in the same box, and the page reads as one
+   thing only if they match. Nothing here inherits the 17px body serif. */
+.cs-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cs-link:hover .cs-title { color: var(--brand-d); }
+
+.cs-meta {
+  margin-top: 0.2rem;
+  font-size: 0.76rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The row's boost button is .ob-boost-pill, defined once in theme.css and
    shared with the Episodes, Songs, Shows and Albums cards. Only its placement
    is local: the row is a flex line, and the class's own margin-left:auto pins
    it to the right end. */
+.cs-row .ob-boost-pill { margin-right: 0.6rem; }
 
 /* ── Feed controls ────────────────────────────────────────────────────────
    The "Sort: X ▾" pill, built by assets/js/feed-controls.js. Those rules live
@@ -595,5 +643,5 @@
   .boost-when { margin-left: 0; }
   .cs-art { width: 38px; height: 38px; }
   .cs-link { gap: 0.55rem; padding-left: 0.4rem; }
-  .cs-row .ob-boost-circle { margin-right: 0.4rem; }
+  .cs-row .ob-boost-pill { margin-right: 0.4rem; }
 }

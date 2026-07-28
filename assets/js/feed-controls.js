@@ -97,6 +97,11 @@ export function rangeControl(initialKey, onPick, opts = {}) {
  * close). Calls onPick(key) on selection.
  *
  * @param {Array<[string,string]>} options  [key, label] pairs, in menu order
+ * @param {object} [opts]
+ * @param {string} [opts.tag]  the label before the current value. Defaults to
+ *   "Sort: "; the show page's community drawer overrides it to name what is
+ *   being sorted, since it sits inside a drawer rather than in the feed bar
+ *   where the surrounding chrome already says.
  */
 export function sortControl(options, initialKey, onPick, opts = {}) {
   const labelFor = (k) => (options.find((o) => o[0] === k) || options[0])[1]
@@ -107,7 +112,7 @@ export function sortControl(options, initialKey, onPick, opts = {}) {
     'aria-haspopup': 'true', 'aria-expanded': 'false',
     title: opts.title || 'Change sort order',
   }, [
-    h('span', { class: 'pcast-sort-tag', text: 'Sort: ' }),
+    h('span', { class: 'pcast-sort-tag', text: opts.tag || 'Sort: ' }),
     curEl,
     h('span', { class: 'pcast-sort-caret', 'aria-hidden': 'true', text: '▾' }),
   ])

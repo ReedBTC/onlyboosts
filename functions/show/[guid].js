@@ -899,13 +899,11 @@ function communityRow(r, rank, size) {
         <span class="cs-meta">${htmlEscape(communityMeta(members, boosts, sats, size))}</span>
       </span>
     </a>
-    <button type="button" class="ob-boost-circle" hidden
+    <button type="button" class="ob-boost-pill" hidden
       data-cs-boost="${htmlEscape(r.podcast_guid)}"
       data-cs-feed="${htmlEscape(isSafeUrl(r.feed_url) ? r.feed_url : "")}"
       data-cs-title="${htmlEscape(title)}"
-      aria-label="Boost ${htmlEscape(title)}" title="Boost ${htmlEscape(title)}">
-      <svg width="13" height="13" fill="currentColor" aria-hidden="true"><use href="#cs-bolt" /></svg>
-    </button>
+      aria-label="Boost ${htmlEscape(title)}" title="Boost ${htmlEscape(title)}">Boost</button>
   </li>`;
 }
 
@@ -917,15 +915,10 @@ function renderCommunityShows(rows) {
   // the fraction are counted the same way and can never read "120 of 115".
   const size = Number(rows[0].community_size || 0);
 
-  // The bolt, defined once and referenced by every row's button through
-  // <use href="#cs-bolt">. Inlining the path 150 times cost 49KB of markup and
-  // 150 identical SVG subtrees to parse; gzip hid most of the bytes but not the
-  // parse. Same-document reference, so the page's default-src 'self' CSP is
-  // untouched.
+  // The bolt symbol sheet that used to sit here went with the icon button: the
+  // pill is the word alone, so there is no glyph to define once and reference
+  // 150 times.
   return `<section class="show-section show-section--bare" id="community-shows">
-    <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
-      <symbol id="cs-bolt" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd"/></symbol>
-    </svg>
     <details class="ep-drawer cs-drawer" open data-community-shows>
       <summary>Other Shows/Albums This Community Boosts <span class="cs-count">${num(rows.length)}</span></summary>
       <!-- Ships hidden and stays hidden without JavaScript: a sort control that

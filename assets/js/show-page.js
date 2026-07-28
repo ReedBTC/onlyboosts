@@ -84,10 +84,13 @@ document.querySelector('[data-share-page]')?.addEventListener('click', async () 
 // counts only boosts sent by a member, so "most sats" means most sats from
 // these boosters, never the show's global total.
 
+// "Community Sort:" is the tag, so each option can be the bare measure — the
+// label already says whose boosts these are, and repeating "here" on every row
+// of the menu only crowded it.
 const CS_SORTS = [
-  ['members', 'Most of this community'],
-  ['boosts', 'Most boosts here'],
-  ['sats', 'Most sats here'],
+  ['members', 'Most Boosters'],
+  ['boosts', 'Most Boosts'],
+  ['sats', 'Most Sats'],
 ]
 
 function initCommunityShows() {
@@ -130,6 +133,7 @@ function initCommunityShows() {
   }
 
   slot.appendChild(sortControl(CS_SORTS, sort, (key) => { sort = key; paint() }, {
+    tag: 'Community Sort: ',
     title: 'Change how these shows are ranked',
   }))
   slot.hidden = false

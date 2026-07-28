@@ -236,10 +236,9 @@ The cap is **150 rows**. Fan-out over the live corpus runs to a median of 45, a
 p90 of 191 and a maximum of 608, so the cap only bites on the head of the
 distribution. The largest page's section measures ~154KB raw, ~21KB gzipped.
 
-The bolt icon is one `<symbol>` at the top of the section, referenced by every
-row's button through `<use href="#cs-bolt">`. Inlining the path 150 times cost
-49KB of markup and 150 identical SVG subtrees to parse; gzip hid most of the
-bytes but not the parse.
+The row buttons carry no icon, so there is no glyph to inline 150 times. An
+icon-only circle shipped briefly and needed a `<symbol>` + `<use>` to avoid 49KB
+of repeated path data; the word "Boost" costs five characters a row.
 
 ### The Per-Row Boost Button
 
@@ -250,13 +249,11 @@ Two things specific to here:
 
 - The button is a **sibling** of the row's link, not a child. A button inside an
   anchor is invalid, and nesting one would make the row swallow its clicks.
-- It is **icon-only**, because the row already carries art, a title, three
-  figures and a rank, and a labelled button pushes the title into an ellipsis on
-  a phone. The homepage's Episodes, Songs, Shows and Albums cards now carry the
-  same control at the right end of their own stats line, built by
-  `assets/js/boost-button.js` and styled once in `theme.css` — so the server
-  builds this markup by hand, and the class name plus the busy/disabled states
-  are the contract between the two.
+- It is the **same control** the homepage's Episodes, Songs, Shows and Albums
+  cards carry at the right end of their own stats line: a tight blue
+  `.ob-boost-pill`, built by `assets/js/boost-button.js` and styled once in
+  `theme.css`. The server builds this markup by hand, so the class name and the
+  busy/disabled states are the contract between the two.
 
 ## The Nostr Community Section
 

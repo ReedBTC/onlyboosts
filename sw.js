@@ -175,10 +175,16 @@
 // counts: feeds-podcasts.js and shows-feed.js gain STATIC imports of two new
 // modules (boost-button.js, cover-art.js) and ob-data.js gains one, so a
 // returning visitor holding a new renderer against a cache that has never seen
-// them fails the import binding and the feed dies. The .ob-boost-circle rules
+// them fails the import binding and the feed dies. The .ob-boost-pill rules
 // are new in theme.css, which every page loads, and the .pcast-btn block that
 // index.html no longer needs came out of it.
-const VERSION = 'ob-v34';
+// ob-v35: the boost button is a tight blue pill reading "Boost" rather than an
+// icon-only circle, which was too small a target; .ob-boost-circle is renamed
+// .ob-boost-pill in theme.css. Required for a second reason too: ob-v34 shipped
+// a show-page.css whose .cs-rank / .cs-art / .cs-title / .cs-meta rules had been
+// deleted by accident, so the community drawer rendered at the 17px body serif
+// with unstyled art. A returning visitor holds that stylesheet until this bump.
+const VERSION = 'ob-v35';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;
