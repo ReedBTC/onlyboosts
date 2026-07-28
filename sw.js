@@ -213,7 +213,13 @@
 // and .show-back are new rules in show-page.css against markup the Function now
 // emits, so a returning visitor on the old stylesheet gets an unstyled "Back"
 // and an empty span in each summary; initBackLink is new in show-page.js.
-const VERSION = 'ob-v40';
+// ob-v41: the /show community drawer's rows get the art2 fallback the hero has
+// had since ob-v39 — its query selected `image` and not `artwork`, so Homegrown
+// Hits rendered broken in every drawer that listed it. Required: the data-art2
+// attribute is new markup from the Function and initCommunityArt is new in
+// show-page.js, and a returning visitor holding the old module gets the
+// attribute with nothing reading it.
+const VERSION = 'ob-v41';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;

@@ -1063,7 +1063,21 @@ projection in `6be0eb5`. So the D1-backed surfaces carry it too:
 | Shows / Albums cards | shard | img → art2 → glyph |
 | Boosts cards | shard | booster pic → show img → show art2 → silhouette |
 | `/show` hero | D1 `artwork` | img → `data-art2` → blank tile |
+| `/show` community drawer rows | D1 `artwork` | img → `data-art2` → glyph |
 | `/api/v1/podcasts`, `…/<guid>` | D1 `artwork` | returned as `art2` |
+
+**The community drawer row was the surface this was missed on**, and it is the
+one where it mattered most: those rows are *other* shows' artwork, so a single
+show with a dead primary rendered broken on every page that lists it while its
+own page had already recovered. The cause was the query rather than the render —
+the community CTE selected `p.image` and not `p.artwork`. Both `/show` surfaces
+now run through one `wireArt2()` in `show-page.js`.
+
+**The episode drawer's rows are deliberately still outside this.** A row falls
+back to the show's own `img` when the episode has no art of its own, and does not
+go on to `art2`; see the note over `episodeRow`. It bites only where a show has a
+dead primary *and* an episode with no art, and episode art was 100% present on
+every show sampled.
 
 **On `/show` it is a `data-art2` attribute, not a second `<img>` or an inline
 `onerror`.** The Function emits the attribute and `show-page.js#initHeroArt`

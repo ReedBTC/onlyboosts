@@ -113,39 +113,76 @@ function initBackLink() {
 
 initBackLink()
 
-// ── Hero artwork fallback ────────────────────────────────────────────
+// ── Artwork fallback ─────────────────────────────────────────────────
 //
 // Some feeds publish two channel-art URLs and the primary is dead: Homegrown
-// Hits' <image> 404s while its <itunes:image> resolves. D1 carries the second
-// as `artwork` and the Function emits it as `data-art2` on the hero image, so
-// there is nothing to fetch — this only swaps the src when the first one fails,
-// then falls back to the blank tile the server would have rendered.
+// Hits' <image> 404s while its <itunes:image> resolves. D1 carries the second as
+// `artwork` and the Function emits it as `data-art2`, so there is nothing to
+// fetch — this only swaps the src when the first one fails, then falls back to
+// the blank tile the server would have rendered.
+//
+// TWO SURFACES on this page, and they are the same code: the hero, and every
+// row of the community drawer. The drawer was the miss — its query selected
+// `image` and not `artwork`, so a show whose art the site had already learned to
+// repair on its own page kept rendering broken in every other show's drawer.
 //
 // It is a FALLBACK, not a replacement. Four of the five shows carrying an art2
 // have a perfectly good primary; only the error path may use it.
 
-function heroBlank(img) {
-  // Matches the markup the Function emits for a show with no artwork at all.
-  const blank = document.createElement('div')
-  blank.className = 'show-art-blank'
+/* Swap a dead image for the glyph tile the Function would have rendered had the
+ * show carried no artwork at all. `tag` differs because the hero's blank is a
+ * grid cell and a row's is an inline span standing in for the <img>. */
+function blankTile(img, tag, className) {
+  const blank = document.createElement(tag)
+  blank.className = className
   blank.setAttribute('aria-hidden', 'true')
   blank.textContent = '🎙️'
   img.replaceWith(blank)
 }
 
-function initHeroArt() {
-  const img = document.querySelector('.show-art img')
-  if (!img) return
+/* Wire one image's art2 chain.
+ *
+ * The chain excludes whatever `src` already holds, so the second URL is only
+ * ever tried after the first has actually failed — art2's presence means the
+ * feed publishes two DIFFERENT URLs, not that the primary is dead, and four of
+ * the five shows carrying one have a perfectly good primary.
+ *
+ * An image can already have failed by the time this deferred module runs (the
+ * hero is loading="eager"; a lazy row can be above the fold), and `error` has
+ * been and gone with no listener attached. `complete` with no intrinsic width is
+ * the only way to see that after the fact.
+ */
+function wireArt2(img, onExhausted) {
   const chain = coverChain(img.dataset.art2).filter((u) => u !== img.getAttribute('src'))
-  const onFail = () => { if (chain.length) wireCoverFallback(img, chain, () => heroBlank(img)); else heroBlank(img) }
-  // The hero image is loading="eager" and this module is deferred, so it can
-  // already have failed before we get here; `complete` with no intrinsic width
-  // is the only way to detect that after the fact.
+  const onFail = () => { if (chain.length) wireCoverFallback(img, chain, onExhausted); else onExhausted() }
   if (img.complete && img.naturalWidth === 0) { onFail(); return }
   img.onerror = () => { img.onerror = null; onFail() }
 }
 
+function initHeroArt() {
+  const img = document.querySelector('.show-art img')
+  if (!img) return
+  wireArt2(img, () => blankTile(img, 'div', 'show-art-blank'))
+}
+
+/* The community drawer's rows are other shows' artwork, which is exactly the
+ * case art2 exists for: Homegrown Hits appears in these drawers right across the
+ * site, and the row was rendering its dead <image> URL on every one of them
+ * while its own page had already recovered. The rows are server-rendered, so the
+ * Function emits data-art2 the same way the hero does.
+ *
+ * Wired per element rather than delegated: `error` does not bubble, and only
+ * five shows in the whole index carry an art2, so this is 0 or 1 nodes on a
+ * typical page and never more than the drawer's 150-row cap.
+ */
+function initCommunityArt() {
+  for (const img of document.querySelectorAll('.cs-art[data-art2]')) {
+    wireArt2(img, () => blankTile(img, 'span', 'cs-art cs-art--blank'))
+  }
+}
+
 initHeroArt()
+initCommunityArt()
 
 // ── The episode drawer's sort ─────────────────────────────────────────
 //

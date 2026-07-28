@@ -149,7 +149,7 @@ export async function onRequestGet({ request, env, params }) {
       `WITH community AS (
          SELECT DISTINCT booster_pubkey FROM boosts WHERE podcast_guid = ?
        )
-       SELECT b.podcast_guid, p.title, p.image, p.feed_url,
+       SELECT b.podcast_guid, p.title, p.image, p.artwork, p.feed_url,
               COUNT(*)                         AS cs_boosts,
               SUM(COALESCE(b.sats, 0))         AS cs_sats,
               COUNT(DISTINCT b.booster_pubkey) AS cs_members
@@ -923,6 +923,12 @@ function communityMeta(members, boosts, sats) {
 
 function communityRow(r, rank) {
   const art = isSafeUrl(r.image) ? r.image : null;
+  // Same second-chance URL the hero carries, on the same terms: an attribute
+  // rather than an inline onerror, wired through cover-art.js by show-page.js.
+  // A row here is another show's artwork, so it hits exactly the case the whole
+  // art2 chain exists for — Homegrown Hits appears in these drawers across the
+  // site, and its <image> 404s everywhere its <itunes:image> would have worked.
+  const art2 = isSafeUrl(r.artwork) && r.artwork !== art ? r.artwork : null;
   const title = truncate(r.title, 120);
   const members = Number(r.cs_members || 0);
   const boosts = Number(r.cs_boosts || 0);
@@ -936,7 +942,7 @@ function communityRow(r, rank) {
     <a class="cs-link" href="/show/${encodeURIComponent(r.podcast_guid)}">
       <span class="cs-rank" aria-hidden="true">${rank}</span>
       ${art
-        ? `<img class="cs-art" src="${htmlEscape(art)}" alt="" width="44" height="44" loading="lazy" referrerpolicy="no-referrer" />`
+        ? `<img class="cs-art" src="${htmlEscape(art)}"${art2 ? ` data-art2="${htmlEscape(art2)}"` : ""} alt="" width="44" height="44" loading="lazy" referrerpolicy="no-referrer" />`
         : `<span class="cs-art cs-art--blank" aria-hidden="true">🎙️</span>`}
       <span class="cs-main">
         <span class="cs-title">${htmlEscape(title)}</span>

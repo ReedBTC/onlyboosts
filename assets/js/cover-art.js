@@ -11,10 +11,12 @@
  * See docs/HANDOFF-art2-fallback.md. BMB's components/podcast-cover.tsx is the
  * reference implementation, and its comment names the same show.
  *
- * ⚠️ `art2` is in the STATIC SHARDS ONLY. The D1 `podcasts` table has no
- * artwork column yet, so `/api/v1/*` and the server-rendered /show pages get
- * nothing here until that migration and backfill land. Don't assume it exists
- * on that side.
+ * `art2` is on BOTH sides now. It has always been in the static shards; the D1
+ * `podcasts.artwork` column was added and backfilled out-of-band and `d1_sync.py`
+ * un-gated the projection in 6be0eb5, so `/api/v1/*` and the server-rendered
+ * /show pages carry it too. Anything reading a show's artwork from either source
+ * should walk the chain — see the table in CLAUDE.md for which surface takes
+ * which route.
  */
 
 function isSafeUrl(url) {
