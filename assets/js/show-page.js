@@ -26,6 +26,7 @@ import { sortControl } from '/assets/js/feed-controls.js'
 // The drawer's per-row buttons are server-rendered, so only the busy-state
 // helper is needed here — the builder is for the feeds, which make theirs in JS.
 import { withBoostBusy } from '/assets/js/boost-button.js'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js'
 // Fallback identity lookup for what the index didn't have — see the profile
 // hydration at the foot of this file.
 import { fetchProfiles } from '/assets/js/primal-profiles.js'
@@ -66,6 +67,97 @@ document.querySelector('[data-share-page]')?.addEventListener('click', async () 
   const ok = await copyText(url)
   showToast(ok ? 'Link copied' : 'Copy failed — clipboard blocked', !ok)
 })
+
+// ── Hero artwork fallback ────────────────────────────────────────────
+//
+// Some feeds publish two channel-art URLs and the primary is dead: Homegrown
+// Hits' <image> 404s while its <itunes:image> resolves. D1 carries the second
+// as `artwork` and the Function emits it as `data-art2` on the hero image, so
+// there is nothing to fetch — this only swaps the src when the first one fails,
+// then falls back to the blank tile the server would have rendered.
+//
+// It is a FALLBACK, not a replacement. Four of the five shows carrying an art2
+// have a perfectly good primary; only the error path may use it.
+
+function heroBlank(img) {
+  // Matches the markup the Function emits for a show with no artwork at all.
+  const blank = document.createElement('div')
+  blank.className = 'show-art-blank'
+  blank.setAttribute('aria-hidden', 'true')
+  blank.textContent = '🎙️'
+  img.replaceWith(blank)
+}
+
+function initHeroArt() {
+  const img = document.querySelector('.show-art img')
+  if (!img) return
+  const chain = coverChain(img.dataset.art2).filter((u) => u !== img.getAttribute('src'))
+  const onFail = () => { if (chain.length) wireCoverFallback(img, chain, () => heroBlank(img)); else heroBlank(img) }
+  // The hero image is loading="eager" and this module is deferred, so it can
+  // already have failed before we get here; `complete` with no intrinsic width
+  // is the only way to detect that after the fact.
+  if (img.complete && img.naturalWidth === 0) { onFail(); return }
+  img.onerror = () => { img.onerror = null; onFail() }
+}
+
+initHeroArt()
+
+// ── The episode drawer's sort ─────────────────────────────────────────
+//
+// Same shape as the community drawer below: every row ships its four figures in
+// one `data-ep` attribute, so a sort is a re-order of nodes already in the DOM.
+// No range control — a show's catalogue is not a window, and the Episodes feed
+// on the homepage is where "what aired lately" is asked.
+//
+// "Latest episode" is the default and reproduces the server's own ORDER BY, so
+// the first paint and the first sort agree. `published` is null on a real slice
+// of rows and packs as 0; those sink rather than floating to the top, which is
+// the trap the homepage feed's episode sort documents.
+
+const EP_SORTS = [
+  ['latest', 'Latest Episode'],
+  ['boosters', 'Most Boosters'],
+  ['boosts', 'Most Boosts'],
+  ['sats', 'Most Sats'],
+]
+
+function initEpisodeSort() {
+  const root = document.querySelector('[data-episode-drawer]')
+  if (!root) return
+  const list = root.querySelector('.ep-list')
+  const slot = root.querySelector('[data-ep-controls]')
+  if (!list || !slot) return
+
+  const rows = Array.from(list.querySelectorAll('.ep-row')).map((el) => {
+    const [boosters, boosts, sats, published] = String(el.dataset.ep || '').split(',').map(Number)
+    return { el, boosters: boosters || 0, boosts: boosts || 0, sats: sats || 0, published: published || 0 }
+  })
+  if (rows.length < 2) return   // nothing to order
+
+  let sort = 'latest'
+
+  function paint() {
+    const order = rows.slice().sort((a, b) => {
+      if (sort === 'boosters') return b.boosters - a.boosters || b.sats - a.sats
+      if (sort === 'boosts') return b.boosts - a.boosts || b.sats - a.sats
+      if (sort === 'sats') return b.sats - a.sats || b.boosts - a.boosts
+      // Undated rows sink instead of leading, then the server's tiebreak.
+      if (!a.published !== !b.published) return a.published ? -1 : 1
+      return b.published - a.published || b.sats - a.sats
+    })
+    const frag = document.createDocumentFragment()
+    for (const r of order) frag.appendChild(r.el)
+    list.appendChild(frag)
+  }
+
+  slot.appendChild(sortControl(EP_SORTS, sort, (key) => { sort = key; paint() }, {
+    tag: 'Sort: ',
+    title: 'Change how these episodes are ordered',
+  }))
+  slot.hidden = false
+}
+
+initEpisodeSort()
 
 // ── Other shows this community boosts ────────────────────────────────
 //

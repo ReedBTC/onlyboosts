@@ -11,12 +11,16 @@ export async function onRequestGet({ request, env }) {
   const limit = clampLimit(u.searchParams.get("limit"));
   const offset = Math.max(0, parseInt(u.searchParams.get("offset"), 10) || 0);
 
-  const sql = `SELECT podcast_guid, title, image, feed_url, medium, author, boost_count,
+  const sql = `SELECT podcast_guid, title, image, artwork, feed_url, medium, author, boost_count,
                       total_sats, booster_count, episode_count, latest_ts
                FROM podcasts ORDER BY ${col} DESC, podcast_guid LIMIT ? OFFSET ?`;
   const { results } = await env.DB.prepare(sql).bind(limit, offset).all();
   const podcasts = results.map((r) => ({
-    guid: r.podcast_guid, title: r.title, img: r.image, feed: r.feed_url,
+    guid: r.podcast_guid, title: r.title, img: r.image,
+    // Second-chance art: <itunes:image> where it differs from <image>. Null for
+    // most shows. Matches the shards' `art2`; see DATA-API.md.
+    art2: r.artwork || null,
+    feed: r.feed_url,
     medium: r.medium, author: r.author,
     boosts: r.boost_count, sats: r.total_sats, boosters: r.booster_count,
     episodes: r.episode_count, latest: r.latest_ts,

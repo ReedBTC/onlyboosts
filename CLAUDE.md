@@ -879,6 +879,8 @@ the set of this show's boosters, so a row's boosts and sats are what *these*
 people sent that show, never its global totals. The sort labels say so — "Most
 boosts here", "Most sats here".
 
+**The drawer summary carries no count**, and neither does the episode drawer's.
+
 **All time only. There is no range control, and that is a decision.** One
 shipped first and came out: a time window is an episode-level question, where
 which shows an audience overlaps with is a standing fact. The data agreed —
@@ -1010,16 +1012,39 @@ reads `art2` off both the all-time rollup and the windowed grouping;
 `boosts-feed.js` puts it in the booster-avatar chain; `feeds-podcasts.js` uses
 the episode chain.
 
-**⚠️ `art2` is in the static shards only.** The collector's `shows.artwork`
-column and its `art2` projection landed in `cc68da3`, but the **remote D1
-`podcasts` table has no artwork column**, so `d1_sync.py` deliberately does not
-project it — see the `NOTE` in both of its INSERT paths, which is the thing to
-read before touching this. `/api/v1/*` and the server-rendered `/show` pages
-therefore get nothing until an out-of-band `ALTER TABLE podcasts ADD COLUMN
-artwork TEXT` plus a backfill ships, the same rollout order `author` used. Don't
-assume it exists on that side; when it lands, wire the same chain into
-`functions/show/[guid].js` and the hero. The field is specified in
-`bots/global-boost-scan/DATA-API.md`.
+**`art2` is now on both sides.** The collector's `shows.artwork` column and its
+`art2` shard projection landed in `cc68da3`; the remote D1 `podcasts.artwork`
+column was added and backfilled out-of-band, and `d1_sync.py` un-gated the
+projection in `6be0eb5`. So the D1-backed surfaces carry it too:
+
+| Surface | Source | Chain |
+|---|---|---|
+| Episodes / Songs cards | shard | episode art → show img → show art2 → glyph |
+| Shows / Albums cards | shard | img → art2 → glyph |
+| Boosts cards | shard | booster pic → show img → show art2 → silhouette |
+| `/show` hero | D1 `artwork` | img → `data-art2` → blank tile |
+| `/api/v1/podcasts`, `…/<guid>` | D1 `artwork` | returned as `art2` |
+
+**On `/show` it is a `data-art2` attribute, not a second `<img>` or an inline
+`onerror`.** The Function emits the attribute and `show-page.js#initHeroArt`
+wires the swap through the same `cover-art.js` helpers the feeds use, so there
+is **no fetch at all** and the house's no-inline-handler convention holds. It
+also handles the case the deferred module can't observe directly: the hero is
+`loading="eager"`, so it may have already failed by the time the module runs,
+which `img.complete && !img.naturalWidth` detects.
+
+**`og:image` stays on the primary, deliberately.** A crawler cannot run the
+error handler, so the temptation is to prefer `art2` there — but `art2`'s
+presence means the feed publishes *two different* URLs, not that the primary is
+dead. Measured over all five shows that carry one: **four primaries return 200
+and one 404s** (Homegrown Hits). Preferring art2 would swap four working share
+cards to fix one.
+
+An earlier pass routed the hero's fallback through `/api/value`, which already
+fetches the Podcast Index feed object and so could return the art for free. That
+was a workaround for D1 not having the column, and it was **reverted** once it
+did — `/api/value` is a money path and carrying show metadata on it earned its
+keep only while there was no alternative.
 
 Live coverage is small and real: 5 of 1,287 shows in the index, 20–31 boosts per
 recent month archive.

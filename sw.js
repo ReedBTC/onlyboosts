@@ -200,7 +200,13 @@
 // markup comes from the Function, so a returning visitor on the old stylesheet
 // gets full-bleed episode art and an unstyled heading. Also drops .ob-scopenote
 // from theme.css, which every page loads and none now mount.
-const VERSION = 'ob-v38';
+// ob-v39: the /show episode drawer gains a sort, its community sibling drops
+// the count from its summary, and the hero repairs a dead artwork URL through
+// /api/value's new `art` field. Required: show-page.js gains a static import of
+// cover-art.js, so a returning visitor holding a new show-page.js against a
+// cache without that module fails the import and loses every interactive part
+// of the page — the sorts, copy-npub and the boost buttons together.
+const VERSION = 'ob-v39';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;

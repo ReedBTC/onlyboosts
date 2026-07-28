@@ -55,8 +55,8 @@ export async function onRequestGet({ request, env, params }) {
   const show = await env.DB.prepare(
     // No episode_count: it is deliberately never displayed (see the stats
     // block below), and selecting it invites someone to put the tile back.
-    `SELECT podcast_guid, title, image, feed_url, medium, author, boost_count,
-            total_sats, booster_count, latest_ts
+    `SELECT podcast_guid, title, image, artwork, feed_url, medium, author,
+            boost_count, total_sats, booster_count, latest_ts
      FROM podcasts WHERE podcast_guid = ?`
   ).bind(guid).first();
 
@@ -76,11 +76,22 @@ export async function onRequestGet({ request, env, params }) {
       // rows, and SQLite sorts NULL below every value, so DESC sinks the
       // undated ones without needing an explicit guard — a `0` fallback would
       // have floated them to the top instead.
-      `SELECT item_guid, title, image, published, duration, episode_number,
-              enclosure_url, boost_count, total_sats
-       FROM episodes WHERE podcast_guid = ?
-       ORDER BY published DESC, total_sats DESC, item_guid LIMIT 500`
-    ).bind(guid).all(),
+      // booster_count is NOT a column on `episodes` — the collector stores
+      // boosts and sats per episode but not distinct boosters, so the drawer's
+      // "Most Boosters" sort has to derive it. A grouped subquery over this
+      // show's boosts is one indexed scan (idx_boosts_podcast) rather than a
+      // correlated lookup per episode; measured at 2.9ms over 290 episodes.
+      `SELECT e.item_guid, e.title, e.image, e.published, e.duration,
+              e.episode_number, e.enclosure_url, e.boost_count, e.total_sats,
+              COALESCE(x.boosters, 0) AS booster_count
+       FROM episodes e
+       LEFT JOIN (
+         SELECT item_guid, COUNT(DISTINCT booster_pubkey) AS boosters
+         FROM boosts WHERE podcast_guid = ? GROUP BY item_guid
+       ) x ON x.item_guid = e.item_guid
+       WHERE e.podcast_guid = ?
+       ORDER BY e.published DESC, e.total_sats DESC, e.item_guid LIMIT 500`
+    ).bind(guid, guid).all(),
     env.DB.prepare(
       // Ranked by sats sent to THIS show, all time. idx_boosts_podcast covers
       // the WHERE. The ORDER BY is a total order deliberately: this response is
@@ -443,7 +454,7 @@ const COPY = {
     itemsPlural: "Episodes",
     itemAbbr: "Ep.",
     untitledItem: "Untitled episode",
-    drawer: "Episodes with Nostr Boosts, newest first",
+    drawer: "Episodes with Nostr Boosts",
     noItems: "No episodes with Nostr boosts yet.",
     ldType: "PodcastSeries",
     // Deliberately "By", never "Host" or "Creator". The source is
@@ -460,7 +471,7 @@ const COPY = {
     itemsPlural: "Tracks",
     itemAbbr: "Track",
     untitledItem: "Untitled track",
-    drawer: "Tracks with Nostr Boosts, newest first",
+    drawer: "Tracks with Nostr Boosts",
     noItems: "No tracks with Nostr boosts yet.",
     ldType: "MusicAlbum",
     // On a music feed <itunes:author> IS the artist, and cleanly so: 97.4% of
@@ -479,6 +490,14 @@ function renderShowPage({ show, episodes, supporters, boosts, community, names }
   const title = show.title;
   const pageUrl = `${SITE_ORIGIN}/show/${encodeURIComponent(show.podcast_guid)}`;
   const art = isSafeUrl(show.image) ? show.image : null;
+  // The second-chance URL: <itunes:image> where it differs from <image>. Only a
+  // FALLBACK — its presence means the feed publishes two different URLs, not
+  // that the primary is dead. Measured over the five shows that carry one, four
+  // primaries return 200 and one (Homegrown Hits) 404s, which is why og:image
+  // below stays on `art`: preferring art2 there would swap the share card of
+  // four working shows to fix one, and a crawler can't run the error handler
+  // either way.
+  const art2 = isSafeUrl(show.artwork) && show.artwork !== art ? show.artwork : null;
   // A music release leads with its artist, the way every music service titles
   // one: "Haleen — Midnight Signal" is what a listener recognises in a shared
   // link, where "Midnight Signal — Boosts on Nostr" buries the name that
@@ -682,7 +701,7 @@ function renderShowPage({ show, episodes, supporters, boosts, community, names }
 
 <main class="show-main">
 
-  ${renderHeader(show, art, title, copy)}
+  ${renderHeader(show, art, title, copy, art2)}
 
   ${renderEpisodes(episodes, show, copy)}
 
@@ -793,7 +812,7 @@ function creditLine(show, copy) {
   return `<p class="show-credit"><span class="show-credit-label">${htmlEscape(copy.credit)}</span> ${htmlEscape(truncate(author, 120))}</p>`;
 }
 
-function renderHeader(show, art, title, copy) {
+function renderHeader(show, art, title, copy, art2) {
   // Three tiles, not four. There was an episode count here and it was removed
   // deliberately: sats, boosts and boosters are measures of boost activity
   // and have no meaning outside it, so "as published to Nostr" is the only
@@ -826,7 +845,7 @@ function renderHeader(show, art, title, copy) {
     <div class="show-hero-inner">
       <div class="show-art">${
         art
-          ? `<img src="${htmlEscape(art)}" alt="" width="180" height="180" loading="eager" />`
+          ? `<img src="${htmlEscape(art)}"${art2 ? ` data-art2="${htmlEscape(art2)}"` : ""} alt="" width="180" height="180" loading="eager" />`
           : `<div class="show-art-blank" aria-hidden="true">🎙️</div>`
       }</div>
       <div class="show-ident">
@@ -925,7 +944,7 @@ function renderCommunityShows(rows) {
   // 150 times.
   return `<section class="show-section show-section--bare" id="community-shows">
     <details class="ep-drawer cs-drawer" open data-community-shows>
-      <summary>Other Shows/Albums This Community Boosts <span class="cs-count">${num(rows.length)}</span></summary>
+      <summary>Other Shows/Albums This Community Boosts</summary>
       <!-- Ships hidden and stays hidden without JavaScript: a sort control that
            cannot sort is worse than none. Same rule as the feed-search slot on
            the homepage panels. -->
@@ -1070,8 +1089,12 @@ function renderEpisodes(rows, show, copy) {
   // No heading or sub-line: the drawer's own summary already reads
   // "62 episodes", so a section title above it would only say it again.
   return `<section class="show-section show-section--bare" id="episodes">
-    <details class="ep-drawer">
+    <details class="ep-drawer" data-episode-drawer>
       <summary>${copy.drawer}</summary>
+      <!-- Ships hidden and stays hidden without JavaScript: a sort control that
+           cannot sort is worse than none. The server's own order is the default
+           the control offers, so a no-JS visitor loses nothing but the choice. -->
+      <div class="cs-controls" data-ep-controls hidden></div>
       <ul class="ep-list">
         ${rows.map((e) => episodeRow(e, copy, isSafeUrl(show.image) ? show.image : null)).join("\n        ")}
       </ul>
@@ -1082,12 +1105,17 @@ function renderEpisodes(rows, show, copy) {
 // `fallbackArt` is the show's own artwork. Episode art is near-universal in the
 // index (100% on every show sampled), but where a row has none the show's art
 // is a truer stand-in than a glyph — it is what that episode's art would almost
-// certainly have been. D1 carries no second-chance URL (see the art2 note in
-// CLAUDE.md), so this is a single src with the glyph behind it.
+// certainly have been. The show's art2 is deliberately NOT a third link here:
+// it is a fallback for a dead show image, and these rows already fall back to
+// the show image only when the episode has none of its own.
 function episodeRow(e, copy, fallbackArt) {
   const bits = [fmtDate(e.published), fmtDuration(e.duration)].filter(Boolean);
   const art = (isSafeUrl(e.image) && e.image) || fallbackArt || null;
-  return `<li class="ep-row">
+  // boosters,boosts,sats,published — the four axes the drawer's sort offers,
+  // packed one attribute per row the way the community drawer does it.
+  const pack = [e.booster_count, e.boost_count, e.total_sats, e.published]
+    .map((v) => Number(v || 0)).join(",");
+  return `<li class="ep-row" data-ep="${pack}">
           ${art
             ? `<img class="ep-art" src="${htmlEscape(art)}" alt="" width="44" height="44" loading="lazy" referrerpolicy="no-referrer" />`
             : `<span class="ep-art ep-art--blank" aria-hidden="true">${copy.glyph}</span>`}

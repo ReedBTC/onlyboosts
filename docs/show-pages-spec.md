@@ -419,9 +419,20 @@ height and the supporters wall still opens the page's body.
 The episode list comes from D1's `episodes` table, which already carries
 `boost_count` and `total_sats` per episode.
 
-**Ordered by air date, newest first**, not by sats. The drawer is a catalogue,
-and a catalogue is chronological; ranking it by sats would make it a second
-leaderboard next to the supporters wall and bury this week's episode. Note that
+**Ordered by air date, newest first** by default, not by sats. The drawer is a
+catalogue, and a catalogue is chronological; opening it ranked by sats would make
+it a second leaderboard next to the supporters wall and bury this week's episode.
+
+**It carries a sort control** — Latest Episode / Most Boosters / Most Boosts /
+Most Sats — the same chrome and the same shape as the community drawer below:
+each row ships its four figures in one `data-ep` attribute and the client only
+re-orders. The default reproduces the server's own `ORDER BY`, so the first paint
+and the first sort agree, and undated rows sink under it rather than floating.
+
+`booster_count` is **not** a column on `episodes`; the collector stores boosts
+and sats per episode but not distinct boosters. "Most Boosters" derives it with a
+grouped subquery over this show's boosts — one indexed scan, measured at 2.9ms
+over 290 episodes — rather than a correlated lookup per row. Note that
 `published` is null on a meaningful slice of rows, and SQLite sorts NULL below
 every value, so a plain `DESC` sinks the undated ones with no explicit guard. A
 `0` fallback would have floated them to the top, which is the trap the Episodes

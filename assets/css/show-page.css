@@ -496,18 +496,9 @@
   --tint: rgba(0, 175, 240, 0.1);
 }
 
-.cs-count {
-  display: inline-block;
-  margin-left: 0.35rem;
-  padding: 0.05rem 0.4rem;
-  border-radius: 999px;
-  background: var(--tint);
-  color: var(--accent-d);
-  font-size: 0.75rem;
-  font-weight: 700;
-}
-
-/* Sort only — there is no range control here. See the note in the Function. */
+/* The sort row, shared by BOTH drawers on this page — the community one and
+   the episode one above it. No range control in either; see the note in the
+   Function. */
 .cs-controls {
   display: flex;
   align-items: center;
