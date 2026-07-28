@@ -232,11 +232,14 @@ function initEpisodeSort() {
     list.appendChild(frag)
   }
 
+  // Appended, not assigned: the band is already on screen carrying the
+  // "See All Episodes" link, which needs no JavaScript and so is not ours to
+  // reveal. Only the sort is conditional, and only on there being an order to
+  // change — a one-row drawer keeps the link and gets no pill.
   slot.appendChild(sortControl(EP_SORTS, sort, (key) => { sort = key; paint() }, {
     tag: 'Sort: ',
     title: 'Change how these episodes are ordered',
   }))
-  slot.hidden = false
 }
 
 initEpisodeSort()

@@ -875,7 +875,24 @@ because these summaries **stand in for the `<h2>` their sections don't have**.
 form, not information; see "No Episode Counts, Anywhere" in the spec for why the
 episode one in particular cannot.
 
-`.cs-controls` (the sort row, mounted by **both** drawers) is `--cream-d`, not
+**The episode drawer's band carries a second control**, at the end opposite the
+sort: **See All Episodes** (*See All Tracks* on music, off the `COPY` table),
+linking to the show on BMB. The drawer lists only episodes carrying an indexed
+boost, which is a small slice of most shows' output, and the page said nothing
+about where the rest were. It is styled as the same pill as the sort beside it,
+since a link styled as a link reads as body text stranded in a toolbar.
+
+That is why the two bands now ship differently: the episode one holds a plain
+link that works with **no JavaScript**, so it ships visible and only the sort is
+conditional; the community one holds nothing but a sort, so it still ships
+`hidden`. The band wraps on a narrow phone rather than squeezing either control.
+
+**It is the second surface pointing at boostmebitch.com**, and
+`assets/js/episode-link.js` still owns that target. The Function builds this URL
+inline because a Pages Function cannot import a client module; both files carry a
+⚠️ pointing at the other, and they change together.
+
+`.cs-controls` (the control band, mounted by **both** drawers) is `--cream-d`, not
 `--cream`. On the page background it read as a gap punched through the card, so
 an open drawer looked severed at the sort row. The `--accent` / `--tint` supply
 those controls need moved from `.cs-drawer` up to `.show-main` at the same time:

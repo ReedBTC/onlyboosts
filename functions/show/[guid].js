@@ -455,6 +455,11 @@ const COPY = {
     itemAbbr: "Ep.",
     untitledItem: "Untitled episode",
     drawer: "Episodes with Nostr Boosts",
+    // The way out of the drawer to a real catalogue. The drawer holds only
+    // episodes carrying an indexed boost, which is a fraction of any show's
+    // output — see "No Episode Counts, Anywhere" in the spec for how small a
+    // fraction — so it needs to say where the rest of them are.
+    allItems: "See All Episodes",
     noItems: "No episodes with Nostr boosts yet.",
     ldType: "PodcastSeries",
     // Where the back link points for a visitor who has nowhere to go back TO
@@ -477,6 +482,7 @@ const COPY = {
     itemAbbr: "Track",
     untitledItem: "Untitled track",
     drawer: "Tracks with Nostr Boosts",
+    allItems: "See All Tracks",
     noItems: "No tracks with Nostr boosts yet.",
     ldType: "MusicAlbum",
     backHref: "/#albums",
@@ -1110,16 +1116,32 @@ function renderEpisodes(rows, show, copy) {
     </section>`;
   }
 
+  // Where the rest of the catalogue is. This drawer lists only episodes with an
+  // indexed boost, which is a small slice of most shows' output, and until now
+  // the page said nothing about where the others were.
+  //
+  // ⚠️ Boost Me Bitch is the same TEMPORARY target assets/js/episode-link.js
+  // documents, and this is the second surface pointing at it. That module owns
+  // the target and both change together; it is not imported here because it is a
+  // client module and nothing else in functions/ reaches outside functions/.
+  // Show-level, so it takes `?podcast=<guid>` alone — a /show page carries no
+  // Podcast Index numeric id to prefer `?feed=` with.
+  const bmb = `https://boostmebitch.com/?podcast=${encodeURIComponent(show.podcast_guid)}`;
+
   // No heading or sub-line of its own: the summary IS this section's heading,
   // and show-page.css styles it as one (Playfair, the .show-stats-title size).
   // An <h2> above it would only say the same words a second time.
   return `<section class="show-section show-section--bare" id="episodes">
     <details class="ep-drawer" data-episode-drawer>
       <summary>${copy.drawer}<span class="drawer-hint" aria-hidden="true"></span></summary>
-      <!-- Ships hidden and stays hidden without JavaScript: a sort control that
-           cannot sort is worse than none. The server's own order is the default
-           the control offers, so a no-JS visitor loses nothing but the choice. -->
-      <div class="cs-controls" data-ep-controls hidden></div>
+      <!-- Unlike the community drawer's row, this one ships VISIBLE: it carries
+           a plain link that works with no JavaScript, so hiding the band until
+           the sort mounts would cost the link to save a control that isn't
+           there. The sort still appends into it, and still only when there are
+           at least two rows to order. -->
+      <div class="cs-controls" data-ep-controls>
+        <a class="cs-allitems" href="${bmb}" target="_blank" rel="noopener">${copy.allItems}<span class="cs-allitems-arrow" aria-hidden="true">↗</span></a>
+      </div>
       <ul class="ep-list">
         ${rows.map((e) => episodeRow(e, copy, isSafeUrl(show.image) ? show.image : null)).join("\n        ")}
       </ul>

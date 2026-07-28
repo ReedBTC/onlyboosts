@@ -219,7 +219,12 @@
 // attribute is new markup from the Function and initCommunityArt is new in
 // show-page.js, and a returning visitor holding the old module gets the
 // attribute with nothing reading it.
-const VERSION = 'ob-v41';
+// ob-v42: the /show episode drawer's control band gains a "See All Episodes"
+// link out to the show on BMB, at the left end opposite the sort. Required: the
+// band now ships visible rather than being revealed by JavaScript, and .cs-
+// allitems and the band's wrap/gap rules are new in show-page.css — a returning
+// visitor on the old stylesheet gets an unstyled link crowding the sort pill.
+const VERSION = 'ob-v42';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;

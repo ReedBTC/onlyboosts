@@ -483,7 +483,37 @@ The community drawer's was removed deliberately, and the episode drawer's cannot
 be honest at all; see No Episode Counts, Anywhere. The cues above are form
 rather than information, which is why they were available.
 
+### The Way Out of the Episode Drawer
+
+The episode drawer lists only episodes carrying an **indexed boost**, which is a
+small slice of what most shows have published: LINUX Unplugged shows 64 rows
+against 676 in its own feed, Rabbit Hole Recap 70 against 415. No Episode Counts,
+Anywhere is why the page never states that as a number, but the page also said
+nothing at all about where the rest of the catalogue was, which left the drawer
+reading as a claim about the show's output rather than about our index of it.
+
+**See All Episodes** ("See All Tracks" on music, off the `COPY` table) sits at
+the left end of the control band, opposite the sort, linking to the show on Boost
+Me Bitch. It is styled as the same pill as the sort beside it, because they are
+two controls on one band and a link styled as a link reads as body text stranded
+in a toolbar; the outbound arrow is the only difference, carrying the one thing
+the sort does not do.
+
+**BMB is a temporary target and this is its second surface.**
+`assets/js/episode-link.js` owns it for boost notes and documents why. This link
+is built inline in `renderEpisodes` because a Pages Function cannot import a
+client module and nothing else in `functions/` reaches outside it; both files
+carry a ⚠️ naming the other. This one is show-level (`?podcast=<guid>` alone — a
+`/show` page holds no Podcast Index numeric id to prefer `?feed=` with) and is
+not a boost note, so retiring BMB for notes does not have to retire it here.
+
 ### The Sort Row
+
+The two bands ship differently, and only in one way: the episode band holds that
+link, which needs no JavaScript, so it renders visible and only the sort is
+conditional on there being at least two rows to order. The community band holds
+nothing but a sort, so it still ships `hidden` and JavaScript reveals it — a sort
+control that cannot sort is worse than none.
 
 `.cs-controls` is mounted by **both** drawers and was painted `--cream`, the page
 background. Inside a white card that reads as a gap punched through to the page

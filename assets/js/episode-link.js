@@ -14,6 +14,13 @@
  * already exist and are NOT the target: a boost note is about one episode, and
  * pointing it at the show would drop the part the reader cares about.
  *
+ * ⚠️  ONE OTHER SURFACE points at BMB and is not built here: the
+ * "See All Episodes" link on the /show episode drawer's control band, in
+ * `renderEpisodes` (functions/show/[guid].js). It is show-level rather than
+ * episode-level, and a Pages Function cannot import a client module — nothing
+ * else in functions/ reaches outside functions/ either. It is not a boost note,
+ * so retiring BMB does not have to retire it, but CHANGE THE TWO TOGETHER.
+ *
  * Boost Me Bitch restores a detail view from URL params: `?feed=<piFeedId>` or
  * `?podcast=<podcastGuid>` picks the show, and `&episode=<itemGuid>` opens that
  * episode, where itemGuid is the RSS item guid (exactly our item_guid). Prefer
