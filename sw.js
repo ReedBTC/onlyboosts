@@ -190,7 +190,11 @@
 // out of the Function while the whole .sup-* block was rewritten in
 // show-page.css, so a returning visitor holding the old stylesheet against the
 // new markup gets boxed cards with no numbers in them.
-const VERSION = 'ob-v36';
+// ob-v37: FIX — ob-v36 shipped a show-page.css missing its Recent boosts and
+// Episodes sections and the .show-more rule, deleted by the same over-broad
+// slice that cost the .cs-* rules in ob-v34. Boost cards rendered as plain
+// text and both drawers lost their box and their scroll. Restored verbatim.
+const VERSION = 'ob-v37';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;

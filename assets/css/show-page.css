@@ -322,6 +322,130 @@
 }
 .sup-card--podium .sup-sats { font-size: 0.78rem; }
 
+/* The "Show N more boosters" toggle under the wall. */
+.show-more { margin-top: 1rem; }
+
+/* ── Recent boosts ────────────────────────────────────────────────────── */
+
+.boost-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.boost-row {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.boost-body { min-width: 0; flex: 1; }
+
+.boost-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.boost-who { font-weight: 700; color: var(--ink); overflow-wrap: anywhere; }
+.boost-amt { color: var(--brand-d); font-weight: 700; }
+.boost-when { color: var(--muted); font-size: 0.78rem; margin-left: auto; }
+
+.boost-msg {
+  margin: 0.4rem 0 0;
+  color: var(--text);
+  font-size: 0.92rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+/* nostr: mentions and bare URLs inside a boost message, rendered server-side
+   by functions/show/[guid].js. The feeds get the identical treatment from
+   boosts-thread.css, but that stylesheet is scoped to .note-body and this page
+   does not load it, so the rule is restated here rather than the two surfaces
+   being made to share a file neither of them fully needs. Keep them matching. */
+.boost-msg a { color: var(--brand-d); text-decoration: none; overflow-wrap: anywhere; }
+.boost-msg a:hover { text-decoration: underline; }
+.boost-msg a.nostr-mention { font-weight: 600; }
+
+.boost-target {
+  margin: 0.4rem 0 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+/* ── Episodes ─────────────────────────────────────────────────────────── */
+
+.ep-drawer {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.ep-drawer > summary {
+  cursor: pointer;
+  padding: 0.75rem 1rem;
+  font: 600 0.85rem/1 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: var(--brand-d);
+  list-style: none;
+}
+.ep-drawer > summary::-webkit-details-marker { display: none; }
+.ep-drawer > summary::before {
+  content: "▸ ";
+  display: inline-block;
+  transition: transform 0.15s;
+}
+.ep-drawer[open] > summary::before { content: "▾ "; }
+
+.ep-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--border);
+  /* A show can carry 500 episode rows; cap the drawer and scroll inside it
+     rather than making the page endless. */
+  max-height: 32rem;
+  overflow-y: auto;
+}
+
+.ep-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.ep-row:last-child { border-bottom: 0; }
+
+.ep-main { min-width: 0; flex: 1; }
+
+.ep-title {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.ep-num { color: var(--brand-d); }
+
+.ep-meta {
+  margin: 0.2rem 0 0;
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
 /* ── Other shows this community boosts ────────────────────────────────── */
 
 /* Reuses .ep-drawer / .ep-list wholesale — same box, same summary affordance,
