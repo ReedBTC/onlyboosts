@@ -53,6 +53,36 @@ def _boost_rows(conn):
         yield r
 
 
+def build_podroll_sql(conn):
+    """Replace the whole podroll projection.
+
+    Always a full replace, never a delta, and it is NOT part of the boost delta
+    path: podroll changes when a publisher edits their feed, which is unrelated to
+    any boost arriving. The collector's weekly podroll pass is what moves it, so
+    that pass pushes it — a few hundred rows in one batch. Wholesale replacement
+    is also what makes a *removed* recommendation actually disappear.
+    """
+    out = ["DELETE FROM podroll;"]
+    for r in db.podroll_rows(conn):
+        # Our resolved title wins over the remoteItem's own `title` attribute —
+        # same rule as the JSON shards (the attribute is a hint in someone else's
+        # feed and goes stale). Same for medium.
+        t_title = r["tgt_title"] or r["target_title"]
+        out.append(
+            "INSERT INTO podroll (source_guid,position,target_guid,target_url,"
+            "source_title,source_image,source_artwork,source_medium,source_author,source_linked,"
+            "target_title,target_image,target_artwork,target_medium,target_author,target_linked"
+            ") VALUES ("
+            f"{q(r['source_guid'])},{q(r['position'])},{q(r['target_guid'])},"
+            f"{q(r['tgt_feed'] or r['target_url'])},"
+            f"{q(r['src_title'])},{q(r['src_img'])},{q(r['src_art2'])},{q(r['src_medium'])},"
+            f"{q(r['src_author'])},{q(1 if (r['src_boosted'] and r['src_title']) else 0)},"
+            f"{q(t_title)},{q(r['tgt_img'])},{q(r['tgt_art2'])},"
+            f"{q(r['tgt_medium'] or r['target_medium'])},{q(r['tgt_author'])},"
+            f"{q(1 if (r['tgt_boosted'] and t_title) else 0)});")
+    return out
+
+
 def build_full_sql(conn):
     """Full-load statements: wipe the projection tables and repopulate."""
     out = []
@@ -119,6 +149,8 @@ def build_full_sql(conn):
         out.append(
             "INSERT INTO profiles (pubkey,name,display_name,picture,nip05) VALUES ("
             f"{q(p['pubkey'])},{q(p['name'])},{q(p['display_name'])},{q(p['picture'])},{q(p['nip05'])});")
+
+    out.extend(build_podroll_sql(conn))
 
     s = db.stats(conn)
     for k, v in {"generated_at": int(time.time()), "boosts": s["boosts"],
@@ -325,6 +357,26 @@ def cmd_remote_delta(args):
     print(f"D1 delta: pushed {len(rows)} new boost(s) ({len(stmts)} statements)")
 
 
+def cmd_remote_podroll(args):
+    """Push the podroll projection alone (full replace). Run after the collector's
+    `podroll` pass; the boost delta never touches this table."""
+    cf = _cf(load_config(CREDENTIALS))
+    if not cf:
+        print("[error] CF_ACCOUNT_ID / CF_D1_DATABASE_ID / CF_API_TOKEN missing from credentials.env")
+        return
+    conn = db.connect(DB_PATH)
+    stmts = build_podroll_sql(conn)
+    BATCH = 100
+    for i in range(0, len(stmts), BATCH):
+        ok, detail = _d1_exec(*cf, "\n".join(stmts[i:i + BATCH]))
+        if not ok:
+            # A missing-table error here means d1/schema.sql hasn't been applied to
+            # the remote yet: run --apply-schema first (it's CREATE ... IF NOT EXISTS).
+            print(f"[error] podroll batch {i // BATCH} failed: {detail}")
+            return
+    print(f"D1 podroll: replaced with {len(stmts) - 1} edge(s)")
+
+
 def cmd_mark_all_synced(args):
     """One-time reconcile after an out-of-band full seed: mark every current boost
     as already in D1 so the first delta run doesn't re-push everything."""
@@ -341,6 +393,8 @@ def main():
     ap.add_argument("--apply-schema", action="store_true", help="apply d1/schema.sql to the remote D1")
     ap.add_argument("--remote", action="store_true", help="full-load the projection to the remote D1")
     ap.add_argument("--remote-delta", action="store_true", help="push only boosts new since last sync (for the timer)")
+    ap.add_argument("--remote-podroll", action="store_true",
+                    help="replace the podroll projection (run after the weekly podroll pass)")
     ap.add_argument("--mark-all-synced", action="store_true", help="one-time: mark all current boosts as already in D1")
     args = ap.parse_args()
     if args.emit_sql:
@@ -351,10 +405,13 @@ def main():
         cmd_remote(args)
     elif args.remote_delta:
         cmd_remote_delta(args)
+    elif args.remote_podroll:
+        cmd_remote_podroll(args)
     elif args.mark_all_synced:
         cmd_mark_all_synced(args)
     else:
-        ap.error("choose --emit-sql <file>, --apply-schema, --remote, --remote-delta, or --mark-all-synced")
+        ap.error("choose --emit-sql <file>, --apply-schema, --remote, --remote-delta, "
+                 "--remote-podroll, or --mark-all-synced")
 
 
 if __name__ == "__main__":

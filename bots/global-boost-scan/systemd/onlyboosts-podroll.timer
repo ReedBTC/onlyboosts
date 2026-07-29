@@ -1,0 +1,13 @@
+[Unit]
+Description=Run the OnlyBoosts podroll refresh weekly
+
+[Timer]
+# Sunday 09:40 UTC — clear of the daily outbox expansion at 08:30 (which can run
+# long) and off the hourly incremental's usual minute. They share a lock anyway;
+# this just keeps them from queueing behind each other.
+OnCalendar=Sun *-*-* 09:40:00 UTC
+RandomizedDelaySec=900
+Persistent=true
+
+[Install]
+WantedBy=timers.target

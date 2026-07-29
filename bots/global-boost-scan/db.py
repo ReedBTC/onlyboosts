@@ -69,8 +69,40 @@ CREATE TABLE IF NOT EXISTS shows (
                                  -- "by" line on podcasts (may be a network/publisher,
                                  -- not a host). Raw string; the site hides it when it
                                  -- just repeats the title. NOT a podcast:person credit.
+    discovered_via TEXT,         -- provenance: NULL/'boost' = someone boosted it;
+                                 -- 'podroll' = resolved only because another feed
+                                 -- recommends it, so it may have no boosts at all and
+                                 -- then appears in no export or D1 row — it exists to
+                                 -- give a podroll card its title and artwork. Written
+                                 -- once at insert and never promoted, so it records how
+                                 -- a show FIRST arrived; nothing counts off it (stats()
+                                 -- asks the boosts table directly, which self-corrects).
+    podroll_checked_at INTEGER,  -- last time we fetched this feed looking for a podroll
+    podroll_status TEXT,         -- outcome of that fetch: ok | none | truncated | http-<n> | err-<Type>
     updated_at    INTEGER
 );
+
+-- <podcast:podroll> — the shows a show's own feed recommends. Feed-level only:
+-- every remoteItem observed in the wild points at a feed (feedGuid/feedUrl), none
+-- at an item, so there is no item column. Parsed from raw RSS by podroll.py;
+-- Podcast Index does not carry this tag.
+--
+-- Rows are an ORDERED LIST replaced wholesale per source (delete-then-insert), so
+-- `position` is a stable part of the key and a removed recommendation disappears
+-- rather than lingering. `target_guid` is a real podcast:guid and joins straight to
+-- shows.podcast_guid — but it is nullable (a few feeds give only a feedUrl), which
+-- is the other reason the key is (source, position) rather than (source, target).
+CREATE TABLE IF NOT EXISTS podroll (
+    source_guid   TEXT NOT NULL,   -- the show whose feed carries the block
+    position      INTEGER NOT NULL,-- order within the block = the publisher's own ranking
+    target_guid   TEXT,            -- remoteItem feedGuid (the join key; ~99% present)
+    target_url    TEXT,            -- remoteItem feedUrl
+    target_title  TEXT,            -- remoteItem title attr, if any — publisher's hint only
+    target_medium TEXT,            -- remoteItem medium attr, if any — publisher's hint only
+    updated_at    INTEGER,
+    PRIMARY KEY (source_guid, position)
+);
+CREATE INDEX IF NOT EXISTS idx_podroll_target ON podroll(target_guid);
 
 CREATE TABLE IF NOT EXISTS episodes (
     item_guid       TEXT PRIMARY KEY,
@@ -142,6 +174,10 @@ def _migrate(conn):
         conn.execute("ALTER TABLE shows ADD COLUMN author TEXT")
     if "artwork" not in show_cols:
         conn.execute("ALTER TABLE shows ADD COLUMN artwork TEXT")
+    for col, decl in (("discovered_via", "TEXT"), ("podroll_checked_at", "INTEGER"),
+                      ("podroll_status", "TEXT")):
+        if col not in show_cols:
+            conn.execute(f"ALTER TABLE shows ADD COLUMN {col} {decl}")
     conn.commit()
 
 
@@ -191,19 +227,21 @@ def upsert_boosts(conn, boosts):
 
 
 # ── enrichment caches ─────────────────────────────────────────────────────────
-def upsert_show(conn, show):
+def upsert_show(conn, show, discovered_via="boost"):
+    """Cache a resolved show. `discovered_via` is recorded on INSERT only — a
+    re-resolve must not rewrite how the show first arrived."""
     conn.execute(
         """INSERT INTO shows (podcast_guid, title, image, artwork, feed_url, feed_id,
-                              itunes_id, medium, author, updated_at)
+                              itunes_id, medium, author, discovered_via, updated_at)
            VALUES (:podcast_guid, :title, :image, :artwork, :feed_url, :feed_id,
-                   :itunes_id, :medium, :author, :updated_at)
+                   :itunes_id, :medium, :author, :discovered_via, :updated_at)
            ON CONFLICT(podcast_guid) DO UPDATE SET
              title=excluded.title, image=excluded.image, artwork=excluded.artwork,
              feed_url=excluded.feed_url,
              feed_id=excluded.feed_id, itunes_id=excluded.itunes_id,
              medium=excluded.medium, author=excluded.author,
              updated_at=excluded.updated_at""",
-        {**show, "updated_at": int(time.time())})
+        {**show, "discovered_via": discovered_via, "updated_at": int(time.time())})
     conn.commit()
 
 
@@ -287,6 +325,105 @@ def mark_enrich_failed(conn, kind, ids):
            ON CONFLICT(kind, id) DO UPDATE SET last_try=excluded.last_try""",
         [(kind, i, now) for i in ids])
     conn.commit()
+
+
+# ── podroll ───────────────────────────────────────────────────────────────────
+#: A read we never completed (rate-limited, timed out, server error, cut short)
+#: is not evidence about the feed, so it earns a shorter cooldown than a clean
+#: answer. `http-404` is deliberately NOT in here: a feed that is gone is a real
+#: answer, and retrying it daily forever is what an unloved crawler does.
+PODROLL_TRANSIENT = ("http-429", "http-5", "err-", "truncated")
+
+
+def shows_needing_podroll(conn, max_age, retry_age=None, only_boosted=True):
+    """Feeds due a podroll fetch: never checked, or last checked too long ago.
+
+    Two ages, because a failed read and a successful one mean different things —
+    see PODROLL_TRANSIENT. `retry_age` defaults to a sixth of `max_age`.
+
+    Ordered oldest-first so an interrupted pass resumes where it left off.
+    `only_boosted` keeps the sweep to shows the site actually has a page for:
+    podroll-discovered shows have feed URLs too, but crawling THEIR podrolls
+    walks the graph outward one hop per run, and the second hop is a set of shows
+    nothing on the site links to."""
+    if retry_age is None:
+        retry_age = max_age // 6
+    now = int(time.time())
+    transient = " OR ".join("s.podroll_status LIKE ?" for _ in PODROLL_TRANSIENT)
+    scope = ""
+    if only_boosted:
+        eg = effective_guid("b")
+        scope = f" AND EXISTS (SELECT 1 FROM boosts b WHERE {eg} = s.podcast_guid)"
+    return conn.execute(
+        f"""SELECT s.podcast_guid, s.feed_url FROM shows s
+            WHERE s.feed_url IS NOT NULL
+              AND (s.podroll_checked_at IS NULL
+                   OR s.podroll_checked_at < ?
+                   OR (({transient}) AND s.podroll_checked_at < ?)){scope}
+            ORDER BY COALESCE(s.podroll_checked_at, 0), s.podcast_guid""",
+        (now - max_age, *[p + "%" for p in PODROLL_TRANSIENT], now - retry_age)).fetchall()
+
+
+def replace_podroll(conn, source_guid, items):
+    """Swap in a show's whole podroll. The block is an ordered list the publisher
+    rewrites as a unit, so this deletes every row for the source before inserting
+    — a dropped recommendation has to actually disappear."""
+    now = int(time.time())
+    conn.execute("DELETE FROM podroll WHERE source_guid=?", (source_guid,))
+    conn.executemany(
+        """INSERT INTO podroll (source_guid, position, target_guid, target_url,
+                                target_title, target_medium, updated_at)
+           VALUES (?,?,?,?,?,?,?)""",
+        [(source_guid, i, it.get("target_guid"), it.get("target_url"),
+          it.get("target_title"), it.get("target_medium"), now)
+         for i, it in enumerate(items)])
+
+
+def mark_podroll_checked(conn, source_guid, status):
+    conn.execute("UPDATE shows SET podroll_checked_at=?, podroll_status=? "
+                 "WHERE podcast_guid=?", (int(time.time()), status, source_guid))
+
+
+def podroll_targets_needing_show(conn):
+    """Podroll target guids with no `shows` row yet — the cards that would render
+    with no title or artwork. Excludes ones inside the enrich-failure cooldown."""
+    rows = conn.execute(
+        """SELECT DISTINCT p.target_guid FROM podroll p
+           LEFT JOIN shows s ON s.podcast_guid = p.target_guid
+           LEFT JOIN enrich_failed f ON f.kind='show' AND f.id = p.target_guid
+           WHERE p.target_guid IS NOT NULL AND s.podcast_guid IS NULL
+             AND (f.id IS NULL OR f.last_try < ?)""", (_cutoff(),)).fetchall()
+    return [r[0] for r in rows]
+
+
+def podroll_rows(conn):
+    """Every podroll edge with both endpoints' display metadata resolved.
+
+    The one join both consumers read — the JSON exporter and the D1 projection —
+    so the two can't drift into disagreeing about what a card says. `*_boosted`
+    is whether that end has boosts, which is exactly whether it has a /show page.
+
+    The boosted set is materialized ONCE in a CTE and left-joined. A correlated
+    EXISTS per endpoint reads far more naturally and is a trap: the effective guid
+    is a COALESCE, which no index can serve, so each one re-scans every boost.
+    """
+    return conn.execute(f"""
+        WITH boosted AS (SELECT DISTINCT {effective_guid('')} AS g FROM boosts
+                         WHERE podcast_guid IS NOT NULL)
+        SELECT p.source_guid, p.position, p.target_guid, p.target_url,
+               p.target_title, p.target_medium,
+               src.title AS src_title, src.image AS src_img, src.artwork AS src_art2,
+               src.medium AS src_medium, src.author AS src_author, src.feed_url AS src_feed,
+               tgt.title AS tgt_title, tgt.image AS tgt_img, tgt.artwork AS tgt_art2,
+               tgt.medium AS tgt_medium, tgt.author AS tgt_author, tgt.feed_url AS tgt_feed,
+               (sb.g IS NOT NULL) AS src_boosted,
+               (tb.g IS NOT NULL) AS tgt_boosted
+        FROM podroll p
+        LEFT JOIN shows   src ON src.podcast_guid = p.source_guid
+        LEFT JOIN shows   tgt ON tgt.podcast_guid = p.target_guid
+        LEFT JOIN boosted sb  ON sb.g = p.source_guid
+        LEFT JOIN boosted tb  ON tb.g = p.target_guid
+        ORDER BY p.source_guid, p.position""").fetchall()
 
 
 def feed_id_for_guid(conn, podcast_guid):
@@ -425,9 +562,20 @@ def stats(conn):
         "distinct_eps":    one("SELECT COUNT(DISTINCT item_guid) FROM boosts WHERE item_guid IS NOT NULL"),
         "distinct_boosters": one("SELECT COUNT(DISTINCT booster_pubkey) FROM boosts"),
         "total_sats":      one("SELECT COALESCE(SUM(sats),0) FROM boosts"),
-        "shows_enriched":  one("SELECT COUNT(*) FROM shows"),
+        # Shows that have boosts AND metadata. Filtered rather than a bare
+        # COUNT(*) because `shows` also caches podroll targets nobody has boosted;
+        # those must not inflate a number the website prints. Reads the boosts
+        # table directly so it self-corrects when a podroll target later gets one.
+        # `IN (subquery)`, NOT a correlated EXISTS: the effective guid is a
+        # COALESCE, so no index can serve it and EXISTS re-scans all 22k boosts
+        # once per show — 6.2s versus 0.02s here, on a function the exporter calls.
+        "shows_enriched":  one(f"SELECT COUNT(*) FROM shows WHERE podcast_guid IN "
+                               f"(SELECT DISTINCT {effective_guid('')} FROM boosts "
+                               f" WHERE podcast_guid IS NOT NULL)"),
         "eps_enriched":    one("SELECT COUNT(*) FROM episodes"),
         "profiles":        one("SELECT COUNT(*) FROM profiles"),
+        "podroll_edges":   one("SELECT COUNT(*) FROM podroll"),
+        "podroll_shows":   one("SELECT COUNT(DISTINCT source_guid) FROM podroll"),
         "earliest":        one("SELECT MIN(created_at) FROM boosts"),
         "latest":          one("SELECT MAX(created_at) FROM boosts"),
     }

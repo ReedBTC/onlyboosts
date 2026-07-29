@@ -1282,6 +1282,77 @@ a fallback. Don't re-add it.
 
 `author` itself did ship; see the section above.
 
+## Podroll: the first field we parse from raw RSS
+
+`<podcast:podroll>` — a publisher's own list of other shows worth hearing —
+**is not in Podcast Index**. Its feed object has no podroll field (`artwork,
+author, categories, … value`, measured) and `/podcasts/bytag?podcast-podroll`
+returns zero feeds where `?podcast-value` returns results. Every other show
+field rode along on a PI call `enrich.py` already made; this one could not, so
+`podroll.py` fetches the show's own feed. **It is the only pass in this
+pipeline that touches third-party RSS**, and that shapes all of it.
+
+**Weekly, never hourly** (`onlyboosts-podroll.timer`, Sundays). A podroll
+changes when a publisher edits their feed, never when a boost arrives, so
+putting this on the incremental tick would spend ~900 feed fetches an hour of
+other people's bandwidth to learn nothing. `run-podroll.sh` takes the same
+pipeline lock as the other two jobs.
+
+**Politeness is load-bearing.** The first scoping sweep, 12 flat workers, drew
+429s from 137 feeds — 135 of them Wavlake, which hosts a big slice of the music
+corpus. Every one would have been recorded as "no podroll", and the number
+would have looked plausible. Re-probed serially: all 135 fetched, none had a
+podroll. So `probe_feeds` groups by host and goes **serial per host**,
+concurrent only across hosts. This is the same failure the Podcast Index
+coverage probes hit; assume any wide third-party sweep has it.
+
+Three more invariants:
+
+- **Only a clean read may rewrite a stored podroll.** A 429/timeout/truncation
+  means we failed to see the feed, not that the publisher deleted their list.
+  Failures record a status and leave the rows alone. They also get a shorter
+  re-check window than successes (`db.PODROLL_TRANSIENT`) and one retry sweep at
+  the end of the pass, when a rate-limiting host has had minutes of quiet.
+  `http-404` is deliberately not transient: a gone feed is a real answer.
+- **Feeds are streamed and abandoned** at `</channel>` or 2MB (one indexed feed
+  is 50MB). The cap was validated, not guessed: all 48 feeds that exceeded it
+  were re-downloaded in full and none carried a podroll past it.
+- **The block is regex-parsed, not XML-parsed**, because it's third-party markup
+  read from a deliberately truncated prefix. A podroll opened but never closed
+  raises `Truncated` rather than storing half a list.
+
+**Coverage, and the reason the reverse edge exists:** 65 of 925 reachable feeds
+(7%), 371 edges, 221 distinct targets. Forward-only that is a section on 65
+pages. Adding `recommended_by` — the same rows read the other way — brings it to
+**109**, because plenty of shows are recommended by someone without publishing a
+podroll themselves. Local Bitcoiners is one of them (Bowl After Bowl recommends
+it). Build both directions or most of the feature is left on the table.
+
+**Only ~56% of cards link anywhere.** A podroll routinely recommends shows
+nobody in this corpus has boosted; 136 of 221 targets were new to the index. Two
+consequences. First, the collector resolves those targets through PI
+`podcasts/byguid` and caches them in `shows` with `discovered_via='podroll'` —
+96% come back with a title and artwork, so the cards render properly instead of
+as bare guids. Second, every card carries a **`linked`** flag (boosts AND a
+title, the same qualifying rule `/show/<guid>` applies); `false` means render the
+card but point it at the feed. Don't re-derive that flag site-side.
+
+Podroll-discovered `shows` rows have no boosts, so they appear in no export row
+and no D1 projection — the exports are all boosts-driven. The one place it would
+have leaked is `db.stats()`, whose `shows_enriched` used to be `COUNT(*) FROM
+shows`; it now asks the boosts table, which also self-corrects if such a show
+later gets boosted.
+
+**In D1, both endpoints are denormalized onto the edge** (`source_*` /
+`target_*`). A join to `podcasts` would only resolve the half of targets that
+have boosts, since that table holds nothing else. It syncs as a **full replace**
+via `d1_sync.py --remote-podroll`, run by the weekly script — never on the boost
+delta path, which is unrelated to it. Wholesale replacement is also what makes a
+*removed* recommendation actually disappear. Requires `d1/schema.sql` applied to
+the remote first (`--apply-schema`, idempotent).
+
+Shape of both surfaces is specified in `DATA-API.md`.
+
 ## Naming note
 
 Internal identifiers still use LB's `lb` prefix — `window.LBLogin`,

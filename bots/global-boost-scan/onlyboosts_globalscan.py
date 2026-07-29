@@ -35,6 +35,7 @@ sys.path.insert(0, str(HERE.parent / "shared"))
 import db                                                       # noqa: E402
 import enrich                                                   # noqa: E402
 import export as export_mod                                     # noqa: E402
+import podroll                                                  # noqa: E402
 import resolve_guids                                            # noqa: E402
 from classify import classify_boost, decode_note_or_nevent, _QUOTE_RE  # noqa: E402
 from relays import CORE_RELAYS, PROFILE_RELAYS, RECEIPT_RELAYS, expand_via_outbox  # noqa: E402
@@ -379,6 +380,103 @@ def cmd_enrich(args):
     _print_stats(conn)
 
 
+# ── podroll ───────────────────────────────────────────────────────────────────
+def cmd_podroll(args):
+    """Refresh <podcast:podroll> for every indexed show, then resolve the shows it
+    points at so each recommendation can render as a real card.
+
+    The ONLY pass that fetches third-party RSS — Podcast Index carries no podroll.
+    Weekly, not hourly: a podroll changes when a publisher edits their feed, never
+    when a boost arrives, so re-crawling ~900 feeds on the incremental tick would
+    be a lot of other people's bandwidth for no new data. Read-only outward."""
+    conn = db.connect(DB_PATH, check_same_thread=False)
+    rows = db.shows_needing_podroll(conn, max_age=args.max_age, retry_age=args.retry_age,
+                                    only_boosted=not args.include_podroll_shows)
+    if not rows:
+        print("podroll: every feed checked within the freshness window — nothing to do")
+        return
+    print(f"Podroll: fetching {len(rows)} feed(s)...")
+    t0 = time.time()
+    results = podroll.probe_feeds(rows, log=lambda m: print(m, flush=True))
+    counts, edges = _store_podroll(conn, results)
+
+    # One retry sweep for the reads that never completed. By now the whole main
+    # pass has elapsed, so a host that rate-limited us has had minutes of quiet —
+    # and the alternative is a transient 429 blinding one show until next week.
+    retry = [r for r in results
+             if r["items"] is None and r["status"].startswith(db.PODROLL_TRANSIENT)]
+    if retry:
+        print(f"  retrying {len(retry)} incomplete read(s)...")
+        again = podroll.probe_feeds(retry, log=lambda m: print(m, flush=True))
+        c2, e2 = _store_podroll(conn, again)
+        for k, v in c2.items():
+            counts[k] = counts.get(k, 0) + v
+        edges += e2
+        print("  after retry: " + ", ".join(f"{k}={v}" for k, v in sorted(c2.items())))
+
+    print(f"  fetched in {time.time() - t0:.0f}s — "
+          + ", ".join(f"{k}={v}" for k, v in sorted(counts.items())))
+    print(f"  {edges} recommendation(s) stored")
+
+    # Resolve the targets. Without this a podroll card has a guid and nothing to
+    # show; ~96% of un-indexed targets come back from PI with a title and artwork.
+    key, secret = _pi_creds()
+    todo = db.podroll_targets_needing_show(conn)
+    if not (key and secret):
+        print(f"[warn] no Podcast Index credentials — {len(todo)} target(s) left unresolved")
+    elif todo:
+        print(f"Resolving {len(todo)} podroll target(s) via Podcast Index...")
+        # 4 workers: concurrent PI sweeps get rate-limited into silent failures
+        # that look exactly like "no such feed".
+        with ThreadPoolExecutor(max_workers=4) as ex:
+            found = list(ex.map(lambda g: (g, enrich.resolve_show(g, key, secret)), todo))
+        ok = 0
+        for guid, info in found:
+            if info:
+                # 'podroll' provenance: these have no boosts, so they appear in no
+                # export row or D1 projection — they exist to title a card.
+                db.upsert_show(conn, info, discovered_via="podroll")
+                ok += 1
+            else:
+                db.mark_enrich_failed(conn, "show", guid)
+        print(f"  resolved {ok}/{len(todo)}")
+    _print_podroll_stats(conn)
+
+
+def _store_podroll(conn, results):
+    """Persist a sweep's results. Returns ({status: count}, edges stored)."""
+    counts, edges = {}, 0
+    for r in results:
+        counts[r["status"]] = counts.get(r["status"], 0) + 1
+        # Only a clean read may rewrite the stored list. A 429/timeout/truncation
+        # is us failing to see the feed, not the publisher removing their podroll,
+        # and treating the two alike would delete real data on a bad network day.
+        if r["items"] is not None:
+            db.replace_podroll(conn, r["podcast_guid"], r["items"])
+            edges += len(r["items"])
+        db.mark_podroll_checked(conn, r["podcast_guid"], r["status"])
+    conn.commit()
+    return counts, edges
+
+
+def _print_podroll_stats(conn):
+    # `IN (boosted)` rather than a correlated EXISTS — the effective guid is a
+    # COALESCE no index can serve, so EXISTS re-scans every boost per row.
+    boosted = (f"SELECT DISTINCT {db.effective_guid('')} FROM boosts "
+               f"WHERE podcast_guid IS NOT NULL")
+    one = lambda q: conn.execute(q).fetchone()[0]                    # noqa: E731
+    print("\n── podroll ──")
+    print(f"  shows with a podroll:  {one('SELECT COUNT(DISTINCT source_guid) FROM podroll'):>6}")
+    print(f"  recommendation edges:  {one('SELECT COUNT(*) FROM podroll'):>6}")
+    print(f"  distinct targets:      {one('SELECT COUNT(DISTINCT target_guid) FROM podroll'):>6}")
+    print(f"  targets we can link:   "
+          f"{one(f'SELECT COUNT(DISTINCT target_guid) FROM podroll WHERE target_guid IN ({boosted})'):>6}")
+    print(f"  pages gaining a section (either direction): "
+          f"{one(f'''SELECT COUNT(*) FROM (SELECT DISTINCT source_guid AS g FROM podroll
+                     UNION SELECT target_guid FROM podroll WHERE target_guid IS NOT NULL) x
+                     WHERE x.g IN ({boosted})'''):>6}")
+
+
 # ── stats ─────────────────────────────────────────────────────────────────────
 def _print_stats(conn):
     s = db.stats(conn)
@@ -477,6 +575,18 @@ def main():
 
     e = sub.add_parser("enrich", help="Podcast Index + profile enrichment")
     e.set_defaults(func=cmd_enrich)
+
+    pr = sub.add_parser("podroll", help="parse <podcast:podroll> from each show's RSS feed")
+    pr.add_argument("--max-age", type=int, default=6 * 24 * 3600,
+                    help="re-check a feed only if it was last checked longer ago than this "
+                         "(seconds; default just under a week, so a weekly timer never skips)")
+    pr.add_argument("--retry-age", type=int, default=None,
+                    help="shorter re-check window for feeds whose last read never completed "
+                         "(429/timeout/5xx); default is a sixth of --max-age")
+    pr.add_argument("--include-podroll-shows", action="store_true",
+                    help="also crawl the podrolls OF podroll targets (walks the graph a "
+                         "second hop; those shows have no page to show it on)")
+    pr.set_defaults(func=cmd_podroll)
 
     x = sub.add_parser("export", help="write static JSON shards for the website")
     x.add_argument("--out", default=str(HERE / "data" / "shards"),

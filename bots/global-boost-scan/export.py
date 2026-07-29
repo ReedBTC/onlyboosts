@@ -82,6 +82,52 @@ def _record(r):
     }
 
 
+def _podroll_maps(conn):
+    """Both directions of the podroll graph, resolved once for the whole export.
+
+    Every edge is read in a single query and grouped in Python rather than asked
+    per shard: the graph is a few hundred rows against ~1,300 shards, so a
+    per-shard query would be three orders of magnitude more work for the same
+    answer. Returns (forward, reverse) as {guid: [card, …]}, forward in the
+    publisher's own order and reverse alphabetical.
+
+    A card's `linked` flag is the site's cue that the target has a /show page —
+    which requires boosts AND a title, the same qualifying rule the page itself
+    applies. Titleless or boost-less targets still ship: they carry artwork and a
+    feed URL, which is enough to render a card that points off-site.
+    """
+    forward, reverse = {}, {}
+    for r in db.podroll_rows(conn):
+        # Our resolved title wins over the remoteItem's `title` attribute: the
+        # attribute is a hand-written hint in someone else's feed and goes stale.
+        t_title = r["tgt_title"] or r["target_title"]
+        forward.setdefault(r["source_guid"], []).append({
+            "guid":   r["target_guid"],
+            "title":  t_title,
+            "img":    r["tgt_img"],
+            "art2":   r["tgt_art2"],
+            "medium": r["tgt_medium"] or r["target_medium"],
+            "author": r["tgt_author"],
+            "feed":   r["tgt_feed"] or r["target_url"],
+            "linked": bool(r["tgt_boosted"] and t_title),
+        })
+        if not r["target_guid"]:
+            continue                      # url-only edge: no key to reverse it under
+        reverse.setdefault(r["target_guid"], []).append({
+            "guid":   r["source_guid"],
+            "title":  r["src_title"],
+            "img":    r["src_img"],
+            "art2":   r["src_art2"],
+            "medium": r["src_medium"],
+            "author": r["src_author"],
+            "feed":   r["src_feed"],
+            "linked": bool(r["src_boosted"] and r["src_title"]),
+        })
+    for lst in reverse.values():
+        lst.sort(key=lambda c: ((c["title"] or "").lower(), c["guid"] or ""))
+    return forward, reverse
+
+
 def export(conn, out_dir, latest_n=1000, per_show=False, log=print):
     out = Path(out_dir)
     rows = conn.execute(_FEED_SQL + " ORDER BY b.created_at DESC").fetchall()
@@ -121,6 +167,7 @@ def export(conn, out_dir, latest_n=1000, per_show=False, log=print):
         WHERE {_EFF} IS NOT NULL
         GROUP BY {_EFF}
         ORDER BY latest DESC""").fetchall()
+    fwd_podroll, rev_podroll = _podroll_maps(conn)
     podcasts = [{
         "guid":     a["podcast_guid"],
         "title":    a["title"],
@@ -135,6 +182,15 @@ def export(conn, out_dir, latest_n=1000, per_show=False, log=print):
         "episodes": a["episodes"],
         "latest":   a["latest"],
         "file":     f"podcasts/{_safe(a['podcast_guid'])}.json",   # exact per-show shard path
+        # Podroll COUNTS only, and only when non-zero. The cards themselves live in
+        # the per-show shard: the tag is on ~7% of feeds, so carrying them here
+        # would weigh down the file every surface loads for a section 93% of pages
+        # don't have — and even two null keys per entry is ~45KB across the index.
+        # A missing key means "no section here, don't open the shard for it".
+        **({"podroll": len(fwd_podroll[a["podcast_guid"]])}
+           if a["podcast_guid"] in fwd_podroll else {}),
+        **({"podrolled_by": len(rev_podroll[a["podcast_guid"]])}
+           if a["podcast_guid"] in rev_podroll else {}),
     } for a in agg]
     write_json(out / "podcasts" / "index.json",
                {"generated_at": generated, "count": len(podcasts), "podcasts": podcasts})
@@ -172,6 +228,12 @@ def export(conn, out_dir, latest_n=1000, per_show=False, log=print):
                          "art2": a["artwork"],   # fallback art URL when `img` 404s (may be null)
                          "feed": a["feed_url"], "medium": a["medium"],
                          "author": a["author"]},
+                # <podcast:podroll>. `podroll` is what this show recommends, in the
+                # publisher's order; `recommended_by` is the reverse edge, which is
+                # what makes the feature worth having — it lights up ~40% more pages
+                # than the forward direction alone. Both omitted when empty.
+                **({"podroll": fwd_podroll[pg]} if pg in fwd_podroll else {}),
+                **({"recommended_by": rev_podroll[pg]} if pg in rev_podroll else {}),
                 "episodes": [{
                     "guid": e["item_guid"], "title": e["title"],
                     "img": e["image"] or a["image"], "date": e["published"],

@@ -57,6 +57,39 @@ CREATE TABLE IF NOT EXISTS episodes (
 );
 CREATE INDEX IF NOT EXISTS idx_episodes_podcast ON episodes(podcast_guid);
 
+-- <podcast:podroll> — the shows a feed recommends, one row per recommendation.
+-- Parsed from raw RSS by the collector (Podcast Index does not carry this tag).
+--
+-- BOTH endpoints' display fields are denormalized onto the edge on purpose. The
+-- show page reads this table in two directions — what this show recommends, and
+-- who recommends this show — and a join to `podcasts` would only answer for the
+-- half of targets that have boosts, since that table holds nothing else. Carrying
+-- the fields makes either direction one indexed read that renders every card. The
+-- table is a few hundred rows; the duplication costs nothing.
+--
+-- *_linked is 1 when that end has a /show page (boosts AND a title). A 0 means
+-- render the card but point it at the feed, not at us.
+CREATE TABLE IF NOT EXISTS podroll (
+  source_guid    TEXT NOT NULL,
+  position       INTEGER NOT NULL,   -- order in the block = the publisher's ranking
+  target_guid    TEXT,               -- remoteItem feedGuid; nullable (a few give only a URL)
+  target_url     TEXT,
+  source_title   TEXT,
+  source_image   TEXT,
+  source_artwork TEXT,
+  source_medium  TEXT,
+  source_author  TEXT,
+  source_linked  INTEGER,
+  target_title   TEXT,
+  target_image   TEXT,
+  target_artwork TEXT,
+  target_medium  TEXT,
+  target_author  TEXT,
+  target_linked  INTEGER,
+  PRIMARY KEY (source_guid, position)
+);
+CREATE INDEX IF NOT EXISTS idx_podroll_target ON podroll(target_guid);
+
 CREATE TABLE IF NOT EXISTS profiles (
   pubkey       TEXT PRIMARY KEY,
   name         TEXT,

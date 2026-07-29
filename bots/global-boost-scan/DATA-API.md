@@ -110,7 +110,9 @@ Boosts within a file are newest-first.
       "author": "Adam Curry & John C. Dvorak", // <itunes:author>; nullable. See the author note below.
       "boosts": 542, "sats": 487214, "boosters": 96, "episodes": 130,
       "latest": 1784980386,            // unix seconds of newest boost
-      "file": "podcasts/856cd618-….json"   // exact per-show shard path — use this, don't build it
+      "file": "podcasts/856cd618-….json",  // exact per-show shard path — use this, don't build it
+      "podroll": 22,                   // KEY IS ABSENT when zero — see the podroll section
+      "podrolled_by": 12               // ditto. Counts only; the cards are in the shard
     }
   ]
 }
@@ -129,9 +131,48 @@ sanitized — always use `file`, don't assemble it yourself).
       "shownotes": "full plain-text shownotes…",   // uncapped; nullable
       "boosts": 9, "sats": 55987 }
   ],
-  "boosts": [ <boost>, … ]             // every boost for this show, newest-first
+  "boosts": [ <boost>, … ],            // every boost for this show, newest-first
+
+  // Both podroll keys are ABSENT when empty (not [] and not null).
+  "podroll":        [ <podroll-card>, … ],  // what THIS show recommends, publisher's order
+  "recommended_by": [ <podroll-card>, … ]   // the reverse edge, alphabetical by title
 }
 ```
+
+### The `<podroll-card>` record
+`<podcast:podroll>` is a publisher's own list of other shows worth hearing. It
+appears in both directions above with the same shape — in `podroll` the card
+describes the show being recommended, in `recommended_by` the show doing the
+recommending.
+```jsonc
+{
+  "guid":   "917393e3-…",        // podcast:guid; nullable (a few feeds give only a URL)
+  "title":  "Podcasting 2.0",    // nullable — 367 of 371 live edges have one
+  "img":    "https://…",         // nullable
+  "art2":   null,                // second-chance art URL; same fallback rule as everywhere else
+  "medium": "podcast",           // nullable
+  "author": "Adam Curry…",       // nullable
+  "feed":   "https://…/rss.xml", // the target's feed URL
+  "linked": true                 // ← READ THIS ONE
+}
+```
+**`linked` is the whole contract.** `true` means the show has a `/show/<guid>`
+page on this site and the card should link to it. `false` means it does not —
+it has no boosts, or no title — and the card must point at `feed` (or render
+unlinked) instead. Roughly **56% of live cards are `linked`**; a podroll
+routinely recommends shows nobody in this corpus has boosted, and those cards
+are still worth rendering because they carry real artwork and titles.
+
+Do **not** re-derive `linked` by looking the guid up in `podcasts/index.json` —
+that works today but it is the collector's rule to own, and it already accounts
+for the titleless case.
+
+The same data is in D1 as a `podroll` table for the server-rendered `/show`
+pages, one row per edge with `source_*` and `target_*` columns carrying these
+fields (`*_linked` as 0/1). Read it in whichever direction the page needs —
+`WHERE source_guid = ?` ordered by `position`, or `WHERE target_guid = ?` — with
+no join to `podcasts` needed, which is the point of denormalizing it: `podcasts`
+holds only shows that have boosts, i.e. barely half the cards.
 
 ### `profiles.json` — booster identities keyed by pubkey hex
 ```jsonc
@@ -194,4 +235,16 @@ Follows views light up only once someone signs in.
   an untagged music feed reads as "By" rather than "Artist" — expected, not a bug.
   (Available in both paths: the per-show shard `show` object and the D1 `/api/v1` `podcasts`
   table — the latter enables author-in-search as a matched-only field.)
+- **Podroll is on ~7% of feeds — design the section to be absent, not empty.** 65 of
+  925 reachable feeds carry the tag; 371 recommendation edges, median 4 per show and
+  one outlier at 63, so cap or scroll the list. It reaches **109 show pages** because
+  `recommended_by` lights up ~40 pages that publish no podroll themselves — build both
+  directions or most of the value is left on the table. The counts on
+  `podcasts/index.json` let you decide whether a page has a section **without** opening
+  the shard; the keys are absent, so test with `in` / `?.`, not `> 0`.
+- **Podroll refreshes WEEKLY, not hourly.** It's the one field parsed from the show's
+  raw RSS (Podcast Index carries no podroll), so re-crawling ~900 third-party feeds on
+  the hourly tick would be rude for data that changes when a publisher edits a feed.
+  A newly-published podroll can take up to a week to appear. Everything else on the
+  page is still hourly.
 - Data updates when the collector's timer runs; `generated_at` tells you how fresh a file is.
