@@ -783,9 +783,9 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
 
   ${renderSupporters(supporters, show, copy)}
 
-  ${renderPodroll(podroll, "forward", copy)}
+  ${renderPodroll(podroll, "forward", copy, show)}
 
-  ${renderPodroll(podrolledBy, "reverse", copy)}
+  ${renderPodroll(podrolledBy, "reverse", copy, show)}
 
   ${renderBoosts(boosts, names, copy)}
 
@@ -1073,7 +1073,12 @@ function renderSupporters(rows, show, copy) {
 
   return `<section class="show-section" id="community">
     <div class="show-section-head">
-      <h2>Nostr Community <span class="show-count">${num(rows.length)}</span></h2>
+      <!-- No count badge. It read as a size claim about the show's community
+           where it is a count of who published a boost to Nostr, and the
+           sub-line under it already names the set precisely. That now matches
+           every other heading on the page: neither drawer summary carries one
+           and neither podroll section does. -->
+      <h2>Nostr Community</h2>
       <p class="show-section-sub">Everyone who has boosted ${htmlEscape(show.title)} on Nostr, ranked by sats sent, all time.</p>
     </div>
 
@@ -1187,36 +1192,44 @@ function podrollTile(c, hidden) {
       </li>`;
 }
 
+// NEITHER HEADING CARRIES A COUNT, and neither may gain one. Both figures are
+// bounded by which feeds the collector has read, so a badge would state a fact
+// about our coverage as though it were one about the show — the same reason the
+// two drawers above carry no count either. Each sub-line says what bounds it,
+// which is what a badge cannot do.
+//
+// "Podroll" is used as the term of art rather than explained, and it is the one
+// place on the site where a spec name is the label. It differs from the NIP-73
+// case (deliberately never the qualifier, see CLAUDE.md) because a podroll is
+// the SUBJECT here, not the mechanism behind a number: a reader who does not
+// know the word learns it from the tiles under it, and a publisher who does know
+// it is looking for exactly this word.
+//
+// Neither heading is split on medium. "Show Authors" reads flat on an album page
+// on purpose, the same call renderCommunityShows makes: a music feed
+// recommending podcasts is the interesting half of the finding.
 const PODROLL_COPY = {
   forward: {
     id: "podroll",
-    // Title Case noun phrase, parallel to "Other Shows/Albums This Community
-    // Boosts" above it — the two sections are the page's two discovery lists and
-    // they should read as a pair.
-    heading: (copy) => `Shows/Albums This ${copy.eyebrow} Recommends`,
+    heading: () => "Podroll - Recommended by Show Authors",
     sub: (copy) =>
       `Taken from this ${copy.noun}'s own RSS feed, in the order its publisher lists ` +
       `them; these are their recommendations, not ours.`,
-    // A count is honest here and only here. The forward list is the publisher's
-    // WHOLE podroll, complete and unsampled — nothing about our index bounds it.
-    counted: true,
   },
   reverse: {
     id: "podrolled-by",
-    heading: (copy) => `Shows/Albums That Recommend This ${copy.eyebrow}`,
+    // Names the show, because "Recommended By" alone reads as though it modifies
+    // the section above rather than starting a new claim. Truncated hard: show
+    // titles run past 90 characters in this index, and this one sits inside a
+    // Playfair heading that already wraps on a phone.
+    heading: (copy, show) => `Inverse Podroll - ${truncate(show.title, 52)} is Recommended By:`,
     sub: (copy) =>
       `Publishers who list this ${copy.noun} among the recommendations in their own ` +
       `feed, as far as the feeds OnlyBoosts has read.`,
-    // NO COUNT, and the asymmetry is deliberate. This figure is bounded by which
-    // feeds we have crawled (925 of them), so "1" beside a heading would read as
-    // a fact about how many shows recommend this one, when it is a fact about
-    // our coverage. The sub-line carries that where a badge cannot. Same rule as
-    // every other qualified number on the site.
-    counted: false,
   },
 };
 
-function renderPodroll(rows, direction, copy) {
+function renderPodroll(rows, direction, copy, show) {
   const meta = PODROLL_COPY[direction];
 
   // Two filters, and both are absence rather than policy.
@@ -1245,9 +1258,7 @@ function renderPodroll(rows, direction, copy) {
 
   return `<section class="show-section" id="${meta.id}">
     <div class="show-section-head">
-      <h2>${meta.heading(copy)}${
-        meta.counted ? ` <span class="show-count">${num(cards.length)}</span>` : ""
-      }</h2>
+      <h2>${htmlEscape(meta.heading(copy, show))}</h2>
       <p class="show-section-sub">${htmlEscape(meta.sub(copy))}</p>
     </div>
     <ul class="pr-grid">

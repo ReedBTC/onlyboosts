@@ -407,8 +407,22 @@ message text, so rows without one render as a sats line alone rather than a gap.
 
 `<podcast:podroll>` is the publisher's own list of other shows worth hearing,
 parsed from the show's raw RSS by the collector's weekly pass. It renders as
-**two sections** between the Nostr Community wall and Recent Boosts: "Shows/
-Albums This Show Recommends" and "Shows/Albums That Recommend This Show".
+**two sections** between the Nostr Community wall and Recent Boosts: "Podroll -
+Recommended by Show Authors" and "Inverse Podroll - <Show Name> is Recommended
+By:". The second names the show because "Recommended By" alone reads as though it
+modifies the section above rather than opening a new claim; the title is
+truncated hard at 52 characters, since this index carries titles past 90 and the
+heading is Playfair at a size that already wraps on a phone.
+
+Neither is split on medium. "Show Authors" reads flat on an album page on
+purpose, the same call the community drawer makes: a music feed recommending
+podcasts is the interesting half of the finding.
+
+`Podroll` is the term of art, used rather than explained. That is deliberately
+unlike NIP-73, which is never the qualifier anywhere on this site: NIP-73 is the
+mechanism behind a number, so naming it explains nothing to a reader wondering
+why their community is missing. A podroll is the subject of the section, the
+tiles beneath it define the word, and a publisher who knows it is looking for it.
 
 Coverage, measured over the live corpus: 65 of 925 reachable feeds publish a
 podroll, 371 edges, 221 distinct targets. Forward-only would be a section on 65
@@ -470,12 +484,21 @@ because barely half of podroll targets have a Podcast Index record to resolve
 splits from, and because the section's whole job is to send a reader onward rather
 than to take a payment in place.
 
-Only the **forward** heading carries a count. That list is the publisher's whole
-podroll, complete and unsampled, so the number is exact. The reverse count is
+**Neither heading carries a count, and neither may gain one.** Both figures are
 bounded by which feeds the collector has read, so a badge would state a fact about
-our coverage as though it were a fact about the show; its sub-line carries the
-qualifier instead. The asymmetry is the site's usual rule about qualified numbers,
-not an oversight.
+our coverage as though it were a fact about the show. Each sub-line says what
+bounds it, which is what a badge cannot do. This now matches the rest of the page:
+neither drawer summary carries a count either, for reasons set out under *Drawer
+Affordance* and *No Episode Counts, Anywhere*.
+
+The **Nostr Community wall's count came off with them**, and the reason is the
+same one that named the section: the badge read as the size of the show's
+community, where it counts the people who published a boost to Nostr. The
+sub-line under the heading already names the set precisely, all time and ranked
+by sats, so the badge added a number and subtracted a qualifier. `.show-count`
+therefore has no emitter left anywhere on the page; the rule stays in
+`show-page.css` because the shape is right for a figure that is complete and
+unqualified, and this page has none.
 
 ### The One Query Allowed to Fail
 

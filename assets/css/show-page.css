@@ -251,6 +251,13 @@
   margin: 0;
 }
 
+/* CURRENTLY UNEMITTED, and kept deliberately. Every count badge came off the
+   page's headings: the Nostr Community one read as a size claim about the show's
+   audience where it counts who published a boost to Nostr, and neither podroll
+   heading may carry one because both figures are bounded by which feeds the
+   collector has read. Each section's sub-line says what bounds it instead. The
+   rule stays because the shape is right for a figure that IS complete and
+   unqualified, should the page ever have one. */
 .show-count {
   display: inline-block;
   margin-left: 0.5rem;

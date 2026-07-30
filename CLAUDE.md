@@ -991,8 +991,8 @@ first field we parse from raw RSS" below; this is the site half.
 `renderPodroll` / `podrollTile` / `PODROLL_COPY` in `functions/show/[guid].js`,
 `.pr-*` in `show-page.css`, `initPodrollArt` in `show-page.js`.
 
-**Two sections, never one.** "Shows/Albums This Show Recommends" and
-"Shows/Albums That Recommend This Show", between the Nostr Community wall and
+**Two sections, never one.** "Podroll - Recommended by Show Authors" and
+"Inverse Podroll - <Show Name> is Recommended By:", between the Nostr Community wall and
 Recent Boosts. Forward-only would be a section on 65 pages; the reverse edge is
 the same rows read the other way and brings it to **109**, because plenty of
 shows are recommended by someone without publishing a podroll themselves (Local
@@ -1026,12 +1026,22 @@ query selects no `*_url` column at all. This is the **third** surface pointing a
 BMB; `assets/js/episode-link.js` owns the target and enumerates all three, and
 the two in `[guid].js` resolve through one `bmbShowUrl()`.
 
-**Only the forward heading carries a count**, and the asymmetry is the point. The
-forward list is the publisher's whole podroll, complete and unsampled. The
-reverse count is bounded by which feeds we have read, so a badge reading "1"
-would state a fact about our coverage as though it were a fact about the show;
-the sub-line carries that instead. Same rule as every other qualified number
-here.
+**Neither heading carries a count, and neither may gain one.** Both figures are
+bounded by which feeds the collector has read, so a badge would state a fact
+about our coverage as though it were one about the show; each sub-line says what
+bounds it, which is what a badge cannot do. **The Nostr Community wall's count
+came off at the same time**, for the matching reason — it read as the size of the
+show's community where it counts who published a boost to Nostr — so `.show-count`
+now has no emitter anywhere on the page. The rule stays in `show-page.css` with a
+note: the shape is right for a figure that is complete and unqualified, and this
+page has none.
+
+`Podroll` is used as the term of art rather than explained, which is the one
+place a spec name is a user-visible label. That is not the NIP-73 case: NIP-73 is
+the *mechanism* behind a number, so naming it explains nothing to a reader
+wondering why their community is missing, where a podroll is the **subject** of
+the section — the tiles beneath it define the word, and a publisher who already
+knows it is looking for exactly that word.
 
 **A titleless card is dropped rather than labelled.** All four in the live corpus
 have no artwork either, so the tile would be empty. This is the one place the
