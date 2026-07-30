@@ -235,7 +235,20 @@
 
 /* ── Sections ─────────────────────────────────────────────────────────── */
 
-.show-section { margin-top: 2.75rem; }
+/* scroll-margin-top because EVERY SECTION id HERE IS A SHAREABLE URL
+   (/show/<guid>#podroll and the five others — see the contract note at the top
+   of the Function). #top-nav is `position: sticky` at 64px, so an anchor without
+   this scrolls the section's heading to y=0 and leaves it behind the bar: the
+   reader lands on a page whose first visible line is the second line of the
+   thing they followed a link to. 5rem clears the bar with a margin, matching
+   `.prose > section` in page.css, which solved this for /about first.
+
+   It belongs on the section rather than on :target so it applies to the
+   JavaScript scrollIntoView path as well — scroll-margin is honoured by both. */
+.show-section {
+  margin-top: 2.75rem;
+  scroll-margin-top: 5rem;
+}
 
 /* A section with no heading of its own (the episode drawer — its summary
    already names it). Sits closer to what precedes it, since there's no

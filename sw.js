@@ -233,7 +233,16 @@
 // show-page.js, and the "Show N more" toggle moved from a supporter-specific
 // listener to one delegated handler scoped to the button's own section, so an
 // old module against the new markup leaves both podroll toggles dead.
-const VERSION = 'ob-v43';
+// ob-v44: the /show sections become shareable URLs — /show/<guid>#podroll and
+// the five others. Required on both halves: .show-section gains a
+// scroll-margin-top in show-page.css without which every anchor parks its
+// heading behind the 64px sticky nav, and revealHashTarget in show-page.js is
+// what opens the episode drawer when #episodes is the target, so a returning
+// visitor holding the old module lands on a collapsed box. The reverse podroll
+// section's id changed from #podrolled-by to #inverse-podroll in the same
+// commit; it had shipped hours earlier and nothing was linking to it, and the
+// six ids are frozen from here (see the note at the top of the Function).
+const VERSION = 'ob-v44';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;

@@ -913,6 +913,50 @@ the point: a visitor who opened a shared link has no chain behind them, and
 `history.back()` would take them off the site or nowhere. The `href` survives the
 upgrade, so a modified click still opens the feed in a new tab.
 
+## Show pages: the section ids are URLs
+
+Every section on `/show/<guid>` is addressable, so a podcaster can share one part
+of their own page: `/show/<guid>#podroll`. **These six ids are frozen.**
+
+| Hash | Section |
+|---|---|
+| `#episodes` | the episode drawer |
+| `#community-shows` | Other Shows/Albums This Community Boosts |
+| `#community` | the Nostr Community wall |
+| `#podroll` | Podroll - Recommended by Show Authors |
+| `#inverse-podroll` | Inverse Podroll - \<Show Name\> is Recommended By: |
+| `#boosts` | Recent Boosts |
+
+Same rule as `ALIASES` in `index.html`, and **stricter for one reason**: a feed
+hash is read by a JS controller that can map an old form onto a new key and
+rewrite the bar. These resolve in the browser's own anchor handling, which has
+nowhere to put a redirect, so a rename is a dead link with no recourse. The note
+about `#supporters` → `#community` being "safe because nothing linked to it" was
+true when it was written and is not a precedent; `#podrolled-by` →
+`#inverse-podroll` was the last such rename and only survived review because the
+id was hours old.
+
+Three pieces hold it up and they live in three files:
+
+- the ids themselves, on the `<section>` elements in `functions/show/[guid].js`
+  (the podroll pair come off `PODROLL_COPY[*].id`);
+- **`scroll-margin-top: 5rem` on `.show-section`** in `show-page.css`. `#top-nav`
+  is `position: sticky` at 64px, so without it an anchor scrolls the heading to
+  y=0 and *behind the bar* — the reader's first visible line is the second line
+  of what they followed a link to. `page.css` solved this for `/about` first;
+- **`revealHashTarget()`** in `show-page.js`, which opens any collapsed
+  `<details>` inside the targeted section. Exactly one case needs it: the episode
+  drawer ships closed, so `#episodes` otherwise lands on a lid. It does **not**
+  re-scroll afterwards — the drawer expands downward from a summary already at
+  the top of its section, so the section's offset doesn't move and the browser's
+  scroll is still right; scrolling again would only add a smooth-scroll animation
+  on load that reads as a glitch. `getElementById`, never `querySelector`: an id
+  off the URL is untrusted and would otherwise be parsed as a selector.
+
+With JavaScript off the anchors still resolve and still scroll. Only the drawer
+stays shut, one click from open, which is what a visitor who scrolled there
+themselves would find.
+
 ## Show pages: other shows this community boosts
 
 A drawer above the Nostr Community wall listing every other show this show's

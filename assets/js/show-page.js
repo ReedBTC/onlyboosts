@@ -4,6 +4,7 @@
  * JavaScript at all — this module only adds the interactive parts:
  *
  *   - the back link's history.back() upgrade
+ *   - opening a collapsed drawer when a #hash deep-links to its section
  *   - copy-npub on every supporter avatar and boost row
  *   - the "Show N more" toggles (the community wall, both podroll grids)
  *   - the art2 fallback on the hero, the drawer rows and the podroll tiles
@@ -122,6 +123,43 @@ function initBackLink() {
 }
 
 initBackLink()
+
+// ── Deep links to a section ──────────────────────────────────────────
+//
+// Every section on this page has an id, and those ids are shareable URLs:
+// /show/<guid>#podroll is how a podcaster sends someone to one part of their own
+// page. See the contract note at the top of functions/show/[guid].js — the six
+// ids are frozen.
+//
+// The browser does the scrolling; .show-section carries a scroll-margin-top so
+// the heading clears the sticky nav. Only one case needs JavaScript: the episode
+// drawer ships COLLAPSED, so a #episodes link lands on a closed box and answers
+// the question with a lid. Any <details> inside the targeted section is opened.
+//
+// No manual scroll afterwards, deliberately. The drawer expands DOWNWARD from a
+// summary already at the top of its section, so the section's own offset does not
+// move and the browser's scroll is still correct — re-scrolling would only add a
+// smooth-scroll animation on load that reads as a glitch.
+//
+// With JavaScript off the anchor still resolves and still scrolls; the drawer is
+// simply closed, one click from open, which is what a visitor who scrolled to it
+// themselves would find.
+function revealHashTarget() {
+  let id = ''
+  try { id = decodeURIComponent(location.hash.slice(1)) } catch { id = location.hash.slice(1) }
+  if (!id) return
+  // getElementById rather than querySelector: an id off the URL is untrusted
+  // input and would otherwise be parsed as a CSS selector.
+  const section = document.getElementById(id)
+  if (!section) return
+  for (const d of section.querySelectorAll('details:not([open])')) d.open = true
+}
+
+revealHashTarget()
+// Also on in-page navigation. Nothing on the page links to a section today, but a
+// shared link pasted into the address bar of an already-open page fires this and
+// not a load.
+window.addEventListener('hashchange', revealHashTarget)
 
 // ── Artwork fallback ─────────────────────────────────────────────────
 //

@@ -528,6 +528,50 @@ keeps the two apart: the community drawer is what *this audience* also boosts,
 which is ours to compute, where the podroll is what *the publisher* recommends,
 which is theirs to declare. Recent boosts stays last, as the page's log.
 
+## Section Deep Links
+
+Every section is addressable, because the person most likely to share this page
+is the podcaster it is about and the part they want to send someone to is often
+one section rather than the whole thing. `/show/<guid>#podroll` is the shape.
+
+| Hash | Section |
+|---|---|
+| `#episodes` | the episode drawer |
+| `#community-shows` | Other Shows/Albums This Community Boosts |
+| `#community` | the Nostr Community wall |
+| `#podroll` | Podroll - Recommended by Show Authors |
+| `#inverse-podroll` | Inverse Podroll - \<Show Name\> is Recommended By: |
+| `#boosts` | Recent Boosts |
+
+**The six are frozen.** This is the same commitment `ALIASES` makes for the
+homepage feed hashes, and it is stricter here: a feed hash goes through a JS
+controller that can alias an old form to a new key and rewrite the bar, where
+these resolve in the browser's own anchor handling and have nowhere to put a
+redirect. A rename is a dead link with no recourse. The earlier note that moving
+`#supporters` to `#community` was "safe because nothing linked to it" was true
+when written and is not a precedent.
+
+Two supports, neither of them obvious from the markup:
+
+**`scroll-margin-top: 5rem` on `.show-section`.** The nav is `position: sticky`
+at 64px tall, so a bare anchor scrolls the section's heading to y=0 and leaves it
+behind the bar. The reader lands on a page whose first visible line is the second
+line of the thing they followed a link to, which reads as a broken link rather
+than a near miss. `page.css` hit this on `/about` first and the value matches.
+
+**`revealHashTarget()` in `show-page.js`.** The episode drawer ships collapsed,
+so `#episodes` would otherwise land on a closed lid — the one section whose
+anchor answers with nothing. Any `<details>` inside the targeted section is
+opened. It deliberately does **not** scroll afterwards: the drawer expands
+downward from a summary already at the top of its section, so the section's
+offset does not move and the browser's own scroll is still correct. A second
+scroll would only add a smooth-scroll animation on load, which reads as a glitch.
+
+With JavaScript off every anchor still resolves and still scrolls. The drawer
+stays shut, one click from open, which is exactly what a visitor who scrolled
+there under their own steam would find. Nothing about the deep link is load-
+bearing on the client.
+
 ## Reversing Out
 
 These pages are a **graph, not a tree**. A row in the community drawer links to

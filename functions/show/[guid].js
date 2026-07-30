@@ -20,6 +20,22 @@
 // Do not hand-edit it here.
 
 const SITE_ORIGIN = "https://onlyboosts.social";
+
+// ⚠️ EVERY SECTION id ON THIS PAGE IS A PUBLIC URL. `/show/<guid>#podroll` is
+// how a podcaster shares one section of their own page, so the six ids below are
+// a contract with links already in the wild and **must not be renamed**:
+//
+//   #episodes  #community-shows  #community  #podroll  #inverse-podroll  #boosts
+//
+// Same rule as ALIASES in index.html, with one difference that makes it
+// stricter: a feed hash is read by a JS controller that can alias the old form
+// to the new one, where these resolve in the browser's own anchor handling and
+// have nowhere to put a redirect. A rename is a dead link, full stop.
+//
+// Two pieces of support live elsewhere and go with them: `scroll-margin-top` on
+// .show-section in show-page.css (the nav is sticky, so a bare anchor puts the
+// heading behind it) and revealHashTarget() in show-page.js (a collapsed drawer
+// has to open when it is the thing being linked to).
 const OG_FALLBACK = `${SITE_ORIGIN}/assets/onlyboosts_banner.png`;
 
 // Guids are UUIDs at 36 chars; the cap leaves slack for the odd-but-real values
@@ -1217,7 +1233,7 @@ const PODROLL_COPY = {
       `them; these are their recommendations, not ours.`,
   },
   reverse: {
-    id: "podrolled-by",
+    id: "inverse-podroll",
     // Names the show, because "Recommended By" alone reads as though it modifies
     // the section above rather than starting a new claim. Truncated hard: show
     // titles run past 90 characters in this index, and this one sits inside a
