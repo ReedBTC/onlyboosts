@@ -224,7 +224,16 @@
 // band now ships visible rather than being revealed by JavaScript, and .cs-
 // allitems and the band's wrap/gap rules are new in show-page.css — a returning
 // visitor on the old stylesheet gets an unstyled link crowding the sort pill.
-const VERSION = 'ob-v42';
+// ob-v43: the /show pages gain the two <podcast:podroll> sections — what this
+// show recommends and who recommends it — as grids of square artwork tiles
+// between the Nostr Community wall and Recent Boosts. Required on both halves:
+// every .pr-* rule is new in show-page.css against markup the Function now
+// emits, so a returning visitor on the old stylesheet gets a vertical stack of
+// full-width artwork instead of a 5-up grid; initPodrollArt is new in
+// show-page.js, and the "Show N more" toggle moved from a supporter-specific
+// listener to one delegated handler scoped to the button's own section, so an
+// old module against the new markup leaves both podroll toggles dead.
+const VERSION = 'ob-v43';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;

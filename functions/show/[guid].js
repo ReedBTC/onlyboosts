@@ -46,6 +46,14 @@ const BOOSTS_SHOWN = 24;
 // around 50KB rather than 200KB.
 const COMMUNITY_SHOWS_LIMIT = 150;
 
+// How many podroll tiles paint before the toggle: two desktop rows of five.
+// Measured over the 371 live edges, the median podroll is 4 and the reverse
+// direction's biggest fan-in is 15, so this only bites on the head of the
+// distribution — one page (Before The Sch3m3s, 63 entries) and two of the
+// reverse lists. Nothing is dropped; the rest ship hidden behind the same
+// .show-more button the community wall uses.
+const PODROLL_VISIBLE = 10;
+
 export async function onRequestGet({ request, env, params }) {
   let guid = params.guid;
   if (Array.isArray(guid)) guid = guid[0];
@@ -70,7 +78,7 @@ export async function onRequestGet({ request, env, params }) {
   // is why nothing here is counted or capped — the rule does the work.
   if (!show || !show.title) return notFound(guid);
 
-  const [eps, sups, boosts, community] = await Promise.all([
+  const [eps, sups, boosts, community, podroll, podrolledBy] = await Promise.all([
     env.DB.prepare(
       // Newest episode first. `published` is null on a meaningful slice of
       // rows, and SQLite sorts NULL below every value, so DESC sinks the
@@ -163,6 +171,10 @@ export async function onRequestGet({ request, env, params }) {
        ORDER BY cs_members DESC, cs_boosts DESC, cs_sats DESC, b.podcast_guid
        LIMIT ?`
     ).bind(guid, guid, COMMUNITY_SHOWS_LIMIT).all(),
+    // Both directions of <podcast:podroll>. See the note over podrollQuery for
+    // why these two are the only queries on the page allowed to fail quietly.
+    podrollQuery(env, guid, "forward"),
+    podrollQuery(env, guid, "reverse"),
   ]);
 
   // Display names for any npub mentioned inside a boost message. One extra
@@ -194,6 +206,8 @@ export async function onRequestGet({ request, env, params }) {
     supporters: sups.results || [],
     boosts: boostRows,
     community: community.results || [],
+    podroll: podroll.results || [],
+    podrolledBy: podrolledBy.results || [],
     names,
   });
 
@@ -206,6 +220,45 @@ export async function onRequestGet({ request, env, params }) {
       "Cache-Control": "public, max-age=300",
     },
   });
+}
+
+// ── The podroll queries ──────────────────────────────────────────────────────
+//
+// `podroll` holds one row per recommendation with BOTH endpoints' display fields
+// denormalized onto the edge, so either direction is one indexed read that
+// renders every tile. That denormalization is the point: `podcasts` holds only
+// shows that have boosts, and only 56% of podroll targets do, so a join would
+// silently drop nearly half the cards.
+//
+// ⚠️ THESE TWO ARE THE ONLY QUERIES ON THIS PAGE THAT MAY FAIL QUIETLY, and the
+// reason is the write path rather than the read. Every other table here rides
+// the collector's hourly boost delta; `podroll` is replaced wholesale by a
+// separate WEEKLY pass (`d1_sync.py --remote-podroll`), because a podroll changes
+// when a publisher edits their feed and never when a boost arrives. So a remote
+// that carries every other table but not yet this one is a normal intermediate
+// state of a deploy, not a bug — and it must not turn 930 show pages into 500s
+// to report a section that 93% of them do not render anyway. A failure here
+// degrades to no section, which is exactly what a show with no podroll gets.
+function podrollQuery(env, guid, direction) {
+  // Only the display fields, and deliberately not the *_url columns: all 371
+  // live edges carry a guid at both ends, so a tile's link never needs a feed
+  // URL to fall back to. `linked` is the collector's flag and is not re-derived
+  // here — see the podroll section in CLAUDE.md.
+  const sql = direction === "forward"
+    // The publisher's own order. `position` IS the ranking they published, so it
+    // is preserved rather than re-sorted; putting the linkable ones first would
+    // be us editorializing someone else's recommendation list.
+    ? `SELECT target_guid AS guid, target_title AS title, target_image AS image,
+              target_artwork AS artwork, target_linked AS linked
+       FROM podroll WHERE source_guid = ? ORDER BY position`
+    // The reverse edge has no order of its own — nobody ranked it — so
+    // alphabetical. NOCASE because a binary sort files every lower-case title
+    // after every upper-case one, which looks like no sort at all.
+    : `SELECT source_guid AS guid, source_title AS title, source_image AS image,
+              source_artwork AS artwork, source_linked AS linked
+       FROM podroll WHERE target_guid = ?
+       ORDER BY source_title COLLATE NOCASE, source_guid`;
+  return env.DB.prepare(sql).bind(guid).all().catch(() => ({ results: [] }));
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -498,7 +551,7 @@ const copyFor = (medium) => (medium === "music" ? COPY.music : COPY.podcast);
 
 // ── the page ─────────────────────────────────────────────────────────────────
 
-function renderShowPage({ show, episodes, supporters, boosts, community, names }) {
+function renderShowPage({ show, episodes, supporters, boosts, community, podroll, podrolledBy, names }) {
   const copy = copyFor(show.medium);
   const title = show.title;
   const pageUrl = `${SITE_ORIGIN}/show/${encodeURIComponent(show.podcast_guid)}`;
@@ -729,6 +782,10 @@ function renderShowPage({ show, episodes, supporters, boosts, community, names }
   ${renderCommunityShows(community)}
 
   ${renderSupporters(supporters, show, copy)}
+
+  ${renderPodroll(podroll, "forward", copy)}
+
+  ${renderPodroll(podrolledBy, "reverse", copy)}
 
   ${renderBoosts(boosts, names, copy)}
 
@@ -1061,6 +1118,147 @@ function supporterCard(r, isPodium, hidden = false) {
       </li>`;
 }
 
+// ── Podroll ──────────────────────────────────────────────────────────────────
+//
+// <podcast:podroll> is the publisher's OWN list of other shows worth hearing,
+// parsed from the show's raw RSS (Podcast Index carries no podroll). It is the
+// only section on this page that is not derived from boost data at all, and the
+// look says so: square artwork tiles in a grid, five across on desktop and two
+// on a phone, carrying the show's art and its name and nothing else. Every other
+// section here is a ranked list with figures beside each row; a recommendation
+// has no figure, and inventing one would misrepresent what a podroll is.
+//
+// BOTH DIRECTIONS SHIP, as two sections with two headings. Forward-only would
+// be a section on 65 pages; the reverse edge — the same rows read the other way —
+// reaches 109, because plenty of shows are recommended by someone without
+// publishing a podroll themselves (Local Bitcoiners is one). They are never
+// merged into one grid: "I recommend them" and "they recommend me" are opposite
+// claims, and a tile carrying only art and a title cannot tell them apart.
+//
+// NOT split on medium, which is the same call renderCommunityShows makes and for
+// the same reason: a music feed recommending podcasts is the interesting half of
+// the finding, so the heading says "Shows/Albums" on both and there is no COPY
+// entry. Only the page's own noun comes off the table.
+//
+// A tile ships with no boost button, deliberately. Every other list of other
+// shows on this site carries one, but a podroll target is barely half likely to
+// have a Podcast Index record we could resolve splits from, and the section's
+// whole job is to send a reader onward rather than to take a payment here.
+
+// The show's page on Boost Me Bitch.
+//
+// ⚠️ THE THIRD SURFACE ON THIS SITE POINTING AT BMB, and the second in this
+// file. assets/js/episode-link.js owns that target and documents the whole set;
+// a Pages Function cannot import a client module, so these are built here and
+// ALL OF THEM CHANGE TOGETHER. Show-level, so `?podcast=<guid>` alone: a /show
+// page carries no Podcast Index numeric id to prefer `?feed=` with.
+function bmbShowUrl(guid) {
+  return `https://boostmebitch.com/?podcast=${encodeURIComponent(guid)}`;
+}
+
+// One tile. `linked` is the collector's flag — boosts AND a title, the same rule
+// notFound() applies above — and it is read, never re-derived: it already
+// accounts for the titleless case and it is the collector's rule to own.
+//
+// A card that is not `linked` still gets a link, just not one of ours. All 371
+// live edges carry a guid at both ends, so BMB can always resolve the show even
+// where we have nothing indexed for it, and an unlinked tile in a section whose
+// entire purpose is discovery would be dead weight.
+function podrollTile(c, hidden) {
+  const title = truncate(c.title, 120);
+  const art = isSafeUrl(c.image) ? c.image : null;
+  // Same second-chance URL as the hero and the community rows, on the same
+  // terms: an attribute, wired through cover-art.js by show-page.js, never an
+  // inline onerror. 8 of the 371 live edges carry one.
+  const art2 = isSafeUrl(c.artwork) && c.artwork !== art ? c.artwork : null;
+  const ours = Number(c.linked) === 1;
+  const href = ours ? `/show/${encodeURIComponent(c.guid)}` : bmbShowUrl(c.guid);
+  // Off-site tiles open in a new tab; ours navigate in place, the way every
+  // other internal link on the page does.
+  const away = ours ? "" : ` target="_blank" rel="noopener"`;
+
+  return `<li class="pr-tile"${hidden ? " hidden data-overflow" : ""}>
+        <a class="pr-link" href="${htmlEscape(href)}"${away} title="${htmlEscape(title)}">
+          ${art
+            ? `<img class="pr-art" src="${htmlEscape(art)}"${art2 ? ` data-art2="${htmlEscape(art2)}"` : ""} alt="" loading="lazy" referrerpolicy="no-referrer" />`
+            : `<span class="pr-art pr-art--blank" aria-hidden="true">🎙️</span>`}
+          <span class="pr-title">${htmlEscape(title)}</span>
+        </a>
+      </li>`;
+}
+
+const PODROLL_COPY = {
+  forward: {
+    id: "podroll",
+    // Title Case noun phrase, parallel to "Other Shows/Albums This Community
+    // Boosts" above it — the two sections are the page's two discovery lists and
+    // they should read as a pair.
+    heading: (copy) => `Shows/Albums This ${copy.eyebrow} Recommends`,
+    sub: (copy) =>
+      `Taken from this ${copy.noun}'s own RSS feed, in the order its publisher lists ` +
+      `them; these are their recommendations, not ours.`,
+    // A count is honest here and only here. The forward list is the publisher's
+    // WHOLE podroll, complete and unsampled — nothing about our index bounds it.
+    counted: true,
+  },
+  reverse: {
+    id: "podrolled-by",
+    heading: (copy) => `Shows/Albums That Recommend This ${copy.eyebrow}`,
+    sub: (copy) =>
+      `Publishers who list this ${copy.noun} among the recommendations in their own ` +
+      `feed, as far as the feeds OnlyBoosts has read.`,
+    // NO COUNT, and the asymmetry is deliberate. This figure is bounded by which
+    // feeds we have crawled (925 of them), so "1" beside a heading would read as
+    // a fact about how many shows recommend this one, when it is a fact about
+    // our coverage. The sub-line carries that where a badge cannot. Same rule as
+    // every other qualified number on the site.
+    counted: false,
+  },
+};
+
+function renderPodroll(rows, direction, copy) {
+  const meta = PODROLL_COPY[direction];
+
+  // Two filters, and both are absence rather than policy.
+  //
+  // A titleless card is dropped outright: there is nothing to label a tile whose
+  // only other content is artwork, and all four such edges in the live corpus
+  // have no artwork either, so the tile would be empty. This is the one place
+  // the page does NOT fall back to "Unidentified show" the way the Shows feed
+  // does — that label works in a list of names and figures, and reads as a bug
+  // in a grid whose entire content is names.
+  //
+  // The dedupe is defensive: the table's key is (source_guid, position), so a
+  // publisher listing the same show at two positions is representable. None do
+  // today, and one tile is the honest render if one ever does.
+  const seen = new Set();
+  const cards = [];
+  for (const r of rows) {
+    if (!r.guid || !String(r.title || "").trim()) continue;
+    if (seen.has(r.guid)) continue;
+    seen.add(r.guid);
+    cards.push(r);
+  }
+  if (!cards.length) return "";
+
+  const hidden = Math.max(0, cards.length - PODROLL_VISIBLE);
+
+  return `<section class="show-section" id="${meta.id}">
+    <div class="show-section-head">
+      <h2>${meta.heading(copy)}${
+        meta.counted ? ` <span class="show-count">${num(cards.length)}</span>` : ""
+      }</h2>
+      <p class="show-section-sub">${htmlEscape(meta.sub(copy))}</p>
+    </div>
+    <ul class="pr-grid">
+      ${cards.map((c, i) => podrollTile(c, i >= PODROLL_VISIBLE)).join("\n      ")}
+    </ul>
+    ${hidden > 0 ? `<button type="button" class="btn btn-quiet show-more" data-show-more="${meta.id}">
+      Show ${num(hidden)} more
+    </button>` : ""}
+  </section>`;
+}
+
 // Every boost to the show, newest first, labelled with what it targeted.
 //
 // NOT filtered to feed-level boosts, and that is the considered choice. Only 18%
@@ -1121,12 +1319,10 @@ function renderEpisodes(rows, show, copy) {
   // the page said nothing about where the others were.
   //
   // ⚠️ Boost Me Bitch is the same TEMPORARY target assets/js/episode-link.js
-  // documents, and this is the second surface pointing at it. That module owns
-  // the target and both change together; it is not imported here because it is a
-  // client module and nothing else in functions/ reaches outside functions/.
-  // Show-level, so it takes `?podcast=<guid>` alone — a /show page carries no
-  // Podcast Index numeric id to prefer `?feed=` with.
-  const bmb = `https://boostmebitch.com/?podcast=${encodeURIComponent(show.podcast_guid)}`;
+  // documents. Built by bmbShowUrl() below, which the podroll tiles also use —
+  // this file emits two BMB links and they resolve through one function so they
+  // cannot drift apart.
+  const bmb = bmbShowUrl(show.podcast_guid);
 
   // No heading or sub-line of its own: the summary IS this section's heading,
   // and show-page.css styles it as one (Playfair, the .show-stats-title size).

@@ -5,7 +5,8 @@
  *
  *   - the back link's history.back() upgrade
  *   - copy-npub on every supporter avatar and boost row
- *   - the "show N more supporters" toggle
+ *   - the "Show N more" toggles (the community wall, both podroll grids)
+ *   - the art2 fallback on the hero, the drawer rows and the podroll tiles
  *   - share (copy the canonical URL)
  *   - boost buttons, show-level and per-episode
  *   - the range/sort controls on the community-shows drawer
@@ -53,13 +54,22 @@ document.addEventListener('click', (e) => {
   copyNpub(el.getAttribute('data-copy-npub'))
 })
 
-// ── supporters overflow ──────────────────────────────────────────────
-document.querySelector('[data-show-more="supporter"]')?.addEventListener('click', function () {
-  for (const li of document.querySelectorAll('[data-supporter-grid] [data-overflow]')) {
+// ── "Show N more" ────────────────────────────────────────────────────
+//
+// Three of these now: the community wall's supporter overflow and one per
+// podroll section. Scoped to the button's own <section> rather than to a named
+// grid, which is what lets one handler serve all of them — the overflow items
+// and the button that reveals them are always in the same section, and the two
+// podroll grids are otherwise identical, so a selector naming one would fire on
+// both. Delegated because the supporter grid can hold 500 cards.
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest?.('[data-show-more]')
+  if (!btn) return
+  for (const li of btn.closest('section')?.querySelectorAll('[data-overflow]') || []) {
     li.hidden = false
     li.removeAttribute('data-overflow')
   }
-  this.remove()
+  btn.remove()
 })
 
 // ── share ────────────────────────────────────────────────────────────
@@ -181,8 +191,19 @@ function initCommunityArt() {
   }
 }
 
+/* The podroll tiles are other shows' artwork too, and 8 of the 371 live edges
+ * carry an art2. Same wiring as the drawer rows; only the blank tile differs,
+ * because a podroll tile's stand-in is a full-size square rather than a 44px
+ * thumbnail. */
+function initPodrollArt() {
+  for (const img of document.querySelectorAll('.pr-art[data-art2]')) {
+    wireArt2(img, () => blankTile(img, 'span', 'pr-art pr-art--blank'))
+  }
+}
+
 initHeroArt()
 initCommunityArt()
+initPodrollArt()
 
 // ── The episode drawer's sort ─────────────────────────────────────────
 //

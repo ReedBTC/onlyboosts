@@ -983,6 +983,70 @@ would put the break at the mercy of viewport arithmetic: a 430px phone fits four
 counts on two phones. 21 boosters show before the toggle
 (`SUPPORTERS_VISIBLE`).
 
+## Show pages: the podroll, in both directions
+
+`<podcast:podroll>` is a publisher's own list of other shows worth hearing, read
+from the show's raw RSS. The collector half is documented under "Podroll: the
+first field we parse from raw RSS" below; this is the site half.
+`renderPodroll` / `podrollTile` / `PODROLL_COPY` in `functions/show/[guid].js`,
+`.pr-*` in `show-page.css`, `initPodrollArt` in `show-page.js`.
+
+**Two sections, never one.** "Shows/Albums This Show Recommends" and
+"Shows/Albums That Recommend This Show", between the Nostr Community wall and
+Recent Boosts. Forward-only would be a section on 65 pages; the reverse edge is
+the same rows read the other way and brings it to **109**, because plenty of
+shows are recommended by someone without publishing a podroll themselves (Local
+Bitcoiners is one, via Bowl After Bowl). Merging them into one grid was rejected:
+*I recommend them* and *they recommend me* are opposite claims, and a tile
+carrying only artwork and a title cannot tell a reader which it is.
+
+**It is the one section on the page not derived from boost data**, and the form
+says so. Everything else here is a row — 44px thumbnail, title, a line of
+figures, a border — and a podroll has no figures at all, so a row would leave
+two thirds of its width empty and read as a ranked list that lost its ranking.
+Square artwork at tile size with the name beneath is what the artwork earns when
+it is the only content. Bowl After Bowl's own roll-call page is the reference.
+**Five across on desktop, two on a phone**, as fixed `grid-template-columns`
+counts rather than `auto-fill`: the wall above can auto-fill because an avatar
+has a natural size, where a tile is as wide as a fifth of the column, so here the
+count is the design and the width follows from it.
+
+**No figures, no sort, no boost button, no drawer.** The tile is artwork and a
+title, full stop. A boost button was withheld on purpose: barely half of podroll
+targets have a Podcast Index record to resolve splits from, and the section's job
+is to send a reader onward rather than to take a payment. Ten tiles paint before
+a `.show-more` toggle (`PODROLL_VISIBLE`) — median podroll is 4, so it bites on
+one page (63 entries) and two reverse lists.
+
+**`linked` is the collector's flag and is read, never re-derived.** True means
+the show has a `/show/<guid>` page; **44% of cards are false** and link to
+`boostmebitch.com/?podcast=<guid>` in a new tab instead. Every one of the 371
+live edges carries a guid at both ends, so a tile is always linkable and the
+query selects no `*_url` column at all. This is the **third** surface pointing at
+BMB; `assets/js/episode-link.js` owns the target and enumerates all three, and
+the two in `[guid].js` resolve through one `bmbShowUrl()`.
+
+**Only the forward heading carries a count**, and the asymmetry is the point. The
+forward list is the publisher's whole podroll, complete and unsampled. The
+reverse count is bounded by which feeds we have read, so a badge reading "1"
+would state a fact about our coverage as though it were a fact about the show;
+the sub-line carries that instead. Same rule as every other qualified number
+here.
+
+**A titleless card is dropped rather than labelled.** All four in the live corpus
+have no artwork either, so the tile would be empty. This is the one place the
+site does *not* fall back to "Unidentified show" — that label works in a list of
+names and figures and reads as a bug in a grid whose entire content is names.
+
+**⚠️ These are the only two queries on the page allowed to fail quietly**, and
+the reason is the write path. Every other table there rides the collector's
+hourly boost delta; `podroll` is replaced wholesale by a separate **weekly** pass
+(`d1_sync.py --remote-podroll`). A remote carrying every other table but not yet
+this one is a normal intermediate state of a deploy, and it must not turn 930
+show pages into 500s to report a section 93% of them don't render. A failure
+degrades to no section, which is what a show with no podroll gets anyway. If the
+sections are missing everywhere, that is the thing to check first.
+
 ## ⚠️ Show-level boosting, and the one boost button
 
 Boosting a SHOW (as opposed to an episode) pays the **feed-level** value block —
@@ -1081,14 +1145,18 @@ projection in `6be0eb5`. So the D1-backed surfaces carry it too:
 | Boosts cards | shard | booster pic → show img → show art2 → silhouette |
 | `/show` hero | D1 `artwork` | img → `data-art2` → blank tile |
 | `/show` community drawer rows | D1 `artwork` | img → `data-art2` → glyph |
+| `/show` podroll tiles | D1 `podroll.*_artwork` | img → `data-art2` → glyph |
 | `/api/v1/podcasts`, `…/<guid>` | D1 `artwork` | returned as `art2` |
 
 **The community drawer row was the surface this was missed on**, and it is the
 one where it mattered most: those rows are *other* shows' artwork, so a single
 show with a dead primary rendered broken on every page that lists it while its
 own page had already recovered. The cause was the query rather than the render —
-the community CTE selected `p.image` and not `p.artwork`. Both `/show` surfaces
-now run through one `wireArt2()` in `show-page.js`.
+the community CTE selected `p.image` and not `p.artwork`. All three `/show`
+surfaces now run through one `wireArt2()` in `show-page.js` — the hero, the
+community rows and the podroll tiles, the last of which is the same case again:
+8 of the 371 podroll edges carry an art2, and Homegrown Hits (the show the whole
+chain exists for) is in Bowl After Bowl's podroll.
 
 **The episode drawer's rows are deliberately still outside this.** A row falls
 back to the show's own `img` when the episode has no art of its own, and does not
@@ -1326,7 +1394,9 @@ Three more invariants:
 pages. Adding `recommended_by` — the same rows read the other way — brings it to
 **109**, because plenty of shows are recommended by someone without publishing a
 podroll themselves. Local Bitcoiners is one of them (Bowl After Bowl recommends
-it). Build both directions or most of the feature is left on the table.
+it). Build both directions or most of the feature is left on the table. **Both
+are built** — see "Show pages: the podroll, in both directions" above for the
+site half.
 
 **Only ~56% of cards link anywhere.** A podroll routinely recommends shows
 nobody in this corpus has boosted; 136 of 221 targets were new to the index. Two

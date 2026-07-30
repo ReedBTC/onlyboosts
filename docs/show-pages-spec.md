@@ -403,17 +403,107 @@ One happy detail: **every feed-level boost in the sample carried a message**, so
 the rows that do surface are worth reading. Globally only 16% of boosts have
 message text, so rows without one render as a sats line alone rather than a gap.
 
+## The Podroll
+
+`<podcast:podroll>` is the publisher's own list of other shows worth hearing,
+parsed from the show's raw RSS by the collector's weekly pass. It renders as
+**two sections** between the Nostr Community wall and Recent Boosts: "Shows/
+Albums This Show Recommends" and "Shows/Albums That Recommend This Show".
+
+Coverage, measured over the live corpus: 65 of 925 reachable feeds publish a
+podroll, 371 edges, 221 distinct targets. Forward-only would be a section on 65
+pages. The reverse edge is the same rows read the other way and brings it to
+**109**, because plenty of shows are recommended by someone without publishing a
+podroll themselves; Local Bitcoiners is one, recommended by Bowl After Bowl.
+
+**They are two sections rather than one grid.** "I recommend them" and "they
+recommend me" are opposite claims, and a tile carrying nothing but artwork and a
+title has no way to distinguish them. Two headings do it for free.
+
+### Why the Form Is Different
+
+This is the only section on the page that is not derived from boost data, and it
+should not look like one that is. Every other list here is a row: a 44px
+thumbnail, a title, a line of figures, a border underneath. A recommendation has
+no figure attached to it. A row would therefore leave two thirds of its width
+empty and read as a ranked list that had lost its ranking, and inventing a figure
+to fill the gap would misrepresent what a podroll is.
+
+So: **square artwork at tile size, the show's name beneath it, and nothing
+else.** Five across on desktop, two on a phone. Bowl After Bowl's own roll-call
+page is the reference, and the artwork earns the space because it is the only
+content.
+
+The column counts are fixed rather than `auto-fill`, which is the opposite of the
+choice the community wall makes above. The difference is that a circular avatar
+has a natural size and the count can follow it, where a tile is as wide as a
+fifth of the column: here the count is the design and the width follows from it.
+
+Ten tiles paint before a "Show N more" toggle. The median podroll is 4, so this
+bites on one page in the corpus (63 entries) and on two of the reverse lists.
+
+### Where a Tile Points
+
+The collector stamps each edge with **`linked`**: true when that end has a
+`/show/<guid>` page of ours, which is boosts *and* a title, the same qualifying
+rule this page applies to itself. It is read, never re-derived — the collector
+owns the rule and already accounts for the titleless case.
+
+**44% of cards are not linked.** A podroll routinely recommends shows nobody in
+this corpus has boosted, and those cards are still worth rendering because they
+carry real artwork and a real title. They point at the show on
+`boostmebitch.com/?podcast=<guid>`, in a new tab. All 371 live edges carry a guid
+at both ends, so a tile is always linkable and the query selects no feed-URL
+column at all.
+
+A card with **no title** is dropped rather than labelled. All four such edges have
+no artwork either, so the tile would be empty. This is deliberately not the
+"Unidentified show" treatment the Shows feed gives an unnamed row: that label
+works in a list of names and figures, and reads as a rendering bug in a grid whose
+entire content is names.
+
+### No Figures, and No Boost Button
+
+The tile carries no boost count, no sats, no sort control and no boost button.
+Every other list of other shows on this site carries one, and this one does not
+because barely half of podroll targets have a Podcast Index record to resolve
+splits from, and because the section's whole job is to send a reader onward rather
+than to take a payment in place.
+
+Only the **forward** heading carries a count. That list is the publisher's whole
+podroll, complete and unsampled, so the number is exact. The reverse count is
+bounded by which feeds the collector has read, so a badge would state a fact about
+our coverage as though it were a fact about the show; its sub-line carries the
+qualifier instead. The asymmetry is the site's usual rule about qualified numbers,
+not an oversight.
+
+### The One Query Allowed to Fail
+
+`podroll` is the only table on this page populated by a separate **weekly** push
+(`d1_sync.py --remote-podroll`), where every other table rides the collector's
+hourly boost delta. A remote that carries every other table but not yet this one
+is a normal intermediate state of a deploy, so both podroll queries catch their
+own failure and render no section. Turning 930 show pages into 500s to report a
+section that 93% of them do not render would be the wrong trade, and "no section"
+is exactly what a show with no podroll gets.
+
 ## Page Order
 
 The back link, the hero, the "Nostr Boost Stats" heading and its tiles,
-**episodes**, other shows this community boosts, the Nostr Community wall,
-recent boosts.
+**episodes**, other shows this community boosts, the Nostr Community wall, the
+two podroll sections, recent boosts.
 
 Episodes sit directly under the stats rather than at the foot of the page: a
 podcaster arriving at their own page is looking for their catalogue, and a
 visitor sent here by that podcaster wants somewhere to boost before they want a
 leaderboard. The drawer is **collapsed by default**, so it costs one line of
 height and the supporters wall still opens the page's body.
+
+The podroll sits **below the wall and above recent boosts**. It is the page's
+second discovery list, and putting it under the community rather than beside it
+keeps the two apart: the community drawer is what *this audience* also boosts,
+which is ours to compute, where the podroll is what *the publisher* recommends,
+which is theirs to declare. Recent boosts stays last, as the page's log.
 
 ## Reversing Out
 

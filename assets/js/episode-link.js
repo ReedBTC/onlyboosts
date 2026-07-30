@@ -14,12 +14,18 @@
  * already exist and are NOT the target: a boost note is about one episode, and
  * pointing it at the show would drop the part the reader cares about.
  *
- * ⚠️  ONE OTHER SURFACE points at BMB and is not built here: the
- * "See All Episodes" link on the /show episode drawer's control band, in
- * `renderEpisodes` (functions/show/[guid].js). It is show-level rather than
- * episode-level, and a Pages Function cannot import a client module — nothing
- * else in functions/ reaches outside functions/ either. It is not a boost note,
- * so retiring BMB does not have to retire it, but CHANGE THE TWO TOGETHER.
+ * ⚠️  TWO OTHER SURFACES point at BMB and are not built here. Both are in
+ * functions/show/[guid].js, both are SHOW-level rather than episode-level, and
+ * both resolve through one `bmbShowUrl()` in that file:
+ *
+ *   - "See All Episodes" on the episode drawer's control band (`renderEpisodes`)
+ *   - a podroll tile for a show we have no page of our own for (`podrollTile`),
+ *     which is 44% of them
+ *
+ * A Pages Function cannot import a client module — nothing else in functions/
+ * reaches outside functions/ either — so they are built there rather than here.
+ * Neither is a boost note, so retiring BMB does not have to retire them, but
+ * CHANGE ALL THREE TOGETHER.
  *
  * Boost Me Bitch restores a detail view from URL params: `?feed=<piFeedId>` or
  * `?podcast=<podcastGuid>` picks the show, and `&episode=<itemGuid>` opens that
