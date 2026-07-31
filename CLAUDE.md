@@ -310,6 +310,8 @@ Carried from the scaffold commit and the LB suite:
 - `assets/js/shows-feed.js` — the show-level rollup behind Shows and Albums
   (written here, not ported)
 - `assets/js/feed-controls.js` — the range/sort chrome they all share
+- `assets/css/episode-card.css` — the episode card itself, shared by the
+  Episodes/Songs feeds and `/show`'s episode drawer
 - `assets/js/feed-search.js` — the per-feed typeahead at the head of each panel
 - `assets/js/boosts-thread.js` — the content tokenizer (nostr: mentions,
   URLs, quoted notes) the boost cards render through
@@ -856,6 +858,83 @@ places that change together: the masthead line under the banner on `index.html`
 The show page's `og:description` states the scope *inside the sentence*, because
 it is the one string that travels without the page around it.
 
+## Show pages: the episode drawer is the feed's card
+
+`/show`'s episode drawer holds the **same card the Episodes and Songs feeds
+paint** — artwork, title, shownotes teaser, a `Nostr Stats:` line with the boost
+pill on its end, an inline player, and a `Nostr Interactions:` drawer of that
+episode's boosts. It was a 44px row until then.
+
+**The card's CSS is a file now: `assets/css/episode-card.css`.** It was ~300
+lines inline in `index.html`; `/show` links it too, so the two surfaces cannot
+drift. Restating it in `show-page.css` was the alternative and was rejected —
+that file already restates `.pcast-sort` and `.nostr-mention` by hand, and this
+would have been the third and largest copy. What **stayed** in `index.html` is
+`.pcast-controls` / `.pcast-range` / `.pcast-sort`, the feed bar's own chrome,
+which belongs to that page rather than to a card.
+
+⚠️ **It reads `--accent` / `--accent-d` / `--tint`**, which only `index.html`
+defines (one per feed, off `body[data-active-feed]`). `.show-main` supplies them
+on `/show`. A page linking the file without supplying them drops every
+declaration using one at computed-value time.
+
+Three things differ from the feed's card, each because of where it is:
+
+- **no show name line** — every card on the page is the same show;
+- **no ⋮ menu.** The feed's is a *show-level* list of subscribe links, so here it
+  would be the same links once per episode. The hero carries one instead
+  (`listenMenu()`), and it is **two of the feed's five**: Fountain comes off a
+  boost's `show_url`, and Podcast Guru and CurioCaster need the Podcast Index
+  numerics; D1's `podcasts` table carries neither, only `feed_url`;
+- **the drawer is a `<details>`, not a button with `aria-expanded`**, because the
+  page reads with no JavaScript. `show-page.css` carries four `[open]` rules that
+  stand in for `.is-open`.
+
+**The drawer's rows are this page's `.boost-row`, not the feed's `.pcast-boost`.**
+Same information, already styled here, and already emitting the
+`data-pk` / `data-missing` pair `hydrateProfiles` patches. What they do **not**
+carry is the feed's reply / like / repost / zap bar: that is `boost-actions.js`
+pulling `boosts-thread.js` and nostr-tools behind it, about 190KB, on the page
+that hand-rolls a bech32 decoder specifically to avoid that import.
+
+**One query feeds two sections.** `BOOSTS_CORPUS` (3,000) replaced the 24-row
+Recent Boosts query; `groupBoostsByEpisode()` indexes it and Recent Boosts slices
+the first `BOOSTS_SHOWN`. Live maximum is 1,356 boosts on one show. The
+mention-name query's 90-slice became load-bearing rather than belt-and-braces at
+the same time — it is now what holds that list inside D1's 100-parameter ceiling.
+
+**`episodes.description` exists in D1 and is used here.** CLAUDE.md's note that
+descriptions "only exist in the per-show shard, too expensive to fetch per card"
+is about the *feed* path. This page reads D1 row by row, so the teaser is free.
+`stripHtml()` is a regex trimmer, not a sanitiser — its output goes through
+`htmlEscape()` like every other field.
+
+⚠️ **The drawer is deliberately not capped.** Measured on the index's biggest
+page (Bitcoin And: 293 episodes, 1,356 boosts):
+
+| episodes | raw | gzip | |
+|---|---|---|---|
+| 1 | 41KB | 8KB | the median show |
+| 4 | 58KB | 9KB | p75 |
+| 17 | 144KB | 15KB | p90 |
+| 97 | 678KB | 52KB | p99 |
+| 293 | 2070KB | 166KB | the maximum, 1 of 933 pages |
+
+Three caps were tried and each failed on evidence. A **per-drawer cap on boost
+rows** saves nothing: boosts spread evenly across a catalogue, so on that show
+the busiest episode has 11 and a cap of 10 keeps 1,352 of 1,353 rows. **Shipping
+overflow cards hidden** behind the `.show-more` button saves nothing either — the
+community wall and podroll grids cap for *layout*, where the cost here is bytes,
+and the cards are inside a closed `<details>` so the layout is skipped anyway.
+**Truncating server-side** does save them and costs the sort: the drawer's one
+interactive feature is "which episode got the most sats", and answering it over
+the newest 60 of 293 answers a different question silently. If the tail becomes a
+problem the fix is a per-episode page or a fetched thread, not a cap.
+
+`bmbEpisodeUrl()` is the **third BMB surface in `[guid].js` and the fourth on the
+site**; `assets/js/episode-link.js` still owns the target and enumerates them.
+It can never prefer `?feed=` — no numeric id in D1.
+
 ## Show pages: the drawer chrome, and the back link
 
 Both `<details>` on `/show` share `.ep-drawer`, and the affordance work is in
@@ -1268,7 +1347,7 @@ chain exists for) is in Bowl After Bowl's podroll.
 
 **The episode drawer's rows are deliberately still outside this.** A row falls
 back to the show's own `img` when the episode has no art of its own, and does not
-go on to `art2`; see the note over `episodeRow`. It bites only where a show has a
+go on to `art2`; see the note over `episodeCard`. It bites only where a show has a
 dead primary *and* an episode with no art, and episode art was 100% present on
 every show sampled.
 

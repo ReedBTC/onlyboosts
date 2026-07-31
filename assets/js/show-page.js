@@ -378,7 +378,7 @@ function initEpisodeSort() {
   const slot = root.querySelector('[data-ep-controls]')
   if (!list || !slot) return
 
-  const rows = Array.from(list.querySelectorAll('.ep-row')).map((el) => {
+  const rows = Array.from(list.querySelectorAll('.ep-card')).map((el) => {
     const [boosters, boosts, sats, published] = String(el.dataset.ep || '').split(',').map(Number)
     return { el, boosters: boosters || 0, boosts: boosts || 0, sats: sats || 0, published: published || 0 }
   })
@@ -692,6 +692,19 @@ initBoosting()
 // and readable on its own, a visitor with no JavaScript keeps exactly what
 // shipped before, and an unreachable cache changes nothing.
 
+/* Mirror of initials() in the Function, for a face whose name Primal supplied
+ * after the server had only an npub to work with. */
+function initialsOf(name) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean)
+  let out = ''
+  for (const p of parts) {
+    const c = [...p].find((ch) => /\p{L}|\p{N}/u.test(ch))
+    if (c) out += c.toUpperCase()
+    if (out.length >= 2) break
+  }
+  return out || '·'
+}
+
 async function hydrateProfiles() {
   const els = Array.from(document.querySelectorAll('[data-pk][data-missing]'))
   if (!els.length) return
@@ -708,6 +721,27 @@ async function hydrateProfiles() {
     // are containers holding the pieces to patch.
     if (el.classList.contains('nostr-mention')) {
       if (prof.name) el.textContent = '@' + prof.name
+      el.removeAttribute('data-missing')
+      continue
+    }
+
+    // A face on an episode card's drawer bar. The element IS the avatar, so
+    // there is no child to fill — a picture means swapping the initials span for
+    // an <img>, which is why the Function tags it "face" and not "pic".
+    if (el.classList.contains('pcast-avatar')) {
+      if (prof.picture) {
+        const img = document.createElement('img')
+        img.className = 'pcast-avatar'
+        img.alt = ''
+        img.loading = 'lazy'
+        img.referrerPolicy = 'no-referrer'
+        // A dead hotlink leaves the initials exactly where they were.
+        img.onerror = () => img.replaceWith(el)
+        img.src = prof.picture
+        el.replaceWith(img)
+        continue
+      }
+      if (prof.name) el.textContent = initialsOf(prof.name)
       el.removeAttribute('data-missing')
       continue
     }

@@ -62,6 +62,21 @@ const SUPPORTERS_VISIBLE = 21;
 const PODIUM = 5;
 const BOOSTS_SHOWN = 24;
 
+// One query serves two sections now, so it pulls the show's whole boost history
+// rather than the 24 the Recent Boosts list paints. The episode cards' "Nostr
+// Interactions" drawers hold the boosts sent to each episode, and a per-episode
+// query would be one round trip per card.
+//
+// Measured over the live index, across the 933 shows that have a page: boosts
+// per show run to a median of 2, a p90 of 36, a p99 of 538 and a maximum of
+// 1,356. So this cap is a guard against a show that grows an order of magnitude,
+// not a limit anything reaches today — the median page's drawers hold two rows
+// between them. Recent Boosts still slices the first BOOSTS_SHOWN.
+//
+// It is ordered newest-first, which is what Recent Boosts wants; the drawers
+// inherit that order, and newest-first is right there too.
+const BOOSTS_CORPUS = 3000;
+
 // How many rows the "Other Shows/Albums This Community Boosts" drawer carries.
 // Measured over the live corpus, the number of distinct other shows a show's
 // booster set has boosted runs to a median of 45, a p90 of 191 and a maximum of
@@ -77,6 +92,39 @@ const COMMUNITY_SHOWS_LIMIT = 150;
 // reverse lists. Nothing is dropped; the rest ship hidden behind the same
 // .show-more button the community wall uses.
 const PODROLL_VISIBLE = 10;
+
+// ⚠️ THE EPISODE DRAWER IS NOT CAPPED, and that is a decision with a measurement
+// behind it. Rendering the index's biggest page (Bitcoin And: 293 episodes,
+// 1,356 boosts) with every episode carrying a description at the cap:
+//
+//     episodes     raw     gzip
+//            1    41KB      8KB   <- the median show
+//            4    58KB      9KB   <- p75
+//           17   144KB     15KB   <- p90
+//           97   678KB     52KB   <- p99
+//          293  2070KB    166KB   <- the maximum, 1 of 933 pages
+//
+// A row was ~200 bytes and a card is ~6.7KB, so this grew by a factor of thirty
+// and the tail is genuinely heavy. Three caps were tried and each was rejected
+// on the evidence:
+//
+//  - a per-drawer cap on boost rows saves nothing. Boosts spread evenly across a
+//    catalogue: on that same show the busiest episode has 11 and the median has
+//    4, so a cap of 10 keeps 1,352 of the 1,353 rows.
+//  - shipping the overflow cards hidden behind a .show-more button, the way the
+//    community wall and the podroll grids do, saves nothing either. Those
+//    sections cap for LAYOUT; here the cost is bytes, and a hidden card is the
+//    same bytes. It is also already inside a closed <details>, so the layout it
+//    would skip is skipped anyway.
+//  - truncating server-side does save them, and costs the sort. The drawer's one
+//    interactive feature is "which episode got the most sats", and answering it
+//    over the newest 60 of 293 answers a different question silently.
+//
+// So every episode paints. The weight is concentrated in 9 pages out of 933 (the
+// count with more than 100 episodes carrying a boost) and it is real content
+// rather than boilerplate — gzip already gets 12x, and what is left is 1,356
+// unique pubkeys, npubs and messages. If this does become a problem, the fix is
+// a per-episode page or a fetched thread, not a cap.
 
 export async function onRequestGet({ request, env, params }) {
   let guid = params.guid;
@@ -113,8 +161,15 @@ export async function onRequestGet({ request, env, params }) {
       // "Most Boosters" sort has to derive it. A grouped subquery over this
       // show's boosts is one indexed scan (idx_boosts_podcast) rather than a
       // correlated lookup per episode; measured at 2.9ms over 290 episodes.
+      // `description` is the one heavy column on this table and it is selected
+      // here where the feeds cannot have it: CLAUDE.md's note that descriptions
+      // "only exist in the per-show shard, too expensive to fetch per card" is
+      // about the static feed path. This page already reads D1 row by row, so
+      // the shownotes teaser costs nothing but the bytes, and stripHtml trims it
+      // to a couple of lines before it reaches the response.
       `SELECT e.item_guid, e.title, e.image, e.published, e.duration,
-              e.episode_number, e.enclosure_url, e.boost_count, e.total_sats,
+              e.episode_number, e.enclosure_url, e.description,
+              e.boost_count, e.total_sats,
               COALESCE(x.boosters, 0) AS booster_count
        FROM episodes e
        LEFT JOIN (
@@ -149,7 +204,7 @@ export async function onRequestGet({ request, env, params }) {
        LEFT JOIN profiles pr ON pr.pubkey = b.booster_pubkey
        WHERE b.podcast_guid = ?
        ORDER BY b.created_at DESC, b.event_id DESC LIMIT ?`
-    ).bind(guid, BOOSTS_SHOWN).all(),
+    ).bind(guid, BOOSTS_CORPUS).all(),
     // What else this show's community boosts.
     //
     // The community is the set of pubkeys that have boosted THIS show; the
@@ -206,11 +261,16 @@ export async function onRequestGet({ request, env, params }) {
   // A mentioned npub need not be a booster, so a miss here is normal and the
   // chip falls back to a truncated identifier.
   const boostRows = boosts.results || [];
-  // Placeholders rather than json_each: BOOSTS_SHOWN is 24, so this list is
-  // tiny and always far inside D1's 100-bound-parameter ceiling. The follows
-  // endpoint needs json_each because its author list runs to thousands; here it
-  // would only add a dependency on a table-valued function Cloudflare does not
-  // document. Sliced anyway, so a pathological message can't blow the limit.
+  // Placeholders rather than json_each, and the 90-slice is what keeps that
+  // true. This used to scan BOOSTS_SHOWN messages and was tiny by construction;
+  // it now scans the whole corpus, because the episode drawers render every
+  // boost and a mention chip has to resolve wherever it appears. The slice is
+  // therefore load-bearing rather than belt-and-braces: it is what holds the
+  // list inside D1's 100-bound-parameter ceiling. It is still not close in
+  // practice — only 16% of boosts carry a message at all and a mention inside
+  // one is rarer again. The follows endpoint needs json_each because its author
+  // list runs to thousands; here it would only add a dependency on a
+  // table-valued function Cloudflare does not document.
   const mentioned = mentionedPubkeys(boostRows.map((r) => r.message)).slice(0, 90);
   const names = new Map();
   if (mentioned.length) {
@@ -537,6 +597,7 @@ const COPY = {
     // output — see "No Episode Counts, Anywhere" in the spec for how small a
     // fraction — so it needs to say where the rest of them are.
     allItems: "See All Episodes",
+    listen: "Listen in",
     noItems: "No episodes with Nostr boosts yet.",
     ldType: "PodcastSeries",
     // Where the back link points for a visitor who has nowhere to go back TO
@@ -560,6 +621,7 @@ const COPY = {
     untitledItem: "Untitled track",
     drawer: "Tracks with Nostr Boosts",
     allItems: "See All Tracks",
+    listen: "Listen in",
     noItems: "No tracks with Nostr boosts yet.",
     ldType: "MusicAlbum",
     backHref: "/#albums",
@@ -701,6 +763,12 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
   <link rel="stylesheet" href="/assets/css/footer.css" />
   <link rel="stylesheet" href="/assets/css/theme.css" />
   <link rel="stylesheet" href="/assets/css/page.css" />
+  <!-- The episode card, shared verbatim with the Episodes and Songs feeds on /.
+       It reads --accent / --accent-d / --tint, which only exist on the feed page
+       off body[data-active-feed]; .show-main supplies them here. Linked BEFORE
+       show-page.css, which carries the [open] rules that stand in for .is-open
+       on a <details> drawer. -->
+  <link rel="stylesheet" href="/assets/css/episode-card.css" />
   <link rel="stylesheet" href="/assets/css/show-page.css" />
 </head>
 <body data-show-guid="${htmlEscape(show.podcast_guid)}">
@@ -801,7 +869,7 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
 
   ${renderHeader(show, art, title, copy, art2)}
 
-  ${renderEpisodes(episodes, show, copy)}
+  ${renderEpisodes(episodes, show, copy, groupBoostsByEpisode(boosts), names)}
 
   ${renderCommunityShows(community)}
 
@@ -811,7 +879,7 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
 
   ${renderPodroll(podrolledBy, "reverse", copy, show)}
 
-  ${renderBoosts(boosts, names, copy)}
+  ${renderBoosts(boosts.slice(0, BOOSTS_SHOWN), names, copy)}
 
 </main>
 
@@ -901,6 +969,39 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
 // on-page credit and the share-card title so the two can never disagree — if
 // they drifted, a music page could title itself "Midnight Signal — Midnight
 // Signal" while the body correctly showed no credit at all.
+// "Listen in" — the show-level app links, once, on the hero.
+//
+// The Episodes feed puts this ⋮ menu on every card, which is right there: each
+// card is a different show. On this page every episode is the SAME show, so a
+// per-card copy would be the same links repeated up to 293 times; it belongs
+// beside RSS feed and Share, which are the page's other two "take this show
+// elsewhere" controls.
+//
+// ⚠️ TWO OF THE FEED'S FIVE, and the missing three are a data gap rather than a
+// choice. Fountain comes off a boost's show_url and Podcast Guru and CurioCaster
+// need the Podcast Index numeric ids (itunes_id / feed_id); D1's `podcasts`
+// table carries neither, only feed_url. If those columns ever land, the other
+// three go here and the feed's subscribeLinks() is the list to copy.
+//
+// A <details> rather than a scripted dropdown: the page reads with no
+// JavaScript, and the nav's Explore menu already establishes the pattern.
+function listenMenu(show, copy) {
+  const guid = show.podcast_guid;
+  if (!guid) return "";
+  const g = encodeURIComponent(guid);
+  const links = [
+    ["Castamatic", `https://castamatic.com/guid/${g}`],
+    ["Podverse", `https://api.podverse.fm/api/v1/podcast/by-podcast-guid/${g}`],
+  ];
+  return `<details class="listen-menu">
+            <summary class="btn btn-quiet">${copy.listen}<span class="listen-caret" aria-hidden="true">▾</span></summary>
+            <div class="listen-panel">
+              ${links.map(([label, url]) =>
+                `<a href="${htmlEscape(url)}" target="_blank" rel="noopener">${label}</a>`).join("\n              ")}
+            </div>
+          </details>`;
+}
+
 function usableAuthor(show) {
   const author = String(show.author || "").trim();
   if (!author) return "";
@@ -966,6 +1067,7 @@ function renderHeader(show, art, title, copy, art2) {
             ? `<a class="btn btn-quiet" href="${htmlEscape(show.feed_url)}" target="_blank" rel="noopener">RSS feed</a>`
             : ""}
           <button type="button" class="btn btn-quiet" data-share-page>Share</button>
+          ${listenMenu(show, copy)}
         </div>
       </div>
     </div>
@@ -1316,7 +1418,11 @@ function renderBoosts(rows, names, copy) {
   </section>`;
 }
 
-function boostRow(r, names, copy) {
+// `omitTarget` drops the "→ Ep. 3 …" line. Recent Boosts keeps it, because a
+// row there can point at any episode or at the show itself; inside an episode
+// card's own drawer every row points at the episode named directly above, so the
+// line would be the same string repeated down the list.
+function boostRow(r, names, copy, omitTarget = false) {
   const realName = displayName(r);
   const name = realName || shortId(r.booster_npub, r.booster_pubkey);
   const pic = isSafeUrl(r.pr_pic) ? r.pr_pic : null;
@@ -1337,12 +1443,32 @@ function boostRow(r, names, copy) {
             <span class="boost-when">${htmlEscape(relTime(r.created_at))}</span>
           </p>
           ${r.message ? `<p class="boost-msg">${renderMessage(r.message, names)}</p>` : ""}
-          <p class="boost-target">→ ${target}</p>
+          ${omitTarget ? "" : `<p class="boost-target">→ ${target}</p>`}
         </div>
       </li>`;
 }
 
-function renderEpisodes(rows, show, copy) {
+// item_guid → its boosts, newest-first, out of the one corpus query. A Map
+// rather than a per-episode query: BOOSTS_CORPUS is already in memory and a
+// query per card would be one D1 round trip per row on a page that can carry
+// 293 of them.
+//
+// Boosts whose item_guid matches no episode row simply never get looked up, and
+// boosts with no item_guid at all (a show-level boost) are skipped here — they
+// belong to no card. Both still appear in Recent Boosts, which is the section
+// that holds everything.
+function groupBoostsByEpisode(rows) {
+  const by = new Map();
+  for (const r of rows) {
+    if (!r.item_guid) continue;
+    const list = by.get(r.item_guid);
+    if (list) list.push(r);
+    else by.set(r.item_guid, [r]);
+  }
+  return by;
+}
+
+function renderEpisodes(rows, show, copy, boostsByEp, names) {
   if (!rows.length) {
     return `<section class="show-section show-section--bare" id="episodes">
       <p class="show-empty">${copy.noItems}</p>
@@ -1374,35 +1500,213 @@ function renderEpisodes(rows, show, copy) {
         <a class="cs-allitems" href="${bmb}" target="_blank" rel="noopener">${copy.allItems}<span class="cs-allitems-arrow" aria-hidden="true">↗</span></a>
       </div>
       <ul class="ep-list">
-        ${rows.map((e) => episodeRow(e, copy, isSafeUrl(show.image) ? show.image : null)).join("\n        ")}
+        ${rows.map((e) => episodeCard(e, copy, show, boostsByEp.get(e.item_guid) || [], names)).join("\n        ")}
       </ul>
     </details>
   </section>`;
 }
 
-// `fallbackArt` is the show's own artwork. Episode art is near-universal in the
-// index (100% on every show sampled), but where a row has none the show's art
-// is a truer stand-in than a glyph — it is what that episode's art would almost
-// certainly have been. The show's art2 is deliberately NOT a third link here:
-// it is a fallback for a dead show image, and these rows already fall back to
-// the show image only when the episode has none of its own.
-function episodeRow(e, copy, fallbackArt) {
-  const bits = [fmtDate(e.published), fmtDuration(e.duration)].filter(Boolean);
+// ⚠️ THE THIRD BMB SURFACE IN THIS FILE and the fourth on the site. The target
+// is owned and documented by assets/js/episode-link.js, which enumerates all of
+// them; a Pages Function cannot import a client module, so the shape is
+// reproduced rather than shared. CHANGE THEM TOGETHER.
+//
+// This is the only episode-level one here, and unlike the feed's builder it can
+// never prefer `?feed=`: D1's `podcasts` table carries no Podcast Index numeric
+// id, only feed_url. `?podcast=` resolves the same show, one lookup later.
+function bmbEpisodeUrl(podcastGuid, itemGuid) {
+  if (!podcastGuid || !itemGuid) return null;
+  return `https://boostmebitch.com/?podcast=${encodeURIComponent(podcastGuid)}&episode=${encodeURIComponent(itemGuid)}`;
+}
+
+// Podcast Index descriptions are HTML. The feeds run them through a DOMParser;
+// there is none in a Worker, and pulling one in for a two-line teaser would be
+// absurd, so tags are stripped with a regex and the five named entities that
+// actually appear are decoded. That is safe here for a reason worth stating: the
+// output is not trusted markup, it is a plain string that goes through
+// htmlEscape() at the render site like every other field. The regex is a
+// TRIMMER, not a sanitiser — nothing downstream depends on it having removed
+// anything.
+function stripHtml(s, max = 240) {
+  if (!s) return "";
+  const text = String(s)
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#0?39;|&apos;/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+  return truncate(text, max);
+}
+
+// One episode, as the same card the Episodes and Songs feeds paint — art, title,
+// shownotes teaser, a Nostr Stats line with the boost pill on its end, the
+// inline player, and a drawer of the boosts sent to it.
+//
+// IT IS THE FEED'S CARD, not a copy of it: every class here is defined in
+// assets/css/episode-card.css, which this page links and the homepage links, so
+// the two cannot drift. Three things differ, and each is because of where it is:
+//
+//  - no show name line. Every card on this page is the same show, which the
+//    hero above already names;
+//  - no ⋮ menu. The feed's is a SHOW-level list of subscribe links, so here it
+//    would be the same links repeated once per episode; the hero carries one;
+//  - the drawer is a <details>, not a button with aria-expanded, because this
+//    page has to read with no JavaScript. show-page.css carries the [open]
+//    rules that stand in for .is-open.
+//
+// Episode art falls back to the SHOW's own artwork where a row has none (100%
+// present on every show sampled, but a truer stand-in than a glyph — it is what
+// that episode's art would almost certainly have been). The show's art2 is
+// deliberately not a third link: it exists for a dead show image, and this chain
+// already reaches the show image only when the episode has none of its own.
+function episodeCard(e, copy, show, epBoosts, names) {
+  const fallbackArt = isSafeUrl(show.image) ? show.image : null;
   const art = (isSafeUrl(e.image) && e.image) || fallbackArt || null;
+  const bmb = bmbEpisodeUrl(show.podcast_guid, e.item_guid);
+  const title = e.title || copy.untitledItem;
+  const audio = isSafeUrl(e.enclosure_url) ? e.enclosure_url : null;
+  const desc = stripHtml(e.description);
+
   // boosters,boosts,sats,published — the four axes the drawer's sort offers,
-  // packed one attribute per row the way the community drawer does it.
+  // packed one attribute per card the way the community drawer does it.
   const pack = [e.booster_count, e.boost_count, e.total_sats, e.published]
     .map((v) => Number(v || 0)).join(",");
-  return `<li class="ep-row" data-ep="${pack}">
-          ${art
-            ? `<img class="ep-art" src="${htmlEscape(art)}" alt="" width="44" height="44" loading="lazy" referrerpolicy="no-referrer" />`
-            : `<span class="ep-art ep-art--blank" aria-hidden="true">${copy.glyph}</span>`}
-          <div class="ep-main">
-            <p class="ep-title">${e.episode_number ? `<span class="ep-num">${copy.itemAbbr} ${htmlEscape(e.episode_number)}</span> ` : ""}${htmlEscape(e.title || copy.untitledItem)}</p>
-            <p class="ep-meta">${bits.map(htmlEscape).join(" · ")}${bits.length ? " · " : ""}${htmlEscape(num(e.total_sats))} sats · ${htmlEscape(num(e.boost_count))} boost${e.boost_count === 1 ? "" : "s"}</p>
+
+  const nBoosters = Number(e.booster_count || 0);
+  const nBoosts = Number(e.boost_count || 0);
+
+  const artInner = art
+    ? `<img src="${htmlEscape(art)}" alt="" width="88" height="88" loading="lazy" referrerpolicy="no-referrer" />`
+    : copy.glyph;
+  const media = bmb
+    ? `<a class="pcast-card-media${art ? "" : " pcast-card-media--none"}" href="${htmlEscape(bmb)}" target="_blank" rel="noopener noreferrer" title="See all boosts on Boost Me Bitch">${artInner}</a>`
+    : `<div class="pcast-card-media${art ? "" : " pcast-card-media--none"}">${artInner}</div>`;
+
+  const num_ = e.episode_number ? `<span class="ep-num">${copy.itemAbbr} ${htmlEscape(e.episode_number)}</span> ` : "";
+  const titleEl = bmb
+    ? `<a class="pcast-title pcast-title-link" href="${htmlEscape(bmb)}" target="_blank" rel="noopener noreferrer" title="See all boosts on Boost Me Bitch">${num_}${htmlEscape(title)}</a>`
+    : `<div class="pcast-title">${num_}${htmlEscape(title)}</div>`;
+
+  // Duration keeps a line of its own rather than joining the stats row: that row
+  // carries the "Nostr Stats:" qualifier, and a runtime is a fact about the
+  // episode rather than about what this index recorded. The air date sits under
+  // the art, where the feed card puts it.
+  const dur = fmtDuration(e.duration);
+
+  return `<li class="pcast-card ep-card" data-ep="${pack}">
+          <div class="pcast-card-head">
+            <div class="pcast-media-col">
+              ${media}
+              ${e.published ? `<div class="pcast-card-aired">${htmlEscape(fmtDate(e.published))}</div>` : ""}
+            </div>
+            <div class="pcast-card-body">
+              ${titleEl}
+              ${dur ? `<div class="pcast-meta">${htmlEscape(dur)}</div>` : ""}
+              ${desc ? `<p class="pcast-desc">${htmlEscape(desc)}</p>` : ""}
+              <div class="pcast-meta pcast-nstats">
+                <span class="ob-stats-label">Nostr Stats:</span>
+                <span>${htmlEscape(num(nBoosters))} booster${nBoosters === 1 ? "" : "s"}</span>
+                <span class="pcast-dot" aria-hidden="true">·</span>
+                <span>${htmlEscape(num(nBoosts))} boost${nBoosts === 1 ? "" : "s"}</span>
+                <button type="button" class="ob-boost-pill" data-ep-boost="${htmlEscape(e.item_guid || "")}" data-ep-title="${htmlEscape(title)}" hidden>Boost</button>
+              </div>
+            </div>
           </div>
-          <button type="button" class="btn btn-boost btn-sm" data-ep-boost="${htmlEscape(e.item_guid || "")}" data-ep-title="${htmlEscape(e.title || "")}" hidden>Boost</button>
+          ${audio
+            // preload="none" — a page can carry hundreds of these and a browser
+            // that fetched metadata for each would spend the visitor's bandwidth
+            // on episodes nobody pressed play on. No <source type>: D1 has no
+            // enclosure_type, so the browser sniffs, exactly as the feed cards
+            // already do for the same reason.
+            ? `<div class="pcast-player-row"><audio class="pcast-player" controls preload="none" src="${htmlEscape(audio)}"></audio></div>`
+            : ""}
+          ${epBoosts.length ? episodeThread(epBoosts, e, names, copy) : ""}
         </li>`;
+}
+
+// The card's "Nostr Interactions:" drawer.
+//
+// The colon is load-bearing and is the feed's own reasoning: the booster faces
+// and the sats sit immediately to its right, so without it the label reads as a
+// heading over an unexplained row of avatars rather than as introducing them.
+//
+// The rows inside are this page's .boost-row, NOT the feed's .pcast-boost. They
+// carry the same information, they are already styled here, and they already
+// emit the data-pk / data-missing pair that show-page.js's profile hydration
+// patches — restating the feed's row markup would have meant a second thing to
+// keep in step for no visible difference. What they do not carry is the feed's
+// reply / like / repost / zap bar: that is boost-actions.js pulling
+// boosts-thread.js and nostr-tools behind it, about 190KB, on the page that
+// carries a hand-rolled bech32 decoder specifically to avoid that import.
+//
+// `omitTarget` because every row in here targets the episode named directly
+// above it; Recent Boosts keeps the line, where the target genuinely varies.
+const MAX_FACES = 6;
+
+// One face on the drawer bar. The element IS the avatar — an <img> where there
+// is a picture, a span of initials where there is not — which is the shape
+// .pcast-avatar is styled for (border-radius and object-fit on the image
+// itself). Not the .sup-avatar button used elsewhere on this page: these are
+// decoration on a summary, and a button inside a <summary> is a click target
+// that competes with opening the drawer.
+//
+// The blank form carries data-missing="face", which is its own token rather than
+// the "pic" the supporter cards use, because patching it means replacing the
+// element rather than filling a child. show-page.js#hydrateProfiles has the
+// matching branch.
+function face(r) {
+  const pic = isSafeUrl(r.pr_pic) ? r.pr_pic : null;
+  if (pic) return `<img class="pcast-avatar" src="${htmlEscape(pic)}" alt="" loading="lazy" referrerpolicy="no-referrer" />`;
+  // displayName only, never shortId: an unresolved booster's stand-in is
+  // "npub1abc…", and initialising that gives every one of them the letter N.
+  // A dot says "nobody yet" where an N says "someone called N".
+  return `<span class="pcast-avatar pcast-avatar--none" data-pk="${htmlEscape(r.booster_pubkey)}" data-missing="face" aria-hidden="true">${htmlEscape(initials(displayName(r)))}</span>`;
+}
+
+// Up to two letters, from the first two words that have one. Matches the feed's
+// avatarEl(); a name that yields nothing (an npub, an emoji-only handle) falls
+// back to a dot rather than an empty circle.
+function initials(name) {
+  const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+  let out = "";
+  for (const p of parts) {
+    const c = [...p].find((ch) => /\p{L}|\p{N}/u.test(ch));
+    if (c) out += c.toUpperCase();
+    if (out.length >= 2) break;
+  }
+  return out || "·";
+}
+
+function episodeThread(rows, e, names, copy) {
+  const sats = rows.reduce((t, r) => t + Number(r.sats || 0), 0);
+  const seen = new Set();
+  const faces = [];
+  for (const r of rows) {
+    if (seen.has(r.booster_pubkey)) continue;
+    seen.add(r.booster_pubkey);
+    faces.push(r);
+    if (faces.length >= MAX_FACES) break;
+  }
+
+  return `<details class="pcast-thread">
+            <summary class="pcast-drawer">
+              <span class="pcast-drawer-caret" aria-hidden="true">▾</span>
+              <span class="pcast-drawer-label">Nostr Interactions:</span>
+              <span class="pcast-drawer-meta">
+                <span class="pcast-avatars">${faces.map(face).join("")}</span>
+                ${sats > 0 ? `<span class="pcast-sats">${htmlEscape(compact(sats))} <span class="pcast-bolt" aria-hidden="true">⚡</span></span>` : ""}
+              </span>
+            </summary>
+            <div class="pcast-details">
+              <ul class="boost-list">
+                ${rows.map((r) => boostRow(r, names, copy, true)).join("\n                ")}
+              </ul>
+            </div>
+          </details>`;
 }
 
 // A guid with no page. Deliberately a real 404 rather than a shell of empty

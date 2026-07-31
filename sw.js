@@ -251,7 +251,23 @@
 // runs the other way, old id to new, which is the direction that keeps links
 // already sent working. initHashSpy is new in the same module and needs nothing
 // from the stylesheet.
-const VERSION = 'ob-v45';
+// ob-v46: the /show episode drawer's rows become the feed's episode card —
+// artwork, shownotes teaser, inline player, the boost pill on a "Nostr Stats:"
+// line, and a "Nostr Interactions:" drawer holding that episode's boosts. The
+// card's CSS left index.html's inline block for /assets/css/episode-card.css so
+// both surfaces share one set of rules. Required on ALL THREE halves, and this
+// is the widest cache dependency the site has had:
+//   - the new stylesheet is precached above; a returning visitor without it gets
+//     unstyled card markup on / AND on every show page, since index.html no
+//     longer carries those rules inline;
+//   - the markup is server-rendered, so it arrives whatever the cache holds —
+//     which is exactly why the stylesheet cannot lag it;
+//   - show-page.js's episode sort now reads .ep-card rather than .ep-row, and
+//     hydrateProfiles gained the .pcast-avatar branch that fills a drawer bar's
+//     faces, so an old module against the new markup loses the sort entirely.
+// Also: the hero gains a "Listen in" menu, and .pcast-toast finally reaches
+// /show, where the Share button's toast had been unstyled since the page shipped.
+const VERSION = 'ob-v46';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;
@@ -278,6 +294,10 @@ const PRECACHE_URLS = [
   '/assets/css/footer.css',
   '/assets/css/boosts-thread.css',
   '/assets/css/boost-actions.css',
+  // The episode card, linked by '/' and by every /show page. Precached with the
+  // rest because the homepage's Episodes feed is the default panel, so a
+  // returning visitor needs it on the first navigation rather than the second.
+  '/assets/css/episode-card.css',
   '/assets/js/boosts-thread.js',
   // A static import of boosts-thread.js, so precaching that without this one
   // leaves a returning visitor fetching half the graph from the network.

@@ -14,18 +14,25 @@
  * already exist and are NOT the target: a boost note is about one episode, and
  * pointing it at the show would drop the part the reader cares about.
  *
- * ⚠️  TWO OTHER SURFACES point at BMB and are not built here. Both are in
- * functions/show/[guid].js, both are SHOW-level rather than episode-level, and
- * both resolve through one `bmbShowUrl()` in that file:
+ * ⚠️  THREE OTHER SURFACES point at BMB and are not built here. All are in
+ * functions/show/[guid].js. Two are SHOW-level and resolve through one
+ * `bmbShowUrl()` in that file:
  *
  *   - "See All Episodes" on the episode drawer's control band (`renderEpisodes`)
  *   - a podroll tile for a show we have no page of our own for (`podrollTile`),
  *     which is 44% of them
  *
+ * The third is episode-level and is the closest thing there to this function:
+ *
+ *   - the artwork and title of every card in the episode drawer
+ *     (`bmbEpisodeUrl`, used by `episodeCard`), which is the same target this
+ *     builder produces. It can never prefer `?feed=`, because D1's `podcasts`
+ *     table carries no Podcast Index numeric id — only `feed_url`.
+ *
  * A Pages Function cannot import a client module — nothing else in functions/
  * reaches outside functions/ either — so they are built there rather than here.
- * Neither is a boost note, so retiring BMB does not have to retire them, but
- * CHANGE ALL THREE TOGETHER.
+ * None is a boost note, so retiring BMB does not have to retire them, but
+ * CHANGE ALL FOUR TOGETHER.
  *
  * Boost Me Bitch restores a detail view from URL params: `?feed=<piFeedId>` or
  * `?podcast=<podcastGuid>` picks the show, and `&episode=<itemGuid>` opens that
