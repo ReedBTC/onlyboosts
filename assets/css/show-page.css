@@ -244,7 +244,14 @@
    `.prose > section` in page.css, which solved this for /about first.
 
    It belongs on the section rather than on :target so it applies to the
-   JavaScript scrollIntoView path as well — scroll-margin is honoured by both. */
+   JavaScript scrollIntoView path as well — scroll-margin is honoured by both.
+
+   ⚠️ initHashSpy() in show-page.js READS THIS VALUE, via getComputedStyle, to
+   place the line at which a section becomes the one the address bar names. The
+   two have to be the same number: the spy's job is to hand back a link that
+   returns you to where you copied it, and if its line sat anywhere other than
+   where an anchor parks, following that link would land a section off. Change
+   this and the spy follows; hardcode it there and they drift. */
 .show-section {
   margin-top: 2.75rem;
   scroll-margin-top: 5rem;

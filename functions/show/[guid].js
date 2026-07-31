@@ -25,17 +25,25 @@ const SITE_ORIGIN = "https://onlyboosts.social";
 // how a podcaster shares one section of their own page, so the six ids below are
 // a contract with links already in the wild and **must not be renamed**:
 //
-//   #episodes  #community-shows  #community  #podroll  #inverse-podroll  #boosts
+//   #episodes  #community-shows  #community  #podroll  #reverse-podroll  #boosts
 //
-// Same rule as ALIASES in index.html, with one difference that makes it
-// stricter: a feed hash is read by a JS controller that can alias the old form
-// to the new one, where these resolve in the browser's own anchor handling and
-// have nowhere to put a redirect. A rename is a dead link, full stop.
+// Same rule as ALIASES in index.html, and it was written here as the stricter
+// one: a feed hash is read by a JS controller that can alias an old form to a
+// new key, where these resolve in the browser's own anchor handling and have
+// nowhere to put a redirect. That is now only true with JavaScript off —
+// HASH_ALIASES in show-page.js rewrites a retired id and scrolls, which is what
+// carried #inverse-podroll to #reverse-podroll. It is a repair, not a licence:
+// the alias needs the module to have run, so a rename still breaks the anchor
+// for a no-JS reader and for anything that resolves the URL without a browser.
 //
-// Two pieces of support live elsewhere and go with them: `scroll-margin-top` on
-// .show-section in show-page.css (the nav is sticky, so a bare anchor puts the
-// heading behind it) and revealHashTarget() in show-page.js (a collapsed drawer
-// has to open when it is the thing being linked to).
+// Three pieces of support live elsewhere and go with them: `scroll-margin-top`
+// on .show-section in show-page.css (the nav is sticky, so a bare anchor puts
+// the heading behind it), revealHashTarget() in show-page.js (a collapsed drawer
+// has to open when it is the thing being linked to), and initHashSpy() beside it
+// — the address bar tracks the section being read, so a reader who never knew
+// the ids existed can still copy a link to one. That last is why the ids are now
+// visible to people rather than only to whoever was told them, and it is also
+// why every one of them has to keep reading as a name for its section.
 const OG_FALLBACK = `${SITE_ORIGIN}/assets/onlyboosts_banner.png`;
 
 // Guids are UUIDs at 36 chars; the cap leaves slack for the odd-but-real values
@@ -1233,12 +1241,12 @@ const PODROLL_COPY = {
       `them; these are their recommendations, not ours.`,
   },
   reverse: {
-    id: "inverse-podroll",
+    id: "reverse-podroll",
     // Names the show, because "Recommended By" alone reads as though it modifies
     // the section above rather than starting a new claim. Truncated hard: show
     // titles run past 90 characters in this index, and this one sits inside a
     // Playfair heading that already wraps on a phone.
-    heading: (copy, show) => `Inverse Podroll - ${truncate(show.title, 52)} is Recommended By:`,
+    heading: (copy, show) => `Reverse Podroll - ${truncate(show.title, 52)} is Recommended By:`,
     sub: (copy) =>
       `Publishers who list this ${copy.noun} among the recommendations in their own ` +
       `feed, as far as the feeds OnlyBoosts has read.`,

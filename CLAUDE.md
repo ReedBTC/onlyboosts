@@ -924,19 +924,25 @@ of their own page: `/show/<guid>#podroll`. **These six ids are frozen.**
 | `#community-shows` | Other Shows/Albums This Community Boosts |
 | `#community` | the Nostr Community wall |
 | `#podroll` | Podroll - Recommended by Show Authors |
-| `#inverse-podroll` | Inverse Podroll - \<Show Name\> is Recommended By: |
+| `#reverse-podroll` | Reverse Podroll - \<Show Name\> is Recommended By: |
 | `#boosts` | Recent Boosts |
 
-Same rule as `ALIASES` in `index.html`, and **stricter for one reason**: a feed
-hash is read by a JS controller that can map an old form onto a new key and
-rewrite the bar. These resolve in the browser's own anchor handling, which has
-nowhere to put a redirect, so a rename is a dead link with no recourse. The note
-about `#supporters` → `#community` being "safe because nothing linked to it" was
-true when it was written and is not a precedent; `#podrolled-by` →
-`#inverse-podroll` was the last such rename and only survived review because the
-id was hours old.
+Same rule as `ALIASES` in `index.html`, and it was written here as the stricter
+one: a feed hash is read by a JS controller that can map an old form onto a new
+key and rewrite the bar, where these resolve in the browser's own anchor
+handling, which has nowhere to put a redirect.
 
-Three pieces hold it up and they live in three files:
+**That is now qualified rather than repealed.** `HASH_ALIASES` in `show-page.js`
+does for a retired id exactly what `ALIASES` does for a feed hash: rewrites it
+with `replaceState` and scrolls. It carried `#inverse-podroll` →
+`#reverse-podroll` and holds that one entry, permanently. But it needs the module
+to have run, so a rename is still a dead link for a reader with JavaScript off
+and for anything resolving the URL without a browser. It is the repair for a
+rename that already happened, **not a licence for the next one**. The note about
+`#supporters` → `#community` being "safe because nothing linked to it" was true
+when it was written and is not a precedent either.
+
+Four pieces hold it up and they live in four files:
 
 - the ids themselves, on the `<section>` elements in `functions/show/[guid].js`
   (the podroll pair come off `PODROLL_COPY[*].id`);
@@ -951,11 +957,59 @@ Three pieces hold it up and they live in three files:
   the top of its section, so the section's offset doesn't move and the browser's
   scroll is still right; scrolling again would only add a smooth-scroll animation
   on load that reads as a glitch. `getElementById`, never `querySelector`: an id
-  off the URL is untrusted and would otherwise be parsed as a selector.
+  off the URL is untrusted and would otherwise be parsed as a selector;
+- **`initHashSpy()`** beside it, which is what makes the ids reachable by a
+  reader who was never told them. See the section below.
 
 With JavaScript off the anchors still resolve and still scroll. Only the drawer
 stays shut, one click from open, which is what a visitor who scrolled there
-themselves would find.
+themselves would find; the address bar simply doesn't follow.
+
+## Show pages: the hash follows the scroll
+
+`initHashSpy()` in `show-page.js`. An `rAF`-throttled scroll handler finds the
+last `.show-section[id]` whose top has crossed the line and `replaceState`s its
+id, clearing back to the bare URL above the first one. **Copying the URL at any
+point yields a link back to that spot**, which is the whole point: the six ids
+above were shareable and undiscoverable, reachable only by someone who had been
+told them.
+
+The two alternatives were considered and both put something on the page. A
+permalink glyph beside each heading is the documentation-site convention, but it
+reaches only **four of the six** sections — `#episodes` and `#community-shows`
+are `show-section--bare`, with a `<summary>` where the `<h2>` would be — and it
+asks the reader to notice a control before they can use it. A clickable heading
+was rejected for the reason that recommends it in the abstract: nothing about a
+plain heading says it does anything, so nobody finds it.
+
+Four properties are load-bearing:
+
+- **`replaceState`, never `pushState`.** Scrolling isn't navigation, and a Back
+  button replaying a scroll one section at a time is worse than the feature. It
+  also fires **no `hashchange`**, which is what stops the spy tripping
+  `revealHashTarget()` and opening the episode drawer as a side effect of
+  scrolling past it. The two coexist on exactly that property.
+- **The line is read from `scroll-margin-top`** via `getComputedStyle`, never
+  hardcoded. The section the spy names has to be the one an anchor would park at,
+  or following your own copied link lands you a section off.
+- **Only on a change.** Safari throttles `replaceState` to ~100 calls per 30s and
+  throws past it; a call per scroll frame spends that in a second.
+- **The last screenful belongs to the last section**, checked explicitly. A short
+  Recent Boosts can sit wholly on screen at the foot of the document without its
+  top ever reaching the line, and would otherwise be the one section the spy can
+  never name.
+
+Offsets are measured live rather than cached at init — a drawer opening, a "Show
+N more" and a re-sort of the community rows all move everything below them. There
+is **no run at init**: a page opened on `#boosts` is still being scrolled there
+when the module executes, and measuring mid-flight would replace the hash the
+reader arrived on.
+
+Two things it is honest about. On iOS Safari and Chrome for Android the URL bar
+collapses while scrolling, so most phone readers never watch it happen; the
+payoff there is that Share and Copy Link carry the section. And the hash reports
+where the reader *stopped* rather than what they chose, which is the price of
+asking for no affordance at all.
 
 ## Show pages: other shows this community boosts
 
@@ -1036,7 +1090,7 @@ first field we parse from raw RSS" below; this is the site half.
 `.pr-*` in `show-page.css`, `initPodrollArt` in `show-page.js`.
 
 **Two sections, never one.** "Podroll - Recommended by Show Authors" and
-"Inverse Podroll - <Show Name> is Recommended By:", between the Nostr Community wall and
+"Reverse Podroll - <Show Name> is Recommended By:", between the Nostr Community wall and
 Recent Boosts. Forward-only would be a section on 65 pages; the reverse edge is
 the same rows read the other way and brings it to **109**, because plenty of
 shows are recommended by someone without publishing a podroll themselves (Local

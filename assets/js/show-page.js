@@ -4,7 +4,8 @@
  * JavaScript at all — this module only adds the interactive parts:
  *
  *   - the back link's history.back() upgrade
- *   - opening a collapsed drawer when a #hash deep-links to its section
+ *   - opening a collapsed drawer when a #hash deep-links to its section, and
+ *     keeping the address bar's hash on the section being scrolled through
  *   - copy-npub on every supporter avatar and boost row
  *   - the "Show N more" toggles (the community wall, both podroll grids)
  *   - the art2 fallback on the hero, the drawer rows and the podroll tiles
@@ -144,10 +145,33 @@ initBackLink()
 // With JavaScript off the anchor still resolves and still scrolls; the drawer is
 // simply closed, one click from open, which is what a visitor who scrolled to it
 // themselves would find.
+//
+// RETIRED IDS, and the reason there is a map at all. The contract note says a
+// rename here is a dead link because the browser resolves these itself and has
+// nowhere to put a redirect. That is true of the browser; it is not true of this
+// module, which already runs on load and on hashchange and can rewrite a hash
+// the same way ALIASES does on the homepage. What it cannot do is help a reader
+// with JavaScript off, or a crawler, or anything resolving the URL without a
+// browser — so this is the repair for a rename that has already happened, never
+// the licence for the next one. #inverse-podroll shipped on 2026-07-30 and was
+// renamed the following day; it is the only entry and it stays forever.
+const HASH_ALIASES = { 'inverse-podroll': 'reverse-podroll' }
+
 function revealHashTarget() {
   let id = ''
   try { id = decodeURIComponent(location.hash.slice(1)) } catch { id = location.hash.slice(1) }
   if (!id) return
+
+  // Rewrite in place, the way a 301 would: replaceState rather than pushState,
+  // since a retired id is not a step the reader took and should not cost them a
+  // press of Back. The browser found nothing to scroll to, so the scroll is ours.
+  const alias = HASH_ALIASES[id]
+  if (alias && document.getElementById(alias)) {
+    id = alias
+    history.replaceState(null, '', `#${alias}`)
+    document.getElementById(alias).scrollIntoView()
+  }
+
   // getElementById rather than querySelector: an id off the URL is untrusted
   // input and would otherwise be parsed as a CSS selector.
   const section = document.getElementById(id)
@@ -156,10 +180,95 @@ function revealHashTarget() {
 }
 
 revealHashTarget()
-// Also on in-page navigation. Nothing on the page links to a section today, but a
-// shared link pasted into the address bar of an already-open page fires this and
-// not a load.
+// Also on in-page navigation: a shared link pasted into the address bar of an
+// already-open page fires this and not a load.
+//
+// The scroll spy below does NOT reach this. It writes with replaceState, which
+// fires no hashchange by specification, so passing the community wall cannot
+// open the episode drawer as a side effect. That is the property that lets the
+// two coexist: the spy reports where the reader is, and only a real navigation
+// rearranges the page.
 window.addEventListener('hashchange', revealHashTarget)
+
+// ── The hash follows the scroll ──────────────────────────────────────
+//
+// The six section ids are shareable URLs, and until now the only way to get one
+// was to already know it: nothing on the page links to a section, and the
+// alternative shapes all put a visible affordance on the page. A permalink glyph
+// beside each heading is the documentation-site convention, but it only reaches
+// four of the six sections — #episodes and #community-shows are
+// `show-section--bare`, with a <summary> standing in for the <h2> — and it asks
+// the reader to notice a control before they can use it.
+//
+// So the address bar simply tracks the section being read, and copying the URL
+// at any point yields a link back to that spot. Nothing on the page changes
+// appearance and nothing new is clickable.
+//
+// Two things this is honest about. On iOS Safari and Chrome for Android the URL
+// bar collapses while scrolling, so most phone readers will never watch it
+// happen; the payoff there is only that Share and Copy Link carry the section.
+// And the hash changes without being asked for, so it reports where the reader
+// stopped rather than what they chose — which is why it is replaceState and
+// never pushState. Scrolling is not navigation, and a Back button that replayed
+// a scroll one section at a time would be worse than the feature.
+//
+// ⚠️ THE LINE IS READ FROM scroll-margin-top, NOT HARDCODED. The section that
+// counts as current has to be the one an anchor would have parked at, or
+// following your own copied link lands you somewhere other than where you copied
+// it. Those are the same 5rem, and reading the computed value is what stops them
+// drifting apart the next time the sticky nav changes height.
+function initHashSpy() {
+  const sections = [...document.querySelectorAll('.show-section[id]')]
+  if (sections.length < 2) return
+
+  const line = parseFloat(getComputedStyle(sections[0]).scrollMarginTop) || 80
+  const bare = location.pathname + location.search
+  let current = null
+  let queued = false
+
+  function update() {
+    queued = false
+    // Last section whose top has crossed the line. Measured live rather than
+    // cached at init: a drawer opening, a "Show N more" and a re-sort of the
+    // community rows all move every offset below them, and an observer set up
+    // once would be reporting the layout the page had on load.
+    let id = ''
+    for (const s of sections) {
+      if (s.getBoundingClientRect().top - line > 1) break
+      id = s.id
+    }
+
+    // The last screenful belongs to the last section. Without this the final
+    // section is the one the spy can never name: a short Recent Boosts on a show
+    // with few of them sits entirely on screen at the bottom of the document
+    // without its top ever reaching the line, so scrolling to it as far as the
+    // page allows still reports the section above.
+    const doc = document.documentElement
+    if (scrollY + innerHeight >= doc.scrollHeight - 2) id = sections[sections.length - 1].id
+
+    if (id === current) return
+    current = id
+    // Only on a change, which matters: Safari throttles replaceState to ~100
+    // calls per 30s and throws past it, and an unguarded call per scroll frame
+    // would spend that budget in a second.
+    history.replaceState(null, '', id ? `#${id}` : bare)
+  }
+
+  // rAF-throttled: the read is six rects, and doing it inside the frame the
+  // browser is already painting keeps it off the scroll handler's critical path.
+  addEventListener('scroll', () => {
+    if (queued) return
+    queued = true
+    requestAnimationFrame(update)
+  }, { passive: true })
+
+  // No run at init, deliberately. A page opened on #boosts is still being
+  // scrolled there by the browser when this module executes, and measuring
+  // mid-flight would replace the hash the reader arrived on with whichever
+  // section happened to be under the line. The first scroll settles it.
+}
+
+initHashSpy()
 
 // ── Artwork fallback ─────────────────────────────────────────────────
 //

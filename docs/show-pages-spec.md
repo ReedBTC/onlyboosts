@@ -408,7 +408,7 @@ message text, so rows without one render as a sats line alone rather than a gap.
 `<podcast:podroll>` is the publisher's own list of other shows worth hearing,
 parsed from the show's raw RSS by the collector's weekly pass. It renders as
 **two sections** between the Nostr Community wall and Recent Boosts: "Podroll -
-Recommended by Show Authors" and "Inverse Podroll - <Show Name> is Recommended
+Recommended by Show Authors" and "Reverse Podroll - <Show Name> is Recommended
 By:". The second names the show because "Recommended By" alone reads as though it
 modifies the section above rather than opening a new claim; the title is
 truncated hard at 52 characters, since this index carries titles past 90 and the
@@ -540,18 +540,26 @@ one section rather than the whole thing. `/show/<guid>#podroll` is the shape.
 | `#community-shows` | Other Shows/Albums This Community Boosts |
 | `#community` | the Nostr Community wall |
 | `#podroll` | Podroll - Recommended by Show Authors |
-| `#inverse-podroll` | Inverse Podroll - \<Show Name\> is Recommended By: |
+| `#reverse-podroll` | Reverse Podroll - \<Show Name\> is Recommended By: |
 | `#boosts` | Recent Boosts |
 
 **The six are frozen.** This is the same commitment `ALIASES` makes for the
-homepage feed hashes, and it is stricter here: a feed hash goes through a JS
-controller that can alias an old form to a new key and rewrite the bar, where
-these resolve in the browser's own anchor handling and have nowhere to put a
-redirect. A rename is a dead link with no recourse. The earlier note that moving
-`#supporters` to `#community` was "safe because nothing linked to it" was true
-when written and is not a precedent.
+homepage feed hashes, and it was written here as the stricter one: a feed hash
+goes through a JS controller that can alias an old form to a new key and rewrite
+the bar, where these resolve in the browser's own anchor handling and have
+nowhere to put a redirect.
 
-Two supports, neither of them obvious from the markup:
+That last clause has since been qualified rather than repealed. `HASH_ALIASES` in
+`show-page.js` does for a retired id exactly what `ALIASES` does for a feed hash:
+rewrites it with `replaceState` and scrolls. It carried `#inverse-podroll` to
+`#reverse-podroll`, and it holds one entry, permanently. But it needs the module
+to have run, so a rename is still a dead link for a reader with JavaScript off
+and for anything resolving the URL without a browser. **It is the repair for a
+rename that has already happened, not a licence for the next one.** The earlier
+note that moving `#supporters` to `#community` was "safe because nothing linked
+to it" was true when written and is not a precedent either.
+
+Three supports, none of them obvious from the markup:
 
 **`scroll-margin-top: 5rem` on `.show-section`.** The nav is `position: sticky`
 at 64px tall, so a bare anchor scrolls the section's heading to y=0 and leaves it
@@ -567,10 +575,56 @@ downward from a summary already at the top of its section, so the section's
 offset does not move and the browser's own scroll is still correct. A second
 scroll would only add a smooth-scroll animation on load, which reads as a glitch.
 
+**`initHashSpy()` in `show-page.js`.** The address bar's hash tracks the section
+being read: an `rAF`-throttled scroll handler finds the last section whose top
+has crossed the line and `replaceState`s its id, clearing back to the bare URL
+above the first one. Copying the URL at any point therefore yields a link back to
+that spot.
+
+This is what makes the ids reachable by someone who was never told them. The
+alternative shapes were considered and this is the one with nothing on the page
+to discover: a permalink glyph beside each heading is the documentation-site
+convention, but it reaches only four of the six sections (`#episodes` and
+`#community-shows` are `show-section--bare`, with a `<summary>` where the `<h2>`
+would be), and it asks the reader to notice a control first. A clickable heading
+was rejected for the reason that recommends it in the abstract — nothing about a
+plain heading says it does anything, so nobody finds it, and the readers who
+click by accident get an unexplained scroll.
+
+Four properties are load-bearing:
+
+- **`replaceState`, never `pushState`.** Scrolling is not navigation, and a Back
+  button that replayed a scroll one section at a time would be worse than the
+  feature. It also fires no `hashchange`, which is what keeps the spy from
+  tripping `revealHashTarget()` and opening the episode drawer as a side effect
+  of scrolling past it.
+- **The line is read from `scroll-margin-top`,** through `getComputedStyle`, not
+  hardcoded. The section the spy names has to be the one an anchor would have
+  parked at, or following your own copied link lands you a section off.
+- **Only on a change.** Safari throttles `replaceState` to about 100 calls per 30
+  seconds and throws past it; a call per scroll frame would spend that in a
+  second.
+- **The last screenful belongs to the last section,** checked explicitly. A short
+  Recent Boosts can sit entirely on screen at the foot of the document without
+  its top ever reaching the line, and would otherwise be the one section the spy
+  can never name.
+
+It measures live rather than caching offsets at init, because a drawer opening, a
+"Show N more" and a re-sort of the community rows all move everything below them.
+There is no run at init: a page opened on `#boosts` is still being scrolled there
+when the module executes, and measuring mid-flight would replace the hash the
+reader arrived on.
+
+Honest about two things. On iOS Safari and Chrome for Android the URL bar
+collapses while scrolling, so most phone readers never watch it happen; the
+payoff there is that Share and Copy Link carry the section. And the hash reports
+where the reader stopped rather than what they chose, which is the cost of asking
+for no affordance at all.
+
 With JavaScript off every anchor still resolves and still scrolls. The drawer
 stays shut, one click from open, which is exactly what a visitor who scrolled
-there under their own steam would find. Nothing about the deep link is load-
-bearing on the client.
+there under their own steam would find, and the address bar simply does not
+follow. Nothing about the deep link itself is load-bearing on the client.
 
 ## Reversing Out
 

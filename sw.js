@@ -242,7 +242,16 @@
 // section's id changed from #podrolled-by to #inverse-podroll in the same
 // commit; it had shipped hours earlier and nothing was linking to it, and the
 // six ids are frozen from here (see the note at the top of the Function).
-const VERSION = 'ob-v44';
+// ob-v45: the /show address bar now tracks the section being scrolled through,
+// so the six ids are discoverable by reading the page rather than only by being
+// told them; and "Inverse Podroll" becomes "Reverse Podroll", id and heading
+// together. Required on the HTML half above all: a cached show page still
+// carries id="inverse-podroll", so a shared /show/<guid>#reverse-podroll link
+// resolves to nothing at all on it — and the HASH_ALIASES repair in show-page.js
+// runs the other way, old id to new, which is the direction that keeps links
+// already sent working. initHashSpy is new in the same module and needs nothing
+// from the stylesheet.
+const VERSION = 'ob-v45';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;
