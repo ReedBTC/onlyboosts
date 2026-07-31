@@ -53,11 +53,6 @@
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
   <link rel="stylesheet" href="/assets/css/boost-actions.css" />
-  <!-- The episode card itself (.pcast-card and everything inside it). Lifted
-       out of the inline block below when /show began server-rendering the same
-       card in its episode drawer — the two surfaces read as one system because
-       they are one set of rules. -->
-  <link rel="stylesheet" href="/assets/css/episode-card.css" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. Must stay last
        among the stylesheets so the inline block below still wins. -->
@@ -498,12 +493,309 @@
     .feed-type-sort .pcast-sort-btn { border-radius: 7px; }
     .feed-type-sort .pcast-sort-menu { border-radius: 8px; }
 
-    /* The episode card and everything inside it — the card box, the media
-       column, the shownotes teaser, the player, the boost drawer and the boost
-       rows within it — moved to /assets/css/episode-card.css when /show began
-       server-rendering the same card. The feed bar's own range/sort chrome
-       (.pcast-controls / .pcast-range / .pcast-sort, above) stayed here: it
-       belongs to this page rather than to a card. */
+    /* minmax(0,1fr) — without the 0 min, a grid item's min-width is its
+       content, so long shownotes/URLs would blow the column (and card) far
+       wider than the container. */
+    .pcast-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.6rem; }
+    .pcast-card {
+      min-width: 0;
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      /* No overflow:hidden here — it would clip the ⋮ subscribe dropdown when
+         it opens past the bottom of the card. The media clips its own corners,
+         and the drawer rounds its bottom corners when it's the last child. */
+      transition: box-shadow 0.12s, border-color 0.12s;
+    }
+    .pcast-card:hover { box-shadow: 0 6px 18px rgba(0,0,0,0.08); }
+    .pcast-card.is-open { border-color: var(--accent); box-shadow: 0 6px 18px rgba(0,0,0,0.10); }
+    .pcast-card-head {
+      display: flex;
+      gap: 0.7rem;
+      align-items: flex-start;
+      /* tight right padding so the ⋮ menu hugs the corner */
+      padding: 0.7rem 0.4rem 0.5rem 0.7rem;
+    }
+    .pcast-card-media {
+      display: block; /* also correct when the media is an <a> link */
+      flex-shrink: 0;
+      width: 68px; height: 68px;
+      border-radius: 8px; overflow: hidden;
+      background: var(--tint);
+    }
+    a.pcast-card-media { cursor: pointer; }
+    /* --podcasts-accent until now, which was never defined — the token has
+       always been --pg-/--eg-accent, so the whole declaration was invalid at
+       computed-value time and the hover did nothing. --accent is the active
+       feed's, which is what it was reaching for. */
+    a.pcast-card-media:hover { box-shadow: 0 0 0 2px var(--accent); }
+    .pcast-card-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .pcast-card-media--none {
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.7rem; opacity: 0.55;
+    }
+    .pcast-card-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; justify-content: center; }
+    .pcast-show {
+      font-size: 0.72rem; font-weight: 700; letter-spacing: 0.02em;
+      text-transform: uppercase; color: var(--accent-d);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    a.pcast-show-link { text-decoration: none; cursor: pointer; display: block; }
+    a.pcast-show-link:hover { text-decoration: underline; }
+    .pcast-title {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 0.98rem; font-weight: 700; line-height: 1.25; color: var(--text);
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .pcast-meta {
+      display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;
+      margin-top: 0.25rem; font-size: 0.78rem; color: var(--muted);
+    }
+
+    /* Shownotes teaser (first ~2 lines) + a links row ("see full description"
+       and a compact "Listen on Fountain") beneath it. */
+    .pcast-desc {
+      margin: 0.35rem 0 0; font-size: 0.82rem; line-height: 1.4; color: var(--muted);
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+      overflow-wrap: anywhere; word-break: break-word;
+    }
+    .pcast-links { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.35rem; }
+    /* The episode card's "Nostr Stats:" line, directly under the Fountain
+       link. Inherits .pcast-meta; tabular figures so the counts line up
+       down a column of cards. */
+    .pcast-nstats { font-variant-numeric: tabular-nums; margin-top: 0.35rem; }
+    .pcast-fountain-link {
+      font-size: 0.78rem; font-weight: 700; color: var(--accent-d); text-decoration: none; white-space: nowrap;
+    }
+    .pcast-fountain-link:hover { text-decoration: underline; }
+
+    /* Inline audio player. */
+    .pcast-player-row { padding: 0.1rem 0.7rem 0.2rem; }
+    .pcast-player { width: 100%; display: block; }
+
+    /* The card action row (a pill Boost button beside "↓ Download MP3") is
+       gone. Boost is now the .ob-boost-pill at the right end of the Nostr
+       Stats line — defined in theme.css, since the show pages use the same
+       one — and the download duplicated what the audio element's own ⋮ menu
+       already offers. That row cost a full band of card height for two
+       controls, which is the whole argument on a phone. */
+    .pcast-dot { opacity: 0.6; }
+    .pcast-sats { font-weight: 700; color: var(--accent-d); white-space: nowrap; }
+    .pcast-bolt { font-size: 0.85em; }
+
+    /* Avatars — stacked on cards, single on modal rows. Size via --pcast-av. */
+    .pcast-avatars { display: inline-flex; align-items: center; }
+    .pcast-avatars .pcast-avatar + .pcast-avatar { margin-left: -8px; }
+    .pcast-avatar {
+      width: var(--pcast-av, 26px); height: var(--pcast-av, 26px);
+      border-radius: 50%; object-fit: cover; flex-shrink: 0;
+      border: 2px solid var(--white); background: var(--tint);
+      box-sizing: border-box;
+    }
+    .pcast-avatar--none {
+      display: inline-flex; align-items: center; justify-content: center;
+      background: var(--cream-d); color: var(--muted);
+      font-size: 0.6rem; font-weight: 700;
+    }
+    .pcast-avatar.is-interactive { cursor: pointer; }
+    .pcast-avatar.is-interactive:hover { border-color: var(--accent); }
+    .pcast-avatar.is-interactive:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+    .pcast-more-wrap { display: flex; justify-content: center; margin-top: 1.1rem; }
+    .pcast-more-group { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; }
+    .pcast-more-count { font-size: 0.75rem; color: var(--muted); }
+    .pcast-showmore {
+      padding: 0.5rem 1.4rem;
+      font: inherit; font-size: 0.85rem; font-weight: 700;
+      color: var(--accent-d); background: var(--white);
+      border: 1px solid var(--border); border-radius: 999px; cursor: pointer;
+      transition: background 0.12s, border-color 0.12s;
+    }
+    .pcast-showmore:hover { background: var(--tint); border-color: var(--accent); }
+
+    /* Episode title links out to the Fountain episode. */
+    .pcast-title-link { color: var(--text); text-decoration: none; }
+    .pcast-title-link:hover { color: var(--accent-d); text-decoration: underline; }
+
+    /* Media column: episode art with the air date tucked directly beneath it. */
+    .pcast-media-col { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; flex-shrink: 0; }
+    .pcast-card-aired { font-size: 0.66rem; color: var(--muted); white-space: nowrap; text-align: center; }
+
+    /* ⋮ subscribe menu on the card head (top-right) — show-level app links. */
+    .pcast-cardmenu { position: relative; flex-shrink: 0; align-self: flex-start; }
+    .pcast-cardmenu-btn {
+      width: 30px; height: 30px; border-radius: 50%;
+      border: none; background: transparent; color: var(--muted); cursor: pointer;
+      font-size: 1.2rem; line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .pcast-cardmenu-btn:hover { background: var(--tint); color: var(--text); }
+    .pcast-cardmenu-menu {
+      position: absolute; top: 34px; right: 0; z-index: 6;
+      min-width: 190px;
+      background: var(--white);
+      border: 1px solid var(--border); border-radius: 10px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+      padding: 0.35rem;
+    }
+    .pcast-cardmenu-menu[hidden] { display: none; }
+    .pcast-cardmenu-label {
+      padding: 0.4rem 0.6rem 0.25rem;
+      font-size: 0.66rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.05em; color: var(--muted);
+    }
+    .pcast-cardmenu-item {
+      display: block; padding: 0.45rem 0.6rem;
+      font-size: 0.85rem; font-weight: 600; color: var(--text);
+      text-decoration: none; border-radius: 6px;
+    }
+    .pcast-cardmenu-item:hover { background: var(--tint); color: var(--accent-d); }
+
+    /* Rank badge — only rendered on the quantitative sorts (most boosters /
+       boosts / sats), where position is a ranking rather than chronology.
+       Tabular figures keep the column steady from 1 to 999. */
+    .pcast-rank {
+      flex: 0 0 auto;
+      align-self: flex-start;
+      min-width: 1.6rem;
+      padding-top: 0.15rem;
+      font-family: 'Playfair Display', Georgia, serif;
+      font-weight: 700;
+      font-size: 1.05rem;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.2;
+      color: var(--accent);
+      text-align: right;
+    }
+    @media (max-width: 640px) {
+      .pcast-rank { min-width: 1.2rem; font-size: 0.95rem; }
+    }
+
+    /* ── Boost drawer — a low-profile full-width toggle under the head. ── */
+    .pcast-drawer {
+      display: flex; align-items: center; gap: 0.4rem; width: 100%;
+      padding: 0.45rem 0.7rem 0.5rem;
+      font: inherit; font-size: 0.78rem; font-weight: 600;
+      color: var(--muted); background: transparent;
+      border: none; border-top: 1px solid var(--border);
+      cursor: pointer; text-align: left;
+      transition: color 0.12s, background 0.12s;
+    }
+    .pcast-drawer:hover { color: var(--accent-d); background: rgba(0,0,0,0.02); }
+    .pcast-drawer:last-child { border-radius: 0 0 10px 10px; }
+    .pcast-drawer-caret { font-size: 0.85em; flex-shrink: 0; transition: transform 0.18s; }
+    .pcast-drawer-label { flex-shrink: 0; }
+    /* Booster faces + total sats, sitting just after the "N boosts" label.
+       The faces are the only part of the bar allowed to shrink: the label and
+       the sats total are the information, the stack is decoration, and it is
+       the one child whose width grows with the data. Without this the row
+       overflows the card on a heavily boosted episode and the whole feed
+       column gets a horizontal scrollbar. MAX_FACES in feeds-podcasts.js caps
+       the stack so the clip below is insurance rather than the usual case. */
+    .pcast-drawer-meta { display: inline-flex; align-items: center; gap: 0.5rem; min-width: 0; }
+    .pcast-drawer-meta .pcast-avatars { min-width: 0; overflow: hidden; }
+    .pcast-drawer-meta .pcast-sats { flex-shrink: 0; font-weight: 700; color: var(--accent-d); white-space: nowrap; }
+    /* Narrow viewports have room for far fewer faces than the DOM cap. The
+       drawer label states the real booster count, so trimming the stack loses
+       nothing. */
+    @media (max-width: 560px) {
+      .pcast-avatars .pcast-avatar:nth-child(n+6) { display: none; }
+    }
+    .pcast-card.is-open .pcast-drawer > .pcast-drawer-caret { transform: rotate(180deg); }
+
+    /* "Hide boosts" control at the bottom of a card's thread. */
+    .pcast-drawer-close {
+      justify-self: start;
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      padding: 0.35rem 0;
+      font: inherit; font-size: 0.8rem; font-weight: 700;
+      color: var(--muted); background: transparent; border: none; cursor: pointer;
+    }
+    .pcast-drawer-close:hover { text-decoration: underline; color: var(--accent-d); }
+
+    /* Thread footer: "see all boosts" (Boost Me Bitch) on the left, hide on the right. */
+    .pcast-details-foot {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 0.75rem; flex-wrap: wrap;
+    }
+    .pcast-seeall {
+      font-size: 0.8rem; font-weight: 700; color: var(--accent-d); text-decoration: none;
+    }
+    .pcast-seeall:hover { text-decoration: underline; }
+
+    /* ── Inline boost details — indented under the card like a child/thread,
+       marked by a left accent rule and kept tight vertically. ── */
+    .pcast-details {
+      display: grid; gap: 0.6rem;
+      margin: 0 0.7rem 0.85rem 3.3rem;
+      padding: 0.15rem 0 0.15rem 0.95rem;
+      border-left: 2px solid var(--accent);
+    }
+    .pcast-details[hidden] { display: none; }
+    .pcast-boost { border-top: 1px solid var(--border); padding-top: 0.6rem; }
+    .pcast-boost:first-child { border-top: none; padding-top: 0; }
+    .pcast-boost-head { display: flex; align-items: center; gap: 0.55rem; }
+    .pcast-boost-who { min-width: 0; flex: 1; display: flex; flex-direction: column; }
+    .pcast-boost-name {
+      align-self: flex-start;
+      font: inherit; font-size: 0.9rem; font-weight: 700; color: var(--text);
+      background: transparent; border: none; padding: 0; cursor: pointer;
+      max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .pcast-boost-name:hover { color: var(--accent-d); text-decoration: underline; }
+    .pcast-boost-when { font-size: 0.74rem; color: var(--muted); }
+    .pcast-boost-sats { flex-shrink: 0; font-size: 0.88rem; font-weight: 700; color: var(--accent-d); white-space: nowrap; }
+    .pcast-boost-msg {
+      margin-top: 0.3rem; font-size: 0.88rem; line-height: 1.35; color: var(--text);
+      white-space: pre-wrap; word-break: break-word;
+    }
+    .pcast-boost-msg a { color: var(--accent-d); }
+    /* Shared reply/repost/like/zap bar (boost-actions.css) under each comment —
+       scoped-down here: no divider line, smaller + tighter than the boosts page. */
+    .pcast-boost .note-actions {
+      margin-top: 0.15rem; padding-top: 0; border-top: none; gap: 0.05rem;
+    }
+    .pcast-boost .note-actions button { font-size: 0.72rem; padding: 0.2rem 0.4rem; gap: 0.25rem; }
+    .pcast-boost .note-actions .lb-icon { font-size: 0.82rem; }
+
+    /* Per-boost ⋮ overflow menu */
+    .pcast-more { position: relative; flex-shrink: 0; }
+    .pcast-more-btn {
+      width: 30px; height: 30px; border-radius: 50%;
+      border: none; background: transparent; color: var(--muted); cursor: pointer;
+      font-size: 1.1rem; line-height: 1;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .pcast-more-btn:hover { background: var(--tint); color: var(--text); }
+    .pcast-more-menu {
+      position: absolute; top: 34px; right: 0; z-index: 5;
+      min-width: 160px;
+      background: var(--white);
+      border: 1px solid var(--border); border-radius: 10px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+      padding: 0.35rem;
+    }
+    .pcast-more-menu[hidden] { display: none; }
+    .pcast-more-item {
+      display: block; width: 100%; box-sizing: border-box; text-align: left;
+      padding: 0.45rem 0.6rem; font: inherit; font-size: 0.85rem; color: var(--text);
+      background: transparent; border: none; border-radius: 6px; cursor: pointer;
+    }
+    .pcast-more-item:hover { background: var(--tint); }
+
+    /* Copy toast */
+    .pcast-toast {
+      position: fixed; left: 50%; bottom: 1.5rem; transform: translate(-50%, 1rem);
+      z-index: 1100;
+      background: var(--text, #1e160a); color: #fff;
+      padding: 0.55rem 1.1rem; border-radius: 999px;
+      font-size: 0.85rem; font-weight: 600;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.18s, transform 0.18s;
+    }
+    .pcast-toast.is-visible { opacity: 1; transform: translate(-50%, 0); }
+    .pcast-toast.is-error { background: #9b2c2c; }
 
     /* ── Shows feed ───────────────────────────────────────────────────
        The show-level rollup (shows-feed.js). The card is deliberately built
@@ -681,6 +973,8 @@
          175px) would open off-screen. */
       .feed-bar-controls { margin-left: auto; }
       .feed-panels-inner { padding: 1.5rem 1rem 2.5rem; }
+      /* Shallower child indent on narrow screens. */
+      .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
     }
   </style>
   <link rel="stylesheet" href="/assets/css/nav.css" />

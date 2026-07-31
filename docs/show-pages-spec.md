@@ -694,80 +694,6 @@ The community drawer's was removed deliberately, and the episode drawer's cannot
 be honest at all; see No Episode Counts, Anywhere. The cues above are form
 rather than information, which is why they were available.
 
-### The Episode Drawer Holds the Feed's Card
-
-Each entry in the episode drawer is the **same card the Episodes and Songs feeds
-paint on the homepage**: artwork with the air date beneath it, the title, a
-shownotes teaser, a `Nostr Stats:` line with the boost pill on its end, an inline
-audio player, and a `Nostr Interactions:` drawer holding that episode's boosts.
-It was a 44px row with a title and a figure line until then.
-
-They are literally the same rules. The card's CSS was ~300 lines inline in
-`index.html`; it now lives in `assets/css/episode-card.css`, which both surfaces
-link. Restating it in `show-page.css` was the alternative and was rejected:
-that file already restates `.pcast-sort` and `.nostr-mention` by hand, and this
-would have been the third and much the largest copy. The feed bar's own
-range-and-sort chrome (`.pcast-controls` / `.pcast-range` / `.pcast-sort`) stayed
-in `index.html`, because it belongs to that page rather than to a card.
-
-Three things differ, each because of where the card is:
-
-- **no show name line.** Every card on this page is the same show, which the hero
-  above already names.
-- **no ⋮ menu.** The feed's is a *show-level* list of subscribe links; on a page
-  where every card is one show it would be the same links repeated up to 293
-  times. The hero carries one instead, labelled **Listen in**, and it holds two
-  of the feed's five: Fountain comes off a boost's `show_url`, and Podcast Guru
-  and CurioCaster need the Podcast Index numeric ids, none of which D1's
-  `podcasts` table carries.
-- **the drawer is a `<details>`**, not a button with `aria-expanded`, because
-  this page reads with no JavaScript. Four `[open]` rules in `show-page.css`
-  stand in for the feed's `.is-open`.
-
-The rows inside the drawer are this page's `.boost-row` rather than the feed's
-`.pcast-boost`: same information, already styled here, and already carrying the
-`data-pk` / `data-missing` pair that the profile fallback patches. What they do
-not carry is the feed's **reply / like / repost / zap bar**. That is
-`boost-actions.js` pulling `boosts-thread.js` and nostr-tools behind it, roughly
-190KB, on the page that hand-rolls a bech32 decoder specifically to avoid that
-import. Recent Boosts at the foot of the page has never had one either.
-
-One query feeds both sections. `BOOSTS_CORPUS` (3,000) replaced the 24-row Recent
-Boosts query; the corpus is indexed by `item_guid` for the drawers and Recent
-Boosts slices the first `BOOSTS_SHOWN` off the front. The live maximum is 1,356
-boosts on one show.
-
-**The drawer is deliberately not capped**, and three caps were tried first.
-Measured on the biggest page in the index (Bitcoin And, 293 episodes and 1,356
-boosts, every episode carrying a description at the cap):
-
-| episodes | raw | gzip | |
-|---|---|---|---|
-| 1 | 41KB | 8KB | the median show |
-| 4 | 58KB | 9KB | p75 |
-| 17 | 144KB | 15KB | p90 |
-| 97 | 678KB | 52KB | p99 |
-| 293 | 2070KB | 166KB | the maximum, 1 page of 933 |
-
-A **per-drawer cap on boost rows** saves nothing, because boosts spread evenly
-across a catalogue: on that show the busiest episode has 11 boosts and the median
-has 4, so a cap of 10 keeps 1,352 of the 1,353 rows. **Shipping the overflow
-cards hidden** behind the `.show-more` button saves nothing either; the community
-wall and the podroll grids cap for layout, where the cost here is bytes, and
-these cards are inside a closed `<details>` so the layout is skipped regardless.
-**Truncating server-side** does save the bytes and costs the sort: the drawer's
-one interactive feature is "which episode got the most sats", and answering that
-over the newest 60 of 293 answers a different question without saying so. The
-weight is concentrated in the 9 pages carrying more than 100 episodes with a
-boost, and it is real content rather than boilerplate. If it becomes a problem
-the fix is a per-episode page or a fetched thread, not a cap.
-
-Two smaller notes. `episodes.description` exists in D1 and is used here; the rule
-that descriptions "only exist in the per-show shard, too expensive to fetch per
-card" is about the static feed path, and this page reads D1 row by row.
-`stripHtml()` is a regex trimmer rather than a sanitiser, and its output goes
-through `htmlEscape()` at the render site like every other field.
-
 ### The Way Out of the Episode Drawer
 
 The episode drawer lists only episodes carrying an **indexed boost**, which is a
@@ -784,10 +710,8 @@ two controls on one band and a link styled as a link reads as body text stranded
 in a toolbar; the outbound arrow is the only difference, carrying the one thing
 the sort does not do.
 
-**BMB is a temporary target and this is one of its surfaces on this page.**
-`assets/js/episode-link.js` owns it for boost notes, documents why, and
-enumerates all four. The other one here is episode-level: `bmbEpisodeUrl()`,
-behind the artwork and the title of every card in the drawer. This link
+**BMB is a temporary target and this is its second surface.**
+`assets/js/episode-link.js` owns it for boost notes and documents why. This link
 is built inline in `renderEpisodes` because a Pages Function cannot import a
 client module and nothing else in `functions/` reaches outside it; both files
 carry a ⚠️ naming the other. This one is show-level (`?podcast=<guid>` alone — a
@@ -840,7 +764,7 @@ every value, so a plain `DESC` sinks the undated ones with no explicit guard. A
 `0` fallback would have floated them to the top, which is the trap the Episodes
 feed documents in CLAUDE.md.
 
-Every episode card gets a boost button, and the show gets one of its own in the
+Every episode row gets a boost button, and the show gets one of its own in the
 header. Both route through `/api/value`, which resolves splits server-side and
 accepts `podcastGuid` or `feedUrl`; all 922 qualifying shows have both, so the
 lookup succeeds for every page this design builds. The show-level button omits

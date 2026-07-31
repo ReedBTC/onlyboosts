@@ -16,12 +16,10 @@
   margin: 0 auto;
   padding: 0 1.25rem 4rem;
 
-  /* The sort control, the drawer chrome and now every rule in episode-card.css
-     read --accent / --accent-d / --tint, which only index.html defines (one per
-     feed, off body[data-active-feed]). A show page has no active feed, so it
-     supplies the brand as the accent for the whole main. This is the supply the
-     shared card file's header comment refers to; without it the cards would
-     paint but every accented detail in them would silently vanish.
+  /* The sort control and the drawer chrome read --accent / --accent-d / --tint,
+     which only index.html defines (one per feed, off body[data-active-feed]).
+     A show page has no active feed, so it supplies the brand as the accent for
+     the whole main.
      This used to sit on .cs-drawer, which was wrong: BOTH drawers mount a
      .cs-controls sort row, and the episode drawer does not carry that class, so
      its pill was reading an undefined --accent — every declaration that used one
@@ -120,44 +118,6 @@
   gap: 0.5rem;
   margin-top: 0.9rem;
 }
-
-/* ── "Listen in" ───────────────────────────────────────────────────────── */
-/*
-   The show-level app links, once, beside RSS feed and Share. The Episodes feed
-   carries the same list as a ⋮ on every card; on this page every card is the
-   same show, so it sits on the hero instead. See listenMenu() in the Function
-   for why it is two links rather than the feed's five.
-
-   A <details> so it opens with no JavaScript, the same primitive as the nav's
-   Explore menu and both drawers below. The summary IS the .btn, so it needs the
-   marker reset and nothing else — the button styling is already on it. */
-.listen-menu { position: relative; }
-.listen-menu > summary { list-style: none; cursor: pointer; }
-.listen-menu > summary::-webkit-details-marker { display: none; }
-.listen-caret { margin-left: 0.3rem; font-size: 0.8em; }
-.listen-menu[open] > summary { border-color: var(--brand); color: var(--brand-d); }
-
-.listen-panel {
-  position: absolute;
-  top: calc(100% + 0.35rem);
-  left: 0;
-  z-index: 20;
-  min-width: 11rem;
-  padding: 0.3rem;
-  background: var(--white);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-}
-.listen-panel a {
-  display: block;
-  padding: 0.4rem 0.6rem;
-  border-radius: 7px;
-  font-size: 0.84rem;
-  color: var(--text);
-  text-decoration: none;
-}
-.listen-panel a:hover { background: var(--tint); color: var(--brand-d); }
 
 /* ── Buttons ──────────────────────────────────────────────────────────── */
 
@@ -588,65 +548,61 @@
 .ep-drawer > summary:hover::before { border-color: var(--brand); }
 .ep-drawer > summary:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 
-/* THE ROWS IN HERE ARE THE FEED'S EPISODE CARD, defined in episode-card.css and
-   shared verbatim with the Episodes and Songs feeds on /. What follows is only
-   what differs because of where the card is: the list around it, and the four
-   rules that reproduce .is-open on a <details>. Everything else — the box, the
-   media column, the teaser, the player, the drawer bar, the boost rows — comes
-   from that file, which is the point of the file. Do not restate it here. */
 .ep-list {
   list-style: none;
   margin: 0;
-  padding: 0.8rem;
+  padding: 0;
   border-top: 1px solid var(--border);
-  /* The gap IS the separator now. Cards have their own border and shadow, so
-     the row rules that used to divide this list would draw a second line
-     immediately inside the first. */
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 0.7rem;
-  /* A show can carry 500 episodes; cap the drawer and scroll inside it rather
-     than making the page endless. Raised from 32rem with the row-to-card change
-     — a card is roughly four times a row's height, so the old cap showed a
-     card and a half and read as a clipped box rather than a scrolling list. */
-  max-height: 46rem;
+  /* A show can carry 500 episode rows; cap the drawer and scroll inside it
+     rather than making the page endless. */
+  max-height: 32rem;
   overflow-y: auto;
-  /* The cards' hover shadow spills past their box; without this the drawer's
-     own rounded corner clips it into a hard edge on the first and last card. */
-  scroll-padding: 0.8rem;
 }
 
-/* The card's box shadow is its separation from the page; inside a drawer that
-   already has a border, the full-strength one reads as a second frame. */
-.ep-card { box-shadow: none; }
-.ep-card:hover { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.07); }
+.ep-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.ep-row:last-child { border-bottom: 0; }
+
+/* Same 44px rounded square as .cs-art in the drawer below, deliberately: the
+   two lists sit in matching boxes on the same page and should read as one
+   pattern. Episode art is near-universal in the index; a row without it falls
+   back to the show's own art, and only then to the glyph. */
+.ep-art {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--cream-d);
+}
+.ep-art--blank {
+  display: grid;
+  place-items: center;
+  font-size: 1.1rem;
+}
+
+.ep-main { min-width: 0; flex: 1; }
+
+.ep-title {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
 
 .ep-num { color: var(--brand-d); }
 
-/* ── The card's boost drawer, as a <details> ──────────────────────────── */
-/*
-   The feed builds this as a <button aria-expanded> and swings the caret off
-   .pcast-card.is-open, which JavaScript sets. This page renders with none, so
-   the same bar is a <summary> and the open state is the [open] attribute the
-   browser maintains by itself. Four rules, and no restatement of the bar: the
-   .pcast-drawer styling on the summary is doing all the visible work.
-
-   list-style:none plus the ::-webkit-details-marker reset removes the native
-   triangle, which would otherwise sit to the left of the caret this bar already
-   draws. Safari needs the pseudo-element form; everything else takes the
-   property. */
-.pcast-thread > summary { list-style: none; cursor: pointer; }
-.pcast-thread > summary::-webkit-details-marker { display: none; }
-.pcast-thread[open] > summary > .pcast-drawer-caret { transform: rotate(180deg); }
-/* The feed's drawer bar rounds its bottom corners when it is the card's last
-   child. Here the <details> is the last child, so the summary inside it needs
-   the rounding while closed and must give it up once the thread is under it. */
-.pcast-thread:not([open]) > summary { border-radius: 0 0 10px 10px; }
-
-/* Boost rows inside a card's thread. .boost-list is the Recent Boosts list at
-   the foot of the page, reused whole — see the note over episodeThread(). It
-   only needs its outer spacing dropped, since .pcast-details supplies that. */
-.pcast-details > .boost-list { margin: 0; padding: 0; }
+.ep-meta {
+  margin: 0.2rem 0 0;
+  font-size: 0.76rem;
+  color: var(--muted);
+}
 
 /* ── Other shows this community boosts ────────────────────────────────── */
 
@@ -768,11 +724,9 @@
 .cs-title,
 .cs-meta { display: block; }
 
-/* 0.9rem, which was .ep-title's size when the episode drawer above held rows of
-   the same shape as these. It now holds full episode cards, so the two lists no
-   longer have to match and this size is kept on its own merits: it is what a
-   one-line title wants beside a 44px thumbnail. Nothing here inherits the 17px
-   body serif. */
+/* Deliberately the same size as .ep-title in the episode drawer above — these
+   are two lists of the same kind in the same box, and the page reads as one
+   thing only if they match. Nothing here inherits the 17px body serif. */
 .cs-title {
   font-size: 0.9rem;
   font-weight: 600;
@@ -972,9 +926,8 @@
      compete for a narrow row. */
   .ep-drawer > summary { padding: 0.7rem 0.8rem; gap: 0.5rem; }
   .drawer-hint { font-size: 0.62rem; letter-spacing: 0.08em; }
-  .cs-art { width: 38px; height: 38px; }
-  /* Tighter gutter around the cards; the card's own padding does the rest. */
-  .ep-list { padding: 0.55rem; gap: 0.55rem; scroll-padding: 0.55rem; }
+  .cs-art,
+  .ep-art { width: 38px; height: 38px; }
   .cs-link { gap: 0.55rem; padding-left: 0.4rem; }
   .cs-row .ob-boost-pill { margin-right: 0.4rem; }
 
