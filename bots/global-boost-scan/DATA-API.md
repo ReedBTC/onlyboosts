@@ -40,6 +40,7 @@ Directories are **not** browsable (no listings). Discover exact filenames from
   },
   "boosts": {
     "latest": "latest.json",
+    "music": "boosts/music.json",      // all-time, music-medium shows only
     "months": [                        // newest first; use these to page back
       { "month": "2026-07", "count": 912, "file": "boosts/2026-07.json" },
       { "month": "2026-06", "count": 1043, "file": "boosts/2026-06.json" }
@@ -62,6 +63,30 @@ All `file` values are paths **relative to the base URL**.
 { "generated_at": …, "month": "2026-07", "count": 912, "boosts": [ <boost>, … ] }
 ```
 Boosts within a file are newest-first.
+
+### `boosts/music.json` — every music boost, all-time (for Songs / Albums)
+```jsonc
+{ "generated_at": 1784995125, "count": 1195, "boosts": [ <boost>, … ] }
+```
+Same shape as `latest.json`, newest-first, **not windowed** — read it whole.
+Currently 1,195 boosts across 474 shows and 601 episodes: 1.5MB raw, 0.34MB
+gzipped, growing ~1MB of raw a year. **Take the path from the manifest**
+(`boosts.music`), not from this heading.
+
+Music is ~5% of the boost stream, so building a Songs feed by filtering the
+windowed general feed shows a small and arbitrary fraction of it — three months
+of archives yields 84 of those 601 episodes while downloading 4MB. This file is
+that join done once, server-side, over all of history.
+
+**Membership is the same projection as `medium` in `podcasts/index.json`** — the
+export derives both from one list, so they can't disagree. Two consequences:
+- **No `medium` field on the records.** The medium is a property of the *show*,
+  and the point of this file is to avoid stamping it onto 22k boost records. If
+  you need it per-show, join `podcast.guid` → `podcasts/index.json` as before.
+- **A show with no declared medium is not here.** It defaults to `podcast`, per
+  the namespace. The split is a partition, not a narrowing: `music` goes to
+  Songs and Albums, *everything else* — podcasts, video, and feeds Podcast Index
+  can't identify — goes to Episodes and Shows.
 
 ### The `<boost>` record (same shape everywhere it appears)
 ```jsonc
@@ -194,12 +219,15 @@ Same numbers as `index.json`'s `totals`, standalone, for a cheap header/summary 
 
 ---
 
-## Building the four views
+## Building the views
 
 | View | How |
 |---|---|
 | **Boosts · Global** | `latest.json` for page 1; page back through `boosts/<month>.json` (months from the manifest, newest→oldest). Each record renders a card directly. |
 | **Boosts · Follows** | Same feed, keep records where `booster.pk` ∈ the signed-in user's follow set. |
+| **Songs · Global** | `boosts/music.json` (path from the manifest's `boosts.music`), read whole — no windowing and no medium join needed, it's pre-filtered. Group by `episode.guid` to rank songs. |
+| **Songs · Follows** | Same file, filtered on `booster.pk` like the other Follows views. |
+| **Albums** | `boosts/music.json` grouped by `podcast.guid`; or `podcasts/index.json` filtered to `medium === "music"` for the rollup with its aggregates. Both agree by construction. |
 | **Podcasts · Global** | `podcasts/index.json` → cards (already sorted by recency; re-sort by `sats`/`boosts` if you prefer). Click a card → fetch its `file` for episodes + shownotes + that show's boosts. |
 | **Podcasts · Follows** | Filter the boost feed to follows, then group by `podcast.guid` and aggregate. (`podcasts/index.json` has no per-booster breakdown, so a follows-scoped podcast list must come from the filtered boosts.) |
 

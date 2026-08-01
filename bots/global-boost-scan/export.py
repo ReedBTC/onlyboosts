@@ -4,6 +4,8 @@
 The four OnlyBoosts views all derive from these files:
   • Boosts Global / Follows  → the boost feed (boosts/latest.json + monthly pages);
     Follows is a client-side filter on booster pubkey.
+  • Songs / Albums           → boosts/music.json, the all-time music-medium slice
+    of the same feed (the medium split is applied here, once, server-side).
   • Podcasts Global          → podcasts/index.json (per-show aggregates).
   • Podcasts Follows         → client groups the follow-filtered boost feed by show.
 
@@ -196,6 +198,27 @@ def export(conn, out_dir, latest_n=1000, per_show=False, log=print):
                {"generated_at": generated, "count": len(podcasts), "podcasts": podcasts})
     log(f"  podcasts index: {len(podcasts)} shows")
 
+    # ── music-only boost feed (boosts/music.json) ─────────────────────────────
+    # All-time, newest first, same record shape as latest.json — the Songs feed
+    # reads it whole instead of windowing the firehose. Music is ~5% of the boost
+    # stream, so the client's three-month window painted 14% of the music in the
+    # index while downloading 4MB to use a twentieth of it; this file is the
+    # complete set and smaller than that window.
+    #
+    # The membership test reads `podcasts` — the very list written above — rather
+    # than re-querying the medium. The site joins guid → medium through that file,
+    # so deriving both from one projection is what keeps a song from appearing in
+    # one surface and not the other. Note it inherits the `or "podcast"` default:
+    # a show with no declared medium is NOT music, because the split is a
+    # partition and filing an unidentified feed under music claims something we
+    # can't support. The records themselves stay medium-free — that's a property
+    # of the show, and stamping it onto 22k boosts is the thing this file avoids.
+    music_guids = {p["guid"] for p in podcasts if p["medium"] == "music"}
+    music = [rec for rec in records if rec["podcast"]["guid"] in music_guids]
+    write_json(out / "boosts" / "music.json",
+               {"generated_at": generated, "count": len(music), "boosts": music})
+    log(f"  music feed: {len(music)} records from {len(music_guids)} music shows")
+
     # ── profiles map (for Follows resolution / richer cards) ──────────────────
     profs = {}
     for p in conn.execute("SELECT * FROM profiles").fetchall():
@@ -253,6 +276,7 @@ def export(conn, out_dir, latest_n=1000, per_show=False, log=print):
         "totals": s,
         "boosts": {
             "latest": "latest.json",
+            "music": "boosts/music.json",     # all-time, music-medium shows only
             "months": [{"month": k, "count": len(months[k]),
                         "file": f"boosts/{k}.json"}
                        for k in sorted(months, reverse=True)],
