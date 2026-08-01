@@ -178,23 +178,28 @@ async function initBoosting() {
 
 initBoosting()
 
-// ── Chapters ─────────────────────────────────────────────────────────
+// ── Chapters and full show notes ─────────────────────────────────────
 //
-/* The drawer under the player, filled from /api/chapters.
+/* One call to /api/episode-meta fills both drawers in the player card.
  *
- * ⚠️ THIS IS THE ONE PIECE OF THE HERO THAT IS NOT SERVER-RENDERED, and the
- * reason is that nothing in D1 knows this episode's <podcast:chapters> URL. The
- * endpoint resolves it through Podcast Index and fetches the file; see the note
- * at the head of functions/api/chapters.js, including what would change if the
- * collector ever stored the URL.
+ * CHAPTERS are the one piece of the hero that cannot be server-rendered at all:
+ * nothing in D1 knows this episode's <podcast:chapters> URL, so the endpoint
+ * resolves it through Podcast Index and fetches the file. The drawer ships
+ * hidden and is revealed only once rows come back — about half the feeds in this
+ * index publish chapters, and a feed that does may not on every episode, so an
+ * empty lid is the failure to avoid.
  *
- * The drawer ships hidden and is revealed only once rows come back — about half
- * the feeds in this index publish chapters at all, and a feed that does may not
- * do so on every episode, so an empty lid is the common failure to avoid.
+ * ⚠️ SHOW NOTES ARE REPLACED, NOT FILLED. The page server-renders D1's copy,
+ * which Podcast Index truncated to 100 words when the collector fetched it
+ * (median 590 characters, and 0.6% cut mid-sentence). This call asks for
+ * `fulltext` and gets the whole thing back WITH ITS PARAGRAPHS, which the
+ * collector's clean_html had also flattened. So the swap is not cosmetic: it is
+ * the difference between a clipped block and the publisher's actual notes. The
+ * server-rendered version stays as the no-JavaScript reading.
  *
  * No IntersectionObserver, unlike the community section below: this sits above
- * the fold, so there is nothing to wait for, and the payload is a few hundred
- * bytes against that section's ~200KB of card machinery.
+ * the fold, so there is nothing to wait for, and the payload is a few KB against
+ * that section's ~200KB of card machinery.
  */
 function fmtChapterTime(totalSecs) {
   const s = Math.max(0, Math.floor(totalSecs))
@@ -221,28 +226,53 @@ function seekTo(audio, secs) {
   if (p && typeof p.catch === 'function') p.catch(() => { /* autoplay policy */ })
 }
 
-async function initChapters() {
+/* The notes drawer, repainted from the token tree the endpoint returns.
+ *
+ * ⚠️ TOKENS, NEVER HTML. Each paragraph is an array of { t: 'text' } and
+ * { t: 'link' } tokens built server-side from a third-party description, and
+ * they become text nodes and anchors through DOM calls. Nothing here touches
+ * innerHTML, which is the whole reason the endpoint returns a tree rather than
+ * the cleaned markup it could just as easily have sent.
+ */
+function paintNotes(notes) {
+  const drawer = document.querySelector('[data-notes]')
+  const body = drawer?.querySelector('[data-notes-body]')
+  if (!drawer || !body || !Array.isArray(notes) || !notes.length) return
+
+  const frag = document.createDocumentFragment()
+  for (const para of notes) {
+    if (!Array.isArray(para) || !para.length) continue
+    const p = document.createElement('p')
+    for (const tok of para) {
+      const v = String(tok?.v ?? '')
+      if (!v) continue
+      if (tok.t === 'link' && /^https?:\/\//i.test(String(tok.href || ''))) {
+        const a = document.createElement('a')
+        a.href = tok.href
+        a.target = '_blank'
+        a.rel = 'noopener noreferrer'
+        a.textContent = v
+        p.appendChild(a)
+      } else {
+        p.appendChild(document.createTextNode(v))
+      }
+    }
+    if (p.childNodes.length) frag.appendChild(p)
+  }
+  if (!frag.childNodes.length) return
+
+  body.replaceChildren(frag)
+  drawer.hidden = false
+}
+
+function paintChapters(chapters) {
   const drawer = document.querySelector('[data-chapters]')
   const audio = document.querySelector('.ep-player-row .pcast-player')
-  if (!drawer || !audio || !EPISODE?.itemGuid) return
-
-  const qs = new URLSearchParams({ guid: EPISODE.itemGuid })
-  if (EPISODE.guid) qs.set('podcastGuid', EPISODE.guid)
-  if (EPISODE.feed) qs.set('feedUrl', EPISODE.feed)
-
-  let chapters = []
-  try {
-    const resp = await fetch(`/api/chapters?${qs}`, { headers: { Accept: 'application/json' } })
-    if (!resp.ok) return
-    const data = await resp.json()
-    chapters = Array.isArray(data?.chapters) ? data.chapters : []
-  } catch { return }
   // Nothing to show is the ordinary outcome, not a failure: the drawer stays
   // hidden and the page is the page it was before.
-  if (!chapters.length) return
+  if (!drawer || !audio || !Array.isArray(chapters) || !chapters.length) return
 
   const list = drawer.querySelector('[data-chapters-list]')
-  const count = drawer.querySelector('[data-chapters-count]')
   if (!list) return
 
   const starts = []
@@ -271,7 +301,6 @@ async function initChapters() {
     buttons.push(btn)
   }
   list.appendChild(frag)
-  if (count) count.textContent = String(chapters.length)
   drawer.hidden = false
 
   // The row covering the playhead, tracked as it advances. The last chapter
@@ -301,7 +330,32 @@ async function initChapters() {
   audio.addEventListener('seeked', syncActive)
 }
 
-initChapters()
+async function initEpisodeMeta() {
+  // The notes drawer is on every page; the chapters one only where there is
+  // audio to seek. Either is reason enough to make the call.
+  if (!EPISODE?.itemGuid) return
+  if (!document.querySelector('[data-notes]') && !document.querySelector('[data-chapters]')) return
+
+  const qs = new URLSearchParams({ guid: EPISODE.itemGuid })
+  if (EPISODE.guid) qs.set('podcastGuid', EPISODE.guid)
+  if (EPISODE.feed) qs.set('feedUrl', EPISODE.feed)
+
+  let data = null
+  try {
+    const resp = await fetch(`/api/episode-meta?${qs}`, { headers: { Accept: 'application/json' } })
+    if (!resp.ok) return
+    data = await resp.json()
+  } catch { return }
+  if (!data) return
+
+  // `notes` absent means the lookup told us nothing, where an empty array would
+  // mean the episode has none — and the difference matters, because the server
+  // already rendered a truncated set that must not be blanked by a miss.
+  paintNotes(data.notes)
+  paintChapters(data.chapters)
+}
+
+initEpisodeMeta()
 
 // ── Other episodes this community boosts ─────────────────────────────
 //

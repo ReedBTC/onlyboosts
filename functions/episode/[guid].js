@@ -190,6 +190,11 @@ const COPY = {
     credit: "By",
     dated: "Aired",
     notes: "Show Notes",
+    // The quiet button beside Boost. It used to read "All boosts to this show",
+    // which described the destination's contents where the reader wants to know
+    // where the link goes; the show page is a page about the show, and naming it
+    // is the shorter and truer label.
+    viewShow: "View Show",
   },
   music: {
     eyebrow: "Track",
@@ -208,6 +213,7 @@ const COPY = {
     // way it is not on the podcast side.
     credit: "Artist",
     dated: "Released",
+    viewShow: "View Album",
     // "Track Notes" rather than "Liner Notes": the source is the item's own
     // <description>, so the notes belong to this track, where liner notes are
     // an album-level form. Same literalism as "Track 3" over "Ep. 3".
@@ -608,7 +614,15 @@ function renderHeader(ep, { art, art2, art3, copy, showTitle, showUrl, boosterCo
     ? `<div class="ep-player-row"><audio class="pcast-player" controls preload="none" src="${htmlEscape(ep.enclosure_url)}"></audio></div>`
     : "";
 
+  // THE PLAYER CARD. One bordered surface carrying the artwork, the title, the
+  // actions, the player and the two drawers, the way localbitcoiners' episode
+  // pages do it: everything about the RECORDING is one object, and the stat
+  // tiles below it — which are about its boosts — sit on the page as they do on
+  // /show. The show page's hero has no card because it has nothing to enclose;
+  // this one does, which is why .ep-card is a delta in episode-page.css rather
+  // than a change to the shared .show-hero.
   return `<header class="show-hero">
+    <div class="ep-card">
     <div class="show-hero-inner">
       <div class="show-art">${
         art
@@ -626,7 +640,7 @@ function renderHeader(ep, { art, art2, art3, copy, showTitle, showUrl, boosterCo
             ${copy.boostBtn}
           </button>
           ${showUrl
-            ? `<a class="btn btn-quiet" href="${htmlEscape(showUrl)}">All boosts to this ${copy.ldType === "MusicRecording" ? "album" : "show"}</a>`
+            ? `<a class="btn btn-quiet" href="${htmlEscape(showUrl)}">${htmlEscape(copy.viewShow)}</a>`
             : ""}
           <button type="button" class="btn btn-quiet" data-share-page>Share</button>
         </div>
@@ -635,6 +649,7 @@ function renderHeader(ep, { art, art2, art3, copy, showTitle, showUrl, boosterCo
     ${audio}
     ${renderChaptersDrawer(ep)}
     ${renderNotesDrawer(ep, copy)}
+    </div>
     <h2 class="show-stats-title">
       <a href="/about#keysend">Nostr Boost</a> Stats
     </h2>
@@ -652,19 +667,18 @@ function renderHeader(ep, { art, art2, art3, copy, showTitle, showUrl, boosterCo
 // Both ship COLLAPSED. LB opens its chapter list by default, but that page is
 // one show's own episode page with nothing under it; here a forty-row list would
 // push the stats, the community wall and the boosts off the first screen of a
-// page whose subject is the boosts. The count in the chapters summary is what
-// carries the discoverability instead.
+// page whose subject is the boosts.
 //
 // They use .ep-drawer, the show page's drawer — the sunken band, the SHOW/HIDE
 // word and the rotating chevron, unchanged. A reader who has opened the episode
 // drawer on /show has already learned this control.
 //
-// ⚠️ A COUNT IS FINE ON THE CHAPTERS SUMMARY and is not on the others. The rule
-// it looks like it breaks (see the drawer-chrome note in CLAUDE.md) is about
-// figures bounded by OUR coverage — a count of episodes we hold boosts for reads
-// as a claim about the show's catalogue. A chapter count is a complete fact
-// about the file the publisher shipped, and nothing about it depends on what
-// this site has indexed.
+// NEITHER SUMMARY CARRIES A COUNT, which is now the rule on every drawer the
+// site has. The chapters one shipped with a chapter count for a day and it came
+// off: it is defensible on its own terms (a chapter count is a complete fact
+// about the publisher's file, not a figure bounded by our coverage the way the
+// show page's would be), but a lid that sometimes carries a number and sometimes
+// does not is a worse rule than one that never does.
 
 /* Show notes. Server-rendered from D1's `episodes.description`, so this drawer
  * works with JavaScript off.
@@ -681,10 +695,12 @@ function renderHeader(ep, { art, art2, art3, copy, showTitle, showUrl, boosterCo
  */
 function renderNotesDrawer(ep, copy) {
   const text = typeof ep.description === "string" ? ep.description.trim() : "";
-  if (!text) return "";
-  return `<details class="ep-drawer ep-notes">
+  // Emitted either way. With text it ships visible and readable; without, it
+  // ships hidden and empty for episode-page.js to fill from /api/episode-meta,
+  // which sometimes has notes for an episode whose D1 row does not.
+  return `<details class="ep-drawer ep-notes" data-notes${text ? "" : " hidden"}>
       <summary>${htmlEscape(copy.notes)}<span class="drawer-hint" aria-hidden="true"></span></summary>
-      <div class="ep-notes-body"><p>${linkifyNotes(text)}</p></div>
+      <div class="ep-notes-body" data-notes-body>${text ? `<p>${linkifyNotes(text)}</p>` : ""}</div>
     </details>`;
 }
 
@@ -713,9 +729,9 @@ function linkifyNotes(text) {
 
 /* Chapters. THE ONE THING ON THIS PAGE THAT DOES NOT EXIST WITHOUT JAVASCRIPT,
  * alongside #community-episodes, and for a data reason rather than a rendering
- * one: nothing in D1 knows this episode's <podcast:chapters> URL. /api/chapters
- * resolves it through Podcast Index at request time and episode-page.js reveals
- * this drawer only if rows come back — so the server cannot know whether there
+ * one: nothing in D1 knows this episode's <podcast:chapters> URL.
+ * /api/episode-meta resolves it through Podcast Index at request time and
+ * episode-page.js reveals this drawer only if rows come back — so the server cannot know whether there
  * is a drawer to draw.
  *
  * It therefore ships EMPTY and HIDDEN, which is the opposite of the choice
@@ -733,7 +749,7 @@ function linkifyNotes(text) {
 function renderChaptersDrawer(ep) {
   if (!isSafeUrl(ep.enclosure_url)) return "";
   return `<details class="ep-drawer ep-chapters" data-chapters hidden>
-      <summary>Chapters<span class="ep-chapters-count" data-chapters-count></span><span class="drawer-hint" aria-hidden="true"></span></summary>
+      <summary>Chapters<span class="drawer-hint" aria-hidden="true"></span></summary>
       <ol class="ep-chapters-list" data-chapters-list></ol>
     </details>`;
 }
@@ -744,6 +760,14 @@ function renderChaptersDrawer(ep) {
 // Community Boosts", and the one section on this page that page has no version
 // of. The community is the set of pubkeys that boosted THIS episode; the rollup
 // is every other episode those pubkeys have boosted, ranked.
+//
+// IT IS THE SAME OBJECT AS ITS SHOW-PAGE COUNTERPART, down to the class list: an
+// .ep-drawer with the heading as its <summary>, the sort band inside the lid,
+// and the list beneath — the same box the show page's community drawer and its
+// episode drawer both are. It shipped first as a plain <section> with an <h2>
+// and a control row, which made one component look like two things depending on
+// which page you were reading. The drawer is the site's established form for a
+// ranked list under a heading, so this is it.
 //
 // EVERY FIGURE IS COMMUNITY-SCOPED BY CONSTRUCTION. The query behind it
 // (functions/api/v1/episodes/[guid].js) joins through the community set, so a
@@ -763,10 +787,10 @@ function renderChaptersDrawer(ep) {
 // is what was asked for.
 //
 // The cost is that this section does not exist with JavaScript off, where the
-// rest of the page does. It ships `hidden` for that reason: an empty heading
-// over nothing is worse than no heading. episode-page.js reveals it once it has
-// cards, and lazy-loads the corpus as the section approaches the viewport, so a
-// reader who never scrolls this far pays nothing for it.
+// rest of the page does. The DRAWER ships `hidden` for that reason: an empty
+// heading over nothing is worse than no heading. episode-page.js reveals it once
+// it has cards, and lazy-loads the corpus as the section approaches the
+// viewport, so a reader who never scrolls this far pays nothing for it.
 //
 // NOT SPLIT ON MEDIUM, which every other rollup on this site is. A music
 // community also boosting podcasts is the interesting half of the finding, so
@@ -784,27 +808,38 @@ function renderCommunityEpisodes(copy) {
   // Everything it costs a reader with no JavaScript is the same either way: an
   // empty section renders as nothing at all, and the module removes it outright
   // if the corpus is empty or unreachable.
-  return `<section class="show-section" id="community-episodes" data-community-episodes>
-    <div data-ce-body hidden>
-      <div class="show-section-head">
-        <h2>Other Episodes/Songs This Community Boosts</h2>
-        <p class="show-section-sub">Everything else the people who boosted this ${copy.noun} have boosted on Nostr, ranked. Every figure counts only what these boosters sent.</p>
-      </div>
+  return `<section class="show-section show-section--bare" id="community-episodes" data-community-episodes>
+    <details class="ep-drawer" open data-ce-body hidden>
+      <!-- The summary IS the heading, exactly as on the show page's community
+           drawer, which is why the section is --bare and carries no <h2>. The
+           sub-line sits under the title INSIDE the summary rather than in a band
+           of its own: it qualifies what the list is, so it belongs against the
+           name of the list, and putting it in the toolbar below would crowd the
+           range buttons off a phone. The hint is aria-hidden — <details>
+           announces its own expanded state. -->
+      <summary>
+        <span class="cs-head">
+          <span class="cs-head-title">Other Episodes/Songs This Community Boosts</span>
+          <span class="cs-head-sub">Other show's episodes boosted by people who boosted this ${htmlEscape(copy.noun)}</span>
+        </span>
+        <span class="drawer-hint" aria-hidden="true"></span>
+      </summary>
       <!-- The range buttons and the sort pill mount here, the same pair the
-           Episodes feed carries and in the same order. Ships hidden and stays
-           hidden until there is a list to control. -->
+           Episodes feed carries and in the same order, on the same band the show
+           page's two drawers use. Ships hidden and stays hidden until there is a
+           list to control. -->
       <div class="cs-controls ce-controls" data-ce-controls hidden></div>
       <!-- The cards and their "Load N more" live inside ONE scroll container,
            the same shape the show page's community drawer uses (.ep-list caps at
            32rem and scrolls). The load-more is inside it rather than under it so
-           the section is a single box: a button below a scrolling window reads
+           the drawer is a single box: a button below a scrolling window reads
            as belonging to the page, not to the list. -->
       <div class="ce-scroll" data-ce-scroll tabindex="0" role="region"
            aria-label="Other episodes and songs this community boosts">
         <div data-ce-list><div class="ce-loading" aria-live="polite">Loading…</div></div>
         <div data-ce-more></div>
       </div>
-    </div>
+    </details>
   </section>`;
 }
 

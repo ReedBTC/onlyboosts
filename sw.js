@@ -261,13 +261,17 @@
 // pointing at /episode/<item-guid>, which rides the same bump — as does the ⋮
 // menus' scrollIntoView on open, which feeds-podcasts.js does for both surfaces.
 // ob-v47: the chapters and show-notes drawers under the player on
-// /episode/<item-guid>. Required on both halves of that page's own pair, which
-// are stale-while-revalidate in a VERSION-keyed cache: the Function now emits a
-// notes drawer and an empty chapters drawer, so a returning visitor holding the
-// old episode-page.css reads the notes without their padding or link colour,
-// and one holding the old episode-page.js never fetches /api/chapters at all, so
-// the chapters drawer stays hidden on a page that has them. Both correct
-// themselves on the second navigation, which is the case this bump exists for.
+// /episode/<item-guid>, inside a player card that now encloses the artwork, the
+// title, the actions and both drawers; and the community-episodes section
+// becomes the same .ep-drawer its show-page counterpart is. Required on both
+// halves of that page's own pair, which are stale-while-revalidate in a
+// VERSION-keyed cache: a returning visitor holding the old episode-page.css gets
+// an unstyled card and drawers bleeding past their edges, and one holding the
+// old episode-page.js calls /api/chapters, which no longer exists — that
+// endpoint became /api/episode-meta when it grew the untruncated show notes, so
+// the stale module leaves both the chapters drawer hidden and the notes cut at
+// 100 words. Both correct themselves on the second navigation, which is the case
+// this bump exists for.
 const VERSION = 'ob-v47';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;

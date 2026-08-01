@@ -1202,7 +1202,7 @@ sections that don't apply, and one that only exists here.
 
 | | `/show/<guid>` | `/episode/<guid>` |
 |---|---|---|
-| Hero | show art, eyebrow "Show", Boost this Show | episode art, eyebrow **is the show's name and links to its page**, Boost this Episode, an audio player, and the two drawers under it |
+| Hero | show art, eyebrow "Show", Boost this Show | **a player card**: episode art, eyebrow **is the show's name and links to its page**, Boost this Episode, View Show, an audio player, and the chapters and show-notes drawers |
 | Stats | show totals | that episode's |
 | `#episodes` | the show's episode drawer | — no equivalent |
 | Community rollup | `#community-shows` — other shows | `#community-episodes` — other **episodes**, as full feed cards |
@@ -1252,93 +1252,117 @@ URL-shaped and all round-trip through one path segment.
 `/show` episode drawer rows, and above all `episode-link.js` — see the note above
 for why that one is not a wiring job.
 
-### Chapters and Show Notes
+### The Player Card: Chapters and Show Notes
 
-Two `<details>` between the audio element and the stat tiles, which is where
-localbitcoiners puts them and for the same reason: they are about the recording,
-where everything below the tiles is about its boosts. Both reuse `.ep-drawer`
-from `show-page.css` unchanged — the sunken band, the SHOW/HIDE word, the
-rotating chevron — so a reader who has opened the episode drawer on `/show` has
-already learned the control. `episode-page.css` adds the spacing and the
-contents and nothing about the lid.
+**One card holds the recording.** The artwork, the title, the credit, the
+actions, the audio element and two `<details>` are inside a single bordered
+surface (`.ep-card`, a delta in `episode-page.css` scoped to
+`.show-main--episode`); the `Nostr Boost Stats` tiles sit outside it on the page,
+because they are about the episode's *boosts* and they are the same tiles `/show`
+carries in the same place. localbitcoiners' episode pages are the model, down to
+the drawers **bleeding to the card's edges** rather than sitting inside its
+padding as nested boxes — that is what makes the card read as one object with
+bands instead of a panel holding two panels. The negative margins therefore have
+to track the card's padding, in the base rule and in the 640px block both.
 
-LB's chapter list ships open; **both of these ship collapsed**. That page is one
-show's own episode page with nothing under it, where a forty-row list here would
-push the stats, the community wall and the boosts off the first screen of a page
-whose subject is the boosts. The count in the chapters summary carries the
-discoverability instead. **A count is legitimate there and is not on the show
-page's drawers**: the rule it looks like it breaks is about figures bounded by
-*our* coverage, and a chapter count is a complete fact about the file the
-publisher shipped.
+Both drawers reuse `.ep-drawer` from `show-page.css` unchanged — the sunken band,
+the SHOW/HIDE word, the rotating chevron — so a reader who has opened the episode
+drawer on `/show` has already learned the control.
 
-**Show notes are server-rendered from D1 and chapters cannot be.** That is the
-whole asymmetry, and it is a data fact rather than a design one.
+LB's chapter list ships open; **both of these ship collapsed**, because that page
+is one show's own episode page with nothing under it where a forty-row list here
+would push the stats, the community wall and the boosts off the first screen.
+**Neither summary carries a count.** The chapters one shipped with a chapter
+count for a day and it came off: it was defensible on its own terms (a chapter
+count is a complete fact about the publisher's file, not a figure bounded by our
+coverage the way the show page's would be), but a lid that sometimes carries a
+number and sometimes does not is a worse rule than one that never does.
+
+**Show notes are server-rendered from D1 and then replaced; chapters cannot be
+server-rendered at all.**
 
 | | Show notes | Chapters |
 |---|---|---|
-| Source | `episodes.description`, already on the row the page selects | `/api/chapters` → Podcast Index → the publisher's chapters JSON |
-| Cost | none, it is the same query | two edge-cached PI hops, off the critical path |
-| JavaScript off | reads normally | **absent**, like `#community-episodes` |
-| Coverage | 99.5% of episodes | ~54% of the boosted feeds publish any |
+| First paint | `episodes.description`, already on the row the page selects | — |
+| Then | replaced from `/api/episode-meta`, untruncated and with its paragraphs | filled from the same response |
+| JavaScript off | reads, truncated | **absent**, like `#community-episodes` |
+| Coverage | 99.5% of episodes | ~45% of items on the boosted feeds |
 
-**⚠️ What the notes text actually is.** The episode description as Podcast Index
-returns it, through the collector's `clean_html`: tags stripped, entities
-decoded, **all whitespace collapsed to single spaces**. So the publisher's
-paragraph breaks are gone before this page sees the text, which is why it renders
-as one block rather than LB's paragraph list, and why links survive only as bare
-URLs and are linkified at render. Measured over 2,218 episodes in the live index:
-99.5% carry notes, median 590 characters, and **PI caps the field near 1,000**,
-which clips 0.6% of them mid-sentence. `renderMessage()` in
-`_shared/detail-page.js` is deliberately not reused — it truncates at 420, under
-the median length, and its mention half has no business here.
+**⚠️ D1's copy is truncated, and the truncation is Podcast Index's.** PI cuts
+every text field to 100 words unless the request carries `fulltext`, which
+`enrich.py` does not send — so the collector stored a prefix. Measured over 2,218
+episodes in the live index: 99.5% carry notes, median 590 characters, maximum
+1,055, and 0.6% cut mid-sentence. `clean_html` then collapses all whitespace, so
+the publisher's paragraph breaks are gone too. **Both are why the drawer's text is
+replaced rather than decorated**: `/api/episode-meta` asks for `fulltext` and
+parses the HTML back into paragraphs. The collector could fix half of this at
+source by adding the parameter; the chapters half of the endpoint would still be
+needed.
 
-**Nothing in this pipeline holds a `<podcast:chapters>` URL**, which is what
-`functions/api/chapters.js` exists to work around. It resolves the episode
-through PI `episodes/byguid` (one hop when a `podcastguid` is passed, which the
-docs confirm as an accepted parameter; the feed-id resolution from `/api/value`
-is the fallback), reads `chaptersUrl` off the episode object, and fetches and
-normalizes the file under the house bounds — timeout, byte cap, streamed read.
-**`enrich.py` already makes that exact `episodes/byguid` call**, so a collector
-`chapters_url` column would cost it nothing and would drop both PI hops here;
-nothing on the client would change. Not built.
+**`functions/api/episode-meta.js` is one PI call serving both fields.**
+`episodes/byguid` returns the episode object, which carries `chaptersUrl` *and*
+`description`. It resolves the episode in one hop when a `podcastguid` is passed
+(an accepted parameter, confirmed against PI's OpenAPI source), with
+`/api/value`'s feed-id resolution as the fallback, then fetches the chapters file
+under the house bounds: timeout, byte cap, streamed read.
 
-Three things about that endpoint that are load-bearing:
+Four things about it that are load-bearing:
 
-- **Every failure answers `200` with an empty list.** Chapters are additive, and
-  a 500 would be a broken drawer on a page about boosts.
-- **Two cache lives.** A resolved answer (rows, or a feed that genuinely
-  publishes none) holds for six hours; a timeout or an upstream error is not an
-  answer at all and holds for five minutes. Same principle as the podroll
-  collector's rule that only a clean read may overwrite a stored list.
-- **The chapters URL is publisher-controlled and reaches an outbound fetch**, so
-  it is http(s) only, no embedded credentials, bounded length. Untitled and
-  `toc: false` entries are dropped: those are ad and segment boundaries, and a
-  row with a timestamp and no label is a seek button that says nothing about
-  where it lands.
+- **Every failure answers `200` with empty fields.** Both are additive, and a 500
+  would be a broken drawer on a page about boosts. The two halves are
+  independent: the notes ride every exit, including the ones where the chapters
+  fetch failed.
+- **`notes` absent ≠ `notes: []`.** An empty array means the episode has none and
+  the client would blank the drawer; a missing field means the lookup told us
+  nothing and the truncated server-rendered set stands.
+- **⚠️ Notes come back as a TOKEN TREE, not HTML** — paragraphs of
+  `{t:"text",v}` and `{t:"link",href,v}` — and the client builds text nodes and
+  anchors from them. Returning cleaned markup would be one `innerHTML` away from
+  a third-party description writing into the page. Anchors are kept because a
+  publisher writes "get the book here" with the URL only in the `href`, so LB's
+  strip-and-linkify would leave the sentence pointing at nothing.
+- **Two cache lives.** A resolved answer holds for six hours; a timeout or an
+  upstream error is not an answer at all and holds for five minutes. Same
+  principle as the podroll collector's rule that only a clean read may overwrite
+  a stored list. The chapters URL is publisher-controlled and reaches an outbound
+  fetch, so it is http(s) only, no embedded credentials, bounded length; untitled
+  and `toc: false` entries are dropped, being ad and segment boundaries rather
+  than chapters.
 
-The drawer therefore **ships empty and hidden**, which is the opposite of what
+The chapters drawer **ships empty and hidden**, which is the opposite of what
 `#community-episodes` does and correct for the same reason. That section needs a
 zero-height sentinel because an `IntersectionObserver` never fires on a hidden
 target; this one sits above the fold and is fetched unconditionally on load, so
 nothing observes it, and a visible-but-empty drawer would be a lid over nothing
 on the ~55% of episodes that publish no chapters. It is withheld outright when
-there is no enclosure to seek.
+there is no enclosure to seek. The notes drawer ships hidden too when D1 had
+nothing, since PI sometimes has notes for an episode whose row does not.
 
 **No Download MP3, no transcript link, and no subscribe menu**, all three of
 which LB's player card carries. The download button is the same call the episode
 cards already made and lost: every browser's native audio controls carry Download
 in their own ⋮ menu.
 
-Clicking a row seeks the player and starts it; the row covering the playhead
-takes `.is-active` as playback advances. The element is `preload="none"`, so on a
-first click there is no duration yet and assigning `currentTime` is dropped —
-`play()` is what triggers the load, so the assignment is queued behind
+Clicking a chapter row seeks the player and starts it; the row covering the
+playhead takes `.is-active` as playback advances. The element is `preload="none"`,
+so on a first click there is no duration yet and assigning `currentTime` is
+dropped — `play()` is what triggers the load, so the assignment is queued behind
 `loadedmetadata` and applied there.
 
 ### Other Episodes/Songs This Community Boosts
 
 The episode-level counterpart of the show page's community drawer, and the one
 section on either detail page that is **not server-rendered**.
+
+**It is the same OBJECT as its show-page counterpart, down to the class list**:
+an `.ep-drawer` whose `<summary>` is the heading, the range and sort band inside
+the lid on the shared `.cs-controls`, and the list beneath — the same box both
+drawers on `/show` are. It shipped first as a plain `<section>` with an `<h2>`
+and a control row under it, which made one component look like two things
+depending on which page you were reading. The summary carries a second line,
+"Other show's episodes boosted by people who boosted this episode", set as a
+caption under the title rather than in the band below it, where it would have
+crowded the range buttons off a phone.
 
 The community is the set of pubkeys that boosted this episode; the section is
 every other episode those pubkeys have boosted, painted as **the Episodes feed's
@@ -1359,13 +1383,14 @@ where the rest of the page does, and `#community-episodes` has nothing to resolv
 to there. An empty heading over nothing is worse than no heading, so the module
 removes the section outright when the corpus is empty or unreachable.
 
-**The `<section>` ships empty and its BODY ships `hidden`, and the two are not
+**The `<section>` ships empty and its DRAWER ships `hidden`, and the two are not
 interchangeable.** The hydration trigger is an `IntersectionObserver` on the
 section, and **an observer never reports a `display:none` target as
 intersecting** — a section that hid itself could never fire its own hydration.
 An empty section is a zero-height block that still has a position, which is
-exactly the sentinel the observer needs. The body is revealed *before* the fetch,
-so the heading and a "Loading…" line are the feedback that something is coming.
+exactly the sentinel the observer needs. The drawer is revealed *before* the
+fetch, so the heading and a "Loading…" line are the feedback that something is
+coming.
 
 **It is lazy in two ways.** `feeds-podcasts.js` and its ~200KB of transitive
 dependencies (nostr-tools, the boost thread, the action bar) are a **dynamic**

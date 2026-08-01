@@ -44,56 +44,64 @@
    full-width by nature. Above the stat tiles, because playing the episode is
    what a reader came for and reading its numbers is what they stayed for. */
 .ep-player-row {
-  margin: 1.1rem 0 0.25rem;
+  margin: 1.1rem 0;
 }
 .ep-player-row .pcast-player {
   width: 100%;
   display: block;
 }
 
-/* ── The two drawers under the player ─────────────────────────────────── */
+/* ── The player card, and the two drawers inside it ───────────────────── */
 
-/* Chapters and show notes, between the audio element and the stat tiles. Both
-   reuse .ep-drawer from show-page.css — the sunken band, the SHOW/HIDE word and
-   the rotating chevron — so this file adds the spacing and the contents and
-   nothing about the lid. A reader who has opened the episode drawer on
+/* ONE CARD holds the artwork, the title, the actions, the player, the chapters
+   and the show notes — everything about the recording. The stat tiles sit
+   outside it on the page background, because they are about its BOOSTS and they
+   are the same tiles /show has, in the same place. localbitcoiners' episode
+   pages are the reference: .ep-card there is a white bordered panel with the
+   player and both disclosures inside it.
+
+   Scoped to .show-main--episode rather than styling .show-hero, which the show
+   page shares and where there is nothing to enclose. */
+.show-main--episode .ep-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1.4rem 1.4rem 0;
+  box-shadow: 0 4px 16px rgba(11, 58, 82, 0.06);
+  overflow: hidden;
+}
+
+/* The drawers reuse .ep-drawer from show-page.css — the sunken band, the
+   SHOW/HIDE word, the rotating chevron — so this file adds only where they sit
+   and what is inside them. A reader who has opened the episode drawer on
    /show/<guid> has already learned the control.
 
-   Both ship collapsed, so this is normally two 44px bands between the player and
-   the numbers. See the note in functions/episode/[guid].js for why the chapter
-   list is not open by default the way localbitcoiners' is. */
-.ep-chapters, .ep-notes {
-  /* Off the player above; the stat tiles carry their own heading, which
-     supplies the air on the other side. */
-  margin: 0.9rem 0 0.35rem;
+   ⚠️ THEY BLEED TO THE CARD'S EDGES rather than sitting inside its padding as
+   nested boxes, which is what makes the card read as one object with bands
+   rather than as a panel with two panels in it. Same move LB makes with its
+   shownotes disclosure. The negative margins therefore have to match the card's
+   padding above, and the card clips them with overflow:hidden so its rounded
+   corners survive.
+
+   Both ship collapsed. See the note in functions/episode/[guid].js for why the
+   chapter list is not open by default the way localbitcoiners' is. */
+.show-main--episode .ep-chapters,
+.show-main--episode .ep-notes {
+  margin: 0 -1.4rem;
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
 }
-/* Tighter between the two than under the player — they are a pair. The
-   :not([hidden]) is load-bearing rather than tidy: the chapters drawer ships
-   hidden and stays hidden on the ~55% of episodes that publish none, and
-   adjacency does not care about display, so without it those pages would pull
-   the notes drawer up against the player. */
-.ep-drawer:not([hidden]) + .ep-drawer { margin-top: 0.55rem; }
+/* The air above the first band belongs to .ep-player-row's own bottom margin
+   rather than to the drawers: which drawer comes first depends on whether this
+   episode has chapters, so a margin on the drawers would vanish with the hidden
+   one. That margin is also what closes the card when neither drawer renders —
+   .ep-card has no bottom padding, and its overflow:hidden makes it a block
+   formatting context, so the margin cannot escape it. */
 /* <details> carries a UA `display: block`, and the attribute selector outranks
    it, but this page hides a drawer as a normal state rather than an edge case —
    worth stating rather than inheriting. */
 .ep-drawer[hidden] { display: none; }
-
-/* The chapter count, in the summary beside the word. A count is legitimate here
-   where the show page's drawers may not carry one: those figures are bounded by
-   what this site has indexed, so a badge would state our coverage as though it
-   were a fact about the show. A chapter count is a complete fact about the file
-   the publisher shipped. */
-.ep-chapters-count {
-  flex: none;
-  min-width: 1.6em;
-  padding: 0.1rem 0.45rem;
-  border-radius: 999px;
-  background: var(--cream);
-  color: var(--muted);
-  font: 700 0.72rem/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  text-align: center;
-}
-.ep-chapters-count:empty { display: none; }
 
 /* Capped and scrolled for the same reason .ep-list is on the show page: a long
    list inside a drawer should not make the page endless. 22rem is about eleven
@@ -161,30 +169,65 @@
 .ep-chapter-btn.is-active .ep-chapter-time { color: var(--brand-dd); }
 .ep-chapter-btn.is-active .ep-chapter-title { font-weight: 600; }
 
-/* Show notes. One block of prose, not a list of paragraphs: the collector
-   collapses all whitespace out of the description, so the publisher's paragraph
-   breaks are gone before this page ever sees the text. Measured median is 590
-   characters, so the measure matters more than the vertical rhythm. */
+/* Show notes.
+ *
+ * TWO SHAPES IN ONE BOX, and they arrive in that order. The server renders D1's
+ * copy as a single <p> — the collector's clean_html has flattened every
+ * paragraph break out of it — and episode-page.js replaces that with the
+ * publisher's real paragraphs once /api/episode-meta answers. So the rhythm
+ * between paragraphs has to be right even though the first paint has only one,
+ * and it is also capped: a full note runs to several thousand characters where
+ * the truncated one is ~590. */
 .ep-notes-body {
   padding: 0.95rem 1rem 1.15rem;
   border-top: 1px solid var(--border);
+  max-height: 34rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   font-size: 0.95rem;
   line-height: 1.7;
   color: var(--text);
   overflow-wrap: anywhere;
 }
 .ep-notes-body p { margin: 0; max-width: 46rem; }
+.ep-notes-body p + p { margin-top: 0.85rem; }
 .ep-notes-body a { color: var(--brand-d); font-weight: 600; }
 .ep-notes-body a:hover { color: var(--brand-dd); }
 
+/* ── The community drawer's stacked summary ───────────────────────────── */
+
+/* "Other Episodes/Songs This Community Boosts" carries a line saying what the
+   list actually is, and it belongs against the NAME of the list rather than in
+   the toolbar below it, where it would crowd the range buttons off a phone.
+   .ep-drawer > summary is a centered flex row, so the pair is one column inside
+   it and .drawer-hint's margin-left:auto still pins the SHOW/HIDE word right. */
+.cs-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+/* The title inherits the summary's Playfair; the sub-line deliberately does not
+   — it is a caption, and setting it in the display face at a small size reads as
+   a subtitle competing with the heading rather than as a note under it. */
+.cs-head-sub {
+  font: 400 0.78rem/1.45 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: var(--muted);
+}
+
 /* ── Other Episodes/Songs This Community Boosts ───────────────────────── */
 
-/* The one client-rendered section on either detail page. The SECTION ships
-   empty and its BODY ships hidden, which is not interchangeable: episode-page.js
-   watches the section with an IntersectionObserver to decide when to pull the
-   card renderer, and an observer never fires on a display:none target. An empty
-   section is a zero-height block that still has a position. Everything else here
-   describes a state the server never emits. */
+/* The one client-rendered section on either detail page, and the same OBJECT as
+   the show page's community drawer: an .ep-drawer whose <summary> is the
+   heading, with the sort band inside the lid. Only the rows differ, because
+   these are full episode cards where those are 44px links.
+
+   The SECTION ships empty and its DRAWER ships hidden, which is not
+   interchangeable: episode-page.js watches the section with an
+   IntersectionObserver to decide when to pull the card renderer, and an observer
+   never fires on a display:none target. An empty section is a zero-height block
+   that still has a position. Everything else here describes a state the server
+   never emits. */
 
 /* No margin of its own until it has content. .show-section carries a 2.75rem top
    margin, and an unhydrated section is empty, so with JavaScript off that margin
@@ -193,16 +236,11 @@
    not worth working around. */
 #community-episodes:has([data-ce-body][hidden]) { margin-top: 0; }
 
-/* The control band. Unlike the show page's, which sits inside a drawer's header
-   and is tinted to match it, this one sits directly under a section heading, so
-   it is a plain row rather than a lid. .cs-controls supplies the layout; this
-   only undoes the drawer treatment. */
-.ce-controls {
-  background: none;
-  border: 0;
-  padding: 0 0 0.35rem;
-  margin-bottom: 0.4rem;
-}
+/* The control band is .cs-controls unmodified — the same tinted lid-and-toolbar
+   stack both drawers on /show have. It carried a set of overrides that flattened
+   it into a plain row, from when this section was a bare <h2> with controls
+   under it rather than a drawer; those are gone, and the only delta left is the
+   one below. */
 
 /* .cs-controls pins its sort to the far end with margin-left:auto, because the
    show page's episode drawer puts a "See All Episodes" link at the other end of
@@ -235,11 +273,10 @@
   /* Stop a flick at the bottom of the list from carrying on into the page —
      the box is the thing being scrolled, so it should absorb the gesture. */
   overscroll-behavior: contain;
-  /* A hairline lid and floor, so the window reads as a window. .ep-list uses a
-     border-top for the same job; this one is not inside a drawer, so it needs
-     both edges to be legible as a container. */
+  /* A hairline lid, the way .ep-list has one on the show page. No floor: the
+     drawer's own bottom border is the floor now, and a second line one pixel
+     above it read as a doubled edge. */
   border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
   /* Room for .pcast-card's hover shadow and its focus ring, which would
      otherwise be shaved off against the container's edges. */
   padding: 0.45rem 0.35rem;
@@ -277,10 +314,15 @@
 }
 
 @media (max-width: 640px) {
-  /* Two controls on one row is tight beside a wrapped heading; let them wrap
-     rather than shrinking the sort pill's label out of legibility. */
-  .ce-controls {
-    flex-wrap: wrap;
-    row-gap: 0.4rem;
-  }
+  /* The card's padding comes in, and the drawers' negative margins have to
+     follow it exactly or the bands stop meeting the card's edges. */
+  .show-main--episode .ep-card { padding: 1rem 1rem 0; border-radius: 12px; }
+  .show-main--episode .ep-chapters,
+  .show-main--episode .ep-notes { margin-left: -1rem; margin-right: -1rem; }
+  .ep-chapter-btn { padding: 0.5rem 0.8rem; }
+  .ep-notes-body { padding: 0.85rem 0.8rem 1rem; }
+  /* The stacked summary is two lines before the SHOW/HIDE word gets a column of
+     its own; keep the caption legible rather than letting it shrink with the
+     heading. */
+  .cs-head-sub { font-size: 0.74rem; }
 }
