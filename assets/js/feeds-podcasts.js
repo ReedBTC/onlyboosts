@@ -69,7 +69,8 @@ export const COPY = {
     untitled: 'Untitled episode',
     listen: 'Listen to this episode',
     dated: 'Episode aired',
-    seeAllTitle: 'Open this episode on Boost Me Bitch',
+    seeAllTitle: 'Every indexed boost to this episode',
+    seeAllOutTitle: 'Open this episode on Boost Me Bitch',
     noun: 'episode',
     searchPlaceholder: 'Search episodes…',
     searchLabel: 'Search episodes',
@@ -90,7 +91,8 @@ export const COPY = {
     untitled: 'Untitled track',
     listen: 'Listen to this track',
     dated: 'Released',
-    seeAllTitle: 'Open this track on Boost Me Bitch',
+    seeAllTitle: 'Every indexed boost to this track',
+    seeAllOutTitle: 'Open this track on Boost Me Bitch',
     noun: 'track',
     searchPlaceholder: 'Search songs…',
     searchLabel: 'Search songs',
@@ -309,13 +311,16 @@ function subscribeLinks(item) {
   return out
 }
 
-// ── "See all boosts" link ────────────────────────────────────────────
+// ── The episode's own link ───────────────────────────────────────────
 // Adapter onto episode-link.js, which owns the target. Only the item→primitives
 // mapping lives here, because only this module knows the rollup's shape; the URL
-// itself is shared with show-page.js so both surfaces publish the same link.
-function boostMeBitchLink(item) {
+// itself is shared with show-page.js and episode-page.js so all three surfaces
+// publish the same link. It resolves to /episode/<item-guid> for a titled
+// episode and falls back to Boost Me Bitch for the 500 that have no page.
+function episodeNoteLink(item) {
   return episodeBoostLink({
     itemGuid: item.guid,
+    title: item.ep?.title || '',
     podcastGuid: item.ep?.podcast_guid || item.show?.podcast_guid || null,
     feedId: item.ep?.feed_id || item.show?.feed_id || null,
   })
@@ -419,7 +424,7 @@ async function onBoostClick(item, btn, copy = COPY.other) {
         episodeTitle: ep.title || '',
         podcastGuid: ep.podcast_guid || show?.podcast_guid || '',
         itemGuid: guid || '',
-        bmbUrl: boostMeBitchLink(item) || '',
+        bmbUrl: episodeNoteLink(item) || '',
       },
       recipientsBundle: { recipients, totalWeight },
     })
@@ -448,10 +453,18 @@ export function episodeCard(item, rank = null, copy = COPY.other) {
   const { ep, show, boosts, distinctBoosters, totalSats, latest } = item
   const detailsId = 'pcast-d-' + (++cardUid)
 
-  const bmbUrl = boostMeBitchLink(item)
+  // Two links, and the first is preferred everywhere it exists. `epHref` is
+  // this episode's page here; `outHref` is the Boost Me Bitch fallback, which
+  // only the 500 untitled episodes now use. See show-link.js for the rule and
+  // episode-link.js for what a boost note carries.
+  const epHref = episodePageHref(item.guid, ep.title)
+  const outHref = epHref ? null : episodeNoteLink(item)
 
-  // Episode art — links to the episode's Boost Me Bitch page (its full boost
-  // feed), the same target as the episode title and show name below.
+  // Episode art — links to the episode's page, the same target as the title
+  // below it. It used to open Boost Me Bitch in a new tab, which was the
+  // outbound half of a deliberate split back when the title was the only thing
+  // pointing at a page of ours; now that every episode surface resolves here,
+  // the art opening somewhere else would be the odd one out.
   //
   // Episode art first, then the show's primary and second-chance artwork. That
   // last link is what `art2` bought: a feed whose channel art 404s still paints
@@ -467,9 +480,11 @@ export function episodeCard(item, rank = null, copy = COPY.other) {
     media.appendChild(document.createTextNode('🎙'))
   })
   const mediaClass = 'pcast-card-media' + (hasArt ? '' : ' pcast-card-media--none')
-  const media = bmbUrl
-    ? h('a', { class: mediaClass, href: bmbUrl, target: '_blank', rel: 'noopener noreferrer', title: 'See all boosts on Boost Me Bitch' }, hasArt ? mediaImg : '🎙')
-    : h('div', { class: mediaClass }, hasArt ? mediaImg : '🎙')
+  const media = epHref
+    ? h('a', { class: mediaClass, href: epHref, title: `Nostr boosts to ${ep.title || copy.untitled}` }, hasArt ? mediaImg : '🎙')
+    : outHref
+      ? h('a', { class: mediaClass, href: outHref, target: '_blank', rel: 'noopener noreferrer', title: 'See all boosts on Boost Me Bitch' }, hasArt ? mediaImg : '🎙')
+      : h('div', { class: mediaClass }, hasArt ? mediaImg : '🎙')
 
   // Booster faces on the drawer bar, stacked — the first MAX_FACES of them.
   const avatars = h('span', { class: 'pcast-avatars' },
@@ -480,37 +495,32 @@ export function episodeCard(item, rank = null, copy = COPY.other) {
   const link = episodeLink(boosts, show, copy)
   const fountainUrl = link && link.episode ? link.url : null
 
-  // The episode TITLE goes to that episode's landing page on OnlyBoosts, the
-  // same move the show name below made when /show/<guid> landed: the name of a
-  // thing points at the page for that thing. It navigates IN PLACE, the way
-  // every other internal link on this site does; the art beside it and "See all
-  // boosts" in the drawer still open Boost Me Bitch in a new tab, so the
-  // outbound affordance is intact.
+  // The episode TITLE goes to that episode's landing page, the same move the
+  // show name below made when /show/<guid> landed: the name of a thing points at
+  // the page for that thing. It navigates in place, as the art above it and
+  // "See all boosts" in the drawer now do — every episode affordance on this
+  // card resolves to the same page, and the boost note published from it points
+  // there too.
   //
   // Falls back to the BMB link for an episode with no page — 500 of the 7,182
   // in the index have no title and so nothing to render a page from. Those cards
   // read "Untitled episode", which is exactly the case where sending someone to
   // a fuller record elsewhere is the right answer. See show-link.js for the rule.
-  //
-  // ⚠️ NOT the same target as a boost note's. assets/js/episode-link.js still
-  // resolves to BMB and is the single owner of that decision; this is a link a
-  // reader clicks, not a URL published into a note that cannot be recalled.
   const titleText = ep.title || copy.untitled
-  const epHref = episodePageHref(item.guid, ep.title)
   const titleEl = epHref
     ? h('a', { class: 'pcast-title pcast-title-link', href: epHref, title: `Nostr boosts to ${titleText}` }, titleText)
-    : bmbUrl
-      ? h('a', { class: 'pcast-title pcast-title-link', href: bmbUrl, target: '_blank', rel: 'noopener noreferrer', title: 'See all boosts on Boost Me Bitch' }, titleText)
+    : outHref
+      ? h('a', { class: 'pcast-title pcast-title-link', href: outHref, target: '_blank', rel: 'noopener noreferrer', title: 'See all boosts on Boost Me Bitch' }, titleText)
       : h('div', { class: 'pcast-title', text: titleText })
 
-  // Shownotes teaser: first ~2 lines of the description, with a link out to the
-  // full description on the episode's Boost Me Bitch page.
+  // Shownotes teaser: first ~2 lines of the description. The full notes are on
+  // the episode's own page, which the title and art above already link to.
   const descText = htmlToText(ep.description)
   const descP = descText ? h('p', { class: 'pcast-desc', text: descText }) : null
 
-  // A compact "Listen on Fountain" link under the description. (The old "See
-  // full description →" link was dropped — the art, show name, and title all
-  // link to the Boost Me Bitch page now.)
+  // A compact "Listen on Fountain" link under the description, and the only
+  // outbound link left on a titled card: the art, the title and "See all boosts"
+  // all resolve to /episode/<item-guid> now, and the show name to /show/<guid>.
   const linksRow = fountainUrl
     ? h('div', { class: 'pcast-links' }, [
         h('a', { class: 'pcast-fountain-link', href: fountainUrl, target: '_blank', rel: 'noopener noreferrer', title: 'Listen on Fountain' }, 'Listen on Fountain ↗'),
@@ -596,7 +606,7 @@ export function episodeCard(item, rank = null, copy = COPY.other) {
       details.hidden = true
       card.classList.remove('is-open')
     } else {
-      if (!built) { built = true; buildDetails(details, boosts, toggle, () => card, bmbUrl, copy) }
+      if (!built) { built = true; buildDetails(details, boosts, toggle, () => card, epHref, outHref, copy) }
       drawer.setAttribute('aria-expanded', 'true')
       details.hidden = false
       card.classList.add('is-open')
@@ -634,18 +644,25 @@ export function episodeCard(item, rank = null, copy = COPY.other) {
 // comments implied some weren't worth showing), then a bottom "hide" that
 // collapses the drawer and brings the card head back into view so a long
 // thread is easy to close without scrolling all the way back up.
-function buildDetails(details, boosts, toggle, getCard, bmbUrl, copy) {
+function buildDetails(details, boosts, toggle, getCard, epHref, outHref, copy) {
   for (const b of boosts) details.appendChild(boostRow(b))
   const hide = h('button', {
     class: 'pcast-drawer-close', type: 'button',
     onclick: () => { toggle(); try { getCard().scrollIntoView({ block: 'nearest' }) } catch {} },
   }, [h('span', { class: 'pcast-drawer-caret', 'aria-hidden': 'true', text: '▴' }), 'Hide boosts'])
-  const seeAll = bmbUrl
-    ? h('a', {
-        class: 'pcast-seeall', href: bmbUrl, target: '_blank', rel: 'noopener noreferrer',
-        title: copy.seeAllTitle,
-      }, ['See all boosts', h('span', { 'aria-hidden': 'true', text: ' ↗' })])
-    : null
+  // "See all boosts" now means this episode's own page, which is a fuller
+  // answer than the drawer above it: the drawer holds the boosts this feed
+  // loaded, where the page holds every one in the index plus the community
+  // rollup. The ↗ and the new tab go with the destination — they belong to a
+  // link that leaves the site, and only the untitled-episode fallback does.
+  const seeAll = epHref
+    ? h('a', { class: 'pcast-seeall', href: epHref, title: copy.seeAllTitle }, 'See all boosts')
+    : outHref
+      ? h('a', {
+          class: 'pcast-seeall', href: outHref, target: '_blank', rel: 'noopener noreferrer',
+          title: copy.seeAllOutTitle,
+        }, ['See all boosts', h('span', { 'aria-hidden': 'true', text: ' ↗' })])
+      : null
   details.appendChild(h('div', { class: 'pcast-details-foot' }, [seeAll, hide]))
 }
 

@@ -40,7 +40,7 @@ import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls,
 } from '/assets/js/feed-controls.js'
 import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js'
-import { showPageHref } from '/assets/js/show-link.js'
+import { showPageHref, episodePageHref } from '/assets/js/show-link.js'
 import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js'
 
 const PAGE_SIZE = 30
@@ -212,17 +212,29 @@ function renderBoostCard(b) {
       fmtSats(b.sats), h('span', { class: 'ob-bolt', 'aria-hidden': 'true', text: '⚡' }),
     ]))
   }
+  // The episode title goes to that episode's landing page — the same rule the
+  // Episodes cards apply, through the same module. It used to point at
+  // `episode.url`, the audio itself, which was the only destination this card
+  // had before the pages existed; that URL is now the fallback for the 500
+  // episodes with no title of their own to qualify them, and it opens in a new
+  // tab where the page navigates in place.
   if (b.episode.title) {
-    bits.push(isSafeUrl(b.episode.url)
+    const epHref = episodePageHref(b.episode.guid, b.episode.title)
+    bits.push(epHref
       ? h('a', {
-          class: 'ob-boost-ep', href: b.episode.url,
-          target: '_blank', rel: 'noopener noreferrer', text: b.episode.title,
+          class: 'ob-boost-ep', href: epHref,
+          title: `Nostr boosts to ${b.episode.title}`, text: b.episode.title,
         })
-      : h('span', { class: 'ob-boost-ep', text: b.episode.title }))
+      : isSafeUrl(b.episode.url)
+        ? h('a', {
+            class: 'ob-boost-ep', href: b.episode.url,
+            target: '_blank', rel: 'noopener noreferrer', text: b.episode.title,
+          })
+        : h('span', { class: 'ob-boost-ep', text: b.episode.title }))
   }
-  // The show name links to its landing page on OnlyBoosts. The episode title
-  // above it still points out to the audio, so the two aren't competing for
-  // the same destination.
+  // The show name links to its landing page. Both names on this row now point at
+  // the page for the thing they name, which is the same pairing the Episodes
+  // cards carry.
   if (b.podcast.title) {
     const href = showPageHref(b.podcast.guid)
     bits.push(href

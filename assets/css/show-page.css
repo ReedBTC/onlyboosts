@@ -596,6 +596,27 @@
   overflow-wrap: anywhere;
 }
 
+/* The title links to /episode/<item-guid>. Inherits the row's own weight and
+   colour rather than arriving in link blue: the whole row is one record and a
+   blue title inside it would read as the only meaningful part, the same
+   reasoning .cs-title follows in the community drawer below. The affordance is
+   the underline on hover, which is where a reader looks for it once the pointer
+   is already on the word. An untitled episode has no page and stays plain. */
+.ep-title-link {
+  color: inherit;
+  text-decoration: none;
+}
+.ep-title-link:hover {
+  color: var(--brand-d);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.ep-title-link:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
 .ep-num { color: var(--brand-d); }
 
 .ep-meta {

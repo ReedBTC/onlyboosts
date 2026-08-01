@@ -863,13 +863,35 @@ function renderCommunityShows(rows) {
 
 // The show's page on Boost Me Bitch.
 //
-// ⚠️ THE THIRD SURFACE ON THIS SITE POINTING AT BMB, and the second in this
-// file. assets/js/episode-link.js owns that target and documents the whole set;
-// a Pages Function cannot import a client module, so these are built here and
-// ALL OF THEM CHANGE TOGETHER. Show-level, so `?podcast=<guid>` alone: a /show
-// page carries no Podcast Index numeric id to prefer `?feed=` with.
+// ⚠️ THE LAST TWO SURFACES ON THIS SITE POINTING AT BMB, and both are in this
+// file: "See All Episodes" on the episode drawer's band, and a podroll tile for
+// a show we have no page of our own for. Every EPISODE link moved to
+// /episode/<item-guid>; these two stay because neither has an equivalent here.
+// The drawer lists only the episodes carrying an indexed boost, so "See All
+// Episodes" reaches the one thing this site does not hold — the show's full
+// catalogue — and 44% of podroll targets have no boosts and so no page.
+// assets/js/episode-link.js documents the whole set. Show-level, so
+// `?podcast=<guid>` alone: a /show page carries no Podcast Index numeric id to
+// prefer `?feed=` with.
 function bmbShowUrl(guid) {
   return `https://boostmebitch.com/?podcast=${encodeURIComponent(guid)}`;
+}
+
+// An episode's landing page here, or null when it has none.
+//
+// ⚠️ RESTATES assets/js/show-link.js#episodePageHref, and the two must agree. A
+// Pages Function cannot import a client module — nothing in functions/ reaches
+// outside functions/ — which is the same arrangement bmbShowUrl() is in. The
+// qualifying test is the TITLE, not the guid: the page is keyed on the item guid
+// alone and renders for an episode whose show we cannot identify, where an
+// episode Podcast Index could not name has nothing to render at all.
+//
+// The guid is only ever encoded, never parsed: 9% of them contain a slash and 30
+// are full http(s) URLs, and Cloudflare Pages keeps an encoded %2F inside one
+// path segment rather than routing on it.
+function episodePageUrl(itemGuid, title) {
+  if (!itemGuid || !title || !String(title).trim()) return null;
+  return `/episode/${encodeURIComponent(itemGuid)}`;
 }
 
 // One tile. `linked` is the collector's flag — boosts AND a title, the same rule
@@ -1028,6 +1050,13 @@ function renderEpisodes(rows, show, copy) {
 function episodeRow(e, copy, fallbackArt) {
   const bits = [fmtDate(e.published), fmtDuration(e.duration)].filter(Boolean);
   const art = (isSafeUrl(e.image) && e.image) || fallbackArt || null;
+  // The row's TITLE links to that episode's page, the same move the show name
+  // makes on every feed card: the name of a thing points at the page for that
+  // thing. The artwork beside it deliberately does not — a 44px thumbnail in a
+  // list row is not a target anyone aims for, and the row already carries a
+  // Boost button at its other end, so a third hit area would be three things to
+  // hit in 44 pixels. An untitled episode has no page and stays plain text.
+  const epUrl = episodePageUrl(e.item_guid, e.title);
   // boosters,boosts,sats,published — the four axes the drawer's sort offers,
   // packed one attribute per row the way the community drawer does it.
   const pack = [e.booster_count, e.boost_count, e.total_sats, e.published]
@@ -1037,7 +1066,11 @@ function episodeRow(e, copy, fallbackArt) {
             ? `<img class="ep-art" src="${htmlEscape(art)}" alt="" width="44" height="44" loading="lazy" referrerpolicy="no-referrer" />`
             : `<span class="ep-art ep-art--blank" aria-hidden="true">${copy.glyph}</span>`}
           <div class="ep-main">
-            <p class="ep-title">${e.episode_number ? `<span class="ep-num">${copy.itemAbbr} ${htmlEscape(e.episode_number)}</span> ` : ""}${htmlEscape(e.title || copy.untitledItem)}</p>
+            <p class="ep-title">${e.episode_number ? `<span class="ep-num">${copy.itemAbbr} ${htmlEscape(e.episode_number)}</span> ` : ""}${
+              epUrl
+                ? `<a class="ep-title-link" href="${htmlEscape(epUrl)}" title="Nostr boosts to ${htmlEscape(e.title)}">${htmlEscape(e.title)}</a>`
+                : htmlEscape(e.title || copy.untitledItem)
+            }</p>
             <p class="ep-meta">${bits.map(htmlEscape).join(" · ")}${bits.length ? " · " : ""}${htmlEscape(num(e.total_sats))} sats · ${htmlEscape(num(e.boost_count))} boost${e.boost_count === 1 ? "" : "s"}</p>
           </div>
           <button type="button" class="btn btn-boost btn-sm" data-ep-boost="${htmlEscape(e.item_guid || "")}" data-ep-title="${htmlEscape(e.title || "")}" hidden>Boost</button>

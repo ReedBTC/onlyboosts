@@ -25,6 +25,7 @@ import { showToast } from '/assets/js/copy-npub.js'
 import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js'
 import { ensureLoginWidget } from '/assets/js/widget-loader.js'
 import { rangeControl, sortControl, rangeDays } from '/assets/js/feed-controls.js'
+import { episodeBoostLink } from '/assets/js/episode-link.js'
 import { normalizeBoosts, toEpisodeShape } from '/assets/js/ob-data.js'
 import {
   initCopyNpub, initShowMore, initShare, initBackLink,
@@ -114,18 +115,25 @@ async function openBoost(bundle, { target, itemGuid, episodeTitle }) {
       episodeTitle: episodeTitle || '',
       podcastGuid: target?.guid || '',
       itemGuid: itemGuid || '',
-      // Deliberately empty rather than a link to this very page.
+      // A link to this very page, and it comes from the shared builder rather
+      // than from `location.href` — episode-link.js is the single owner of what
+      // a boost note points at, and this page does not get its own opinion. The
+      // two now agree, which is the point: an episode boosted from here
+      // publishes the same note it would from the feed.
       //
-      // assets/js/episode-link.js is the single owner of what a boost note
-      // points at, and it still resolves to Boost Me Bitch on every surface. A
-      // note published from here has to be identical to the same episode boosted
-      // from the Episodes feed, so this page does not get to make its own
-      // decision — flipping that target is one change in that one module, and
-      // the note the feed publishes follows at the same moment. Until then,
-      // passing this page's URL would give the same episode two different notes
-      // depending on where it was boosted from, which is the exact bug that
-      // module was written to fix.
-      bmbUrl: '',
+      // This field was deliberately empty until that builder moved off Boost Me
+      // Bitch, because a page passing its own URL while the feed passed BMB is
+      // exactly the two-notes-for-one-episode bug the module was written to fix.
+      bmbUrl: episodeBoostLink({
+        itemGuid: itemGuid || '',
+        title: episodeTitle || '',
+        podcastGuid: target?.guid || null,
+        // The page payload carries no Podcast Index numeric id, so the BMB
+        // fallback — reached only by an untitled episode, which this page
+        // cannot be, since a title is what qualifies it for a page — would
+        // resolve through ?podcast=<guid>.
+        feedId: null,
+      }) || '',
     },
     recipientsBundle: bundle,
   })

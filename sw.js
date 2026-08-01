@@ -272,7 +272,15 @@
 // the stale module leaves both the chapters drawer hidden and the notes cut at
 // 100 words. Both correct themselves on the second navigation, which is the case
 // this bump exists for.
-const VERSION = 'ob-v47';
+// ob-v48: every episode link on the site now resolves to /episode/<item-guid> —
+// the Episodes and Songs cards' artwork, title and "See all boosts", the Boosts
+// cards' episode title, and the URL written into a published boost note.
+// Required, and the note path is why: episode-link.js is a cached module, so a
+// returning visitor holding the old copy would keep PUBLISHING boostmebitch.com
+// links into events that cannot be recalled. The two show-level links on
+// /show/<guid> ("See All Episodes", the podroll tiles) are server-rendered and
+// deliberately unchanged.
+const VERSION = 'ob-v48';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;

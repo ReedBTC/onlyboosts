@@ -262,11 +262,15 @@ async function openBoost(bundle, { itemGuid = '', episodeTitle = '', target = SH
       podcastGuid: target?.guid || '',
       itemGuid,
       // Same builder the Episodes feed uses, so an episode boosted from here
-      // publishes the same note it would from the feed. Null on a show-level
-      // boost (no itemGuid), where there is no episode to point at; the note
-      // template omits both the link line and the `r` tag.
+      // publishes the same note it would from the feed — /episode/<item-guid>
+      // for a titled episode, Boost Me Bitch for the 500 with no page. Null on a
+      // show-level boost (no itemGuid), where there is no episode to point at;
+      // the note template omits both the link line and the `r` tag.
       bmbUrl: episodeBoostLink({
         itemGuid,
+        // The drawer row carries its title in data-ep-title, which is what
+        // decides whether this episode has a page of ours.
+        title: episodeTitle || '',
         podcastGuid: target?.guid || null,
         // The show payload carries no Podcast Index numeric id (see the
         // "two fields the feed doesn't carry" note in CLAUDE.md), so this

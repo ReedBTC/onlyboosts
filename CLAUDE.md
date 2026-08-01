@@ -757,40 +757,73 @@ booster identities, which `renderPodcasts` seeds before first paint — so the
 batched Primal lookup now only runs for stragglers the collector couldn't
 resolve.
 
-### The Boost Note's Episode Link
+### Every Episode Link Points at `/episode/<item-guid>`
 
-**Two surfaces start an external boost, and they must publish the same note.**
-`feeds-podcasts.js` (the Episodes/Songs cards) and `show-page.js` (the
-`/show/<guid>` episode rows) both call `LBLogin.openExternalBoost`, so they
-share one modal (`ExternalBoostModal.jsx`) and one orchestrator
-(`externalBoost.js`). What they did *not* share was the `bmbUrl` field:
-the feed built a link inline while the show page passed `''`, and
+**Six surfaces name an episode, and all six now resolve to its page here.** Five
+are hyperlinks a reader clicks; the sixth is the URL written into a published
+boost note, which is why the set was wired in two passes rather than one.
+
+| Surface | What links | Built by |
+|---|---|---|
+| Episodes / Songs cards | artwork, title, "See all boosts" in the drawer | `feeds-podcasts.js`, via `show-link.js#episodePageHref` |
+| `/episode` community cards | the same card, unchanged | the same |
+| Boosts cards | the episode title on the meta row | `boosts-feed.js`, same module |
+| `/show` episode drawer rows | the row's title | `functions/show/[guid].js#episodePageUrl` |
+| A published boost note | the content link line and the `r` tag | `episode-link.js#episodeBoostLink` |
+
+**The qualifying rule is the TITLE in all of them**, and each falls back to what
+it linked before rather than emitting a URL that 404s: 6,682 of the 7,182
+episodes carrying an indexed boost have one, and the other 500 are boosts tagged
+with an item guid Podcast Index cannot identify. Those keep the Boost Me Bitch
+link on the cards and in the note, and stay plain text in the `/show` drawer,
+where a row already carries a Boost button and had no link before.
+
+**⚠️ Two surfaces still point at boostmebitch.com on purpose, and both are
+show-level**, in `functions/show/[guid].js` through one `bmbShowUrl()`:
+
+- **"See All Episodes"** on the episode drawer's control band. The drawer lists
+  only the episodes carrying an indexed boost, so this link reaches the one thing
+  this site does not hold: the show's full catalogue.
+- **A podroll tile** for a show we have no page of our own for, which is 44% of
+  them.
+
+Neither has an equivalent here, which is the whole test. `episode-link.js`
+enumerates the set.
+
+**Two surfaces started an external boost and had to publish the same note.**
+`feeds-podcasts.js` and `show-page.js` both call `LBLogin.openExternalBoost`, so
+they share one modal (`ExternalBoostModal.jsx`) and one orchestrator
+(`externalBoost.js`). What they did *not* share was the `bmbUrl` field: the feed
+built a link inline while the show page passed `''`, and
 `buildExternalNoteTemplate` gates both the content link line and the `r` tag on
-it. The same episode boosted from the two pages therefore produced two
-different notes. Fixed by `assets/js/episode-link.js#episodeBoostLink`, which
-both now import.
+it, so the same episode boosted from the two pages produced two different notes.
+`episodeBoostLink` is the fix and is the single owner of that target — three
+surfaces import it now, `episode-page.js` being the third.
 
-**That module is the single owner of the target, and the target is now a
-decision rather than a constraint.** It resolved to boostmebitch.com because
-OnlyBoosts had no per-episode page; `/episode/<item-guid>` shipped and it still
-resolves there. **The flip was deliberately deferred, not forgotten** — moving it
-changes what every boost note published from every surface points at,
-permanently, so it is its own decision on its own commit rather than a side
-effect of the pages landing. When it is made it is one change in that one
-function and all three surfaces follow together, and it needs a fallback for the
-500 of 7,182 boosted episodes that have no title and so no page.
-`/show/<guid>` is **not** the replacement: a boost note is about one episode, so
-pointing it at the show would drop the part the reader wants.
+**⚠️ THE NOTE'S LINK IS PERMANENT, WHICH IS WHY IT MOVED ON ITS OWN DECISION.**
+It resolved to BMB from the fork because OnlyBoosts had no per-episode page, and
+the flip was held back when the pages shipped rather than being taken as a side
+effect of them. **Notes already published keep pointing at BMB and always will**:
+an event cannot be recalled. The URL it emits is **absolute** for the same
+reason — the string is read wherever the event is rendered, so a site-relative
+path would resolve against whatever client is displaying it.
 
-`episode-page.js` passes `bmbUrl: ''` for the same reason. It is the **third**
-surface to start an external boost, and an episode boosted from its own page has
-to publish the note the feed would publish; the page does not get its own
-opinion.
+`episode-page.js` passed `bmbUrl: ''` until that moment, deliberately: a page
+passing its own URL while the feed passed BMB is exactly the
+two-notes-for-one-episode bug the module exists to prevent. It now passes the
+shared builder's answer, which is this page's own URL, arrived at through the
+module rather than from `location.href` — the page does not get its own opinion.
 
-It returns null (caller sends `''`, template omits both) when there is no
-episode to point at, which is also what a **show-level** boost from
-`/show/<guid>` gets. Show pages carry no Podcast Index numeric id, so they
-always resolve through `?podcast=<guid>` where the feed can prefer `?feed=`.
+`episodeBoostLink` returns null (caller sends `''`, template omits both) when
+there is no episode to point at, which is also what a **show-level** boost from
+`/show/<guid>` gets. `/show/<guid>` is **not** the episode target and never was:
+a boost note is about one episode, so pointing it at the show would drop the part
+the reader wants.
+
+**The `/show` drawer row links its title and not its artwork**, where the feed
+card links both. A 44px thumbnail in a list row is not a target anyone aims for,
+and the row already carries a Boost button at its other end; a third hit area
+would be three things to hit in 44 pixels.
 
 ### Snapshot → card
 
@@ -920,10 +953,14 @@ link that works with **no JavaScript**, so it ships visible and only the sort is
 conditional; the community one holds nothing but a sort, so it still ships
 `hidden`. The band wraps on a narrow phone rather than squeezing either control.
 
-**It is the second surface pointing at boostmebitch.com**, and
-`assets/js/episode-link.js` still owns that target. The Function builds this URL
-inline because a Pages Function cannot import a client module; both files carry a
-⚠️ pointing at the other, and they change together.
+**It is one of the two surfaces still pointing at boostmebitch.com**, and it is
+the reason that link survived the sweep that moved every episode link onto
+`/episode/<item-guid>`: the drawer lists only the episodes carrying an indexed
+boost, so a show's FULL catalogue is the one thing this site cannot offer. The
+podroll tile for an unknown show is the other. `assets/js/episode-link.js` owns
+the target and enumerates the set; the Function builds the URL inline because a
+Pages Function cannot import a client module, and both files carry a ⚠️ pointing
+at the other.
 
 `.cs-controls` (the control band, mounted by **both** drawers) is `--cream-d`, not
 `--cream`. On the page background it read as a gap punched through the card, so
@@ -1157,9 +1194,9 @@ one page (63 entries) and two reverse lists.
 the show has a `/show/<guid>` page; **44% of cards are false** and link to
 `boostmebitch.com/?podcast=<guid>` in a new tab instead. Every one of the 371
 live edges carries a guid at both ends, so a tile is always linkable and the
-query selects no `*_url` column at all. This is the **third** surface pointing at
-BMB; `assets/js/episode-link.js` owns the target and enumerates all three, and
-the two in `[guid].js` resolve through one `bmbShowUrl()`.
+query selects no `*_url` column at all. This is one of the **two** remaining
+surfaces pointing at BMB, both show-level and both in this file through one
+`bmbShowUrl()`; `assets/js/episode-link.js` owns the target and enumerates them.
 
 **Neither heading carries a count, and neither may gain one.** Both figures are
 bounded by which feeds the collector has read, so a badge would state a fact
@@ -1231,14 +1268,15 @@ arrives encoded and `decodeURIComponent` recovers the original — **verified
 against production** (`/show/https%3A%2F%2Fexample.com%2Fa%2Fb` echoes the
 decoded string back in its 404) before the page was written.
 
-**One surface links to them: the episode TITLE on the Episodes and Songs
-cards.** It is the same move the show name made when `/show/<guid>` landed — the
-name of a thing points at the page for that thing — and it navigates in place,
-where the artwork beside it and "See all boosts" in the drawer still open Boost
-Me Bitch in a new tab. That split is deliberate: the outbound affordance stays,
-and the two names both go where they read as going.
+**Every episode link on the site resolves here** — the Episodes and Songs cards'
+artwork, title and "See all boosts", the Boosts cards' episode title, the `/show`
+episode drawer's rows, and the URL in a published boost note. See "Every Episode
+Link Points at `/episode/<item-guid>`" above for the full set and for the two
+show-level links that deliberately still leave the site. It is the same move the
+show name made when `/show/<guid>` landed: the name of a thing points at the page
+for that thing.
 
-`show-link.js#episodePageHref` owns the rule, next to `showPageHref` so the two
+`show-link.js#episodePageHref` owns the rule for the client surfaces, next to `showPageHref` so the two
 cannot drift. **The qualifying test is the TITLE, not the guid**, and that is not
 the show rule: the page is keyed on the item guid alone and renders for the 13
 episodes in the corpus whose show is unidentified, losing only the eyebrow link
@@ -1248,9 +1286,10 @@ is what fills the D1 `episodes` table — and the 500 it declines are the ones t
 render as "Untitled episode" and fall back to BMB. 947 of the linked guids are
 URL-shaped and all round-trip through one path segment.
 
-**Still unlinked, and each is its own decision:** the Boosts feed's cards, the
-`/show` episode drawer rows, and above all `episode-link.js` — see the note above
-for why that one is not a wiring job.
+`functions/show/[guid].js#episodePageUrl` restates it for the server-rendered
+drawer rows, because nothing in `functions/` can import a client module, and
+`episode-link.js` restates it again for the note path. **Three copies of one
+test, and they must agree**; each is marked.
 
 ### The Player Card: Chapters and Show Notes
 
