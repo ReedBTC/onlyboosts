@@ -256,7 +256,9 @@
 // assets/css/feed-cards.css so the new pages could link it, and a returning
 // visitor holding the PRECACHED index.html would render every feed card
 // unstyled until that new file fetched. Same shape as the ob-v9 bump, which
-// moved the theme tokens out of the same block.
+// moved the theme tokens out of the same block. The episode TITLE on the
+// Episodes and Songs cards also stops pointing at Boost Me Bitch and starts
+// pointing at /episode/<item-guid>, which rides the same bump.
 const VERSION = 'ob-v46';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;

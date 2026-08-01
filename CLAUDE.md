@@ -1231,9 +1231,26 @@ arrives encoded and `decodeURIComponent` recovers the original — **verified
 against production** (`/show/https%3A%2F%2Fexample.com%2Fa%2Fb` echoes the
 decoded string back in its 404) before the page was written.
 
-**Nothing links to these pages yet.** They are reachable by direct link and by
-the sitemap, and wiring them into the feeds and the show pages is a separate
-pass — see the `episode-link.js` note above for the one that matters most.
+**One surface links to them: the episode TITLE on the Episodes and Songs
+cards.** It is the same move the show name made when `/show/<guid>` landed — the
+name of a thing points at the page for that thing — and it navigates in place,
+where the artwork beside it and "See all boosts" in the drawer still open Boost
+Me Bitch in a new tab. That split is deliberate: the outbound affordance stays,
+and the two names both go where they read as going.
+
+`show-link.js#episodePageHref` owns the rule, next to `showPageHref` so the two
+cannot drift. **The qualifying test is the TITLE, not the guid**, and that is not
+the show rule: the page is keyed on the item guid alone and renders for the 13
+episodes in the corpus whose show is unidentified, losing only the eyebrow link
+and the boost button. Measured over the full 22,366-boost corpus, the rule links
+**6,682 of 7,182** episodes — exactly the collector's own `eps_enriched`, which
+is what fills the D1 `episodes` table — and the 500 it declines are the ones that
+render as "Untitled episode" and fall back to BMB. 947 of the linked guids are
+URL-shaped and all round-trip through one path segment.
+
+**Still unlinked, and each is its own decision:** the Boosts feed's cards, the
+`/show` episode drawer rows, and above all `episode-link.js` — see the note above
+for why that one is not a wiring job.
 
 ### Other Episodes/Songs This Community Boosts
 

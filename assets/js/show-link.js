@@ -1,9 +1,16 @@
-/* One place that decides whether a show title links to its landing page.
+/* One place that decides whether a title links to its landing page.
+ *
+ * Two landing pages, two rules, one module. The filename still says "show"
+ * because the show rule was here first and a module filename is not a URL — the
+ * same call the site makes for feeds-podcasts.js, which renders Episodes and
+ * Songs. See the naming note in CLAUDE.md.
  *
  * Show titles appear on three surfaces — the Shows feed's cards, the Episodes
  * feed's cards, and the boost cards' meta line — and all three link to
- * /show/<podcast-guid>. The rule for *whether* to link is subtle enough that
- * three copies of it would drift.
+ * /show/<podcast-guid>. Episode titles appear on the Episodes and Songs cards
+ * and link to /episode/<item-guid>. The rule for *whether* to link is subtle
+ * enough in both cases that copies of it would drift, and keeping the pair
+ * together is what stops the two rules drifting from each other.
  *
  * Two ways a title can have no page behind it:
  *
@@ -31,4 +38,36 @@ export function showPageHref(guid) {
   const g = guid.trim()
   if (!g || g.startsWith(SYNTHETIC_PREFIX)) return null
   return `/show/${encodeURIComponent(g)}`
+}
+
+/**
+ * The landing-page URL for an episode, or null when there isn't one.
+ *
+ * The qualifying rule is the TITLE, not the guid, and that is not the same test
+ * as the show one above. `functions/episode/[guid].js` serves a page for any
+ * episode the collector has enriched, and enrichment is what produces a title:
+ * 6,682 of the 7,182 episodes carrying an indexed boost have one, and that
+ * figure is exactly the collector's own `eps_enriched`. The other 500 are boosts
+ * tagged with an item guid Podcast Index cannot identify — they render as
+ * "Untitled episode" and have nothing behind them.
+ *
+ * A missing SHOW is deliberately not disqualifying, which is why nothing here
+ * looks at the podcast guid. 23 titled episodes carry none, and the page renders
+ * for them: it is keyed on the item guid alone, and only the eyebrow link and
+ * the boost button drop out.
+ *
+ * ⚠️ `itemGuid` IS SOMETIMES A URL rather than a UUID — 9% of the distinct guids
+ * contain a slash and 30 are full http(s) URLs — so it is encoded and never
+ * parsed. Cloudflare Pages keeps an encoded %2F inside one path segment rather
+ * than routing on it.
+ *
+ * Callers should treat null as "fall back to whatever they linked before":
+ * an unidentified episode is still a real card, it just has no page of ours.
+ */
+export function episodePageHref(itemGuid, title) {
+  if (typeof itemGuid !== 'string') return null
+  const g = itemGuid.trim()
+  if (!g) return null
+  if (typeof title !== 'string' || !title.trim()) return null
+  return `/episode/${encodeURIComponent(g)}`
 }

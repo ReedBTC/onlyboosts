@@ -51,7 +51,7 @@ import {
   rangeControl, sortControl, mountFeedControls,
 } from '/assets/js/feed-controls.js'
 import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js'
-import { showPageHref } from '/assets/js/show-link.js'
+import { showPageHref, episodePageHref } from '/assets/js/show-link.js'
 import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js'
 
 const VALUE_API = '/api/value'   // Podcast Index value-block proxy (splits)
@@ -480,12 +480,28 @@ export function episodeCard(item, rank = null, copy = COPY.other) {
   const link = episodeLink(boosts, show, copy)
   const fountainUrl = link && link.episode ? link.url : null
 
-  // Title links to the episode's Boost Me Bitch page (its full boost feed);
-  // plain text if we can't build that link.
+  // The episode TITLE goes to that episode's landing page on OnlyBoosts, the
+  // same move the show name below made when /show/<guid> landed: the name of a
+  // thing points at the page for that thing. It navigates IN PLACE, the way
+  // every other internal link on this site does; the art beside it and "See all
+  // boosts" in the drawer still open Boost Me Bitch in a new tab, so the
+  // outbound affordance is intact.
+  //
+  // Falls back to the BMB link for an episode with no page — 500 of the 7,182
+  // in the index have no title and so nothing to render a page from. Those cards
+  // read "Untitled episode", which is exactly the case where sending someone to
+  // a fuller record elsewhere is the right answer. See show-link.js for the rule.
+  //
+  // ⚠️ NOT the same target as a boost note's. assets/js/episode-link.js still
+  // resolves to BMB and is the single owner of that decision; this is a link a
+  // reader clicks, not a URL published into a note that cannot be recalled.
   const titleText = ep.title || copy.untitled
-  const titleEl = bmbUrl
-    ? h('a', { class: 'pcast-title pcast-title-link', href: bmbUrl, target: '_blank', rel: 'noopener noreferrer', title: 'See all boosts on Boost Me Bitch' }, titleText)
-    : h('div', { class: 'pcast-title', text: titleText })
+  const epHref = episodePageHref(item.guid, ep.title)
+  const titleEl = epHref
+    ? h('a', { class: 'pcast-title pcast-title-link', href: epHref, title: `Nostr boosts to ${titleText}` }, titleText)
+    : bmbUrl
+      ? h('a', { class: 'pcast-title pcast-title-link', href: bmbUrl, target: '_blank', rel: 'noopener noreferrer', title: 'See all boosts on Boost Me Bitch' }, titleText)
+      : h('div', { class: 'pcast-title', text: titleText })
 
   // Shownotes teaser: first ~2 lines of the description, with a link out to the
   // full description on the episode's Boost Me Bitch page.
@@ -502,9 +518,9 @@ export function episodeCard(item, rank = null, copy = COPY.other) {
     : null
 
   // Show name — links to the show's landing page on OnlyBoosts. It used to
-  // point at Boost Me Bitch alongside the art and the episode title; those two
-  // still do, so the outbound affordance is intact and the show NAME now goes
-  // to the show page, which is what it names. Falls back to plain text for a
+  // point at Boost Me Bitch alongside the art and the episode title; the ART
+  // still does, so the outbound affordance is intact, and both names now go to
+  // the page for the thing they name. Falls back to plain text for a
   // show with no page (no guid, or a synthetic one) — see show-link.js.
   const showHref = showPageHref(show?.podcast_guid)
   const showEl = show?.title
