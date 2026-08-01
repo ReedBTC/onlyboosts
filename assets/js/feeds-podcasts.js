@@ -64,7 +64,7 @@ const INITIAL_CARDS = 30       // episodes rendered per "load more" batch
 // ranking and the card are all identical and only the words change. That makes
 // the difference a copy table rather than a second renderer — see
 // ob-data.js#mediumPredicate for the split itself.
-const COPY = {
+export const COPY = {
   other: {
     untitled: 'Untitled episode',
     listen: 'Listen to this episode',
@@ -242,7 +242,7 @@ function episodeLink(boosts, show, copy) {
 // Group boosts by episode, resolve episode/show records, drop episodes we
 // can't render (null Podcast Index episode record → no title/art), and sort
 // by most-recent boost.
-function buildEpisodes(data) {
+export function buildEpisodes(data) {
   const { boosts = [], episodes = {}, shows = {} } = data || {}
   const byGuid = new Map()
   for (const b of boosts) {
@@ -444,7 +444,7 @@ let cardUid = 0
 // the sort isn't a ranking. Only the quantitative sorts (most boosters / most
 // boosts / most sats) get a number — on "Latest boost" or "Latest episode" a
 // rank would read as a score when it's really just chronology.
-function episodeCard(item, rank = null, copy = COPY.other) {
+export function episodeCard(item, rank = null, copy = COPY.other) {
   const { ep, show, boosts, distinctBoosters, totalSats, latest } = item
   const detailsId = 'pcast-d-' + (++cardUid)
 
@@ -758,6 +758,21 @@ function moreMenu(b) {
 const profiles = new Map()
 function profileFor(pubkey) { return profiles.get(pubkey) || null }
 
+/* Seed the map from identities that came embedded in the data feed.
+ *
+ * renderPodcasts does this inline for its own corpus; the episode page's
+ * community section is the second consumer of these cards and holds a corpus of
+ * its own, so the seeding is a function rather than a reach into a module map.
+ * setCachedProfile feeds the same identity to the boost-thread tokenizer, which
+ * is what makes an @mention chip inside a boost message agree with the avatar
+ * and display name above it.
+ */
+export function seedProfiles(map) {
+  for (const [pk, prof] of map) {
+    if (!profiles.has(pk)) { profiles.set(pk, prof); setCachedProfile(pk, prof) }
+  }
+}
+
 // nostr: mentions inside a boost message (npub / nprofile). Matches how
 // boosts-thread parses them — bare npubs without the scheme aren't linked
 // there either, so we keep parity.
@@ -797,7 +812,7 @@ async function fetchProfilesInto(pubkeys) {
 // Booster names/avatars now arrive embedded in the data feed, so this only
 // has to fetch the stragglers — records whose booster had no kind-0 when the
 // collector ran. Seeding happens in renderPodcasts before first paint.
-async function loadBoosterProfiles(items) {
+export async function loadBoosterProfiles(items) {
   const pks = new Set()
   for (const it of items) for (const b of it.boosts) {
     if (b.booster_pubkey && !profiles.has(b.booster_pubkey)) pks.add(b.booster_pubkey)
@@ -806,7 +821,7 @@ async function loadBoosterProfiles(items) {
   await fetchProfilesInto([...pks])
 }
 
-async function loadMentionProfiles(items) {
+export async function loadMentionProfiles(items) {
   const pks = new Set()
   for (const it of items) for (const b of it.boosts) for (const pk of mentionPubkeys(b.message)) pks.add(pk)
   await fetchProfilesInto([...pks].filter((pk) => !profiles.has(pk)))
@@ -815,9 +830,9 @@ async function loadMentionProfiles(items) {
 // ── Sorting ──────────────────────────────────────────────────────────
 // Sorts where a position means something. Kept next to SORT_OPTIONS so the
 // two can't drift — adding a quantitative sort means adding it here too.
-const RANKED_SORTS = new Set(['count', 'boosts', 'sats'])
+export const RANKED_SORTS = new Set(['count', 'boosts', 'sats'])
 
-const SORT_OPTIONS = [
+export const SORT_OPTIONS = [
   ['recent', 'Latest boost'],
   ['episode', 'Latest episode'],
   ['count', 'Most boosters'],
@@ -836,7 +851,7 @@ const SORTERS = {
   boosts: (a, b) => b.boosts.length - a.boosts.length || bySats(a, b),
   sats: bySats,
 }
-function sortItems(items, key) {
+export function sortItems(items, key) {
   return [...items].sort(SORTERS[key] || SORTERS.recent)
 }
 
@@ -849,7 +864,7 @@ function sortItems(items, key) {
 //
 // On the music side the same field is the track's release date, which is why
 // the tooltips come out of the copy table rather than being written here.
-function filterItems(items, key) {
+export function filterItems(items, key) {
   const cutoff = rangeCutoff(key)
   if (!cutoff) return items
   return items.filter((it) => (it.ep.published || 0) >= cutoff)
@@ -1006,9 +1021,7 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
     data = toEpisodeShape(rows.filter((b) => inMedium(b.podcast.guid)))
     // Seed from the embedded identities so the cards paint with real names
     // and avatars immediately — no profile round-trip, no repaint.
-    for (const [pk, prof] of data.profiles) {
-      if (!profiles.has(pk)) { profiles.set(pk, prof); setCachedProfile(pk, prof) }
-    }
+    seedProfiles(data.profiles)
   } catch (e) {
     console.error('[podcasts] fetch failed', e)
     renderPlaceholder(list, ...copy.loadFail)
@@ -1156,7 +1169,7 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
 // Swap decorative card avatars in place after profiles resolve, so we don't
 // tear down and rebuild the whole list. Modal rows read profileFor() live, so
 // they're already correct whenever a card is opened after this runs.
-function repaintProfiles(cards) {
+export function repaintProfiles(cards) {
   cards.querySelectorAll('.pcast-card').forEach((cardEl) => {
     const it = cardEl._pcastItem
     if (!it) return

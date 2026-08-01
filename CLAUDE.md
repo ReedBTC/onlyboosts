@@ -204,6 +204,16 @@ the `body[data-active-feed]` mapping — because those only mean anything on
 the page that has the feeds. `assets/css/page.css` is the counterpart for the
 plain content pages (`.page-header`, `.soon-card`).
 
+`assets/css/feed-cards.css` holds the **episode card and everything that hangs
+off it** — the range/sort controls, the card, the boost drawer, the inline boost
+thread, the copy toast, `.ob-stats-label` and `.feed-placeholder`. It was inline
+in `index.html` until `/episode/<guid>` needed the same cards. Every rule in it
+reads `--accent` / `--accent-d` / `--tint`, which `index.html` supplies per feed
+off `body[data-active-feed]` and `show-page.css` supplies on `.show-main`, so a
+page that links it has to supply them too. The Shows and Boosts feeds' own card
+variants build on `.pcast-card` but exist only on the homepage, and stay inline
+there.
+
 Those stylesheets were written against localbitcoiners' token names
 (`--cream`, `--navy`, `--orange`, `--green-d` …). Rather than rename ~300
 usages across five files, the old names are kept as **aliases repointed at
@@ -316,7 +326,13 @@ Carried from the scaffold commit and the LB suite:
 - `assets/js/boost-actions.js` — reply / like / repost / zap
 - `login-widget/` — NIP-07/46/nsec login, NWC + WebLN wallets, boost modals,
   multi-leg value-split payments, bug-report modal
-- `partials/` + `scripts/sync-partials.js` — shared nav/footer
+- `functions/show/[guid].js` + `functions/episode/[guid].js` — the two
+  edge-rendered detail pages, sharing `functions/_shared/detail-page.js` on the
+  server and `assets/js/detail-page.js` on the client
+- `assets/js/show-page.js` / `episode-page.js` — what each one adds on top
+- `partials/` + `scripts/sync-partials.js` — shared nav/footer. **Its
+  `EDGE_PAGES` list is what keeps the two Functions' nav and footer in sync**;
+  a new edge-rendered page needs an entry there and an empty marker pair.
 - `functions/api/data/[[path]].js` + `assets/js/ob-data.js` — the data feed
 - `bots/bug-watcher/` — polls the bug relay, opens GitHub issues
 - `bots/global-boost-scan/` — the network-wide collector: NIP-73
@@ -587,6 +603,13 @@ so everything downstream of the fetch sees one model and the card renderers are
 shared. `ob-live.js` caches nothing in-process — the shard cache is safe only
 because those files are immutable.
 
+A third consumer reads D1 directly rather than through `ob-live.js`:
+`/episode/<guid>`'s community section fetches
+`GET /api/v1/episodes/<item-guid>?community=1` itself, because it needs one
+bounded corpus once rather than a paging reader. It returns the same record
+shape, so it too runs through `normalizeBoosts` and everything downstream sees
+the one model.
+
 Two shapes on the live side: `followsBoostReader()` pages incrementally for the
 note feed, `getFollowsBoosts()` pulls a bounded corpus for the episodes rollup,
 which has to group and range-filter before it can paint anything. The corpus is
@@ -747,12 +770,22 @@ it. The same episode boosted from the two pages therefore produced two
 different notes. Fixed by `assets/js/episode-link.js#episodeBoostLink`, which
 both now import.
 
-**That module is the single owner of the target, and the target is temporary.**
-It resolves to boostmebitch.com only because OnlyBoosts has no per-episode page
-yet; when one lands, this function changes and every boost note follows. That is
-the entire reason it exists as a shared function rather than as two inline URL
-builders. `/show/<guid>` is **not** the replacement: a boost note is about one
-episode, so pointing it at the show would drop the part the reader wants.
+**That module is the single owner of the target, and the target is now a
+decision rather than a constraint.** It resolved to boostmebitch.com because
+OnlyBoosts had no per-episode page; `/episode/<item-guid>` shipped and it still
+resolves there. **The flip was deliberately deferred, not forgotten** — moving it
+changes what every boost note published from every surface points at,
+permanently, so it is its own decision on its own commit rather than a side
+effect of the pages landing. When it is made it is one change in that one
+function and all three surfaces follow together, and it needs a fallback for the
+500 of 7,182 boosted episodes that have no title and so no page.
+`/show/<guid>` is **not** the replacement: a boost note is about one episode, so
+pointing it at the show would drop the part the reader wants.
+
+`episode-page.js` passes `bmbUrl: ''` for the same reason. It is the **third**
+surface to start an external boost, and an episode boosted from its own page has
+to publish the note the feed would publish; the page does not get its own
+opinion.
 
 It returns null (caller sends `''`, template omits both) when there is no
 episode to point at, which is also what a **show-level** boost from
@@ -907,7 +940,7 @@ whose rows link on again — and because `manifest.webmanifest` declares
 all.
 
 It is **server-rendered as a real link to the feed** (`/#shows`, or `/#albums`
-off the `COPY` table) and `show-page.js#initBackLink` upgrades it to
+off the `COPY` table) and `detail-page.js#initBackLink` upgrades it to
 `history.back()` **only when `document.referrer` is same-origin**. That split is
 the point: a visitor who opened a shared link has no chain behind them, and
 `history.back()` would take them off the site or nowhere. The `href` survives the
@@ -932,7 +965,8 @@ one: a feed hash is read by a JS controller that can map an old form onto a new
 key and rewrite the bar, where these resolve in the browser's own anchor
 handling, which has nowhere to put a redirect.
 
-**That is now qualified rather than repealed.** `HASH_ALIASES` in `show-page.js`
+**That is now qualified rather than repealed.** `HASH_ALIASES`, passed to
+`initHashRouting()` in `detail-page.js`,
 does for a retired id exactly what `ALIASES` does for a feed hash: rewrites it
 with `replaceState` and scrolls. It carried `#inverse-podroll` →
 `#reverse-podroll` and holds that one entry, permanently. But it needs the module
@@ -950,7 +984,8 @@ Four pieces hold it up and they live in four files:
   is `position: sticky` at 64px, so without it an anchor scrolls the heading to
   y=0 and *behind the bar* — the reader's first visible line is the second line
   of what they followed a link to. `page.css` solved this for `/about` first;
-- **`revealHashTarget()`** in `show-page.js`, which opens any collapsed
+- **`revealHashTarget()`** inside `initHashRouting()` in `detail-page.js`,
+  which opens any collapsed
   `<details>` inside the targeted section. Exactly one case needs it: the episode
   drawer ships closed, so `#episodes` otherwise lands on a lid. It does **not**
   re-scroll afterwards — the drawer expands downward from a summary already at
@@ -967,7 +1002,8 @@ themselves would find; the address bar simply doesn't follow.
 
 ## Show pages: the hash follows the scroll
 
-`initHashSpy()` in `show-page.js`. An `rAF`-throttled scroll handler finds the
+`initHashSpy()` in `detail-page.js`, shared with `/episode/<guid>`. An
+`rAF`-throttled scroll handler finds the
 last `.show-section[id]` whose top has crossed the line and `replaceState`s its
 id, clearing back to the bare URL above the first one. **Copying the URL at any
 point yields a link back to that spot**, which is the whole point: the six ids
@@ -1087,7 +1123,8 @@ counts on two phones. 21 boosters show before the toggle
 from the show's raw RSS. The collector half is documented under "Podroll: the
 first field we parse from raw RSS" below; this is the site half.
 `renderPodroll` / `podrollTile` / `PODROLL_COPY` in `functions/show/[guid].js`,
-`.pr-*` in `show-page.css`, `initPodrollArt` in `show-page.js`.
+`.pr-*` in `show-page.css`, `initArt2('.pr-art[data-art2]', …)` in
+`show-page.js`.
 
 **Two sections, never one.** "Podroll - Recommended by Show Authors" and
 "Reverse Podroll - <Show Name> is Recommended By:", between the Nostr Community wall and
@@ -1155,6 +1192,153 @@ show pages into 500s to report a section 93% of them don't render. A failure
 degrades to no section, which is what a show with no podroll gets anyway. If the
 sections are missing everywhere, that is the thing to check first.
 
+## Episode pages
+
+`/episode/<item-guid>`, rendered by `functions/episode/[guid].js`. **The same
+page as `/show/<guid>`, one level down**: the hero, the `Nostr Boost Stats`
+tiles, the Nostr Community wall and the boost list are the same components, and
+both pages call them from the same two files. What differs is the subject, three
+sections that don't apply, and one that only exists here.
+
+| | `/show/<guid>` | `/episode/<guid>` |
+|---|---|---|
+| Hero | show art, eyebrow "Show", Boost this Show | episode art, eyebrow **is the show's name and links to its page**, Boost this Episode, an audio player |
+| Stats | show totals | that episode's |
+| `#episodes` | the show's episode drawer | — no equivalent |
+| Community rollup | `#community-shows` — other shows | `#community-episodes` — other **episodes**, as full feed cards |
+| `#community` | boosters of the show | boosters of the episode |
+| Podroll | both directions | — a podroll is a show-level tag |
+| `#boosts` | Recent Boosts, capped at 24 | **Episode Boosts, all of them** |
+
+**The three ids are frozen** the same way the show page's six are, and two of
+them are deliberately the *same* ids: `#community` and `#boosts` name the same
+section on both pages, so a reader who has learned one URL has learned both.
+`#community-episodes` and `#community-shows` are different sections listing
+different things, so they don't share one.
+
+**Qualifying rule: the episode has a title.** 6,682 of the 7,182 episodes
+carrying an indexed boost do; the other 500 are boosts tagged with an item guid
+Podcast Index can't identify, so there is nothing to render and they 404 — the
+same rule and the same reasoning as a titleless show. A missing *show* is not
+disqualifying: 23 titled episodes carry no podcast guid, and those lose the
+eyebrow link and the boost button and keep everything else.
+
+**⚠️ `item_guid` IS NOT ALWAYS A UUID, and it is the URL key.** 9% of the
+distinct guids contain a slash and 30 are full http(s) URLs, so it is only ever
+`encodeURIComponent`d and bound, never parsed or split. Cloudflare Pages keeps an
+encoded `%2F` inside one path segment rather than routing on it, so `params.guid`
+arrives encoded and `decodeURIComponent` recovers the original — **verified
+against production** (`/show/https%3A%2F%2Fexample.com%2Fa%2Fb` echoes the
+decoded string back in its 404) before the page was written.
+
+**Nothing links to these pages yet.** They are reachable by direct link and by
+the sitemap, and wiring them into the feeds and the show pages is a separate
+pass — see the `episode-link.js` note above for the one that matters most.
+
+### Other Episodes/Songs This Community Boosts
+
+The episode-level counterpart of the show page's community drawer, and the one
+section on either detail page that is **not server-rendered**.
+
+The community is the set of pubkeys that boosted this episode; the section is
+every other episode those pubkeys have boosted, painted as **the Episodes feed's
+own card** — artwork, air date, the `Nostr Stats:` line, the boost pill, the ⋮
+subscribe menu, an audio player, and the `Nostr Interactions:` drawer with a
+reply / like / repost / zap bar on every boost note inside it. It carries the
+same 1W/1M/All range and the same five sorts, tagged **`Community Sort:`** rather
+than `Sort:` for the same reason the show page's is: every figure on a card is
+what *these* boosters sent, never the episode's global totals.
+
+**The card is a JavaScript artifact, so the section is too.** A server-rendered
+version would be a second implementation of the site's most intricate component,
+guaranteed to drift from the one the homepage paints, and its action bar cannot
+exist without a signer at all. Reusing `feeds-podcasts.js#episodeCard` is what
+makes the two surfaces identical, which is the whole requirement. The cost is
+stated rather than hidden: **this section does not exist with JavaScript off**,
+where the rest of the page does, and `#community-episodes` has nothing to resolve
+to there. An empty heading over nothing is worse than no heading, so the module
+removes the section outright when the corpus is empty or unreachable.
+
+**The `<section>` ships empty and its BODY ships `hidden`, and the two are not
+interchangeable.** The hydration trigger is an `IntersectionObserver` on the
+section, and **an observer never reports a `display:none` target as
+intersecting** — a section that hid itself could never fire its own hydration.
+An empty section is a zero-height block that still has a position, which is
+exactly the sentinel the observer needs. The body is revealed *before* the fetch,
+so the heading and a "Loading…" line are the feedback that something is coming.
+
+**It is lazy in two ways.** `feeds-podcasts.js` and its ~200KB of transitive
+dependencies (nostr-tools, the boost thread, the action bar) are a **dynamic**
+import, and the corpus is fetched on an `IntersectionObserver` 800px out rather
+than on load. A reader who never scrolls past the community wall pays neither.
+
+**Not split on medium**, which every other rollup on this site is — the same call
+`renderCommunityShows` makes, for the same reason: a music community also
+boosting podcasts is the interesting half of the finding. Hence
+"Episodes/Songs" on both mediums and no `COPY` entry.
+
+**The corpus is capped at 2,000 boost rows and says when it capped.** Measured
+over all 22,366 indexed boosts, the fan-out behind this runs to a **median of 248
+rows across 189 distinct other episodes, a p90 of 1,171 and a maximum of 3,368**,
+so 2,000 truncates 1.6% of episodes. It is ordered newest-first, so a truncated
+corpus is a recent prefix of the community's history rather than an arbitrary
+slice — the same trade `ob-live.js` makes for the Follows feeds. The note under
+the last page of cards passes that on rather than letting a ranking over a prefix
+pose as a ranking over everything.
+
+`GET /api/v1/episodes/<item-guid>?community=1` is where it comes from. The
+endpoint returns the **standard boost record shape**, so the client runs it
+through `ob-data.js#normalizeBoosts` → `toEpisodeShape` → `buildEpisodes` and the
+cards are built from the same model as the feed's. A deduped side-table shape was
+measured and rejected: it saves 27% of the gzipped bytes and costs the one data
+model everything downstream of a fetch shares.
+
+**Rank first, filter second**, the same ordering the feeds' search contract
+depends on: rank over the whole window, then paint. Ranks are shown only on the
+quantitative sorts (`RANKED_SORTS`), because a numeral under "Latest boost" reads
+as a score when it is chronology.
+
+### What the two pages share, and where it lives
+
+Four files, and the split is server / client rather than show / episode:
+
+| | |
+|---|---|
+| `functions/_shared/detail-page.js` | escaping, the stat-tile number and date formats, the bech32 decoder behind the `@Name` chips in a boost message, `renderSupporters` (the community wall) and `renderBoosts` |
+| `assets/js/detail-page.js` | the back link, the section deep-links, the hash spy, copy-npub, "Show N more", the `art2` fallback, share, and the Primal profile backfill |
+| `assets/css/show-page.css` | linked by both; the episode page reuses its `.show-*` classes verbatim |
+| `assets/css/feed-cards.css` | the episode card, **extracted from `index.html`'s inline `<style>`** so the episode page could link it |
+
+All of it came out of the show page unchanged — these are moves, not rewrites.
+The episode page keeps the `.show-*` class names on identical boxes deliberately:
+a parallel `.episode-*` set would be a rename with no meaning behind it, the same
+call the site already makes for `lb-*` and `.sup-*`. `assets/css/episode-page.css`
+carries only the deltas.
+
+**`feed-cards.css` is a real extraction, not a restatement.** show-page.css
+*restates* the `.pcast-sort` rules under `.cs-controls` because that is one
+control; this is 370 lines, so index.html now links the file instead of holding
+it inline. That is why `sw.js` needed a `VERSION` bump — a returning visitor
+holding the precached `index.html` would paint every feed card unstyled until the
+new file fetched, the same shape as the `ob-v9` bump that moved the theme tokens
+out of the same block.
+
+**One behavioural change fell out of the move**: the hash spy now skips a section
+with no height. `#community-episodes` ships `display:none`, which reports a
+`top` of 0 — always under the line — so without the skip the spy would name it
+while the reader was still at the head of the document.
+
+**Sitemap: the substantial episodes only.** 6,682 qualify for a page against 934
+shows, and the median one has **one booster and two boosts**. A page built on one
+boost is worth existing — it is what a shared link resolves to and it carries a
+proper share card — and is thin to put in front of a crawler, so
+`functions/sitemap.xml.js` lists the **2,027** with three or more distinct
+boosters and leaves the rest to be found by link. Both halves carry canonical and
+OG tags either way; those are about the share card, not about crawling. The
+episode query is a `GROUP BY` over the whole boosts table where the show one is a
+single indexed scan, so it has its **own** `try` — a failure there must not cost
+the show entries that already succeeded.
+
 ## ⚠️ Show-level boosting, and the one boost button
 
 Boosting a SHOW (as opposed to an episode) pays the **feed-level** value block —
@@ -1181,6 +1365,11 @@ what keeps it on the stats line instead of taking a row.
 | Shows / Albums cards | `shows-feed.js#onShowBoost` | that show's feed block |
 | `/show` community drawer rows | `show-page.js#onCommunityBoost` | another show's |
 | `/show` hero button | `show-page.js#initBoosting` | this show's |
+| `/episode` hero button | `episode-page.js#initBoosting` | this episode |
+| `/episode` community cards | `feeds-podcasts.js#onBoostClick` | another episode |
+
+The last row is not a fifth handler: those cards **are** the Episodes feed's
+cards, so they carry its boost path unchanged. See the episode-pages section.
 
 **`boost-button.js` is chrome, not a money path.** It builds a button and
 reports clicks; each caller owns its own resolve-and-pay sequence, because what
@@ -1252,6 +1441,7 @@ projection in `6be0eb5`. So the D1-backed surfaces carry it too:
 | Shows / Albums cards | shard | img → art2 → glyph |
 | Boosts cards | shard | booster pic → show img → show art2 → silhouette |
 | `/show` hero | D1 `artwork` | img → `data-art2` → blank tile |
+| `/episode` hero | D1 `episodes.image` + `podcasts.artwork` | episode img → show img (`data-art2`) → show art2 (`data-art3`) → glyph |
 | `/show` community drawer rows | D1 `artwork` | img → `data-art2` → glyph |
 | `/show` podroll tiles | D1 `podroll.*_artwork` | img → `data-art2` → glyph |
 | `/api/v1/podcasts`, `…/<guid>` | D1 `artwork` | returned as `art2` |
@@ -1261,7 +1451,7 @@ one where it mattered most: those rows are *other* shows' artwork, so a single
 show with a dead primary rendered broken on every page that lists it while its
 own page had already recovered. The cause was the query rather than the render —
 the community CTE selected `p.image` and not `p.artwork`. All three `/show`
-surfaces now run through one `wireArt2()` in `show-page.js` — the hero, the
+surfaces now run through one `wireArt2()` in `detail-page.js` — the hero, the
 community rows and the podroll tiles, the last of which is the same case again:
 8 of the 371 podroll edges carry an art2, and Homegrown Hits (the show the whole
 chain exists for) is in Bowl After Bowl's podroll.
@@ -1272,8 +1462,15 @@ go on to `art2`; see the note over `episodeRow`. It bites only where a show has 
 dead primary *and* an episode with no art, and episode art was 100% present on
 every show sampled.
 
+The episode hero is the one surface whose chain is **two** fallbacks long rather
+than one, because an episode with no art of its own falls back to the show's
+primary before the show's second chance — the same order `toEpisodeShape` builds
+for the feed cards. `data-art3` is that third link and exists nowhere else;
+`wireArt2` reads both attributes and `coverChain` dedupes, so a show whose
+`art2` equals its `image` still costs one request rather than two.
+
 **On `/show` it is a `data-art2` attribute, not a second `<img>` or an inline
-`onerror`.** The Function emits the attribute and `show-page.js#initHeroArt`
+`onerror`.** The Function emits the attribute and `detail-page.js#initArt2`
 wires the swap through the same `cover-art.js` helpers the feeds use, so there
 is **no fetch at all** and the house's no-inline-handler convention holds. It
 also handles the case the deferred module can't observe directly: the hero is
@@ -1356,7 +1553,8 @@ two holes it cannot cover:
 |---|---|---|
 | Episodes / Songs | Primal (`loadBoosterProfiles`) | Primal (`loadMentionProfiles`) |
 | Boosts | Primal (`hydrateProfiles`, post-paint per page) | same pass |
-| `/show/<guid>` | Primal (`hydrateProfiles` in `show-page.js`) | same pass |
+| `/show/<guid>` | Primal (`hydrateProfiles` in `detail-page.js`) | same pass |
+| `/episode/<guid>` | same module, same pass | same pass |
 
 Primal is a **cache, not a relay fan-out**: one WebSocket, one batch, ~6s
 timeout. A normal client would ask relays; this answers a page of pubkeys in a

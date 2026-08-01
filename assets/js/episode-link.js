@@ -7,12 +7,29 @@
  * places produced two different notes, one carrying a link and an `r` tag and
  * one carrying neither.
  *
- * ⚠️  THE TARGET IS TEMPORARY. It resolves to boostmebitch.com because
- * OnlyBoosts has no per-episode page yet. When it does, this function changes
- * and every boost note follows; that is the whole reason it exists as a
- * function rather than as two inline URL builders. Show pages (`/show/<guid>`)
- * already exist and are NOT the target: a boost note is about one episode, and
- * pointing it at the show would drop the part the reader cares about.
+ * ⚠️  THE TARGET IS STILL boostmebitch.com, AND THAT IS NOW A DECISION RATHER
+ * THAN A CONSTRAINT. It was written when OnlyBoosts had no per-episode page;
+ * `/episode/<item-guid>` (functions/episode/[guid].js) shipped alongside this
+ * note and the pages exist. The flip was deliberately deferred: changing the
+ * line below changes what every boost note published from every surface points
+ * at, permanently and unrecallably, so it is its own decision on its own commit
+ * rather than a side effect of the pages landing.
+ *
+ * When it is made, it is ONE change here and every surface follows at the same
+ * moment — which is the whole reason this exists as a function rather than as
+ * inline URL builders. Two things go with it:
+ *
+ *   - 6,682 of the 7,182 episodes carrying an indexed boost qualify for a page
+ *     (they have a title). The other 500 do not, so the builder still needs a
+ *     fallback for them rather than emitting a URL that 404s.
+ *   - `assets/js/episode-page.js` passes `bmbUrl: ''` today for exactly this
+ *     reason: an episode boosted from its own page must publish the same note it
+ *     would from the feed, and until this function moves, the feed's note is the
+ *     BMB one.
+ *
+ * Show pages (`/show/<guid>`) are NOT the target and never were: a boost note is
+ * about one episode, and pointing it at the show would drop the part the reader
+ * cares about.
  *
  * ⚠️  TWO OTHER SURFACES point at BMB and are not built here. Both are in
  * functions/show/[guid].js, both are SHOW-level rather than episode-level, and

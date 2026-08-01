@@ -251,7 +251,13 @@
 // runs the other way, old id to new, which is the direction that keeps links
 // already sent working. initHashSpy is new in the same module and needs nothing
 // from the stylesheet.
-const VERSION = 'ob-v45';
+// ob-v46: /episode/<item-guid> landing pages. Required, not cosmetic: the
+// episode-card CSS that lived in index.html's inline <style> moved out to
+// assets/css/feed-cards.css so the new pages could link it, and a returning
+// visitor holding the PRECACHED index.html would render every feed card
+// unstyled until that new file fetched. Same shape as the ob-v9 bump, which
+// moved the theme tokens out of the same block.
+const VERSION = 'ob-v46';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;
@@ -278,6 +284,11 @@ const PRECACHE_URLS = [
   '/assets/css/footer.css',
   '/assets/css/boosts-thread.css',
   '/assets/css/boost-actions.css',
+  // The episode card and its drawer. Precached alongside the others because the
+  // homepage's feeds are painted in it and it used to be inline in index.html,
+  // which IS precached — leaving it out would trade an inline block for a
+  // network round trip on the one page this list exists to make fast.
+  '/assets/css/feed-cards.css',
   '/assets/js/boosts-thread.js',
   // A static import of boosts-thread.js, so precaching that without this one
   // leaves a returning visitor fetching half the graph from the network.

@@ -1,0 +1,738 @@
+// GET /episode/:guid — one episode's landing page, server-rendered at the edge.
+//
+// The episode-level counterpart of functions/show/[guid].js, and deliberately
+// the same page: the hero, the stat tiles, the Nostr Community wall and the
+// boost list are the same components off functions/_shared/detail-page.js, and
+// the client half shares detail-page.js on the other side too. What differs is
+// the subject, three sections that do not apply, and one that only exists here.
+//
+// WHY SERVER-RENDERED, when every other page on this site is static HTML plus a
+// client fetch: the Open Graph card. This page exists to be shared, and a
+// crawler handed an empty shell produces a blank preview, which defeats the
+// point. See the same note on the show page.
+//
+// ⚠️ THE URL KEY IS THE RSS `item_guid`, AND IT IS NOT ALWAYS A UUID. 9% of the
+// distinct guids in the index contain a slash and 30 of them are full http(s)
+// URLs, which is why it is only ever encoded and bound, never parsed or split.
+// Cloudflare Pages keeps an encoded %2F inside a single path segment rather than
+// splitting the route on it, so `params.guid` arrives encoded and
+// decodeURIComponent recovers the original. Verified against production before
+// this page was written.
+//
+// NAV/FOOTER markup between the marker comments is GENERATED — edit
+// partials/nav.html or partials/footer.html and run scripts/sync-partials.js.
+// Do not hand-edit it here.
+import {
+  htmlEscape, jsonForScript, isSafeUrl, num, compact, fmtDate, relTime,
+  fmtDuration, truncate, lookupMentionNames,
+  renderSupporters, renderBoosts,
+} from "../_shared/detail-page.js";
+
+const SITE_ORIGIN = "https://onlyboosts.social";
+
+// ⚠️ EVERY SECTION id ON THIS PAGE IS A PUBLIC URL, exactly as on /show/<guid>:
+// `/episode/<guid>#community` is how someone shares one part of it. The three
+// ids below are a contract with links in the wild and **must not be renamed**:
+//
+//   #community-episodes   #community   #boosts
+//
+// Two of them are the show page's ids, and that is on purpose — the same
+// section keeps the same name on both pages, so a reader who has learned one
+// URL has learned both. #community-episodes is this page's own; the show page's
+// equivalent is #community-shows, and the two are different sections listing
+// different things, so they do not share an id either.
+//
+// Three pieces of support live elsewhere and go with them: `scroll-margin-top`
+// on .show-section in show-page.css (the nav is sticky, so a bare anchor puts
+// the heading behind it), and initHashRouting() / initHashSpy() in
+// detail-page.js, which open a collapsed drawer that is linked to and keep the
+// address bar tracking the section being read.
+//
+// ⚠️ ONE HONEST GAP: #community-episodes is CLIENT-RENDERED (see the section
+// note below), so with JavaScript off there is nothing for that anchor to
+// resolve to. The other two are server-rendered and resolve either way.
+const OG_FALLBACK = `${SITE_ORIGIN}/assets/onlyboosts_banner.png`;
+
+// Episode guids are UUIDs at 36 characters and run to 101 in the live index
+// (the longest is a `<pubkey>:<uuid>` pair). The cap leaves generous slack for
+// the odd-but-real values without letting a kilobyte string reach a bound query.
+const GUID_MAX = 400;
+
+// Every boost to this episode, not a page of them: the user-facing promise of
+// the section is that it lists all of them, and it can keep it — the busiest
+// episode in the index has 55 boosts and the median has 2. This is a guard
+// against a pathological row rather than a page size.
+const BOOSTS_CAP = 500;
+
+export async function onRequestGet({ env, params }) {
+  let guid = params.guid;
+  if (Array.isArray(guid)) guid = guid[0];
+  try { guid = decodeURIComponent(guid); } catch { /* keep the raw form */ }
+  if (!guid || guid.length > GUID_MAX) return notFound(guid);
+
+  const ep = await env.DB.prepare(
+    `SELECT e.item_guid, e.podcast_guid, e.title, e.image, e.published, e.duration,
+            e.episode_number, e.enclosure_url, e.boost_count, e.total_sats,
+            p.title AS p_title, p.image AS p_image, p.artwork AS p_artwork,
+            p.feed_url AS p_feed, p.medium AS p_medium, p.author AS p_author
+     FROM episodes e
+     LEFT JOIN podcasts p ON p.podcast_guid = e.podcast_guid
+     WHERE e.item_guid = ?`
+  ).bind(guid).first();
+
+  // The qualifying rule, and the whole of it — the same one the show page
+  // applies. 6,682 of the 7,182 episodes carrying an indexed boost have a
+  // title; the other 500 are boosts tagged with an item guid Podcast Index
+  // can't identify, so there is genuinely nothing to render. They keep their
+  // boosts in every feed; they just have no page.
+  //
+  // A missing SHOW is not disqualifying. 23 titled episodes carry no podcast
+  // guid, and the page degrades cleanly: no eyebrow link, no boost button, and
+  // the community sections work unchanged because they are keyed on the
+  // episode.
+  if (!ep || !ep.title) return notFound(guid);
+
+  const [sups, boosts, boosters] = await Promise.all([
+    env.DB.prepare(
+      // Ranked by sats sent to THIS EPISODE, all time. idx_boosts_item covers
+      // the WHERE. The ORDER BY is a total order deliberately: this response is
+      // edge-cached, and a tie on both sats and boosts would otherwise let two
+      // boosters swap places between renders.
+      `SELECT b.booster_pubkey, b.booster_npub,
+              SUM(COALESCE(b.sats, 0)) AS sats,
+              COUNT(*)                 AS boosts,
+              pr.name, pr.display_name, pr.picture
+       FROM boosts b
+       LEFT JOIN profiles pr ON pr.pubkey = b.booster_pubkey
+       WHERE b.item_guid = ?
+       GROUP BY b.booster_pubkey
+       ORDER BY sats DESC, boosts DESC, b.booster_pubkey
+       LIMIT ?`
+    ).bind(guid, BOOSTS_CAP).all(),
+    env.DB.prepare(
+      `SELECT b.event_id, b.booster_pubkey, b.booster_npub, b.created_at, b.sats,
+              b.message, pr.name AS pr_name, pr.display_name AS pr_dname,
+              pr.picture AS pr_pic
+       FROM boosts b
+       LEFT JOIN profiles pr ON pr.pubkey = b.booster_pubkey
+       WHERE b.item_guid = ?
+       ORDER BY b.created_at DESC, b.event_id DESC LIMIT ?`
+    ).bind(guid, BOOSTS_CAP).all(),
+    // booster_count is NOT a column on `episodes` — the collector stores boosts
+    // and sats per episode but not distinct boosters — so the third stat tile
+    // is derived. One indexed lookup through idx_boosts_item.
+    env.DB.prepare(
+      `SELECT COUNT(DISTINCT booster_pubkey) AS n, MAX(created_at) AS latest
+       FROM boosts WHERE item_guid = ?`
+    ).bind(guid).first(),
+  ]);
+
+  const boostRows = boosts.results || [];
+  const names = await lookupMentionNames(env, boostRows.map((r) => r.message));
+
+  const html = renderEpisodePage({
+    ep,
+    supporters: sups.results || [],
+    boosts: boostRows,
+    boosterCount: boosters?.n || 0,
+    latestTs: boosters?.latest || null,
+    names,
+  });
+
+  return new Response(html, {
+    status: 200,
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      // The collector runs a five-minute cycle, so anything tighter buys
+      // nothing but origin load.
+      "Cache-Control": "public, max-age=300",
+    },
+  });
+}
+
+// ── Copy ─────────────────────────────────────────────────────────────────────
+//
+// Everything that differs between a podcast episode and a music track. Nothing
+// structural does, which is the same arrangement as the COPY tables in
+// functions/show/[guid].js, shows-feed.js and feeds-podcasts.js: the medium
+// changes the words, never the layout, so a third medium is a third entry here
+// rather than a second page.
+//
+// The medium comes from `<podcast:medium>` on the SHOW, projected onto the
+// podcasts table by the collector — an episode carries no medium of its own,
+// because the medium is a property of the feed it belongs to. copyFor() defaults
+// to `podcast`, matching the namespace default and the partition rule in
+// CLAUDE.md: an episode whose show we cannot identify is not called a track.
+const COPY = {
+  podcast: {
+    eyebrow: "Episode",
+    noun: "episode",
+    glyph: "🎙",
+    boostBtn: "Boost this Episode",
+    itemAbbr: "Ep.",
+    boostsHeading: "Episode Boosts",
+    ldType: "PodcastEpisode",
+    seriesType: "PodcastSeries",
+    seriesProp: "partOfSeries",
+    // Where the back link points for a visitor who has nowhere to go back TO
+    // (a shared link, a search result). detail-page.js swaps it for
+    // history.back() when the previous document was ours.
+    backHref: "/#episodes-global",
+    backLabel: "All Episodes",
+    // Deliberately "By", never "Host" or "Creator". The source is
+    // <itunes:author> on the show, whoever the publisher named there: usually
+    // the host, sometimes a network ("Jupiter Broadcasting"), occasionally a
+    // tagline. "By Jupiter Broadcasting" is true of all three; "Host:" is not.
+    credit: "By",
+    dated: "Aired",
+  },
+  music: {
+    eyebrow: "Track",
+    noun: "track",
+    glyph: "💿",
+    boostBtn: "Boost this Track",
+    itemAbbr: "Track",
+    boostsHeading: "Track Boosts",
+    ldType: "MusicRecording",
+    seriesType: "MusicAlbum",
+    seriesProp: "inAlbum",
+    backHref: "/#songs-global",
+    backLabel: "All Songs",
+    // On a music feed <itunes:author> IS the artist, and cleanly so: 97.4% of
+    // album pages carry a usable one. The stronger label is earned here in a
+    // way it is not on the podcast side.
+    credit: "Artist",
+    dated: "Released",
+  },
+};
+
+const copyFor = (medium) => (medium === "music" ? COPY.music : COPY.podcast);
+
+// The show's credit line, or "" when there is nothing honest to print. Two
+// rejections, both deliberate: an EMPTY author, and one that merely repeats the
+// SHOW title (~7% of rows) after normalizing case, punctuation and a leading
+// "The". Note it is compared against the show's title and not the episode's —
+// "By Bowl After Bowl" under an episode heading is a real credit, where the same
+// string on the show's own page is noise.
+//
+// Nothing else is filtered. A tagline like "Bitcoin is for Everyone" reads oddly
+// and still ships, because any rule sharp enough to catch it also eats real
+// names, and a wrongly suppressed credit is worse than an awkward one.
+function usableAuthor(ep) {
+  const author = String(ep.p_author || "").trim();
+  if (!author) return "";
+  const norm = (v) => String(v || "").toLowerCase().replace(/^the\s+/, "").replace(/[^a-z0-9]+/g, "");
+  return norm(author) === norm(ep.p_title) ? "" : author;
+}
+
+// ── the page ─────────────────────────────────────────────────────────────────
+
+function renderEpisodePage({ ep, supporters, boosts, boosterCount, latestTs, names }) {
+  const copy = copyFor(ep.p_medium);
+  const title = ep.title;
+  const showTitle = ep.p_title || "";
+  const pageUrl = `${SITE_ORIGIN}/episode/${encodeURIComponent(ep.item_guid)}`;
+  const showUrl = ep.podcast_guid ? `/show/${encodeURIComponent(ep.podcast_guid)}` : null;
+
+  // The art chain, which is one link longer than the show page's. An episode
+  // with no art of its own falls back to the show's, and only then to the
+  // show's second-chance <itunes:image> — the same order ob-data.js builds for
+  // the feed cards, so the two surfaces recover from a dead URL identically.
+  const chain = [ep.image, ep.p_image, ep.p_artwork]
+    .filter((u) => isSafeUrl(u))
+    .filter((u, i, a) => a.indexOf(u) === i);
+  const [art, art2, art3] = chain;
+
+  // A music release leads with its artist, the way every music service titles
+  // one. 97.4% of music feeds carry a usable artist; the rest fall back to the
+  // standard form rather than printing a dangling separator.
+  //
+  // og:image stays on the PRIMARY, deliberately: a crawler cannot run the error
+  // handler, and art2's presence means the feed publishes two different URLs
+  // rather than that the first is dead. Four of the five shows carrying one have
+  // a perfectly good primary.
+  const artist = copy.ldType === "MusicRecording" ? usableAuthor(ep) : "";
+  const ogTitle = artist
+    ? `${artist} — ${title} | OnlyBoosts`
+    : showTitle
+      ? `${title} — ${showTitle} | OnlyBoosts`
+      : `${title} — Boosts on Nostr | OnlyBoosts`;
+
+  // Synthesized from the boost data rather than copied from the episode's own
+  // shownotes. THE SCOPE HAS TO BE INSIDE THE SENTENCE, not merely on the page:
+  // this is the one string that travels without the page around it, into a Nostr
+  // client's preview card or a group chat, where nothing else qualifies it. A
+  // bare "3 boosters have sent…" reads as a verdict on the episode's whole
+  // audience. Don't trim it.
+  const one = boosterCount === 1;
+  const ogDesc = boosterCount
+    ? `${num(boosterCount)} Nostr booster${one ? " has" : "s have"} sent ` +
+      `${num(ep.total_sats)} sats to ${title}${showTitle ? ` (${showTitle})` : ""} across ` +
+      `${num(ep.boost_count)} boost${ep.boost_count === 1 ? "" : "s"}. Counts cover only ` +
+      `boosts published to Nostr; most boosting is keysend and never appears.`
+    : `Boosts published to Nostr for ${title}, indexed by OnlyBoosts.`;
+
+  const ld = {
+    "@context": "https://schema.org",
+    "@type": copy.ldType,
+    name: title,
+    url: pageUrl,
+    ...(ep.published ? { datePublished: new Date(Number(ep.published) * 1000).toISOString().slice(0, 10) } : {}),
+    ...(ep.episode_number ? { episodeNumber: ep.episode_number } : {}),
+    ...(art ? { image: art } : {}),
+    ...(showTitle ? { [copy.seriesProp]: { "@type": copy.seriesType, name: showTitle, ...(showUrl ? { url: SITE_ORIGIN + showUrl } : {}) } } : {}),
+    ...(artist ? { byArtist: { "@type": "MusicGroup", name: artist } } : {}),
+  };
+
+  // MONEY PATH INPUT. /api/value resolves this episode's own value block from
+  // Podcast Index at click time, keyed on the show's guid and/or feed URL plus
+  // the item guid. An episode with no block of its own falls back to the feed's
+  // server-side, so an episode of a boostable show is boostable.
+  const boostPayload = {
+    guid: ep.podcast_guid || null,
+    title: showTitle,
+    feed: isSafeUrl(ep.p_feed) ? ep.p_feed : null,
+    img: art || null,
+    itemGuid: ep.item_guid,
+    episodeTitle: title,
+  };
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Shared CSP. Every page carries the same policy so tightening happens in
+       lockstep; see CLAUDE.md. -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    script-src 'self' 'unsafe-inline' 'unsafe-eval';
+    style-src 'self' 'unsafe-inline';
+    img-src 'self' data: https:;
+    font-src 'self' data:;
+    connect-src 'self' https: wss:;
+    media-src 'self' https:;
+    base-uri 'self';
+    form-action 'self';
+    object-src 'none';
+  " />
+
+  <title>${htmlEscape(ogTitle)}</title>
+  <meta name="description" content="${htmlEscape(ogDesc)}" />
+  <link rel="canonical" href="${htmlEscape(pageUrl)}" />
+  <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
+
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#00aff0" />
+  <link rel="apple-touch-icon" href="/assets/onlyboosts_pfp.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="OnlyBoosts" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="${htmlEscape(pageUrl)}" />
+  <meta property="og:title" content="${htmlEscape(ogTitle)}" />
+  <meta property="og:description" content="${htmlEscape(ogDesc)}" />
+  <meta property="og:site_name" content="OnlyBoosts" />
+  <meta property="og:image" content="${htmlEscape(art || OG_FALLBACK)}" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="${htmlEscape(ogTitle)}" />
+  <meta name="twitter:description" content="${htmlEscape(ogDesc)}" />
+  <meta name="twitter:image" content="${htmlEscape(art || OG_FALLBACK)}" />
+  ${isSafeUrl(ep.p_feed) ? `<link rel="alternate" type="application/rss+xml" title="${htmlEscape(showTitle || title)}" href="${htmlEscape(ep.p_feed)}" />` : ""}
+
+  <script type="application/ld+json">
+  ${jsonForScript(ld)}
+  </script>
+
+  <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
+  <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
+
+  <link rel="stylesheet" href="/assets/css/nav.css" />
+  <link rel="stylesheet" href="/assets/css/footer.css" />
+  <link rel="stylesheet" href="/assets/css/theme.css" />
+  <link rel="stylesheet" href="/assets/css/page.css" />
+  <!-- The hero, the community wall and the boost list are the show page's, so
+       this page links its stylesheet and adds only the deltas. -->
+  <link rel="stylesheet" href="/assets/css/show-page.css" />
+  <!-- The episode card, for the community-episodes section: the same chrome
+       feeds-podcasts.js paints on the homepage. -->
+  <link rel="stylesheet" href="/assets/css/feed-cards.css" />
+  <!-- The boost thread inside a card's drawer, and its reply / like / repost /
+       zap bar. Only this page's community section needs them; /show does not. -->
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css" />
+  <link rel="stylesheet" href="/assets/css/episode-page.css" />
+</head>
+<body data-episode-guid="${htmlEscape(ep.item_guid)}"${ep.podcast_guid ? ` data-show-guid="${htmlEscape(ep.podcast_guid)}"` : ""}>
+
+<!-- NAV:START (generated by scripts/sync-partials.js — edit the partial) -->
+<!-- ══════════════════════════════ NAV ══════════════════════════════
+     SHARED NAV — single source of truth. Do NOT edit the copies inside the
+     page files; edit THIS file, then run scripts/sync-partials.js to
+     push it into every page (between the NAV:START / NAV:END markers).
+     Styles live in /assets/css/nav.css; behavior in /assets/js/nav.js. -->
+<header id="top-nav">
+  <div class="nav-inner">
+    <a class="nav-logo" href="/" aria-label="OnlyBoosts home">
+      <img src="/assets/onlyboosts_pfp.png" alt="" />
+    </a>
+    <a class="nav-site-name" href="/">OnlyBoosts</a>
+    <nav aria-label="Main navigation">
+      <!-- Single "Explore" menu = the whole site map. Grouped dropdown on
+           desktop, full-screen overlay on mobile. -->
+      <details class="nav-explore">
+        <summary aria-label="Explore the site">
+          <span class="nav-explore-glyph" aria-hidden="true">🧭</span>
+          <span class="nav-explore-text">Explore</span>
+          <span class="caret" aria-hidden="true">▾</span>
+        </summary>
+        <div class="nav-explore-panel">
+          <div class="nav-explore-head">
+            <span>Explore</span>
+            <button type="button" class="nav-explore-close" aria-label="Close menu">✕</button>
+          </div>
+          <a class="nav-explore-home" href="/"><span aria-hidden="true">🏠</span> Home</a>
+          <div class="nav-explore-groups">
+            <!-- Feeds: one entry per feed, matching the homepage's what-menu
+                 exactly (Episodes / Shows / Songs / Albums / Boosts). The
+                 Global vs Follows axis is deliberately absent — it's the
+                 second dropdown on the page itself, and listing both scopes
+                 here made the nav a grid restating a control the page already
+                 has. Songs and Albums are the music half of Episodes and
+                 Shows, split on <podcast:medium>; they sit next to the feeds
+                 they mirror rather than in a group of their own. -->
+            <div class="nav-explore-group">
+              <h4>Feeds</h4>
+              <a href="/#episodes-global"><span aria-hidden="true">🎙</span> Episodes</a>
+              <a href="/#shows"><span aria-hidden="true">📻</span> Shows</a>
+              <a href="/#songs-global"><span aria-hidden="true">🎵</span> Songs</a>
+              <a href="/#albums"><span aria-hidden="true">💿</span> Albums</a>
+              <a href="/#boosts-global"><span aria-hidden="true">⚡</span> Boosts</a>
+            </div>
+            <!-- Stats: the aggregate views over the same data. Both are
+                 coming-soon pages for now (noindex, out of the sitemap). -->
+            <div class="nav-explore-group">
+              <h4>Stats</h4>
+              <a href="/stats"><span aria-hidden="true">📊</span> Boost Stats</a>
+              <a href="/boosters"><span aria-hidden="true">🧑‍🤝‍🧑</span> Community</a>
+            </div>
+            <div class="nav-explore-group">
+              <h4>More</h4>
+              <a href="/about"><span aria-hidden="true">ℹ️</span> About</a>
+              <a href="https://github.com/ReedBTC/onlyboosts" target="_blank" rel="noopener"><span aria-hidden="true">💻</span> Source</a>
+              <a href="#" data-lb-bug-trigger><span aria-hidden="true">🐞</span> Report a bug</a>
+            </div>
+          </div>
+        </div>
+      </details>
+    </nav>
+    <div id="lb-boost-slot" aria-label="Donate">
+      <button
+        type="button"
+        class="lb-boost-placeholder"
+        data-lb-boost-trigger="show"
+        aria-label="Donate to OnlyBoosts"
+      >
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd"/>
+        </svg>
+        <span class="lb-label-long">Donate</span>
+        <span class="lb-label-short">Donate</span>
+      </button>
+    </div>
+    <div id="lb-identity-slot" aria-label="Account">
+      <!-- Static placeholder swapped out by IdentityWidget once the
+           bundle loads. Picks shimmer vs sign-in based on whether a
+           saved session exists; populated by inline script below. -->
+    </div>
+  </div>
+</header>
+<!-- NAV:END -->
+
+<main class="show-main show-main--episode">
+
+  <!-- Ships as a real link to the feed, which is what a visitor who arrived on
+       a shared link should get; detail-page.js relabels it "Back" and wires
+       history.back() when the previous document was one of ours. The href stays
+       either way, so a middle-click still opens the feed in a new tab. -->
+  <a class="show-back" href="${copy.backHref}" data-show-back>
+    <span class="show-back-arrow" aria-hidden="true">←</span><span data-back-label>${copy.backLabel}</span>
+  </a>
+
+  ${renderHeader(ep, { art, art2, art3, copy, showTitle, showUrl, boosterCount, latestTs })}
+
+  ${renderCommunityEpisodes(copy)}
+
+  ${renderSupporters(supporters, {
+    sub: `Everyone who has boosted ${htmlEscape(truncate(title, 90))} on Nostr, ranked by sats sent, all time.`,
+    empty: `No boosters recorded for this ${copy.noun} yet.`,
+  })}
+
+  ${renderBoosts(boosts, names, {
+    heading: copy.boostsHeading,
+    // "Every", not "the most recent": this list is not truncated in practice.
+    // The busiest episode in the index carries 55 boosts against a cap of 500.
+    sub: `Every boost sent to this ${copy.noun}, as published to Nostr, newest first.`,
+    itemAbbr: copy.itemAbbr,
+    noun: copy.noun,
+    // The target line would name this same episode on every row.
+    showTarget: false,
+  })}
+
+</main>
+
+<!-- FOOTER:START (generated by scripts/sync-partials.js — edit the partial) -->
+<!-- ══════════════════════════════ FOOTER ══════════════════════════════
+     SHARED FOOTER — single source of truth. Do NOT edit the copies inside
+     the page files; edit THIS file, then run scripts/sync-partials.js
+     to push it into every page (between FOOTER:START / FOOTER:END markers).
+     Styles live in /assets/css/footer.css. -->
+<footer id="site-footer">
+  <div class="footer-top">
+
+    <div class="footer-col footer-about">
+      <h3>OnlyBoosts</h3>
+      <p>A Nostr client for only podcast boosts. Every Podcasting 2.0 boostagram published to Nostr, cached and indexed for stats by episode, show and booster. Sort, filter, search, view all or just see boosts from your follows on Nostr.</p>
+    </div>
+
+    <!-- Same two groups as the nav's Explore menu, in the same order — the
+         footer is the nav's site map repeated, so they're regrouped together
+         or not at all. -->
+    <div class="footer-col">
+      <h3>Feeds</h3>
+      <ul>
+        <li><a href="/#episodes-global">🎙 Episodes</a></li>
+        <li><a href="/#shows">📻 Shows</a></li>
+        <li><a href="/#songs-global">🎵 Songs</a></li>
+        <li><a href="/#albums">💿 Albums</a></li>
+        <li><a href="/#boosts-global">⚡ Boosts</a></li>
+      </ul>
+    </div>
+
+    <div class="footer-col">
+      <h3>Stats</h3>
+      <ul>
+        <li><a href="/stats">📊 Boost Stats</a></li>
+        <li><a href="/boosters">🧑‍🤝‍🧑 Community</a></li>
+      </ul>
+    </div>
+
+    <div class="footer-col">
+      <h3>Connect</h3>
+      <ul>
+        <li><a href="/about">ℹ️ About</a></li>
+        <li><a href="https://github.com/ReedBTC/onlyboosts" target="_blank" rel="noopener">💻 Site Source</a></li>
+        <li><a href="#" data-lb-bug-trigger">🐞 Report a bug</a></li>
+      </ul>
+    </div>
+
+  </div>
+  <div class="footer-bottom">
+    <p class="footer-made">
+      Made with <span role="img" aria-label="love">💜</span> by
+      <a class="footer-maker" href="https://njump.me/npub1xgyjasdztryl9sg6nfdm2wcj0j3qjs03sq7a0an32pg0lr5l6yaqxhgu7s" target="_blank" rel="noopener">
+        <img src="/assets/reed_pfp.png" alt="" width="24" height="24" loading="lazy" />
+        Reed
+      </a>
+    </p>
+  </div>
+</footer>
+<!-- FOOTER:END -->
+
+<script type="application/json" id="episode-boost-payload">${jsonForScript(boostPayload)}</script>
+
+<script src="/assets/js/nav.js" defer></script>
+<script src="/assets/js/episode-page.js" type="module"></script>
+<!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
+     every page — see CLAUDE.md. -->
+<script src="/assets/js/nav-widget-boot.js"></script>
+<script src="/assets/js/sw-register.js" defer></script>
+</body>
+</html>`;
+}
+
+function creditLine(ep, copy) {
+  const author = usableAuthor(ep);
+  if (!author) return "";
+  return `<p class="show-credit"><span class="show-credit-label">${htmlEscape(copy.credit)}</span> ${htmlEscape(truncate(author, 120))}</p>`;
+}
+
+function renderHeader(ep, { art, art2, art3, copy, showTitle, showUrl, boosterCount, latestTs }) {
+  // The same three tiles as the show page, scoped to this episode, under the
+  // same heading. THE STAT HEADING IS THIS PAGE'S QUALIFIER: "Nostr Boost Stats"
+  // with the link carrying what the numbers exclude, rather than a caveat
+  // paragraph under them. See the vocabulary note in CLAUDE.md — the pattern
+  // across every surface is a short label at the point of the numbers.
+  const stats = [
+    { label: "sats", value: compact(ep.total_sats), exact: num(ep.total_sats) },
+    { label: ep.boost_count === 1 ? "boost" : "boosts", value: num(ep.boost_count), exact: num(ep.boost_count) },
+    { label: boosterCount === 1 ? "booster" : "boosters", value: num(boosterCount), exact: num(boosterCount) },
+  ];
+
+  // The show's name is the eyebrow, where /show puts the bare word "Show". It
+  // is the one thing on this page that says which feed the episode belongs to,
+  // and it is a link when the show has a page of its own — 23 titled episodes
+  // carry no podcast guid, and those print the eyebrow's default instead.
+  const eyebrow = showTitle
+    ? (showUrl
+        ? `<a href="${htmlEscape(showUrl)}" title="Nostr boosts to ${htmlEscape(showTitle)}">${htmlEscape(truncate(showTitle, 80))}</a>`
+        : htmlEscape(truncate(showTitle, 80)))
+    : copy.eyebrow;
+
+  // Air date, run time and episode number on one line, then how long ago it was
+  // last boosted. The show page's sub-line carries only the boost recency; an
+  // episode has facts of its own worth stating, and they are what identify it
+  // among a show's other episodes.
+  const bits = [
+    ep.episode_number ? `${copy.itemAbbr} ${ep.episode_number}` : null,
+    ep.published ? `${copy.dated} ${fmtDate(ep.published)}` : null,
+    fmtDuration(ep.duration) || null,
+    latestTs ? `Last boosted ${relTime(latestTs)}` : null,
+  ].filter(Boolean);
+
+  // Native controls, no preload until played, and no JavaScript involved — an
+  // episode page that cannot play the episode is missing the obvious thing. It
+  // sits under the hero rather than in it so a long title never squeezes it.
+  const audio = isSafeUrl(ep.enclosure_url)
+    ? `<div class="ep-player-row"><audio class="pcast-player" controls preload="none" src="${htmlEscape(ep.enclosure_url)}"></audio></div>`
+    : "";
+
+  return `<header class="show-hero">
+    <div class="show-hero-inner">
+      <div class="show-art">${
+        art
+          ? `<img src="${htmlEscape(art)}"${art2 ? ` data-art2="${htmlEscape(art2)}"` : ""}${art3 ? ` data-art3="${htmlEscape(art3)}"` : ""} alt="" width="180" height="180" loading="eager" />`
+          : `<div class="show-art-blank" aria-hidden="true">${copy.glyph}</div>`
+      }</div>
+      <div class="show-ident">
+        <p class="show-eyebrow">${eyebrow}</p>
+        <h1>${htmlEscape(ep.title)}</h1>
+        ${creditLine(ep, copy)}
+        <p class="show-sub">${bits.map(htmlEscape).join(" · ") || "No boosts recorded yet"}</p>
+        <div class="show-actions">
+          <button type="button" class="btn btn-boost" data-episode-boost hidden>
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" width="14" height="14"><path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd"/></svg>
+            ${copy.boostBtn}
+          </button>
+          ${showUrl
+            ? `<a class="btn btn-quiet" href="${htmlEscape(showUrl)}">All boosts to this ${copy.ldType === "MusicRecording" ? "album" : "show"}</a>`
+            : ""}
+          <button type="button" class="btn btn-quiet" data-share-page>Share</button>
+        </div>
+      </div>
+    </div>
+    ${audio}
+    <h2 class="show-stats-title">
+      <a href="/about#keysend">Nostr Boost</a> Stats
+    </h2>
+    <dl class="show-stats">
+      ${stats.map((s) => `<div class="show-stat"><dt>${htmlEscape(s.label)}</dt><dd title="${htmlEscape(s.exact)}">${htmlEscape(s.value)}</dd></div>`).join("\n      ")}
+    </dl>
+  </header>`;
+}
+
+// ── Other episodes this community boosts ─────────────────────────────────────
+//
+// The episode-level counterpart of the show page's "Other Shows/Albums This
+// Community Boosts", and the one section on this page that page has no version
+// of. The community is the set of pubkeys that boosted THIS episode; the rollup
+// is every other episode those pubkeys have boosted, ranked.
+//
+// EVERY FIGURE IS COMMUNITY-SCOPED BY CONSTRUCTION. The query behind it
+// (functions/api/v1/episodes/[guid].js) joins through the community set, so a
+// card's boosters, boosts and sats are what THESE people sent that episode,
+// never its global totals — the same property the show page's version has, and
+// the reason the sort tag reads "Community Sort:" rather than "Sort:".
+//
+// ⚠️ THIS IS THE ONE SECTION ON EITHER DETAIL PAGE THAT IS NOT SERVER-RENDERED,
+// and the reason is the card rather than the data. A row here is the full
+// Episodes-feed card — artwork, an audio player, the ⋮ subscribe menu, a boost
+// pill, and a drawer holding the individual boost notes with a reply / like /
+// repost / zap bar on each. That card is a JavaScript artifact
+// (feeds-podcasts.js#episodeCard) and its action bar cannot exist without a
+// signer, so a server-rendered version would be a second implementation of the
+// site's most intricate component, guaranteed to drift from the one the homepage
+// paints. Reusing the renderer is what makes the two surfaces identical, which
+// is what was asked for.
+//
+// The cost is that this section does not exist with JavaScript off, where the
+// rest of the page does. It ships `hidden` for that reason: an empty heading
+// over nothing is worse than no heading. episode-page.js reveals it once it has
+// cards, and lazy-loads the corpus as the section approaches the viewport, so a
+// reader who never scrolls this far pays nothing for it.
+//
+// NOT SPLIT ON MEDIUM, which every other rollup on this site is. A music
+// community also boosting podcasts is the interesting half of the finding, so
+// the heading says "Episodes/Songs" on both mediums and there is no COPY entry —
+// exactly the call renderCommunityShows makes on the show page.
+function renderCommunityEpisodes(copy) {
+  // ⚠️ THE SECTION SHIPS EMPTY, AND ITS BODY SHIPS `hidden` — not the other way
+  // round, which is what it was first and did not work. episode-page.js waits
+  // for the section to approach the viewport before it pulls 200KB of card
+  // renderer, and an IntersectionObserver never reports a `display:none` target
+  // as intersecting, so a hidden SECTION could never fire its own hydration. An
+  // empty section is a zero-height block that still has a position, which is
+  // exactly the sentinel that observer needs.
+  //
+  // Everything it costs a reader with no JavaScript is the same either way: an
+  // empty section renders as nothing at all, and the module removes it outright
+  // if the corpus is empty or unreachable.
+  return `<section class="show-section" id="community-episodes" data-community-episodes>
+    <div data-ce-body hidden>
+      <div class="show-section-head">
+        <h2>Other Episodes/Songs This Community Boosts</h2>
+        <p class="show-section-sub">Everything else the people who boosted this ${copy.noun} have boosted on Nostr, ranked. Every figure counts only what these boosters sent.</p>
+      </div>
+      <!-- The range buttons and the sort pill mount here, the same pair the
+           Episodes feed carries and in the same order. Ships hidden and stays
+           hidden until there is a list to control. -->
+      <div class="cs-controls ce-controls" data-ce-controls hidden></div>
+      <div data-ce-list><div class="ce-loading" aria-live="polite">Loading…</div></div>
+      <div data-ce-more></div>
+    </div>
+  </section>`;
+}
+
+// A guid with no page. Deliberately a real 404 rather than a shell of empty
+// fields: 500 of the 7,182 episodes carrying an indexed boost have no title,
+// artwork or Podcast Index record, so there is genuinely nothing to show.
+function notFound(guid) {
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex" />
+  <title>Episode not found — OnlyBoosts</title>
+  <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
+  <link rel="stylesheet" href="/assets/css/nav.css" />
+  <link rel="stylesheet" href="/assets/css/footer.css" />
+  <link rel="stylesheet" href="/assets/css/theme.css" />
+  <link rel="stylesheet" href="/assets/css/page.css" />
+</head>
+<body>
+<section class="page-header">
+  <p class="page-eyebrow">404</p>
+  <h1>Episode not found</h1>
+  <p>No indexed episode matches <code>${htmlEscape(truncate(guid || "", 80))}</code>.</p>
+</section>
+<main class="page-main">
+  <div class="page-inner">
+    <div class="soon-card">
+      <p>Some boosts in the index carry an episode identifier that Podcast Index
+         doesn't recognise, so the episode has no title, artwork or air date and
+         therefore no page of its own. Those boosts still appear in the feeds.</p>
+      <p><a href="/#episodes-global">Browse all episodes →</a></p>
+    </div>
+  </div>
+</main>
+<script src="/assets/js/sw-register.js" defer></script>
+</body>
+</html>`;
+  return new Response(html, {
+    status: 404,
+    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=300" },
+  });
+}

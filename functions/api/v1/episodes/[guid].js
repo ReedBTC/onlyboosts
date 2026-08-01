@@ -1,0 +1,149 @@
+// GET /api/v1/episodes/:guid — one episode: aggregate + its show + its boosts.
+// GET /api/v1/episodes/:guid?community=1 — additionally, the boost corpus behind
+//     "Other Episodes/Songs This Community Boosts" on /episode/<guid>.
+//
+// The episode-level counterpart of /api/v1/podcasts/:guid. Two things about it
+// are worth knowing before touching either:
+//
+//   1. `item_guid` IS SOMETIMES A URL, not a UUID — 9% of the distinct guids in
+//      the index contain a slash and 30 of them are full http(s) URLs. It is an
+//      opaque key everywhere on this site and it is never parsed, only bound and
+//      encoded. Cloudflare Pages keeps a %2F inside one path segment rather than
+//      splitting on it, so `params.guid` arrives encoded and decodeURIComponent
+//      recovers the original (verified against production).
+//   2. THE COMMUNITY CORPUS IS THE EXPENSIVE HALF and is opt-in for that reason.
+//      It is every boost sent by this episode's boosters to any OTHER episode,
+//      which is what lets the client roll it up into the same episode cards the
+//      homepage feed paints. Measured over all 22,366 indexed boosts, that
+//      fan-out runs to a median of 248 rows, a p90 of 1,171 and a maximum of
+//      3,368 — so the cap below bites on 1.6% of episodes, and the caller is
+//      told when it did.
+import { json, preflight, BOOST_SELECT, boostRecord, clampLimit } from "../_common.js";
+
+export async function onRequestOptions({ request }) { return preflight(request); }
+
+// Every boost to this episode, not a page of them: the busiest episode in the
+// index has 55 and the median has 2, so this is a guard against a pathological
+// row rather than a page size.
+const BOOSTS_CAP = 500;
+
+// How many community boost rows the rollup may pull. The section is a ranked
+// list of other episodes, so the corpus has to be big enough that the ranking
+// means something, and small enough that a page nobody scrolls to doesn't cost
+// a megabyte.
+//
+// Ordered newest-first, so a truncated corpus is a recent prefix of the
+// community's history rather than an arbitrary slice — the same trade
+// ob-live.js makes for the Follows feeds, and for the same reason. `truncated`
+// says so; the client prints it under the list.
+const COMMUNITY_ROWS = 2000;
+
+export async function onRequestGet({ request, env, params }) {
+  let guid = params.guid;
+  if (Array.isArray(guid)) guid = guid[0];
+  try { guid = decodeURIComponent(guid); } catch { /* keep the raw form */ }
+  const u = new URL(request.url);
+
+  const ep = await env.DB.prepare(
+    `SELECT e.item_guid, e.podcast_guid, e.title, e.image, e.published, e.duration,
+            e.episode_number, e.enclosure_url, e.boost_count, e.total_sats,
+            p.title AS p_title, p.image AS p_image, p.artwork AS p_artwork,
+            p.feed_url AS p_feed, p.medium AS p_medium, p.author AS p_author
+     FROM episodes e
+     LEFT JOIN podcasts p ON p.podcast_guid = e.podcast_guid
+     WHERE e.item_guid = ?`
+  ).bind(guid).first();
+  if (!ep) return json(request, { error: "episode not found" }, { status: 404 });
+
+  const limit = clampLimit(u.searchParams.get("limit"), BOOSTS_CAP, BOOSTS_CAP);
+  const [boosts, boosters] = await Promise.all([
+    env.DB.prepare(
+      `${BOOST_SELECT} WHERE b.item_guid = ? ORDER BY b.created_at DESC, b.event_id DESC LIMIT ?`
+    ).bind(guid, limit).all(),
+    // booster_count is not a column on `episodes` — the collector stores boosts
+    // and sats per episode but not distinct boosters, so it is derived. One
+    // indexed lookup through idx_boosts_item.
+    env.DB.prepare(
+      `SELECT COUNT(DISTINCT booster_pubkey) AS n FROM boosts WHERE item_guid = ?`
+    ).bind(guid).first(),
+  ]);
+
+  const body = {
+    episode: {
+      guid: ep.item_guid,
+      title: ep.title,
+      img: ep.image || ep.p_image,
+      date: ep.published,
+      num: ep.episode_number,
+      duration: ep.duration,
+      url: ep.enclosure_url,
+      boosts: ep.boost_count,
+      sats: ep.total_sats,
+      boosters: boosters?.n || 0,
+      show: {
+        guid: ep.podcast_guid,
+        title: ep.p_title,
+        img: ep.p_image,
+        art2: ep.p_artwork || null,
+        feed: ep.p_feed,
+        medium: ep.p_medium,
+        author: ep.p_author,
+      },
+    },
+    boosts: (boosts.results || []).map(boostRecord),
+  };
+
+  if (u.searchParams.get("community")) {
+    body.community = await fetchCommunityBoosts(env, guid);
+  }
+
+  // Shownotes on demand, matching the podcasts endpoint: `description` is the
+  // one heavy column on `episodes` and no caller renders it until asked.
+  if (u.searchParams.get("shownotes")) {
+    const row = await env.DB.prepare(
+      `SELECT description FROM episodes WHERE item_guid = ?`
+    ).bind(guid).first();
+    body.shownotes = row ? row.description : null;
+  }
+
+  return json(request, body);
+}
+
+/* Every boost this episode's boosters have sent to any OTHER episode.
+ *
+ * The community is the set of pubkeys that boosted THIS episode; the corpus is
+ * their whole boost history minus this episode. The client groups it by
+ * item_guid through ob-data.js#toEpisodeShape and paints the result as the same
+ * episode cards the homepage feed uses, which is why this returns raw boost
+ * records rather than a pre-rolled-up summary: the cards carry a drawer holding
+ * the individual boosts, and the sort and range controls both operate over the
+ * ungrouped rows.
+ *
+ * EVERY FIGURE IT PRODUCES IS COMMUNITY-SCOPED BY CONSTRUCTION, the same
+ * property the show page's equivalent has: the join means only boosts sent by a
+ * member are returned, so a card's boosters, boosts and sats are what THESE
+ * people sent that episode and never its global totals.
+ *
+ * idx_boosts_item covers the CTE, idx_boosts_booster the scan.
+ */
+async function fetchCommunityBoosts(env, guid) {
+  const { results } = await env.DB.prepare(
+    `WITH community AS (
+       SELECT DISTINCT booster_pubkey FROM boosts WHERE item_guid = ?
+     )
+     ${BOOST_SELECT}
+     JOIN community c ON c.booster_pubkey = b.booster_pubkey
+     WHERE b.item_guid IS NOT NULL AND b.item_guid <> ?
+     ORDER BY b.created_at DESC, b.event_id DESC
+     LIMIT ?`
+  ).bind(guid, guid, COMMUNITY_ROWS + 1).all();
+
+  const rows = results || [];
+  // One row over the cap is how truncation is detected without a second COUNT
+  // over the same fan-out.
+  const truncated = rows.length > COMMUNITY_ROWS;
+  return {
+    truncated,
+    boosts: (truncated ? rows.slice(0, COMMUNITY_ROWS) : rows).map(boostRecord),
+  };
+}

@@ -1,0 +1,121 @@
+/* Episode landing pages (/episode/<item-guid>), rendered by
+ * functions/episode/[guid].js.
+ *
+ * THE DELTAS ONLY. The page links show-page.css and reuses its `.show-*`
+ * classes verbatim — the hero, the stat tiles, the Nostr Community wall and the
+ * boost list are the same components, emitted by the same functions in
+ * functions/_shared/detail-page.js, and a parallel set of `.episode-*` names for
+ * identical boxes would be a rename with no meaning behind it. The site already
+ * keeps `lb-*` and `.sup-*` for exactly this reason; see the naming note in
+ * CLAUDE.md.
+ *
+ * It also links feed-cards.css, because the community-episodes section paints
+ * the homepage's episode card. That file needs --accent / --accent-d / --tint,
+ * which show-page.css supplies on .show-main.
+ *
+ * Load order matters and is fixed in the Function's <head>: show-page.css, then
+ * feed-cards.css, then this.
+ */
+
+/* ── Hero ─────────────────────────────────────────────────────────────── */
+
+/* The eyebrow is the show's name and a link to its page, where /show's is the
+   bare word "Show". Inherits the eyebrow's uppercase brand treatment and only
+   adds the affordance — it is the one thing on the page that says which feed
+   this episode belongs to, so it has to read as a way out. */
+.show-eyebrow a {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+.show-eyebrow a:hover {
+  border-bottom-color: currentColor;
+}
+
+/* An episode title is longer than a show's and is the page's subject, so it
+   wraps to more lines before it is worth shrinking. .show-ident h1's clamp is
+   otherwise unchanged. */
+.show-main--episode .show-ident h1 {
+  font-size: clamp(1.35rem, 3.4vw, 2rem);
+}
+
+/* The player sits under the hero's identity block rather than inside it: a long
+   title already competes with the artwork for that row, and the control is
+   full-width by nature. Above the stat tiles, because playing the episode is
+   what a reader came for and reading its numbers is what they stayed for. */
+.ep-player-row {
+  margin: 1.1rem 0 0.25rem;
+}
+.ep-player-row .pcast-player {
+  width: 100%;
+  display: block;
+}
+
+/* ── Other Episodes/Songs This Community Boosts ───────────────────────── */
+
+/* The one client-rendered section on either detail page. The SECTION ships
+   empty and its BODY ships hidden, which is not interchangeable: episode-page.js
+   watches the section with an IntersectionObserver to decide when to pull the
+   card renderer, and an observer never fires on a display:none target. An empty
+   section is a zero-height block that still has a position. Everything else here
+   describes a state the server never emits. */
+
+/* No margin of its own until it has content. .show-section carries a 2.75rem top
+   margin, and an unhydrated section is empty, so with JavaScript off that margin
+   lands between the hero and the community wall and doubles one gap. Degrades to
+   exactly that where :has() is unsupported, which is why it is worth having and
+   not worth working around. */
+#community-episodes:has([data-ce-body][hidden]) { margin-top: 0; }
+
+/* The control band. Unlike the show page's, which sits inside a drawer's header
+   and is tinted to match it, this one sits directly under a section heading, so
+   it is a plain row rather than a lid. .cs-controls supplies the layout; this
+   only undoes the drawer treatment. */
+.ce-controls {
+  background: none;
+  border: 0;
+  padding: 0 0 0.35rem;
+  margin-bottom: 0.4rem;
+}
+
+/* .cs-controls pins its sort to the far end with margin-left:auto, because the
+   show page's episode drawer puts a "See All Episodes" link at the other end of
+   the same band. There is no second control here — the range group is the sort's
+   partner, not its opposite — so the pair sits together at the right the way it
+   does in the homepage's feed bar. */
+.ce-controls .pcast-sort { margin-left: 0; }
+
+.ce-loading {
+  padding: 1.75rem 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+/* The truncation note, printed under the last page of cards when the endpoint
+   capped the corpus. Quiet and at the foot deliberately: it is an answer for a
+   reader who reached the end of a long list, not a warning over the top of one.
+   See the cap note in functions/api/v1/episodes/[guid].js. */
+.ce-note {
+  margin: 1.1rem auto 0;
+  max-width: 34rem;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+/* The cards are a grid of their own inside a .show-section, which has no
+   list-reset of its own to inherit from. */
+.show-main--episode .pcast-list {
+  margin-top: 0.4rem;
+}
+
+@media (max-width: 640px) {
+  /* Two controls on one row is tight beside a wrapped heading; let them wrap
+     rather than shrinking the sort pill's label out of legibility. */
+  .ce-controls {
+    flex-wrap: wrap;
+    row-gap: 0.4rem;
+  }
+}
