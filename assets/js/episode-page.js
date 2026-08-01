@@ -250,10 +250,11 @@ function initCommunityEpisodes() {
   if (!section || !guid) return
 
   const body = section.querySelector('[data-ce-body]')
+  const scroll = section.querySelector('[data-ce-scroll]')
   const listSlot = section.querySelector('[data-ce-list]')
   const moreSlot = section.querySelector('[data-ce-more]')
   const ctrlSlot = section.querySelector('[data-ce-controls]')
-  if (!body || !listSlot || !moreSlot || !ctrlSlot) return
+  if (!body || !scroll || !listSlot || !moreSlot || !ctrlSlot) return
 
   /* The section is `hidden` from the server and stays that way unless there is
    * something to show. An empty heading over nothing is worse than no heading,
@@ -366,6 +367,11 @@ function initCommunityEpisodes() {
         cards.appendChild(empty)
         return
       }
+      // Back to the top of the window, not of the page. A re-sort or a range
+      // change replaces the list under the reader; leaving the box scrolled
+      // halfway down would land them in the middle of a ranking they just asked
+      // to have rebuilt, with #1 out of sight above.
+      scroll.scrollTop = 0
       renderMore()
       feed.repaintProfiles(cards)
     }

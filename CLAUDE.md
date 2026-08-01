@@ -1294,6 +1294,35 @@ than on load. A reader who never scrolls past the community wall pays neither.
 boosting podcasts is the interesting half of the finding. Hence
 "Episodes/Songs" on both mediums and no `COPY` entry.
 
+**⚠️ The whole of the subject's SHOW is excluded, not merely the subject
+episode.** The section answers "what *else* does this audience listen to", and a
+community that boosts one show heavily fills the list with more of that show —
+the one thing the reader is already looking at and can reach from the eyebrow
+link. Measured over a 900-page sample it removes a median of **7.8%** of the list
+(mean 15.3%) and takes the share of pages with nothing to show from **3.3% to
+6.1%**; those are communities that have boosted nothing but this show, where no
+section is a truer answer than the same show again. The clause is
+`(b.podcast_guid IS NULL OR b.podcast_guid <> ?)` — the `IS NULL` half **keeps**
+episodes whose own show is unidentified, because we cannot know they belong to
+this one and dropping them would be a claim. A subject episode with no show falls
+back to excluding only itself.
+
+**The cards sit in a scroll container** (`.ce-scroll`), the same shape the show
+page's community drawer uses. Not the same number: `.ep-list` caps at 32rem,
+which shows eleven 44px rows and would show two and a half ~180px cards here, so
+this caps on the viewport instead — `min(75vh, 46rem)`. The "Load N more" is
+**inside** it, so the section is one box rather than a window with a button
+underneath, and a re-sort or a range change resets `scrollTop` so the reader
+lands on the new #1 rather than mid-ranking.
+
+**The container clips the two ⋮ menus**, which are `position: absolute` — the
+card's subscribe menu and the per-boost one. They still contribute to the
+container's scroll height, so an opened menu is reachable rather than lost, and
+`episodeCard` now calls `scrollIntoView({ block: 'nearest' })` on open, which is
+a no-op when the menu is already visible and therefore costs the homepage
+nothing. The alternative is a portal or a popover, which is a rewrite of a
+component both surfaces share. That trade is the price of the container.
+
 **The corpus is capped at 2,000 boost rows and says when it capped.** Measured
 over all 22,366 indexed boosts, the fan-out behind this runs to a **median of 248
 rows across 189 distinct other episodes, a p90 of 1,171 and a maximum of 3,368**,

@@ -689,8 +689,16 @@ function renderCommunityEpisodes(copy) {
            Episodes feed carries and in the same order. Ships hidden and stays
            hidden until there is a list to control. -->
       <div class="cs-controls ce-controls" data-ce-controls hidden></div>
-      <div data-ce-list><div class="ce-loading" aria-live="polite">Loading…</div></div>
-      <div data-ce-more></div>
+      <!-- The cards and their "Load N more" live inside ONE scroll container,
+           the same shape the show page's community drawer uses (.ep-list caps at
+           32rem and scrolls). The load-more is inside it rather than under it so
+           the section is a single box: a button below a scrolling window reads
+           as belonging to the page, not to the list. -->
+      <div class="ce-scroll" data-ce-scroll tabindex="0" role="region"
+           aria-label="Other episodes and songs this community boosts">
+        <div data-ce-list><div class="ce-loading" aria-live="polite">Loading…</div></div>
+        <div data-ce-more></div>
+      </div>
     </div>
   </section>`;
 }

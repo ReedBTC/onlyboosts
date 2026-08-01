@@ -85,6 +85,45 @@
    does in the homepage's feed bar. */
 .ce-controls .pcast-sort { margin-left: 0; }
 
+/* The scroll container.
+ *
+ * Same intent as .ep-list on the show page — cap the section and scroll inside
+ * it rather than making the page endless — but deliberately NOT the same 32rem.
+ * That number was chosen for 44px rows, where it shows eleven of them; a card
+ * here is ~180px, so 32rem would be two and a half cards and read as a bug. The
+ * cap is a share of the VIEWPORT instead, which is the honest expression of what
+ * it is for: leave the reader a screenful of list and keep the rest of the page
+ * reachable. 46rem is the ceiling on a tall desktop, where 75vh would otherwise
+ * be most of the document again.
+ *
+ * ⚠️ overflow CLIPS the card's ⋮ subscribe menu and the per-boost ⋮ menu, both of
+ * which are position:absolute. They still contribute to the container's scroll
+ * height, so an opened menu near the bottom edge is reachable rather than lost,
+ * and episodeCard scrolls it into view on open. The alternative is a portal or a
+ * popover, which is a rewrite of a component the homepage shares. That trade is
+ * the price of the container and it is worth stating rather than discovering.
+ */
+.ce-scroll {
+  max-height: min(75vh, 46rem);
+  overflow-y: auto;
+  /* Stop a flick at the bottom of the list from carrying on into the page —
+     the box is the thing being scrolled, so it should absorb the gesture. */
+  overscroll-behavior: contain;
+  /* A hairline lid and floor, so the window reads as a window. .ep-list uses a
+     border-top for the same job; this one is not inside a drawer, so it needs
+     both edges to be legible as a container. */
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  /* Room for .pcast-card's hover shadow and its focus ring, which would
+     otherwise be shaved off against the container's edges. */
+  padding: 0.45rem 0.35rem;
+}
+.ce-scroll:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+/* The load-more sits INSIDE the container, so it needs less air above it than
+   the feed's does at the foot of a page. */
+.ce-scroll .pcast-more-wrap { margin-top: 0.8rem; margin-bottom: 0.2rem; }
+
 .ce-loading {
   padding: 1.75rem 0;
   text-align: center;

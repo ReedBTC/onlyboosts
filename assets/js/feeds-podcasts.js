@@ -675,6 +675,12 @@ function subscribeMenu(item) {
   function open() {
     menu.hidden = false
     btn.setAttribute('aria-expanded', 'true')
+    // Scrolled into view on open, minimally. The menu is position:absolute and
+    // opens downward, so on the homepage it can land below the fold and on
+    // /episode/<guid> it can land past the bottom of that section's scroll
+    // container, which clips it. `block: 'nearest'` is a no-op when the menu is
+    // already fully visible, so this costs the common case nothing.
+    try { menu.scrollIntoView({ block: 'nearest' }) } catch {}
     document.addEventListener('click', onDoc, true)
     document.addEventListener('keydown', onKey)
   }
@@ -752,6 +758,8 @@ function moreMenu(b) {
   function open() {
     menu.hidden = false
     btn.setAttribute('aria-expanded', 'true')
+    // Same reason as the subscribe menu above.
+    try { menu.scrollIntoView({ block: 'nearest' }) } catch {}
     document.addEventListener('click', onDoc, true)
     document.addEventListener('keydown', onKey)
   }
