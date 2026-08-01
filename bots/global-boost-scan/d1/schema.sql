@@ -53,9 +53,23 @@ CREATE TABLE IF NOT EXISTS episodes (
   enclosure_url  TEXT,
   description    TEXT,                    -- full shownotes (the one heavier column)
   boost_count    INTEGER,
-  total_sats     INTEGER
+  total_sats     INTEGER,
+  booster_count  INTEGER,                 -- DISTINCT boosters; 'Most boosters' sort
+  latest_ts      INTEGER                  -- newest boost on this episode; 'Latest boost' sort
 );
 CREATE INDEX IF NOT EXISTS idx_episodes_podcast ON episodes(podcast_guid);
+-- One index per ranked sort /api/v1/episodes offers. Each is (sort column,
+-- then the endpoint's exact tiebreakers) so ORDER BY is an index walk rather
+-- than a temp B-tree over every episode: measured 19,499 rows read → 202 for an
+-- all-time top-100. The trailing columns are load-bearing, not padding — an
+-- index of (total_sats DESC) alone does NOT satisfy
+-- `ORDER BY total_sats DESC, item_guid` and the scan comes back. Keep these in
+-- step with `tiebreak` in functions/api/v1/episodes.js.
+CREATE INDEX IF NOT EXISTS idx_episodes_sats      ON episodes(total_sats DESC, item_guid);
+CREATE INDEX IF NOT EXISTS idx_episodes_boosts    ON episodes(boost_count DESC, total_sats DESC, item_guid);
+CREATE INDEX IF NOT EXISTS idx_episodes_boosters  ON episodes(booster_count DESC, total_sats DESC, item_guid);
+CREATE INDEX IF NOT EXISTS idx_episodes_latest    ON episodes(latest_ts DESC, total_sats DESC, item_guid);
+CREATE INDEX IF NOT EXISTS idx_episodes_published ON episodes(published DESC, total_sats DESC, item_guid);
 
 -- <podcast:podroll> — the shows a feed recommends, one row per recommendation.
 -- Parsed from raw RSS by the collector (Podcast Index does not carry this tag).
