@@ -123,6 +123,9 @@ hex accepted anywhere a pubkey is taken.
 ```
 GET  /api/v1/boosts?podcast=&item=&booster=&since=&until=&cursor=&limit=
 POST /api/v1/boosts/follows        body: { authors:[npub|hex,…], since?, cursor?, limit? }
+GET  /api/v1/episodes?sort=recent|episode|count|boosts|sats&range=1w|1m|all
+                     &medium=|not_medium=&podcast=&limit=&offset=
+POST /api/v1/episodes              body: { follows:[npub|hex,…] }  — same params, follows-scoped
 GET  /api/v1/podcasts?sort=recent|sats|boosts&cursor=&limit=
 GET  /api/v1/podcasts/{guid}       → podcast + its episodes (+ recent boosts)
 GET  /api/v1/boosters/{npub}       → profile + that booster's boosts
@@ -133,6 +136,21 @@ GET  /api/v1/stats                 → totals (mirrors meta.json)
 - **Follows** is a POST (follow lists get large); server does
   `WHERE booster_pubkey IN (…)` against the indexed column — the thing that's
   painful client-side becomes a fast indexed query.
+- **`/api/v1/episodes` is the per-episode rollup** behind the Episodes and Songs
+  feeds, and the reason it exists is correctness, not speed: rolling up
+  client-side from the windowed boost feed ranked over ~11% of the corpus, so 7
+  of the true all-time top 10 episodes were missing and one true-#7 episode
+  showed at #128 with only its recent sats. Global reads the precomputed
+  `episodes` aggregates; **Follows** re-aggregates over `boosts`, because a
+  per-user ranking can't be precomputed for every possible set of people.
+  `sort`/`range` keys are the frontend's own, and `range` filters on **air
+  date**, matching the feed. The medium split is a partition, so the Episodes
+  half is `not_medium=music` (keeping video and unidentified feeds) rather than
+  `medium=podcast`.
+- **The `idx_episodes_*` indexes encode the endpoint's ORDER BY**, tiebreakers
+  included. Repeating the sort column among its own tiebreakers defeats them and
+  costs a full temp-B-tree sort (19,499 rows read vs 202) — so the index list
+  and `tiebreak` in `episodes.js` change together or not at all.
 - Every GET sets `Cache-Control` (short TTL) so the CF edge still absorbs bursts.
 - Bound every query (`limit` capped, e.g. 200) — no unbounded scans.
 
