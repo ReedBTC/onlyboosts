@@ -260,7 +260,15 @@
 // Episodes and Songs cards also stops pointing at Boost Me Bitch and starts
 // pointing at /episode/<item-guid>, which rides the same bump — as does the ⋮
 // menus' scrollIntoView on open, which feeds-podcasts.js does for both surfaces.
-const VERSION = 'ob-v46';
+// ob-v47: the chapters and show-notes drawers under the player on
+// /episode/<item-guid>. Required on both halves of that page's own pair, which
+// are stale-while-revalidate in a VERSION-keyed cache: the Function now emits a
+// notes drawer and an empty chapters drawer, so a returning visitor holding the
+// old episode-page.css reads the notes without their padding or link colour,
+// and one holding the old episode-page.js never fetches /api/chapters at all, so
+// the chapters drawer stays hidden on a page that has them. Both correct
+// themselves on the second navigation, which is the case this bump exists for.
+const VERSION = 'ob-v47';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;

@@ -51,6 +51,132 @@
   display: block;
 }
 
+/* ── The two drawers under the player ─────────────────────────────────── */
+
+/* Chapters and show notes, between the audio element and the stat tiles. Both
+   reuse .ep-drawer from show-page.css — the sunken band, the SHOW/HIDE word and
+   the rotating chevron — so this file adds the spacing and the contents and
+   nothing about the lid. A reader who has opened the episode drawer on
+   /show/<guid> has already learned the control.
+
+   Both ship collapsed, so this is normally two 44px bands between the player and
+   the numbers. See the note in functions/episode/[guid].js for why the chapter
+   list is not open by default the way localbitcoiners' is. */
+.ep-chapters, .ep-notes {
+  /* Off the player above; the stat tiles carry their own heading, which
+     supplies the air on the other side. */
+  margin: 0.9rem 0 0.35rem;
+}
+/* Tighter between the two than under the player — they are a pair. The
+   :not([hidden]) is load-bearing rather than tidy: the chapters drawer ships
+   hidden and stays hidden on the ~55% of episodes that publish none, and
+   adjacency does not care about display, so without it those pages would pull
+   the notes drawer up against the player. */
+.ep-drawer:not([hidden]) + .ep-drawer { margin-top: 0.55rem; }
+/* <details> carries a UA `display: block`, and the attribute selector outranks
+   it, but this page hides a drawer as a normal state rather than an edge case —
+   worth stating rather than inheriting. */
+.ep-drawer[hidden] { display: none; }
+
+/* The chapter count, in the summary beside the word. A count is legitimate here
+   where the show page's drawers may not carry one: those figures are bounded by
+   what this site has indexed, so a badge would state our coverage as though it
+   were a fact about the show. A chapter count is a complete fact about the file
+   the publisher shipped. */
+.ep-chapters-count {
+  flex: none;
+  min-width: 1.6em;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: var(--cream);
+  color: var(--muted);
+  font: 700 0.72rem/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  text-align: center;
+}
+.ep-chapters-count:empty { display: none; }
+
+/* Capped and scrolled for the same reason .ep-list is on the show page: a long
+   list inside a drawer should not make the page endless. 22rem is about eleven
+   rows, which is the length at which a chapter list stops being a glance. */
+.ep-chapters-list {
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem 0;
+  max-height: 22rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-top: 1px solid var(--border);
+}
+.ep-chapter { margin: 0; }
+
+/* A row is a button, not a link: it seeks the player on this page rather than
+   navigating. The left border is the rail the active marker slides down, and it
+   is reserved on every row so the list does not shift by 3px when playback
+   crosses a boundary. */
+.ep-chapter-btn {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.5rem 1rem;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-left: 3px solid transparent;
+  font: inherit;
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.ep-chapter-btn:hover { background: var(--cream); color: var(--brand-dd); }
+.ep-chapter-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+
+.ep-chapter-time {
+  flex: none;
+  min-width: 3.2rem;
+  /* Tabular figures so the timestamps form a column rather than a ragged edge
+     as the minute digits change width. */
+  font-variant-numeric: tabular-nums;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.ep-chapter-btn:hover .ep-chapter-time { color: var(--brand-d); }
+
+.ep-chapter-title {
+  font-size: 0.95rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+/* The row covering the playhead, set by episode-page.js as the audio advances.
+   Brand on the rail rather than a background wash strong enough to compete with
+   hover — the two states have to be distinguishable while the pointer is inside
+   the list. */
+.ep-chapter-btn.is-active {
+  background: var(--cream);
+  border-left-color: var(--brand);
+  color: var(--ink);
+}
+.ep-chapter-btn.is-active .ep-chapter-time { color: var(--brand-dd); }
+.ep-chapter-btn.is-active .ep-chapter-title { font-weight: 600; }
+
+/* Show notes. One block of prose, not a list of paragraphs: the collector
+   collapses all whitespace out of the description, so the publisher's paragraph
+   breaks are gone before this page ever sees the text. Measured median is 590
+   characters, so the measure matters more than the vertical rhythm. */
+.ep-notes-body {
+  padding: 0.95rem 1rem 1.15rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.ep-notes-body p { margin: 0; max-width: 46rem; }
+.ep-notes-body a { color: var(--brand-d); font-weight: 600; }
+.ep-notes-body a:hover { color: var(--brand-dd); }
+
 /* ── Other Episodes/Songs This Community Boosts ───────────────────────── */
 
 /* The one client-rendered section on either detail page. The SECTION ships

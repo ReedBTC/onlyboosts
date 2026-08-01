@@ -71,8 +71,12 @@ export async function onRequestGet({ env, params }) {
   if (!guid || guid.length > GUID_MAX) return notFound(guid);
 
   const ep = await env.DB.prepare(
+    // `description` is the one heavy column on `episodes` and the API endpoints
+    // fetch it only on request (?shownotes=). Here it is always wanted — the
+    // notes drawer is server-rendered, which is what lets it read with
+    // JavaScript off — and it costs nothing extra: this is already the row.
     `SELECT e.item_guid, e.podcast_guid, e.title, e.image, e.published, e.duration,
-            e.episode_number, e.enclosure_url, e.boost_count, e.total_sats,
+            e.episode_number, e.enclosure_url, e.description, e.boost_count, e.total_sats,
             p.title AS p_title, p.image AS p_image, p.artwork AS p_artwork,
             p.feed_url AS p_feed, p.medium AS p_medium, p.author AS p_author
      FROM episodes e
@@ -185,6 +189,7 @@ const COPY = {
     // tagline. "By Jupiter Broadcasting" is true of all three; "Host:" is not.
     credit: "By",
     dated: "Aired",
+    notes: "Show Notes",
   },
   music: {
     eyebrow: "Track",
@@ -203,6 +208,10 @@ const COPY = {
     // way it is not on the podcast side.
     credit: "Artist",
     dated: "Released",
+    // "Track Notes" rather than "Liner Notes": the source is the item's own
+    // <description>, so the notes belong to this track, where liner notes are
+    // an album-level form. Same literalism as "Track 3" over "Ep. 3".
+    notes: "Track Notes",
   },
 };
 
@@ -624,6 +633,8 @@ function renderHeader(ep, { art, art2, art3, copy, showTitle, showUrl, boosterCo
       </div>
     </div>
     ${audio}
+    ${renderChaptersDrawer(ep)}
+    ${renderNotesDrawer(ep, copy)}
     <h2 class="show-stats-title">
       <a href="/about#keysend">Nostr Boost</a> Stats
     </h2>
@@ -631,6 +642,100 @@ function renderHeader(ep, { art, art2, art3, copy, showTitle, showUrl, boosterCo
       ${stats.map((s) => `<div class="show-stat"><dt>${htmlEscape(s.label)}</dt><dd title="${htmlEscape(s.exact)}">${htmlEscape(s.value)}</dd></div>`).join("\n      ")}
     </dl>
   </header>`;
+}
+
+// ── The two drawers under the player ─────────────────────────────────────────
+//
+// Both sit inside the hero, between the audio element and the stat tiles, which
+// is where localbitcoiners' episode pages put them and for the same reason: they
+// are about the recording, and everything below the tiles is about its boosts.
+// Both ship COLLAPSED. LB opens its chapter list by default, but that page is
+// one show's own episode page with nothing under it; here a forty-row list would
+// push the stats, the community wall and the boosts off the first screen of a
+// page whose subject is the boosts. The count in the chapters summary is what
+// carries the discoverability instead.
+//
+// They use .ep-drawer, the show page's drawer — the sunken band, the SHOW/HIDE
+// word and the rotating chevron, unchanged. A reader who has opened the episode
+// drawer on /show has already learned this control.
+//
+// ⚠️ A COUNT IS FINE ON THE CHAPTERS SUMMARY and is not on the others. The rule
+// it looks like it breaks (see the drawer-chrome note in CLAUDE.md) is about
+// figures bounded by OUR coverage — a count of episodes we hold boosts for reads
+// as a claim about the show's catalogue. A chapter count is a complete fact
+// about the file the publisher shipped, and nothing about it depends on what
+// this site has indexed.
+
+/* Show notes. Server-rendered from D1's `episodes.description`, so this drawer
+ * works with JavaScript off.
+ *
+ * ⚠️ WHAT THIS TEXT IS, precisely: the episode description as Podcast Index
+ * returns it, run through the collector's clean_html — tags stripped, entities
+ * decoded, ALL whitespace collapsed to single spaces. Two consequences that are
+ * not bugs and cannot be fixed here. The publisher's paragraph breaks are gone,
+ * so this renders as one block rather than LB's paragraph list; and links
+ * survive only as bare URLs, which is why they are linkified below. Measured
+ * over 2,218 episodes in the live index: 99.5% carry notes, median 590
+ * characters, and PI caps the field near 1,000, which clips 0.6% of them
+ * mid-sentence.
+ */
+function renderNotesDrawer(ep, copy) {
+  const text = typeof ep.description === "string" ? ep.description.trim() : "";
+  if (!text) return "";
+  return `<details class="ep-drawer ep-notes">
+      <summary>${htmlEscape(copy.notes)}<span class="drawer-hint" aria-hidden="true"></span></summary>
+      <div class="ep-notes-body"><p>${linkifyNotes(text)}</p></div>
+    </details>`;
+}
+
+// Bare URLs → links, everything else escaped. renderMessage() in
+// _shared/detail-page.js does this and more for a boost message, but it
+// truncates at 420 characters, which is under the median length of a show note.
+// The mention half of that function is not wanted here either: an npub inside a
+// publisher's description is not a boost mention and has no name to resolve.
+const NOTES_URL_RE = /https?:\/\/[^\s<>"']+/g;
+function linkifyNotes(text) {
+  let out = "";
+  let cursor = 0;
+  for (const m of text.matchAll(NOTES_URL_RE)) {
+    out += htmlEscape(text.slice(cursor, m.index));
+    cursor = m.index + m[0].length;
+    // A trailing sentence period is punctuation, not part of the URL.
+    const raw = m[0].replace(/[.,;:)\]]+$/, "");
+    const tail = m[0].slice(raw.length);
+    out += isSafeUrl(raw)
+      ? `<a href="${htmlEscape(raw)}" target="_blank" rel="noopener noreferrer">${htmlEscape(truncate(raw, 60))}</a>`
+      : htmlEscape(raw);
+    out += htmlEscape(tail);
+  }
+  return out + htmlEscape(text.slice(cursor));
+}
+
+/* Chapters. THE ONE THING ON THIS PAGE THAT DOES NOT EXIST WITHOUT JAVASCRIPT,
+ * alongside #community-episodes, and for a data reason rather than a rendering
+ * one: nothing in D1 knows this episode's <podcast:chapters> URL. /api/chapters
+ * resolves it through Podcast Index at request time and episode-page.js reveals
+ * this drawer only if rows come back — so the server cannot know whether there
+ * is a drawer to draw.
+ *
+ * It therefore ships EMPTY and HIDDEN, which is the opposite of the choice
+ * #community-episodes makes and correct for the same reason. That section is
+ * hydrated by an IntersectionObserver, and an observer never fires on a hidden
+ * target, so it needs a zero-height sentinel with a position. This one is
+ * fetched unconditionally on load — it sits above the fold — so nothing has to
+ * observe it, and a visible-but-empty drawer would be a lid over nothing on the
+ * ~55% of episodes that publish no chapters.
+ *
+ * Withheld entirely when there is no enclosure to seek. A chapter list is a
+ * control for the player; without one it is a table of timestamps pointing at
+ * audio the page cannot play.
+ */
+function renderChaptersDrawer(ep) {
+  if (!isSafeUrl(ep.enclosure_url)) return "";
+  return `<details class="ep-drawer ep-chapters" data-chapters hidden>
+      <summary>Chapters<span class="ep-chapters-count" data-chapters-count></span><span class="drawer-hint" aria-hidden="true"></span></summary>
+      <ol class="ep-chapters-list" data-chapters-list></ol>
+    </details>`;
 }
 
 // ── Other episodes this community boosts ─────────────────────────────────────

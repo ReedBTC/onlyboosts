@@ -7,6 +7,8 @@
  *     spy, copy-npub, "Show N more", the art2 fallback, share, and the Primal
  *     profile backfill) — all of it in detail-page.js, shared with /show
  *   - the hero's Boost button, which pays THIS EPISODE's value block
+ *   - the chapters drawer under the player, which the server cannot render
+ *     because nothing in D1 holds a <podcast:chapters> URL
  *   - "Other Episodes/Songs This Community Boosts", the one section the server
  *     does not render
  *
@@ -175,6 +177,131 @@ async function initBoosting() {
 }
 
 initBoosting()
+
+// ── Chapters ─────────────────────────────────────────────────────────
+//
+/* The drawer under the player, filled from /api/chapters.
+ *
+ * ⚠️ THIS IS THE ONE PIECE OF THE HERO THAT IS NOT SERVER-RENDERED, and the
+ * reason is that nothing in D1 knows this episode's <podcast:chapters> URL. The
+ * endpoint resolves it through Podcast Index and fetches the file; see the note
+ * at the head of functions/api/chapters.js, including what would change if the
+ * collector ever stored the URL.
+ *
+ * The drawer ships hidden and is revealed only once rows come back — about half
+ * the feeds in this index publish chapters at all, and a feed that does may not
+ * do so on every episode, so an empty lid is the common failure to avoid.
+ *
+ * No IntersectionObserver, unlike the community section below: this sits above
+ * the fold, so there is nothing to wait for, and the payload is a few hundred
+ * bytes against that section's ~200KB of card machinery.
+ */
+function fmtChapterTime(totalSecs) {
+  const s = Math.max(0, Math.floor(totalSecs))
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  const sec = String(s % 60).padStart(2, '0')
+  // The hour segment is dropped under an hour in, so a 40-minute episode reads
+  // 12:30 rather than 0:12:30. Minutes are padded only when hours are shown.
+  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`
+}
+
+/* Seek the player to a chapter and start it.
+ *
+ * The element is preload="none", so on a first click there is no duration yet
+ * and assigning currentTime is silently dropped. play() is what triggers the
+ * load, so the assignment is queued behind loadedmetadata and applied then. On
+ * every later click readyState is already past that and it applies immediately.
+ */
+function seekTo(audio, secs) {
+  const apply = () => { try { audio.currentTime = secs } catch { /* not seekable */ } }
+  if (audio.readyState >= 1) apply()
+  else audio.addEventListener('loadedmetadata', apply, { once: true })
+  const p = audio.play()
+  if (p && typeof p.catch === 'function') p.catch(() => { /* autoplay policy */ })
+}
+
+async function initChapters() {
+  const drawer = document.querySelector('[data-chapters]')
+  const audio = document.querySelector('.ep-player-row .pcast-player')
+  if (!drawer || !audio || !EPISODE?.itemGuid) return
+
+  const qs = new URLSearchParams({ guid: EPISODE.itemGuid })
+  if (EPISODE.guid) qs.set('podcastGuid', EPISODE.guid)
+  if (EPISODE.feed) qs.set('feedUrl', EPISODE.feed)
+
+  let chapters = []
+  try {
+    const resp = await fetch(`/api/chapters?${qs}`, { headers: { Accept: 'application/json' } })
+    if (!resp.ok) return
+    const data = await resp.json()
+    chapters = Array.isArray(data?.chapters) ? data.chapters : []
+  } catch { return }
+  // Nothing to show is the ordinary outcome, not a failure: the drawer stays
+  // hidden and the page is the page it was before.
+  if (!chapters.length) return
+
+  const list = drawer.querySelector('[data-chapters-list]')
+  const count = drawer.querySelector('[data-chapters-count]')
+  if (!list) return
+
+  const starts = []
+  const buttons = []
+  const frag = document.createDocumentFragment()
+  for (const c of chapters) {
+    const secs = Math.max(0, Math.floor(Number(c.start) || 0))
+    const li = document.createElement('li')
+    li.className = 'ep-chapter'
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.className = 'ep-chapter-btn'
+    const time = document.createElement('span')
+    time.className = 'ep-chapter-time'
+    time.textContent = fmtChapterTime(secs)
+    const title = document.createElement('span')
+    title.className = 'ep-chapter-title'
+    // textContent throughout: a chapter title is a publisher's string arriving
+    // from a third-party file, so it never touches innerHTML.
+    title.textContent = String(c.title || '')
+    btn.append(time, title)
+    btn.addEventListener('click', () => seekTo(audio, secs))
+    li.appendChild(btn)
+    frag.appendChild(li)
+    starts.push(secs)
+    buttons.push(btn)
+  }
+  list.appendChild(frag)
+  if (count) count.textContent = String(chapters.length)
+  drawer.hidden = false
+
+  // The row covering the playhead, tracked as it advances. The last chapter
+  // whose start is at or behind the current time wins; the quarter-second
+  // tolerance is so a click-seek lands on the chapter it came from rather than
+  // the one before it.
+  let active = -1
+  const syncActive = () => {
+    const t = audio.currentTime
+    let idx = -1
+    for (let i = 0; i < starts.length; i++) {
+      if (starts[i] <= t + 0.25) idx = i
+      else break
+    }
+    if (idx === active) return
+    if (active >= 0) {
+      buttons[active].classList.remove('is-active')
+      buttons[active].removeAttribute('aria-current')
+    }
+    active = idx
+    if (idx >= 0) {
+      buttons[idx].classList.add('is-active')
+      buttons[idx].setAttribute('aria-current', 'true')
+    }
+  }
+  audio.addEventListener('timeupdate', syncActive)
+  audio.addEventListener('seeked', syncActive)
+}
+
+initChapters()
 
 // ── Other episodes this community boosts ─────────────────────────────
 //

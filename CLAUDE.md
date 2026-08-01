@@ -1202,7 +1202,7 @@ sections that don't apply, and one that only exists here.
 
 | | `/show/<guid>` | `/episode/<guid>` |
 |---|---|---|
-| Hero | show art, eyebrow "Show", Boost this Show | episode art, eyebrow **is the show's name and links to its page**, Boost this Episode, an audio player |
+| Hero | show art, eyebrow "Show", Boost this Show | episode art, eyebrow **is the show's name and links to its page**, Boost this Episode, an audio player, and the two drawers under it |
 | Stats | show totals | that episode's |
 | `#episodes` | the show's episode drawer | — no equivalent |
 | Community rollup | `#community-shows` — other shows | `#community-episodes` — other **episodes**, as full feed cards |
@@ -1251,6 +1251,89 @@ URL-shaped and all round-trip through one path segment.
 **Still unlinked, and each is its own decision:** the Boosts feed's cards, the
 `/show` episode drawer rows, and above all `episode-link.js` — see the note above
 for why that one is not a wiring job.
+
+### Chapters and Show Notes
+
+Two `<details>` between the audio element and the stat tiles, which is where
+localbitcoiners puts them and for the same reason: they are about the recording,
+where everything below the tiles is about its boosts. Both reuse `.ep-drawer`
+from `show-page.css` unchanged — the sunken band, the SHOW/HIDE word, the
+rotating chevron — so a reader who has opened the episode drawer on `/show` has
+already learned the control. `episode-page.css` adds the spacing and the
+contents and nothing about the lid.
+
+LB's chapter list ships open; **both of these ship collapsed**. That page is one
+show's own episode page with nothing under it, where a forty-row list here would
+push the stats, the community wall and the boosts off the first screen of a page
+whose subject is the boosts. The count in the chapters summary carries the
+discoverability instead. **A count is legitimate there and is not on the show
+page's drawers**: the rule it looks like it breaks is about figures bounded by
+*our* coverage, and a chapter count is a complete fact about the file the
+publisher shipped.
+
+**Show notes are server-rendered from D1 and chapters cannot be.** That is the
+whole asymmetry, and it is a data fact rather than a design one.
+
+| | Show notes | Chapters |
+|---|---|---|
+| Source | `episodes.description`, already on the row the page selects | `/api/chapters` → Podcast Index → the publisher's chapters JSON |
+| Cost | none, it is the same query | two edge-cached PI hops, off the critical path |
+| JavaScript off | reads normally | **absent**, like `#community-episodes` |
+| Coverage | 99.5% of episodes | ~54% of the boosted feeds publish any |
+
+**⚠️ What the notes text actually is.** The episode description as Podcast Index
+returns it, through the collector's `clean_html`: tags stripped, entities
+decoded, **all whitespace collapsed to single spaces**. So the publisher's
+paragraph breaks are gone before this page sees the text, which is why it renders
+as one block rather than LB's paragraph list, and why links survive only as bare
+URLs and are linkified at render. Measured over 2,218 episodes in the live index:
+99.5% carry notes, median 590 characters, and **PI caps the field near 1,000**,
+which clips 0.6% of them mid-sentence. `renderMessage()` in
+`_shared/detail-page.js` is deliberately not reused — it truncates at 420, under
+the median length, and its mention half has no business here.
+
+**Nothing in this pipeline holds a `<podcast:chapters>` URL**, which is what
+`functions/api/chapters.js` exists to work around. It resolves the episode
+through PI `episodes/byguid` (one hop when a `podcastguid` is passed, which the
+docs confirm as an accepted parameter; the feed-id resolution from `/api/value`
+is the fallback), reads `chaptersUrl` off the episode object, and fetches and
+normalizes the file under the house bounds — timeout, byte cap, streamed read.
+**`enrich.py` already makes that exact `episodes/byguid` call**, so a collector
+`chapters_url` column would cost it nothing and would drop both PI hops here;
+nothing on the client would change. Not built.
+
+Three things about that endpoint that are load-bearing:
+
+- **Every failure answers `200` with an empty list.** Chapters are additive, and
+  a 500 would be a broken drawer on a page about boosts.
+- **Two cache lives.** A resolved answer (rows, or a feed that genuinely
+  publishes none) holds for six hours; a timeout or an upstream error is not an
+  answer at all and holds for five minutes. Same principle as the podroll
+  collector's rule that only a clean read may overwrite a stored list.
+- **The chapters URL is publisher-controlled and reaches an outbound fetch**, so
+  it is http(s) only, no embedded credentials, bounded length. Untitled and
+  `toc: false` entries are dropped: those are ad and segment boundaries, and a
+  row with a timestamp and no label is a seek button that says nothing about
+  where it lands.
+
+The drawer therefore **ships empty and hidden**, which is the opposite of what
+`#community-episodes` does and correct for the same reason. That section needs a
+zero-height sentinel because an `IntersectionObserver` never fires on a hidden
+target; this one sits above the fold and is fetched unconditionally on load, so
+nothing observes it, and a visible-but-empty drawer would be a lid over nothing
+on the ~55% of episodes that publish no chapters. It is withheld outright when
+there is no enclosure to seek.
+
+**No Download MP3, no transcript link, and no subscribe menu**, all three of
+which LB's player card carries. The download button is the same call the episode
+cards already made and lost: every browser's native audio controls carry Download
+in their own ⋮ menu.
+
+Clicking a row seeks the player and starts it; the row covering the playhead
+takes `.is-active` as playback advances. The element is `preload="none"`, so on a
+first click there is no duration yet and assigning `currentTime` is dropped —
+`play()` is what triggers the load, so the assignment is queued behind
+`loadedmetadata` and applied there.
 
 ### Other Episodes/Songs This Community Boosts
 
