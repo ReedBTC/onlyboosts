@@ -1270,10 +1270,39 @@ different things, so they don't share one.
 
 **Qualifying rule: the episode has a title.** 6,682 of the 7,182 episodes
 carrying an indexed boost do; the other 500 are boosts tagged with an item guid
-Podcast Index can't identify, so there is nothing to render and they 404 — the
-same rule and the same reasoning as a titleless show. A missing *show* is not
-disqualifying: 23 titled episodes carry no podcast guid, and those lose the
-eyebrow link and the boost button and keep everything else.
+Podcast Index can't identify, so there is nothing to render — the same rule and
+the same reasoning as a titleless show. A missing *show* is not disqualifying: 23
+titled episodes carry no podcast guid, and those lose the eyebrow link and the
+boost button and keep everything else.
+
+**⚠️ When there is no page, the reader is redirected to the SHOW rather than
+404'd** — `noEpisodePage()`, one indexed lookup on the miss path only. It joins
+`boosts` to `podcasts` so the target is confirmed to have a title, which is
+exactly the rule `/show/<guid>` applies, so it can never hand over a second 404.
+A failed lookup degrades to the 404 rather than a 500.
+
+It exists because **the two halves of the pipeline can disagree, and this page
+cannot see the disagreement.** A feed card links an episode when the BOOST RECORD
+carries a title, which comes from the collector's static exports; this page
+renders from D1's `episodes` table. Measured 2026-08-01: the manifest reported
+`eps_enriched: 6755` against `episodes: 6688` in D1, so **~1% of the episode
+links the site rendered resolved to nothing** — including real episodes with
+double-digit boost counts. The cause is upstream, in `d1_sync.py`'s delta path:
+it pushes an episode only in the tick where a boost for it arrives, and silently
+skips it when enrichment hasn't yet written the local row, never revisiting it.
+An episode enriched after its last boost therefore never reaches D1 while looking
+complete in every static export. **The fix belongs in the collector; this is the
+graceful failure while any such skew exists.**
+
+It covers the permanent miss too — the 434 episodes with no title and nothing to
+enrich — whose show is usually known perfectly well.
+
+**302, never 301.** Both cases are expected to resolve, and a permanent redirect
+is cached by browsers indefinitely, so it would keep sending readers to the show
+long after the episode page started working. The target is the bare `/show/<guid>`
+and deliberately not `#episodes`: that anchor opens the show's episode drawer,
+which is built from the same `episodes` table that just missed, so it is
+precisely the list this episode is not in.
 
 **⚠️ `item_guid` IS NOT ALWAYS A UUID, and it is the URL key.** 9% of the
 distinct guids contain a slash and 30 are full http(s) URLs, so it is only ever

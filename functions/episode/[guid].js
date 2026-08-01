@@ -94,7 +94,7 @@ export async function onRequestGet({ env, params }) {
   // guid, and the page degrades cleanly: no eyebrow link, no boost button, and
   // the community sections work unchanged because they are keyed on the
   // episode.
-  if (!ep || !ep.title) return notFound(guid);
+  if (!ep || !ep.title) return await noEpisodePage(env, guid);
 
   const [sups, boosts, boosters] = await Promise.all([
     env.DB.prepare(
@@ -846,6 +846,69 @@ function renderCommunityEpisodes(copy) {
 // A guid with no page. Deliberately a real 404 rather than a shell of empty
 // fields: 500 of the 7,182 episodes carrying an indexed boost have no title,
 // artwork or Podcast Index record, so there is genuinely nothing to show.
+/* No page for this episode. Send the reader to its SHOW when we can name one.
+ *
+ * ⚠️ THIS EXISTS BECAUSE THE TWO HALVES OF THE PIPELINE CAN DISAGREE, and the
+ * disagreement is invisible from here. A feed card links an episode when the
+ * BOOST RECORD carries a title, which comes from the collector's static exports;
+ * this page renders from D1's `episodes` table. Those are normally the same set
+ * and are not guaranteed to be: measured 2026-08-01, the manifest reported 6,755
+ * enriched episodes against 6,688 rows in D1, so ~1% of the links the site
+ * renders resolved to nothing. The cause is upstream — `d1_sync.py`'s delta path
+ * pushes an episode only in the tick where a boost for it arrives, and silently
+ * skips it when enrichment has not yet written the local row, never revisiting
+ * it — and the fix belongs there. This is the graceful failure while any such
+ * skew exists, not a substitute for fixing it.
+ *
+ * It covers the other miss too, and that one is permanent: 434 episodes carry
+ * boosts under an item guid Podcast Index cannot identify, so they have no
+ * title, no page and nothing to enrich. Their show is usually known perfectly
+ * well, and a reader who followed a link to one is better served by the show
+ * than by a dead end.
+ *
+ * 302, NEVER 301. Both cases are expected to resolve — the first when the
+ * collector catches up, the second if Podcast Index ever learns the episode —
+ * and a permanent redirect is cached by browsers indefinitely, so it would keep
+ * sending readers to the show long after the episode page started working.
+ *
+ * The target is the bare `/show/<guid>`, not `#episodes`. That anchor opens the
+ * show's episode drawer, and the drawer is built from the same `episodes` table
+ * that just missed, so it is precisely the list this episode is NOT in.
+ */
+async function noEpisodePage(env, guid) {
+  // One indexed lookup through idx_boosts_item, and only on the miss path. The
+  // join to `podcasts` is what makes this a redirect rather than a guess: it
+  // confirms the show has a title, which is exactly the rule /show/<guid>
+  // applies, so this can never hand the reader a second 404.
+  let row = null;
+  try {
+    row = await env.DB.prepare(
+      `SELECT b.podcast_guid AS guid
+       FROM boosts b
+       JOIN podcasts p ON p.podcast_guid = b.podcast_guid
+       WHERE b.item_guid = ? AND b.podcast_guid IS NOT NULL
+         AND p.title IS NOT NULL AND p.title <> ''
+       LIMIT 1`
+    ).bind(guid).first();
+  } catch (err) {
+    // A failed lookup is a 404, not a 500: the reader asked for a page that
+    // does not exist either way, and this query only ever improves the answer.
+    console.warn("[episode] show fallback lookup failed", err);
+  }
+
+  if (!row?.guid) return notFound(guid);
+
+  return new Response(null, {
+    status: 302,
+    headers: {
+      Location: `/show/${encodeURIComponent(row.guid)}`,
+      // Short, and shorter than the page's own 300s for the same reason the
+      // status is 302: this answer is expected to stop being the right one.
+      "Cache-Control": "public, max-age=120",
+    },
+  });
+}
+
 function notFound(guid) {
   const html = `<!DOCTYPE html>
 <html lang="en">
