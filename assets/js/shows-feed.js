@@ -59,7 +59,7 @@ import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls,
 } from '/assets/js/feed-controls.js'
 import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js'
-import { showPageHref } from '/assets/js/show-link.js'
+import { showPageHref, episodePageHref } from '/assets/js/show-link.js'
 // Show-level boosting. Same four pieces the episode feed uses, and deliberately
 // the same ones: fromApiValue / applyExternalOverrides are where the split
 // logic lives, and sharing them is what keeps every surface paying the value
@@ -412,6 +412,16 @@ function loadRange(key) {
 // Newest episode first: the list reads as the show's recent catalogue, with
 // each row carrying what it took. The episode-level ranking question is what
 // the Episodes feeds are for.
+//
+// The row's TITLE links to that episode's page here, the same rule and the same
+// module every other episode surface uses — see show-link.js#episodePageHref and
+// the link section in CLAUDE.md. It used to point at `e.url`, the audio itself,
+// which was the only destination this row had before the pages existed; that URL
+// is now the fallback for an episode with no title to qualify it, and it is the
+// only branch that still opens a new tab.
+//
+// Both sources feeding this carry a guid: the All path maps it off the per-show
+// shard, and the windowed rollup keys its own episode map on it.
 function renderEpisodes(into, eps, copy, { truncatedFrom = 0 } = {}) {
   if (!eps.length) {
     into.replaceChildren(h('div', { class: 'ob-show-note', text: copy.noItems }))
@@ -420,16 +430,22 @@ function renderEpisodes(into, eps, copy, { truncatedFrom = 0 } = {}) {
   const list = h('ul', { class: 'ob-ep-list' })
   for (const e of eps) {
     const title = e.title || copy.untitledItem
+    const epHref = episodePageHref(e.guid, e.title)
     const meta = [shortDate(e.date), e.boosts ? plural(e.boosts, 'boost', 'boosts') : null]
       .filter(Boolean).join(' · ')
     list.appendChild(h('li', { class: 'ob-ep' }, [
       h('div', { class: 'ob-ep-main' }, [
-        isSafeUrl(e.url)
+        epHref
           ? h('a', {
-              class: 'ob-ep-title', href: e.url,
-              target: '_blank', rel: 'noopener noreferrer', text: title,
+              class: 'ob-ep-title', href: epHref,
+              title: `Nostr boosts to ${title}`, text: title,
             })
-          : h('span', { class: 'ob-ep-title', text: title }),
+          : isSafeUrl(e.url)
+            ? h('a', {
+                class: 'ob-ep-title', href: e.url,
+                target: '_blank', rel: 'noopener noreferrer', text: title,
+              })
+            : h('span', { class: 'ob-ep-title', text: title }),
         meta ? h('span', { class: 'ob-ep-meta', text: meta }) : null,
       ]),
       e.sats ? h('span', { class: 'ob-ep-sats' }, [fmtSats(e.sats), h('span', { class: 'pcast-bolt', 'aria-hidden': 'true', text: ' ⚡' })]) : null,

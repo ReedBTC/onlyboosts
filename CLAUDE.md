@@ -759,24 +759,39 @@ resolve.
 
 ### Every Episode Link Points at `/episode/<item-guid>`
 
-**Six surfaces name an episode, and all six now resolve to its page here.** Five
-are hyperlinks a reader clicks; the sixth is the URL written into a published
-boost note, which is why the set was wired in two passes rather than one.
+**Seven surfaces name an episode, and all seven now resolve to its page here.**
+Six are hyperlinks a reader clicks; the seventh is the URL written into a
+published boost note, which is why the set was wired in two passes rather than
+one.
 
 | Surface | What links | Built by |
 |---|---|---|
 | Episodes / Songs cards | artwork, title, "See all boosts" in the drawer | `feeds-podcasts.js`, via `show-link.js#episodePageHref` |
 | `/episode` community cards | the same card, unchanged | the same |
+| Shows / Albums cards' episode drawer | the row's title | `shows-feed.js#renderEpisodes`, same module |
 | Boosts cards | the episode title on the meta row | `boosts-feed.js`, same module |
 | `/show` episode drawer rows | the row's title | `functions/show/[guid].js#episodePageUrl` |
 | A published boost note | the content link line and the `r` tag | `episode-link.js#episodeBoostLink` |
 
+**Both mediums, everywhere.** Songs is `feeds-podcasts.js` and Albums is
+`shows-feed.js` — the same two renderers behind Episodes and Shows, differing
+only by a copy table — so a track's title links exactly as an episode's does and
+there was nothing medium-specific to add. `/episode/<item-guid>` serves a track
+the same way it serves an episode; only the words change.
+
 **The qualifying rule is the TITLE in all of them**, and each falls back to what
 it linked before rather than emitting a URL that 404s: 6,682 of the 7,182
 episodes carrying an indexed boost have one, and the other 500 are boosts tagged
-with an item guid Podcast Index cannot identify. Those keep the Boost Me Bitch
-link on the cards and in the note, and stay plain text in the `/show` drawer,
-where a row already carries a Boost button and had no link before.
+with an item guid Podcast Index cannot identify. The fallbacks differ because
+what each surface linked before differs — Boost Me Bitch on the feed cards and in
+the note, the episode's own audio URL on the Boosts cards and in the Shows/Albums
+drawer, and plain text in the `/show` drawer, where a row already carries a Boost
+button and had no link at all before.
+
+**Two surfaces used to point at the AUDIO**, `episode.url`, because that was the
+only destination they had: the Boosts card's episode name and the Shows/Albums
+drawer's rows. That URL is now the untitled fallback, and it is the only branch
+on those surfaces that still opens a new tab.
 
 **⚠️ Two surfaces still point at boostmebitch.com on purpose, and both are
 show-level**, in `functions/show/[guid].js` through one `bmbShowUrl()`:

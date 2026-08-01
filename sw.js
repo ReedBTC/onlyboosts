@@ -273,8 +273,9 @@
 // 100 words. Both correct themselves on the second navigation, which is the case
 // this bump exists for.
 // ob-v48: every episode link on the site now resolves to /episode/<item-guid> —
-// the Episodes and Songs cards' artwork, title and "See all boosts", the Boosts
-// cards' episode title, and the URL written into a published boost note.
+// the Episodes and Songs cards' artwork, title and "See all boosts", the Shows
+// and Albums cards' episode drawer rows, the Boosts cards' episode title, and
+// the URL written into a published boost note.
 // Required, and the note path is why: episode-link.js is a cached module, so a
 // returning visitor holding the old copy would keep PUBLISHING boostmebitch.com
 // links into events that cannot be recalled. The two show-level links on
