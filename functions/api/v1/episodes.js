@@ -44,6 +44,78 @@ const RANGE_DAYS = { "1w": 7, "1m": 30, all: null };
 const MEDIA = new Set(["podcast", "music", "video"]);
 const MAX_FOLLOWS = 5000;
 
+// ── ?include=boosts ──────────────────────────────────────────────────────────
+// The feed card isn't a row of figures: it opens a drawer of the actual boost
+// notes with a reply/like/repost/zap bar each, and its collapsed state shows
+// booster avatars. Aggregates can't produce either, so the notes ride along
+// with the page that needs them instead of costing a second round trip.
+//
+// Capped PER EPISODE, not per page: one 300-boost episode must not starve the
+// other 29 cards. 50 matches what the drawer already lives with, and the card's
+// `boosts` total is the full count — so `boosts_inline.length < boosts` is how a
+// client knows it was truncated and should link out to /episode/<guid>.
+const BOOSTS_PER_EPISODE = 50;
+// D1 hard-caps bound parameters at exactly 100 per statement (verified: 100 OK,
+// 101 → "too many SQL variables"). A page can carry up to `limit` = 200
+// episodes, so the guid list is chunked rather than bound in one go. The guids
+// are NOT interpolated: 9% of them contain a slash and some are full URLs, so
+// they stay opaque bound values.
+const GUID_CHUNK = 90;
+
+function inlineBoostRecord(r) {
+  return {
+    id: r.event_id,
+    ts: r.created_at,
+    sats: r.sats,
+    src: r.amount_source,
+    msg: r.message,
+    client: r.client,
+    booster: { pk: r.booster_pubkey, npub: r.booster_npub, name: r.pr_name, pic: r.pr_pic },
+  };
+}
+
+/**
+ * Attach each episode's boost notes in place. `followsIn` is a pre-validated,
+ * already-escaped SQL fragment (or null) — when the page is follows-scoped the
+ * notes are scoped the same way, so the drawer can't show boosts the card's own
+ * numbers didn't count.
+ */
+async function attachBoosts(env, episodes, followsIn) {
+  if (!episodes.length) return;
+  const byGuid = new Map(episodes.map((e) => [e.guid, e]));
+  for (const e of episodes) e.boosts_inline = [];
+
+  const guids = [...byGuid.keys()];
+  const chunks = [];
+  for (let i = 0; i < guids.length; i += GUID_CHUNK) chunks.push(guids.slice(i, i + GUID_CHUNK));
+
+  // ROW_NUMBER partitioned by episode is what makes the per-episode cap one
+  // query instead of one per card (verified supported on D1).
+  const results = await Promise.all(chunks.map((chunk) => {
+    const ph = chunk.map(() => "?").join(",");
+    return env.DB.prepare(`
+      SELECT item_guid, event_id, booster_pubkey, booster_npub, created_at, sats,
+             amount_source, client, message, pr_name, pr_pic
+      FROM (
+        SELECT b.item_guid, b.event_id, b.booster_pubkey, b.booster_npub, b.created_at,
+               b.sats, b.amount_source, b.client, b.message,
+               pr.name AS pr_name, pr.picture AS pr_pic,
+               ROW_NUMBER() OVER (PARTITION BY b.item_guid
+                                  ORDER BY b.created_at DESC, b.event_id DESC) AS rn
+        FROM boosts b
+        LEFT JOIN profiles pr ON pr.pubkey = b.booster_pubkey
+        WHERE b.item_guid IN (${ph})
+          ${followsIn ? `AND b.booster_pubkey IN (${followsIn})` : ""}
+      )
+      WHERE rn <= ?
+      ORDER BY item_guid, created_at DESC`).bind(...chunk, BOOSTS_PER_EPISODE).all();
+  }));
+
+  for (const { results: rows } of results) {
+    for (const r of rows) byGuid.get(r.item_guid)?.boosts_inline.push(inlineBoostRecord(r));
+  }
+}
+
 function episodeRecord(r) {
   return {
     guid: r.item_guid,
@@ -54,8 +126,12 @@ function episodeRecord(r) {
     num: r.episode_number,
     url: r.enclosure_url,
     show: {
+      // `feed` is not cosmetic: the card's boost button resolves splits through
+      // /api/value, which prefers ?feedUrl= and only falls back to
+      // ?podcastGuid=. Matches the show object /api/v1/episodes/<guid> emits.
       guid: r.podcast_guid, title: r.p_title, img: r.p_image,
-      art2: r.p_artwork || null, medium: r.p_medium || "podcast", author: r.p_author,
+      art2: r.p_artwork || null, feed: r.p_feed,
+      medium: r.p_medium || "podcast", author: r.p_author,
     },
     boosts: r.boost_count,
     sats: r.total_sats,
@@ -80,8 +156,10 @@ function readParams(u) {
   if (notMedium && !MEDIA.has(notMedium)) return { error: "bad not_medium (podcast|music|video)" };
   const podcast = u.searchParams.get("podcast") || null;
   const days = RANGE_DAYS[range];
+  const include = new Set((u.searchParams.get("include") || "").split(",").filter(Boolean));
   return {
     sortKey, range, medium, notMedium, podcast,
+    withBoosts: include.has("boosts"),
     // Cutoff is computed per request; the response is cached briefly, so a
     // window can lag its own edge by the cache TTL. That's invisible at 7-day
     // granularity and keeps this a pure function of the URL.
@@ -121,7 +199,7 @@ export async function onRequestGet({ request, env }) {
            e.episode_number, e.enclosure_url,
            e.boost_count, e.total_sats, e.booster_count, e.latest_ts,
            pc.title AS p_title, pc.image AS p_image, pc.artwork AS p_artwork,
-           pc.medium AS p_medium, pc.author AS p_author
+           pc.feed_url AS p_feed, pc.medium AS p_medium, pc.author AS p_author
     FROM episodes e
     LEFT JOIN podcasts pc ON pc.podcast_guid = e.podcast_guid
     ${where.length ? "WHERE " + where.join(" AND ") : ""}
@@ -131,6 +209,7 @@ export async function onRequestGet({ request, env }) {
 
   const { results } = await env.DB.prepare(sql).bind(...args).all();
   const episodes = results.map(episodeRecord);
+  if (p.withBoosts) await attachBoosts(env, episodes, null);
   return json(request, {
     count: episodes.length,
     scope: "global",
@@ -196,7 +275,7 @@ export async function onRequestPost({ request, env }) {
            COUNT(DISTINCT b.booster_pubkey)    AS booster_count,
            MAX(b.created_at)                   AS latest_ts,
            pc.title AS p_title, pc.image AS p_image, pc.artwork AS p_artwork,
-           pc.medium AS p_medium, pc.author AS p_author
+           pc.feed_url AS p_feed, pc.medium AS p_medium, pc.author AS p_author
     FROM boosts b
     LEFT JOIN episodes e  ON e.item_guid    = b.item_guid
     LEFT JOIN podcasts pc ON pc.podcast_guid = b.podcast_guid
@@ -208,6 +287,9 @@ export async function onRequestPost({ request, env }) {
 
   const { results } = await env.DB.prepare(sql).bind(...args).all();
   const episodes = results.map((r) => episodeRecord({ ...r, item_guid: r.item_guid }));
+  // Notes scoped to the same follow set as the aggregates above — a drawer
+  // showing boosts the card's own numbers didn't count would read as a bug.
+  if (p.withBoosts) await attachBoosts(env, episodes, inList);
   return json(request, {
     count: episodes.length,
     scope: "follows",
