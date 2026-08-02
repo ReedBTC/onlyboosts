@@ -21,9 +21,10 @@
 
 const UPSTREAM_BASE = "https://relay.mynostr.app/onlyboosts/";
 const FETCH_TIMEOUT_MS = 10_000;
-// Largest shard today is ~1.2MB (latest.json); the biggest per-show file seen
-// is ~570KB. 12MB is generous headroom for growth without letting a
-// misbehaving upstream pin the Function's memory.
+// Largest shard today is ~1.5MB (boosts/music.json, all-time and uncapped);
+// latest.json is ~1.2MB and the biggest per-show file seen is ~570KB. 12MB is
+// generous headroom for growth without letting a misbehaving upstream pin the
+// Function's memory.
 const RESPONSE_MAX_BYTES = 12 * 1024 * 1024;
 
 // Exact-match origin allowlist — `startsWith` would let a lookalike origin
@@ -44,6 +45,7 @@ const PATH_RULES = [
   /^meta\.json$/,
   /^profiles\.json$/,
   /^boosts\/\d{4}-\d{2}\.json$/,
+  /^boosts\/music\.json$/,        // all-time music slice; literal, not a wildcard
   /^podcasts\/index\.json$/,
   // Per-show shards. The collector derives these from a podcast guid, which is
   // usually a UUID but not always — some feeds carry arbitrary guid strings —

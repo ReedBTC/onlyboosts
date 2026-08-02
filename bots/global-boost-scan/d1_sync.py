@@ -132,17 +132,20 @@ def build_full_sql(conn):
     for e in conn.execute("""
         SELECT e.item_guid, e.podcast_guid, e.title, e.image, e.published,
                e.duration, e.episode_number, e.enclosure_url, e.description,
-               agg.boost_count, agg.total_sats
+               agg.boost_count, agg.total_sats, agg.booster_count, agg.latest_ts
         FROM episodes e
-        JOIN (SELECT item_guid, COUNT(*) boost_count, COALESCE(SUM(sats),0) total_sats
+        JOIN (SELECT item_guid, COUNT(*) boost_count, COALESCE(SUM(sats),0) total_sats,
+                     COUNT(DISTINCT booster_pubkey) booster_count, MAX(created_at) latest_ts
               FROM boosts WHERE item_guid IS NOT NULL GROUP BY item_guid) agg
           ON agg.item_guid = e.item_guid""").fetchall():
         out.append(
             "INSERT INTO episodes (item_guid,podcast_guid,title,image,published,"
-            "duration,episode_number,enclosure_url,description,boost_count,total_sats) VALUES ("
+            "duration,episode_number,enclosure_url,description,boost_count,total_sats,"
+            "booster_count,latest_ts) VALUES ("
             f"{q(e['item_guid'])},{q(e['podcast_guid'])},{q(e['title'])},{q(e['image'])},"
             f"{q(e['published'])},{q(e['duration'])},{q(e['episode_number'])},"
-            f"{q(e['enclosure_url'])},{q(e['description'])},{q(e['boost_count'])},{q(e['total_sats'])});")
+            f"{q(e['enclosure_url'])},{q(e['description'])},{q(e['boost_count'])},{q(e['total_sats'])},"
+            f"{q(e['booster_count'])},{q(e['latest_ts'])});")
 
     # profiles
     for p in conn.execute("SELECT pubkey,name,display_name,picture,nip05 FROM profiles").fetchall():
@@ -215,16 +218,20 @@ def build_delta_sql(conn, rows):
             """SELECT e.item_guid,e.podcast_guid,e.title,e.image,e.published,e.duration,
                       e.episode_number,e.enclosure_url,e.description,
                       (SELECT COUNT(*) FROM boosts WHERE item_guid=e.item_guid) AS boost_count,
-                      (SELECT COALESCE(SUM(sats),0) FROM boosts WHERE item_guid=e.item_guid) AS total_sats
+                      (SELECT COALESCE(SUM(sats),0) FROM boosts WHERE item_guid=e.item_guid) AS total_sats,
+                      (SELECT COUNT(DISTINCT booster_pubkey) FROM boosts WHERE item_guid=e.item_guid) AS booster_count,
+                      (SELECT MAX(created_at) FROM boosts WHERE item_guid=e.item_guid) AS latest_ts
                FROM episodes e WHERE e.item_guid=?""", (ig,)).fetchone()
         if not e:
             continue
         out.append(
             "INSERT OR REPLACE INTO episodes (item_guid,podcast_guid,title,image,published,"
-            "duration,episode_number,enclosure_url,description,boost_count,total_sats) VALUES ("
+            "duration,episode_number,enclosure_url,description,boost_count,total_sats,"
+            "booster_count,latest_ts) VALUES ("
             f"{q(e['item_guid'])},{q(e['podcast_guid'])},{q(e['title'])},{q(e['image'])},"
             f"{q(e['published'])},{q(e['duration'])},{q(e['episode_number'])},"
-            f"{q(e['enclosure_url'])},{q(e['description'])},{q(e['boost_count'])},{q(e['total_sats'])});")
+            f"{q(e['enclosure_url'])},{q(e['description'])},{q(e['boost_count'])},{q(e['total_sats'])},"
+            f"{q(e['booster_count'])},{q(e['latest_ts'])});")
 
     if pubs:
         ph = ",".join("?" * len(pubs))
