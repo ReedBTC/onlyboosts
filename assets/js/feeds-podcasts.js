@@ -40,15 +40,12 @@ import { episodeBoostLink } from '/assets/js/episode-link.js'
 import { buildActionBar, configureBoostActions } from '/assets/js/boost-actions.js'
 import { ensureLoginWidget } from '/assets/js/widget-loader.js'
 import { resolveFollows } from '/assets/js/follow-set.js'
-import {
-  getLatestBoosts, getBoostMonths, getBoostMonth, toEpisodeShape, mediumPredicate,
-} from '/assets/js/ob-data.js'
-import { getFollowsBoosts } from '/assets/js/ob-live.js'
+import { toEpisodeShape, normalizeBoosts, episodeApiToBoosts } from '/assets/js/ob-data.js'
+import { getEpisodePage } from '/assets/js/ob-live.js'
 import { copyText, showToast, copyNpub } from '/assets/js/copy-npub.js'
 import { boostButton, withBoostBusy } from '/assets/js/boost-button.js'
 import {
-  RANGE_OPTIONS, rangeDays, rangeCutoff,
-  rangeControl, sortControl, mountFeedControls,
+  rangeDays, rangeControl, sortControl, mountFeedControls,
 } from '/assets/js/feed-controls.js'
 import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js'
 import { showPageHref, episodePageHref } from '/assets/js/show-link.js'
@@ -450,7 +447,9 @@ let cardUid = 0
 // boosts / most sats) get a number — on "Latest boost" or "Latest episode" a
 // rank would read as a score when it's really just chronology.
 export function episodeCard(item, rank = null, copy = COPY.other) {
-  const { ep, show, boosts, distinctBoosters, totalSats, latest } = item
+  const { ep, show, boosts, distinctBoosters, latest } = item
+  // Same rule as the counts below: the server's total, falling back to the rows.
+  const totalSats = item.totals?.sats ?? item.totalSats
   const detailsId = 'pcast-d-' + (++cardUid)
 
   // Two links, and the first is preferred everywhere it exists. `epHref` is
@@ -546,8 +545,13 @@ export function episodeCard(item, rank = null, copy = COPY.other) {
   // per-card replacement for the scope-note paragraph that used to sit above
   // the whole feed. The sats stay on the drawer bar beside the booster faces;
   // they are the visual anchor there and repeating them here would only echo.
-  const nBoosters = distinctBoosters.length
-  const nBoosts = boosts.length
+  // ⚠️ THE FIGURES ARE THE SERVER'S, NOT A COUNT OF THE ROWS IN THIS CARD. The
+  // endpoint caps the notes it inlines at 50 per episode while reporting the
+  // true all-time totals, so counting `boosts` here would understate the one
+  // episode in the index that exceeds the cap. It falls back to the rows for a
+  // card built from anything that does not carry totals.
+  const nBoosters = item.totals?.boosters ?? distinctBoosters.length
+  const nBoosts = item.totals?.boosts ?? boosts.length
   const statsRow = h('div', { class: 'pcast-meta pcast-nstats' }, [
     h('span', { class: 'ob-stats-label', text: 'Nostr Stats:' }),
     h('span', { text: `${nBoosters.toLocaleString()} booster${nBoosters === 1 ? '' : 's'}` }),
@@ -880,53 +884,6 @@ export const SORT_OPTIONS = [
   ['boosts', 'Most boosts'],
   ['sats', 'Most sats'],
 ]
-// Every comparator breaks ties on total sats, then on most-recent-boost so the
-// order stays stable. 'count' ranks by distinct people, 'boosts' by raw boost
-// volume — they differ on the ~16% of episodes where someone boosted the same
-// episode repeatedly.
-const bySats = (a, b) => b.totalSats - a.totalSats || b.latest - a.latest
-const SORTERS = {
-  recent: (a, b) => b.latest - a.latest || b.totalSats - a.totalSats,
-  episode: (a, b) => (b.ep.published || 0) - (a.ep.published || 0) || bySats(a, b),
-  count: (a, b) => b.distinctBoosters.length - a.distinctBoosters.length || bySats(a, b),
-  boosts: (a, b) => b.boosts.length - a.boosts.length || bySats(a, b),
-  sats: bySats,
-}
-export function sortItems(items, key) {
-  return [...items].sort(SORTERS[key] || SORTERS.recent)
-}
-
-// ── Air-date range filter ────────────────────────────────────────────
-// Scopes the feed to episodes that *aired* recently (ep.published), which is
-// independent of when they were boosted — an old episode boosted today is in
-// the feed's data but out of the 1W view. The note feed's identical-looking
-// buttons filter on boost time instead, which is why the tooltips are written
-// per feed rather than in feed-controls.js.
-//
-// On the music side the same field is the track's release date, which is why
-// the tooltips come out of the copy table rather than being written here.
-export function filterItems(items, key) {
-  const cutoff = rangeCutoff(key)
-  if (!cutoff) return items
-  return items.filter((it) => (it.ep.published || 0) >= cutoff)
-}
-// Pick the opening range.
-//
-// Global opens on All: that tab's whole job is the network-wide picture, and
-// a 7-day air-date window hides most of what the community has boosted —
-// including every boost on an older episode, which is a lot of them.
-//
-// Follows opens on 1W and widens until something's there (a quiet week would
-// otherwise leave the feed blank). A personal feed is small enough to read
-// week by week, and "nothing this week" is useful information there.
-function defaultRange(items, scope) {
-  if (scope !== 'follows') return 'all'
-  for (const [key] of RANGE_OPTIONS) {
-    if (filterItems(items, key).length) return key
-  }
-  return 'all'
-}
-
 // Put this feed's range buttons + sort dropdown in the sticky feed bar.
 function mountControls(feed, { sortKey, rangeKey, onSort, onRange, copy }) {
   mountFeedControls(feed, [
@@ -942,58 +899,67 @@ function mountControls(feed, { sortKey, rangeKey, onSort, onRange, copy }) {
   ])
 }
 
-// ── Boost corpus ─────────────────────────────────────────────────────
-// Both tabs group boosts by episode, so unlike the note feed neither can
-// paint until it holds a corpus to roll up and range-filter over. What
-// differs is where that corpus comes from.
-
-/**
- * Global: latest.json plus the three most recent month archives.
+// ── The corpus ───────────────────────────────────────────────────────
+//
+/* ⚠️ RANKING MOVED TO THE SERVER, AND IT WAS A CORRECTNESS FIX RATHER THAN A
+ * SPEEDUP.
  *
- * The range filter offers 1W / 1M / All, so "All" needs more than the recent
- * 1,000 boosts to mean anything — but pulling all 22 archives would be ~20MB.
- * Three months keeps the default views honest at ~4MB worst case.
- */
-async function loadGlobalRows() {
-  const [latest, months] = await Promise.all([getLatestBoosts(), getBoostMonths()])
-  const seen = new Set()
-  const rows = []
-  const take = (arr) => {
-    for (const b of arr) {
-      if (seen.has(b.id)) continue
-      seen.add(b.id)
-      rows.push(b)
-    }
-  }
-  take(latest)
-  const archives = await Promise.all(
-    months.slice(0, 3).map((m) => getBoostMonth(m.file).catch((e) => {
-      console.warn('[podcasts] month load failed', m.file, e)
-      return []
-    }))
-  )
-  for (const a of archives) take(a)
-  return rows
-}
-
-/**
- * Follows: the D1 query API, filtered to the contact list server-side.
+ * Both feeds used to pull latest.json plus three month archives and roll the
+ * whole thing up in the browser, which ranked over whatever those shards
+ * happened to hold rather than over the index. Measured against the full corpus:
+ * 7 of the true all-time top 10 episodes were missing outright, only 20 of the
+ * true top 100 appeared at all, and the true #7 painted at #128 because only its
+ * last-three-months sats were counted. Songs was worse — 84 of 601 music
+ * episodes — because music is ~5% of a boost stream whose window was sized for
+ * the other 95%.
  *
- * No month window here. The three-month bound above exists because the shards
- * are global and big; a follow set's boosts are a thin slice of the same
- * table, so the query walks the follow set's own history and stops on the row
- * budget in ob-live.js rather than at an archive boundary. That makes "All"
- * mean more on this tab than on Global, which is the right way round — a
- * Follows audience is exactly the one whose older boosts are worth finding.
+ * /api/v1/episodes aggregates over every boost, so the range filter and the sort
+ * menu are QUERIES now rather than array operations, and changing either
+ * refetches. filterItems / sortItems / defaultRange and the SORTS table went
+ * with them; SORT_OPTIONS survives because its keys are the endpoint's own sort
+ * values, and RANKED_SORTS because it still decides when a position is worth
+ * printing.
+ *
+ * THE MEDIUM SPLIT MOVED TOO. mediumPredicate() and the podcasts/index.json
+ * rollup it joined through are no longer read by these feeds at all — the
+ * endpoint takes the medium as a parameter, so a ~103KB fetch and a guid→medium
+ * join both left the page.
  */
-async function loadFollowsRows(authors) {
-  const { rows, truncated } = await getFollowsBoosts(authors)
-  if (truncated) {
-    // Worth knowing when tuning the budget: the rollup is over a prefix of the
-    // follow set's history, not all of it.
-    console.info('[podcasts] follows corpus truncated at', rows.length, 'boosts')
+
+// One page of ranked episodes, adapted into the shape the card already reads.
+//
+// Nothing downstream knows the corpus changed: the endpoint returns each
+// episode's notes inline in the collector's own record shape, so
+// ob-data.js#episodeApiToBoosts hydrates the podcast/episode blocks back onto
+// them and the existing normalizeBoosts → toEpisodeShape → buildEpisodes chain
+// runs unmodified over them.
+async function loadEpisodePage({ medium, sort, range, offset, follows }) {
+  const { records, nextOffset } = await getEpisodePage({
+    medium: medium === 'music' ? 'music' : null,
+    sort, range, offset, follows,
+  })
+  const { boosts, totals } = episodeApiToBoosts(records)
+  const shaped = toEpisodeShape(normalizeBoosts({ boosts }))
+  // Booster identities ride along in every record, so the cards paint with real
+  // names and avatars with no profile round trip.
+  seedProfiles(shaped.profiles)
+
+  // ⚠️ buildEpisodes ENDS WITH A SORT BY RECENCY, which would throw away the
+  // ranking we just asked the server for. The API's order is the answer, so the
+  // built items are put back into it here.
+  const built = new Map(buildEpisodes(shaped).map((it) => [it.guid, it]))
+  const items = []
+  for (const r of records) {
+    const it = built.get(r.guid)
+    if (!it) continue
+    // ⚠️ FIGURES FROM THE AGGREGATES, NOTES FROM THE ROWS. Inline notes are
+    // capped at 50 per episode while the record's counts are true all-time
+    // totals, so recounting the rows would understate the one episode in the
+    // index that exceeds the cap.
+    it.totals = totals.get(r.guid) || null
+    items.push(it)
   }
-  return rows
+  return { items, nextOffset }
 }
 
 // ── Entry point ──────────────────────────────────────────────────────
@@ -1038,42 +1004,40 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
     follows = res.follows
   }
 
-  let data
+  // Most boosts is the opening sort on both feeds — raw boost volume is the
+  // ranking the feed is FOR. ('count' ranks by distinct boosters instead; the
+  // two differ on the ~16% of episodes someone boosted more than once.)
+  let sortKey = 'boosts'
+  // Both scopes open on All now. Global always did; Follows used to widen from
+  // 1W until something appeared, which needed the whole corpus in hand to test
+  // — three requests to reproduce, against a feed whose whole history is thin
+  // enough that All is the useful opening view anyway.
+  let rangeKey = 'all'
+
+  let items = []
+  let nextOffset = 0
+  let loading = false
+  let search = null
+  let view = []
+  const cards = h('div', { class: 'pcast-list' })
+  const moreWrap = h('div', { class: 'pcast-more-wrap' })
+
+  // The first page decides whether there is a feed at all, so it is the one
+  // fetch that can render a placeholder instead of cards.
+  let first
   try {
-    // Which side of <podcast:medium> this feed shows. The corpus is the same
-    // boosts either way; the medium is a property of the show, so it's joined
-    // in from the published rollup rather than read off the boost — see
-    // ob-data.js#mediumPredicate. Fetched alongside the corpus rather than
-    // before it: the two are independent requests and serializing them would
-    // put a whole round-trip in front of every feed's first paint.
-    const [{ test: inMedium, ok: mediumOk }, rows] = await Promise.all([
-      mediumPredicate(medium),
-      follows ? loadFollowsRows(follows) : loadGlobalRows(),
-    ])
-    // `ok` is false when the rollup is unreachable, in which case `test` keeps
-    // everything — so Episodes degrades to an unsplit feed, while Songs would
-    // silently look empty. Only the music side treats that as an error,
-    // because only there is "no results" a lie.
-    if (!mediumOk && medium === 'music') {
-      renderPlaceholder(list, 'Couldn’t sort podcasts from music',
-        ' The show index that says which feeds are music is unavailable right now — please try again later.')
-      return
-    }
-    data = toEpisodeShape(rows.filter((b) => inMedium(b.podcast.guid)))
-    // Seed from the embedded identities so the cards paint with real names
-    // and avatars immediately — no profile round-trip, no repaint.
-    seedProfiles(data.profiles)
+    first = await loadEpisodePage({ medium, sort: sortKey, range: rangeKey, offset: 0, follows })
   } catch (e) {
     console.error('[podcasts] fetch failed', e)
     renderPlaceholder(list, ...copy.loadFail)
     return
   }
-
-  const items = buildEpisodes(data)
-  if (!items.length) {
+  if (!first.items.length) {
     renderPlaceholder(list, ...(follows ? copy.emptyFollows : copy.emptyGlobal))
     return
   }
+  items = first.items
+  nextOffset = first.nextOffset
 
   // Pre-warm the boost widget in the background once the feed is up, so the
   // first Boost click doesn't pay the cold-start cost (bundle load + session /
@@ -1087,27 +1051,23 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
       .catch(() => {})
   }, 1200)
 
-  // Names/avatars enrich the cards but shouldn't gate first paint — render
-  // immediately with initials, repaint once booster profiles resolve, and
-  // resolve message-mention profiles in the background for opened threads.
-  const profilesReady = loadBoosterProfiles(items)
+  // Names/avatars enrich the cards but must not gate first paint — render
+  // immediately with what the records embedded, repaint once the stragglers
+  // resolve, and resolve message-mention profiles in the background.
+  let profilesReady = loadBoosterProfiles(items)
   loadMentionProfiles(items)
 
-  // Most boosts is the opening sort on both tabs — raw boost volume is the
-  // ranking the feed is *for*. ('count' ranks by distinct boosters instead;
-  // the two differ on the ~16% of episodes someone boosted more than once.)
-  let sortKey = 'boosts'
-  let rangeKey = defaultRange(items, scope)
-  let search = null
-  // `sorted` is every episode in the range, ranked. `view` is what's painted:
-  // the same list, or the single episode the search box picked out of it.
-  let sorted = []
-  let view = []
-  let shown = 0
-  const cards = h('div', { class: 'pcast-list' })
-  const moreWrap = h('div', { class: 'pcast-more-wrap' })
-
-  function renderMore() {
+  /* Paint the cards currently in `view`, and the control under them.
+   *
+   * ⚠️ THE RANK IS THE POSITION IN THE SERVER'S ORDER, stamped over `items`
+   * before any search filter narrows it — so a searched episode keeps the
+   * standing it has in the feed rather than being renumbered to #1. That is the
+   * same contract the client-side ranking kept; only who computes the order
+   * changed. Numbering continues across pages rather than restarting.
+   */
+  function paint() {
+    cards.innerHTML = ''
+    moreWrap.innerHTML = ''
     if (!view.length) {
       const picked = search?.selection || null
       cards.appendChild(picked
@@ -1121,56 +1081,100 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
           ]))
       return
     }
-    const next = view.slice(shown, shown + INITIAL_CARDS)
-    next.forEach((it) => {
-      // The rank was stamped in rebuild(), over the whole ranked list and
-      // before any search filter narrowed it — so a searched episode keeps the
-      // standing it has in the feed. Numbering continues across "Show more"
-      // pages rather than restarting at 1 each time.
+    view.forEach((it) => {
       const el = episodeCard(it, (showRanks && RANKED_SORTS.has(sortKey)) ? it._rank : null, copy)
-      el._pcastItem = it   // lets repaintProfiles map avatars regardless of sort order
+      el._pcastItem = it   // lets repaintProfiles map avatars regardless of order
       cards.appendChild(el)
     })
-    shown += next.length
-    moreWrap.innerHTML = ''
-    const remaining = view.length - shown
-    if (remaining > 0) {
-      const batch = Math.min(INITIAL_CARDS, remaining)
+    // "Load more" is a REQUEST now, not a slice, so it reports what it is doing
+    // and cannot be pressed twice. A search selection hides it: the list is one
+    // card, and paging under it would be paging something the reader filtered
+    // away.
+    if (nextOffset != null && !search?.selection) {
+      const btn = h('button', {
+        class: 'pcast-showmore', type: 'button',
+        onclick: async () => {
+          if (loading) return
+          loading = true
+          btn.disabled = true
+          btn.textContent = 'Loading…'
+          try {
+            const next = await loadEpisodePage({
+              medium, sort: sortKey, range: rangeKey, offset: nextOffset, follows,
+            })
+            items = items.concat(next.items)
+            nextOffset = next.nextOffset
+            profilesReady = loadBoosterProfiles(next.items)
+            loadMentionProfiles(next.items)
+            rebuild()
+            profilesReady.then(() => repaintProfiles(cards))
+          } catch (e) {
+            console.warn('[podcasts] load more failed', e)
+            btn.disabled = false
+            btn.textContent = copy.moreLabel(INITIAL_CARDS)
+          } finally {
+            loading = false
+          }
+        },
+      }, copy.moreLabel(INITIAL_CARDS))
       moreWrap.appendChild(h('div', { class: 'pcast-more-group' }, [
-        h('button', {
-          class: 'pcast-showmore', type: 'button', onclick: renderMore,
-        }, copy.moreLabel(batch)),
-        h('div', { class: 'pcast-more-count', text: `Showing ${shown} of ${view.length}` }),
+        btn,
+        // No total to count against: the endpoint pages rather than reporting
+        // how many episodes the whole range holds, so this says what is on
+        // screen and nothing it cannot support.
+        h('div', { class: 'pcast-more-count', text: `Showing ${items.length}` }),
       ]))
     }
   }
 
-  // Rank first, filter second: ranking the filtered list instead would tell a
-  // searched episode it's #1 of 1, which is the opposite of what the search is
-  // being asked.
+  // Rank first, filter second — ranking the filtered list would tell a searched
+  // episode it is #1 of 1, which answers a different question.
   function rebuild() {
-    sorted = sortItems(filterItems(items, rangeKey), sortKey)
-    sorted.forEach((it, i) => { it._rank = i + 1 })
+    items.forEach((it, i) => { it._rank = i + 1 })
     search?.refresh()
     const picked = search?.selection || null
-    view = picked ? sorted.filter((it) => it.guid === picked.key) : sorted
-    shown = 0
-    cards.innerHTML = ''
-    moreWrap.innerHTML = ''
-    renderMore()
+    view = picked ? items.filter((it) => it.guid === picked.key) : items
+    paint()
     repaintProfiles(cards)
+  }
+
+  /* A range or sort change is a new QUERY, so it refetches from offset 0.
+   *
+   * The previous cards stay on screen while it is in flight rather than being
+   * cleared to a spinner: a feed that blanks on every control press reads as
+   * broken, and the answer usually arrives in well under a second. A failure
+   * leaves the old view in place and says so, which is the honest outcome —
+   * the reader still has the list they had.
+   */
+  async function requery() {
+    if (loading) return
+    loading = true
+    try {
+      const page = await loadEpisodePage({ medium, sort: sortKey, range: rangeKey, offset: 0, follows })
+      items = page.items
+      nextOffset = page.nextOffset
+      profilesReady = loadBoosterProfiles(items)
+      loadMentionProfiles(items)
+      rebuild()
+      profilesReady.then(() => repaintProfiles(cards))
+    } catch (e) {
+      console.warn('[podcasts] requery failed', e)
+      showToast('Couldn’t reload the feed — please try again.', true)
+    } finally {
+      loading = false
+    }
   }
 
   function applySort(key) {
     if (key === sortKey) return
     sortKey = key
-    rebuild()
+    requery()
   }
 
   function applyRange(key) {
     if (key === rangeKey) return
     rangeKey = key
-    rebuild()
+    requery()
   }
 
   mountControls(panel?.dataset.feed || `episodes-${scope}`,
@@ -1185,7 +1189,11 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
     label: copy.searchLabel,
     noun: copy.searchNoun,
     onPick: () => rebuild(),
-    getEntries: () => sorted.map((it) => ({
+    // ⚠️ SEARCHES WHAT IS LOADED, not the whole range. The corpus is paged from
+    // the server now, so the index covers the pages pulled so far rather than
+    // every episode in the window — the same limit the Boosts feed's search has
+    // always had on All. Loading more widens it.
+    getEntries: () => items.map((it) => ({
       key: it.guid,
       label: it.ep.title || copy.untitled,
       sub: it.show?.title || '',

@@ -175,3 +175,94 @@ export async function getFollowsBoosts(authors, { maxRows = MAX_EAGER_ROWS, sign
   rows.sort((a, b) => b.ts - a.ts)
   return { rows, truncated, matchedAuthors }
 }
+
+/* ── The episode rollup ──────────────────────────────────────────────
+ *
+ * GET|POST /api/v1/episodes — the ranked, range-filtered episode list, rolled
+ * up SERVER-SIDE over the whole boost table.
+ *
+ * ⚠️ THIS REPLACED A CLIENT-SIDE ROLLUP, AND THE REASON IS CORRECTNESS RATHER
+ * THAN COST. The Episodes and Songs feeds used to build their corpus from
+ * latest.json plus three month archives and group it in the browser, which
+ * ranked over whatever those shards happened to hold: measured against the full
+ * index, 7 of the true all-time top 10 episodes were missing outright, only 20
+ * of the true top 100 appeared, and the true #7 rendered at #128 because only
+ * its last-three-months sats were counted. Songs was worse again, painting 84
+ * of 601 music episodes, because music is ~5% of a stream that window was sized
+ * for. A ranked feed that ranks the wrong things is not a thin feed; it is a
+ * wrong one.
+ *
+ * `include=boosts` is what makes this usable by the existing card. Each episode
+ * carries its own boost notes inline, in the collector's record shape minus the
+ * podcast/episode blocks, which ob-data.js#episodeApiToBoosts hydrates back
+ * from the parent. That is what lets the whole downstream chain — normalizeBoosts
+ * → toEpisodeShape → buildEpisodes → episodeCard — run completely unchanged
+ * over a corpus that now comes from D1 instead of from static shards.
+ *
+ * ⚠️ INLINE NOTES ARE CAPPED AT 50 PER EPISODE while `boosts` is the true total,
+ * so `boosts_inline.length < boosts` is the truncation signal. It bites on
+ * exactly one episode in the index today (the single one with 55 boosts). The
+ * card therefore takes its FIGURES from the aggregates and its NOTES from the
+ * inline list, which is why they are carried separately rather than being
+ * recounted from the rows.
+ *
+ * Follows is POST because a kind-3 list does not fit in a query string. The
+ * response echoes how many keys were accepted, so a silent drop is visible.
+ * Follows-scoped pages scope the inline notes to the same follow set: a drawer
+ * showing boosts the card's own numbers did not count would read as a bug.
+ */
+const EPISODES_API = '/api/v1/episodes'
+
+// The server caps a page at 200. 60 is two "load more" batches of the feed's
+// own 30, so the second batch costs no request — worth it because a page with
+// include=boosts is dominated by the notes, not the episodes.
+const EPISODE_PAGE = 60
+
+/**
+ * One page of the ranked episode list.
+ *
+ * @param {object}   opts
+ * @param {'music'|null} [opts.medium]  'music' selects the Songs/Albums half.
+ *   The Episodes half passes NOT_MUSIC instead of `medium: 'podcast'` — the
+ *   split is a partition, so it has to keep video and undeclared feeds too.
+ * @param {string}   [opts.sort]    recent|episode|count|boosts|sats
+ * @param {string}   [opts.range]   1w|1m|all, filtered on AIR DATE
+ * @param {number}   [opts.offset]
+ * @param {string[]} [opts.follows] hex or npub; presence switches to POST
+ * @returns {Promise<{records: object[], nextOffset: number|null, follows: number|null}>}
+ */
+export async function getEpisodePage({
+  medium = null, sort = 'boosts', range = 'all',
+  offset = 0, limit = EPISODE_PAGE, follows = null, signal,
+} = {}) {
+  const qs = new URLSearchParams({
+    sort, range, include: 'boosts',
+    limit: String(limit), offset: String(offset),
+  })
+  // Deliberately not `medium=podcast`. Both are the same 6,123 episodes today,
+  // but a show that declares `video` (there are two in the index, neither with
+  // an enriched boosted episode yet) would be dropped by one and kept by the
+  // other, and the partition rule says everything that is not music belongs to
+  // Episodes.
+  if (medium === 'music') qs.set('medium', 'music')
+  else qs.set('not_medium', 'music')
+
+  const init = { headers: { Accept: 'application/json' }, signal }
+  if (follows && follows.length) {
+    init.method = 'POST'
+    init.headers['Content-Type'] = 'application/json'
+    init.body = JSON.stringify({ follows })
+  }
+
+  const resp = await fetch(`${EPISODES_API}?${qs}`, init)
+  if (!resp.ok) throw new Error(`episodes: HTTP ${resp.status}`)
+  const data = await resp.json()
+  return {
+    records: Array.isArray(data?.episodes) ? data.episodes : [],
+    nextOffset: Number.isFinite(data?.next_offset) ? data.next_offset : null,
+    // How many of the keys we sent were accepted. A number lower than what we
+    // passed means entries were dropped as unparseable rather than the follow
+    // set being small.
+    follows: Number.isFinite(data?.follows) ? data.follows : null,
+  }
+}

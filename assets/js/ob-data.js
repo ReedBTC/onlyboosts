@@ -361,3 +361,62 @@ export function boosterLabel(booster) {
   if (booster?.npub) return booster.npub.slice(0, 12) + '…'
   return (booster?.pk || '').slice(0, 8) + '…'
 }
+
+/* API episode records → flat boost records, so the existing chain can run.
+ *
+ * /api/v1/episodes?include=boosts returns each episode already grouped, with
+ * its notes inline and the podcast/episode blocks stripped from them — the
+ * parent carries those, so repeating them per note would be the bulk of the
+ * response. This puts them back, which is what lets normalizeBoosts →
+ * toEpisodeShape → buildEpisodes → episodeCard run completely unchanged over a
+ * corpus that came from D1 rather than from the static shards.
+ *
+ * ⚠️ THE FIGURES DO NOT COME FROM THESE ROWS. Inline notes are capped at 50 per
+ * episode while the record's own `boosts` / `boosters` / `sats` are the true
+ * all-time totals, so recounting the rows would understate the one episode in
+ * the index that exceeds the cap. `totals` is returned alongside for the caller
+ * to stamp back onto the built items: notes from the rows, numbers from the
+ * aggregates.
+ *
+ * An episode with no inline notes still yields its totals, so a card can be
+ * built for it even though its drawer would be empty.
+ */
+export function episodeApiToBoosts(records) {
+  const boosts = []
+  const totals = new Map()
+  for (const r of Array.isArray(records) ? records : []) {
+    const guid = r?.guid
+    if (!guid) continue
+    const show = r.show || {}
+    // The blocks every inline note is missing, rebuilt once per episode and
+    // shared by reference — normalizeBoosts reads them and never mutates.
+    const podcast = {
+      guid: show.guid || null,
+      title: show.title || null,
+      img: show.img || null,
+      art2: show.art2 || null,
+      feed: show.feed || null,
+    }
+    const episode = {
+      guid,
+      title: r.title || null,
+      img: r.img || null,
+      date: r.date || null,
+      num: r.num || null,
+      url: r.url || null,
+    }
+    totals.set(guid, {
+      boosts: num(r.boosts) || 0,
+      boosters: num(r.boosters) || 0,
+      sats: num(r.sats) || 0,
+      latest: num(r.latest) || 0,
+      // The signal that this episode's drawer is a prefix rather than the whole
+      // of it: the endpoint caps inline notes at 50 and reports the true count.
+      truncated: (r.boosts_inline?.length || 0) < (num(r.boosts) || 0),
+    })
+    for (const b of r.boosts_inline || []) {
+      boosts.push({ ...b, podcast, episode })
+    }
+  }
+  return { boosts, totals }
+}

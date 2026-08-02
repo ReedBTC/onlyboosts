@@ -84,12 +84,17 @@ show-level rollup, so its follows path works unchanged, while
 `podcasts/index.json` is computed over everyone and cannot serve a filtered
 audience. See the scope note in `shows-feed.js`.
 
-**Songs · Global pays for the full boost corpus to paint ~120 cards** — it
-filters the same `latest.json` + 3 months (~4.7MB) the Episodes feed pulls, of
-which ~5% is music. Those shards are shared and cached, so opening Episodes
-first makes it free, but a direct landing on `#songs-global` is expensive for
-what it shows. A collector-side `boosts/music.json` shard would fix it; not
-built.
+**The Episodes and Songs feeds rank server-side.** They used to build a corpus
+from `latest.json` + 3 months and roll it up in the browser, which ranked over
+whatever those shards held rather than over the index: measured against the full
+corpus, **7 of the true all-time top 10 episodes were missing outright, only 20
+of the true top 100 appeared, and the true #7 painted at #128** because only its
+last-three-months sats were counted. Songs was worse — **84 of 601** music
+episodes — because music is ~5% of a stream whose window was sized for the other
+95%. `GET|POST /api/v1/episodes` aggregates over every boost, so **range and sort
+are queries now and changing either refetches**. `boosts/music.json` exists as an
+all-time music shard and is no longer needed for this rollup; it stays useful
+where individual music boosts are wanted.
 
 **The feed bar replaced a row of four tabs**, one per feed. Two dropdowns
 instead of four buttons is what makes room for more `what` options (Shows, then
@@ -498,10 +503,10 @@ renderer on first view.
 |---|---|---|
 | `boosts-global` | `boosts-feed.js` | `latest.json`, paging back through month archives |
 | `boosts-follows` | `boosts-feed.js` | `POST /api/v1/boosts/follows`, cursor-paged |
-| `episodes-global` | `feeds-podcasts.js` | `latest.json` + 3 recent months, rolled up by episode |
-| `episodes-follows` | `feeds-podcasts.js` | `POST /api/v1/boosts/follows`, same rollup |
-| `songs-global` | `feeds-podcasts.js` | same as `episodes-global`, `medium: 'music'` |
-| `songs-follows` | `feeds-podcasts.js` | same as `episodes-follows`, `medium: 'music'` |
+| `episodes-global` | `feeds-podcasts.js` | `GET /api/v1/episodes?not_medium=music&include=boosts`, ranked and paged server-side |
+| `episodes-follows` | `feeds-podcasts.js` | the same endpoint as `POST`, body `{follows:[…]}` |
+| `songs-global` | `feeds-podcasts.js` | same, `medium=music` |
+| `songs-follows` | `feeds-podcasts.js` | same, `medium=music`, as `POST` |
 | `shows` | `shows-feed.js` | `podcasts/index.json` on All; the boost corpus rolled up by show on 1W/1M |
 | `albums` | `shows-feed.js` | same as `shows`, `medium: 'music'` |
 

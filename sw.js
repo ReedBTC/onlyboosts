@@ -281,7 +281,14 @@
 // links into events that cannot be recalled. The two show-level links on
 // /show/<guid> ("See All Episodes", the podroll tiles) are server-rendered and
 // deliberately unchanged.
-const VERSION = 'ob-v48';
+// ob-v49: the Episodes and Songs feeds rank server-side through
+// /api/v1/episodes instead of rolling up latest.json + 3 months in the browser.
+// Required rather than cosmetic: a returning visitor holding the old
+// feeds-podcasts.js keeps ranking over a three-month window, which is the bug
+// this replaces — it painted 84 of 601 songs and put the true #7 episode at
+// #128. ob-data.js and ob-live.js carry the adapter and the reader it needs, so
+// all three have to turn over together.
+const VERSION = 'ob-v49';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;
