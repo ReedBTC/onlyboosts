@@ -229,8 +229,10 @@ def build_delta_sql(conn, rows):
     aggregate depends on ALL its boosts, so it's recomputed from the box DB) +
     the boosters' profiles + refreshed meta.
 
-    Returns (statements, podcast_guids, item_guids) — the caller feeds those guid
-    sets to build_meta_drift_sql so a row isn't projected twice in one push."""
+    Returns (statements, podcast_guids, item_guids, skipped) — the caller feeds
+    those guid sets to build_meta_drift_sql so a row isn't projected twice in one
+    push. `skipped` counts episodes a NEW boost landed on that we still can't
+    name; it is reported rather than swallowed (see db.enrichment_gap_size)."""
     out = []
     pods, items, pubs = set(), set(), set()
     for r in rows:
@@ -251,8 +253,11 @@ def build_delta_sql(conn, rows):
 
     for pg in pods:
         out.extend(_podcast_upsert_sql(conn, pg))
+    skipped = 0
     for ig in items:
-        out.extend(_episode_upsert_sql(conn, ig))
+        stmts = _episode_upsert_sql(conn, ig)
+        out.extend(stmts)
+        skipped += not stmts
 
     if pubs:
         ph = ",".join("?" * len(pubs))
@@ -262,7 +267,7 @@ def build_delta_sql(conn, rows):
             out.extend(_profile_upsert_sql(p))
 
     out.extend(_meta_sql(conn))
-    return out, pods, items
+    return out, pods, items, skipped
 
 
 def _meta_sql(conn):
@@ -317,6 +322,9 @@ def build_meta_drift_sql(conn, since, skip_pods=(), skip_items=()):
             (since,)).fetchall():
         if r["item_guid"] in skip_items:
             continue
+        # No skip counter here: this loop selects FROM `episodes`, so the row is
+        # there by construction. The skip that matters is in the delta path — a
+        # brand-new boost landing on an episode we still can't name.
         stmts = _episode_upsert_sql(conn, r["item_guid"])
         out.extend(stmts)
         counts["episodes"] += bool(stmts)
@@ -453,9 +461,9 @@ def cmd_remote_delta(args):
     started = int(time.time())
     rows = _unsynced_boosts(conn)
 
-    stmts, pods, items = ([], set(), set())
+    stmts, pods, items, skipped = ([], set(), set(), 0)
     if rows:
-        stmts, pods, items = build_delta_sql(conn, rows)
+        stmts, pods, items, skipped = build_delta_sql(conn, rows)
     # Shows emptied by guid re-keying: the projection is upsert-only, so a phantom
     # that lost all its boosts has to be deleted explicitly or its page lives on
     # in D1 double-counting them against the real show.
@@ -486,6 +494,12 @@ def cmd_remote_delta(args):
           f"{counts['profiles']} profile(s) whose metadata changed"
           + (f", deleted {len(orphans)} emptied show(s)" if orphans else "")
           + f" ({len(stmts)} statements)")
+    # Never let the un-projectable population be silent: a boosted episode with
+    # no metadata row is skipped on purpose, but "on purpose" and "unnoticed" are
+    # not the same thing, and the last defect here hid in exactly that gap.
+    if skipped:
+        print(f"  skipped {skipped} newly-boosted episode(s) with no metadata row "
+              f"(standing enrichment gap: {db.enrichment_gap_size(conn)})")
 
 
 def cmd_remote_podroll(args):

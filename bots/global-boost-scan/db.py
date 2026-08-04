@@ -531,6 +531,19 @@ def apply_aliases(conn):
     return len(to_change)
 
 
+def enrichment_gap_size(conn):
+    """How many boosted item_guids still have no `episodes` row.
+
+    These are invisible everywhere downstream — the D1 projection inner-joins
+    metadata, so they can't be ranked, searched, or linked. That silence is
+    exactly why the population went unwatched for so long, so the sync prints
+    this number rather than leaving it to be discovered."""
+    return conn.execute(
+        """SELECT COUNT(DISTINCT b.item_guid) FROM boosts b
+           LEFT JOIN episodes e ON e.item_guid = b.item_guid
+           WHERE b.item_guid IS NOT NULL AND e.item_guid IS NULL""").fetchone()[0]
+
+
 def orphaned_podcast_guids(conn):
     """Guids whose D1 podcasts row should be deleted (emptied by re-keying)."""
     if not _has_table(conn, "d1_podcasts_orphaned"):
