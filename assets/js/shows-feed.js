@@ -52,9 +52,8 @@
  * episode-level and go through feeds-podcasts.js, which never reads this file.
  */
 import {
-  getPodcastIndex, getPodcastDetail, getShowMediums, getShowAuthors,
-  getLatestBoosts, getBoostMonths, getBoostMonth,
-} from '/assets/js/ob-data.js'
+  getShowPage, searchShows, getShowEpisodes, SEARCH_HITS, SEARCH_MIN_CHARS,
+} from '/assets/js/ob-live.js'
 import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls,
 } from '/assets/js/feed-controls.js'
@@ -154,7 +153,10 @@ const COPY = {
     rangeTitle: (days) => (days ? `Shows boosted in the last ${days} days` : 'All time'),
     sortTitle: 'Sort shows',
     moreLabel: (n) => `Load ${n} more show${n === 1 ? '' : 's'}`,
-    countLine: (shown, total) => `Showing ${shown} of ${total}`,
+    // No total to count against: the endpoint pages rather than reporting how
+    // many shows the range holds, so this states what is on screen and nothing
+    // it cannot support.
+    countLine: (shown) => `Showing ${shown}`,
     searchPlaceholder: 'Search shows…',
     searchLabel: 'Search shows',
     searchNoun: 'show',
@@ -164,6 +166,12 @@ const COPY = {
     emptyAll: ['No shows in this window', ' When someone boosts a podcast episode on Nostr, its show will appear here.'],
     emptyWindow: ['No shows in this window', ' Nothing was boosted in this time range — try a wider one.'],
     outOfRange: (label) => ` ${label} wasn’t boosted in this time range — widen the range, or clear the search.`,
+    // A miss means two different things and the single old line read as both.
+    // On All the search has seen the whole index, so it is a COVERAGE boundary
+    // rather than a filter to widen: a show nobody has boosted on Nostr is not
+    // in the index and will not be until somebody does.
+    searchNoneAll: 'No show matches. The index holds only shows someone has boosted on Nostr.',
+    searchNoneRange: 'No show matches in this time range. Try All.',
   },
   music: {
     glyph: '💿',
@@ -177,7 +185,10 @@ const COPY = {
     rangeTitle: (days) => (days ? `Albums boosted in the last ${days} days` : 'All time'),
     sortTitle: 'Sort albums',
     moreLabel: (n) => `Load ${n} more album${n === 1 ? '' : 's'}`,
-    countLine: (shown, total) => `Showing ${shown} of ${total}`,
+    // No total to count against: the endpoint pages rather than reporting how
+    // many shows the range holds, so this states what is on screen and nothing
+    // it cannot support.
+    countLine: (shown) => `Showing ${shown}`,
     searchPlaceholder: 'Search albums…',
     searchLabel: 'Search albums',
     searchNoun: 'album',
@@ -187,6 +198,8 @@ const COPY = {
     emptyAll: ['No albums in this window', ' When someone boosts a track from a music feed on Nostr, its album will appear here.'],
     emptyWindow: ['No albums in this window', ' Nothing was boosted in this time range — try a wider one.'],
     outOfRange: (label) => ` ${label} wasn’t boosted in this time range — widen the range, or clear the search.`,
+    searchNoneAll: 'No album matches. The index holds only releases someone has boosted on Nostr.',
+    searchNoneRange: 'No album matches in this time range. Try All.',
   },
 }
 
@@ -227,35 +240,50 @@ const SORT_OPTIONS = [
 // 'latest' is chronology, not standing.
 const RANKED_SORTS = new Set(['boosts', 'sats', 'boosters'])
 
-// Every comparator breaks ties on sats, then on most-recent boost, so the
-// order is stable across repaints.
-const bySats = (a, b) => b.sats - a.sats || b.latest - a.latest
-const SORTERS = {
-  boosts: (a, b) => b.boosts - a.boosts || bySats(a, b),
-  sats: bySats,
-  boosters: (a, b) => b.boosters - a.boosters || bySats(a, b),
-  latest: (a, b) => b.latest - a.latest || bySats(a, b),
+/* ⚠️ THE COMPARATORS ARE GONE, AND THAT WAS A CORRECTNESS FIX RATHER THAN A
+ * SPEEDUP — the same move the Episodes feeds made, and this was the last
+ * client-side aggregation on the site.
+ *
+ * All time read the collector's published per-show rollup WHOLE: ~440KB
+ * describing every show in the index, downloaded to paint thirty cards. The
+ * windowed ranges were worse in kind rather than in size — they walked
+ * latest.json plus month archives and GROUPed the boosts by show in the
+ * browser, so "the last 30 days" ranked over whatever those shards happened to
+ * hold rather than over the window.
+ *
+ * `/api/v1/podcasts` aggregates over the whole boosts table inside the window,
+ * so range and sort are QUERIES now and changing either refetches. SORT_OPTIONS
+ * survives because its keys are the endpoint's own sort values, and RANKED_SORTS
+ * because it still decides when a position is worth printing.
+ */
+
+// ── Source ────────────────────────────────────────────────────────────
+/**
+ * One page of ranked shows, adapted into the shape the card already reads.
+ *
+ * The endpoint returns the same record whichever range asked for it: on All it
+ * reads the precomputed aggregate columns, on 1W/1M it GROUPs the boosts inside
+ * the window. So the card does not know or care which one answered, and neither
+ * does anything below this function.
+ *
+ * `eps` is no longer carried. The windowed rollup used to arrive with every
+ * boost in memory, so the drawer's episode list came free; now BOTH ranges fetch
+ * it on expand, through one endpoint that windows the rows the same way the card
+ * was windowed. That is a request the windowed drawer did not previously make,
+ * and in exchange the All drawer stops fetching the per-show shard, which ran to
+ * 1.95MB on the most-boosted show.
+ */
+async function loadShowPage({ medium, sort, range, offset, signal }) {
+  const { records, nextOffset } = await getShowPage({
+    medium: medium === 'music' ? 'music' : null,
+    sort, range, offset, signal,
+  })
+  return { items: records.map(toCard), nextOffset }
 }
 
-// ── Sources ───────────────────────────────────────────────────────────
-// Both produce the same card shape:
-//
-//   { guid, title, img, feed, file, boosts, sats, boosters, episodes, latest,
-//     eps }
-//
-// `eps` is the episode list when we already hold it (the windowed rollup has
-// every boost in memory, so it comes for free) and null when we don't (the
-// all-time index carries counts only, so the drawer fetches the shard).
-
-/** All time: the collector's published per-show rollup, as published. */
-async function loadAllTime() {
-  const rows = await getPodcastIndex()
-  return rows.map((p) => ({
+function toCard(p) {
+  return {
     guid: p.guid,
-    // <podcast:medium>, straight off the rollup — which is why the all-time
-    // range gets the Shows/Albums split for free. The collector already
-    // defaults an un-enriched feed to "podcast" per the namespace.
-    music: typeof p.medium === 'string' && p.medium.toLowerCase() === 'music',
     title: typeof p.title === 'string' ? p.title : '',
     img: typeof p.img === 'string' ? p.img : '',
     // The feed's OTHER artwork URL, published only when it differs from `img`.
@@ -264,148 +292,18 @@ async function loadAllTime() {
     art2: typeof p.art2 === 'string' ? p.art2 : '',
     feed: typeof p.feed === 'string' ? p.feed : '',
     // <itunes:author>: the artist on a music feed, the host or publisher on a
-    // podcast. Matched by the search box, never displayed here — the credit
-    // line belongs on the show's own page, next to its name.
+    // podcast. Matched by the search box server-side, never displayed here —
+    // the credit line belongs on the show's own page, next to its name.
     author: typeof p.author === 'string' ? p.author : '',
-    // Verbatim from the rollup — the collector owns its own layout, so a
-    // shard path is never built by hand from the guid.
-    file: typeof p.file === 'string' ? p.file : '',
     boosts: num(p.boosts),
     sats: num(p.sats),
     boosters: num(p.boosters),
     episodes: num(p.episodes),
     latest: num(p.latest),
-    eps: null,
-  }))
-}
-
-/**
- * Enough boost rows to cover a cutoff, newest-first.
- *
- * latest.json is ~1,000 boosts spanning ~26 days, so 1W is already covered by
- * it and 1M needs one archive. Walking until the oldest row is past the cutoff
- * (rather than taking a fixed number of months) is what keeps that true as the
- * network's volume changes.
- */
-async function loadRowsSince(cutoff) {
-  const [latest, months] = await Promise.all([getLatestBoosts(), getBoostMonths()])
-  const seen = new Set()
-  const rows = []
-  let oldest = Infinity
-  const take = (arr) => {
-    for (const b of arr) {
-      if (seen.has(b.id)) continue
-      seen.add(b.id)
-      rows.push(b)
-      if (b.ts < oldest) oldest = b.ts
-    }
+    // Present only on a search hit: the position in the FULL ordering, which a
+    // filtered page cannot be numbered by. See the rank note in repaint().
+    rank: Number.isFinite(p.rank) ? p.rank : null,
   }
-  take(latest)
-  for (let i = 0; i < months.length && oldest > cutoff; i++) {
-    try {
-      take(await getBoostMonth(months[i].file))
-    } catch (e) {
-      console.warn('[shows] month load failed', months[i].file, e)
-    }
-  }
-  return rows.filter((b) => b.ts >= cutoff)
-}
-
-/** A window: the boosts in it, grouped by show. */
-async function loadWindow(cutoff) {
-  // A boost record carries no medium (it's a property of the show), so the
-  // windowed path joins it in from the same rollup the all-time path reads
-  // wholesale. Deliberately not caught: a group with no medium would land in
-  // Shows and never in Albums, so a silent failure is a feed that quietly
-  // hides every album. The caller's error placeholder is the honest answer.
-  const [rows, mediums, authors] = await Promise.all([
-    loadRowsSince(cutoff), getShowMediums(), getShowAuthors(),
-  ])
-  const byShow = new Map()
-
-  for (const b of rows) {
-    const guid = b.podcast.guid
-    // ~2% of rows carry no show guid, so there's nothing to group them under.
-    // They're still counted in the Boosts feed; they just can't be a card here.
-    if (!guid) continue
-
-    let s = byShow.get(guid)
-    if (!s) {
-      s = {
-        guid, title: b.podcast.title || '', img: b.podcast.img || '',
-        art2: b.podcast.art2 || '',
-        feed: b.podcast.feed || '', file: `podcasts/${guid}.json`,
-        music: mediums.get(guid) === 'music',
-        // Boost records carry no author (it's a show-level fact, same as the
-        // medium), so it joins through the rollup those rows already loaded.
-        author: authors.get(guid) || '',
-        boosts: 0, sats: 0, boosters: 0, episodes: 0, latest: 0,
-        eps: [],
-        _boosters: new Set(),
-        _eps: new Map(),
-      }
-      byShow.set(guid, s)
-    }
-    // Metadata is embedded per boost and any given row can be missing a piece,
-    // so fill from whichever row has it.
-    if (!s.title && b.podcast.title) s.title = b.podcast.title
-    if (!s.img && b.podcast.img) s.img = b.podcast.img
-    if (!s.art2 && b.podcast.art2) s.art2 = b.podcast.art2
-    if (!s.feed && b.podcast.feed) s.feed = b.podcast.feed
-
-    s.boosts++
-    s.sats += b.sats || 0
-    if (b.ts > s.latest) s.latest = b.ts
-    s._boosters.add(b.booster.pk)
-
-    // Episode guid is an opaque key — sometimes a UUID, sometimes a URL.
-    const eg = b.episode.guid
-    if (!eg) continue
-    let e = s._eps.get(eg)
-    if (!e) {
-      e = {
-        guid: eg, title: b.episode.title || '', img: b.episode.img || '',
-        date: b.episode.date || 0, num: b.episode.num || 0,
-        url: b.episode.url || '', boosts: 0, sats: 0,
-      }
-      s._eps.set(eg, e)
-    }
-    if (!e.title && b.episode.title) e.title = b.episode.title
-    if (!e.date && b.episode.date) e.date = b.episode.date
-    if (!e.url && b.episode.url) e.url = b.episode.url
-    e.boosts++
-    e.sats += b.sats || 0
-  }
-
-  const out = []
-  for (const s of byShow.values()) {
-    s.boosters = s._boosters.size
-    s.episodes = s._eps.size
-    s.eps = [...s._eps.values()]
-    delete s._boosters
-    delete s._eps
-    out.push(s)
-  }
-  return out
-}
-
-// One entry per range for the page's lifetime. The HTTP layer is already
-// cached by ob-data.js; this caches the *grouping*, so toggling 1M → All → 1M
-// repaints instantly instead of re-walking a few thousand rows.
-//
-// Keyed by range alone, NOT by medium: every row carries its own `music` flag
-// and the renderer filters after the fact, so Shows and Albums share one
-// grouping per range. Opening either makes the other free.
-const byRange = new Map()
-
-function loadRange(key) {
-  if (byRange.has(key)) return byRange.get(key)
-  const cutoff = rangeCutoff(key)
-  const p = (cutoff ? loadWindow(cutoff) : loadAllTime())
-  byRange.set(key, p)
-  // A failed load shouldn't poison the range for the rest of the session.
-  p.catch(() => byRange.delete(key))
-  return p
 }
 
 // ── Episode drawer ────────────────────────────────────────────────────
@@ -545,7 +443,10 @@ async function onShowBoost(s, btn, copy) {
 // Built out of the episode card's chrome (.pcast-card and friends) rather than
 // a parallel set of its own, so the two feeds read as one system. Only the
 // stat row and the episode list are new.
-function renderShowCard(s, rank, copy) {
+// `since` is the active range's cutoff (null on All). It reaches the card only
+// to scope the drawer's episode list to the same window the card's own figures
+// were computed over.
+function renderShowCard(s, rank, copy, since = null) {
   // 462 of the 1,384 shows in the index (33%) have no title and no art: the
   // collector holds a boost tagged with their guid but Podcast Index doesn't
   // know the feed, so there is nothing to enrich from. They're the long tail —
@@ -647,32 +548,32 @@ function renderShowCard(s, rank, copy) {
     if (open || loaded) return
     loaded = true
 
-    // Windowed ranges hold every boost in memory, so the list is already
-    // built and costs nothing. The all-time index carries counts only, so that
-    // path pays for the show's detail shard. Measured across the index: 3.5KB
-    // at the median, 15KB at p90, and 1.95MB for the single most-boosted show
-    // (the shards carry every boost and full shownotes). Cheap for nearly
-    // every show, which is why it's an explicit expand rather than eager, and
-    // ob-data.js caches it for the rest of the session.
-    if (s.eps) {
-      renderEpisodes(details, sortEpisodes(s.eps).slice(0, DRAWER_EPISODES), copy, { truncatedFrom: s.eps.length })
-      return
-    }
-    if (!s.file) {
-      renderEpisodes(details, [], copy)
-      return
-    }
+    /* Both ranges fetch now, and both fetch the same thing.
+     *
+     * ⚠️ THIS RETIRES THE PER-SHOW SHARD, which was the largest request the
+     * site could make: 3.5KB at the median and 15KB at p90, but **1.95MB** for
+     * the most-boosted show, because a shard carries every boost it ever had
+     * plus full shownotes. The endpoint returns the episode rows and nothing
+     * else.
+     *
+     * The windowed ranges used to build this list in memory for free, since the
+     * browser was holding every boost in the window anyway. It no longer is —
+     * that aggregation is the thing that moved — so the window is passed to the
+     * server instead and the rows come back scoped and recounted. A drawer
+     * showing all-time figures under a card showing the week's would contradict
+     * the card it opened from.
+     */
     details.replaceChildren(h('div', { class: 'ob-show-note', text: 'Loading episodes…' }))
     try {
-      const detail = await getPodcastDetail(s.file)
-      const eps = detail.episodes.map((e) => ({
+      const rows = await getShowEpisodes({ guid: s.guid, since })
+      const eps = rows.map((e) => ({
         guid: e.guid, title: e.title || '', img: e.img || '',
         date: num(e.date), num: num(e.num), url: e.url || '',
         boosts: num(e.boosts), sats: num(e.sats),
       }))
       renderEpisodes(details, sortEpisodes(eps).slice(0, DRAWER_EPISODES), copy, { truncatedFrom: eps.length })
     } catch (e) {
-      console.warn('[shows] detail load failed', s.file, e)
+      console.warn('[shows] episode load failed', s.guid, e)
       loaded = false   // collapsing and reopening retries
       details.replaceChildren(h('div', { class: 'ob-show-note', text: 'Couldn’t load this show’s episodes.' }))
     }
@@ -691,157 +592,255 @@ export async function renderShows({ panel, list, medium = 'other' }) {
   if (!list) return
   const copy = COPY[medium] || COPY.other
   const wantMusic = medium === 'music'
-  // Every row carries its own medium, so the shared per-range grouping is
-  // narrowed here rather than at load time.
-  const inMedium = (rows) => rows.filter((s) => s.music === wantMusic)
   // Neither of these re-renders today (Global only, so no account switch
   // reaches them), but the reset is what makes that a fact about the feed
   // rather than an assumption baked into this one.
   resetFeedSearch(panel)
 
-  // All time is the opening view: it's the one request that needs no archive
-  // walk, and the all-time leaderboard is the question a show-level feed is
-  // for. The windowed ranges narrow it.
+  // All time is the opening view: the all-time leaderboard is the question a
+  // show-level feed is for. The windowed ranges narrow it.
   let rangeKey = 'all'
   // Raw boost volume, matching the episode rollup's default — the ranking the
   // feed is *for*. 'boosters' ranks by distinct people instead, which differs
   // wherever someone boosts the same show repeatedly (most of them).
   let sortKey = 'boosts'
-  let shows = []
-  let sorted = []   // every show in the range, in sort order, rank stamped
-  let view = []     // what's painted: `sorted`, or the one searched show
+
+  let shows = []          // the pages pulled so far, in the server's order
+  let nextOffset = 0
+  let loading = false
+  let view = []           // what's painted: `shows`, or the one searched show
   let shown = 0
   let seq = 0
   let search = null
+  // A pick is a fetch now, the same shape feeds-podcasts.js uses: `picked` is
+  // the chosen suggestion, `pickedItem` the card built for it.
+  let picked = null
+  let pickedItem = null
+  let pickLoading = false
+  let pickSeq = 0
 
   const cards = h('div', { class: 'pcast-list' })
   const moreWrap = h('div', { class: 'pcast-more-wrap' })
 
+  const cutoff = () => rangeCutoff(rangeKey)
+
   function paintMore() {
     const slice = view.slice(shown, shown + PAGE_SIZE)
     slice.forEach((s) => {
-      // The rank is the show's position in the full sorted list, stamped in
-      // repaint() before any search filter narrowed it — so a searched show
-      // still reads #47 rather than #1. Numbering continues across pages.
-      cards.appendChild(renderShowCard(s, RANKED_SORTS.has(sortKey) ? s._rank : null, copy))
+      cards.appendChild(renderShowCard(
+        s, RANKED_SORTS.has(sortKey) ? s._rank : null, copy, cutoff(),
+      ))
     })
     shown += slice.length
     moreWrap.replaceChildren()
-    const remaining = view.length - shown
-    if (remaining <= 0) return
-    const batch = Math.min(PAGE_SIZE, remaining)
+
+    // Two different "more" buttons behind one control. Inside the pages already
+    // held it is a slice, and past them it is a REQUEST — so the label stays
+    // the same and the work does not.
+    const local = view.length - shown
+    const canFetch = !picked && nextOffset != null
+    if (local <= 0 && !canFetch) return
+    const batch = local > 0 ? Math.min(PAGE_SIZE, local) : PAGE_SIZE
+    const btn = h('button', {
+      class: 'pcast-showmore', type: 'button',
+      onclick: async () => {
+        if (local > 0) { paintMore(); return }
+        if (loading) return
+        loading = true
+        btn.disabled = true
+        btn.textContent = 'Loading…'
+        try {
+          const next = await loadShowPage({ medium, sort: sortKey, range: rangeKey, offset: nextOffset })
+          shows = shows.concat(next.items)
+          nextOffset = next.nextOffset
+          rebuild({ keepShown: true })
+        } catch (e) {
+          console.warn('[shows] load more failed', e)
+          btn.disabled = false
+          btn.textContent = copy.moreLabel(batch)
+        } finally {
+          loading = false
+        }
+      },
+    }, copy.moreLabel(batch))
     moreWrap.appendChild(h('div', { class: 'pcast-more-group' }, [
-      h('button', {
-        class: 'pcast-showmore', type: 'button', onclick: paintMore,
-      }, copy.moreLabel(batch)),
-      h('div', { class: 'pcast-more-count', text: copy.countLine(shown, view.length) }),
+      btn,
+      // No total to count against: the endpoint pages rather than reporting how
+      // many shows the whole range holds, so this says what is on screen.
+      h('div', { class: 'pcast-more-count', text: copy.countLine(shown) }),
     ]))
   }
 
-  function repaint() {
-    // Rank first, filter second. Stamping the position before the search
-    // narrows the list is what lets one searched card carry its standing in
-    // the whole ranking; ranking the filtered list would renumber it to #1.
-    sorted = [...shows].sort(SORTERS[sortKey] || SORTERS.boosts)
-    sorted.forEach((s, i) => { s._rank = i + 1 })
-    // The index is the current range in the current order, so it's dropped
-    // whenever either changes. Rebuilt lazily on the next keystroke.
+  /* ⚠️ RANK FIRST, FILTER SECOND, and the two halves now come from different
+   * places. An unfiltered page is numbered by POSITION, because the server
+   * returned it in rank order from offset 0 and numbering continues across
+   * pages. A searched card cannot be numbered that way at all: it is one row out
+   * of a filtered query and its standing is a fact about the whole index, so it
+   * carries the `rank` the server computed and is never renumbered here.
+   * Ranking the filtered list would tell a searched show it is #1 of 1, which
+   * answers a different question.
+   */
+  function rebuild({ keepShown = false } = {}) {
+    if (!picked) shows.forEach((s, i) => { s._rank = i + 1 })
     search?.refresh()
-    const picked = search?.selection || null
-    view = picked ? sorted.filter((s) => s.guid === picked.key) : sorted
-    shown = 0
-    cards.replaceChildren()
+    view = picked ? (pickedItem ? [pickedItem] : []) : shows
+    const from = keepShown ? shown : 0
+    shown = from
+    if (!keepShown) cards.replaceChildren()
     moreWrap.replaceChildren()
     if (!view.length) {
       const empty = rangeKey === 'all' ? copy.emptyAll : copy.emptyWindow
-      cards.appendChild(picked
+      cards.appendChild(pickLoading
         ? h('div', { class: 'feed-placeholder' }, [
-            h('strong', { text: 'Not in this range' }),
-            copy.outOfRange(picked.label),
+            h('strong', { text: 'Loading…' }),
+            `Fetching ${picked?.label || 'that one'}.`,
           ])
-        : h('div', { class: 'feed-placeholder' }, [
-            h('strong', { text: empty[0] }), empty[1],
-          ]))
+        : picked
+          ? h('div', { class: 'feed-placeholder' }, [
+              h('strong', { text: 'Not in this range' }),
+              copy.outOfRange(picked.label),
+            ])
+          : h('div', { class: 'feed-placeholder' }, [
+              h('strong', { text: empty[0] }), empty[1],
+            ]))
       return
     }
     paintMore()
   }
 
-  // A range change means a different source, so it can fetch. The seq guard
-  // covers a second click landing while the first is still in flight.
-  async function applyRange(key) {
-    if (key === rangeKey) return
-    rangeKey = key
-    const mine = ++seq
-    if (!byRange.has(key)) {
-      list.className = ''
-      list.replaceChildren(h('div', { class: 'feed-placeholder' }, [
-        h('strong', { text: copy.loading[0] }), copy.loading[1],
-      ]))
-    }
-    let next
+  /* Fetch the picked show under the feed's CURRENT range and sort.
+   *
+   * Re-issuing the query the suggestion came from is what makes the row
+   * findable: same q, same filters, same ordering, so the pick is inside the
+   * same handful of hits it was chosen from. It runs again on every range or
+   * sort change, because both move the ranking the card is reporting and either
+   * can push the show out of the window entirely.
+   */
+  async function resolvePick() {
+    const mine = ++pickSeq
+    // Dropping the filter comes through here too, and it has to repaint:
+    // bumping pickSeq has already retired any resolve still in flight.
+    if (!picked) { pickedItem = null; pickLoading = false; rebuild(); return }
+    pickLoading = true
+    pickedItem = null
+    rebuild()
     try {
-      next = await loadRange(key)
+      const records = await searchShows({
+        q: picked.query, medium: wantMusic ? 'music' : null,
+        sort: sortKey, range: rangeKey, limit: SEARCH_HITS,
+      })
+      if (mine !== pickSeq) return
+      const hit = records.find((r) => r.guid === picked.key)
+      pickedItem = hit ? toCard(hit) : null
+      if (pickedItem) pickedItem._rank = pickedItem.rank
     } catch (e) {
-      console.error('[shows] range load failed', key, e)
-      if (mine !== seq) return
-      renderPlaceholder(list, ...copy.rangeFail)
-      return
+      if (mine !== pickSeq) return
+      console.warn('[shows] search pick failed', e)
+      showToast('Couldn’t open that search result — please try again.', true)
+    } finally {
+      if (mine === pickSeq) { pickLoading = false; rebuild() }
     }
-    if (mine !== seq) return
-    shows = inMedium(next)
-    list.replaceChildren(cards, moreWrap)
-    repaint()
   }
 
+  /* A range or sort change is a new QUERY, so it refetches from offset 0.
+   *
+   * The previous cards stay on screen while it is in flight rather than being
+   * cleared to a spinner: a feed that blanks on every control press reads as
+   * broken, and the answer usually arrives in well under a second.
+   */
+  /* ⚠️ NOT GUARDED BY `loading`, and that is the point. Dropping a second press
+   * while the first is in flight would leave the control showing one range and
+   * the cards showing another, since the key is already set by the time this
+   * runs. Overlapping queries are allowed and the sequence guard makes the last
+   * one win. `loading` is still SET, so the load-more button stays disabled
+   * while a fresh first page is on its way to replacing it.
+   */
+  async function requery() {
+    const mine = ++seq
+    loading = true
+    try {
+      const page = await loadShowPage({ medium, sort: sortKey, range: rangeKey, offset: 0 })
+      if (mine !== seq) return
+      shows = page.items
+      nextOffset = page.nextOffset
+      rebuild()
+      // The unfiltered list is still fetched under a live search filter, since
+      // clearing the box has to reveal the new range rather than fetch again.
+      if (picked) resolvePick()
+    } catch (e) {
+      if (mine !== seq) return
+      console.error('[shows] requery failed', e)
+      showToast(copy.rangeFail[0], true)
+    } finally {
+      if (mine === seq) loading = false
+    }
+  }
+
+  let first
   try {
-    shows = inMedium(await loadRange(rangeKey))
+    first = await loadShowPage({ medium, sort: sortKey, range: rangeKey, offset: 0 })
   } catch (e) {
     console.error('[shows] index fetch failed', e)
     renderPlaceholder(list, ...copy.loadFail)
     return
   }
+  shows = first.items
+  nextOffset = first.nextOffset
 
   mountFeedControls(panel?.dataset.feed || (wantMusic ? 'albums' : 'shows'), [
-    rangeControl(rangeKey, applyRange, {
+    rangeControl(rangeKey, (key) => {
+      if (key === rangeKey) return
+      rangeKey = key
+      requery()
+    }, {
       label: copy.rangeLabel, titleFor: (key) => copy.rangeTitle(rangeDays(key)),
     }),
     sortControl(SORT_OPTIONS, sortKey, (key) => {
       if (key === sortKey) return
       sortKey = key
-      repaint()
+      requery()
     }, { title: copy.sortTitle }),
   ])
 
-  // Search the shows in the current range. The sub-line is the show's own
-  // numbers, so two similarly-named feeds are told apart by their size rather
-  // than by a guid nobody recognises — except on the 33% with no title at all,
-  // where the guid is the only handle there is.
   search = mountFeedSearch(panel, {
     placeholder: copy.searchPlaceholder,
     label: copy.searchLabel,
     noun: copy.searchNoun,
-    onPick: () => repaint(),
-    getEntries: () => sorted.map((s) => ({
-      key: s.guid,
-      label: s.title || copy.unidentified,
-      sub: s.title
-        ? `${plural(s.boosts, 'boost', 'boosts')} · ${fmtSats(s.sats)} sats`
-        : s.guid,
-      // Matched, not shown. The guid is the only handle on the 33% of shows
-      // with no title, and it's what you'd have copied off one of their cards.
-      // The author joins it so an artist or host finds their own work: "Theo
-      // Katzman" reaches the album, "Guy Swann" reaches Bitcoin Audible.
-      // Deliberately not in `sub` — it would push the show's own numbers off a
-      // narrow card, and a name is a way in rather than a way to tell two
-      // similar results apart. An author hit ranks below every title hit,
-      // which is what the scoring ladder in feed-search.js already does.
-      extra: [s.guid, s.author].filter(Boolean).join(' '),
-      img: s.img,
-    })),
+    minChars: SEARCH_MIN_CHARS,
+    onPick: (entry) => { picked = entry; resolvePick() },
+    /* ⚠️ SEARCHES THE WHOLE INDEX, not the pages loaded. The in-memory index
+     * this replaces read the full range, which was true only while the browser
+     * downloaded every show; now the feed pages a ranked list and those pages
+     * are a prefix of it.
+     *
+     * The guid and the author are still matched: the guid is the only handle on
+     * the 33% of shows with no title, and an author lets a host or artist find
+     * their own work. Both happen server-side now — the author through
+     * `podcasts_fts`, which indexes it beside the title, and the guid as an
+     * equality, since FTS5 does not index it and a pasted one is all hyphens.
+     */
+    searchRemote: async (query, { signal }) => {
+      const records = await searchShows({
+        q: query, medium: wantMusic ? 'music' : null,
+        sort: sortKey, range: rangeKey, signal,
+      })
+      return records.map((r) => ({
+        key: r.guid,
+        label: r.title || copy.unidentified,
+        // The show's own numbers, so two similarly-named feeds are told apart
+        // by their size rather than by a guid nobody recognises — except on the
+        // untitled ones, where the guid is the only handle there is.
+        sub: r.title
+          ? `${plural(num(r.boosts), 'boost', 'boosts')} · ${fmtSats(num(r.sats))} sats`
+          : r.guid,
+        img: r.img,
+        query,
+      }))
+    },
+    noMatchText: () => (rangeKey === 'all' ? copy.searchNoneAll : copy.searchNoneRange),
   })
 
   list.className = ''
   list.replaceChildren(cards, moreWrap)
-  repaint()
+  rebuild()
 }

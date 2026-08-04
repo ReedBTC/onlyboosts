@@ -29,16 +29,42 @@ export async function onRequestGet({ request, env, params }) {
   ).bind(guid).first();
   if (!show) return json(request, { error: "podcast not found" }, { status: 404 });
 
-  const eps = await env.DB.prepare(
-    `SELECT item_guid, title, image, published, duration, episode_number,
-            enclosure_url, boost_count, total_sats
-     FROM episodes WHERE podcast_guid = ? ORDER BY total_sats DESC LIMIT 500`
-  ).bind(guid).all();
+  // ?since=<unix> windows the EPISODE LIST to the boosts inside it, recomputing
+  // each row's boosts and sats over that window. It exists for the Shows feed's
+  // drawer on 1W and 1M: the card above it is showing the window's figures, so a
+  // drawer listing all-time ones would contradict the card it opened from. It
+  // deliberately does NOT window `show` — the caller already has the windowed
+  // aggregate from /api/v1/podcasts, and recomputing it here would be a second
+  // GROUP BY for a number nothing reads.
+  const since = parseInt(u.searchParams.get("since"), 10);
+  const windowed = Number.isFinite(since) && since > 0;
+  const eps = windowed
+    ? await env.DB.prepare(
+        `SELECT b.item_guid, e.title, e.image, e.published, e.duration, e.episode_number,
+                e.enclosure_url,
+                COUNT(*)                AS boost_count,
+                COALESCE(SUM(b.sats),0) AS total_sats
+         FROM boosts b
+         LEFT JOIN episodes e ON e.item_guid = b.item_guid
+         WHERE b.podcast_guid = ? AND b.created_at >= ? AND b.item_guid IS NOT NULL
+         GROUP BY b.item_guid
+         ORDER BY total_sats DESC LIMIT 500`
+      ).bind(guid, since).all()
+    : await env.DB.prepare(
+        `SELECT item_guid, title, image, published, duration, episode_number,
+                enclosure_url, boost_count, total_sats
+         FROM episodes WHERE podcast_guid = ? ORDER BY total_sats DESC LIMIT 500`
+      ).bind(guid).all();
 
+  // The drawer wants episodes and nothing else; the landing page wants the
+  // boost notes too. Skipping them is ~50 records of the heaviest rows here.
+  const wantBoosts = u.searchParams.get("boosts") !== "0";
   const limit = clampLimit(u.searchParams.get("limit"), 50, 200);
-  const recent = await env.DB.prepare(
-    `${BOOST_SELECT} WHERE b.podcast_guid = ? ORDER BY b.created_at DESC, b.event_id DESC LIMIT ?`
-  ).bind(guid, limit).all();
+  const recent = wantBoosts
+    ? await env.DB.prepare(
+        `${BOOST_SELECT} WHERE b.podcast_guid = ? ORDER BY b.created_at DESC, b.event_id DESC LIMIT ?`
+      ).bind(guid, limit).all()
+    : { results: [] };
 
   const body = {
     show: {

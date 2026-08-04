@@ -507,8 +507,8 @@ renderer on first view.
 | `episodes-follows` | `feeds-podcasts.js` | the same endpoint as `POST`, body `{follows:[…]}` |
 | `songs-global` | `feeds-podcasts.js` | same, `medium=music` |
 | `songs-follows` | `feeds-podcasts.js` | same, `medium=music`, as `POST` |
-| `shows` | `shows-feed.js` | `podcasts/index.json` on All; the boost corpus rolled up by show on 1W/1M |
-| `albums` | `shows-feed.js` | same as `shows`, `medium: 'music'` |
+| `shows` | `shows-feed.js` | `GET /api/v1/podcasts?not_medium=music`, ranked and paged server-side |
+| `albums` | `shows-feed.js` | same, `medium=music` |
 
 ### Range and sort
 
@@ -603,10 +603,17 @@ keystroke after each `refresh()`, and every renderer refreshes on repaint.
 
 `searchRemote` is for a feed that **pages a ranked list off the server**, where
 the loaded pages are a prefix of the corpus rather than the whole of it. That is
-Episodes and Songs since their ranking moved server-side: an in-memory index
-there could only find what the reader had already scrolled past, so a show at
-#300 was unfindable until "load more" had been pressed nine times. A feed
-supplies one or the other, never both. The remote path is debounced at 220ms,
+Episodes and Songs since their ranking moved server-side, and Shows and Albums
+since theirs did: an in-memory index there could only find what the reader had
+already scrolled past, so a show at #300 was unfindable until "load more" had
+been pressed nine times. A feed supplies one or the other, never both. Boosts is
+the only feed still on `getEntries`.
+
+**Shows and Albums keep matching the guid and the author, and both moved
+server-side.** The author is in `podcasts_fts` beside the title, so it is part of
+the MATCH. The guid is **not** indexed there and a pasted one is all hyphens, so
+`/api/v1/podcasts?q=` tests it as a separate equality alongside the MATCH. That
+is the only handle on the 33% of shows with no title. The remote path is debounced at 220ms,
 every request is abortable, and replies are **sequence-guarded as well as
 aborted** — an aborted fetch is not guaranteed to lose the race, so a stale
 answer is dropped on arrival rather than merely asked to stop.
@@ -622,6 +629,18 @@ the only way a suggestion is guaranteed to be something the feed can show. The
 cost is the ordering: hits come back in the feed's **active sort** rather than by
 relevance, so the menu reads as the feed with non-matches removed, which is
 exactly what picking one does.
+
+**⚠️ A RAW SEARCH STRING IS NOT AN FTS5 QUERY**, and every endpoint that
+touches one goes through `_common.js#ftsMatch`. MATCH parses its right-hand side
+as an expression language, so `-` negates, `:` selects a column and `(` groups;
+passing typed text through raises `SQLITE_ERROR`. Measured against production
+before it existed: `q=bitcoin` answered 200 while `q=rabbit-hole`, `q=foo:bar`
+and a pasted show guid all answered **500**. `ftsMatch` quotes every token and
+puts the prefix `*` outside the last closing quote. Tokens are quoted
+individually rather than the whole string being one phrase, because that
+difference is the semantics: `"joe" "rogan"*` is an implicit AND of terms
+appearing anywhere, which is what the client ladder did, where `"joe rogan"*`
+would demand adjacency.
 
 **Notes are left off the typeahead and fetched on the pick.** Measured at 80KB
 for 5 rows with `include=boosts` against 4KB without, and it runs while someone
@@ -752,24 +771,32 @@ episode feed and was reverted (`1f24c77`); it has its own slot now, so nothing i
 displaced. The reverted renderer is still readable at
 `git show 7995db0:assets/js/podcasts-feed.js`.
 
-**The range decides the source, because only one source can answer each range.**
+**Both ranges are now one query, and the range is a parameter rather than a
+source.** `GET /api/v1/podcasts` answers all three off D1: on All it reads the
+precomputed aggregate columns, on 1W/1M it GROUPs the boosts inside the window.
+The card cannot tell which one answered, and neither can anything below the
+fetch. **Range and sort are queries, so changing either refetches.**
 
-- **All** → `podcasts/index.json`, the collector's own per-show rollup: 1,384
-  shows with genuinely all-time counts in one ~440KB request, nothing
-  aggregated in the browser. This is the file CLAUDE.md tells the *episode*
-  feed not to use, and the reason is the same one that makes it right here —
-  it's a show-level rollup, so a show-level view is exactly its consumer.
-- **1W / 1M** → the boost corpus, grouped by `podcast.guid` in the browser. The
-  published index has no per-window breakdown, so a windowed card can only be
-  built from the boosts; and it must be, or "last 7 days" would be showing
-  all-time sat totals.
+**⚠️ `range` MEANS BOOST TIME on this endpoint and AIR DATE on
+`/api/v1/episodes`.** A show is in the 1W view because someone boosted it this
+week and its figures are that week's; an episode is in the 1W view because it
+AIRED this week, however long ago it was boosted. Both sides are deliberate and
+the parameter name is shared; do not "unify" them.
 
-The windowed path walks `latest.json` plus archives until the oldest row passes
-the cutoff, so it's **0 extra requests for 1W and 1 for 1M** — and those are the
-same shards the Episodes feeds pull, cached by `ob-data.js`, so opening Episodes
-first makes it free. Verified against production: 1W = 309 rows → 93 shows, 1M =
-1,092 rows → 170 shows, every one of them present in the all-time index with no
-windowed count exceeding its all-time count.
+What this replaced, and why it was a correctness fix rather than a speedup:
+
+- **All** read `podcasts/index.json` WHOLE — ~440KB describing every show in the
+  index, downloaded to paint thirty cards.
+- **1W / 1M** walked `latest.json` plus month archives and GROUPed the boosts by
+  `podcast.guid` **in the browser**, so a windowed ranking was computed over
+  whatever shards the walk happened to pull rather than over the window. This
+  was the last client-side aggregation on the site, and the same defect the
+  Episodes feeds were fixed for.
+
+**Nothing on the site reads `podcasts/index.json` or the per-show shards any
+more.** `ob-data.js` still exports `getPodcastIndex`, `getPodcastDetail`,
+`getShowMediums` and `getShowAuthors`; they have no callers and are kept
+deliberately, since the shards remain a published dataset.
 
 Two data facts that shaped the UI, both measured over the live index:
 
@@ -780,14 +807,21 @@ Two data facts that shaped the UI, both measured over the live index:
   kept rather than filtered (real boosts to real shows) and labelled
   "Unidentified show" with the guid, so an unnamed card reads as incomplete data
   rather than a bug.
-- **Detail shards run 3.5KB at the median, 15KB at p90, and 1.95MB for the
-  single most-boosted show.** That's why the episode drawer is an explicit
-  expand on the All path. On a windowed range it costs nothing — the rollup
-  already holds every boost, so the episode list is built in memory and no shard
-  is fetched at all.
+- **Detail shards ran 3.5KB at the median, 15KB at p90, and 1.95MB for the
+  single most-boosted show**, because a shard carries every boost the show ever
+  had plus full shownotes. **That fetch is retired.** The drawer now calls
+  `GET /api/v1/podcasts/<guid>?boosts=0`, which returns the episode rows and
+  nothing else.
 
-`byRange` caches the *grouping* per range for the page's lifetime, on top of
-ob-data.js's HTTP cache, so toggling 1M → All → 1M repaints instantly.
+**Both ranges fetch the drawer now, where the windowed ones used to build it in
+memory for free.** That freedom came from the browser holding every boost in the
+window, which is precisely the thing that moved to the server; so the window
+goes with the request instead, as `?since=<unix>`, and the rows come back scoped
+and recounted. A drawer showing all-time figures under a card showing the week's
+would contradict the card it opened from. It is one small request on an explicit
+expand, traded against never fetching a 1.95MB shard again.
+
+`byRange` is gone with the grouping it cached.
 
 ### The episode feed adapter
 

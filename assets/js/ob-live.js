@@ -318,3 +318,91 @@ export async function searchEpisodes({
   })
   return records
 }
+
+/* ── The show-level rollup, behind Shows and Albums ──────────────────────────
+ *
+ * ⚠️ `range` MEANS BOOST TIME HERE, where the episode reader above means AIR
+ * DATE. A show is in the 1W view because someone boosted it this week and its
+ * figures are that week's; an episode is in the 1W view because it AIRED this
+ * week, however long ago it was boosted. The endpoints keep the same split, and
+ * each feed writes its own tooltips for exactly this reason.
+ *
+ * What this replaces: the All range read the collector's published per-show
+ * rollup whole (~440KB of every show, to paint thirty cards) and the windowed
+ * ranges walked latest.json plus month archives and GROUPed the boosts in the
+ * browser. That was the last client-side aggregation on the site.
+ */
+const PODCASTS_API = '/api/v1/podcasts'
+
+// One screen and a bit. The feed paints 30 at a time, so a page is one press of
+// "load more" rather than a fetch per press.
+const SHOW_PAGE = 60
+
+/**
+ * One page of the ranked show list.
+ *
+ * @param {'music'|null} [opts.medium]  'music' selects Albums; everything else
+ *   is the Shows half, sent as not_medium=music so the partition keeps video and
+ *   the 33% of shows Podcast Index cannot identify.
+ * @param {string} [opts.sort]   boosts|sats|boosters|latest
+ * @param {string} [opts.range]  1w|1m|all, filtered on BOOST TIME
+ * @param {string} [opts.q]      free text over title + author, or a pasted guid.
+ *   Every record then carries `rank`, its position in the full ordering.
+ */
+export async function getShowPage({
+  medium = null, sort = 'boosts', range = 'all',
+  offset = 0, limit = SHOW_PAGE, q = null, signal,
+} = {}) {
+  const qs = new URLSearchParams({
+    sort, range, limit: String(limit), offset: String(offset),
+  })
+  if (medium === 'music') qs.set('medium', 'music')
+  else qs.set('not_medium', 'music')
+  if (q) qs.set('q', q)
+
+  const resp = await fetch(`${PODCASTS_API}?${qs}`, {
+    headers: { Accept: 'application/json' }, signal,
+  })
+  if (!resp.ok) throw new Error(`podcasts: HTTP ${resp.status}`)
+  const data = await resp.json()
+  return {
+    records: Array.isArray(data?.podcasts) ? data.podcasts : [],
+    nextOffset: Number.isFinite(data?.next_offset) ? data.next_offset : null,
+  }
+}
+
+/** The Shows/Albums typeahead. Same reasoning as searchEpisodes above. */
+export async function searchShows({
+  q, medium = null, sort = 'boosts', range = 'all', limit = SEARCH_HITS, signal,
+} = {}) {
+  const text = typeof q === 'string' ? q.trim() : ''
+  if (text.length < SEARCH_MIN_CHARS) return []
+  const { records } = await getShowPage({
+    medium, sort, range, signal, q: text, limit, offset: 0,
+  })
+  return records
+}
+
+/**
+ * One show's episode list, for the feed card's drawer.
+ *
+ * ⚠️ THIS RETIRES THE PER-SHOW SHARD FETCH, which was the single largest
+ * request the site could make: the shards carry every boost and full shownotes,
+ * measured at 3.5KB median, 15KB at p90 and **1.95MB** for the most-boosted
+ * show. `boosts=0` drops the recent-notes array the drawer never reads.
+ *
+ * `since` windows the rows to the boosts inside the range and recomputes each
+ * episode's figures over it, because the card above the drawer is showing the
+ * window's numbers and a drawer of all-time ones would contradict it.
+ */
+export async function getShowEpisodes({ guid, since = null, signal } = {}) {
+  const qs = new URLSearchParams({ boosts: '0' })
+  if (since) qs.set('since', String(since))
+  const resp = await fetch(
+    `${PODCASTS_API}/${encodeURIComponent(guid)}?${qs}`,
+    { headers: { Accept: 'application/json' }, signal },
+  )
+  if (!resp.ok) throw new Error(`podcast detail: HTTP ${resp.status}`)
+  const data = await resp.json()
+  return Array.isArray(data?.episodes) ? data.episodes : []
+}

@@ -296,7 +296,13 @@
 // unfindable until "load more" had been pressed nine times. ob-live.js carries
 // the reader, and index.html the one rule the loading line needs, so all four
 // turn over together.
-const VERSION = 'ob-v50';
+// ob-v51: Shows and Albums rank and page through /api/v1/podcasts instead of
+// downloading podcasts/index.json whole (~440KB of every show, to paint thirty
+// cards) and GROUPing month archives by show in the browser. Required rather
+// than cosmetic: a returning visitor holding the old shows-feed.js keeps a
+// windowed ranking computed over whichever shards its archive walk happened to
+// pull. ob-live.js carries the reader, so both turn over together.
+const VERSION = 'ob-v51';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;
