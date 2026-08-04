@@ -301,6 +301,7 @@ export async function onRequestPost({ request, env }) {
   const hexes = [...new Set(raw.map(toHexPubkey).filter(Boolean))];
   if (!hexes.length) {
     return json(request, { count: 0, scope: "follows", sort: p.sortKey, range: p.range,
+                           ...(p.q ? { q: p.q } : {}),
                            next_offset: null, episodes: [] }, { cache: 0 });
   }
 
@@ -385,6 +386,9 @@ export async function onRequestPost({ request, env }) {
     follows: hexes.length,
     sort: p.sortKey,
     range: p.range,
+    // Echoed for the same reason as the GET path: a caller that asked to filter
+    // must be able to see, from the response alone, that filtering happened.
+    ...(p.q ? { q: p.q } : {}),
     next_offset: episodes.length === p.limit ? p.offset + p.limit : null,
     episodes,
   // Per-user and POSTed: not shared-cacheable.
