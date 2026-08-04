@@ -144,22 +144,27 @@ Current standing against that target:
 
 | | State |
 |---|---|
-| One authoritative store | D1 exists and is fast; it is not yet the only read path |
+| One authoritative store | Done. D1 is the only read path the feeds use |
 | Precomputed aggregates | Done. `boost_count`, `total_sats`, `booster_count`, `latest_ts` are maintained columns |
 | Search index | Done. `podcasts_fts` covers shows (title + author), `episodes_fts` covers episodes (title + show), both queried rather than downloaded |
-| Browser computes nothing | True for Episodes and Songs, ranking and search both; false for Shows, Albums and Boosts |
+| Browser computes nothing | Done. Every feed's ranking, range and search are queries |
 | Edge caching | In place on the static proxy and the detail pages |
 
-The architecture is right and roughly 70% built. The current pain comes from
-operating both halves simultaneously, which is the worst point of any migration
-and is temporary by construction.
+The architecture is right, and as of 2026-08-04 it is built. Four of the five
+rows above are done; the fifth was already in place. The pain this document was
+written about came from operating both halves at once, which was the worst point
+of the migration and was temporary by construction, as expected.
+
+What remains is not architecture but housekeeping: piece 3 below, demoting the
+shards from a read path they no longer serve to the published dataset they
+already are.
 
 ## The Work
 
 Four pieces. None is large, and they can be sequenced independently apart from
 the dependency noted in the third.
 
-### 1. Move the Remaining Feeds to D1
+### 1. Move the Remaining Feeds to D1 — Done, 2026-08-04
 
 Shows, Albums and the two Boosts feeds still read static shards and, in the case
 of Shows and Albums on the windowed ranges, still group in the browser. They
@@ -173,6 +178,14 @@ runs unmodified. Nothing about the card had to change. A `/api/v1/podcasts`
 equivalent for the show-level rollup would follow the same shape.
 
 This also removes the last client-side reads of `podcasts/index.json`.
+
+Delivered. Shows and Albums page `/api/v1/podcasts`, which grew range (on boost
+time), the medium partition, the two sorts it lacked and `q=` with a rank; their
+drawer reads `/api/v1/podcasts/<guid>?boosts=0&since=`, retiring the per-show
+shard that ran to 1.95MB on the most-boosted show. The Boosts feeds' Global
+scope pages `/api/v1/boosts` by cursor, retiring `latest.json` and the archive
+walk. `ob-data.js` is now shape-only: every one of its fetching functions has no
+caller.
 
 ### 2. Add an Episode Search Index — Done, 2026-08-04
 
@@ -239,9 +252,9 @@ hole. D1 and the manifest now agree at 6,788 episodes.
    and both shipped together.** The branch carried the ranking fix and the
    server-side search into `main` as one change, so the regression it would have
    introduced alone never reached a reader.
-2. **Ordering of the four pieces.** Recommendation was 4, then 2, then 1, then 3;
-   4 and 2 are done in that order. **1 is next**, and 3 is safe only once
-   nothing reads the shards.
+2. **Ordering of the four pieces.** Recommendation was 4, then 2, then 1, then 3,
+   and 4, 2 and 1 are done in that order. **3 is now unblocked**: nothing on the
+   site reads a shard, so demoting them is a decision rather than a migration.
 3. **Whether the published shards keep their current shape** once they are an
    export rather than a read path. They are a public contract, so the default
    answer is yes. Still open.

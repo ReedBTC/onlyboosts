@@ -3,12 +3,17 @@
  * One card per kind-1 boost note, newest first. The Episodes feeds render the
  * same data rolled up by episode; this renders the boosts themselves.
  *
- * The two scopes read different backends. Global comes from ob-data.js: the
- * latest.json shard for the first page, then month archives from the manifest
- * for paging back. Follows comes from ob-live.js — the D1 query API filters to
- * the contact list server-side and pages by cursor, because the shards are
- * global by construction and scoping them client-side meant downloading months
- * of boosts to keep the handful that matched.
+ * Both scopes read ob-live.js now, cursor-paged off the same D1 table: Global
+ * through GET /api/v1/boosts, Follows through POST /api/v1/boosts/follows,
+ * which filters to the contact list server-side. They are one reader interface
+ * with two backings, so the paging, the coverage pass and the sorting below are
+ * shared rather than branched.
+ *
+ * Global used to open on the latest.json shard and page back a whole month
+ * archive at a time. That is what a static export can offer and not what a feed
+ * wants: the shard lags its own edge by the collector's publish interval, so the
+ * newest boosts were missing from the feed whose job is to show them, and "load
+ * older" fetched hundreds of KB to paint thirty more cards.
  *
  * Range and sort (feed-controls.js, shared with the Episodes rollup): the
  * range filters on when the boost was SENT, which is the axis a note feed is
@@ -32,10 +37,8 @@ import { parseSegments, renderSegmentsInto, setCachedProfile } from '/assets/js/
 import { fetchProfiles } from '/assets/js/primal-profiles.js'
 import { ensureLoginWidget } from '/assets/js/widget-loader.js'
 import { resolveFollows } from '/assets/js/follow-set.js'
-import {
-  getLatestBoosts, getBoostMonths, getBoostMonth, boosterLabel,
-} from '/assets/js/ob-data.js'
-import { followsBoostReader } from '/assets/js/ob-live.js'
+import { boosterLabel } from '/assets/js/ob-data.js'
+import { followsBoostReader, globalBoostReader } from '/assets/js/ob-live.js'
 import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls,
 } from '/assets/js/feed-controls.js'
@@ -293,43 +296,33 @@ function renderBoostCard(b) {
 // pulling until they add something rather than returning 0 on a batch that
 // happened to be all duplicates.
 
+/* ⚠️ THE GLOBAL SOURCE NO LONGER READS STATIC SHARDS.
+ *
+ * It used to open on `latest.json` — the most recent ~1,000 boosts — and page
+ * backwards a WHOLE MONTH ARCHIVE at a time. Two things were wrong with that,
+ * and neither was speed. The shard lags its own edge by the collector's publish
+ * interval, so the newest boosts on the site were missing from the feed whose
+ * entire job is to show them; and "load older" fetched a month (hundreds of KB)
+ * to paint thirty more cards, which is why the button had to name the month
+ * rather than a count.
+ *
+ * `/api/v1/boosts` is cursor-paged off the same table everything else reads, so
+ * the two scopes are now one reader interface with two backings and the button
+ * says the same thing on both.
+ */
 async function createGlobalSource() {
-  const [all, months] = await Promise.all([getLatestBoosts(), getBoostMonths()])
-  // latest.json is the most recent ~1,000 boosts regardless of month, so the
-  // newest archive overlaps it. Dedupe by id rather than trusting boundaries.
-  const seen = new Set(all.map((b) => b.id))
-  let monthIdx = 0
-
-  const src = {
-    rows: all.slice(),
-    get hasMore() { return monthIdx < months.length },
-    get moreLabel() { return `Load older boosts (${months[monthIdx].month})` },
-    async loadMore() {
-      while (monthIdx < months.length) {
-        const m = months[monthIdx++]
-        let batch
-        try {
-          batch = await getBoostMonth(m.file)
-        } catch (e) {
-          console.warn('[boosts] month load failed', m.file, e)
-          continue
-        }
-        let added = 0
-        for (const b of batch) {
-          if (seen.has(b.id)) continue
-          seen.add(b.id)
-          src.rows.push(b)
-          added++
-        }
-        if (added) {
-          src.rows.sort((a, b) => b.ts - a.ts)
-          return added
-        }
-      }
-      return 0
-    },
+  const reader = globalBoostReader()
+  // Pull the first page here so a fetch failure surfaces as "couldn't load"
+  // rather than after an empty list is painted — same as the Follows path.
+  await reader.loadMore()
+  return {
+    rows: reader.rows,
+    get hasMore() { return reader.hasMore },
+    // No month to name any more: the cursor walks the table itself, which does
+    // not line up with archive boundaries.
+    moreLabel: 'Load older boosts',
+    loadMore: () => reader.loadMore(),
   }
-  return src
 }
 
 async function createFollowsSource(authors) {
@@ -492,10 +485,14 @@ export async function renderBoosts({ panel, list, scope = 'global' }) {
     return !!cutoff && source.hasMore && oldestTs() > cutoff
   }
 
-  // Cheap by construction. On Global, latest.json alone spans ~26 days, so 1W
-  // needs no fetch at all and 1M needs at most one month archive.
+  // Cheap by construction, and now identically so on both scopes: a page is
+  // ob-live.js's 200 rows. The network publishes ~38 boosts a day, so 1W is
+  // ~280 rows (2 requests) and 1M ~1,140 (6) even on Global, where every boost
+  // in the window counts. It used to be 0 requests for 1W on Global, because
+  // latest.json arrived holding ~1,000 rows spanning ~26 days; that shard is
+  // also what made the feed lag its own edge, which is the trade.
   //
-  // On Follows it's a page walk at ob-live.js's 200 rows a request, which is
+  // On Follows it's the same page walk, which is
   // left alone deliberately. The network publishes ~38 boosts a day, so even a
   // follow set covering every booster alive bounds 1W at ~280 rows (2 requests)
   // and 1M at ~1,140 (6). A real contact list is a fraction of that, and pages

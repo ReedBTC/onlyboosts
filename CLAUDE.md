@@ -501,7 +501,7 @@ renderer on first view.
 
 | Feed | Module | Source |
 |---|---|---|
-| `boosts-global` | `boosts-feed.js` | `latest.json`, paging back through month archives |
+| `boosts-global` | `boosts-feed.js` | `GET /api/v1/boosts`, cursor-paged |
 | `boosts-follows` | `boosts-feed.js` | `POST /api/v1/boosts/follows`, cursor-paged |
 | `episodes-global` | `feeds-podcasts.js` | `GET /api/v1/episodes?not_medium=music&include=boosts`, ranked and paged server-side |
 | `episodes-follows` | `feeds-podcasts.js` | the same endpoint as `POST`, body `{follows:[…]}` |
@@ -669,14 +669,30 @@ someone does. There is no wider view to send them to, and the old copy pointed a
 one. Three strings per medium, off the `COPY` table: `searchNoneAll`,
 `searchNoneRange`, `searchNoneFollows`.
 
-**Two backends, one record shape.** `ob-data.js` is the static half (immutable
-CDN shards under `/api/data/*`); `ob-live.js` is the live half (D1 query API
-under `/api/v1/*`). The split is not stylistic: a Global view is the same bytes
-for every visitor and caches, a Follows view is scoped to the signed-in user's
-contact list and cannot. Both normalize through `ob-data.js#normalizeBoosts`,
-so everything downstream of the fetch sees one model and the card renderers are
-shared. `ob-live.js` caches nothing in-process — the shard cache is safe only
-because those files are immutable.
+**⚠️ EVERY FEED READS `ob-live.js` NOW. The static/live split is over.**
+
+It was: `ob-data.js` for the Global views (immutable CDN shards under
+`/api/data/*`) and `ob-live.js` for Follows (the D1 query API under
+`/api/v1/*`), on the reasoning that a Global view is the same bytes for every
+visitor and caches where a Follows view cannot. The caching benefit was real;
+generalising it into "static for global, live for follows" is what produced two
+stores that had to agree with nothing forcing them to. See
+`docs/data-architecture.md`.
+
+`ob-data.js` is now **shape only**. `normalizeBoosts`, `toEpisodeShape`,
+`episodeApiToBoosts` and `boosterLabel` still have callers and are the reason
+every consumer downstream of a fetch sees one model. Its *fetching* half —
+`getPodcastIndex`, `getPodcastDetail`, `getShowMediums`, `getShowAuthors`,
+`getLatestBoosts`, `getBoostMonths`, `getBoostMonth` — has **no callers left**.
+They are kept rather than deleted: the shards remain a published dataset and the
+proxy still serves them. `/about`'s stat strip is the one page that still fetches
+`/api/data/meta.json`, and it is a page of figures rather than a feed.
+
+That closes the dependency piece 3 was waiting on. Demoting the shards to an
+export is now a decision rather than a migration.
+
+`ob-live.js` caches nothing in-process — the shard cache was safe only because
+those files are immutable.
 
 A third consumer reads D1 directly rather than through `ob-live.js`:
 `/episode/<guid>`'s community section fetches
@@ -745,12 +761,13 @@ says something sane instead of rendering an empty list.
 
 Two scoping details that aren't obvious:
 
-- **Boosts · Follows no longer pages backwards hunting for matches.** It used
-  to: a follow set can match nothing in the most recent 1,000 boosts while
+- **Neither Boosts scope pages backwards hunting for matches any more.** Follows
+  used to: a follow set can match nothing in the most recent 1,000 boosts while
   having plenty further back, so the client walked month archives until
-  something turned up. The D1 query answers that in one indexed hit, so an
-  empty first page now genuinely means empty. The archive-walk branch survives
-  on the Global path, where `latest.json` can lag.
+  something turned up. The D1 query answers that in one indexed hit, so an empty
+  first page now genuinely means empty. **The archive walk is gone from the
+  Global path too** — it was the last thing keeping it, and `latest.json` lagging
+  its own edge was the reason to remove it rather than to keep it.
 - **The Episodes feeds don't use `podcasts/index.json`.** The cards are
   *episodes*, not shows, and the published index is a show-level rollup
   computed over everyone — so its counts would also be wrong for a Follows

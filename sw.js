@@ -302,7 +302,13 @@
 // than cosmetic: a returning visitor holding the old shows-feed.js keeps a
 // windowed ranking computed over whichever shards its archive walk happened to
 // pull. ob-live.js carries the reader, so both turn over together.
-const VERSION = 'ob-v51';
+// ob-v52: the Boosts feeds' Global scope pages /api/v1/boosts by cursor instead
+// of opening on latest.json and walking month archives. Required rather than
+// cosmetic: the shard lags its own edge by the collector's publish interval, so
+// a returning visitor holding the old boosts-feed.js keeps a feed that is
+// missing the newest boosts it exists to show. With this, no client module
+// fetches a static shard at all.
+const VERSION = 'ob-v52';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;

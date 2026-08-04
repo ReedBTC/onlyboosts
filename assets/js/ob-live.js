@@ -91,6 +91,82 @@ export async function getFollowsBoostPage(authors, { cursor = null, limit = PAGE
 }
 
 /**
+ * One page of the GLOBAL boost feed, newest first.
+ *
+ * The counterpart of getFollowsBoostPage, and deliberately the same shape: the
+ * note feed's paging model is one reader interface with two backings, so the
+ * renderer cannot tell the scopes apart.
+ */
+export async function getGlobalBoostPage({ cursor = null, limit = PAGE_LIMIT, since = null, signal } = {}) {
+  const qs = new URLSearchParams({ limit: String(limit) })
+  if (cursor) qs.set('cursor', cursor)
+  // Passed through because the endpoint has it. The note feed does NOT use it —
+  // see the warning over globalBoostReader for why the window is applied over
+  // the rows in hand instead.
+  if (since) qs.set('since', String(since))
+  const resp = await fetch(`/api/v1/boosts?${qs}`, {
+    headers: { Accept: 'application/json' }, signal,
+  })
+  if (!resp.ok) throw new Error(`boosts: HTTP ${resp.status}`)
+  const data = await resp.json()
+  return {
+    rows: normalizeBoosts(data),
+    cursor: typeof data?.next_cursor === 'string' ? data.next_cursor : null,
+  }
+}
+
+/**
+ * A page-at-a-time reader over the global boost feed.
+ *
+ * ⚠️ THIS REPLACES latest.json PLUS AN ARCHIVE WALK. The feed used to read the
+ * most recent ~1,000 boosts from a static shard and then page backwards through
+ * month archives, which is what a static export can offer and not what a feed
+ * wants: the shard lags its own edge by the publish interval, so the newest
+ * boosts were missing from the feed whose job is to show them, and "load older"
+ * cost a whole month's file to paint thirty more cards.
+ *
+ * Same interface as followsBoostReader, so the renderer's paging, its coverage
+ * pass and its sorting are shared between the two scopes rather than branched.
+ *
+ * ⚠️ NO `since`, deliberately, and the reason is the one already written over
+ * ensureCoverage in boosts-feed.js: on a short page the endpoint returns no
+ * cursor, and the client cannot mint the opaque cursor it would then need to
+ * keep paging PAST the window when the reader widens their range again. The
+ * window is applied where it always was, over the rows in hand, once the
+ * coverage pass has paged enough of them to cover it.
+ */
+export function globalBoostReader() {
+  const seen = new Set()
+  let cursor = null
+  let exhausted = false
+
+  const reader = {
+    rows: [],
+    get hasMore() { return !exhausted },
+    async loadMore() {
+      let added = 0
+      // Loop rather than return 0 on an all-duplicate page: returning 0 reads
+      // as "nothing left" to the caller, which would strand rows the server
+      // still has.
+      while (!exhausted && added === 0) {
+        const page = await getGlobalBoostPage({ cursor })
+        cursor = page.cursor
+        if (!cursor) exhausted = true
+        for (const b of page.rows) {
+          if (seen.has(b.id)) continue
+          seen.add(b.id)
+          reader.rows.push(b)
+          added++
+        }
+      }
+      if (added) reader.rows.sort((a, b) => b.ts - a.ts)
+      return added
+    },
+  }
+  return reader
+}
+
+/**
  * A page-at-a-time reader over the follow feed, for a view that renders
  * incrementally rather than needing the whole corpus up front.
  *
