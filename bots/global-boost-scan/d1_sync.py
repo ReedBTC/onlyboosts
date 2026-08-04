@@ -13,7 +13,9 @@ Two modes:
                       --full recomputes everything.
 
 D1 is a derived, disposable projection — a full re-emit rebuilds it from scratch,
-so drift can never accumulate.
+so drift can never accumulate. Between full loads the delta path keeps it honest
+in two directions: new boosts (the `d1_boosts_synced` marker) and changed
+metadata (the `meta_synced_at` watermark) — see build_meta_drift_sql.
 """
 
 import argparse
@@ -163,12 +165,72 @@ def build_full_sql(conn):
     return out
 
 
+# ── single-row upserts (shared by the delta and metadata-drift paths) ─────────
+def _podcast_upsert_sql(conn, guid):
+    """Re-project one podcasts row (aggregates recomputed from ALL its boosts)."""
+    eg = db.effective_guid("b")
+    a = conn.execute(
+        f"""SELECT {eg} AS guid, COUNT(*) AS boost_count,
+                  COALESCE(SUM(b.sats),0) AS total_sats,
+                  COUNT(DISTINCT b.booster_pubkey) AS booster_count,
+                  COUNT(DISTINCT b.item_guid) AS episode_count,
+                  MAX(b.created_at) AS latest_ts,
+                  s.title, s.image, s.artwork, s.feed_url, s.medium, s.author
+           FROM boosts b LEFT JOIN shows s ON s.podcast_guid={eg}
+           WHERE {eg}=? GROUP BY {eg}""", (guid,)).fetchone()
+    if not a:
+        return []
+    # `artwork` (second-chance art URL) is projected here and in the full load;
+    # the remote D1 column exists.
+    out = ["INSERT OR REPLACE INTO podcasts (podcast_guid,title,image,artwork,feed_url,medium,author,"
+           "boost_count,total_sats,booster_count,episode_count,latest_ts) VALUES ("
+           f"{q(a['guid'])},{q(a['title'])},{q(a['image'])},{q(a['artwork'])},{q(a['feed_url'])},"
+           f"{q(a['medium'])},{q(a['author'])},{q(a['boost_count'])},{q(a['total_sats'])},"
+           f"{q(a['booster_count'])},{q(a['episode_count'])},{q(a['latest_ts'])});",
+           f"DELETE FROM podcasts_fts WHERE podcast_guid={q(guid)};"]
+    if a["title"]:
+        out.append("INSERT INTO podcasts_fts (podcast_guid,title) VALUES ("
+                   f"{q(guid)},{q(a['title'])});")
+    return out
+
+
+def _episode_upsert_sql(conn, item_guid):
+    """Re-project one episodes row, or nothing if the box has no metadata for it
+    yet (a boosted item_guid with no `episodes` row is the enrichment gap, not
+    something to project as an untitled placeholder)."""
+    e = conn.execute(
+        """SELECT e.item_guid,e.podcast_guid,e.title,e.image,e.published,e.duration,
+                  e.episode_number,e.enclosure_url,e.description,
+                  (SELECT COUNT(*) FROM boosts WHERE item_guid=e.item_guid) AS boost_count,
+                  (SELECT COALESCE(SUM(sats),0) FROM boosts WHERE item_guid=e.item_guid) AS total_sats,
+                  (SELECT COUNT(DISTINCT booster_pubkey) FROM boosts WHERE item_guid=e.item_guid) AS booster_count,
+                  (SELECT MAX(created_at) FROM boosts WHERE item_guid=e.item_guid) AS latest_ts
+           FROM episodes e WHERE e.item_guid=?""", (item_guid,)).fetchone()
+    if not e:
+        return []
+    return ["INSERT OR REPLACE INTO episodes (item_guid,podcast_guid,title,image,published,"
+            "duration,episode_number,enclosure_url,description,boost_count,total_sats,"
+            "booster_count,latest_ts) VALUES ("
+            f"{q(e['item_guid'])},{q(e['podcast_guid'])},{q(e['title'])},{q(e['image'])},"
+            f"{q(e['published'])},{q(e['duration'])},{q(e['episode_number'])},"
+            f"{q(e['enclosure_url'])},{q(e['description'])},{q(e['boost_count'])},{q(e['total_sats'])},"
+            f"{q(e['booster_count'])},{q(e['latest_ts'])});"]
+
+
+def _profile_upsert_sql(p):
+    return ["INSERT OR REPLACE INTO profiles (pubkey,name,display_name,picture,nip05) VALUES ("
+            f"{q(p['pubkey'])},{q(p['name'])},{q(p['display_name'])},{q(p['picture'])},{q(p['nip05'])});"]
+
+
 # ── delta projection (only what changed since last sync) ──────────────────────
 def build_delta_sql(conn, rows):
     """SQL for `rows` (boosts not yet in D1): the new boosts (OR IGNORE, immutable)
     + FTS, plus a recomputed upsert of every podcast/episode they touched (an
     aggregate depends on ALL its boosts, so it's recomputed from the box DB) +
-    the boosters' profiles + refreshed meta."""
+    the boosters' profiles + refreshed meta.
+
+    Returns (statements, podcast_guids, item_guids) — the caller feeds those guid
+    sets to build_meta_drift_sql so a row isn't projected twice in one push."""
     out = []
     pods, items, pubs = set(), set(), set()
     for r in rows:
@@ -187,67 +249,85 @@ def build_delta_sql(conn, rows):
             items.add(r["item_guid"])
         pubs.add(r["booster_pubkey"])
 
-    eg = db.effective_guid("b")
     for pg in pods:
-        a = conn.execute(
-            f"""SELECT {eg} AS guid, COUNT(*) AS boost_count,
-                      COALESCE(SUM(b.sats),0) AS total_sats,
-                      COUNT(DISTINCT b.booster_pubkey) AS booster_count,
-                      COUNT(DISTINCT b.item_guid) AS episode_count,
-                      MAX(b.created_at) AS latest_ts,
-                      s.title, s.image, s.artwork, s.feed_url, s.medium, s.author
-               FROM boosts b LEFT JOIN shows s ON s.podcast_guid={eg}
-               WHERE {eg}=? GROUP BY {eg}""", (pg,)).fetchone()
-        if not a:
-            continue
-        # `artwork` (second-chance art URL) is now projected — see the full-load
-        # path above; the remote D1 column exists.
-        out.append(
-            "INSERT OR REPLACE INTO podcasts (podcast_guid,title,image,artwork,feed_url,medium,author,"
-            "boost_count,total_sats,booster_count,episode_count,latest_ts) VALUES ("
-            f"{q(a['guid'])},{q(a['title'])},{q(a['image'])},{q(a['artwork'])},{q(a['feed_url'])},{q(a['medium'])},"
-            f"{q(a['author'])},{q(a['boost_count'])},{q(a['total_sats'])},{q(a['booster_count'])},"
-            f"{q(a['episode_count'])},{q(a['latest_ts'])});")
-        out.append(f"DELETE FROM podcasts_fts WHERE podcast_guid={q(pg)};")
-        if a["title"]:
-            out.append("INSERT INTO podcasts_fts (podcast_guid,title) VALUES ("
-                       f"{q(pg)},{q(a['title'])});")
-
+        out.extend(_podcast_upsert_sql(conn, pg))
     for ig in items:
-        e = conn.execute(
-            """SELECT e.item_guid,e.podcast_guid,e.title,e.image,e.published,e.duration,
-                      e.episode_number,e.enclosure_url,e.description,
-                      (SELECT COUNT(*) FROM boosts WHERE item_guid=e.item_guid) AS boost_count,
-                      (SELECT COALESCE(SUM(sats),0) FROM boosts WHERE item_guid=e.item_guid) AS total_sats,
-                      (SELECT COUNT(DISTINCT booster_pubkey) FROM boosts WHERE item_guid=e.item_guid) AS booster_count,
-                      (SELECT MAX(created_at) FROM boosts WHERE item_guid=e.item_guid) AS latest_ts
-               FROM episodes e WHERE e.item_guid=?""", (ig,)).fetchone()
-        if not e:
-            continue
-        out.append(
-            "INSERT OR REPLACE INTO episodes (item_guid,podcast_guid,title,image,published,"
-            "duration,episode_number,enclosure_url,description,boost_count,total_sats,"
-            "booster_count,latest_ts) VALUES ("
-            f"{q(e['item_guid'])},{q(e['podcast_guid'])},{q(e['title'])},{q(e['image'])},"
-            f"{q(e['published'])},{q(e['duration'])},{q(e['episode_number'])},"
-            f"{q(e['enclosure_url'])},{q(e['description'])},{q(e['boost_count'])},{q(e['total_sats'])},"
-            f"{q(e['booster_count'])},{q(e['latest_ts'])});")
+        out.extend(_episode_upsert_sql(conn, ig))
 
     if pubs:
         ph = ",".join("?" * len(pubs))
         for p in conn.execute(
             f"SELECT pubkey,name,display_name,picture,nip05 FROM profiles WHERE pubkey IN ({ph})",
                 tuple(pubs)).fetchall():
-            out.append(
-                "INSERT OR REPLACE INTO profiles (pubkey,name,display_name,picture,nip05) VALUES ("
-                f"{q(p['pubkey'])},{q(p['name'])},{q(p['display_name'])},{q(p['picture'])},{q(p['nip05'])});")
+            out.extend(_profile_upsert_sql(p))
 
+    out.extend(_meta_sql(conn))
+    return out, pods, items
+
+
+def _meta_sql(conn):
     s = db.stats(conn)
-    for k, v in {"generated_at": int(time.time()), "boosts": s["boosts"],
-                 "total_sats": s["total_sats"], "distinct_shows": s["distinct_shows"],
-                 "distinct_boosters": s["distinct_boosters"]}.items():
-        out.append(f"INSERT OR REPLACE INTO meta (key,value) VALUES ({q(k)},{q(v)});")
-    return out
+    return [f"INSERT OR REPLACE INTO meta (key,value) VALUES ({q(k)},{q(v)});"
+            for k, v in {"generated_at": int(time.time()), "boosts": s["boosts"],
+                         "total_sats": s["total_sats"], "distinct_shows": s["distinct_shows"],
+                         "distinct_boosters": s["distinct_boosters"]}.items()]
+
+
+# ── metadata drift (box metadata that changed after it was last projected) ────
+META_WATERMARK = "meta_synced_at"
+META_OVERLAP = 3600   # re-read an hour behind the watermark; upserts are idempotent
+
+
+def build_meta_drift_sql(conn, since, skip_pods=(), skip_items=()):
+    """Re-project rows whose BOX metadata changed since `since` (unix seconds).
+
+    The boost delta only touches a podcast/episode/profile when a NEW boost
+    arrives for it. Metadata, though, moves on its own schedule: an episode
+    boosted months ago gets enriched by a later Podcast Index pass, a feed
+    re-scrape changes a show's art, a booster updates their kind-0. Without this
+    pass D1 keeps the stale — or entirely missing — projection until the next
+    boost happens to touch that row, which for a dormant show is never.
+
+    Watermarked on the box's own `updated_at` columns, re-read with an hour of
+    overlap: a duplicate upsert is free, a missed row is invisible.
+
+    Returns (statements, counts)."""
+    out = []
+    since = max(0, since - META_OVERLAP)
+    counts = {"podcasts": 0, "episodes": 0, "profiles": 0}
+
+    # Only shows that a podcasts row is actually keyed by: the projection joins
+    # `shows` on the CANONICAL guid, so an alias's own show row feeds nothing.
+    eg = db.effective_guid("b")
+    for r in conn.execute(
+        f"""SELECT s.podcast_guid FROM shows s
+            WHERE s.updated_at IS NOT NULL AND s.updated_at >= ?
+              AND EXISTS (SELECT 1 FROM boosts b WHERE {eg}=s.podcast_guid)""",
+            (since,)).fetchall():
+        if r["podcast_guid"] in skip_pods:
+            continue
+        stmts = _podcast_upsert_sql(conn, r["podcast_guid"])
+        out.extend(stmts)
+        counts["podcasts"] += bool(stmts)
+
+    for r in conn.execute(
+        """SELECT e.item_guid FROM episodes e
+           WHERE e.updated_at IS NOT NULL AND e.updated_at >= ?
+             AND EXISTS (SELECT 1 FROM boosts b WHERE b.item_guid=e.item_guid)""",
+            (since,)).fetchall():
+        if r["item_guid"] in skip_items:
+            continue
+        stmts = _episode_upsert_sql(conn, r["item_guid"])
+        out.extend(stmts)
+        counts["episodes"] += bool(stmts)
+
+    for p in conn.execute(
+        """SELECT pubkey,name,display_name,picture,nip05 FROM profiles
+           WHERE updated_at IS NOT NULL AND updated_at >= ?""", (since,)).fetchall():
+        out.extend(_profile_upsert_sql(p))
+        counts["profiles"] += 1
+
+    return out, counts
 
 
 # ── which boosts are already in D1 (marker table in the box DB) ───────────────
@@ -268,6 +348,24 @@ def _unsynced_boosts(conn):
 def _mark_synced(conn, ids):
     conn.executemany("INSERT OR IGNORE INTO d1_boosts_synced (event_id) VALUES (?)",
                      [(i,) for i in ids])
+    conn.commit()
+
+
+def _ensure_state_table(conn):
+    conn.execute("CREATE TABLE IF NOT EXISTS d1_sync_state (key TEXT PRIMARY KEY, value INTEGER)")
+    conn.commit()
+
+
+def _get_watermark(conn, key):
+    """0 when unset — a fresh box re-projects all metadata once, which is correct."""
+    _ensure_state_table(conn)
+    r = conn.execute("SELECT value FROM d1_sync_state WHERE key=?", (key,)).fetchone()
+    return r[0] if r else 0
+
+
+def _set_watermark(conn, key, ts):
+    _ensure_state_table(conn)
+    conn.execute("INSERT OR REPLACE INTO d1_sync_state (key,value) VALUES (?,?)", (key, ts))
     conn.commit()
 
 
@@ -326,7 +424,8 @@ def cmd_remote(args):
         print("[error] CF_ACCOUNT_ID / CF_D1_DATABASE_ID / CF_API_TOKEN missing from credentials.env")
         return
     conn = db.connect(DB_PATH)
-    stmts = build_full_sql(conn)   # NOTE: full load for now; delta mode is a follow-up
+    started = int(time.time())
+    stmts = build_full_sql(conn)
     BATCH = 100
     sent = 0
     for i in range(0, len(stmts), BATCH):
@@ -339,6 +438,8 @@ def cmd_remote(args):
             print(f"  …{sent}/{len(stmts)} statements", flush=True)
     _ensure_sync_table(conn)
     _mark_synced(conn, [r["event_id"] for r in conn.execute("SELECT event_id FROM boosts").fetchall()])
+    # Everything is projected as of `started`, so the drift pass starts from here.
+    _set_watermark(conn, META_WATERMARK, started)
     print(f"pushed {sent} statements to D1 (remote, full load); marked all boosts synced")
 
 
@@ -349,19 +450,33 @@ def cmd_remote_delta(args):
         return
     conn = db.connect(DB_PATH)
     _ensure_sync_table(conn)
+    started = int(time.time())
     rows = _unsynced_boosts(conn)
-    if not rows:
+
+    stmts, pods, items = ([], set(), set())
+    if rows:
+        stmts, pods, items = build_delta_sql(conn, rows)
+    # Metadata moves independently of boosts — always run the drift pass, even
+    # on a cycle where no new boost arrived.
+    drift, counts = build_meta_drift_sql(conn, _get_watermark(conn, META_WATERMARK), pods, items)
+    stmts += drift
+    if not stmts:
         print("D1 delta: nothing new to sync")
+        _set_watermark(conn, META_WATERMARK, started)
         return
-    stmts = build_delta_sql(conn, rows)
+
     BATCH = 100
     for i in range(0, len(stmts), BATCH):
         ok, detail = _d1_exec(*cf, "\n".join(stmts[i:i + BATCH]))
         if not ok:
             print(f"[error] delta batch {i // BATCH} failed: {detail}")
-            return
+            return   # neither watermark advances: the whole push retries next cycle
     _mark_synced(conn, [r["event_id"] for r in rows])
-    print(f"D1 delta: pushed {len(rows)} new boost(s) ({len(stmts)} statements)")
+    _set_watermark(conn, META_WATERMARK, started)
+    print(f"D1 delta: pushed {len(rows)} new boost(s), refreshed "
+          f"{counts['podcasts']} show(s) / {counts['episodes']} episode(s) / "
+          f"{counts['profiles']} profile(s) whose metadata changed "
+          f"({len(stmts)} statements)")
 
 
 def cmd_remote_podroll(args):
