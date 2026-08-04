@@ -157,7 +157,14 @@ function readParams(u) {
   const podcast = u.searchParams.get("podcast") || null;
   const days = RANGE_DAYS[range];
   const include = new Set((u.searchParams.get("include") || "").split(",").filter(Boolean));
+  // Free-text over episode titles. Same treatment as /api/v1/search: strip the
+  // quote so a stray one can't become FTS5 syntax, and append * so partial words
+  // match the way a search box implies.
+  const rawQ = (u.searchParams.get("q") || "").trim();
+  if (rawQ && rawQ.length < 2) return { error: "q must be >= 2 chars" };
   return {
+    q: rawQ || null,
+    match: rawQ ? rawQ.replace(/["]/g, " ") + "*" : null,
     sortKey, range, medium, notMedium, podcast,
     withBoosts: include.has("boosts"),
     // Cutoff is computed per request; the response is cached briefly, so a
@@ -194,27 +201,75 @@ export async function onRequestGet({ request, env }) {
   // (sort col, total_sats, item_guid) precisely so this ORDER BY is an index
   // walk; changing one without the other silently reintroduces the scan.
   const tiebreak = col === "e.total_sats" ? "e.item_guid" : "e.total_sats DESC, e.item_guid";
-  const sql = `
-    SELECT e.item_guid, e.podcast_guid, e.title, e.image, e.published,
+  const SELECT_COLS = `
+           e.item_guid, e.podcast_guid, e.title, e.image, e.published,
            e.episode_number, e.enclosure_url,
            e.boost_count, e.total_sats, e.booster_count, e.latest_ts,
            pc.title AS p_title, pc.image AS p_image, pc.artwork AS p_artwork,
-           pc.feed_url AS p_feed, pc.medium AS p_medium, pc.author AS p_author
-    FROM episodes e
-    LEFT JOIN podcasts pc ON pc.podcast_guid = e.podcast_guid
-    ${where.length ? "WHERE " + where.join(" AND ") : ""}
-    ORDER BY ${col} DESC, ${tiebreak}
-    LIMIT ? OFFSET ?`;
-  args.push(p.limit, p.offset);
+           pc.feed_url AS p_feed, pc.medium AS p_medium, pc.author AS p_author`;
+  const whereSql = where.length ? "WHERE " + where.join(" AND ") : "";
+
+  let sql;
+  if (p.match) {
+    // Search answers "where does my show stand", so a hit is useless without its
+    // position in the FULL ordering — the client is holding a filtered list and
+    // can no longer count rows itself. `rank` is computed over every episode the
+    // non-q filters admit, then the matches are picked out of it.
+    //
+    // This is deliberately the expensive path: ROW_NUMBER() over the whole
+    // filtered set reads every one of those rows, where the unfiltered feed
+    // walks an index and reads only its page. Measured ~31k rows read for
+    // q=bitcoin against ~200 for the same page unfiltered. Acceptable because
+    // search is user-initiated and rare next to feed loads — but do not reuse
+    // this shape for the default listing. (Dropping the podcasts join from the
+    // CTE when no medium filter needs it was measured and changes nothing.)
+    //
+    // Results stay in the ACTIVE SORT, not relevance order: the feed reads as
+    // the same leaderboard with non-matches removed, which is what makes the
+    // rank numbers legible.
+    sql = `
+      WITH ranked AS (
+        SELECT e.item_guid,
+               ROW_NUMBER() OVER (ORDER BY ${col} DESC, ${tiebreak}) AS rank
+        FROM episodes e
+        LEFT JOIN podcasts pc ON pc.podcast_guid = e.podcast_guid
+        ${whereSql}
+      )
+      SELECT ${SELECT_COLS}, r.rank
+      FROM episodes_fts f
+      JOIN episodes e ON e.item_guid = f.item_guid
+      JOIN ranked r ON r.item_guid = e.item_guid
+      LEFT JOIN podcasts pc ON pc.podcast_guid = e.podcast_guid
+      WHERE episodes_fts MATCH ?
+      ORDER BY ${col} DESC, ${tiebreak}
+      LIMIT ? OFFSET ?`;
+    // The filters are bound once, for the CTE; the outer query re-applies none of
+    // them because JOIN ranked already restricts to exactly those rows.
+    args.push(p.match, p.limit, p.offset);
+  } else {
+    sql = `
+      SELECT ${SELECT_COLS}
+      FROM episodes e
+      LEFT JOIN podcasts pc ON pc.podcast_guid = e.podcast_guid
+      ${whereSql}
+      ORDER BY ${col} DESC, ${tiebreak}
+      LIMIT ? OFFSET ?`;
+    args.push(p.limit, p.offset);
+  }
 
   const { results } = await env.DB.prepare(sql).bind(...args).all();
-  const episodes = results.map(episodeRecord);
+  const episodes = results.map((r) => {
+    const rec = episodeRecord(r);
+    if (p.match) rec.rank = r.rank;      // position in the unfiltered ordering
+    return rec;
+  });
   if (p.withBoosts) await attachBoosts(env, episodes, null);
   return json(request, {
     count: episodes.length,
     scope: "global",
     sort: p.sortKey,
     range: p.range,
+    ...(p.q ? { q: p.q } : {}),
     next_offset: episodes.length === p.limit ? p.offset + p.limit : null,
     episodes,
   }, { cache: 300 });

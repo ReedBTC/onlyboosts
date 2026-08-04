@@ -90,7 +90,7 @@ def build_full_sql(conn):
     out = []
     out.append("PRAGMA foreign_keys=OFF;")
     for t in ("boosts", "podcasts", "episodes", "profiles", "meta",
-              "boosts_fts", "podcasts_fts"):
+              "boosts_fts", "podcasts_fts", "episodes_fts"):
         out.append(f"DELETE FROM {t};")
 
     # boosts + FTS
@@ -126,9 +126,9 @@ def build_full_sql(conn):
             f"{q(a['guid'])},{q(a['title'])},{q(a['image'])},{q(a['artwork'])},{q(a['feed_url'])},"
             f"{q(a['medium'])},{q(a['author'])},{q(a['boost_count'])},{q(a['total_sats'])},"
             f"{q(a['booster_count'])},{q(a['episode_count'])},{q(a['latest_ts'])});")
-        if a["title"]:
-            out.append("INSERT INTO podcasts_fts (podcast_guid,title) VALUES ("
-                       f"{q(a['guid'])},{q(a['title'])});")
+        if a["title"] or a["author"]:
+            out.append("INSERT INTO podcasts_fts (podcast_guid,title,author) VALUES ("
+                       f"{q(a['guid'])},{q(a['title'])},{q(a['author'])});")
 
     # episodes (metadata + per-episode aggregates)
     for e in conn.execute("""
@@ -148,6 +148,9 @@ def build_full_sql(conn):
             f"{q(e['published'])},{q(e['duration'])},{q(e['episode_number'])},"
             f"{q(e['enclosure_url'])},{q(e['description'])},{q(e['boost_count'])},{q(e['total_sats'])},"
             f"{q(e['booster_count'])},{q(e['latest_ts'])});")
+        if e["title"]:
+            out.append("INSERT INTO episodes_fts (item_guid,title) VALUES ("
+                       f"{q(e['item_guid'])},{q(e['title'])});")
 
     # profiles
     for p in conn.execute("SELECT pubkey,name,display_name,picture,nip05 FROM profiles").fetchall():
@@ -188,9 +191,9 @@ def _podcast_upsert_sql(conn, guid):
            f"{q(a['medium'])},{q(a['author'])},{q(a['boost_count'])},{q(a['total_sats'])},"
            f"{q(a['booster_count'])},{q(a['episode_count'])},{q(a['latest_ts'])});",
            f"DELETE FROM podcasts_fts WHERE podcast_guid={q(guid)};"]
-    if a["title"]:
-        out.append("INSERT INTO podcasts_fts (podcast_guid,title) VALUES ("
-                   f"{q(guid)},{q(a['title'])});")
+    if a["title"] or a["author"]:
+        out.append("INSERT INTO podcasts_fts (podcast_guid,title,author) VALUES ("
+                   f"{q(guid)},{q(a['title'])},{q(a['author'])});")
     return out
 
 
@@ -208,13 +211,18 @@ def _episode_upsert_sql(conn, item_guid):
            FROM episodes e WHERE e.item_guid=?""", (item_guid,)).fetchone()
     if not e:
         return []
-    return ["INSERT OR REPLACE INTO episodes (item_guid,podcast_guid,title,image,published,"
-            "duration,episode_number,enclosure_url,description,boost_count,total_sats,"
-            "booster_count,latest_ts) VALUES ("
-            f"{q(e['item_guid'])},{q(e['podcast_guid'])},{q(e['title'])},{q(e['image'])},"
-            f"{q(e['published'])},{q(e['duration'])},{q(e['episode_number'])},"
-            f"{q(e['enclosure_url'])},{q(e['description'])},{q(e['boost_count'])},{q(e['total_sats'])},"
-            f"{q(e['booster_count'])},{q(e['latest_ts'])});"]
+    out = ["INSERT OR REPLACE INTO episodes (item_guid,podcast_guid,title,image,published,"
+           "duration,episode_number,enclosure_url,description,boost_count,total_sats,"
+           "booster_count,latest_ts) VALUES ("
+           f"{q(e['item_guid'])},{q(e['podcast_guid'])},{q(e['title'])},{q(e['image'])},"
+           f"{q(e['published'])},{q(e['duration'])},{q(e['episode_number'])},"
+           f"{q(e['enclosure_url'])},{q(e['description'])},{q(e['boost_count'])},{q(e['total_sats'])},"
+           f"{q(e['booster_count'])},{q(e['latest_ts'])});",
+           f"DELETE FROM episodes_fts WHERE item_guid={q(e['item_guid'])};"]
+    if e["title"]:
+        out.append("INSERT INTO episodes_fts (item_guid,title) VALUES ("
+                   f"{q(e['item_guid'])},{q(e['title'])});")
+    return out
 
 
 def _profile_upsert_sql(p):
@@ -522,6 +530,54 @@ def cmd_remote_podroll(args):
     print(f"D1 podroll: replaced with {len(stmts) - 1} edge(s)")
 
 
+def cmd_rebuild_fts(args):
+    """Drop and repopulate the podcasts/episodes FTS tables.
+
+    Needed because `CREATE VIRTUAL TABLE IF NOT EXISTS` will not reshape a table
+    that already exists: adding `author` to podcasts_fts, or introducing
+    episodes_fts at all, is invisible to --apply-schema on a live database.
+
+    Only these two — boosts_fts is untouched and far the largest, so this stays a
+    few thousand statements instead of a full reload. The base tables aren't
+    touched either: FTS content is derived, so rebuilding it is safe at any time
+    (search is briefly empty mid-run)."""
+    cf = _cf(load_config(CREDENTIALS))
+    if not cf:
+        print("[error] CF_ACCOUNT_ID / CF_D1_DATABASE_ID / CF_API_TOKEN missing from credentials.env")
+        return
+    conn = db.connect(DB_PATH)
+    stmts = [
+        "DROP TABLE IF EXISTS podcasts_fts;",
+        "DROP TABLE IF EXISTS episodes_fts;",
+        "CREATE VIRTUAL TABLE podcasts_fts USING fts5(podcast_guid UNINDEXED, title, author);",
+        "CREATE VIRTUAL TABLE episodes_fts USING fts5(item_guid UNINDEXED, title);",
+    ]
+    eg = db.effective_guid("b")
+    for a in conn.execute(f"""
+        SELECT {eg} AS guid, s.title, s.author
+        FROM boosts b LEFT JOIN shows s ON s.podcast_guid={eg}
+        WHERE {eg} IS NOT NULL GROUP BY {eg}""").fetchall():
+        if a["title"] or a["author"]:
+            stmts.append("INSERT INTO podcasts_fts (podcast_guid,title,author) VALUES ("
+                         f"{q(a['guid'])},{q(a['title'])},{q(a['author'])});")
+    for e in conn.execute("""
+        SELECT e.item_guid, e.title FROM episodes e
+        WHERE e.title IS NOT NULL
+          AND EXISTS (SELECT 1 FROM boosts WHERE item_guid = e.item_guid)""").fetchall():
+        stmts.append("INSERT INTO episodes_fts (item_guid,title) VALUES ("
+                     f"{q(e['item_guid'])},{q(e['title'])});")
+
+    BATCH = 100
+    for i in range(0, len(stmts), BATCH):
+        ok, detail = _d1_exec(*cf, "\n".join(stmts[i:i + BATCH]))
+        if not ok:
+            print(f"[error] fts batch {i // BATCH} failed: {detail}")
+            return
+        if (i // BATCH) % 20 == 0:
+            print(f"  …{min(i + BATCH, len(stmts))}/{len(stmts)} statements", flush=True)
+    print(f"rebuilt podcasts_fts + episodes_fts ({len(stmts)} statements)")
+
+
 def cmd_mark_all_synced(args):
     """One-time reconcile after an out-of-band full seed: mark every current boost
     as already in D1 so the first delta run doesn't re-push everything."""
@@ -540,6 +596,8 @@ def main():
     ap.add_argument("--remote-delta", action="store_true", help="push only boosts new since last sync (for the timer)")
     ap.add_argument("--remote-podroll", action="store_true",
                     help="replace the podroll projection (run after the weekly podroll pass)")
+    ap.add_argument("--rebuild-fts", action="store_true",
+                    help="drop + repopulate podcasts_fts/episodes_fts (needed after a column change)")
     ap.add_argument("--mark-all-synced", action="store_true", help="one-time: mark all current boosts as already in D1")
     args = ap.parse_args()
     if args.emit_sql:
@@ -552,11 +610,13 @@ def main():
         cmd_remote_delta(args)
     elif args.remote_podroll:
         cmd_remote_podroll(args)
+    elif args.rebuild_fts:
+        cmd_rebuild_fts(args)
     elif args.mark_all_synced:
         cmd_mark_all_synced(args)
     else:
         ap.error("choose --emit-sql <file>, --apply-schema, --remote, --remote-delta, "
-                 "--remote-podroll, or --mark-all-synced")
+                 "--remote-podroll, --rebuild-fts, or --mark-all-synced")
 
 
 if __name__ == "__main__":
