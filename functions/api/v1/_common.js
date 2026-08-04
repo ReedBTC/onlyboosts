@@ -82,6 +82,37 @@ export function clampLimit(v, def = 50, max = 200) {
   return Math.min(n, max);
 }
 
+/**
+ * Turn a raw search box string into an FTS5 MATCH expression, or null when
+ * there is nothing left to match on.
+ *
+ * ⚠️ A USER STRING IS NOT AN FTS5 QUERY. MATCH parses its right-hand side as an
+ * expression language — `-` negates, `:` selects a column, `(` groups, `*`
+ * is a prefix operator — so passing typed text through raises
+ * `SQLITE_ERROR` and the endpoint 500s on input a person would obviously type.
+ * Measured against production before this existed: `q=bitcoin` answered 200
+ * while `q=rabbit-hole`, `q=foo:bar` and a pasted show guid all answered 500.
+ *
+ * The fix is to quote every token, which demotes all of it to literal text, and
+ * to put the prefix `*` OUTSIDE the closing quote of the last one so a partial
+ * final word still matches the way a search box implies.
+ *
+ * Tokens are quoted INDIVIDUALLY rather than the whole string being wrapped as
+ * one phrase, and that difference is the search's semantics: `"joe" "rogan"*`
+ * is an implicit AND of terms appearing anywhere in any indexed column, which is
+ * what the client-side ladder did, where `"joe rogan"*` would demand they be
+ * adjacent. Verified across `-`, `:`, `(`, `***`, bare `OR` and a full guid:
+ * every one either matches or returns nothing, and none of them errors.
+ */
+export function ftsMatch(raw) {
+  if (typeof raw !== "string") return null;
+  // The double quote is the one character that cannot survive: it is the
+  // quoting mechanism itself, and FTS5 offers no escape for it.
+  const parts = raw.replace(/"/g, " ").split(/\s+/).filter(Boolean);
+  if (!parts.length) return null;
+  return parts.map((t, i) => `"${t}"${i === parts.length - 1 ? "*" : ""}`).join(" ");
+}
+
 // The SELECT used by every boost-returning endpoint: joins display fields so a
 // row maps straight to the shard record shape.
 export const BOOST_SELECT = `

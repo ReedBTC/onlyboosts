@@ -1,6 +1,6 @@
 // GET /api/v1/search?q=&type=boosts|podcasts|episodes — FTS5 search over
 // boostagram text, podcast titles/authors, or episode titles.
-import { json, preflight, BOOST_SELECT, boostRecord, clampLimit } from "./_common.js";
+import { json, preflight, BOOST_SELECT, boostRecord, clampLimit, ftsMatch } from "./_common.js";
 
 export async function onRequestOptions({ request }) { return preflight(request); }
 
@@ -12,8 +12,12 @@ export async function onRequestGet({ request, env }) {
   const asked = u.searchParams.get("type");
   const type = TYPES.has(asked) ? asked : "boosts";
   const limit = clampLimit(u.searchParams.get("limit"), 30, 100);
-  // FTS5 MATCH: quote the query as a phrase-ish prefix to keep it safe + forgiving
-  const match = q.replace(/["]/g, " ") + "*";
+  // FTS5 MATCH. See ftsMatch: a raw user string is an EXPRESSION to MATCH, so
+  // `-`, `:` and `(` used to raise SQLITE_ERROR and 500 this endpoint.
+  const match = ftsMatch(q);
+  // Nothing tokenizable survived (all punctuation, or a lone quote). No hits is
+  // the honest answer; an empty MATCH string is a syntax error.
+  if (!match) return json(request, { type, q, count: 0, [type]: [] });
 
   if (type === "episodes") {
     // Flat relevance-ordered lookup. The ranked, sort-aware version lives on

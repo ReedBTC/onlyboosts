@@ -19,7 +19,7 @@
 //     per-user ranking can't be precomputed for every possible set of people,
 //     so this one genuinely has to aggregate per request.
 // Both return the same record shape; only the corpus differs.
-import { json, preflight, clampLimit, toHexPubkey } from "./_common.js";
+import { json, preflight, clampLimit, toHexPubkey, ftsMatch } from "./_common.js";
 
 export async function onRequestOptions({ request }) { return preflight(request); }
 
@@ -161,14 +161,18 @@ function readParams(u) {
   const podcast = u.searchParams.get("podcast") || null;
   const days = RANGE_DAYS[range];
   const include = new Set((u.searchParams.get("include") || "").split(",").filter(Boolean));
-  // Free-text over episode titles. Same treatment as /api/v1/search: strip the
-  // quote so a stray one can't become FTS5 syntax, and append * so partial words
-  // match the way a search box implies.
+  // Free-text over episode title + show name. See _common.js#ftsMatch: a raw
+  // user string is an EXPRESSION to MATCH, not a literal, so `-`, `:` and `(`
+  // used to raise SQLITE_ERROR here — `q=rabbit-hole` 500'd in production while
+  // `q=bitcoin` answered 200.
   const rawQ = (u.searchParams.get("q") || "").trim();
   if (rawQ && rawQ.length < 2) return { error: "q must be >= 2 chars" };
+  // A query that tokenizes to nothing takes the unfiltered path rather than an
+  // empty MATCH, which is a syntax error.
+  const match = rawQ ? ftsMatch(rawQ) : null;
   return {
-    q: rawQ || null,
-    match: rawQ ? rawQ.replace(/["]/g, " ") + "*" : null,
+    q: match ? rawQ : null,
+    match,
     sortKey, range, medium, notMedium, podcast,
     withBoosts: include.has("boosts"),
     // Cutoff is computed per request; the response is cached briefly, so a
