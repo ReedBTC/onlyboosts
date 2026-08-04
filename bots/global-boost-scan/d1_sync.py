@@ -13,7 +13,9 @@ Two modes:
                       --full recomputes everything.
 
 D1 is a derived, disposable projection — a full re-emit rebuilds it from scratch,
-so drift can never accumulate.
+so drift can never accumulate. Between full loads the delta path keeps it honest
+in two directions: new boosts (the `d1_boosts_synced` marker) and changed
+metadata (the `meta_synced_at` watermark) — see build_meta_drift_sql.
 """
 
 import argparse
@@ -88,7 +90,7 @@ def build_full_sql(conn):
     out = []
     out.append("PRAGMA foreign_keys=OFF;")
     for t in ("boosts", "podcasts", "episodes", "profiles", "meta",
-              "boosts_fts", "podcasts_fts"):
+              "boosts_fts", "podcasts_fts", "episodes_fts"):
         out.append(f"DELETE FROM {t};")
 
     # boosts + FTS
@@ -124,20 +126,22 @@ def build_full_sql(conn):
             f"{q(a['guid'])},{q(a['title'])},{q(a['image'])},{q(a['artwork'])},{q(a['feed_url'])},"
             f"{q(a['medium'])},{q(a['author'])},{q(a['boost_count'])},{q(a['total_sats'])},"
             f"{q(a['booster_count'])},{q(a['episode_count'])},{q(a['latest_ts'])});")
-        if a["title"]:
-            out.append("INSERT INTO podcasts_fts (podcast_guid,title) VALUES ("
-                       f"{q(a['guid'])},{q(a['title'])});")
+        if a["title"] or a["author"]:
+            out.append("INSERT INTO podcasts_fts (podcast_guid,title,author) VALUES ("
+                       f"{q(a['guid'])},{q(a['title'])},{q(a['author'])});")
 
     # episodes (metadata + per-episode aggregates)
     for e in conn.execute("""
         SELECT e.item_guid, e.podcast_guid, e.title, e.image, e.published,
                e.duration, e.episode_number, e.enclosure_url, e.description,
+               s.title AS show_title,
                agg.boost_count, agg.total_sats, agg.booster_count, agg.latest_ts
         FROM episodes e
         JOIN (SELECT item_guid, COUNT(*) boost_count, COALESCE(SUM(sats),0) total_sats,
                      COUNT(DISTINCT booster_pubkey) booster_count, MAX(created_at) latest_ts
               FROM boosts WHERE item_guid IS NOT NULL GROUP BY item_guid) agg
-          ON agg.item_guid = e.item_guid""").fetchall():
+          ON agg.item_guid = e.item_guid
+        LEFT JOIN shows s ON s.podcast_guid = e.podcast_guid""").fetchall():
         out.append(
             "INSERT INTO episodes (item_guid,podcast_guid,title,image,published,"
             "duration,episode_number,enclosure_url,description,boost_count,total_sats,"
@@ -146,6 +150,9 @@ def build_full_sql(conn):
             f"{q(e['published'])},{q(e['duration'])},{q(e['episode_number'])},"
             f"{q(e['enclosure_url'])},{q(e['description'])},{q(e['boost_count'])},{q(e['total_sats'])},"
             f"{q(e['booster_count'])},{q(e['latest_ts'])});")
+        if e["title"] or e["show_title"]:
+            out.append("INSERT INTO episodes_fts (item_guid,title,show) VALUES ("
+                       f"{q(e['item_guid'])},{q(e['title'])},{q(e['show_title'])});")
 
     # profiles
     for p in conn.execute("SELECT pubkey,name,display_name,picture,nip05 FROM profiles").fetchall():
@@ -163,12 +170,81 @@ def build_full_sql(conn):
     return out
 
 
+# ── single-row upserts (shared by the delta and metadata-drift paths) ─────────
+def _podcast_upsert_sql(conn, guid):
+    """Re-project one podcasts row (aggregates recomputed from ALL its boosts)."""
+    eg = db.effective_guid("b")
+    a = conn.execute(
+        f"""SELECT {eg} AS guid, COUNT(*) AS boost_count,
+                  COALESCE(SUM(b.sats),0) AS total_sats,
+                  COUNT(DISTINCT b.booster_pubkey) AS booster_count,
+                  COUNT(DISTINCT b.item_guid) AS episode_count,
+                  MAX(b.created_at) AS latest_ts,
+                  s.title, s.image, s.artwork, s.feed_url, s.medium, s.author
+           FROM boosts b LEFT JOIN shows s ON s.podcast_guid={eg}
+           WHERE {eg}=? GROUP BY {eg}""", (guid,)).fetchone()
+    if not a:
+        return []
+    # `artwork` (second-chance art URL) is projected here and in the full load;
+    # the remote D1 column exists.
+    out = ["INSERT OR REPLACE INTO podcasts (podcast_guid,title,image,artwork,feed_url,medium,author,"
+           "boost_count,total_sats,booster_count,episode_count,latest_ts) VALUES ("
+           f"{q(a['guid'])},{q(a['title'])},{q(a['image'])},{q(a['artwork'])},{q(a['feed_url'])},"
+           f"{q(a['medium'])},{q(a['author'])},{q(a['boost_count'])},{q(a['total_sats'])},"
+           f"{q(a['booster_count'])},{q(a['episode_count'])},{q(a['latest_ts'])});",
+           f"DELETE FROM podcasts_fts WHERE podcast_guid={q(guid)};"]
+    if a["title"] or a["author"]:
+        out.append("INSERT INTO podcasts_fts (podcast_guid,title,author) VALUES ("
+                   f"{q(guid)},{q(a['title'])},{q(a['author'])});")
+    return out
+
+
+def _episode_upsert_sql(conn, item_guid):
+    """Re-project one episodes row, or nothing if the box has no metadata for it
+    yet (a boosted item_guid with no `episodes` row is the enrichment gap, not
+    something to project as an untitled placeholder)."""
+    e = conn.execute(
+        """SELECT e.item_guid,e.podcast_guid,e.title,e.image,e.published,e.duration,
+                  e.episode_number,e.enclosure_url,e.description, s.title AS show_title,
+                  (SELECT COUNT(*) FROM boosts WHERE item_guid=e.item_guid) AS boost_count,
+                  (SELECT COALESCE(SUM(sats),0) FROM boosts WHERE item_guid=e.item_guid) AS total_sats,
+                  (SELECT COUNT(DISTINCT booster_pubkey) FROM boosts WHERE item_guid=e.item_guid) AS booster_count,
+                  (SELECT MAX(created_at) FROM boosts WHERE item_guid=e.item_guid) AS latest_ts
+           FROM episodes e
+           LEFT JOIN shows s ON s.podcast_guid = e.podcast_guid
+           WHERE e.item_guid=?""", (item_guid,)).fetchone()
+    if not e:
+        return []
+    out = ["INSERT OR REPLACE INTO episodes (item_guid,podcast_guid,title,image,published,"
+           "duration,episode_number,enclosure_url,description,boost_count,total_sats,"
+           "booster_count,latest_ts) VALUES ("
+           f"{q(e['item_guid'])},{q(e['podcast_guid'])},{q(e['title'])},{q(e['image'])},"
+           f"{q(e['published'])},{q(e['duration'])},{q(e['episode_number'])},"
+           f"{q(e['enclosure_url'])},{q(e['description'])},{q(e['boost_count'])},{q(e['total_sats'])},"
+           f"{q(e['booster_count'])},{q(e['latest_ts'])});",
+           f"DELETE FROM episodes_fts WHERE item_guid={q(e['item_guid'])};"]
+    if e["title"] or e["show_title"]:
+        out.append("INSERT INTO episodes_fts (item_guid,title,show) VALUES ("
+                   f"{q(e['item_guid'])},{q(e['title'])},{q(e['show_title'])});")
+    return out
+
+
+def _profile_upsert_sql(p):
+    return ["INSERT OR REPLACE INTO profiles (pubkey,name,display_name,picture,nip05) VALUES ("
+            f"{q(p['pubkey'])},{q(p['name'])},{q(p['display_name'])},{q(p['picture'])},{q(p['nip05'])});"]
+
+
 # ── delta projection (only what changed since last sync) ──────────────────────
 def build_delta_sql(conn, rows):
     """SQL for `rows` (boosts not yet in D1): the new boosts (OR IGNORE, immutable)
     + FTS, plus a recomputed upsert of every podcast/episode they touched (an
     aggregate depends on ALL its boosts, so it's recomputed from the box DB) +
-    the boosters' profiles + refreshed meta."""
+    the boosters' profiles + refreshed meta.
+
+    Returns (statements, podcast_guids, item_guids, skipped) — the caller feeds
+    those guid sets to build_meta_drift_sql so a row isn't projected twice in one
+    push. `skipped` counts episodes a NEW boost landed on that we still can't
+    name; it is reported rather than swallowed (see db.enrichment_gap_size)."""
     out = []
     pods, items, pubs = set(), set(), set()
     for r in rows:
@@ -187,67 +263,91 @@ def build_delta_sql(conn, rows):
             items.add(r["item_guid"])
         pubs.add(r["booster_pubkey"])
 
-    eg = db.effective_guid("b")
     for pg in pods:
-        a = conn.execute(
-            f"""SELECT {eg} AS guid, COUNT(*) AS boost_count,
-                      COALESCE(SUM(b.sats),0) AS total_sats,
-                      COUNT(DISTINCT b.booster_pubkey) AS booster_count,
-                      COUNT(DISTINCT b.item_guid) AS episode_count,
-                      MAX(b.created_at) AS latest_ts,
-                      s.title, s.image, s.artwork, s.feed_url, s.medium, s.author
-               FROM boosts b LEFT JOIN shows s ON s.podcast_guid={eg}
-               WHERE {eg}=? GROUP BY {eg}""", (pg,)).fetchone()
-        if not a:
-            continue
-        # `artwork` (second-chance art URL) is now projected — see the full-load
-        # path above; the remote D1 column exists.
-        out.append(
-            "INSERT OR REPLACE INTO podcasts (podcast_guid,title,image,artwork,feed_url,medium,author,"
-            "boost_count,total_sats,booster_count,episode_count,latest_ts) VALUES ("
-            f"{q(a['guid'])},{q(a['title'])},{q(a['image'])},{q(a['artwork'])},{q(a['feed_url'])},{q(a['medium'])},"
-            f"{q(a['author'])},{q(a['boost_count'])},{q(a['total_sats'])},{q(a['booster_count'])},"
-            f"{q(a['episode_count'])},{q(a['latest_ts'])});")
-        out.append(f"DELETE FROM podcasts_fts WHERE podcast_guid={q(pg)};")
-        if a["title"]:
-            out.append("INSERT INTO podcasts_fts (podcast_guid,title) VALUES ("
-                       f"{q(pg)},{q(a['title'])});")
-
+        out.extend(_podcast_upsert_sql(conn, pg))
+    skipped = 0
     for ig in items:
-        e = conn.execute(
-            """SELECT e.item_guid,e.podcast_guid,e.title,e.image,e.published,e.duration,
-                      e.episode_number,e.enclosure_url,e.description,
-                      (SELECT COUNT(*) FROM boosts WHERE item_guid=e.item_guid) AS boost_count,
-                      (SELECT COALESCE(SUM(sats),0) FROM boosts WHERE item_guid=e.item_guid) AS total_sats,
-                      (SELECT COUNT(DISTINCT booster_pubkey) FROM boosts WHERE item_guid=e.item_guid) AS booster_count,
-                      (SELECT MAX(created_at) FROM boosts WHERE item_guid=e.item_guid) AS latest_ts
-               FROM episodes e WHERE e.item_guid=?""", (ig,)).fetchone()
-        if not e:
-            continue
-        out.append(
-            "INSERT OR REPLACE INTO episodes (item_guid,podcast_guid,title,image,published,"
-            "duration,episode_number,enclosure_url,description,boost_count,total_sats,"
-            "booster_count,latest_ts) VALUES ("
-            f"{q(e['item_guid'])},{q(e['podcast_guid'])},{q(e['title'])},{q(e['image'])},"
-            f"{q(e['published'])},{q(e['duration'])},{q(e['episode_number'])},"
-            f"{q(e['enclosure_url'])},{q(e['description'])},{q(e['boost_count'])},{q(e['total_sats'])},"
-            f"{q(e['booster_count'])},{q(e['latest_ts'])});")
+        stmts = _episode_upsert_sql(conn, ig)
+        out.extend(stmts)
+        skipped += not stmts
 
     if pubs:
         ph = ",".join("?" * len(pubs))
         for p in conn.execute(
             f"SELECT pubkey,name,display_name,picture,nip05 FROM profiles WHERE pubkey IN ({ph})",
                 tuple(pubs)).fetchall():
-            out.append(
-                "INSERT OR REPLACE INTO profiles (pubkey,name,display_name,picture,nip05) VALUES ("
-                f"{q(p['pubkey'])},{q(p['name'])},{q(p['display_name'])},{q(p['picture'])},{q(p['nip05'])});")
+            out.extend(_profile_upsert_sql(p))
 
+    out.extend(_meta_sql(conn))
+    return out, pods, items, skipped
+
+
+def _meta_sql(conn):
     s = db.stats(conn)
-    for k, v in {"generated_at": int(time.time()), "boosts": s["boosts"],
-                 "total_sats": s["total_sats"], "distinct_shows": s["distinct_shows"],
-                 "distinct_boosters": s["distinct_boosters"]}.items():
-        out.append(f"INSERT OR REPLACE INTO meta (key,value) VALUES ({q(k)},{q(v)});")
-    return out
+    return [f"INSERT OR REPLACE INTO meta (key,value) VALUES ({q(k)},{q(v)});"
+            for k, v in {"generated_at": int(time.time()), "boosts": s["boosts"],
+                         "total_sats": s["total_sats"], "distinct_shows": s["distinct_shows"],
+                         "distinct_boosters": s["distinct_boosters"]}.items()]
+
+
+# ── metadata drift (box metadata that changed after it was last projected) ────
+META_WATERMARK = "meta_synced_at"
+META_OVERLAP = 3600   # re-read an hour behind the watermark; upserts are idempotent
+
+
+def build_meta_drift_sql(conn, since, skip_pods=(), skip_items=()):
+    """Re-project rows whose BOX metadata changed since `since` (unix seconds).
+
+    The boost delta only touches a podcast/episode/profile when a NEW boost
+    arrives for it. Metadata, though, moves on its own schedule: an episode
+    boosted months ago gets enriched by a later Podcast Index pass, a feed
+    re-scrape changes a show's art, a booster updates their kind-0. Without this
+    pass D1 keeps the stale — or entirely missing — projection until the next
+    boost happens to touch that row, which for a dormant show is never.
+
+    Watermarked on the box's own `updated_at` columns, re-read with an hour of
+    overlap: a duplicate upsert is free, a missed row is invisible.
+
+    Returns (statements, counts)."""
+    out = []
+    since = max(0, since - META_OVERLAP)
+    counts = {"podcasts": 0, "episodes": 0, "profiles": 0}
+
+    # Only shows that a podcasts row is actually keyed by: the projection joins
+    # `shows` on the CANONICAL guid, so an alias's own show row feeds nothing.
+    eg = db.effective_guid("b")
+    for r in conn.execute(
+        f"""SELECT s.podcast_guid FROM shows s
+            WHERE s.updated_at IS NOT NULL AND s.updated_at >= ?
+              AND EXISTS (SELECT 1 FROM boosts b WHERE {eg}=s.podcast_guid)""",
+            (since,)).fetchall():
+        if r["podcast_guid"] in skip_pods:
+            continue
+        stmts = _podcast_upsert_sql(conn, r["podcast_guid"])
+        out.extend(stmts)
+        counts["podcasts"] += bool(stmts)
+
+    for r in conn.execute(
+        """SELECT e.item_guid FROM episodes e
+           WHERE e.updated_at IS NOT NULL AND e.updated_at >= ?
+             AND EXISTS (SELECT 1 FROM boosts b WHERE b.item_guid=e.item_guid)""",
+            (since,)).fetchall():
+        if r["item_guid"] in skip_items:
+            continue
+        # No skip counter here: this loop selects FROM `episodes`, so the row is
+        # there by construction. The skip that matters is in the delta path — a
+        # brand-new boost landing on an episode we still can't name.
+        stmts = _episode_upsert_sql(conn, r["item_guid"])
+        out.extend(stmts)
+        counts["episodes"] += bool(stmts)
+
+    for p in conn.execute(
+        """SELECT pubkey,name,display_name,picture,nip05 FROM profiles
+           WHERE updated_at IS NOT NULL AND updated_at >= ?""", (since,)).fetchall():
+        out.extend(_profile_upsert_sql(p))
+        counts["profiles"] += 1
+
+    return out, counts
 
 
 # ── which boosts are already in D1 (marker table in the box DB) ───────────────
@@ -268,6 +368,24 @@ def _unsynced_boosts(conn):
 def _mark_synced(conn, ids):
     conn.executemany("INSERT OR IGNORE INTO d1_boosts_synced (event_id) VALUES (?)",
                      [(i,) for i in ids])
+    conn.commit()
+
+
+def _ensure_state_table(conn):
+    conn.execute("CREATE TABLE IF NOT EXISTS d1_sync_state (key TEXT PRIMARY KEY, value INTEGER)")
+    conn.commit()
+
+
+def _get_watermark(conn, key):
+    """0 when unset — a fresh box re-projects all metadata once, which is correct."""
+    _ensure_state_table(conn)
+    r = conn.execute("SELECT value FROM d1_sync_state WHERE key=?", (key,)).fetchone()
+    return r[0] if r else 0
+
+
+def _set_watermark(conn, key, ts):
+    _ensure_state_table(conn)
+    conn.execute("INSERT OR REPLACE INTO d1_sync_state (key,value) VALUES (?,?)", (key, ts))
     conn.commit()
 
 
@@ -326,7 +444,8 @@ def cmd_remote(args):
         print("[error] CF_ACCOUNT_ID / CF_D1_DATABASE_ID / CF_API_TOKEN missing from credentials.env")
         return
     conn = db.connect(DB_PATH)
-    stmts = build_full_sql(conn)   # NOTE: full load for now; delta mode is a follow-up
+    started = int(time.time())
+    stmts = build_full_sql(conn)
     BATCH = 100
     sent = 0
     for i in range(0, len(stmts), BATCH):
@@ -339,6 +458,8 @@ def cmd_remote(args):
             print(f"  …{sent}/{len(stmts)} statements", flush=True)
     _ensure_sync_table(conn)
     _mark_synced(conn, [r["event_id"] for r in conn.execute("SELECT event_id FROM boosts").fetchall()])
+    # Everything is projected as of `started`, so the drift pass starts from here.
+    _set_watermark(conn, META_WATERMARK, started)
     print(f"pushed {sent} statements to D1 (remote, full load); marked all boosts synced")
 
 
@@ -349,19 +470,48 @@ def cmd_remote_delta(args):
         return
     conn = db.connect(DB_PATH)
     _ensure_sync_table(conn)
+    started = int(time.time())
     rows = _unsynced_boosts(conn)
-    if not rows:
+
+    stmts, pods, items, skipped = ([], set(), set(), 0)
+    if rows:
+        stmts, pods, items, skipped = build_delta_sql(conn, rows)
+    # Shows emptied by guid re-keying: the projection is upsert-only, so a phantom
+    # that lost all its boosts has to be deleted explicitly or its page lives on
+    # in D1 double-counting them against the real show.
+    orphans = [g for g in db.orphaned_podcast_guids(conn) if g not in pods]
+    for g in orphans:
+        stmts.append(f"DELETE FROM podcasts WHERE podcast_guid={q(g)};")
+        stmts.append(f"DELETE FROM podcasts_fts WHERE podcast_guid={q(g)};")
+    # Metadata moves independently of boosts — always run the drift pass, even
+    # on a cycle where no new boost arrived.
+    drift, counts = build_meta_drift_sql(conn, _get_watermark(conn, META_WATERMARK), pods, items)
+    stmts += drift
+    if not stmts:
         print("D1 delta: nothing new to sync")
+        _set_watermark(conn, META_WATERMARK, started)
         return
-    stmts = build_delta_sql(conn, rows)
+
     BATCH = 100
     for i in range(0, len(stmts), BATCH):
         ok, detail = _d1_exec(*cf, "\n".join(stmts[i:i + BATCH]))
         if not ok:
             print(f"[error] delta batch {i // BATCH} failed: {detail}")
-            return
+            return   # neither watermark advances: the whole push retries next cycle
     _mark_synced(conn, [r["event_id"] for r in rows])
-    print(f"D1 delta: pushed {len(rows)} new boost(s) ({len(stmts)} statements)")
+    _set_watermark(conn, META_WATERMARK, started)
+    db.clear_orphaned_podcast_guids(conn, orphans)
+    print(f"D1 delta: pushed {len(rows)} new boost(s), refreshed "
+          f"{counts['podcasts']} show(s) / {counts['episodes']} episode(s) / "
+          f"{counts['profiles']} profile(s) whose metadata changed"
+          + (f", deleted {len(orphans)} emptied show(s)" if orphans else "")
+          + f" ({len(stmts)} statements)")
+    # Never let the un-projectable population be silent: a boosted episode with
+    # no metadata row is skipped on purpose, but "on purpose" and "unnoticed" are
+    # not the same thing, and the last defect here hid in exactly that gap.
+    if skipped:
+        print(f"  skipped {skipped} newly-boosted episode(s) with no metadata row "
+              f"(standing enrichment gap: {db.enrichment_gap_size(conn)})")
 
 
 def cmd_remote_podroll(args):
@@ -384,6 +534,56 @@ def cmd_remote_podroll(args):
     print(f"D1 podroll: replaced with {len(stmts) - 1} edge(s)")
 
 
+def cmd_rebuild_fts(args):
+    """Drop and repopulate the podcasts/episodes FTS tables.
+
+    Needed because `CREATE VIRTUAL TABLE IF NOT EXISTS` will not reshape a table
+    that already exists: adding `author` to podcasts_fts, or introducing
+    episodes_fts at all, is invisible to --apply-schema on a live database.
+
+    Only these two — boosts_fts is untouched and far the largest, so this stays a
+    few thousand statements instead of a full reload. The base tables aren't
+    touched either: FTS content is derived, so rebuilding it is safe at any time
+    (search is briefly empty mid-run)."""
+    cf = _cf(load_config(CREDENTIALS))
+    if not cf:
+        print("[error] CF_ACCOUNT_ID / CF_D1_DATABASE_ID / CF_API_TOKEN missing from credentials.env")
+        return
+    conn = db.connect(DB_PATH)
+    stmts = [
+        "DROP TABLE IF EXISTS podcasts_fts;",
+        "DROP TABLE IF EXISTS episodes_fts;",
+        "CREATE VIRTUAL TABLE podcasts_fts USING fts5(podcast_guid UNINDEXED, title, author);",
+        "CREATE VIRTUAL TABLE episodes_fts USING fts5(item_guid UNINDEXED, title, show);",
+    ]
+    eg = db.effective_guid("b")
+    for a in conn.execute(f"""
+        SELECT {eg} AS guid, s.title, s.author
+        FROM boosts b LEFT JOIN shows s ON s.podcast_guid={eg}
+        WHERE {eg} IS NOT NULL GROUP BY {eg}""").fetchall():
+        if a["title"] or a["author"]:
+            stmts.append("INSERT INTO podcasts_fts (podcast_guid,title,author) VALUES ("
+                         f"{q(a['guid'])},{q(a['title'])},{q(a['author'])});")
+    for e in conn.execute("""
+        SELECT e.item_guid, e.title, s.title AS show_title
+        FROM episodes e
+        LEFT JOIN shows s ON s.podcast_guid = e.podcast_guid
+        WHERE (e.title IS NOT NULL OR s.title IS NOT NULL)
+          AND EXISTS (SELECT 1 FROM boosts WHERE item_guid = e.item_guid)""").fetchall():
+        stmts.append("INSERT INTO episodes_fts (item_guid,title,show) VALUES ("
+                     f"{q(e['item_guid'])},{q(e['title'])},{q(e['show_title'])});")
+
+    BATCH = 100
+    for i in range(0, len(stmts), BATCH):
+        ok, detail = _d1_exec(*cf, "\n".join(stmts[i:i + BATCH]))
+        if not ok:
+            print(f"[error] fts batch {i // BATCH} failed: {detail}")
+            return
+        if (i // BATCH) % 20 == 0:
+            print(f"  …{min(i + BATCH, len(stmts))}/{len(stmts)} statements", flush=True)
+    print(f"rebuilt podcasts_fts + episodes_fts ({len(stmts)} statements)")
+
+
 def cmd_mark_all_synced(args):
     """One-time reconcile after an out-of-band full seed: mark every current boost
     as already in D1 so the first delta run doesn't re-push everything."""
@@ -402,6 +602,8 @@ def main():
     ap.add_argument("--remote-delta", action="store_true", help="push only boosts new since last sync (for the timer)")
     ap.add_argument("--remote-podroll", action="store_true",
                     help="replace the podroll projection (run after the weekly podroll pass)")
+    ap.add_argument("--rebuild-fts", action="store_true",
+                    help="drop + repopulate podcasts_fts/episodes_fts (needed after a column change)")
     ap.add_argument("--mark-all-synced", action="store_true", help="one-time: mark all current boosts as already in D1")
     args = ap.parse_args()
     if args.emit_sql:
@@ -414,11 +616,13 @@ def main():
         cmd_remote_delta(args)
     elif args.remote_podroll:
         cmd_remote_podroll(args)
+    elif args.rebuild_fts:
+        cmd_rebuild_fts(args)
     elif args.mark_all_synced:
         cmd_mark_all_synced(args)
     else:
         ap.error("choose --emit-sql <file>, --apply-schema, --remote, --remote-delta, "
-                 "--remote-podroll, or --mark-all-synced")
+                 "--remote-podroll, --rebuild-fts, or --mark-all-synced")
 
 
 if __name__ == "__main__":

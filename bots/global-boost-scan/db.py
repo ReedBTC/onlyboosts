@@ -432,6 +432,13 @@ def feed_id_for_guid(conn, podcast_guid):
     return row[0] if row else None
 
 
+def show_feed_for_guid(conn, podcast_guid):
+    """(feed_url, image) for a show — what the raw-RSS enrichment fallback needs
+    when Podcast Index has no episode for a guid. None when the show is unknown."""
+    return conn.execute("SELECT feed_url, image FROM shows WHERE podcast_guid=?",
+                        (podcast_guid,)).fetchone()
+
+
 # ── phantom-guid aliasing ─────────────────────────────────────────────────────
 def raw_guids_needing_alias(conn):
     """Distinct as-signed podcast_guids that carry no alias yet. The resolver looks
@@ -493,6 +500,18 @@ def apply_aliases(conn):
     actually changes are touched; those are also un-marked in the D1 sync table (if
     present) so the next delta re-pushes them under the corrected guid. Returns the
     number of boost rows re-keyed."""
+    # Recorded unconditionally, BEFORE the no-op return: an alias applied on an
+    # earlier run leaves the same emptied row behind, and that run had nothing
+    # left to re-key by the time anyone noticed.
+    conn.execute("CREATE TABLE IF NOT EXISTS d1_podcasts_orphaned (podcast_guid TEXT PRIMARY KEY)")
+    conn.execute(
+        f"""INSERT OR IGNORE INTO d1_podcasts_orphaned (podcast_guid)
+            SELECT DISTINCT a.raw_guid FROM guid_aliases a
+            WHERE a.raw_guid <> a.canonical_guid
+              AND NOT EXISTS (SELECT 1 FROM boosts b
+                              WHERE {effective_guid("b")} = a.raw_guid)""")
+    conn.commit()
+
     to_change = [r[0] for r in conn.execute(
         """SELECT b.event_id FROM boosts b JOIN guid_aliases a ON a.raw_guid = b.podcast_guid
            WHERE b.canonical_guid IS NOT a.canonical_guid""").fetchall()]
@@ -510,6 +529,33 @@ def apply_aliases(conn):
                          [(i,) for i in to_change])
     conn.commit()
     return len(to_change)
+
+
+def enrichment_gap_size(conn):
+    """How many boosted item_guids still have no `episodes` row.
+
+    These are invisible everywhere downstream — the D1 projection inner-joins
+    metadata, so they can't be ranked, searched, or linked. That silence is
+    exactly why the population went unwatched for so long, so the sync prints
+    this number rather than leaving it to be discovered."""
+    return conn.execute(
+        """SELECT COUNT(DISTINCT b.item_guid) FROM boosts b
+           LEFT JOIN episodes e ON e.item_guid = b.item_guid
+           WHERE b.item_guid IS NOT NULL AND e.item_guid IS NULL""").fetchone()[0]
+
+
+def orphaned_podcast_guids(conn):
+    """Guids whose D1 podcasts row should be deleted (emptied by re-keying)."""
+    if not _has_table(conn, "d1_podcasts_orphaned"):
+        return []
+    return [r[0] for r in conn.execute(
+        "SELECT podcast_guid FROM d1_podcasts_orphaned").fetchall()]
+
+
+def clear_orphaned_podcast_guids(conn, guids):
+    conn.executemany("DELETE FROM d1_podcasts_orphaned WHERE podcast_guid=?",
+                     [(g,) for g in guids])
+    conn.commit()
 
 
 # ── scan cursors ──────────────────────────────────────────────────────────────

@@ -120,5 +120,19 @@ CREATE TABLE IF NOT EXISTS meta (
 -- Full-text search (SQLite FTS5, built into D1). Standalone tables that carry the
 -- row id UNINDEXED alongside the searchable text: MATCH the text, get the id back,
 -- join to the base table. Populated by the sync step.
+--
+-- CHANGING A COLUMN LIST HERE IS NOT ENOUGH. `CREATE VIRTUAL TABLE IF NOT EXISTS`
+-- silently keeps an existing table's old shape, so applying this file over a live
+-- D1 will NOT add a column — the table has to be dropped and repopulated. That is
+-- what `d1_sync.py --rebuild-fts` does, and it is the only supported path.
 CREATE VIRTUAL TABLE IF NOT EXISTS boosts_fts   USING fts5(event_id UNINDEXED, message);
-CREATE VIRTUAL TABLE IF NOT EXISTS podcasts_fts USING fts5(podcast_guid UNINDEXED, title);
+-- author alongside title: an artist name is what people type when they're looking
+-- for a music feed, and matching it here is what lets /api/v1/search?type=podcasts
+-- answer that server-side instead of only the static rollup doing it client-side.
+CREATE VIRTUAL TABLE IF NOT EXISTS podcasts_fts USING fts5(podcast_guid UNINDEXED, title, author);
+-- `show` alongside the episode title because the feed contract is "episode title,
+-- plus the show behind it" — typing a show name into the Episodes feed has to list
+-- that show's episodes. Title alone regresses it badly: "UNGOVERNABLE" is 135
+-- episodes of that show but only 2 episodes with the word in their own title, both
+-- belonging to other shows.
+CREATE VIRTUAL TABLE IF NOT EXISTS episodes_fts USING fts5(item_guid UNINDEXED, title, show);

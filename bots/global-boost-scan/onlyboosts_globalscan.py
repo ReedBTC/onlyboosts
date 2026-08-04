@@ -21,6 +21,7 @@ classifying.
 import argparse
 import json
 import re
+import requests
 import subprocess
 import sys
 import threading
@@ -34,6 +35,7 @@ sys.path.insert(0, str(HERE.parent / "shared"))
 
 import db                                                       # noqa: E402
 import enrich                                                   # noqa: E402
+import fountain                                                 # noqa: E402
 import export as export_mod                                     # noqa: E402
 import podroll                                                  # noqa: E402
 import resolve_guids                                            # noqa: E402
@@ -331,6 +333,81 @@ def cmd_resolve_guids(args):
     _print_stats(conn)
 
 
+def cmd_fountain_shows(args):
+    """Identify shows through Fountain when Podcast Index couldn't.
+
+    Targets exactly the dead end the raw-RSS fallback can't open: an episode we
+    hold boosts for whose SHOW we never resolved, so there's no feed to read. The
+    boost's fountain.fm URL is the only handle left. Per unresolved show:
+
+        episode page -> its show's RSS url -> the real show (PI, else Fountain)
+
+    and, because the podcast_guid on those boosts is typically a client-minted
+    phantom, the phantom is recorded as an alias of the real guid so every boost
+    under it re-keys onto the real show. One episode page per SHOW, not per
+    episode — the feed url is a property of the show.
+
+    Deliberately its own command rather than a step inside `enrich`: it scrapes a
+    third-party page, so it stays out of the 5-minute cycle until it has earned
+    its place there.
+    """
+    conn = db.connect(DB_PATH, check_same_thread=False)
+    key, secret = _pi_creds()
+    eg = db.effective_guid("b")
+
+    # One representative fountain.fm URL per unresolved show, worst-first by sats.
+    rows = conn.execute(f"""
+        SELECT {eg} AS pg, b.item_url,
+               COUNT(DISTINCT b.item_guid) AS eps, SUM(b.sats) AS sats
+        FROM boosts b
+        LEFT JOIN episodes e ON e.item_guid = b.item_guid
+        WHERE b.item_guid IS NOT NULL AND e.item_guid IS NULL
+          AND {eg} IS NOT NULL
+          AND b.item_url LIKE '%fountain.fm/%'
+          AND NOT EXISTS (SELECT 1 FROM shows s
+                          WHERE s.podcast_guid = {eg} AND s.feed_url IS NOT NULL)
+        GROUP BY {eg} ORDER BY sats DESC""").fetchall()
+    if args.limit:
+        rows = rows[:args.limit]
+    print(f"Fountain show resolution: {len(rows)} unresolved show(s) with a Fountain URL")
+
+    session = requests.Session()
+    resolved = aliased = 0
+    for i, r in enumerate(rows, 1):
+        html = fountain.fetch_episode_page(r["item_url"], session)
+        feed_url = fountain.feed_url_from_page(html)
+        if not feed_url:
+            print(f"  [{i}/{len(rows)}] {r['pg'][:20]}… no feed url on {r['item_url']}")
+            continue
+        # Podcast Index first — it returns the richer record (medium, itunes_id,
+        # artwork). Fountain's own row is the fallback and carries the guid too.
+        show = enrich.resolve_feed_by_url(feed_url, key, secret) if key else None
+        via = "pi-byfeedurl"
+        if not show:
+            show = fountain.show_by_feed_url(feed_url)
+            via = "fountain-podcasts"
+        if not show:
+            print(f"  [{i}/{len(rows)}] {r['pg'][:20]}… feed {feed_url} resolved by neither")
+            continue
+        db.upsert_show(conn, show, discovered_via="fountain")
+        resolved += 1
+        real = show["podcast_guid"]
+        note = ""
+        if real != r["pg"]:
+            db.upsert_alias(conn, r["pg"], real, f"fountain-episode-rss/{via}")
+            aliased += 1
+            note = f"  (alias {r['pg'][:12]}… -> {real[:12]}…)"
+        print(f"  [{i}/{len(rows)}] {show['title']!r} via {via}, "
+              f"{r['eps']} episode(s), {r['sats'] or 0:,} sats{note}")
+
+    rekeyed = db.apply_aliases(conn) if aliased else 0
+    print(f"Fountain show resolution: {resolved} show(s) identified, "
+          f"{aliased} phantom guid(s) aliased, {rekeyed} boost(s) re-keyed")
+    if resolved:
+        print("  run `enrich` next — those shows now have a feed to read episodes from")
+    _print_stats(conn)
+
+
 # ── enrichment ────────────────────────────────────────────────────────────────
 def cmd_enrich(args):
     conn = db.connect(DB_PATH, check_same_thread=False)
@@ -352,18 +429,44 @@ def cmd_enrich(args):
         print(f"Enriching {len(eps)} episode(s)...")
         # map item_guid -> its show's canonical guid so we can pass feedid
         eg = db.effective_guid("boosts")
+        rss_pending = {}     # feed_url -> [{item_guid, podcast_guid, feed_id, show_image}]
+        rss_unreachable = []  # PI missed it and we have no feed to fall back to
         for i, ig in enumerate(eps, 1):
             row = conn.execute(
                 f"SELECT {eg} AS g FROM boosts WHERE item_guid=? AND {eg} IS NOT NULL LIMIT 1",
                 (ig,)).fetchone()
-            feed_id = db.feed_id_for_guid(conn, row[0]) if row else None
+            pg = row[0] if row else None
+            feed_id = db.feed_id_for_guid(conn, pg) if pg else None
             info = enrich.resolve_episode(ig, feed_id, key, secret)
             if info:
                 db.upsert_episode(conn, info)
             else:
-                db.mark_enrich_failed(conn, "episode", ig)
+                # Don't negative-cache yet — the publisher's own feed still gets
+                # a say (live items and not-yet-indexed episodes are invisible to
+                # PI but present in the RSS). Batched below, one fetch per feed.
+                show = db.show_feed_for_guid(conn, pg) if pg else None
+                if show and show["feed_url"]:
+                    rss_pending.setdefault(show["feed_url"], []).append(
+                        {"item_guid": ig, "podcast_guid": pg, "feed_id": feed_id,
+                         "show_image": show["image"]})
+                else:
+                    rss_unreachable.append(ig)
             if i % 50 == 0:
                 print(f"  episodes {i}/{len(eps)}")
+
+        db.mark_enrich_failed(conn, "episode", rss_unreachable)
+        if rss_pending:
+            chasing = sum(len(v) for v in rss_pending.values())
+            print(f"  raw-RSS fallback: {chasing} episode(s) PI missed, across "
+                  f"{len(rss_pending)} feed(s)")
+            found = enrich.resolve_episodes_from_feeds(rss_pending, log=print)
+            for info in found.values():
+                db.upsert_episode(conn, info)
+            still_missing = [w["item_guid"] for wanted in rss_pending.values()
+                             for w in wanted if w["item_guid"] not in found]
+            db.mark_enrich_failed(conn, "episode", still_missing)
+            print(f"  raw-RSS fallback: recovered {len(found)}, "
+                  f"{len(still_missing)} still unresolved")
     else:
         print("[warn] no Podcast Index credentials — skipping show/episode enrichment")
 
@@ -575,6 +678,12 @@ def main():
 
     e = sub.add_parser("enrich", help="Podcast Index + profile enrichment")
     e.set_defaults(func=cmd_enrich)
+
+    fs = sub.add_parser("fountain-shows",
+                        help="identify unresolved shows via their Fountain episode page")
+    fs.add_argument("--limit", type=int, default=0,
+                    help="only process the N highest-sats shows (0 = all)")
+    fs.set_defaults(func=cmd_fountain_shows)
 
     pr = sub.add_parser("podroll", help="parse <podcast:podroll> from each show's RSS feed")
     pr.add_argument("--max-age", type=int, default=6 * 24 * 3600,
