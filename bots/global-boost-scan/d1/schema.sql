@@ -130,4 +130,9 @@ CREATE VIRTUAL TABLE IF NOT EXISTS boosts_fts   USING fts5(event_id UNINDEXED, m
 -- for a music feed, and matching it here is what lets /api/v1/search?type=podcasts
 -- answer that server-side instead of only the static rollup doing it client-side.
 CREATE VIRTUAL TABLE IF NOT EXISTS podcasts_fts USING fts5(podcast_guid UNINDEXED, title, author);
-CREATE VIRTUAL TABLE IF NOT EXISTS episodes_fts USING fts5(item_guid UNINDEXED, title);
+-- `show` alongside the episode title because the feed contract is "episode title,
+-- plus the show behind it" — typing a show name into the Episodes feed has to list
+-- that show's episodes. Title alone regresses it badly: "UNGOVERNABLE" is 135
+-- episodes of that show but only 2 episodes with the word in their own title, both
+-- belonging to other shows.
+CREATE VIRTUAL TABLE IF NOT EXISTS episodes_fts USING fts5(item_guid UNINDEXED, title, show);

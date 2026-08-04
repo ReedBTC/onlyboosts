@@ -26,12 +26,16 @@ export async function onRequestOptions({ request }) { return preflight(request);
 // Sort keys are the frontend's own (SORT_OPTIONS in feeds-podcasts.js) so the
 // two can't drift. `episode` ranks by air date; every other key ranks by an
 // aggregate over the episode's boosts.
+// `agg` is the follows-path expression, computed inside the GROUP BY. `alias` is
+// the name that expression is projected under — the only form usable OUTSIDE the
+// aggregation, which is what the ranking CTE for q= selects from. An aggregate
+// function cannot be referenced from a query reading already-grouped rows.
 const SORTS = {
-  recent:  { col: "e.latest_ts",     agg: "MAX(b.created_at)" },              // latest boost
-  episode: { col: "e.published",     agg: "e.published" },                    // latest episode
-  count:   { col: "e.booster_count", agg: "COUNT(DISTINCT b.booster_pubkey)" },
-  boosts:  { col: "e.boost_count",   agg: "COUNT(*)" },
-  sats:    { col: "e.total_sats",    agg: "COALESCE(SUM(b.sats),0)" },
+  recent:  { col: "e.latest_ts",     agg: "MAX(b.created_at)",               alias: "latest_ts" },
+  episode: { col: "e.published",     agg: "e.published",                     alias: "published" },
+  count:   { col: "e.booster_count", agg: "COUNT(DISTINCT b.booster_pubkey)", alias: "booster_count" },
+  boosts:  { col: "e.boost_count",   agg: "COUNT(*)",                        alias: "boost_count" },
+  sats:    { col: "e.total_sats",    agg: "COALESCE(SUM(b.sats),0)",         alias: "total_sats" },
 };
 const DEFAULT_SORT = "boosts";      // matches the feed's opening sort
 
@@ -322,7 +326,7 @@ export async function onRequestPost({ request, env }) {
   // stable paging rather than speed.
   const agg = SORTS[p.sortKey].agg;
   const aggTiebreak = p.sortKey === "sats" ? "b.item_guid" : "total_sats DESC, b.item_guid";
-  const sql = `
+  const AGG_SELECT = `
     SELECT b.item_guid, e.podcast_guid, e.title, e.image, e.published,
            e.episode_number, e.enclosure_url,
            COUNT(*)                            AS boost_count,
@@ -335,13 +339,43 @@ export async function onRequestPost({ request, env }) {
     LEFT JOIN episodes e  ON e.item_guid    = b.item_guid
     LEFT JOIN podcasts pc ON pc.podcast_guid = b.podcast_guid
     WHERE ${where.join(" AND ")}
-    GROUP BY b.item_guid
+    GROUP BY b.item_guid`;
+
+  let sql;
+  if (p.match) {
+    // Same contract as the GET path: `rank` is the position in the follow set's
+    // FULL ordering, so a hit still answers "where does this stand among the
+    // people I follow". The aggregate is already a full scan over the follow
+    // set's boosts, so wrapping it in a CTE and numbering the rows costs
+    // essentially nothing beyond what this endpoint always pays.
+    // Outside the GROUP BY the sort key exists only under its projected alias.
+    const a = SORTS[p.sortKey].alias;
+    const rankTiebreak = a === "total_sats" ? "item_guid" : "total_sats DESC, item_guid";
+    sql = `
+      WITH agg AS (${AGG_SELECT}),
+      ranked AS (
+        SELECT agg.*, ROW_NUMBER() OVER (ORDER BY ${a} DESC, ${rankTiebreak}) AS rank
+        FROM agg
+      )
+      SELECT r.* FROM ranked r
+      JOIN episodes_fts f ON f.item_guid = r.item_guid
+      WHERE episodes_fts MATCH ?
+      ORDER BY r.${a} DESC, ${a === "total_sats" ? "" : "r.total_sats DESC, "}r.item_guid
+      LIMIT ? OFFSET ?`;
+    args.push(p.match, p.limit, p.offset);
+  } else {
+    sql = `${AGG_SELECT}
     ORDER BY ${agg} DESC, total_sats DESC, b.item_guid
     LIMIT ? OFFSET ?`;
-  args.push(p.limit, p.offset);
+    args.push(p.limit, p.offset);
+  }
 
   const { results } = await env.DB.prepare(sql).bind(...args).all();
-  const episodes = results.map((r) => episodeRecord({ ...r, item_guid: r.item_guid }));
+  const episodes = results.map((r) => {
+    const rec = episodeRecord({ ...r, item_guid: r.item_guid });
+    if (p.match) rec.rank = r.rank;
+    return rec;
+  });
   // Notes scoped to the same follow set as the aggregates above — a drawer
   // showing boosts the card's own numbers didn't count would read as a bug.
   if (p.withBoosts) await attachBoosts(env, episodes, inList);

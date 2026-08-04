@@ -134,12 +134,14 @@ def build_full_sql(conn):
     for e in conn.execute("""
         SELECT e.item_guid, e.podcast_guid, e.title, e.image, e.published,
                e.duration, e.episode_number, e.enclosure_url, e.description,
+               s.title AS show_title,
                agg.boost_count, agg.total_sats, agg.booster_count, agg.latest_ts
         FROM episodes e
         JOIN (SELECT item_guid, COUNT(*) boost_count, COALESCE(SUM(sats),0) total_sats,
                      COUNT(DISTINCT booster_pubkey) booster_count, MAX(created_at) latest_ts
               FROM boosts WHERE item_guid IS NOT NULL GROUP BY item_guid) agg
-          ON agg.item_guid = e.item_guid""").fetchall():
+          ON agg.item_guid = e.item_guid
+        LEFT JOIN shows s ON s.podcast_guid = e.podcast_guid""").fetchall():
         out.append(
             "INSERT INTO episodes (item_guid,podcast_guid,title,image,published,"
             "duration,episode_number,enclosure_url,description,boost_count,total_sats,"
@@ -148,9 +150,9 @@ def build_full_sql(conn):
             f"{q(e['published'])},{q(e['duration'])},{q(e['episode_number'])},"
             f"{q(e['enclosure_url'])},{q(e['description'])},{q(e['boost_count'])},{q(e['total_sats'])},"
             f"{q(e['booster_count'])},{q(e['latest_ts'])});")
-        if e["title"]:
-            out.append("INSERT INTO episodes_fts (item_guid,title) VALUES ("
-                       f"{q(e['item_guid'])},{q(e['title'])});")
+        if e["title"] or e["show_title"]:
+            out.append("INSERT INTO episodes_fts (item_guid,title,show) VALUES ("
+                       f"{q(e['item_guid'])},{q(e['title'])},{q(e['show_title'])});")
 
     # profiles
     for p in conn.execute("SELECT pubkey,name,display_name,picture,nip05 FROM profiles").fetchall():
@@ -203,12 +205,14 @@ def _episode_upsert_sql(conn, item_guid):
     something to project as an untitled placeholder)."""
     e = conn.execute(
         """SELECT e.item_guid,e.podcast_guid,e.title,e.image,e.published,e.duration,
-                  e.episode_number,e.enclosure_url,e.description,
+                  e.episode_number,e.enclosure_url,e.description, s.title AS show_title,
                   (SELECT COUNT(*) FROM boosts WHERE item_guid=e.item_guid) AS boost_count,
                   (SELECT COALESCE(SUM(sats),0) FROM boosts WHERE item_guid=e.item_guid) AS total_sats,
                   (SELECT COUNT(DISTINCT booster_pubkey) FROM boosts WHERE item_guid=e.item_guid) AS booster_count,
                   (SELECT MAX(created_at) FROM boosts WHERE item_guid=e.item_guid) AS latest_ts
-           FROM episodes e WHERE e.item_guid=?""", (item_guid,)).fetchone()
+           FROM episodes e
+           LEFT JOIN shows s ON s.podcast_guid = e.podcast_guid
+           WHERE e.item_guid=?""", (item_guid,)).fetchone()
     if not e:
         return []
     out = ["INSERT OR REPLACE INTO episodes (item_guid,podcast_guid,title,image,published,"
@@ -219,9 +223,9 @@ def _episode_upsert_sql(conn, item_guid):
            f"{q(e['enclosure_url'])},{q(e['description'])},{q(e['boost_count'])},{q(e['total_sats'])},"
            f"{q(e['booster_count'])},{q(e['latest_ts'])});",
            f"DELETE FROM episodes_fts WHERE item_guid={q(e['item_guid'])};"]
-    if e["title"]:
-        out.append("INSERT INTO episodes_fts (item_guid,title) VALUES ("
-                   f"{q(e['item_guid'])},{q(e['title'])});")
+    if e["title"] or e["show_title"]:
+        out.append("INSERT INTO episodes_fts (item_guid,title,show) VALUES ("
+                   f"{q(e['item_guid'])},{q(e['title'])},{q(e['show_title'])});")
     return out
 
 
@@ -550,7 +554,7 @@ def cmd_rebuild_fts(args):
         "DROP TABLE IF EXISTS podcasts_fts;",
         "DROP TABLE IF EXISTS episodes_fts;",
         "CREATE VIRTUAL TABLE podcasts_fts USING fts5(podcast_guid UNINDEXED, title, author);",
-        "CREATE VIRTUAL TABLE episodes_fts USING fts5(item_guid UNINDEXED, title);",
+        "CREATE VIRTUAL TABLE episodes_fts USING fts5(item_guid UNINDEXED, title, show);",
     ]
     eg = db.effective_guid("b")
     for a in conn.execute(f"""
@@ -561,11 +565,13 @@ def cmd_rebuild_fts(args):
             stmts.append("INSERT INTO podcasts_fts (podcast_guid,title,author) VALUES ("
                          f"{q(a['guid'])},{q(a['title'])},{q(a['author'])});")
     for e in conn.execute("""
-        SELECT e.item_guid, e.title FROM episodes e
-        WHERE e.title IS NOT NULL
+        SELECT e.item_guid, e.title, s.title AS show_title
+        FROM episodes e
+        LEFT JOIN shows s ON s.podcast_guid = e.podcast_guid
+        WHERE (e.title IS NOT NULL OR s.title IS NOT NULL)
           AND EXISTS (SELECT 1 FROM boosts WHERE item_guid = e.item_guid)""").fetchall():
-        stmts.append("INSERT INTO episodes_fts (item_guid,title) VALUES ("
-                     f"{q(e['item_guid'])},{q(e['title'])});")
+        stmts.append("INSERT INTO episodes_fts (item_guid,title,show) VALUES ("
+                     f"{q(e['item_guid'])},{q(e['title'])},{q(e['show_title'])});")
 
     BATCH = 100
     for i in range(0, len(stmts), BATCH):
