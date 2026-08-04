@@ -500,6 +500,18 @@ def apply_aliases(conn):
     actually changes are touched; those are also un-marked in the D1 sync table (if
     present) so the next delta re-pushes them under the corrected guid. Returns the
     number of boost rows re-keyed."""
+    # Recorded unconditionally, BEFORE the no-op return: an alias applied on an
+    # earlier run leaves the same emptied row behind, and that run had nothing
+    # left to re-key by the time anyone noticed.
+    conn.execute("CREATE TABLE IF NOT EXISTS d1_podcasts_orphaned (podcast_guid TEXT PRIMARY KEY)")
+    conn.execute(
+        f"""INSERT OR IGNORE INTO d1_podcasts_orphaned (podcast_guid)
+            SELECT DISTINCT a.raw_guid FROM guid_aliases a
+            WHERE a.raw_guid <> a.canonical_guid
+              AND NOT EXISTS (SELECT 1 FROM boosts b
+                              WHERE {effective_guid("b")} = a.raw_guid)""")
+    conn.commit()
+
     to_change = [r[0] for r in conn.execute(
         """SELECT b.event_id FROM boosts b JOIN guid_aliases a ON a.raw_guid = b.podcast_guid
            WHERE b.canonical_guid IS NOT a.canonical_guid""").fetchall()]
@@ -517,6 +529,20 @@ def apply_aliases(conn):
                          [(i,) for i in to_change])
     conn.commit()
     return len(to_change)
+
+
+def orphaned_podcast_guids(conn):
+    """Guids whose D1 podcasts row should be deleted (emptied by re-keying)."""
+    if not _has_table(conn, "d1_podcasts_orphaned"):
+        return []
+    return [r[0] for r in conn.execute(
+        "SELECT podcast_guid FROM d1_podcasts_orphaned").fetchall()]
+
+
+def clear_orphaned_podcast_guids(conn, guids):
+    conn.executemany("DELETE FROM d1_podcasts_orphaned WHERE podcast_guid=?",
+                     [(g,) for g in guids])
+    conn.commit()
 
 
 # ── scan cursors ──────────────────────────────────────────────────────────────

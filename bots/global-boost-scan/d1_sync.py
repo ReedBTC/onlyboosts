@@ -456,6 +456,13 @@ def cmd_remote_delta(args):
     stmts, pods, items = ([], set(), set())
     if rows:
         stmts, pods, items = build_delta_sql(conn, rows)
+    # Shows emptied by guid re-keying: the projection is upsert-only, so a phantom
+    # that lost all its boosts has to be deleted explicitly or its page lives on
+    # in D1 double-counting them against the real show.
+    orphans = [g for g in db.orphaned_podcast_guids(conn) if g not in pods]
+    for g in orphans:
+        stmts.append(f"DELETE FROM podcasts WHERE podcast_guid={q(g)};")
+        stmts.append(f"DELETE FROM podcasts_fts WHERE podcast_guid={q(g)};")
     # Metadata moves independently of boosts — always run the drift pass, even
     # on a cycle where no new boost arrived.
     drift, counts = build_meta_drift_sql(conn, _get_watermark(conn, META_WATERMARK), pods, items)
@@ -473,10 +480,12 @@ def cmd_remote_delta(args):
             return   # neither watermark advances: the whole push retries next cycle
     _mark_synced(conn, [r["event_id"] for r in rows])
     _set_watermark(conn, META_WATERMARK, started)
+    db.clear_orphaned_podcast_guids(conn, orphans)
     print(f"D1 delta: pushed {len(rows)} new boost(s), refreshed "
           f"{counts['podcasts']} show(s) / {counts['episodes']} episode(s) / "
-          f"{counts['profiles']} profile(s) whose metadata changed "
-          f"({len(stmts)} statements)")
+          f"{counts['profiles']} profile(s) whose metadata changed"
+          + (f", deleted {len(orphans)} emptied show(s)" if orphans else "")
+          + f" ({len(stmts)} statements)")
 
 
 def cmd_remote_podroll(args):
