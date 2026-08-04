@@ -432,6 +432,13 @@ def feed_id_for_guid(conn, podcast_guid):
     return row[0] if row else None
 
 
+def show_feed_for_guid(conn, podcast_guid):
+    """(feed_url, image) for a show — what the raw-RSS enrichment fallback needs
+    when Podcast Index has no episode for a guid. None when the show is unknown."""
+    return conn.execute("SELECT feed_url, image FROM shows WHERE podcast_guid=?",
+                        (podcast_guid,)).fetchone()
+
+
 # ── phantom-guid aliasing ─────────────────────────────────────────────────────
 def raw_guids_needing_alias(conn):
     """Distinct as-signed podcast_guids that carry no alias yet. The resolver looks

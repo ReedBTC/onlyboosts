@@ -352,18 +352,44 @@ def cmd_enrich(args):
         print(f"Enriching {len(eps)} episode(s)...")
         # map item_guid -> its show's canonical guid so we can pass feedid
         eg = db.effective_guid("boosts")
+        rss_pending = {}     # feed_url -> [{item_guid, podcast_guid, feed_id, show_image}]
+        rss_unreachable = []  # PI missed it and we have no feed to fall back to
         for i, ig in enumerate(eps, 1):
             row = conn.execute(
                 f"SELECT {eg} AS g FROM boosts WHERE item_guid=? AND {eg} IS NOT NULL LIMIT 1",
                 (ig,)).fetchone()
-            feed_id = db.feed_id_for_guid(conn, row[0]) if row else None
+            pg = row[0] if row else None
+            feed_id = db.feed_id_for_guid(conn, pg) if pg else None
             info = enrich.resolve_episode(ig, feed_id, key, secret)
             if info:
                 db.upsert_episode(conn, info)
             else:
-                db.mark_enrich_failed(conn, "episode", ig)
+                # Don't negative-cache yet — the publisher's own feed still gets
+                # a say (live items and not-yet-indexed episodes are invisible to
+                # PI but present in the RSS). Batched below, one fetch per feed.
+                show = db.show_feed_for_guid(conn, pg) if pg else None
+                if show and show["feed_url"]:
+                    rss_pending.setdefault(show["feed_url"], []).append(
+                        {"item_guid": ig, "podcast_guid": pg, "feed_id": feed_id,
+                         "show_image": show["image"]})
+                else:
+                    rss_unreachable.append(ig)
             if i % 50 == 0:
                 print(f"  episodes {i}/{len(eps)}")
+
+        db.mark_enrich_failed(conn, "episode", rss_unreachable)
+        if rss_pending:
+            chasing = sum(len(v) for v in rss_pending.values())
+            print(f"  raw-RSS fallback: {chasing} episode(s) PI missed, across "
+                  f"{len(rss_pending)} feed(s)")
+            found = enrich.resolve_episodes_from_feeds(rss_pending, log=print)
+            for info in found.values():
+                db.upsert_episode(conn, info)
+            still_missing = [w["item_guid"] for wanted in rss_pending.values()
+                             for w in wanted if w["item_guid"] not in found]
+            db.mark_enrich_failed(conn, "episode", still_missing)
+            print(f"  raw-RSS fallback: recovered {len(found)}, "
+                  f"{len(still_missing)} still unresolved")
     else:
         print("[warn] no Podcast Index credentials — skipping show/episode enrichment")
 

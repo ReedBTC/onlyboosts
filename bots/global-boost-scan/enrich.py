@@ -138,6 +138,203 @@ def resolve_episode(item_guid, feed_id, key, secret):
         return None
 
 
+# ── raw-RSS fallback ──────────────────────────────────────────────────────────
+# Podcast Index is not the whole truth. Three ways an episode we hold boosts for
+# is absent from its API but present in the publisher's feed (measured
+# 2026-08-04 over the 432 unenriched episodes):
+#   * <podcast:liveItem> — a live show. PI's episodes API never indexes these,
+#     and they are the richest per-episode boosts we have.
+#   * PI simply hasn't indexed the item yet, mostly within a week of publication.
+#   * the item aged out of the feed's rolling window before PI (or we) caught it
+#     — unfixable after the fact, which is why this runs at scan time rather
+#     than waiting on the 7-day retry cooldown.
+# A bare-guid PI lookup does NOT substitute (0 hits / 12 tried): it needs feed
+# context, so this path is only reachable when we know the show's feed_url.
+#
+# Regex parsing, deliberately — same call as podroll.py: feeds in the wild are
+# too often malformed for a strict XML parser, and we want the one item we can
+# match rather than an exception over the whole document.
+FEED_CAP_BYTES = 8_000_000     # full item list, not just the channel header
+FEED_TIMEOUT = 25
+FEED_UA = {"User-Agent": "OnlyBoosts/1.0 (+https://onlyboosts.social; episode enrichment)"}
+
+# <item> and <podcast:liveItem> both hold an episode; the namespace prefix is the
+# feed's to choose, so match any.
+_ITEM_BLOCK_RE = re.compile(
+    r"<(?:[a-zA-Z0-9]+:)?(item|liveItem)\b([^>]*)>(.*?)</(?:[a-zA-Z0-9]+:)?\1>", re.S | re.I)
+_CDATA_RE = re.compile(r"^\s*<!\[CDATA\[(.*?)\]\]>\s*$", re.S)
+
+
+def _tag(block, name):
+    """Text of the first <name> in `block`, CDATA unwrapped. Any ns prefix.
+
+    Ordinary text content is entity-decoded (`&#8211;` → `–`), CDATA is not —
+    CDATA is literal by definition, and decoding it would corrupt any feed that
+    wraps real markup in it."""
+    m = re.search(rf"<(?:[a-zA-Z0-9]+:)?{name}\b[^>]*>(.*?)</(?:[a-zA-Z0-9]+:)?{name}>",
+                  block, re.S | re.I)
+    if not m:
+        return None
+    val = m.group(1)
+    cd = _CDATA_RE.match(val)
+    val = cd.group(1) if cd else html.unescape(val)
+    return val.strip() or None
+
+
+def _attr(block, tag_name, *attrs):
+    """First matching attribute value off a self-closing-ish tag (e.g. enclosure)."""
+    m = re.search(rf"<(?:[a-zA-Z0-9]+:)?{tag_name}\b([^>]*)>", block, re.I)
+    if not m:
+        return None
+    found = dict((k.split(":")[-1].lower(), v)
+                 for k, v in re.findall(r'([\w:]+)\s*=\s*"([^"]*)"', m.group(1)))
+    for a in attrs:
+        if found.get(a):
+            return found[a]
+    return None
+
+
+def _parse_int(raw):
+    raw = (raw or "").strip()
+    return int(raw) if raw.isdigit() else None
+
+
+def _parse_duration(raw):
+    """<itunes:duration> is either seconds or [HH:]MM:SS."""
+    if not raw:
+        return None
+    raw = raw.strip()
+    if raw.isdigit():
+        return int(raw)
+    parts = raw.split(":")
+    try:
+        parts = [int(p) for p in parts]
+    except ValueError:
+        return None
+    secs = 0
+    for p in parts:
+        secs = secs * 60 + p
+    return secs or None
+
+
+def _parse_pubdate(raw):
+    if not raw:
+        return None
+    try:
+        from email.utils import parsedate_to_datetime
+        return int(parsedate_to_datetime(raw).timestamp())
+    except Exception:
+        return None
+
+
+def _parse_iso8601(raw):
+    """A <podcast:liveItem>'s `start` attribute — its stand-in for pubDate."""
+    if not raw:
+        return None
+    try:
+        import datetime
+        return int(datetime.datetime.fromisoformat(
+            raw.strip().replace("Z", "+00:00")).timestamp())
+    except Exception:
+        return None
+
+
+def parse_feed_episodes(xml):
+    """{guid: episode-dict} for every <item>/<liveItem> in `xml` that has a guid.
+
+    Fields mirror resolve_episode's shape so both paths feed db.upsert_episode
+    identically — except podcast_guid/feed_id, which the caller supplies from the
+    show we already resolved (a feed's items don't restate them)."""
+    out = {}
+    for kind, attrs, block in _ITEM_BLOCK_RE.findall(xml):
+        guid = _tag(block, "guid")
+        if not guid:
+            continue
+        live = kind.lower() == "liveitem"
+        # A live item carries no <pubDate>; its `start` attribute is the airing.
+        published = _parse_pubdate(_tag(block, "pubDate"))
+        if published is None and live:
+            start = dict((k.split(":")[-1].lower(), v)
+                         for k, v in re.findall(r'([\w:]+)\s*=\s*"([^"]*)"', attrs)).get("start")
+            published = _parse_iso8601(start)
+        # A live item's enclosure is the stream; some feeds spell the attribute
+        # `uri` (podcast:alternateEnclosure's spelling) rather than `url`.
+        out[guid] = {
+            "item_guid":      guid,
+            "title":          _tag(block, "title"),
+            "image":          _attr(block, "image", "href") or _tag(block, "image"),
+            "published":      published,
+            "duration":       _parse_duration(_tag(block, "duration")),
+            "episode_number": _parse_int(_tag(block, "episode")),
+            "enclosure_url":  _attr(block, "enclosure", "url", "uri"),
+            "enclosure_type": _attr(block, "enclosure", "type"),
+            "description":    clean_html(_tag(block, "encoded") or _tag(block, "description")),
+            "is_live":        live,
+        }
+    return out
+
+
+def fetch_feed(url, session=None):
+    """Feed body as text, or None on any failure. Never raises — a dead feed is
+    an ordinary outcome here (51 of the 432 unenriched episodes sit behind one)."""
+    get = (session or requests).get
+    try:
+        resp = get(url, headers=FEED_UA, timeout=FEED_TIMEOUT, stream=True)
+        try:
+            if resp.status_code != 200:
+                return None
+            parts, n = [], 0
+            for chunk in resp.iter_content(chunk_size=65536):
+                if not chunk:
+                    continue
+                parts.append(chunk.decode("utf-8", "replace")
+                             if isinstance(chunk, bytes) else chunk)
+                n += len(parts[-1])
+                if n >= FEED_CAP_BYTES:
+                    break
+            return "".join(parts)
+        finally:
+            resp.close()
+    except Exception:
+        return None
+
+
+def resolve_episodes_from_feeds(pending, log=print):
+    """pending: {feed_url: [{item_guid, podcast_guid, feed_id, show_image}, ...]}
+    Returns {item_guid: episode-dict} for whatever the feeds actually contain.
+
+    One fetch per feed however many episodes we're chasing in it — the whole
+    point of batching the fallback after the PI loop rather than per-episode."""
+    resolved = {}
+    session = requests.Session()
+    for i, (feed_url, wanted) in enumerate(pending.items(), 1):
+        xml = fetch_feed(feed_url, session)
+        if xml is None:
+            log(f"    rss: [{i}/{len(pending)}] unreachable, {len(wanted)} episode(s) left: {feed_url}")
+            continue
+        episodes = parse_feed_episodes(xml)
+        hits = 0
+        for want in wanted:
+            info = episodes.get(want["item_guid"])
+            if not info:
+                continue
+            info = dict(info)
+            live = info.pop("is_live")
+            info["podcast_guid"] = want["podcast_guid"]
+            info["feed_id"] = want["feed_id"]
+            # Plenty of items carry no art of their own; PI's episode object
+            # falls back to feedImage, so do the same rather than ship a
+            # picture-less card.
+            info["image"] = info["image"] or want.get("show_image")
+            resolved[want["item_guid"]] = info
+            hits += 1
+            if live:
+                log(f"    rss: recovered LIVE item {want['item_guid']} — {info['title']!r}")
+        if hits:
+            log(f"    rss: [{i}/{len(pending)}] {hits}/{len(wanted)} recovered from {feed_url}")
+    return resolved
+
+
 # ── kind-0 profiles ───────────────────────────────────────────────────────────
 def resolve_profiles(pubkey_hexes, relays, batch_size=100, log=print):
     """Fetch newest kind-0 per pubkey across `relays`. Returns {pubkey: profile}.
