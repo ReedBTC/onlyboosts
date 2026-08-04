@@ -41,7 +41,9 @@ import { buildActionBar, configureBoostActions } from '/assets/js/boost-actions.
 import { ensureLoginWidget } from '/assets/js/widget-loader.js'
 import { resolveFollows } from '/assets/js/follow-set.js'
 import { toEpisodeShape, normalizeBoosts, episodeApiToBoosts } from '/assets/js/ob-data.js'
-import { getEpisodePage } from '/assets/js/ob-live.js'
+import {
+  getEpisodePage, searchEpisodes, SEARCH_HITS, SEARCH_MIN_CHARS,
+} from '/assets/js/ob-live.js'
 import { copyText, showToast, copyNpub } from '/assets/js/copy-npub.js'
 import { boostButton, withBoostBusy } from '/assets/js/boost-button.js'
 import {
@@ -83,6 +85,14 @@ export const COPY = {
     emptyGlobal: ['No boosted episodes yet', 'When someone boosts a podcast episode on Nostr, it’ll show up here.'],
     emptyWindow: ['No episodes in this window', 'Nothing the community boosted aired in this time range — try a wider one.'],
     outOfRange: 'aired outside this time range — widen the range, or clear the search.',
+    // A miss now means three different things, and the old single line ("No
+    // matching episode in this view") read as all three at once. On All/Global
+    // the search has seen the entire index, so a miss is a COVERAGE boundary and
+    // saying "in this view" invites the reader to go looking for a view that
+    // holds it; there isn't one until somebody boosts it.
+    searchNoneAll: 'No episode matches. The index holds only episodes someone has boosted on Nostr.',
+    searchNoneRange: 'No episode matches in this time range. Try All.',
+    searchNoneFollows: 'No match among the episodes your follows have boosted. Switch to Global to search everyone.',
   },
   music: {
     untitled: 'Untitled track',
@@ -105,6 +115,9 @@ export const COPY = {
     emptyGlobal: ['No boosted songs yet', 'When someone boosts a track from a music feed on Nostr, it’ll show up here.'],
     emptyWindow: ['No songs in this window', 'Nothing the community boosted was released in this time range — try a wider one.'],
     outOfRange: 'was released outside this time range — widen the range, or clear the search.',
+    searchNoneAll: 'No song matches. The index holds only tracks someone has boosted on Nostr.',
+    searchNoneRange: 'No song matches in this time range. Try All.',
+    searchNoneFollows: 'No match among the songs your follows have boosted. Switch to Global to search everyone.',
   },
 }
 
@@ -933,10 +946,10 @@ function mountControls(feed, { sortKey, rangeKey, onSort, onRange, copy }) {
 // ob-data.js#episodeApiToBoosts hydrates the podcast/episode blocks back onto
 // them and the existing normalizeBoosts → toEpisodeShape → buildEpisodes chain
 // runs unmodified over them.
-async function loadEpisodePage({ medium, sort, range, offset, follows }) {
+async function loadEpisodePage({ medium, sort, range, offset, follows, q = null, limit, signal }) {
   const { records, nextOffset } = await getEpisodePage({
     medium: medium === 'music' ? 'music' : null,
-    sort, range, offset, follows,
+    sort, range, offset, follows, q, limit, signal,
   })
   const { boosts, totals } = episodeApiToBoosts(records)
   const shaped = toEpisodeShape(normalizeBoosts({ boosts }))
@@ -957,6 +970,11 @@ async function loadEpisodePage({ medium, sort, range, offset, follows }) {
     // totals, so recounting the rows would understate the one episode in the
     // index that exceeds the cap.
     it.totals = totals.get(r.guid) || null
+    // A `q=` response ranks each hit against the WHOLE ordering rather than
+    // against the handful of rows it returned, so a searched card can only get
+    // its position from here. An unfiltered page carries no rank and is
+    // numbered by position instead, in rebuild().
+    if (Number.isFinite(r.rank)) it._rank = r.rank
     items.push(it)
   }
   return { items, nextOffset }
@@ -1019,6 +1037,14 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
   let loading = false
   let search = null
   let view = []
+  // The search filter lives here rather than being read back off the module,
+  // because resolving a pick is a FETCH now: `picked` is the chosen suggestion,
+  // `pickedItem` the card built for it, and the gap between them is a state the
+  // feed has to paint rather than an instant array filter.
+  let picked = null
+  let pickedItem = null
+  let pickLoading = false
+  let pickSeq = 0
   const cards = h('div', { class: 'pcast-list' })
   const moreWrap = h('div', { class: 'pcast-more-wrap' })
 
@@ -1069,16 +1095,23 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
     cards.innerHTML = ''
     moreWrap.innerHTML = ''
     if (!view.length) {
-      const picked = search?.selection || null
-      cards.appendChild(picked
+      // Three empty states, and conflating any two of them tells the reader
+      // something false: still fetching, fetched and genuinely outside the
+      // range, or no search at all and the window itself is empty.
+      cards.appendChild(pickLoading
         ? h('div', { class: 'feed-placeholder' }, [
-            h('strong', { text: 'Not in this range' }),
-            `${picked.label} ${copy.outOfRange}`,
+            h('strong', { text: 'Loading…' }),
+            `Fetching ${picked?.label || 'that one'}.`,
           ])
-        : h('div', { class: 'feed-placeholder' }, [
-            h('strong', { text: copy.emptyWindow[0] }),
-            copy.emptyWindow[1],
-          ]))
+        : picked
+          ? h('div', { class: 'feed-placeholder' }, [
+              h('strong', { text: 'Not in this range' }),
+              `${picked.label} ${copy.outOfRange}`,
+            ])
+          : h('div', { class: 'feed-placeholder' }, [
+              h('strong', { text: copy.emptyWindow[0] }),
+              copy.emptyWindow[1],
+            ]))
       return
     }
     view.forEach((it) => {
@@ -1090,7 +1123,7 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
     // and cannot be pressed twice. A search selection hides it: the list is one
     // card, and paging under it would be paging something the reader filtered
     // away.
-    if (nextOffset != null && !search?.selection) {
+    if (nextOffset != null && !picked) {
       const btn = h('button', {
         class: 'pcast-showmore', type: 'button',
         onclick: async () => {
@@ -1127,15 +1160,64 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
     }
   }
 
-  // Rank first, filter second — ranking the filtered list would tell a searched
-  // episode it is #1 of 1, which answers a different question.
+  /* Rank first, filter second — ranking the filtered list would tell a searched
+   * episode it is #1 of 1, which answers a different question.
+   *
+   * ⚠️ THE TWO HALVES OF THAT NOW COME FROM DIFFERENT PLACES, and the ordering
+   * survives the move. An unfiltered page is numbered by position, because the
+   * server returned it in rank order from offset 0. A searched card cannot be
+   * numbered that way at all: it is one row out of a filtered query and its
+   * standing is a fact about the whole index, so it carries the `rank` the
+   * server computed and `pickedItem` is never renumbered here.
+   */
   function rebuild() {
-    items.forEach((it, i) => { it._rank = i + 1 })
+    if (!picked) items.forEach((it, i) => { it._rank = i + 1 })
     search?.refresh()
-    const picked = search?.selection || null
-    view = picked ? items.filter((it) => it.guid === picked.key) : items
+    view = picked ? (pickedItem ? [pickedItem] : []) : items
     paint()
     repaintProfiles(cards)
+  }
+
+  /* Fetch the picked episode under the feed's CURRENT range and sort.
+   *
+   * The suggestion already carries everything the menu row needed, but not the
+   * boost notes the card's drawer opens onto: those are ~16KB an episode, so the
+   * typeahead asks for the list without them and this asks again for the one row
+   * that was chosen. Re-issuing the same query is what makes that row findable —
+   * same q, same filters, same ordering, so the pick is inside the same handful
+   * of hits it came out of.
+   *
+   * It runs again on every range or sort change, because both move the ranking
+   * the card is reporting, and either can push the episode out of the window
+   * entirely. Nothing found means exactly that, and paint() says so.
+   */
+  async function resolvePick() {
+    const mine = ++pickSeq
+    // Dropping the filter comes through here too (editing the box or pressing
+    // ×), and it has to repaint: bumping pickSeq above has already retired any
+    // resolve still in flight, so nothing else is going to.
+    if (!picked) { pickedItem = null; pickLoading = false; rebuild(); return }
+    pickLoading = true
+    pickedItem = null
+    rebuild()
+    try {
+      const page = await loadEpisodePage({
+        medium, sort: sortKey, range: rangeKey, offset: 0, follows,
+        q: picked.query, limit: SEARCH_HITS,
+      })
+      if (mine !== pickSeq) return
+      pickedItem = page.items.find((it) => it.guid === picked.key) || null
+      if (pickedItem) {
+        loadBoosterProfiles([pickedItem]).then(() => repaintProfiles(cards))
+        loadMentionProfiles([pickedItem])
+      }
+    } catch (e) {
+      if (mine !== pickSeq) return
+      console.warn('[podcasts] search pick failed', e)
+      showToast('Couldn’t open that search result — please try again.', true)
+    } finally {
+      if (mine === pickSeq) { pickLoading = false; rebuild() }
+    }
   }
 
   /* A range or sort change is a new QUERY, so it refetches from offset 0.
@@ -1157,6 +1239,10 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
       loadMentionProfiles(items)
       rebuild()
       profilesReady.then(() => repaintProfiles(cards))
+      // The unfiltered list is still fetched under a live search filter, since
+      // clearing the box has to reveal the new range rather than fetch again.
+      // The card on screen, though, is the picked one, and its rank moved.
+      if (picked) resolvePick()
     } catch (e) {
       console.warn('[podcasts] requery failed', e)
       showToast('Couldn’t reload the feed — please try again.', true)
@@ -1188,20 +1274,50 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
     placeholder: copy.searchPlaceholder,
     label: copy.searchLabel,
     noun: copy.searchNoun,
-    onPick: () => rebuild(),
-    // ⚠️ SEARCHES WHAT IS LOADED, not the whole range. The corpus is paged from
-    // the server now, so the index covers the pages pulled so far rather than
-    // every episode in the window — the same limit the Boosts feed's search has
-    // always had on All. Loading more widens it.
-    getEntries: () => items.map((it) => ({
-      key: it.guid,
-      label: it.ep.title || copy.untitled,
-      sub: it.show?.title || '',
-      // The show name matches as well as showing: "no agenda" should find that
-      // show's episodes whatever their own titles are.
-      extra: it.show?.title || '',
-      img: it.ep.image,
-    })),
+    minChars: SEARCH_MIN_CHARS,
+    onPick: (entry) => { picked = entry; resolvePick() },
+    /* ⚠️ SEARCHES THE WHOLE INDEX, not the loaded pages, and that is the half of
+     * the server-side ranking move that was missing.
+     *
+     * The in-memory index this replaces read `items`, which was the entire
+     * corpus while the rollup happened in the browser and became a PREFIX of it
+     * the moment the endpoint started paging a ranked list. A show sitting at
+     * #300 was then unfindable until the reader had pressed "load more" nine
+     * times, which is the opposite of what a search is for.
+     *
+     * The show name is still matched as well as the episode title, because "no
+     * agenda" has to find that show's episodes whatever their own titles are.
+     * That match now happens in `episodes_fts`, whose `show` column exists for
+     * this: title alone returned 2 hits for "UNGOVERNABLE" against the show's
+     * own 135 episodes, all 2 belonging to other shows.
+     */
+    searchRemote: async (query, { signal }) => {
+      const records = await searchEpisodes({
+        // Same 'music'|null the data layer takes everywhere else. Passing this
+        // feed's own 'other' would happen to work, since anything that isn't
+        // 'music' becomes not_medium=music, but only by accident.
+        q: query, medium: medium === 'music' ? 'music' : null,
+        sort: sortKey, range: rangeKey, follows, signal,
+      })
+      return records.map((r) => ({
+        key: r.guid,
+        label: r.title || copy.untitled,
+        // Shown, not matched. Episode titles repeat across shows far more than
+        // they collide within one ("Episode 42", "Weekly Roundup"), so the show
+        // is what tells two hits apart.
+        sub: r.show?.title || '',
+        img: r.img,
+        // The query that produced this hit, carried so the pick can re-issue it
+        // and land on the same row with its notes attached.
+        query,
+      }))
+    },
+    // What a miss MEANS depends on where the reader is standing: on All/Global
+    // the search has seen the whole index, so there is no wider view to send
+    // them to and the old "in this view" was pointing at one.
+    noMatchText: () => (follows ? copy.searchNoneFollows
+      : rangeKey === 'all' ? copy.searchNoneAll
+      : copy.searchNoneRange),
   })
 
   list.className = ''

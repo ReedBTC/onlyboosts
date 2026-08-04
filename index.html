@@ -379,6 +379,14 @@
       padding: 0.6rem 0.55rem;
       font-size: 0.85rem; color: var(--muted);
     }
+    /* "Searching…" occupies the same row a miss does, so it needs to read as a
+       state rather than an answer. A pulse says "still going" where the same
+       muted line in the same place would say "nothing found". */
+    .feed-search-empty.is-loading { animation: feed-search-pulse 1.1s ease-in-out infinite; }
+    @keyframes feed-search-pulse { 50% { opacity: 0.45; } }
+    @media (prefers-reduced-motion: reduce) {
+      .feed-search-empty.is-loading { animation: none; opacity: 0.7; }
+    }
 
     /* Collapsed "Past events / older posts" section under a feed's list. */
     .feed-past {

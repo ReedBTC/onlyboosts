@@ -99,6 +99,9 @@ fixed, which was the wrong call.
 The feed search regression found on 2026-08-02 is the same class again: with
 ranking and paging moved server-side, a client-side search index can only see the
 pages already fetched, so a typeahead finds only what is already on screen.
+**Closed 2026-08-04**; `feed-search.js` grew a `searchRemote` backend and the
+Episodes and Songs feeds query `/api/v1/episodes?q=` instead of indexing their
+loaded pages.
 
 ### On the Origin of the Split
 
@@ -143,8 +146,8 @@ Current standing against that target:
 |---|---|
 | One authoritative store | D1 exists and is fast; it is not yet the only read path |
 | Precomputed aggregates | Done. `boost_count`, `total_sats`, `booster_count`, `latest_ts` are maintained columns |
-| Search index | `podcasts_fts` covers shows. Nothing covers episodes |
-| Browser computes nothing | True for Episodes and Songs as of the `episodes-api` branch; false for Shows, Albums and Boosts |
+| Search index | Done. `podcasts_fts` covers shows (title + author), `episodes_fts` covers episodes (title + show), both queried rather than downloaded |
+| Browser computes nothing | True for Episodes and Songs, ranking and search both; false for Shows, Albums and Boosts |
 | Edge caching | In place on the static proxy and the detail pages |
 
 The architecture is right and roughly 70% built. The current pain comes from
@@ -171,7 +174,7 @@ equivalent for the show-level rollup would follow the same shape.
 
 This also removes the last client-side reads of `podcasts/index.json`.
 
-### 2. Add an Episode Search Index
+### 2. Add an Episode Search Index — Done, 2026-08-04
 
 `episodes_fts` in the collector schema, populated on sync, plus a `q=` parameter
 on `/api/v1/episodes` honouring the active sort, range and medium.
@@ -203,7 +206,7 @@ class of defect described above, rather than catching instances of it.
 
 Depends on the first piece.
 
-### 4. Close the Sync Gap
+### 4. Close the Sync Gap — Done, 2026-08-04
 
 `d1_sync.py` should sync episodes on their own change signal rather than only on
 boost arrival. The `episodes` table already carries `updated_at`, so the delta can
@@ -215,7 +218,11 @@ equivalent full episode reload, which is idempotent because the projection is
 The silent `continue` that caused this should also count and log; the defect was
 invisible for as long as it was precisely because nothing reported it.
 
-Already handed to the collector side and in progress.
+Delivered in `2f96516` and `fec5a06`, and generalised past the ask: rather than
+special-casing episodes, the delta gained a metadata drift pass watermarked on
+the box's own `updated_at` columns, covering shows and profiles as well, and it
+runs on every cycle including ones where no boost arrived, which was the actual
+hole. D1 and the manifest now agree at 6,788 episodes.
 
 ## What Is Deliberately Not Being Done
 
@@ -228,15 +235,16 @@ Already handed to the collector side and in progress.
 
 ## Open Decisions
 
-1. **Whether to hold `episodes-api` until `q=` lands.** The branch fixes badly
-   wrong rankings but narrows feed search to the pages loaded, which is a
-   regression a person would notice. Recommendation: hold it, ship both together.
-2. **Ordering of the four pieces.** Recommendation: 4, then 2, then 1, then 3.
-   The sync fix is already moving; search is the visible gap; the feed migration
-   is the largest; demoting the shards is safe only once nothing reads them.
+1. ~~**Whether to hold `episodes-api` until `q=` lands.**~~ **Resolved: held,
+   and both shipped together.** The branch carried the ranking fix and the
+   server-side search into `main` as one change, so the regression it would have
+   introduced alone never reached a reader.
+2. **Ordering of the four pieces.** Recommendation was 4, then 2, then 1, then 3;
+   4 and 2 are done in that order. **1 is next**, and 3 is safe only once
+   nothing reads the shards.
 3. **Whether the published shards keep their current shape** once they are an
    export rather than a read path. They are a public contract, so the default
-   answer is yes.
+   answer is yes. Still open.
 
 ## Re-deriving the Measurements
 

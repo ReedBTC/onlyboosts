@@ -588,16 +588,67 @@ which made every show in the index a weak hit for "boost" and pushed the real
 ones out of a five-row menu; the boosters' sub-line carries a truncated npub,
 while `extra` holds the full one so a pasted npub still resolves.
 
-Scoring is a ladder (exact / prefix / word-start / substring / label before
-`extra`), not a fuzzy distance — these queries are the opening words of a name
-the user already knows, so *where* a match lands beats how many characters it
-shares. Ties break on the entry's position in the feed's current order, so a
-one-letter query offers the biggest shows first. Measured at 12ms for 200
-queries over the 1,384-show index, which is why there's no debounce.
+#### Two Backends, and Which One a Feed Gets Is Not a Preference
 
-The index is built lazily on the first keystroke after each `refresh()`, and
-every renderer refreshes on repaint — range, sort, an account switch and a page
-of older boosts all change what's searchable.
+`getEntries` is the original: the feed hands over the corpus it already holds
+and the ladder scores it in memory. Right for a feed whose window **is** the
+corpus, which Shows, Albums and Boosts all load. Scoring is a ladder (exact /
+prefix / word-start / substring / label before `extra`), not a fuzzy distance —
+these queries are the opening words of a name the user already knows, so *where*
+a match lands beats how many characters it shares. Ties break on the entry's
+position in the feed's current order, so a one-letter query offers the biggest
+shows first. Measured at 12ms for 200 queries over the 1,384-show index, which
+is why that path has no debounce; its index is built lazily on the first
+keystroke after each `refresh()`, and every renderer refreshes on repaint.
+
+`searchRemote` is for a feed that **pages a ranked list off the server**, where
+the loaded pages are a prefix of the corpus rather than the whole of it. That is
+Episodes and Songs since their ranking moved server-side: an in-memory index
+there could only find what the reader had already scrolled past, so a show at
+#300 was unfindable until "load more" had been pressed nine times. A feed
+supplies one or the other, never both. The remote path is debounced at 220ms,
+every request is abortable, and replies are **sequence-guarded as well as
+aborted** — an aborted fetch is not guaranteed to lose the race, so a stale
+answer is dropped on arrival rather than merely asked to stop.
+
+**⚠️ The remote source is `/api/v1/episodes?q=`, NOT
+`/api/v1/search?type=episodes`, and the choice is forced.** The search endpoint
+is a flat relevance-ordered "does this exist" lookup with **no medium filter and
+no follows scoping at all**; pointed at these feeds it would offer Songs inside
+Episodes, and on a Follows feed it would suggest episodes nobody the reader
+follows has boosted, every one of which would then filter to an empty list. The
+episodes endpoint applies the active medium, range, sort *and* scope, which is
+the only way a suggestion is guaranteed to be something the feed can show. The
+cost is the ordering: hits come back in the feed's **active sort** rather than by
+relevance, so the menu reads as the feed with non-matches removed, which is
+exactly what picking one does.
+
+**Notes are left off the typeahead and fetched on the pick.** Measured at 80KB
+for 5 rows with `include=boosts` against 4KB without, and it runs while someone
+is typing. The pick re-issues the *same* query with the notes attached and finds
+its row inside the same handful of hits; that is why the entry carries the
+`query` that produced it. Both responses were verified to agree row for row.
+
+**A picked card takes its rank from the server, not from its position.** An
+unfiltered page is numbered by position because it arrives in rank order from
+offset 0, but a searched card is one row out of a filtered query, so
+`loadEpisodePage` stamps `_rank` from the response's own `rank` field and
+`rebuild()` does not renumber it. Rank is scoped to the active range: on `1m` the
+top hits come back 1, 2, 4.
+
+A pick is a fetch now, so it has states an array filter didn't: `pickLoading`
+paints "Loading…", a resolved miss paints "Not in this range", and no search at
+all paints the empty-window copy. Conflating any two of them tells the reader
+something false.
+
+**The no-match line is a function, not a string** (`noMatchText`), because what a
+miss *means* depends on where the reader is standing. It used to read "No
+matching episode in this view" everywhere, which suggests a filter problem when
+on All/Global the truth is a **coverage boundary**: the search has seen the whole
+index, and a show nobody has boosted on Nostr is not in it and will not be until
+someone does. There is no wider view to send them to, and the old copy pointed at
+one. Three strings per medium, off the `COPY` table: `searchNoneAll`,
+`searchNoneRange`, `searchNoneFollows`.
 
 **Two backends, one record shape.** `ob-data.js` is the static half (immutable
 CDN shards under `/api/data/*`); `ob-live.js` is the live half (D1 query API

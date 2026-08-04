@@ -33,9 +33,31 @@
  * Ranking before filtering is what makes a searched card say #47 instead of
  * #1. Reversing those two steps would renumber the survivor and quietly answer
  * a different question.
+ *
+ * ── Two backends, and which one a feed gets is not a preference ──────
+ *
+ * `getEntries` is the original: the feed hands over the corpus it is already
+ * holding and the ladder below scores it in memory. That is right for a feed
+ * whose window IS the corpus — Shows, Albums and Boosts all load theirs.
+ *
+ * `searchRemote` is for a feed that pages a ranked list off the server, where
+ * the loaded pages are a prefix of the corpus rather than the whole of it. An
+ * in-memory index there can only find what has already been scrolled past,
+ * which is the failure the Episodes and Songs feeds had the moment their
+ * ranking moved server-side. A feed supplies one or the other, never both.
+ *
+ * The remote path is debounced and every request is abortable, because it now
+ * costs a round trip per keystroke where the local one costs 12ms for 200
+ * queries over the 1,384-show index. Responses are sequence-guarded as well as
+ * aborted: an aborted fetch is not guaranteed to lose the race, so a stale
+ * answer has to be dropped on arrival rather than merely asked to stop.
  */
 
 const MAX_HITS = 5
+
+// Long enough that a burst of typing is one request, short enough that the menu
+// still feels attached to the keyboard.
+const REMOTE_DEBOUNCE_MS = 220
 
 function h(tag, attrs = {}, kids = []) {
   const el = document.createElement(tag)
@@ -154,13 +176,22 @@ export function resetFeedSearch(panel) {
  * @param {object}   opts
  * @param {string}   opts.placeholder    input placeholder
  * @param {string}   opts.label          accessible name for the input
- * @param {Function} opts.getEntries     () => Array<{key, label, sub, img, extra}>, in
+ * @param {Function} [opts.getEntries]   () => Array<{key, label, sub, img, extra}>, in
  *   the feed's current display order. `label` is shown and matched, `sub` is
  *   shown only, `extra` is matched only. Called lazily on the first keystroke
  *   after each refresh(), so it may be as expensive as one pass over the
  *   corpus. Order is the tie-break: equal scores resolve to the higher-ranked
  *   entry, which is why a bare "the" offers the biggest shows first.
- * @param {Function} opts.onPick         called with {key, label} or null
+ * @param {Function} [opts.searchRemote] async (query, {signal}) => Array<entry>,
+ *   already ordered and already trimmed to what should be shown. The ladder is
+ *   not applied to these: the server decided the ordering, and re-scoring it
+ *   here would reorder a ranked answer by a different rule. Supply this OR
+ *   getEntries.
+ * @param {Function} [opts.minChars]     shortest query worth sending remotely
+ * @param {Function} [opts.noMatchText]  () => string, the menu's no-hit line.
+ *   A function rather than a string because what a miss MEANS depends on the
+ *   feed's live range and scope.
+ * @param {Function} opts.onPick         called with the picked entry, or null
  * @returns {{refresh: Function, clear: Function, selection: object|null}|null}
  */
 export function mountFeedSearch(panel, opts) {
@@ -170,10 +201,17 @@ export function mountFeedSearch(panel, opts) {
   const uid = Math.random().toString(36).slice(2, 8)
   const menuId = `feed-search-menu-${uid}`
 
+  const remote = typeof opts.searchRemote === 'function'
+  const minChars = Math.max(1, opts.minChars || 1)
+
   let entries = null      // lazily built by getEntries(), dropped on refresh()
-  let selection = null    // {key, label} once something is picked
+  let selection = null    // the picked entry once something is picked
   let hits = []           // what the menu is currently showing
   let active = -1         // keyboard cursor into hits
+  let state = 'ready'     // ready | short | loading | error — remote path only
+  let timer = null        // debounce handle
+  let inflight = null     // AbortController for the request in flight
+  let seq = 0             // monotonic request id; a late reply below it is stale
 
   const input = h('input', {
     class: 'feed-search-input',
@@ -235,7 +273,7 @@ export function mountFeedSearch(panel, opts) {
     return entries
   }
 
-  function search(raw) {
+  function searchLocal(raw) {
     const q = norm(raw)
     if (!q) return []
     const terms = q.split(/\s+/).filter(Boolean)
@@ -249,12 +287,54 @@ export function mountFeedSearch(panel, opts) {
     return scored.slice(0, MAX_HITS).map((row) => row[2])
   }
 
+  /* Stop the remote path where it stands: the pending debounce and the request
+   * itself. Bumping `seq` is what actually retires an answer, since aborting a
+   * fetch does not guarantee the promise loses the race. */
+  function cancelRemote() {
+    if (timer) { clearTimeout(timer); timer = null }
+    if (inflight) { inflight.abort(); inflight = null }
+    seq++
+  }
+
+  async function runRemote(raw) {
+    const mine = ++seq
+    const ctl = new AbortController()
+    inflight = ctl
+    try {
+      const found = await opts.searchRemote(raw.trim(), { signal: ctl.signal })
+      if (mine !== seq) return
+      hits = (found || []).slice(0, MAX_HITS)
+      state = 'ready'
+    } catch (e) {
+      if (mine !== seq || e?.name === 'AbortError') return
+      console.warn('[feed-search] remote search failed', e)
+      hits = []
+      state = 'error'
+    } finally {
+      if (inflight === ctl) inflight = null
+    }
+    // The reader may have emptied the box or picked something while this was
+    // out; either way the menu it would open no longer describes anything.
+    if (!input.value || selection) return
+    active = hits.length ? 0 : -1
+    renderMenu()
+    open()
+    setActive(active)
+  }
+
   function renderMenu() {
     menu.replaceChildren()
     if (!hits.length) {
+      // A miss, a query too short to send, a request in flight and a failed one
+      // all put a single line here, and they must not read alike: "no match" in
+      // place of "still looking" is a wrong answer rather than a slow one.
+      const line = state === 'loading' ? 'Searching…'
+        : state === 'error' ? 'Search is unavailable right now.'
+        : state === 'short' ? 'Keep typing to search.'
+        : (opts.noMatchText?.() || `No matching ${opts.noun || 'result'} in this view.`)
       menu.appendChild(h('div', {
-        class: 'feed-search-empty',
-        text: `No matching ${opts.noun || 'result'} in this view.`,
+        class: 'feed-search-empty' + (state === 'loading' ? ' is-loading' : ''),
+        text: line,
       }))
       return
     }
@@ -326,8 +406,13 @@ export function mountFeedSearch(panel, opts) {
     if (active < 0) input.removeAttribute('aria-activedescendant')
   }
 
+  // The WHOLE entry becomes the selection, not just its key and label. A remote
+  // hit arrives carrying its record and the server's rank for it, and that is
+  // the copy the renderer paints — re-deriving either from the loaded pages is
+  // exactly what the remote path exists to stop it doing.
   function pick(e) {
-    selection = { key: e.key, label: e.label }
+    cancelRemote()
+    selection = { ...e }
     input.value = e.label
     clearBtn.hidden = false
     field.classList.add('is-filtered')
@@ -339,11 +424,13 @@ export function mountFeedSearch(panel, opts) {
   // renderer is already repainting and doesn't need telling twice.
   function clear({ silent = false, focus = false } = {}) {
     const had = !!selection
+    cancelRemote()
     selection = null
     input.value = ''
     clearBtn.hidden = true
     field.classList.remove('is-filtered')
     hits = []
+    state = 'ready'
     close()
     if (focus) input.focus()
     if (had && !silent) opts.onPick?.(null)
@@ -359,8 +446,30 @@ export function mountFeedSearch(panel, opts) {
       opts.onPick?.(null)
     }
     clearBtn.hidden = !input.value
-    hits = search(input.value)
-    if (!input.value) { close(); return }
+
+    if (!remote) {
+      hits = searchLocal(input.value)
+      if (!input.value) { close(); return }
+      active = hits.length ? 0 : -1
+      renderMenu()
+      open()
+      setActive(active)
+      return
+    }
+
+    cancelRemote()
+    if (!input.value) { hits = []; state = 'ready'; close(); return }
+    const q = input.value.trim()
+    if (q.length < minChars) {
+      hits = []
+      state = 'short'
+    } else {
+      // The previous hits stay up under the new request rather than blanking to
+      // a spinner on every keystroke — the loading line only shows when there is
+      // nothing yet to leave in place.
+      state = 'loading'
+      timer = setTimeout(() => { timer = null; runRemote(q) }, REMOTE_DEBOUNCE_MS)
+    }
     active = hits.length ? 0 : -1
     renderMenu()
     open()
@@ -394,8 +503,23 @@ export function mountFeedSearch(panel, opts) {
   clearBtn.addEventListener('click', () => clear({ focus: true }))
 
   return {
-    /** Drop the cached index — the corpus behind it changed (range, page, account). */
-    refresh() { entries = null; hits = [] },
+    /* Drop the cached index — the corpus behind it changed (range, page,
+     * account).
+     *
+     * ⚠️ A NO-OP ON THE REMOTE PATH, and deliberately. There is no index to
+     * drop there, and cancelling in-flight work here would be a hang: every
+     * rebuild() calls this, so a "load more" landing while someone is typing
+     * would kill their request and nothing would reschedule it, leaving the menu
+     * on "Searching…" for good. A suggestion fetched against the previous range
+     * is self-correcting anyway — picking it re-queries under the current one
+     * and says "Not in this range" if that is the truth.
+     *
+     * `hits` is only dropped while the menu is CLOSED. Clearing it under an open
+     * menu leaves rows on screen that the arrow keys and Enter no longer know
+     * about, since both read `hits`; closed, the only thing it feeds is the
+     * focus handler's decision to reopen, which is exactly what should not
+     * survive a corpus change. */
+    refresh() { entries = null; if (menu.hidden) hits = [] },
     /** Drop the filter. Silent by default: the caller is already repainting. */
     clear(o = {}) { clear({ silent: true, ...o }) },
     get selection() { return selection },

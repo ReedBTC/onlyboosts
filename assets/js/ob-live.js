@@ -229,16 +229,24 @@ const EPISODE_PAGE = 60
  * @param {string}   [opts.range]   1w|1m|all, filtered on AIR DATE
  * @param {number}   [opts.offset]
  * @param {string[]} [opts.follows] hex or npub; presence switches to POST
+ * @param {string}   [opts.q]       free-text over episode title + show name.
+ *   Every returned record then carries `rank`, its position in the FULL ordering
+ *   under this same sort/range/medium — see searchEpisodes below.
+ * @param {boolean}  [opts.withBoosts] inline each episode's notes. Default true;
+ *   the typeahead turns it off because it dominates the payload.
  * @returns {Promise<{records: object[], nextOffset: number|null, follows: number|null}>}
  */
 export async function getEpisodePage({
   medium = null, sort = 'boosts', range = 'all',
-  offset = 0, limit = EPISODE_PAGE, follows = null, signal,
+  offset = 0, limit = EPISODE_PAGE, follows = null, q = null,
+  withBoosts = true, signal,
 } = {}) {
   const qs = new URLSearchParams({
-    sort, range, include: 'boosts',
+    sort, range,
     limit: String(limit), offset: String(offset),
   })
+  if (withBoosts) qs.set('include', 'boosts')
+  if (q) qs.set('q', q)
   // Deliberately not `medium=podcast`. Both are the same 6,123 episodes today,
   // but a show that declares `video` (there are two in the index, neither with
   // an enriched boosted episode yet) would be dropped by one and kept by the
@@ -265,4 +273,48 @@ export async function getEpisodePage({
     // set being small.
     follows: Number.isFinite(data?.follows) ? data.follows : null,
   }
+}
+
+// How many suggestions the typeahead asks for. Same MAX_HITS the local search
+// ladder shows, so the menu never has to drop a row the server bothered to rank.
+export const SEARCH_HITS = 5
+
+// The endpoint rejects a one-character q, so the box must not spend a request
+// asking. Kept here rather than in the renderer because it is the API's rule.
+export const SEARCH_MIN_CHARS = 2
+
+/**
+ * The feed's own search, run over the whole index instead of the loaded pages.
+ *
+ * ⚠️ THIS IS `/api/v1/episodes?q=`, NOT `/api/v1/search?type=episodes`, and the
+ * choice is forced rather than stylistic. The search endpoint is a flat
+ * relevance-ordered "does this exist" lookup with no medium filter and no
+ * follows scoping at all — pointed at these feeds it would offer Songs inside
+ * Episodes, and on a Follows feed it would suggest episodes nobody the reader
+ * follows has boosted, every one of which would then filter to an empty list.
+ * The episodes endpoint applies the active medium, range, sort AND scope, which
+ * is the only way a suggestion is guaranteed to be something the feed can show.
+ *
+ * The cost of that is the ordering: hits come back in the feed's ACTIVE SORT
+ * rather than by relevance, so the suggestions read as the feed with non-matches
+ * removed. That is the same thing picking one does, which is what makes the two
+ * agree.
+ *
+ * Notes are left off deliberately. Measured at 80KB for 5 rows with
+ * `include=boosts` against 4KB without, and this runs while someone is typing;
+ * the pick re-asks for the one row it needs with the notes attached.
+ *
+ * @returns {Promise<object[]>} raw records, each carrying `rank`
+ */
+export async function searchEpisodes({
+  q, medium = null, sort = 'boosts', range = 'all',
+  follows = null, limit = SEARCH_HITS, signal,
+} = {}) {
+  const text = typeof q === 'string' ? q.trim() : ''
+  if (text.length < SEARCH_MIN_CHARS) return []
+  const { records } = await getEpisodePage({
+    medium, sort, range, follows, signal,
+    q: text, limit, offset: 0, withBoosts: false,
+  })
+  return records
 }

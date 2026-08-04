@@ -288,7 +288,15 @@
 // this replaces — it painted 84 of 601 songs and put the true #7 episode at
 // #128. ob-data.js and ob-live.js carry the adapter and the reader it needs, so
 // all three have to turn over together.
-const VERSION = 'ob-v49';
+// ob-v50: feed search on Episodes and Songs queries /api/v1/episodes?q= instead
+// of indexing the pages it has loaded. Required rather than cosmetic: a
+// returning visitor holding the old feed-search.js + feeds-podcasts.js keeps a
+// typeahead that can only find what they have already scrolled past, which is
+// the half of the v49 ranking move that was missing — a show at #300 was
+// unfindable until "load more" had been pressed nine times. ob-live.js carries
+// the reader, and index.html the one rule the loading line needs, so all four
+// turn over together.
+const VERSION = 'ob-v50';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;
