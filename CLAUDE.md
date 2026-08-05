@@ -211,6 +211,26 @@ Local dev: `wrangler pages dev .` (so `/api/*` Functions resolve).
 - **`isSafeUrl()` before any user-supplied URL** reaches `href`/`src`.
 - **Bump `VERSION` in `sw.js`** when shipping changed assets that returning
   visitors must get on the *first* navigation rather than the second.
+- **⚠️ Never add a named export to an existing module that existing modules
+  import.** Assets ship `max-age=14400`, so the browser holds each module URL
+  for up to four hours **on its own clock**; the provider and its consumers
+  therefore never turn over together. A reader with a stale provider and a fresh
+  consumer gets `does not provide an export named 'X'`, and an unresolved named
+  import is a **link-time** error, so the consumer never executes and everything
+  in it fails rather than the one feature that was added. **A `VERSION` bump does
+  not close this** — the service worker's cache is only consulted for clients it
+  already controls, and the HTTP cache underneath is per-URL either way. This is
+  how `ob-v53` took all eight feeds down: three renderers importing
+  `mountFeedNote` from `feed-controls.js`.
+
+  Two shapes are safe, and `feed-controls.js` carries the worked example of
+  each. **Put new behaviour in a new module** — a URL with no cached old version
+  can only resolve or 404, which is what `assets/js/feed-note.js` is. Or **derive
+  it from something the module already exports**, which degrades instead of
+  throwing: `WALKED_RANGES` in `boosts-feed.js` filters `RANGE_OPTIONS`, so an
+  older copy lacking the `1y` row yields a missing button rather than a dead
+  feed. Adding an **optional property to an options object** is safe in both
+  directions for the same reason.
 
 ## Theming
 

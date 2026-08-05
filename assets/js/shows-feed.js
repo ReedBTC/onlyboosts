@@ -56,8 +56,10 @@ import {
 } from '/assets/js/ob-live.js'
 import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls,
-  mountFeedNote, resetFeedNote,
 } from '/assets/js/feed-controls.js'
+// Its own module, not two more exports of feed-controls.js — see the ⚠️ note
+// at the top of that file for the four-hour window that shape opens.
+import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js'
 import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js'
 import { showPageHref, episodePageHref } from '/assets/js/show-link.js'
 // Show-level boosting. Same four pieces the episode feed uses, and deliberately

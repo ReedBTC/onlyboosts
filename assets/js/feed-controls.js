@@ -17,6 +17,32 @@
  * That show/hide is CSS off body[data-active-feed], not JS: feeds hydrate once
  * and keep their controls forever, so a declarative rule is the only version
  * that can't leave a re-visited feed with someone else's controls (or none).
+ *
+ * ⚠️ DO NOT ADD A NAMED EXPORT HERE FOR NEW BEHAVIOUR. All three feed renderers
+ * import from this module, and assets ship `max-age=14400`, so the browser
+ * holds each module URL for up to four hours ON ITS OWN CLOCK. A reader
+ * carrying a three-hour-old copy of this file who fetches a fresh renderer gets
+ *
+ *   SyntaxError: The requested module '/assets/js/feed-controls.js' does not
+ *   provide an export named 'X'
+ *
+ * and an unresolved named import is a LINK-TIME error: the renderer never
+ * executes at all, so every feed on the site fails at once rather than the one
+ * feature that was added. Bumping sw.js does not close this — the service
+ * worker's cache is only consulted for clients it already controls, and the
+ * HTTP cache underneath it is per-URL either way. This is not hypothetical;
+ * mountFeedNote lived here for exactly one deploy and did precisely that.
+ *
+ * Two shapes are safe. Put new behaviour in a NEW module (a URL with no cached
+ * old version can only resolve or 404) — assets/js/feed-note.js is the worked
+ * example. Or have callers derive what they need from a table this module
+ * ALREADY exports, which degrades instead of throwing: WALKED_RANGES in
+ * boosts-feed.js filters RANGE_OPTIONS, so an older copy without the '1y' row
+ * simply yields no 1Y button.
+ *
+ * Adding an OPTIONAL property to an options object is likewise safe in both
+ * directions — an older rangeControl ignores `opts.options` and renders its own
+ * list, which is a missing button rather than a broken feed.
  */
 
 function h(tag, attrs = {}, kids = []) {
@@ -50,17 +76,6 @@ export const RANGE_OPTIONS = [
   ['all', 'All', null],
 ]
 
-// The subset offered by a feed whose bounded window is PAGED IN rather than
-// queried — the Boosts note feed, which has to hold every boost in the window
-// before it can sort them (ensureCoverage in boosts-feed.js). The network
-// publishes ~38 boosts a day, so 1W is ~280 rows and 1M ~1,140, both a handful
-// of 200-row requests; a year is ~13,900 rows, which is ~70 sequential requests
-// and several megabytes before the first card paints. That is a different
-// feature, not a fourth button — widening the note feed to a year means giving
-// it a `since`-scoped query the way the ranked feeds have, so the window is
-// answered rather than walked.
-export const WALKED_RANGE_OPTIONS = RANGE_OPTIONS.filter(([key]) => key !== '1y')
-
 /** Days in a range key, or null for the unbounded one. */
 export function rangeDays(key) {
   const found = RANGE_OPTIONS.find((o) => o[0] === key)
@@ -84,8 +99,8 @@ export function rangeCutoff(key) {
  * @param {Function} [opts.titleFor] (key, label) => tooltip; the range means
  *   different things per feed, so the wording is the caller's to own.
  * @param {Array}    [opts.options]  the range rows to offer, defaulting to all
- *   of them. A feed that pages its window in rather than querying it passes
- *   WALKED_RANGE_OPTIONS — see the note there.
+ *   of them. A feed that pages its window in rather than querying it filters
+ *   RANGE_OPTIONS down itself — see WALKED_RANGES in boosts-feed.js.
  */
 export function rangeControl(initialKey, onPick, opts = {}) {
   const options = opts.options || RANGE_OPTIONS
@@ -164,38 +179,6 @@ export function sortControl(options, initialKey, onPick, opts = {}) {
   }
   btn.addEventListener('click', () => { menu.hidden ? open() : close() })
   return wrap
-}
-
-/**
- * Fill a panel's [data-feed-note] slot — the one line above the search box
- * saying what the cards below are ranked over.
- *
- * It exists only on the ranked feeds. Global vs Follows is self-explanatory on
- * the Boosts note feed, where a card is one note and the axis is the same one
- * every Nostr client has; on Episodes, Songs, Shows and Albums a card is an
- * aggregate, so the scope is a statement about the CORPUS THE RANKING WAS
- * COMPUTED OVER rather than about which cards were kept, and nothing on screen
- * said so.
- *
- * The slot ships empty and `hidden`, so a feed that renders "sign in" or an
- * error never grows a line describing a ranking that isn't there. Same contract
- * as the search slot beneath it.
- *
- * @param {Element} panel
- * @param {string}  text   plain text; null or empty leaves the slot hidden
- */
-export function mountFeedNote(panel, text) {
-  const host = panel?.querySelector('[data-feed-note]')
-  if (!host) return null
-  if (!text) { host.textContent = ''; host.hidden = true; return null }
-  host.textContent = text
-  host.hidden = false
-  return host
-}
-
-/** Empty a panel's note slot and hide it again. */
-export function resetFeedNote(panel) {
-  return mountFeedNote(panel, null)
 }
 
 /**

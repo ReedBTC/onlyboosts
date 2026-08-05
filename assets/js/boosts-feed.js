@@ -41,7 +41,7 @@ import { boosterLabel } from '/assets/js/ob-data.js'
 import { followsBoostReader, globalBoostReader } from '/assets/js/ob-live.js'
 import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls,
-  WALKED_RANGE_OPTIONS,
+  RANGE_OPTIONS,
 } from '/assets/js/feed-controls.js'
 import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js'
 import { showPageHref, episodePageHref } from '/assets/js/show-link.js'
@@ -58,6 +58,27 @@ function rangeTitle(key) {
   const days = rangeDays(key)
   return days ? `Boosts sent in the last ${days} days` : 'All boosts'
 }
+
+// 1W / 1M / All, and deliberately no 1Y where the ranked feeds have one.
+//
+// This feed WALKS its window in rather than querying it: ensureCoverage below
+// has to hold every boost in the range before it can sort them, or "largest
+// boost" ranks whichever pages happened to land. The network publishes ~38
+// boosts a day, so 1W is ~280 rows and 1M ~1,140, both a handful of 200-row
+// requests; a year is ~13,900 rows, which is ~70 sequential requests and
+// several megabytes before the first card paints. Widening this feed to a year
+// means giving it a `since`-scoped query the way /api/v1/episodes and
+// /api/v1/podcasts have, so the window is answered rather than walked. That is
+// a different feature, not a fourth button.
+//
+// Derived here rather than exported from feed-controls.js on purpose. Assets
+// ship max-age=14400 and each module URL expires on its own clock, so a new
+// named export there is unresolvable for up to four hours in any browser
+// holding the older copy — and an unresolved named import is a LINK-TIME error
+// that takes the whole module down. Filtering a table that module already
+// exported degrades instead: an older RANGE_OPTIONS has no '1y' row, so this is
+// a no-op and the feed still renders. See feed-note.js for the full note.
+const WALKED_RANGES = RANGE_OPTIONS.filter(([key]) => key !== '1y')
 
 // Deliberately shorter than the Episodes rollup's menu: an episode card
 // aggregates many boosts and can be ranked by boosters / boosts / sats, but a
@@ -602,16 +623,12 @@ export async function renderBoosts({ panel, list, scope = 'global' }) {
   }
 
   mountFeedControls(panel?.dataset.feed || `boosts-${scope}`, [
-    // 1W / 1M / All, and deliberately no 1Y where the ranked feeds have one:
-    // this feed WALKS its window in rather than querying it (ensureCoverage
-    // above), so a year would be ~70 sequential requests before the first card
-    // paints. See WALKED_RANGE_OPTIONS.
     rangeControl(rangeKey, (key) => {
       if (key !== rangeKey) apply(() => { rangeKey = key })
     }, {
       label: 'Filter by when the boost was sent',
       titleFor: rangeTitle,
-      options: WALKED_RANGE_OPTIONS,
+      options: WALKED_RANGES,
     }),
     sortControl(SORT_OPTIONS, sortKey, (key) => {
       if (key !== sortKey) apply(() => { sortKey = key })

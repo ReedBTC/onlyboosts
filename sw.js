@@ -324,7 +324,23 @@
 // now live in episode-page.js, where the corpus is bounded and ranking it in
 // memory is correct; a returning visitor holding the old module keeps the empty
 // section until this bump reaches them.
-const VERSION = 'ob-v53';
+// ob-v54: the hotfix for what ob-v53 broke, and the rule that stops it
+// recurring. v53 added mountFeedNote / resetFeedNote / WALKED_RANGE_OPTIONS to
+// feed-controls.js and imported them from all three feed renderers. Assets ship
+// max-age=14400, so the browser holds each module URL for up to four hours ON
+// ITS OWN CLOCK: a reader with a stale feed-controls.js and a fresh renderer got
+// "does not provide an export named 'mountFeedNote'", and an unresolved named
+// import is a LINK-TIME error, so the renderer never ran and all eight feeds
+// failed at once. A VERSION bump cannot close that window — the service worker's
+// cache is only consulted for clients it already controls, and the HTTP cache
+// underneath is per-URL regardless.
+// The note helpers moved to assets/js/feed-note.js, a new URL that has no cached
+// old version anywhere and so can only resolve or 404; WALKED_RANGES is derived
+// in boosts-feed.js from the RANGE_OPTIONS that module already exported, which
+// degrades to "no 1Y button" against an older copy instead of throwing. All 12
+// old/new combinations of the three renderers against both feed-controls
+// versions were checked to resolve.
+const VERSION = 'ob-v54';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;
