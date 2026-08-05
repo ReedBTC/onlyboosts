@@ -23,6 +23,25 @@ as the Local Bitcoiners bot suite (`~/localbitcoiners/bots/`):
 - **`shared/`** — `nostr_utils` (relay list, npub helpers, outbox lookup) and
   `collector_common` (bounded relay queries, VPS push).
 
+## The exclusion list
+
+`../excludes.json` (repo root) names shows, episodes, boosters and individual
+boost notes that the collector keeps indexing but never publishes — takedown
+requests, and feeds that were never meant to be indexed. Every entry carries a
+`reason`, and the file is public so what is hidden and why is readable in one
+place. It ships empty.
+
+Adding an entry hides its content everywhere on the next pipeline run; removing
+one brings it back. Check an edit before it goes live with:
+
+```
+python3 global-boost-scan/onlyboosts_globalscan.py excludes
+```
+
+which validates the file and reports what each entry currently hides. See the
+file's own `_readme` for the entry format, and the **The exclusion list** section
+of the repo `CLAUDE.md` for how it reaches the shards and D1.
+
 The Local Bitcoiners collectors this project forked from — `community-scan`,
 `community-boosts`, `community-feeds`, and `shared/boost_formatter.py` — were
 removed once `global-boost-scan` superseded them. They're still readable at

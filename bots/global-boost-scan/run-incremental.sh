@@ -14,6 +14,11 @@ exec 9>data/pipeline.lock
 flock -n 9 || { echo "[skip] pipeline busy — another run holds the lock"; exit 0; }
 
 echo "=== $(date -u +%FT%TZ) OnlyBoosts incremental cycle ==="
+# First, and deliberately fatal: a malformed excludes.json must stop the cycle
+# BEFORE anything is exported or pushed. Every db.connect() re-applies the list
+# anyway, so this step exists to fail legibly here rather than as a traceback
+# somewhere in the middle of a scan.
+"$PY" "$BOT" excludes             # validate the exclusion list + report what it hides
 "$PY" "$BOT" incremental          # new boosts since last run → SQLite
 "$PY" "$BOT" resolve-guids        # canonicalize phantom guids (feed ids / item guids / slugs)
 "$PY" "$BOT" enrich               # fill metadata/profiles for anything new

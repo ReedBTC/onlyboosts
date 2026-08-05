@@ -35,6 +35,10 @@ def write_json(path, obj):
 # denormalized boost record for the feed (lean — no shownotes).
 # podcast identity is the CANONICAL guid (falls back to the as-signed one), so
 # phantom-guid boosts join to their real show and carry the real guid to the site.
+#
+# The trailing WHERE is the exclusion filter (excludes.json → boosts.excluded), and
+# it is baked into the SQL rather than added per call site so no consumer of this
+# string can forget it — callers that narrow further append `AND …`, not `WHERE`.
 _EFF = db.effective_guid("b")
 _FEED_SQL = f"""
 SELECT b.event_id, b.booster_pubkey, b.booster_npub, b.created_at, b.sats,
@@ -49,6 +53,7 @@ FROM boosts b
 LEFT JOIN episodes e ON e.item_guid    = b.item_guid
 LEFT JOIN shows    s ON s.podcast_guid = {_EFF}
 LEFT JOIN profiles p ON p.pubkey       = b.booster_pubkey
+WHERE {db.not_excluded('b')}
 """
 
 
@@ -166,7 +171,7 @@ def export(conn, out_dir, latest_n=1000, per_show=False, log=print):
                MAX(b.created_at) AS latest,
                s.title, s.image, s.artwork, s.feed_url, s.medium, s.author
         FROM boosts b LEFT JOIN shows s ON s.podcast_guid = {_EFF}
-        WHERE {_EFF} IS NOT NULL
+        WHERE {_EFF} IS NOT NULL AND {db.not_excluded('b')}
         GROUP BY {_EFF}
         ORDER BY latest DESC""").fetchall()
     fwd_podroll, rev_podroll = _podroll_maps(conn)
@@ -220,8 +225,13 @@ def export(conn, out_dir, latest_n=1000, per_show=False, log=print):
     log(f"  music feed: {len(music)} records from {len(music_guids)} music shows")
 
     # ── profiles map (for Follows resolution / richer cards) ──────────────────
+    # Excluded boosters lose their identity row too: the map is keyed by pubkey and
+    # read by the feeds, so leaving it would publish the name and avatar of someone
+    # whose boosts are gone.
     profs = {}
-    for p in conn.execute("SELECT * FROM profiles").fetchall():
+    for p in conn.execute(
+        "SELECT * FROM profiles p WHERE NOT EXISTS (SELECT 1 FROM excluded_ids x "
+            "WHERE x.kind='booster' AND x.id = p.pubkey)").fetchall():
         profs[p["pubkey"]] = {
             "npub": hex_to_npub(p["pubkey"]),
             "name": p["name"], "display_name": p["display_name"],
@@ -239,10 +249,10 @@ def export(conn, out_dir, latest_n=1000, per_show=False, log=print):
                 SELECT e.*, COUNT(b.event_id) AS boosts,
                        COALESCE(SUM(b.sats),0) AS sats
                 FROM boosts b LEFT JOIN episodes e ON e.item_guid = b.item_guid
-                WHERE {_EFF} = ? AND b.item_guid IS NOT NULL
+                WHERE {_EFF} = ? AND b.item_guid IS NOT NULL AND {db.not_excluded('b')}
                 GROUP BY b.item_guid ORDER BY MAX(b.created_at) DESC""", (pg,)).fetchall()
             show_boosts = [_record(r) for r in
-                           conn.execute(_FEED_SQL + f" WHERE {_EFF} = ? "
+                           conn.execute(_FEED_SQL + f" AND {_EFF} = ? "
                                         "ORDER BY b.created_at DESC", (pg,)).fetchall()]
             # No generated_at here either — a show's file changes only when that
             # show gets a new boost, so rsync ships just the handful that moved.
@@ -267,6 +277,19 @@ def export(conn, out_dir, latest_n=1000, per_show=False, log=print):
             })
             n += 1
         log(f"  per-show detail shards: {n}")
+        # A show that dropped out of `agg` — excluded, or emptied by guid re-keying
+        # — leaves its shard behind, and the routine push is an rsync WITHOUT
+        # --delete, so the VPS would keep serving /show/<guid> from a stale file
+        # after the show came off the index. Removing it locally is only half the
+        # job; the marker is what tells `push` to mirror this time.
+        keep = {f"{_safe(a['podcast_guid'])}.json" for a in agg} | {"index.json"}
+        stale = [f for f in (out / "podcasts").glob("*.json") if f.name not in keep]
+        for f in stale:
+            f.unlink()
+        if stale:
+            # OUTSIDE the shards tree — everything inside it is rsynced verbatim.
+            prune_marker(out).write_text("\n".join(f.name for f in stale) + "\n")
+            log(f"  removed {len(stale)} stale per-show shard(s) — next push will mirror")
 
     # ── manifest (root index.json) — directories aren't browsable on the VPS,
     # so this is how a consumer discovers exact filenames/months up front ──────
@@ -289,6 +312,15 @@ def export(conn, out_dir, latest_n=1000, per_show=False, log=print):
     write_json(out / "meta.json", {"generated_at": generated, **s})
     log(f"  exported to {out}")
     return total
+
+
+def prune_marker(out_dir):
+    """Where `export` records that it deleted shards and `push` must mirror.
+
+    A sibling of the shards directory, never inside it: rsync ships that tree
+    verbatim, so a marker in there would land on the VPS as a file the site serves.
+    """
+    return Path(out_dir).parent / "prune-pending.txt"
 
 
 _UNSAFE = str.maketrans({c: "_" for c in '/\\:*?"<>| '})

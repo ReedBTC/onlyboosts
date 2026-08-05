@@ -13,8 +13,14 @@ DB directly; a separate exporter renders static JSON shards from it.
 
 import json
 import sqlite3
+import sys
 import time
 from pathlib import Path
+
+if str(Path(__file__).resolve().parent) not in sys.path:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import excludes as excludes_mod
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS boosts (
@@ -32,7 +38,11 @@ CREATE TABLE IF NOT EXISTS boosts (
     message         TEXT,
     client          TEXT,
     r_urls          TEXT,          -- JSON array
-    raw_json        TEXT           -- full signed event, for anything we didn't model
+    raw_json        TEXT,          -- full signed event, for anything we didn't model
+    excluded        INTEGER NOT NULL DEFAULT 0
+                                   -- 1 = on the exclusion list; still indexed here,
+                                   -- never published. Materialized from excluded_ids
+                                   -- by apply_excludes(); see excludes.py.
 );
 CREATE INDEX IF NOT EXISTS idx_boosts_created  ON boosts(created_at);
 CREATE INDEX IF NOT EXISTS idx_boosts_booster  ON boosts(booster_pubkey);
@@ -150,6 +160,28 @@ CREATE TABLE IF NOT EXISTS enrich_failed (
     last_try  INTEGER,
     PRIMARY KEY (kind, id)
 );
+
+-- The exclusion list, projected from the repo's excludes.json by apply_excludes().
+-- Rebuilt wholesale on every run, so an entry deleted from the file disappears
+-- here and its content comes back — nothing is ever removed from `boosts`.
+-- `reason` is carried across only so the CLI can report it; nothing joins on it.
+CREATE TABLE IF NOT EXISTS excluded_ids (
+    kind    TEXT NOT NULL,   -- 'show' | 'show_feed' | 'episode' | 'booster' | 'boost'
+    id      TEXT NOT NULL,
+    reason  TEXT,
+    added   TEXT,
+    PRIMARY KEY (kind, id)
+);
+
+-- Rows D1 has to be told about out of band. The projection is upsert-only and
+-- driven by NEW boosts, so a row that must DISAPPEAR (excluded) or be RECOUNTED
+-- (its show/episode lost boosts to an exclusion) has no other way to reach it.
+-- Drained by d1_sync --remote-delta; see cmd_remote_delta.
+CREATE TABLE IF NOT EXISTS d1_reproject (
+    kind  TEXT NOT NULL,     -- 'boost' (delete) | 'podcast' | 'episode' | 'profile' (re-derive or delete)
+    id    TEXT NOT NULL,
+    PRIMARY KEY (kind, id)
+);
 """
 
 # Re-attempt a failed enrichment at most this often.
@@ -163,12 +195,137 @@ def effective_guid(alias="b"):
     return f"COALESCE({p}canonical_guid, {p}podcast_guid)"
 
 
+# ── the exclusion list ────────────────────────────────────────────────────────
+# Everything that reaches a reader is filtered on `boosts.excluded = 0`. Use this
+# rather than writing the flag by hand, so the one predicate is greppable.
+def not_excluded(alias="b"):
+    return f"{alias + '.' if alias else ''}excluded = 0"
+
+
+def _excluded_expr(alias="b"):
+    """1 when this boost is on the list, by any of the ways of naming it.
+
+    A guid is matched against EVERY identity slot, not the one its list is named
+    after, and that is load-bearing rather than sloppy. Two reasons:
+
+      • The as-signed `podcast_guid` and the resolved `canonical_guid` both have to
+        answer, so a takedown naming the guid a client actually signed works after
+        we've aliased it onto the real feed, and one naming the real feed works on
+        boosts still carrying the phantom.
+      • Clients demonstrably sign an ITEM guid in the `podcast:guid` tag — that's
+        what guid_aliases exists to repair, and it doesn't always manage it.
+        Measured on the live index, 52 of the 107 boosts to one episode name it in
+        the show slot with no item_guid at all. Matching `episode` against
+        `item_guid` alone would have left every one of them published.
+
+    These ids are opaque and unique, so a listed id turning up in another slot only
+    ever means the same content, and erring toward hiding is the right direction
+    for a list whose entries are undertakings not to publish.
+    """
+    p = f"{alias}."
+    eg = effective_guid(alias)
+    return f"""(EXISTS (SELECT 1 FROM excluded_ids x WHERE
+                   (x.kind='boost'   AND x.id = {p}event_id)
+                OR (x.kind='booster' AND x.id = {p}booster_pubkey)
+                OR (x.kind IN ('show','episode')
+                    AND x.id IN ({p}podcast_guid, {eg}, {p}item_guid)))
+           OR EXISTS (SELECT 1 FROM shows s
+                      JOIN excluded_ids x ON x.kind='show_feed' AND x.id = s.feed_url
+                      WHERE s.podcast_guid = {eg}))"""
+
+
+def show_excluded(guid_col, feed_col=None):
+    """Predicate for a SHOW row itself — the podroll graph is the one surface that
+    renders a show we hold no boosts for, so filtering boosts doesn't reach it.
+
+    Takes `episode` ids against the guid column too, for the phantom-guid reason
+    in _excluded_expr: a listed 'episode' can be what a feed is keyed by here.
+    """
+    return ("EXISTS (SELECT 1 FROM excluded_ids x WHERE "
+            f"(x.kind IN ('show','episode') AND x.id = {guid_col})"
+            + (f" OR (x.kind='show_feed' AND x.id = {feed_col})" if feed_col else "")
+            + ")")
+
+
+def excluded_booster_ids(conn):
+    return {r[0] for r in conn.execute(
+        "SELECT id FROM excluded_ids WHERE kind='booster'").fetchall()}
+
+
+def apply_excludes(conn, ex=None):
+    """Project excludes.json onto `excluded_ids` + `boosts.excluded`.
+
+    Runs on every connect. Returns the number of boost rows whose flag MOVED —
+    normally 0, non-zero only on the run after the file was edited.
+
+    Both directions are handled, because the list has to be reversible: an entry
+    added hides content, an entry removed brings it back. The rows that moved are
+    queued in `d1_reproject`, which is the only way a *deletion* can reach D1 (the
+    projection is upsert-only and driven by new boosts). The JSON shards need no
+    equivalent — they are rewritten whole on every export.
+    """
+    if ex is None:
+        ex = excludes_mod.load()
+    _rebuild_excluded_ids(conn, ex)
+
+    expr = _excluded_expr("b")
+    eg = effective_guid("b")
+    moved = conn.execute(f"""
+        SELECT * FROM (
+            SELECT b.event_id, b.booster_pubkey, b.item_guid, {eg} AS pod_guid,
+                   b.excluded AS was, CASE WHEN {expr} THEN 1 ELSE 0 END AS now
+            FROM boosts b)
+        WHERE was <> now""").fetchall()
+    if not moved:
+        return 0
+
+    conn.executemany("UPDATE boosts SET excluded=? WHERE event_id=?",
+                     [(r["now"], r["event_id"]) for r in moved])
+
+    # Un-mark every moved row so the next delta re-derives it: an un-excluded boost
+    # is re-inserted by the ordinary path, and an excluded one is filtered out of
+    # _unsynced_boosts, so the marker would otherwise lie in both directions.
+    if _has_table(conn, "d1_boosts_synced"):
+        conn.executemany("DELETE FROM d1_boosts_synced WHERE event_id=?",
+                         [(r["event_id"],) for r in moved])
+    queue, unqueue = [], []
+    for r in moved:
+        (queue if r["now"] else unqueue).append(("boost", r["event_id"]))
+        for kind, val in (("podcast", r["pod_guid"]), ("episode", r["item_guid"]),
+                          ("profile", r["booster_pubkey"])):
+            if val:
+                queue.append((kind, val))
+    conn.executemany("INSERT OR IGNORE INTO d1_reproject (kind,id) VALUES (?,?)", queue)
+    # An exclude→un-exclude round trip between two pushes must not leave a pending
+    # DELETE behind the re-insert.
+    conn.executemany("DELETE FROM d1_reproject WHERE kind=? AND id=?", unqueue)
+    conn.commit()
+    return len(moved)
+
+
+def _rebuild_excluded_ids(conn, ex):
+    """Replace the table with the file's contents, touching nothing when they agree
+    (the common case — this runs on every connect)."""
+    want = {(e["kind"], e["id"]): (e["reason"], e["added"]) for e in ex.entries}
+    have = {(r["kind"], r["id"]): (r["reason"], r["added"])
+            for r in conn.execute("SELECT kind,id,reason,added FROM excluded_ids")}
+    if want == have:
+        return
+    conn.execute("DELETE FROM excluded_ids")
+    conn.executemany("INSERT INTO excluded_ids (kind,id,reason,added) VALUES (?,?,?,?)",
+                     [(k, i, r, a) for (k, i), (r, a) in want.items()])
+    conn.commit()
+
+
 def _migrate(conn):
     """Additive migrations for DBs created before a column existed."""
     cols = {r[1] for r in conn.execute("PRAGMA table_info(boosts)")}
     if "canonical_guid" not in cols:
         conn.execute("ALTER TABLE boosts ADD COLUMN canonical_guid TEXT")
+    if "excluded" not in cols:
+        conn.execute("ALTER TABLE boosts ADD COLUMN excluded INTEGER NOT NULL DEFAULT 0")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_boosts_canonical ON boosts(canonical_guid)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_boosts_excluded  ON boosts(excluded)")
     show_cols = {r[1] for r in conn.execute("PRAGMA table_info(shows)")}
     if "author" not in show_cols:
         conn.execute("ALTER TABLE shows ADD COLUMN author TEXT")
@@ -181,7 +338,7 @@ def _migrate(conn):
     conn.commit()
 
 
-def connect(db_path, check_same_thread=True):
+def connect(db_path, check_same_thread=True, apply_exclusions=True):
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db_path, timeout=30, check_same_thread=check_same_thread)
     conn.row_factory = sqlite3.Row
@@ -189,6 +346,12 @@ def connect(db_path, check_same_thread=True):
     conn.execute("PRAGMA synchronous=NORMAL")
     conn.executescript(SCHEMA)
     _migrate(conn)
+    # Deliberately on the CONNECTION, not in the pipeline scripts: every publish
+    # path filters on `boosts.excluded`, so a command that opened the DB without
+    # refreshing it would publish against a stale list. There is no path to the
+    # data that skips this one. Idempotent and near-free when nothing changed.
+    if apply_exclusions:
+        apply_excludes(conn)
     return conn
 
 
@@ -283,33 +446,36 @@ def _cutoff():
     return int(time.time()) - ENRICH_RETRY_COOLDOWN
 
 
+# Each also skips excluded boosts: enrichment exists to make a row publishable, so
+# fetching Podcast Index and kind-0s for content we've undertaken not to show is
+# outbound traffic about exactly the show that asked us to stop.
 def guids_needing_show(conn):
     eg = effective_guid("b")
     rows = conn.execute(
         f"""SELECT DISTINCT {eg} AS g FROM boosts b
            LEFT JOIN shows s ON s.podcast_guid = {eg}
            LEFT JOIN enrich_failed f ON f.kind='show' AND f.id = {eg}
-           WHERE {eg} IS NOT NULL AND s.podcast_guid IS NULL
+           WHERE {eg} IS NOT NULL AND s.podcast_guid IS NULL AND {not_excluded('b')}
              AND (f.id IS NULL OR f.last_try < ?)""", (_cutoff(),)).fetchall()
     return [r[0] for r in rows]
 
 
 def guids_needing_episode(conn):
     rows = conn.execute(
-        """SELECT DISTINCT b.item_guid FROM boosts b
+        f"""SELECT DISTINCT b.item_guid FROM boosts b
            LEFT JOIN episodes e ON e.item_guid = b.item_guid
            LEFT JOIN enrich_failed f ON f.kind='episode' AND f.id = b.item_guid
-           WHERE b.item_guid IS NOT NULL AND e.item_guid IS NULL
+           WHERE b.item_guid IS NOT NULL AND e.item_guid IS NULL AND {not_excluded('b')}
              AND (f.id IS NULL OR f.last_try < ?)""", (_cutoff(),)).fetchall()
     return [r[0] for r in rows]
 
 
 def pubkeys_needing_profile(conn):
     rows = conn.execute(
-        """SELECT DISTINCT b.booster_pubkey FROM boosts b
+        f"""SELECT DISTINCT b.booster_pubkey FROM boosts b
            LEFT JOIN profiles p ON p.pubkey = b.booster_pubkey
            LEFT JOIN enrich_failed f ON f.kind='profile' AND f.id = b.booster_pubkey
-           WHERE p.pubkey IS NULL
+           WHERE p.pubkey IS NULL AND {not_excluded('b')}
              AND (f.id IS NULL OR f.last_try < ?)""", (_cutoff(),)).fetchall()
     return [r[0] for r in rows]
 
@@ -353,10 +519,12 @@ def shows_needing_podroll(conn, max_age, retry_age=None, only_boosted=True):
     scope = ""
     if only_boosted:
         eg = effective_guid("b")
-        scope = f" AND EXISTS (SELECT 1 FROM boosts b WHERE {eg} = s.podcast_guid)"
+        scope = (f" AND EXISTS (SELECT 1 FROM boosts b "
+                 f"WHERE {eg} = s.podcast_guid AND {not_excluded('b')})")
     return conn.execute(
         f"""SELECT s.podcast_guid, s.feed_url FROM shows s
             WHERE s.feed_url IS NOT NULL
+              AND NOT {show_excluded('s.podcast_guid', 's.feed_url')}
               AND (s.podroll_checked_at IS NULL
                    OR s.podroll_checked_at < ?
                    OR (({transient}) AND s.podroll_checked_at < ?)){scope}
@@ -388,12 +556,28 @@ def podroll_targets_needing_show(conn):
     """Podroll target guids with no `shows` row yet — the cards that would render
     with no title or artwork. Excludes ones inside the enrich-failure cooldown."""
     rows = conn.execute(
-        """SELECT DISTINCT p.target_guid FROM podroll p
+        f"""SELECT DISTINCT p.target_guid FROM podroll p
            LEFT JOIN shows s ON s.podcast_guid = p.target_guid
            LEFT JOIN enrich_failed f ON f.kind='show' AND f.id = p.target_guid
            WHERE p.target_guid IS NOT NULL AND s.podcast_guid IS NULL
+             AND NOT {show_excluded('p.target_guid', 'p.target_url')}
              AND (f.id IS NULL OR f.last_try < ?)""", (_cutoff(),)).fetchall()
     return [r[0] for r in rows]
+
+
+#: The excluded-edge test, shared by podroll_rows and the podroll figures in
+#: stats() so the graph and its counts can't disagree. Both endpoints are tested,
+#: by guid and by feed URL; see the WHERE clause in podroll_rows for why it is a
+#: NOT EXISTS rather than a NOT ... IN.
+_PODROLL_EDGE_OK = """NOT EXISTS (
+    SELECT 1 FROM excluded_ids x
+     WHERE (x.kind IN ('show','episode') AND x.id IN (p.source_guid, p.target_guid))
+        OR (x.kind='show_feed' AND x.id IN (src.feed_url, tgt.feed_url, p.target_url)))"""
+
+_PODROLL_FILTERED = f"""(podroll p
+    LEFT JOIN shows src ON src.podcast_guid = p.source_guid
+    LEFT JOIN shows tgt ON tgt.podcast_guid = p.target_guid)
+    WHERE {_PODROLL_EDGE_OK}"""
 
 
 def podroll_rows(conn):
@@ -409,7 +593,7 @@ def podroll_rows(conn):
     """
     return conn.execute(f"""
         WITH boosted AS (SELECT DISTINCT {effective_guid('')} AS g FROM boosts
-                         WHERE podcast_guid IS NOT NULL)
+                         WHERE podcast_guid IS NOT NULL AND {not_excluded('')})
         SELECT p.source_guid, p.position, p.target_guid, p.target_url,
                p.target_title, p.target_medium,
                src.title AS src_title, src.image AS src_img, src.artwork AS src_art2,
@@ -423,6 +607,13 @@ def podroll_rows(conn):
         LEFT JOIN shows   tgt ON tgt.podcast_guid = p.target_guid
         LEFT JOIN boosted sb  ON sb.g = p.source_guid
         LEFT JOIN boosted tb  ON tb.g = p.target_guid
+        -- Excluded at EITHER end drops the edge. This is the one surface that can
+        -- render a show we hold no boosts for, so `boosts.excluded` never reaches
+        -- it; an excluded feed must not survive as somebody else's podroll tile.
+        -- Written as NOT EXISTS with the ids on the inside so a NULL target_guid
+        -- (url-only edges) stays harmless — `NULL IN (…)` inside NOT (…) drops the
+        -- row, inside EXISTS it just fails to match.
+        WHERE {_PODROLL_EDGE_OK}
         ORDER BY p.source_guid, p.position""").fetchall()
 
 
@@ -444,9 +635,10 @@ def raw_guids_needing_alias(conn):
     """Distinct as-signed podcast_guids that carry no alias yet. The resolver looks
     at each and decides whether it's a phantom that maps to a real guid."""
     rows = conn.execute(
-        """SELECT DISTINCT b.podcast_guid FROM boosts b
+        f"""SELECT DISTINCT b.podcast_guid FROM boosts b
            LEFT JOIN guid_aliases a ON a.raw_guid = b.podcast_guid
-           WHERE b.podcast_guid IS NOT NULL AND a.raw_guid IS NULL""").fetchall()
+           WHERE b.podcast_guid IS NOT NULL AND a.raw_guid IS NULL
+             AND {not_excluded('b')}""").fetchall()
     return [r[0] for r in rows]
 
 
@@ -539,9 +731,10 @@ def enrichment_gap_size(conn):
     exactly why the population went unwatched for so long, so the sync prints
     this number rather than leaving it to be discovered."""
     return conn.execute(
-        """SELECT COUNT(DISTINCT b.item_guid) FROM boosts b
+        f"""SELECT COUNT(DISTINCT b.item_guid) FROM boosts b
            LEFT JOIN episodes e ON e.item_guid = b.item_guid
-           WHERE b.item_guid IS NOT NULL AND e.item_guid IS NULL""").fetchone()[0]
+           WHERE b.item_guid IS NOT NULL AND e.item_guid IS NULL
+             AND {not_excluded('b')}""").fetchone()[0]
 
 
 def orphaned_podcast_guids(conn):
@@ -555,6 +748,22 @@ def orphaned_podcast_guids(conn):
 def clear_orphaned_podcast_guids(conn, guids):
     conn.executemany("DELETE FROM d1_podcasts_orphaned WHERE podcast_guid=?",
                      [(g,) for g in guids])
+    conn.commit()
+
+
+def reproject_queue(conn):
+    """What D1 has to be told about that no new boost will tell it — see the
+    d1_reproject table comment. {kind: [id, …]}."""
+    if not _has_table(conn, "d1_reproject"):
+        return {}
+    out = {}
+    for r in conn.execute("SELECT kind, id FROM d1_reproject").fetchall():
+        out.setdefault(r["kind"], []).append(r["id"])
+    return out
+
+
+def clear_reproject_queue(conn, pairs):
+    conn.executemany("DELETE FROM d1_reproject WHERE kind=? AND id=?", list(pairs))
     conn.commit()
 
 
@@ -599,15 +808,21 @@ def set_meta(conn, key, value):
 
 # ── stats ─────────────────────────────────────────────────────────────────────
 def stats(conn):
+    """Every figure here is published — meta.json, the manifest totals and the
+    /about stat strip all read it — so every one of them is net of exclusions.
+    `nx` is the flag test; the metadata-cache counts subtract excluded rows the
+    same way, since "excluded from all feeds and stats" means the counts too."""
     def one(q):
         return conn.execute(q).fetchone()[0]
+    nx = not_excluded("")
     return {
-        "boosts":          one("SELECT COUNT(*) FROM boosts"),
+        "boosts":          one(f"SELECT COUNT(*) FROM boosts WHERE {nx}"),
         "distinct_shows":  one("SELECT COUNT(DISTINCT COALESCE(canonical_guid, podcast_guid)) "
-                               "FROM boosts WHERE podcast_guid IS NOT NULL"),
-        "distinct_eps":    one("SELECT COUNT(DISTINCT item_guid) FROM boosts WHERE item_guid IS NOT NULL"),
-        "distinct_boosters": one("SELECT COUNT(DISTINCT booster_pubkey) FROM boosts"),
-        "total_sats":      one("SELECT COALESCE(SUM(sats),0) FROM boosts"),
+                               f"FROM boosts WHERE podcast_guid IS NOT NULL AND {nx}"),
+        "distinct_eps":    one("SELECT COUNT(DISTINCT item_guid) FROM boosts "
+                               f"WHERE item_guid IS NOT NULL AND {nx}"),
+        "distinct_boosters": one(f"SELECT COUNT(DISTINCT booster_pubkey) FROM boosts WHERE {nx}"),
+        "total_sats":      one(f"SELECT COALESCE(SUM(sats),0) FROM boosts WHERE {nx}"),
         # Shows that have boosts AND metadata. Filtered rather than a bare
         # COUNT(*) because `shows` also caches podroll targets nobody has boosted;
         # those must not inflate a number the website prints. Reads the boosts
@@ -617,11 +832,19 @@ def stats(conn):
         # once per show — 6.2s versus 0.02s here, on a function the exporter calls.
         "shows_enriched":  one(f"SELECT COUNT(*) FROM shows WHERE podcast_guid IN "
                                f"(SELECT DISTINCT {effective_guid('')} FROM boosts "
-                               f" WHERE podcast_guid IS NOT NULL)"),
-        "eps_enriched":    one("SELECT COUNT(*) FROM episodes"),
-        "profiles":        one("SELECT COUNT(*) FROM profiles"),
-        "podroll_edges":   one("SELECT COUNT(*) FROM podroll"),
-        "podroll_shows":   one("SELECT COUNT(DISTINCT source_guid) FROM podroll"),
-        "earliest":        one("SELECT MIN(created_at) FROM boosts"),
-        "latest":          one("SELECT MAX(created_at) FROM boosts"),
+                               f" WHERE podcast_guid IS NOT NULL AND {nx})"),
+        "eps_enriched":    one("SELECT COUNT(*) FROM episodes e WHERE NOT EXISTS "
+                               "(SELECT 1 FROM excluded_ids x "
+                               " WHERE x.kind IN ('show','episode') "
+                               "   AND x.id IN (e.item_guid, e.podcast_guid))"),
+        "profiles":        one("SELECT COUNT(*) FROM profiles p WHERE NOT EXISTS "
+                               "(SELECT 1 FROM excluded_ids x "
+                               " WHERE x.kind='booster' AND x.id = p.pubkey)"),
+        # Same edge filter as podroll_rows, minus its metadata join — these are
+        # counts, and re-running that query's boosts CTE twice per export to get
+        # two integers is the expensive way to agree with it.
+        "podroll_edges":   one(f"SELECT COUNT(*) FROM {_PODROLL_FILTERED}"),
+        "podroll_shows":   one(f"SELECT COUNT(DISTINCT p.source_guid) FROM {_PODROLL_FILTERED}"),
+        "earliest":        one(f"SELECT MIN(created_at) FROM boosts WHERE {nx}"),
+        "latest":          one(f"SELECT MAX(created_at) FROM boosts WHERE {nx}"),
     }

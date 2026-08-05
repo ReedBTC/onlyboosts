@@ -496,6 +496,104 @@ Carried from the scaffold commit and the LB suite:
    inherited, not chosen. Only those two families are self-hosted in
    `assets/fonts/`.
 
+## The exclusion list
+
+`excludes.json`, at the repo root. Anything named in it is filtered out of every
+published surface — the JSON shards, the D1 projection behind `/api/v1`, the
+show and episode pages, search, the podroll graph, and the counts on `/about`.
+It ships **empty**; it exists so a takedown request, or a feed like the LNURL
+test feed that was never meant to be indexed, is answered by one edit.
+
+**It is at the repo root, and it is public, both on purpose.** The repo is
+public and the file is the answer to "what are you hiding, and why" — so every
+entry carries a required `reason`, and `pages_build_output_dir = "."` means it
+is also served at `onlyboosts.social/excludes.json`. Its `_readme` key is the
+user-facing documentation; JSON has no comments, so the file carries its own.
+
+**Four lists, and the medium split does not get its own.** `shows` covers albums
+and `episodes` covers songs, because an album *is* a show with
+`<podcast:medium>music` — see The medium split. The other two are `boosters`
+(one person's boosts and their profile) and `boosts` (one note).
+
+**Nothing is deleted.** The collector keeps indexing everything; the list gates
+what is *published*. That is what makes it reversible — removing an entry
+restores the content on the next pipeline run, verified end to end (a filtered
+export followed by a restored one reproduces the unfiltered shards exactly). The
+box's SQLite is not a published surface, so there is no half-measure here.
+
+### How it reaches the data
+
+`bots/global-boost-scan/excludes.py` parses the file; `db.apply_excludes()`
+projects it onto the `excluded_ids` table and a `boosts.excluded` flag, and
+**every publish path filters on `db.not_excluded()`**. Use that helper rather
+than writing `excluded = 0` by hand — it is how a new query is found by grep.
+
+**`db.connect()` applies it, not the pipeline scripts.** There is deliberately
+no path to the data that can skip it: a command that opened the DB against a
+stale list would publish against a stale list. It is idempotent and touches
+nothing when the file and the table agree, which is every run but the one after
+an edit.
+
+**A malformed file is fatal, a missing one is empty.** A fresh clone with no
+file publishes everything, which is right for a list that is empty anyway. A
+file that exists and doesn't parse — an unknown list name, a missing id, a
+missing reason — raises, and the run scripts validate it as their *first* step
+so the failure is legible rather than a traceback inside a scan. The failure
+mode being guarded is a typo'd key (`"show"` for `"shows"`) silently excluding
+nothing while everyone believes the content is gone.
+
+**⚠️ A guid is matched against every identity slot**, not the one its list is
+named after. Clients demonstrably sign an *item* guid into the `podcast:guid`
+tag — that is what `guid_aliases` exists to repair and it doesn't always manage
+it. Measured on the live index, 52 of the 107 boosts to one episode name it in
+the show slot with no `item_guid` at all, so matching `episode` against
+`item_guid` alone would have left most of them published. These ids are opaque
+and unique, so a listed id turning up in another slot only ever means the same
+content. See `db._excluded_expr`.
+
+**Two surfaces need more than the boost filter**, and both are easy to miss:
+
+- **The podroll graph** renders shows we hold no boosts for, so
+  `boosts.excluded` never reaches it. `db.podroll_rows` drops an edge excluded at
+  *either* end, and `stats()` counts through the same predicate so the graph and
+  its figures can't disagree.
+- **The per-show shards on the VPS.** The routine push is an rsync *without*
+  `--delete`, so an excluded show's `podcasts/<guid>.json` would keep being
+  served after it left the index. `export` deletes the stale shards and leaves
+  `data/prune-pending.txt`; `push` reads that marker, forces `--delete` for that
+  run, and clears it. The marker is a sibling of the shards directory, never
+  inside it — everything in there is rsynced verbatim.
+
+**D1 needs to be told, because its projection is upsert-only** and driven by new
+boosts arriving. An exclusion is the opposite: a row has to *disappear*.
+`apply_excludes` queues what moved in `d1_reproject` — in both directions, so
+un-listing restores — and `d1_sync.build_reproject_sql` drains it. That drain is
+a re-derivation, not a delete: each show/episode/profile is recomputed from the
+box DB and only *becomes* a delete when the recompute comes back empty. So a
+show that lost one episode keeps its page with corrected totals, and a show that
+lost everything loses its page. The deletes are emitted **before** the delta's
+inserts, so an exclude→un-exclude round trip inside one cycle lands right way up.
+
+**Enrichment skips excluded rows too.** Podcast Index lookups and kind-0 fetches
+exist to make a row publishable, so continuing to make outbound requests about
+the show that asked us to stop is the one thing worse than showing it.
+
+`onlyboosts_globalscan.py excludes` validates the file and reports what each
+entry currently hides, in boosts and sats. That is the check to run after an
+edit — the alternative is waiting for a timer and reading a feed.
+
+**All three units carry `OnFailure=lb-bot-alert@%n.service`**, and the two that
+didn't were wired *because* of this feature: a broken exclusion file stops the
+cycle, and without the alert it would stop silently. Two caveats that come with
+the alerter — it only catches **non-zero exits**, so an error a step swallows
+stays invisible, and its target repo is hardcoded to `ReedBTC/localbitcoiners`,
+so an OnlyBoosts failure files an issue over there. Closing the issue re-arms it.
+
+**The removal path is deliberately not documented on the site.** `/about` says
+nothing about how to be excluded, and `docs/about-and-faq-source.md` — the
+factual source of record for that page — is intentionally silent on it too.
+Reed's call; don't add it as a "missing piece".
+
 ## Data feed
 
 The collector publishes static JSON to `https://relay.mynostr.app/onlyboosts/`.

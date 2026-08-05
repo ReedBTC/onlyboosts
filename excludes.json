@@ -1,0 +1,50 @@
+{
+  "_readme": [
+    "The OnlyBoosts exclusion list. Anything named here is filtered out of every",
+    "published surface: the JSON shards behind the feeds, the D1 projection behind",
+    "/api/v1, the show/episode pages, search, the podroll graph, and the counts on",
+    "/about. Nothing here is deleted from the collector's own index, so removing an",
+    "entry from this file puts the content back on the next pipeline run.",
+    "",
+    "Every entry carries a `reason`. That is the point of the file: what is hidden",
+    "and why is readable by anyone, in one place, in the public repo.",
+    "",
+    "FOUR LISTS, and which surfaces each one covers:",
+    "  shows     — a whole feed and every boost to it. Covers ALBUMS too: an album",
+    "              is a show with <podcast:medium>music, not a separate thing.",
+    "              Identify it by `guid` (the <podcast:guid>, which is the last",
+    "              path segment of an onlyboosts.social/show/<guid> URL) or by",
+    "              `feed` (the RSS URL, exact match). Either is enough; use `feed`",
+    "              when a takedown request names a feed we may not have indexed",
+    "              yet, and it starts working the moment we do.",
+    "  episodes  — one episode and its boosts. Covers SONGS for the same reason.",
+    "              `guid` is the <guid> of the item (sometimes a URL — copy it",
+    "              verbatim from the episode page URL).",
+    "  boosters  — every boost sent by one person, plus their profile. `npub` (or",
+    "              `pubkey` in hex).",
+    "  boosts    — a single boost note, left everywhere else intact. `id` is the",
+    "              64-char Nostr event id.",
+    "",
+    "ENTRY FIELDS: the id field above, `reason` (required, free text), and",
+    "optionally `added` (YYYY-MM-DD) and `source` (who asked, or how we found it).",
+    "",
+    "You do not have to get the LIST right, only the id. A guid is matched against",
+    "every identity slot on a boost, because some apps sign an episode's guid into",
+    "the show tag and vice versa. Put an id in whichever list describes it and it",
+    "will catch the boosts that mean it.",
+    "",
+    "A typo is not silently ignored. An unknown list name, an entry with no id, or",
+    "an entry with no reason stops the pipeline rather than publishing something",
+    "that was meant to be hidden. Validate an edit before it goes live with:",
+    "    python3 bots/global-boost-scan/onlyboosts_globalscan.py excludes",
+    "which parses this file and reports exactly what each entry currently hides."
+  ],
+
+  "shows": [],
+
+  "episodes": [],
+
+  "boosters": [],
+
+  "boosts": []
+}

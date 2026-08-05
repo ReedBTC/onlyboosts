@@ -50,7 +50,7 @@ def _boost_rows(conn):
     rows = conn.execute(
         f"""SELECT event_id, booster_pubkey, booster_npub, created_at, sats, amount_source,
                   {eg} AS podcast_guid, item_guid, item_url, client, message
-           FROM boosts""").fetchall()
+           FROM boosts WHERE {db.not_excluded('')}""").fetchall()
     for r in rows:
         yield r
 
@@ -115,7 +115,7 @@ def build_full_sql(conn):
                MAX(b.created_at) AS latest_ts,
                s.title, s.image, s.artwork, s.feed_url, s.medium, s.author
         FROM boosts b LEFT JOIN shows s ON s.podcast_guid={eg}
-        WHERE {eg} IS NOT NULL GROUP BY {eg}""").fetchall():
+        WHERE {eg} IS NOT NULL AND {db.not_excluded('b')} GROUP BY {eg}""").fetchall():
         # `artwork` is the second-chance art URL (<itunes:image> when it differs
         # from <image>); the show page falls back to it when `image` 404s. The
         # remote D1 `podcasts.artwork` column shipped out-of-band (ALTER + backfill),
@@ -130,8 +130,10 @@ def build_full_sql(conn):
             out.append("INSERT INTO podcasts_fts (podcast_guid,title,author) VALUES ("
                        f"{q(a['guid'])},{q(a['title'])},{q(a['author'])});")
 
-    # episodes (metadata + per-episode aggregates)
-    for e in conn.execute("""
+    # episodes (metadata + per-episode aggregates). The aggregate subquery is an
+    # INNER join, so filtering it is also what drops an excluded episode entirely:
+    # with no surviving boost it produces no row to join to.
+    for e in conn.execute(f"""
         SELECT e.item_guid, e.podcast_guid, e.title, e.image, e.published,
                e.duration, e.episode_number, e.enclosure_url, e.description,
                s.title AS show_title,
@@ -139,7 +141,8 @@ def build_full_sql(conn):
         FROM episodes e
         JOIN (SELECT item_guid, COUNT(*) boost_count, COALESCE(SUM(sats),0) total_sats,
                      COUNT(DISTINCT booster_pubkey) booster_count, MAX(created_at) latest_ts
-              FROM boosts WHERE item_guid IS NOT NULL GROUP BY item_guid) agg
+              FROM boosts WHERE item_guid IS NOT NULL AND {db.not_excluded('')}
+              GROUP BY item_guid) agg
           ON agg.item_guid = e.item_guid
         LEFT JOIN shows s ON s.podcast_guid = e.podcast_guid""").fetchall():
         out.append(
@@ -154,8 +157,11 @@ def build_full_sql(conn):
             out.append("INSERT INTO episodes_fts (item_guid,title,show) VALUES ("
                        f"{q(e['item_guid'])},{q(e['title'])},{q(e['show_title'])});")
 
-    # profiles
-    for p in conn.execute("SELECT pubkey,name,display_name,picture,nip05 FROM profiles").fetchall():
+    # profiles (excluded boosters lose their identity row here as in the shards)
+    for p in conn.execute(
+        "SELECT pubkey,name,display_name,picture,nip05 FROM profiles p "
+        "WHERE NOT EXISTS (SELECT 1 FROM excluded_ids x "
+        "                  WHERE x.kind='booster' AND x.id = p.pubkey)").fetchall():
         out.append(
             "INSERT INTO profiles (pubkey,name,display_name,picture,nip05) VALUES ("
             f"{q(p['pubkey'])},{q(p['name'])},{q(p['display_name'])},{q(p['picture'])},{q(p['nip05'])});")
@@ -172,7 +178,11 @@ def build_full_sql(conn):
 
 # ── single-row upserts (shared by the delta and metadata-drift paths) ─────────
 def _podcast_upsert_sql(conn, guid):
-    """Re-project one podcasts row (aggregates recomputed from ALL its boosts)."""
+    """Re-project one podcasts row (aggregates recomputed from ALL its boosts).
+
+    Returns [] when the show has no publishable boost left — every caller reads
+    that as "delete it", which is how an excluded show's D1 row goes away.
+    """
     eg = db.effective_guid("b")
     a = conn.execute(
         f"""SELECT {eg} AS guid, COUNT(*) AS boost_count,
@@ -182,7 +192,7 @@ def _podcast_upsert_sql(conn, guid):
                   MAX(b.created_at) AS latest_ts,
                   s.title, s.image, s.artwork, s.feed_url, s.medium, s.author
            FROM boosts b LEFT JOIN shows s ON s.podcast_guid={eg}
-           WHERE {eg}=? GROUP BY {eg}""", (guid,)).fetchone()
+           WHERE {eg}=? AND {db.not_excluded('b')} GROUP BY {eg}""", (guid,)).fetchone()
     if not a:
         return []
     # `artwork` (second-chance art URL) is projected here and in the full load;
@@ -202,18 +212,24 @@ def _podcast_upsert_sql(conn, guid):
 def _episode_upsert_sql(conn, item_guid):
     """Re-project one episodes row, or nothing if the box has no metadata for it
     yet (a boosted item_guid with no `episodes` row is the enrichment gap, not
-    something to project as an untitled placeholder)."""
+    something to project as an untitled placeholder).
+
+    Also nothing when every boost on it is excluded. That case can't arise on the
+    delta path — the row is there because a new boost landed on it — but it is the
+    whole point on the reprojection path, where [] means "delete it".
+    """
+    nx = db.not_excluded("")
     e = conn.execute(
-        """SELECT e.item_guid,e.podcast_guid,e.title,e.image,e.published,e.duration,
+        f"""SELECT e.item_guid,e.podcast_guid,e.title,e.image,e.published,e.duration,
                   e.episode_number,e.enclosure_url,e.description, s.title AS show_title,
-                  (SELECT COUNT(*) FROM boosts WHERE item_guid=e.item_guid) AS boost_count,
-                  (SELECT COALESCE(SUM(sats),0) FROM boosts WHERE item_guid=e.item_guid) AS total_sats,
-                  (SELECT COUNT(DISTINCT booster_pubkey) FROM boosts WHERE item_guid=e.item_guid) AS booster_count,
-                  (SELECT MAX(created_at) FROM boosts WHERE item_guid=e.item_guid) AS latest_ts
+                  (SELECT COUNT(*) FROM boosts WHERE item_guid=e.item_guid AND {nx}) AS boost_count,
+                  (SELECT COALESCE(SUM(sats),0) FROM boosts WHERE item_guid=e.item_guid AND {nx}) AS total_sats,
+                  (SELECT COUNT(DISTINCT booster_pubkey) FROM boosts WHERE item_guid=e.item_guid AND {nx}) AS booster_count,
+                  (SELECT MAX(created_at) FROM boosts WHERE item_guid=e.item_guid AND {nx}) AS latest_ts
            FROM episodes e
            LEFT JOIN shows s ON s.podcast_guid = e.podcast_guid
            WHERE e.item_guid=?""", (item_guid,)).fetchone()
-    if not e:
+    if not e or not e["boost_count"]:
         return []
     out = ["INSERT OR REPLACE INTO episodes (item_guid,podcast_guid,title,image,published,"
            "duration,episode_number,enclosure_url,description,boost_count,total_sats,"
@@ -282,6 +298,49 @@ def build_delta_sql(conn, rows):
     return out, pods, items, skipped
 
 
+def build_reproject_sql(conn, queue):
+    """SQL for the `d1_reproject` queue — rows the boost delta can't reach.
+
+    The projection is upsert-only and driven by boosts arriving. An exclusion does
+    the opposite: a boost has to DISAPPEAR from D1, and the show, episode and
+    profile behind it have to be recounted or dropped. `apply_excludes` records
+    what moved (in BOTH directions, so un-listing something restores it) and this
+    drains it.
+
+    The re-derivation is not a delete: each row is recomputed from the box DB and
+    upserted, and only *turns into* a delete when the recompute comes back empty —
+    so a show that lost one of fifty episodes keeps its page with corrected totals,
+    and a show that lost everything loses its page.
+
+    Returns (statements, pairs) — `pairs` is what to clear once the push succeeds.
+    """
+    out, pairs = [], []
+    for event_id in queue.get("boost", []):
+        out.append(f"DELETE FROM boosts WHERE event_id={q(event_id)};")
+        out.append(f"DELETE FROM boosts_fts WHERE event_id={q(event_id)};")
+        pairs.append(("boost", event_id))
+    for guid in queue.get("podcast", []):
+        stmts = _podcast_upsert_sql(conn, guid)
+        out.extend(stmts or [f"DELETE FROM podcasts WHERE podcast_guid={q(guid)};",
+                             f"DELETE FROM podcasts_fts WHERE podcast_guid={q(guid)};"])
+        pairs.append(("podcast", guid))
+    for item in queue.get("episode", []):
+        stmts = _episode_upsert_sql(conn, item)
+        out.extend(stmts or [f"DELETE FROM episodes WHERE item_guid={q(item)};",
+                             f"DELETE FROM episodes_fts WHERE item_guid={q(item)};"])
+        pairs.append(("episode", item))
+    for pubkey in queue.get("profile", []):
+        p = conn.execute(
+            """SELECT pubkey,name,display_name,picture,nip05 FROM profiles p
+               WHERE p.pubkey=? AND NOT EXISTS (SELECT 1 FROM excluded_ids x
+                                                WHERE x.kind='booster' AND x.id=p.pubkey)""",
+            (pubkey,)).fetchone()
+        out.extend(_profile_upsert_sql(p) if p
+                   else [f"DELETE FROM profiles WHERE pubkey={q(pubkey)};"])
+        pairs.append(("profile", pubkey))
+    return out, pairs
+
+
 def _meta_sql(conn):
     s = db.stats(conn)
     return [f"INSERT OR REPLACE INTO meta (key,value) VALUES ({q(k)},{q(v)});"
@@ -319,7 +378,8 @@ def build_meta_drift_sql(conn, since, skip_pods=(), skip_items=()):
     for r in conn.execute(
         f"""SELECT s.podcast_guid FROM shows s
             WHERE s.updated_at IS NOT NULL AND s.updated_at >= ?
-              AND EXISTS (SELECT 1 FROM boosts b WHERE {eg}=s.podcast_guid)""",
+              AND EXISTS (SELECT 1 FROM boosts b
+                          WHERE {eg}=s.podcast_guid AND {db.not_excluded('b')})""",
             (since,)).fetchall():
         if r["podcast_guid"] in skip_pods:
             continue
@@ -328,9 +388,10 @@ def build_meta_drift_sql(conn, since, skip_pods=(), skip_items=()):
         counts["podcasts"] += bool(stmts)
 
     for r in conn.execute(
-        """SELECT e.item_guid FROM episodes e
+        f"""SELECT e.item_guid FROM episodes e
            WHERE e.updated_at IS NOT NULL AND e.updated_at >= ?
-             AND EXISTS (SELECT 1 FROM boosts b WHERE b.item_guid=e.item_guid)""",
+             AND EXISTS (SELECT 1 FROM boosts b
+                         WHERE b.item_guid=e.item_guid AND {db.not_excluded('b')})""",
             (since,)).fetchall():
         if r["item_guid"] in skip_items:
             continue
@@ -342,8 +403,11 @@ def build_meta_drift_sql(conn, since, skip_pods=(), skip_items=()):
         counts["episodes"] += bool(stmts)
 
     for p in conn.execute(
-        """SELECT pubkey,name,display_name,picture,nip05 FROM profiles
-           WHERE updated_at IS NOT NULL AND updated_at >= ?""", (since,)).fetchall():
+        """SELECT pubkey,name,display_name,picture,nip05 FROM profiles p
+           WHERE updated_at IS NOT NULL AND updated_at >= ?
+             AND NOT EXISTS (SELECT 1 FROM excluded_ids x
+                             WHERE x.kind='booster' AND x.id = p.pubkey)""",
+            (since,)).fetchall():
         out.extend(_profile_upsert_sql(p))
         counts["profiles"] += 1
 
@@ -362,7 +426,7 @@ def _unsynced_boosts(conn):
         f"""SELECT b.event_id,b.booster_pubkey,b.booster_npub,b.created_at,b.sats,
                   b.amount_source,{eg} AS podcast_guid,b.item_guid,b.item_url,b.client,b.message
            FROM boosts b LEFT JOIN d1_boosts_synced d ON d.event_id=b.event_id
-           WHERE d.event_id IS NULL""").fetchall()
+           WHERE d.event_id IS NULL AND {db.not_excluded('b')}""").fetchall()
 
 
 def _mark_synced(conn, ids):
@@ -457,9 +521,16 @@ def cmd_remote(args):
         if (i // BATCH) % 50 == 0:
             print(f"  …{sent}/{len(stmts)} statements", flush=True)
     _ensure_sync_table(conn)
+    # Excluded boosts are marked synced too: they are absent from the load, and the
+    # marker is what keeps the next delta from re-adding them. apply_excludes
+    # un-marks any that come off the list.
     _mark_synced(conn, [r["event_id"] for r in conn.execute("SELECT event_id FROM boosts").fetchall()])
     # Everything is projected as of `started`, so the drift pass starts from here.
     _set_watermark(conn, META_WATERMARK, started)
+    # A full load already reflects the exclusion list; a queued re-derivation of it
+    # would be a no-op at best and a stale delete at worst.
+    db.clear_reproject_queue(conn, [(k, i) for k, ids in db.reproject_queue(conn).items()
+                                    for i in ids])
     print(f"pushed {sent} statements to D1 (remote, full load); marked all boosts synced")
 
 
@@ -473,9 +544,15 @@ def cmd_remote_delta(args):
     started = int(time.time())
     rows = _unsynced_boosts(conn)
 
-    stmts, pods, items, skipped = ([], set(), set(), 0)
+    # Exclusions FIRST, so a delete never lands after the re-insert that undoes it
+    # on an exclude→un-exclude round trip inside one cycle. Its recomputed
+    # podcast/episode rows are superseded by the delta's own recompute below, which
+    # reads the same box DB — duplicating an upsert is free, dropping one isn't.
+    reproj, reproj_pairs = build_reproject_sql(conn, db.reproject_queue(conn))
+    stmts, pods, items, skipped = (list(reproj), set(), set(), 0)
     if rows:
-        stmts, pods, items, skipped = build_delta_sql(conn, rows)
+        delta, pods, items, skipped = build_delta_sql(conn, rows)
+        stmts += delta
     # Shows emptied by guid re-keying: the projection is upsert-only, so a phantom
     # that lost all its boosts has to be deleted explicitly or its page lives on
     # in D1 double-counting them against the real show.
@@ -487,6 +564,10 @@ def cmd_remote_delta(args):
     # on a cycle where no new boost arrived.
     drift, counts = build_meta_drift_sql(conn, _get_watermark(conn, META_WATERMARK), pods, items)
     stmts += drift
+    # An exclusion changes the published totals with no new boost behind it, and
+    # `_meta_sql` otherwise only rides along with the delta path.
+    if reproj and not rows:
+        stmts += _meta_sql(conn)
     if not stmts:
         print("D1 delta: nothing new to sync")
         _set_watermark(conn, META_WATERMARK, started)
@@ -501,10 +582,13 @@ def cmd_remote_delta(args):
     _mark_synced(conn, [r["event_id"] for r in rows])
     _set_watermark(conn, META_WATERMARK, started)
     db.clear_orphaned_podcast_guids(conn, orphans)
+    db.clear_reproject_queue(conn, reproj_pairs)
     print(f"D1 delta: pushed {len(rows)} new boost(s), refreshed "
           f"{counts['podcasts']} show(s) / {counts['episodes']} episode(s) / "
           f"{counts['profiles']} profile(s) whose metadata changed"
           + (f", deleted {len(orphans)} emptied show(s)" if orphans else "")
+          + (f", re-derived {len(reproj_pairs)} row(s) for the exclusion list"
+             if reproj_pairs else "")
           + f" ({len(stmts)} statements)")
     # Never let the un-projectable population be silent: a boosted episode with
     # no metadata row is skipped on purpose, but "on purpose" and "unnoticed" are
@@ -560,16 +644,17 @@ def cmd_rebuild_fts(args):
     for a in conn.execute(f"""
         SELECT {eg} AS guid, s.title, s.author
         FROM boosts b LEFT JOIN shows s ON s.podcast_guid={eg}
-        WHERE {eg} IS NOT NULL GROUP BY {eg}""").fetchall():
+        WHERE {eg} IS NOT NULL AND {db.not_excluded('b')} GROUP BY {eg}""").fetchall():
         if a["title"] or a["author"]:
             stmts.append("INSERT INTO podcasts_fts (podcast_guid,title,author) VALUES ("
                          f"{q(a['guid'])},{q(a['title'])},{q(a['author'])});")
-    for e in conn.execute("""
+    for e in conn.execute(f"""
         SELECT e.item_guid, e.title, s.title AS show_title
         FROM episodes e
         LEFT JOIN shows s ON s.podcast_guid = e.podcast_guid
         WHERE (e.title IS NOT NULL OR s.title IS NOT NULL)
-          AND EXISTS (SELECT 1 FROM boosts WHERE item_guid = e.item_guid)""").fetchall():
+          AND EXISTS (SELECT 1 FROM boosts
+                      WHERE item_guid = e.item_guid AND {db.not_excluded('')})""").fetchall():
         stmts.append("INSERT INTO episodes_fts (item_guid,title,show) VALUES ("
                      f"{q(e['item_guid'])},{q(e['title'])},{q(e['show_title'])});")
 

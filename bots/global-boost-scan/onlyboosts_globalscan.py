@@ -6,6 +6,7 @@ Subcommands:
                resumable per-relay; classify + store boosts.
   incremental  forward tail scan since the last run (for the recurring timer).
   enrich       fill Podcast Index show/episode metadata + kind-0 profiles.
+  excludes     validate excludes.json and report what each entry hides.
   stats        print DB counts.
 
 READ-ONLY: this collector only reads Nostr + Podcast Index and writes the local
@@ -35,6 +36,7 @@ sys.path.insert(0, str(HERE.parent / "shared"))
 
 import db                                                       # noqa: E402
 import enrich                                                   # noqa: E402
+import excludes                                                 # noqa: E402
 import fountain                                                 # noqa: E402
 import export as export_mod                                     # noqa: E402
 import podroll                                                  # noqa: E402
@@ -330,6 +332,12 @@ def cmd_resolve_guids(args):
     conn = db.connect(DB_PATH, check_same_thread=False)
     key, secret = _pi_creds()
     resolve_guids.resolve_all(conn, key, secret, log=lambda m: print(m, flush=True))
+    # Re-key first, exclusion second: a boost that just moved onto an excluded
+    # show's real guid is only excluded once its canonical guid says so, and the
+    # projection this connection did on open predates that move.
+    moved = db.apply_excludes(conn)
+    if moved:
+        print(f"exclusion list: {moved} boost(s) changed state after re-keying")
     _print_stats(conn)
 
 
@@ -619,11 +627,20 @@ def cmd_push(args):
         print(f"[error] no shards at {shards} — run `export` first")
         return
     n = sum(1 for _ in shards.rglob("*.json"))
+    # The routine push is add/update-only, which is right for a tail run: nothing
+    # is ever removed. An exclusion (or a guid re-key) DOES remove a shard, and the
+    # exporter leaves this marker to say so — a removal that only happened locally
+    # is a show still being served from the VPS. Cleared once the mirror succeeds.
+    marker = export_mod.prune_marker(shards)
+    mirror = args.delete or marker.exists()
     ssh_cmd = f"ssh -i {VPS_KEY_FILE} -p {port} -o StrictHostKeyChecking=accept-new"
     dest = f"{user}@{host}:{VPS_REMOTE_NS}/"       # relative to the rrsync-forced root
     cmd = ["rsync", "-a", "-e", ssh_cmd, f"{shards}/", dest]
-    if args.delete:
+    if mirror:
         cmd[1:1] = ["--delete"]     # mirror: prune stale files WITHIN onlyboosts/ only
+        if not args.delete:
+            print(f"  --delete forced: {marker.name} lists "
+                  f"{len(marker.read_text().split())} shard(s) removed since the last push")
     if args.dry_run:
         cmd[1:1] = ["-n", "-v", "--stats"]
     print(f"{'DRY-RUN ' if args.dry_run else ''}rsync {n} json files → {VPS_REMOTE_NS}/ on the VPS")
@@ -637,7 +654,51 @@ def cmd_push(args):
     if r.returncode != 0:
         print(f"[error] rsync exit {r.returncode}: {r.stderr.strip()[-600:]}")
     else:
+        if mirror and not args.dry_run:
+            marker.unlink(missing_ok=True)
         print("push OK" if not args.dry_run else "dry-run OK (nothing written)")
+
+
+def cmd_excludes(args):
+    """Validate excludes.json and report what each entry currently hides.
+
+    The list is public and hand-edited, so it needs a way to be checked that
+    doesn't involve waiting for a timer and reading a feed. Read-only apart from
+    the projection every connect does anyway.
+    """
+    try:
+        ex = excludes.load()
+    except excludes.ExcludeError as e:
+        print(f"[error] {e}")
+        sys.exit(1)
+    print(f"{ex.path}: {ex.summary()}")
+    conn = db.connect(DB_PATH, check_same_thread=False)
+    if not ex.entries:
+        print("nothing excluded — every indexed boost is published")
+        return
+    total = conn.execute("SELECT COUNT(*) FROM boosts WHERE excluded=1").fetchone()[0]
+    # Per entry, not per row: two entries can hide the same boost (a show and one
+    # of its episodes), so these will not sum to the total, and shouldn't.
+    eg = db.effective_guid("b")
+    for e in ex.entries:
+        # Mirrors db._excluded_expr, including its slot-agnostic guid match — a
+        # report that counted differently from the filter would be worse than none.
+        where = {
+            "boost":     "b.event_id = ?1",
+            "booster":   "b.booster_pubkey = ?1",
+            "show_feed": f"{eg} IN (SELECT podcast_guid FROM shows WHERE feed_url = ?1)",
+        }.get(e["kind"], f"?1 IN (b.podcast_guid, {eg}, b.item_guid)")
+        hits = conn.execute(
+            f"SELECT COUNT(*), COALESCE(SUM(b.sats),0) FROM boosts b WHERE {where}",
+            (e["id"],)).fetchone()
+        print(f"  {e['list'][:-1]:<8} {e['raw'][:52]:<52} "
+              f"{hits[0]:>5} boost(s), {hits[1]:>9} sats")
+        print(f"           reason: {e['reason']}"
+              + (f"  [added {e['added']}]" if e["added"] else "")
+              + (f"  [via {e['source']}]" if e["source"] else ""))
+    print(f"\n{total} of {conn.execute('SELECT COUNT(*) FROM boosts').fetchone()[0]} "
+          f"indexed boosts are withheld from every published surface.")
+    print("Nothing is deleted: removing an entry republishes it on the next run.")
 
 
 def cmd_stats(args):
@@ -714,6 +775,10 @@ def main():
     pu.add_argument("--delete", action="store_true",
                     help="prune remote files no longer exported (within onlyboosts/ only)")
     pu.set_defaults(func=cmd_push)
+
+    xc = sub.add_parser("excludes",
+                        help="validate excludes.json and report what each entry hides")
+    xc.set_defaults(func=cmd_excludes)
 
     s = sub.add_parser("stats", help="print index counts")
     s.set_defaults(func=cmd_stats)
