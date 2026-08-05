@@ -202,6 +202,31 @@ Local dev: `wrangler pages dev .` (so `/api/*` Functions resolve).
 - **Link pages without the `.html`.** Cloudflare Pages serves `/about` and
   308-redirects `/about.html` to it, so an in-site link with the extension
   costs a redirect hop.
+- **⚠️ `404.html` is what makes a missing path answer 404.** Without it in the
+  repo root, Cloudflare Pages answers **every** unmatched path with `200` and
+  the full homepage. Measured before it existed: `/this/does/not/exist`,
+  `/assets/js/nope.js` and `/assets/css/nope.css` all returned `200
+  text/html` and 56KB of `index.html`. Three consequences, and the third is the
+  one that costs an afternoon: a dead link silently showed the homepage instead
+  of saying anything; a crawler was told every dead URL was a real page
+  duplicating `/`; and **a file that failed to deploy reported a MIME error
+  rather than a 404**, since the browser fetched HTML where a module was
+  expected and (correctly, under `nosniff`) refused it with "Expected a
+  JavaScript-or-Wasm module script but the server responded with a MIME type of
+  text/html". Nothing in that message says the file is missing. Pages picks the
+  file up automatically; it needs no config, and it is deliberately out of
+  `functions/sitemap.xml.js` and `noindex`.
+
+  It carries **no canonical and no Open Graph tags**, which is the one place the
+  page conventions above are deliberately broken: this file is served under
+  whatever URL was missed, so there is no single address for either to name.
+  `follow` is kept so a crawler landing here still traverses the nav back into
+  the site map.
+
+  `/show/<guid>` and `/episode/<guid>` answer their own misses and are
+  unaffected. The static page matches their look on purpose (`page-eyebrow`
+  carrying the status, an `h1` naming what was not found, a `.soon-card`
+  explaining and pointing out), so the site has one 404 rather than two.
 - **Pages Functions bound every upstream fetch**: wall-clock timeout, byte
   cap, *and* a streamed read (`resp.text()` buffers before you can check
   size). See `functions/api/data/[[path]].js` for the reference shape.
