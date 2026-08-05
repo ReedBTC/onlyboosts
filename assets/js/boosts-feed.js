@@ -41,6 +41,7 @@ import { boosterLabel } from '/assets/js/ob-data.js'
 import { followsBoostReader, globalBoostReader } from '/assets/js/ob-live.js'
 import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls,
+  WALKED_RANGE_OPTIONS,
 } from '/assets/js/feed-controls.js'
 import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js'
 import { showPageHref, episodePageHref } from '/assets/js/show-link.js'
@@ -601,9 +602,17 @@ export async function renderBoosts({ panel, list, scope = 'global' }) {
   }
 
   mountFeedControls(panel?.dataset.feed || `boosts-${scope}`, [
+    // 1W / 1M / All, and deliberately no 1Y where the ranked feeds have one:
+    // this feed WALKS its window in rather than querying it (ensureCoverage
+    // above), so a year would be ~70 sequential requests before the first card
+    // paints. See WALKED_RANGE_OPTIONS.
     rangeControl(rangeKey, (key) => {
       if (key !== rangeKey) apply(() => { rangeKey = key })
-    }, { label: 'Filter by when the boost was sent', titleFor: rangeTitle }),
+    }, {
+      label: 'Filter by when the boost was sent',
+      titleFor: rangeTitle,
+      options: WALKED_RANGE_OPTIONS,
+    }),
     sortControl(SORT_OPTIONS, sortKey, (key) => {
       if (key !== sortKey) apply(() => { sortKey = key })
     }, { title: 'Sort boosts' }),

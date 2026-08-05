@@ -56,6 +56,7 @@ import {
 } from '/assets/js/ob-live.js'
 import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls,
+  mountFeedNote, resetFeedNote,
 } from '/assets/js/feed-controls.js'
 import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js'
 import { showPageHref, episodePageHref } from '/assets/js/show-link.js'
@@ -152,6 +153,8 @@ const COPY = {
     rangeLabel: 'Filter by when the show was boosted',
     rangeTitle: (days) => (days ? `Shows boosted in the last ${days} days` : 'All time'),
     sortTitle: 'Sort shows',
+    // The line above the search box. See mountFeedNote in feed-controls.js.
+    noteGlobal: 'Ranks based on every boost in the index',
     moreLabel: (n) => `Load ${n} more show${n === 1 ? '' : 's'}`,
     // No total to count against: the endpoint pages rather than reporting how
     // many shows the range holds, so this states what is on screen and nothing
@@ -184,6 +187,7 @@ const COPY = {
     rangeLabel: 'Filter by when the album was boosted',
     rangeTitle: (days) => (days ? `Albums boosted in the last ${days} days` : 'All time'),
     sortTitle: 'Sort albums',
+    noteGlobal: 'Ranks based on every boost in the index',
     moreLabel: (n) => `Load ${n} more album${n === 1 ? '' : 's'}`,
     // No total to count against: the endpoint pages rather than reporting how
     // many shows the range holds, so this states what is on screen and nothing
@@ -596,6 +600,7 @@ export async function renderShows({ panel, list, medium = 'other' }) {
   // reaches them), but the reset is what makes that a fact about the feed
   // rather than an assumption baked into this one.
   resetFeedSearch(panel)
+  resetFeedNote(panel)
 
   // All time is the opening view: the all-time leaderboard is the question a
   // show-level feed is for. The windowed ranges narrow it.
@@ -786,6 +791,11 @@ export async function renderShows({ panel, list, medium = 'other' }) {
   }
   shows = first.items
   nextOffset = first.nextOffset
+
+  // The same line the Episodes and Songs feeds carry. There is no Follows scope
+  // here yet, so it has one form; when Shows · Follows lands it gains the second
+  // and this becomes the scope-dependent pick the other renderer already makes.
+  mountFeedNote(panel, copy.noteGlobal)
 
   mountFeedControls(panel?.dataset.feed || (wantMusic ? 'albums' : 'shows'), [
     rangeControl(rangeKey, (key) => {

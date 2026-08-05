@@ -162,7 +162,7 @@
     /* ── Feed bar ────────────────────────────────────────────────────
        One row that picks the feed and controls it. Two dropdowns carry the
        two axes — what (Episodes / Shows / Songs / Albums / Boosts) x whose
-       (Global / Follows) — and each feed mounts its own 1W/1M/All + sort into
+       (Global / Follows) — and each feed mounts its own range + sort controls into
        the right-hand slot (feed-controls.js). Sticky under the nav, as the
        four-tab ribbon it replaced was, so switching feed, window or order
        doesn't mean scrolling back to the top of a long list.
@@ -285,6 +285,28 @@
       background-size: 200% 100%;
       animation: skeleton-shimmer 1.4s ease-in-out infinite;
     }
+
+    /* ── Feed note ────────────────────────────────────────────────────
+       One line above the search box on the four RANKED feeds, naming the
+       corpus the ranking was computed over. It is not on the Boosts note
+       feed: there a card is one note and Global vs Follows is the same axis
+       every Nostr client has, where a rollup card is an aggregate and its
+       scope is a claim about what was counted, which nothing on screen said.
+
+       Deliberately one line and no box. The full scope paragraph
+       (.ob-scopenote) lived here once and came off for pushing the feed below
+       the fold; this is the smallest thing that answers the question, in the
+       accent the panel is already washed in so it reads as chrome rather than
+       as a warning. */
+    .feed-note {
+      margin: 0 0 0.6rem;
+      font-size: 0.82rem;
+      line-height: 1.4;
+      color: var(--muted);
+      border-left: 2px solid var(--accent);
+      padding-left: 0.6rem;
+    }
+    .feed-note[hidden] { display: none; }
 
     /* ── Feed search ──────────────────────────────────────────────────
        The typeahead at the head of each panel (feed-search.js). Inside the
@@ -771,6 +793,7 @@
          numbers read as a claim about somebody's audience. -->
 
     <section class="feed-panel is-active" id="panel-episodes-global" role="region" aria-label="Episodes, global" data-feed="episodes-global" data-scope="global">
+      <p class="feed-note" data-feed-note hidden></p>
       <div class="feed-search" data-feed-search hidden></div>
       <div class="feed-list" data-feed-list>
         <div class="feed-placeholder">
@@ -791,6 +814,7 @@
     </section>
 
     <section class="feed-panel" id="panel-episodes-follows" role="region" aria-label="Episodes from your follows" data-feed="episodes-follows" data-scope="follows" hidden>
+      <p class="feed-note" data-feed-note hidden></p>
       <div class="feed-search" data-feed-search hidden></div>
       <div class="feed-list" data-feed-list>
         <div class="feed-placeholder">
@@ -815,6 +839,7 @@
          episode. Both scopes, because this path never reads the show-level
          rollup that keeps Shows and Albums Global-only. -->
     <section class="feed-panel" id="panel-songs-global" role="region" aria-label="Songs, global" data-feed="songs-global" data-scope="global" hidden>
+      <p class="feed-note" data-feed-note hidden></p>
       <div class="feed-search" data-feed-search hidden></div>
       <div class="feed-list" data-feed-list>
         <div class="feed-placeholder">
@@ -825,6 +850,7 @@
     </section>
 
     <section class="feed-panel" id="panel-songs-follows" role="region" aria-label="Songs from your follows" data-feed="songs-follows" data-scope="follows" hidden>
+      <p class="feed-note" data-feed-note hidden></p>
       <div class="feed-search" data-feed-search hidden></div>
       <div class="feed-list" data-feed-list>
         <div class="feed-placeholder">
@@ -838,6 +864,7 @@
          episode-level. Global only — podcasts/index.json is computed over
          everyone, so it can't serve a Follows audience (shows-feed.js). -->
     <section class="feed-panel" id="panel-shows" role="region" aria-label="Shows" data-feed="shows" data-scope="global" hidden>
+      <p class="feed-note" data-feed-note hidden></p>
       <div class="feed-search" data-feed-search hidden></div>
       <div class="feed-list" data-feed-list>
         <div class="feed-placeholder">
@@ -850,6 +877,7 @@
     <!-- Albums: Shows, narrowed to the music side of the same rollup. Global
          only for the same reason Shows is. -->
     <section class="feed-panel" id="panel-albums" role="region" aria-label="Albums" data-feed="albums" data-scope="global" hidden>
+      <p class="feed-note" data-feed-note hidden></p>
       <div class="feed-search" data-feed-search hidden></div>
       <div class="feed-list" data-feed-list>
         <div class="feed-placeholder">

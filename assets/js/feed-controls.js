@@ -35,13 +35,31 @@ function h(tag, attrs = {}, kids = []) {
   return el
 }
 
-// [key, label, days] — days null means unbounded. Order is display order, and
-// defaultRange() in feeds-podcasts.js walks it narrowest-first, so keep it so.
+// [key, label, days] — days null means unbounded. Order is display order and is
+// narrowest-first; keep it so.
+//
+// A range key is a QUERY PARAMETER on the feeds that rank server-side
+// (/api/v1/episodes and /api/v1/podcasts both enumerate the same keys), so a
+// wider window there costs nothing but a different WHERE clause. Anything added
+// here has to be added to RANGE_DAYS in both of those endpoints or the feed
+// answers 400.
 export const RANGE_OPTIONS = [
   ['1w', '1W', 7],
   ['1m', '1M', 30],
+  ['1y', '1Y', 365],
   ['all', 'All', null],
 ]
+
+// The subset offered by a feed whose bounded window is PAGED IN rather than
+// queried — the Boosts note feed, which has to hold every boost in the window
+// before it can sort them (ensureCoverage in boosts-feed.js). The network
+// publishes ~38 boosts a day, so 1W is ~280 rows and 1M ~1,140, both a handful
+// of 200-row requests; a year is ~13,900 rows, which is ~70 sequential requests
+// and several megabytes before the first card paints. That is a different
+// feature, not a fourth button — widening the note feed to a year means giving
+// it a `since`-scoped query the way the ranked feeds have, so the window is
+// answered rather than walked.
+export const WALKED_RANGE_OPTIONS = RANGE_OPTIONS.filter(([key]) => key !== '1y')
 
 /** Days in a range key, or null for the unbounded one. */
 export function rangeDays(key) {
@@ -65,8 +83,12 @@ export function rangeCutoff(key) {
  * @param {string}   [opts.label]    group label for screen readers
  * @param {Function} [opts.titleFor] (key, label) => tooltip; the range means
  *   different things per feed, so the wording is the caller's to own.
+ * @param {Array}    [opts.options]  the range rows to offer, defaulting to all
+ *   of them. A feed that pages its window in rather than querying it passes
+ *   WALKED_RANGE_OPTIONS — see the note there.
  */
 export function rangeControl(initialKey, onPick, opts = {}) {
+  const options = opts.options || RANGE_OPTIONS
   const titleFor = opts.titleFor || ((key, label) => (
     rangeDays(key) ? `Last ${rangeDays(key)} days` : label
   ))
@@ -74,7 +96,7 @@ export function rangeControl(initialKey, onPick, opts = {}) {
     class: 'pcast-range', role: 'group',
     'aria-label': opts.label || 'Filter by date',
   })
-  const btns = RANGE_OPTIONS.map(([key, label]) =>
+  const btns = options.map(([key, label]) =>
     h('button', {
       class: 'pcast-range-btn', type: 'button',
       title: titleFor(key, label),
@@ -82,7 +104,7 @@ export function rangeControl(initialKey, onPick, opts = {}) {
     }, label))
   function setActive(key) {
     btns.forEach((el, i) => {
-      const on = RANGE_OPTIONS[i][0] === key
+      const on = options[i][0] === key
       el.classList.toggle('is-active', on)
       el.setAttribute('aria-pressed', on ? 'true' : 'false')
     })
@@ -142,6 +164,38 @@ export function sortControl(options, initialKey, onPick, opts = {}) {
   }
   btn.addEventListener('click', () => { menu.hidden ? open() : close() })
   return wrap
+}
+
+/**
+ * Fill a panel's [data-feed-note] slot — the one line above the search box
+ * saying what the cards below are ranked over.
+ *
+ * It exists only on the ranked feeds. Global vs Follows is self-explanatory on
+ * the Boosts note feed, where a card is one note and the axis is the same one
+ * every Nostr client has; on Episodes, Songs, Shows and Albums a card is an
+ * aggregate, so the scope is a statement about the CORPUS THE RANKING WAS
+ * COMPUTED OVER rather than about which cards were kept, and nothing on screen
+ * said so.
+ *
+ * The slot ships empty and `hidden`, so a feed that renders "sign in" or an
+ * error never grows a line describing a ranking that isn't there. Same contract
+ * as the search slot beneath it.
+ *
+ * @param {Element} panel
+ * @param {string}  text   plain text; null or empty leaves the slot hidden
+ */
+export function mountFeedNote(panel, text) {
+  const host = panel?.querySelector('[data-feed-note]')
+  if (!host) return null
+  if (!text) { host.textContent = ''; host.hidden = true; return null }
+  host.textContent = text
+  host.hidden = false
+  return host
+}
+
+/** Empty a panel's note slot and hide it again. */
+export function resetFeedNote(panel) {
+  return mountFeedNote(panel, null)
 }
 
 /**

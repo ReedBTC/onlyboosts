@@ -60,7 +60,10 @@
 .pcast-range { display: flex; flex-shrink: 0; }
 .pcast-range-btn {
   /* Near-square: the min-width and the vertical padding are tuned to land
-     the box at roughly 32x30, so the three read as one tight block. */
+     the box at roughly 32x30, so the row reads as one tight block. Four
+     segments on the ranked feeds (1W/1M/1Y/All), three on the Boosts note
+     feed — ~128px either way, which still leaves the sort pill beside it on
+     a 375px phone once the group has wrapped onto its own line. */
   min-width: 2rem; padding: 0.5rem 0.35rem;
   font: inherit; font-size: 0.72rem; font-weight: 700; line-height: 1.2;
   color: var(--muted); background: transparent;

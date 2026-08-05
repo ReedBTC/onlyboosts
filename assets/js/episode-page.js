@@ -24,7 +24,7 @@
 import { showToast } from '/assets/js/copy-npub.js'
 import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js'
 import { ensureLoginWidget } from '/assets/js/widget-loader.js'
-import { rangeControl, sortControl, rangeDays } from '/assets/js/feed-controls.js'
+import { rangeControl, sortControl, rangeDays, rangeCutoff } from '/assets/js/feed-controls.js'
 import { episodeBoostLink } from '/assets/js/episode-link.js'
 import { normalizeBoosts, toEpisodeShape } from '/assets/js/ob-data.js'
 import {
@@ -396,6 +396,50 @@ const CE_SORTS = [
   ['episode', 'Latest episode'],
 ]
 
+/* ── The ranking, and why it is HERE rather than imported ──────────────
+ *
+ * These are the Episodes feed's own comparators and air-date filter, which used
+ * to be `feeds-podcasts.js#sortItems` / `#filterItems`. That module stopped
+ * exporting them when its ranking moved into /api/v1/episodes, and this section
+ * kept calling them: a TypeError inside rebuild(), so the drawer painted its
+ * heading and controls over an empty list.
+ *
+ * Restoring them here rather than re-exporting them is the correct half of that
+ * split, not a workaround. THE FEEDS RANK SERVER-SIDE BECAUSE THEY PAGE — their
+ * loaded rows are a prefix of the corpus, so ranking in the browser ranks the
+ * wrong things. THIS SECTION HOLDS ITS WHOLE CORPUS, one bounded response of at
+ * most 2,000 boost rows fetched once, so ranking it in memory is ranking
+ * everything it has and a re-sort costs no round trip. The two feeds' cases are
+ * genuinely different, and one shared export would have to serve both.
+ *
+ * The item shape is still `buildEpisodes`'s, so these read the same fields they
+ * always did. Every comparator breaks ties on total sats, then on the most
+ * recent boost, so the order is stable. `count` ranks by distinct people and
+ * `boosts` by raw volume; they differ wherever someone boosted the same episode
+ * more than once.
+ */
+const bySats = (a, b) => b.totalSats - a.totalSats || b.latest - a.latest
+const CE_SORTERS = {
+  recent: (a, b) => b.latest - a.latest || b.totalSats - a.totalSats,
+  episode: (a, b) => (b.ep.published || 0) - (a.ep.published || 0) || bySats(a, b),
+  count: (a, b) => b.distinctBoosters.length - a.distinctBoosters.length || bySats(a, b),
+  boosts: (a, b) => b.boosts.length - a.boosts.length || bySats(a, b),
+  sats: bySats,
+}
+
+function sortItems(items, key) {
+  return [...items].sort(CE_SORTERS[key] || CE_SORTERS.recent)
+}
+
+// The range filters on when the episode AIRED (ep.published), not on when the
+// community boosted it — the same axis the Episodes feed uses, and the reason
+// the tooltip below says "aired or released" rather than naming a boost.
+function filterItems(items, key) {
+  const cutoff = rangeCutoff(key)
+  if (!cutoff) return items
+  return items.filter((it) => (it.ep.published || 0) >= cutoff)
+}
+
 /* The corpus, fetched once and lazily.
  *
  * IntersectionObserver with a generous margin rather than a fetch on load: this
@@ -541,7 +585,7 @@ function initCommunityEpisodes() {
     // depends on. There is no search here, but the range filter is the same
     // narrowing: rank over everything in the window, then paint.
     function rebuild() {
-      view = feed.sortItems(feed.filterItems(items, rangeKey), sortKey)
+      view = sortItems(filterItems(items, rangeKey), sortKey)
       view.forEach((it, i) => { it._rank = i + 1 })
       shown = 0
       cards.textContent = ''

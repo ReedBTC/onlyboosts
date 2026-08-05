@@ -43,7 +43,7 @@ const DEFAULT_SORT = "boosts";      // matches the feed's opening sort
 // filters on when the episode AIRED, not when it was boosted — an old episode
 // boosted today is outside 1W. Getting this backwards would silently redefine
 // the feed, so it's spelled out here.
-const RANGE_DAYS = { "1w": 7, "1m": 30, all: null };
+const RANGE_DAYS = { "1w": 7, "1m": 30, "1y": 365, all: null };
 
 const MEDIA = new Set(["podcast", "music", "video"]);
 const MAX_FOLLOWS = 5000;
@@ -148,7 +148,7 @@ function episodeRecord(r) {
 function readParams(u) {
   const sortKey = SORTS[u.searchParams.get("sort")] ? u.searchParams.get("sort") : DEFAULT_SORT;
   const range = u.searchParams.get("range") || "all";
-  if (!(range in RANGE_DAYS)) return { error: "bad range (1w|1m|all)" };
+  if (!(range in RANGE_DAYS)) return { error: "bad range (1w|1m|1y|all)" };
   // The medium split is a PARTITION: `music` goes to Songs/Albums, everything
   // else — podcast, video, and feeds Podcast Index can't identify — goes to
   // Episodes/Shows. So the Episodes half is `not_medium=music`, not

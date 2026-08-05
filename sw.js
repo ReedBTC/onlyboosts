@@ -308,7 +308,23 @@
 // a returning visitor holding the old boosts-feed.js keeps a feed that is
 // missing the newest boosts it exists to show. With this, no client module
 // fetches a static shard at all.
-const VERSION = 'ob-v52';
+// ob-v53: a 1Y range on the four ranked feeds, and a line above each of their
+// search boxes naming the corpus the ranking was computed over. Required rather
+// than cosmetic on both halves. A returning visitor holding the old
+// feed-controls.js sees no 1Y button at all, since the range table is a cached
+// module rather than markup; and index.html carries both the note slot the
+// renderers fill and the one rule that styles it, so a stale copy of it would
+// leave a fresh feeds-podcasts.js writing into an element that isn't there.
+// index.html, feed-controls.js, feeds-podcasts.js, shows-feed.js, boosts-feed.js
+// and feed-cards.css turn over together.
+// Carries one repair with it: /episode/<guid>'s community-episodes section had
+// been calling feeds-podcasts.js#sortItems / #filterItems, which that module
+// stopped exporting in ob-v49 when its ranking moved into /api/v1/episodes. The
+// section painted its heading, drawer and controls over an empty list. The two
+// now live in episode-page.js, where the corpus is bounded and ranking it in
+// memory is correct; a returning visitor holding the old module keeps the empty
+// section until this bump reaches them.
+const VERSION = 'ob-v53';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;

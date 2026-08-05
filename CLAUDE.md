@@ -131,10 +131,27 @@ leave a feed you come back to showing another feed's controls, or none. The
 panels have no head of their own any more — the bar names the feed, so a
 heading under it would only restate the dropdown.
 
-**Each panel's own first child is a `[data-feed-search]` slot**, filled by
-`feed-search.js` and left hidden until it is. It's inside the panel rather than
-in the bar, so it scrolls away with the cards it filters. See the search note
-under Feed loaders.
+**Each panel leads with two slots, both shipped empty and `hidden`**: a
+`[data-feed-note]` line and, under it, the `[data-feed-search]` box. Both are
+filled by the renderer and stay hidden until one does, so a feed showing "sign
+in" or an error grows neither. They're inside the panel rather than in the bar,
+so they scroll away with the cards they describe. See the search note under Feed
+loaders.
+
+**The note slot is on the four ranked feeds only** (`mountFeedNote` in
+`feed-controls.js`, text off each renderer's `COPY` table). It names the corpus
+the ranking was computed over: "Ranks based on every boost in the index" on
+Global, "Ranks based on only boosts from the accounts you follow" on Follows.
+Global vs Follows
+is self-explanatory on the Boosts note feed, where a card is one note and the
+axis is the one every Nostr client has; on a rollup a card is an **aggregate**,
+so the scope is a claim about what was counted rather than about which cards
+survived, and nothing on screen said so. Shows and Albums carry the Global form
+and gain the second when Shows · Follows lands.
+
+This is deliberately one line and no box. `.ob-scopenote` was the full scope
+paragraph and it lived in exactly this position before being removed for pushing
+the feed below the fold; don't grow this back into it.
 
 ## Where this code came from
 
@@ -512,7 +529,7 @@ renderer on first view.
 
 ### Range and sort
 
-Every feed carries a 1W/1M/All range and a sort dropdown, built by
+Every feed carries a range and a sort dropdown, built by
 `assets/js/feed-controls.js` and mounted into the feed bar. The chrome is
 shared; **what the range means is not**, which is why each renderer passes its
 own tooltips:
@@ -538,6 +555,19 @@ The note feed's shorter menu is not an omission — a card there is one boost, s
 rows explicitly: `episode.date` is null on ~12% of records, and a `0` fallback
 would float them to the top.
 
+**The ranked feeds offer 1W/1M/1Y/All; the Boosts note feed offers 1W/1M/All,
+and the missing 1Y is a consequence of how each answers a window.** On Episodes,
+Songs, Shows and Albums the range is a **query parameter** — `RANGE_DAYS` in
+`functions/api/v1/episodes.js` and `…/podcasts.js` — so a wider window is a
+different `WHERE` clause and costs nothing. **Those two tables and
+`RANGE_OPTIONS` move together, or a range button answers 400.** The note feed
+**walks** its window instead (`ensureCoverage`, below), and at ~38 boosts a day
+network-wide a year is ~13,900 rows: ~70 sequential 200-row requests and several
+megabytes before the first card paints. `WALKED_RANGE_OPTIONS` is the subset it
+passes. Giving it a year means giving it a `since`-scoped query the way the
+ranked feeds have, so the window is answered rather than walked; it is not a
+fourth button.
+
 **Sorting is over the selected window, so a bounded window is paged in
 completely before it's painted** (`ensureCoverage` in `boosts-feed.js`) —
 otherwise "largest boost" would rank whichever pages happened to be loaded.
@@ -554,7 +584,8 @@ always did.
 ### Search
 
 `assets/js/feed-search.js` is the typeahead at the head of every panel. Each
-panel ships an empty `[data-feed-search]` slot as its first child and the
+panel ships an empty `[data-feed-search]` slot (under the `[data-feed-note]`
+line, where there is one) and the
 renderer fills it; the slot stays `hidden` until one does, so a feed showing
 "sign in" or an error never grows a search box over a list that isn't there.
 **It sits inside the panel, not in the sticky bar** — range and sort are read

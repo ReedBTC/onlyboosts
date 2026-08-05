@@ -302,7 +302,7 @@ const EPISODE_PAGE = 60
  *   The Episodes half passes NOT_MUSIC instead of `medium: 'podcast'` — the
  *   split is a partition, so it has to keep video and undeclared feeds too.
  * @param {string}   [opts.sort]    recent|episode|count|boosts|sats
- * @param {string}   [opts.range]   1w|1m|all, filtered on AIR DATE
+ * @param {string}   [opts.range]   1w|1m|1y|all, filtered on AIR DATE
  * @param {number}   [opts.offset]
  * @param {string[]} [opts.follows] hex or npub; presence switches to POST
  * @param {string}   [opts.q]       free-text over episode title + show name.
@@ -421,7 +421,7 @@ const SHOW_PAGE = 60
  *   is the Shows half, sent as not_medium=music so the partition keeps video and
  *   the 33% of shows Podcast Index cannot identify.
  * @param {string} [opts.sort]   boosts|sats|boosters|latest
- * @param {string} [opts.range]  1w|1m|all, filtered on BOOST TIME
+ * @param {string} [opts.range]  1w|1m|1y|all, filtered on BOOST TIME
  * @param {string} [opts.q]      free text over title + author, or a pasted guid.
  *   Every record then carries `rank`, its position in the full ordering.
  */

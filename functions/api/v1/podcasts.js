@@ -45,7 +45,10 @@ const SORTS = {
 const SORT_ALIASES = { recent: "latest", count: "boosters" };
 const DEFAULT_SORT = "latest";   // unchanged from the original shipped default
 
-const RANGE_DAYS = { "1w": 7, "1m": 30, all: null };
+// Boost-time windows, matching RANGE_OPTIONS in feed-controls.js. Adding a key
+// here without adding it there (or the reverse) is what makes a range button
+// answer 400, so the two lists move together.
+const RANGE_DAYS = { "1w": 7, "1m": 30, "1y": 365, all: null };
 const MEDIA = new Set(["podcast", "music", "video"]);
 
 // A show guid is a UUID in almost every case, and the feed's search box matches
@@ -75,7 +78,7 @@ function readParams(u) {
   const sortKey = SORTS[mapped] ? mapped : DEFAULT_SORT;
 
   const range = u.searchParams.get("range") || "all";
-  if (!(range in RANGE_DAYS)) return { error: "bad range (1w|1m|all)" };
+  if (!(range in RANGE_DAYS)) return { error: "bad range (1w|1m|1y|all)" };
 
   // The medium split is a PARTITION: `music` goes to Albums, everything else —
   // podcast, video, and the 33% of shows Podcast Index cannot identify — goes to

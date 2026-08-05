@@ -21,9 +21,10 @@
  * resolve. "Follows" narrows by the viewer's kind-3 contact list.
  *
  * Ordering: episodes are ranked by raw boost volume, with total sats as the
- * tiebreaker. The opening air-date window differs by scope — see
- * defaultRange. Both are user-switchable from the sticky feed bar, whose
- * range/sort chrome is shared with the note feed (feed-controls.js).
+ * tiebreaker, and both scopes open on the All air-date window. Range and sort
+ * are QUERIES rather than array operations, so changing either refetches; the
+ * chrome they mount into the sticky feed bar is shared with the note feed
+ * (feed-controls.js).
  *
  * Entry point: renderPodcasts({ panel, list }) — lazy-imported by feeds.js
  * the first time the feed is opened.
@@ -48,6 +49,7 @@ import { copyText, showToast, copyNpub } from '/assets/js/copy-npub.js'
 import { boostButton, withBoostBusy } from '/assets/js/boost-button.js'
 import {
   rangeDays, rangeControl, sortControl, mountFeedControls,
+  mountFeedNote, resetFeedNote,
 } from '/assets/js/feed-controls.js'
 import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js'
 import { showPageHref, episodePageHref } from '/assets/js/show-link.js'
@@ -78,6 +80,11 @@ export const COPY = {
     rangeTitle: (days) => (days ? `Episodes aired in the last ${days} days` : 'All episodes'),
     sortTitle: 'Sort episodes',
     sortDateLabel: 'Latest episode',
+    // The line above the search box. A rollup card is an aggregate, so the
+    // scope names the corpus the RANKING was computed over rather than which
+    // cards survived a filter — see mountFeedNote in feed-controls.js.
+    noteGlobal: 'Ranks based on every boost in the index',
+    noteFollows: 'Ranks based on only boosts from the accounts you follow',
     moreLabel: (n) => `Load ${n} more episode${n === 1 ? '' : 's'}`,
     loadFail: ['Couldn’t load podcast boosts', 'The boosts feed is unavailable right now — please try again later.'],
     noFollows: ['You’re not following anyone yet', 'Follow some npubs in any Nostr client and the episodes they boost will show up here.'],
@@ -108,6 +115,8 @@ export const COPY = {
     rangeTitle: (days) => (days ? `Songs released in the last ${days} days` : 'All songs'),
     sortTitle: 'Sort songs',
     sortDateLabel: 'Latest release',
+    noteGlobal: 'Ranks based on every boost in the index',
+    noteFollows: 'Ranks based on only boosts from the accounts you follow',
     moreLabel: (n) => `Load ${n} more song${n === 1 ? '' : 's'}`,
     loadFail: ['Couldn’t load music boosts', 'The boosts feed is unavailable right now — please try again later.'],
     noFollows: ['You’re not following anyone yet', 'Follow some npubs in any Nostr client and the songs they boost will show up here.'],
@@ -933,6 +942,13 @@ function mountControls(feed, { sortKey, rangeKey, onSort, onRange, copy }) {
  * values, and RANKED_SORTS because it still decides when a position is worth
  * printing.
  *
+ * ⚠️ ONE CALLER OUTLIVED THE FIRST TWO and was not caught here: the community
+ * section on /episode/<guid> imports this module for `episodeCard` and was also
+ * calling `sortItems` / `filterItems`, which left it painting an empty list.
+ * It carries its own copy now, correctly — that section holds its whole bounded
+ * corpus in one response, where these feeds hold a paged prefix, so ranking in
+ * memory is right there and wrong here. Don't re-export these to serve it.
+ *
  * THE MEDIUM SPLIT MOVED TOO. mediumPredicate() and the podcasts/index.json
  * rollup it joined through are no longer read by these feeds at all — the
  * endpoint takes the medium as a parameter, so a ~103KB fetch and a guid→medium
@@ -994,8 +1010,10 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
   // to follow", so a #1 would imply a standing that doesn't exist.
   const showRanks = scope !== 'follows'
   // A re-render (account switch) may end on a placeholder, so clear any box a
-  // previous run left behind before deciding whether this one gets one.
+  // previous run left behind before deciding whether this one gets one. The
+  // scope line above it takes the same treatment for the same reason.
   resetFeedSearch(panel)
+  resetFeedNote(panel)
   // Follows scoping applies to the raw boost rows, BEFORE the episode rollup:
   // an episode should only appear if someone you follow boosted it, and its
   // booster counts / sat totals must reflect only those boosts. Scoping after
@@ -1064,6 +1082,12 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
   }
   items = first.items
   nextOffset = first.nextOffset
+
+  // There is a ranking, so say what it ranks over. Mounted here rather than at
+  // the top of the function so it shares the search box's contract: a feed that
+  // ends on "sign in" or a load failure never grows a line describing a list it
+  // isn't showing.
+  mountFeedNote(panel, follows ? copy.noteFollows : copy.noteGlobal)
 
   // Pre-warm the boost widget in the background once the feed is up, so the
   // first Boost click doesn't pay the cold-start cost (bundle load + session /
