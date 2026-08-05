@@ -25,6 +25,10 @@ import {
   lookupMentionNames, renderMessage,
   renderSupporters, renderBoosts,
 } from "../_shared/detail-page.js";
+// The show's own description, which is the one thing on this page that comes
+// from neither D1 nor the collector. See fetchShowDescription below.
+import { piHeaders, piGet } from "../_shared/podcast-index.js";
+import { parseNotes } from "../_shared/rich-text.js";
 
 const SITE_ORIGIN = "https://onlyboosts.social";
 
@@ -99,7 +103,7 @@ export async function onRequestGet({ request, env, params }) {
   // is why nothing here is counted or capped — the rule does the work.
   if (!show || !show.title) return notFound(guid);
 
-  const [eps, sups, boosts, community, podroll, podrolledBy] = await Promise.all([
+  const [eps, sups, boosts, community, podroll, podrolledBy, description] = await Promise.all([
     env.DB.prepare(
       // Newest episode first. `published` is null on a meaningful slice of
       // rows, and SQLite sorts NULL below every value, so DESC sinks the
@@ -196,6 +200,10 @@ export async function onRequestGet({ request, env, params }) {
     // why these two are the only queries on the page allowed to fail quietly.
     podrollQuery(env, guid, "forward"),
     podrollQuery(env, guid, "reverse"),
+    // ⚠️ THE ONE OUTBOUND THIRD-PARTY FETCH IN THIS RENDER. It sits inside the
+    // batch rather than after it so the page pays max(D1, PI) instead of the
+    // sum; see fetchShowDescription for the rest of the bargain.
+    fetchShowDescription(env, show),
   ]);
 
   const boostRows = boosts.results || [];
@@ -209,6 +217,7 @@ export async function onRequestGet({ request, env, params }) {
     community: community.results || [],
     podroll: podroll.results || [],
     podrolledBy: podrolledBy.results || [],
+    description,
     names,
   });
 
@@ -334,7 +343,7 @@ const copyFor = (medium) => (medium === "music" ? COPY.music : COPY.podcast);
 
 // ── the page ─────────────────────────────────────────────────────────────────
 
-function renderShowPage({ show, episodes, supporters, boosts, community, podroll, podrolledBy, names }) {
+function renderShowPage({ show, episodes, supporters, boosts, community, podroll, podrolledBy, description, names }) {
   const copy = copyFor(show.medium);
   const title = show.title;
   const pageUrl = `${SITE_ORIGIN}/show/${encodeURIComponent(show.podcast_guid)}`;
@@ -558,7 +567,7 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
     <span class="show-back-arrow" aria-hidden="true">←</span><span data-back-label>${copy.backLabel}</span>
   </a>
 
-  ${renderHeader(show, art, title, copy, art2)}
+  ${renderHeader(show, art, title, copy, art2, description)}
 
   ${renderEpisodes(episodes, show, copy)}
 
@@ -675,13 +684,109 @@ function usableAuthor(show) {
   return norm(author) === norm(show.title) ? "" : author;
 }
 
+/* ── The show's description ──────────────────────────────────────────────────
+ *
+ * The publisher's own summary of the show, above the stat tiles. It is the only
+ * thing on this page that comes from neither D1 nor the collector's exports:
+ * `podcasts` carries title, image, artwork, feed_url, medium, author and the
+ * three boost aggregates, and the per-show shards are no richer.
+ *
+ * ⚠️ IT IS FETCHED PER REQUEST RATHER THAN STORED, AND THAT IS THE POINT. The
+ * alternative was a `description` column, which means a schema migration, a
+ * backfill over ~930 shows, and a field on every enrichment tick that has to be
+ * re-fetched to stay current — all to cache a string Podcast Index already
+ * serves and already caches for us. `enrich.py` calls this exact endpoint for
+ * every show it identifies; this reads the same object one field further
+ * across.
+ *
+ * `fulltext` is what makes it whole. Without it PI cuts every text field to 100
+ * words, which is the same truncation the collector inherited for episode notes
+ * — so a stored copy would have been the clipped version anyway unless the
+ * collector changed too.
+ *
+ * Three properties hold this up:
+ *
+ *   THE TIMEOUT IS SHORT, and much shorter than /api/episode-meta's. That
+ *   endpoint fills a drawer after paint and can afford ten seconds; this is on
+ *   a reader's TTFB, so a slow upstream has to cost a missing paragraph rather
+ *   than a hung page.
+ *
+ *   IT RUNS INSIDE THE Promise.all with the six D1 queries, so the page pays
+ *   max(D1, PI) rather than the sum. In the common case PI answers from the
+ *   colo's cache — piGet sets cacheEverything with an hour's TTL, and a show
+ *   page is the same request for every reader — and the batch is unchanged.
+ *
+ *   IT NEVER REJECTS AND NEVER THROWS. A show with no description, a show PI
+ *   has never seen, a timeout and an outage all produce the same empty array,
+ *   and the page renders exactly as it did before this existed. A description
+ *   is additive; nothing below it depends on it.
+ *
+ * og:description is deliberately NOT sourced from here. That string is
+ * synthesized from the boost data and is the one place the full scope sentence
+ * survives — see the note over ogDesc.
+ */
+const SHOW_DESC_TIMEOUT_MS = 2_500;
+
+async function fetchShowDescription(env, show) {
+  const key = env.PODCAST_INDEX_KEY;
+  const secret = env.PODCAST_INDEX_SECRET;
+  // Unconfigured keys are a deployment fact rather than an answer about this
+  // show. /api/episode-meta answers 503 for it because a client can log that;
+  // here there is no one to tell, so it degrades like every other miss.
+  if (!key || !secret || !show?.podcast_guid) return [];
+
+  try {
+    const headers = await piHeaders(key, secret, "OnlyBoosts-ShowPage/1.0");
+    const r = await piGet(
+      `/podcasts/byguid?fulltext&guid=${encodeURIComponent(show.podcast_guid)}`,
+      headers,
+      { timeoutMs: SHOW_DESC_TIMEOUT_MS }
+    );
+    return parseNotes(r?.feed?.description);
+  } catch {
+    return [];
+  }
+}
+
+/* The token tree → HTML. The client-side twin of this is paintNotes() in
+ * episode-page.js, which builds text nodes and anchors; here every field is
+ * escaped individually instead, which is the same guarantee by the other route.
+ *
+ * ⚠️ NOTHING IN A TOKEN IS TRUSTED. `v` is publisher-authored text and `href`
+ * is a publisher-authored URL, so the first is escaped and the second is put
+ * through isSafeUrl before it can reach an attribute — a link that fails it
+ * renders as its own label in plain text rather than being dropped, because the
+ * sentence around it was written expecting the words to be there.
+ *
+ * The clamp is CSS and the "More" control is added by show-desc.js only when
+ * the text actually overflows. With JavaScript off the description simply
+ * renders in full, which is the same trade the "Show N more" toggles make.
+ */
+function renderDescription(paragraphs) {
+  if (!Array.isArray(paragraphs) || !paragraphs.length) return "";
+  const body = paragraphs.map((para) => {
+    const inner = para.map((tok) => {
+      const v = htmlEscape(String(tok?.v ?? ""));
+      if (!v) return "";
+      return tok.t === "link" && isSafeUrl(tok.href)
+        ? `<a href="${htmlEscape(tok.href)}" target="_blank" rel="noopener noreferrer">${v}</a>`
+        : v;
+    }).join("");
+    return inner ? `<p>${inner}</p>` : "";
+  }).filter(Boolean).join("");
+  if (!body) return "";
+  return `<div class="show-desc" data-show-desc>
+      <div class="show-desc-body" data-show-desc-body>${body}</div>
+    </div>`;
+}
+
 function creditLine(show, copy) {
   const author = usableAuthor(show);
   if (!author) return "";
   return `<p class="show-credit"><span class="show-credit-label">${htmlEscape(copy.credit)}</span> ${htmlEscape(truncate(author, 120))}</p>`;
 }
 
-function renderHeader(show, art, title, copy, art2) {
+function renderHeader(show, art, title, copy, art2, description) {
   // Three tiles, not four. There was an episode count here and it was removed
   // deliberately: sats, boosts and boosters are measures of boost activity
   // and have no meaning outside it, so "as published to Nostr" is the only
@@ -736,6 +841,7 @@ function renderHeader(show, art, title, copy, art2) {
         </div>
       </div>
     </div>
+    ${renderDescription(description)}
     <h2 class="show-stats-title">
       <a href="/about#keysend">Nostr Boost</a> Stats
     </h2>

@@ -1525,6 +1525,77 @@ show pages into 500s to report a section 93% of them don't render. A failure
 degrades to no section, which is what a show with no podroll gets anyway. If the
 sections are missing everywhere, that is the thing to check first.
 
+## Show pages: the description
+
+The publisher's own summary of the show, between the hero's identity block and
+the `Nostr Boost Stats` tiles. `fetchShowDescription` / `renderDescription` in
+`functions/show/[guid].js`, `.show-desc` in `show-page.css`,
+`assets/js/show-desc.js` for the toggle.
+
+**⚠️ It is fetched per request rather than stored, and that is the decision.**
+Nothing in D1 or the shards carries it: `podcasts` holds title, image, artwork,
+feed_url, medium, author and the three boost aggregates, and a shard's `show`
+object is `{guid, title, img, feed, medium}`. Storing it means a schema
+migration, a backfill across ~930 shows and a field on every enrichment tick
+that has to be re-fetched to stay current, all to cache a string Podcast Index
+already serves and already caches for us. `enrich.py` calls
+`podcasts/byguid` for every show it identifies; this reads the same object one
+field further across. **No change to any collection run.**
+
+`fulltext` is what makes it whole, the same parameter and the same reason as
+`/api/episode-meta`: without it PI cuts every text field to 100 words, so a
+stored copy would have been the clipped version anyway.
+
+**It is the one outbound third-party fetch inside a show-page render**, which is
+what the three properties below are for:
+
+- **It runs inside the existing `Promise.all`** with the six D1 queries, so the
+  page pays `max(D1, PI)` rather than the sum. `piGet` sets `cacheEverything`
+  with an hour's TTL and a show page is the same request for every reader, so
+  after the first reader in a colo it is a cache hit.
+- **The timeout is 2.5s**, against `/api/episode-meta`'s 10s. That endpoint
+  fills a drawer after paint; this is on a reader's TTFB, so a slow upstream has
+  to cost a paragraph rather than a hung page.
+- **It never rejects and never throws.** No description, a show PI has never
+  seen, unconfigured keys, a timeout and an outage all produce the same empty
+  array, and the page renders exactly as it did before the feature existed.
+
+**`og:description` is deliberately not sourced from it.** That string is
+synthesized from the boost data and is the only place the full scope sentence
+survives; see the note over `ogDesc`.
+
+**The clamp is applied by JavaScript, not shipped in the markup.** The page
+renders the description in full and `show-desc.js` collapses it to three lines
+and adds the **More** control, only when the text actually overflows — so a
+short description never grows a control it doesn't need, and a reader with no
+JavaScript gets the whole thing rather than three lines with no way to reach
+the rest. Same direction as the "Show N more" toggles. It re-measures after
+`document.fonts.ready` (the body copy is a self-hosted serif, and the fallback
+metrics can cross or clear three lines) and on a debounced resize, but never
+re-collapses a description the reader expanded.
+
+**It is a new module rather than a ninth export from `detail-page.js`**, which
+is the `feed-note.js` shape and the rule from the `ob-v53` outage: a stale
+`detail-page.js` against a fresh `show-page.js` is a link-time error that takes
+the page's whole JavaScript down, where a new URL can only resolve or 404.
+
+### The two shared server modules
+
+Both were moved out of `functions/api/episode-meta.js` verbatim when this
+landed, since a show description and an episode's show notes are the same field
+at two levels:
+
+| | |
+|---|---|
+| `functions/_shared/podcast-index.js` | `piHeaders` + `piGet` — auth, the timeout, and the colo cache. **⚠️ `/api/value` keeps its own copy deliberately**: it resolves value blocks, where a wrong answer moves sats, and a metadata lookup must never share a code path with it. |
+| `functions/_shared/rich-text.js` | `parseNotes` — publisher HTML → paragraphs of `{t:"text"\|"link"}` tokens. Client-side it becomes text nodes and anchors (`paintNotes`); server-side every field is escaped individually (`renderDescription`). Either way **nothing it returns can reach `innerHTML`**. |
+
+One behaviour changed in the move: `OPAQUE_TAG` now discards the *content* of
+`script`, `style`, `noscript`, `iframe`, `template` and `svg`. Nothing there
+could ever have become markup, but a feed that pastes a tracking snippet into
+its description used to print the script's source as a paragraph. This applies
+to the episode notes drawer too.
+
 ## Episode pages
 
 `/episode/<item-guid>`, rendered by `functions/episode/[guid].js`. **The same

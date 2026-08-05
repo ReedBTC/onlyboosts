@@ -30,6 +30,10 @@ import {
   initCopyNpub, initShowMore, initShare, initBackLink,
   initHashRouting, initHashSpy, initArt2, hydrateProfiles,
 } from '/assets/js/detail-page.js'
+// Its own module rather than a ninth export from detail-page.js, deliberately:
+// a stale copy of that file against a fresh copy of this one is a link-time
+// error that takes the whole page's JavaScript down. See the note at its head.
+import { initShowDesc } from '/assets/js/show-desc.js'
 
 const VALUE_API = '/api/value'
 
@@ -52,6 +56,7 @@ const HASH_ALIASES = { 'inverse-podroll': 'reverse-podroll' }
 
 initCopyNpub()
 initShowMore()
+initShowDesc()
 initShare()
 initBackLink()
 initHashRouting(HASH_ALIASES)

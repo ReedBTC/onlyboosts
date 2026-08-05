@@ -340,7 +340,18 @@
 // degrades to "no 1Y button" against an older copy instead of throwing. All 12
 // old/new combinations of the three renderers against both feed-controls
 // versions were checked to resolve.
-const VERSION = 'ob-v54';
+// ob-v55: the show's own description on /show/<guid>, above the stat tiles,
+// fetched live from Podcast Index at render time rather than stored. Required
+// on the stylesheet half: every .show-desc rule is new in show-page.css against
+// markup the Function now emits unconditionally, so a returning visitor holding
+// the old copy would get the description at body size, unclamped and with no
+// "More" — readable, but the whole hero pushed down the page.
+// The JavaScript half is safe either way by construction. show-page.js gains a
+// static import of assets/js/show-desc.js, which is a NEW URL with no cached old
+// version, so it can only resolve or 404; and a stale show-page.js simply never
+// imports it, which costs the clamp and nothing else, since the description
+// renders expanded and this collapses it rather than the other way round.
+const VERSION = 'ob-v55';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;

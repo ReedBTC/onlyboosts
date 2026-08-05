@@ -212,6 +212,62 @@
   justify-content: center;
 }
 
+/* ── The show's description ───────────────────────────────────────────── */
+
+/* The publisher's own summary, between the hero's identity block and the stat
+   tiles. It is the only text on this page not derived from boost data, so it
+   reads as prose rather than as another figure: full measure, body size,
+   --text rather than --ink, and no card around it.
+
+   IT IS CLAMPED ONLY ONCE JAVASCRIPT SAYS SO. The three-line limit lives on
+   .is-clamped, which show-desc.js adds only when the text actually overflows
+   it — so a two-line description never grows a "More" it does not need, and a
+   reader with no JavaScript gets the whole description rather than three lines
+   with no way to reach the rest. Same trade the "Show N more" toggles make. */
+.show-desc {
+  margin: 1.5rem 0 0;
+  max-width: 52rem;
+}
+
+.show-desc-body {
+  color: var(--text);
+  font-size: 0.95rem;
+  line-height: 1.62;
+  /* A description carries publisher-typed URLs, which do not wrap on their
+     own and would otherwise push the hero sideways. */
+  overflow-wrap: anywhere;
+}
+.show-desc-body p { margin: 0; }
+.show-desc-body p + p { margin-top: 0.7rem; }
+.show-desc-body a { color: var(--brand-d); font-weight: 600; }
+.show-desc-body a:hover { color: var(--brand-dd); }
+
+/* The same -webkit-box clamp the podroll tiles' titles use. Three lines is the
+   most the hero can spend and still leave the stat tiles on a phone's first
+   screen, which is the whole design of this page. */
+.show-desc.is-clamped .show-desc-body {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* A text control, not a .btn. The buttons above it are the page's actions —
+   Boost, RSS, Share — and this only changes how much of one paragraph is on
+   screen; styling it as a fourth pill would put it in their company. */
+.show-desc-more {
+  margin-top: 0.45rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: 600 0.85rem/1 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: var(--brand-d);
+  cursor: pointer;
+}
+.show-desc-more:hover,
+.show-desc-more:focus-visible { text-decoration: underline; text-underline-offset: 3px; }
+
 /* "Nostr Boost Stats" over the three tiles. Same Playfair treatment as a
    section h2, a step down in size — it labels three cards, not a section of the
    page. The linked half is the page's qualifier now (a caveat paragraph used to
@@ -928,6 +984,8 @@
   }
   .show-art img,
   .show-art-blank { width: 110px; height: 110px; }
+  .show-desc { margin-top: 1.15rem; }
+  .show-desc-body { font-size: 0.9rem; }
   .show-stat dd { font-size: 1.2rem; }
   /* Three across on a phone, five on desktop. Cards four and five wrap to a
      centered second line rather than disappearing — PODIUM is decided by the
