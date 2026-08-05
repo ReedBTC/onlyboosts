@@ -1,0 +1,22 @@
+[Unit]
+Description=OnlyBoosts global boost incremental scan + export + VPS push
+After=network-online.target
+Wants=network-online.target
+# Non-zero exit opens a GitHub issue (in ReedBTC/localbitcoiners — the alerter's
+# repo is hardcoded and shared across both bot suites). This only catches NON-ZERO
+# exits, so a step that swallows its own errors still fails silently.
+#
+# The reason it is wired now: the cycle validates excludes.json as its first step
+# and `set -e` aborts on a malformed one. That is the right behaviour — better to
+# publish nothing than to publish content someone was told was removed — but
+# without this line the pipeline would simply stop every five minutes in silence.
+OnFailure=lb-bot-alert@%n.service
+
+[Service]
+Type=oneshot
+User=reed
+WorkingDirectory=/home/reed/onlyboosts/bots/global-boost-scan
+ExecStart=/home/reed/onlyboosts/bots/global-boost-scan/run-incremental.sh
+TimeoutStartSec=900
+StandardOutput=journal
+StandardError=journal

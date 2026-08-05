@@ -1,0 +1,18 @@
+[Unit]
+Description=OnlyBoosts daily outbox expansion (widen relay coverage) + export + VPS push
+After=network-online.target
+Wants=network-online.target
+# Non-zero exit opens a GitHub issue — see onlyboosts-incremental.service for the
+# caveats (hardcoded repo, non-zero exits only) and why the exclusion-list check
+# makes this worth having. This one runs daily, so a silent stop here would go
+# unnoticed far longer than on the five-minute incremental.
+OnFailure=lb-bot-alert@%n.service
+
+[Service]
+Type=oneshot
+User=reed
+WorkingDirectory=/home/reed/onlyboosts/bots/global-boost-scan
+ExecStart=/home/reed/onlyboosts/bots/global-boost-scan/run-outbox.sh
+TimeoutStartSec=7200
+StandardOutput=journal
+StandardError=journal
