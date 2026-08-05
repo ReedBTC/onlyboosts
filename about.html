@@ -267,14 +267,14 @@
           <li><strong>Scan.</strong> A collector continuously queries a curated set of relays, along with the personal relays of every npub previously observed boosting, for events carrying podcast tags.</li>
           <li><strong>Classify.</strong> Events carrying a NIP-73 podcast tag and a payment signal are retained. Everything else is discarded.</li>
           <li><strong>Enrich.</strong> Each show and episode is looked up in the Podcast Index by GUID to attach its title, artwork and air date, and the booster&rsquo;s public Nostr profile is resolved for a display name and avatar.</li>
-          <li><strong>Serve.</strong> The result is written out as plain JSON and served openly. This website reads exactly the same files that are available to anyone else.</li>
+          <li><strong>Serve.</strong> The result is written out as plain JSON and served openly, and is loaded in the same pass into a query database that answers the ranking, paging and search behind the feeds. Both are built from the same records; the query layer exists because ranking every episode in the index is not work a browser should be sent a corpus to do.</li>
         </ul>
         <p>An initial backfill reached as far back as relays still retain these events, approximately October 2024. Two collectors have kept the index current since.</p>
         <ul>
-          <li><strong>An incremental scan, every five minutes.</strong> It queries a core set of roughly a dozen relays selected for boost density, enriches whatever is new, rebuilds the JSON and refreshes the query layer behind the Follows feeds. A run completes in about fifteen seconds. This is what makes a new boost appear.</li>
+          <li><strong>An incremental scan, every five minutes.</strong> It queries a core set of roughly a dozen relays selected for boost density, enriches whatever is new, rebuilds the JSON and refreshes the query layer every feed on this site reads. A run completes in about fifteen seconds. This is what makes a new boost appear.</li>
           <li><strong>A deep sweep, once daily.</strong> It resolves each booster&rsquo;s own declared write relays and queries those as well, recovering boosts that landed only on a relay the core set does not reach. The core relays already carry approximately 99.6% of what is found, so this pass is a completeness backstop rather than the mechanism that keeps the site current.</li>
         </ul>
-        <p>Published files are then held at the content delivery network for five minutes, so what you are reading may be one cache period behind what the collector holds. A boost note therefore reaches this site in five to six minutes typically, and in about ten minutes in the worst case, where a note misses a scan by seconds and then waits out a full cache period.</p>
+        <p>Query responses are then held at the content delivery network for thirty seconds, so a boost note reaches the feeds within about five minutes of being published, and within six in the worst case, where a note misses a scan by seconds. The published JSON files are cached for five minutes instead; the figures under <a href="#stats">Indexer Stats</a> above are the one thing on this site still read from them, so they can lag the feeds by that much.</p>
 
         <h3>Applications Publishing Boost Notes</h3>
         <p>Four sources are known to be publishing NIP-73 boost notes at present, one of which is this site.</p>
@@ -401,7 +401,7 @@
           <details>
             <summary>When will my boost appear?</summary>
             <div class="faq-body">
-              <p>Five to six minutes after the note is published, and within about ten minutes in the worst case. The incremental scan runs every five minutes and takes roughly fifteen seconds; the files it writes are then cached at the content delivery network for a further five minutes, and those two intervals are the whole of the delay.</p>
+              <p>Within about five minutes of the note being published, and within six in the worst case. The incremental scan runs every five minutes and takes roughly fifteen seconds; what it writes is then cached at the content delivery network for a further thirty seconds, and those intervals are the whole of the delay.</p>
               <p>A daily deep sweep queries a wider set of relays and recovers anything the five-minute scan could not reach, so a boost that surfaces late is generally one that was published to an unusual relay rather than one the site was slow to notice.</p>
               <p>If it has not appeared after a day, the likely explanation is that no note was published at all, which the first entry above covers.</p>
             </div>
@@ -436,7 +436,7 @@
             <summary>Can I access the OnlyBoosts index?</summary>
             <div class="faq-body">
               <p>A documented public API is in progress and will be announced when its paths are stable. Until it ships there is no supported endpoint for third-party use, and the file layout this site reads may change without notice, so it is not something to build against yet.</p>
-              <p>The position behind that work is settled, however. The index is served as plain JSON and this website reads exactly the same files it will publish; nothing is held back for the site&rsquo;s own use. The data was public on Nostr before it was collected here, and organizing it does not make it proprietary.</p>
+              <p>The position behind that work is settled, however. The feeds on this site are answered by a query layer rather than by the published files, because ranking every episode in the index is not work a browser should be sent a corpus to do; both are built from the same records in the same collector pass, and nothing is held back for the site&rsquo;s own use. The data was public on Nostr before it was collected here, and organizing it does not make it proprietary.</p>
             </div>
           </details>
 
