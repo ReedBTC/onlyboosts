@@ -581,7 +581,7 @@ def cmd_remote_delta(args):
             return   # neither watermark advances: the whole push retries next cycle
     _mark_synced(conn, [r["event_id"] for r in rows])
     _set_watermark(conn, META_WATERMARK, started)
-    db.clear_orphaned_podcast_guids(conn, orphans)
+    db.mark_orphaned_podcasts_deleted(conn, orphans)
     db.clear_reproject_queue(conn, reproj_pairs)
     print(f"D1 delta: pushed {len(rows)} new boost(s), refreshed "
           f"{counts['podcasts']} show(s) / {counts['episodes']} episode(s) / "

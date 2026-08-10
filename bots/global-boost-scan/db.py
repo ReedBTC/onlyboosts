@@ -335,6 +335,14 @@ def _migrate(conn):
                       ("podroll_status", "TEXT")):
         if col not in show_cols:
             conn.execute(f"ALTER TABLE shows ADD COLUMN {col} {decl}")
+    # A ledger, not a work queue — see apply_aliases. Rows created before
+    # `deleted_at` existed migrate with it NULL, so they are re-sent exactly once
+    # and then go quiet.
+    conn.execute("""CREATE TABLE IF NOT EXISTS d1_podcasts_orphaned (
+                      podcast_guid TEXT PRIMARY KEY, deleted_at INTEGER)""")
+    orphan_cols = {r[1] for r in conn.execute("PRAGMA table_info(d1_podcasts_orphaned)")}
+    if "deleted_at" not in orphan_cols:
+        conn.execute("ALTER TABLE d1_podcasts_orphaned ADD COLUMN deleted_at INTEGER")
     conn.commit()
 
 
@@ -695,7 +703,29 @@ def apply_aliases(conn):
     # Recorded unconditionally, BEFORE the no-op return: an alias applied on an
     # earlier run leaves the same emptied row behind, and that run had nothing
     # left to re-key by the time anyone noticed.
-    conn.execute("CREATE TABLE IF NOT EXISTS d1_podcasts_orphaned (podcast_guid TEXT PRIMARY KEY)")
+    #
+    # ⚠️ This table is a LEDGER, not a work queue, and the difference is the whole
+    # reason `deleted_at` exists. The SELECT below is a standing fact — an alias
+    # whose raw guid has no boosts will never have boosts again — so a row cleared
+    # by DELETE was simply re-inserted on the next cycle, forever. That is how the
+    # delta came to re-issue the same 128 deletes every five minutes (256
+    # statements a cycle, ~74k D1 statements a day, all no-ops). A deleted row is
+    # therefore MARKED rather than removed, and `orphaned_podcast_guids` returns
+    # only the unmarked ones.
+    conn.execute("""CREATE TABLE IF NOT EXISTS d1_podcasts_orphaned (
+                      podcast_guid TEXT PRIMARY KEY, deleted_at INTEGER)""")
+    # Re-arm first: a guid that has boosts again is not an orphan, so forget we
+    # ever deleted it. Without this the ledger is a one-way door — un-aliasing a
+    # guid and later re-aliasing it would leave the second emptying unreported,
+    # since INSERT OR IGNORE won't disturb a row already marked deleted.
+    # ⚠️ The outer column MUST be qualified. `boosts` has its own `podcast_guid`,
+    # so a bare name binds to the INNER table and the condition degrades to
+    # `COALESCE(b.canonical_guid, b.podcast_guid) = b.podcast_guid` — true for
+    # every un-aliased boost, which deletes the whole ledger on every cycle.
+    conn.execute(
+        f"""DELETE FROM d1_podcasts_orphaned
+            WHERE EXISTS (SELECT 1 FROM boosts b
+                          WHERE {effective_guid("b")} = d1_podcasts_orphaned.podcast_guid)""")
     conn.execute(
         f"""INSERT OR IGNORE INTO d1_podcasts_orphaned (podcast_guid)
             SELECT DISTINCT a.raw_guid FROM guid_aliases a
@@ -738,16 +768,20 @@ def enrichment_gap_size(conn):
 
 
 def orphaned_podcast_guids(conn):
-    """Guids whose D1 podcasts row should be deleted (emptied by re-keying)."""
+    """Guids whose D1 podcasts row should be deleted (emptied by re-keying), and
+    that we have not already deleted. See the ledger note in apply_aliases."""
     if not _has_table(conn, "d1_podcasts_orphaned"):
         return []
     return [r[0] for r in conn.execute(
-        "SELECT podcast_guid FROM d1_podcasts_orphaned").fetchall()]
+        "SELECT podcast_guid FROM d1_podcasts_orphaned WHERE deleted_at IS NULL").fetchall()]
 
 
-def clear_orphaned_podcast_guids(conn, guids):
-    conn.executemany("DELETE FROM d1_podcasts_orphaned WHERE podcast_guid=?",
-                     [(g,) for g in guids])
+def mark_orphaned_podcasts_deleted(conn, guids):
+    """Record that D1 has been told about these, so the next cycle doesn't repeat
+    the DELETE. Marks rather than removes — apply_aliases would just re-insert."""
+    conn.executemany(
+        "UPDATE d1_podcasts_orphaned SET deleted_at=? WHERE podcast_guid=?",
+        [(int(time.time()), g) for g in guids])
     conn.commit()
 
 
