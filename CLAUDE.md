@@ -1518,7 +1518,7 @@ names and figures and reads as a bug in a grid whose entire content is names.
 
 **⚠️ These are the only two queries on the page allowed to fail quietly**, and
 the reason is the write path. Every other table there rides the collector's
-hourly boost delta; `podroll` is replaced wholesale by a separate **weekly** pass
+hourly boost delta; `podroll` is replaced wholesale by a separate **daily** pass
 (`d1_sync.py --remote-podroll`). A remote carrying every other table but not yet
 this one is a normal intermediate state of a deploy, and it must not turn 930
 show pages into 500s to report a section 93% of them don't render. A failure
@@ -2255,11 +2255,34 @@ field rode along on a PI call `enrich.py` already made; this one could not, so
 `podroll.py` fetches the show's own feed. **It is the only pass in this
 pipeline that touches third-party RSS**, and that shapes all of it.
 
-**Weekly, never hourly** (`onlyboosts-podroll.timer`, Sundays). A podroll
+**Daily, never hourly** (`onlyboosts-podroll.timer`, 09:40 UTC). A podroll
 changes when a publisher edits their feed, never when a boost arrives, so
 putting this on the incremental tick would spend ~900 feed fetches an hour of
 other people's bandwidth to learn nothing. `run-podroll.sh` takes the same
 pipeline lock as the other two jobs.
+
+**The timer's cadence is NOT the crawl's cadence, which is what makes daily
+cheap.** `db.shows_needing_podroll` is age-gated by `--max-age` (default 6d), so
+a feed read cleanly two days ago is skipped however often the timer fires. It
+was weekly until 2026-08-11; measured on the day it changed, **8 feeds were due
+against 948 in a full sweep**. So the whole corpus still turns over about once a
+week — one run gets the cohort, the other six pick up the handful of shows first
+boosted since. Don't "fix" the frequency by lowering `--max-age` to match it:
+that is the 7x-bandwidth version, and it buys edits among the 69 of 948 feeds
+that carry a podroll at all.
+
+The wall clock is a politeness floor, not compute: the last full sweep was 948
+feeds in 261s, and that time is Wavlake's 187 feeds going serially at
+`HOST_DELAY` — see below for why that delay exists.
+
+Daily also makes `--retry-age` reachable for the first time. It defaults to
+`max_age // 6` = 24h, the shorter cooldown a never-completed read earns
+(`PODROLL_TRANSIENT`), and on a weekly timer the timer itself was the floor.
+
+**A new show waits for this pass, and nothing else fills the gap.** The row is
+created by whichever tick first sees a boost for it, so a show boosted just after
+a run has no podroll section until the next one — a real report, and the reason
+the cadence changed. There is no podroll path on the incremental tick by design.
 
 **Politeness is load-bearing.** The first scoping sweep, 12 flat workers, drew
 429s from 137 feeds — 135 of them Wavlake, which hosts a big slice of the music
@@ -2311,7 +2334,7 @@ later gets boosted.
 **In D1, both endpoints are denormalized onto the edge** (`source_*` /
 `target_*`). A join to `podcasts` would only resolve the half of targets that
 have boosts, since that table holds nothing else. It syncs as a **full replace**
-via `d1_sync.py --remote-podroll`, run by the weekly script — never on the boost
+via `d1_sync.py --remote-podroll`, run by the podroll script — never on the boost
 delta path, which is unrelated to it. Wholesale replacement is also what makes a
 *removed* recommendation actually disappear. Requires `d1/schema.sql` applied to
 the remote first (`--apply-schema`, idempotent).

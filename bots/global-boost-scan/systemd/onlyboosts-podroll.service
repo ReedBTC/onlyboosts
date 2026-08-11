@@ -1,5 +1,5 @@
 [Unit]
-Description=OnlyBoosts weekly podroll refresh (<podcast:podroll> from raw RSS) + export + VPS/D1 push
+Description=OnlyBoosts daily podroll refresh (<podcast:podroll> from raw RSS) + export + VPS/D1 push
 After=network-online.target
 Wants=network-online.target
 # Non-zero exit opens a GitHub issue. Note the pass swallows per-feed failures by

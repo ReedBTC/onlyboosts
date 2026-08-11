@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
-# Weekly podroll cycle: re-read every indexed show's RSS feed for a
+# Daily podroll cycle: re-read every indexed show's RSS feed for a
 # <podcast:podroll> block, resolve the shows it points at, then re-export and
 # publish. The only pass that fetches third-party RSS — Podcast Index carries no
-# podroll — so it is deliberately WEEKLY: a podroll changes when a publisher
-# edits their feed, never when a boost arrives.
+# podroll — so it is deliberately NOT on the boost tick: a podroll changes when a
+# publisher edits their feed, never when a boost arrives.
+#
+# Daily since 2026-08-11, and that is not 7x the crawling it was: the `podroll`
+# step is age-gated by --max-age (6d), so most days it fetches the handful of
+# shows first boosted since the last run (8 of 948 on the day it changed) and the
+# full corpus still turns over about weekly. See CLAUDE.md.
 #
 # Read-only outward apart from the usual two publishes: the rsync of static JSON
 # and the D1 projection. Nothing here signs or pays.

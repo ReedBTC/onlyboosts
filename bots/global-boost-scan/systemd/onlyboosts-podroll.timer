@@ -1,11 +1,22 @@
 [Unit]
-Description=Run the OnlyBoosts podroll refresh weekly
+Description=Run the OnlyBoosts podroll refresh daily
 
 [Timer]
-# Sunday 09:40 UTC — clear of the daily outbox expansion at 08:30 (which can run
-# long) and off the hourly incremental's usual minute. They share a lock anyway;
-# this just keeps them from queueing behind each other.
-OnCalendar=Sun *-*-* 09:40:00 UTC
+# 09:40 UTC — clear of the daily outbox expansion at 08:30 (which can run long)
+# and off the incremental's usual minute. They share a lock anyway; this just
+# keeps them from queueing behind each other.
+#
+# DAILY, not weekly, and that is NOT a 7x increase in third-party crawling:
+# `podroll` is age-gated by --max-age (default 6d), so a feed read cleanly two
+# days ago is skipped however often this fires. Measured the day it changed: 8
+# feeds due against 948 in a full sweep. The cohort still rolls over about once a
+# week and one run a week does the whole sweep; the other six pick up shows first
+# boosted since the last one, which used to wait up to seven days for a page.
+#
+# It also makes --retry-age reachable. That defaults to max_age//6 = 24h, the
+# shorter cooldown for reads that never completed (429/timeout/5xx) — on a weekly
+# timer the timer itself was the floor, so it could never fire.
+OnCalendar=*-*-* 09:40:00 UTC
 RandomizedDelaySec=900
 Persistent=true
 
