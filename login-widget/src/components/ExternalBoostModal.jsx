@@ -19,7 +19,7 @@ import { isSafeUrl } from '../lib/utils.js'
 import * as wallet from '../lib/wallet.js'
 import { payExternalBoost, STATUS } from '../lib/externalBoost.js'
 import { buildExternalNoteTemplate, MAX_MESSAGE_CHARS } from '../lib/externalBoostagram.js'
-import { signKindOneShareWithUser, publishSignedKindOne, confirmInvoiceSettled } from '../lib/boostagram.js'
+import { signKindOneShareWithUser, publishSignedKindOne, confirmInvoiceSettled, fetchLnurlMeta } from '../lib/boostagram.js'
 import { setBoostModalProgressVisible } from '../lib/boostModalSignal.js'
 import { fireConfetti } from '../lib/confetti.js'
 import ConfirmLeaveOverlay from './ConfirmLeaveOverlay.jsx'
@@ -114,6 +114,32 @@ export default function ExternalBoostModal({ user, onClose, episode, recipientsB
 
   useEffect(() => { lockBodyScroll(); return () => unlockBodyScroll() }, [])
 
+  // Resolve every lnaddress recipient's LNURL endpoint in parallel as soon as
+  // the modal mounts, so the orchestrator can skip its own resolve step at pay
+  // time. Two round trips per leg used to happen while the booster watched a
+  // spinner; this moves them to the seconds spent typing an amount. Same
+  // arrangement EpisodeBoostModal has had — the external path was the one that
+  // never got it.
+  //
+  // Only lnaddress legs: a node recipient's `address` is a node pubkey, and a
+  // keysend has no LNURL step to prefetch. A failed fetch is stored as null
+  // rather than omitted, which is the same instruction to the orchestrator
+  // either way (fetch it live) and keeps the two cases from looking different.
+  const [lnurlCache, setLnurlCache] = useState({})
+  useEffect(() => {
+    if (recipients.length === 0) return
+    let cancelled = false
+    const next = {}
+    Promise.all(recipients.map(async (r) => {
+      if (r?.type !== 'lnaddress' || !r.address) return
+      try { next[r.address] = await fetchLnurlMeta(r.address) }
+      catch { next[r.address] = null }
+    })).then(() => { if (!cancelled) setLnurlCache(next) })
+    return () => { cancelled = true }
+    // The bundle's own array, not the `|| []` fallback above — that allocates a
+    // fresh array on every render and would re-run this effect each time.
+  }, [recipientsBundle?.recipients])
+
   const progressActive = phase === 'sending'
   useEffect(() => {
     setBoostModalProgressVisible(phase !== 'form')
@@ -179,6 +205,7 @@ export default function ExternalBoostModal({ user, onClose, episode, recipientsB
           itemGuid: episode?.itemGuid,
           url: episode?.bmbUrl,
         },
+        lnurlCache,
         onLeg: (i, legState) => updateLeg(i, legState),
       })
     } catch (e) {
@@ -233,6 +260,10 @@ export default function ExternalBoostModal({ user, onClose, episode, recipientsB
           showTitle: episode?.showTitle, episodeTitle: episode?.episodeTitle,
           podcastGuid: episode?.podcastGuid, itemGuid: episode?.itemGuid, url: episode?.bmbUrl,
         },
+        // A leg that failed at the LNURL step has a null cache entry, so a
+        // retry re-fetches it live; one that failed at the payment reuses the
+        // metadata it already had. Both are what the retry wants.
+        lnurlCache,
         onLeg: (_i, ls) => updateLeg(index, { ...ls, sats: leg.sats }),
       })
       if (res?.anyPaid) fireConfetti()

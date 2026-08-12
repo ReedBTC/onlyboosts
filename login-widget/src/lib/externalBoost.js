@@ -59,6 +59,40 @@ if (typeof window !== 'undefined') {
   })
 }
 
+/**
+ * Per-leg phase timing.
+ *
+ * A boost that churns gives no account of itself: the modal shows one spinner
+ * per leg and the console shows nothing, so a slow leg is indistinguishable
+ * from a slow LNURL host, a slow wallet relay and a slow wallet. Splitting the
+ * leg into its phases is the difference between reasoning about which one it
+ * was and reading it. `pay` is the NWC round trip — the request event out to
+ * the wallet's relay and the wallet's reply back — and the wallet does not
+ * reply until the payment has settled, so a large number there is the wallet
+ * or the route, never this file.
+ *
+ * Unconditional console.info rather than a debug flag: a boost is a handful of
+ * lines, it only runs on an explicit click, and the one time anyone wants
+ * these is a boost that already happened.
+ */
+const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now())
+
+function legTimer() {
+  const start = now()
+  let last = start
+  const phases = []
+  return {
+    mark(name) {
+      const t = now()
+      phases.push(`${name} ${Math.round(t - last)}ms`)
+      last = t
+    },
+    summary() {
+      return { totalMs: Math.round(now() - start), phases: phases.join(', ') }
+    },
+  }
+}
+
 /** UUID4 tying every leg of one boost together (boostagram `uuid`). */
 function uuid4() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
@@ -108,8 +142,15 @@ function isCleanDecline(msg) {
     /not_implemented|not implemented|unsupported|method not found/i.test(String(msg || ''))
 }
 
-async function payLnaddressLeg(leg, ctx, update) {
-  const meta = await fetchLnurlMeta(leg.recipient.address)
+async function payLnaddressLeg(leg, ctx, update, timer) {
+  // Prefer the modal's prefetched metadata over a fresh fetch. The modal
+  // resolves every lnaddress recipient in parallel on mount, so by boost time
+  // most legs already have theirs. A cache miss — or a null, which is what the
+  // modal stores when its own fetch failed — falls through to a live fetch, so
+  // this is a saving and never a dependency. Same arrangement as payAllLegs.
+  let meta = ctx.lnurlCache?.[leg.recipient.address] || null
+  if (!meta) meta = await fetchLnurlMeta(leg.recipient.address)
+  timer?.mark('meta')
   const msats = leg.sats * 1000
   if (typeof meta.minSendable === 'number' && msats < meta.minSendable) {
     throw new Error(`This leg needs at least ${Math.ceil(meta.minSendable / 1000).toLocaleString()} sats — bump the boost.`)
@@ -120,6 +161,7 @@ async function payLnaddressLeg(leg, ctx, update) {
   const allowed = meta.commentAllowed || 0
   const comment = allowed > 0 ? (ctx.message || '').slice(0, Math.min(allowed, MAX_MESSAGE_CHARS)) : ''
   const { pr, verify } = await fetchLnurlInvoice(meta.callback, msats, comment)
+  timer?.mark('invoice')
   const paymentHash = bolt11PaymentHash(pr)
   update({ verifyUrl: verify || null, paymentHash })
 
@@ -130,6 +172,7 @@ async function payLnaddressLeg(leg, ctx, update) {
     const res = await ctx.wal.payInvoice({ invoice: pr })
     preimage = res?.preimage || null
   } catch (e) { payError = e }
+  timer?.mark('pay')
 
   if (preimage) return { status: STATUS.PAID }
 
@@ -139,12 +182,13 @@ async function payLnaddressLeg(leg, ctx, update) {
   // Ambiguous — never blind-fail an NWC leg (the reply can be lost while the
   // payment settles). Confirm via LUD-21 before deciding.
   const settled = await confirmInvoiceSettled(verify, paymentHash)
+  timer?.mark('verify')
   if (settled === 'settled') return { status: STATUS.PAID }
   if (settled === 'unsettled') return { status: STATUS.FAILED, error: friendlyError(msg) || 'Payment did not settle.' }
   return { status: STATUS.UNCERTAIN, error: 'Couldn’t confirm this payment — check your wallet before retrying.' }
 }
 
-async function payKeysendLeg(leg, ctx, update) {
+async function payKeysendLeg(leg, ctx, update, timer) {
   const boostagram = buildBoostagram({
     legMsats: leg.sats * 1000,
     totalMsats: ctx.totalSats * 1000,
@@ -194,6 +238,10 @@ async function payKeysendLeg(leg, ctx, update) {
     const msg = String(e?.message || e)
     if (isCleanDecline(msg)) return { status: STATUS.FAILED, error: friendlyError(msg) }
     return { status: STATUS.UNCERTAIN, error: friendlyError(msg) }
+  } finally {
+    // finally, not a mark per return: the try/catch has six of them, and a
+    // keysend has no phase before the payment to separate out anyway.
+    timer?.mark('pay')
   }
 }
 
@@ -208,11 +256,16 @@ async function payKeysendLeg(leg, ctx, update) {
  * @param {string} [p.senderName]
  * @param {string} [p.senderPubkey] - hex pubkey when signed in
  * @param {object} p.meta          - { showTitle, episodeTitle, podcastGuid, itemGuid, url }
+ * @param {object} [p.lnurlCache]  - { [lnaddress]: lnurlMeta|null } prefetched by
+ *                                   the modal on mount. Optional in both
+ *                                   directions: a missing entry, a null entry
+ *                                   and no cache at all all fall through to a
+ *                                   live fetch inside the leg.
  * @param {(index:number, patch:object)=>void} [p.onLeg]
  * @returns {Promise<{legs:Array, anyPaid:boolean, paidSats:number}>}
  */
 export async function payExternalBoost({
-  recipients, totalWeight, totalSats, message, senderName, senderPubkey, meta, onLeg,
+  recipients, totalWeight, totalSats, message, senderName, senderPubkey, meta, lnurlCache, onLeg,
 }) {
   if (!wallet.isReady()) throw new Error('Connect a wallet first')
   if (!Array.isArray(recipients) || recipients.length === 0) throw new Error('No recipients to pay')
@@ -221,35 +274,56 @@ export async function payExternalBoost({
   const kind = wallet.getStatus().kind
   const wal = wallet.getActiveWallet()
   const boostUuid = uuid4()
-  const ctx = { kind, wal, message, senderName, senderPubkey, totalSats, boostUuid, meta }
+  const ctx = { kind, wal, message, senderName, senderPubkey, totalSats, boostUuid, meta, lnurlCache }
 
   const legs = distributeSats(totalSats, recipients, totalWeight).map((l) => ({
     ...l, status: STATUS.PENDING, error: null, paymentHash: null, verifyUrl: null,
   }))
 
   activeBoosts++
+  const startedAt = now()
   try {
     for (const leg of legs) {
       const update = (patch) => { Object.assign(leg, patch); onLeg?.(leg.index, { ...leg }) }
 
-      if (leg.sats <= 0) { update({ status: STATUS.SKIPPED }); continue }
+      if (leg.sats <= 0) {
+        update({ status: STATUS.SKIPPED })
+        // Logged despite having nothing to time, so the console carries one
+        // line per leg and a missing number never has to be accounted for.
+        console.info(`[lb-boost] leg ${leg.index + 1}/${legs.length} ${leg.recipient.address} → skipped (0 sats)`)
+        continue
+      }
 
+      const timer = legTimer()
       try {
         const result = leg.recipient.type === 'lnaddress'
-          ? await payLnaddressLeg(leg, ctx, update)
-          : await payKeysendLeg(leg, ctx, update)
+          ? await payLnaddressLeg(leg, ctx, update, timer)
+          : await payKeysendLeg(leg, ctx, update, timer)
         update(result)
       } catch (e) {
         // Pre-payment failures (LNURL resolve, below-min, invoice fetch) — these
         // are definitively not-paid.
         update({ status: STATUS.FAILED, error: friendlyError(e?.message || e) })
       }
+      const { totalMs, phases } = timer.summary()
+      // Address rather than name: `name` is empty on most value blocks (the
+      // show's own leg usually carries none), and the address is public data
+      // straight out of the feed either way.
+      console.info(
+        `[lb-boost] leg ${leg.index + 1}/${legs.length} ${leg.recipient.type} ` +
+        `${leg.recipient.address} ${leg.sats} sats → ${leg.status} in ${totalMs}ms` +
+        (phases ? ` (${phases})` : ''),
+      )
     }
   } finally {
     activeBoosts--
   }
 
   const paidLegs = legs.filter((l) => l.status === STATUS.PAID)
+  console.info(
+    `[lb-boost] ${legs.length} legs via ${kind} in ${Math.round(now() - startedAt)}ms: ` +
+    `${paidLegs.length} paid, ${paidLegs.reduce((a, l) => a + l.sats, 0)} of ${totalSats} sats`,
+  )
   return {
     legs,
     anyPaid: paidLegs.length > 0,
