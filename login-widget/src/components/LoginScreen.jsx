@@ -383,7 +383,7 @@ export default function LoginScreen({ onLogin, embedded = false }) {
       const NC_RELAYS = [
         'wss://relay.nsec.app',
         'wss://relay.primal.net',
-        'wss://relay.damus.io',
+        'wss://relay.ditto.pub',
         'wss://nos.lol',
         'wss://relay.nostr.band',
       ]

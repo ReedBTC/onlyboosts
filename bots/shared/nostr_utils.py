@@ -15,30 +15,59 @@ import requests
 import websocket
 from pynostr.key import PrivateKey
 
-# Small, fast, reliable bootstrap set used for metadata lookups (kind 0, kind 3,
-# kind 10002). All are popular general-purpose relays that respond within a few
-# seconds. purplepag.es is a profile aggregator — specifically useful for finding
-# kind 0 / kind 10002 events that haven't propagated widely.
+# Metadata lookups (kind 0, kind 3, kind 10002).
+#
+# Chosen by measurement rather than by reputation, 2026-08-12, against the 61
+# distinct boosters behind the 100 most recent boosts — coverage per relay,
+# kind 0 / kind 10002 / kind 3:
+#     relay.ditto.pub    80% / 42% / 67%
+#     nos.lol            78% / 59% / 75%
+#     relay.mostr.pub    47% / 36% / 47%
+#     relay.wavlake.com  37% / 37% / 24%
+#
+# ⚠️ purplepag.es was here as the one DEDICATED profile aggregator, and the
+# measurement is why it is not any more: it scored 32% / 37% / 50%, and its
+# MARGINAL contribution once ditto and nos.lol are present was ZERO on every
+# kind. Everything it held, they held. Don't re-add it on the reasoning that an
+# aggregator belongs in a list like this; re-measure instead. Dropped for the
+# same reason: relay.primal.net (6% / 4% / 18%) and relay.wisp.talk (26/24/16).
+#
+# wavlake earns its slot on this audience specifically — our boosters are
+# podcast and music listeners, so the relay their boosts live on also carries
+# their profiles. It beat purplepag.es on kind 0 and matched it on kind 10002.
 BOOTSTRAP_RELAYS = [
-    "wss://relay.damus.io",
+    "wss://relay.ditto.pub",
     "wss://nos.lol",
-    "wss://relay.primal.net",
-    "wss://purplepag.es",
+    "wss://relay.mostr.pub",
+    "wss://relay.wavlake.com",
 ]
 
 # Kind-1 fallback set used by `publish_to_nostr` when an account has no kind 10002
 # outbox to resolve. Trimmed in 2026-04 to drop chronically-flaky relays
 # (nostr.band, snort.social, oxtr.dev, current.fyi) — they timed out on every run.
 # Notes are no longer routinely broadcast to this set; the outbox model handles
-# the normal publish path. relay.fountain.fm is retained because Fountain users
-# often have profiles there.
+# the normal publish path.
+#
+# A relay belongs here if it accepts kind 1 AND the podcasting audience reads
+# it. relay.fountain.fm stays on the first count and earns the second outright:
+# measured 2026-08-12, it holds a kind 1 for 60 of the 61 boosters behind the
+# most recent 100 boosts, where no general relay cleared 44%. (The older note
+# here justified it as a place "Fountain users often have profiles" — it
+# returned no kind 0 at all in that measurement, so keep it for the notes.)
+# chadf and podtards are added on the same reasoning: the collector already
+# reads boosts from them, so they are demonstrably where this audience is.
+#
+# ⚠️ `wss://relay.getalby.com/v1` was in this list and is REMOVED. It is NWC
+# transport, not a general relay: both it and the bare host answer every single
+# REQ with `blocked: Request rejected`, so no reader can ever retrieve a note
+# published there. NWC is unaffected — a wallet connection carries its own relay
+# in the connection string and never consults this list.
 NOSTR_RELAYS = [
-    "wss://relay.damus.io",
-    "wss://purplepag.es",
+    "wss://relay.ditto.pub",
     "wss://nos.lol",
-    "wss://relay.getalby.com/v1",
-    "wss://relay.primal.net",
     "wss://relay.fountain.fm",
+    "wss://chadf.nostr1.com",
+    "wss://podtards.com",
 ]
 
 def load_config(config_file):

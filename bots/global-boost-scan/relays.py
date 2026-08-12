@@ -16,7 +16,7 @@ from nostr_utils import get_outbox_relays
 CORE_RELAYS = [
     "wss://relay.fountain.fm",
     "wss://nos.lol",
-    "wss://relay.damus.io",
+    "wss://relay.ditto.pub",
     "wss://relay.mostr.pub",
     "wss://chadf.nostr1.com",
     "wss://nostr.mom",
@@ -29,15 +29,30 @@ CORE_RELAYS = [
 ]
 
 # Profile / NIP-65 sources — queried for kind-0 and kind-10002, not boosts.
-# Aggregators (purplepag.es) miss many boosters; the general relays where people
-# actually publish their kind-0 (nos.lol, mostr.pub, primal) carry the rest.
-# relay.nostr.band is dropped here — it timed out on nearly every profile batch.
+# relay.nostr.band was dropped in the original pass for timing out on nearly
+# every profile batch; re-probed 2026-08-12 it answered 0% on every kind.
+#
+# Re-measured 2026-08-12 against the 61 distinct boosters behind the 100 most
+# recent boosts. Coverage, kind 0 / kind 10002:
+#     relay.ditto.pub    80% / 42%
+#     nos.lol            78% / 59%
+#     relay.mostr.pub    47% / 36%
+#     relay.wavlake.com  37% / 37%
+#
+# ⚠️ The header note above this list used to read "Aggregators (purplepag.es)
+# miss many boosters" — that was right, and the measurement is what retired it:
+# 32% / 37% on its own, and ZERO marginal coverage once ditto and nos.lol are
+# present. Same finding for relay.primal.net (6% / 4%) and relay.wisp.talk
+# (26% / 24%). wavlake replaces them because this audience is podcast and music
+# listeners, so the relay their boosts live on carries their profiles too.
+#
+# 11% of boosters have no kind 0 on ANY relay tested and 36% no kind 10002.
+# That floor is a fact about them; adding relays does not move it.
 PROFILE_RELAYS = [
-    "wss://purplepag.es",
     "wss://nos.lol",
+    "wss://relay.ditto.pub",
     "wss://relay.mostr.pub",
-    "wss://relay.primal.net",
-    "wss://relay.damus.io",
+    "wss://relay.wavlake.com",
 ]
 
 # Where to look up quoted kind-9735 zap receipts (Fountain boosts carry no amount
@@ -46,7 +61,7 @@ PROFILE_RELAYS = [
 RECEIPT_RELAYS = [
     "wss://relay.fountain.fm",
     "wss://nos.lol",
-    "wss://relay.damus.io",
+    "wss://relay.ditto.pub",
 ]
 
 

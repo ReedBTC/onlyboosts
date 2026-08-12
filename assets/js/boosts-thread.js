@@ -29,12 +29,29 @@ import {
 // ── Config ───────────────────────────────────────────────────────────
 export const ROOT_NEVENT = 'nevent1qvzqqqqqqypzpses3q0zsa5rs8wchh7jws6pmjsvtzpv9xuxgt4yhjp0w43jv3vjqyd8wumn8ghj7urewfsk66ty9enxjct5dfskvtnrdakj7qgwwaehxw309ahx7uewd3hkctcqyr3keved458q3n7x7839r86vj4dx0s4xh0p8j7fzvf4nq7824ulagy77tpj'
 
+// Two jobs, one list: kind-1 boost threads and (via the re-export below)
+// kind-3 contact lists for the Follows feeds. It is their UNION rather than
+// two constants, because four sockets are cheap and two exported sets are a
+// seam someone eventually imports the wrong half of.
+//
+// Chosen by measurement, 2026-08-12, over the 61 distinct boosters behind the
+// 100 most recent boosts — coverage per relay, kind 1 / kind 3:
+//   relay.fountain.fm  98% / 4%     ← no general relay clears 44% on kind 1
+//   nos.lol            44% / 75%
+//   relay.mostr.pub    44% / 47%    ← the +1 that takes kind 1 to 100%
+//   relay.ditto.pub    32% / 67%
+// Dropped: relay.nostr.band answered 0% on every kind tested, and
+// relay.primal.net 29% / 18% while adding nothing the others don't hold.
+//
+// ⚠️ relay.fountain.fm does not EOSE on an UNFILTERED kind-1 REQ. Every live
+// consumer here filters by author, id or #e, which it answers normally; keep
+// it that way, and note `fetchThreadNotesFromRelays` is unbounded (it is dead
+// LB thread code, and would need a timeout before it were revived).
 const STATIC_RELAYS = [
-  'wss://relay.damus.io',
+  'wss://relay.ditto.pub',
   'wss://nos.lol',
-  'wss://relay.primal.net',
-  'wss://relay.nostr.band',
-  'wss://purplepag.es',
+  'wss://relay.fountain.fm',
+  'wss://relay.mostr.pub',
 ]
 export { STATIC_RELAYS }
 

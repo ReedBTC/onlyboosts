@@ -28,7 +28,7 @@
 import { generateSecretKey, finalizeEvent, SimplePool } from 'nostr-tools'
 import { nip19 } from 'nostr-tools'
 import { NDKEvent } from '@nostr-dev-kit/ndk'
-import { getNDK, signWithTimeout } from './ndk.js'
+import { getNDK, signWithTimeout, publishRelaySet } from './ndk.js'
 import { withTimeout } from './utils.js'
 
 // ─── Recipient constants ────────────────────────────────────────────────────
@@ -101,11 +101,27 @@ const LNURL_BODY_BYTE_CAP = 64 * 1024
 // Relays used for kind 30078 publishing. Same set the rest of the Nostr
 // boost ecosystem watches; broad enough for any future bot subscribing
 // to the metadata stream.
+//
+// Every entry has to ACCEPT kind 30078 to be worth a socket here. purplepag.es
+// was in this list and could not: it stores kind 0 / 3 / 10002 and nothing
+// else, so a REQ for kind 30078 against it returns zero and a publish to it was
+// one of four acks that could never arrive. Check a candidate before adding it
+// — relay.fountain.fm is the other one that can't, answering a kind-30078 REQ
+// with `kinds not supported`, which is why it is absent despite being the best
+// relay on this site's audience for kind 1.
+//
+// The last three are the podcasting relays the collector already reads boosts
+// from, added 2026-08-12: all three store kind 30078, and they are where this
+// audience actually is, which a general relay is not. Their NIP-11 reports open
+// writes, but strfry usually leaves `restricted_writes` unset, so that is a
+// claim rather than proof — a rejected publish here costs one of five acks and
+// never a payment, since the leg pays whether or not the metadata lands.
 const BOOSTAGRAM_RELAYS = [
-  'wss://relay.damus.io',
+  'wss://relay.ditto.pub',
   'wss://nos.lol',
-  'wss://relay.primal.net',
-  'wss://purplepag.es',
+  'wss://chadf.nostr1.com',
+  'wss://podtards.com',
+  'wss://relay.wavlake.com',
 ]
 
 // ─── bolt11 payment hash extractor ──────────────────────────────────────────
@@ -720,16 +736,21 @@ export async function signKindOneShareWithUser(template) {
 }
 
 /**
- * Publish an already-signed kind 1 share note via NDK to the user's
- * outbox relays. Best-effort: returns whether at least one relay
+ * Publish an already-signed kind 1 share note to PUBLISH_RELAYS unioned with
+ * the user's own outbox. Best-effort: returns whether at least one relay
  * ack'd. Never throws.
+ *
+ * Not a bare `ev.publish()`: that reaches only NDK's pool, which is the
+ * identity-read set plus the user's write relays, and a boost note's audience
+ * is podcast listeners on relays no read set has any use for. See
+ * `publishRelaySet` in ndk.js for why the union rather than the set alone.
  */
 export async function publishSignedKindOne(signedEvent) {
   if (!signedEvent?.id || !signedEvent?.sig) return { published: false }
   const ndk = getNDK()
   try {
     const ev = new NDKEvent(ndk, signedEvent)
-    const ackd = await ev.publish()
+    const ackd = await ev.publish(publishRelaySet(ndk))
     return { published: !!(ackd && ackd.size > 0) }
   } catch {
     return { published: false }
@@ -797,10 +818,12 @@ export async function publishBoostShareNote({
 
   // Publish to the user's own write relays via NDK's default publish.
   // Failures are non-fatal — the boost itself succeeded; the share is
-  // best-effort.
+  // best-effort. Same relay set as publishSignedKindOne: these are the same
+  // kind of note and must not reach two different audiences depending on which
+  // path built them.
   let published = false
   try {
-    const ackd = await ev.publish()
+    const ackd = await ev.publish(publishRelaySet(ndk))
     published = ackd && ackd.size > 0
   } catch {
     published = false

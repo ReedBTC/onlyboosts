@@ -377,7 +377,95 @@ Carried from the scaffold commit and the LB suite:
 - Relay note that carries over: Fountain boosts are heavily
   `wss://relay.fountain.fm`-only (~90%), which is why it's in the
   `NOSTR_RELAYS` list in `bots/shared/nostr_utils.py` despite not being a
-  general-purpose relay. Don't prune it.
+  general-purpose relay. Don't prune it. See the relay section below.
+
+## Relay sets
+
+**A relay list is defined by the kind it carries and the audience it reaches,
+not by which relays are popular.** Every set in this repo was re-derived from
+that rule on 2026-08-12, measured against the 61 distinct boosters behind the
+100 most recent boosts. **Re-measure before changing one**; the numbers below
+are the whole argument, and reputation is a bad proxy for them.
+
+**⚠️ Reading and publishing are different jobs and take different sets.** A
+read set answers "who HAS this event", which is measurable, and a useless
+member costs latency on every query. A publish set answers "who will SEE this
+event", which cannot be measured from outside, and an extra member costs one
+socket on an infrequent action while omitting one costs reach nobody can
+observe. **So the read sets are cut to what the measurement supports and the
+publish sets are deliberately generous, and a low score is not an argument
+against a publish target.** One list doing both jobs is the smell that produced
+the 2026-08-12 split; `FALLBACK_RELAYS` was it.
+
+| Relay | kind 0 | kind 10002 | kind 3 | kind 1 |
+|---|---|---|---|---|
+| `relay.fountain.fm` | 0% | 0% | 4% | **98%** |
+| `nos.lol` | 78% | **59%** | **75%** | 44% |
+| `relay.ditto.pub` | **80%** | 42% | 67% | 32% |
+| `relay.mostr.pub` | 47% | 36% | 47% | 44% |
+| `relay.wavlake.com` | 37% | 37% | 24% | 14% |
+| `purplepag.es` | 32% | 37% | 50% | 0% |
+| `relay.primal.net` | 6% | 4% | 18% | 29% |
+| `relay.nostr.band` | 0% | 0% | 0% | 0% |
+
+The sets, and the one job each has:
+
+| Set | File | Kinds |
+|---|---|---|
+| `STATIC_RELAYS` | `assets/js/boosts-thread.js` | read 1 threads + 3 follows |
+| `FALLBACK_RELAYS` | `login-widget/src/lib/ndk.js` | **read** 0, 10002 |
+| `OUTBOX_RELAYS` | `login-widget/src/lib/ndk.js` | read 10002 only |
+| `PUBLISH_RELAYS` | `login-widget/src/lib/ndk.js` | **publish** 1 share notes |
+| `BOOSTAGRAM_RELAYS` | `login-widget/src/lib/boostagram.js` | publish 30078 |
+| `NC_RELAYS` | `login-widget/src/components/LoginScreen.jsx` | 24133 bunker transport |
+| `BUG_RELAY` | `login-widget/src/lib/bugReport.js` | 1, tag-gated, isolated |
+| `BOOTSTRAP_RELAYS` | `bots/shared/nostr_utils.py` | 0, 3, 10002 |
+| `NOSTR_RELAYS` | `bots/shared/nostr_utils.py` | publish 1 |
+| `CORE_` / `PROFILE_` / `RECEIPT_RELAYS` | `bots/global-boost-scan/relays.py` | 1 / 0+10002 / 9735 |
+| NIP-05 hints | `.well-known/nostr.json` | mirrors `FALLBACK_RELAYS` |
+
+Five findings that outlive the numbers:
+
+- **⚠️ `relay.damus.io` is gone and must not come back.** It answers a
+  WebSocket connect with **HTTP 503**. It was first in every browser-side list.
+- **⚠️ `relay.getalby.com` is NWC transport, not a relay.** Both it and
+  `/v1` answer *every* REQ with `blocked: Request rejected`, so a note
+  published there can never be read. It was in `NOSTR_RELAYS`. NWC is
+  unaffected either way: the wallet's relay comes from the connection string.
+- **A relay has to accept the kind.** `purplepag.es` stores only 0/3/10002 and
+  was in `BOOSTAGRAM_RELAYS`, where a kind-30078 publish to it could never be
+  stored; `relay.fountain.fm` refuses 30078 with `kinds not supported`.
+- **Aggregators are not automatically worth a slot.** `purplepag.es` scored
+  respectably alone and added **zero** marginal coverage once ditto and nos.lol
+  were present. Same for `relay.primal.net`, which was in five sets. That is
+  the *relay*; `cache1.primal.net` behind `primal-profiles.js` is a different
+  service and is the reason profiles still resolve.
+- **⚠️ NDK dials relays this repo never names.** It builds a second, outbox
+  pool from its own `DEFAULT_OUTBOX_RELAYS` (`purplepag.es`, `nos.lol`) unless
+  `outboxRelayUrls` is passed. Removing a relay from every list here does not
+  stop the browser connecting to it; `ndk.js` now passes the option explicitly.
+- **⚠️ Publishing to Primal's RELAY is not how Primal users see a note.**
+  Measured on a real boost note: absent from `relay.primal.net`, which held
+  **0** of that author's kind-1s on a limit-200 query, and simultaneously
+  **present in `cache1.primal.net`**, which is what the Primal client reads.
+  The cache ingests from the network at large, so a note published to any
+  well-connected relay reaches Primal users. `relay.primal.net` is in
+  `PUBLISH_RELAYS` on the read/publish asymmetry above, not on evidence.
+
+**⚠️ `publishRelaySet()` in `ndk.js` unions `PUBLISH_RELAYS` with NDK's pool,
+and the union is load-bearing.** `ensureUserWriteRelays` seeds that pool with
+the signed-in user's NIP-65 write relays, so passing a relay set built from
+`PUBLISH_RELAYS` alone would replace the pool and silently stop publishing to
+the user's own relays — the note still publishes, to the wrong audience, and no
+error is raised. Both kind-1 publish paths in `boostagram.js` go through it, so
+one note cannot reach two different audiences depending on which built it.
+
+Floors worth knowing before chasing coverage: **11% of boosters have no kind 0
+on any relay tested, and 36% have no kind 10002.** No list closes that.
+
+Untested, and the one thing to confirm: **write policy.** Every relay above
+reports open writes in NIP-11, but strfry usually leaves `restricted_writes`
+unset, so a publish target is unproven until an event actually lands.
 
 ## What's built vs. what isn't
 
