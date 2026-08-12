@@ -374,19 +374,47 @@ export default function LoginScreen({ onLogin, embedded = false }) {
       const ndk = getNDK()
       await connectAndWait(ndk)
 
-      // Different signers publish the connect response to different relays;
-      // advertise + subscribe to a broad set so whichever relay the signer
-      // picks, we'll see the response. nsec.app, primal, and damus cover
-      // most named bunkers; nos.lol + relay.nostr.band catch Amber-on-
-      // Android configurations that publish to a wider set or fall back
-      // to a "well-known" relay when the user's preferred isn't reachable.
+      // The nostrconnect:// transport set. ⚠️ This list is OURS, not the
+      // signer's: NIP-46 requires the signer to answer on the relays named
+      // in the URI, so on this path the user's own Amber/nsec.app relay
+      // settings do not govern the handshake. The bunker:// path below is
+      // the reverse — those relays come out of the pasted string.
+      //
+      // A member has to be reachable BY BOTH SIDES and has to carry kind
+      // 24133, which is ephemeral, so nothing is stored and a reply that
+      // lands while nobody is subscribed is gone for good. Measured
+      // 2026-08-12 by publishing a throwaway 24133 to each and watching a
+      // second socket on the same relay for delivery:
+      //
+      //   relay.primal.net   OK: true, relayed
+      //   relay.ditto.pub    OK: true, relayed
+      //   nos.lol            OK: true, relayed
+      //   relay.mostr.pub    OK: true, relayed   (tested spare, not shipped)
+      //   relay.nsec.app     HTTP 502, socket closes 1006 in ~540ms
+      //   relay.nostr.band   TCP connect never completes; ~10s, then 1006
+      //
+      // ⚠️ An OK is not proof of transport. relay.fountain.fm answers
+      // `OK: true` to the publish and then CLOSEs the subscription with
+      // "kinds not supported", so the event is accepted and never
+      // delivered. Test the read side too before adding a member.
+      //
+      // The two that were dropped were both dead before this measurement
+      // and neither was the recent damus.io → ditto.pub swap. nostr.band
+      // is the expensive one: a refusal costs half a second, a connect
+      // that hangs costs the dialer's full timeout, and the signer pays
+      // that wait where this page cannot see it.
       const NC_RELAYS = [
-        'wss://relay.nsec.app',
         'wss://relay.primal.net',
         'wss://relay.ditto.pub',
         'wss://nos.lol',
-        'wss://relay.nostr.band',
       ]
+
+      // Amber prompts once per scope it hasn't been granted, and the second
+      // prompt lands after the user has already tabbed back here, which is
+      // where a connect appears to hang. Naming both scopes up front lets
+      // the signer approve them on one screen. A signer that ignores `perms`
+      // is left exactly where it was, so this cannot regress the handshake.
+      const NC_PERMS = ['get_public_key', 'sign_event']
 
       // Reuse the saved secret + URI if we published one recently.
       let clientSecretKey
@@ -412,6 +440,7 @@ export default function LoginScreen({ onLogin, embedded = false }) {
         nostrConnectUri = createNostrConnectURI({
           clientPubkey,
           relays: NC_RELAYS,
+          perms: NC_PERMS,
           secret,
           name: 'OnlyBoosts',
           url: 'https://onlyboosts.social',

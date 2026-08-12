@@ -452,6 +452,49 @@ Five findings that outlive the numbers:
   well-connected relay reaches Primal users. `relay.primal.net` is in
   `PUBLISH_RELAYS` on the read/publish asymmetry above, not on evidence.
 
+### `NC_RELAYS` Is a Third Job, and the Signer Pays for a Bad Member
+
+**⚠️ The `nostrconnect://` relay list is OURS, not the user's signer's.** NIP-46
+requires the signer to answer on the relays named in the URI, so the relays
+configured in someone's Amber do not govern that handshake; they govern the
+`bunker://` path, where the pasted string carries the signer's own list. The
+two directions are opposite and the same five relays serve only one of them.
+
+That makes this neither a read set nor a publish set. A member has to be
+reachable **by both sides** and has to carry kind 24133, which is ephemeral, so
+nothing is stored and a reply arriving while nobody is subscribed is gone for
+good. The set was re-derived on 2026-08-12 by publishing a throwaway 24133 to
+each relay and watching a second socket on the same relay for delivery:
+
+| Relay | Publish | Relayed |
+|---|---|---|
+| `relay.primal.net` | `OK: true` | yes |
+| `relay.ditto.pub` | `OK: true` | yes |
+| `nos.lol` | `OK: true` | yes |
+| `relay.mostr.pub` | `OK: true` | yes (tested spare, not shipped) |
+| `relay.nsec.app` | HTTP 502, socket closes 1006 in ~540ms | — |
+| `relay.nostr.band` | TCP connect never completes; ~10s, then 1006 | — |
+
+- **⚠️ An OK is not proof of transport.** `relay.fountain.fm` answers `OK: true`
+  to the publish and then CLOSEs the subscription with `kinds not supported`, so
+  the event is accepted and never delivered. **Test the read side too.**
+- **⚠️ A hang costs more than a refusal, and the SIGNER pays it.** A 502 is half
+  a second; a connect that never completes costs the dialer's whole timeout, and
+  the dialer here is the signer app, off where this site cannot see or report
+  it. That is what a login "taking forever and then working" looks like, and
+  `relay.nostr.band` was doing it from inside a list nobody had measured.
+- **The 2026-08-12 sweep did not cover this set.** It measured kinds 0, 1, 3 and
+  10002; `NC_RELAYS` carries 24133 and got only the mechanical
+  `damus.io` → `ditto.pub` substitution, which is why two relays that were
+  already dead survived it. **A relay list is defined by the kind it carries**,
+  and that rule applies to this one too.
+
+The URI also names `perms` (`get_public_key`, `sign_event`). Amber prompts once
+per ungranted scope and the second prompt lands after the user has tabbed back
+to the browser, which is where a connect appears to hang; naming both up front
+lets one screen approve them. A signer that ignores the parameter is left
+exactly where it was.
+
 **⚠️ `publishRelaySet()` in `ndk.js` unions `PUBLISH_RELAYS` with NDK's pool,
 and the union is load-bearing.** `ensureUserWriteRelays` seeds that pool with
 the signed-in user's NIP-65 write relays, so passing a relay set built from

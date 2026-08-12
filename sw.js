@@ -351,7 +351,15 @@
 // version, so it can only resolve or 404; and a stale show-page.js simply never
 // imports it, which costs the clamp and nothing else, since the description
 // renders expanded and this collapses it rather than the other way round.
-const VERSION = 'ob-v55';
+// ob-v56: the NIP-46 transport set drops two dead relays and the
+// nostrconnect:// URI names the permissions it wants. Both live inside the
+// rebuilt assets/widgets/login-widget.js, and the bump is what a returning
+// visitor needs to get it on the first navigation rather than the second —
+// the point of the fix is a signer login that stops waiting on a relay whose
+// TCP connect never completes, and a visitor holding the old bundle keeps
+// waiting. No other asset changed, and nothing outside the bundle reads
+// either value, so this bump is required only for the widget's sake.
+const VERSION = 'ob-v56';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;
