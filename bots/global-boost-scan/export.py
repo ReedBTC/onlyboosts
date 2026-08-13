@@ -236,6 +236,8 @@ def export(conn, out_dir, latest_n=1000, per_show=False, log=print):
             "npub": hex_to_npub(p["pubkey"]),
             "name": p["name"], "display_name": p["display_name"],
             "picture": p["picture"], "nip05": p["nip05"],
+            "about": p["about"], "lud16": p["lud16"], "lud06": p["lud06"],
+            "website": p["website"], "banner": p["banner"],
         }
     write_json(out / "profiles.json", {"generated_at": generated, "profiles": profs})
     log(f"  profiles: {len(profs)}")

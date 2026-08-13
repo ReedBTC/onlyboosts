@@ -104,12 +104,22 @@ CREATE TABLE IF NOT EXISTS podroll (
 );
 CREATE INDEX IF NOT EXISTS idx_podroll_target ON podroll(target_guid);
 
+-- ⚠️ CREATE TABLE IF NOT EXISTS DOES NOT ADD A COLUMN to an existing remote
+-- table, so applying this file is NOT how the five fields below reach a D1 that
+-- already has a `profiles` table. They were added out-of-band with ALTER TABLE
+-- ... ADD COLUMN, the same way `podcasts.artwork` was. This declaration is for a
+-- database built from scratch; keep the two in step by hand.
 CREATE TABLE IF NOT EXISTS profiles (
   pubkey       TEXT PRIMARY KEY,
   name         TEXT,
   display_name TEXT,
   picture      TEXT,
-  nip05        TEXT
+  nip05        TEXT,
+  about        TEXT,
+  lud16        TEXT,   -- lightning address; lud06 is the older bech32 LNURL form
+  lud06        TEXT,   -- of the same field, kept separate because it renders differently
+  website      TEXT,
+  banner       TEXT
 );
 
 CREATE TABLE IF NOT EXISTS meta (

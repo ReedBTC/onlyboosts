@@ -478,8 +478,14 @@ def cmd_enrich(args):
     else:
         print("[warn] no Podcast Index credentials — skipping show/episode enrichment")
 
+    # Capped per pass, new pubkeys first — see db.pubkeys_needing_profile. The
+    # backlog is printed rather than inferred from the count: a full batch means
+    # "there is more", and that is worth saying out loud on a pass that is
+    # deliberately not finishing the job.
+    new_due, stale_due = db.profile_refresh_backlog(conn)
     pubkeys = db.pubkeys_needing_profile(conn)
-    print(f"Enriching {len(pubkeys)} profile(s) via kind-0...")
+    print(f"Enriching {len(pubkeys)} profile(s) via kind-0 "
+          f"({new_due} never fetched, {stale_due} stale)...")
     profs = enrich.resolve_profiles(pubkeys, PROFILE_RELAYS,
                                     log=lambda m: print(m, flush=True))
     for pk, prof in profs.items():
@@ -488,6 +494,9 @@ def cmd_enrich(args):
     if missed:
         db.mark_enrich_failed(conn, "profile", missed)     # no kind-0 found this pass
     print(f"Enrichment done: {len(profs)} profiles resolved, {len(missed)} negative-cached.")
+    if len(pubkeys) >= db.PROFILE_BATCH:
+        print(f"  profile queue capped at {db.PROFILE_BATCH}; "
+              f"{new_due + stale_due - len(pubkeys)} left for the next pass")
     _print_stats(conn)
 
 

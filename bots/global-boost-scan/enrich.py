@@ -336,10 +336,55 @@ def resolve_episodes_from_feeds(pending, log=print):
 
 
 # ── kind-0 profiles ───────────────────────────────────────────────────────────
+# The fields we read out of a kind-0. `event_at` rides alongside them but is not
+# one of them — see resolve_profiles.
+PROFILE_CONTENT_FIELDS = ("name", "display_name", "picture", "nip05",
+                          "about", "lud16", "lud06", "website", "banner")
+
+
+def _profile_from_content(content):
+    """kind-0 content JSON → the columns we store.
+
+    `lud16` and `lud06` are kept SEPARATE rather than coalesced into one
+    "lightning address". They are different types — lud16 is an addressable
+    user@host, lud06 a bech32 LNURL blob — and they render differently: one is
+    copyable text a reader can paste into a wallet, the other is a QR/scan
+    payload. Collapsing them would force every consumer to re-derive which it
+    got by sniffing the string shape, which is exactly the branch we'd be
+    hiding rather than removing."""
+    return {
+        "name":         content.get("name"),
+        "display_name": content.get("display_name") or content.get("displayName"),
+        "picture":      content.get("picture"),
+        "nip05":        content.get("nip05"),
+        "about":        content.get("about"),
+        "lud16":        content.get("lud16"),
+        "lud06":        content.get("lud06"),
+        "website":      content.get("website"),
+        "banner":       content.get("banner"),
+    }
+
+
 def resolve_profiles(pubkey_hexes, relays, batch_size=100, log=print):
     """Fetch newest kind-0 per pubkey across `relays`. Returns {pubkey: profile}.
-    Profile fields taken from the kind-0 content JSON (name/display_name/
-    picture/nip05)."""
+    Profile fields are taken from the kind-0 content JSON — see
+    `_profile_from_content` for the set.
+
+    ⚠️ A profile that parses to NOTHING is dropped rather than returned. This
+    only became load-bearing when profiles started being RE-fetched (see
+    db.pubkeys_needing_profile): on a first fetch an all-null profile costs
+    nothing, but on a refresh it would overwrite a good stored row with nulls
+    because a relay served a kind-0 with an unparseable content field. A
+    profile we failed to read is not a profile that went blank.
+
+    Each returned profile carries `event_at`, the kind-0's own `created_at`, so
+    the write side can refuse to move BACKWARDS — see db.upsert_profile. That
+    matters because this reads across five relays and takes the newest of
+    whatever answered: when one is down, "newest reachable" can be older than
+    what we already stored. Measured on the first backfill sweep, with
+    relay.damus.io 503ing throughout, four fields came back net-negative across
+    the corpus (display_name 1778→1772, nip05 1304→1300). Once per 30 days
+    forever, that ratchets."""
     newest = {}   # pubkey -> (created_at, parsed_profile)
     batches = [pubkey_hexes[i:i + batch_size]
                for i in range(0, len(pubkey_hexes), batch_size)]
@@ -356,11 +401,12 @@ def resolve_profiles(pubkey_hexes, relays, batch_size=100, log=print):
                         content = json.loads(ev.get("content") or "{}")
                     except Exception:
                         content = {}
-                    newest[pk] = (ca, {
-                        "name":         content.get("name"),
-                        "display_name": content.get("display_name") or content.get("displayName"),
-                        "picture":      content.get("picture"),
-                        "nip05":        content.get("nip05"),
-                    })
+                    newest[pk] = (ca, {**_profile_from_content(content),
+                                       "event_at": ca})
         log(f"    profiles: batch {bi}/{len(batches)} — {len(newest)} resolved so far")
-    return {pk: prof for pk, (_, prof) in newest.items()}
+    # Empty-parse guard, see the docstring: an all-null profile is a failed read,
+    # and the caller negative-caches it rather than storing the blank. Checked
+    # against the content fields only — `event_at` is always set and would make
+    # every empty parse look like a result.
+    return {pk: prof for pk, (_, prof) in newest.items()
+            if any(prof[f] for f in PROFILE_CONTENT_FIELDS)}

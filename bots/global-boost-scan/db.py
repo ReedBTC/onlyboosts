@@ -135,7 +135,16 @@ CREATE TABLE IF NOT EXISTS profiles (
     display_name  TEXT,
     picture       TEXT,
     nip05         TEXT,
-    updated_at    INTEGER
+    about         TEXT,          -- bio paragraph
+    lud16         TEXT,          -- lightning address (user@host)
+    lud06         TEXT,          -- bech32 LNURL; the older form of the same field,
+                                 -- stored separately because it renders differently
+    website       TEXT,
+    banner        TEXT,
+    event_at      INTEGER,       -- the kind-0's own created_at; box-side only, never
+                                 -- projected. Stops a refresh moving backwards.
+    checked_at    INTEGER,       -- when we last LOOKED (the refresh gate)
+    updated_at    INTEGER        -- when the row last CHANGED (the D1 drift gate)
 );
 
 CREATE TABLE IF NOT EXISTS scan_state (
@@ -186,6 +195,11 @@ CREATE TABLE IF NOT EXISTS d1_reproject (
 
 # Re-attempt a failed enrichment at most this often.
 ENRICH_RETRY_COOLDOWN = 7 * 24 * 60 * 60
+
+# How long a stored kind-0 is trusted before it is re-read, and how many pubkeys
+# one pass may spend on it. See pubkeys_needing_profile for why both exist.
+PROFILE_MAX_AGE = 30 * 24 * 60 * 60
+PROFILE_BATCH = 100
 
 # The show a boost really belongs to: its resolved canonical guid if the as-signed
 # podcast_guid was a phantom, else the as-signed value. Used everywhere boosts are
@@ -340,6 +354,22 @@ def _migrate(conn):
     # and then go quiet.
     conn.execute("""CREATE TABLE IF NOT EXISTS d1_podcasts_orphaned (
                       podcast_guid TEXT PRIMARY KEY, deleted_at INTEGER)""")
+    # Profile fields added for the per-booster pages. Every existing row migrates
+    # with these NULL and is filled by the refresh gate below — `updated_at` is
+    # what makes them due, and bumping it is what carries them to D1 on the
+    # metadata-drift pass.
+    prof_cols = {r[1] for r in conn.execute("PRAGMA table_info(profiles)")}
+    for col in ("about", "lud16", "lud06", "website", "banner"):
+        if col not in prof_cols:
+            conn.execute(f"ALTER TABLE profiles ADD COLUMN {col} TEXT")
+    for col in ("event_at", "checked_at"):
+        if col not in prof_cols:
+            conn.execute(f"ALTER TABLE profiles ADD COLUMN {col} INTEGER")
+    if "checked_at" not in prof_cols:
+        # Rows that predate the split were written when updated_at meant "last
+        # written", which is the closer of the two meanings to "last looked".
+        conn.execute("UPDATE profiles SET checked_at = updated_at "
+                     "WHERE checked_at IS NULL")
     orphan_cols = {r[1] for r in conn.execute("PRAGMA table_info(d1_podcasts_orphaned)")}
     if "deleted_at" not in orphan_cols:
         conn.execute("ALTER TABLE d1_podcasts_orphaned ADD COLUMN deleted_at INTEGER")
@@ -435,16 +465,59 @@ def upsert_episode(conn, ep):
 
 
 def upsert_profile(conn, pubkey, prof):
+    """Store the newest kind-0 we could read for this pubkey.
+
+    Every field is overwritten, including with NULL: the newest kind-0 is the
+    truth, so a booster who deleted their picture loses it here too. What must
+    NOT reach this function is a profile we merely failed to READ — two guards,
+    at two different layers:
+
+    - an all-empty parse is dropped by enrich.resolve_profiles and never arrives;
+    - an OLDER kind-0 than the one behind the stored row is refused here, by the
+      `event_at` check in the WHERE clause below. `resolve_profiles` takes the
+      newest across whichever relays answered, so a relay outage can make
+      "newest reachable" older than what we already have. Without this, every
+      30-day refresh is a chance to ratchet a profile backwards; with it, a
+      degraded read is a no-op.
+
+    `event_at` is box-side only and deliberately NOT projected to D1 — it is how
+    we decide what to store, not something a consumer reads. A row written
+    before the column existed has it NULL and is treated as "unknown", i.e.
+    overwritable, which is what lets the first refresh establish a baseline.
+
+    ⚠️ TWO TIMESTAMPS, AND THEY ARE NOT THE SAME QUESTION. `checked_at` is when
+    we last LOOKED and is the refresh gate; `updated_at` is when the row last
+    CHANGED and is what the D1 metadata-drift pass selects on. They are written
+    by two separate statements because a refused write must still count as a
+    look — otherwise a row whose newest reachable kind-0 is permanently older
+    than what we stored would be due on every 5-minute tick forever, and the
+    guard above would have bought a hot loop."""
+    now = int(time.time())
     conn.execute(
-        """INSERT INTO profiles (pubkey, name, display_name, picture, nip05, updated_at)
-           VALUES (:pubkey, :name, :display_name, :picture, :nip05, :updated_at)
+        """INSERT INTO profiles (pubkey, name, display_name, picture, nip05,
+                                 about, lud16, lud06, website, banner,
+                                 event_at, checked_at, updated_at)
+           VALUES (:pubkey, :name, :display_name, :picture, :nip05,
+                   :about, :lud16, :lud06, :website, :banner,
+                   :event_at, :now, :now)
            ON CONFLICT(pubkey) DO UPDATE SET
              name=excluded.name, display_name=excluded.display_name,
-             picture=excluded.picture, nip05=excluded.nip05, updated_at=excluded.updated_at""",
-        {"pubkey": pubkey, "name": prof.get("name"),
+             picture=excluded.picture, nip05=excluded.nip05,
+             about=excluded.about, lud16=excluded.lud16, lud06=excluded.lud06,
+             website=excluded.website, banner=excluded.banner,
+             event_at=excluded.event_at,
+             updated_at=excluded.updated_at
+           WHERE profiles.event_at IS NULL OR excluded.event_at IS NULL
+              OR excluded.event_at >= profiles.event_at""",
+        {"pubkey": pubkey, "event_at": prof.get("event_at"), "now": now,
+         "name": prof.get("name"),
          "display_name": prof.get("display_name") or prof.get("displayName"),
          "picture": prof.get("picture"), "nip05": prof.get("nip05"),
-         "updated_at": int(time.time())})
+         "about": prof.get("about"), "lud16": prof.get("lud16"),
+         "lud06": prof.get("lud06"), "website": prof.get("website"),
+         "banner": prof.get("banner")})
+    # Unconditional: we looked, whether or not the look changed anything.
+    conn.execute("UPDATE profiles SET checked_at=? WHERE pubkey=?", (now, pubkey))
     conn.commit()
 
 
@@ -478,14 +551,62 @@ def guids_needing_episode(conn):
     return [r[0] for r in rows]
 
 
-def pubkeys_needing_profile(conn):
+def pubkeys_needing_profile(conn, limit=PROFILE_BATCH, max_age=PROFILE_MAX_AGE):
+    """Pubkeys to fetch a kind-0 for: the ones we have never resolved, then the
+    ones whose stored profile has gone stale.
+
+    ⚠️ THIS USED TO BE `WHERE p.pubkey IS NULL` — fetch once, on the first tick
+    after a booster's first boost, and never look again. That was a tolerable
+    fit for a name and an avatar and a bad one for `about` and `lud16`: someone
+    who adds a lightning address after their first boost would never get one on
+    their page. `checked_at` is the gate now — NOT `updated_at`, which moves
+    only when the row's content actually changed and is what the D1 drift pass
+    selects on. Gating on `updated_at` would mean a profile nobody edits gets
+    re-read every tick forever; see upsert_profile.
+
+    Two properties that are not decoration:
+
+    - **New pubkeys sort first.** A refresh makes an existing page better; a new
+      fetch is what makes a page render at all. Under the cap, refreshes are
+      what gets starved.
+    - **The cap is per-tick, and it is sized on the RELAY budget, not the row
+      count.** `resolve_profiles` queries PROFILE_RELAYS serially at up to 30s
+      of wall each per batch of 100, and the incremental timer fires every 300s
+      behind a lock that skips a busy tick. One batch is what fits. Without a
+      cap the whole corpus comes due on the same day — they were all last
+      written by the same backfill — and one tick tries to walk 1,948 pubkeys.
+      At this cap the corpus turns over in ~20 ticks whenever it does come due.
+    """
     rows = conn.execute(
-        f"""SELECT DISTINCT b.booster_pubkey FROM boosts b
+        f"""SELECT b.booster_pubkey, MIN(p.pubkey IS NOT NULL) AS known,
+                   MIN(COALESCE(p.checked_at, 0)) AS seen
+           FROM boosts b
            LEFT JOIN profiles p ON p.pubkey = b.booster_pubkey
            LEFT JOIN enrich_failed f ON f.kind='profile' AND f.id = b.booster_pubkey
-           WHERE p.pubkey IS NULL AND {not_excluded('b')}
-             AND (f.id IS NULL OR f.last_try < ?)""", (_cutoff(),)).fetchall()
+           WHERE {not_excluded('b')}
+             AND (p.pubkey IS NULL OR COALESCE(p.checked_at, 0) < ?)
+             AND (f.id IS NULL OR f.last_try < ?)
+           GROUP BY b.booster_pubkey
+           ORDER BY known ASC, seen ASC
+           LIMIT ?""",
+        (int(time.time()) - max_age, _cutoff(), limit)).fetchall()
     return [r[0] for r in rows]
+
+
+def profile_refresh_backlog(conn, max_age=PROFILE_MAX_AGE):
+    """(never-fetched, stale) counts, so a capped pass can say what it left."""
+    return conn.execute(
+        f"""SELECT COUNT(*) FILTER (WHERE known = 0),
+                   COUNT(*) FILTER (WHERE known = 1)
+           FROM (SELECT b.booster_pubkey, MIN(p.pubkey IS NOT NULL) AS known
+                 FROM boosts b
+                 LEFT JOIN profiles p ON p.pubkey = b.booster_pubkey
+                 LEFT JOIN enrich_failed f ON f.kind='profile' AND f.id = b.booster_pubkey
+                 WHERE {not_excluded('b')}
+                   AND (p.pubkey IS NULL OR COALESCE(p.checked_at, 0) < ?)
+                   AND (f.id IS NULL OR f.last_try < ?)
+                 GROUP BY b.booster_pubkey)""",
+        (int(time.time()) - max_age, _cutoff())).fetchone()
 
 
 def mark_enrich_failed(conn, kind, ids):

@@ -159,12 +159,10 @@ def build_full_sql(conn):
 
     # profiles (excluded boosters lose their identity row here as in the shards)
     for p in conn.execute(
-        "SELECT pubkey,name,display_name,picture,nip05 FROM profiles p "
+        f"SELECT {PROFILE_COLS} FROM profiles p "
         "WHERE NOT EXISTS (SELECT 1 FROM excluded_ids x "
         "                  WHERE x.kind='booster' AND x.id = p.pubkey)").fetchall():
-        out.append(
-            "INSERT INTO profiles (pubkey,name,display_name,picture,nip05) VALUES ("
-            f"{q(p['pubkey'])},{q(p['name'])},{q(p['display_name'])},{q(p['picture'])},{q(p['nip05'])});")
+        out.extend(_profile_upsert_sql(p, verb="INSERT"))
 
     out.extend(build_podroll_sql(conn))
 
@@ -175,6 +173,20 @@ def build_full_sql(conn):
         out.append(f"INSERT INTO meta (key,value) VALUES ({q(k)},{q(v)});")
     return out
 
+
+# The projected `profiles` column list, in one place. It was restated at five
+# sites and a partial edit is a silent NULL rather than an error — the column is
+# simply never written and the page renders a blank line. Every path that reads
+# or writes a profile row goes through these two names.
+PROFILE_COL_LIST = ("pubkey", "name", "display_name", "picture", "nip05",
+                    "about", "lud16", "lud06", "website", "banner")
+PROFILE_COLS = ",".join(PROFILE_COL_LIST)
+
+# ⚠️ Adding a name here also needs an out-of-band ALTER TABLE on the remote D1
+# BEFORE the change ships: `d1/schema.sql` is CREATE TABLE IF NOT EXISTS, so it
+# will not add a column to a table that already exists, and a projection naming
+# an absent column fails the whole batch — which returns before `_mark_synced`,
+# so boosts stop reaching D1 entirely until it is fixed.
 
 # ── single-row upserts (shared by the delta and metadata-drift paths) ─────────
 def _podcast_upsert_sql(conn, guid):
@@ -245,9 +257,9 @@ def _episode_upsert_sql(conn, item_guid):
     return out
 
 
-def _profile_upsert_sql(p):
-    return ["INSERT OR REPLACE INTO profiles (pubkey,name,display_name,picture,nip05) VALUES ("
-            f"{q(p['pubkey'])},{q(p['name'])},{q(p['display_name'])},{q(p['picture'])},{q(p['nip05'])});"]
+def _profile_upsert_sql(p, verb="INSERT OR REPLACE"):
+    return [f"{verb} INTO profiles ({PROFILE_COLS}) VALUES ("
+            + ",".join(q(p[c]) for c in PROFILE_COL_LIST) + ");"]
 
 
 # ── delta projection (only what changed since last sync) ──────────────────────
@@ -290,7 +302,7 @@ def build_delta_sql(conn, rows):
     if pubs:
         ph = ",".join("?" * len(pubs))
         for p in conn.execute(
-            f"SELECT pubkey,name,display_name,picture,nip05 FROM profiles WHERE pubkey IN ({ph})",
+            f"SELECT {PROFILE_COLS} FROM profiles WHERE pubkey IN ({ph})",
                 tuple(pubs)).fetchall():
             out.extend(_profile_upsert_sql(p))
 
@@ -331,7 +343,7 @@ def build_reproject_sql(conn, queue):
         pairs.append(("episode", item))
     for pubkey in queue.get("profile", []):
         p = conn.execute(
-            """SELECT pubkey,name,display_name,picture,nip05 FROM profiles p
+            f"""SELECT {PROFILE_COLS} FROM profiles p
                WHERE p.pubkey=? AND NOT EXISTS (SELECT 1 FROM excluded_ids x
                                                 WHERE x.kind='booster' AND x.id=p.pubkey)""",
             (pubkey,)).fetchone()
@@ -403,7 +415,7 @@ def build_meta_drift_sql(conn, since, skip_pods=(), skip_items=()):
         counts["episodes"] += bool(stmts)
 
     for p in conn.execute(
-        """SELECT pubkey,name,display_name,picture,nip05 FROM profiles p
+        f"""SELECT {PROFILE_COLS} FROM profiles p
            WHERE updated_at IS NOT NULL AND updated_at >= ?
              AND NOT EXISTS (SELECT 1 FROM excluded_ids x
                              WHERE x.kind='booster' AND x.id = p.pubkey)""",

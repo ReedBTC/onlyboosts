@@ -206,13 +206,27 @@ holds only shows that have boosts, i.e. barely half the cards.
   "profiles": {
     "<pubkey_hex>": { "npub": "npub1…", "name": "inpc",
                       "display_name": null, "picture": "https://…",
-                      "nip05": "inpc@inpc.cat" }
+                      "nip05": "inpc@inpc.cat",
+                      "about": "Bitcoiner, podcaster…", "lud16": "inpc@getalby.com",
+                      "lud06": null, "website": "https://…", "banner": null }
   }
 }
 ```
 Boost records already embed `booster.name`/`pic`, so you only need this for
-extra fields (nip05/display_name) or a standalone lookup. ~52 boosters have no
-profile anywhere — they simply won't appear here (use the npub).
+extra fields (nip05/display_name/about/lud16) or a standalone lookup. ~51
+boosters have no profile anywhere — they simply won't appear here (use the
+npub). **Every field but `npub` is nullable**; they are whatever the booster's
+newest kind-0 carried.
+
+`lud16` and `lud06` are the same field in two forms and are deliberately NOT
+coalesced: `lud16` is an addressable `user@host` a reader can copy into a
+wallet, `lud06` a bech32 LNURL blob that is scanned rather than read. A profile
+may carry either, both, or neither. Prefer `lud16` when both are present.
+
+The same columns are in D1's `profiles` table, which the `/api/v1` layer reads.
+A profile is re-fetched when its stored copy passes `db.PROFILE_MAX_AGE`
+(30 days), so `about` and `lud16` track a booster who edits their kind-0 after
+their first boost, rather than being frozen at whatever the first fetch saw.
 
 ### `meta.json`
 Same numbers as `index.json`'s `totals`, standalone, for a cheap header/summary poll.
