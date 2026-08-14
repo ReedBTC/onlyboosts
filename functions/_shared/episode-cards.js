@@ -19,7 +19,7 @@
 //
 // Only the corpus and the opening sort differ, which is why they share this.
 import {
-  COPY, buildEpisodes, renderEpisodeCards, sortEpisodeItems, RANKED_SORTS,
+  COPY, CARD_PARTS, buildEpisodes, renderEpisodeCards, sortEpisodeItems, RANKED_SORTS,
 } from "../../assets/js/episode-card.js";
 import { normalizeBoosts, toEpisodeShape } from "../../assets/js/ob-data.js";
 import { jsonForScript } from "./detail-page.js";
@@ -56,19 +56,27 @@ export function itemsFromBoosts(records, { sort = "boosts" } = {}) {
  */
 export function renderCardPage(items, {
   copy = COPY.other, profiles = new Map(), sort = "boosts", range = "all",
-  limit = CARDS_PER_PAGE, showRanks = true, state = {},
+  limit = CARDS_PER_PAGE, showRanks = true, parts = CARD_PARTS, state = {},
 } = {}) {
   const page = items.slice(0, limit);
   const html = renderEpisodeCards(page, {
     copy,
     profiles,
+    parts,
     // The rank is the position in the FULL ranked view, and it is stamped here
     // rather than left to the client so a card is numbered the same whichever
     // side rendered it. Chronological sorts pass no rank at all — a numeral
     // under "Latest boost" reads as a score when it is only order.
     rankOf: (_it, i) => (showRanks && RANKED_SORTS.has(sort) ? i + 1 : null),
   });
-  return html + stateScript({ sort, range, count: page.length, total: items.length, ...state });
+  // ⚠️ `card` RIDES THE STATE, and that is not incidental. episode-section.js and
+  // feeds-podcasts.js both repaint these cards on a re-sort, so the variant has to
+  // travel with them — a surface that hid the player at the edge and re-rendered
+  // it in the browser would grow one the first time the reader changed a sort.
+  // One declaration per surface, here, in the Function.
+  return html + stateScript({
+    sort, range, count: page.length, total: items.length, card: parts, ...state,
+  });
 }
 
 /* The handover, as one <script type="application/json">.

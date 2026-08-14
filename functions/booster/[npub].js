@@ -880,6 +880,13 @@ function renderEpisodes(corpus) {
           sort: "sats",
           range: "all",
           limit: CARDS_PER_PAGE,
+          // Neither part earns its place here. Every card aggregates ONE person's
+          // boosts, so "1 booster · 3 boosts" restates the page's own subject on
+          // every row and the booster count is 1 by construction — CLAUDE.md names
+          // this case verbatim under what may legitimately differ. And the player
+          // goes for the same reason as the twin on /episode: the title links to a
+          // page that has one.
+          parts: { stats: false, player: false },
           state: { surface: "booster-episodes", truncated: !!corpus?.truncated },
         })}</div>
         <div data-be-more></div>

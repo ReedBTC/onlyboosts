@@ -167,41 +167,54 @@
  * than beside it. Its height is deliberately close to the line box: the bio is
  * clamped to two lines, and a chip taller than the leading would make one line
  * of a two-line paragraph visibly taller than the other. */
+/* ── A mention inside the bio ──────────────────────────────────────────────
+ *
+ * ⚠️ INLINE TEXT, NOT A PILL. It was a rounded chip with a tinted background,
+ * which is the right treatment for a mention that stands alone in a toolbar and
+ * the wrong one inside a sentence: a bio runs two or three lines and a pill in
+ * the middle of it reads as the bio's main content, which is exactly what the
+ * note over renderBioText was worried about when it argued the chips shouldn't
+ * link. Setting it as ordinary link-coloured text answers that objection rather
+ * than working around it.
+ *
+ * The avatar stays because it is what makes a mention read as a PERSON at a
+ * glance, but it is sized to the text (1em, so it tracks the font rather than
+ * imposing a line height) and sits on the baseline beside the name. Nothing here
+ * adds vertical space to the paragraph. */
 .bs-mention {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.28em;
-  vertical-align: baseline;
-  padding: 0 0.34em 0 0.18em;
-  border-radius: 999px;
-  background: var(--cream-d, rgba(0, 0, 0, 0.05));
+  display: inline;
   font-weight: 600;
-  color: var(--ink);
+  color: var(--brand-d);
   /* The npub fallback is 15 characters of bech32 and must not be broken across
      a line at an arbitrary point the way the surrounding prose may be. */
   white-space: nowrap;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
+.bs-mention:hover .bs-mention-name,
+.bs-mention:focus-visible .bs-mention-name { text-decoration: underline; }
+a.bs-mention { text-decoration: none; }
+
+/* 1em, not 1.15: the avatar must not be taller than the line it sits in, or the
+   paragraph's leading opens up wherever a mention falls. `vertical-align` rather
+   than a flex row for the same reason — an inline-flex wrapper is a box, and a
+   box in the middle of a sentence is the pill again. */
 .bs-mention-pic {
-  width: 1.15em;
-  height: 1.15em;
+  width: 1em;
+  height: 1em;
   border-radius: 50%;
   object-fit: cover;
-  flex: none;
   background: var(--border);
-}
-/* The dot a mention we could not resolve keeps. Not a silhouette glyph: at
-   1.15em a glyph is illegible, and a flat tinted circle reads as an avatar
-   nobody has rather than as a broken image. */
-.bs-mention-pic.is-blank {
   display: inline-block;
+  vertical-align: -0.13em;
+  margin-right: 0.22em;
+}
+/* The dot a mention we could not resolve keeps. Not a silhouette glyph: at 1em a
+   glyph is illegible, and a flat tinted circle reads as an avatar nobody has
+   rather than as a broken image. */
+.bs-mention-pic.is-blank {
   background: linear-gradient(140deg,
     color-mix(in srgb, var(--brand) 30%, transparent),
     color-mix(in srgb, var(--brand-d) 18%, transparent));
 }
-.bs-mention-name { overflow: hidden; text-overflow: ellipsis; }
 
 /* ── Lightning address and website ─────────────────────────────────────────
  *

@@ -874,6 +874,13 @@ function renderCommunityEpisodes(copy, community) {
           sort: "boosts",
           range: "all",
           limit: CARDS_PER_PAGE,
+          // The figures STAY: they are community-scoped by construction, so
+          // "27 boosters" here is what these people sent that episode and is the
+          // whole point of the section. The PLAYER goes: every card's title and
+          // artwork link to that episode's own page, which carries a player on a
+          // surface with room for it, and inside a 75vh scroll container a row of
+          // native audio controls per card is height this list cannot spare.
+          parts: { stats: true, player: false },
           state: { surface: "community-episodes", truncated: !!community?.truncated },
         })}</div>
         <div data-ce-more></div>

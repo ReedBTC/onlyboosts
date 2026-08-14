@@ -126,6 +126,35 @@ export function copyFor(medium) {
   return medium === 'music' ? COPY.music : COPY.other
 }
 
+/* ── Which PARTS of the card a surface shows ──────────────────────────
+ *
+ * ⚠️ NOT A LICENCE TO FORK THE CARD. The rendering rule in CLAUDE.md draws the
+ * line already: the card, its chrome and its boost drawer are identical
+ * everywhere, and what may legitimately differ is "which figures are meaningful"
+ * and "which sections exist". These are exactly those two, and there are two of
+ * them because two surfaces asked, not because a surface may ask for anything.
+ *
+ *   stats   the "Nostr Stats:" line. OFF on /booster/<npub>, where every card
+ *           aggregates ONE person's boosts — "1 booster · 3 boosts" is the
+ *           page's own subject restated on every row, and the booster count is
+ *           1 by construction. CLAUDE.md names this case verbatim: "a booster
+ *           page has no booster count". The line's ROW survives, because the
+ *           boost pill rides its right end.
+ *   player  the inline <audio>. OFF in the two detail-page drawers, where every
+ *           card's title now links to that episode's own page and the player is
+ *           there, one click away, on a surface with room for it. It earns its
+ *           height on the homepage feed, which is a browsing surface with no
+ *           page behind each card to send anyone to.
+ *
+ * ⚠️ THE SERVER DECLARES THE VARIANT AND THE CLIENT INHERITS IT, through the
+ * `card` key in the state element. That is the whole reason it is data rather
+ * than a flag each side sets for itself: a re-sort in the browser repaints these
+ * cards, and a surface that turned the player off at the edge and on in
+ * episode-section.js would grow one the moment the reader touched a control. One
+ * declaration, in the Function, per surface.
+ */
+export const CARD_PARTS = { stats: true, player: true }
+
 // ── Formatting ───────────────────────────────────────────────────────
 function fmtSats(n) {
   if (!n || n < 0) return '0'
@@ -406,9 +435,13 @@ function avatarHtml(profile, npub, { size = 26, interactive = false, label = '',
  *   it from what they already hold: the edge from the `profiles` table, the
  *   browser from the identities the collector embeds in every boost record.
  */
-export function episodeCardHtml(item, { rank = null, copy = COPY.other, profiles = new Map(), names = null } = {}) {
+export function episodeCardHtml(item, {
+  rank = null, copy = COPY.other, profiles = new Map(), names = null, parts = CARD_PARTS,
+} = {}) {
   const { ep, show, boosts, distinctBoosters } = item
   const nameMap = names || namesFrom(profiles)
+  const showStats = parts.stats !== false
+  const showPlayer = parts.player !== false
   // Same rule as the counts below: the server's total, falling back to the rows.
   const totalSats = item.totals?.sats ?? item.totalSats
 
@@ -513,11 +546,18 @@ export function episodeCardHtml(item, { rank = null, copy = COPY.other, profiles
    * defined once in theme.css. The markup is here rather than in the actions
    * module so the card is one object with one definition — only the click is
    * attached elsewhere. */
+  //
+  // ⚠️ THE FIGURES ARE OPTIONAL AND THE PILL IS NOT. The pill is right-aligned by
+  // its own margin-left:auto and this row is the flex line it rides, so dropping
+  // the row would cost the boost button its position rather than just its
+  // neighbours. On a surface with no meaningful figures the row is the pill alone.
   const statsRow = `<div class="pcast-meta pcast-nstats">` +
-    `<span class="ob-stats-label">Nostr Stats:</span>` +
-    `<span>${esc(nBoosters.toLocaleString('en-US'))} booster${nBoosters === 1 ? '' : 's'}</span>` +
-    `<span class="pcast-dot" aria-hidden="true">·</span>` +
-    `<span>${esc(nBoosts.toLocaleString('en-US'))} boost${nBoosts === 1 ? '' : 's'}</span>` +
+    (showStats
+      ? `<span class="ob-stats-label">Nostr Stats:</span>` +
+        `<span>${esc(nBoosters.toLocaleString('en-US'))} booster${nBoosters === 1 ? '' : 's'}</span>` +
+        `<span class="pcast-dot" aria-hidden="true">·</span>` +
+        `<span>${esc(nBoosts.toLocaleString('en-US'))} boost${nBoosts === 1 ? '' : 's'}</span>`
+      : '') +
     `<button type="button" class="ob-boost-pill" hidden data-boost-episode title="Boost ${esc(titleText)}" aria-label="Boost ${esc(titleText)}">Boost</button>` +
     `</div>`
 
@@ -546,7 +586,7 @@ export function episodeCardHtml(item, { rank = null, copy = COPY.other, profiles
   // did not — `enclosure_type` is the second of the two fields toEpisodeShape
   // documents as absent, so on the feeds the browser sniffs it, which is what it
   // has always done here.
-  const audioUrl = isSafeUrl(ep.enclosure_url) ? ep.enclosure_url : null
+  const audioUrl = (showPlayer && isSafeUrl(ep.enclosure_url)) ? ep.enclosure_url : null
   const playerHtml = !audioUrl ? ''
     : ep.enclosure_type
       ? `<div class="pcast-player-row"><audio class="pcast-player" controls preload="none">` +
@@ -744,9 +784,11 @@ function namesFrom(profiles) {
  *   two detail sections renumber on every re-sort, and the chronological sorts
  *   pass null so a numeral never reads as a score.
  */
-export function renderEpisodeCards(items, { copy = COPY.other, profiles = new Map(), rankOf = null } = {}) {
+export function renderEpisodeCards(items, {
+  copy = COPY.other, profiles = new Map(), rankOf = null, parts = CARD_PARTS,
+} = {}) {
   const names = namesFrom(profiles)
   return items
-    .map((it, i) => episodeCardHtml(it, { rank: rankOf ? rankOf(it, i) : null, copy, profiles, names }))
+    .map((it, i) => episodeCardHtml(it, { rank: rankOf ? rankOf(it, i) : null, copy, profiles, names, parts }))
     .join('')
 }

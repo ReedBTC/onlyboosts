@@ -311,6 +311,21 @@ the facts/verbs line.**
 | `assets/js/episode-card.js` | the FACTS, as an HTML **string**: artwork and its fallback chain, title, show, air date, rank, the `Nostr Stats:` line, and every boost note inside the drawer. No DOM, no `fetch`, no `Intl` defaults. |
 | `assets/js/episode-card-actions.js` | the VERBS: the ⋮ subscribe menu, the boost pill, the drawer's hide control, the per-boost ⋮ menu, and the reply / like / repost / zap bars. |
 
+**Two parts of the card are per-surface, and only two.** `CARD_PARTS` in
+`episode-card.js` is the whole table — `stats` (the `Nostr Stats:` line, off on
+`/booster/<npub>`, where every card aggregates one person's boosts and the
+booster count is 1 by construction) and `player` (the inline `<audio>`, off in
+the two detail-page drawers, where every title links to a page that has one).
+Both are cases the table above already sanctions as legitimately different.
+**⚠️ The Function declares the variant and it travels in the state element**, so
+a client repaint cannot render a different card than the edge did; setting it on
+both sides would be two declarations that agree only until one is edited.
+
+**⚠️ `functions/index.js` fetches `/` from `env.ASSETS`, never `/index.html`.**
+Pages 308-redirects `/index.html` to `/`, `/` is that Function, and returning the
+redirect made the front door answer `ERR_TOO_MANY_REDIRECTS`. It shipped that way
+once. A 3xx from the asset server is now never propagated.
+
 **⚠️ ONE MODULE, IMPORTED FROM BOTH SIDES, and that is the mechanism the whole
 thing rests on.** A Pages Function imports `../../assets/js/episode-card.js` by
 relative path and esbuild inlines it off the filesystem; the browser imports
@@ -383,8 +398,8 @@ this trade is the right one.
 
 | | |
 |---|---|
-| Homepage first view | **206.3KB → 212.8KB brotli, +6.5KB**, and one round trip instead of two. The 431KB JSON fetch it used to make is gone; the document went 14.4KB → 146.0KB br. |
-| Homepage raw markup | **54KB → 1.14MB**, which is the cost that does not compress away: ~5,000 extra DOM nodes for 737 boost rows, all inside closed `<details>` so nothing lays them out until a drawer opens. |
+| Homepage first view | **206.6KB → 217.7KB brotli, +11.1KB**, and one round trip instead of two. The 431KB JSON fetch it used to make is gone; the document went 14.5KB → 150.6KB br. Gated on an absolute 256KB budget rather than a percentage — see the note in `test-server-render.mjs` for why. |
+| Homepage raw markup | **54KB → 1.15MB**, which is the cost that does not compress away: ~5,000 extra DOM nodes for 737 boost rows, all inside closed `<details>` so nothing lays them out until a drawer opens. |
 | `/episode/<guid>` | one extra query in the existing `Promise.all` — the community corpus, median 248 rows, capped at 2,000. Measured at ~190ms for a heavy episode (834 rows) against a page TTFB of ~170ms, so the page pays `max()` rather than `sum()`. |
 | `/booster/<npub>` | the same, and cheaper: one indexed scan, heaviest booster 975 rows against the same cap. |
 

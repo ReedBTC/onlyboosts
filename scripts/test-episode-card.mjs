@@ -14,6 +14,7 @@
 import assert from 'node:assert/strict'
 import { buildEpisodes, episodeCardHtml, COPY, sortEpisodeItems, filterEpisodeItems, RANKED_SORTS }
   from '../assets/js/episode-card.js'
+import { renderMessage, renderBioText } from '../assets/js/nostr-text.js'
 import { toEpisodeShape, normalizeBoosts, episodeApiToBoosts } from '../assets/js/ob-data.js'
 
 let passed = 0
@@ -230,6 +231,81 @@ check('filterEpisodeItems filters on air date and keeps undated rows out', () =>
 
 check('RANKED_SORTS covers exactly the quantitative sorts', () => {
   assert.deepEqual([...RANKED_SORTS].sort(), ['boosts', 'count', 'sats'])
+})
+
+// ── Card variants ───────────────────────────────────────────────────────────
+//
+// Two surfaces show less of the card, and both are cases CLAUDE.md's rendering
+// rule names as legitimately different: "which figures are meaningful" and
+// "which sections exist". These assert that the parts really do drop out AND
+// that nothing else moves with them.
+console.log('\nCard variants:')
+
+const noStats = episodeCardHtml(byGuid['item-guid-1'], {
+  rank: 1, copy: COPY.other, profiles, parts: { stats: false, player: true },
+})
+const noPlayer = episodeCardHtml(byGuid['item-guid-1'], {
+  rank: 1, copy: COPY.other, profiles, parts: { stats: true, player: false },
+})
+
+check('stats:false drops the figures and KEEPS the boost pill', () => {
+  assert.doesNotMatch(noStats, /Nostr Stats:/)
+  assert.doesNotMatch(noStats, /2 boosters/)
+  // The pill is right-aligned by its own margin inside this row, so the row has
+  // to survive or the button loses its position rather than its neighbours.
+  assert.match(noStats, /<div class="pcast-meta pcast-nstats">/)
+  assert.match(noStats, /class="ob-boost-pill" hidden data-boost-episode/)
+})
+
+check('player:false drops the audio element and nothing else', () => {
+  assert.doesNotMatch(noPlayer, /<audio/)
+  assert.doesNotMatch(noPlayer, /pcast-player/)
+  // Everything the player sat between is still there.
+  assert.match(noPlayer, /pcast-card-head/)
+  assert.match(noPlayer, /<details class="pcast-card-details">/)
+  assert.match(noPlayer, /Nostr Stats:/)
+})
+
+check('the default renders both', () => {
+  assert.match(html, /Nostr Stats:/)
+  assert.match(html, /<audio class="pcast-player"/)
+})
+
+// ── Message truncation ──────────────────────────────────────────────────────
+console.log('\nMessage length:')
+
+check('a long boost message is not cut at 420', () => {
+  // 420 clipped 6.9% of real messages, measured over the 2,000 most recent
+  // boosts. That was the server renderer's number and it reached the feeds when
+  // the card became one definition, where nothing had truncated before.
+  const long = 'x'.repeat(1200)
+  const out = renderMessage(long, new Map())
+  assert.ok(out.length >= 1200, `rendered ${out.length} characters of 1200`)
+  assert.doesNotMatch(out, /…/)
+})
+
+check('a pathological message is still bounded', () => {
+  const huge = 'y'.repeat(9000)
+  const out = renderMessage(huge, new Map())
+  assert.ok(out.length < 2100, `rendered ${out.length} characters — the cap is not holding`)
+  assert.match(out, /…$/)
+})
+
+// ── Bio mentions ────────────────────────────────────────────────────────────
+console.log('\nBio mentions:')
+
+check('a mention is an njump link, not a bare span', () => {
+  const out = renderBioText(`hi ${NPUB_A} and bye`, new Map())
+  assert.match(out, /<a class="bs-mention" href="https:\/\/njump\.me\/npub1/)
+  assert.match(out, /<span class="bs-mention-name">/)
+  // The hooks booster-page.js#fillMention patches through must survive.
+  assert.match(out, new RegExp(`data-pk="${HEX_A}"`))
+  assert.match(out, /class="bs-mention-pic is-blank"/)
+})
+
+check('a bare npub with a bad checksum stays text', () => {
+  const out = renderBioText('hi npub1zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzsg7hg4y', new Map())
+  assert.doesNotMatch(out, /bs-mention/)
 })
 
 console.log(`\n${passed} assertions passed${process.exitCode ? ' (with failures above)' : ''}.`)

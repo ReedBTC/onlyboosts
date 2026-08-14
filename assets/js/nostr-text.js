@@ -210,16 +210,23 @@ function linkOut(url) {
 
 /* A booster's kind-0 `about` as HTML, for the header on /booster/<npub>.
  *
- * Same tokenizer as renderMessage, two deliberate differences in what it emits:
+ * Same tokenizer as renderMessage, one deliberate difference in what it emits:
  *
- * ⚠️ A MENTION IS NOT A LINK HERE. On a boost message an @Name chip opens njump,
- * which resolves any npub. In a bio the obvious destination would be
- * /booster/<npub> — and that page only exists for people who have BOOSTED, which
- * a mentioned npub need never have done. Rather than link some mentions and not
- * others, or link them all and 404 for most, none of them link. njump is not
- * used either: on this page, unlike a boost message, the mention sits inside a
- * two-line clamped paragraph where a row of outbound chips would read as the
- * bio's main content.
+ * ⚠️ A MENTION LINKS TO NJUMP, AND THAT REVERSES AN EARLIER DECISION. It used to
+ * emit no link at all. The reasoning was sound on its own terms — /booster/<npub>
+ * only exists for people who have BOOSTED, which a mentioned npub need never have
+ * done, so linking there would 404 for most of them — but it went on to reject
+ * njump as well, on the grounds that "a row of outbound chips would read as the
+ * bio's main content". That objection was about the CHIP: a rounded pill with a
+ * tinted background sitting in the middle of a sentence. The treatment is inline
+ * link-coloured text now (see `.bs-mention` in booster-page.css), so the reason
+ * not to link went away with the pill — and a mention styled as a link that is
+ * not one is a worse affordance than either.
+ *
+ * njump rather than /booster/<npub> for the original reason, which still holds:
+ * njump resolves ANY npub, so every mention gets the same destination rather than
+ * some linking and some not. It is also what a boost message's mentions have
+ * always done, so the site now has one answer instead of two.
  *
  * ⚠️ IT SHOWS A FACE. The chip is a small avatar plus the display name, which is
  * how every Nostr client renders a mention and is why the profile lookup
@@ -253,14 +260,33 @@ export function renderBioText(text, profiles) {
     const prof = profiles?.get(pk) || null;
     const label = prof?.name ? "@" + prof.name : "@" + s.id.slice(0, 14) + "…";
     const missing = [prof?.name ? null : "name", prof?.picture ? null : "pic"].filter(Boolean).join(" ");
-    out += `<span class="bs-mention"${missing ? ` data-pk="${htmlEscape(pk)}" data-missing="${htmlEscape(missing)}"` : ""}>` +
+    // The identifier exactly as it appeared, never re-encoded — the decode above
+    // exists only to look a name up. booster-page.js#fillMention reaches the two
+    // inner spans by class, so the wrapper being an <a> costs it nothing.
+    out += `<a class="bs-mention" href="https://njump.me/${htmlEscape(s.id)}" target="_blank" rel="noopener noreferrer"` +
+      (missing ? ` data-pk="${htmlEscape(pk)}" data-missing="${htmlEscape(missing)}"` : "") + `>` +
       (prof?.picture
         ? `<img class="bs-mention-pic" src="${htmlEscape(prof.picture)}" alt="" loading="lazy" referrerpolicy="no-referrer" />`
         : `<span class="bs-mention-pic is-blank" aria-hidden="true"></span>`) +
-      `<span class="bs-mention-name">${htmlEscape(label)}</span></span>`;
+      `<span class="bs-mention-name">${htmlEscape(label)}</span></a>`;
   }
   return out + htmlEscape(src.slice(cursor));
 }
+
+/* How much of a boost message is rendered.
+ *
+ * ⚠️ 420 CUT 6.9% OF REAL MESSAGES, which is not a guard, it is a policy nobody
+ * chose. That number came from the server-side renderer this was extracted from,
+ * so /show and /episode had been clipping one note in fourteen mid-sentence; when
+ * the episode card became one definition the same cut reached the feeds, where
+ * the client tokenizer had never truncated at all, and it showed immediately.
+ *
+ * Measured over 1,682 messages across the 2,000 most recent boosts: median 121
+ * characters, p90 368, p99 759, longest 4,045. A cap of 2,000 clips 2 of them —
+ * 0.12% — so it bounds the pathological case, which is all a cap is for, and is
+ * invisible on everything else. It is the same number renderBioText uses.
+ */
+const MESSAGE_MAX = 2000;
 
 /* A boost message as HTML: nostr: URIs become @Name chips, bare URLs become
  * links, everything else is escaped text.
@@ -271,7 +297,7 @@ export function renderBioText(text, profiles) {
  * renders the same way in both places.
  */
 export function renderMessage(text, names) {
-  const src = truncate(String(text || ""), 420);
+  const src = truncate(String(text || ""), MESSAGE_MAX);
   const spans = scanSpans(src);
 
   let out = "", cursor = 0;

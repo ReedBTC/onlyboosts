@@ -81,6 +81,13 @@ export function initEpisodeSection({
   let sortKey = state.sort || sorts[0][0]
   let rangeKey = state.range || 'all'
   const truncated = !!state.truncated
+  /* ⚠️ THE CARD VARIANT COMES FROM THE SERVER, NOT FROM THIS MODULE. Each
+   * surface's Function declares which parts of the card it shows — /booster hides
+   * the "Nostr Stats:" figures, both detail drawers hide the player — and it
+   * travels in the state element so a repaint here cannot render a different card
+   * than the edge did. Setting it in both places would be two declarations that
+   * only agree until one is edited. */
+  const parts = state.card || undefined
 
   /* What the server painted, and what the whole ranked view holds.
    *
@@ -229,7 +236,7 @@ export function initEpisodeSection({
     // entries on the next press and paint one of them twice.
     painted = Math.min(view.length, painted + consumed)
     if (next.length) {
-      cards.insertAdjacentHTML('beforeend', renderEpisodeCards(next, { copy: COPY.other, profiles, rankOf }))
+      cards.insertAdjacentHTML('beforeend', renderEpisodeCards(next, { copy: COPY.other, profiles, rankOf, parts }))
       enhance()
     }
     paintMore()

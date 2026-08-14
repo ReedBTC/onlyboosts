@@ -52,10 +52,36 @@ const FEED = {
   range: "all",
 };
 
+/* ⚠️ ASK THE ASSET SERVER FOR `/`, NEVER FOR `/index.html`, AND NEVER RETURN A
+ * REDIRECT FROM IT. This is the shape of an infinite loop and it shipped once.
+ *
+ * Pages 308-redirects `/index.html` to `/` — that is the same rule that makes
+ * `/about.html` redirect to `/about`, and it is documented in CLAUDE.md under
+ * the conventions. So fetching `/index.html` here returns a 308 rather than a
+ * document; `!shell.ok` was true; the 308 was passed straight back to the
+ * browser; the browser followed it to `/`; and `/` is this Function.
+ * ERR_TOO_MANY_REDIRECTS on every request to the site's front door.
+ *
+ * `/` is the correct address for the same file — `env.ASSETS.fetch` resolves it
+ * to index.html with a 200 and bypasses Functions routing, so there is no
+ * recursion. The guard below is the belt to that brace: whatever the asset
+ * server ever answers, a 3xx must not leave this handler, because every
+ * redirect it could plausibly emit points back here.
+ */
 export async function onRequestGet(context) {
   const { request, env } = context;
-  const shell = await env.ASSETS.fetch(new Request(new URL("/index.html", request.url), request));
-  // A non-200 here means the deploy is broken in a way this cannot improve.
+  const shell = await env.ASSETS.fetch(new Request(new URL("/", request.url), request));
+
+  if (shell.status >= 300 && shell.status < 400) {
+    // Unreachable in a working deploy, and a loop if it ever happens. Report the
+    // one thing that is true rather than sending the reader in a circle.
+    console.error("[home] asset server redirected / to", shell.headers.get("location"));
+    return new Response("The homepage is temporarily unavailable.", {
+      status: 503,
+      headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
+    });
+  }
+  // Any other non-200 means the deploy is broken in a way this cannot improve.
   if (!shell.ok) return shell;
 
   let html = await shell.text();
