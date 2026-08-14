@@ -19,8 +19,8 @@ import {
   getCachedProfile,
   setCachedProfile,
   registerEvent,
-} from '/assets/js/boosts-thread.js?v=ob-v59'
-import { nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v59'
+} from '/assets/js/boosts-thread.js?v=ob-v60'
+import { nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v60'
 
 // ── Module state ─────────────────────────────────────────────────────
 const state = {
@@ -464,19 +464,68 @@ async function handleRepost(ev, btn) {
   btn.setAttribute('aria-pressed', 'true')
 
   try {
-    // NIP-18 best practice: stringify the original event into content
-    // so consumers can render the repost without a separate fetch.
+    /* ⚠️ THE CARD NEVER HAS THE SIGNED EVENT, so this had to go and fetch it.
+     *
+     * Every surface on this site builds a PROJECTION to hand to buildActionBar —
+     * `{id, pubkey, kind, content, created_at, tags}` off a D1 row or a JSON
+     * feed, with no `sig`, because the signed event is not stored anywhere we
+     * read. Like and zap do not care. Repost did, silently: the guard below used
+     * to be `if (ev.id && ev.pubkey && ev.sig)`, which was never true, so every
+     * repost this site has ever published carried EMPTY content and an EMPTY
+     * relay hint.
+     *
+     * That is valid NIP-18 and it still did not work, for a reason particular to
+     * this site's data: a bare kind-6 tells the reader's client "go fetch note X
+     * yourself", and 98% of boost notes live on relay.fountain.fm ONLY, which is
+     * not a general-purpose relay and is in nobody's default set. So the repost
+     * published cleanly, said "Reposted", and rendered as an empty card in every
+     * client that could not reach Fountain. Reported from a /booster page on
+     * 2026-08-14; it was never specific to that page.
+     *
+     * Fetching the original makes the repost SELF-CONTAINED, which is what
+     * NIP-18 recommends and what makes it renderable by a client that has never
+     * heard of Fountain. It also yields an accurate relay hint — the relay we
+     * actually found it on, rather than a guess baked into this file.
+     */
     let content = ''
-    if (ev.id && ev.pubkey && ev.sig) {
+    let relayHint = ''
+    let full = ev.sig ? ev : null
+
+    if (!full && ev.id) {
+      try {
+        const ndk = window.LBLogin.getNDK()
+        // One event by id. Bounded, because this runs on a click and a repost
+        // that hangs is worse than one that degrades.
+        const found = await promiseWithTimeout(
+          ndk.fetchEvent({ ids: [ev.id] }),
+          6000,
+          'lookup timed out',
+        )
+        if (found?.sig) {
+          full = found
+          // NDK records which relays answered. The first is as good a hint as
+          // any and is a fact rather than an assumption.
+          const from = found.onRelays?.[0]?.url || found.relay?.url || ''
+          if (typeof from === 'string' && from.startsWith('wss://')) relayHint = from
+        }
+      } catch (e) {
+        // A failed lookup must not block the repost — a bare kind-6 is still a
+        // valid repost, and some clients resolve it. It just cannot be relied
+        // on, which is what the toast below says.
+        console.warn('[boost-actions] could not fetch the original to embed', e)
+      }
+    }
+
+    if (full?.id && full?.pubkey && full?.sig) {
       try {
         content = JSON.stringify({
-          id:         ev.id,
-          pubkey:     ev.pubkey,
-          created_at: ev.created_at,
-          kind:       ev.kind,
-          tags:       Array.isArray(ev.tags) ? ev.tags : [],
-          content:    ev.content || '',
-          sig:        ev.sig,
+          id:         full.id,
+          pubkey:     full.pubkey,
+          created_at: full.created_at,
+          kind:       full.kind,
+          tags:       Array.isArray(full.tags) ? full.tags : [],
+          content:    full.content || '',
+          sig:        full.sig,
         })
       } catch { content = '' }
     }
@@ -485,15 +534,25 @@ async function handleRepost(ev, btn) {
     // byte-identical (kind 6, no `a`).
     const kind = ev.kind || 1
     const isAddressable = kind >= 30000 && kind < 40000
-    const tags = [['e', ev.id, '']]
-    if (isAddressable && ev.dTag) tags.push(['a', `${kind}:${ev.pubkey}:${ev.dTag}`, ''])
+    // ⚠️ THE THIRD ELEMENT IS THE RELAY HINT and it used to be hardcoded empty,
+    // which is the other half of why these reposts did not render. It carries
+    // the relay the original was actually found on now, and stays empty when the
+    // lookup failed rather than guessing — a hint is only useful if it is true.
+    const tags = [['e', ev.id, relayHint]]
+    if (isAddressable && ev.dTag) tags.push(['a', `${kind}:${ev.pubkey}:${ev.dTag}`, relayHint])
     tags.push(['p', ev.pubkey], ['k', String(kind)], ['client', 'onlyboosts.social'])
     await window.LBLogin.signAndPublish({
       kind: kind === 1 ? 6 : 16,
       content,
       tags,
     })
-    showToast('Reposted')
+    // Two different outcomes, said differently. A repost whose original could
+    // not be embedded is the case the reader complained about — it publishes,
+    // and then may render as an empty card in a client that cannot reach the
+    // note. Saying plain "Reposted" for that is what hid the problem.
+    showToast(content
+      ? 'Reposted'
+      : 'Reposted, but the original note couldn’t be attached — it may not show in every client.')
   } catch (e) {
     repostedIds.delete(id)
     btn.setAttribute('aria-pressed', 'false')

@@ -29,38 +29,38 @@
  * Entry point: renderPodcasts({ panel, list }) — lazy-imported by feeds.js
  * the first time the feed is opened.
  */
-import { nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v59'
+import { nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v60'
 import {
   fetchProfilesFromPrimal,
   setCachedProfile,
   parseSegments,
   renderSegmentsInto,
-} from '/assets/js/boosts-thread.js?v=ob-v59'
-import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v59'
-import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v59'
-import { buildActionBar, configureBoostActions } from '/assets/js/boost-actions.js?v=ob-v59'
-import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v59'
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v59'
-import { toEpisodeShape, normalizeBoosts, episodeApiToBoosts } from '/assets/js/ob-data.js?v=ob-v59'
+} from '/assets/js/boosts-thread.js?v=ob-v60'
+import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v60'
+import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v60'
+import { buildActionBar, configureBoostActions } from '/assets/js/boost-actions.js?v=ob-v60'
+import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v60'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v60'
+import { toEpisodeShape, normalizeBoosts, episodeApiToBoosts } from '/assets/js/ob-data.js?v=ob-v60'
 import {
   getEpisodePage, searchEpisodes, SEARCH_HITS, SEARCH_MIN_CHARS,
-} from '/assets/js/ob-live.js?v=ob-v59'
-import { copyText, showToast, copyNpub } from '/assets/js/copy-npub.js?v=ob-v59'
-import { boostButton, withBoostBusy } from '/assets/js/boost-button.js?v=ob-v59'
+} from '/assets/js/ob-live.js?v=ob-v60'
+import { copyText, showToast, copyNpub } from '/assets/js/copy-npub.js?v=ob-v60'
+import { boostButton, withBoostBusy } from '/assets/js/boost-button.js?v=ob-v60'
 import {
   rangeDays, rangeControl, sortControl, mountFeedControls,
-} from '/assets/js/feed-controls.js?v=ob-v59'
+} from '/assets/js/feed-controls.js?v=ob-v60'
 // Its own module, not two more exports of feed-controls.js — see the ⚠️ note
 // at the top of that file for the four-hour window that shape opens.
-import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v59'
-import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v59'
-import { showPageHref, episodePageHref } from '/assets/js/show-link.js?v=ob-v59'
+import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v60'
+import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v60'
+import { showPageHref, episodePageHref } from '/assets/js/show-link.js?v=ob-v60'
 // Its own module rather than a third export from show-link.js, which every feed
 // renderer imports: a stale copy of that file against a fresh copy of this one
 // is a link-time error that takes all eight feeds down. See the note at its head
 // and the ob-v53 entry in CLAUDE.md.
-import { boosterPageHref, markBoosterLink } from '/assets/js/booster-link.js?v=ob-v59'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v59'
+import { boosterPageHref, markBoosterLink } from '/assets/js/booster-link.js?v=ob-v60'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v60'
 
 const VALUE_API = '/api/value'   // Podcast Index value-block proxy (splits)
 const INITIAL_CARDS = 30       // episodes rendered per "load more" batch

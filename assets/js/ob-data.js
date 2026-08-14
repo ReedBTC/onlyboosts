@@ -23,7 +23,7 @@
  * one exception is the per-show shard, and even there the rollup carries a
  * `file` pointer we use verbatim.
  */
-import { coverChain } from '/assets/js/cover-art.js?v=ob-v59'
+import { coverChain } from '/assets/js/cover-art.js?v=ob-v60'
 
 /* ⚠️ THE FETCHING HALF OF THIS MODULE IS GONE, and this is what it was.
  *
