@@ -79,7 +79,13 @@ function initHeroArt() {
     })
   }
 
-  const bannerImg = document.querySelector('[data-bs-banner] img')
+  // ⚠️ DIRECT CHILD, and it has to be. The avatar is positioned against the
+  // banner, so it lives INSIDE [data-bs-banner] — a descendant selector here
+  // matches the banner's own image first only while there IS one, and picks up
+  // the AVATAR's image on the 57% of profiles with no banner. A dead avatar
+  // would then take the banner's exit: image removed, strip marked blank, and
+  // the face silently gone.
+  const bannerImg = document.querySelector('[data-bs-banner] > img')
   if (bannerImg) {
     // The banner has no fallback and no placeholder worth showing: a broken
     // strip of wallpaper is worse than the flat tint the blank variant paints,

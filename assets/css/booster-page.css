@@ -33,27 +33,44 @@
   overflow: hidden;
 }
 
-/* ── The banner ────────────────────────────────────────────────────────────
+/* ── The banner, and the avatar that hangs off it ──────────────────────────
  *
- * 42.5% of stored profiles carry one. The blank variant is NOT a missing state
- * to apologise for: it is a flat brand-tinted strip that gives the card a lid
- * and a place for the avatar to overlap, so a profile with no banner reads as
- * designed rather than as truncated. booster-page.js swaps a dead banner to the
- * same variant, so a broken hotlink and an absent field look identical.
+ * ⚠️ NOTHING BUT THE AVATAR MAY OVERLAP THE BANNER. The first version pulled
+ * the whole identity row up with a negative margin-top, and because that row
+ * held the avatar and the text side by side, it dragged the display name onto
+ * the banner. A name over a banner is unreadable and cannot be fixed with a
+ * scrim or a text-shadow, because the image underneath is a stranger's and can
+ * be any colour at all.
  *
- * The aspect ratio is fixed rather than the height, so the strip scales with the
- * card instead of cropping harder on a phone. 4:1 is shallower than Nostr's
- * conventional 3:1 because this banner sits above a 120px avatar inside a
- * bordered card rather than filling the top of a screen. */
+ * The arrangement below is the one every Nostr client uses, read off MyNostr's
+ * ProfileModule (`~/Desktop/Files/nostr/mynostr`): a fixed-height banner, an
+ * avatar absolutely positioned so it hangs exactly HALF below the banner's
+ * bottom edge, and a separate identity block padded to clear it. Twitter and
+ * Bluesky are the same. Three numbers move together and are the whole layout —
+ * the avatar's size, its negative `bottom` (always half that size), and
+ * `.bs-ident`'s `padding-top` (that half, plus breathing room).
+ *
+ * A FIXED HEIGHT, not an aspect-ratio. The previous rule set `aspect-ratio: 4/1`
+ * and then clamped it between a min and a max height, which is three rules
+ * disagreeing about the same box: inside the clamps the strip grew with the
+ * card, outside them the ratio was simply ignored. Every client sizes this
+ * absolutely, `object-fit: cover` crops to whatever the box is, and a banner is
+ * decoration whose height nothing else depends on.
+ *
+ * ⚠️ NO `overflow: hidden` HERE — it would clip the avatar that deliberately
+ * escapes the bottom edge. The card's own overflow rounds the banner's top
+ * corners, and the image below is sized to the box exactly, so there is nothing
+ * else to clip.
+ *
+ * 42.5% of stored profiles carry a banner. The blank variant is not a missing
+ * state to apologise for: it is the brand ramp at low opacity, giving the card a
+ * lid and the avatar something to sit against. booster-page.js swaps a DEAD
+ * banner to the same variant, so a broken hotlink and an absent field are
+ * indistinguishable. */
 .bs-banner {
-  aspect-ratio: 4 / 1;
-  /* A floor and a ceiling: a very wide card should not spend 300px on
-     someone's wallpaper, and a narrow one still needs room for the avatar to
-     overlap into. */
-  min-height: 84px;
-  max-height: 180px;
+  position: relative;
+  height: 160px;
   background: var(--tint, rgba(0, 175, 240, 0.08));
-  overflow: hidden;
 }
 .bs-banner img {
   width: 100%;
@@ -62,40 +79,25 @@
   display: block;
 }
 .bs-banner--blank {
-  /* The brand ramp at low opacity, so the strip belongs to the site rather than
-     reading as an empty grey box waiting for content. */
   background: linear-gradient(120deg,
     color-mix(in srgb, var(--brand) 16%, transparent),
     color-mix(in srgb, var(--brand-d) 10%, transparent));
 }
 
-/* ── The identity block ────────────────────────────────────────────────────
- *
- * .show-hero-inner is the two-column art + identity grid both other pages use.
- * The overlap is the only change: the avatar is pulled up into the banner, which
- * is what makes the card read as a profile rather than as a header with a
- * picture beside it. */
-.bs-inner {
-  padding: 0 1.5rem 1.5rem;
-  /* The pull-up has to be less than the avatar's height or the identity column
-     beside it rises off the card's top edge with it. */
-  margin-top: -2.75rem;
-  align-items: end;
-}
-
-.bs-avatar-wrap { align-self: start; }
-
 .bs-avatar {
-  display: block;
-  width: 120px;
-  height: 120px;
+  position: absolute;
+  left: 1.5rem;
+  /* Exactly half of the height below, so the circle straddles the edge. */
+  bottom: -56px;
+  width: 112px;
+  height: 112px;
   border-radius: 50%;
   overflow: hidden;
   background: var(--cream-d, rgba(0, 0, 0, 0.06));
-  /* The ring is what separates a dark avatar from a dark banner. It reads as
-     part of the card, so it takes the card's background rather than the
-     brand — a brand ring here would compete with the podium rings on the
-     community walls, where it means "top five". */
+  /* The ring is what separates a dark avatar from a dark banner, and it takes
+     the CARD's background so the avatar reads as sitting on the card rather
+     than on the image. Brand would compete with the podium rings on the
+     community walls, where a brand ring means "top five". */
   box-shadow: 0 0 0 4px var(--surface);
 }
 .bs-avatar img {
@@ -110,6 +112,13 @@
   background: linear-gradient(140deg,
     color-mix(in srgb, var(--brand) 22%, transparent),
     color-mix(in srgb, var(--brand-d) 14%, transparent));
+}
+
+/* The identity block. Full width, under the banner, never over it — see the
+   warning above. `padding-top` is the avatar's overhang (56px) plus room to
+   breathe, and it moves whenever the avatar's size does. */
+.bs-ident {
+  padding: 4.25rem 1.5rem 1.5rem;
 }
 
 /* nip05 sits directly under the name, above the boost dates, because it is part
@@ -242,19 +251,20 @@
 
 /* ── Narrow screens ────────────────────────────────────────────────────────
  *
- * The negative margin that pulls the avatar into the banner has to track the
- * card's padding here the way .ep-card's drawer bleeds do on /episode — the two
- * are set together or the avatar detaches from the strip above it. */
+ * ⚠️ THE THREE AVATAR NUMBERS MOVE TOGETHER OR THE LAYOUT BREAKS: the size, the
+ * negative `bottom` (always exactly half the size), and `.bs-ident`'s
+ * `padding-top` (that half plus breathing room). Change one alone and the
+ * avatar either detaches from the banner or overlaps the eyebrow beneath it.
+ * 88px here, so bottom is -44px and the padding clears 44. */
 @media (max-width: 640px) {
-  .bs-inner {
-    padding: 0 1rem 1.15rem;
-    margin-top: -2.25rem;
-  }
+  .bs-banner { height: 116px; }
   .bs-avatar {
-    width: 92px;
-    height: 92px;
+    left: 1rem;
+    bottom: -44px;
+    width: 88px;
+    height: 88px;
     box-shadow: 0 0 0 3px var(--surface);
   }
-  .bs-banner { min-height: 68px; }
+  .bs-ident { padding: 3.4rem 1rem 1.15rem; }
   .bs-chip { font-size: 0.78rem; }
 }

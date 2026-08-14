@@ -582,36 +582,47 @@ function renderHeader({ hex, npub, prof, label, realName, pic, banner, stats, to
     latest ? `Last boosted ${relTime(latest)}` : null,
   ].filter(Boolean);
 
+  // ⚠️ THE AVATAR IS THE ONLY THING THAT MAY OVERLAP THE BANNER, and it is
+  // positioned against the banner rather than pulled up by a margin. The first
+  // version pulled the whole identity ROW up with a negative margin-top, and
+  // since that row was avatar and text side by side, it dragged the name onto
+  // the banner — a display name over a stranger's photograph is unreadable at
+  // any contrast, because the photograph is arbitrary.
+  //
+  // This is the shape every Nostr client uses and it came from reading one:
+  // MyNostr's ProfileModule (`~/Desktop/Files/nostr/mynostr`) renders a
+  // fixed-height banner, an avatar absolutely positioned at `-bottom-12` so it
+  // hangs exactly half below the banner's edge with a ring in the card's own
+  // colour, and then a SEPARATE identity block padded at the top to clear it.
+  // Twitter and Bluesky are the same arrangement. The identity block is
+  // full-width as a result, which is a gain rather than a cost: the bio and the
+  // chips get the whole card instead of a column beside a 112px avatar.
   return `<header class="show-hero">
     <div class="bs-card"${missing ? ` data-pk="${htmlEscape(hex)}" data-missing="${htmlEscape(missing)}"` : ""}>
-      ${banner
-        ? `<div class="bs-banner" data-bs-banner><img src="${htmlEscape(banner)}" alt="" loading="lazy" referrerpolicy="no-referrer" /></div>`
-        : `<div class="bs-banner bs-banner--blank" data-bs-banner aria-hidden="true"></div>`}
-      <div class="show-hero-inner bs-inner">
-        <div class="show-art bs-avatar-wrap">
-          <span class="bs-avatar${pic ? "" : " is-blank"}" data-bs-avatar>
-            ${pic ? `<img src="${htmlEscape(pic)}" alt="" width="120" height="120" loading="eager" referrerpolicy="no-referrer" />` : ""}
-          </span>
-        </div>
-        <div class="show-ident">
-          <p class="show-eyebrow">Booster</p>
-          <h1 data-bs-name>${htmlEscape(label)}</h1>
-          ${nip05 ? `<p class="bs-nip05" data-bs-nip05><span aria-hidden="true">✓</span> ${htmlEscape(truncate(nip05, 60))}</p>` : `<p class="bs-nip05" data-bs-nip05 hidden></p>`}
-          <p class="show-sub">${bits.map(htmlEscape).join(" · ") || "No boosts recorded yet"}</p>
-          ${renderBio(about)}
-          ${renderContact({ lud16, lud06, website })}
-          <div class="show-actions">
-            <!-- Copy npub is the primary action, and it is the one thing a
-                 reader of this page reliably wants: it is how you follow, zap or
-                 mention someone anywhere else. The npub is nullable in the
-                 record where the pubkey is not, so this falls back to hex rather
-                 than shipping a dead control. -->
-            <button type="button" class="btn btn-boost" data-copy-npub="${htmlEscape(npub || hex)}">
-              Copy npub
-            </button>
-            <a class="btn btn-quiet" href="https://njump.me/${htmlEscape(npub || hex)}" target="_blank" rel="noopener noreferrer">View Profile</a>
-            <button type="button" class="btn btn-quiet" data-share-page>Share</button>
-          </div>
+      <div class="bs-banner${banner ? "" : " bs-banner--blank"}" data-bs-banner>
+        ${banner ? `<img src="${htmlEscape(banner)}" alt="" loading="lazy" referrerpolicy="no-referrer" />` : ""}
+        <span class="bs-avatar${pic ? "" : " is-blank"}" data-bs-avatar>
+          ${pic ? `<img src="${htmlEscape(pic)}" alt="" width="112" height="112" loading="eager" referrerpolicy="no-referrer" />` : ""}
+        </span>
+      </div>
+      <div class="show-ident bs-ident">
+        <p class="show-eyebrow">Booster</p>
+        <h1 data-bs-name>${htmlEscape(label)}</h1>
+        ${nip05 ? `<p class="bs-nip05" data-bs-nip05><span aria-hidden="true">✓</span> ${htmlEscape(truncate(nip05, 60))}</p>` : `<p class="bs-nip05" data-bs-nip05 hidden></p>`}
+        <p class="show-sub">${bits.map(htmlEscape).join(" · ") || "No boosts recorded yet"}</p>
+        ${renderBio(about)}
+        ${renderContact({ lud16, lud06, website })}
+        <div class="show-actions">
+          <!-- In the flow under the bio rather than absolutely placed at the
+               avatar's level, which is where MyNostr and Twitter put their Edit
+               and Follow buttons. Those surfaces have ONE button; this has
+               three plus a display name that can run long, and on a 375px phone
+               that corner is where they would collide. -->
+          <button type="button" class="btn btn-boost" data-copy-npub="${htmlEscape(npub || hex)}">
+            Copy npub
+          </button>
+          <a class="btn btn-quiet" href="https://njump.me/${htmlEscape(npub || hex)}" target="_blank" rel="noopener noreferrer">View Profile</a>
+          <button type="button" class="btn btn-quiet" data-share-page>Share</button>
         </div>
       </div>
     </div>
