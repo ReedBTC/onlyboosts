@@ -65,14 +65,19 @@ no medium at all and stay the unsplit firehose.
 
 **The medium is a property of the SHOW, so it is not on the boost record.** The
 alternative was the collector stamping one show-level fact onto 22k boosts and
-rewriting every month archive; instead `ob-data.js#mediumPredicate` joins
-guid → medium through `podcasts/index.json`. That file is ~103KB over the wire
-and cached for the page's lifetime, and the show-level feeds load it anyway, so
-the join costs one request the first time and nothing after. `mediumPredicate`
-returns `{ test, ok }`: on a failed join `test` keeps everything, so Episodes
-degrades to an unsplit feed while the music callers read `ok` and say the index
-is unavailable — an empty Songs feed is indistinguishable from a quiet week, so
-it must not be the failure mode.
+rewriting every month archive.
+
+**⚠️ The medium is a QUERY PARAMETER now, not a client-side join.**
+`/api/v1/episodes` and `/api/v1/podcasts` take `medium=music` or
+`not_medium=music` and answer already split, so the browser never has to reconcile
+two datasets. This paragraph used to describe `ob-data.js#mediumPredicate`, which
+joined guid → medium through `podcasts/index.json` in the browser and returned a
+`{ test, ok }` pair so a failed join degraded Episodes rather than silently
+emptying Songs. That function was **deleted on 2026-08-14 along with the rest of
+the shard-reading half of `ob-data.js`**: the ranking move to D1 had taken its
+last caller, and the three modules plus this file that still named it were all
+doing so in COMMENTS. Its careful failure mode is worth knowing about if a
+client-side join is ever needed again; `git log -S mediumPredicate` finds it.
 
 The one cost this imposes is on the **show-level windowed ranges**, which used
 to need no extra request. `All` is the opening range on both Shows and Albums
@@ -1110,10 +1115,19 @@ stores that had to agree with nothing forcing them to. See
 `episodeApiToBoosts` and `boosterLabel` still have callers and are the reason
 every consumer downstream of a fetch sees one model. Its *fetching* half —
 `getPodcastIndex`, `getPodcastDetail`, `getShowMediums`, `getShowAuthors`,
-`getLatestBoosts`, `getBoostMonths`, `getBoostMonth` — has **no callers left**.
-They are kept rather than deleted: the shards remain a published dataset and the
-proxy still serves them. `/about`'s stat strip is the one page that still fetches
-`/api/data/meta.json`, and it is a page of figures rather than a feed.
+`getLatestBoosts`, `getBoostMonths`, `getBoostMonth`, `fetchJson`, `getManifest`
+and `mediumPredicate` — was **deleted on 2026-08-14**, 168 lines and 32% of the
+file. It was kept for a while on the reasoning that the shards remain a published
+dataset; that is still true and is untouched, since
+`functions/api/data/[[path]].js` still proxies them and `/about`'s stat strip
+still reads `/api/data/meta.json`. Publishing a dataset does not require shipping
+an unused client for it to every visitor.
+
+⚠️ **Verify per function INCLUDING internal callers before removing anything
+here.** A grep that excludes the file itself hides functions whose only caller is
+a sibling in the same module, which is exactly what made `mediumPredicate` look
+live. All four of its remaining references turned out to be comments, in three
+modules and in this document.
 
 That closes the dependency piece 3 was waiting on. Demoting the shards to an
 export is now a decision rather than a migration.
@@ -1238,9 +1252,10 @@ What this replaced, and why it was a correctness fix rather than a speedup:
   Episodes feeds were fixed for.
 
 **Nothing on the site reads `podcasts/index.json` or the per-show shards any
-more.** `ob-data.js` still exports `getPodcastIndex`, `getPodcastDetail`,
-`getShowMediums` and `getShowAuthors`; they have no callers and are kept
-deliberately, since the shards remain a published dataset.
+more**, and as of 2026-08-14 nothing can: `getPodcastIndex`, `getPodcastDetail`,
+`getShowMediums` and `getShowAuthors` are deleted along with the rest of
+`ob-data.js`'s fetching half. The shards remain a published dataset served by the
+proxy; see the note in the Feed loaders section.
 
 Two data facts that shaped the UI, both measured over the live index:
 

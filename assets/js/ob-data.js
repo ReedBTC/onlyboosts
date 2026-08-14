@@ -25,174 +25,30 @@
  */
 import { coverChain } from '/assets/js/cover-art.js?v=ob-v59'
 
-const BASE = '/api/data/'
-
-// The manifest changes hourly at most; the month archives are immutable once
-// written. Cache per-path in memory for the page's lifetime so switching tabs
-// doesn't refetch a 1MB shard.
-const cache = new Map()
-
-/**
- * Fetch one JSON path under the data feed. Rejects on anything that isn't a
- * parseable JSON body, so callers never have to guess.
+/* ⚠️ THE FETCHING HALF OF THIS MODULE IS GONE, and this is what it was.
+ *
+ * `fetchJson`, `getManifest`, `getLatestBoosts`, `getBoostMonths`,
+ * `getBoostMonth`, `getPodcastIndex`, `getShowMediums`, `getShowAuthors`,
+ * `getPodcastDetail` and `mediumPredicate` read the collector's static shards
+ * under /api/data/. Every feed on the site moved to the D1 query API, and by the
+ * time they were removed NOT ONE of them had a caller — verified per function,
+ * and including the ones this file called internally, which is what hid
+ * `mediumPredicate`: three modules and CLAUDE.md still referred to it as the
+ * live medium split, but all four references were COMMENTS.
+ *
+ * They were kept for a while on the reasoning that the shards remain a published
+ * dataset. That is still true and is unaffected: `functions/api/data/[[path]].js`
+ * still proxies them and /about still reads meta.json. Publishing a dataset does
+ * not require shipping an unused client for it to every visitor.
+ *
+ * `git show <this commit>^:assets/js/ob-data.js` has the whole thing if a reader
+ * is ever wanted again.
+ *
+ * WHAT REMAINS IS SHAPE ONLY. normalizeBoosts, toEpisodeShape, boosterLabel and
+ * episodeApiToBoosts are why every consumer downstream of a fetch sees one model,
+ * and they have callers throughout.
  */
-export async function fetchJson(path) {
-  if (cache.has(path)) return cache.get(path)
 
-  const promise = (async () => {
-    const resp = await fetch(BASE + path, { headers: { Accept: 'application/json' } })
-    if (!resp.ok) throw new Error(`data ${path}: HTTP ${resp.status}`)
-    // Defence in depth — see the module note. The proxy already enforces this.
-    const ctype = resp.headers.get('content-type') || ''
-    if (!ctype.includes('json')) throw new Error(`data ${path}: not JSON (${ctype})`)
-    return resp.json()
-  })()
-
-  cache.set(path, promise)
-  // A failed fetch shouldn't poison the cache for the rest of the session —
-  // the user may just have been offline for a moment.
-  promise.catch(() => cache.delete(path))
-  return promise
-}
-
-/** The manifest: totals, the month list, and where everything lives. */
-export function getManifest() {
-  return fetchJson('index.json')
-}
-
-/** Most recent ~1,000 boosts, already newest-first. */
-export async function getLatestBoosts() {
-  const m = await getManifest()
-  const file = m?.boosts?.latest || 'latest.json'
-  const d = await fetchJson(file)
-  return normalizeBoosts(d)
-}
-
-/**
- * Month archives, newest month first, as listed in the manifest.
- * @returns {Promise<Array<{month:string,count:number,file:string}>>}
- */
-export async function getBoostMonths() {
-  const m = await getManifest()
-  const months = Array.isArray(m?.boosts?.months) ? m.boosts.months : []
-  return months
-    .filter((x) => x && typeof x.file === 'string' && typeof x.month === 'string')
-    .sort((a, b) => (a.month < b.month ? 1 : -1))
-}
-
-/** One month archive of boosts. */
-export async function getBoostMonth(file) {
-  return normalizeBoosts(await fetchJson(file))
-}
-
-/** Per-show rollups, one row per podcast. */
-export async function getPodcastIndex() {
-  const m = await getManifest()
-  const file = m?.podcasts?.index || 'podcasts/index.json'
-  const d = await fetchJson(file)
-  const rows = Array.isArray(d?.podcasts) ? d.podcasts : []
-  return rows.filter((p) => p && typeof p.guid === 'string')
-}
-
-// ── podcast:medium ────────────────────────────────────────────────────
-//
-// <podcast:medium> is what separates a podcast from a music release: a "music"
-// feed's items are tracks on an album, not episodes of a show. The collector
-// projects the tag onto every row of podcasts/index.json, defaulting to
-// "podcast" per the namespace where a feed carries none. Measured against the
-// live index: 818 podcast, 465 music, 2 video.
-//
-// It is a property of the SHOW, so it is deliberately not on the boost record —
-// the alternative is the collector stamping one show-level fact onto 22k boosts
-// and rewriting every month archive. The episode-level feeds join through the
-// published rollup instead. That file is ~103KB over the wire, cached for the
-// page's lifetime by fetchJson above, and the show-level feeds load it anyway,
-// so the join costs one request the first time and nothing after.
-
-/** guid → medium, lowercased, from the published per-show rollup. */
-export async function getShowMediums() {
-  const rows = await getPodcastIndex()
-  const map = new Map()
-  for (const p of rows) {
-    const m = str(p.medium)
-    if (m) map.set(p.guid, m.toLowerCase())
-  }
-  return map
-}
-
-/**
- * guid → author, from the same rollup. `<itunes:author>`, which on a music
- * feed is the artist and on a podcast is whoever the publisher named there:
- * often the host, sometimes a network, occasionally a tagline.
- *
- * Verbatim, INCLUDING rows where the author merely repeats the show title
- * (~7% of them). The collector publishes it raw on purpose and each consumer
- * decides: a display surface hides the repeats, a search index does not care,
- * because matching a show by its own title is a no-op rather than a wrong hit.
- *
- * A second pass over the rows getShowMediums() already walked. Both read the
- * same cached file, so this costs no request.
- */
-export async function getShowAuthors() {
-  const rows = await getPodcastIndex()
-  const map = new Map()
-  for (const p of rows) {
-    const a = str(p.author)
-    if (a) map.set(p.guid, a)
-  }
-  return map
-}
-
-/**
- * A guid → boolean test for one side of the music / not-music split.
- *
- * `want` is 'music' (the Songs and Albums feeds) or 'other' (Episodes and
- * Shows — podcasts, plus the two video feeds, plus every show the collector
- * holds boosts for but Podcast Index can't identify). Anything falsy keeps
- * everything and costs no fetch, which is what the unsplit Boosts feeds pass.
- *
- * A show with no medium counts as not-music: the namespace's default is
- * "podcast", and filing an unidentified feed under Albums would be a claim
- * about it we can't support.
- *
- * @returns {Promise<{test:(guid:string|null)=>boolean, ok:boolean}>} `ok` is
- *   false when the rollup couldn't be read. The test then keeps everything on
- *   the 'other' side and nothing on the 'music' side, which is the right
- *   failure for each: an Episodes feed carrying a few stray tracks beats no
- *   feed at all, whereas an empty Songs feed is indistinguishable from a quiet
- *   week — so the music callers read `ok` and say what actually happened.
- */
-export async function mediumPredicate(want) {
-  if (!want) return { test: () => true, ok: true }
-  const music = want === 'music'
-  let mediums = new Map()
-  let ok = true
-  try {
-    mediums = await getShowMediums()
-  } catch (e) {
-    console.warn('[ob-data] medium join unavailable', e)
-    ok = false
-  }
-  return { test: (guid) => (mediums.get(guid) === 'music') === music, ok }
-}
-
-/** One show: { show, episodes[], boosts[] }. Takes the rollup's `file`. */
-export async function getPodcastDetail(file) {
-  const d = await fetchJson(file)
-  return {
-    show: d?.show || null,
-    episodes: Array.isArray(d?.episodes) ? d.episodes : [],
-    boosts: normalizeBoosts(d),
-  }
-}
-
-// ── normalization ─────────────────────────────────────────────────────
-//
-// The wire record is:
-//   { id, ts, sats, src, msg, client,
-//     booster{pk,npub,name,pic}, podcast{guid,title,img,feed},
-//     episode{guid,title,img,date,num,url} }
-//
 // Almost every display field is nullable — measured against a 1,000-row
 // sample: msg 16%, booster.pic 15%, episode.title 11%, episode.num 61%,
 // podcast.guid 2%. So this flattens to a shape where the *only* fields a
