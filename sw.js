@@ -384,7 +384,19 @@
 // The JavaScript half degrades gracefully on its own: booster-link.js is a NEW
 // module, so a browser can only resolve or 404 it, and a stale feed renderer
 // simply keeps copying npubs on click. It is the stylesheets that cannot lag.
-const VERSION = 'ob-v58';
+// ob-v59: boost notes get the full Nostr treatment on /show, /episode and
+// /booster — the same .note-card the homepage Boosts feed paints, with the same
+// reply/repost/like/zap bar and ⋮ menu. First change built under the rendering
+// rule now recorded in CLAUDE.md: the note is a FACT and is server-rendered
+// complete, the reactions are VERBS and attach afterwards.
+//
+// REQUIRED, and the stylesheet is why. `.ob-boost-*` moved OUT of index.html's
+// inline <style> into boosts-thread.css so all four surfaces can share one
+// definition — the same extraction feed-cards.css made for /episode. A returning
+// visitor holding the precached index.html against a fresh boosts-thread.css, or
+// the reverse, paints the Boosts feed's meta row unstyled. Same shape as the
+// ob-v9 and ob-v55 bumps, which both moved rules out of that same block.
+const VERSION = 'ob-v59';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;

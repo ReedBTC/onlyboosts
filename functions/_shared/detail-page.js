@@ -572,12 +572,16 @@ function supporterCard(r, isPodium, hidden = false) {
 export function renderBoosts(rows, names, { heading, sub, itemAbbr, noun, showTarget = true, linkBooster = true }) {
   if (!rows.length) return "";
 
+  // `ob-boost-list` alongside `boost-list` is what makes these cards the same
+  // object as the homepage Boosts feed's: the container override that gives a
+  // .note-card its white background and 12px radius is keyed on it. Both classes
+  // are carried because the section spacing is still show-page.css's.
   return `<section class="show-section" id="boosts">
     <div class="show-section-head">
       <h2>${htmlEscape(heading)}</h2>
       <p class="show-section-sub">${htmlEscape(sub)}</p>
     </div>
-    <ul class="boost-list">
+    <ul class="boost-list ob-boost-list">
       ${rows.map((r) => boostRow(r, names, { itemAbbr, noun, showTarget, linkBooster })).join("\n      ")}
     </ul>
   </section>`;
@@ -589,35 +593,79 @@ function boostRow(r, names, { itemAbbr, noun, showTarget, linkBooster = true }) 
   const pic = isSafeUrl(r.pr_pic) ? r.pr_pic : null;
   const href = linkBooster ? boosterPageUrl(r.booster_npub, r.booster_pubkey) : null;
   const missing = [realName ? null : "name", pic ? null : "pic"].filter(Boolean).join(" ");
+  // ⚠️ NO "the episode" FALLBACK ANY MORE. The old compact row printed
+  // "→ the episode" when the boost carried no episode title, which read fine as
+  // a sentence fragment after an arrow. In the meta row it is a chip in the
+  // position a title occupies, so it reads as though the episode were CALLED
+  // "the episode". The feed card omits the chip outright in this case
+  // (`if (b.episode.title)`), and these two surfaces are now one component, so
+  // this does the same. `noun` is consequently unused here and kept in the
+  // signature for the callers that still pass it.
   const target = r.e_title
     ? (r.e_num ? `${itemAbbr} ${htmlEscape(r.e_num)} · ${htmlEscape(truncate(r.e_title, 70))}` : htmlEscape(truncate(r.e_title, 70)))
-    : `the ${noun}`;
+    : null;
 
   // ⚠️ TWO LINKS TO ONE DESTINATION, unlike the community card above, and it is
-  // unavoidable here: the avatar sits at the row's left edge and the name inside
-  // the meta line, with the whole boost body between them, so no single anchor
-  // can hold both. The AVATAR is the duplicate and takes aria-hidden and
-  // tabindex="-1" — it stays clickable with a mouse and drops out of the tab
-  // order and the accessibility tree, so the row announces one link, on the
-  // name, which is the half carrying the text.
-  const avatar = pic ? `<img src="${htmlEscape(pic)}" alt="" loading="lazy" />` : "";
+  // unavoidable here: the avatar sits at the card's top-left and the name beside
+  // it, but the ⋮ menu and the timestamp come between them in the author row.
+  // The AVATAR is the duplicate and takes aria-hidden and tabindex="-1" — it
+  // stays clickable with a mouse and drops out of the tab order and the
+  // accessibility tree, so the card announces one link, on the name.
+  //
+  // The avatar is ALWAYS an <img>, falling back to the site placeholder rather
+  // than to an empty circle. That is what the Boosts feed does (its cover chain
+  // ends there and so always resolves), and it is what lets hydrateProfiles fill
+  // a late-arriving picture by setting one src rather than by constructing an
+  // element into a blank.
+  const avatarSrc = pic || "/assets/avatar-fallback.svg";
+  const avatar = `<img src="${htmlEscape(avatarSrc)}" alt="" loading="lazy" referrerpolicy="no-referrer" />`;
   const avatarEl = href
-    ? `<a class="sup-avatar sup-avatar--sm${pic ? "" : " is-blank"}" href="${htmlEscape(href)}" tabindex="-1" aria-hidden="true">${avatar}</a>`
-    : `<span class="sup-avatar sup-avatar--sm${pic ? "" : " is-blank"}">${avatar}</span>`;
+    ? `<a class="note-avatar-link" href="${htmlEscape(href)}" tabindex="-1" aria-hidden="true">${avatar}</a>`
+    : avatar;
   const whoEl = href
-    ? `<a class="boost-who" href="${htmlEscape(href)}" title="Boosts by ${htmlEscape(name)}">${htmlEscape(name)}</a>`
-    : `<span class="boost-who">${htmlEscape(name)}</span>`;
+    ? `<a class="author-name" href="${htmlEscape(href)}" title="Boosts by ${htmlEscape(name)}">${htmlEscape(name)}</a>`
+    : `<span class="author-name">${htmlEscape(name)}</span>`;
 
-  return `<li class="boost-row"${missing ? ` data-pk="${htmlEscape(r.booster_pubkey)}" data-missing="${missing}"` : ""}>
-        ${avatarEl}
-        <div class="boost-body">
-          <p class="boost-meta">
-            ${whoEl}
-            <span class="boost-amt">${htmlEscape(num(r.sats))} sats</span>
-            <span class="boost-when">${htmlEscape(relTime(r.created_at))}</span>
-          </p>
-          ${r.message ? `<p class="boost-msg">${renderMessage(r.message, names)}</p>` : ""}
-          ${showTarget ? `<p class="boost-target">→ ${target}</p>` : ""}
-        </div>
+  // The meta row, same classes and same order as the feed card's: the sats, then
+  // what was boosted. The feed also names the SHOW here; none of the three
+  // detail-page queries select a show title, and on /show and /episode it would
+  // be the page's own subject repeated on every row anyway.
+  const meta = [
+    Number(r.sats) > 0
+      ? `<span class="ob-boost-sats">${htmlEscape(num(r.sats))}<span class="ob-bolt" aria-hidden="true">⚡</span></span>`
+      : null,
+    showTarget && target ? `<span class="ob-boost-ep">${target}</span>` : null,
+  ].filter(Boolean).join("\n            ");
+
+  const ts = Number(r.created_at) || 0;
+  const iso = ts ? new Date(ts * 1000).toISOString() : "";
+
+  /* ⚠️ THE CARD IS THE `[data-boost-note]` ELEMENT, and the three attributes on
+   * it are the entire contract with assets/js/boost-note-actions.js. That module
+   * finds these, builds the `{id, pubkey, kind, content, created_at, tags}`
+   * projection buildActionBar needs, and appends the reply/like/repost/zap bar
+   * plus the ⋮ menu — which buildActionBar puts into `.note-author` itself, so
+   * that class is load-bearing rather than decorative.
+   *
+   * This is the rendering rule from CLAUDE.md in one element: the note is a
+   * FACT and is server-rendered complete, the reactions are VERBS and arrive
+   * with JavaScript. Nothing here waits on that, and a reader who never loads
+   * the module reads the same boost.
+   *
+   * The message is deliberately NOT carried in a data attribute. A reply quotes
+   * it, and the projection reads it back out of `.note-body` at attach time —
+   * one copy of a string that can be 420 characters, on up to 500 cards. */
+  return `<li${missing ? ` data-pk="${htmlEscape(r.booster_pubkey)}" data-missing="${missing}"` : ""}>
+        <article class="note-card" data-boost-note data-event-id="${htmlEscape(r.event_id || "")}" data-pubkey="${htmlEscape(r.booster_pubkey || "")}" data-ts="${ts}">
+          <div class="note-author">
+            ${avatarEl}
+            <div class="note-author-name-wrap">${whoEl}</div>
+            <time datetime="${htmlEscape(iso)}" title="${htmlEscape(fmtDate(ts))}">${htmlEscape(relTime(ts))}</time>
+          </div>
+          ${meta ? `<div class="ob-boost-meta">
+            ${meta}
+          </div>` : ""}
+          ${r.message ? `<div class="note-body">${renderMessage(r.message, names)}</div>` : ""}
+        </article>
       </li>`;
 }

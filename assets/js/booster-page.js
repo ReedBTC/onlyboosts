@@ -28,6 +28,7 @@ import {
   initHashRouting, initHashSpy, initArt2, wireArt2,
 } from '/assets/js/detail-page.js'
 import { initShowDesc } from '/assets/js/show-desc.js'
+import { initBoostNoteActions } from '/assets/js/boost-note-actions.js'
 
 const PK = document.body.dataset.boosterPk || ''
 const NPUB = document.body.dataset.boosterNpub || PK
@@ -44,6 +45,7 @@ initShare()
 initBackLink()
 const revealHashTarget = initHashRouting()
 initHashSpy()
+initBoostNoteActions()
 
 /* ⚠️ initShowDesc() RUNS EXACTLY ONCE PER PAGE, on whichever path supplies the
  * bio. Calling it twice is not harmless: each call closes over its own `btn` and

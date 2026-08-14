@@ -31,6 +31,10 @@ import {
   initCopyNpub, initShowMore, initShare, initBackLink,
   initHashRouting, initHashSpy, initArt2, hydrateProfiles,
 } from '/assets/js/detail-page.js'
+// The reaction bar and ⋮ on the server-rendered boost notes at the foot of
+// this page. The community cards above them carry their own, through the feed
+// renderer they are built by.
+import { initBoostNoteActions } from '/assets/js/boost-note-actions.js'
 
 const VALUE_API = '/api/value'
 
@@ -53,6 +57,7 @@ initShare()
 initBackLink()
 const revealHashTarget = initHashRouting()
 initHashSpy()
+initBoostNoteActions()
 
 // One art2 surface here, not three: the hero. The community cards below build
 // their own chain through cover-art.js inside episodeCard, the way the feed

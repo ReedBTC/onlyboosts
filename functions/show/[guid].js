@@ -470,6 +470,13 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
   <link rel="stylesheet" href="/assets/css/theme.css" />
   <link rel="stylesheet" href="/assets/css/page.css" />
   <link rel="stylesheet" href="/assets/css/show-page.css" />
+  <!-- The boost note card and its reaction bar. Added when the boost list at
+       the foot of this page became the same .note-card the homepage Boosts
+       feed paints; this page linked neither before, which is why show-page.css
+       restates .nostr-mention. That restatement is now redundant rather than
+       load-bearing, and is left in place rather than removed in the same pass. -->
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css" />
 </head>
 <body data-show-guid="${htmlEscape(show.podcast_guid)}">
 

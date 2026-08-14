@@ -350,29 +350,44 @@ export async function hydrateProfiles(root = document) {
       continue
     }
 
+    // `.author-name` is the boost card's, `.sup-name` the community wall's.
+    // `.boost-who` was the boost row's before those rows became the same
+    // .note-card the Boosts feed paints; it is kept so a reader holding a stale
+    // copy of a page against a fresh copy of this module still gets names.
     if (missing.includes('name') && prof.name) {
-      const nameEl = el.querySelector('.sup-name, .boost-who')
+      const nameEl = el.querySelector('.sup-name, .author-name, .boost-who')
       if (nameEl) {
         nameEl.textContent = prof.name
         nameEl.setAttribute('title', prof.name)
       }
-      // The avatar's aria-label names the person it belongs to.
       const btn = el.querySelector('.sup-avatar')
       if (btn) btn.setAttribute('aria-label', `Copy npub for ${prof.name}`)
     }
 
     if (missing.includes('pic') && prof.picture) {
-      const btn = el.querySelector('.sup-avatar')
-      if (btn && !btn.querySelector('img')) {
-        const img = document.createElement('img')
-        img.alt = ''
-        img.loading = 'lazy'
-        img.referrerPolicy = 'no-referrer'
-        // A dead hotlink returns the card to the blank circle it already had.
-        img.onerror = () => { img.remove(); btn.classList.add('is-blank') }
-        img.src = prof.picture
-        btn.classList.remove('is-blank')
-        btn.appendChild(img)
+      // TWO SHAPES, because the two surfaces resolve a missing picture
+      // differently. A community card has an EMPTY `.sup-avatar` to construct an
+      // <img> into; a boost card always has one already, showing the site
+      // placeholder, so it only needs its src swapped. Doing the second as the
+      // first would append a second image inside the first.
+      const existing = el.querySelector('.note-author img')
+      if (existing) {
+        const fallback = existing.getAttribute('src')
+        existing.onerror = () => { existing.onerror = null; existing.src = fallback }
+        existing.src = prof.picture
+      } else {
+        const btn = el.querySelector('.sup-avatar')
+        if (btn && !btn.querySelector('img')) {
+          const img = document.createElement('img')
+          img.alt = ''
+          img.loading = 'lazy'
+          img.referrerPolicy = 'no-referrer'
+          // A dead hotlink returns the card to the blank circle it already had.
+          img.onerror = () => { img.remove(); btn.classList.add('is-blank') }
+          img.src = prof.picture
+          btn.classList.remove('is-blank')
+          btn.appendChild(img)
+        }
       }
     }
 

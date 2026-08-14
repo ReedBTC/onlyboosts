@@ -186,6 +186,72 @@ cd login-widget && npm install && npm run build
 
 Local dev: `wrangler pages dev .` (so `/api/*` Functions resolve).
 
+## ⚠️ The Rendering Rule: The Server Renders The Facts, JavaScript Adds The Verbs
+
+**This is the standard every page is held to. Adopted 2026-08-14.** It replaces
+an unstated habit that had drifted into "some pages work without JavaScript and
+some don't", which was never a decision anyone made and was quietly deciding
+what could be built where.
+
+| | |
+|---|---|
+| **Facts** | Anything that comes out of the database and is the same for every visitor: who boosted, how many sats, which show and episode, message text, artwork, rankings, air dates. **Server-rendered, always, on every page.** |
+| **Verbs** | Anything needing a signer, a gesture, or knowledge of who is looking: reply, like, repost, zap, boost, copy, sort, filter, search, expand, seek. **Attached by JavaScript, always, on every page.** |
+
+The consequence worth internalising: **a component never has to choose between
+being server-rendered and being interactive.** A boost note is server-rendered
+*and* carries a full reply/like/repost/zap bar, because the note is a fact and
+the bar is a verb. Reaching for "this section has to be client-rendered so it can
+be interactive" means the split has been drawn in the wrong place.
+
+**What this is actually protecting**, because "works without JavaScript" overstates
+it and was the phrase that caused the confusion:
+
+- **Search.** ~930 show pages and 2,027 episode pages are in the sitemap.
+  Googlebot runs JavaScript, but on a delayed second pass and not dependably per
+  page. Server-rendered content is indexed on the first pass.
+- **Resilience.** `ob-v53` blanked all eight feeds when one cached module didn't
+  match another. The feeds went down; the show pages did not.
+- **Speed.** Finished HTML paints once. A shell paints, fetches, then paints again.
+- **Not** readers with JavaScript disabled. That is a rounding error and was never
+  the reason.
+
+### What Must Be Identical Across Pages, And What May Differ
+
+**The test: if a reader could screenshot the same component from two pages and
+tell them apart, that is a bug** unless the subject genuinely differs.
+
+| Identical everywhere | Legitimately differs |
+|---|---|
+| A boost note: card, message, mentions, reaction bar, ⋮ menu | The **subject** (show / episode / person) |
+| A rollup drawer: the box, the lid, the range and sort controls | **Which sections exist** (a podroll is show-level; chapters are episode-level) |
+| An artwork fallback chain | **The words**, off a `COPY` table (Episode vs Track) |
+| A booster's name and face, and where they link | **Which figures are meaningful** (a booster page has no booster count) |
+
+### The One Standing Exception, And Its Expiry
+
+`feeds-podcasts.js#episodeCard` exists only as JavaScript, so the two sections
+built from it — `#community-episodes` on `/episode` and `#episodes` on
+`/booster` — do not render without it. That is tolerated **only** because both
+are derived lists below the fold rather than a page's own subject; nobody finds
+this site by searching for "other episodes this community boosts".
+
+It is an exception with a known fix rather than a second rule: split that card
+along the same line (art, title, date, stats and boost list are facts; player,
+subscribe menu, boost pill and action bars are verbs), and the exception
+disappears, the homepage can server-render its default feed, and there stops
+being one card definition plus three call sites that can drift. **Do not add a
+second exception; close this one.**
+
+### The Cost, Stated
+
+More server rendering is more D1 reads and more edge CPU per request. A detail
+page already runs six or seven queries plus a Podcast Index fetch in one
+`Promise.all`. The 300s edge cache absorbs most of it and current traffic is
+nowhere near a limit, but the failure mode to watch for is a slow TTFB rather
+than a blank page — which is the better failure of the two, and is part of why
+this trade is the right one.
+
 ## Conventions carried over from LB — keep these
 
 - **CSP meta tag on every page.** All pages share one policy so tightening

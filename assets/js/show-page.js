@@ -34,6 +34,9 @@ import {
 // a stale copy of that file against a fresh copy of this one is a link-time
 // error that takes the whole page's JavaScript down. See the note at its head.
 import { initShowDesc } from '/assets/js/show-desc.js'
+// The reaction bar and ⋮ on this page's server-rendered boost notes. Its own
+// module for the same reason show-desc.js is; see the note at its head.
+import { initBoostNoteActions } from '/assets/js/boost-note-actions.js'
 
 const VALUE_API = '/api/value'
 
@@ -61,6 +64,7 @@ initShare()
 initBackLink()
 initHashRouting(HASH_ALIASES)
 initHashSpy()
+initBoostNoteActions()
 
 // Three surfaces carry another show's artwork, and all three hit the case the
 // art2 chain exists for. The community drawer's rows were the miss: the query
