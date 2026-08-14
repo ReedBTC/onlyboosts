@@ -18,17 +18,17 @@
  * thread and the action bar behind it — roughly 200KB, DYNAMICALLY imported and
  * only when the section is about to be read.
  */
-import { copyText, showToast } from '/assets/js/copy-npub.js'
-import { fetchProfiles } from '/assets/js/primal-profiles.js'
-import { rangeControl, sortControl, rangeDays, rangeCutoff } from '/assets/js/feed-controls.js'
-import { normalizeBoosts, toEpisodeShape } from '/assets/js/ob-data.js'
-import { ensureLoginWidget } from '/assets/js/widget-loader.js'
+import { copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v59'
+import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v59'
+import { rangeControl, sortControl, rangeDays, rangeCutoff } from '/assets/js/feed-controls.js?v=ob-v59'
+import { normalizeBoosts, toEpisodeShape } from '/assets/js/ob-data.js?v=ob-v59'
+import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v59'
 import {
   initCopyNpub, initShowMore, initShare, initBackLink,
   initHashRouting, initHashSpy, initArt2, wireArt2,
-} from '/assets/js/detail-page.js'
-import { initShowDesc } from '/assets/js/show-desc.js'
-import { initBoostNoteActions } from '/assets/js/boost-note-actions.js'
+} from '/assets/js/detail-page.js?v=ob-v59'
+import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v59'
+import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v59'
 
 const PK = document.body.dataset.boosterPk || ''
 const NPUB = document.body.dataset.boosterNpub || PK
@@ -556,7 +556,7 @@ function initEpisodes() {
     const rows = normalizeBoosts({ boosts: data?.corpus?.boosts || [] })
     if (!rows.length) { giveUp(); return }
 
-    const feed = await import('/assets/js/feeds-podcasts.js')
+    const feed = await import('/assets/js/feeds-podcasts.js?v=ob-v59')
     const shaped = toEpisodeShape(rows)
     feed.seedProfiles(shaped.profiles)
     const items = feed.buildEpisodes(shaped)
@@ -678,7 +678,7 @@ function initEpisodes() {
     // screen needs it yet.
     setTimeout(async () => {
       try {
-        const actions = await import('/assets/js/boost-actions.js')
+        const actions = await import('/assets/js/boost-actions.js?v=ob-v59')
         await ensureLoginWidget()
         actions.configureBoostActions({})
       } catch { /* the cards still read; only the action bars stay inert */ }

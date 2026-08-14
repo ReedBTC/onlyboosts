@@ -21,20 +21,20 @@
  * it is DYNAMICALLY imported and only when the section is about to be read. A
  * visitor who never scrolls past the community wall pays none of it.
  */
-import { showToast } from '/assets/js/copy-npub.js'
-import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js'
-import { ensureLoginWidget } from '/assets/js/widget-loader.js'
-import { rangeControl, sortControl, rangeDays, rangeCutoff } from '/assets/js/feed-controls.js'
-import { episodeBoostLink } from '/assets/js/episode-link.js'
-import { normalizeBoosts, toEpisodeShape } from '/assets/js/ob-data.js'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v59'
+import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v59'
+import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v59'
+import { rangeControl, sortControl, rangeDays, rangeCutoff } from '/assets/js/feed-controls.js?v=ob-v59'
+import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v59'
+import { normalizeBoosts, toEpisodeShape } from '/assets/js/ob-data.js?v=ob-v59'
 import {
   initCopyNpub, initShowMore, initShare, initBackLink,
   initHashRouting, initHashSpy, initArt2, hydrateProfiles,
-} from '/assets/js/detail-page.js'
+} from '/assets/js/detail-page.js?v=ob-v59'
 // The reaction bar and ⋮ on the server-rendered boost notes at the foot of
 // this page. The community cards above them carry their own, through the feed
 // renderer they are built by.
-import { initBoostNoteActions } from '/assets/js/boost-note-actions.js'
+import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v59'
 
 const VALUE_API = '/api/value'
 
@@ -521,7 +521,7 @@ function initCommunityEpisodes() {
     if (!rows.length) { giveUp(); return }
 
     // Everything from here needs the card renderer, which is the heavy import.
-    const feed = await import('/assets/js/feeds-podcasts.js')
+    const feed = await import('/assets/js/feeds-podcasts.js?v=ob-v59')
     const shaped = toEpisodeShape(rows)
     feed.seedProfiles(shaped.profiles)
     const items = feed.buildEpisodes(shaped)
@@ -656,7 +656,7 @@ function initCommunityEpisodes() {
       try {
         // Already in the graph — feeds-podcasts.js imports it — so this resolves
         // from cache rather than fetching again.
-        const actions = await import('/assets/js/boost-actions.js')
+        const actions = await import('/assets/js/boost-actions.js?v=ob-v59')
         await ensureLoginWidget()
         actions.configureBoostActions({})
       } catch { /* the cards still read; only the action bars stay inert */ }

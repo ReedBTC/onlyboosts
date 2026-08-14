@@ -32,7 +32,7 @@
  * feed-bar controller in index.html, plus a load of whichever feed is active
  * when this module first runs).
  */
-import { STATIC_RELAYS, fetchProfilesFromPrimal } from '/assets/js/boosts-thread.js'
+import { STATIC_RELAYS, fetchProfilesFromPrimal } from '/assets/js/boosts-thread.js?v=ob-v59'
 import {
   parseCalendarEvent,
   renderCalendarCard,
@@ -43,13 +43,13 @@ import {
   clearPendingPromote,
   KIND_DATE_EVENT,
   KIND_TIME_EVENT,
-} from '/assets/js/calendar-events.js'
-import { SimplePool, verifyEvent, nip19 } from '/assets/widgets/nostr-tools.js'
+} from '/assets/js/calendar-events.js?v=ob-v59'
+import { SimplePool, verifyEvent, nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v59'
 // Supporter-set resolution lives in one shared module; re-exported below so
 // home-feeds.js keeps importing resolveSupporters from feeds.js unchanged.
-import { resolveSupporters } from '/assets/js/supporter-set.js'
+import { resolveSupporters } from '/assets/js/supporter-set.js?v=ob-v59'
 // Identity, for keeping the Follows feeds in sync with who's signed in.
-import { getSessionPubkey, clearFollowCache } from '/assets/js/follow-set.js'
+import { getSessionPubkey, clearFollowCache } from '/assets/js/follow-set.js?v=ob-v59'
 
 // Hourly events snapshot (Cloudflare Pages Function proxying the file
 // bots/community-feeds pushes to the VPS). It carries the same raw signed
@@ -1055,9 +1055,9 @@ async function hydrate(panelId, mod, scope, medium) {
 }
 
 // ── Lazy per-feed dispatch ───────────────────────────────────────────
-const BOOSTS = '/assets/js/boosts-feed.js'
-const PODCASTS = '/assets/js/feeds-podcasts.js'
-const SHOWS = '/assets/js/shows-feed.js'
+const BOOSTS = '/assets/js/boosts-feed.js?v=ob-v59'
+const PODCASTS = '/assets/js/feeds-podcasts.js?v=ob-v59'
+const SHOWS = '/assets/js/shows-feed.js?v=ob-v59'
 // Each module's entry point, by module. Named rather than sniffed out of the
 // path, so adding a feed is one line here instead of another branch.
 const RENDERERS = {

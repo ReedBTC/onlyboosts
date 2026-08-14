@@ -31,7 +31,7 @@
  * and a reader who never scrolls to #boosts pays none of it. The notes are
  * readable and complete throughout.
  */
-import { ensureLoginWidget } from '/assets/js/widget-loader.js'
+import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v59'
 
 /* The projection buildActionBar needs.
  *
@@ -91,7 +91,7 @@ export function initBoostNoteActions() {
   whenApproached(cards, async () => {
     let actions
     try {
-      actions = await import('/assets/js/boost-actions.js')
+      actions = await import('/assets/js/boost-actions.js?v=ob-v59')
       // The signer. Without it the bar still renders and each button reports
       // that it needs a sign-in, which is the same behaviour the feeds have.
       await ensureLoginWidget()

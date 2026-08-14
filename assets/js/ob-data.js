@@ -23,7 +23,7 @@
  * one exception is the per-show shard, and even there the rollup carries a
  * `file` pointer we use verbatim.
  */
-import { coverChain } from '/assets/js/cover-art.js'
+import { coverChain } from '/assets/js/cover-art.js?v=ob-v59'
 
 const BASE = '/api/data/'
 

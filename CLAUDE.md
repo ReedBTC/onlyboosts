@@ -186,6 +186,62 @@ cd login-widget && npm install && npm run build
 
 Local dev: `wrangler pages dev .` (so `/api/*` Functions resolve).
 
+**Two scripts run before a commit that touches shared markup or assets, in this
+order:**
+
+```
+node scripts/sync-partials.js     # nav + footer into every page
+node scripts/stamp-assets.js      # ?v=<VERSION> onto every JS/CSS reference
+node scripts/stamp-assets.js --check   # verify; non-zero exit if anything is stale
+```
+
+**Order matters.** `sync-partials` injects markup into the page files; anything
+it injects has to be stamped afterwards.
+
+### ⚠️ Asset Stamping Retired The "Never Add A Named Export" Rule
+
+`scripts/stamp-assets.js` appends `?v=<VERSION>` to every `/assets/{js,css,widgets}/…`
+reference, reading VERSION from `sw.js` so there is one source of truth. It
+exists to close the failure that produced `ob-v53`.
+
+**The failure:** Pages serves assets `public, max-age=14400, must-revalidate`
+(verified against production), and **every module URL runs that four-hour clock
+on its own**. A reader could hold a three-hour-old `feed-controls.js` against a
+freshly-fetched renderer importing something the old copy did not export, and an
+unresolved named import is a **link-time** error, so the renderer never executed
+at all. All eight feeds went down together. Bumping `sw.js` never closed it: the
+service worker's cache is only consulted for clients it already controls, and the
+HTTP cache underneath is per-URL either way.
+
+**The fix:** a URL now means exactly one version of one file. A deploy references
+new URLs, so a stale copy is unreachable rather than merely undesirable, and every
+asset on a page turns over together instead of on twenty independent timers.
+
+**So the old prohibition is history.** Adding a named export to a module other
+modules import is ordinary work now, as is any cross-module refactor. The notes
+warning against it survive in `feed-controls.js`, `feed-note.js`, `show-desc.js`,
+`booster-link.js` and `boost-note-actions.js` as the reason each of those exists;
+they are accurate history, not live constraints. **One rule replaces the several
+it displaced: bump `VERSION` in `sw.js` when you change any asset, then run the
+script.** Consistency is then guaranteed by construction rather than by memory.
+
+Two details worth knowing before editing the script:
+
+- **It matches only quoted references** — `href="…"`, `src="…"`, `from '…'`,
+  `import('…')`, and `sw.js`'s `PRECACHE_URLS` literals. An unanchored pattern
+  also matches comment prose ("behavior in `/assets/js/nav.js`."), and the
+  sentence's full stop then sits where the version suffix goes, so the next run
+  parses it as part of the version and deletes it. That is a script that edits
+  documentation a little more every time it runs. It happened on the first
+  attempt and `--check` is what caught it.
+- **JS and CSS only.** Images and fonts are left alone deliberately: the failure
+  being closed is two *code* files disagreeing, and a stale logo is not a broken
+  page. `assets/widgets/` is stamped at the reference sites but its files are
+  never rewritten, since they are build artifacts a rebuild would overwrite.
+
+`sw.js` routes on `url.pathname`, so the query string does not disturb it, and
+its VERSION-keyed cache names evict the previous run's entries as before.
+
 ## ⚠️ The Rendering Rule: The Server Renders The Facts, JavaScript Adds The Verbs
 
 **This is the standard every page is held to. Adopted 2026-08-14.** It replaces

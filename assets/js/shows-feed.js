@@ -53,25 +53,25 @@
  */
 import {
   getShowPage, searchShows, getShowEpisodes, SEARCH_HITS, SEARCH_MIN_CHARS,
-} from '/assets/js/ob-live.js'
+} from '/assets/js/ob-live.js?v=ob-v59'
 import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls,
-} from '/assets/js/feed-controls.js'
+} from '/assets/js/feed-controls.js?v=ob-v59'
 // Its own module, not two more exports of feed-controls.js — see the ⚠️ note
 // at the top of that file for the four-hour window that shape opens.
-import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js'
-import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js'
-import { showPageHref, episodePageHref } from '/assets/js/show-link.js'
+import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v59'
+import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v59'
+import { showPageHref, episodePageHref } from '/assets/js/show-link.js?v=ob-v59'
 // Show-level boosting. Same four pieces the episode feed uses, and deliberately
 // the same ones: fromApiValue / applyExternalOverrides are where the split
 // logic lives, and sharing them is what keeps every surface paying the value
 // block a feed actually published.
-import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js'
-import { ensureLoginWidget } from '/assets/js/widget-loader.js'
-import { episodeBoostLink } from '/assets/js/episode-link.js'
-import { showToast } from '/assets/js/copy-npub.js'
-import { boostButton, withBoostBusy } from '/assets/js/boost-button.js'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js'
+import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v59'
+import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v59'
+import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v59'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v59'
+import { boostButton, withBoostBusy } from '/assets/js/boost-button.js?v=ob-v59'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v59'
 
 const PAGE_SIZE = 25       // show cards per "load more" batch
 const DRAWER_EPISODES = 50 // episodes listed per expanded show
