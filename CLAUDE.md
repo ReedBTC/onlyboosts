@@ -239,6 +239,13 @@ Two details worth knowing before editing the script:
   parses it as part of the version and deletes it. That is a script that edits
   documentation a little more every time it runs. It happened on the first
   attempt and `--check` is what caught it.
+- **It stamps two shapes.** The absolute `/assets/{js,css,widgets}/…` reference
+  every page and module uses, and a **relative** `'./sibling.js?v=…'` import
+  inside `assets/js`. The second exists for the modules imported from BOTH the
+  browser and a Pages Function — an absolute specifier cannot be bundled by
+  esbuild, a relative one resolves correctly on both sides, and an unstamped
+  relative import would reopen the four-hour skew through the back door. See
+  "The Exception Is Closed".
 - **JS and CSS only.** Images and fonts are left alone deliberately: the failure
   being closed is two *code* files disagreeing, and a stale logo is not a broken
   page. `assets/widgets/` is stamped at the reference sites but its files are
@@ -289,20 +296,79 @@ tell them apart, that is a bug** unless the subject genuinely differs.
 | An artwork fallback chain | **The words**, off a `COPY` table (Episode vs Track) |
 | A booster's name and face, and where they link | **Which figures are meaningful** (a booster page has no booster count) |
 
-### The One Standing Exception, And Its Expiry
+### The Exception Is Closed
 
-`feeds-podcasts.js#episodeCard` exists only as JavaScript, so the two sections
-built from it — `#community-episodes` on `/episode` and `#episodes` on
-`/booster` — do not render without it. That is tolerated **only** because both
-are derived lists below the fold rather than a page's own subject; nobody finds
-this site by searching for "other episodes this community boosts".
+`feeds-podcasts.js#episodeCard` was the one component that existed only as
+JavaScript, so the two sections built from it — `#community-episodes` on
+`/episode` and `#episodes` on `/booster` — did not render without it, and the
+homepage's opening feed was a shell. This section used to record that as a
+tolerated exception with instructions to close it rather than add a second.
+**It was closed on 2026-08-14, by the route named here: split the card along
+the facts/verbs line.**
 
-It is an exception with a known fix rather than a second rule: split that card
-along the same line (art, title, date, stats and boost list are facts; player,
-subscribe menu, boost pill and action bars are verbs), and the exception
-disappears, the homepage can server-render its default feed, and there stops
-being one card definition plus three call sites that can drift. **Do not add a
-second exception; close this one.**
+| | |
+|---|---|
+| `assets/js/episode-card.js` | the FACTS, as an HTML **string**: artwork and its fallback chain, title, show, air date, rank, the `Nostr Stats:` line, and every boost note inside the drawer. No DOM, no `fetch`, no `Intl` defaults. |
+| `assets/js/episode-card-actions.js` | the VERBS: the ⋮ subscribe menu, the boost pill, the drawer's hide control, the per-boost ⋮ menu, and the reply / like / repost / zap bars. |
+
+**⚠️ ONE MODULE, IMPORTED FROM BOTH SIDES, and that is the mechanism the whole
+thing rests on.** A Pages Function imports `../../assets/js/episode-card.js` by
+relative path and esbuild inlines it off the filesystem; the browser imports
+`/assets/js/episode-card.js?v=<VERSION>` and gets the same file. So a card
+rendered at the edge and the same card rebuilt in the browser after a re-sort are
+byte-identical **by construction** rather than by inspection. The note in
+`functions/_shared/detail-page.js` that "a Pages Function cannot import a client
+module" was true of the modules it was written about and is false in general;
+what a two-sided module cannot use is an **absolute** `/assets/js/…` import,
+which the browser resolves and esbuild cannot.
+
+Two rules follow, and both are enforced by `scripts/stamp-assets.js`:
+
+- **A two-sided module imports its siblings as `'./thing.js?v=<VERSION>'`.** The
+  browser resolves that against the importing module's own stamped URL and
+  arrives at exactly the absolute form; esbuild strips the query and reads the
+  file. The script stamps both shapes.
+- **Everything a two-sided module imports must itself be two-sided.**
+  `show-link.js`, `episode-link.js`, `booster-link.js`, `cover-art.js` and
+  `nostr-text.js` are all dependency-free, which is what made this cheap.
+
+The four surfaces, all now one definition:
+
+| Surface | Rendered by |
+|---|---|
+| Homepage Episodes / Songs | `functions/index.js` for the opening page, `feeds-podcasts.js` after |
+| `/episode/<guid>` `#community-episodes` | `functions/episode/[guid].js` |
+| `/booster/<npub>` `#episodes` | `functions/booster/[npub].js` |
+| every re-sort, range change and search pick | `feeds-podcasts.js` / `episode-section.js` |
+
+**The homepage's front door is server-rendered too.** `functions/index.js`
+fetches `index.html` through `env.ASSETS` and splices thirty ranked cards into
+one marked slot (`<!--OB:SSR-EPISODES-->`); `feeds-podcasts.js` finds them and
+**adopts** them rather than fetching the same rows again. It is a **fast path,
+not a dependency** — a failed asset fetch, a D1 error or a missing marker all
+serve the file untouched and the feed hydrates the way it did before.
+
+Three things that fell out of the split and are worth knowing:
+
+- **The drawer is a `<details>`**, not a button beside a hidden div. The boost
+  notes inside it are facts and are in the document, so a control only
+  JavaScript could open would leave them unreachable. It is also the idiom
+  `.ep-drawer` already uses on `/show` and `/episode`. `feed-cards.css` carries
+  the two-rule delta; `.pcast-card.is-open` has no emitter any more.
+- **Dates are `en-US` in UTC on the feeds now**, not the reader's locale, because
+  the edge and the browser have to produce the same string. That is what
+  `functions/_shared/detail-page.js` has always done, so the site has one date
+  format rather than two.
+- **Boost messages tokenize through `nostr-text.js`**, extracted from
+  `functions/_shared/detail-page.js` (which re-exports it, so no caller changed).
+  The homepage's cards used `boosts-thread.js#parseSegments`, which needs
+  nostr-tools and a DOM; a `nostr:note1…` inside a message is now the same njump
+  chip on all four surfaces rather than a quoted-note chip on one.
+
+**⚠️ It did NOT make the homepage's module graph smaller** — measured 20 modules
+at 124.5KB gzipped before, 23 at 136.8KB after. `follow-set.js` and `feeds.js`
+import nostr-tools and `boosts-thread.js` directly, so both arrive regardless.
+The win is one card definition and a crawlable front door.
 
 ### The Cost, Stated
 
@@ -312,6 +378,26 @@ page already runs six or seven queries plus a Podcast Index fetch in one
 nowhere near a limit, but the failure mode to watch for is a slow TTFB rather
 than a blank page — which is the better failure of the two, and is part of why
 this trade is the right one.
+
+**Measured when the episode card closed the exception**, against production:
+
+| | |
+|---|---|
+| Homepage first view | **206.3KB → 212.8KB brotli, +6.5KB**, and one round trip instead of two. The 431KB JSON fetch it used to make is gone; the document went 14.4KB → 146.0KB br. |
+| Homepage raw markup | **54KB → 1.14MB**, which is the cost that does not compress away: ~5,000 extra DOM nodes for 737 boost rows, all inside closed `<details>` so nothing lays them out until a drawer opens. |
+| `/episode/<guid>` | one extra query in the existing `Promise.all` — the community corpus, median 248 rows, capped at 2,000. Measured at ~190ms for a heavy episode (834 rows) against a page TTFB of ~170ms, so the page pays `max()` rather than `sum()`. |
+| `/booster/<npub>` | the same, and cheaper: one indexed scan, heaviest booster 975 rows against the same cap. |
+
+**Both detail-page queries are allowed to fail quietly**, the same discipline the
+two podroll queries on `/show` have: a rollup below the fold must never cost a
+reader the page they came for. And **neither client module fetches the corpus any
+more until the reader touches a control or presses "Load more"** — the server's
+ranking answers the opening view, so a reader who reads the section and moves on
+pays nothing for it, where the old version fetched it on approach every time.
+
+`scripts/test-episode-card.mjs` asserts on the card's HTML against fixtures;
+`scripts/test-server-render.mjs` asserts on the assembled homepage against a
+captured production response, including the size table above.
 
 ## Conventions carried over from LB — keep these
 
@@ -642,6 +728,10 @@ unset, so a publish target is unproven until an event actually lands.
 **Working, ported from LB:**
 - `assets/js/boosts-feed.js` / `feeds-podcasts.js` — the boost feeds and the
   episode-level rollup behind both Episodes and Songs (see the naming note)
+- `assets/js/episode-card.js` + `episode-card-actions.js` — **the** episode
+  card, facts and verbs, shared by the edge and the browser
+- `assets/js/episode-section.js` — the card drawer on `/episode` and `/booster`
+- `functions/index.js` — the homepage's opening feed, rendered at the edge
 - `assets/js/shows-feed.js` — the show-level rollup behind Shows and Albums
   (written here, not ported)
 - `assets/js/feed-controls.js` — the range/sort chrome they all share
@@ -1392,11 +1482,20 @@ would be three things to hit in 44 pixels.
 ### Snapshot → card
 
 The feed carries each boost's identity and content but **not the signed
-event**. That's enough: the card needs only those fields, and reply / repost /
-like / zap need only `id` + `pubkey`. Both renderers build a minimal
+event**. That's enough: the card needs only those fields, and reply / like / zap
+need only `id` + `pubkey`. Every surface builds a minimal
 `{id, pubkey, kind, content, created_at, tags}` object purely to hand to
 `buildActionBar` — a projection, not a verified event. Don't pass it anywhere
 that assumes a real one.
+
+**⚠️ THE MISSING `sig` HAS BITTEN ONCE.** `handleRepost` embedded the original
+note only when `ev.sig` was present, and no surface on this site has it, so every
+repost published from here was a bare kind-6 with empty content — valid NIP-18
+and still unrenderable, since 98% of boost notes live on `relay.fountain.fm`
+alone. Fixed in `b6c0bd4` by fetching the original through NDK. The projection is
+now built in three places (`episode-card-actions.js`, `boost-note-actions.js`,
+`boosts-feed.js`) and each says so; **when a new action is added, decide
+explicitly whether it needs the real signed event or only the projection.**
 
 On both feeds a booster's avatar and display name copy their npub —
 `assets/js/copy-npub.js` holds the clipboard + toast helpers (the toast keeps
@@ -2054,8 +2153,9 @@ dropped — `play()` is what triggers the load, so the assignment is queued behi
 
 ### Other Episodes/Songs This Community Boosts
 
-The episode-level counterpart of the show page's community drawer, and the one
-section on either detail page that is **not server-rendered**.
+The episode-level counterpart of the show page's community drawer. It was the
+one section on either detail page that was **not** server-rendered, and as of
+2026-08-14 it is — see "The Exception Is Closed" above.
 
 **It is the same OBJECT as its show-page counterpart, down to the class list**:
 an `.ep-drawer` whose `<summary>` is the heading, the range and sort band inside
@@ -2076,29 +2176,34 @@ same 1W/1M/All range and the same five sorts, tagged **`Community Sort:`** rathe
 than `Sort:` for the same reason the show page's is: every figure on a card is
 what *these* boosters sent, never the episode's global totals.
 
-**The card is a JavaScript artifact, so the section is too.** A server-rendered
-version would be a second implementation of the site's most intricate component,
-guaranteed to drift from the one the homepage paints, and its action bar cannot
-exist without a signer at all. Reusing `feeds-podcasts.js#episodeCard` is what
-makes the two surfaces identical, which is the whole requirement. The cost is
-stated rather than hidden: **this section does not exist with JavaScript off**,
-where the rest of the page does, and `#community-episodes` has nothing to resolve
-to there. An empty heading over nothing is worse than no heading, so the module
-removes the section outright when the corpus is empty or unreachable.
+**The card is one definition now, so the section is server-rendered.** The
+Function fetches the corpus inside its existing `Promise.all`, ranks it with the
+shared comparators and paints the first thirty cards; `episode-section.js`
+attaches the controls and the verbs. A reader with no JavaScript gets the list,
+the artwork, the figures and every boost note, and loses the re-sort, the range
+and the reactions — exactly the line the rendering rule draws. **The section is
+omitted outright when the corpus is empty or the query failed**, because an empty
+heading over nothing is worse than no heading; 6.1% of episodes land there.
 
-**The `<section>` ships empty and its DRAWER ships `hidden`, and the two are not
-interchangeable.** The hydration trigger is an `IntersectionObserver` on the
-section, and **an observer never reports a `display:none` target as
-intersecting** — a section that hid itself could never fire its own hydration.
-An empty section is a zero-height block that still has a position, which is
-exactly the sentinel the observer needs. The drawer is revealed *before* the
-fetch, so the heading and a "Loading…" line are the feedback that something is
-coming.
+**`assets/js/episode-section.js` is this section AND `/booster`'s `#episodes`.**
+They were two near-identical client implementations, each carrying its own copy
+of the comparators with its own note explaining why; the difference between them
+is now a copy table — the corpus, the opening sort, the sort menu and three
+strings.
 
-**It is lazy in two ways.** `feeds-podcasts.js` and its ~200KB of transitive
-dependencies (nostr-tools, the boost thread, the action bar) are a **dynamic**
-import, and the corpus is fetched on an `IntersectionObserver` 800px out rather
-than on load. A reader who never scrolls past the community wall pays neither.
+**The corpus is no longer fetched on approach.** It is fetched on the first
+control change or the first "Load more", which are gestures with somewhere to
+show a loading state. The old version pulled it unconditionally as the section
+neared the viewport — a median ~75KB gzipped and up to ~600KB at the cap — for a
+section most readers scroll past. What IS still deferred to approach is the verb
+layer, which is where the boost widget and (on a drawer open) the reaction
+machinery come from.
+
+**⚠️ "Load more" skips what is already on screen, and that guard is not
+paranoia.** On the first press the cards in the DOM are the server's, ranked when
+the page was rendered and edge-cached for up to five minutes; the corpus just
+fetched is current. A boost landing in that window can shift the top thirty, so
+appending blind would repaint a card the reader is looking at. It compares guids.
 
 **Not split on medium**, which every other rollup on this site is — the same call
 `renderCommunityShows` makes, for the same reason: a music community also
@@ -2129,7 +2234,7 @@ lands on the new #1 rather than mid-ranking.
 **The container clips the two ⋮ menus**, which are `position: absolute` — the
 card's subscribe menu and the per-boost one. They still contribute to the
 container's scroll height, so an opened menu is reachable rather than lost, and
-`episodeCard` now calls `scrollIntoView({ block: 'nearest' })` on open, which is
+`episode-card-actions.js` calls `scrollIntoView({ block: 'nearest' })` on open, which is
 a no-op when the menu is already visible and therefore costs the homepage
 nothing. The alternative is a portal or a popover, which is a rewrite of a
 component both surfaces share. That trade is the price of the container.
@@ -2218,15 +2323,20 @@ what keeps it on the stats line instead of taking a row.
 
 | Surface | Handler | Pays |
 |---|---|---|
-| Episodes / Songs cards | `feeds-podcasts.js#onBoostClick` | that episode |
+| Episodes / Songs cards | `episode-card-actions.js#onBoostClick` | that episode |
 | Shows / Albums cards | `shows-feed.js#onShowBoost` | that show's feed block |
 | `/show` community drawer rows | `show-page.js#onCommunityBoost` | another show's |
 | `/show` hero button | `show-page.js#initBoosting` | this show's |
 | `/episode` hero button | `episode-page.js#initBoosting` | this episode |
-| `/episode` community cards | `feeds-podcasts.js#onBoostClick` | another episode |
+| `/episode` community cards | `episode-card-actions.js#onBoostClick` | another episode |
+| `/booster` episode cards | the same | another episode |
 
-The last row is not a fifth handler: those cards **are** the Episodes feed's
-cards, so they carry its boost path unchanged. See the episode-pages section.
+The last two rows are not extra handlers: those cards **are** the Episodes feed's
+cards, and since the card became one definition all four episode-card surfaces
+share **one** boost path rather than the feed owning it and two page modules
+borrowing it. The handler reads the card's own data attributes, because the card
+it is attached to may have been built by a Pages Function that finished running
+before the module loaded.
 
 **`boost-button.js` is chrome, not a money path.** It builds a button and
 reports clicks; each caller owns its own resolve-and-pay sequence, because what
@@ -2408,7 +2518,7 @@ two holes it cannot cover:
 
 | Surface | Boosters | Mentions |
 |---|---|---|
-| Episodes / Songs | Primal (`loadBoosterProfiles`) | Primal (`loadMentionProfiles`) |
+| Episodes / Songs | Primal (`hydrateProfiles`, off `data-pk`) | same pass |
 | Boosts | Primal (`hydrateProfiles`, post-paint per page) | same pass |
 | `/show/<guid>` | Primal (`hydrateProfiles` in `detail-page.js`) | same pass |
 | `/episode/<guid>` | same module, same pass | same pass |

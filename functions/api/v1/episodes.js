@@ -144,8 +144,15 @@ function episodeRecord(r) {
   };
 }
 
-/** Shared query params, or an {error} to return verbatim. */
-function readParams(u) {
+/** Shared query params, or an {error} to return verbatim.
+ *
+ * ⚠️ EXPORTED, because functions/index.js server-renders the homepage's opening
+ * feed and has to ask this endpoint's question without making an HTTP request to
+ * it. It builds a URL, reads it through here, and runs globalEpisodes below — so
+ * the front door's list is produced by the same parameter parsing, the same SQL
+ * and the same record shape as the one the browser fetches on the next page.
+ */
+export function readParams(u) {
   const sortKey = SORTS[u.searchParams.get("sort")] ? u.searchParams.get("sort") : DEFAULT_SORT;
   const range = u.searchParams.get("range") || "all";
   if (!(range in RANGE_DAYS)) return { error: "bad range (1w|1m|1y|all)" };
@@ -189,6 +196,21 @@ export async function onRequestGet({ request, env }) {
   const p = readParams(u);
   if (p.error) return json(request, { error: p.error }, { status: 400 });
 
+  const { episodes, nextOffset } = await globalEpisodes(env, p);
+  return json(request, {
+    count: episodes.length,
+    scope: "global",
+    sort: p.sortKey,
+    range: p.range,
+    ...(p.q ? { q: p.q } : {}),
+    next_offset: nextOffset,
+    episodes,
+  }, { cache: 300 });
+}
+
+/** One page of the global ranking, as records. See readParams above for why
+ *  this is separate from the handler that serves it over HTTP. */
+export async function globalEpisodes(env, p) {
   // No `boost_count > 0` guard: every episodes row is derived from a boost, so
   // it matches everything — and its presence steered the planner onto the
   // boost_count index and away from the one matching the ORDER BY.
@@ -272,15 +294,10 @@ export async function onRequestGet({ request, env }) {
     return rec;
   });
   if (p.withBoosts) await attachBoosts(env, episodes, null);
-  return json(request, {
-    count: episodes.length,
-    scope: "global",
-    sort: p.sortKey,
-    range: p.range,
-    ...(p.q ? { q: p.q } : {}),
-    next_offset: episodes.length === p.limit ? p.offset + p.limit : null,
+  return {
     episodes,
-  }, { cache: 300 });
+    nextOffset: episodes.length === p.limit ? p.offset + p.limit : null,
+  };
 }
 
 // Follows scope. POST because a kind-3 contact list runs to thousands of

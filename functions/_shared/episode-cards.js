@@ -1,0 +1,89 @@
+// Server-rendered episode cards, for the three surfaces that show a list of them.
+//
+// ⚠️ THIS FILE OWNS NO MARKUP. Every byte of a card comes from
+// assets/js/episode-card.js, which the browser imports over a stamped URL and
+// which esbuild inlines here off the filesystem when wrangler bundles the Pages
+// Functions. What lives in this module is the little that is genuinely
+// server-side: turning D1 boost rows into the item shape, applying the surface's
+// opening sort, and writing the small state element the client adopts the result
+// through. If a change to how a card LOOKS lands here, it has landed in the
+// wrong file.
+//
+// The three callers and what differs between them:
+//
+//   functions/index.js          Episodes · Global, ranked by /api/v1/episodes
+//   functions/episode/[guid].js #community-episodes, over this episode's
+//                               community corpus, opening on Most boosts
+//   functions/booster/[npub].js #episodes, over one person's own corpus,
+//                               opening on Most sats
+//
+// Only the corpus and the opening sort differ, which is why they share this.
+import {
+  COPY, buildEpisodes, renderEpisodeCards, sortEpisodeItems, RANKED_SORTS,
+} from "../../assets/js/episode-card.js";
+import { normalizeBoosts, toEpisodeShape } from "../../assets/js/ob-data.js";
+import { jsonForScript } from "./detail-page.js";
+
+// One page of cards, matching CARDS_PER_PAGE in the two client modules. A
+// server render that painted a different number than the client's first slice
+// would make "Load N more" skip or repeat rows.
+export const CARDS_PER_PAGE = 30;
+
+/**
+ * Boost records (the collector's published shape, which is also what every
+ * /api/v1 endpoint returns) → ranked items ready to render.
+ *
+ * ⚠️ THE SAME CHAIN THE BROWSER RUNS, function for function: normalizeBoosts →
+ * toEpisodeShape → buildEpisodes → sortEpisodeItems. That is the point of it
+ * being reachable from here — a card built at the edge and the same card rebuilt
+ * in the browser after a re-sort have to be the same string, and the only way to
+ * guarantee that is for both to run the same code over the same model.
+ */
+export function itemsFromBoosts(records, { sort = "boosts" } = {}) {
+  const rows = normalizeBoosts({ boosts: Array.isArray(records) ? records : [] });
+  const shaped = toEpisodeShape(rows);
+  const items = sortEpisodeItems(buildEpisodes(shaped), sort);
+  return { items, profiles: shaped.profiles };
+}
+
+/**
+ * A page of cards plus the state element that lets the client take over.
+ *
+ * `total` is the number of items the whole ranked view holds, not the number
+ * painted: the client needs it to label its "Load N more" without refetching
+ * anything, and a section that says "Showing 30 of 30" when there are 189 is a
+ * lie the reader can't see through.
+ */
+export function renderCardPage(items, {
+  copy = COPY.other, profiles = new Map(), sort = "boosts", range = "all",
+  limit = CARDS_PER_PAGE, showRanks = true, state = {},
+} = {}) {
+  const page = items.slice(0, limit);
+  const html = renderEpisodeCards(page, {
+    copy,
+    profiles,
+    // The rank is the position in the FULL ranked view, and it is stamped here
+    // rather than left to the client so a card is numbered the same whichever
+    // side rendered it. Chronological sorts pass no rank at all — a numeral
+    // under "Latest boost" reads as a score when it is only order.
+    rankOf: (_it, i) => (showRanks && RANKED_SORTS.has(sort) ? i + 1 : null),
+  });
+  return html + stateScript({ sort, range, count: page.length, total: items.length, ...state });
+}
+
+/* The handover, as one <script type="application/json">.
+ *
+ * ⚠️ IT CARRIES STATE, NEVER CONTENT. The temptation is to embed the rows the
+ * cards were built from so the client can re-sort without a request — and that
+ * is the whole payload again, in JSON, next to the HTML it already produced.
+ * Measured on the homepage's opening page: 431KB of records against the markup
+ * they became. So the client gets the four numbers it cannot derive from the DOM
+ * and fetches the corpus only if the reader actually touches a control.
+ *
+ * `type="application/json"` is not executable and needs no CSP allowance; the
+ * `<` escape in jsonForScript is what keeps a `</script>` inside a value from
+ * closing the element early.
+ */
+function stateScript(state) {
+  return `<script type="application/json" data-feed-state>${jsonForScript(state)}</script>`;
+}

@@ -37,6 +37,9 @@ import {
   truncate, shortId, lookupMentionNames, lookupMentionProfiles, renderBioText,
   renderBoosts,
 } from "../_shared/detail-page.js";
+import { itemsFromBoosts, renderCardPage, CARDS_PER_PAGE } from "../_shared/episode-cards.js";
+import { fetchBoosterCorpus } from "../api/v1/boosters/[npub].js";
+import { COPY as CARD_COPY } from "../../assets/js/episode-card.js";
 
 const SITE_ORIGIN = "https://onlyboosts.social";
 const OG_FALLBACK = `${SITE_ORIGIN}/assets/onlyboosts_banner.png`;
@@ -91,7 +94,17 @@ export async function onRequestGet({ env, params }) {
   const cut1m = now - 30 * 86400;
   const cut1y = now - 365 * 86400;
 
-  const [prof, totals, shows, boosts] = await Promise.all([
+  /* ⚠️ THE CORPUS IS FETCHED HERE NOW, because #episodes is SERVER-RENDERED.
+   * It was the second of the rendering rule's two exceptions and closed with the
+   * first — the card is one shared definition (assets/js/episode-card.js) that
+   * runs at the edge and in the browser, so there is no second implementation to
+   * drift. See the note over renderCommunityEpisodes in functions/episode/[guid].js.
+   *
+   * It never rejects: a failure costs this one section and the rest of the page
+   * renders exactly as it did. The measured heaviest booster has 975 boosts
+   * against a 2,000 cap, so this is one indexed scan through idx_boosts_booster
+   * rather than the fan-out /episode pays. */
+  const [prof, totals, shows, boosts, corpus] = await Promise.all([
     // ⚠️ COLUMNS NAMED, never SELECT *. The five beyond the original set landed
     // on 2026-08-13 and are nullable at very different rates: about 54%,
     // lud16 65%, lud06 4.4%, website 19%, banner 43%. Every one of them is
@@ -174,6 +187,11 @@ export async function onRequestGet({ env, params }) {
        WHERE b.booster_pubkey = ?
        ORDER BY b.created_at DESC, b.event_id DESC LIMIT ?`
     ).bind(hex, BOOSTS_SHOWN).all(),
+
+    fetchBoosterCorpus(env, hex).catch((err) => {
+      console.warn("[booster] episode corpus unavailable", err);
+      return null;
+    }),
   ]);
 
   // The qualifying rule, and the whole of it. A pubkey nobody has a boost for
@@ -203,6 +221,7 @@ export async function onRequestGet({ env, params }) {
     boosts: boostRows,
     names,
     bioProfiles,
+    corpus,
   });
 
   return new Response(html, {
@@ -245,7 +264,7 @@ function toHexPubkey(s) {
 
 // ── the page ─────────────────────────────────────────────────────────────────
 
-function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioProfiles }) {
+function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioProfiles, corpus }) {
   const realName = prof?.display_name || prof?.name || null;
   const label = realName || shortId(npub, hex);
   const pageUrl = `${SITE_ORIGIN}/booster/${encodeURIComponent(npub || hex)}`;
@@ -345,22 +364,22 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v60" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v60" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v60" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v60" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v61" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v61" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v61" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v61" />
   <!-- The hero, the drawers and the boost list are the show page's, so this
        page links its stylesheet and adds only the deltas. -->
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v60" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v61" />
   <!-- The episode card, for the #episodes rollup: the same chrome
        feeds-podcasts.js paints on the homepage. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v60" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v61" />
   <!-- The boost thread inside a card's drawer, and its reply / like / repost /
        zap bar, both reached through that same card. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v60" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v60" />
-  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v60" />
-  <link rel="stylesheet" href="/assets/css/booster-page.css?v=ob-v60" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v61" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v61" />
+  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v61" />
+  <link rel="stylesheet" href="/assets/css/booster-page.css?v=ob-v61" />
 </head>
 <body data-booster-pk="${htmlEscape(hex)}"${npub ? ` data-booster-npub="${htmlEscape(npub)}"` : ""}>
 
@@ -463,7 +482,7 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
 
   ${renderShows(shows)}
 
-  ${renderEpisodes()}
+  ${renderEpisodes(corpus)}
 
   ${renderBoosts(boosts, names, {
     heading: "Recent Boosts",
@@ -542,12 +561,12 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav.js?v=ob-v60" defer></script>
-<script src="/assets/js/booster-page.js?v=ob-v60" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v61" defer></script>
+<script src="/assets/js/booster-page.js?v=ob-v61" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v60"></script>
-<script src="/assets/js/sw-register.js?v=ob-v60" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v61"></script>
+<script src="/assets/js/sw-register.js?v=ob-v61" defer></script>
 </body>
 </html>`;
 }
@@ -816,20 +835,33 @@ function showMeta(boosts, sats, eps) {
 //
 // Everything this person has boosted at the episode level, painted as the
 // Episodes feed's own card. Structurally identical to #community-episodes on
-// /episode/<guid> — the same drawer, the same observer, the same reason it is
-// the one section here that is not server-rendered — so see the long note over
-// renderCommunityEpisodes in functions/episode/[guid].js for the whole argument.
-// The short version: a row here is the full feed card, artwork through action
-// bar, and that card is a JavaScript artifact whose second implementation would
-// drift from the one the homepage paints.
+// /episode/<guid> — the same drawer, the same controls, the same shared card —
+// so see the long note over renderCommunityEpisodes there for the whole
+// argument.
 //
-// ⚠️ THE SECTION SHIPS EMPTY AND ITS BODY SHIPS `hidden`, never the other way
-// round. An IntersectionObserver never reports a display:none target as
-// intersecting, so a section that hid itself could never fire its own hydration;
-// an empty section is a zero-height block that still has a position.
-function renderEpisodes() {
-  return `<section class="show-section show-section--bare" id="episodes" data-booster-episodes>
-    <details class="ep-drawer" open data-be-body hidden>
+// ⚠️ SERVER-RENDERED, like every other section on this page. It and its twin on
+// /episode were the rendering rule's two standing exceptions, tolerated only
+// because the card existed as JavaScript alone; assets/js/episode-card.js is an
+// HTML-string builder now and runs at the edge, so both are closed.
+//
+// ONE DIFFERENCE FROM THE TWIN worth naming: the figures here are NOT
+// community-scoped, they are this person's own. So the sort is tagged plainly
+// "Sort:" rather than "Community Sort:" — a card's boosts and sats are what this
+// booster sent that episode, which is exactly what the section claims.
+//
+// AND ONE MORE: it opens on Most sats rather than Most boosts. Every card here
+// is one person's giving to one episode and the median booster has two boosts
+// in total, so a boost-count ranking is mostly ties; sats is the axis that
+// actually orders a single person's history.
+function renderEpisodes(corpus) {
+  // A booster whose every boost carries no item guid has no episode-level
+  // history at all, and no section. A failed corpus fetch takes the same exit.
+  const { items, profiles } = itemsFromBoosts(corpus?.boosts, { sort: "sats" });
+  if (!items.length) return "";
+
+  return `<section class="show-section show-section--bare" id="episodes" data-booster-episodes${
+      corpus?.truncated ? " data-truncated" : ""}>
+    <details class="ep-drawer" open data-be-body>
       <summary>
         <span class="cs-head">
           <span class="cs-head-title">Episodes and Songs Boosted</span>
@@ -840,7 +872,16 @@ function renderEpisodes() {
       <div class="cs-controls ce-controls" data-be-controls hidden></div>
       <div class="ce-scroll" data-be-scroll tabindex="0" role="region"
            aria-label="Episodes and songs this booster has boosted">
-        <div data-be-list><div class="ce-loading" aria-live="polite">Loading…</div></div>
+        <div class="pcast-list" data-be-list>${renderCardPage(items, {
+          // Not split on medium — see the page header. One person's podcasts and
+          // music are one history, and the cards read correctly either way.
+          copy: CARD_COPY.other,
+          profiles,
+          sort: "sats",
+          range: "all",
+          limit: CARDS_PER_PAGE,
+          state: { surface: "booster-episodes", truncated: !!corpus?.truncated },
+        })}</div>
         <div data-be-more></div>
       </div>
     </details>
@@ -864,10 +905,10 @@ function notFound(raw) {
   <meta name="robots" content="noindex" />
   <title>Booster not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v60" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v60" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v60" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v60" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v61" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v61" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v61" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v61" />
 </head>
 <body>
 <section class="page-header">
@@ -885,7 +926,7 @@ function notFound(raw) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v60" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v61" defer></script>
 </body>
 </html>`;
   return new Response(html, {

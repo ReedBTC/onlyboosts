@@ -23,7 +23,15 @@
  * one exception is the per-show shard, and even there the rollup carries a
  * `file` pointer we use verbatim.
  */
-import { coverChain } from '/assets/js/cover-art.js?v=ob-v60'
+// ⚠️ RELATIVE AND STAMPED, NOT ABSOLUTE, and that is deliberate: this module is
+// imported by the Pages Functions that server-render episode cards as well as by
+// the browser. esbuild strips the query and reads the file off disk; the browser
+// resolves it against this module's own stamped URL and gets
+// `/assets/js/cover-art.js?v=<VERSION>`, exactly as an absolute import would. An
+// absolute `/assets/js/…` specifier cannot be bundled, so it is the one form a
+// two-sided module may not use. See the header of episode-card.js, and
+// scripts/stamp-assets.js, which stamps both shapes.
+import { coverChain } from './cover-art.js?v=ob-v61'
 
 /* ⚠️ THE FETCHING HALF OF THIS MODULE IS GONE, and this is what it was.
  *
@@ -224,7 +232,7 @@ export function boosterLabel(booster) {
  * its notes inline and the podcast/episode blocks stripped from them — the
  * parent carries those, so repeating them per note would be the bulk of the
  * response. This puts them back, which is what lets normalizeBoosts →
- * toEpisodeShape → buildEpisodes → episodeCard run completely unchanged over a
+ * toEpisodeShape → buildEpisodes → episodeCardHtml run completely unchanged over a
  * corpus that came from D1 rather than from the static shards.
  *
  * ⚠️ THE FIGURES DO NOT COME FROM THESE ROWS. Inline notes are capped at 50 per

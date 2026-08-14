@@ -173,7 +173,7 @@ should read D1 endpoints in the same shape the Episodes and Songs feeds now do.
 The Episodes migration is the template: `/api/v1/episodes?include=boosts` returns
 each episode's notes inline in the collector's record shape, so
 `ob-data.js#episodeApiToBoosts` rehydrates them and the existing
-`normalizeBoosts` to `toEpisodeShape` to `buildEpisodes` to `episodeCard` chain
+`normalizeBoosts` to `toEpisodeShape` to `buildEpisodes` to `episodeCardHtml` chain
 runs unmodified. Nothing about the card had to change. A `/api/v1/podcasts`
 equivalent for the show-level rollup would follow the same shape.
 

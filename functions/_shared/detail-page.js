@@ -6,38 +6,44 @@
 //
 // The show page was written first and every one of these came out of it
 // unchanged; this is a move, not a rewrite. What lives here is what a page about
-// a SHOW and a page about an EPISODE do identically: escaping, the number and
-// date formats on the stat tiles, the bech32 decoder that turns a `nostr:` URI
-// inside a boost message into an @Name chip, the wall of booster avatars, and
+// a SHOW and a page about an EPISODE do identically: the number and date formats
+// on the stat tiles, the two mention lookups, the wall of booster avatars, and
 // the list of boosts at the foot.
+//
+// The escaping and the bech32 tokenizer moved on to assets/js/nostr-text.js, and
+// are re-exported below — see the note over that re-export.
 //
 // What deliberately does NOT live here is the nav and footer markup. Those are
 // generated into each page file between NAV:START / NAV:END markers by
 // scripts/sync-partials.js, which carries an EDGE_PAGES list — a shared module
 // would put the markup one indirection away from the script that owns it.
 
-export function htmlEscape(s) {
-  return String(s == null ? "" : s)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
+/* ⚠️ THE TEXT RENDERER MOVED, AND THIS RE-EXPORTS IT.
+ *
+ * htmlEscape, isSafeUrl, truncate, renderMessage, renderBioText and
+ * mentionedPubkeys were all defined here until the episode card became one
+ * definition. The card renders boost messages, and it renders them at the edge
+ * AND in the browser, so the tokenizer had to be reachable from both — which a
+ * module under `functions/` never can be. It lives in
+ * `assets/js/nostr-text.js` now, imported by relative path here (esbuild reads
+ * it off the filesystem when wrangler bundles the Functions) and by stamped URL
+ * in the browser.
+ *
+ * They are re-exported rather than relocated in the callers' imports because
+ * this file is where four Functions already look for them; moving the import
+ * sites would be churn with nothing behind it. `htmlEscape` alone has ~200 uses
+ * across the pages.
+ */
+export {
+  htmlEscape, isSafeUrl, truncate,
+  renderMessage, renderBioText, mentionedPubkeys,
+} from "../../assets/js/nostr-text.js";
+import {
+  htmlEscape, isSafeUrl, truncate, mentionedPubkeys, renderMessage,
+} from "../../assets/js/nostr-text.js";
 
 export function jsonForScript(v) {
   return JSON.stringify(v).replace(/</g, "\\u003c");
-}
-
-// Matches assets/js/boosts-feed.js#isSafeUrl. Every image and link on these
-// pages originates in third-party RSS by way of Podcast Index, so none of it
-// reaches href/src unchecked.
-export function isSafeUrl(url) {
-  if (typeof url !== "string") return false;
-  try {
-    const u = new URL(url);
-    return u.protocol === "http:" || u.protocol === "https:";
-  } catch { return false; }
 }
 
 export function num(n) {
@@ -85,11 +91,6 @@ export function fmtDuration(sec) {
   return h ? `${h}h ${m}m` : `${m}m`;
 }
 
-export function truncate(s, n) {
-  const t = String(s || "").replace(/\s+/g, " ").trim();
-  return t.length <= n ? t : t.slice(0, n - 1).trimEnd() + "…";
-}
-
 // A booster with no kind-0 gets their npub, shortened. `booster.npub` is
 // nullable where the pubkey is not, so fall back to hex.
 export function shortId(npub, pk) {
@@ -104,9 +105,19 @@ export function displayName(r) {
 
 /* One booster's page.
  *
- * ⚠️ A SECOND COPY OF assets/js/booster-link.js#boosterPageHref, and it exists
- * for the same reason episodePageUrl in functions/show/[guid].js does: a Pages
- * Function cannot import a client module. THE TWO MUST AGREE. Both are marked.
+ * ⚠️ A SECOND COPY OF assets/js/booster-link.js#boosterPageHref, and THE TWO MUST
+ * AGREE. Both are marked, as is the third copy, episodePageUrl in
+ * functions/show/[guid].js.
+ *
+ * All three were written when the rule was believed to be "a Pages Function
+ * cannot import a client module". That is FALSE in general — esbuild inlines a
+ * relative import off the filesystem when wrangler bundles the Functions, which
+ * is exactly how assets/js/episode-card.js reaches this side and is what let the
+ * episode card become one definition. What a two-sided module cannot use is an
+ * ABSOLUTE `/assets/js/…` specifier, and booster-link.js has none. So these
+ * copies are collapsible now; they are left alone because collapsing them is a
+ * separate change with its own risk, not because it is impossible. See "The
+ * Exception Is Closed" in CLAUDE.md.
  *
  * The rule is simply "there is an identifier", which is the whole reason this
  * sweep needed no fallbacks: a booster page qualifies on HAVING BOOSTED, and
@@ -131,98 +142,6 @@ export function boosterPageUrl(npub, pk) {
     }
   }
   return null;
-}
-
-// ── nostr: URIs in boost messages ────────────────────────────────────────────
-//
-// The two client feeds render mentions through boosts-thread.js#parseSegments,
-// which decodes with nostr-tools and paints an @Name chip. These pages cannot:
-// importing that module would mean shipping boosts-thread.js (30KB),
-// calendar-events.js (24KB) and nostr-tools (102KB) to a page whose stated
-// design is that it reads with no JavaScript at all. So the same job is done
-// server-side, and the output is deliberately the same `.nostr-mention` chip
-// so the surfaces look identical.
-//
-// Only bech32 DECODE is implemented, and only far enough to recover a pubkey.
-// Links use the identifier exactly as it appeared in the note, so nothing has
-// to be re-encoded; the decode exists purely to look a display name up.
-
-const BECH32_CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
-
-// Returns the data part as bytes, or null. The checksum is verified: an
-// identifier that fails it is left as plain text rather than being linked,
-// since a corrupted npub would otherwise resolve to somebody else's profile.
-function bech32ToBytes(str) {
-  const s = String(str).toLowerCase();
-  const sep = s.lastIndexOf("1");
-  if (sep < 1 || sep + 7 > s.length || s.length > 2000) return null;
-
-  const words = [];
-  for (let i = sep + 1; i < s.length; i++) {
-    const v = BECH32_CHARSET.indexOf(s[i]);
-    if (v === -1) return null;
-    words.push(v);
-  }
-
-  // bech32 (not bech32m): the polymod of hrp-expansion ++ data must be 1.
-  const hrp = s.slice(0, sep);
-  const expanded = [];
-  for (let i = 0; i < hrp.length; i++) expanded.push(hrp.charCodeAt(i) >> 5);
-  expanded.push(0);
-  for (let i = 0; i < hrp.length; i++) expanded.push(hrp.charCodeAt(i) & 31);
-  let chk = 1;
-  for (const v of expanded.concat(words)) {
-    const top = chk >>> 25;
-    chk = ((chk & 0x1ffffff) << 5) ^ v;
-    for (let i = 0; i < 5; i++) if ((top >>> i) & 1) chk ^= [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3][i];
-  }
-  if (chk !== 1) return null;
-
-  // 5-bit groups back to 8-bit, dropping the 6-word checksum.
-  const data = words.slice(0, -6);
-  const out = [];
-  let acc = 0, bits = 0;
-  for (const v of data) {
-    acc = (acc << 5) | v;
-    bits += 5;
-    while (bits >= 8) { bits -= 8; out.push((acc >> bits) & 0xff); }
-  }
-  // Any leftover must be zero padding, per the spec.
-  if (bits >= 5 || ((acc << (8 - bits)) & 0xff)) return null;
-  return out;
-}
-
-const toHex = (bytes) => bytes.map((b) => b.toString(16).padStart(2, "0")).join("");
-
-// npub → the pubkey. nprofile → the pubkey in its TLV type-0 record.
-function pubkeyFromBech32(id) {
-  const bytes = bech32ToBytes(id);
-  if (!bytes) return null;
-  if (/^npub1/i.test(id)) return bytes.length === 32 ? toHex(bytes) : null;
-  if (/^nprofile1/i.test(id)) {
-    for (let i = 0; i + 2 <= bytes.length; ) {
-      const type = bytes[i], len = bytes[i + 1];
-      if (i + 2 + len > bytes.length) return null;
-      if (type === 0) return len === 32 ? toHex(bytes.slice(i + 2, i + 34)) : null;
-      i += 2 + len;
-    }
-  }
-  return null;
-}
-
-const NOSTR_URI_RE = /nostr:((?:npub|nprofile|note|nevent|naddr)1[023456789acdefghjklmnpqrstuvwxyz]+)/gi;
-const URL_RE = /https?:\/\/[^\s<>"']+/gi;
-
-// Every pubkey mentioned across a set of boost messages, for the name lookup.
-export function mentionedPubkeys(messages) {
-  const out = new Set();
-  for (const m of messages) {
-    for (const match of String(m || "").matchAll(NOSTR_URI_RE)) {
-      const pk = pubkeyFromBech32(match[1]);
-      if (pk) out.add(pk);
-    }
-  }
-  return [...out];
 }
 
 /* Display names for any npub mentioned inside a boost message.
@@ -276,158 +195,6 @@ export async function lookupMentionProfiles(env, texts) {
       picture: isSafeUrl(p.picture) ? p.picture : null,
     });
   }
-  return out;
-}
-
-/* ⚠️ A BIO IS TYPED BY A HUMAN, SO ITS MENTIONS HAVE NO `nostr:` PREFIX.
- *
- * NIP-27 says a CLIENT composing note content emits `nostr:npub1…`, which is
- * what NOSTR_URI_RE above matches and why boost messages tokenize correctly. A
- * kind-0 `about` is not composed by a client — someone types it into a profile
- * editor — so the overwhelmingly common form there is a naked `npub1…`, or one
- * with a leading `@`. Measured on a live profile in the index
- * (npub1yvscx9v…, Sir Spencer): two mentions in the bio, both bare, both
- * rendering as 63 characters of raw bech32 because this pattern demanded the
- * scheme.
- *
- * Only npub and nprofile, because only those are PEOPLE. A `note1…` in a bio has
- * no face and no name to show, and pubkeyFromBech32 returns null for it anyway,
- * so it stays text.
- *
- * The lookbehind keeps `foonpub1…` from matching mid-token. The bech32 checksum
- * gate in the renderer is the real guard against a false positive: a word that
- * merely begins `npub1` fails it and degrades to text.
- *
- * An npub sitting INSIDE a URL (njump.me/npub1…) is handled by the ordering in
- * scanSpans rather than by this pattern: the URL span starts earlier, wins the
- * cursor, and the mention span inside it is skipped.
- */
-const BIO_MENTION_RE = /(?<![0-9a-z])(?:nostr:|@)?((?:npub|nprofile)1[023456789acdefghjklmnpqrstuvwxyz]+)/gi;
-
-/* Find the mentions and bare URLs in a string, in document order.
- *
- * Shared by renderMessage and renderBioText, which tokenize identically and
- * differ only in what they emit — and in which mention pattern they pass, which
- * is the whole reason it is a parameter. A URL that falls inside a mention span
- * is skipped rather than double-matched.
- */
-function scanSpans(src, mentionRe = NOSTR_URI_RE) {
-  const spans = [];
-  for (const m of src.matchAll(mentionRe)) spans.push({ start: m.index, end: m.index + m[0].length, id: m[1], value: m[0], kind: "nostr" });
-  for (const m of src.matchAll(URL_RE)) {
-    if (spans.some((s) => m.index >= s.start && m.index < s.end)) continue;
-    spans.push({ start: m.index, end: m.index + m[0].length, id: m[0], kind: "url" });
-  }
-  spans.sort((a, b) => a.start - b.start);
-  return spans;
-}
-
-/* One link, escaped and bounded. Shared by renderMessage and renderBioText.
- *
- * ⚠️ TRAILING SENTENCE PUNCTUATION IS NOT PART OF THE URL. The URL pattern is
- * greedy to the next whitespace, so "book at https://example.com/hire." put the
- * full stop inside the href and produced a link that 404s. It is trimmed back
- * and re-emitted as text after the anchor, which is what linkifyNotes on
- * /episode/<guid> has always done and what this had not.
- *
- * This corrects boost messages on /show and /episode as well as bios, since all
- * three now share this function — the same defect was live on every message
- * carrying a sentence-final URL.
- */
-function linkOut(url) {
-  const raw = String(url).replace(/[.,;:!?)\]]+$/, "");
-  const tail = String(url).slice(raw.length);
-  const body = isSafeUrl(raw)
-    ? `<a href="${htmlEscape(raw)}" target="_blank" rel="noopener noreferrer">${htmlEscape(truncate(raw, 60))}</a>`
-    : htmlEscape(raw);
-  return body + htmlEscape(tail);
-}
-
-/* A booster's kind-0 `about` as HTML, for the header on /booster/<npub>.
- *
- * Same tokenizer as renderMessage, two deliberate differences in what it emits:
- *
- * ⚠️ A MENTION IS NOT A LINK HERE. On a boost message an @Name chip opens njump,
- * which resolves any npub. In a bio the obvious destination would be
- * /booster/<npub> — and that page only exists for people who have BOOSTED, which
- * a mentioned npub need never have done. Rather than link some mentions and not
- * others, or link them all and 404 for most, none of them link. njump is not
- * used either: on this page, unlike a boost message, the mention sits inside a
- * two-line clamped paragraph where a row of outbound chips would read as the
- * bio's main content.
- *
- * ⚠️ IT SHOWS A FACE. The chip is a small avatar plus the display name, which is
- * how every Nostr client renders a mention and is why the profile lookup above
- * returns pictures. A mention we cannot resolve degrades to `@npub1abc…`, and
- * carries data-pk/data-missing so booster-page.js can fill it from Primal in the
- * same batch it already fetches the subject with — most mentioned npubs are not
- * in our index at all, so that fallback is the common path rather than the edge.
- *
- * Truncated far longer than a boost message's 420: bios run to a measured
- * maximum of 4,965 characters, and the two-line clamp is what actually bounds
- * what a reader sees.
- */
-export function renderBioText(text, profiles) {
-  const src = truncate(String(text || ""), 2000);
-  let out = "", cursor = 0;
-  // BIO_MENTION_RE, not the scheme-only pattern the boost messages use — see
-  // the warning over it. This is the difference between a bio's mentions
-  // rendering and not.
-  for (const s of scanSpans(src, BIO_MENTION_RE)) {
-    if (s.start < cursor) continue;
-    out += htmlEscape(src.slice(cursor, s.start));
-    cursor = s.end;
-    if (s.kind === "url") { out += linkOut(s.id); continue; }
-
-    // Same checksum gate as renderMessage: a corrupted identifier is text, not
-    // a mis-resolved person. It also fixes the one tokenizing edge case, where
-    // two mentions run together capture one character too many.
-    const pk = bech32ToBytes(s.id) ? pubkeyFromBech32(s.id) : null;
-    if (!pk) { out += htmlEscape(s.value ?? s.id); continue; }
-
-    const prof = profiles?.get(pk) || null;
-    const label = prof?.name ? "@" + prof.name : "@" + s.id.slice(0, 14) + "…";
-    const missing = [prof?.name ? null : "name", prof?.picture ? null : "pic"].filter(Boolean).join(" ");
-    out += `<span class="bs-mention"${missing ? ` data-pk="${htmlEscape(pk)}" data-missing="${htmlEscape(missing)}"` : ""}>` +
-      (prof?.picture
-        ? `<img class="bs-mention-pic" src="${htmlEscape(prof.picture)}" alt="" loading="lazy" referrerpolicy="no-referrer" />`
-        : `<span class="bs-mention-pic is-blank" aria-hidden="true"></span>`) +
-      `<span class="bs-mention-name">${htmlEscape(label)}</span></span>`;
-  }
-  return out + htmlEscape(src.slice(cursor));
-}
-
-// A boost message as HTML: nostr: URIs become @Name chips, bare URLs become
-// links, everything else is escaped text. Mirrors buildMentionEl() in
-// boosts-thread.js, including the .nostr-mention class and the njump target.
-export function renderMessage(text, names) {
-  const src = truncate(String(text || ""), 420);
-  const spans = scanSpans(src);
-
-  let out = "", cursor = 0;
-  for (const s of spans) {
-    if (s.start < cursor) continue;
-    out += htmlEscape(src.slice(cursor, s.start));
-    cursor = s.end;
-    if (s.kind === "url") { out += linkOut(s.id); continue; }
-    // An identifier that fails its checksum is left as plain text rather than
-    // linked. It would only ever open an empty njump tab, and it is also how
-    // the one tokenizing edge case resolves itself: bech32's charset includes
-    // `n`, so two mentions run together with no space ("…ckn ostr:npub1…")
-    // greedily match one character too many. That over-long capture fails the
-    // checksum, so it degrades to text instead of pointing at the wrong person.
-    if (!bech32ToBytes(s.id)) { out += htmlEscape(s.value ?? s.id); continue; }
-    const pk = pubkeyFromBech32(s.id);
-    const name = pk ? names.get(pk) : null;
-    const label = name ? "@" + name : "@" + s.id.slice(0, 14) + "…";
-    // An unresolved mention carries its pubkey so the client can ask Primal for
-    // the name and swap the label in. A mentioned npub need never have boosted
-    // anything, so missing from `profiles` is the normal case here rather than
-    // the exceptional one.
-    const hook = !name && pk ? ` data-pk="${htmlEscape(pk)}" data-missing="name"` : "";
-    out += `<a class="nostr-mention" href="https://njump.me/${htmlEscape(s.id)}" target="_blank" rel="noopener noreferrer"${hook}>${htmlEscape(label)}</a>`;
-  }
-  out += htmlEscape(src.slice(cursor));
   return out;
 }
 

@@ -79,11 +79,42 @@ export function boosterPageHref(npub, pk) {
  */
 export function markBoosterLink(el, { label = '', secondary = false } = {}) {
   if (!el) return el;
-  if (secondary) {
-    el.setAttribute('tabindex', '-1');
-    el.setAttribute('aria-hidden', 'true');
-  } else {
-    el.setAttribute('title', label ? `Boosts by ${label}` : 'See this booster’s boosts');
+  for (const [k, v] of Object.entries(boosterLinkAttrMap({ label, secondary }))) {
+    el.setAttribute(k, v);
   }
   return el;
+}
+
+/**
+ * The same marking, as attributes rather than as a mutation.
+ *
+ * ⚠️ ONE RULE, TWO SHAPES, AND THEY SHARE THE TABLE BELOW. markBoosterLink is
+ * for a builder holding an element; this is for one building an HTML string,
+ * which the episode card now is on both sides of the wire. Neither reimplements
+ * the decision — both read boosterLinkAttrMap — so a change to what a secondary
+ * link means cannot reach one surface and miss the other.
+ *
+ * Returns a string with a leading space, or '', so it drops straight into a
+ * template literal after the href.
+ */
+export function boosterLinkAttrs({ label = '', secondary = false } = {}) {
+  return Object.entries(boosterLinkAttrMap({ label, secondary }))
+    .map(([k, v]) => ` ${k}="${escapeAttr(v)}"`)
+    .join('');
+}
+
+/* `secondary` marks a DUPLICATE link to the same person inside one row — see
+ * the note on markBoosterLink above. */
+function boosterLinkAttrMap({ label, secondary }) {
+  if (secondary) return { tabindex: '-1', 'aria-hidden': 'true' };
+  return { title: label ? `Boosts by ${label}` : 'See this booster’s boosts' };
+}
+
+// Local rather than imported from nostr-text.js: this module is imported by
+// every feed renderer and has been dependency-free since it was written, and
+// one attribute value is not worth changing that.
+function escapeAttr(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }

@@ -64,20 +64,9 @@ export async function onRequestGet({ request, env, params }) {
 
   // ── the whole history, one response ────────────────────────────────────────
   if (u.searchParams.get("corpus") === "1") {
-    const { results } = await env.DB.prepare(
-      `${BOOST_SELECT} WHERE b.booster_pubkey = ?
-       ORDER BY b.created_at DESC, b.event_id DESC LIMIT ?`
-    ).bind(hex, CORPUS_CAP + 1).all();
-
-    // One row over the cap is fetched purely to detect the truncation, then
-    // dropped. Asking for exactly the cap cannot tell "there are precisely this
-    // many" from "there are more".
-    const rows = results || [];
-    const truncated = rows.length > CORPUS_CAP;
-    const boosts = (truncated ? rows.slice(0, CORPUS_CAP) : rows).map(boostRecord);
-
+    const { boosts, truncated, npub: seen } = await fetchBoosterCorpus(env, hex);
     return json(request, {
-      booster: booster(rows[0]?.booster_npub),
+      booster: booster(seen),
       // Nested rather than flat, so a caller can never mistake this for the
       // paged shape and start looking for a cursor that is deliberately absent.
       corpus: { boosts, truncated, count: boosts.length },
@@ -105,4 +94,32 @@ export async function onRequestGet({ request, env, params }) {
     next_cursor: boosts.length === limit ? encodeCursor(results[results.length - 1]) : null,
     boosts,
   });
+}
+
+/* Every boost one person has sent, bounded and newest-first.
+ *
+ * ⚠️ EXPORTED, AND functions/booster/[npub].js CALLS IT DIRECTLY. That page
+ * server-renders the first thirty cards of its Episodes and Songs section, so it
+ * needs the corpus inside its own Promise.all rather than through a subrequest
+ * to this endpoint. One query definition, two callers, no HTTP hop — and the
+ * page cannot rank over a corpus assembled differently from the one the client
+ * later fetches to re-sort with.
+ *
+ * One row over the cap is fetched purely to detect the truncation, then dropped.
+ * Asking for exactly the cap cannot tell "there are precisely this many" from
+ * "there are more".
+ */
+export async function fetchBoosterCorpus(env, hex) {
+  const { results } = await env.DB.prepare(
+    `${BOOST_SELECT} WHERE b.booster_pubkey = ?
+     ORDER BY b.created_at DESC, b.event_id DESC LIMIT ?`
+  ).bind(hex, CORPUS_CAP + 1).all();
+
+  const rows = results || [];
+  const truncated = rows.length > CORPUS_CAP;
+  return {
+    boosts: (truncated ? rows.slice(0, CORPUS_CAP) : rows).map(boostRecord),
+    truncated,
+    npub: rows[0]?.booster_npub,
+  };
 }

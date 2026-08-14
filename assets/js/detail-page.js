@@ -16,9 +16,9 @@
  * page to be complete and legible; it adds the interactive half and every
  * function degrades to what the server rendered.
  */
-import { copyNpub, copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v60'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v60'
-import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v60'
+import { copyNpub, copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v61'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v61'
+import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v61'
 
 // ── copy-npub ────────────────────────────────────────────────────────
 /* Delegated rather than per-element: the community wall can hold 500 cards, and
@@ -350,12 +350,23 @@ export async function hydrateProfiles(root = document) {
       continue
     }
 
-    // `.author-name` is the boost card's, `.sup-name` the community wall's.
-    // `.boost-who` was the boost row's before those rows became the same
-    // .note-card the Boosts feed paints; it is kept so a reader holding a stale
-    // copy of a page against a fresh copy of this module still gets names.
+    // A bare avatar is the element itself too, and is picture-only: the stacked
+    // faces on an episode card's drawer bar carry no name to patch. They are the
+    // one identity on that card the row-level hooks don't reach, which is what
+    // the feed's old repaintProfiles pass existed to refresh.
+    if (el.classList.contains('pcast-avatar')) {
+      if (missing.includes('pic') && prof.picture) fillCardAvatar(el, prof.picture)
+      el.removeAttribute('data-missing')
+      continue
+    }
+
+    // `.author-name` is the boost card's, `.sup-name` the community wall's,
+    // `.pcast-boost-name` the episode card's drawer row. `.boost-who` was the
+    // boost row's before those rows became the same .note-card the Boosts feed
+    // paints; it is kept so a reader holding a stale copy of a page against a
+    // fresh copy of this module still gets names.
     if (missing.includes('name') && prof.name) {
-      const nameEl = el.querySelector('.sup-name, .author-name, .boost-who')
+      const nameEl = el.querySelector('.sup-name, .author-name, .boost-who, .pcast-boost-name')
       if (nameEl) {
         nameEl.textContent = prof.name
         nameEl.setAttribute('title', prof.name)
@@ -365,6 +376,12 @@ export async function hydrateProfiles(root = document) {
     }
 
     if (missing.includes('pic') && prof.picture) {
+      // An episode card's drawer row: a `.pcast-avatar` chip standing in for the
+      // picture, which becomes an <img> of the same size. Checked before the two
+      // below because that row has neither a `.note-author` nor a `.sup-avatar`.
+      const chip = el.querySelector('.pcast-avatar')
+      if (chip) { fillCardAvatar(chip, prof.picture); el.removeAttribute('data-missing'); continue }
+
       // TWO SHAPES, because the two surfaces resolve a missing picture
       // differently. A community card has an EMPTY `.sup-avatar` to construct an
       // <img> into; a boost card always has one already, showing the site
@@ -393,4 +410,29 @@ export async function hydrateProfiles(root = document) {
 
     el.removeAttribute('data-missing')
   }
+}
+
+/* One episode-card avatar, filled from a late-arriving picture.
+ *
+ * The card renders a `.pcast-avatar` chip carrying the booster's initials when
+ * the index had no picture. Swapping in an <img> rather than setting a
+ * background keeps the element the same shape the stylesheet sizes — `--pcast-av`
+ * rides on the inline style and has to survive — and a dead hotlink puts the
+ * chip straight back rather than leaving a broken image where a face was.
+ *
+ * Takes either the chip itself (the stacked faces on the drawer bar) or an <img>
+ * that is already there (nothing calls it that way today, and it costs one line
+ * to be right if something ever does).
+ */
+function fillCardAvatar(chip, picture) {
+  if (chip.tagName === 'IMG') { chip.src = picture; return }
+  const img = document.createElement('img')
+  img.className = chip.className.replace('pcast-avatar--none', '').trim()
+  img.setAttribute('style', chip.getAttribute('style') || '')
+  img.alt = ''
+  img.referrerPolicy = 'no-referrer'
+  img.dataset.initials = chip.textContent || ''
+  img.onerror = () => { img.replaceWith(chip) }
+  img.src = picture
+  chip.replaceWith(img)
 }

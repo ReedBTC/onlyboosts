@@ -406,7 +406,16 @@
 // original through NDK now and embeds it. Required: boost-actions.js is a cached
 // module and a returning visitor holding the old copy keeps publishing reposts
 // that render as empty cards — and a published event cannot be recalled.
-const VERSION = 'ob-v60';
+// ob-v61: the episode card became one definition, rendered at the edge and in
+// the browser (assets/js/episode-card.js), and the homepage's opening feed is
+// server-rendered into index.html by functions/index.js. REQUIRED on both
+// counts. The card's drawer is a <details> now rather than a button and a hidden
+// div, and feed-cards.css carries the rules that style a <summary> — a returning
+// visitor holding the old stylesheet against the new markup gets a disclosure
+// triangle beside the caret and no rotation. And `/` is a Pages Function
+// response rather than a static file, so the precached copy of it is a document
+// that no longer exists; it is dropped from PRECACHE_URLS below for that reason.
+const VERSION = 'ob-v61';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;
@@ -419,35 +428,45 @@ const SNAPSHOT_CACHE = `${VERSION}-snapshot`;
 // The boost-feed snapshot (/api/community-boosts) is excluded too: it's
 // large and refreshes hourly, so stale-while-revalidate handles it
 // better than precaching a copy that's stale by first paint.
+// ⚠️ `/` IS NOT PRECACHED ANY MORE, and `/index.html` is what replaced it.
+// Since ob-v61 the homepage is a Pages Function that injects thirty rendered
+// episode cards into the static file, so `/` is ~1.1MB of markup — precaching it
+// would spend that on every service-worker install, for a document the runtime
+// HTML cache picks up from the navigation the reader has just made anyway
+// (see the isHTMLRequest branch below, which caches every successful one).
+//
+// `/index.html` stays, at 54KB: it is the OFFLINE FALLBACK the fetch handler
+// reaches for when a navigation fails with nothing cached for that URL, and it
+// is the un-injected shell, which hydrates its own feed exactly as it did before
+// this. That is the right thing to have offline.
 const PRECACHE_URLS = [
-  '/',
   '/index.html',
   '/manifest.webmanifest',
   '/assets/onlyboosts_favicon.png',
   '/assets/onlyboosts_pfp.png',
   '/assets/onlyboosts_banner.png',
   '/assets/avatar-fallback.svg',
-  '/assets/css/theme.css?v=ob-v60',
-  '/assets/css/page.css?v=ob-v60',
-  '/assets/css/nav.css?v=ob-v60',
-  '/assets/css/footer.css?v=ob-v60',
-  '/assets/css/boosts-thread.css?v=ob-v60',
-  '/assets/css/boost-actions.css?v=ob-v60',
+  '/assets/css/theme.css?v=ob-v61',
+  '/assets/css/page.css?v=ob-v61',
+  '/assets/css/nav.css?v=ob-v61',
+  '/assets/css/footer.css?v=ob-v61',
+  '/assets/css/boosts-thread.css?v=ob-v61',
+  '/assets/css/boost-actions.css?v=ob-v61',
   // The episode card and its drawer. Precached alongside the others because the
   // homepage's feeds are painted in it and it used to be inline in index.html,
   // which IS precached — leaving it out would trade an inline block for a
   // network round trip on the one page this list exists to make fast.
-  '/assets/css/feed-cards.css?v=ob-v60',
-  '/assets/js/boosts-thread.js?v=ob-v60',
+  '/assets/css/feed-cards.css?v=ob-v61',
+  '/assets/js/boosts-thread.js?v=ob-v61',
   // A static import of boosts-thread.js, so precaching that without this one
   // leaves a returning visitor fetching half the graph from the network.
-  '/assets/js/primal-profiles.js?v=ob-v60',
-  '/assets/js/calendar-events.js?v=ob-v60',
-  '/assets/js/boost-actions.js?v=ob-v60',
-  '/assets/js/nav.js?v=ob-v60',
-  '/assets/js/nav-widget-boot.js?v=ob-v60',
-  '/assets/js/widget-loader.js?v=ob-v60',
-  '/assets/js/sw-register.js?v=ob-v60',
+  '/assets/js/primal-profiles.js?v=ob-v61',
+  '/assets/js/calendar-events.js?v=ob-v61',
+  '/assets/js/boost-actions.js?v=ob-v61',
+  '/assets/js/nav.js?v=ob-v61',
+  '/assets/js/nav-widget-boot.js?v=ob-v61',
+  '/assets/js/widget-loader.js?v=ob-v61',
+  '/assets/js/sw-register.js?v=ob-v61',
 ];
 
 self.addEventListener('install', (event) => {

@@ -129,6 +129,9 @@
   transition: box-shadow 0.12s, border-color 0.12s;
 }
 .pcast-card:hover { box-shadow: 0 6px 18px rgba(0,0,0,0.08); }
+/* `.is-open` has no emitter any more — the drawer is a <details> and the open
+   state is read off it directly, further down this file. Kept because a reader
+   holding a cached page that still adds the class gets the same highlight. */
 .pcast-card.is-open { border-color: var(--accent); box-shadow: 0 6px 18px rgba(0,0,0,0.10); }
 .pcast-card-head {
   display: flex;
@@ -299,7 +302,22 @@ a.pcast-show-link:hover { text-decoration: underline; }
   .pcast-rank { min-width: 1.2rem; font-size: 0.95rem; }
 }
 
-/* ── Boost drawer — a low-profile full-width toggle under the head. ── */
+/* ── Boost drawer — a low-profile full-width toggle under the head. ──
+
+   ⚠️ IT IS A <summary> INSIDE A <details> NOW, not a <button> beside a hidden
+   <div>. The boost notes it opens onto are FACTS and are server-rendered into
+   the document, so a control only JavaScript could open would leave them
+   unreachable — which is the whole shape the rendering rule exists to remove.
+   <details> opens on its own, and it is the same idiom .ep-drawer uses on /show
+   and /episode, so a reader who has opened one has already learned this one.
+
+   The classes, the children and every declaration below are unchanged; the two
+   rules that follow are the entire delta. A <summary> paints a disclosure
+   triangle by default, which would sit beside the caret this design already
+   draws — `list-style` kills it everywhere except WebKit, which needs the
+   pseudo-element. */
+.pcast-card-details > .pcast-drawer { list-style: none; }
+.pcast-card-details > .pcast-drawer::-webkit-details-marker { display: none; }
 .pcast-drawer {
   display: flex; align-items: center; gap: 0.4rem; width: 100%;
   padding: 0.45rem 0.7rem 0.5rem;
@@ -329,7 +347,15 @@ a.pcast-show-link:hover { text-decoration: underline; }
 @media (max-width: 560px) {
   .pcast-avatars .pcast-avatar:nth-child(n+6) { display: none; }
 }
-.pcast-card.is-open .pcast-drawer > .pcast-drawer-caret { transform: rotate(180deg); }
+/* Open state, off the <details> rather than off a class JavaScript added. The
+   :has() is what lets the CARD react to a descendant opening; browsers without
+   it lose a border highlight and nothing else, which is why the caret rotation
+   is written as a plain descendant rule rather than folded into it. */
+.pcast-card-details[open] > .pcast-drawer > .pcast-drawer-caret { transform: rotate(180deg); }
+.pcast-card:has(> .pcast-card-details[open]) {
+  border-color: var(--accent);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.10);
+}
 
 /* "Hide boosts" control at the bottom of a card's thread. */
 .pcast-drawer-close {

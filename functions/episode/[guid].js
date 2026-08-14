@@ -27,6 +27,9 @@ import {
   fmtDuration, truncate, lookupMentionNames,
   renderSupporters, renderBoosts,
 } from "../_shared/detail-page.js";
+import { itemsFromBoosts, renderCardPage, CARDS_PER_PAGE } from "../_shared/episode-cards.js";
+import { fetchCommunityBoosts } from "../api/v1/episodes/[guid].js";
+import { COPY as CARD_COPY } from "../../assets/js/episode-card.js";
 
 const SITE_ORIGIN = "https://onlyboosts.social";
 
@@ -48,9 +51,9 @@ const SITE_ORIGIN = "https://onlyboosts.social";
 // detail-page.js, which open a collapsed drawer that is linked to and keep the
 // address bar tracking the section being read.
 //
-// ⚠️ ONE HONEST GAP: #community-episodes is CLIENT-RENDERED (see the section
-// note below), so with JavaScript off there is nothing for that anchor to
-// resolve to. The other two are server-rendered and resolve either way.
+// All three resolve with JavaScript off. #community-episodes was the exception
+// until the episode card became one shared definition; see the note over
+// renderCommunityEpisodes below.
 const OG_FALLBACK = `${SITE_ORIGIN}/assets/onlyboosts_banner.png`;
 
 // Episode guids are UUIDs at 36 characters and run to 101 in the live index
@@ -96,7 +99,23 @@ export async function onRequestGet({ env, params }) {
   // episode.
   if (!ep || !ep.title) return await noEpisodePage(env, guid);
 
-  const [sups, boosts, boosters] = await Promise.all([
+  /* ⚠️ THE COMMUNITY CORPUS IS FETCHED HERE NOW, inside the same Promise.all as
+   * everything else, because #community-episodes is SERVER-RENDERED. It used to
+   * be the one section on either detail page that was not, on the reasoning that
+   * its card was a JavaScript artifact — which it no longer is.
+   *
+   * It is the most expensive query on the page: every boost this episode's
+   * boosters have sent anywhere else, a median of 248 rows and up to the 2,000
+   * cap. Running it in parallel means the page pays max() rather than sum(), and
+   * the 300s edge cache means one reader per colo pays it at all. Measured
+   * against production before the change: the endpoint answers a heavy episode
+   * (834 rows, 1.1MB) in ~190ms, against a page TTFB of ~170ms.
+   *
+   * ⚠️ IT NEVER REJECTS. A failure here must cost the section and nothing else —
+   * the rest of the page is complete without it, and a reader who came for this
+   * episode's own boosts must not get a 500 because a rollup below the fold
+   * could not be built. Same discipline as the two podroll queries on /show. */
+  const [sups, boosts, boosters, community] = await Promise.all([
     env.DB.prepare(
       // Ranked by sats sent to THIS EPISODE, all time. idx_boosts_item covers
       // the WHERE. The ORDER BY is a total order deliberately: this response is
@@ -129,6 +148,10 @@ export async function onRequestGet({ env, params }) {
       `SELECT COUNT(DISTINCT booster_pubkey) AS n, MAX(created_at) AS latest
        FROM boosts WHERE item_guid = ?`
     ).bind(guid).first(),
+    fetchCommunityBoosts(env, guid, ep.podcast_guid).catch((err) => {
+      console.warn("[episode] community corpus unavailable", err);
+      return null;
+    }),
   ]);
 
   const boostRows = boosts.results || [];
@@ -141,6 +164,7 @@ export async function onRequestGet({ env, params }) {
     boosterCount: boosters?.n || 0,
     latestTs: boosters?.latest || null,
     names,
+    community,
   });
 
   return new Response(html, {
@@ -242,7 +266,7 @@ function usableAuthor(ep) {
 
 // ── the page ─────────────────────────────────────────────────────────────────
 
-function renderEpisodePage({ ep, supporters, boosts, boosterCount, latestTs, names }) {
+function renderEpisodePage({ ep, supporters, boosts, boosterCount, latestTs, names, community }) {
   const copy = copyFor(ep.p_medium);
   const title = ep.title;
   const showTitle = ep.p_title || "";
@@ -364,21 +388,21 @@ function renderEpisodePage({ ep, supporters, boosts, boosterCount, latestTs, nam
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v60" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v60" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v60" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v60" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v61" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v61" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v61" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v61" />
   <!-- The hero, the community wall and the boost list are the show page's, so
        this page links its stylesheet and adds only the deltas. -->
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v60" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v61" />
   <!-- The episode card, for the community-episodes section: the same chrome
        feeds-podcasts.js paints on the homepage. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v60" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v61" />
   <!-- The boost thread inside a card's drawer, and its reply / like / repost /
        zap bar. Only this page's community section needs them; /show does not. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v60" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v60" />
-  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v60" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v61" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v61" />
+  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v61" />
 </head>
 <body data-episode-guid="${htmlEscape(ep.item_guid)}"${ep.podcast_guid ? ` data-show-guid="${htmlEscape(ep.podcast_guid)}"` : ""}>
 
@@ -478,7 +502,7 @@ function renderEpisodePage({ ep, supporters, boosts, boosterCount, latestTs, nam
 
   ${renderHeader(ep, { art, art2, art3, copy, showTitle, showUrl, boosterCount, latestTs })}
 
-  ${renderCommunityEpisodes(copy)}
+  ${renderCommunityEpisodes(copy, community)}
 
   ${renderSupporters(supporters, {
     sub: `Everyone who has boosted ${htmlEscape(truncate(title, 90))} on Nostr, ranked by sats sent, all time.`,
@@ -558,12 +582,12 @@ function renderEpisodePage({ ep, supporters, boosts, boosterCount, latestTs, nam
 
 <script type="application/json" id="episode-boost-payload">${jsonForScript(boostPayload)}</script>
 
-<script src="/assets/js/nav.js?v=ob-v60" defer></script>
-<script src="/assets/js/episode-page.js?v=ob-v60" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v61" defer></script>
+<script src="/assets/js/episode-page.js?v=ob-v61" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v60"></script>
-<script src="/assets/js/sw-register.js?v=ob-v60" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v61"></script>
+<script src="/assets/js/sw-register.js?v=ob-v61" defer></script>
 </body>
 </html>`;
 }
@@ -775,41 +799,44 @@ function renderChaptersDrawer(ep) {
 // never its global totals — the same property the show page's version has, and
 // the reason the sort tag reads "Community Sort:" rather than "Sort:".
 //
-// ⚠️ THIS IS THE ONE SECTION ON EITHER DETAIL PAGE THAT IS NOT SERVER-RENDERED,
-// and the reason is the card rather than the data. A row here is the full
-// Episodes-feed card — artwork, an audio player, the ⋮ subscribe menu, a boost
-// pill, and a drawer holding the individual boost notes with a reply / like /
-// repost / zap bar on each. That card is a JavaScript artifact
-// (feeds-podcasts.js#episodeCard) and its action bar cannot exist without a
-// signer, so a server-rendered version would be a second implementation of the
-// site's most intricate component, guaranteed to drift from the one the homepage
-// paints. Reusing the renderer is what makes the two surfaces identical, which
-// is what was asked for.
+// ⚠️ IT IS SERVER-RENDERED NOW, and closing that was the point of the whole
+// change. It used to be the one section on either detail page that was not, on
+// the reasoning that a row here is the full Episodes-feed card — artwork, an
+// audio player, the ⋮ subscribe menu, a boost pill and a drawer of boost notes
+// with a reaction bar on each — and that card was a JavaScript artifact whose
+// second implementation would drift from the one the homepage paints. CLAUDE.md
+// recorded that as the rendering rule's one standing exception, tolerated
+// because the section is a derived list below the fold, with instructions to
+// close it rather than add a second.
 //
-// The cost is that this section does not exist with JavaScript off, where the
-// rest of the page does. The DRAWER ships `hidden` for that reason: an empty
-// heading over nothing is worse than no heading. episode-page.js reveals it once
-// it has cards, and lazy-loads the corpus as the section approaches the
-// viewport, so a reader who never scrolls this far pays nothing for it.
+// The fix was the one named there: split the card along the facts/verbs line.
+// assets/js/episode-card.js builds it as an HTML string with no DOM, so it runs
+// here and in the browser and there is no second implementation to drift —
+// literally the same module, imported by relative path at the edge and by
+// stamped URL in the page. episode-card-actions.js attaches the pill, the menus
+// and the reaction bars to whichever side rendered it.
+//
+// So the drawer ships OPEN with thirty ranked cards in it, and a reader with no
+// JavaScript gets the list, the artwork, the figures and every boost note. What
+// they don't get is the re-sort, the range and the reactions, which is exactly
+// the line the rule draws.
 //
 // NOT SPLIT ON MEDIUM, which every other rollup on this site is. A music
 // community also boosting podcasts is the interesting half of the finding, so
 // the heading says "Episodes/Songs" on both mediums and there is no COPY entry —
 // exactly the call renderCommunityShows makes on the show page.
-function renderCommunityEpisodes(copy) {
-  // ⚠️ THE SECTION SHIPS EMPTY, AND ITS BODY SHIPS `hidden` — not the other way
-  // round, which is what it was first and did not work. episode-page.js waits
-  // for the section to approach the viewport before it pulls 200KB of card
-  // renderer, and an IntersectionObserver never reports a `display:none` target
-  // as intersecting, so a hidden SECTION could never fire its own hydration. An
-  // empty section is a zero-height block that still has a position, which is
-  // exactly the sentinel that observer needs.
-  //
-  // Everything it costs a reader with no JavaScript is the same either way: an
-  // empty section renders as nothing at all, and the module removes it outright
-  // if the corpus is empty or unreachable.
-  return `<section class="show-section show-section--bare" id="community-episodes" data-community-episodes>
-    <details class="ep-drawer" open data-ce-body hidden>
+function renderCommunityEpisodes(copy, community) {
+  // A community that has boosted nothing else has no section, which is a truer
+  // answer than a heading over an empty list. Measured over a 900-page sample,
+  // 6.1% of episodes land here — mostly communities that have boosted only this
+  // show, which is excluded wholesale by the query. A failed corpus fetch takes
+  // the same exit: `community` is null and the page is complete without it.
+  const { items, profiles } = itemsFromBoosts(community?.boosts, { sort: "boosts" });
+  if (!items.length) return "";
+
+  return `<section class="show-section show-section--bare" id="community-episodes" data-community-episodes${
+      community?.truncated ? " data-truncated" : ""}>
+    <details class="ep-drawer" open data-ce-body>
       <!-- The summary IS the heading, exactly as on the show page's community
            drawer, which is why the section is --bare and carries no <h2>. The
            sub-line sits under the title INSIDE the summary rather than in a band
@@ -826,8 +853,9 @@ function renderCommunityEpisodes(copy) {
       </summary>
       <!-- The range buttons and the sort pill mount here, the same pair the
            Episodes feed carries and in the same order, on the same band the show
-           page's two drawers use. Ships hidden and stays hidden until there is a
-           list to control. -->
+           page's two drawers use. Ships hidden because both are VERBS: the list
+           beneath is already ranked, and a control that cannot act is worse than
+           none. episode-page.js reveals them. -->
       <div class="cs-controls ce-controls" data-ce-controls hidden></div>
       <!-- The cards and their "Load N more" live inside ONE scroll container,
            the same shape the show page's community drawer uses (.ep-list caps at
@@ -836,7 +864,18 @@ function renderCommunityEpisodes(copy) {
            as belonging to the page, not to the list. -->
       <div class="ce-scroll" data-ce-scroll tabindex="0" role="region"
            aria-label="Other episodes and songs this community boosts">
-        <div data-ce-list><div class="ce-loading" aria-live="polite">Loading…</div></div>
+        <div class="pcast-list" data-ce-list>${renderCardPage(items, {
+          // NOT split on medium, unlike every other rollup on this site, so the
+          // copy is the podcast table on both — see the note above. The cards
+          // themselves say "episode" and a track among them reads correctly,
+          // which is the same call renderCommunityShows makes on /show.
+          copy: CARD_COPY.other,
+          profiles,
+          sort: "boosts",
+          range: "all",
+          limit: CARDS_PER_PAGE,
+          state: { surface: "community-episodes", truncated: !!community?.truncated },
+        })}</div>
         <div data-ce-more></div>
       </div>
     </details>
@@ -918,10 +957,10 @@ function notFound(guid) {
   <meta name="robots" content="noindex" />
   <title>Episode not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v60" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v60" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v60" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v60" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v61" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v61" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v61" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v61" />
 </head>
 <body>
 <section class="page-header">
@@ -939,7 +978,7 @@ function notFound(guid) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v60" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v61" defer></script>
 </body>
 </html>`;
   return new Response(html, {

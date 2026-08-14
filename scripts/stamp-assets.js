@@ -90,6 +90,33 @@ const VERSION = versionMatch[1];
  */
 const ASSET_RE = /(["'`])(\/assets\/(?:js|css|widgets)\/[A-Za-z0-9._\-/]+\.(?:js|css))(\?v=[A-Za-z0-9_-]*)?\1/g;
 
+/* ⚠️ THE SECOND SHAPE: a RELATIVE sibling import inside assets/js.
+ *
+ * A handful of modules are imported from BOTH sides — by the browser over a URL
+ * and by a Pages Function off the filesystem, which is what makes one episode
+ * card possible rather than two that agree by inspection. Those modules cannot
+ * use the absolute `/assets/js/…` form: esbuild resolves it against the
+ * filesystem root and the Functions build fails. They use `'./thing.js?v=…'`
+ * instead, which BOTH resolvers handle — the browser resolves it against the
+ * importing module's own stamped URL and arrives at exactly the absolute form,
+ * and esbuild strips the query and reads the file. Verified both ways before the
+ * first such module was written.
+ *
+ * So these need stamping too, or a fresh two-sided module would import a
+ * permanently pinned old copy of its sibling and the four-hour skew this whole
+ * script exists to kill would reopen through the back door.
+ *
+ * ANCHORED ON `from` OR `import(`, for the same reason ASSET_RE is anchored on
+ * quotes: a bare `./thing.js` pattern matches prose, and this repo's comments
+ * are full of filenames. Only a real specifier position is rewritten.
+ */
+const REL_RE = /((?:\bfrom|\bimport)\s*\(?\s*)(["'`])(\.\/[A-Za-z0-9._-]+\.js)(\?v=[A-Za-z0-9_-]*)?\2/g;
+
+// Only inside assets/js: a relative specifier means something different in
+// functions/ (where it is server-only and never fetched by a browser) and in
+// login-widget/ (which Vite resolves at build time).
+const REL_DIR = path.join('assets', 'js') + path.sep;
+
 // Files that REFERENCE assets. Not the assets' own directory listing — a module
 // is processed because it may `import` a sibling, not because it is one.
 function walk(dir, out = []) {
@@ -118,13 +145,22 @@ const stale = [];
 
 for (const file of targets) {
   const src = fs.readFileSync(file, 'utf8');
+  const rel = path.relative(ROOT, file);
   let hits = 0;
-  const next = src.replace(ASSET_RE, (whole, quote, url, existing) => {
+  let next = src.replace(ASSET_RE, (whole, quote, url, existing) => {
     hits++;
     const want = `${quote}${url}?v=${VERSION}${quote}`;
-    if (whole !== want) stale.push(`${path.relative(ROOT, file)}  ${url}${existing || ''}`);
+    if (whole !== want) stale.push(`${rel}  ${url}${existing || ''}`);
     return want;
   });
+  if (rel.startsWith(REL_DIR)) {
+    next = next.replace(REL_RE, (whole, lead, quote, spec, existing) => {
+      hits++;
+      const want = `${lead}${quote}${spec}?v=${VERSION}${quote}`;
+      if (whole !== want) stale.push(`${rel}  ${spec}${existing || ''}`);
+      return want;
+    });
+  }
   if (!hits || next === src) continue;
   if (!CHECK) fs.writeFileSync(file, next);
   changed++;

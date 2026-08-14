@@ -1,7 +1,7 @@
 /* Client hydration for /episode/<item-guid>.
  *
- * The page is server-rendered (functions/episode/[guid].js) and, with one stated
- * exception, readable with no JavaScript at all. This module adds:
+ * The page is server-rendered (functions/episode/[guid].js) and readable with no
+ * JavaScript at all. This module adds:
  *
  *   - the shared detail-page chrome (back link, section deep-links, the hash
  *     spy, copy-npub, "Show N more", the art2 fallback, share, and the Primal
@@ -9,32 +9,31 @@
  *   - the hero's Boost button, which pays THIS EPISODE's value block
  *   - the chapters drawer under the player, which the server cannot render
  *     because nothing in D1 holds a <podcast:chapters> URL
- *   - "Other Episodes/Songs This Community Boosts", the one section the server
- *     does not render
+ *   - the verbs on "Other Episodes/Songs This Community Boosts"
  *
- * THAT SECTION IS THE REASON THIS FILE IS NOT SMALL. Its rows are the full
- * Episodes-feed card — artwork, player, ⋮ subscribe menu, boost pill, and a
- * drawer of the individual boost notes with a reply / like / repost / zap bar on
- * each — so it is painted by feeds-podcasts.js#episodeCard rather than by a
- * second implementation that would drift from the homepage's. That module pulls
- * nostr-tools, the boost thread and the action bar behind it, roughly 200KB, so
- * it is DYNAMICALLY imported and only when the section is about to be read. A
- * visitor who never scrolls past the community wall pays none of it.
+ * ⚠️ THAT LAST SECTION USED TO BE THE REASON THIS FILE WAS NOT SMALL, and it is
+ * now four lines at the foot of it. Its rows are the full Episodes-feed card,
+ * which existed only as JavaScript — so the section was client-rendered, was the
+ * one part of this page that did not exist without a script, and pulled ~200KB
+ * of renderer to paint itself. The card is `assets/js/episode-card.js` now, an
+ * HTML-string builder the Pages Function runs at the edge, so the section ships
+ * finished and `episode-section.js` only attaches its controls and its verbs.
+ * That module is shared with the structurally identical section on
+ * /booster/<npub>.
  */
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v60'
-import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v60'
-import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v60'
-import { rangeControl, sortControl, rangeDays, rangeCutoff } from '/assets/js/feed-controls.js?v=ob-v60'
-import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v60'
-import { normalizeBoosts, toEpisodeShape } from '/assets/js/ob-data.js?v=ob-v60'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v61'
+import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v61'
+import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v61'
+import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v61'
+import { initEpisodeSection } from '/assets/js/episode-section.js?v=ob-v61'
 import {
   initCopyNpub, initShowMore, initShare, initBackLink,
   initHashRouting, initHashSpy, initArt2, hydrateProfiles,
-} from '/assets/js/detail-page.js?v=ob-v60'
+} from '/assets/js/detail-page.js?v=ob-v61'
 // The reaction bar and ⋮ on the server-rendered boost notes at the foot of
 // this page. The community cards above them carry their own, through the feed
 // renderer they are built by.
-import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v60'
+import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v61'
 
 const VALUE_API = '/api/value'
 
@@ -55,15 +54,19 @@ initCopyNpub()
 initShowMore()
 initShare()
 initBackLink()
-const revealHashTarget = initHashRouting()
+// The return value used to be kept so the community section could re-reveal its
+// own anchor after hydrating: it shipped as a zero-height block, so a deep link
+// to #community-episodes parked on whatever followed it. The section has a real
+// height from first paint now, and the browser's own scroll is correct.
+initHashRouting()
 initHashSpy()
 initBoostNoteActions()
 
-// One art2 surface here, not three: the hero. The community cards below build
-// their own chain through cover-art.js inside episodeCard, the way the feed
-// does, so they never carry a data-art2 attribute. The chain is one link longer
-// than the show page's — episode art, then the show's primary, then the show's
-// second chance — which is what data-art3 is for.
+// One art2 call here, for the hero. The community cards below carry the same
+// data-art2 / data-art3 attributes and are wired through the same helper by
+// episode-card-actions.js, per card, as they are on every other surface. The
+// hero's chain is one link longer than the show page's — episode art, then the
+// show's primary, then the show's second chance — which is what data-art3 is for.
 initArt2('.show-art img[data-art2]', 'div', 'show-art-blank')
 
 // ── Boosting this episode ────────────────────────────────────────────
@@ -376,295 +379,52 @@ initEpisodeMeta()
 // every other episode those pubkeys have boosted, painted as the same cards the
 // Episodes feed uses and carrying the same range and sort controls.
 //
-// EVERY FIGURE IS COMMUNITY-SCOPED BY CONSTRUCTION. The endpoint joins through
-// the community set, so a card's boosters, boosts and sats are what THESE people
+// ⚠️ IT IS SERVER-RENDERED. The Function fetches the corpus, ranks it and paints
+// the first thirty cards, so everything below is verbs — see the note over
+// renderCommunityEpisodes in functions/episode/[guid].js for why that was the
+// change worth making, and episode-section.js for the behaviour, which is shared
+// with the identical section on /booster/<npub>.
+//
+// EVERY FIGURE IS COMMUNITY-SCOPED BY CONSTRUCTION. The query joins through the
+// community set, so a card's boosters, boosts and sats are what THESE people
 // sent that episode and never its global totals — which is why the sort is
 // tagged "Community Sort:" rather than "Sort:", the same wording the show page's
 // equivalent uses.
 //
 // Measured over all 22,366 indexed boosts, the corpus behind this runs to a
 // median of 248 boost rows across 189 distinct other episodes, a p90 of 1,171
-// rows, and a maximum of 3,368. The endpoint caps it at 2,000 and says when it
-// did; the note under the list passes that on rather than letting a ranking over
+// rows, and a maximum of 3,368. The query caps it at 2,000 and says when it did;
+// the note under the last page passes that on rather than letting a ranking over
 // a prefix pose as a ranking over everything.
-
-const CARDS_PER_PAGE = 30
-
-// The Episodes feed's five sorts, with its own labels. "Latest boost" and
-// "Latest episode" are chronological rather than ranked, so no rank badge is
-// painted under them — a numeral there would read as a score.
-const CE_SORTS = [
-  ['boosts', 'Most boosts'],
-  ['count', 'Most boosters'],
-  ['sats', 'Most sats'],
-  ['recent', 'Latest boost'],
-  ['episode', 'Latest episode'],
-]
-
-/* ── The ranking, and why it is HERE rather than imported ──────────────
- *
- * These are the Episodes feed's own comparators and air-date filter, which used
- * to be `feeds-podcasts.js#sortItems` / `#filterItems`. That module stopped
- * exporting them when its ranking moved into /api/v1/episodes, and this section
- * kept calling them: a TypeError inside rebuild(), so the drawer painted its
- * heading and controls over an empty list.
- *
- * Restoring them here rather than re-exporting them is the correct half of that
- * split, not a workaround. THE FEEDS RANK SERVER-SIDE BECAUSE THEY PAGE — their
- * loaded rows are a prefix of the corpus, so ranking in the browser ranks the
- * wrong things. THIS SECTION HOLDS ITS WHOLE CORPUS, one bounded response of at
- * most 2,000 boost rows fetched once, so ranking it in memory is ranking
- * everything it has and a re-sort costs no round trip. The two feeds' cases are
- * genuinely different, and one shared export would have to serve both.
- *
- * The item shape is still `buildEpisodes`'s, so these read the same fields they
- * always did. Every comparator breaks ties on total sats, then on the most
- * recent boost, so the order is stable. `count` ranks by distinct people and
- * `boosts` by raw volume; they differ wherever someone boosted the same episode
- * more than once.
- */
-const bySats = (a, b) => b.totalSats - a.totalSats || b.latest - a.latest
-const CE_SORTERS = {
-  recent: (a, b) => b.latest - a.latest || b.totalSats - a.totalSats,
-  episode: (a, b) => (b.ep.published || 0) - (a.ep.published || 0) || bySats(a, b),
-  count: (a, b) => b.distinctBoosters.length - a.distinctBoosters.length || bySats(a, b),
-  boosts: (a, b) => b.boosts.length - a.boosts.length || bySats(a, b),
-  sats: bySats,
-}
-
-function sortItems(items, key) {
-  return [...items].sort(CE_SORTERS[key] || CE_SORTERS.recent)
-}
-
-// The range filters on when the episode AIRED (ep.published), not on when the
-// community boosted it — the same axis the Episodes feed uses, and the reason
-// the tooltip below says "aired or released" rather than naming a boost.
-function filterItems(items, key) {
-  const cutoff = rangeCutoff(key)
-  if (!cutoff) return items
-  return items.filter((it) => (it.ep.published || 0) >= cutoff)
-}
-
-/* The corpus, fetched once and lazily.
- *
- * IntersectionObserver with a generous margin rather than a fetch on load: this
- * section sits below the hero and the stat tiles, so most readers reach it a
- * scroll or two in, and between the response (~75KB gzipped at the median,
- * ~600KB at the cap) and the card renderer (~200KB of module) it is the most
- * expensive thing on the page. Starting it 800px out means it is normally in
- * flight before the reader arrives, and a reader who never scrolls that far
- * pays none of it.
- *
- * A deep link to #community-episodes lands inside the observer's margin and
- * fires it immediately, which is the case that would otherwise be worst.
- *
- * ⚠️ THE OBSERVED ELEMENT MUST NOT BE display:none. An observer never reports a
- * hidden target as intersecting, so a section that hid itself could never fire
- * its own hydration. The section therefore ships EMPTY (a zero-height block with
- * a real position, which is the sentinel this needs) and its body ships hidden.
- * See renderCommunityEpisodes in functions/episode/[guid].js.
- */
-function whenApproached(el, run) {
-  if (typeof IntersectionObserver !== 'function') { run(); return }
-  const io = new IntersectionObserver((entries) => {
-    if (!entries.some((e) => e.isIntersecting)) return
-    io.disconnect()
-    run()
-  }, { rootMargin: '800px 0px' })
-  io.observe(el)
-}
-
-async function fetchCommunity(guid) {
-  const resp = await fetch(`/api/v1/episodes/${encodeURIComponent(guid)}?community=1`, {
-    headers: { Accept: 'application/json' },
-  })
-  if (!resp.ok) throw new Error(`community: HTTP ${resp.status}`)
-  return resp.json()
-}
-
-function initCommunityEpisodes() {
-  const section = document.querySelector('[data-community-episodes]')
-  const guid = document.body.dataset.episodeGuid
-  if (!section || !guid) return
-
-  const body = section.querySelector('[data-ce-body]')
-  const scroll = section.querySelector('[data-ce-scroll]')
-  const listSlot = section.querySelector('[data-ce-list]')
-  const moreSlot = section.querySelector('[data-ce-more]')
-  const ctrlSlot = section.querySelector('[data-ce-controls]')
-  if (!body || !scroll || !listSlot || !moreSlot || !ctrlSlot) return
-
-  /* The section is `hidden` from the server and stays that way unless there is
-   * something to show. An empty heading over nothing is worse than no heading,
-   * and this can legitimately be empty: an episode boosted by one person who has
-   * boosted nothing else has no community overlap at all. A failed fetch takes
-   * the same exit — the rest of the page is complete without this. */
-  const giveUp = () => { section.remove() }
-
-  whenApproached(section, async () => {
-    // Revealed before the fetch, not after: the heading and its "Loading…" line
-    // are the feedback that something is coming. On a failure the section is
-    // removed outright, so the worst case is a heading that appears and goes
-    // rather than one that sits over an error.
-    body.hidden = false
-
-    let data
-    try {
-      data = await fetchCommunity(guid)
-    } catch (err) {
-      console.warn('[episode] community episodes unavailable', err)
-      giveUp()
-      return
-    }
-
-    const rows = normalizeBoosts({ boosts: data?.community?.boosts || [] })
-    if (!rows.length) { giveUp(); return }
-
-    // Everything from here needs the card renderer, which is the heavy import.
-    const feed = await import('/assets/js/feeds-podcasts.js?v=ob-v60')
-    const shaped = toEpisodeShape(rows)
-    feed.seedProfiles(shaped.profiles)
-    const items = feed.buildEpisodes(shaped)
-    if (!items.length) { giveUp(); return }
-
-    // Names and avatars enrich the cards but must not gate first paint: render
-    // with what the index embedded, repaint once the stragglers resolve, and
-    // resolve message-mention profiles in the background for opened drawers.
-    const profilesReady = feed.loadBoosterProfiles(items)
-    feed.loadMentionProfiles(items)
-
-    // Same defaults as Episodes · Global, which is the feed these cards come
-    // from: raw boost volume is the ranking the list is for, over the whole
-    // window rather than a recent slice.
-    let sortKey = 'boosts'
-    let rangeKey = 'all'
-    let view = []
-    let shown = 0
-
-    const cards = document.createElement('div')
-    cards.className = 'pcast-list'
-    const moreWrap = document.createElement('div')
-    moreWrap.className = 'pcast-more-wrap'
-
-    function renderMore() {
-      const next = view.slice(shown, shown + CARDS_PER_PAGE)
-      for (const it of next) {
-        // The rank was stamped in rebuild(), over the whole ranked list, so
-        // numbering continues across pages rather than restarting at 1.
-        const ranked = feed.RANKED_SORTS.has(sortKey) ? it._rank : null
-        const el = feed.episodeCard(it, ranked, feed.COPY.other)
-        el._pcastItem = it   // repaintProfiles maps avatars through this
-        cards.appendChild(el)
-      }
-      shown += next.length
-      moreWrap.textContent = ''
-      const remaining = view.length - shown
-      if (remaining > 0) {
-        const batch = Math.min(CARDS_PER_PAGE, remaining)
-        const group = document.createElement('div')
-        group.className = 'pcast-more-group'
-        const btn = document.createElement('button')
-        btn.type = 'button'
-        btn.className = 'pcast-showmore'
-        btn.textContent = `Load ${batch} more`
-        btn.addEventListener('click', renderMore)
-        const count = document.createElement('div')
-        count.className = 'pcast-more-count'
-        count.textContent = `Showing ${shown} of ${view.length}`
-        group.append(btn, count)
-        moreWrap.appendChild(group)
-      } else if (data?.community?.truncated) {
-        // Only at the end of the list, where it is an answer rather than a
-        // warning: the ranking above is over the community's most recent 2,000
-        // boosts, not its whole history, and a reader who got this far is the
-        // one for whom that distinction matters.
-        const note = document.createElement('p')
-        note.className = 'ce-note'
-        note.textContent =
-          'Ranked over this community’s 2,000 most recent boosts. They have sent more than that, so an episode boosted only long ago may be missing.'
-        moreWrap.appendChild(note)
-      }
-    }
-
-    // Rank first, filter second — the ordering the feeds' search contract
-    // depends on. There is no search here, but the range filter is the same
-    // narrowing: rank over everything in the window, then paint.
-    function rebuild() {
-      view = sortItems(filterItems(items, rangeKey), sortKey)
-      view.forEach((it, i) => { it._rank = i + 1 })
-      shown = 0
-      cards.textContent = ''
-      moreWrap.textContent = ''
-      if (!view.length) {
-        const empty = document.createElement('div')
-        empty.className = 'feed-placeholder'
-        const strong = document.createElement('strong')
-        strong.textContent = 'Nothing in this window'
-        empty.append(strong, document.createTextNode(
-          'Nothing this community boosted aired or was released in this time range — try a wider one.'))
-        cards.appendChild(empty)
-        return
-      }
-      // Back to the top of the window, not of the page. A re-sort or a range
-      // change replaces the list under the reader; leaving the box scrolled
-      // halfway down would land them in the middle of a ranking they just asked
-      // to have rebuilt, with #1 out of sight above.
-      scroll.scrollTop = 0
-      renderMore()
-      feed.repaintProfiles(cards)
-    }
-
-    // The range filters on when an episode AIRED, not on when it was boosted —
-    // the same axis the Episodes feed uses, and the reason the tooltips are
-    // written per surface rather than inside feed-controls.js. The wording is
-    // neutral because this list is deliberately NOT split on medium: a music
-    // community also boosting podcasts is the interesting half of the finding,
-    // so one list carries both and "aired or released" covers them.
-    ctrlSlot.append(
-      rangeControl(rangeKey, (key) => { if (key !== rangeKey) { rangeKey = key; rebuild() } }, {
-        label: 'Filter by air or release date',
-        titleFor: (key, label) => (rangeDays(key)
-          ? `Aired or released in the last ${rangeDays(key)} days`
-          : label),
-      }),
-      sortControl(CE_SORTS, sortKey, (key) => { if (key !== sortKey) { sortKey = key; rebuild() } }, {
-        tag: 'Community Sort: ',
-        title: 'Change how these episodes are ranked',
-      }),
-    )
-    ctrlSlot.hidden = false
-
-    listSlot.textContent = ''
-    listSlot.appendChild(cards)
-    moreSlot.appendChild(moreWrap)
-    rebuild()
-
-    // The section was an empty zero-height block when the browser resolved the
-    // URL, so an anchor pointing at it parked on whatever followed. Now that it
-    // has a height, put the reader where they asked to be.
-    if (location.hash === '#community-episodes') {
-      revealHashTarget()
-      section.scrollIntoView()
-    }
-
-    profilesReady.then(() => feed.repaintProfiles(cards))
-
-    // Wire the shared reply / repost / like / zap actions once the widget is up,
-    // so the boost notes inside an opened drawer work and hydrate the reader's
-    // existing likes and reposts. Deferred: nothing on screen needs it yet.
-    setTimeout(async () => {
-      try {
-        // Already in the graph — feeds-podcasts.js imports it — so this resolves
-        // from cache rather than fetching again.
-        const actions = await import('/assets/js/boost-actions.js?v=ob-v60')
-        await ensureLoginWidget()
-        actions.configureBoostActions({})
-      } catch { /* the cards still read; only the action bars stay inert */ }
-    }, 1200)
-  })
-}
-
-initCommunityEpisodes()
+initEpisodeSection({
+  selector: '[data-community-episodes]',
+  prefix: 'ce',
+  // The Episodes feed's five sorts, opening on the same "Most boosts" it does.
+  sorts: [
+    ['boosts', 'Most boosts'],
+    ['count', 'Most boosters'],
+    ['sats', 'Most sats'],
+    ['recent', 'Latest boost'],
+    ['episode', 'Latest episode'],
+  ],
+  // "Latest boost" and "Latest episode" are chronological rather than ranked, so
+  // no rank badge is painted under them — a numeral there would read as a score.
+  rankedSorts: new Set(['boosts', 'count', 'sats']),
+  sortTag: 'Community Sort: ',
+  sortTitle: 'Change how these episodes are ranked',
+  fetchCorpus: async () => {
+    const guid = document.body.dataset.episodeGuid
+    const resp = await fetch(`/api/v1/episodes/${encodeURIComponent(guid)}?community=1`, {
+      headers: { Accept: 'application/json' },
+    })
+    if (!resp.ok) throw new Error(`community: HTTP ${resp.status}`)
+    return (await resp.json())?.community?.boosts || []
+  },
+  truncatedNote:
+    'Ranked over this community\u2019s 2,000 most recent boosts. They have sent more than that, so an episode boosted only long ago may be missing.',
+  emptyTitle: 'Nothing in this window',
+  emptyBody: 'Nothing this community boosted aired or was released in this time range \u2014 try a wider one.',
+})
 
 // ── Profile fallback ───────────────────────────────────
 //

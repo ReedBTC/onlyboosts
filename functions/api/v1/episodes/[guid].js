@@ -138,8 +138,15 @@ export async function onRequestGet({ request, env, params }) {
  * which is all the data supports.
  *
  * idx_boosts_item covers the CTE, idx_boosts_booster the scan.
+ *
+ * ⚠️ EXPORTED, AND functions/episode/[guid].js CALLS IT DIRECTLY. That page
+ * server-renders the first thirty cards of this section, so it needs the corpus
+ * inside its own Promise.all rather than through a subrequest to this endpoint.
+ * One query definition, two callers, no HTTP hop — and no chance of the page
+ * ranking over a corpus assembled differently from the one the client later
+ * fetches to re-sort with.
  */
-async function fetchCommunityBoosts(env, guid, showGuid) {
+export async function fetchCommunityBoosts(env, guid, showGuid) {
   const excludeShow = showGuid ? " AND (b.podcast_guid IS NULL OR b.podcast_guid <> ?)" : "";
   const binds = showGuid
     ? [guid, guid, showGuid, COMMUNITY_ROWS + 1]

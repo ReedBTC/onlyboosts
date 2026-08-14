@@ -19,7 +19,7 @@
  * per-user and change as boosts arrive, so a page-lifetime cache would serve a
  * stale feed. The endpoints set their own short Cache-Control.
  */
-import { normalizeBoosts } from '/assets/js/ob-data.js?v=ob-v60'
+import { normalizeBoosts } from '/assets/js/ob-data.js?v=ob-v61'
 
 const BASE = '/api/v1/'
 
@@ -272,7 +272,7 @@ export async function getFollowsBoosts(authors, { maxRows = MAX_EAGER_ROWS, sign
  * carries its own boost notes inline, in the collector's record shape minus the
  * podcast/episode blocks, which ob-data.js#episodeApiToBoosts hydrates back
  * from the parent. That is what lets the whole downstream chain — normalizeBoosts
- * → toEpisodeShape → buildEpisodes → episodeCard — run completely unchanged
+ * → toEpisodeShape → buildEpisodes → episodeCardHtml — run completely unchanged
  * over a corpus that now comes from D1 instead of from static shards.
  *
  * ⚠️ INLINE NOTES ARE CAPPED AT 50 PER EPISODE while `boosts` is the true total,
