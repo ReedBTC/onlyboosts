@@ -279,15 +279,41 @@ export async function lookupMentionProfiles(env, texts) {
   return out;
 }
 
-/* Find the nostr: URIs and bare URLs in a string, in document order.
+/* ⚠️ A BIO IS TYPED BY A HUMAN, SO ITS MENTIONS HAVE NO `nostr:` PREFIX.
+ *
+ * NIP-27 says a CLIENT composing note content emits `nostr:npub1…`, which is
+ * what NOSTR_URI_RE above matches and why boost messages tokenize correctly. A
+ * kind-0 `about` is not composed by a client — someone types it into a profile
+ * editor — so the overwhelmingly common form there is a naked `npub1…`, or one
+ * with a leading `@`. Measured on a live profile in the index
+ * (npub1yvscx9v…, Sir Spencer): two mentions in the bio, both bare, both
+ * rendering as 63 characters of raw bech32 because this pattern demanded the
+ * scheme.
+ *
+ * Only npub and nprofile, because only those are PEOPLE. A `note1…` in a bio has
+ * no face and no name to show, and pubkeyFromBech32 returns null for it anyway,
+ * so it stays text.
+ *
+ * The lookbehind keeps `foonpub1…` from matching mid-token. The bech32 checksum
+ * gate in the renderer is the real guard against a false positive: a word that
+ * merely begins `npub1` fails it and degrades to text.
+ *
+ * An npub sitting INSIDE a URL (njump.me/npub1…) is handled by the ordering in
+ * scanSpans rather than by this pattern: the URL span starts earlier, wins the
+ * cursor, and the mention span inside it is skipped.
+ */
+const BIO_MENTION_RE = /(?<![0-9a-z])(?:nostr:|@)?((?:npub|nprofile)1[023456789acdefghjklmnpqrstuvwxyz]+)/gi;
+
+/* Find the mentions and bare URLs in a string, in document order.
  *
  * Shared by renderMessage and renderBioText, which tokenize identically and
- * differ only in what they emit. A URL that falls inside a nostr: span is
- * skipped rather than double-matched.
+ * differ only in what they emit — and in which mention pattern they pass, which
+ * is the whole reason it is a parameter. A URL that falls inside a mention span
+ * is skipped rather than double-matched.
  */
-function scanSpans(src) {
+function scanSpans(src, mentionRe = NOSTR_URI_RE) {
   const spans = [];
-  for (const m of src.matchAll(NOSTR_URI_RE)) spans.push({ start: m.index, end: m.index + m[0].length, id: m[1], value: m[0], kind: "nostr" });
+  for (const m of src.matchAll(mentionRe)) spans.push({ start: m.index, end: m.index + m[0].length, id: m[1], value: m[0], kind: "nostr" });
   for (const m of src.matchAll(URL_RE)) {
     if (spans.some((s) => m.index >= s.start && m.index < s.end)) continue;
     spans.push({ start: m.index, end: m.index + m[0].length, id: m[0], kind: "url" });
@@ -344,7 +370,10 @@ function linkOut(url) {
 export function renderBioText(text, profiles) {
   const src = truncate(String(text || ""), 2000);
   let out = "", cursor = 0;
-  for (const s of scanSpans(src)) {
+  // BIO_MENTION_RE, not the scheme-only pattern the boost messages use — see
+  // the warning over it. This is the difference between a bio's mentions
+  // rendering and not.
+  for (const s of scanSpans(src, BIO_MENTION_RE)) {
     if (s.start < cursor) continue;
     out += htmlEscape(src.slice(cursor, s.start));
     cursor = s.end;
