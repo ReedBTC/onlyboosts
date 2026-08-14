@@ -1,0 +1,260 @@
+/* /booster/<npub> — deltas only.
+ *
+ * The page links show-page.css, feed-cards.css, boosts-thread.css,
+ * boost-actions.css and episode-page.css and reuses their classes verbatim: the
+ * hero, the .ep-drawer lids, the .cs-* rows, the .ce-scroll container, the stat
+ * tiles, the community-style boost list. What is here is only what a page about
+ * a PERSON needs that a page about a show or an episode does not — the profile
+ * card, the banner, the round avatar and the contact chips.
+ *
+ * Same arrangement as episode-page.css, and the same reasoning: the .show-*
+ * class names stay on identical boxes rather than being mirrored into a parallel
+ * .booster-* set, which would be a rename with no meaning behind it. See the
+ * naming note in CLAUDE.md.
+ *
+ * Everything reads --brand / --ink / --surface / --border off theme.css. There
+ * are no per-feed accents here: those exist only on index.html.
+ */
+
+/* ── The profile card ──────────────────────────────────────────────────────
+ *
+ * One bordered surface holding the banner, the avatar, the identity and the
+ * actions — this page's counterpart to the .ep-card on /episode/<guid>, and for
+ * the same reason: everything about the PERSON is one object, while the stat
+ * tiles below it are about their boosts and sit on the page as they do on both
+ * other pages.
+ *
+ * overflow:hidden is what lets the banner bleed to the card's rounded top
+ * corners without a second border-radius that would have to track this one. */
+.bs-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+/* ── The banner ────────────────────────────────────────────────────────────
+ *
+ * 42.5% of stored profiles carry one. The blank variant is NOT a missing state
+ * to apologise for: it is a flat brand-tinted strip that gives the card a lid
+ * and a place for the avatar to overlap, so a profile with no banner reads as
+ * designed rather than as truncated. booster-page.js swaps a dead banner to the
+ * same variant, so a broken hotlink and an absent field look identical.
+ *
+ * The aspect ratio is fixed rather than the height, so the strip scales with the
+ * card instead of cropping harder on a phone. 4:1 is shallower than Nostr's
+ * conventional 3:1 because this banner sits above a 120px avatar inside a
+ * bordered card rather than filling the top of a screen. */
+.bs-banner {
+  aspect-ratio: 4 / 1;
+  /* A floor and a ceiling: a very wide card should not spend 300px on
+     someone's wallpaper, and a narrow one still needs room for the avatar to
+     overlap into. */
+  min-height: 84px;
+  max-height: 180px;
+  background: var(--tint, rgba(0, 175, 240, 0.08));
+  overflow: hidden;
+}
+.bs-banner img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.bs-banner--blank {
+  /* The brand ramp at low opacity, so the strip belongs to the site rather than
+     reading as an empty grey box waiting for content. */
+  background: linear-gradient(120deg,
+    color-mix(in srgb, var(--brand) 16%, transparent),
+    color-mix(in srgb, var(--brand-d) 10%, transparent));
+}
+
+/* ── The identity block ────────────────────────────────────────────────────
+ *
+ * .show-hero-inner is the two-column art + identity grid both other pages use.
+ * The overlap is the only change: the avatar is pulled up into the banner, which
+ * is what makes the card read as a profile rather than as a header with a
+ * picture beside it. */
+.bs-inner {
+  padding: 0 1.5rem 1.5rem;
+  /* The pull-up has to be less than the avatar's height or the identity column
+     beside it rises off the card's top edge with it. */
+  margin-top: -2.75rem;
+  align-items: end;
+}
+
+.bs-avatar-wrap { align-self: start; }
+
+.bs-avatar {
+  display: block;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--cream-d, rgba(0, 0, 0, 0.06));
+  /* The ring is what separates a dark avatar from a dark banner. It reads as
+     part of the card, so it takes the card's background rather than the
+     brand — a brand ring here would compete with the podium rings on the
+     community walls, where it means "top five". */
+  box-shadow: 0 0 0 4px var(--surface);
+}
+.bs-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.bs-avatar.is-blank {
+  /* No glyph. A silhouette placeholder for a person reads as a broken image;
+     a plain tinted circle reads as an avatar nobody set. */
+  background: linear-gradient(140deg,
+    color-mix(in srgb, var(--brand) 22%, transparent),
+    color-mix(in srgb, var(--brand-d) 14%, transparent));
+}
+
+/* nip05 sits directly under the name, above the boost dates, because it is part
+   of the identity rather than part of the record. The check is decorative and
+   deliberately NOT a verification claim: nothing here re-resolves the
+   .well-known, so it marks that the profile published one. */
+.bs-nip05 {
+  margin: 0.15rem 0 0;
+  font-size: 0.85rem;
+  color: var(--brand-d);
+  overflow-wrap: anywhere;
+}
+.bs-nip05 span { opacity: 0.75; }
+
+/* ── The bio ───────────────────────────────────────────────────────────────
+ *
+ * ⚠️ TWO LINES, WHERE /show CLAMPS TO THREE. Measured over the 1,050 profiles
+ * carrying an `about`: median 60 characters, p75 125, p90 220, and 16.6% run
+ * past 160 — so two clamped lines covers roughly 84% of them outright and a
+ * three-line clamp would ship a "More" control that five profiles in six never
+ * need. Everything else about the control is show-desc.js's, unchanged.
+ *
+ * The selector has to out-specify `.show-desc.is-clamped .show-desc-body`, which
+ * is why it names both classes. */
+.show-desc.bs-bio.is-clamped .show-desc-body {
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+.bs-bio { margin-top: 0.9rem; }
+/* A bio is a stranger's free text and routinely carries a pasted URL, which does
+   not wrap on its own and would otherwise push the card sideways. */
+.bs-bio .show-desc-body { overflow-wrap: anywhere; }
+
+/* ── Lightning address and website ─────────────────────────────────────────
+ *
+ * Chips rather than rows in a definition list: there are at most two, they are
+ * both short, and both are things you take away from the page rather than read
+ * on it. The lightning one is a copy control and NOT a payment control — see the
+ * note over renderContact. */
+.bs-contact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.85rem 0 0;
+}
+/* The slot ships empty and `hidden` so booster-page.js has somewhere to put a
+   lightning address only Primal knows about. Same trap as .cs-row[hidden]
+   above: without this pair the author `display: flex` beats the user agent's
+   [hidden] rule and an empty row of chips reserves space on the 35% of profiles
+   that publish neither field. */
+.bs-contact[hidden] { display: none; }
+.bs-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: 100%;
+  padding: 0.3rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--cream, rgba(0, 0, 0, 0.03));
+  color: var(--ink);
+  font: 600 0.82rem/1.3 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  text-decoration: none;
+  cursor: pointer;
+  /* A lightning address can be long and a website longer; the chip truncates
+     rather than wrapping to two lines or widening the card. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bs-chip:hover,
+.bs-chip:focus-visible {
+  border-color: var(--brand);
+  color: var(--brand-d);
+}
+.bs-chip-glyph { flex: none; opacity: 0.8; }
+
+/* ── The Shows and Albums drawer ───────────────────────────────────────────
+ *
+ * The rows, the lid and the scroll container are all show-page.css's .cs-* and
+ * .ep-list, unchanged. Two additions only.
+ *
+ * An UNIDENTIFIED show has no page, so its row is a <div> carrying .cs-link
+ * rather than an <a>. It must not look clickable: no pointer, no hover, and the
+ * title dimmed so the row reads as a record with a gap in it rather than as a
+ * link that failed. 33% of the shows in the index are in this state, and they
+ * are kept here (where the show page's community drawer drops them) because this
+ * is one person's history and dropping a third of it would under-report what the
+ * stat tile above already counted. */
+/* ⚠️ WITHOUT THIS THE RANGE FILTER DOES NOTHING. `.cs-row` is `display: flex` in
+   show-page.css, and an author `display` declaration beats the user-agent's
+   `[hidden] { display: none }`, so setting el.hidden on a row leaves it on
+   screen. The show page never needed the pair because its community drawer only
+   ever re-orders rows; this page hides them, so it has to say so. `.cs-controls`
+   two hundred lines up in that same file carries exactly this rule for exactly
+   this reason. */
+.cs-row[hidden] { display: none; }
+
+.cs-link--dead {
+  cursor: default;
+  color: inherit;
+}
+.cs-link--dead:hover { background: none; }
+.cs-link--dead .cs-title {
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* ⚠️ RESTATED FROM episode-page.css, which scopes the same rule to
+   .show-main--episode. The cards inside .ce-scroll are a grid of their own
+   inside a .show-section, which has no list-reset to inherit from; without this
+   the first card sits flush against the container's lid. Scoping it there rather
+   than leaving it bare was right for that file — this page simply has to say so
+   too, which is the same arrangement .pcast-sort has between index.html and
+   show-page.css. */
+.show-main--booster .pcast-list {
+  margin-top: 0.4rem;
+}
+
+/* Painted when a range empties the list. Half of all boosters have sent nothing
+   in the last 7 days, so this is an ordinary answer rather than an error, and it
+   is worded as one. */
+.cs-empty {
+  margin: 0;
+  padding: 1.25rem 1rem;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* ── Narrow screens ────────────────────────────────────────────────────────
+ *
+ * The negative margin that pulls the avatar into the banner has to track the
+ * card's padding here the way .ep-card's drawer bleeds do on /episode — the two
+ * are set together or the avatar detaches from the strip above it. */
+@media (max-width: 640px) {
+  .bs-inner {
+    padding: 0 1rem 1.15rem;
+    margin-top: -2.25rem;
+  }
+  .bs-avatar {
+    width: 92px;
+    height: 92px;
+    box-shadow: 0 0 0 3px var(--surface);
+  }
+  .bs-banner { min-height: 68px; }
+  .bs-chip { font-size: 0.78rem; }
+}

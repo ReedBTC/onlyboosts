@@ -359,7 +359,17 @@
 // TCP connect never completes, and a visitor holding the old bundle keeps
 // waiting. No other asset changed, and nothing outside the bundle reads
 // either value, so this bump is required only for the widget's sake.
-const VERSION = 'ob-v56';
+// ob-v57: /booster/<npub>, the third detail page. Almost all of it is NEW URLs —
+// the Function, booster-page.js, booster-page.css — which a returning visitor
+// cannot hold a stale copy of, so they need no bump at all. Exactly one SHARED
+// asset changed: primal-profiles.js gained `about`, `website` and `banner` on
+// the object parseProfileEvent returns, which is what fills the new page's bio
+// and lightning-address chip for a booster the collector has no kind-0 for.
+// A field is safe where a named export is not, so a stale copy degrades to
+// `undefined` and simply backfills nothing rather than failing to link — this
+// bump is what makes that header complete on the FIRST navigation instead of up
+// to four hours later. Nothing else on the site reads those three fields.
+const VERSION = 'ob-v57';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;

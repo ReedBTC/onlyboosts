@@ -83,6 +83,16 @@ export function parseProfileEvent(ev) {
       nip05:   meta.nip05 || '',
       lud16:   typeof meta.lud16 === 'string' ? meta.lud16.trim() : '',
       lud06:   typeof meta.lud06 === 'string' ? meta.lud06.trim() : '',
+      // The three the booster page's header needs and no other caller reads.
+      // ADDING A PROPERTY IS SAFE IN BOTH DIRECTIONS, which is why this is a
+      // change here rather than a new module: a consumer holding a stale copy of
+      // this file simply sees `undefined`, and every reader of these three
+      // treats a falsy value as "not published" already. That is the same
+      // reasoning the note in feed-controls.js gives for optional options —
+      // it is a NAMED EXPORT that cannot be added, not a field.
+      about:   typeof meta.about === 'string' ? meta.about.trim() : '',
+      website: typeof meta.website === 'string' ? meta.website.trim() : '',
+      banner:  isSafeUrl(meta.banner) ? meta.banner : null,
     }
   } catch {
     return { pubkey: ev.pubkey }

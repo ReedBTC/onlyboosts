@@ -94,6 +94,7 @@ const EDGE_PAGES = [
   path.join('functions', '_middleware.js'),
   path.join('functions', 'show', '[guid].js'),
   path.join('functions', 'episode', '[guid].js'),
+  path.join('functions', 'booster', '[npub].js'),
 ];
 
 for (const p of PARTIALS) {

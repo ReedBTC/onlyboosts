@@ -1,6 +1,27 @@
 // GET /api/v1/boosters/:npub — one booster's profile + their boosts (npub or hex).
+//
+// Two shapes, and which one you get is the `corpus` parameter:
+//
+//   (default)   cursor-paged boosts, newest-first — the public API shape
+//   ?corpus=1   every boost this person has sent, in one bounded response
+//
+// THE CORPUS MODE EXISTS FOR /booster/<npub>, which rolls one person's whole
+// history up by episode in the browser and cannot do that from a prefix of it.
+// It is the same shape and the same reasoning as `?community=1` on
+// /api/v1/episodes/<guid>: a client that has to GROUP BY needs the whole window
+// or its ranking is over whatever it happened to page in.
+//
+// ⚠️ THE CAP IS NOT A PAGE SIZE, and it is generous on purpose. Measured over
+// all 1,999 boosters in the live index, the heaviest has 975 boosts, the p99 has
+// 164 and the median has 2 — so CORPUS_CAP truncates nobody today and is a guard
+// against a future outlier rather than a window. If it ever bites, `truncated`
+// says so and the page passes that on rather than letting a ranking over a
+// prefix pose as a ranking over everything.
 import { json, preflight, BOOST_SELECT, boostRecord, toHexPubkey,
          encodeCursor, decodeCursor, clampLimit } from "../_common.js";
+
+// See the note above: ~2x the heaviest booster in the index.
+const CORPUS_CAP = 2000;
 
 export async function onRequestOptions({ request }) { return preflight(request); }
 
@@ -8,11 +29,62 @@ export async function onRequestGet({ request, env, params }) {
   const hex = toHexPubkey(params.npub);
   if (!hex) return json(request, { error: "bad npub/hex" }, { status: 400 });
 
+  // ⚠️ EVERY COLUMN IS NAMED, never SELECT *. That is what made the collector's
+  // five-column migration a non-event on this side: a table gaining columns
+  // cannot change an existing response. The five below (about, lud16, lud06,
+  // website, banner) landed 2026-08-13 and are what the booster page's header
+  // is built from. All of them are nullable — coverage runs 54% for `about`
+  // down to 4.4% for `lud06`.
   const prof = await env.DB.prepare(
-    `SELECT pubkey, name, display_name, picture, nip05 FROM profiles WHERE pubkey = ?`
+    `SELECT pubkey, name, display_name, picture, nip05,
+            about, lud16, lud06, website, banner
+     FROM profiles WHERE pubkey = ?`
   ).bind(hex).first();
 
   const u = new URL(request.url);
+
+  // The npub as it should be echoed back. Accepting hex on input is a
+  // convenience; every consumer wants the bech32 form, and when the caller gave
+  // us hex we can still recover it from any of their boost rows, which store it.
+  const givenNpub = String(params.npub || "").startsWith("npub") ? params.npub : null;
+
+  const booster = (npubFromRows) => ({
+    pk: hex,
+    npub: givenNpub || npubFromRows || null,
+    name: prof?.name ?? null,
+    display_name: prof?.display_name ?? null,
+    pic: prof?.picture ?? null,
+    nip05: prof?.nip05 ?? null,
+    about: prof?.about ?? null,
+    lud16: prof?.lud16 ?? null,
+    lud06: prof?.lud06 ?? null,
+    website: prof?.website ?? null,
+    banner: prof?.banner ?? null,
+  });
+
+  // ── the whole history, one response ────────────────────────────────────────
+  if (u.searchParams.get("corpus") === "1") {
+    const { results } = await env.DB.prepare(
+      `${BOOST_SELECT} WHERE b.booster_pubkey = ?
+       ORDER BY b.created_at DESC, b.event_id DESC LIMIT ?`
+    ).bind(hex, CORPUS_CAP + 1).all();
+
+    // One row over the cap is fetched purely to detect the truncation, then
+    // dropped. Asking for exactly the cap cannot tell "there are precisely this
+    // many" from "there are more".
+    const rows = results || [];
+    const truncated = rows.length > CORPUS_CAP;
+    const boosts = (truncated ? rows.slice(0, CORPUS_CAP) : rows).map(boostRecord);
+
+    return json(request, {
+      booster: booster(rows[0]?.booster_npub),
+      // Nested rather than flat, so a caller can never mistake this for the
+      // paged shape and start looking for a cursor that is deliberately absent.
+      corpus: { boosts, truncated, count: boosts.length },
+    });
+  }
+
+  // ── the paged shape ────────────────────────────────────────────────────────
   const limit = clampLimit(u.searchParams.get("limit"));
   const args = [hex];
   let curClause = "";
@@ -28,10 +100,7 @@ export async function onRequestGet({ request, env, params }) {
 
   const boosts = results.map(boostRecord);
   return json(request, {
-    booster: prof
-      ? { pk: hex, npub: params.npub.startsWith("npub") ? params.npub : null,
-          name: prof.name, display_name: prof.display_name, pic: prof.picture, nip05: prof.nip05 }
-      : { pk: hex, npub: null, name: null, pic: null },
+    booster: booster(results[0]?.booster_npub),
     count: boosts.length,
     next_cursor: boosts.length === limit ? encodeCursor(results[results.length - 1]) : null,
     boosts,
