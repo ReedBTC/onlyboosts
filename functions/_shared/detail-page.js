@@ -253,11 +253,39 @@ export async function lookupMentionNames(env, messages) {
   return names;
 }
 
-// A boost message as HTML: nostr: URIs become @Name chips, bare URLs become
-// links, everything else is escaped text. Mirrors buildMentionEl() in
-// boosts-thread.js, including the .nostr-mention class and the njump target.
-export function renderMessage(text, names) {
-  const src = truncate(String(text || ""), 420);
+/* Profiles, not just names, for every npub mentioned across a set of texts.
+ *
+ * The sibling of lookupMentionNames above, and separate from it rather than a
+ * widening of it: that function's Map holds STRINGS and renderMessage does
+ * `names.get(pk)` expecting one, so changing its value type would have to
+ * change both boost surfaces at once for the benefit of a third. This returns
+ * `{ name, picture }` because a bio mention renders as a face and a name where
+ * a boost-message mention renders as a text chip.
+ */
+export async function lookupMentionProfiles(env, texts) {
+  const out = new Map();
+  const mentioned = mentionedPubkeys(texts).slice(0, 90);
+  if (!mentioned.length) return out;
+  const rows = await env.DB.prepare(
+    `SELECT pubkey, name, display_name, picture FROM profiles
+     WHERE pubkey IN (${mentioned.map(() => "?").join(",")})`
+  ).bind(...mentioned).all();
+  for (const p of rows.results || []) {
+    out.set(p.pubkey, {
+      name: p.display_name || p.name || null,
+      picture: isSafeUrl(p.picture) ? p.picture : null,
+    });
+  }
+  return out;
+}
+
+/* Find the nostr: URIs and bare URLs in a string, in document order.
+ *
+ * Shared by renderMessage and renderBioText, which tokenize identically and
+ * differ only in what they emit. A URL that falls inside a nostr: span is
+ * skipped rather than double-matched.
+ */
+function scanSpans(src) {
   const spans = [];
   for (const m of src.matchAll(NOSTR_URI_RE)) spans.push({ start: m.index, end: m.index + m[0].length, id: m[1], value: m[0], kind: "nostr" });
   for (const m of src.matchAll(URL_RE)) {
@@ -265,18 +293,94 @@ export function renderMessage(text, names) {
     spans.push({ start: m.index, end: m.index + m[0].length, id: m[0], kind: "url" });
   }
   spans.sort((a, b) => a.start - b.start);
+  return spans;
+}
+
+/* One link, escaped and bounded. Shared by renderMessage and renderBioText.
+ *
+ * ⚠️ TRAILING SENTENCE PUNCTUATION IS NOT PART OF THE URL. The URL pattern is
+ * greedy to the next whitespace, so "book at https://example.com/hire." put the
+ * full stop inside the href and produced a link that 404s. It is trimmed back
+ * and re-emitted as text after the anchor, which is what linkifyNotes on
+ * /episode/<guid> has always done and what this had not.
+ *
+ * This corrects boost messages on /show and /episode as well as bios, since all
+ * three now share this function — the same defect was live on every message
+ * carrying a sentence-final URL.
+ */
+function linkOut(url) {
+  const raw = String(url).replace(/[.,;:!?)\]]+$/, "");
+  const tail = String(url).slice(raw.length);
+  const body = isSafeUrl(raw)
+    ? `<a href="${htmlEscape(raw)}" target="_blank" rel="noopener noreferrer">${htmlEscape(truncate(raw, 60))}</a>`
+    : htmlEscape(raw);
+  return body + htmlEscape(tail);
+}
+
+/* A booster's kind-0 `about` as HTML, for the header on /booster/<npub>.
+ *
+ * Same tokenizer as renderMessage, two deliberate differences in what it emits:
+ *
+ * ⚠️ A MENTION IS NOT A LINK HERE. On a boost message an @Name chip opens njump,
+ * which resolves any npub. In a bio the obvious destination would be
+ * /booster/<npub> — and that page only exists for people who have BOOSTED, which
+ * a mentioned npub need never have done. Rather than link some mentions and not
+ * others, or link them all and 404 for most, none of them link. njump is not
+ * used either: on this page, unlike a boost message, the mention sits inside a
+ * two-line clamped paragraph where a row of outbound chips would read as the
+ * bio's main content.
+ *
+ * ⚠️ IT SHOWS A FACE. The chip is a small avatar plus the display name, which is
+ * how every Nostr client renders a mention and is why the profile lookup above
+ * returns pictures. A mention we cannot resolve degrades to `@npub1abc…`, and
+ * carries data-pk/data-missing so booster-page.js can fill it from Primal in the
+ * same batch it already fetches the subject with — most mentioned npubs are not
+ * in our index at all, so that fallback is the common path rather than the edge.
+ *
+ * Truncated far longer than a boost message's 420: bios run to a measured
+ * maximum of 4,965 characters, and the two-line clamp is what actually bounds
+ * what a reader sees.
+ */
+export function renderBioText(text, profiles) {
+  const src = truncate(String(text || ""), 2000);
+  let out = "", cursor = 0;
+  for (const s of scanSpans(src)) {
+    if (s.start < cursor) continue;
+    out += htmlEscape(src.slice(cursor, s.start));
+    cursor = s.end;
+    if (s.kind === "url") { out += linkOut(s.id); continue; }
+
+    // Same checksum gate as renderMessage: a corrupted identifier is text, not
+    // a mis-resolved person. It also fixes the one tokenizing edge case, where
+    // two mentions run together capture one character too many.
+    const pk = bech32ToBytes(s.id) ? pubkeyFromBech32(s.id) : null;
+    if (!pk) { out += htmlEscape(s.value ?? s.id); continue; }
+
+    const prof = profiles?.get(pk) || null;
+    const label = prof?.name ? "@" + prof.name : "@" + s.id.slice(0, 14) + "…";
+    const missing = [prof?.name ? null : "name", prof?.picture ? null : "pic"].filter(Boolean).join(" ");
+    out += `<span class="bs-mention"${missing ? ` data-pk="${htmlEscape(pk)}" data-missing="${htmlEscape(missing)}"` : ""}>` +
+      (prof?.picture
+        ? `<img class="bs-mention-pic" src="${htmlEscape(prof.picture)}" alt="" loading="lazy" referrerpolicy="no-referrer" />`
+        : `<span class="bs-mention-pic is-blank" aria-hidden="true"></span>`) +
+      `<span class="bs-mention-name">${htmlEscape(label)}</span></span>`;
+  }
+  return out + htmlEscape(src.slice(cursor));
+}
+
+// A boost message as HTML: nostr: URIs become @Name chips, bare URLs become
+// links, everything else is escaped text. Mirrors buildMentionEl() in
+// boosts-thread.js, including the .nostr-mention class and the njump target.
+export function renderMessage(text, names) {
+  const src = truncate(String(text || ""), 420);
+  const spans = scanSpans(src);
 
   let out = "", cursor = 0;
   for (const s of spans) {
     if (s.start < cursor) continue;
     out += htmlEscape(src.slice(cursor, s.start));
     cursor = s.end;
-    if (s.kind === "url") {
-      out += isSafeUrl(s.id)
-        ? `<a href="${htmlEscape(s.id)}" target="_blank" rel="noopener noreferrer">${htmlEscape(truncate(s.id, 60))}</a>`
-        : htmlEscape(s.id);
-      continue;
-    }
+    if (s.kind === "url") { out += linkOut(s.id); continue; }
     // An identifier that fails its checksum is left as plain text rather than
     // linked. It would only ever open an empty njump tab, and it is also how
     // the one tokenizing edge case resolves itself: bech32's charset includes

@@ -136,11 +136,103 @@ document.addEventListener('click', async (e) => {
 // Everything below runs POST-PAINT and changes nothing on failure: the header is
 // complete and readable as rendered, and a visitor with no JavaScript keeps the
 // shortened npub, the blank circle and no bio.
-async function hydrateHeader() {
-  const card = document.querySelector('.bs-card[data-pk][data-missing]')
-  if (!card || !PK) return
+/* Bare URLs in a string → text nodes and anchors, appended to `el`.
+ *
+ * ⚠️ THIS IS THE PRIMAL PATH ONLY, AND IT IS DELIBERATELY POORER THAN THE
+ * SERVER'S. renderBioText on the server resolves `nostr:` mentions into faces;
+ * doing that here would need a bech32 decoder, and the only one on the client is
+ * inside nostr-tools — 102KB pulled onto a page whose whole design is that it
+ * reads without it, to serve the minority of profiles where D1 has no `about`
+ * and Primal does. So a Primal-supplied bio gets its links and leaves any
+ * mention as the raw npub text. Stated rather than hidden; if it ever matters,
+ * the fix is a small standalone decoder, not the whole library.
+ *
+ * Nothing here touches innerHTML — a bio is a stranger's free text.
+ */
+const BIO_URL_RE = /https?:\/\/[^\s<>"']+/g
+function paintBioText(el, text) {
+  const src = String(text || '').slice(0, 2000)
+  const frag = document.createDocumentFragment()
+  let cursor = 0
+  for (const m of src.matchAll(BIO_URL_RE)) {
+    if (m.index > cursor) frag.appendChild(document.createTextNode(src.slice(cursor, m.index)))
+    cursor = m.index + m[0].length
+    // A trailing sentence period is punctuation, not part of the URL — the same
+    // trim linkifyNotes makes on /episode.
+    const raw = m[0].replace(/[.,;:)\]]+$/, '')
+    const tail = m[0].slice(raw.length)
+    let ok = false
+    try { const u = new URL(raw); ok = u.protocol === 'http:' || u.protocol === 'https:' } catch { ok = false }
+    if (ok) {
+      const a = document.createElement('a')
+      a.href = raw
+      a.target = '_blank'
+      a.rel = 'noopener noreferrer'
+      a.textContent = raw.length > 60 ? raw.slice(0, 59) + '…' : raw
+      frag.appendChild(a)
+    } else {
+      frag.appendChild(document.createTextNode(raw))
+    }
+    if (tail) frag.appendChild(document.createTextNode(tail))
+  }
+  frag.appendChild(document.createTextNode(src.slice(cursor)))
+  el.replaceChildren(frag)
+}
 
-  const found = await fetchProfiles([PK])
+/* Fill a `nostr:` mention chip the server could not resolve.
+ *
+ * These are the COMMON case rather than the edge, which is why they ride the
+ * same batch as the subject: a mentioned npub need never have boosted anything,
+ * so most of them are in no table of ours at all.
+ */
+function fillMention(el, prof) {
+  const missing = (el.getAttribute('data-missing') || '').split(' ')
+  if (missing.includes('name') && prof.name) {
+    const nameEl = el.querySelector('.bs-mention-name')
+    if (nameEl) nameEl.textContent = '@' + prof.name
+  }
+  if (missing.includes('pic') && prof.picture) {
+    const blank = el.querySelector('.bs-mention-pic.is-blank')
+    if (blank) {
+      const img = document.createElement('img')
+      img.className = 'bs-mention-pic'
+      img.alt = ''
+      img.loading = 'lazy'
+      img.referrerPolicy = 'no-referrer'
+      // A dead hotlink returns the chip to the blank dot it already had.
+      img.onerror = () => { img.replaceWith(blank) }
+      img.src = prof.picture
+      blank.replaceWith(img)
+    }
+  }
+  el.removeAttribute('data-missing')
+}
+
+async function hydrateHeader() {
+  const card = document.querySelector('.bs-card')
+  if (!card) return
+
+  // Two kinds of gap, one request. The subject's own fields are missing on the
+  // 51 boosters with no kind-0 and on anyone the collector has not resolved yet;
+  // the bio's mentions are missing far more often than that. Batching them means
+  // a header with an unresolved subject AND three mentions costs one round trip.
+  const subjectMissing = Boolean(PK) && card.hasAttribute('data-missing')
+  const mentionEls = Array.from(card.querySelectorAll('.bs-mention[data-pk][data-missing]'))
+
+  const want = new Set()
+  if (subjectMissing) want.add(PK)
+  for (const el of mentionEls) want.add(el.getAttribute('data-pk'))
+  if (!want.size) return
+
+  const found = await fetchProfiles([...want])
+  if (!found.size) return
+
+  for (const el of mentionEls) {
+    const prof = found.get(el.getAttribute('data-pk'))
+    if (prof) fillMention(el, prof)
+  }
+
+  if (!subjectMissing) return
   const prof = found.get(PK)
   if (!prof) return
 
@@ -179,7 +271,8 @@ async function hydrateHeader() {
     const wrap = card.querySelector('[data-show-desc]')
     const body = card.querySelector('[data-bs-about]')
     if (wrap && body) {
-      body.textContent = String(prof.about).slice(0, 2000)
+      // Links, but no mention faces — see the note over paintBioText.
+      paintBioText(body, prof.about)
       wrap.hidden = false
       // The one call on this path. It did not run at load, because there was no
       // bio to clamp; now there is. See the note beside the server-path call.

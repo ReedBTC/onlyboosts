@@ -151,6 +151,57 @@
 /* A bio is a stranger's free text and routinely carries a pasted URL, which does
    not wrap on its own and would otherwise push the card sideways. */
 .bs-bio .show-desc-body { overflow-wrap: anywhere; }
+.bs-bio a { color: var(--brand-d); font-weight: 600; text-decoration: none; }
+.bs-bio a:hover { color: var(--brand-dd); text-decoration: underline; }
+
+/* ── A `nostr:` mention inside a bio ───────────────────────────────────────
+ *
+ * A small face and a display name, which is how every Nostr client renders one.
+ * ⚠️ NOT A LINK, and not styled as one — see renderBioText in
+ * functions/_shared/detail-page.js. /booster/<npub> only exists for people who
+ * have BOOSTED, and a mentioned npub need never have done; rather than link some
+ * and 404 the rest, none of them link, so this must not borrow the brand colour
+ * that says "clickable" everywhere else on the page.
+ *
+ * inline-flex with a baseline alignment, so the chip sits IN the sentence rather
+ * than beside it. Its height is deliberately close to the line box: the bio is
+ * clamped to two lines, and a chip taller than the leading would make one line
+ * of a two-line paragraph visibly taller than the other. */
+.bs-mention {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28em;
+  vertical-align: baseline;
+  padding: 0 0.34em 0 0.18em;
+  border-radius: 999px;
+  background: var(--cream-d, rgba(0, 0, 0, 0.05));
+  font-weight: 600;
+  color: var(--ink);
+  /* The npub fallback is 15 characters of bech32 and must not be broken across
+     a line at an arbitrary point the way the surrounding prose may be. */
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bs-mention-pic {
+  width: 1.15em;
+  height: 1.15em;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: none;
+  background: var(--border);
+}
+/* The dot a mention we could not resolve keeps. Not a silhouette glyph: at
+   1.15em a glyph is illegible, and a flat tinted circle reads as an avatar
+   nobody has rather than as a broken image. */
+.bs-mention-pic.is-blank {
+  display: inline-block;
+  background: linear-gradient(140deg,
+    color-mix(in srgb, var(--brand) 30%, transparent),
+    color-mix(in srgb, var(--brand-d) 18%, transparent));
+}
+.bs-mention-name { overflow: hidden; text-overflow: ellipsis; }
 
 /* ── Lightning address and website ─────────────────────────────────────────
  *

@@ -34,7 +34,8 @@
 // Do not hand-edit it here.
 import {
   htmlEscape, jsonForScript, isSafeUrl, num, compact, fmtDate, relTime,
-  truncate, shortId, lookupMentionNames, renderBoosts,
+  truncate, shortId, lookupMentionNames, lookupMentionProfiles, renderBioText,
+  renderBoosts,
 } from "../_shared/detail-page.js";
 
 const SITE_ORIGIN = "https://onlyboosts.social";
@@ -182,7 +183,16 @@ export async function onRequestGet({ env, params }) {
   if (!totals || !Number(totals.boosts)) return notFound(raw);
 
   const boostRows = boosts.results || [];
-  const names = await lookupMentionNames(env, boostRows.map((r) => r.message));
+  // Two lookups against the same table and deliberately not one. The boost list
+  // wants names for its text chips; the bio wants names AND pictures for its
+  // face chips, and merging them would make every /show and /episode render
+  // carry a `picture` column it has no use for.
+  const [names, bioProfiles] = await Promise.all([
+    lookupMentionNames(env, boostRows.map((r) => r.message)),
+    // Skipped entirely when the bio has no mention in it, which is the common
+    // case — mentionedPubkeys returns empty and the helper never queries.
+    lookupMentionProfiles(env, [prof?.about || ""]),
+  ]);
 
   const html = renderBoosterPage({
     hex,
@@ -192,6 +202,7 @@ export async function onRequestGet({ env, params }) {
     shows: shows.results || [],
     boosts: boostRows,
     names,
+    bioProfiles,
   });
 
   return new Response(html, {
@@ -234,7 +245,7 @@ function toHexPubkey(s) {
 
 // ── the page ─────────────────────────────────────────────────────────────────
 
-function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names }) {
+function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioProfiles }) {
   const realName = prof?.display_name || prof?.name || null;
   const label = realName || shortId(npub, hex);
   const pageUrl = `${SITE_ORIGIN}/booster/${encodeURIComponent(npub || hex)}`;
@@ -448,7 +459,7 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names }) {
     <span class="show-back-arrow" aria-hidden="true">←</span><span data-back-label>All Boosts</span>
   </a>
 
-  ${renderHeader({ hex, npub, prof, label, realName, pic, banner, stats, totals })}
+  ${renderHeader({ hex, npub, prof, label, realName, pic, banner, stats, totals, bioProfiles })}
 
   ${renderShows(shows)}
 
@@ -552,7 +563,7 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names }) {
 // the 1,948 stored profiles: about 53.9%, lud16 64.7%, website 18.8%,
 // banner 42.5%, lud06 4.4%. A header built as a form with empty rows would be
 // mostly empty rows; every one of these prints or is absent.
-function renderHeader({ hex, npub, prof, label, realName, pic, banner, stats, totals }) {
+function renderHeader({ hex, npub, prof, label, realName, pic, banner, stats, totals, bioProfiles }) {
   const nip05 = String(prof?.nip05 || "").trim();
   const about = String(prof?.about || "").trim();
   const website = isSafeUrl(prof?.website) ? prof.website : null;
@@ -610,7 +621,7 @@ function renderHeader({ hex, npub, prof, label, realName, pic, banner, stats, to
         <h1 data-bs-name>${htmlEscape(label)}</h1>
         ${nip05 ? `<p class="bs-nip05" data-bs-nip05><span aria-hidden="true">✓</span> ${htmlEscape(truncate(nip05, 60))}</p>` : `<p class="bs-nip05" data-bs-nip05 hidden></p>`}
         <p class="show-sub">${bits.map(htmlEscape).join(" · ") || "No boosts recorded yet"}</p>
-        ${renderBio(about)}
+        ${renderBio(about, bioProfiles)}
         ${renderContact({ lud16, lud06, website })}
         <div class="show-actions">
           <!-- In the flow under the bio rather than absolutely placed at the
@@ -652,10 +663,16 @@ function renderHeader({ hex, npub, prof, label, realName, pic, banner, stats, to
  * Ships EMPTY AND HIDDEN when there is none, rather than being omitted: 46% of
  * profiles have no `about`, and Primal's cache sometimes carries one for a
  * booster whose D1 row does not. booster-page.js fills and reveals it.
+ *
+ * URLs in it are links and `nostr:` mentions render as a small face plus a
+ * display name. Neither is decoration: a bio routinely IS a link ("book at
+ * …"), and a mention rendered raw is 63 characters of bech32 in the middle of a
+ * sentence, which is most of a two-line clamp spent on noise. See renderBioText
+ * for why the mentions are deliberately NOT clickable.
  */
-function renderBio(about) {
+function renderBio(about, bioProfiles) {
   return `<div class="show-desc bs-bio" data-show-desc${about ? "" : " hidden"}>
-            <div class="show-desc-body" data-show-desc-body data-bs-about>${about ? htmlEscape(truncate(about, 2000)) : ""}</div>
+            <div class="show-desc-body" data-show-desc-body data-bs-about>${about ? renderBioText(about, bioProfiles) : ""}</div>
           </div>`;
 }
 
