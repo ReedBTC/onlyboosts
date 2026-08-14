@@ -39,10 +39,28 @@
   flex-shrink: 0;
   background: var(--cream-d);
 }
+/* The avatar's link wrapper on a boost card. It exists only to carry the href —
+   `.note-author img` above still sizes the image inside it — so it must not
+   introduce a box of its own or the author row's alignment shifts. */
+.note-avatar-link {
+  display: flex;
+  flex-shrink: 0;
+  line-height: 0;
+  border-radius: 50%;
+}
+.note-avatar-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
 .note-author .author-name {
   font-weight: 700;
   color: var(--navy);
 }
+/* The name is an <a> to /booster/<npub> now. It keeps the weight and colour it
+   had as a span — a row of blue underlined names would read as a list of links
+   rather than as the people who sent these boosts — and earns its underline on
+   hover, which is the same affordance the episode title on these cards uses. */
+.note-author a.author-name { text-decoration: none; }
+.note-author a.author-name:hover { color: var(--brand-d); text-decoration: underline; }
+.note-author a.author-name:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .note-author .author-handle {
   color: var(--muted);
   font-size: 0.78rem;

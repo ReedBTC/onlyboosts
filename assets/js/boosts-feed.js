@@ -32,7 +32,14 @@
  */
 import { nip19 } from '/assets/widgets/nostr-tools.js'
 import { buildActionBar, configureBoostActions } from '/assets/js/boost-actions.js'
-import { wireNpubCopy } from '/assets/js/copy-npub.js'
+// ⚠️ wireNpubCopy WAS IMPORTED HERE and is not any more. The avatar and the name
+// were its only two callers on this feed, and both are now links to
+// /booster/<npub>. Unlike the Episodes drawer — where the per-boost ⋮ menu
+// absorbed the gesture — a Boosts card has no menu, so copying a booster's npub
+// from this feed means opening their page, which leads with the button.
+// Its own module rather than a third export from show-link.js; see the note at
+// the head of booster-link.js and the ob-v53 entry in CLAUDE.md.
+import { boosterPageHref, markBoosterLink } from '/assets/js/booster-link.js'
 import { parseSegments, renderSegmentsInto, setCachedProfile } from '/assets/js/boosts-thread.js'
 import { fetchProfiles } from '/assets/js/primal-profiles.js'
 import { ensureLoginWidget } from '/assets/js/widget-loader.js'
@@ -209,14 +216,31 @@ function renderBoostCard(b) {
     b.booster.pic, b.podcast.img, b.podcast.art2, '/assets/avatar-fallback.svg',
   ))
 
-  const nameEl = h('span', { class: 'author-name', text: boosterLabel(b.booster) })
+  /* ⚠️ THE AVATAR AND THE NAME USED TO COPY THE NPUB AND NOW OPEN THAT
+   * BOOSTER'S PAGE. The gesture moved rather than being dropped:
+   * /booster/<npub> leads with a Copy npub button, and the card's own ⋮ menu is
+   * where a reader who wants the identifier without leaving the feed finds it.
+   *
+   * The NAME is the primary link and the avatar is marked secondary — one card
+   * offering two tab stops and two announcements for one destination is what
+   * that flag exists to prevent. Both stay clickable with a mouse.
+   *
+   * The label falls back to the pubkey because `booster.npub` is nullable where
+   * `booster.pk` is not, and /booster/<npub> accepts either form. */
+  const npub = boosterNpub(b.booster)
+  const label = boosterLabel(b.booster)
+  const href = boosterPageHref(npub, b.booster.pk)
+
+  const nameEl = href
+    ? markBoosterLink(h('a', { class: 'author-name', href, text: label }), { label })
+    : h('span', { class: 'author-name', text: label })
   const nameWrap = h('div', { class: 'note-author-name-wrap' }, [nameEl])
 
-  // Avatar and name both copy the booster's npub — the same gesture the
-  // Episodes feed's booster avatars already offer.
-  const npub = boosterNpub(b.booster)
-  wireNpubCopy(img, npub)
-  wireNpubCopy(nameEl, npub)
+  // The avatar is wrapped rather than turned into a link, so wireCoverFallback
+  // above keeps operating on the <img> it was handed.
+  const avatarEl = href
+    ? markBoosterLink(h('a', { class: 'note-avatar-link', href }, [img]), { label, secondary: true })
+    : img
 
   const time = h('time', {
     datetime: new Date(b.ts * 1000).toISOString(),
@@ -225,7 +249,7 @@ function renderBoostCard(b) {
   })
 
   const card = h('article', { class: 'note-card' }, [
-    h('div', { class: 'note-author' }, [img, nameWrap, time]),
+    h('div', { class: 'note-author' }, [avatarEl, nameWrap, time]),
   ])
 
   // What was boosted. Every part is optional: podcast.guid is null on ~2% of

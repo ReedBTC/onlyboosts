@@ -464,6 +464,11 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names }) {
     // rather than a repeat of the <h1>. This is the page renderBoosts' default
     // was written for.
     showTarget: true,
+    // ⚠️ AND FALSE HERE, uniquely. Every row belongs to the booster whose page
+    // this is, so the sweep that pointed every name and avatar at
+    // /booster/<npub> would point this page at itself once per row. Same rule as
+    // showTarget one line up, one column over.
+    linkBooster: false,
   })}
 
 </main>

@@ -369,7 +369,22 @@
 // `undefined` and simply backfills nothing rather than failing to link — this
 // bump is what makes that header complete on the FIRST navigation instead of up
 // to four hours later. Nothing else on the site reads those three fields.
-const VERSION = 'ob-v57';
+// ob-v58: every booster's display name and avatar now links to
+// /booster/<npub>, across the Episodes/Songs drawer rows, the Boosts cards, the
+// Nostr Community wall and the boost lists on both detail pages.
+//
+// REQUIRED, and the CSS half is why. The renderers now emit <a> where they
+// emitted <button> and <span>, and the rules that keep those anchors looking
+// like the controls they replaced live in feed-cards.css, boosts-thread.css and
+// show-page.css. A returning visitor holding fresh JavaScript against any stale
+// one of those three gets underlined, link-blue names through the feeds — the
+// same shape as the ob-v47 pairing, where a page's two halves have to turn over
+// together.
+//
+// The JavaScript half degrades gracefully on its own: booster-link.js is a NEW
+// module, so a browser can only resolve or 404 it, and a stale feed renderer
+// simply keeps copying npubs on click. It is the stylesheets that cannot lag.
+const VERSION = 'ob-v58';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;

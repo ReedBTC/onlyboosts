@@ -102,6 +102,37 @@ export function displayName(r) {
   return r.display_name || r.pr_dname || r.name || r.pr_name || null;
 }
 
+/* One booster's page.
+ *
+ * ⚠️ A SECOND COPY OF assets/js/booster-link.js#boosterPageHref, and it exists
+ * for the same reason episodePageUrl in functions/show/[guid].js does: a Pages
+ * Function cannot import a client module. THE TWO MUST AGREE. Both are marked.
+ *
+ * The rule is simply "there is an identifier", which is the whole reason this
+ * sweep needed no fallbacks: a booster page qualifies on HAVING BOOSTED, and
+ * every booster rendered by this file is there because they boosted. Contrast
+ * episodePageUrl, which is withheld from the 500 titleless episodes and forces
+ * every calling surface to carry a fallback destination.
+ *
+ * `booster.npub` is nullable where the pubkey is not, so the hex form is the
+ * fallback; /booster/<npub> accepts both.
+ */
+export function boosterPageUrl(npub, pk) {
+  // ⚠️ EACH CANDIDATE IS TRIED IN TURN, never `npub || pk` collapsed into one
+  // string. A malformed npub would otherwise win over a perfectly good pubkey
+  // and the row would render unlinked — bech32 excludes `1`, `b`, `i` and `o`,
+  // so a value that merely looks npub-shaped can still fail. The pubkey is the
+  // row's own primary key, so this always resolves for a real record.
+  for (const cand of [npub, pk]) {
+    const s = String(cand || "").trim();
+    if (!s) continue;
+    if (/^npub1[023456789acdefghjklmnpqrstuvwxyz]+$/i.test(s) || /^[0-9a-f]{64}$/i.test(s)) {
+      return `/booster/${encodeURIComponent(s)}`;
+    }
+  }
+  return null;
+}
+
 // ── nostr: URIs in boost messages ────────────────────────────────────────────
 //
 // The two client feeds render mentions through boosts-thread.js#parseSegments,
@@ -338,26 +369,51 @@ export function renderSupporters(rows, { sub, empty }) {
 // No rank number. The wall is ordered by sats, so position already says
 // standing, and a numeral on every avatar turned a community into a scoreboard.
 // The podium's larger avatars are what mark the top of the order now.
+//
+// ⚠️ THE AVATAR WAS A COPY-NPUB BUTTON AND IS NOW A LINK TO THAT BOOSTER'S PAGE.
+// The gesture is not lost, it MOVED: /booster/<npub> leads with a "Copy npub"
+// button, on a page that also says whose npub it is. That trade is the whole
+// point of the page existing — a face on a wall that copies a string is a dead
+// end, where a face that opens the person's history is the same navigation the
+// show name and the episode title already do.
+//
+// ONE anchor wrapping the avatar AND the name, not two. Two links to one
+// destination inside one card is announced twice and tabbed through twice; the
+// sats stay outside it, being a figure rather than a way in. `.sup-link`
+// restates the card's own column layout so the wrapper costs nothing visually —
+// see show-page.css.
 function supporterCard(r, isPodium, hidden = false) {
   const name = displayName(r);
   const label = name || shortId(r.booster_npub, r.booster_pubkey);
   const pic = isSafeUrl(r.picture) ? r.picture : null;
-  // npub is nullable where the pubkey is not; the copy button falls back to hex
-  // so the control is never dead.
-  const copyVal = r.booster_npub || r.booster_pubkey;
+  const href = boosterPageUrl(r.booster_npub, r.booster_pubkey);
 
   // What the index couldn't supply is declared for the client to fill from
   // Primal (detail-page.js#hydrateProfiles). Nothing here waits on that: the
   // card is complete and readable as rendered, and a visitor with no JavaScript
   // keeps the shortened npub and the blank circle.
+  //
+  // hydrateProfiles reaches `.sup-name` and `.sup-avatar` by class from this
+  // <li>, so wrapping them in the anchor below leaves it working untouched.
   const missing = [name ? null : "name", pic ? null : "pic"].filter(Boolean).join(" ");
+
+  const inner = `<span class="sup-avatar${pic ? "" : " is-blank"}">
+            ${pic ? `<img src="${htmlEscape(pic)}" alt="" loading="lazy" />` : ""}
+          </span>
+          <span class="sup-name" title="${htmlEscape(label)}">${htmlEscape(label)}</span>`;
+
+  // A booster with neither an npub nor a pubkey cannot happen — the pubkey is
+  // the row's own key — but the card renders unlinked rather than emitting a
+  // dead href if one ever does.
+  const body = href
+    ? `<a class="sup-link" href="${htmlEscape(href)}" title="Boosts by ${htmlEscape(label)}">
+          ${inner}
+        </a>`
+    : `<span class="sup-link">${inner}</span>`;
 
   return `<li class="sup-card${isPodium ? " sup-card--podium" : ""}"${hidden ? " hidden data-overflow" : ""}${
         missing ? ` data-pk="${htmlEscape(r.booster_pubkey)}" data-missing="${missing}"` : ""}>
-        <button type="button" class="sup-avatar${pic ? "" : " is-blank"}" data-copy-npub="${htmlEscape(copyVal)}" title="Copy npub" aria-label="Copy npub for ${htmlEscape(label)}">
-          ${pic ? `<img src="${htmlEscape(pic)}" alt="" loading="lazy" />` : ""}
-        </button>
-        <span class="sup-name" title="${htmlEscape(label)}">${htmlEscape(label)}</span>
+        ${body}
         <span class="sup-sats" title="${htmlEscape(num(r.sats))} sats across ${htmlEscape(num(r.boosts))} boosts">${htmlEscape(compact(r.sats))} sats</span>
       </li>`;
 }
@@ -375,7 +431,12 @@ function supporterCard(r, isPodium, hidden = false) {
 // the show page's: on an episode page every boost in the list targets the same
 // episode the reader is already on, so the line would repeat the <h1> once per
 // row. Pass `showTarget: false` there.
-export function renderBoosts(rows, names, { heading, sub, itemAbbr, noun, showTarget = true }) {
+//
+// `linkBooster` is false on ONE page: /booster/<npub>, where every row belongs
+// to the booster whose page it is, so linking each one would point the page at
+// itself once per row. The same reasoning as `showTarget` above, one column
+// over — a row must not repeat what the <h1> already said.
+export function renderBoosts(rows, names, { heading, sub, itemAbbr, noun, showTarget = true, linkBooster = true }) {
   if (!rows.length) return "";
 
   return `<section class="show-section" id="boosts">
@@ -384,28 +445,41 @@ export function renderBoosts(rows, names, { heading, sub, itemAbbr, noun, showTa
       <p class="show-section-sub">${htmlEscape(sub)}</p>
     </div>
     <ul class="boost-list">
-      ${rows.map((r) => boostRow(r, names, { itemAbbr, noun, showTarget })).join("\n      ")}
+      ${rows.map((r) => boostRow(r, names, { itemAbbr, noun, showTarget, linkBooster })).join("\n      ")}
     </ul>
   </section>`;
 }
 
-function boostRow(r, names, { itemAbbr, noun, showTarget }) {
+function boostRow(r, names, { itemAbbr, noun, showTarget, linkBooster = true }) {
   const realName = displayName(r);
   const name = realName || shortId(r.booster_npub, r.booster_pubkey);
   const pic = isSafeUrl(r.pr_pic) ? r.pr_pic : null;
-  const copyVal = r.booster_npub || r.booster_pubkey;
+  const href = linkBooster ? boosterPageUrl(r.booster_npub, r.booster_pubkey) : null;
   const missing = [realName ? null : "name", pic ? null : "pic"].filter(Boolean).join(" ");
   const target = r.e_title
     ? (r.e_num ? `${itemAbbr} ${htmlEscape(r.e_num)} · ${htmlEscape(truncate(r.e_title, 70))}` : htmlEscape(truncate(r.e_title, 70)))
     : `the ${noun}`;
 
+  // ⚠️ TWO LINKS TO ONE DESTINATION, unlike the community card above, and it is
+  // unavoidable here: the avatar sits at the row's left edge and the name inside
+  // the meta line, with the whole boost body between them, so no single anchor
+  // can hold both. The AVATAR is the duplicate and takes aria-hidden and
+  // tabindex="-1" — it stays clickable with a mouse and drops out of the tab
+  // order and the accessibility tree, so the row announces one link, on the
+  // name, which is the half carrying the text.
+  const avatar = pic ? `<img src="${htmlEscape(pic)}" alt="" loading="lazy" />` : "";
+  const avatarEl = href
+    ? `<a class="sup-avatar sup-avatar--sm${pic ? "" : " is-blank"}" href="${htmlEscape(href)}" tabindex="-1" aria-hidden="true">${avatar}</a>`
+    : `<span class="sup-avatar sup-avatar--sm${pic ? "" : " is-blank"}">${avatar}</span>`;
+  const whoEl = href
+    ? `<a class="boost-who" href="${htmlEscape(href)}" title="Boosts by ${htmlEscape(name)}">${htmlEscape(name)}</a>`
+    : `<span class="boost-who">${htmlEscape(name)}</span>`;
+
   return `<li class="boost-row"${missing ? ` data-pk="${htmlEscape(r.booster_pubkey)}" data-missing="${missing}"` : ""}>
-        <button type="button" class="sup-avatar sup-avatar--sm${pic ? "" : " is-blank"}" data-copy-npub="${htmlEscape(copyVal)}" title="Copy npub" aria-label="Copy npub for ${htmlEscape(name)}">
-          ${pic ? `<img src="${htmlEscape(pic)}" alt="" loading="lazy" />` : ""}
-        </button>
+        ${avatarEl}
         <div class="boost-body">
           <p class="boost-meta">
-            <span class="boost-who">${htmlEscape(name)}</span>
+            ${whoEl}
             <span class="boost-amt">${htmlEscape(num(r.sats))} sats</span>
             <span class="boost-when">${htmlEscape(relTime(r.created_at))}</span>
           </p>

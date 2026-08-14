@@ -55,6 +55,11 @@ import {
 import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js'
 import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js'
 import { showPageHref, episodePageHref } from '/assets/js/show-link.js'
+// Its own module rather than a third export from show-link.js, which every feed
+// renderer imports: a stale copy of that file against a fresh copy of this one
+// is a link-time error that takes all eight feeds down. See the note at its head
+// and the ob-v53 entry in CLAUDE.md.
+import { boosterPageHref, markBoosterLink } from '/assets/js/booster-link.js'
 import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js'
 
 const VALUE_API = '/api/value'   // Podcast Index value-block proxy (splits)
@@ -205,35 +210,53 @@ function initials(profile, npub) {
 // row further on narrow viewports.
 const MAX_FACES = 10
 
-// A booster avatar. `interactive` wires click/keyboard to copy the npub.
-// Avatars load eagerly (they're tiny, and `loading=lazy` left off-screen
-// ones perpetually unloaded → looked broken); a picture that fails to load
-// (dead host, hotlink block) swaps to the initials chip via onerror.
-function avatarEl(profile, npub, { size = 26, interactive = false, cls = '' } = {}) {
+/* A booster avatar.
+ *
+ * ⚠️ `interactive` USED TO MEAN "click to copy the npub" AND NOW MEANS "link to
+ * that booster's page". The copy gesture is not lost, it moved: /booster/<npub>
+ * leads with a Copy npub button, and the per-boost ⋮ menu below carries one too,
+ * so the drawer keeps it inline. A face that opens someone's history is the same
+ * navigation the show name and the episode title already are, where a face that
+ * copies a string was a dead end.
+ *
+ * The anchor WRAPS the image rather than replacing it, so `.pcast-avatar` keeps
+ * sizing the img or the initials chip exactly as before and the error swap below
+ * still works on the node it was built for. `.pcast-avatar-link` is the wrapper
+ * and does nothing but sit in the flex row without disturbing it.
+ *
+ * Avatars load eagerly (they're tiny, and `loading=lazy` left off-screen ones
+ * perpetually unloaded → looked broken); a picture that fails to load (dead
+ * host, hotlink block) swaps to the initials chip via onerror.
+ */
+// `pk` is the hex pubkey, and it is a fallback for the LINK only — `npub` is
+// still what the initials chip is derived from. It is separate from `npub`
+// rather than pre-collapsed by the caller because boosterPageHref tries the two
+// in turn; see the note on that function.
+function avatarEl(profile, npub, { size = 26, interactive = false, cls = '', label = '', pk = null } = {}) {
   const style = `--pcast-av:${size}px`
-  const makeInitials = () => wire(h('span', { class: 'pcast-avatar pcast-avatar--none ' + cls, style }, initials(profile, npub)))
+  const makeInitials = () => h('span', { class: 'pcast-avatar pcast-avatar--none ' + cls, style }, initials(profile, npub))
 
-  function wire(n) {
-    if (interactive && npub) {
-      n.classList.add('is-interactive')
-      n.setAttribute('role', 'button')
-      n.setAttribute('tabindex', '0')
-      n.setAttribute('title', 'Copy npub')
-      n.addEventListener('click', (e) => { e.stopPropagation(); copyNpub(npub) })
-      n.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); copyNpub(npub) }
-      })
-    }
-    return n
-  }
-
+  let node
   const pic = profile?.picture
   if (pic && isSafeImg(pic)) {
     const img = h('img', { class: 'pcast-avatar ' + cls, style, src: pic, alt: '', referrerpolicy: 'no-referrer' })
     img.addEventListener('error', () => { img.replaceWith(makeInitials()) }, { once: true })
-    return wire(img)
+    node = img
+  } else {
+    node = makeInitials()
   }
-  return makeInitials()
+
+  const href = interactive ? boosterPageHref(npub, pk) : null
+  if (!href) return node
+
+  node.classList.add('is-interactive')
+  const a = h('a', { class: 'pcast-avatar-link', href })
+  // Secondary: the booster's NAME beside this avatar links to the same page, and
+  // one row should not offer two tab stops and two announcements for one
+  // destination. The name is the primary link because it carries the text.
+  markBoosterLink(a, { label, secondary: true })
+  a.appendChild(node)
+  return a
 }
 
 // ── Episode link ladder ──────────────────────────────────────────────
@@ -509,7 +532,16 @@ export function episodeCard(item, rank = null, copy = COPY.other) {
       ? h('a', { class: mediaClass, href: outHref, target: '_blank', rel: 'noopener noreferrer', title: 'See all boosts on Boost Me Bitch' }, hasArt ? mediaImg : '🎙')
       : h('div', { class: mediaClass }, hasArt ? mediaImg : '🎙')
 
-  // Booster faces on the drawer bar, stacked — the first MAX_FACES of them.
+  /* Booster faces on the drawer bar, stacked — the first MAX_FACES of them.
+   *
+   * ⚠️ DELIBERATELY NOT LINKED, and the only pfps on the site that are not.
+   * This stack lives inside the drawer's <summary>, which is itself an
+   * interactive element: an anchor nested in one is both a navigation and a
+   * toggle on the same click, and it puts up to ten extra tab stops inside a
+   * control whose whole job is to open. These faces were never interactive
+   * either — they have no copy gesture to have moved — so this is a place the
+   * sweep did not reach rather than one it took something from. The same
+   * boosters are linked, individually, on the rows inside the drawer. */
   const avatars = h('span', { class: 'pcast-avatars' },
     distinctBoosters.slice(0, MAX_FACES).map((b) =>
       avatarEl(profileFor(b.booster_pubkey), b.booster_npub, { size: 22 })))
@@ -743,17 +775,21 @@ function boostRow(b) {
   const profile = profileFor(b.booster_pubkey)
   const name = profile?.name?.trim() || (b.booster_npub ? b.booster_npub.slice(0, 12) + '…' : 'anon')
 
-  const nameEl = h('button', {
-    class: 'pcast-boost-name', type: 'button', title: 'Copy npub',
-    onclick: () => copyNpub(b.booster_npub),
-  }, name)
+  // The primary link of the row: the avatar beside it points at the same page
+  // and is marked secondary, so this is the one that is announced and tabbed to.
+  // Falls back to a plain span when there is no identifier to key on, which
+  // cannot happen for a real record but must not emit a dead href if it does.
+  const href = boosterPageHref(b.booster_npub, b.booster_pubkey)
+  const nameEl = href
+    ? markBoosterLink(h('a', { class: 'pcast-boost-name', href }, name), { label: name })
+    : h('span', { class: 'pcast-boost-name' }, name)
 
   const satsEl = (b.sats != null)
     ? h('span', { class: 'pcast-boost-sats' }, [`${fmtSats(b.sats)} `, h('span', { class: 'pcast-bolt', 'aria-hidden': 'true', text: '⚡' })])
     : null
 
   const head = h('div', { class: 'pcast-boost-head' }, [
-    avatarEl(profile, b.booster_npub, { size: 34, interactive: true }),
+    avatarEl(profile, b.booster_npub, { size: 34, interactive: true, label: name, pk: b.booster_pubkey }),
     h('div', { class: 'pcast-boost-who' }, [
       nameEl,
       h('span', { class: 'pcast-boost-when', text: fullDate(b.created_at) }),
@@ -790,7 +826,17 @@ function moreMenu(b) {
     class: 'pcast-more-btn', type: 'button', 'aria-label': 'More options',
     'aria-haspopup': 'true', 'aria-expanded': 'false',
   }, '⋮')
+  // Copy npub is here because the avatar and the name above it stopped copying
+  // when they became links to /booster/<npub>. The gesture is on the booster's
+  // own page too, but this menu was already on the row and keeps it one click
+  // away rather than one navigation — which matters for the reader who wants the
+  // npub precisely so they do NOT have to go somewhere else for it.
+  const npub = b.booster_npub || b.booster_pubkey
   const menu = h('div', { class: 'pcast-more-menu', hidden: 'hidden' }, [
+    npub ? h('button', {
+      class: 'pcast-more-item', type: 'button',
+      onclick: () => { close(); copyNpub(npub) },
+    }, 'Copy npub') : null,
     h('button', {
       class: 'pcast-more-item', type: 'button',
       onclick: () => { close(); copyNevent(b.event_id, b.booster_pubkey) },

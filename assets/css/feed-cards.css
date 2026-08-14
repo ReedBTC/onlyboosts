@@ -221,6 +221,13 @@ a.pcast-show-link:hover { text-decoration: underline; }
 .pcast-avatar.is-interactive { cursor: pointer; }
 .pcast-avatar.is-interactive:hover { border-color: var(--accent); }
 .pcast-avatar.is-interactive:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* The link wrapper an interactive avatar sits in since those faces started
+   pointing at /booster/<npub>. It carries the href and nothing else: the
+   `.pcast-avatar` inside it is still what has the size, the border and the
+   radius, so this must add no box of its own. The hover is delegated inward
+   because the wrapper is the element the pointer is actually over. */
+.pcast-avatar-link { display: inline-flex; flex-shrink: 0; line-height: 0; }
+.pcast-avatar-link:hover .pcast-avatar { border-color: var(--accent); }
 
 .pcast-more-wrap { display: flex; justify-content: center; margin-top: 1.1rem; }
 .pcast-more-group { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; }
@@ -357,13 +364,19 @@ a.pcast-show-link:hover { text-decoration: underline; }
 .pcast-boost:first-child { border-top: none; padding-top: 0; }
 .pcast-boost-head { display: flex; align-items: center; gap: 0.55rem; }
 .pcast-boost-who { min-width: 0; flex: 1; display: flex; flex-direction: column; }
+/* Was a <button> that copied the npub; now an <a> to /booster/<npub>. The
+   declarations below were already neutralising the button chrome, so they carry
+   over to an anchor unchanged — `text-decoration: none` is the one addition,
+   since the underline is meant to arrive on hover and not before. */
 .pcast-boost-name {
   align-self: flex-start;
   font: inherit; font-size: 0.9rem; font-weight: 700; color: var(--text);
   background: transparent; border: none; padding: 0; cursor: pointer;
+  text-decoration: none;
   max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .pcast-boost-name:hover { color: var(--accent-d); text-decoration: underline; }
+.pcast-boost-name:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .pcast-boost-when { font-size: 0.74rem; color: var(--muted); }
 .pcast-boost-sats { flex-shrink: 0; font-size: 0.88rem; font-weight: 700; color: var(--accent-d); white-space: nowrap; }
 .pcast-boost-msg {

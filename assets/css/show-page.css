@@ -414,6 +414,30 @@
    fits three, so the same rule would give different counts on two phones. */
 .sup-card--podium { width: calc((100% - 4 * 1.3rem) / 5); }
 
+/* The community card's avatar and name are wrapped in ONE anchor to that
+   booster's page. The wrapper restates the card's own column layout rather than
+   using display:contents, so nothing about the existing `.sup-avatar` /
+   `.sup-name` rules had to change and the semantics of a focusable link are not
+   at the mercy of how a browser treats a box that is not generated. The sats
+   line stays outside it — a figure, not a way in — and inherits the card's gap,
+   which is the same value, so the spacing is unchanged.
+
+   The avatar itself was a copy-npub <button> before this and is now a <span>
+   inside the link; `cursor: pointer` below is what it always had and is now the
+   anchor's doing. */
+.sup-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  max-width: 100%;
+  text-decoration: none;
+  color: inherit;
+}
+.sup-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; border-radius: 8px; }
+.sup-link:hover .sup-name { color: var(--brand-d); }
+
 .sup-avatar {
   width: 68px;
   height: 68px;
@@ -497,6 +521,14 @@
 }
 
 .boost-who { font-weight: 700; color: var(--ink); overflow-wrap: anywhere; }
+/* The name is an <a> to /booster/<npub> on /show and /episode, and a plain span
+   on /booster itself, where every row belongs to the person whose page it is.
+   It keeps --ink rather than taking link blue: a boost list is a list of people
+   who sent sats, and a column of blue names would read as a list of links. The
+   underline arrives on hover, which is where the affordance belongs. */
+a.boost-who { text-decoration: none; }
+a.boost-who:hover { color: var(--brand-d); text-decoration: underline; }
+a.boost-who:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .boost-amt { color: var(--brand-d); font-weight: 700; }
 .boost-when { color: var(--muted); font-size: 0.78rem; margin-left: auto; }
 
