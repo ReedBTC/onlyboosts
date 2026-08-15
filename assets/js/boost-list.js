@@ -1,0 +1,350 @@
+/* The boost note, as HTML, for the #boosts section on all three detail pages.
+ *
+ * ⚠️ THIS MODULE IS IMPORTED FROM BOTH SIDES. `functions/_shared/detail-page.js`
+ * imports it by relative path, which esbuild resolves off the filesystem when
+ * wrangler bundles the Pages Functions; assets/js/boost-section.js imports it as
+ * `/assets/js/boost-list.js?v=<VERSION>` like any other module. That is the
+ * whole reason it exists as a file of its own, and it is the same mechanism
+ * assets/js/episode-card.js rests on. Two rules follow, both load-bearing:
+ *
+ *   1. NO DOM, NO `env`, NO `fetch`, NO `Intl` defaults. Everything here is a
+ *      pure value→string function, so the same row produces the same bytes at
+ *      the edge and in the browser. A row the server painted and the same row
+ *      rebuilt after a re-sort are byte-identical BY CONSTRUCTION rather than by
+ *      inspection.
+ *   2. IMPORTS ARE RELATIVE AND STAMPED — `'./thing.js?v=ob-v61'`. An ABSOLUTE
+ *      `/assets/js/…` import resolves in the browser and fails to bundle, so it
+ *      is the one form a two-sided module may not use. Everything imported here
+ *      is itself two-sided.
+ *
+ * WHERE IT CAME FROM. `renderBoosts` and `boostRow` were
+ * `functions/_shared/detail-page.js`'s and moved here unchanged, along with the
+ * five small formatters they need. That file re-exports all of it, so nothing
+ * that imported them from there had to change. The move is what lets the boost
+ * list carry range and sort controls: the controls are VERBS and rebuild the
+ * list in the browser, and the list they rebuild has to be the same list.
+ *
+ * WHAT IS NEW HERE rather than moved: the three comparators, the range filter,
+ * the record→row adapter, and the two slots the client mounts into. See the
+ * headings below.
+ */
+import {
+  htmlEscape, isSafeUrl, truncate, renderMessage,
+} from './nostr-text.js?v=ob-v61';
+import { episodePageHref, showPageHref } from './show-link.js?v=ob-v61';
+/* ⚠️ THE REAL MODULE, NOT A FOURTH COPY OF THE RULE. booster-link.js has been
+ * dependency-free since it was written, so esbuild inlines it here exactly as it
+ * does nostr-text.js, and the boost rows link a booster by the same test every
+ * feed surface uses rather than by a transcription of it. This is the collapse
+ * that functions/_shared/detail-page.js#boosterPageUrl said was available; that
+ * name is now an alias for this function rather than a second copy of it. */
+import { boosterPageHref } from './booster-link.js?v=ob-v61';
+
+// ── The formatters the row needs ─────────────────────────────────────────────
+//
+// All five were functions/_shared/detail-page.js's and are re-exported from
+// there, so the stat tiles and the page headers still reach them under the names
+// they always had. They live on this side because the boost row is the one
+// component that renders in both places, and a row rebuilt in the browser has to
+// print a number and a date exactly as the edge did.
+//
+// `en-US` in UTC, never the reader's locale, for that reason — the same call the
+// feeds make. The site has one date format rather than two.
+
+export function num(n) {
+  return Number(n || 0).toLocaleString("en-US");
+}
+
+export function fmtDate(ts) {
+  if (!ts) return "";
+  const d = new Date(Number(ts) * 1000);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" });
+}
+
+/* ⚠️ THE ONE FUNCTION HERE THAT IS NOT PURE: it reads the clock, so the edge and
+ * the browser disagree by however long the page has been open. That is correct
+ * rather than a violation — "3h ago" is a statement about now, and a rebuilt row
+ * showing the stale string the edge computed would be the bug. The `datetime`
+ * and `title` attributes beside it are absolute and do not move. */
+export function relTime(ts) {
+  const sec = Math.floor(Date.now() / 1000) - Number(ts || 0);
+  if (!Number.isFinite(sec) || sec < 0) return "";
+  if (sec < 3600) return `${Math.max(1, Math.floor(sec / 60))}m ago`;
+  if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`;
+  if (sec < 2592000) return `${Math.floor(sec / 86400)}d ago`;
+  return fmtDate(ts);
+}
+
+// A booster with no kind-0 gets their npub, shortened. `booster.npub` is
+// nullable where the pubkey is not, so fall back to hex.
+export function shortId(npub, pk) {
+  const s = npub || pk || "";
+  if (s.length < 16) return s;
+  return s.slice(0, 10) + "…" + s.slice(-4);
+}
+
+export function displayName(r) {
+  return r.display_name || r.pr_dname || r.name || r.pr_name || null;
+}
+
+// ── The row shape ────────────────────────────────────────────────────────────
+//
+// A "row" here is the boost as the three page queries SELECT it — event_id,
+// booster_pubkey, booster_npub, created_at, sats, message, and whichever of
+// item_guid / podcast_guid / e_title / e_num / e_pub / p_title / pr_name /
+// pr_dname / pr_pic that surface joined for. Every one beyond the first four is
+// optional, and a surface that suppresses a line does not select the column
+// behind it.
+//
+// ⚠️ THE API RETURNS A DIFFERENT SHAPE, and this is the one place the two meet.
+// /api/v1 answers in the collector's published record shape (`boostRecord` in
+// functions/api/v1/_common.js), because every other consumer on the site reads
+// that. Rather than teach the row renderer two shapes — which is how one
+// component starts rendering two ways — the client adapts the records into rows
+// once, here, and everything downstream sees the row the server saw.
+
+/**
+ * Published boost records → the row shape `boostRow` renders.
+ *
+ * @param {Array} records  as returned by any /api/v1 boost endpoint
+ * @returns {Array} rows
+ */
+export function rowsFromRecords(records) {
+  return (Array.isArray(records) ? records : []).map((b) => ({
+    event_id: b.id ?? null,
+    booster_pubkey: b.booster?.pk ?? null,
+    booster_npub: b.booster?.npub ?? null,
+    created_at: b.ts ?? 0,
+    sats: b.sats ?? 0,
+    message: b.msg ?? null,
+    item_guid: b.episode?.guid ?? null,
+    podcast_guid: b.podcast?.guid ?? null,
+    e_title: b.episode?.title ?? null,
+    e_num: b.episode?.num ?? null,
+    // Not selected by any of the three PAGE queries — none of them prints an
+    // air date on a boost row — but it is what the `episode` sort orders on, and
+    // sorting only ever happens over a corpus fetched from the API. See
+    // BOOST_SORTERS below.
+    e_pub: b.episode?.date ?? null,
+    p_title: b.podcast?.title ?? null,
+    // ⚠️ `dname` IS A DELIBERATE ADDITION TO THE RECORD SHAPE, not an accident of
+    // this adapter. The pages print `display_name` in preference to `name`; the
+    // published record carried only the latter, so a rebuilt row would have
+    // renamed every booster whose kind-0 sets both. See BOOST_SELECT.
+    pr_dname: b.booster?.dname ?? null,
+    pr_name: b.booster?.name ?? null,
+    pr_pic: b.booster?.pic ?? null,
+  }));
+}
+
+// ── Range and sort ───────────────────────────────────────────────────────────
+//
+// ⚠️ THE RANGE MEANS WHEN THE BOOST WAS SENT, on all three pages, matching
+// /#boosts-global and /api/v1/podcasts. It does NOT mean when the episode aired;
+// that axis belongs to the Episodes feeds and to /api/v1/episodes. Two readings
+// of that parameter name already exist on this site deliberately, and there must
+// not be a third.
+//
+// The comparators are boosts-feed.js#SORTERS over the row shape rather than the
+// record shape, function for function, so a boost ordered on the homepage and
+// the same boost ordered on a detail page land in the same place. No tie-break
+// on the id: the corpus arrives ordered `created_at DESC, event_id DESC` and
+// Array#sort is stable, so ties keep the server's total order for free.
+
+// `e_pub` is null on ~12% of records (and on every record with no episode
+// metadata at all), so undated boosts sink to the bottom of the episode order
+// rather than floating to the top, where a 0 would put them.
+function epTime(r) {
+  const t = Number(r.e_pub);
+  return Number.isFinite(t) && t > 0 ? t : -Infinity;
+}
+
+export const BOOST_SORTERS = {
+  recent: (a, b) => b.created_at - a.created_at,
+  // Compared before subtracting: two undated rows would otherwise be
+  // -Infinity - -Infinity, i.e. NaN, in the comparator.
+  episode: (a, b) => {
+    const ea = epTime(a);
+    const eb = epTime(b);
+    return ea === eb ? b.created_at - a.created_at : eb - ea;
+  },
+  sats: (a, b) => ((b.sats || 0) - (a.sats || 0)) || (b.created_at - a.created_at),
+};
+
+/** Rows in the selected order. Always a new array; the caller's is untouched. */
+export function sortBoostRows(rows, key) {
+  const cmp = BOOST_SORTERS[key] || BOOST_SORTERS.recent;
+  return [...rows].sort(cmp);
+}
+
+/** Rows sent at or after `cutoff` (epoch seconds). A null cutoff is unbounded. */
+export function filterBoostRows(rows, cutoff) {
+  return cutoff ? rows.filter((r) => Number(r.created_at) >= cutoff) : rows;
+}
+
+// ── The section ──────────────────────────────────────────────────────────────
+//
+// NOT filtered to feed-level boosts on the show page, and that is the considered
+// choice. Only 18% of qualifying shows have even one feed-level boost over six
+// months and only 5% have three; UNGOVERNABLE, Citadel Dispatch and What Bitcoin
+// Did would each show an empty section despite carrying 130+ boosts apiece.
+// Whether a show accumulates them is an artifact of how listeners' apps build a
+// boost, not a fact about the show. See docs/show-pages-spec.md.
+//
+// `target` is the "→ Ep. 3 · Title" line naming what a boost was sent to. It is
+// the show page's: on an episode page every boost in the list targets the same
+// episode the reader is already on, so the line would repeat the <h1> once per
+// row. Pass `showTarget: false` there.
+//
+// `linkBooster` is false on ONE page: /booster/<npub>, where every row belongs
+// to the booster whose page it is, so linking each one would point the page at
+// itself once per row. The same reasoning as `showTarget` above, one column
+// over — a row must not repeat what the <h1> already said.
+//
+// `showShow` names the SHOW beside the episode, and is true on exactly one page
+// for that same reason. See the meta-row note in boostRow.
+
+export function renderBoosts(rows, names, {
+  heading, sub, itemAbbr, noun, showTarget = true, linkBooster = true, showShow = false,
+}) {
+  if (!rows.length) return "";
+
+  // `ob-boost-list` alongside `boost-list` is what makes these cards the same
+  // object as the homepage Boosts feed's: the container override that gives a
+  // .note-card its white background and 12px radius is keyed on it. Both classes
+  // are carried because the section spacing is still show-page.css's.
+  return `<section class="show-section" id="boosts">
+    <div class="show-section-head">
+      <h2>${htmlEscape(heading)}</h2>
+      <p class="show-section-sub">${htmlEscape(sub)}</p>
+    </div>
+    <ul class="boost-list ob-boost-list">
+      ${boostRows(rows, names, { itemAbbr, noun, showTarget, linkBooster, showShow })}
+    </ul>
+  </section>`;
+}
+
+/**
+ * Just the `<li>` rows, joined — what a client repaint replaces the list with.
+ *
+ * Exported separately from `renderBoosts` because a rebuild replaces the list's
+ * CONTENTS and not the section around it.
+ */
+export function boostRows(rows, names, opts) {
+  return rows.map((r) => boostRow(r, names, opts)).join("\n      ");
+}
+
+function boostRow(r, names, { itemAbbr, noun, showTarget, linkBooster = true, showShow = false }) {
+  const realName = displayName(r);
+  const name = realName || shortId(r.booster_npub, r.booster_pubkey);
+  const pic = isSafeUrl(r.pr_pic) ? r.pr_pic : null;
+  const href = linkBooster ? boosterPageHref(r.booster_npub, r.booster_pubkey) : null;
+  const missing = [realName ? null : "name", pic ? null : "pic"].filter(Boolean).join(" ");
+  // ⚠️ NO "the episode" FALLBACK ANY MORE. The old compact row printed
+  // "→ the episode" when the boost carried no episode title, which read fine as
+  // a sentence fragment after an arrow. In the meta row it is a chip in the
+  // position a title occupies, so it reads as though the episode were CALLED
+  // "the episode". The feed card omits the chip outright in this case
+  // (`if (b.episode.title)`), and these two surfaces are now one component, so
+  // this does the same. `noun` is consequently unused here and kept in the
+  // signature for the callers that still pass it.
+  const target = r.e_title
+    ? (r.e_num ? `${itemAbbr} ${htmlEscape(r.e_num)} · ${htmlEscape(truncate(r.e_title, 70))}` : htmlEscape(truncate(r.e_title, 70)))
+    : null;
+
+  // ⚠️ TWO LINKS TO ONE DESTINATION, unlike the community card, and it is
+  // unavoidable here: the avatar sits at the card's top-left and the name beside
+  // it, but the ⋮ menu and the timestamp come between them in the author row.
+  // The AVATAR is the duplicate and takes aria-hidden and tabindex="-1" — it
+  // stays clickable with a mouse and drops out of the tab order and the
+  // accessibility tree, so the card announces one link, on the name.
+  //
+  // The avatar is ALWAYS an <img>, falling back to the site placeholder rather
+  // than to an empty circle. That is what the Boosts feed does (its cover chain
+  // ends there and so always resolves), and it is what lets hydrateProfiles fill
+  // a late-arriving picture by setting one src rather than by constructing an
+  // element into a blank.
+  const avatarSrc = pic || "/assets/avatar-fallback.svg";
+  const avatar = `<img src="${htmlEscape(avatarSrc)}" alt="" loading="lazy" referrerpolicy="no-referrer" />`;
+  const avatarEl = href
+    ? `<a class="note-avatar-link" href="${htmlEscape(href)}" tabindex="-1" aria-hidden="true">${avatar}</a>`
+    : avatar;
+  const whoEl = href
+    ? `<a class="author-name" href="${htmlEscape(href)}" title="Boosts by ${htmlEscape(name)}">${htmlEscape(name)}</a>`
+    : `<span class="author-name">${htmlEscape(name)}</span>`;
+
+  /* The meta row: the sats, then what was boosted.
+   *
+   * ⚠️ THE EPISODE IS A LINK, AND THE SHOW APPEARS BESIDE IT. The homepage
+   * Boosts feed had rendered both as links since /episode/<guid> landed —
+   * `a.ob-boost-ep` and `a.ob-boost-show` are styled in boosts-thread.css and
+   * were sitting there unused on this side — while these three pages emitted a
+   * plain span and no show at all. That is exactly the failure the rendering
+   * rule's own test names: a reader could screenshot a boost note from the
+   * homepage and one from /show and tell them apart.
+   *
+   * The link is withheld from the 500 titleless episodes by the same rule every
+   * other surface applies, through the same module rather than a copy of it.
+   *
+   * ⚠️ `showShow` IS TRUE ON /booster ONLY, and that is not an oversight. On
+   * /show and /episode the show is the page's own subject — the <h1> on one and
+   * the eyebrow link on the other — so naming it on every one of 24 rows
+   * restates what the reader is already looking at. Same reasoning as
+   * `showTarget`, which suppresses the EPISODE on /episode for the same reason.
+   * A booster's page is the one where a row's show is new information.
+   */
+  const epHref = episodePageHref(r.item_guid, r.e_title);
+  const epEl = target
+    ? (epHref
+        ? `<a class="ob-boost-ep" href="${htmlEscape(epHref)}">${target}</a>`
+        : `<span class="ob-boost-ep">${target}</span>`)
+    : null;
+
+  const showHref = showPageHref(r.podcast_guid);
+  const showEl = (showShow && r.p_title)
+    ? (showHref
+        ? `<a class="ob-boost-show ob-boost-show-link" href="${htmlEscape(showHref)}">${htmlEscape(truncate(r.p_title, 60))}</a>`
+        : `<span class="ob-boost-show">${htmlEscape(truncate(r.p_title, 60))}</span>`)
+    : null;
+
+  const meta = [
+    Number(r.sats) > 0
+      ? `<span class="ob-boost-sats">${htmlEscape(num(r.sats))}<span class="ob-bolt" aria-hidden="true">⚡</span></span>`
+      : null,
+    showTarget ? epEl : null,
+    showTarget ? showEl : null,
+  ].filter(Boolean).join("\n            ");
+
+  const ts = Number(r.created_at) || 0;
+  const iso = ts ? new Date(ts * 1000).toISOString() : "";
+
+  /* ⚠️ THE CARD IS THE `[data-boost-note]` ELEMENT, and the three attributes on
+   * it are the entire contract with assets/js/boost-note-actions.js. That module
+   * finds these, builds the `{id, pubkey, kind, content, created_at, tags}`
+   * projection buildActionBar needs, and appends the reply/like/repost/zap bar
+   * plus the ⋮ menu — which buildActionBar puts into `.note-author` itself, so
+   * that class is load-bearing rather than decorative.
+   *
+   * This is the rendering rule from CLAUDE.md in one element: the note is a
+   * FACT and is server-rendered complete, the reactions are VERBS and arrive
+   * with JavaScript. Nothing here waits on that, and a reader who never loads
+   * the module reads the same boost.
+   *
+   * The message is deliberately NOT carried in a data attribute. A reply quotes
+   * it, and the projection reads it back out of `.note-body` at attach time —
+   * one copy of a string that can be 420 characters, on up to 500 cards. */
+  return `<li${missing ? ` data-pk="${htmlEscape(r.booster_pubkey)}" data-missing="${missing}"` : ""}>
+        <article class="note-card" data-boost-note data-event-id="${htmlEscape(r.event_id || "")}" data-pubkey="${htmlEscape(r.booster_pubkey || "")}" data-ts="${ts}">
+          <div class="note-author">
+            ${avatarEl}
+            <div class="note-author-name-wrap">${whoEl}</div>
+            <time datetime="${htmlEscape(iso)}" title="${htmlEscape(fmtDate(ts))}">${htmlEscape(relTime(ts))}</time>
+          </div>
+          ${meta ? `<div class="ob-boost-meta">
+            ${meta}
+          </div>` : ""}
+          ${r.message ? `<div class="note-body">${renderMessage(r.message, names)}</div>` : ""}
+        </article>
+      </li>`;
+}
