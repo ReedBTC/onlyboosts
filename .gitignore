@@ -8,6 +8,15 @@
 .claude/settings.local.json
 .claude/settings.local.json.tmp.*
 
+# --- Handoff notes: local working files, never public content ---
+# A handoff is one agent briefing the next on work in flight. It is scratch by
+# nature — it goes stale the moment the work lands, and a reader who finds it on
+# GitHub cannot tell whether it describes the code or something that was
+# abandoned. What is worth keeping from one belongs in CLAUDE.md or in the
+# relevant docs/*-spec.md, which is where a reader looks anyway.
+*HANDOFF*.md
+*handoff*.md
+
 # --- Wrangler local dev server scratch (created by `wrangler pages dev`) ---
 .wrangler/
 
