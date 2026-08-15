@@ -1,7 +1,12 @@
 .DS_Store
 
 # --- Claude Code local settings ---
+# Both settings files stay on this machine and are never committed. The repo is
+# public, and these carry absolute home paths and a permission allowlist that
+# describes one machine rather than the project.
+.claude/settings.json
 .claude/settings.local.json
+.claude/settings.local.json.tmp.*
 
 # --- Wrangler local dev server scratch (created by `wrangler pages dev`) ---
 .wrangler/
