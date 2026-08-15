@@ -19,7 +19,7 @@
 import assert from 'node:assert/strict'
 import {
   renderBoosts, boostRows, rowsFromRecords, sortBoostRows, filterBoostRows,
-  BOOST_SORTERS, CONTROLS_MIN,
+  searchBoostRows, BOOST_SORTERS, CONTROLS_MIN,
 } from '../assets/js/boost-list.js'
 import { boostRecord } from '../functions/api/v1/_common.js'
 
@@ -213,6 +213,41 @@ check('the range filters on when the boost was SENT, not when the episode aired'
   assert.equal(filterBoostRows(dbRows, null).length, 3, 'a null cutoff is unbounded')
 })
 
+check('search matches the message, and every term of it, in any order', () => {
+  const hits = (q) => searchBoostRows(dbRows, q).map((r) => r.event_id[0])
+  assert.deepEqual(hits('great'), ['a'], 'case-insensitive')
+  assert.deepEqual(hits('GREAT one'), ['a'], 'terms are ANDed, in any order')
+  assert.deepEqual(hits('one great'), ['a'])
+  assert.deepEqual(hits('great missing'), [], 'every term has to appear')
+  assert.deepEqual(hits('nice'), ['d'])
+})
+
+check('search is a substring match, which is the point of not using FTS5', () => {
+  // FTS5 matches whole tokens with a prefix wildcard, so it would find "thing"
+  // from "thin" but never from "hing". A boost message is short prose someone
+  // wants to grep.
+  assert.deepEqual(searchBoostRows(dbRows, 'hing').map((r) => r.event_id[0]), ['a'])
+})
+
+check('search never matches a row that has no message', () => {
+  // dbRows[1] carries none, and ~84% of indexed boosts are like it.
+  assert.equal(searchBoostRows(dbRows, 'c').some((r) => r.message == null), false)
+})
+
+check('search matches the message only, never the show or episode title', () => {
+  // "A Track" is dbRows[2]'s episode title and "Another Show" its show; neither
+  // may make it a hit, or a query naming the page's own subject returns
+  // everything.
+  assert.deepEqual(searchBoostRows(dbRows, 'track'), [])
+  assert.deepEqual(searchBoostRows(dbRows, 'another show'), [])
+})
+
+check('an empty or whitespace query is not a filter', () => {
+  assert.equal(searchBoostRows(dbRows, '').length, 3)
+  assert.equal(searchBoostRows(dbRows, '   ').length, 3)
+  assert.equal(searchBoostRows(dbRows, null).length, 3)
+})
+
 check('every sort key in the menu has a comparator', () => {
   for (const key of ['recent', 'episode', 'sats']) {
     assert.equal(typeof BOOST_SORTERS[key], 'function', `${key} has no comparator`)
@@ -230,6 +265,11 @@ check('the section ships the slots boost-section.js contracts on', () => {
   assert.match(html, /data-bs-controls hidden/)
   assert.match(html, /data-bs-list/)
   assert.match(html, /data-bs-more/)
+  // The band, the list and the load-more are one panel; see .bs-shell.
+  const shell = html.slice(html.indexOf('<div class="bs-shell">'))
+  for (const slot of ['data-bs-controls', 'data-bs-list', 'data-bs-more']) {
+    assert.ok(shell.includes(slot), `${slot} must live inside the shell`)
+  }
   const state = JSON.parse(html.match(/data-boost-state>(.*?)<\/script>/s)[1])
   assert.equal(state.count, 3)
   assert.equal(state.total, 1404)

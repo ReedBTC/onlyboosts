@@ -491,22 +491,75 @@
 
 /* ── The #boosts section ──────────────────────────────────────────────── */
 
-/* The range + sort band, on all three detail pages.
+/* THE SHELL. The band, the list and the "Load more" are one panel.
  *
- * It is `.cs-controls` so it inherits the sort pill, the menu and the layout the
- * two drawers already use — one toolbar on this site, not two. What it overrides
- * is everything that made that band a DRAWER LID: `.cs-controls` sits directly
- * under a summary, so it has a top border and no others and reads as the seam
- * between a header and its body. Here there is no lid above it, so a lone top
- * border would read as a rule struck through the section. Full border, rounded,
- * and its own gap under it, so it reads as a toolbar over a list.
+ * ⚠️ WITHOUT THIS THE CONTROLS DID NOT READ AS THE LIST'S. A toolbar floating
+ * above a run of separate cards says nothing about what it acts on — a reader
+ * could take the range buttons for page-level chrome, or for something belonging
+ * to the community wall above. Bordered, with the band as its lid, it is the
+ * same box-with-a-lid idiom `.ep-drawer` uses everywhere else on these pages.
+ *
+ * --cream, the page's own background, rather than --surface. The rows inside are
+ * WHITE cards with their own borders, so a white shell would erase their edges;
+ * on cream they read as cards sitting in a well, which is what they are. The
+ * band's --cream-d is one step darker again, so the stack reads lid / body. */
+.bs-shell {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--cream);
+  overflow: hidden;
+}
+
+/* The band is `.cs-controls` so it inherits the sort pill, the menu and the
+ * layout the two drawers already use — one toolbar on this site, not two. Inside
+ * the shell it is a LID, so it drops the top border `.cs-controls` carries for
+ * sitting under a <summary> and takes a bottom one instead.
  *
  * Ships `hidden` from the server and revealed by boost-section.js; the
  * `[hidden]` rule is `.cs-controls`'s and applies unchanged. */
 .bs-controls {
+  border-top: 0;
+  border-bottom: 1px solid var(--border);
+  gap: 0.5rem 0.75rem;
+}
+
+/* ⚠️ THE RANGE AND THE SORT ARE ONE GROUP AT THE RIGHT END, matching the feeds.
+ * `.cs-controls .pcast-sort` pins a lone sort to the far end with an auto
+ * margin, which is right in the drawers — their band's left end holds a link out
+ * to the show's catalogue — and wrong here, where it left the range stranded at
+ * the opposite end of the band from the control it belongs beside. The auto
+ * margin moves to the group, so the pair still holds the right end and the
+ * search box takes the slack. Must come AFTER the .cs-controls rule it undoes;
+ * the two have equal specificity. */
+.bs-knobs {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.bs-knobs .pcast-sort { margin-left: 0; }
+
+/* The search box. Grows into whatever the knobs leave, and drops to its own full
+   line on a narrow phone rather than squeezing four range segments and a sort
+   pill onto one — `.cs-controls` already wraps, so this only has to declare a
+   basis wide enough to be worth typing into. */
+.bs-search { flex: 1 1 13rem; min-width: 9rem; display: flex; }
+.bs-search-input {
+  width: 100%;
+  padding: 0.4rem 0.7rem;
+  font: inherit;
+  font-size: 0.82rem;
+  color: var(--text);
+  background: var(--white);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  margin: 0 0 0.9rem;
+  border-radius: 999px;
+}
+.bs-search-input::placeholder { color: var(--muted); }
+.bs-search-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: var(--accent);
 }
 
 /* The 1W/1M/1Y/All segments.
@@ -543,15 +596,25 @@
   background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
-/* A band mid-fetch. The one request this section makes is fast enough that a
-   spinner would flash, but the controls must not look live while a second press
-   would queue a rebuild against a corpus that has not arrived. */
-.cs-controls[aria-busy='true'] { opacity: 0.55; pointer-events: none; }
+/* A band mid-fetch — the FIRST gesture only, since the corpus request is
+   memoised. The knobs must not look live while a second press would queue a
+   rebuild against a corpus that has not arrived.
 
-/* "Load N more", under the list. Deliberately the same pill as the feeds'
-   .pcast-showmore rather than a reference to it, for the same reason as the
-   range buttons above: /show does not link the stylesheet that defines it. */
-.bs-more { display: flex; justify-content: center; margin-top: 1.1rem; }
+   ⚠️ THE KNOBS, NOT THE BAND. `pointer-events: none` over the whole band would
+   take the search box out from under the reader's cursor at the exact moment
+   they are typing into it, which is what triggers the fetch in the first place.
+   The input stays live and its keystrokes queue behind the same promise. */
+.bs-controls[aria-busy='true'] .bs-knobs { opacity: 0.55; pointer-events: none; }
+/* The drawers' bands hold no search box, so there the whole band is the knobs. */
+.cs-controls[aria-busy='true']:not(.bs-controls) { opacity: 0.55; pointer-events: none; }
+
+/* "Load N more", INSIDE the shell — the same call `.ce-scroll` makes on the
+   episode drawers, and for the same reason: a button below a panel reads as
+   belonging to the page rather than to the list. Deliberately the same pill as
+   the feeds' .pcast-showmore rather than a reference to it, for the same reason
+   as the range buttons above: /show does not link the stylesheet that defines
+   it. */
+.bs-more { display: flex; justify-content: center; padding: 0 0.7rem 0.9rem; }
 /* The slot ships empty on every page and stays empty on a list that holds
    everything already, so it must cost no space until something is put in it. */
 .bs-more:empty { display: none; }
@@ -589,6 +652,21 @@
   display: flex;
   flex-direction: column;
   gap: 0.7rem;
+}
+
+/* ⚠️ SCOPED TO THE SHELL, so the homepage Boosts feed is untouched. The gap
+   actually in force on these rows is boosts-thread.css's
+   `.ob-boost-list { gap: 0.85rem }` — that file is linked after this one, so
+   `.boost-list` alone loses the tie — and it is the SAME <ul> class the
+   /#boosts-global cards use. Tightening it there too would be a change to a feed
+   nobody asked about; this two-class selector outruns it on specificity and
+   reaches only these three sections.
+
+   The padding is the shell's inset: the rows are bordered cards, so they must
+   not sit against its edge. */
+.bs-shell .ob-boost-list {
+  gap: 0.45rem;
+  padding: 0.7rem;
 }
 
 .boost-row {

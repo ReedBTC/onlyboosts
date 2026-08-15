@@ -1161,10 +1161,16 @@ Four pieces hold the ids up, in four files:
 - **`scroll-margin-top: 5rem` on `.show-section`** in `show-page.css`. `#top-nav`
   is sticky at 64px, so without it an anchor scrolls the heading *behind the bar*;
 - **`revealHashTarget()`** inside `initHashRouting()`, which opens any collapsed
-  `<details>` inside the targeted section — exactly one case needs it, the episode
-  drawer. It does **not** re-scroll afterwards. `getElementById`, never
-  `querySelector`: an id off the URL is untrusted and would otherwise be parsed
-  as a selector;
+  **`details.ep-drawer`** inside the targeted section — exactly one case needs it,
+  `/show`'s episode drawer, and every other `.ep-drawer` already ships `open`. It
+  does **not** re-scroll afterwards. `getElementById`, never `querySelector`: an
+  id off the URL is untrusted and would otherwise be parsed as a selector.
+  **⚠️ The selector was `details:not([open])` and that was a bug**: a card rollup
+  is full of nested drawers (`.pcast-card-details`, one per episode card, holding
+  its boost notes), so targeting a rollup section opened every one of them at
+  once. The path in was the hash spy below — it leaves `#episodes` in the URL as
+  the reader scrolls, and the next **reload** ran this over that section. A card's
+  own drawer is the reader's to open;
 - **`initHashSpy()`**, which makes the ids reachable by a reader who was never
   told them.
 
@@ -1474,8 +1480,49 @@ Six things a change would break:
   two boosts, and a range control over a two-item list can only empty it. It
   gates the band, never the list.
 
-Out of scope on purpose: **search** on these sections, and the Follows axis. A
-boost list about one subject has no scope axis.
+**The band is the shell's lid.** `.bs-shell` wraps the band, the list and the
+"Load more" in one bordered box, and the load-more is *inside* it — the same call
+`.ce-scroll` makes on the episode drawers, for the same reason: a toolbar
+floating over a run of separate cards says nothing about what it acts on. The
+shell's background is `--cream` rather than `--surface` because the rows inside
+are white bordered cards, which a white shell would erase the edges of.
+
+**The range and the sort sit together at the right end**, in a `.bs-knobs` group,
+matching `.pcast-controls` on the feeds. `.cs-controls` pins a lone sort to the
+far end with an auto margin — right in the drawers, whose band's left end holds a
+link out to the show's catalogue, and wrong here; the auto margin moves to the
+group and the search box takes the slack.
+
+### Searching Boost Messages
+
+The band's third control is a plain text filter over the corpus, not a typeahead.
+`feed-search.js` suggests entries and filters to a **pick**, which is right where
+the question is "where does my show stand" and the answer is one card. Here the
+question is "what did people say", and the answer is however many messages say
+it.
+
+**⚠️ It matches the MESSAGE and nothing else.** Matching the show or episode
+title beside it sounds friendlier and is not: on `/show` every row belongs to the
+same show, so a query naming it returns everything, and anywhere a search for
+"bitcoin" would surface every boost sent to a show with Bitcoin in its title
+rather than every boost that *says* bitcoin.
+
+**⚠️ It is a SUBSTRING match, not FTS5**, and `boost-list.js#searchBoostRows` is
+the whole of it. `boosts_fts` exists and `/api/v1/search?type=boosts` already
+reads it, but MATCH is token-based with a prefix wildcard — "rabbit" does not
+find "rabbithole" — and it is a **global** index with no way to scope to one
+show, episode or booster without new plumbing. The section already holds its
+subject's whole corpus in memory the moment any control is touched. Terms are
+ANDed, in any order.
+
+**Only ~16% of indexed boosts carry a message**, so a row without one can never
+match, and the empty state says as much rather than leaving a reader to conclude
+the search is broken. `emptyMessage()` in `boost-section.js` is three strings for
+that reason: no search, a search that missed, and a search on a subject where
+nothing carries text at all.
+
+Still out of scope on purpose: the Follows axis. A boost list about one subject
+has no scope axis.
 
 ### The community rollups
 

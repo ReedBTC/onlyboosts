@@ -34,11 +34,11 @@
  * See paintRows.
  */
 import {
-  boostRows, rowsFromRecords, sortBoostRows, filterBoostRows,
-} from '/assets/js/boost-list.js?v=ob-v62'
-import { rangeControl, sortControl, rangeDays, rangeCutoff } from '/assets/js/feed-controls.js?v=ob-v62'
-import { wireBoostNotes } from '/assets/js/boost-note-actions.js?v=ob-v62'
-import { hydrateProfiles } from '/assets/js/detail-page.js?v=ob-v62'
+  boostRows, rowsFromRecords, sortBoostRows, filterBoostRows, searchBoostRows,
+} from '/assets/js/boost-list.js?v=ob-v63'
+import { rangeControl, sortControl, rangeDays, rangeCutoff } from '/assets/js/feed-controls.js?v=ob-v63'
+import { wireBoostNotes } from '/assets/js/boost-note-actions.js?v=ob-v63'
+import { hydrateProfiles } from '/assets/js/detail-page.js?v=ob-v63'
 
 /* The sort menu, taken from boosts-feed.js#SORT_OPTIONS so the wording matches
  * the feed the reader was sent here from.
@@ -111,6 +111,9 @@ export function initBoostSection({
 
   let sortKey = state.sort || sorts[0][0]
   let rangeKey = state.range || 'all'
+  // The search box's current text. '' is "no search", which is a different empty
+  // from "searched and found nothing" — see emptyMessage.
+  let query = ''
 
   /* How many rows a page holds, declared by the Function.
    *
@@ -139,9 +142,24 @@ export function initBoostSection({
   })
 
   // ── Controls ───────────────────────────────────────────────────────
+  /* Three controls on one band, in reading order: the search box, then the
+   * range, then the sort.
+   *
+   * ⚠️ THE RANGE AND THE SORT SIT TOGETHER AT THE RIGHT END, in their own
+   * `.bs-knobs` group. `.cs-controls` pins a lone sort to the far end with
+   * `margin-left: auto`, which is right in the drawers — the band's left end
+   * holds a link out to the show's catalogue there — and wrong here: it left the
+   * range stranded at the opposite end of the band from the control it belongs
+   * beside. The feeds put the two adjacent (`.pcast-controls` in
+   * feed-cards.css) and this now matches them. The auto margin moves to the
+   * GROUP, so the pair still holds the right end and the search box takes the
+   * slack. */
   function mountControls() {
     if (!ctrlSlot) return
-    ctrlSlot.append(
+
+    const knobs = document.createElement('div')
+    knobs.className = 'bs-knobs'
+    knobs.append(
       rangeControl(rangeKey, (key) => { if (key !== rangeKey) { rangeKey = key; onControlChange() } }, {
         label: 'Filter by when the boost was sent',
         titleFor: rangeTitle,
@@ -155,21 +173,77 @@ export function initBoostSection({
         title: sortTitle,
       }),
     )
+    ctrlSlot.append(mountSearch(), knobs)
     ctrlSlot.hidden = false
+  }
+
+  /* The search box.
+   *
+   * ⚠️ IT SEARCHES THE BOOST MESSAGE AND NOTHING ELSE, and it is a SUBSTRING
+   * match rather than FTS5. Both decisions, and why, are on
+   * boost-list.js#searchBoostRows, which is where the matching lives.
+   *
+   * ⚠️ IT IS NOT THE TYPEAHEAD THE FEEDS CARRY. feed-search.js suggests entries
+   * and filters to a PICK, which is right where the question is "where does my
+   * show stand" and the answer is one card. Here the question is "what did people
+   * say", and the answer is however many messages say it — so this is a plain
+   * filter over the list, with no suggestion list to choose from.
+   *
+   * Debounced at 220ms, matching feed-search.js. No abort handling is needed
+   * because there is no request: the one fetch is `ensureCorpus`, which is
+   * memoised, so typing before it lands waits on the same promise every other
+   * control does.
+   */
+  function mountSearch() {
+    const wrap = document.createElement('div')
+    wrap.className = 'bs-search'
+    const input = document.createElement('input')
+    input.type = 'search'
+    input.className = 'bs-search-input'
+    input.placeholder = 'Search boost messages…'
+    input.setAttribute('aria-label', 'Search boost messages')
+    input.autocomplete = 'off'
+    let timer = null
+    const run = () => {
+      const next = input.value.trim()
+      if (next === query) return
+      query = next
+      onControlChange()
+    }
+    input.addEventListener('input', () => {
+      clearTimeout(timer)
+      timer = setTimeout(run, 220)
+    })
+    // Enter and the type="search" clear affordance both bypass the debounce:
+    // they are decisions rather than keystrokes.
+    input.addEventListener('search', () => { clearTimeout(timer); run() })
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); clearTimeout(timer); run() }
+    })
+    wrap.appendChild(input)
+    return wrap
   }
 
   /* A control moved, so the whole list is rebuilt — which needs the corpus.
    *
-   * The band is marked busy while the one fetch this section ever makes is in
-   * flight rather than left live: a second press during it would queue a rebuild
-   * against a corpus that had not arrived.
+   * ⚠️ BUSY ONLY WHILE THE CORPUS IS GENUINELY IN FLIGHT, which is the first
+   * gesture and no other. `ensureCorpus` is memoised, so every call after the
+   * first resolves in a microtask; setting the flag unconditionally would strobe
+   * the band on every keystroke of a search.
+   *
+   * ⚠️ AND THE FLAG DISABLES THE KNOBS, NOT THE BAND. The CSS behind it is
+   * `pointer-events: none`, which is right for the range and the sort — a second
+   * press during that one fetch would queue a rebuild against a corpus that had
+   * not arrived — and wrong for the search box, which the reader is typing into
+   * at that exact moment. See `.bs-controls[aria-busy] .bs-knobs`.
    */
   async function onControlChange() {
-    ctrlSlot?.setAttribute('aria-busy', 'true')
+    const cold = !rows
+    if (cold) ctrlSlot?.setAttribute('aria-busy', 'true')
     try {
       await ensureCorpus()
     } finally {
-      ctrlSlot?.removeAttribute('aria-busy')
+      if (cold) ctrlSlot?.removeAttribute('aria-busy')
     }
     if (!rows) return
     rebuild()
@@ -197,9 +271,29 @@ export function initBoostSection({
   }
 
   // ── Painting ───────────────────────────────────────────────────────
+  /* Range first, then the query, then the order.
+   *
+   * The two filters are boost-list.js's, so the search means the same thing
+   * wherever it is applied and the comparators see the same rows either way. */
   function buildView() {
-    view = sortBoostRows(filterBoostRows(rows, rangeCutoff(rangeKey)), sortKey)
+    view = sortBoostRows(
+      searchBoostRows(filterBoostRows(rows, rangeCutoff(rangeKey)), query),
+      sortKey)
     total = view.length
+  }
+
+  /* What an empty list means, which is three different things.
+   *
+   * Conflating them tells the reader something false: "try a wider range" is
+   * wrong advice for a query that matches nothing at any range, and a search
+   * that finds nothing on a subject where almost no boost carries a message is a
+   * fact about the data rather than about the query. */
+  function emptyMessage() {
+    if (!query) return emptyText
+    const anyText = (rows || []).some((r) => r.message)
+    return anyText
+      ? `No boost message here contains “${query}”. Try fewer words, or a wider date range.`
+      : `No boost message here contains “${query}” — none of these boosts carries a message. Most don’t.`
   }
 
   function rebuild() {
@@ -211,7 +305,7 @@ export function initBoostSection({
       const li = document.createElement('li')
       const p = document.createElement('p')
       p.className = 'show-empty'
-      p.textContent = emptyText
+      p.textContent = emptyMessage()
       li.appendChild(p)
       list.appendChild(li)
       return

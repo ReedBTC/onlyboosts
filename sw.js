@@ -415,7 +415,7 @@
 // triangle beside the caret and no rotation. And `/` is a Pages Function
 // response rather than a static file, so the precached copy of it is a document
 // that no longer exists; it is dropped from PRECACHE_URLS below for that reason.
-const VERSION = 'ob-v62';
+const VERSION = 'ob-v63';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;
@@ -446,27 +446,27 @@ const PRECACHE_URLS = [
   '/assets/onlyboosts_pfp.png',
   '/assets/onlyboosts_banner.png',
   '/assets/avatar-fallback.svg',
-  '/assets/css/theme.css?v=ob-v62',
-  '/assets/css/page.css?v=ob-v62',
-  '/assets/css/nav.css?v=ob-v62',
-  '/assets/css/footer.css?v=ob-v62',
-  '/assets/css/boosts-thread.css?v=ob-v62',
-  '/assets/css/boost-actions.css?v=ob-v62',
+  '/assets/css/theme.css?v=ob-v63',
+  '/assets/css/page.css?v=ob-v63',
+  '/assets/css/nav.css?v=ob-v63',
+  '/assets/css/footer.css?v=ob-v63',
+  '/assets/css/boosts-thread.css?v=ob-v63',
+  '/assets/css/boost-actions.css?v=ob-v63',
   // The episode card and its drawer. Precached alongside the others because the
   // homepage's feeds are painted in it and it used to be inline in index.html,
   // which IS precached — leaving it out would trade an inline block for a
   // network round trip on the one page this list exists to make fast.
-  '/assets/css/feed-cards.css?v=ob-v62',
-  '/assets/js/boosts-thread.js?v=ob-v62',
+  '/assets/css/feed-cards.css?v=ob-v63',
+  '/assets/js/boosts-thread.js?v=ob-v63',
   // A static import of boosts-thread.js, so precaching that without this one
   // leaves a returning visitor fetching half the graph from the network.
-  '/assets/js/primal-profiles.js?v=ob-v62',
-  '/assets/js/calendar-events.js?v=ob-v62',
-  '/assets/js/boost-actions.js?v=ob-v62',
-  '/assets/js/nav.js?v=ob-v62',
-  '/assets/js/nav-widget-boot.js?v=ob-v62',
-  '/assets/js/widget-loader.js?v=ob-v62',
-  '/assets/js/sw-register.js?v=ob-v62',
+  '/assets/js/primal-profiles.js?v=ob-v63',
+  '/assets/js/calendar-events.js?v=ob-v63',
+  '/assets/js/boost-actions.js?v=ob-v63',
+  '/assets/js/nav.js?v=ob-v63',
+  '/assets/js/nav-widget-boot.js?v=ob-v63',
+  '/assets/js/widget-loader.js?v=ob-v63',
+  '/assets/js/sw-register.js?v=ob-v63',
 ];
 
 self.addEventListener('install', (event) => {

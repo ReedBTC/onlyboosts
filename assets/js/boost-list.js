@@ -30,15 +30,15 @@
  */
 import {
   htmlEscape, isSafeUrl, truncate, renderMessage,
-} from './nostr-text.js?v=ob-v62';
-import { episodePageHref, showPageHref } from './show-link.js?v=ob-v62';
+} from './nostr-text.js?v=ob-v63';
+import { episodePageHref, showPageHref } from './show-link.js?v=ob-v63';
 /* ⚠️ THE REAL MODULE, NOT A FOURTH COPY OF THE RULE. booster-link.js has been
  * dependency-free since it was written, so esbuild inlines it here exactly as it
  * does nostr-text.js, and the boost rows link a booster by the same test every
  * feed surface uses rather than by a transcription of it. This is the collapse
  * that functions/_shared/detail-page.js#boosterPageUrl said was available; that
  * name is now an alias for this function rather than a second copy of it. */
-import { boosterPageHref } from './booster-link.js?v=ob-v62';
+import { boosterPageHref } from './booster-link.js?v=ob-v63';
 
 // ── The formatters the row needs ─────────────────────────────────────────────
 //
@@ -183,6 +183,36 @@ export function filterBoostRows(rows, cutoff) {
   return cutoff ? rows.filter((r) => Number(r.created_at) >= cutoff) : rows;
 }
 
+/* Rows whose MESSAGE contains every term in `query`, in any order.
+ *
+ * ⚠️ THE MESSAGE AND NOTHING ELSE, which is worth being strict about. Matching
+ * the show or episode title beside it sounds friendlier and is not: on /show
+ * every row belongs to the same show, so a query naming it returns everything,
+ * and on any page a search for "bitcoin" would surface every boost sent to a
+ * show with Bitcoin in its title rather than every boost that SAYS bitcoin. The
+ * Shows feed learned the same lesson from its sub-line; see the `label` /
+ * `extra` split in feed-search.js.
+ *
+ * ⚠️ SUBSTRING, NOT FTS5, AND DELIBERATELY SO. `boosts_fts` exists and
+ * /api/v1/search?type=boosts already reads it, but MATCH is token-based with a
+ * prefix wildcard — "rabbit" does not find "rabbithole" — and it is a GLOBAL
+ * index with no way to scope to one show, episode or booster without new
+ * plumbing. The section already holds its subject's whole corpus in memory the
+ * moment any control is touched, so this is both cheaper and a closer match to
+ * what someone typing into a box over their own boost inbox means.
+ *
+ * A row with no message can never match. That is not a bug and is worth knowing:
+ * only ~16% of indexed boosts carry one, which is why the empty state says so.
+ */
+export function searchBoostRows(rows, query) {
+  const terms = String(query || "").toLowerCase().split(/\s+/).filter(Boolean);
+  if (!terms.length) return rows;
+  return rows.filter((r) => {
+    const hay = String(r.message || "").toLowerCase();
+    return hay ? terms.every((t) => hay.includes(t)) : false;
+  });
+}
+
 // ── The section ──────────────────────────────────────────────────────────────
 //
 // NOT filtered to feed-level boosts on the show page, and that is the considered
@@ -246,10 +276,19 @@ export function renderBoosts(rows, names, {
   /* ⚠️ THE BAND, THE LIST SLOT, THE MORE SLOT AND THE STATE ELEMENT ARE THE WHOLE
    * CONTRACT with assets/js/boost-section.js.
    *
-   * The band ships EMPTY and `hidden` because range and sort are VERBS: a
-   * control that cannot act is worse than no control, and a reader with no
-   * JavaScript gets the list with nothing missing but two dropdowns. Same
+   * The band ships EMPTY and `hidden` because search, range and sort are VERBS:
+   * a control that cannot act is worse than no control, and a reader with no
+   * JavaScript gets the list with nothing missing but three controls. Same
    * discipline, and the same `.cs-controls` band, as the drawers on these pages.
+   *
+   * ⚠️ `.bs-shell` IS WHAT MAKES THE CONTROLS BELONG TO THE LIST. Without it the
+   * band was a floating toolbar with a run of separate cards under it, and
+   * nothing said the two were one thing — a reader could take the range buttons
+   * for page-level chrome. Bordered, with the band as its lid, it is the same
+   * box-with-a-lid idiom `.ep-drawer` uses everywhere else on these pages, and
+   * the "Load more" is INSIDE it for the same reason it is inside `.ce-scroll`
+   * on the episode drawers: a button below a panel reads as belonging to the
+   * page rather than to the list.
    *
    * `ob-boost-list` alongside `boost-list` is what makes these cards the same
    * object as the homepage Boosts feed's: the container override that gives a
@@ -260,11 +299,13 @@ export function renderBoosts(rows, names, {
       <h2>${htmlEscape(heading)}</h2>
       <p class="show-section-sub">${htmlEscape(sub)}</p>
     </div>
-    ${all >= CONTROLS_MIN ? `<div class="cs-controls bs-controls" data-bs-controls hidden></div>` : ""}
-    <ul class="boost-list ob-boost-list" data-bs-list>
-      ${boostRows(rows, names, { itemAbbr, noun, showTarget, linkBooster, showShow })}
-    </ul>
-    <div class="bs-more" data-bs-more></div>
+    <div class="bs-shell">
+      ${all >= CONTROLS_MIN ? `<div class="cs-controls bs-controls" data-bs-controls hidden></div>` : ""}
+      <ul class="boost-list ob-boost-list" data-bs-list>
+        ${boostRows(rows, names, { itemAbbr, noun, showTarget, linkBooster, showShow })}
+      </ul>
+      <div class="bs-more" data-bs-more></div>
+    </div>
     ${stateScript({
       count, total: all, sort: "recent", range: "all",
       /* ⚠️ THE ROW VARIANT RIDES THE STATE, exactly as `card` does in

@@ -16,9 +16,9 @@
  * page to be complete and legible; it adds the interactive half and every
  * function degrades to what the server rendered.
  */
-import { copyNpub, copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v62'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v62'
-import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v62'
+import { copyNpub, copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v63'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v63'
+import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v63'
 
 // ── copy-npub ────────────────────────────────────────────────────────
 /* Delegated rather than per-element: the community wall can hold 500 cards, and
@@ -112,8 +112,9 @@ export function initBackLink() {
 //
 // The browser does the scrolling; .show-section carries a scroll-margin-top so
 // the heading clears the sticky nav. Only one case needs JavaScript: a drawer
-// that ships COLLAPSED answers its own anchor with a lid. Any <details> inside
-// the targeted section is opened.
+// that ships COLLAPSED answers its own anchor with a lid. Any SECTION-LEVEL
+// drawer (`.ep-drawer`) inside the target is opened — never a card's own; see
+// the note at the selector.
 //
 // No manual scroll afterwards, deliberately. A drawer expands DOWNWARD from a
 // summary already at the top of its section, so the section's own offset does not
@@ -152,7 +153,26 @@ export function initHashRouting(aliases = {}) {
     // input and would otherwise be parsed as a CSS selector.
     const section = document.getElementById(id)
     if (!section) return
-    for (const d of section.querySelectorAll('details:not([open])')) d.open = true
+    /* ⚠️ `.ep-drawer` ONLY, NEVER EVERY <details> IN THE SECTION.
+     *
+     * This used to be `details:not([open])`, which opened the section's own
+     * drawer AND every drawer nested inside it — and the card rollups are full
+     * of those: each episode card carries a `<details class="pcast-card-details">`
+     * holding its boost notes, which ships closed because that is thirty
+     * collapsed lists and not thirty open ones.
+     *
+     * The way it bit is initHashSpy, three functions down. The spy rewrites the
+     * hash as the reader scrolls, so a reader who scrolled past "Episodes and
+     * Songs Boosted" was left on /booster/<npub>#episodes — and the next RELOAD
+     * ran this over that section and opened every card's drawer at once. The
+     * reader never typed a URL or clicked an anchor; the page simply came back
+     * expanded.
+     *
+     * `.ep-drawer` is the class every SECTION-level drawer on these three pages
+     * carries, and it is the only kind this ever needed to reach: exactly one
+     * ships collapsed (/show's episode drawer) and the rest ship `open`. A card's
+     * own drawer is the reader's to open. */
+    for (const d of section.querySelectorAll('details.ep-drawer:not([open])')) d.open = true
   }
 
   revealHashTarget()
