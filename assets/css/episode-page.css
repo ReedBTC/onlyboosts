@@ -283,6 +283,47 @@
 }
 .ce-scroll:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 
+/* ── The compact card ──────────────────────────────────────────────────────
+ *
+ * The cards in this container are the feed's, unchanged in markup and built by
+ * the same module — this only tightens their spacing. A card designed for a
+ * full-width feed column is too airy inside a 75vh scroll box on a page that
+ * already has six sections: the reader is scanning a rollup here, not browsing,
+ * and every row of padding is one fewer card visible at a time.
+ *
+ * ⚠️ SPACING ONLY, AND SCOPED TO .ce-scroll. Nothing here changes what a card
+ * SAYS or where anything links, and none of it reaches the homepage. The parts a
+ * surface genuinely drops — the "Nostr Stats:" line, the player — are in the card
+ * module's CARD_PARTS table and travel in the state element, because they change
+ * the markup and the client has to render the same variant on a re-sort. A
+ * padding value cannot get that wrong, so it stays here where it can be read
+ * beside the container it applies to.
+ *
+ * Both drawers get it: this file is linked by /episode AND /booster, which is
+ * also where .ce-scroll itself is defined. */
+.ce-scroll .pcast-list { gap: 0.45rem; }
+.ce-scroll .pcast-card-head {
+  gap: 0.55rem;
+  padding: 0.5rem 0.4rem 0.45rem 0.55rem;
+}
+/* 56 rather than 68. The artwork is still the anchor of the row and still square;
+   it is simply not the thing being read on this surface, where the title and the
+   figures are. */
+.ce-scroll .pcast-card-media { width: 56px; height: 56px; }
+.ce-scroll .pcast-card-aired { font-size: 0.62rem; }
+.ce-scroll .pcast-title { font-size: 0.92rem; }
+.ce-scroll .pcast-meta { margin-top: 0.15rem; }
+.ce-scroll .pcast-links { margin-top: 0.2rem; }
+.ce-scroll .pcast-nstats { margin-top: 0.25rem; }
+.ce-scroll .pcast-drawer { padding: 0.35rem 0.6rem 0.4rem; }
+/* The thread's left rule aligns under the artwork, so it tracks the width above:
+   0.55rem of card padding + 56px of art + 0.55rem of gap. */
+.ce-scroll .pcast-details {
+  margin: 0 0.6rem 0.7rem 4.6rem;
+  padding-left: 0.8rem;
+  gap: 0.5rem;
+}
+
 /* The load-more sits INSIDE the container, so it needs less air above it than
    the feed's does at the foot of a page. */
 .ce-scroll .pcast-more-wrap { margin-top: 0.8rem; margin-bottom: 0.2rem; }

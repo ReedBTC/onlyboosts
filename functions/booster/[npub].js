@@ -178,11 +178,20 @@ export async function onRequestGet({ env, params }) {
     ).all(),
 
     env.DB.prepare(
+      // ⚠️ THE SHOW IS SELECTED HERE AND ON NEITHER OTHER PAGE. A boost row names
+      // the show beside the episode only where the show is new information, which
+      // is this page: on /show it is the <h1> and on /episode it is the eyebrow,
+      // so there the join would cost a lookup per render to print what the reader
+      // is already looking at. One more LEFT JOIN through the podcasts primary
+      // key, on a list capped at BOOSTS_SHOWN.
       `SELECT b.event_id, b.booster_pubkey, b.booster_npub, b.created_at, b.sats,
-              b.item_guid, b.message, e.title AS e_title, e.episode_number AS e_num,
+              b.item_guid, b.podcast_guid, b.message,
+              e.title AS e_title, e.episode_number AS e_num,
+              p.title AS p_title,
               pr.name AS pr_name, pr.display_name AS pr_dname, pr.picture AS pr_pic
        FROM boosts b
        LEFT JOIN episodes e ON e.item_guid = b.item_guid
+       LEFT JOIN podcasts p ON p.podcast_guid = b.podcast_guid
        LEFT JOIN profiles pr ON pr.pubkey = b.booster_pubkey
        WHERE b.booster_pubkey = ?
        ORDER BY b.created_at DESC, b.event_id DESC LIMIT ?`
@@ -499,6 +508,11 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
     // /booster/<npub> would point this page at itself once per row. Same rule as
     // showTarget one line up, one column over.
     linkBooster: false,
+    // ⚠️ TRUE HERE AND NOWHERE ELSE, by the same test again: this is the one page
+    // where a row's SHOW is new information rather than the subject the reader
+    // already has in front of them. It is what makes these rows the same object
+    // as the homepage Boosts feed's cards, which have always named both.
+    showShow: true,
   })}
 
 </main>
@@ -880,13 +894,12 @@ function renderEpisodes(corpus) {
           sort: "sats",
           range: "all",
           limit: CARDS_PER_PAGE,
-          // Neither part earns its place here. Every card aggregates ONE person's
-          // boosts, so "1 booster · 3 boosts" restates the page's own subject on
-          // every row and the booster count is 1 by construction — CLAUDE.md names
-          // this case verbatim under what may legitimately differ. And the player
-          // goes for the same reason as the twin on /episode: the title links to a
-          // page that has one.
-          parts: { stats: false, player: false },
+          // The figures go too, unlike the twin on /episode: every card here
+          // aggregates ONE person's boosts, so "1 booster · 3 boosts" restates the
+          // page's own subject on every row and the booster count is 1 by
+          // construction — CLAUDE.md names this case verbatim under what may
+          // legitimately differ.
+          parts: { stats: false, layout: "compact" },
           state: { surface: "booster-episodes", truncated: !!corpus?.truncated },
         })}</div>
         <div data-be-more></div>

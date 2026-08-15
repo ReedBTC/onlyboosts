@@ -241,34 +241,47 @@ check('RANKED_SORTS covers exactly the quantitative sorts', () => {
 // that nothing else moves with them.
 console.log('\nCard variants:')
 
-const noStats = episodeCardHtml(byGuid['item-guid-1'], {
-  rank: 1, copy: COPY.other, profiles, parts: { stats: false, player: true },
+// The two live variants: /episode's community drawer and /booster's episode list.
+const community = episodeCardHtml(byGuid['item-guid-1'], {
+  rank: 1, copy: COPY.other, profiles, parts: { stats: true, layout: 'compact' },
 })
-const noPlayer = episodeCardHtml(byGuid['item-guid-1'], {
-  rank: 1, copy: COPY.other, profiles, parts: { stats: true, player: false },
-})
-
-check('stats:false drops the figures and KEEPS the boost pill', () => {
-  assert.doesNotMatch(noStats, /Nostr Stats:/)
-  assert.doesNotMatch(noStats, /2 boosters/)
-  // The pill is right-aligned by its own margin inside this row, so the row has
-  // to survive or the button loses its position rather than its neighbours.
-  assert.match(noStats, /<div class="pcast-meta pcast-nstats">/)
-  assert.match(noStats, /class="ob-boost-pill" hidden data-boost-episode/)
+const booster = episodeCardHtml(byGuid['item-guid-1'], {
+  rank: 1, copy: COPY.other, profiles, parts: { stats: false, layout: 'compact' },
 })
 
-check('player:false drops the audio element and nothing else', () => {
-  assert.doesNotMatch(noPlayer, /<audio/)
-  assert.doesNotMatch(noPlayer, /pcast-player/)
-  // Everything the player sat between is still there.
-  assert.match(noPlayer, /pcast-card-head/)
-  assert.match(noPlayer, /<details class="pcast-card-details">/)
-  assert.match(noPlayer, /Nostr Stats:/)
+check('compact drops the player and the ⋮ menu, and rails the pill', () => {
+  assert.doesNotMatch(community, /<audio/)
+  assert.doesNotMatch(community, /pcast-cardmenu/)
+  assert.match(community, /<div class="pcast-card-rail"><button type="button" class="ob-boost-pill"/)
+  // The rail is a child of the head, so it can stretch to the head's height —
+  // which is what centres the pill vertically.
+  assert.match(community, /pcast-card-head[\s\S]*pcast-card-rail/)
 })
 
-check('the default renders both', () => {
+check('compact keeps everything that is not a verb or a duplicate', () => {
+  assert.match(community, /pcast-card-head/)
+  assert.match(community, /<details class="pcast-card-details">/)
+  assert.match(community, /Nostr Stats:/)          // community-scoped, so meaningful
+  assert.match(community, /data-boost-note/)       // the notes still ship
+  assert.match(community, /pcast-seeall/)
+})
+
+check('stats:false drops the figures without leaving an empty row', () => {
+  assert.doesNotMatch(booster, /Nostr Stats:/)
+  assert.doesNotMatch(booster, /2 boosters/)
+  // .pcast-meta carries a top margin, so an empty one is a gap that reads as a
+  // mistake. The pill has moved to the rail, so there is nothing left to hold.
+  assert.doesNotMatch(booster, /<div class="pcast-meta pcast-nstats">/)
+  assert.match(booster, /class="ob-boost-pill"/)
+})
+
+check('the feed layout is unchanged — pill on the stats line, ⋮ present', () => {
   assert.match(html, /Nostr Stats:/)
   assert.match(html, /<audio class="pcast-player"/)
+  assert.match(html, /pcast-cardmenu/)
+  assert.doesNotMatch(html, /pcast-card-rail/)
+  // The pill closes the stats row rather than standing alone.
+  assert.match(html, /3 boosts<\/span><button type="button" class="ob-boost-pill"/)
 })
 
 // ── Message truncation ──────────────────────────────────────────────────────

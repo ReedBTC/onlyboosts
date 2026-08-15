@@ -159,6 +159,29 @@ a.pcast-card-media:hover { box-shadow: 0 0 0 2px var(--accent); }
   font-size: 1.7rem; opacity: 0.55;
 }
 .pcast-card-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; justify-content: center; }
+
+/* The compact layout's right rail — the boost pill, and nothing else.
+ *
+ * `align-self: stretch` makes the rail as tall as the card head whatever drives
+ * that height (the artwork on a short card, the body on a long one), and
+ * `align-items: center` then puts the pill at its vertical middle. That is the
+ * whole trick: the pill used to be the last thing on the last line of the body,
+ * so on a card with no player it sat against the drawer's top edge.
+ *
+ * ⚠️ IT OCCUPIES THE ⋮ SUBSCRIBE MENU'S EDGE, which is why the compact layout
+ * drops that menu rather than keeping both. A menu pinned to the top of the head
+ * and a pill centred in it overlap on a short card, and a card in this container
+ * is short by design. See CARD_PARTS in episode-card.js.
+ *
+ * The pill keeps its own `margin-left: auto` from theme.css, which is a no-op in
+ * a one-child row and correct if anything is ever added beside it. */
+.pcast-card-rail {
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+  flex-shrink: 0;
+  padding-left: 0.2rem;
+}
 .pcast-show {
   font-size: 0.72rem; font-weight: 700; letter-spacing: 0.02em;
   text-transform: uppercase; color: var(--accent-d);

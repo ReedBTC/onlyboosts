@@ -41,6 +41,13 @@ export {
 import {
   htmlEscape, isSafeUrl, truncate, mentionedPubkeys, renderMessage,
 } from "../../assets/js/nostr-text.js";
+/* ⚠️ THE REAL MODULE, NOT A FOURTH COPY OF THE RULE. show-link.js is
+ * dependency-free, so esbuild inlines it here exactly as it does episode-card.js,
+ * and the boost rows on all three detail pages link an episode by the same test
+ * the feeds use rather than by a transcription of it. functions/show/[guid].js
+ * still carries `episodePageUrl`, which is now collapsible for the same reason —
+ * see the note over boosterPageUrl below. */
+import { episodePageHref, showPageHref } from "../../assets/js/show-link.js";
 
 export function jsonForScript(v) {
   return JSON.stringify(v).replace(/</g, "\\u003c");
@@ -336,7 +343,12 @@ function supporterCard(r, isPodium, hidden = false) {
 // to the booster whose page it is, so linking each one would point the page at
 // itself once per row. The same reasoning as `showTarget` above, one column
 // over — a row must not repeat what the <h1> already said.
-export function renderBoosts(rows, names, { heading, sub, itemAbbr, noun, showTarget = true, linkBooster = true }) {
+//
+// `showShow` names the SHOW beside the episode, and is true on exactly one page
+// for that same reason. See the meta-row note in boostRow.
+export function renderBoosts(rows, names, {
+  heading, sub, itemAbbr, noun, showTarget = true, linkBooster = true, showShow = false,
+}) {
   if (!rows.length) return "";
 
   // `ob-boost-list` alongside `boost-list` is what makes these cards the same
@@ -349,12 +361,12 @@ export function renderBoosts(rows, names, { heading, sub, itemAbbr, noun, showTa
       <p class="show-section-sub">${htmlEscape(sub)}</p>
     </div>
     <ul class="boost-list ob-boost-list">
-      ${rows.map((r) => boostRow(r, names, { itemAbbr, noun, showTarget, linkBooster })).join("\n      ")}
+      ${rows.map((r) => boostRow(r, names, { itemAbbr, noun, showTarget, linkBooster, showShow })).join("\n      ")}
     </ul>
   </section>`;
 }
 
-function boostRow(r, names, { itemAbbr, noun, showTarget, linkBooster = true }) {
+function boostRow(r, names, { itemAbbr, noun, showTarget, linkBooster = true, showShow = false }) {
   const realName = displayName(r);
   const name = realName || shortId(r.booster_npub, r.booster_pubkey);
   const pic = isSafeUrl(r.pr_pic) ? r.pr_pic : null;
@@ -393,15 +405,46 @@ function boostRow(r, names, { itemAbbr, noun, showTarget, linkBooster = true }) 
     ? `<a class="author-name" href="${htmlEscape(href)}" title="Boosts by ${htmlEscape(name)}">${htmlEscape(name)}</a>`
     : `<span class="author-name">${htmlEscape(name)}</span>`;
 
-  // The meta row, same classes and same order as the feed card's: the sats, then
-  // what was boosted. The feed also names the SHOW here; none of the three
-  // detail-page queries select a show title, and on /show and /episode it would
-  // be the page's own subject repeated on every row anyway.
+  /* The meta row: the sats, then what was boosted.
+   *
+   * ⚠️ THE EPISODE IS A LINK NOW, AND THE SHOW APPEARS BESIDE IT. The homepage
+   * Boosts feed had rendered both as links since /episode/<guid> landed —
+   * `a.ob-boost-ep` and `a.ob-boost-show` are styled in boosts-thread.css and
+   * were sitting there unused on this side — while these three pages emitted a
+   * plain span and no show at all. That is exactly the failure the rendering
+   * rule's own test names: a reader could screenshot a boost note from the
+   * homepage and one from /show and tell them apart.
+   *
+   * The link is withheld from the 500 titleless episodes by the same rule every
+   * other surface applies, through the same module rather than a copy of it.
+   *
+   * ⚠️ `showShow` IS TRUE ON /booster ONLY, and that is not an oversight. On
+   * /show and /episode the show is the page's own subject — the <h1> on one and
+   * the eyebrow link on the other — so naming it on every one of 24 rows
+   * restates what the reader is already looking at. Same reasoning as
+   * `showTarget`, which suppresses the EPISODE on /episode for the same reason.
+   * A booster's page is the one where a row's show is new information.
+   */
+  const epHref = episodePageHref(r.item_guid, r.e_title);
+  const epEl = target
+    ? (epHref
+        ? `<a class="ob-boost-ep" href="${htmlEscape(epHref)}">${target}</a>`
+        : `<span class="ob-boost-ep">${target}</span>`)
+    : null;
+
+  const showHref = showPageHref(r.podcast_guid);
+  const showEl = (showShow && r.p_title)
+    ? (showHref
+        ? `<a class="ob-boost-show ob-boost-show-link" href="${htmlEscape(showHref)}">${htmlEscape(truncate(r.p_title, 60))}</a>`
+        : `<span class="ob-boost-show">${htmlEscape(truncate(r.p_title, 60))}</span>`)
+    : null;
+
   const meta = [
     Number(r.sats) > 0
       ? `<span class="ob-boost-sats">${htmlEscape(num(r.sats))}<span class="ob-bolt" aria-hidden="true">⚡</span></span>`
       : null,
-    showTarget && target ? `<span class="ob-boost-ep">${target}</span>` : null,
+    showTarget ? epEl : null,
+    showTarget ? showEl : null,
   ].filter(Boolean).join("\n            ");
 
   const ts = Number(r.created_at) || 0;

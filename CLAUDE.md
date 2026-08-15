@@ -311,15 +311,28 @@ the facts/verbs line.**
 | `assets/js/episode-card.js` | the FACTS, as an HTML **string**: artwork and its fallback chain, title, show, air date, rank, the `Nostr Stats:` line, and every boost note inside the drawer. No DOM, no `fetch`, no `Intl` defaults. |
 | `assets/js/episode-card-actions.js` | the VERBS: the ⋮ subscribe menu, the boost pill, the drawer's hide control, the per-boost ⋮ menu, and the reply / like / repost / zap bars. |
 
-**Two parts of the card are per-surface, and only two.** `CARD_PARTS` in
-`episode-card.js` is the whole table — `stats` (the `Nostr Stats:` line, off on
-`/booster/<npub>`, where every card aggregates one person's boosts and the
-booster count is 1 by construction) and `player` (the inline `<audio>`, off in
-the two detail-page drawers, where every title links to a page that has one).
-Both are cases the table above already sanctions as legitimately different.
+**Two knobs decide what a surface shows of the card, and only two.**
+`CARD_PARTS` in `episode-card.js` is the whole table:
+
+| | |
+|---|---|
+| `stats` | the `Nostr Stats:` line. Off on `/booster/<npub>`, where every card aggregates one person's boosts and the booster count is 1 by construction — the case this document already names under what may legitimately differ. |
+| `layout` | `feed` or `compact`. Compact is the two detail-page drawers and means three things that move together: no inline `<audio>`, no ⋮ subscribe menu, and the boost pill in a right-hand rail of its own, vertically centred, instead of at the end of the stats line. |
+
+It was four booleans for about an hour, three of which only ever moved together
+— a table describing 16 cards when the site has two. The player and the ⋮ both
+come off for one reason: every card's title links to that episode's own page,
+which carries both on a surface with room for them, where this is a 75vh scroll
+box inside a page with six other sections. **The pill can only be centred
+because the ⋮ is gone** — they share the card's right edge, and a menu pinned to
+the top of it collides with a pill centred in it on a card this short.
+
 **⚠️ The Function declares the variant and it travels in the state element**, so
 a client repaint cannot render a different card than the edge did; setting it on
 both sides would be two declarations that agree only until one is edited.
+**Spacing is not in that table** — the compact card's padding, artwork size and
+type scale are CSS scoped to `.ce-scroll` in `episode-page.css`, because a
+padding value cannot make the two sides render different markup.
 
 **⚠️ `functions/index.js` fetches `/` from `env.ASSETS`, never `/index.html`.**
 Pages 308-redirects `/index.html` to `/`, `/` is that Function, and returning the
@@ -1424,6 +1437,7 @@ one.
 | `/episode` community cards | the same card, unchanged | the same |
 | Shows / Albums cards' episode drawer | the row's title | `shows-feed.js#renderEpisodes`, same module |
 | Boosts cards | the episode title on the meta row | `boosts-feed.js`, same module |
+| `/show`, `/episode`, `/booster` boost notes | the episode title on the meta row | `functions/_shared/detail-page.js#boostRow`, through the real `show-link.js` |
 | `/show` episode drawer rows | the row's title | `functions/show/[guid].js#episodePageUrl` |
 | A published boost note | the content link line and the `r` tag | `episode-link.js#episodeBoostLink` |
 
@@ -1586,6 +1600,15 @@ links to `/about`.
 
 The `/boosts` cards carry no qualifier at all: one card is one boost, and its
 sats figure is that note's own claim rather than an aggregate.
+
+**A boost note names what it was boosted to, and both halves link.** The
+episode resolves to `/episode/<item-guid>` by the same title rule every other
+surface applies, and the show to `/show/<guid>`. The homepage Boosts feed had
+done this since the episode pages landed while the three detail pages emitted a
+plain span and no show at all — the exact failure the rendering rule's own test
+names. **⚠️ Each half is suppressed where it is the page's own subject**: the
+episode on `/episode` (`showTarget: false`), the show on `/show` and `/episode`
+(`showShow` is true on `/booster` alone). A row must not repeat the `<h1>`.
 
 **The rename is a surface rename only.** `supporterCard`, `renderSupporters`,
 `SUPPORTERS_VISIBLE`, `data-show-more="supporter"`, `data-supporter-grid`, the
