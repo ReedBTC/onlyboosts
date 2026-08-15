@@ -18,16 +18,17 @@
  * `episode-section.js` attaches the controls and the verbs and nothing else.
  * That module is shared with the identical section on /episode/<guid>.
  */
-import { copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v61'
-import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v61'
-import { rangeControl, sortControl, rangeDays } from '/assets/js/feed-controls.js?v=ob-v61'
-import { initEpisodeSection } from '/assets/js/episode-section.js?v=ob-v61'
+import { copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v62'
+import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v62'
+import { rangeControl, sortControl, rangeDays } from '/assets/js/feed-controls.js?v=ob-v62'
+import { initEpisodeSection } from '/assets/js/episode-section.js?v=ob-v62'
 import {
   initCopyNpub, initShowMore, initShare, initBackLink,
   initHashRouting, initHashSpy, initArt2, wireArt2,
-} from '/assets/js/detail-page.js?v=ob-v61'
-import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v61'
-import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v61'
+} from '/assets/js/detail-page.js?v=ob-v62'
+import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v62'
+import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v62'
+import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v62'
 
 const PK = document.body.dataset.boosterPk || ''
 const NPUB = document.body.dataset.boosterNpub || PK
@@ -442,6 +443,33 @@ function initShows() {
 
 initShows()
 
+/* This person's whole boost history, fetched at most once.
+ *
+ * ⚠️ TWO SECTIONS ON THIS PAGE WANT THE SAME 2,000 ROWS: the Episodes and Songs
+ * rollup below, which groups them by episode, and #boosts at the foot, which
+ * orders them as notes. They are lazy and gesture-gated independently, so a
+ * reader who uses both would otherwise make the same request twice — and the
+ * response carries this person's entire history, which on the heaviest booster in
+ * the index is 975 rows. One promise, shared, and whichever section is touched
+ * first pays for both.
+ *
+ * A failure is not cached: the promise is cleared so the other section, or a
+ * second press, can try again rather than inheriting a rejection it never made.
+ */
+let corpusPromise = null
+function boosterCorpus() {
+  if (!corpusPromise) {
+    corpusPromise = (async () => {
+      const resp = await fetch(`/api/v1/boosters/${encodeURIComponent(NPUB)}?corpus=1`, {
+        headers: { Accept: 'application/json' },
+      })
+      if (!resp.ok) throw new Error(`corpus: HTTP ${resp.status}`)
+      return (await resp.json())?.corpus || {}
+    })().catch((err) => { corpusPromise = null; throw err })
+  }
+  return corpusPromise
+}
+
 // ── Episodes and Songs ───────────────────────────────────────────────
 //
 // Everything this person has boosted at the episode level, painted as the
@@ -475,13 +503,7 @@ initEpisodeSection({
   rankedSorts: new Set(['sats', 'boosts']),
   sortTag: 'Sort: ',
   sortTitle: 'Change how these episodes are ranked',
-  fetchCorpus: async () => {
-    const resp = await fetch(`/api/v1/boosters/${encodeURIComponent(NPUB)}?corpus=1`, {
-      headers: { Accept: 'application/json' },
-    })
-    if (!resp.ok) throw new Error(`corpus: HTTP ${resp.status}`)
-    return (await resp.json())?.corpus?.boosts || []
-  },
+  fetchCorpus: async () => (await boosterCorpus()).boosts || [],
   // The cap is 2,000 against a measured heaviest booster of 975, so this line is
   // unreachable today. It is here because a ranking over a prefix must never
   // pose as a ranking over everything.
@@ -489,4 +511,20 @@ initEpisodeSection({
     'Ranked over this booster\u2019s 2,000 most recent boosts. They have sent more than that, so an episode boosted only long ago may be missing.',
   emptyTitle: 'Nothing in this window',
   emptyBody: 'Nothing this booster sent sats to aired or was released in this time range \u2014 try a wider one.',
+})
+
+// ── Boosts Sent ──────────────────────────────────────────────────────
+//
+// The same section, the same module and the same controls as on /show and
+// /episode. It opens on the newest 24 and holds this person's whole history once
+// a control moves, over the corpus the rollup above already fetches.
+initBoostSection({
+  fetchCorpus: boosterCorpus,
+  sortTitle: 'Sort the boosts this booster has sent',
+  emptyText: 'This booster sent nothing in this time range \u2014 try a wider one.',
+  // The cap is 2,000 against a measured heaviest booster of 975, so this line is
+  // unreachable today. It is here because an order over a prefix must never pose
+  // as an order over everything.
+  truncatedNote:
+    'Sorted over this booster\u2019s 2,000 most recent boosts. They have sent more than that, so an older boost may be missing.',
 })

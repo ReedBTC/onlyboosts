@@ -307,6 +307,10 @@ const COPY = {
     allItems: "See All Episodes",
     noItems: "No episodes with Nostr boosts yet.",
     ldType: "PodcastSeries",
+    // The #boosts heading. "Show Boosts" rather than "Recent Boosts": the
+    // section holds the show's whole boost corpus once the reader touches a
+    // control, so "Recent" would stop being true the moment they did.
+    boostsHeading: "Show Boosts",
     // Where the back link points for a visitor who has nowhere to go back TO
     // (a shared link, a search result). show-page.js swaps it for history.back()
     // when the previous document was ours; see the note over .show-back.
@@ -330,6 +334,7 @@ const COPY = {
     allItems: "See All Tracks",
     noItems: "No tracks with Nostr boosts yet.",
     ldType: "MusicAlbum",
+    boostsHeading: "Album Boosts",
     backHref: "/#albums",
     backLabel: "All Albums",
     // On a music feed <itunes:author> IS the artist, and cleanly so: 97.4% of
@@ -465,18 +470,18 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v61" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v61" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v61" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v61" />
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v61" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v62" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v62" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v62" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v62" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v62" />
   <!-- The boost note card and its reaction bar. Added when the boost list at
        the foot of this page became the same .note-card the homepage Boosts
        feed paints; this page linked neither before, which is why show-page.css
        restates .nostr-mention. That restatement is now redundant rather than
        load-bearing, and is left in place rather than removed in the same pass. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v61" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v61" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v62" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v62" />
 </head>
 <body data-show-guid="${htmlEscape(show.podcast_guid)}">
 
@@ -590,10 +595,22 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
   ${renderPodroll(podrolledBy, "reverse", copy, show)}
 
   ${renderBoosts(boosts, names, {
-    heading: "Recent Boosts",
-    sub: `The most recent boosts sent to this ${copy.noun}, as published to Nostr.`,
+    // ⚠️ NOT "Recent Boosts" ANY MORE, and the heading is the smaller half of the
+    // change. With a range and an order over the show's whole corpus this section
+    // stops being a sample of the last few days and becomes the show's BOOST
+    // INBOX — which is how a podcaster reads boosts, across the catalogue rather
+    // than one episode at a time. A heading saying "Recent" would be false the
+    // moment the reader sorted by size.
+    heading: copy.boostsHeading,
+    sub: `Every boost sent to this ${copy.noun}, as published to Nostr.`,
     itemAbbr: copy.itemAbbr,
     noun: copy.noun,
+    // The show's own aggregate, so the load-more control is correct before the
+    // client has fetched anything. The list itself is still the newest 24: the
+    // heaviest show carries 1,404 boosts, and the homepage already measured what
+    // server-rendering that many notes costs (737 rows, 1.15MB of raw markup).
+    total: show.boost_count,
+    state: { page: BOOSTS_SHOWN },
   })}
 
 </main>
@@ -658,12 +675,12 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
 
 <script type="application/json" id="show-boost-payload">${jsonForScript(boostPayload)}</script>
 
-<script src="/assets/js/nav.js?v=ob-v61" defer></script>
-<script src="/assets/js/show-page.js?v=ob-v61" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v62" defer></script>
+<script src="/assets/js/show-page.js?v=ob-v62" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v61"></script>
-<script src="/assets/js/sw-register.js?v=ob-v61" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v62"></script>
+<script src="/assets/js/sw-register.js?v=ob-v62" defer></script>
 </body>
 </html>`;
 }
@@ -1202,10 +1219,10 @@ function notFound(guid) {
   <meta name="robots" content="noindex" />
   <title>Show not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v61" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v61" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v61" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v61" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v62" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v62" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v62" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v62" />
 </head>
 <body>
 <section class="page-header">
@@ -1224,7 +1241,7 @@ function notFound(guid) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v61" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v62" defer></script>
 </body>
 </html>`;
   return new Response(html, {

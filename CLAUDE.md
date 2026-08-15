@@ -16,7 +16,6 @@ there rather than restating the argument:
 | The D1 consolidation (complete) | `docs/data-architecture.md` |
 | `/about` copy, factual source of record | `docs/about-and-faq-source.md` |
 | The `/api/v1` surface | `docs/api-tier2-d1-spec.md` |
-| Range + sort on the `#boosts` sections (designed, not built) | `docs/HANDOFF-boost-section-controls.md` |
 
 Deleted reasoning is recoverable: `git log -S <symbol> -- CLAUDE.md` finds the
 paragraph that used to explain any name in here.
@@ -290,6 +289,11 @@ The episode card is the worked example, split along the facts/verbs line:
 |---|---|
 | `assets/js/episode-card.js` | the FACTS, as an HTML **string**: artwork and its fallback chain, title, show, air date, rank, the `Nostr Stats:` line, and every boost note inside the drawer. No DOM, no `fetch`, no `Intl` defaults. |
 | `assets/js/episode-card-actions.js` | the VERBS: the ⋮ subscribe menu, the boost pill, the drawer's hide control, the per-boost ⋮ menu, and the reply / like / repost / zap bars. |
+
+**The boost row is the second worked example**, and the same split:
+`assets/js/boost-list.js` is the facts (`renderBoosts`, `boostRows`, the three
+comparators, the range filter) and `assets/js/boost-section.js` is the verbs.
+See "Range And Sort On `#boosts`" under the detail pages.
 
 **Two knobs decide what a surface shows of the card, and only two.** `CARD_PARTS`
 in `episode-card.js` is the whole table:
@@ -1107,7 +1111,7 @@ differs is the subject and which sections apply.
 | Rollup | `#community-shows` | `#community-episodes` | `#shows` + `#episodes` |
 | Community wall | `#community` | `#community` | — |
 | Podroll | both directions | — show-level tag | — |
-| Boosts | `#boosts`, capped at 24 | `#boosts`, all of them | `#boosts` |
+| Boosts | `#boosts`, opens on 24 | `#boosts`, all of them | `#boosts`, opens on 24 |
 
 **Design of record for `/show` is `docs/show-pages-spec.md`.** What follows here
 is only what a change would break.
@@ -1116,7 +1120,9 @@ is only what a change would break.
 
 | | |
 |---|---|
-| `functions/_shared/detail-page.js` | escaping, the stat-tile number and date formats, the bech32 decoder behind the `@Name` chips, `renderSupporters`, `renderBoosts`, `renderBioText` |
+| `functions/_shared/detail-page.js` | escaping, `compact`, `isoDate`, `fmtDuration`, the bech32 decoder behind the `@Name` chips, `renderSupporters`, `renderBioText`. **Re-exports `renderBoosts` and five formatters from `assets/js/boost-list.js`** and `boosterPageUrl` from `booster-link.js`; those are aliases, not definitions |
+| `assets/js/boost-list.js` | **two-sided**: the boost row and the `#boosts` section, plus the comparators and the range filter both sides run |
+| `assets/js/boost-section.js` | the `#boosts` range and sort, shared by all three |
 | `functions/_shared/episode-cards.js` | `itemsFromBoosts`, `renderCardPage`, `CARDS_PER_PAGE` — the server half of the episode card |
 | `assets/js/detail-page.js` | the back link, section deep-links, the hash spy, copy-npub, "Show N more", the `art2` fallback, share, the Primal backfill |
 | `assets/js/episode-section.js` | the card rollup's controls and verbs, shared by `/episode` and `/booster` |
@@ -1407,6 +1413,69 @@ and an episode's show notes are the same field at two levels:
 `template` and `svg`. Nothing there could ever have become markup, but a feed that
 pastes a tracking snippet into its description used to print the script's source
 as a paragraph.
+
+### Range And Sort On `#boosts`
+
+The `#boosts` section on all three pages carries a range and a sort, built by
+`assets/js/boost-section.js`. **The range means when the boost was SENT**,
+matching `/#boosts-global` and `/api/v1/podcasts`. It does not mean when the
+episode aired; that axis belongs to the Episodes feeds and to
+`/api/v1/episodes`. Two readings of that parameter name exist on this site
+deliberately and there must not be a third.
+
+**`/show/<guid>#boosts` is the section that changed character.** It was the most
+recent 24 boosts; with an order over the show's whole corpus it is the show's
+**boost inbox**, which is how a podcaster reads boosts — across the catalogue
+rather than one episode at a time. The heading is `copy.boostsHeading` (Show
+Boosts / Album Boosts) for that reason: "Recent Boosts" stops being true the
+moment a reader sorts by size. `/booster` reads "Boosts Sent" on the same
+argument; `/episode` is unchanged.
+
+| | `/show` | `/episode` | `/booster` |
+|---|---|---|---|
+| Server-rendered | newest 24 | **all of them** | newest 24 |
+| Corpus | `GET /api/v1/podcasts/<guid>?corpus=1` | `GET /api/v1/episodes/<guid>?names=1` | `GET /api/v1/boosters/<npub>?corpus=1` |
+| Cap / measured worst case | 2,000 / 1,404 | 500 / 55 | 2,000 / 975 |
+| Sorts | latest boost · latest episode · largest boost | the same **minus latest episode** | all three |
+
+`episode` is dropped on `/episode` because every row targets the same episode, so
+the sort would be a no-op that looked like a ranking — the same call `/booster`'s
+episode rollup makes in leaving "Most boosters" out of its menu. **No sort here
+paints a rank numeral**: a row is one boost, so there is no aggregate to rank.
+
+**Ranges are 1W/1M/1Y/All, one more than `/#boosts-global` offers.** That feed
+omits 1Y because it *walks* month archives to cover a window; these sections hold
+a bounded corpus in memory, so a year costs nothing.
+
+Six things a change would break:
+
+- **The corpus is fetched on the first control press or the first "Load more",
+  never on approach.** The server's list answers the opening view, so a reader
+  who reads the section and moves on pays nothing. `items === null` versus `[]`
+  is load-bearing: null means not yet fetched.
+- **⚠️ Every repaint re-attaches the verbs.** These rows carry a full
+  reply / like / repost / zap bar, a ⋮ menu, and the Primal backfill. A rebuild
+  that replaced the markup and stopped there produces a list of dead boost notes
+  that looks correct. `boost-note-actions.js#wireBoostNotes(root)` is the scoped,
+  idempotent half that exists for this; `data-actions-on` is what stops a second
+  bar being appended.
+- **⚠️ `names` comes from the server, not from Primal.** A boost message renders
+  `nostr:npub1…` as an `@Name` chip off a D1 `profiles` lookup the edge runs. All
+  three corpus responses now carry that map, so a rebuilt row's chips match the
+  rows beside it. The Primal backfill is the second line of defence.
+- **⚠️ `booster.dname` on the published record** is the same fix one field over:
+  the pages print `display_name` in preference to `name` and the record carried
+  only the latter. Additive; `name` is unchanged.
+- **The row variant and the page size ride the state element**, declared by the
+  Function, the same arrangement `card` has in `episode-cards.js`. `page` is 24
+  on two pages and `BOOSTS_CAP` on `/episode`, whose sub-line promises every
+  boost and whose re-sort therefore must not grow a "Load more".
+- **The band is withheld below `CONTROLS_MIN` (3).** The median episode carries
+  two boosts, and a range control over a two-item list can only empty it. It
+  gates the band, never the list.
+
+Out of scope on purpose: **search** on these sections, and the Follows axis. A
+boost list about one subject has no scope axis.
 
 ### The community rollups
 
@@ -1765,6 +1834,7 @@ would. Never remove an entry** — those links are in the wild.
 | `boosts-feed.js` / `feeds-podcasts.js` | the boost feeds and the episode-level rollup behind Episodes and Songs |
 | `episode-card.js` + `episode-card-actions.js` | **the** episode card, facts and verbs, shared by the edge and the browser |
 | `episode-section.js` | the card rollup on `/episode` and `/booster` |
+| `boost-list.js` + `boost-section.js` | **the** boost row and the `#boosts` range and sort, facts and verbs, shared by the edge and the browser |
 | `shows-feed.js` | the show-level rollup behind Shows and Albums |
 | `feed-controls.js` / `feed-search.js` | the range/sort chrome and the per-feed typeahead |
 | `boosts-thread.js` / `boost-actions.js` | the content tokenizer and reply / like / repost / zap |
@@ -1796,26 +1866,20 @@ would. Never remove an entry** — those links are in the wild.
    it would page. **The path stayed `/boosters` when the label became Community**:
    the URL is in the wild and the rename was a label change.
 
-2. **Range and sort on the `#boosts` sections** of all three detail pages, so a
-   podcaster can read their boost inbox the way `/#boosts-global` reads. Designed
-   and specified in `docs/HANDOFF-boost-section-controls.md`; nothing is built.
-   **The range means when the boost was SENT**, matching `/#boosts-global` and
-   `/api/v1/podcasts` — it must not add a third reading of that parameter name.
-
-3. **Shows · Follows.** The scope menu is hidden on Shows because the show-level
+2. **Shows · Follows.** The scope menu is hidden on Shows because the show-level
    rollup is computed over everyone. See the scope note at the top of
    `shows-feed.js`.
 
-4. **A crawlable show directory.** ~930 show pages are reachable only through the
+3. **A crawlable show directory.** ~930 show pages are reachable only through the
    sitemap and through links on other pages. See the note in
    `functions/sitemap.xml.js`.
 
-5. **Bug relay write-policy.** `BUG_TAG` is `onlyboosts-alpha` in both
+4. **Bug relay write-policy.** `BUG_TAG` is `onlyboosts-alpha` in both
    `login-widget/src/lib/bugReport.js` and `bots/bug-watcher/watcher.js`, but
    `relay.mynostr.app`'s strfry write-policy plugin still has to whitelist that
    literal string. **VPS-side — reports are silently rejected until it's made.**
 
-6. **Dead LB code still in the tree.** `feeds.js` keeps `loadEvents` and the
+5. **Dead LB code still in the tree.** `feeds.js` keeps `loadEvents` and the
    NIP-52 calendar machinery, unreachable since the Events tab went away
    (`LOADERS` doesn't map it). `boosts-thread.js` still has LB's `ROOT_NEVENT` and
    `EXCLUDED_NOTE_IDS`, and `fetchBoostThread` has no caller. `calendar-events.js`
@@ -1823,12 +1887,12 @@ would. Never remove an entry** — those links are in the wild.
    quotes inside boost notes — that circular import is what makes the cleanup
    fiddly. All of it ships to every visitor.
 
-7. **The homepage's server-rendered drawer payload.** See The Cost, Stated: the
+6. **The homepage's server-rendered drawer payload.** See The Cost, Stated: the
    homepage's raw markup is 1.15MB, ~5,000 DOM nodes for 737 boost rows inside
    closed `<details>`. Deferred deliberately; the question is whether the drawer
    *contents* should be a verb rather than a fact on that one surface.
 
-8. **Typography.** The brand wordmark is a bold sans; the site is still on LB's
+7. **Typography.** The brand wordmark is a bold sans; the site is still on LB's
    Playfair Display / Source Serif 4. It reads fine, but the serif is inherited,
    not chosen. Only those two families are self-hosted in `assets/fonts/`.
 

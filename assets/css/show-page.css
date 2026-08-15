@@ -489,7 +489,98 @@
 /* The "Show N more boosters" toggle under the wall. */
 .show-more { margin-top: 1rem; }
 
-/* ── Recent boosts ────────────────────────────────────────────────────── */
+/* ── The #boosts section ──────────────────────────────────────────────── */
+
+/* The range + sort band, on all three detail pages.
+ *
+ * It is `.cs-controls` so it inherits the sort pill, the menu and the layout the
+ * two drawers already use — one toolbar on this site, not two. What it overrides
+ * is everything that made that band a DRAWER LID: `.cs-controls` sits directly
+ * under a summary, so it has a top border and no others and reads as the seam
+ * between a header and its body. Here there is no lid above it, so a lone top
+ * border would read as a rule struck through the section. Full border, rounded,
+ * and its own gap under it, so it reads as a toolbar over a list.
+ *
+ * Ships `hidden` from the server and revealed by boost-section.js; the
+ * `[hidden]` rule is `.cs-controls`'s and applies unchanged. */
+.bs-controls {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin: 0 0 0.9rem;
+}
+
+/* The 1W/1M/1Y/All segments.
+ *
+ * ⚠️ DEFINED HERE RATHER THAN INHERITED, because /show/<guid> does not link
+ * feed-cards.css — it has never carried a range control before — while /episode
+ * and /booster do. Scoped under `.cs-controls`, so on the two pages that load
+ * both stylesheets this wins on specificity regardless of link order and all
+ * three pages draw one control. Kept visually identical to the feeds';
+ * feed-cards.css is the original. */
+.cs-controls .pcast-range { display: flex; flex-shrink: 0; }
+.cs-controls .pcast-range-btn {
+  min-width: 2rem;
+  padding: 0.5rem 0.35rem;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.cs-controls .pcast-range-btn:hover {
+  color: var(--accent-d);
+  background: var(--tint);
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+.cs-controls .pcast-range-btn.is-active {
+  color: var(--accent-d);
+  background: var(--tint);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+/* A band mid-fetch. The one request this section makes is fast enough that a
+   spinner would flash, but the controls must not look live while a second press
+   would queue a rebuild against a corpus that has not arrived. */
+.cs-controls[aria-busy='true'] { opacity: 0.55; pointer-events: none; }
+
+/* "Load N more", under the list. Deliberately the same pill as the feeds'
+   .pcast-showmore rather than a reference to it, for the same reason as the
+   range buttons above: /show does not link the stylesheet that defines it. */
+.bs-more { display: flex; justify-content: center; margin-top: 1.1rem; }
+/* The slot ships empty on every page and stays empty on a list that holds
+   everything already, so it must cost no space until something is put in it. */
+.bs-more:empty { display: none; }
+.bs-more-group { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; }
+.bs-more-count { font-size: 0.75rem; color: var(--muted); }
+.bs-more-btn {
+  padding: 0.5rem 1.4rem;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--accent-d);
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+.bs-more-btn:hover { background: var(--tint); border-color: var(--accent); }
+.bs-more-btn:disabled { opacity: 0.6; cursor: default; }
+
+/* The truncation line, at the END of the list where it is an answer rather than
+   a warning. Unreachable on today's data; see the note at each call site. */
+.bs-note {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-align: center;
+  max-width: 34rem;
+}
 
 .boost-list {
   list-style: none;

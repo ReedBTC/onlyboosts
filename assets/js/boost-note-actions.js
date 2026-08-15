@@ -31,7 +31,7 @@
  * and a reader who never scrolls to #boosts pays none of it. The notes are
  * readable and complete throughout.
  */
-import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v61'
+import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v62'
 
 /* The projection buildActionBar needs.
  *
@@ -78,42 +78,89 @@ function whenApproached(els, fn) {
   for (const el of els) io.observe(el)
 }
 
-/**
- * Wire every server-rendered boost note on the page.
+/* The one load of boost-actions.js, memoised.
  *
- * Safe to call on a page with none — it returns immediately, which is why all
- * three page modules can call it unconditionally.
+ * It pulls nostr-tools and the login widget behind it and is the heaviest thing
+ * any of these pages would fetch, so it happens once however many times the list
+ * is repainted. A failure clears the promise rather than caching itself: a
+ * reader whose first attempt raced a flaky network gets another on the next
+ * re-sort, and until then the notes are exactly as complete as they rendered.
  */
-export function initBoostNoteActions() {
-  const cards = Array.from(document.querySelectorAll('[data-boost-note]'))
-  if (!cards.length) return
-
-  whenApproached(cards, async () => {
-    let actions
-    try {
-      actions = await import('/assets/js/boost-actions.js?v=ob-v61')
+let actionsPromise = null
+function loadActions() {
+  if (!actionsPromise) {
+    actionsPromise = (async () => {
+      const actions = await import('/assets/js/boost-actions.js?v=ob-v62')
       // The signer. Without it the bar still renders and each button reports
       // that it needs a sign-in, which is the same behaviour the feeds have.
       await ensureLoginWidget()
       actions.configureBoostActions({})
-    } catch (err) {
+      return actions
+    })().catch((err) => {
       // The notes are complete without this. A failed import must cost the
       // reactions and nothing else, so there is no placeholder and no error
       // state — the page is exactly the page it was.
       console.warn('[boost-notes] actions unavailable', err)
-      return
-    }
+      actionsPromise = null
+      return null
+    })
+  }
+  return actionsPromise
+}
 
-    for (const card of cards) {
-      const ev = projectEvent(card)
-      if (!ev) continue
-      try {
-        // Appends the ⋮ into .note-author as a side effect; see the note above.
-        card.appendChild(actions.buildActionBar(ev, card))
-      } catch (err) {
-        // One malformed row must not cost the other 499 their bars.
-        console.warn('[boost-notes] action bar failed', err)
-      }
+/**
+ * Attach the bar and the ⋮ to every boost note under `root` that hasn't got one.
+ *
+ * ⚠️ THIS IS WHAT MAKES A REPAINT SURVIVABLE, and it is why the module exports
+ * two functions rather than one. assets/js/boost-section.js replaces the list's
+ * markup on every range change, sort change and "Load more", and a rebuild that
+ * stopped at the markup would leave a list of DEAD boost notes: no reply, no
+ * like, no repost, no zap, no menu. It calls this after every paint.
+ *
+ * IDEMPOTENT BY FLAG, because the surfaces overlap. `initBoostNoteActions` wires
+ * whatever is on the page when the reader approaches it, and a "Load more" then
+ * appends rows beside those — so both paths run over containers that already hold
+ * wired cards, and buildActionBar would happily append a second bar to each.
+ * `data-actions-on` is the record that it has already been done.
+ *
+ * The flag is set inside a loop with no `await` in it, so two overlapping calls
+ * cannot interleave between the check and the mark.
+ */
+export async function wireBoostNotes(root = document) {
+  const cards = Array.from(root.querySelectorAll('[data-boost-note]:not([data-actions-on])'))
+  if (!cards.length) return
+
+  const actions = await loadActions()
+  if (!actions) return
+
+  for (const card of cards) {
+    if (card.dataset.actionsOn) continue
+    const ev = projectEvent(card)
+    if (!ev) continue
+    card.dataset.actionsOn = '1'
+    try {
+      // Appends the ⋮ into .note-author as a side effect; see the note above.
+      card.appendChild(actions.buildActionBar(ev, card))
+    } catch (err) {
+      // One malformed row must not cost the other 499 their bars.
+      console.warn('[boost-notes] action bar failed', err)
     }
-  })
+  }
+}
+
+/**
+ * Wire every server-rendered boost note on the page, once it is approached.
+ *
+ * Safe to call on a page with none — it returns immediately, which is why all
+ * three page modules can call it unconditionally.
+ *
+ * ⚠️ THE CARDS ARE RE-QUERIED WHEN THE OBSERVER FIRES, not captured here. The
+ * list can be rebuilt between load and approach (a deep link to #boosts and a
+ * quick press of a sort control is all it takes), and the array captured at init
+ * would then name nodes no longer in the document.
+ */
+export function initBoostNoteActions() {
+  const cards = Array.from(document.querySelectorAll('[data-boost-note]'))
+  if (!cards.length) return
+  whenApproached(cards, () => { wireBoostNotes(document) })
 }

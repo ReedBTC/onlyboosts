@@ -45,26 +45,26 @@
  * Entry point: renderPodcasts({ panel, list }) — lazy-imported by feeds.js
  * the first time the feed is opened.
  */
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v61'
-import { toEpisodeShape, normalizeBoosts, episodeApiToBoosts } from '/assets/js/ob-data.js?v=ob-v61'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v62'
+import { toEpisodeShape, normalizeBoosts, episodeApiToBoosts } from '/assets/js/ob-data.js?v=ob-v62'
 import {
   getEpisodePage, searchEpisodes, SEARCH_HITS, SEARCH_MIN_CHARS,
-} from '/assets/js/ob-live.js?v=ob-v61'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v61'
+} from '/assets/js/ob-live.js?v=ob-v62'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v62'
 import {
   rangeDays, rangeControl, sortControl, mountFeedControls,
-} from '/assets/js/feed-controls.js?v=ob-v61'
+} from '/assets/js/feed-controls.js?v=ob-v62'
 // Its own module, not two more exports of feed-controls.js — see the ⚠️ note
 // at the top of that file for the four-hour window that shape opens.
-import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v61'
-import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v61'
+import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v62'
+import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v62'
 // The card, and the card's verbs. One definition each, shared with the edge.
 import {
   COPY, buildEpisodes, renderEpisodeCards, RANKED_SORTS, SORT_OPTIONS,
-} from '/assets/js/episode-card.js?v=ob-v61'
+} from '/assets/js/episode-card.js?v=ob-v62'
 import {
   wireEpisodeCards, hydrateCardProfiles, prewarmBoosting,
-} from '/assets/js/episode-card-actions.js?v=ob-v61'
+} from '/assets/js/episode-card-actions.js?v=ob-v62'
 
 const INITIAL_CARDS = 30       // episodes rendered per "load more" batch
 

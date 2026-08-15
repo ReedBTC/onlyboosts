@@ -14,29 +14,30 @@
  * block we haven't resolved at render time, and a button that only ever
  * reports failure is worse than no button. See docs/show-pages-spec.md.
  */
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v61'
-import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v61'
-import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v61'
-import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v61'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v62'
+import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v62'
+import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v62'
+import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v62'
 // The same "Sort: X ▾" dropdown the feeds use. feed-controls.js imports
 // nothing, so this costs the page ~4KB and no transitive dependencies;
 // rangeControl and mountFeedControls are deliberately not used (no range here,
 // and no sticky bar to mount into).
-import { sortControl } from '/assets/js/feed-controls.js?v=ob-v61'
+import { sortControl } from '/assets/js/feed-controls.js?v=ob-v62'
 // The drawer's per-row buttons are server-rendered, so only the busy-state
 // helper is needed here — the builder is for the feeds, which make theirs in JS.
-import { withBoostBusy } from '/assets/js/boost-button.js?v=ob-v61'
+import { withBoostBusy } from '/assets/js/boost-button.js?v=ob-v62'
 import {
   initCopyNpub, initShowMore, initShare, initBackLink,
   initHashRouting, initHashSpy, initArt2, hydrateProfiles,
-} from '/assets/js/detail-page.js?v=ob-v61'
+} from '/assets/js/detail-page.js?v=ob-v62'
 // Its own module rather than a ninth export from detail-page.js, deliberately:
 // a stale copy of that file against a fresh copy of this one is a link-time
 // error that takes the whole page's JavaScript down. See the note at its head.
-import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v61'
+import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v62'
 // The reaction bar and ⋮ on this page's server-rendered boost notes. Its own
 // module for the same reason show-desc.js is; see the note at its head.
-import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v61'
+import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v62'
+import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v62'
 
 const VALUE_API = '/api/value'
 
@@ -407,3 +408,38 @@ initBoosting()
 // chips the Function marked `data-missing` because the index had no kind-0 for
 // them. See detail-page.js.
 hydrateProfiles()
+
+// ── The boost inbox ──────────────────────────────────────────────────
+//
+// #boosts opens on the newest 24 and, once the reader touches a control, holds
+// every boost this show has ever received. That is the change that makes the
+// range mean something here: a podcaster reads boosts off across the whole
+// catalogue rather than one episode at a time, so this section is the show's
+// inbox rather than a sample of the last few days.
+//
+// The corpus is one bounded request — the heaviest show in the index carries
+// 1,404 boosts against a cap of 2,000 — and it is not made until a control moves
+// or "Load more" is pressed. Everything else is boost-section.js's, shared with
+// the identical section on /episode and /booster.
+initBoostSection({
+  fetchCorpus: async () => {
+    const guid = SHOW?.guid
+    if (!guid) throw new Error('corpus: no show guid')
+    // ?corpus=1 answers this and nothing else — no episode list, no supporter
+    // GROUP BY. /api/v1/boosts?podcast=<guid> is deliberately not the source: it
+    // is cursor-paged at 200 a page, so the heaviest show would take seven round
+    // trips before the reader's chosen order could cover all of it.
+    const resp = await fetch(`/api/v1/podcasts/${encodeURIComponent(guid)}?corpus=1`, {
+      headers: { Accept: 'application/json' },
+    })
+    if (!resp.ok) throw new Error(`corpus: HTTP ${resp.status}`)
+    return (await resp.json())?.corpus || {}
+  },
+  sortTitle: 'Sort the boosts sent to this show',
+  emptyText: 'Nobody boosted this show in this time range \u2014 try a wider one.',
+  // The cap is 2,000 against a measured heaviest show of 1,404, so this line is
+  // unreachable today. It is here because an order over a prefix must never pose
+  // as an order over everything.
+  truncatedNote:
+    'Sorted over this show\u2019s 2,000 most recent boosts. It has received more than that, so an older boost may be missing.',
+})

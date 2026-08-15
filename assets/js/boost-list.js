@@ -12,7 +12,7 @@
  *      the edge and in the browser. A row the server painted and the same row
  *      rebuilt after a re-sort are byte-identical BY CONSTRUCTION rather than by
  *      inspection.
- *   2. IMPORTS ARE RELATIVE AND STAMPED — `'./thing.js?v=ob-v61'`. An ABSOLUTE
+ *   2. IMPORTS ARE RELATIVE AND STAMPED — `'./thing.js?v=<VERSION>'`. An ABSOLUTE
  *      `/assets/js/…` import resolves in the browser and fails to bundle, so it
  *      is the one form a two-sided module may not use. Everything imported here
  *      is itself two-sided.
@@ -30,15 +30,15 @@
  */
 import {
   htmlEscape, isSafeUrl, truncate, renderMessage,
-} from './nostr-text.js?v=ob-v61';
-import { episodePageHref, showPageHref } from './show-link.js?v=ob-v61';
+} from './nostr-text.js?v=ob-v62';
+import { episodePageHref, showPageHref } from './show-link.js?v=ob-v62';
 /* ⚠️ THE REAL MODULE, NOT A FOURTH COPY OF THE RULE. booster-link.js has been
  * dependency-free since it was written, so esbuild inlines it here exactly as it
  * does nostr-text.js, and the boost rows link a booster by the same test every
  * feed surface uses rather than by a transcription of it. This is the collapse
  * that functions/_shared/detail-page.js#boosterPageUrl said was available; that
  * name is now an alias for this function rather than a second copy of it. */
-import { boosterPageHref } from './booster-link.js?v=ob-v61';
+import { boosterPageHref } from './booster-link.js?v=ob-v62';
 
 // ── The formatters the row needs ─────────────────────────────────────────────
 //
@@ -205,23 +205,80 @@ export function filterBoostRows(rows, cutoff) {
 // `showShow` names the SHOW beside the episode, and is true on exactly one page
 // for that same reason. See the meta-row note in boostRow.
 
+/* Below how many boosts the section ships no controls at all.
+ *
+ * ⚠️ A RANGE CONTROL NEEDS SOMETHING TO RANGE OVER. The median episode carries
+ * two boosts and the median show a handful, so a 1W/1M/1Y/All band over a
+ * two-item list is chrome whose only possible effect is to empty the list it
+ * sits above. Three is the smallest count at which an order is a question with
+ * more than one answer.
+ *
+ * It gates the BAND, not the section: the list, the messages and the links are
+ * facts and ship on every page regardless. */
+export const CONTROLS_MIN = 3;
+
+/**
+ * The #boosts section: the list itself, plus the slots the client fills.
+ *
+ * @param {Array}  rows    boost rows, ordered newest-first by the query
+ * @param {Map}    names   hex pubkey → display name, for the mention chips
+ * @param {object} opts
+ * @param {number} [opts.total]  how many boosts the subject has in ALL, which is
+ *   what makes the load-more control correct before anything has been fetched.
+ *   Defaults to the number of rows painted, which is right on a surface that
+ *   ships every one of them.
+ * @param {object} [opts.state]  extra keys for the state element. `page` is the
+ *   one every caller sets: how many rows a client-side page holds, declared by
+ *   the Function so a repaint cannot show fewer rows than the edge did.
+ */
 export function renderBoosts(rows, names, {
   heading, sub, itemAbbr, noun, showTarget = true, linkBooster = true, showShow = false,
+  total = null, state = null,
 }) {
   if (!rows.length) return "";
 
-  // `ob-boost-list` alongside `boost-list` is what makes these cards the same
-  // object as the homepage Boosts feed's: the container override that gives a
-  // .note-card its white background and 12px radius is keyed on it. Both classes
-  // are carried because the section spacing is still show-page.css's.
-  return `<section class="show-section" id="boosts">
+  const count = rows.length;
+  // Never below what is actually painted. `total` comes from an aggregate column
+  // the collector maintains, and a stale one that undercounts would otherwise
+  // print "Showing 24 of 19".
+  const all = Math.max(Number(total) || 0, count);
+
+  /* ⚠️ THE BAND, THE LIST SLOT, THE MORE SLOT AND THE STATE ELEMENT ARE THE WHOLE
+   * CONTRACT with assets/js/boost-section.js.
+   *
+   * The band ships EMPTY and `hidden` because range and sort are VERBS: a
+   * control that cannot act is worse than no control, and a reader with no
+   * JavaScript gets the list with nothing missing but two dropdowns. Same
+   * discipline, and the same `.cs-controls` band, as the drawers on these pages.
+   *
+   * `ob-boost-list` alongside `boost-list` is what makes these cards the same
+   * object as the homepage Boosts feed's: the container override that gives a
+   * .note-card its white background and 12px radius is keyed on it. Both classes
+   * are carried because the section spacing is still show-page.css's. */
+  return `<section class="show-section" id="boosts" data-boost-section>
     <div class="show-section-head">
       <h2>${htmlEscape(heading)}</h2>
       <p class="show-section-sub">${htmlEscape(sub)}</p>
     </div>
-    <ul class="boost-list ob-boost-list">
+    ${all >= CONTROLS_MIN ? `<div class="cs-controls bs-controls" data-bs-controls hidden></div>` : ""}
+    <ul class="boost-list ob-boost-list" data-bs-list>
       ${boostRows(rows, names, { itemAbbr, noun, showTarget, linkBooster, showShow })}
     </ul>
+    <div class="bs-more" data-bs-more></div>
+    ${stateScript({
+      count, total: all, sort: "recent", range: "all",
+      /* ⚠️ THE ROW VARIANT RIDES THE STATE, exactly as `card` does in
+       * functions/_shared/episode-cards.js, and for the same reason. Each surface
+       * suppresses a different line — the episode on /episode, the booster link on
+       * /booster, the show everywhere but /booster — and boost-section.js rebuilds
+       * these rows on a re-sort. Declaring the variant in the client module as
+       * well would be two declarations that agree only until one is edited, and
+       * the failure would be a re-sorted /episode growing an episode chip naming
+       * the page it is on. It is written from the arguments this call already
+       * received, so a caller cannot set one and forget the other. */
+      row: { itemAbbr, noun, showTarget, linkBooster, showShow },
+      ...(state || {}),
+    })}
   </section>`;
 }
 
@@ -229,10 +286,30 @@ export function renderBoosts(rows, names, {
  * Just the `<li>` rows, joined — what a client repaint replaces the list with.
  *
  * Exported separately from `renderBoosts` because a rebuild replaces the list's
- * CONTENTS and not the section around it.
+ * CONTENTS and not the section around it: the band, the state and the more slot
+ * are the client's own and have to survive a re-sort.
  */
 export function boostRows(rows, names, opts) {
   return rows.map((r) => boostRow(r, names, opts)).join("\n      ");
+}
+
+/* The handover, as one <script type="application/json">.
+ *
+ * ⚠️ IT CARRIES STATE, NEVER CONTENT — the same rule and the same reason as
+ * functions/_shared/episode-cards.js#stateScript. The temptation is to embed the
+ * rows so the client can re-sort without a request, and that is the whole
+ * payload again, in JSON, beside the HTML it already produced. The client gets
+ * the numbers it cannot derive from the DOM and fetches the corpus only if the
+ * reader touches a control.
+ *
+ * `type="application/json"` is not executable and needs no CSP allowance; the
+ * `<` escape is what keeps a `</script>` inside a value from closing the element
+ * early. Written out here rather than imported from detail-page.js#jsonForScript
+ * because that module is one-sided and this one may not depend on it.
+ */
+function stateScript(state) {
+  return `<script type="application/json" data-boost-state>${
+    JSON.stringify(state).replace(/</g, "\\u003c")}</script>`;
 }
 
 function boostRow(r, names, { itemAbbr, noun, showTarget, linkBooster = true, showShow = false }) {

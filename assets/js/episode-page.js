@@ -21,19 +21,20 @@
  * That module is shared with the structurally identical section on
  * /booster/<npub>.
  */
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v61'
-import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v61'
-import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v61'
-import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v61'
-import { initEpisodeSection } from '/assets/js/episode-section.js?v=ob-v61'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v62'
+import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v62'
+import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v62'
+import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v62'
+import { initEpisodeSection } from '/assets/js/episode-section.js?v=ob-v62'
 import {
   initCopyNpub, initShowMore, initShare, initBackLink,
   initHashRouting, initHashSpy, initArt2, hydrateProfiles,
-} from '/assets/js/detail-page.js?v=ob-v61'
+} from '/assets/js/detail-page.js?v=ob-v62'
 // The reaction bar and ⋮ on the server-rendered boost notes at the foot of
 // this page. The community cards above them carry their own, through the feed
 // renderer they are built by.
-import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v61'
+import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v62'
+import { initBoostSection, BOOST_SORTS } from '/assets/js/boost-section.js?v=ob-v62'
 
 const VALUE_API = '/api/value'
 
@@ -432,3 +433,33 @@ initEpisodeSection({
 // mention chips the Function marked `data-missing` because the index had no
 // kind-0 for them. See detail-page.js.
 hydrateProfiles()
+
+// ── This episode's boosts ────────────────────────────────────────────
+//
+// The one surface of the three where every boost is already on the page: the
+// busiest episode in the index carries 55 against a cap of 500, so the sub-line
+// promises all of them and the server renders all of them. What this adds is the
+// range and the order, over the corpus the page already holds.
+//
+// ⚠️ "LATEST EPISODE" IS DROPPED FROM THE MENU. Every row here targets the same
+// episode, so that sort would be a no-op that looked like a ranking. The same
+// call /booster's episode rollup makes in leaving "Most boosters" out of its own.
+initBoostSection({
+  sorts: BOOST_SORTS.filter(([key]) => key !== 'episode'),
+  fetchCorpus: async () => {
+    const guid = document.body.dataset.episodeGuid
+    if (!guid) throw new Error('corpus: no episode guid')
+    // No ?corpus=1 here, unlike the other two pages: `boosts` on this endpoint
+    // already IS every boost to this episode. ?names=1 is the only thing the
+    // rebuild needs that the default response does not carry — the display names
+    // behind the @Name chips inside the messages.
+    const resp = await fetch(`/api/v1/episodes/${encodeURIComponent(guid)}?names=1`, {
+      headers: { Accept: 'application/json' },
+    })
+    if (!resp.ok) throw new Error(`corpus: HTTP ${resp.status}`)
+    const body = await resp.json()
+    return { boosts: body?.boosts || [], names: body?.names || {}, truncated: false }
+  },
+  sortTitle: 'Sort the boosts sent to this episode',
+  emptyText: 'Nobody boosted this episode in this time range \u2014 try a wider one.',
+})
