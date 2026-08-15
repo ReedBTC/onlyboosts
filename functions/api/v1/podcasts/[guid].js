@@ -11,13 +11,27 @@
 //      ?shownotes=<item_guid>.
 //   2. `supporters` ranks boosters by sats sent TO THIS SHOW, all time. Opt in
 //      with ?supporters=1 — the Shows feed doesn't need it and it's a GROUP BY.
+//   3. `?corpus=1` answers something else entirely: every boost sent to this
+//      show, in one bounded response, and none of the above. See fetchShowCorpus.
 import { json, preflight, BOOST_SELECT, boostRecord, clampLimit } from "../_common.js";
+import { lookupMentionNames } from "../../../_shared/detail-page.js";
 
 export async function onRequestOptions({ request }) { return preflight(request); }
 
 // The busiest show in the index has 210 boosters, so this is a guard against a
 // pathological row rather than a page size — the landing page paints them all.
 const SUPPORTER_CAP = 500;
+
+/* ⚠️ NOT A PAGE SIZE, and generous on purpose. Measured against production on
+ * 2026-08-15, the ten heaviest shows carry 1,404 / 1,010 / 910 / 861 / 643 /
+ * 603 / 590 / 559 / 546 / 544 boosts, so this truncates nobody today and is a
+ * guard against a future outlier rather than a window. If it ever bites,
+ * `truncated` says so and the page passes that on rather than letting an order
+ * over a prefix pose as an order over everything.
+ *
+ * The same number and the same reasoning as CORPUS_CAP in
+ * functions/api/v1/boosters/[npub].js. */
+const CORPUS_CAP = 2000;
 
 export async function onRequestGet({ request, env, params }) {
   const guid = params.guid;
@@ -28,6 +42,20 @@ export async function onRequestGet({ request, env, params }) {
             booster_count, episode_count, latest_ts FROM podcasts WHERE podcast_guid = ?`
   ).bind(guid).first();
   if (!show) return json(request, { error: "podcast not found" }, { status: 404 });
+
+  /* ── every boost to this show, one response ────────────────────────────────
+   *
+   * Returned BEFORE the episode list, the recent-boosts page and the supporter
+   * GROUP BY are built: a caller asking for the corpus wants the boosts and
+   * nothing else, and running the other three would triple the cost of the one
+   * request /show/<guid>#boosts makes in its life.
+   *
+   * GET /api/v1/boosts?podcast=<guid> is deliberately NOT the answer to this. It
+   * is cursor-paged at 200 a page, so the heaviest show would take seven round
+   * trips before the reader's chosen order could be applied to all of it. */
+  if (u.searchParams.get("corpus") === "1") {
+    return json(request, { corpus: await fetchShowCorpus(env, guid) });
+  }
 
   // ?since=<unix> windows the EPISODE LIST to the boosts inside it, recomputing
   // each row's boosts and sats over that window. It exists for the Shows feed's
@@ -100,6 +128,44 @@ export async function onRequestGet({ request, env, params }) {
   }
 
   return json(request, body);
+}
+
+/* Every boost sent to one show, bounded and newest-first.
+ *
+ * ⚠️ EXPORTED, so a future caller can run it inside a page's own Promise.all
+ * rather than through a subrequest — which is what functions/show/[guid].js
+ * would want if it ever server-rendered more of #boosts than its opening 24.
+ * The same arrangement, for the same reason, as fetchBoosterCorpus and
+ * fetchCommunityBoosts.
+ *
+ * One row over the cap is fetched purely to detect the truncation, then dropped.
+ * Asking for exactly the cap cannot tell "there are precisely this many" from
+ * "there are more".
+ *
+ * ⚠️ `names` IS WHY THIS IS NOT JUST A WIDER LIMIT ON THE PAGED QUERY. A boost
+ * message renders `nostr:npub1…` as an `@Name` chip, and the name comes from a
+ * `profiles` lookup the edge runs when it renders the page. A row rebuilt in the
+ * browser from a response without it would degrade its chips to truncated npubs
+ * while the rows beside it, painted by the edge, showed real names — one
+ * component rendering two ways, on one screen. The Primal backfill in
+ * detail-page.js#hydrateProfiles still catches what this misses; it is the
+ * second line of defence rather than the first.
+ */
+export async function fetchShowCorpus(env, guid) {
+  const { results } = await env.DB.prepare(
+    `${BOOST_SELECT} WHERE b.podcast_guid = ?
+     ORDER BY b.created_at DESC, b.event_id DESC LIMIT ?`
+  ).bind(guid, CORPUS_CAP + 1).all();
+
+  const rows = results || [];
+  const truncated = rows.length > CORPUS_CAP;
+  const kept = truncated ? rows.slice(0, CORPUS_CAP) : rows;
+  // A plain object rather than the Map lookupMentionNames returns: this crosses
+  // the wire as JSON, and the client turns it back into a Map for renderMessage.
+  const names = Object.fromEntries(
+    await lookupMentionNames(env, kept.map((r) => r.message))
+  );
+  return { boosts: kept.map(boostRecord), truncated, count: kept.length, names };
 }
 
 // Boosters ranked by sats sent to this show, all time.

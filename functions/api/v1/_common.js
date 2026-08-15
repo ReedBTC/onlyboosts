@@ -121,7 +121,7 @@ export const BOOST_SELECT = `
          p.title AS p_title, p.image AS p_image, p.feed_url AS p_feed,
          e.title AS e_title, e.image AS e_image, e.published AS e_pub,
          e.episode_number AS e_num, e.enclosure_url AS e_url,
-         pr.name AS pr_name, pr.picture AS pr_pic
+         pr.name AS pr_name, pr.display_name AS pr_dname, pr.picture AS pr_pic
   FROM boosts b
   LEFT JOIN podcasts p ON p.podcast_guid = b.podcast_guid
   LEFT JOIN episodes e ON e.item_guid    = b.item_guid
@@ -135,7 +135,19 @@ export function boostRecord(r) {
     src: r.amount_source,
     msg: r.message,
     client: r.client,
-    booster: { pk: r.booster_pubkey, npub: r.booster_npub, name: r.pr_name, pic: r.pr_pic },
+    /* ⚠️ `dname` IS ADDITIVE AND `name` DID NOT CHANGE MEANING. The three detail
+     * pages print `display_name` in preference to `name` — that is what
+     * boost-list.js#displayName does, and it is what those pages have always
+     * shipped — while this record carried only `name`. So a boost row rebuilt in
+     * the browser from a corpus response would have RENAMED every booster whose
+     * kind-0 sets both fields, which is the one component rendering two ways that
+     * the rendering rule exists to prevent.
+     *
+     * Adding the field rather than reordering the existing one: `name` is the
+     * collector's published shape (see DATA-API.md) and every feed on the site
+     * reads it, so the fix belongs where the difference is rather than in a
+     * value 22k records already carry. Nullable, like every display field. */
+    booster: { pk: r.booster_pubkey, npub: r.booster_npub, name: r.pr_name, dname: r.pr_dname ?? null, pic: r.pr_pic },
     podcast: { guid: r.podcast_guid, title: r.p_title, img: r.p_image, feed: r.p_feed },
     episode: {
       guid: r.item_guid, title: r.e_title, img: r.e_image || r.p_image,

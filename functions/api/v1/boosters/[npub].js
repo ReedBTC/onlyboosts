@@ -19,6 +19,7 @@
 // prefix pose as a ranking over everything.
 import { json, preflight, BOOST_SELECT, boostRecord, toHexPubkey,
          encodeCursor, decodeCursor, clampLimit } from "../_common.js";
+import { lookupMentionNames } from "../../../_shared/detail-page.js";
 
 // See the note above: ~2x the heaviest booster in the index.
 const CORPUS_CAP = 2000;
@@ -64,12 +65,12 @@ export async function onRequestGet({ request, env, params }) {
 
   // ── the whole history, one response ────────────────────────────────────────
   if (u.searchParams.get("corpus") === "1") {
-    const { boosts, truncated, npub: seen } = await fetchBoosterCorpus(env, hex);
+    const { boosts, truncated, names, npub: seen } = await fetchBoosterCorpus(env, hex, { names: true });
     return json(request, {
       booster: booster(seen),
       // Nested rather than flat, so a caller can never mistake this for the
       // paged shape and start looking for a cursor that is deliberately absent.
-      corpus: { boosts, truncated, count: boosts.length },
+      corpus: { boosts, truncated, count: boosts.length, names },
     });
   }
 
@@ -108,8 +109,22 @@ export async function onRequestGet({ request, env, params }) {
  * One row over the cap is fetched purely to detect the truncation, then dropped.
  * Asking for exactly the cap cannot tell "there are precisely this many" from
  * "there are more".
+ *
+ * ⚠️ `names` RIDES ALONG FOR THE BOOST LIST, NOT FOR THE EPISODE ROLLUP. The
+ * rollup (episode-section.js) ignores it; #boosts needs it, because a boost
+ * message renders `nostr:npub1…` as an `@Name` chip and the name comes from a
+ * `profiles` lookup the edge runs when it renders the page. A row rebuilt in the
+ * browser without it would show a truncated npub where the row beside it, painted
+ * by the edge, showed a name. See the same note over fetchShowCorpus.
+ *
+ * ⚠️ AND IT IS OPT-IN, because of the OTHER caller. functions/booster/[npub].js
+ * runs this inside its own Promise.all to server-render the episode rollup, and
+ * that page already runs its own mention lookup over the 24 rows it prints.
+ * Defaulting the flag on would have put a second lookup, over up to 2,000
+ * messages, on the TTFB of every booster page to fill a map that render throws
+ * away.
  */
-export async function fetchBoosterCorpus(env, hex) {
+export async function fetchBoosterCorpus(env, hex, { names: wantNames = false } = {}) {
   const { results } = await env.DB.prepare(
     `${BOOST_SELECT} WHERE b.booster_pubkey = ?
      ORDER BY b.created_at DESC, b.event_id DESC LIMIT ?`
@@ -117,9 +132,15 @@ export async function fetchBoosterCorpus(env, hex) {
 
   const rows = results || [];
   const truncated = rows.length > CORPUS_CAP;
+  const kept = truncated ? rows.slice(0, CORPUS_CAP) : rows;
   return {
-    boosts: (truncated ? rows.slice(0, CORPUS_CAP) : rows).map(boostRecord),
+    boosts: kept.map(boostRecord),
     truncated,
+    // A plain object rather than the Map lookupMentionNames returns: this
+    // crosses the wire as JSON, and the client turns it back into a Map.
+    names: wantNames
+      ? Object.fromEntries(await lookupMentionNames(env, kept.map((r) => r.message)))
+      : null,
     npub: rows[0]?.booster_npub,
   };
 }

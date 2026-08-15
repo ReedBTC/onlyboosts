@@ -19,6 +19,7 @@
 //      3,368 — so the cap below bites on 1.6% of episodes, and the caller is
 //      told when it did.
 import { json, preflight, BOOST_SELECT, boostRecord, clampLimit } from "../_common.js";
+import { lookupMentionNames } from "../../../_shared/detail-page.js";
 
 export async function onRequestOptions({ request }) { return preflight(request); }
 
@@ -94,6 +95,26 @@ export async function onRequestGet({ request, env, params }) {
 
   if (u.searchParams.get("community")) {
     body.community = await fetchCommunityBoosts(env, guid, ep.podcast_guid);
+  }
+
+  /* ?names=1 — display names for any npub MENTIONED inside these boost messages.
+   *
+   * ⚠️ NO `?corpus=1` HERE, unlike the other two boost endpoints, because
+   * `boosts` above IS the corpus: it is every boost sent to this episode, capped
+   * at 500 against a measured worst case of 55. A corpus mode would be the same
+   * query run a second time under a second name.
+   *
+   * Opt-in rather than always-on, because the lookup is a query and the two
+   * existing callers of this endpoint render no boost messages at all. The one
+   * caller that needs it is /episode/<guid>#boosts, which rebuilds its rows in
+   * the browser when the reader re-sorts and would otherwise degrade every
+   * mention chip to a truncated npub while the rows the edge painted showed real
+   * names. See the note over fetchShowCorpus in ../podcasts/[guid].js.
+   */
+  if (u.searchParams.get("names") === "1") {
+    body.names = Object.fromEntries(
+      await lookupMentionNames(env, (boosts.results || []).map((r) => r.message))
+    );
   }
 
   // Shownotes on demand, matching the podcasts endpoint: `description` is the
