@@ -16,9 +16,10 @@
  * episode-level rollup, Shows and Albums the same show-level one, split on
  * <podcast:medium>. A "music" feed's items are tracks on an album; everything
  * else is episodes of a show. That's the `medium` argument threaded through
- * hydrate() below — see ob-data.js#mediumPredicate for the split itself. The
- * Boosts feeds take no medium: a boost note is a boost note, so they stay the
- * unsplit firehose.
+ * hydrate() below; it becomes a medium=music / not_medium=music query
+ * parameter on /api/v1/episodes and /api/v1/podcasts, so the server answers
+ * already split. The Boosts feeds take no medium: a boost note is a boost
+ * note, so they stay the unsplit firehose.
  *
  * The Events / Marketplace / Articles feeds and their modules were removed on
  * fork. What's left of the Events path below — loadEvents, the supporter-set

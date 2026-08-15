@@ -1,6 +1,11 @@
 # Cloudflare Pages redirects. Add entries here as pages move.
 
-# The show directory lived at /podcasts until the nav grouped the two feeds
-# under a "Podcasts" heading; the page is /shows now. Only the site page
-# moves — the /api/v1/podcasts endpoints are a different path, unaffected.
-/podcasts /shows 301
+# The show directory lived at /podcasts, then at /shows as a standalone page.
+# The Shows *feed* on the homepage replaced both, so each now lands on the feed
+# itself rather than chaining /podcasts -> /shows -> nothing. Only the site page
+# moves; the /api/v1/podcasts endpoints are a different path, unaffected.
+#
+# Both targets carry the fragment deliberately: the feed bar's controller reads
+# the hash to pick which panel is on screen, so /#shows is the whole address.
+/podcasts /#shows 301
+/shows /#shows 301

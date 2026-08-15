@@ -1,5 +1,13 @@
 # Data Architecture: Current State and Consolidation Plan
 
+> **STATUS: COMPLETE as of 2026-08-14.** All four pieces of "The Work" shipped.
+> Every feed and page reads D1 through `/api/v1/*`; the shard-reading half of
+> `ob-data.js` was deleted, which closed the dependency piece 3 was waiting on.
+> The static shards remain a published dataset, and the only thing on the site
+> still reading one is `/about`'s stat strip (`meta.json`). Demoting them to an
+> export is now a decision rather than a migration. Kept as the record of why
+> the consolidation was done and what was measured; **it is not open work.**
+
 Written 2026-08-02, after a run of data defects that raised the question of
 whether the D1 and static-JSON approach is the right foundation. The short
 answer is that it is, that it is roughly 70% built, and that the defects come

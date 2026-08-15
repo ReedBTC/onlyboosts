@@ -13,13 +13,13 @@
  * differ only in the copy table below and in which half of the corpus they
  * keep. Measured against the live index: 818 podcast, 465 music, 2 video.
  *
- * The split is a hard dependency on podcasts/index.json, which is where the
- * medium is published (it's a property of the show, not of a boost — see
- * ob-data.js#mediumPredicate). That's free on the All range, which reads that
- * file anyway, and it makes the windowed ranges need one request they used to
- * do without. Acceptable because All is the opening range on both feeds: a
- * visitor who reaches 1W has already loaded the index, and one that couldn't
- * load it never got past the first paint either.
+ * The split is a QUERY PARAMETER, not a client-side join: /api/v1/podcasts
+ * takes medium=music or not_medium=music and answers already split, so the
+ * browser never reconciles two datasets. This used to read podcasts/index.json
+ * to join guid -> medium in memory, which cost the windowed ranges a request
+ * the All range got for free; that whole path is gone with the rest of
+ * ob-data.js's fetching half. The medium is still a property of the SHOW
+ * rather than of a boost, which is why it is not on the boost record.
  *
  * An earlier pass at this replaced the episode feed with it and was reverted
  * (1f24c77) — correctly, since the two views answer different questions and the

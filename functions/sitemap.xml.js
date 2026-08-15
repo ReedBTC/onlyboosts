@@ -45,14 +45,16 @@ const MAX_EPISODES = 20000;
 // don't index fragments separately — listing them would just be duplicate
 // entries for the same URL.
 //
-// /stats, /boosters and /shows are deliberately absent: they're coming-soon
+// /stats and /boosters are deliberately absent: they're coming-soon
 // placeholders and carry `noindex` themselves. Add them here when they have a
 // feature behind them.
 //
-// /shows is the near-term one: turning it into the crawlable directory that
-// links the show pages is the obvious next step, and it goes in this list on
-// the same commit that drops its `noindex`. Listing it before then would
-// advertise a placeholder.
+// /shows was a third such placeholder and is now a 301 to /#shows, since the
+// Shows feed replaced it. The idea it was holding open is still open, and is
+// still worth doing: a crawlable directory page that LINKS the ~930 show pages,
+// rather than leaving them reachable only through this sitemap. If that gets
+// built it needs a real path of its own and an entry in this list; it is not a
+// reason to keep an empty page parked on the URL in the meantime.
 const STATIC_URLS = [
   { loc: "/", changefreq: "hourly", priority: "1.0" },
   { loc: "/about", changefreq: "monthly", priority: "0.6" },
