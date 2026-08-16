@@ -1081,8 +1081,9 @@ a.boost-who:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px
    it to the right end. */
 .cs-row .ob-boost-pill { margin-right: 0.6rem; }
 
-/* "Boosts →" on a booster page's show row: the way into the #boosts filter.
-   See renderShows in functions/booster/[npub].js.
+/* "Boosts by <name> →" on a booster page's show row: the way into the #boosts
+   filter. See renderShows in functions/booster/[npub].js, where the label, its
+   16-character cap and its name-free fallback are all argued.
 
    Deliberately quieter than .ob-boost-pill, which shares this right edge on the
    show page's rows. That one moves sats and is the loudest thing on its row;
@@ -1106,16 +1107,25 @@ a.boost-who:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px
   border: 1px solid var(--border);
   border-radius: 999px;
   cursor: pointer;
+  white-space: nowrap;
   transition: color 0.12s, border-color 0.12s, background 0.12s;
 }
 .cs-boosts-btn[hidden] { display: none; }
 .cs-boosts-btn:hover { color: var(--accent-d); border-color: var(--accent); background: var(--tint); }
 .cs-boosts-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
 
-/* Under ~26rem the row is already tight with rank, art, title and figures. The
-   label goes and the arrow carries it — the button keeps its hit area and the
-   title keeps its line. */
-@media (max-width: 26rem) {
+/* ⚠️ THE LABEL GOES BELOW 34rem, AND THE ARROW CARRIES IT. The row already holds
+   a rank, 44px of artwork, a title and three figures; "Boosts by btconboard #LN…"
+   is ~150px on top of that, which at 375px leaves the show title nothing. The
+   title is the row's actual content, so it wins.
+
+   The breakpoint is set from the label rather than from a device: 34rem is where
+   the longest capped label still leaves the title a readable column. It was 26rem
+   when the button said only "Boosts".
+
+   The name is not lost, it moves — `title` and `aria-label` carry the full,
+   uncapped "Boosts by <name> to <show>" at every width. */
+@media (max-width: 34rem) {
   .cs-boosts-btn { padding: 0.3rem 0.5rem; font-size: 0; gap: 0; }
   .cs-boosts-btn span { font-size: 0.85rem; }
 }

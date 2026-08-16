@@ -1550,6 +1550,33 @@ beside "40.1k sats across 38 episodes". Each row's `.cs-boosts-btn` is the whole
 affordance; it sits **outside** the row's anchor, because a button nested in a
 link is neither.
 
+**⚠️ The button names the booster, and a bare "Boosts →" is what it replaced.**
+On a row whose subject is a SHOW that read as *the show's* boosts — every boost
+anyone has ever sent it — where what it opens is one person's. The `<h1>` says
+whose, and a reader twenty rows down cannot see it. `showFilterLabel` in
+`functions/booster/[npub].js` owns the string:
+
+- **"Boosts by X", not "X's Boosts."** The first is already the site's phrase for
+  this — `title="Boosts by ${name}"` is on every boost row's author link and every
+  community-wall card — and it has no possessive to get wrong on a name ending
+  in s.
+- **Capped at 16 characters.** Measured over 45 boosters on 2026-08-16: median
+  name 11, mean 11, max 27, only 5 above the cap. The cap is about strangeness as
+  much as width; the tail is `btconboard #LNHANCE or #CTV` and
+  `ChadF and 33 others`, which are campaign text rather than names. The full
+  string rides `title` and `aria-label`, where length costs nothing.
+- **⚠️ Name-free when there is no kind-0.** 51 boosters have no profile on any
+  relay tested, and for them the page's `label` is a truncated identifier —
+  "dbd1ba83b0…ecbd Boosts" is worse than saying nothing about whose. Those rows
+  read "Read these" and point at the figures beside them. The same call the rows
+  above make in printing "Unidentified show" rather than a guid dressed as a
+  title. **Pass `realName`, never the page's `label`.**
+- **The label goes below 34rem and the arrow carries it.** The row already holds
+  a rank, 44px of artwork, a title and three figures; ~150px of button on top of
+  that leaves the show title nothing at 375px, and the title is the row's actual
+  content. The breakpoint is set from the longest capped label rather than from a
+  device — it was 26rem when the button said only "Boosts".
+
 **The filter renders as a chip, not a fourth control.** A "Show: All shows ▾"
 menu would be permanent chrome on a band that already carries three controls and
 is two rows on a phone. The chip is absent until something is picked and gone the

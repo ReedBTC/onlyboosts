@@ -373,22 +373,22 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v64" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v64" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v64" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v64" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v65" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v65" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v65" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v65" />
   <!-- The hero, the drawers and the boost list are the show page's, so this
        page links its stylesheet and adds only the deltas. -->
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v64" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v65" />
   <!-- The episode card, for the #episodes rollup: the same chrome
        feeds-podcasts.js paints on the homepage. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v64" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v65" />
   <!-- The boost thread inside a card's drawer, and its reply / like / repost /
        zap bar, both reached through that same card. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v64" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v64" />
-  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v64" />
-  <link rel="stylesheet" href="/assets/css/booster-page.css?v=ob-v64" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v65" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v65" />
+  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v65" />
+  <link rel="stylesheet" href="/assets/css/booster-page.css?v=ob-v65" />
 </head>
 <body data-booster-pk="${htmlEscape(hex)}"${npub ? ` data-booster-npub="${htmlEscape(npub)}"` : ""}>
 
@@ -489,7 +489,7 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
 
   ${renderHeader({ hex, npub, prof, label, realName, pic, banner, stats, totals, bioProfiles })}
 
-  ${renderShows(shows)}
+  ${renderShows(shows, realName)}
 
   ${renderEpisodes(corpus)}
 
@@ -583,12 +583,12 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav.js?v=ob-v64" defer></script>
-<script src="/assets/js/booster-page.js?v=ob-v64" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v65" defer></script>
+<script src="/assets/js/booster-page.js?v=ob-v65" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v64"></script>
-<script src="/assets/js/sw-register.js?v=ob-v64" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v65"></script>
+<script src="/assets/js/sw-register.js?v=ob-v65" defer></script>
 </body>
 </html>`;
 }
@@ -782,7 +782,7 @@ function renderContact({ lud16, lud06, website }) {
 // reader support a show they have just discovered; this list is a record of what
 // someone else has already boosted, and each row links to that show's own page,
 // which carries the button. Keeping the money paths off this page is deliberate.
-function renderShows(rows) {
+function renderShows(rows, realName) {
   if (!rows.length) return "";
 
   return `<section class="show-section show-section--bare" id="shows">
@@ -799,7 +799,7 @@ function renderShows(rows) {
            All, which is the view they would land on. -->
       <div class="cs-controls" data-bs-shows-controls hidden></div>
       <ul class="ep-list cs-list" data-bs-shows-list>
-        ${rows.map((r, i) => showRow(r, i + 1)).join("\n        ")}
+        ${rows.map((r, i) => showRow(r, i + 1, realName)).join("\n        ")}
       </ul>
       <!-- Painted by booster-page.js when a range empties the list. A window
            with nothing in it is a real answer here — half of all boosters have
@@ -809,7 +809,7 @@ function renderShows(rows) {
   </section>`;
 }
 
-function showRow(r, rank) {
+function showRow(r, rank, realName) {
   const art = isSafeUrl(r.image) ? r.image : null;
   // The same second-chance URL every other surface carries, on the same terms.
   const art2 = isSafeUrl(r.artwork) && r.artwork !== art ? r.artwork : null;
@@ -867,13 +867,64 @@ function showRow(r, rank) {
    * The label is the row's, so an unidentified show reads "Unidentified show"
    * here as it does above. It still gets a button — a show Podcast Index cannot
    * name still has boosts worth reading. */
+  /* ⚠️ THE LABEL NAMES THE BOOSTER, and a bare "Boosts →" is what it replaced.
+   * On a row whose subject is a SHOW, that read as "this show's boosts" — every
+   * boost anyone has ever sent it — when what the button opens is one person's.
+   * The page's <h1> says whose, but a reader twenty rows down cannot see it.
+   *
+   * "Boosts by X" rather than "X's Boosts" because it is already the site's
+   * phrase for this: `title="Boosts by ${name}"` is on every boost row's author
+   * link and on every community-wall card. It also sidesteps the possessive on a
+   * name ending in s.
+   *
+   * ⚠️ CAPPED AT 16, because the name is third-party text and is not always a
+   * name. Measured over 45 boosters: median 11 characters, mean 11, max 27, and
+   * only 5 above 16 — but the tail is "btconboard #LNHANCE or #CTV" and "ChadF
+   * and 33 others", so the cap is about strangeness as much as width. The full
+   * string is in `title` and `aria-label`, where length costs nothing.
+   *
+   * ⚠️ AND IT FALLS BACK WHEN THERE IS NO NAME. 51 boosters in the index have no
+   * kind-0 on any profile relay, and for them `label` is a truncated identifier —
+   * "dbd1ba83b0…ecbd Boosts" is worse than saying nothing about whose. Those rows
+   * point at the figures beside them instead. Same call the rows above make in
+   * printing "Unidentified show" rather than a guid dressed as a title. */
+  const { label: byline, full } = showFilterLabel(realName, title);
+
   const filter = `<button type="button" class="cs-boosts-btn"
         data-bs-show-filter="${htmlEscape(r.podcast_guid || "")}"
         data-bs-show-label="${htmlEscape(title)}"
-        aria-label="Show only boosts to ${htmlEscape(title)}" hidden>Boosts <span aria-hidden="true">&rarr;</span></button>`;
+        title="${htmlEscape(full)}" aria-label="${htmlEscape(full)}" hidden>${
+        htmlEscape(byline)} <span aria-hidden="true">&rarr;</span></button>`;
 
   return `<li class="cs-row" data-bs="${packed}">${body}${filter}</li>`;
 }
+
+/* The show-filter button's two strings: what it shows, and what it says in full.
+ *
+ * Exported for scripts/test-boost-row.mjs — the cap and the fallback are exactly
+ * the kind of decision that regresses silently, and neither is visible from the
+ * rendered page without a D1 stub. Only onRequest* is routed, so an extra export
+ * here costs nothing.
+ *
+ * @param {string|null} realName  the booster's kind-0 name, or null if they have
+ *   none. NOT the page's `label`, which falls back to a truncated identifier —
+ *   "dbd1ba83b0…ecbd Boosts" is worse than saying nothing about whose.
+ * @param {string} showTitle  the row's own title, already truncated and already
+ *   "Unidentified show" where there is none.
+ */
+export function showFilterLabel(realName, showTitle) {
+  const name = String(realName || "").trim();
+  return name
+    ? { label: `Boosts by ${truncate(name, LABEL_NAME_MAX)}`, full: `Boosts by ${name} to ${showTitle}` }
+    : { label: "Read these", full: `Read this booster's boosts to ${showTitle}` };
+}
+
+/* Measured over 45 boosters on 2026-08-16: median name 11 characters, mean 11,
+ * max 27, and only 5 above this. The cap is about strangeness as much as width —
+ * the tail is "btconboard #LNHANCE or #CTV" and "ChadF and 33 others", which are
+ * campaign text rather than names. The full string is in `title` and
+ * `aria-label`, where length costs nothing. */
+const LABEL_NAME_MAX = 16;
 
 function showMeta(boosts, sats, eps) {
   return `${num(boosts)} boost${boosts === 1 ? "" : "s"} · ` +
@@ -960,10 +1011,10 @@ function notFound(raw) {
   <meta name="robots" content="noindex" />
   <title>Booster not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v64" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v64" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v64" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v64" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v65" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v65" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v65" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v65" />
 </head>
 <body>
 <section class="page-header">
@@ -981,7 +1032,7 @@ function notFound(raw) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v64" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v65" defer></script>
 </body>
 </html>`;
   return new Response(html, {

@@ -36,10 +36,10 @@
 import {
   boostRows, rowsFromRecords, sortBoostRows,
   filterBoostRows, filterBoostShow, searchBoostRows,
-} from '/assets/js/boost-list.js?v=ob-v64'
-import { rangeControl, sortControl, rangeDays, rangeCutoff } from '/assets/js/feed-controls.js?v=ob-v64'
-import { wireBoostNotes } from '/assets/js/boost-note-actions.js?v=ob-v64'
-import { hydrateProfiles } from '/assets/js/detail-page.js?v=ob-v64'
+} from '/assets/js/boost-list.js?v=ob-v65'
+import { rangeControl, sortControl, rangeDays, rangeCutoff } from '/assets/js/feed-controls.js?v=ob-v65'
+import { wireBoostNotes } from '/assets/js/boost-note-actions.js?v=ob-v65'
+import { hydrateProfiles } from '/assets/js/detail-page.js?v=ob-v65'
 
 /* The sort menu, taken from boosts-feed.js#SORT_OPTIONS so the wording matches
  * the feed the reader was sent here from.
