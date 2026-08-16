@@ -15,16 +15,16 @@
  * already-fetched profile data, and so the same DOM nodes get reused across
  * mutating repaints.
  */
-import { SimplePool, nip19, verifyEvent } from '/assets/widgets/nostr-tools.js?v=ob-v67'
+import { SimplePool, nip19, verifyEvent } from '/assets/widgets/nostr-tools.js?v=ob-v68'
 // Primal profile lookup lives in its own module so /show pages can use it
 // without importing this one. See primal-profiles.js.
-import { primalQuery, fetchProfilesFromPrimal, parseProfileEvent } from '/assets/js/primal-profiles.js?v=ob-v67'
+import { primalQuery, fetchProfilesFromPrimal, parseProfileEvent } from '/assets/js/primal-profiles.js?v=ob-v68'
 import {
   KIND_DATE_EVENT,
   KIND_TIME_EVENT,
   fetchCalendarEventsFromRelays,
   renderCalendarCard,
-} from '/assets/js/calendar-events.js?v=ob-v67'
+} from '/assets/js/calendar-events.js?v=ob-v68'
 
 // ── Config ───────────────────────────────────────────────────────────
 export const ROOT_NEVENT = 'nevent1qvzqqqqqqypzpses3q0zsa5rs8wchh7jws6pmjsvtzpv9xuxgt4yhjp0w43jv3vjqyd8wumn8ghj7urewfsk66ty9enxjct5dfskvtnrdakj7qgwwaehxw309ahx7uewd3hkctcqyr3keved458q3n7x7839r86vj4dx0s4xh0p8j7fzvf4nq7824ulagy77tpj'

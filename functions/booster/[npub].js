@@ -361,10 +361,25 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
        someone's wallpaper; the face is what identifies the page. Same principle
        as og:image staying on a show's primary artwork. -->
   <meta property="og:image" content="${htmlEscape(pic || OG_FALLBACK)}" />
-  <meta name="twitter:card" content="summary_large_image" />
+  <meta property="og:image:alt" content="${htmlEscape(pic ? `${label}’s profile picture` : "OnlyBoosts")}" />
+  <!-- ⚠️ THE CARD TYPE FOLLOWS THE IMAGE, and this is the one page where it has
+       to. A large-image card crops to about 1.91:1; a profile picture is nothing
+       of the sort. Measured over 26 real booster avatars from the live index:
+       NOT ONE is wide enough, 13 are exactly square, and the rest are portrait
+       down to 0.67. So the large card was slicing a horizontal band out of the
+       middle of every face — the pfp WAS being sent, and was being cropped into
+       something unrecognisable, which is a worse failure than sending nothing,
+       because it reads as a broken image rather than a missing one. The summary
+       card is the small square thumbnail those dimensions actually are.
+
+       The fallback keeps the large card: OG_FALLBACK is the 1800x600 site
+       banner, which is the one image here that belongs in a wide frame. Two
+       shapes, two cards, chosen by which one is in use. -->
+  <meta name="twitter:card" content="${pic ? "summary" : "summary_large_image"}" />
   <meta name="twitter:title" content="${htmlEscape(ogTitle)}" />
   <meta name="twitter:description" content="${htmlEscape(ogDesc)}" />
   <meta name="twitter:image" content="${htmlEscape(pic || OG_FALLBACK)}" />
+  <meta name="twitter:image:alt" content="${htmlEscape(pic ? `${label}’s profile picture` : "OnlyBoosts")}" />
 
   <script type="application/ld+json">
   ${jsonForScript(ld)}
@@ -373,22 +388,22 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v67" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v67" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v67" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v67" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v68" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v68" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v68" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v68" />
   <!-- The hero, the drawers and the boost list are the show page's, so this
        page links its stylesheet and adds only the deltas. -->
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v67" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v68" />
   <!-- The episode card, for the #episodes rollup: the same chrome
        feeds-podcasts.js paints on the homepage. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v67" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v68" />
   <!-- The boost thread inside a card's drawer, and its reply / like / repost /
        zap bar, both reached through that same card. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v67" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v67" />
-  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v67" />
-  <link rel="stylesheet" href="/assets/css/booster-page.css?v=ob-v67" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v68" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v68" />
+  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v68" />
+  <link rel="stylesheet" href="/assets/css/booster-page.css?v=ob-v68" />
 </head>
 <body data-booster-pk="${htmlEscape(hex)}"${npub ? ` data-booster-npub="${htmlEscape(npub)}"` : ""}>
 
@@ -583,12 +598,12 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav.js?v=ob-v67" defer></script>
-<script src="/assets/js/booster-page.js?v=ob-v67" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v68" defer></script>
+<script src="/assets/js/booster-page.js?v=ob-v68" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v67"></script>
-<script src="/assets/js/sw-register.js?v=ob-v67" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v68"></script>
+<script src="/assets/js/sw-register.js?v=ob-v68" defer></script>
 </body>
 </html>`;
 }
@@ -1011,10 +1026,10 @@ function notFound(raw) {
   <meta name="robots" content="noindex" />
   <title>Booster not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v67" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v67" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v67" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v67" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v68" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v68" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v68" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v68" />
 </head>
 <body>
 <section class="page-header">
@@ -1032,7 +1047,7 @@ function notFound(raw) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v67" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v68" defer></script>
 </body>
 </html>`;
   return new Response(html, {
