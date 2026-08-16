@@ -129,6 +129,7 @@ POST /api/v1/episodes              body: { follows:[npub|hex,…] }  — same pa
 GET  /api/v1/podcasts?sort=recent|sats|boosts&cursor=&limit=
 GET  /api/v1/podcasts/{guid}       → podcast + its episodes (+ recent boosts)
 GET  /api/v1/boosters/{npub}       → profile + that booster's boosts
+GET  /api/v1/boosters/pubkeys      → every pubkey that has a /booster page, flat
 GET  /api/v1/search?q=&type=boosts|podcasts&limit=
 GET  /api/v1/stats                 → totals (mirrors meta.json)
 ```
@@ -168,6 +169,22 @@ GET  /api/v1/stats                 → totals (mirrors meta.json)
   included. Repeating the sort column among its own tiebreakers defeats them and
   costs a full temp-B-tree sort (19,499 rows read vs 202) — so the index list
   and `tiebreak` in `episodes.js` change together or not at all.
+- **`/api/v1/boosters/pubkeys` is a membership set, not a records endpoint**, and
+  it is the one place pagination is deliberately absent: the caller is another
+  site rendering many people at once, and it has to answer "does this person link
+  to OnlyBoosts" synchronously, at render time, for all of them. A per-pubkey
+  check cannot serve that, since it produces no real `<a href>` and a
+  `window.open()` after an `await` is eaten by a mobile popup blocker.
+  **⚠️ It derives from `boosts`, never from `profiles`.** `/booster/<npub>`
+  qualifies on having boosted and not on having a resolvable kind-0, so the
+  profiles table is short by the 51 boosters (of 2,003) with no kind-0 on any
+  relay; sourcing from it would report live pages as missing. `/api/v1/stats`'s
+  `boosters` figure is the check. One covering-index scan of
+  `idx_boosts_booster`, ~130KB raw, cached 1800s because the set only changes
+  when somebody boosts for the first time. The static filename wins the route
+  over its `[npub].js` sibling; verified under `wrangler pages dev`, since the
+  failure mode is quiet (`toHexPubkey("pubkeys")` returns null and the caller
+  gets a booster-shaped error instead of an index).
 - Every GET sets `Cache-Control` (short TTL) so the CF edge still absorbs bursts.
 - Bound every query (`limit` capped, e.g. 200) — no unbounded scans.
 
