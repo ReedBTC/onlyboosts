@@ -169,7 +169,7 @@ def export(conn, out_dir, latest_n=1000, per_show=False, log=print):
                COUNT(DISTINCT b.booster_pubkey) AS boosters,
                COUNT(DISTINCT b.item_guid) AS episodes,
                MAX(b.created_at) AS latest,
-               s.title, s.image, s.artwork, s.feed_url, s.medium, s.author
+               s.title, s.image, s.artwork, s.feed_url, s.medium, s.author, s.language
         FROM boosts b LEFT JOIN shows s ON s.podcast_guid = {_EFF}
         WHERE {_EFF} IS NOT NULL AND {db.not_excluded('b')}
         GROUP BY {_EFF}
@@ -183,6 +183,11 @@ def export(conn, out_dir, latest_n=1000, per_show=False, log=print):
         "feed":     a["feed_url"],
         "medium":   a["medium"] or "podcast",   # podcast:medium — 'music' etc.; default per the namespace
         "author":   a["author"],                # <itunes:author>: 'Artist' on music, weak 'by' on podcasts; raw
+        # RSS <language>, primary subtag ('en', 'de'). NULL/absent means the feed
+        # declares none — NOT English. 99% of podcasts carry one against 48% of
+        # music, so a consumer filtering on this must treat null as its own state
+        # or it silently drops half the music. Same partition rule as `medium`.
+        "language": a["language"],
         "boosts":   a["boosts"],
         "sats":     a["sats"],
         "boosters": a["boosters"],
@@ -262,7 +267,7 @@ def export(conn, out_dir, latest_n=1000, per_show=False, log=print):
                 "show": {"guid": pg, "title": a["title"], "img": a["image"],
                          "art2": a["artwork"],   # fallback art URL when `img` 404s (may be null)
                          "feed": a["feed_url"], "medium": a["medium"],
-                         "author": a["author"]},
+                         "author": a["author"], "language": a["language"]},
                 # <podcast:podroll>. `podroll` is what this show recommends, in the
                 # publisher's order; `recommended_by` is the reverse edge, which is
                 # what makes the feature worth having — it lights up ~40% more pages

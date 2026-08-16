@@ -100,6 +100,10 @@ def show_by_feed_url(feed_url):
         "medium":    None,
         # Fountain's `publisher` is the same idea as <itunes:author>.
         "author":    (_scalar(content.get("publisher")) or "").strip() or None,
+        # Fountain's schema carries no language either. Left unset for the same
+        # reason as medium: NULL means "we don't know", and the site must not read
+        # an unknown as a language.
+        "language":  None,
     }
 
 

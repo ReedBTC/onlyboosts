@@ -1852,6 +1852,65 @@ through `podcasts_fts`, declared `fts5(podcast_guid UNINDEXED, title)`. Adding i
 is a collector-side schema change plus a repopulate; a SELECT cannot do it. Also
 open: `og:title` for music becoming "<artist> — <album>".
 
+## Show language: `language`
+
+RSS channel `<language>`, off the Podcast Index feed object. It rides the
+`podcasts/byguid` call `enrich.py` already makes, so it costs **no extra
+request**. Carried by `podcasts/index.json`, the per-show shards and D1's
+`podcasts` table; `backfill_language.py` filled the existing rows.
+
+**Stored as the primary subtag, lowercased** — `en`, `de`, never `en-US`. The
+corpus describes ~21 languages in **36 distinct raw tags** (`en`, `en-us`,
+`en-US`, `en-gb`, `en-au` are one language and five menu entries, and the case
+varies by publisher). Anything not 2–3 alpha is dropped rather than stored, so a
+junk value can't become a junk filter option.
+
+**⚠️ NULL MEANS THE FEED DECLARES NONE, AND THAT IS NOT ENGLISH.** Coverage
+splits hard on the medium: **99% of podcasts (466 of 469) against 48% of music
+(232 of 485)**, because Wavlake — 198 of the 251 music misses — publishes no
+`<language>` at all. Across the index that is **594 untagged of 1,294**. So an
+untagged show is a populous, first-class state, not a gap to default away: a
+filter that folds NULL into a language turns "filter by language" into "hide half
+the Albums feed", under a claim those publishers never made. Same partition rule
+as the medium split, where the unidentified shows are why the Shows feed is
+`not_medium=music` and never `medium=podcast`.
+
+**The tail is thinner than the show counts suggest.** Boost-weighted: `en` 17,286,
+`de` 3,155 across 40 shows — essentially the whole non-English story — `es` 319,
+every other language under 50. A menu listing all 20 is mostly dead entries.
+
+`lang=` filters `GET /api/v1/podcasts` and `GET|POST /api/v1/episodes`, on all
+four query paths (all-time read, windowed GROUP BY, `q=` ranking CTE, follows
+POST). `readLang` / `langWhere` in `_common.js` are shared so both validate
+identically. Three rules:
+
+- **`lang=unknown` is how the untagged bucket is asked for.** There is
+  deliberately **no `not_lang`**: medium needs its negation because every show
+  must land in exactly one of Shows/Albums, and language has no such obligation.
+- **A full tag is normalized, not rejected** (`lang=en-US` → `en`). Nothing is
+  stored in that form, so a 400 would only trap a caller passing a value straight
+  back from a feed.
+- **Validated by shape, never against a fixed list.** The set grows the first time
+  anyone boosts a show in a new language; a whitelist would 400 it.
+
+**`GET /api/v1/languages` is the facet, and a control is built from it rather than
+a constant** — the set is data, not software. It is `medium`-aware because `de` is
+38 shows on the podcast side and 2 on the music side, and it returns the `unknown`
+row as a peer.
+
+`language` also rides `/api/v1/podcasts/<guid>`, `/api/v1/episodes/<guid>` and
+`/api/v1/search`, for consistency with the shards. **It is not in `podcasts_fts`**
+and nothing needs to *search* a language.
+
+Remote D1 got `ALTER TABLE podcasts ADD COLUMN language TEXT` out-of-band, as
+`artwork` and the profiles fields did — `CREATE TABLE IF NOT EXISTS` adds no
+column to an existing table, so `d1/schema.sql` and the live remote are kept in
+step by hand. The backfill reached D1 through the **metadata-drift pass**: bumping
+`shows.updated_at` is what makes a row due.
+
+**Still open: the UI.** No feed carries a language control yet, and the Boosts
+endpoints take no `lang`.
+
 ## Not indexed: `podcast:person`
 
 `<podcast:person>` is **not** in this pipeline and deliberately isn't being added.

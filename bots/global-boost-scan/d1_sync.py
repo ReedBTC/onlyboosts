@@ -113,7 +113,7 @@ def build_full_sql(conn):
                COUNT(DISTINCT b.booster_pubkey) AS booster_count,
                COUNT(DISTINCT b.item_guid) AS episode_count,
                MAX(b.created_at) AS latest_ts,
-               s.title, s.image, s.artwork, s.feed_url, s.medium, s.author
+               s.title, s.image, s.artwork, s.feed_url, s.medium, s.author, s.language
         FROM boosts b LEFT JOIN shows s ON s.podcast_guid={eg}
         WHERE {eg} IS NOT NULL AND {db.not_excluded('b')} GROUP BY {eg}""").fetchall():
         # `artwork` is the second-chance art URL (<itunes:image> when it differs
@@ -121,10 +121,11 @@ def build_full_sql(conn):
         # remote D1 `podcasts.artwork` column shipped out-of-band (ALTER + backfill),
         # so it's projected here and in the --remote-delta path below.
         out.append(
-            "INSERT INTO podcasts (podcast_guid,title,image,artwork,feed_url,medium,author,"
+            "INSERT INTO podcasts (podcast_guid,title,image,artwork,feed_url,medium,author,language,"
             "boost_count,total_sats,booster_count,episode_count,latest_ts) VALUES ("
             f"{q(a['guid'])},{q(a['title'])},{q(a['image'])},{q(a['artwork'])},{q(a['feed_url'])},"
-            f"{q(a['medium'])},{q(a['author'])},{q(a['boost_count'])},{q(a['total_sats'])},"
+            f"{q(a['medium'])},{q(a['author'])},{q(a['language'])},"
+            f"{q(a['boost_count'])},{q(a['total_sats'])},"
             f"{q(a['booster_count'])},{q(a['episode_count'])},{q(a['latest_ts'])});")
         if a["title"] or a["author"]:
             out.append("INSERT INTO podcasts_fts (podcast_guid,title,author) VALUES ("
@@ -202,17 +203,18 @@ def _podcast_upsert_sql(conn, guid):
                   COUNT(DISTINCT b.booster_pubkey) AS booster_count,
                   COUNT(DISTINCT b.item_guid) AS episode_count,
                   MAX(b.created_at) AS latest_ts,
-                  s.title, s.image, s.artwork, s.feed_url, s.medium, s.author
+                  s.title, s.image, s.artwork, s.feed_url, s.medium, s.author, s.language
            FROM boosts b LEFT JOIN shows s ON s.podcast_guid={eg}
            WHERE {eg}=? AND {db.not_excluded('b')} GROUP BY {eg}""", (guid,)).fetchone()
     if not a:
         return []
     # `artwork` (second-chance art URL) is projected here and in the full load;
     # the remote D1 column exists.
-    out = ["INSERT OR REPLACE INTO podcasts (podcast_guid,title,image,artwork,feed_url,medium,author,"
+    out = ["INSERT OR REPLACE INTO podcasts (podcast_guid,title,image,artwork,feed_url,medium,author,language,"
            "boost_count,total_sats,booster_count,episode_count,latest_ts) VALUES ("
            f"{q(a['guid'])},{q(a['title'])},{q(a['image'])},{q(a['artwork'])},{q(a['feed_url'])},"
-           f"{q(a['medium'])},{q(a['author'])},{q(a['boost_count'])},{q(a['total_sats'])},"
+           f"{q(a['medium'])},{q(a['author'])},{q(a['language'])},"
+           f"{q(a['boost_count'])},{q(a['total_sats'])},"
            f"{q(a['booster_count'])},{q(a['episode_count'])},{q(a['latest_ts'])});",
            f"DELETE FROM podcasts_fts WHERE podcast_guid={q(guid)};"]
     if a["title"] or a["author"]:

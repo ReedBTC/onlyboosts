@@ -32,6 +32,10 @@ CREATE TABLE IF NOT EXISTS podcasts (
   feed_url      TEXT,
   medium        TEXT,
   author        TEXT,               -- <itunes:author>: 'Artist' on music, weak 'by' on podcasts; raw string
+  -- ⚠️ ADDED OUT-OF-BAND with ALTER TABLE ... ADD COLUMN on the live remote, the
+  -- same way `artwork` and the profiles fields were — see the note over `profiles`.
+  language      TEXT,               -- RSS <language>, primary subtag only ('en','de'); NULL = feed declares
+                                    -- none, which is NOT English (48% of music feeds vs 99% of podcasts)
   boost_count   INTEGER,
   total_sats    INTEGER,
   booster_count INTEGER,

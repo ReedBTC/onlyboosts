@@ -19,7 +19,7 @@
 //     per-user ranking can't be precomputed for every possible set of people,
 //     so this one genuinely has to aggregate per request.
 // Both return the same record shape; only the corpus differs.
-import { json, preflight, clampLimit, toHexPubkey, ftsMatch } from "./_common.js";
+import { json, preflight, clampLimit, toHexPubkey, ftsMatch, readLang, langWhere } from "./_common.js";
 
 export async function onRequestOptions({ request }) { return preflight(request); }
 
@@ -136,6 +136,8 @@ function episodeRecord(r) {
       guid: r.podcast_guid, title: r.p_title, img: r.p_image,
       art2: r.p_artwork || null, feed: r.p_feed,
       medium: r.p_medium || "podcast", author: r.p_author,
+      // The show's RSS <language>; null means its feed declares none, NOT English.
+      language: r.p_language || null,
     },
     boosts: r.boost_count,
     sats: r.total_sats,
@@ -165,6 +167,10 @@ export function readParams(u) {
   if (medium && !MEDIA.has(medium)) return { error: "bad medium (podcast|music|video)" };
   const notMedium = u.searchParams.get("not_medium");
   if (notMedium && !MEDIA.has(notMedium)) return { error: "bad not_medium (podcast|music|video)" };
+  // Language is a property of the SHOW, so an episode inherits its feed's — the
+  // same join `medium` rides. An episode of an untagged show is untagged.
+  const { lang, error: langError } = readLang(u);
+  if (langError) return { error: langError };
   const podcast = u.searchParams.get("podcast") || null;
   const days = RANGE_DAYS[range];
   const include = new Set((u.searchParams.get("include") || "").split(",").filter(Boolean));
@@ -180,7 +186,7 @@ export function readParams(u) {
   return {
     q: match ? rawQ : null,
     match,
-    sortKey, range, medium, notMedium, podcast,
+    sortKey, range, medium, notMedium, lang, podcast,
     withBoosts: include.has("boosts"),
     // Cutoff is computed per request; the response is cached briefly, so a
     // window can lag its own edge by the cache TTL. That's invisible at 7-day
@@ -202,6 +208,7 @@ export async function onRequestGet({ request, env }) {
     scope: "global",
     sort: p.sortKey,
     range: p.range,
+    ...(p.lang ? { lang: p.lang } : {}),
     ...(p.q ? { q: p.q } : {}),
     next_offset: nextOffset,
     episodes,
@@ -219,6 +226,8 @@ export async function globalEpisodes(env, p) {
   if (p.cutoff) { where.push("e.published >= ?"); args.push(p.cutoff); }
   if (p.medium) { where.push("COALESCE(pc.medium,'podcast') = ?"); args.push(p.medium); }
   if (p.notMedium) { where.push("COALESCE(pc.medium,'podcast') <> ?"); args.push(p.notMedium); }
+  // No COALESCE: NULL is its own state, reachable only as lang=unknown.
+  { const w = langWhere(p.lang, "pc.language", args); if (w) where.push(w); }
   if (p.podcast) { where.push("e.podcast_guid = ?"); args.push(p.podcast); }
 
   const col = SORTS[p.sortKey].col;
@@ -236,7 +245,8 @@ export async function globalEpisodes(env, p) {
            e.episode_number, e.enclosure_url,
            e.boost_count, e.total_sats, e.booster_count, e.latest_ts,
            pc.title AS p_title, pc.image AS p_image, pc.artwork AS p_artwork,
-           pc.feed_url AS p_feed, pc.medium AS p_medium, pc.author AS p_author`;
+           pc.feed_url AS p_feed, pc.medium AS p_medium, pc.author AS p_author,
+           pc.language AS p_language`;
   const whereSql = where.length ? "WHERE " + where.join(" AND ") : "";
 
   let sql;
@@ -338,6 +348,7 @@ export async function onRequestPost({ request, env }) {
   if (p.cutoff) { where.push("e.published >= ?"); args.push(p.cutoff); }
   if (p.medium) { where.push("COALESCE(pc.medium,'podcast') = ?"); args.push(p.medium); }
   if (p.notMedium) { where.push("COALESCE(pc.medium,'podcast') <> ?"); args.push(p.notMedium); }
+  { const w = langWhere(p.lang, "pc.language", args); if (w) where.push(w); }
   if (p.podcast) { where.push("b.podcast_guid = ?"); args.push(p.podcast); }
 
   // Aggregates are recomputed over the filtered boosts — the precomputed
@@ -356,7 +367,8 @@ export async function onRequestPost({ request, env }) {
            COUNT(DISTINCT b.booster_pubkey)    AS booster_count,
            MAX(b.created_at)                   AS latest_ts,
            pc.title AS p_title, pc.image AS p_image, pc.artwork AS p_artwork,
-           pc.feed_url AS p_feed, pc.medium AS p_medium, pc.author AS p_author
+           pc.feed_url AS p_feed, pc.medium AS p_medium, pc.author AS p_author,
+           pc.language AS p_language
     FROM boosts b
     LEFT JOIN episodes e  ON e.item_guid    = b.item_guid
     LEFT JOIN podcasts pc ON pc.podcast_guid = b.podcast_guid
@@ -407,6 +419,7 @@ export async function onRequestPost({ request, env }) {
     follows: hexes.length,
     sort: p.sortKey,
     range: p.range,
+    ...(p.lang ? { lang: p.lang } : {}),
     // Echoed for the same reason as the GET path: a caller that asked to filter
     // must be able to see, from the response alone, that filtering happened.
     ...(p.q ? { q: p.q } : {}),

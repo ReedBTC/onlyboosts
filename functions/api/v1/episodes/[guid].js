@@ -56,7 +56,8 @@ export async function onRequestGet({ request, env, params }) {
             e.episode_number, e.enclosure_url, e.boost_count, e.booster_count,
             e.total_sats,
             p.title AS p_title, p.image AS p_image, p.artwork AS p_artwork,
-            p.feed_url AS p_feed, p.medium AS p_medium, p.author AS p_author
+            p.feed_url AS p_feed, p.medium AS p_medium, p.author AS p_author,
+            p.language AS p_language
      FROM episodes e
      LEFT JOIN podcasts p ON p.podcast_guid = e.podcast_guid
      WHERE e.item_guid = ?`
@@ -88,6 +89,8 @@ export async function onRequestGet({ request, env, params }) {
         feed: ep.p_feed,
         medium: ep.p_medium,
         author: ep.p_author,
+        // The show's RSS <language>; null = its feed declares none, NOT English.
+        language: ep.p_language || null,
       },
     },
     boosts: (boosts.results || []).map(boostRecord),

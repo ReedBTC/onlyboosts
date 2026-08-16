@@ -48,7 +48,7 @@ export async function onRequestGet({ request, env }) {
     const { results } = await env.DB.prepare(
       // author is both RETURNED and MATCHED: podcasts_fts carries it alongside
       // title (see d1/schema.sql), so an artist name finds its feed here.
-      `SELECT p.podcast_guid, p.title, p.image, p.feed_url, p.author, p.boost_count, p.total_sats,
+      `SELECT p.podcast_guid, p.title, p.image, p.feed_url, p.author, p.language, p.boost_count, p.total_sats,
               p.booster_count, p.episode_count, p.latest_ts
        FROM podcasts_fts f JOIN podcasts p ON p.podcast_guid = f.podcast_guid
        WHERE podcasts_fts MATCH ? ORDER BY p.total_sats DESC LIMIT ?`
@@ -57,7 +57,7 @@ export async function onRequestGet({ request, env }) {
       type, q, count: results.length,
       podcasts: results.map((r) => ({
         guid: r.podcast_guid, title: r.title, img: r.image, feed: r.feed_url,
-        author: r.author,
+        author: r.author, language: r.language || null,
         boosts: r.boost_count, sats: r.total_sats, boosters: r.booster_count,
         episodes: r.episode_count, latest: r.latest_ts,
       })),

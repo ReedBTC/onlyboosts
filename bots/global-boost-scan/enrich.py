@@ -46,6 +46,24 @@ def clean_html(raw):
     return text or None
 
 
+def _normalize_language(raw):
+    """RSS channel <language> → primary subtag, lowercased. None when absent.
+
+    The region is deliberately dropped: measured over all 943 titled shows in the
+    index, 36 distinct raw tags describe ~21 languages — 'en', 'en-us', 'en-US',
+    'en-gb', 'en-au' are one language and five filter entries, and the case varies
+    by publisher. A reader filtering for German wants Einundzwanzig whether the feed
+    says 'de' or 'de-de'. Anything that isn't a plausible subtag (2-3 alpha, per
+    ISO 639) is dropped rather than stored — a junk value would become a junk
+    filter option, and NULL already means "not declared".
+    """
+    tag = (raw or "").strip().lower()
+    if not tag:
+        return None
+    primary = re.split(r"[-_]", tag, 1)[0]
+    return primary if re.fullmatch(r"[a-z]{2,3}", primary) else None
+
+
 def _show_from_feed(feed, podcast_guid=None):
     """Normalize a Podcast Index `feed` object into our shows-table shape. When
     `podcast_guid` is omitted it's taken from the feed's own podcastGuid (used when
@@ -76,6 +94,11 @@ def _show_from_feed(feed, podcast_guid=None):
         # it just repeats the title). NOT a podcast:person credit; PI exposes no
         # channel-level person data, and it's present on only ~6% of feeds anyway.
         "author":    (feed.get("author") or "").strip() or None,
+        # RSS channel <language>, normalized to the primary subtag. Rides the
+        # byguid call we already make, so it costs no extra request. Coverage is
+        # split hard by medium — 99% of podcasts, 48% of music, because Wavlake
+        # (198 of the 251 music misses) publishes no <language> at all.
+        "language":  _normalize_language(feed.get("language")),
     }
 
 

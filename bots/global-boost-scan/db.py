@@ -79,6 +79,13 @@ CREATE TABLE IF NOT EXISTS shows (
                                  -- "by" line on podcasts (may be a network/publisher,
                                  -- not a host). Raw string; the site hides it when it
                                  -- just repeats the title. NOT a podcast:person credit.
+    language      TEXT,          -- RSS channel <language>, normalized to the PRIMARY
+                                 -- SUBTAG, lowercased: en-US/en-us/en-gb all store
+                                 -- 'en'. See enrich._normalize_language for why the
+                                 -- region is dropped. NULL means the feed declares
+                                 -- none — which is NOT "English", and is 52% of music
+                                 -- feeds (Wavlake emits no <language>), so a filter
+                                 -- must never fold NULL into a language.
     discovered_via TEXT,         -- provenance: NULL/'boost' = someone boosted it;
                                  -- 'podroll' = resolved only because another feed
                                  -- recommends it, so it may have no boosts at all and
@@ -345,6 +352,8 @@ def _migrate(conn):
         conn.execute("ALTER TABLE shows ADD COLUMN author TEXT")
     if "artwork" not in show_cols:
         conn.execute("ALTER TABLE shows ADD COLUMN artwork TEXT")
+    if "language" not in show_cols:
+        conn.execute("ALTER TABLE shows ADD COLUMN language TEXT")
     for col, decl in (("discovered_via", "TEXT"), ("podroll_checked_at", "INTEGER"),
                       ("podroll_status", "TEXT")):
         if col not in show_cols:
@@ -433,16 +442,23 @@ def upsert_show(conn, show, discovered_via="boost"):
     re-resolve must not rewrite how the show first arrived."""
     conn.execute(
         """INSERT INTO shows (podcast_guid, title, image, artwork, feed_url, feed_id,
-                              itunes_id, medium, author, discovered_via, updated_at)
+                              itunes_id, medium, author, language, discovered_via,
+                              updated_at)
            VALUES (:podcast_guid, :title, :image, :artwork, :feed_url, :feed_id,
-                   :itunes_id, :medium, :author, :discovered_via, :updated_at)
+                   :itunes_id, :medium, :author, :language, :discovered_via,
+                   :updated_at)
            ON CONFLICT(podcast_guid) DO UPDATE SET
              title=excluded.title, image=excluded.image, artwork=excluded.artwork,
              feed_url=excluded.feed_url,
              feed_id=excluded.feed_id, itunes_id=excluded.itunes_id,
              medium=excluded.medium, author=excluded.author,
+             language=excluded.language,
              updated_at=excluded.updated_at""",
-        {**show, "discovered_via": discovered_via, "updated_at": int(time.time())})
+        # `language` is defaulted ahead of the spread so a builder that predates the
+        # column writes NULL instead of failing the bind and taking the whole cycle
+        # down; every current builder supplies it explicitly.
+        {"language": None, **show,
+         "discovered_via": discovered_via, "updated_at": int(time.time())})
     conn.commit()
 
 

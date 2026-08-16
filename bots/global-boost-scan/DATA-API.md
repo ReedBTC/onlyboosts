@@ -133,6 +133,7 @@ export derives both from one list, so they can't disagree. Two consequences:
       "feed": "https://…/rss.xml",
       "medium": "podcast",             // podcast:medium — 'music', 'video', … ; defaults to 'podcast'
       "author": "Adam Curry & John C. Dvorak", // <itunes:author>; nullable. See the author note below.
+      "language": "en",                // RSS <language>, primary subtag only; NULLABLE — see the language note
       "boosts": 542, "sats": 487214, "boosters": 96, "episodes": 130,
       "latest": 1784980386,            // unix seconds of newest boost
       "file": "podcasts/856cd618-….json",  // exact per-show shard path — use this, don't build it
@@ -150,7 +151,8 @@ sanitized — always use `file`, don't assemble it yourself).
 {
   "generated_at": …,
   "show": { "guid": …, "title": …, "img": …, "art2": …, "feed": …, "medium": "podcast",
-            "author": "Adam Curry & John C. Dvorak" },   // art2/author nullable; see notes below
+            "author": "Adam Curry & John C. Dvorak",
+            "language": "en" },   // art2/author/language nullable; see notes below
   "episodes": [
     { "guid": …, "title": …, "img": …, "date": …, "num": …, "url": …,
       "shownotes": "full plain-text shownotes…",   // uncapped; nullable
@@ -277,6 +279,30 @@ Follows views light up only once someone signs in.
   an untagged music feed reads as "By" rather than "Artist" — expected, not a bug.
   (Available in both paths: the per-show shard `show` object and the D1 `/api/v1` `podcasts`
   table — the latter enables author-in-search as a matched-only field.)
+- **`language` is the feed's own `<language>`, normalized to the PRIMARY SUBTAG** — `en`,
+  `de` — because the corpus describes ~21 languages in 36 distinct raw tags (`en`, `en-us`,
+  `en-US`, `en-gb`, `en-au` are one language, and the case varies by publisher). Region is
+  dropped on write, so a consumer never sees `en-US`.
+  **⚠️ NULL MEANS THE FEED DECLARES NONE, AND THAT IS NOT ENGLISH.** Coverage splits hard
+  by medium: **99% of podcasts (466/469) against 48% of music (232/485)**, because Wavlake
+  — which hosts most of the music corpus — emits no `<language>` at all (198 of the 251
+  music misses). Across the whole index that is **594 of 1,294 shows with no language**.
+  So an untagged show is a populous, first-class state, not a gap to default away: a
+  consumer filtering to `en` must **exclude** null rather than assume it, and must offer
+  the untagged bucket or say plainly that filtering hides it — otherwise "filter by
+  language" silently becomes "hide half the Albums feed", under a claim those publishers
+  never made. Same partition reasoning as `medium`, where the unidentified shows are why
+  the Shows feed is `not_medium=music` rather than `medium=podcast`.
+  Boost-weighted the long tail is thinner than the show counts suggest: `en` 17,286 boosts,
+  `de` 3,155 (40 shows, essentially the whole non-English story), `es` 319, and every other
+  language under 50 — so a menu listing all 20 is mostly dead entries.
+  Available in **both** paths: the shards above and the D1 `/api/v1` `podcasts` table.
+  `GET /api/v1/languages` returns the live facet (counts per language, `medium`-aware) and
+  is what a language control should be built from — the set grows whenever a show in a new
+  language is first boosted, so a hardcoded list goes stale silently.
+  `GET /api/v1/podcasts?lang=` and `GET|POST /api/v1/episodes?lang=` filter on it; the
+  literal `lang=unknown` selects the untagged bucket, and a full tag (`lang=en-US`) is
+  normalized rather than rejected.
 - **Podroll is on ~7% of feeds — design the section to be absent, not empty.** 65 of
   925 reachable feeds carry the tag; 371 recommendation edges, median 4 per show and
   one outlier at 63, so cap or scroll the list. It reaches **109 show pages** because

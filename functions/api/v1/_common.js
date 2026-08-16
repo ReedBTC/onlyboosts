@@ -113,6 +113,54 @@ export function ftsMatch(raw) {
   return parts.map((t, i) => `"${t}"${i === parts.length - 1 ? "*" : ""}`).join(" ");
 }
 
+/**
+ * Read the `lang` filter. Returns `{ lang }` (null = no filter) or `{ error }`.
+ *
+ * RSS <language>, stored as the PRIMARY SUBTAG only — 'en', 'de' — because the
+ * feeds describe ~21 languages in 36 distinct raw tags ('en', 'en-us', 'en-US',
+ * 'en-gb'), and a reader filtering for German wants the show whether its feed
+ * says 'de' or 'de-de'. The collector normalizes on write; this only ever sees
+ * the normalized form.
+ *
+ * ⚠️ NULL IS NOT ENGLISH, AND IT IS NOT A ROUNDING ERROR. 52% of music feeds
+ * declare no language at all (Wavlake, which hosts most of the music corpus,
+ * emits none), against 1% of podcasts. So an untagged show is a real, populous
+ * state and not a gap to be defaulted away: `lang=en` deliberately excludes it
+ * rather than assuming, and `lang=unknown` is how a caller asks for exactly that
+ * bucket. A UI that offers language must therefore either keep an "unknown"
+ * option or say that filtering hides untagged shows — silently folding NULL into
+ * a language would put half the Albums feed under a claim its publisher never
+ * made. Same partition reasoning as `medium`, where the unidentified shows are
+ * why the Shows feed is `not_medium=music` rather than `medium=podcast`.
+ *
+ * Validated by SHAPE (ISO 639 is 2-3 alpha) rather than against a fixed list:
+ * the set of languages present grows as shows are indexed, and a hardcoded
+ * whitelist here would silently 400 the first Korean show anyone boosts. An
+ * unknown-but-well-formed subtag simply matches nothing.
+ */
+export function readLang(u) {
+  const raw = (u.searchParams.get("lang") || "").trim().toLowerCase();
+  if (!raw) return { lang: null };
+  if (raw === "unknown") return { lang: "unknown" };
+  // A full tag is normalized rather than rejected, the same way the collector
+  // normalizes on write: nothing is stored as 'en-us', so `lang=en-US` could only
+  // ever match zero rows, and 400ing input that plainly means English would be a
+  // trap for anyone who passed a value straight back from an RSS feed.
+  const primary = raw.split(/[-_]/)[0];
+  if (!/^[a-z]{2,3}$/.test(primary)) {
+    return { error: "bad lang (2-3 letter subtag, or 'unknown')" };
+  }
+  return { lang: primary };
+}
+
+/** SQL fragment for `lang`, given the column to test. Pushes its own bind. */
+export function langWhere(lang, col, args) {
+  if (!lang) return null;
+  if (lang === "unknown") return `${col} IS NULL`;
+  args.push(lang);
+  return `${col} = ?`;
+}
+
 // The SELECT used by every boost-returning endpoint: joins display fields so a
 // row maps straight to the shard record shape.
 export const BOOST_SELECT = `

@@ -38,7 +38,7 @@ export async function onRequestGet({ request, env, params }) {
   const u = new URL(request.url);
 
   const show = await env.DB.prepare(
-    `SELECT podcast_guid, title, image, artwork, feed_url, medium, author, boost_count, total_sats,
+    `SELECT podcast_guid, title, image, artwork, feed_url, medium, author, language, boost_count, total_sats,
             booster_count, episode_count, latest_ts FROM podcasts WHERE podcast_guid = ?`
   ).bind(guid).first();
   if (!show) return json(request, { error: "podcast not found" }, { status: 404 });
@@ -102,6 +102,8 @@ export async function onRequestGet({ request, env, params }) {
       art2: show.artwork || null,
       feed: show.feed_url,
       medium: show.medium, author: show.author,
+      // RSS <language>, primary subtag; null = the feed declares none, NOT English.
+      language: show.language || null,
       boosts: show.boost_count, sats: show.total_sats,
       boosters: show.booster_count, episodes: show.episode_count, latest: show.latest_ts,
     },

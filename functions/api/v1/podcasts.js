@@ -23,7 +23,7 @@
 //                window's.
 // Both project the same column names, so everything downstream of `base` — the
 // ranking, the search join, the ordering, the record shape — is written once.
-import { json, preflight, clampLimit, ftsMatch } from "./_common.js";
+import { json, preflight, clampLimit, ftsMatch, readLang, langWhere } from "./_common.js";
 
 export async function onRequestOptions({ request }) { return preflight(request); }
 
@@ -67,6 +67,9 @@ function showRecord(r) {
     art2: r.artwork || null,
     feed: r.feed_url,
     medium: r.medium, author: r.author,
+    // RSS <language>, primary subtag. Null means the feed declares none, which is
+    // NOT English — see readLang in _common.js.
+    language: r.language || null,
     boosts: r.boost_count, sats: r.total_sats, boosters: r.booster_count,
     episodes: r.episode_count, latest: r.latest_ts,
   };
@@ -90,6 +93,13 @@ function readParams(u) {
   const notMedium = u.searchParams.get("not_medium");
   if (notMedium && !MEDIA.has(notMedium)) return { error: "bad not_medium (podcast|music|video)" };
 
+  // `lang` is an independent axis from `medium`: a filter can be music+de. Unlike
+  // medium there is no `not_lang` — the partition medium needs exists because the
+  // unidentified shows must land in exactly one of Shows/Albums, whereas an
+  // untagged show is asked for by name with lang=unknown.
+  const { lang, error: langError } = readLang(u);
+  if (langError) return { error: langError };
+
   const rawQ = (u.searchParams.get("q") || "").trim();
   if (rawQ && rawQ.length < 2) return { error: "q must be >= 2 chars" };
 
@@ -100,7 +110,7 @@ function readParams(u) {
   // unfiltered path rather than emitting an empty MATCH.
   const match = rawQ ? ftsMatch(rawQ) : null;
   return {
-    sortKey, range, medium, notMedium,
+    sortKey, range, medium, notMedium, lang,
     q: match ? rawQ : null,
     match,
     // FTS5 does not index the guid (podcasts_fts is title + author), so a
@@ -136,9 +146,12 @@ export async function onRequestGet({ request, env }) {
     args.push(p.cutoff);
     if (p.medium) { where.push("COALESCE(pc.medium,'podcast') = ?"); args.push(p.medium); }
     if (p.notMedium) { where.push("COALESCE(pc.medium,'podcast') <> ?"); args.push(p.notMedium); }
+    // No COALESCE: a NULL language is its own state, reachable only as lang=unknown.
+    { const w = langWhere(p.lang, "pc.language", args); if (w) where.push(w); }
     base = `
       SELECT b.podcast_guid                     AS guid,
              pc.title, pc.image, pc.artwork, pc.feed_url, pc.medium, pc.author,
+             pc.language,
              COUNT(*)                           AS boost_count,
              COALESCE(SUM(b.sats),0)            AS total_sats,
              COUNT(DISTINCT b.booster_pubkey)   AS booster_count,
@@ -152,9 +165,10 @@ export async function onRequestGet({ request, env }) {
     const where = [];
     if (p.medium) { where.push("COALESCE(p.medium,'podcast') = ?"); args.push(p.medium); }
     if (p.notMedium) { where.push("COALESCE(p.medium,'podcast') <> ?"); args.push(p.notMedium); }
+    { const w = langWhere(p.lang, "p.language", args); if (w) where.push(w); }
     base = `
       SELECT p.podcast_guid AS guid, p.title, p.image, p.artwork, p.feed_url,
-             p.medium, p.author, p.boost_count, p.total_sats, p.booster_count,
+             p.medium, p.author, p.language, p.boost_count, p.total_sats, p.booster_count,
              p.episode_count, p.latest_ts
       FROM podcasts p
       ${where.length ? "WHERE " + where.join(" AND ") : ""}`;
@@ -216,6 +230,7 @@ export async function onRequestGet({ request, env }) {
     count: podcasts.length,
     sort: p.sortKey,
     range: p.range,
+    ...(p.lang ? { lang: p.lang } : {}),
     ...(p.q ? { q: p.q } : {}),
     next_offset: podcasts.length === p.limit ? p.offset + p.limit : null,
     podcasts,
