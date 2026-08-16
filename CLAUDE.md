@@ -1738,6 +1738,24 @@ back to the show's `img` when the episode has no art, and does not go on to
 `art2`. It bites only where a show has a dead primary *and* an episode with no
 art, and episode art was 100% present on every show sampled.
 
+**⚠️ The share card's TYPE follows its image, on all three detail pages.** A
+large-image card crops to roughly 1.91:1, and nothing these pages send is that
+shape: podcast artwork is square by specification (Apple requires 1400x1400 to
+3000x3000, and 12 of 12 sampled from the live index are exactly 1.00), and a
+booster's avatar is square or portrait (0 of 26 sampled were wide enough; 13 were
+exactly square, the rest ran down to 0.67). Every page shipped
+`summary_large_image` until 2026-08-16, so every cover and every face was being
+sliced into a horizontal band — **a worse failure than sending no image, because
+it reads as a broken picture rather than a missing one.** Artwork now gets
+`summary`; only the fallback keeps the large card, `OG_FALLBACK` being the
+1800x600 site banner. Two shapes, two cards, chosen by which is in use.
+
+Two things that follow. **A platform caches OG data per URL**, so a link shared
+before a page existed keeps its 404 card until the TTL expires or someone forces
+a re-scrape — worth knowing before concluding a card is broken. And **`node
+--check` is not a syntax check for these Functions**: it accepted a template
+literal broken by backticks inside an HTML comment. Import the module instead.
+
 **⚠️ `og:image` stays on the primary, deliberately.** A crawler cannot run the
 error handler, so the temptation is to prefer `art2` there — but `art2`'s presence
 means the feed publishes *two different* URLs, not that the primary is dead.

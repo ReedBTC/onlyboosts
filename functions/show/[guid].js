@@ -457,10 +457,22 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
   <meta property="og:description" content="${htmlEscape(ogDesc)}" />
   <meta property="og:site_name" content="OnlyBoosts" />
   <meta property="og:image" content="${htmlEscape(art || OG_FALLBACK)}" />
-  <meta name="twitter:card" content="summary_large_image" />
+  <meta property="og:image:alt" content="${htmlEscape(art ? `Artwork for ${title}` : "OnlyBoosts")}" />
+  <!-- ⚠️ THE CARD TYPE FOLLOWS THE IMAGE. A large-image card crops to roughly
+       1.91:1, and podcast artwork is SQUARE by specification — Apple requires
+       1400x1400 to 3000x3000, and 12 of 12 sampled from the live index are
+       exactly 1.00. So the large card was slicing a horizontal band out of the
+       middle of every cover, which reads as a broken image rather than a missing
+       one. The summary card is the square thumbnail this artwork actually is.
+
+       The fallback keeps the large card: OG_FALLBACK is the 1800x600 site
+       banner, the one image here that belongs in a wide frame. Same rule, and
+       the same reasoning, as on functions/booster/[npub].js. -->
+  <meta name="twitter:card" content="${art ? "summary" : "summary_large_image"}" />
   <meta name="twitter:title" content="${htmlEscape(ogTitle)}" />
   <meta name="twitter:description" content="${htmlEscape(ogDesc)}" />
   <meta name="twitter:image" content="${htmlEscape(art || OG_FALLBACK)}" />
+  <meta name="twitter:image:alt" content="${htmlEscape(art ? `Artwork for ${title}` : "OnlyBoosts")}" />
   ${isSafeUrl(show.feed_url) ? `<link rel="alternate" type="application/rss+xml" title="${htmlEscape(title)}" href="${htmlEscape(show.feed_url)}" />` : ""}
 
   <script type="application/ld+json">
@@ -470,18 +482,18 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v68" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v68" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v68" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v68" />
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v68" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v69" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v69" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v69" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v69" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v69" />
   <!-- The boost note card and its reaction bar. Added when the boost list at
        the foot of this page became the same .note-card the homepage Boosts
        feed paints; this page linked neither before, which is why show-page.css
        restates .nostr-mention. That restatement is now redundant rather than
        load-bearing, and is left in place rather than removed in the same pass. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v68" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v68" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v69" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v69" />
 </head>
 <body data-show-guid="${htmlEscape(show.podcast_guid)}">
 
@@ -675,12 +687,12 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
 
 <script type="application/json" id="show-boost-payload">${jsonForScript(boostPayload)}</script>
 
-<script src="/assets/js/nav.js?v=ob-v68" defer></script>
-<script src="/assets/js/show-page.js?v=ob-v68" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v69" defer></script>
+<script src="/assets/js/show-page.js?v=ob-v69" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v68"></script>
-<script src="/assets/js/sw-register.js?v=ob-v68" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v69"></script>
+<script src="/assets/js/sw-register.js?v=ob-v69" defer></script>
 </body>
 </html>`;
 }
@@ -1219,10 +1231,10 @@ function notFound(guid) {
   <meta name="robots" content="noindex" />
   <title>Show not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v68" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v68" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v68" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v68" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v69" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v69" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v69" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v69" />
 </head>
 <body>
 <section class="page-header">
@@ -1241,7 +1253,7 @@ function notFound(guid) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v68" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v69" defer></script>
 </body>
 </html>`;
   return new Response(html, {
