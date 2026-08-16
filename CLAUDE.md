@@ -1116,6 +1116,19 @@ differs is the subject and which sections apply.
 **Design of record for `/show` is `docs/show-pages-spec.md`.** What follows here
 is only what a change would break.
 
+**⚠️ The stat tiles are one row on a phone, whatever the count.** They are
+`repeat(auto-fit, minmax(7rem, 1fr))` at full width, which on a 375px phone needs
+360px for three columns against 335px of content — so `/show` and `/episode` broke
+2 + 1 and `/booster` broke 2 + 2, and the second line read as a separate row of
+figures rather than the rest of one. Under 640px the grid switches to
+`grid-auto-flow: column` over `grid-template-columns: none`, which is what makes
+it **count-agnostic**: three tiles become three equal columns and four become
+four, with no rule naming either number. The maximum today is four (sats, boosts,
+shows, episodes on `/booster`); a fifth wants looking at rather than squeezing in.
+The type scales with `clamp()` rather than stepping, and **the binding constraint
+is the LABEL, not the number** — "episodes" and "boosters" are eight characters,
+where the widest figure is five.
+
 ### Where the shared code lives
 
 | | |

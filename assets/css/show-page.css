@@ -1289,7 +1289,36 @@ a.boost-who:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px
   .show-art-blank { width: 110px; height: 110px; }
   .show-desc { margin-top: 1.15rem; }
   .show-desc-body { font-size: 0.9rem; }
-  .show-stat dd { font-size: 1.2rem; }
+  /* ⚠️ ONE ROW, WHATEVER THE COUNT. The tiles are `repeat(auto-fit,
+     minmax(7rem, 1fr))` at full width, which on a 375px phone (335px of content)
+     needs 360px for three columns and falls to two — so /show and /episode broke
+     2 + 1 and /booster broke 2 + 2, and the second line read as a separate row of
+     figures rather than the rest of one.
+
+     `grid-auto-flow: column` over `grid-template-columns: none` is what makes
+     this count-agnostic: three tiles become three equal columns and four become
+     four, with no rule naming either number. Today the maximum is four (sats,
+     boosts, shows, episodes on /booster). A fifth would want looking at rather
+     than squeezing in.
+
+     The sizes below are the whole cost, and they scale continuously rather than
+     stepping: at 320px the four-tile case leaves ~65px a tile, where the binding
+     constraint is the LABEL — "episodes" and "boosters" are eight characters —
+     not the number above it. */
+  .show-stats {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    gap: 0.4rem;
+  }
+  /* Grid items default to min-width:auto, which refuses to shrink below their
+     content and would push the row wider than the page. */
+  .show-stat { min-width: 0; padding: 0.6rem 0.25rem; }
+  .show-stat dd { font-size: clamp(0.95rem, 4.4vw, 1.25rem); }
+  .show-stat dt {
+    font-size: clamp(0.55rem, 2.1vw, 0.72rem);
+    letter-spacing: 0.05em;
+  }
   /* Three across on a phone, five on desktop. Cards four and five wrap to a
      centered second line rather than disappearing — PODIUM is decided by the
      server, and no supporter is dropped for being on a small screen. */
