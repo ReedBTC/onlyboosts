@@ -18,17 +18,17 @@
  * `episode-section.js` attaches the controls and the verbs and nothing else.
  * That module is shared with the identical section on /episode/<guid>.
  */
-import { copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v63'
-import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v63'
-import { rangeControl, sortControl, rangeDays } from '/assets/js/feed-controls.js?v=ob-v63'
-import { initEpisodeSection } from '/assets/js/episode-section.js?v=ob-v63'
+import { copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v64'
+import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v64'
+import { rangeControl, sortControl, rangeDays } from '/assets/js/feed-controls.js?v=ob-v64'
+import { initEpisodeSection } from '/assets/js/episode-section.js?v=ob-v64'
 import {
   initCopyNpub, initShowMore, initShare, initBackLink,
   initHashRouting, initHashSpy, initArt2, wireArt2,
-} from '/assets/js/detail-page.js?v=ob-v63'
-import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v63'
-import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v63'
-import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v63'
+} from '/assets/js/detail-page.js?v=ob-v64'
+import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v64'
+import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v64'
+import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v64'
 
 const PK = document.body.dataset.boosterPk || ''
 const NPUB = document.body.dataset.boosterNpub || PK
@@ -518,7 +518,7 @@ initEpisodeSection({
 // The same section, the same module and the same controls as on /show and
 // /episode. It opens on the newest 24 and holds this person's whole history once
 // a control moves, over the corpus the rollup above already fetches.
-initBoostSection({
+const boostSection = initBoostSection({
   fetchCorpus: boosterCorpus,
   sortTitle: 'Sort the boosts this booster has sent',
   emptyText: 'This booster sent nothing in this time range \u2014 try a wider one.',
@@ -528,3 +528,51 @@ initBoostSection({
   truncatedNote:
     'Sorted over this booster\u2019s 2,000 most recent boosts. They have sent more than that, so an older boost may be missing.',
 })
+
+/* ── The Shows rollup is the show picker for #boosts ──────────────────
+ *
+ * "What did this person say about THIS show" is a different question from the
+ * per-episode one #episodes answers, and it is the one a podcaster reading their
+ * own boosters actually has. The filter itself lives on #boosts, where the range,
+ * the sort and the message search already are and compose with it; what lives
+ * here is only the way in.
+ *
+ * ⚠️ THE ROLLUP IS THE PICKER RATHER THAN A DROPDOWN ON THAT BAND, and the data
+ * decided it. Sampled over 30 active boosters on 2026-08-16, the median has
+ * boosted 10 distinct shows, the mean 27 and the heaviest 188. A menu of 188
+ * entries is not a dropdown; this list already is one, ranked by what the person
+ * gave, scrollable, carrying the artwork and its own range and sort. And the pick
+ * happens where the question is asked — beside "40.1k sats across 38 episodes".
+ *
+ * ⚠️ /booster ONLY, and structurally so rather than by a flag. The picker is a
+ * section no other page has, so /show and /episode never call setShow, never grow
+ * a chip and pay nothing. A boost list about one show cannot be filtered by show.
+ *
+ * Delegated from the rollup rather than bound per row: the list can hold 188 of
+ * them and booster-page.js#initShows hides and reveals rows as the range changes.
+ */
+function initShowFilterPicker() {
+  // No band to put the chip on means no picker: below boost-list.js#CONTROLS_MIN
+  // the server ships no controls at all, and a button leading to a filtered list
+  // with no visible filter and no way to clear it is a trap.
+  if (!boostSection?.canFilter) return
+  const rollup = document.querySelector('[data-booster-shows]')
+  if (!rollup) return
+
+  const btns = rollup.querySelectorAll('[data-bs-show-filter]')
+  // One show is the whole history, so filtering to it is a no-op that looks like
+  // a control. Two is the first count at which the question has an answer.
+  if (btns.length < 2) return
+  for (const btn of btns) btn.hidden = false
+
+  // No preventDefault and no stopPropagation: the button is a SIBLING of the
+  // row's link rather than nested inside it, and type="button" submits nothing,
+  // so there is no default to cancel and nothing above this listening.
+  rollup.addEventListener('click', (e) => {
+    const btn = e.target.closest?.('[data-bs-show-filter]')
+    if (!btn) return
+    boostSection.setShow(btn.dataset.bsShowFilter, btn.dataset.bsShowLabel || '')
+  })
+}
+
+initShowFilterPicker()

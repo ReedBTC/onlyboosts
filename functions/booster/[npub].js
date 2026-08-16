@@ -373,22 +373,22 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v63" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v63" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v63" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v63" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v64" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v64" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v64" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v64" />
   <!-- The hero, the drawers and the boost list are the show page's, so this
        page links its stylesheet and adds only the deltas. -->
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v63" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v64" />
   <!-- The episode card, for the #episodes rollup: the same chrome
        feeds-podcasts.js paints on the homepage. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v63" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v64" />
   <!-- The boost thread inside a card's drawer, and its reply / like / repost /
        zap bar, both reached through that same card. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v63" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v63" />
-  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v63" />
-  <link rel="stylesheet" href="/assets/css/booster-page.css?v=ob-v63" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v64" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v64" />
+  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v64" />
+  <link rel="stylesheet" href="/assets/css/booster-page.css?v=ob-v64" />
 </head>
 <body data-booster-pk="${htmlEscape(hex)}"${npub ? ` data-booster-npub="${htmlEscape(npub)}"` : ""}>
 
@@ -583,12 +583,12 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav.js?v=ob-v63" defer></script>
-<script src="/assets/js/booster-page.js?v=ob-v63" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v64" defer></script>
+<script src="/assets/js/booster-page.js?v=ob-v64" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v63"></script>
-<script src="/assets/js/sw-register.js?v=ob-v63" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v64"></script>
+<script src="/assets/js/sw-register.js?v=ob-v64" defer></script>
 </body>
 </html>`;
 }
@@ -845,7 +845,34 @@ function showRow(r, rank) {
     ? `<a class="cs-link" href="/show/${encodeURIComponent(r.podcast_guid)}">${inner}</a>`
     : `<div class="cs-link cs-link--dead" title="${htmlEscape(r.podcast_guid || "")}">${inner}</div>`;
 
-  return `<li class="cs-row" data-bs="${packed}">${body}</li>`;
+  /* ⚠️ THIS ROLLUP IS THE SHOW PICKER FOR #boosts, and this button is the whole
+   * of the affordance. Pressing it filters the boost list at the foot of the page
+   * to this show and scrolls there — "what did this person say about THIS show",
+   * which is a different question from the per-episode one #episodes answers.
+   *
+   * ⚠️ IT IS THE PICKER RATHER THAN A DROPDOWN ON THAT BAND, and the data is the
+   * reason. Sampled over 30 active boosters, the median has boosted 10 distinct
+   * shows, the mean 27 and the heaviest 188 — a menu holding 188 entries is not a
+   * dropdown, it is a list, and this is already a better one: ranked by what the
+   * person actually gave, scrollable, with its own range and sort, and carrying
+   * the artwork. The pick also happens where the question is asked, next to
+   * "40.1k sats across 38 episodes".
+   *
+   * ⚠️ A VERB, SO IT SHIPS `hidden`. It does nothing without JavaScript, and a
+   * control that cannot act is worse than no control — the same discipline as the
+   * two control bands on this page. booster-page.js reveals it, and only when
+   * there is more than one show to choose between and a band to put the chip on.
+   * OUTSIDE the anchor, never inside it: a button nested in a link is neither.
+   *
+   * The label is the row's, so an unidentified show reads "Unidentified show"
+   * here as it does above. It still gets a button — a show Podcast Index cannot
+   * name still has boosts worth reading. */
+  const filter = `<button type="button" class="cs-boosts-btn"
+        data-bs-show-filter="${htmlEscape(r.podcast_guid || "")}"
+        data-bs-show-label="${htmlEscape(title)}"
+        aria-label="Show only boosts to ${htmlEscape(title)}" hidden>Boosts <span aria-hidden="true">&rarr;</span></button>`;
+
+  return `<li class="cs-row" data-bs="${packed}">${body}${filter}</li>`;
 }
 
 function showMeta(boosts, sats, eps) {
@@ -933,10 +960,10 @@ function notFound(raw) {
   <meta name="robots" content="noindex" />
   <title>Booster not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v63" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v63" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v63" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v63" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v64" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v64" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v64" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v64" />
 </head>
 <body>
 <section class="page-header">
@@ -954,7 +981,7 @@ function notFound(raw) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v63" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v64" defer></script>
 </body>
 </html>`;
   return new Response(html, {

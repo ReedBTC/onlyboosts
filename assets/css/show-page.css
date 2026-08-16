@@ -523,6 +523,54 @@
   gap: 0.5rem 0.75rem;
 }
 
+/* The picked show, on /booster only — see boost-section.js#mountChip.
+ *
+ * It holds the LEFT end of the knobs' row, where it reads as a statement about
+ * what is below rather than as another control: the three real controls are all
+ * to its right, and the only thing on the chip that can be pressed is the ✕.
+ *
+ * Brand-tinted rather than bordered like the pills beside it, because it is not
+ * one of them. A chip that matched the sort pill would invite a press expecting a
+ * menu; this one says "a filter is on" and offers to take it off. */
+.bs-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  max-width: 100%;
+  padding: 0.28rem 0.35rem 0.28rem 0.7rem;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: var(--tint);
+  font: 600 0.78rem/1.3 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: var(--accent-d);
+}
+.bs-chip[hidden] { display: none; }
+/* A show title runs to any length; the row must not be pushed sideways by one. */
+.bs-chip-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bs-chip-clear {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  padding: 0;
+  font: inherit;
+  font-size: 0.7rem;
+  line-height: 1;
+  color: var(--accent-d);
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.bs-chip-clear:hover { background: var(--accent); color: var(--white); }
+.bs-chip-clear:focus-visible { outline: 2px solid var(--accent-d); outline-offset: 1px; }
+
 /* ⚠️ THE RANGE AND THE SORT ARE ONE GROUP AT THE RIGHT END, matching the feeds.
  * `.cs-controls .pcast-sort` pins a lone sort to the far end with an auto
  * margin, which is right in the drawers — their band's left end holds a link out
@@ -540,11 +588,16 @@
 }
 .bs-knobs .pcast-sort { margin-left: 0; }
 
-/* The search box. Grows into whatever the knobs leave, and drops to its own full
-   line on a narrow phone rather than squeezing four range segments and a sort
-   pill onto one — `.cs-controls` already wraps, so this only has to declare a
-   basis wide enough to be worth typing into. */
-.bs-search { flex: 1 1 13rem; min-width: 9rem; display: flex; }
+/* The search box, on a full row of its own.
+ *
+ * ⚠️ `flex-basis: 100%` RATHER THAN A WIDTH THAT WRAPS WHEN IT MUST. Four range
+   segments, a sort pill, a chip and a search box do not share one line at any
+   phone width, and relying on the wrap put the break at the mercy of how long the
+   picked show's name happened to be — the band reflowed as the reader used it.
+   A declared row is stable, and it gives the query the width it deserves: this is
+   the control someone types a sentence fragment into, where the other three are
+   one press each. */
+.bs-search { flex: 1 1 100%; display: flex; }
 .bs-search-input {
   width: 100%;
   padding: 0.4rem 0.7rem;
@@ -1027,6 +1080,45 @@ a.boost-who:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px
    is local: the row is a flex line, and the class's own margin-left:auto pins
    it to the right end. */
 .cs-row .ob-boost-pill { margin-right: 0.6rem; }
+
+/* "Boosts →" on a booster page's show row: the way into the #boosts filter.
+   See renderShows in functions/booster/[npub].js.
+
+   Deliberately quieter than .ob-boost-pill, which shares this right edge on the
+   show page's rows. That one moves sats and is the loudest thing on its row;
+   this one changes what a list below shows, and a second solid pill would read
+   as a second payment button. It comes up to brand on hover, where the press is
+   already intended.
+
+   ⚠️ Ships `hidden` from the server and revealed by booster-page.js — it does
+   nothing without JavaScript. `[hidden]` needs saying because the rule below
+   sets `display`. */
+.cs-boosts-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-right: 0.6rem;
+  padding: 0.3rem 0.65rem;
+  font: 600 0.72rem/1 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
+}
+.cs-boosts-btn[hidden] { display: none; }
+.cs-boosts-btn:hover { color: var(--accent-d); border-color: var(--accent); background: var(--tint); }
+.cs-boosts-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+
+/* Under ~26rem the row is already tight with rank, art, title and figures. The
+   label goes and the arrow carries it — the button keeps its hit area and the
+   title keeps its line. */
+@media (max-width: 26rem) {
+  .cs-boosts-btn { padding: 0.3rem 0.5rem; font-size: 0; gap: 0; }
+  .cs-boosts-btn span { font-size: 0.85rem; }
+}
 
 /* ── Podroll ──────────────────────────────────────────────────────────────
    The two <podcast:podroll> sections: what this show recommends, and who

@@ -10,8 +10,8 @@
  * and community-status.js imports it directly to decide whether the logged-in
  * npub is a community member.
  */
-import { STATIC_RELAYS } from '/assets/js/boosts-thread.js?v=ob-v63'
-import { SimplePool, verifyEvent } from '/assets/widgets/nostr-tools.js?v=ob-v63'
+import { STATIC_RELAYS } from '/assets/js/boosts-thread.js?v=ob-v64'
+import { SimplePool, verifyEvent } from '/assets/widgets/nostr-tools.js?v=ob-v64'
 
 // The show account that owns the supporter follow packs (hex of the show
 // npub — same constant supporters.js / bots/follow-packs use).

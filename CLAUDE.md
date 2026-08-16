@@ -1524,6 +1524,62 @@ nothing carries text at all.
 Still out of scope on purpose: the Follows axis. A boost list about one subject
 has no scope axis.
 
+### The Show Filter, And Why The Rollup Is Its Picker
+
+**`/booster/<npub>` only.** "What did this person say about *this show*" is a
+different question from the per-episode one `#episodes` answers, and it is the
+one a podcaster reading their own boosters has. `/show` and `/episode` never call
+`setShow`, grow no chip and pay nothing — a boost list about one show cannot be
+filtered by show, and a control that can only ever be a no-op is worse than none.
+
+**The picker is the Shows and Albums rollup, not a dropdown**, and the data
+decided it. Sampled over 30 active boosters on 2026-08-16 (drawn from the 200
+most recent boosts, so skewed toward the people who would use this):
+
+| distinct shows per booster | |
+|---|---|
+| median | 10 |
+| mean | 27 |
+| max | **188** |
+| more than 20 | 8 of 30 |
+
+A menu of 188 entries is not a dropdown, it is a list — and `#shows` already is
+one, ranked by what the person actually gave, scrollable, carrying the artwork
+and its own range and sort. The pick also happens where the question is asked,
+beside "40.1k sats across 38 episodes". Each row's `.cs-boosts-btn` is the whole
+affordance; it sits **outside** the row's anchor, because a button nested in a
+link is neither.
+
+**The filter renders as a chip, not a fourth control.** A "Show: All shows ▾"
+menu would be permanent chrome on a band that already carries three controls and
+is two rows on a phone. The chip is absent until something is picked and gone the
+moment it is cleared, so the default band is exactly the one the other two pages
+carry. **Clearing is all it does** — changing the show means going back to the
+rollup, which is the point of there being no menu.
+
+Four things a change would break:
+
+- **The filter is an equality on `podcast_guid`, never on the title.** 33% of
+  shows in the index have none and titles are not unique in any case. A row with
+  a null guid (~2% of records) therefore matches no picked show, which is right.
+- **The picker is withheld below two shows and below `CONTROLS_MIN`.** One show
+  is the whole history, so filtering to it is a no-op that looks like a control;
+  and with no band there is no chip, so a filtered list would have no visible
+  filter and no way to clear it.
+- **The chip must not outlive a failed corpus fetch.** `onControlChange` gives up
+  quietly when the corpus never arrives, leaving the server's rows on screen, so
+  `setShow` reverts rather than leaving the page claiming a filter it did not
+  apply.
+- **`mountControls` is idempotent.** Pressing "Boosts →" four sections up can
+  happen before `#boosts` has ever been approached, so the band has to be built
+  on demand as well as on approach.
+
+**The search box takes a full row of its own** (`flex-basis: 100%`), not a width
+that wraps when it must. Four range segments, a sort pill, a chip and a search
+box share no line at any phone width, and relying on the wrap put the break at
+the mercy of how long the picked show's name happened to be — the band reflowed
+as the reader used it.
+
 ### The community rollups
 
 `#community-shows` on `/show` and `#community-episodes` on `/episode` are the

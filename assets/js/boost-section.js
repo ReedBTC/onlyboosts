@@ -34,11 +34,12 @@
  * See paintRows.
  */
 import {
-  boostRows, rowsFromRecords, sortBoostRows, filterBoostRows, searchBoostRows,
-} from '/assets/js/boost-list.js?v=ob-v63'
-import { rangeControl, sortControl, rangeDays, rangeCutoff } from '/assets/js/feed-controls.js?v=ob-v63'
-import { wireBoostNotes } from '/assets/js/boost-note-actions.js?v=ob-v63'
-import { hydrateProfiles } from '/assets/js/detail-page.js?v=ob-v63'
+  boostRows, rowsFromRecords, sortBoostRows,
+  filterBoostRows, filterBoostShow, searchBoostRows,
+} from '/assets/js/boost-list.js?v=ob-v64'
+import { rangeControl, sortControl, rangeDays, rangeCutoff } from '/assets/js/feed-controls.js?v=ob-v64'
+import { wireBoostNotes } from '/assets/js/boost-note-actions.js?v=ob-v64'
+import { hydrateProfiles } from '/assets/js/detail-page.js?v=ob-v64'
 
 /* The sort menu, taken from boosts-feed.js#SORT_OPTIONS so the wording matches
  * the feed the reader was sent here from.
@@ -115,6 +116,13 @@ export function initBoostSection({
   // from "searched and found nothing" — see emptyMessage.
   let query = ''
 
+  /* The picked show, on /booster only. null is "every show", which is the state
+   * every other page is permanently in — see setShow. */
+  let showGuid = null
+  let showLabel = ''
+  let chip = null
+  let mounted = false
+
   /* How many rows a page holds, declared by the Function.
    *
    * ⚠️ IT IS 24 ON TWO PAGES AND EVERY ROW ON THE THIRD, and that asymmetry is the
@@ -141,6 +149,14 @@ export function initBoostSection({
     paintMore()
   })
 
+  /* What a caller can drive from outside. Only /booster uses it; see setShow.
+   *
+   * `canFilter` reports whether there is a band to put a chip on at all. Below
+   * boost-list.js#CONTROLS_MIN the server ships none, and a picker that led to a
+   * list with no visible filter and no way to clear it would be a trap — so the
+   * caller hides its own affordance rather than this silently doing nothing. */
+  return { setShow, canFilter: Boolean(ctrlSlot) }
+
   // ── Controls ───────────────────────────────────────────────────────
   /* Three controls on one band, in reading order: the search box, then the
    * range, then the sort.
@@ -155,7 +171,11 @@ export function initBoostSection({
    * GROUP, so the pair still holds the right end and the search box takes the
    * slack. */
   function mountControls() {
-    if (!ctrlSlot) return
+    if (!ctrlSlot || mounted) return
+    // Idempotent, because setShow can run before the reader has ever scrolled
+    // here: pressing "Boosts →" four sections up is a gesture that has to work
+    // whether or not the observer below has fired yet.
+    mounted = true
 
     const knobs = document.createElement('div')
     knobs.className = 'bs-knobs'
@@ -173,8 +193,90 @@ export function initBoostSection({
         title: sortTitle,
       }),
     )
-    ctrlSlot.append(mountSearch(), knobs)
+    // Order is the layout: the search takes a full row of its own (see
+    // `.bs-search`), then the chip sits at the left of the second row and the
+    // knobs hold its right end.
+    ctrlSlot.append(mountSearch(), mountChip(), knobs)
     ctrlSlot.hidden = false
+  }
+
+  /* The picked show, as a clearable chip.
+   *
+   * ⚠️ A CHIP RATHER THAN A FOURTH DROPDOWN, and the difference is what the band
+   * costs when nobody is using the feature — which is most of the time. A "Show:
+   * All shows ▾" menu is a permanent fourth control on a band that already
+   * carries three, on a page whose phone layout is already two rows. A chip is
+   * absent until something is picked and gone again the moment it is cleared, so
+   * the default band is exactly the one /show and /episode carry.
+   *
+   * Clearing is the only thing it does. CHANGING the show means going back to the
+   * rollup, which is one more gesture and is the right one: the rollup is the
+   * ranked list of the person's shows, and choosing from it is the whole reason
+   * there is no menu here. */
+  function mountChip() {
+    chip = document.createElement('span')
+    chip.className = 'bs-chip'
+    chip.hidden = true
+    const label = document.createElement('span')
+    label.className = 'bs-chip-label'
+    const clear = document.createElement('button')
+    clear.type = 'button'
+    clear.className = 'bs-chip-clear'
+    clear.setAttribute('aria-label', 'Show boosts to every show again')
+    clear.textContent = '✕'
+    clear.addEventListener('click', () => setShow(null))
+    chip.append(label, clear)
+    chip._label = label
+    return chip
+  }
+
+  function paintChip() {
+    if (!chip) return
+    chip.hidden = !showGuid
+    if (showGuid) chip._label.textContent = showLabel || 'This show'
+  }
+
+  /* Narrow the list to one show, or back to all of them.
+   *
+   * ⚠️ THE ONLY WAY IN IS THE ROLLUP, on /booster. Nothing here reads the DOM to
+   * find a picker: booster-page.js owns the wiring, because it is the one page
+   * with a section that can pick. /show and /episode never call this and grow no
+   * chip, which is why the filter costs those two pages nothing at all — a boost
+   * list about one show cannot be filtered by show, and a fourth control that can
+   * only ever be a no-op is worse than none.
+   */
+  async function setShow(guid, labelText = '') {
+    const next = guid || null
+    // Pressing the same show twice is a request to come back here, not a
+    // rebuild — the reader has scrolled away and wants the list again.
+    if (next === showGuid) { if (next) scrollHere(); return }
+    mountControls()
+
+    const prevGuid = showGuid
+    const prevLabel = showLabel
+    showGuid = next
+    showLabel = labelText
+    paintChip()
+    await onControlChange()
+
+    // ⚠️ THE CHIP MUST NOT OUTLIVE A FAILED FETCH. onControlChange gives up
+    // quietly when the corpus never arrives, leaving the server's rows on
+    // screen — so a chip left showing would be the page claiming a filter that
+    // is not applied, over a list that contradicts it.
+    if (!rows) {
+      showGuid = prevGuid
+      showLabel = prevLabel
+      paintChip()
+      return
+    }
+    if (next) scrollHere()
+  }
+
+  // The section's own top, not the list's: `.show-section` carries a
+  // scroll-margin-top that clears the sticky nav, so this lands where an anchor
+  // would. Skipped when clearing — the reader is already here.
+  function scrollHere() {
+    section.scrollIntoView()
   }
 
   /* The search box.
@@ -271,13 +373,19 @@ export function initBoostSection({
   }
 
   // ── Painting ───────────────────────────────────────────────────────
-  /* Range first, then the query, then the order.
+  /* Show first, then range, then the query, then the order.
    *
-   * The two filters are boost-list.js's, so the search means the same thing
-   * wherever it is applied and the comparators see the same rows either way. */
+   * Narrowest scope outward, so each stage sees fewer rows than the last. The
+   * range and search filters are boost-list.js's, so they mean the same thing
+   * wherever they are applied and the comparators see the same rows either way.
+   *
+   * All three filters are boost-list.js's, so each means the same thing wherever
+   * it is applied and the comparators see the same rows either way. */
   function buildView() {
     view = sortBoostRows(
-      searchBoostRows(filterBoostRows(rows, rangeCutoff(rangeKey)), query),
+      searchBoostRows(
+        filterBoostRows(filterBoostShow(rows, showGuid), rangeCutoff(rangeKey)),
+        query),
       sortKey)
     total = view.length
   }
@@ -289,6 +397,14 @@ export function initBoostSection({
    * that finds nothing on a subject where almost no boost carries a message is a
    * fact about the data rather than about the query. */
   function emptyMessage() {
+    // The show filter is the narrowest of the three, so it is the likeliest
+    // reason a list is empty and the one worth naming first.
+    if (showGuid && !query) {
+      return `Nothing sent to ${showLabel || 'this show'} in this time range — try a wider one, or clear the show filter.`
+    }
+    if (showGuid && query) {
+      return `No boost message to ${showLabel || 'this show'} contains “${query}”. Try fewer words, a wider date range, or clear the show filter.`
+    }
     if (!query) return emptyText
     const anyText = (rows || []).some((r) => r.message)
     return anyText

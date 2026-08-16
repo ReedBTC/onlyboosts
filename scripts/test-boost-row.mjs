@@ -19,7 +19,7 @@
 import assert from 'node:assert/strict'
 import {
   renderBoosts, boostRows, rowsFromRecords, sortBoostRows, filterBoostRows,
-  searchBoostRows, BOOST_SORTERS, CONTROLS_MIN,
+  searchBoostRows, filterBoostShow, BOOST_SORTERS, CONTROLS_MIN,
 } from '../assets/js/boost-list.js'
 import { boostRecord } from '../functions/api/v1/_common.js'
 
@@ -211,6 +211,36 @@ check('the range filters on when the boost was SENT, not when the episode aired'
   const kept = filterBoostRows(dbRows, 1_700_050_000)
   assert.deepEqual(kept.map((r) => r.event_id[0]), ['a'])
   assert.equal(filterBoostRows(dbRows, null).length, 3, 'a null cutoff is unbounded')
+})
+
+check('the show filter is an equality on the guid, never on the title', () => {
+  assert.deepEqual(filterBoostShow(dbRows, 'show-guid-1').map((r) => r.event_id[0]), ['a'])
+  assert.deepEqual(filterBoostShow(dbRows, 'show-guid-2').map((r) => r.event_id[0]), ['d'])
+  // The title is not a handle: 33% of shows in the index have none, and titles
+  // are not unique in any case.
+  assert.deepEqual(filterBoostShow(dbRows, 'Another Show'), [])
+})
+
+check('a boost with no show guid belongs to no picked show', () => {
+  // dbRows[1] carries a null podcast_guid — ~2% of records do. Filing it under
+  // whichever show was picked would be a claim the data cannot support.
+  assert.equal(filterBoostShow(dbRows, 'show-guid-1').some((r) => r.podcast_guid == null), false)
+  assert.equal(filterBoostShow(dbRows, 'show-guid-2').some((r) => r.podcast_guid == null), false)
+})
+
+check('a null show is every show, which is where the other two pages live', () => {
+  assert.equal(filterBoostShow(dbRows, null).length, 3)
+  assert.equal(filterBoostShow(dbRows, ''), dbRows, 'and costs no copy')
+})
+
+check('the three filters compose, narrowest scope outward', () => {
+  // One show, then a window that keeps it, then a term its message carries.
+  const chain = (guid, cutoff, q) =>
+    searchBoostRows(filterBoostRows(filterBoostShow(dbRows, guid), cutoff), q)
+  assert.deepEqual(chain('show-guid-1', null, 'great').map((r) => r.event_id[0]), ['a'])
+  assert.deepEqual(chain('show-guid-1', 1_700_050_000, 'great').map((r) => r.event_id[0]), ['a'])
+  // The same term against the other show finds nothing: the show filter wins.
+  assert.deepEqual(chain('show-guid-2', null, 'great'), [])
 })
 
 check('search matches the message, and every term of it, in any order', () => {

@@ -30,15 +30,15 @@
  */
 import {
   htmlEscape, isSafeUrl, truncate, renderMessage,
-} from './nostr-text.js?v=ob-v63';
-import { episodePageHref, showPageHref } from './show-link.js?v=ob-v63';
+} from './nostr-text.js?v=ob-v64';
+import { episodePageHref, showPageHref } from './show-link.js?v=ob-v64';
 /* ⚠️ THE REAL MODULE, NOT A FOURTH COPY OF THE RULE. booster-link.js has been
  * dependency-free since it was written, so esbuild inlines it here exactly as it
  * does nostr-text.js, and the boost rows link a booster by the same test every
  * feed surface uses rather than by a transcription of it. This is the collapse
  * that functions/_shared/detail-page.js#boosterPageUrl said was available; that
  * name is now an alias for this function rather than a second copy of it. */
-import { boosterPageHref } from './booster-link.js?v=ob-v63';
+import { boosterPageHref } from './booster-link.js?v=ob-v64';
 
 // ── The formatters the row needs ─────────────────────────────────────────────
 //
@@ -181,6 +181,20 @@ export function sortBoostRows(rows, key) {
 /** Rows sent at or after `cutoff` (epoch seconds). A null cutoff is unbounded. */
 export function filterBoostRows(rows, cutoff) {
   return cutoff ? rows.filter((r) => Number(r.created_at) >= cutoff) : rows;
+}
+
+/* Rows sent to one show.
+ *
+ * ⚠️ AN EQUALITY ON podcast_guid, NEVER ON THE TITLE. 33% of the shows in the
+ * index have no title and titles are not unique in any case, so the guid is a
+ * row's only real handle. A row carrying no guid — ~2% of records — therefore
+ * matches no picked show, which is right: we cannot say which show it belongs
+ * to, and putting it under one would be a claim the data does not support.
+ *
+ * A null `guid` is "every show", the state every page but /booster is
+ * permanently in. See boost-section.js#setShow. */
+export function filterBoostShow(rows, guid) {
+  return guid ? rows.filter((r) => r.podcast_guid === guid) : rows;
 }
 
 /* Rows whose MESSAGE contains every term in `query`, in any order.
