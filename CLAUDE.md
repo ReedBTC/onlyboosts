@@ -1773,6 +1773,29 @@ Two invariants:
   and the client patches those and removes the attribute. Don't let the client
   re-derive what the server already knows.
 
+**⚠️ WHICH ROOT EACH PAGE PASSES IS PART OF THE CONTRACT, because
+`hydrateProfiles` REMOVES `data-missing` on its way out — including from an
+element whose shape it does not know how to fill.** So a page with a second,
+private backfill cannot call it on `document`.
+
+| Page | Call | Covers |
+|---|---|---|
+| `/show`, `/episode` | `hydrateProfiles()` | everything; neither page has a private path |
+| `/booster` | `hydrateProfiles(#boosts)` | the boost list only |
+| any card rollup | `hydrateCardProfiles(list)` | its own cards, on approach |
+
+`/booster` is scoped because its **bio** carries a `.bs-mention` chip with its own
+patch path (`fillMention`, selecting `.bs-mention[data-pk][data-missing]`).
+Unscoped, `hydrateProfiles` matches that chip, finds none of the four class names
+it knows, fills nothing, and strips the attribute — after which the header's own
+backfill selects nothing and the bio mention never resolves. Measured in a DOM
+against the live cache: unscoped fills 16 of 16 chips and breaks the bio; scoped
+fills 8 on load and the rollup's own pass takes the rest to 0 on approach.
+
+**`/booster` had no call at all until 2026-08-16**, so the `nostr:` mentions
+inside its `#boosts` messages stayed truncated npubs forever. The hook was
+correctly emitted the whole time; nothing read it.
+
 The Boosts feed **rebuilds the card** rather than patching it, seeding
 `setCachedProfile` first so the mention chips inside the message body agree with
 the avatar above them.

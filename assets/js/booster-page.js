@@ -8,6 +8,7 @@
  *     detail-page.js, shared with /show and /episode
  *   - the bio's More control, via show-desc.js, unchanged from /show
  *   - the header's own Primal backfill, which is NOT hydrateProfiles(); see below
+ *   - the SHARED backfill over #boosts, which is hydrateProfiles(); see the foot
  *   - the Shows and Albums drawer's range and sort, which need no fetch
  *   - the verbs on "Episodes and Songs Boosted"
  *
@@ -18,17 +19,17 @@
  * `episode-section.js` attaches the controls and the verbs and nothing else.
  * That module is shared with the identical section on /episode/<guid>.
  */
-import { copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v66'
-import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v66'
-import { rangeControl, sortControl, rangeDays } from '/assets/js/feed-controls.js?v=ob-v66'
-import { initEpisodeSection } from '/assets/js/episode-section.js?v=ob-v66'
+import { copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v67'
+import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v67'
+import { rangeControl, sortControl, rangeDays } from '/assets/js/feed-controls.js?v=ob-v67'
+import { initEpisodeSection } from '/assets/js/episode-section.js?v=ob-v67'
 import {
   initCopyNpub, initShowMore, initShare, initBackLink,
-  initHashRouting, initHashSpy, initArt2, wireArt2,
-} from '/assets/js/detail-page.js?v=ob-v66'
-import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v66'
-import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v66'
-import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v66'
+  initHashRouting, initHashSpy, initArt2, wireArt2, hydrateProfiles,
+} from '/assets/js/detail-page.js?v=ob-v67'
+import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v67'
+import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v67'
+import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v67'
 
 const PK = document.body.dataset.boosterPk || ''
 const NPUB = document.body.dataset.boosterNpub || PK
@@ -576,3 +577,34 @@ function initShowFilterPicker() {
 }
 
 initShowFilterPicker()
+
+/* ── The Primal fallback over the boost list ──────────────────────────
+ *
+ * ⚠️ THIS PAGE WAS THE ONE MISSING IT. /show and /episode have called
+ * hydrateProfiles() since they were written; /booster never imported it, so the
+ * `nostr:` mentions inside its boost messages stayed as truncated npubs forever.
+ * Measured on a real page before this landed: 16 mention chips, 11 of them
+ * showing `@npub1cvcgs83gw…`, all 11 carrying the `data-pk` + `data-missing`
+ * hook the server had correctly emitted, and nothing on the page reading it.
+ * Primal answered all 6 distinct pubkeys behind them in 732ms — "jack mallers",
+ * "Bowl After Bowl", "Local Bitcoiners". A 100% fill rate on content that was
+ * rendering as gibberish.
+ *
+ * ⚠️ SCOPED TO #boosts, AND NOT document. An unscoped call would also match the
+ * `.bs-mention` chip inside the BIO, which has its own patch path a few hundred
+ * lines up (fillMention, selecting `.bs-mention[data-pk][data-missing]`).
+ * hydrateProfiles does not know that chip's shape, so it would find nothing to
+ * fill and then STRIP `data-missing` on its way out — and the header's own
+ * backfill, racing it, would then select nothing and the bio mention would never
+ * resolve. Fixing one gap by opening another.
+ *
+ * The other two regions are already covered and must not be double-handled:
+ * #episodes goes through episode-section.js → hydrateCardProfiles, and #shows
+ * carries no identities at all.
+ *
+ * Post-paint and best-effort, like every other use of it: the section is
+ * complete and readable as rendered, this is one WebSocket to a cache with a 6s
+ * timeout, and an unreachable Primal leaves the page exactly as it shipped.
+ */
+const boostsSection = document.getElementById('boosts')
+if (boostsSection) hydrateProfiles(boostsSection)
