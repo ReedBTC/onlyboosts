@@ -39,11 +39,11 @@
  * what functions/_shared/detail-page.js has always done, so the site now has one
  * date format rather than one for the feeds and another for the detail pages.
  */
-import { showPageHref, episodePageHref } from './show-link.js?v=ob-v71'
-import { episodeBoostLink } from './episode-link.js?v=ob-v71'
-import { boosterPageHref, boosterLinkAttrs } from './booster-link.js?v=ob-v71'
-import { coverChain } from './cover-art.js?v=ob-v71'
-import { htmlEscape, isSafeUrl, renderMessage } from './nostr-text.js?v=ob-v71'
+import { showPageHref, episodePageHref } from './show-link.js?v=ob-v72'
+import { episodeBoostLink } from './episode-link.js?v=ob-v72'
+import { boosterPageHref, boosterLinkAttrs } from './booster-link.js?v=ob-v72'
+import { coverChain } from './cover-art.js?v=ob-v72'
+import { htmlEscape, isSafeUrl, renderMessage } from './nostr-text.js?v=ob-v72'
 
 const esc = htmlEscape
 
@@ -404,8 +404,28 @@ export const MAX_FACES = 10
  * The anchor WRAPS the image rather than replacing it, so `.pcast-avatar` keeps
  * sizing the img or the initials chip exactly as before.
  *
- * Avatars load eagerly (they're tiny, and `loading=lazy` left off-screen ones
- * perpetually unloaded → looked broken). A picture that fails to load swaps to
+ * ⚠️ AVATARS LOAD LAZILY, AND THEY USED TO LOAD EAGERLY. The old note here read
+ * "they're tiny, and `loading=lazy` left off-screen ones perpetually unloaded →
+ * looked broken", which was written about a face scrolling into view on one
+ * card. It was never weighed against the homepage, where the server renders
+ * thirty cards with their drawers: measured on the live page, **841 eager remote
+ * <img> from ~40 third-party hosts**, 624 of them inside a closed <details> the
+ * reader never opens, against 30 pieces of visible artwork that were already
+ * lazy. The only eager images on the page were the ones nobody could see.
+ *
+ * Every one of them blocks the window `load` event, so a single dead avatar host
+ * held the browser's tab spinner for ~30 seconds. Timing all 236 distinct URLs:
+ * 84 answered 200, 93 redirected, **31 were 404**, and two hosts never responded
+ * at all. That is not an outage, it is the steady state of third-party avatar
+ * hosting, and the page has to survive it.
+ *
+ * `loading=lazy` is the fix for the CLASS rather than for one bad host, which is
+ * why it is applied to every avatar and not only to the ones behind a drawer:
+ * the same faces appear on the visible drawer bar as in the rows inside (148 of
+ * the 236 URLs are in both), so lazying only the hidden ones would have left the
+ * spinner one dead host away from coming straight back.
+ *
+ * A picture that fails to load swaps to
  * the initials chip, which is a VERB and lives in episode-card-actions.js —
  * `data-initials` is what that swap builds the chip from, since the server
  * cannot attach an error handler and this file may not emit an inline one.
@@ -422,7 +442,7 @@ function avatarHtml(profile, npub, { size = 26, interactive = false, label = '',
   const mark = (hook && !hasPic && pk) ? ` data-pk="${esc(pk)}" data-missing="pic"` : ''
 
   const node = hasPic
-    ? `<img class="pcast-avatar" style="${esc(style)}" src="${esc(pic)}" alt="" referrerpolicy="no-referrer" data-initials="${esc(chip)}" />`
+    ? `<img class="pcast-avatar" style="${esc(style)}" src="${esc(pic)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" data-initials="${esc(chip)}" />`
     : `<span class="pcast-avatar pcast-avatar--none" style="${esc(style)}"${mark}>${esc(chip)}</span>`
 
   const href = interactive ? boosterPageHref(npub, pk) : null

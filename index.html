@@ -49,17 +49,17 @@
 
   <!-- Shared note / card styles (.note-card, .embed-note) — the boosts
        feeds render through the same kind-1 card as boosts-thread.js. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v71" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v72" />
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v71" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v72" />
   <!-- The episode card and its drawer, extracted from the inline block below
        when /episode/<guid> pages needed the same cards. See the file header. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v71" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v72" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. Must stay last
        among the stylesheets so the inline block below still wins. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v71" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v72" />
 
   <style>
     :root {
@@ -570,8 +570,8 @@
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
     }
   </style>
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v71" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v71" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v72" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v72" />
 </head>
 <body data-active-feed="episodes-global">
 
@@ -1059,7 +1059,31 @@
     scope = nextScope;
 
     const feed = feedKey(type, scope);
+    /* ⚠️ THE LANGUAGE IS FILED UNDER THE FEED THIS RESOLVED TO, not the one the
+       hash named, and the two differ more often than they look. A signed-out
+       `#episodes-follows?lang=de` becomes episodes-global three lines above;
+       filing 'de' against the key we arrived with put the language on a feed
+       that is not on screen, and the one that IS on screen opened unfiltered.
+       `opts.lang === undefined` means "leave this feed's language alone", which
+       is what a menu pick does, so each feed keeps its own across a switch. */
+    let langChanged = false;
+    if (opts && opts.lang !== undefined) {
+      const want = LANG_FEEDS[feed] ? (opts.lang || '') : '';
+      langChanged = (langByFeed[feed] || '') !== want;
+      langByFeed[feed] = want;
+      // A language this feed had to drop must not survive in the address bar.
+      if (want !== (opts.lang || '')) updateHash = true;
+    }
     document.body.setAttribute('data-active-feed', feed);
+    /* ⚠️ THE LANGUAGE RIDES THE ATTRIBUTE AS WELL AS THE EVENT, and the
+       attribute is the one that matters on a cold load. This inline script runs
+       during parse; feeds.js is a module and therefore deferred, so it attaches
+       its lb:feed-activate listener AFTER this has already dispatched. That is
+       why feeds.js re-reads body[data-active-feed] when it first runs, and it is
+       why a language carried only in the event detail is silently dropped on
+       exactly the path a shared link takes. Shipped that way once: every
+       `#shows?lang=de` cold load painted the unfiltered feed. */
+    document.body.setAttribute('data-feed-lang', langByFeed[feed] || '');
     panels.forEach((panel) => {
       const isActive = panel.dataset.feed === feed;
       panel.classList.toggle('is-active', isActive);
@@ -1076,6 +1100,7 @@
     document.dispatchEvent(new CustomEvent('lb:feed-activate', {
       detail: { feed: feed, lang: langByFeed[feed] || 'all' },
     }));
+    return { feed: feed, langChanged: langChanged };
   }
 
   function fromHash(updateHash) {
@@ -1085,17 +1110,14 @@
     const cfg = FEEDS[key];
     // An unknown hash falls back to the default *and* rewrites, so the URL
     // never keeps naming something that isn't on screen.
-    if (!cfg) { setFeed(DEFAULT_TYPE, DEFAULT_SCOPE, { updateHash: true }); return; }
-    // A feed with no language axis drops the parameter rather than carrying one
-    // it cannot apply, and the rewrite below takes it out of the URL.
-    const wanted = LANG_FEEDS[key] ? parsed.lang : '';
-    const changed = (langByFeed[key] || '') !== wanted;
-    langByFeed[key] = wanted;
+    if (!cfg) { setFeed(DEFAULT_TYPE, DEFAULT_SCOPE, { updateHash: true, lang: '' }); return; }
     // An aliased hash always rewrites, whatever the caller asked for — that's
-    // what upgrades an old link's URL to the current name. So does a language
-    // this feed had to drop.
-    const force = key !== raw || (parsed.lang && !wanted);
-    setFeed(cfg.type, cfg.scope, { updateHash: force ? true : updateHash });
+    // what upgrades an old link's URL to the current name. setFeed forces the
+    // rewrite itself when it has to drop a language the feed cannot apply.
+    const res = setFeed(cfg.type, cfg.scope, {
+      updateHash: key !== raw ? true : updateHash,
+      lang: parsed.lang,
+    });
     /* ⚠️ A HASH CHANGE ON AN ALREADY-HYDRATED FEED NEEDS A SECOND SIGNAL. The
        activate event above is a no-op once feeds.js has loaded a feed, so a URL
        pasted into an open tab would move the hash and leave the cards alone —
@@ -1104,9 +1126,9 @@
        It is dispatched AFTER setFeed, so on a cold load the renderer's dynamic
        import has not resolved and nothing is listening yet; the opening state
        comes from the activate detail and is applied exactly once. */
-    if (changed) {
+    if (res.langChanged) {
       document.dispatchEvent(new CustomEvent('lb:set-feed-lang', {
-        detail: { feed: key, lang: wanted || 'all' },
+        detail: { feed: res.feed, lang: langByFeed[res.feed] || 'all' },
       }));
     }
   }
@@ -1199,17 +1221,17 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v71"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v72"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v71" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v72" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v71" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v72" defer></script>
 
 <!-- Feed hydration — lazily loads the active feed on first view. -->
-<script type="module" src="/assets/js/feeds.js?v=ob-v71"></script>
-<script src="/assets/js/nav.js?v=ob-v71" defer></script>
+<script type="module" src="/assets/js/feeds.js?v=ob-v72"></script>
+<script src="/assets/js/nav.js?v=ob-v72" defer></script>
 
 </body>
 </html>
