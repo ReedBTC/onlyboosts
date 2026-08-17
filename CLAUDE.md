@@ -185,9 +185,32 @@ node scripts/stamp-assets.js --check   # verify; non-zero exit if anything is st
 **Order matters.** `sync-partials` injects markup into the page files; anything
 it injects has to be stamped afterwards.
 
-Two test scripts: `scripts/test-episode-card.mjs` asserts on the card's HTML
-against fixtures, `scripts/test-server-render.mjs` on the assembled homepage
-against a captured production response, including a 256KB first-view budget.
+Four test scripts, all plain `node scripts/<name>.mjs` with no runner:
+
+| | |
+|---|---|
+| `test-episode-card.mjs` | the card's HTML against fixtures |
+| `test-server-render.mjs` | the assembled homepage against a captured production response, including a 256KB first-view budget. Takes the capture as an argument |
+| `test-feed-hash.mjs` | the inline feed-bar controller: hash parsing, and the boot sequence |
+| `test-feed-lang.mjs` | `feed-lang.js`: menu ordering, the withholding rule, and the copy |
+
+**⚠️ `test-feed-hash.mjs` EXTRACTS THE CONTROLLER OUT OF `index.html` and runs
+it**, because it is an inline `<script>` and cannot be imported. That is the
+whole value of it: a second copy of `normLang()` inside the test would pass
+forever while the shipped one rotted. It scans for `FEED BAR CONTROLLER` and for
+`function <name>(` with a balanced-brace walk, so **renaming those functions or
+that comment breaks the test loudly**, which is the intended failure.
+
+It exists because two bugs shipped that no unit test of the parsing could see,
+both living in the boot sequence: the language reached `lb:feed-activate` but not
+`body[data-feed-lang]`, so every shared link opened unfiltered; and it was filed
+under the feed key the hash named rather than the one `setFeed` resolved to, so a
+signed-out `#episodes-follows?lang=de` filed it against a feed that was not on
+screen. **Anything about how this page boots wants a test here, not a unit test.**
+
+`test-feed-lang.mjs` imports the real module and rewrites only its two
+version-stamped absolute imports to stubs, so the module under test is the
+shipped source.
 
 ### Asset Stamping, And The Rule It Replaced
 
