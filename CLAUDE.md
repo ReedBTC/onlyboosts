@@ -2351,6 +2351,26 @@ would. Never remove an entry** — those links are in the wild.
    closed `<details>`. Deferred deliberately; the question is whether the drawer
    *contents* should be a verb rather than a fact on that one surface.
 
+   **It costs more than DOM weight, and the second cost is the one to lead
+   with.** The inline feed-bar controller is the last thing in `<body>`, so it
+   sits **1,159,545 bytes after the first card**: the browser parses and paints
+   the whole Episodes · Global feed before any script can say which feed the hash
+   actually named. Every `#shows`, `#albums` and `#boosts-global` load therefore
+   flashes the Episodes feed first, and a `?lang=` load flashes it unfiltered.
+   Measured 2026-08-17, and it predates the language filter entirely.
+
+   **So this is also the fix for that flash**, and the reason two patches for it
+   were considered and rejected on 2026-08-17 (skeletons over the server's cards;
+   a boot script in `<head>` carrying its own copy of the feed-key list). Dropping
+   the payload moves the controller to roughly byte 40,000 and largely dissolves
+   the flash without either. Reed's call: fix it here, not with patches that would
+   then be deleted.
+
+   **⚠️ Removing the drawer markup does NOT fix the eager-avatar problem**, and
+   the two are easy to confuse. 148 of the 236 distinct avatar URLs appear on the
+   visible drawer *bar* as well as in the rows inside, so the requests survive the
+   markup. That was fixed separately, by making every avatar `loading="lazy"`.
+
 7. **Typography.** The brand wordmark is a bold sans; the site is still on LB's
    Playfair Display / Source Serif 4. It reads fine, but the serif is inherited,
    not chosen. Only those two families are self-hosted in `assets/fonts/`.
