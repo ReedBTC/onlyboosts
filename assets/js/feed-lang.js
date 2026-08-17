@@ -136,11 +136,16 @@ export async function languageOptions({ medium = null, signal } = {}) {
  *   in prose and neither should re-derive it.
  */
 export function langControl(options, initialKey, onPick, opts = {}) {
+  const labelFor = (key) => (options.find((o) => o[0] === key) || options[0])[1]
   const el = sortControl(options, initialKey, (key) => {
-    const row = options.find((o) => o[0] === key)
-    onPick(key, row ? row[1] : key)
+    const label = labelFor(key)
+    paint(key, label)
+    onPick(key, label)
   }, {
-    tag: 'Language: ',
+    // No colon: `.pcast-lang` adds one, so that under 640px, where the unset
+    // pill shows the tag alone, it can be dropped and leave "Language" rather
+    // than a dangling "Language:".
+    tag: 'Language',
     // Names the SHOW deliberately, on every feed. On Episodes and Songs the
     // cards are episodes and tracks, but the tag they are being filtered by is
     // their feed's, and a tooltip saying "episode language" would describe a
@@ -152,6 +157,40 @@ export function langControl(options, initialKey, onPick, opts = {}) {
   // show in a new language — so it is the one dropdown on the site that has to
   // scroll. The class is the only hook feed-cards.css needs for that.
   el.classList.add('pcast-lang')
+
+  /* ⚠️ THE PHONE SHOWS THE SUBTAG, NOT THE NAME, AND IT IS THE ONLY THING THAT
+   * MAKES THREE CONTROLS FIT. Measured over every sort x language combination
+   * at 375px: with the full name in the pill, 58 of 120 fit on one line, because
+   * "Norwegian Bokmål" and "Recently boosted" are 141px each against the 335px
+   * inside the bar. "DE" is 48px, which takes every picked state under the line.
+   *
+   * The full name is never lost: it is the menu row the reader picks from, and
+   * it is the button's own tooltip. This span is empty and `display:none` above
+   * 640px, so the desktop pill is exactly the "Language: German ▾" it was.
+   */
+  const btn = el.querySelector('.pcast-sort-btn')
+  const short = document.createElement('span')
+  short.className = 'pcast-lang-short'
+  btn.insertBefore(short, btn.querySelector('.pcast-sort-caret'))
+
+  // ⚠️ `data-lang` is what the narrow-viewport CSS reads to decide whether this
+  // pill shows its AXIS or its VALUE, so it has to move with the key or the
+  // pill goes on naming a filter it no longer applies.
+  function paint(key, label) {
+    el.dataset.lang = key
+    short.textContent = key === LANG_ALL ? ''
+      // 'unknown' is not a subtag and uppercasing it reads as one. The menu row
+      // says "Not tagged"; this is the same claim with no room to make it.
+      : key === LANG_UNKNOWN ? 'None'
+      : key.toUpperCase()
+    // setAttribute rather than `.title =`, matching the h() helper every control
+    // here is built with. The tooltip is where the language's NAME survives once
+    // the phone rule has swapped the pill down to its subtag.
+    btn.setAttribute('title', key === LANG_ALL
+      ? (opts.title || 'Filter by the show’s language')
+      : `Language: ${label}`)
+  }
+  paint(initialKey, labelFor(initialKey))
   return el
 }
 

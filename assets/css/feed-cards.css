@@ -134,6 +134,53 @@
   overflow-y: auto;
   overscroll-behavior: contain;
 }
+/* The colon is CSS rather than part of the tag text, so the narrow-viewport
+   rule below can drop it and leave "Language" instead of "Language:". */
+.pcast-lang .pcast-sort-tag::after { content: ':'; }
+/* The subtag form ("DE"), for the phone rule below. Off entirely on desktop,
+   where the pill has room for the language's name. */
+.pcast-lang-short { display: none; }
+
+/* ── The bar on a phone ──
+   Three controls do not fit on a 375px screen: the range is 128px, and
+   "Language: All ▾" and "Sort: Most boosts ▾" are 124px and 153px against the
+   335px inside the bar's padding. The group wrapped to a second line, which put
+   the sticky chrome at three rows and 200px with the nav — 30% of a 667px
+   screen before a single card.
+
+   The TAGS are the fat, and they say what the value already implies. Dropping
+   them here takes the group to ~330px and the bar back to two rows, with every
+   active filter still legible, which is the whole reason these are sticky
+   rather than in the panel. Desktop is untouched: there is room for the tags
+   there, and "Sort: X ▾" is a pattern the detail pages share. */
+@media (max-width: 640px) {
+  .pcast-sort:not(.pcast-lang) .pcast-sort-tag { display: none; }
+
+  /* ⚠️ THE LANGUAGE PILL IS THE OTHER WAY AROUND WHEN NOTHING IS PICKED. A bare
+     "All" would sit inches from the range's own All button and mean something
+     entirely different, so the unset pill names its AXIS and the picked one
+     names its VALUE — a language is self-identifying and needs no tag. */
+  .pcast-lang[data-lang="all"] .pcast-sort-cur { display: none; }
+  .pcast-lang[data-lang="all"] .pcast-sort-tag::after { content: none; }
+  .pcast-lang[data-lang="all"] .pcast-sort-tag { color: var(--accent-d); font-weight: 700; }
+  .pcast-lang:not([data-lang="all"]) .pcast-sort-tag { display: none; }
+
+  /* ⚠️ AND A PICKED LANGUAGE SHOWS ITS SUBTAG, WHICH IS WHAT ACTUALLY MAKES
+     THREE CONTROLS FIT. With the name in the pill only 58 of the 120 sort x
+     language combinations fit on one line: "Norwegian Bokmål" is 141px and
+     "Recently boosted" another 141px, against 335px inside the bar. "DE" is
+     48px and takes every picked state under the line. The name is still the
+     menu row it was picked from, and the button's tooltip. */
+  .pcast-lang:not([data-lang="all"]) .pcast-sort-cur { display: none; }
+  .pcast-lang:not([data-lang="all"]) .pcast-lang-short {
+    display: inline; color: var(--accent-d); font-weight: 700;
+  }
+
+  /* The last ~15px, taken off the padding rather than the type: shrinking the
+     label is what makes a control look like a different control. */
+  .pcast-range-btn { min-width: 1.85rem; }
+  .pcast-sort-btn { padding-left: 0.55rem; padding-right: 0.55rem; }
+}
 
 /* Events type dropdown — squarer corners than the podcast sort pill. */
 .feed-type-sort .pcast-sort-btn { border-radius: 7px; }

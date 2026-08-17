@@ -972,8 +972,39 @@ already paged in. Two consequences the site's existing discipline demands:
   filter and the only one whose fix is one press; under Follows plus German,
   "switch to Global" points past the filter actually hiding the reader's show.
 
-`.pcast-controls` **wraps** now, because three controls run ~360px against the
-335px a 375px phone leaves inside the bar.
+### The Bar On A Phone
+
+**⚠️ THREE CONTROLS DO NOT FIT ON ONE LINE AT 375px WITH THEIR DESKTOP LABELS,
+and the fix is in the labels rather than the layout.** The bar has 335px inside
+its padding; the range is 128px, `Language: All ▾` 124px and
+`Sort: Most boosts ▾` 153px, so the group ran 421px and wrapped, putting the
+sticky chrome at three rows and 200px with the nav. That is 30% of a 667px
+screen before the first card. Two rows was the state before the language pill
+existed, and it is the state to hold.
+
+Under 640px, therefore:
+
+- **Both pills drop their tag.** `Sort: ` and `Language: ` cost 41px and 32px
+  and say what the value already implies.
+- **⚠️ The language pill inverts: unset it shows its AXIS, picked it shows its
+  VALUE.** A bare "All" would sit inches from the range's own All button and mean
+  something else entirely, so the unset pill reads `Language ▾`.
+- **⚠️ A picked language shows its SUBTAG, and this is the load-bearing part.**
+  With the name in the pill only **58 of the 120** sort × language combinations
+  fit on one line, because `Norwegian Bokmål` is 141px and `Recently boosted`
+  another 141px. `DE` is 48px and takes it to **115 of 120**. The name is not
+  lost: it is the menu row it was picked from, and the button's tooltip.
+- The last ~15px comes off the range's `min-width` and the pills' padding, never
+  off the type scale. Shrinking a label is what makes a control look like a
+  different control.
+
+The five that still wrap are all *unset* language plus one of the four longest
+sort labels, and they wrap gracefully to a second control line. Closing them
+means shortening a sort label ("Recently boosted"), which is product copy and a
+separate decision. `.pcast-controls` carries `flex-wrap` for exactly this tail.
+
+**Desktop is untouched.** There is room for the tags there, and `Sort: X ▾` is a
+pattern the three detail pages share.
 
 **The Boosts feeds have no language axis**: `/api/v1/boosts` and
 `/api/v1/boosts/follows` take no `lang`. That is backend work, not a decision.
