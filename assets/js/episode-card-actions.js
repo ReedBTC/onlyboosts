@@ -36,11 +36,11 @@
  * bundle having shrunk — measured, it grew by 12.3KB gzipped. See the header of
  * feeds-podcasts.js.
  */
-import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v69'
-import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v69'
-import { copyText, showToast, copyNpub } from '/assets/js/copy-npub.js?v=ob-v69'
-import { withBoostBusy } from '/assets/js/boost-button.js?v=ob-v69'
-import { wireArt2, blankTile, hydrateProfiles } from '/assets/js/detail-page.js?v=ob-v69'
+import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v70'
+import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v70'
+import { copyText, showToast, copyNpub } from '/assets/js/copy-npub.js?v=ob-v70'
+import { withBoostBusy } from '/assets/js/boost-button.js?v=ob-v70'
+import { wireArt2, blankTile, hydrateProfiles } from '/assets/js/detail-page.js?v=ob-v70'
 
 const VALUE_API = '/api/value'   // Podcast Index value-block proxy (splits)
 
@@ -372,7 +372,7 @@ function wireBoostMenu(row) {
 async function copyNevent(eventId, author) {
   let nevent = ''
   try {
-    const { nip19 } = await import('/assets/widgets/nostr-tools.js?v=ob-v69')
+    const { nip19 } = await import('/assets/widgets/nostr-tools.js?v=ob-v70')
     nevent = nip19.neventEncode({ id: eventId, author: author || undefined })
   } catch {}
   if (!nevent) { showToast('Could not build nevent', true); return }
@@ -400,7 +400,7 @@ async function copyNevent(eventId, author) {
 async function attachActionBars(details) {
   let actions
   try {
-    actions = await import('/assets/js/boost-actions.js?v=ob-v69')
+    actions = await import('/assets/js/boost-actions.js?v=ob-v70')
     // The signer. Without it the bar still renders and each button reports that
     // it needs a sign-in, which is the same behaviour every other surface has.
     await ensureLoginWidget()

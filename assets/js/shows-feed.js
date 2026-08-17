@@ -53,25 +53,28 @@
  */
 import {
   getShowPage, searchShows, getShowEpisodes, SEARCH_HITS, SEARCH_MIN_CHARS,
-} from '/assets/js/ob-live.js?v=ob-v69'
+} from '/assets/js/ob-live.js?v=ob-v70'
 import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls,
-} from '/assets/js/feed-controls.js?v=ob-v69'
+} from '/assets/js/feed-controls.js?v=ob-v70'
 // Its own module, not two more exports of feed-controls.js — see the ⚠️ note
 // at the top of that file for the four-hour window that shape opens.
-import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v69'
-import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v69'
-import { showPageHref, episodePageHref } from '/assets/js/show-link.js?v=ob-v69'
+import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v70'
+import {
+  LANG_ALL, languageOptions, langControl, langNote, langNoMatchText,
+} from '/assets/js/feed-lang.js?v=ob-v70'
+import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v70'
+import { showPageHref, episodePageHref } from '/assets/js/show-link.js?v=ob-v70'
 // Show-level boosting. Same four pieces the episode feed uses, and deliberately
 // the same ones: fromApiValue / applyExternalOverrides are where the split
 // logic lives, and sharing them is what keeps every surface paying the value
 // block a feed actually published.
-import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v69'
-import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v69'
-import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v69'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v69'
-import { boostButton, withBoostBusy } from '/assets/js/boost-button.js?v=ob-v69'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v69'
+import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v70'
+import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v70'
+import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v70'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v70'
+import { boostButton, withBoostBusy } from '/assets/js/boost-button.js?v=ob-v70'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v70'
 
 const PAGE_SIZE = 25       // show cards per "load more" batch
 const DRAWER_EPISODES = 50 // episodes listed per expanded show
@@ -279,10 +282,10 @@ const RANKED_SORTS = new Set(['boosts', 'sats', 'boosters'])
  * and in exchange the All drawer stops fetching the per-show shard, which ran to
  * 1.95MB on the most-boosted show.
  */
-async function loadShowPage({ medium, sort, range, offset, signal }) {
+async function loadShowPage({ medium, sort, range, lang, offset, signal }) {
   const { records, nextOffset } = await getShowPage({
     medium: medium === 'music' ? 'music' : null,
-    sort, range, offset, signal,
+    sort, range, lang, offset, signal,
   })
   return { items: records.map(toCard), nextOffset }
 }
@@ -611,6 +614,17 @@ export async function renderShows({ panel, list, medium = 'other' }) {
   // feed is *for*. 'boosters' ranks by distinct people instead, which differs
   // wherever someone boosts the same show repeatedly (most of them).
   let sortKey = 'boosts'
+  // No language filter, which is NOT the same as English: 341 shows on this
+  // side of the medium split and 253 on the music side declare no <language>
+  // at all, so All is the only key that holds every card. See feed-lang.js.
+  let langKey = LANG_ALL
+  let langLabel = 'All'
+  // Fired here rather than where the control is mounted, so this small GROUP BY
+  // overlaps the first page's much heavier one instead of following it. It is
+  // never awaited on the render path — see the insert below. `languageOptions`
+  // never rejects; it resolves null when the endpoint is unavailable or the feed
+  // holds one bucket, and a null menu is a control that is simply not mounted.
+  const langOptionsP = languageOptions({ medium: wantMusic ? 'music' : null })
 
   let shows = []          // the pages pulled so far, in the server's order
   let nextOffset = 0
@@ -657,7 +671,7 @@ export async function renderShows({ panel, list, medium = 'other' }) {
         btn.disabled = true
         btn.textContent = 'Loading…'
         try {
-          const next = await loadShowPage({ medium, sort: sortKey, range: rangeKey, offset: nextOffset })
+          const next = await loadShowPage({ medium, sort: sortKey, range: rangeKey, lang: langKey, offset: nextOffset })
           shows = shows.concat(next.items)
           nextOffset = next.nextOffset
           rebuild({ keepShown: true })
@@ -734,7 +748,7 @@ export async function renderShows({ panel, list, medium = 'other' }) {
     try {
       const records = await searchShows({
         q: picked.query, medium: wantMusic ? 'music' : null,
-        sort: sortKey, range: rangeKey, limit: SEARCH_HITS,
+        sort: sortKey, range: rangeKey, lang: langKey, limit: SEARCH_HITS,
       })
       if (mine !== pickSeq) return
       const hit = records.find((r) => r.guid === picked.key)
@@ -766,7 +780,7 @@ export async function renderShows({ panel, list, medium = 'other' }) {
     const mine = ++seq
     loading = true
     try {
-      const page = await loadShowPage({ medium, sort: sortKey, range: rangeKey, offset: 0 })
+      const page = await loadShowPage({ medium, sort: sortKey, range: rangeKey, lang: langKey, offset: 0 })
       if (mine !== seq) return
       shows = page.items
       nextOffset = page.nextOffset
@@ -785,7 +799,7 @@ export async function renderShows({ panel, list, medium = 'other' }) {
 
   let first
   try {
-    first = await loadShowPage({ medium, sort: sortKey, range: rangeKey, offset: 0 })
+    first = await loadShowPage({ medium, sort: sortKey, range: rangeKey, lang: langKey, offset: 0 })
   } catch (e) {
     console.error('[shows] index fetch failed', e)
     renderPlaceholder(list, ...copy.loadFail)
@@ -797,9 +811,11 @@ export async function renderShows({ panel, list, medium = 'other' }) {
   // The same line the Episodes and Songs feeds carry. There is no Follows scope
   // here yet, so it has one form; when Shows · Follows lands it gains the second
   // and this becomes the scope-dependent pick the other renderer already makes.
-  mountFeedNote(panel, copy.noteGlobal)
+  // Through langNote even though the filter is provably All here, so this line
+  // and the language control's cannot drift into two versions of one sentence.
+  mountFeedNote(panel, langNote(copy.noteGlobal, langKey, langLabel, copy.noun))
 
-  mountFeedControls(panel?.dataset.feed || (wantMusic ? 'albums' : 'shows'), [
+  const controls = mountFeedControls(panel?.dataset.feed || (wantMusic ? 'albums' : 'shows'), [
     rangeControl(rangeKey, (key) => {
       if (key === rangeKey) return
       rangeKey = key
@@ -813,6 +829,33 @@ export async function renderShows({ panel, list, medium = 'other' }) {
       requery()
     }, { title: copy.sortTitle }),
   ])
+
+  /* A language change is a QUERY, exactly like the range and the sort, because
+   * the ranking is computed over the filtered corpus server-side. Filtering the
+   * loaded pages instead would rank a German show against the English ones it
+   * was ranked beside, and could only ever find the languages inside the prefix
+   * the reader had already paged in.
+   *
+   * The menu is fetched, so it is INSERTED into the bar when it lands rather
+   * than awaited: re-mounting the group would throw away a control the reader
+   * may already have open, and blocking would hold the whole bar for a menu
+   * nobody has reached for. A null menu never inserts, which leaves exactly the
+   * control bar that shipped before this existed.
+   */
+  langOptionsP.then((langOptions) => {
+    if (!langOptions || !controls) return
+    const ctl = langControl(langOptions, langKey, (key, label) => {
+      if (key === langKey) return
+      langKey = key
+      langLabel = label
+      // "Ranks based on every boost in the index" stops being true the moment
+      // this is anything but All.
+      mountFeedNote(panel, langNote(copy.noteGlobal, langKey, langLabel, copy.noun))
+      requery()
+    })
+    // Before the sort pill: filters together, the ordering at the end.
+    controls.insertBefore(ctl, controls.lastElementChild)
+  })
 
   search = mountFeedSearch(panel, {
     placeholder: copy.searchPlaceholder,
@@ -834,7 +877,10 @@ export async function renderShows({ panel, list, medium = 'other' }) {
     searchRemote: async (query, { signal }) => {
       const records = await searchShows({
         q: query, medium: wantMusic ? 'music' : null,
-        sort: sortKey, range: rangeKey, signal,
+        // ⚠️ THE LANGUAGE HAS TO TRAVEL WITH THE SEARCH, like the medium: a
+        // suggestion the feed would then filter away to nothing is the
+        // documented failure that keeps /api/v1/search off these feeds.
+        sort: sortKey, range: rangeKey, lang: langKey, signal,
       })
       return records.map((r) => ({
         key: r.guid,
@@ -849,7 +895,13 @@ export async function renderShows({ panel, list, medium = 'other' }) {
         query,
       }))
     },
-    noMatchText: () => (rangeKey === 'all' ? copy.searchNoneAll : copy.searchNoneRange),
+    // The language is tested FIRST because it is the narrowest of the two
+    // filters and the only one whose fix is a single press. It also outranks
+    // the All case, where the line would otherwise call a coverage boundary on
+    // a show that is in the index and merely in another language.
+    noMatchText: () => (langKey !== LANG_ALL ? langNoMatchText(langKey, langLabel, copy.noun)
+      : rangeKey === 'all' ? copy.searchNoneAll
+      : copy.searchNoneRange),
   })
 
   list.className = ''

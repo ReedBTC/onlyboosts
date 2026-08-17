@@ -49,9 +49,21 @@
    meta row of booster avatars / recency / sats, and a ⋮ menu of
    show-level subscribe links. A low-profile drawer bar under the head
    toggles the inline boost thread. Rendered by feeds-podcasts.js. */
-/* Range buttons + sort dropdown, as mounted into the feed bar's slot. */
+/* Range buttons + language menu + sort dropdown, as mounted into the feed bar's
+   slot, in that order: the two filters that narrow the ranked corpus, then the
+   sort that only arranges what survives.
+
+   ⚠️ IT WRAPS, and it has to. Four range segments (~128px), the language pill
+   and the sort pill run to ~360px against the 335px a 375px phone leaves inside
+   the bar's padding, so the group is wider than the line it sits on the moment a
+   feed carries all three. The bar itself already wraps, which puts this group on
+   its own line but cannot break it up. Wrapping to the right keeps the sort pill
+   under the controls it belongs with rather than stranded against the menus.
+   The ranked feeds are the ones that reach three; the Boosts note feed carries
+   two and never wraps. */
 .pcast-controls {
   display: flex; align-items: center; gap: 0.5rem;
+  flex-wrap: wrap; justify-content: flex-end;
   flex-shrink: 0; align-self: center;
 }
 /* 1W / 1M / All — deliberately borderless and touching: the faint tint on
@@ -110,6 +122,19 @@
 .pcast-sort-item:hover { background: var(--tint); color: var(--accent-d); }
 .pcast-sort-item.is-active { color: var(--accent-d); background: var(--tint); }
 .pcast-sort-item.is-active::after { content: ' ✓'; float: right; }
+/* The language menu is the sort pill exactly, with one difference: its LENGTH IS
+   DATA. The index describes 19 languages on the podcast side and gains a row the
+   first time anyone boosts a show in a new one, where every sort menu on the
+   site is a fixed five or six. Twenty rows is ~600px, which overruns a phone
+   entirely, so this one scrolls. A floor on the menu would have been the other
+   fix and is deliberately not taken — ten of those languages are a single show,
+   and hiding them makes those shows unfindable by the axis the control is for. */
+.pcast-lang .pcast-sort-menu {
+  max-height: min(60vh, 21rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 /* Events type dropdown — squarer corners than the podcast sort pill. */
 .feed-type-sort .pcast-sort-btn { border-radius: 7px; }
 .feed-type-sort .pcast-sort-menu { border-radius: 8px; }

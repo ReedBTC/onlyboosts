@@ -19,7 +19,7 @@
  * per-user and change as boosts arrive, so a page-lifetime cache would serve a
  * stale feed. The endpoints set their own short Cache-Control.
  */
-import { normalizeBoosts } from '/assets/js/ob-data.js?v=ob-v69'
+import { normalizeBoosts } from '/assets/js/ob-data.js?v=ob-v70'
 
 const BASE = '/api/v1/'
 
@@ -303,6 +303,11 @@ const EPISODE_PAGE = 60
  *   split is a partition, so it has to keep video and undeclared feeds too.
  * @param {string}   [opts.sort]    recent|episode|count|boosts|sats
  * @param {string}   [opts.range]   1w|1m|1y|all, filtered on AIR DATE
+ * @param {string}   [opts.lang]    a 2-3 letter subtag, or 'unknown' for the
+ *   shows that declare no `<language>` at all. Omitted or 'all' sends nothing.
+ *   ⚠️ The language belongs to the SHOW, so this selects episodes whose FEED
+ *   declares it, and `lang=en` deliberately excludes the untagged rather than
+ *   absorbing them — see the header of feed-lang.js.
  * @param {number}   [opts.offset]
  * @param {string[]} [opts.follows] hex or npub; presence switches to POST
  * @param {string}   [opts.q]       free-text over episode title + show name.
@@ -313,7 +318,7 @@ const EPISODE_PAGE = 60
  * @returns {Promise<{records: object[], nextOffset: number|null, follows: number|null}>}
  */
 export async function getEpisodePage({
-  medium = null, sort = 'boosts', range = 'all',
+  medium = null, sort = 'boosts', range = 'all', lang = null,
   offset = 0, limit = EPISODE_PAGE, follows = null, q = null,
   withBoosts = true, signal,
 } = {}) {
@@ -323,6 +328,9 @@ export async function getEpisodePage({
   })
   if (withBoosts) qs.set('include', 'boosts')
   if (q) qs.set('q', q)
+  // 'all' is the absence of a filter rather than a value the endpoint knows, so
+  // an unfiltered feed sends the query string it always sent.
+  if (lang && lang !== 'all') qs.set('lang', lang)
   // Deliberately not `medium=podcast`. Both are the same 6,123 episodes today,
   // but a show that declares `video` (there are two in the index, neither with
   // an enriched boosted episode yet) would be dropped by one and kept by the
@@ -383,13 +391,13 @@ export const SEARCH_MIN_CHARS = 2
  * @returns {Promise<object[]>} raw records, each carrying `rank`
  */
 export async function searchEpisodes({
-  q, medium = null, sort = 'boosts', range = 'all',
+  q, medium = null, sort = 'boosts', range = 'all', lang = null,
   follows = null, limit = SEARCH_HITS, signal,
 } = {}) {
   const text = typeof q === 'string' ? q.trim() : ''
   if (text.length < SEARCH_MIN_CHARS) return []
   const { records } = await getEpisodePage({
-    medium, sort, range, follows, signal,
+    medium, sort, range, lang, follows, signal,
     q: text, limit, offset: 0, withBoosts: false,
   })
   return records
@@ -422,11 +430,14 @@ const SHOW_PAGE = 60
  *   the 33% of shows Podcast Index cannot identify.
  * @param {string} [opts.sort]   boosts|sats|boosters|latest
  * @param {string} [opts.range]  1w|1m|1y|all, filtered on BOOST TIME
+ * @param {string} [opts.lang]   a 2-3 letter subtag, or 'unknown'. See the note
+ *   on getEpisodePage; the language means the same thing on both endpoints,
+ *   unlike `range`.
  * @param {string} [opts.q]      free text over title + author, or a pasted guid.
  *   Every record then carries `rank`, its position in the full ordering.
  */
 export async function getShowPage({
-  medium = null, sort = 'boosts', range = 'all',
+  medium = null, sort = 'boosts', range = 'all', lang = null,
   offset = 0, limit = SHOW_PAGE, q = null, signal,
 } = {}) {
   const qs = new URLSearchParams({
@@ -435,6 +446,7 @@ export async function getShowPage({
   if (medium === 'music') qs.set('medium', 'music')
   else qs.set('not_medium', 'music')
   if (q) qs.set('q', q)
+  if (lang && lang !== 'all') qs.set('lang', lang)
 
   const resp = await fetch(`${PODCASTS_API}?${qs}`, {
     headers: { Accept: 'application/json' }, signal,
@@ -449,12 +461,13 @@ export async function getShowPage({
 
 /** The Shows/Albums typeahead. Same reasoning as searchEpisodes above. */
 export async function searchShows({
-  q, medium = null, sort = 'boosts', range = 'all', limit = SEARCH_HITS, signal,
+  q, medium = null, sort = 'boosts', range = 'all', lang = null,
+  limit = SEARCH_HITS, signal,
 } = {}) {
   const text = typeof q === 'string' ? q.trim() : ''
   if (text.length < SEARCH_MIN_CHARS) return []
   const { records } = await getShowPage({
-    medium, sort, range, signal, q: text, limit, offset: 0,
+    medium, sort, range, lang, signal, q: text, limit, offset: 0,
   })
   return records
 }
@@ -481,4 +494,34 @@ export async function getShowEpisodes({ guid, since = null, signal } = {}) {
   if (!resp.ok) throw new Error(`podcast detail: HTTP ${resp.status}`)
   const data = await resp.json()
   return Array.isArray(data?.episodes) ? data.episodes : []
+}
+
+/* ── The languages present in the index ──────────────────────────────
+ *
+ * The menu behind the ranked feeds' language filter. It is fetched rather than
+ * declared because the set grows the first time anybody boosts a show in a new
+ * language, and a hardcoded table goes stale silently — see feed-lang.js, which
+ * owns everything about how the answer becomes a menu.
+ */
+const LANGUAGES_API = '/api/v1/languages'
+
+/**
+ * @param {'music'|null} [opts.medium]  the same partition every other reader
+ *   here draws. ⚠️ PASS IT. The endpoint is medium-aware and the two halves
+ *   disagree — German is 38 shows on the podcast side against 2 on music — so a
+ *   menu built without it offers a feed options matching nothing it can show.
+ * @returns {Promise<Array<{lang: string, shows: number, boosts: number, sats: number}>>}
+ *   ordered by show count, with the untagged bucket included as a peer row
+ *   under the key 'unknown'.
+ */
+export async function getLanguages({ medium = null, signal } = {}) {
+  const qs = new URLSearchParams()
+  if (medium === 'music') qs.set('medium', 'music')
+  else qs.set('not_medium', 'music')
+  const resp = await fetch(`${LANGUAGES_API}?${qs}`, {
+    headers: { Accept: 'application/json' }, signal,
+  })
+  if (!resp.ok) throw new Error(`languages: HTTP ${resp.status}`)
+  const data = await resp.json()
+  return Array.isArray(data?.languages) ? data.languages : []
 }

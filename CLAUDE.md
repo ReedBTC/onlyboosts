@@ -910,6 +910,74 @@ in place under those sorts; under `recent` it appends.
 **Neither Boosts scope pages backwards hunting for matches any more.** The D1
 query answers in one indexed hit, so an empty first page genuinely means empty.
 
+### The Language Filter
+
+`assets/js/feed-lang.js`, mounted as a third control on **all four ranked feeds**
+and on none of the detail pages. `<language>` is an RSS *channel* element, so it
+is a property of the SHOW and an episode inherits its feed's; the collector
+stores the primary subtag only (`en`, never `en-US`), because the corpus
+describes ~21 languages in 36 distinct raw tags.
+
+**⚠️ NULL IS NOT ENGLISH.** The rule and its numbers are under **Show language:
+`language`** below; what it costs this control is that the untagged bucket gets
+its own menu row, **"Not tagged"**, sending `lang=unknown`. It is there for the
+same reason an unidentified show is labelled rather than dropped: once a reader
+has filtered, that row is the only way back to those shows.
+
+**⚠️ `lang=all` IS NOT "no filter"; it is a well-formed subtag that matches
+nothing.** `readLang` validates by shape, so `all` passes and answers **0 rows**
+(verified against production). `ob-live.js` sends the parameter only when the key
+is not `all`, and that guard is the whole of what stands between the opening view
+and an empty feed.
+
+**⚠️ The menu is FETCHED, never declared.** `GET /api/v1/languages` is
+medium-aware and the two halves disagree, German being 38 shows on the podcast
+side against 2 on music, so one shared static list would offer Albums options
+matching nothing it can show. It would also go stale silently the first time
+anybody boosts a show in a new language. Three things follow:
+
+- **A null menu is a withheld control, not an error**, and there are three ways
+  to get one: the endpoint failed, it 404'd, or the feed holds a single bucket.
+  All three leave exactly the control bar that shipped before this existed. That
+  is also the graceful path while the API half of the feature is undeployed.
+- **It is inserted into the bar, never awaited.** On the adopted homepage feed
+  there is no first-page fetch to hide behind, so blocking would delay
+  `enhance()` and leave thirty painted cards with dead boost buttons.
+- **Order in the group is filters then ordering**: range, language, sort. The
+  sort pill stays at the right end, where it has always been.
+
+**⚠️ NO LANGUAGE IS FLOORED OUT OF THE MENU, so the menu SCROLLS.** Measured live
+on 2026-08-17 the endpoint answers **19 buckets** on the podcast side and 6 on
+music, and **ten of the podcast languages are a single show** (ar, da, el, fi,
+ja, nb, zh …). Boost-weighted the tail is nothing, which makes a floor tempting;
+it is not applied, because hiding the one Japanese show's language makes that
+show unfindable by the axis the control exists for, and that is the same
+objection that keeps "Not tagged" in the list. Twenty rows is ~600px, so
+`.pcast-lang` caps the menu at `min(60vh, 21rem)` and scrolls it. **The real
+constraint was menu height, not the length of the list.**
+
+**Changing the language is a QUERY, exactly like the range and the sort.**
+Filtering the loaded pages instead would rank a German show against the English
+ones it was ranked beside, and could only find the languages inside the prefix
+already paged in. Two consequences the site's existing discipline demands:
+
+- **The search carries it**, like the medium and the scope. A suggestion the feed
+  then filters to nothing is the documented reason `/api/v1/search` is not used
+  by these feeds.
+- **The feed note gains a second sentence** rather than a rewritten first one:
+  "Ranks based on every boost in the index. German-language shows only." One rule
+  covers both scopes and both media. `-language` is not padding; "English shows"
+  reads as shows from England.
+- **`noMatchText` gains a fourth cause, tested FIRST.** It is the narrowest
+  filter and the only one whose fix is one press; under Follows plus German,
+  "switch to Global" points past the filter actually hiding the reader's show.
+
+`.pcast-controls` **wraps** now, because three controls run ~360px against the
+335px a 375px phone leaves inside the bar.
+
+**The Boosts feeds have no language axis**: `/api/v1/boosts` and
+`/api/v1/boosts/follows` take no `lang`. That is backend work, not a decision.
+
 ### Search
 
 `assets/js/feed-search.js` is the typeahead at the head of every panel, inside
@@ -2080,6 +2148,7 @@ would. Never remove an entry** — those links are in the wild.
 | `boost-list.js` + `boost-section.js` | **the** boost row and the `#boosts` range and sort, facts and verbs, shared by the edge and the browser |
 | `shows-feed.js` | the show-level rollup behind Shows and Albums |
 | `feed-controls.js` / `feed-search.js` | the range/sort chrome and the per-feed typeahead |
+| `feed-lang.js` | the language menu on the four ranked feeds, and the copy it rewrites |
 | `boosts-thread.js` / `boost-actions.js` | the content tokenizer and reply / like / repost / zap |
 | `functions/index.js` | the homepage's opening feed, rendered at the edge |
 | `functions/{show,episode,booster}/…` | the three edge-rendered detail pages |

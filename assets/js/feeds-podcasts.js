@@ -45,26 +45,29 @@
  * Entry point: renderPodcasts({ panel, list }) — lazy-imported by feeds.js
  * the first time the feed is opened.
  */
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v69'
-import { toEpisodeShape, normalizeBoosts, episodeApiToBoosts } from '/assets/js/ob-data.js?v=ob-v69'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v70'
+import { toEpisodeShape, normalizeBoosts, episodeApiToBoosts } from '/assets/js/ob-data.js?v=ob-v70'
 import {
   getEpisodePage, searchEpisodes, SEARCH_HITS, SEARCH_MIN_CHARS,
-} from '/assets/js/ob-live.js?v=ob-v69'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v69'
+} from '/assets/js/ob-live.js?v=ob-v70'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v70'
 import {
   rangeDays, rangeControl, sortControl, mountFeedControls,
-} from '/assets/js/feed-controls.js?v=ob-v69'
+} from '/assets/js/feed-controls.js?v=ob-v70'
 // Its own module, not two more exports of feed-controls.js — see the ⚠️ note
 // at the top of that file for the four-hour window that shape opens.
-import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v69'
-import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v69'
+import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v70'
+import {
+  LANG_ALL, languageOptions, langControl, langNote, langNoMatchText,
+} from '/assets/js/feed-lang.js?v=ob-v70'
+import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v70'
 // The card, and the card's verbs. One definition each, shared with the edge.
 import {
   COPY, buildEpisodes, renderEpisodeCards, RANKED_SORTS, SORT_OPTIONS,
-} from '/assets/js/episode-card.js?v=ob-v69'
+} from '/assets/js/episode-card.js?v=ob-v70'
 import {
   wireEpisodeCards, hydrateCardProfiles, prewarmBoosting,
-} from '/assets/js/episode-card-actions.js?v=ob-v69'
+} from '/assets/js/episode-card-actions.js?v=ob-v70'
 
 const INITIAL_CARDS = 30       // episodes rendered per "load more" batch
 
@@ -107,9 +110,16 @@ function renderPlaceholder(list, title, body) {
   ]))
 }
 
-// Put this feed's range buttons + sort dropdown in the sticky feed bar.
+// Put this feed's range buttons and sort dropdown in the sticky feed bar, and
+// return the group so the language menu can be inserted into it when it lands.
+//
+// ⚠️ THE SORT CONTROL IS LAST AND THE LANGUAGE MENU IS INSERTED BEFORE IT. The
+// order is FILTERS THEN ORDERING: the range and the language both narrow the
+// corpus the ranking is computed over, where the sort only arranges what
+// survives. That also leaves the sort pill at the right end of the group, where
+// it has always been.
 function mountControls(feed, { sortKey, rangeKey, onSort, onRange, copy }) {
-  mountFeedControls(feed, [
+  return mountFeedControls(feed, [
     rangeControl(rangeKey, onRange, {
       label: copy.rangeLabel, titleFor: (key) => copy.rangeTitle(rangeDays(key)),
     }),
@@ -156,10 +166,10 @@ function mountControls(feed, { sortKey, rangeKey, onSort, onRange, copy }) {
 // ob-data.js#episodeApiToBoosts hydrates the podcast/episode blocks back onto
 // them and the existing normalizeBoosts → toEpisodeShape → buildEpisodes chain
 // runs unmodified over them — the same chain the two edge renderers run.
-async function loadEpisodePage({ medium, sort, range, offset, follows, q = null, limit, signal }) {
+async function loadEpisodePage({ medium, sort, range, lang, offset, follows, q = null, limit, signal }) {
   const { records, nextOffset } = await getEpisodePage({
     medium: medium === 'music' ? 'music' : null,
-    sort, range, offset, follows, q, limit, signal,
+    sort, range, lang, offset, follows, q, limit, signal,
   })
   const { boosts, totals } = episodeApiToBoosts(records)
   const shaped = toEpisodeShape(normalizeBoosts({ boosts }))
@@ -244,6 +254,25 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
   // — three requests to reproduce, against a feed whose whole history is thin
   // enough that All is the useful opening view anyway.
   let rangeKey = 'all'
+  // No language filter, which is not the same as English — see feed-lang.js.
+  // The menu itself is fetched, so the control is mounted below rather than
+  // here; until it resolves this is the only language state there is, and it is
+  // the state the feed shipped in before the filter existed.
+  let langKey = LANG_ALL
+  let langLabel = 'All'
+  // The SHOW-level noun, because <language> is a channel element. The cards on
+  // these two feeds are episodes and tracks, but what the filter selects is
+  // their feed, so the prose it produces has to say so.
+  const langNoun = medium === 'music' ? 'album' : 'show'
+  // Fired here rather than where the control is mounted, so this small GROUP BY
+  // overlaps the first page's much heavier one instead of following it. It is
+  // never awaited on the render path — see the insert below — and
+  // `languageOptions` never rejects, so nothing downstream has to handle it.
+  //
+  // It is deliberately AFTER the follows resolution above, which has three early
+  // returns: a signed-out reader should not spend a request on a menu for a feed
+  // that is about to render "sign in".
+  const langOptionsP = languageOptions({ medium: medium === 'music' ? 'music' : null })
 
   let items = []
   let nextOffset = 0
@@ -329,7 +358,7 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
     // fetch that can render a placeholder instead of cards.
     let first
     try {
-      first = await loadEpisodePage({ medium, sort: sortKey, range: rangeKey, offset: 0, follows })
+      first = await loadEpisodePage({ medium, sort: sortKey, range: rangeKey, lang: langKey, offset: 0, follows })
     } catch (e) {
       console.error('[podcasts] fetch failed', e)
       renderPlaceholder(list, ...copy.loadFail)
@@ -352,7 +381,11 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
   // the top of the function so it shares the search box's contract: a feed that
   // ends on "sign in" or a load failure never grows a line describing a list it
   // isn't showing.
-  mountFeedNote(panel, follows ? copy.noteFollows : copy.noteGlobal)
+  // Through langNote even though the filter is provably All here, so this line
+  // and applyLang's cannot drift into two definitions of the same sentence.
+  mountFeedNote(panel, langNote(
+    follows ? copy.noteFollows : copy.noteGlobal, langKey, langLabel, langNoun,
+  ))
 
   // Pre-warm the boost widget in the background once the feed is up, so the
   // first Boost click doesn't pay the cold-start cost (bundle load + session /
@@ -449,7 +482,7 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
         btn.textContent = 'Loading…'
         try {
           const next = await loadEpisodePage({
-            medium, sort: sortKey, range: rangeKey, offset: nextOffset, follows,
+            medium, sort: sortKey, range: rangeKey, lang: langKey, offset: nextOffset, follows,
           })
           mergeProfiles(next.profiles)
           const start = adoptedCount + items.length
@@ -519,7 +552,7 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
     rebuild()
     try {
       const page = await loadEpisodePage({
-        medium, sort: sortKey, range: rangeKey, offset: 0, follows,
+        medium, sort: sortKey, range: rangeKey, lang: langKey, offset: 0, follows,
         q: picked.query, limit: SEARCH_HITS,
       })
       if (mine !== pickSeq) return
@@ -545,7 +578,7 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
   async function refetchUnfiltered() {
     if (items.length) { rebuild(); return }
     try {
-      const page = await loadEpisodePage({ medium, sort: sortKey, range: rangeKey, offset: 0, follows })
+      const page = await loadEpisodePage({ medium, sort: sortKey, range: rangeKey, lang: langKey, offset: 0, follows })
       mergeProfiles(page.profiles)
       items = page.items
       nextOffset = page.nextOffset
@@ -568,7 +601,7 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
     if (loading) return
     loading = true
     try {
-      const page = await loadEpisodePage({ medium, sort: sortKey, range: rangeKey, offset: 0, follows })
+      const page = await loadEpisodePage({ medium, sort: sortKey, range: rangeKey, lang: langKey, offset: 0, follows })
       mergeProfiles(page.profiles)
       items = page.items
       nextOffset = page.nextOffset
@@ -600,8 +633,51 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
     requery()
   }
 
-  mountControls(panel?.dataset.feed || `episodes-${scope}`,
+  /* A language change is a QUERY, exactly like the range and the sort, because
+   * the ranking is computed over the filtered corpus server-side. Filtering the
+   * loaded pages instead would rank a German show against the English ones it
+   * was ranked beside, which is the client-side rollup mistake one axis over.
+   *
+   * The note has to be rewritten as well, since "Ranks based on every boost in
+   * the index" stops being true the moment this is anything but All.
+   */
+  function applyLang(key, label) {
+    if (key === langKey) return
+    langKey = key
+    langLabel = label
+    mountFeedNote(panel, langNote(
+      follows ? copy.noteFollows : copy.noteGlobal, langKey, langLabel, langNoun,
+    ))
+    requery()
+  }
+
+  const controls = mountControls(panel?.dataset.feed || `episodes-${scope}`,
     { sortKey, rangeKey, onSort: applySort, onRange: applyRange, copy })
+
+  /* The language menu is fetched, so it arrives after the bar is up. It is
+   * INSERTED rather than re-mounted: rebuilding the group would throw away a
+   * range or sort control the reader may already have open, and would have to
+   * re-read every key to keep one from snapping back to where it started.
+   *
+   * ⚠️ NOT AWAITED, and that is the point. On the ADOPTED feed there is no
+   * first-page fetch for this to hide behind — the cards are already painted —
+   * so blocking here would push `enhance()` back by a round trip and leave
+   * thirty visible cards with dead boost buttons and drawers while a control
+   * nobody has reached for is arranged. A pill that appears late is the cheaper
+   * of the two failures.
+   *
+   * A null menu (the endpoint unavailable, or one bucket) simply never inserts,
+   * which leaves exactly the control bar that shipped before this existed.
+   */
+  langOptionsP.then((langOptions) => {
+    if (!langOptions || !controls) return
+    controls.insertBefore(
+      langControl(langOptions, langKey, applyLang),
+      // The sort pill — mountControls puts it last, and the language menu is a
+      // filter, so it belongs on the range side of it.
+      controls.lastElementChild,
+    )
+  })
 
   // Search the episodes in the current range. The show's name is the sub-line
   // because episode titles repeat across shows far more than they collide
@@ -634,6 +710,12 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
         // feed's own 'other' would happen to work, since anything that isn't
         // 'music' becomes not_medium=music, but only by accident.
         q: query, medium: medium === 'music' ? 'music' : null,
+        // ⚠️ THE LANGUAGE HAS TO TRAVEL WITH THE SEARCH, for the same reason the
+        // medium and the scope do: a suggestion the feed would then filter away
+        // to nothing is the documented failure that keeps /api/v1/search off
+        // these feeds. Rank still comes from the server and is a position in
+        // the FILTERED ordering, which is the ordering the reader is looking at.
+        lang: langKey,
         sort: sortKey, range: rangeKey, follows, signal,
       })
       return records.map((r) => ({
@@ -652,7 +734,13 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
     // What a miss MEANS depends on where the reader is standing: on All/Global
     // the search has seen the whole index, so there is no wider view to send
     // them to and the old "in this view" was pointing at one.
-    noMatchText: () => (follows ? copy.searchNoneFollows
+    //
+    // The language is tested FIRST because it is the narrowest of the filters
+    // and the only one whose fix is a single press — under Follows + German,
+    // "switch to Global" sends the reader past the filter that is actually
+    // hiding their show. See langNoMatchText.
+    noMatchText: () => (langKey !== LANG_ALL ? langNoMatchText(langKey, langLabel, langNoun)
+      : follows ? copy.searchNoneFollows
       : rangeKey === 'all' ? copy.searchNoneAll
       : copy.searchNoneRange),
   })
