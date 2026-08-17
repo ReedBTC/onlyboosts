@@ -53,28 +53,42 @@
  */
 import {
   getShowPage, searchShows, getShowEpisodes, SEARCH_HITS, SEARCH_MIN_CHARS,
-} from '/assets/js/ob-live.js?v=ob-v70'
+} from '/assets/js/ob-live.js?v=ob-v71'
 import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls,
-} from '/assets/js/feed-controls.js?v=ob-v70'
+} from '/assets/js/feed-controls.js?v=ob-v71'
 // Its own module, not two more exports of feed-controls.js — see the ⚠️ note
 // at the top of that file for the four-hour window that shape opens.
-import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v70'
+import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v71'
 import {
-  LANG_ALL, languageOptions, langControl, langNote, langNoMatchText,
-} from '/assets/js/feed-lang.js?v=ob-v70'
-import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v70'
-import { showPageHref, episodePageHref } from '/assets/js/show-link.js?v=ob-v70'
+  LANG_ALL, languageOptions, langControl, langNote, langNoMatchText, langLabelFor,
+} from '/assets/js/feed-lang.js?v=ob-v71'
+import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v71'
+import { showPageHref, episodePageHref } from '/assets/js/show-link.js?v=ob-v71'
 // Show-level boosting. Same four pieces the episode feed uses, and deliberately
 // the same ones: fromApiValue / applyExternalOverrides are where the split
 // logic lives, and sharing them is what keeps every surface paying the value
 // block a feed actually published.
-import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v70'
-import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v70'
-import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v70'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v70'
-import { boostButton, withBoostBusy } from '/assets/js/boost-button.js?v=ob-v70'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v70'
+import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v71'
+import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v71'
+import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v71'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v71'
+import { boostButton, withBoostBusy } from '/assets/js/boost-button.js?v=ob-v71'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v71'
+
+/* ── The hash's language, on an already-hydrated feed ──
+ * The twin of the map in feeds-podcasts.js, and there for the same reason: a
+ * feed hydrates once and then owns its control, so a URL pasted into an open tab
+ * needs a way in that is not the loader. One listener, keyed by feed, so Shows
+ * and Albums share it and a re-render replaces its entry rather than stacking a
+ * second listener that requeries twice.
+ */
+const LANG_APPLY = new Map()
+document.addEventListener('lb:set-feed-lang', (e) => {
+  const detail = e && e.detail
+  const apply = detail && detail.feed && LANG_APPLY.get(detail.feed)
+  if (apply) apply(detail.lang || LANG_ALL)
+})
 
 const PAGE_SIZE = 25       // show cards per "load more" batch
 const DRAWER_EPISODES = 50 // episodes listed per expanded show
@@ -596,8 +610,10 @@ function renderShowCard(s, rank, copy, since = null) {
  * @param {Element} [opts.panel]  the feed's panel, for its feed key
  * @param {Element} opts.list     the [data-feed-list] container to fill
  * @param {string}  opts.medium   'other' (Shows) | 'music' (Albums)
+ * @param {string}  [opts.lang]   the feed's OPENING language, off the hash
+ *                                (`#shows?lang=de`). Must reach the first query.
  */
-export async function renderShows({ panel, list, medium = 'other' }) {
+export async function renderShows({ panel, list, medium = 'other', lang = null }) {
   if (!list) return
   const copy = COPY[medium] || COPY.other
   const wantMusic = medium === 'music'
@@ -617,8 +633,14 @@ export async function renderShows({ panel, list, medium = 'other' }) {
   // No language filter, which is NOT the same as English: 341 shows on this
   // side of the medium split and 253 on the music side declare no <language>
   // at all, so All is the only key that holds every card. See feed-lang.js.
-  let langKey = LANG_ALL
-  let langLabel = 'All'
+  const feedKey = panel?.dataset.feed || (medium === 'music' ? 'albums' : 'shows')
+  // The hash's language is the opening state. langLabelFor names it from the
+  // subtag so the feed note reads correctly on the first paint, before the menu
+  // request has landed.
+  let langKey = (typeof lang === 'string' && lang) ? lang : LANG_ALL
+  let langLabel = langLabelFor(langKey)
+  let langOptions = null
+  let langCtl = null
   // Fired here rather than where the control is mounted, so this small GROUP BY
   // overlaps the first page's much heavier one instead of following it. It is
   // never awaited on the render path — see the insert below. `languageOptions`
@@ -842,19 +864,57 @@ export async function renderShows({ panel, list, medium = 'other' }) {
    * nobody has reached for. A null menu never inserts, which leaves exactly the
    * control bar that shipped before this existed.
    */
-  langOptionsP.then((langOptions) => {
+  function applyLang(key, label) {
+    if (key === langKey) return
+    langKey = key
+    langLabel = label || langLabelFor(key)
+    // "Ranks based on every boost in the index" stops being true the moment
+    // this is anything but All.
+    mountFeedNote(panel, langNote(copy.noteGlobal, langKey, langLabel, copy.noun))
+    // The controller writes the hash from this, so a shareable URL falls out of
+    // using the control. Reported on a COERCION too, which is what takes an
+    // unshowable language back out of the address bar.
+    document.dispatchEvent(new CustomEvent('lb:feed-lang', {
+      detail: { feed: feedKey, lang: langKey === LANG_ALL ? '' : langKey },
+    }))
+    requery()
+  }
+
+  // Rebuilt rather than mutated: sortControl owns its own label and checkmark,
+  // and an externally-set language has to move both.
+  function mountLangControl() {
     if (!langOptions || !controls) return
-    const ctl = langControl(langOptions, langKey, (key, label) => {
-      if (key === langKey) return
-      langKey = key
-      langLabel = label
-      // "Ranks based on every boost in the index" stops being true the moment
-      // this is anything but All.
-      mountFeedNote(panel, langNote(copy.noteGlobal, langKey, langLabel, copy.noun))
-      requery()
-    })
+    const next = langControl(langOptions, langKey, applyLang)
+    if (langCtl && langCtl.parentNode === controls) controls.replaceChild(next, langCtl)
     // Before the sort pill: filters together, the ordering at the end.
-    controls.insertBefore(ctl, controls.lastElementChild)
+    else controls.insertBefore(next, controls.lastElementChild)
+    langCtl = next
+  }
+
+  /* The hash, on a feed already on screen. Registered even when the menu never
+   * arrives: the QUERY works without it, so a URL can still filter a feed whose
+   * control was withheld. */
+  LANG_APPLY.set(feedKey, (key) => {
+    // ⚠️ A URL can name a language THIS feed has none of — the music half holds
+    // six buckets against the podcast half's nineteen. Coerce rather than paint
+    // an empty feed under a filter the menu cannot display as selected.
+    const want = (key && key !== LANG_ALL && langOptions
+      && !langOptions.some((o) => o[0] === key)) ? LANG_ALL : (key || LANG_ALL)
+    if (want === langKey) return
+    applyLang(want, langLabelFor(want))
+    mountLangControl()
+  })
+
+  langOptionsP.then((opts) => {
+    if (!opts || !controls) return
+    langOptions = opts
+    // ⚠️ The opening language came from a URL and nothing has checked it against
+    // what this feed holds. A stale or hand-written `?lang=` with no menu row is
+    // dropped here, which reports and rewrites the hash.
+    if (langKey !== LANG_ALL && !opts.some((o) => o[0] === langKey)) {
+      applyLang(LANG_ALL, 'All')
+    }
+    mountLangControl()
   })
 
   search = mountFeedSearch(panel, {

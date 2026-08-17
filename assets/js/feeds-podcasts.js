@@ -45,31 +45,48 @@
  * Entry point: renderPodcasts({ panel, list }) — lazy-imported by feeds.js
  * the first time the feed is opened.
  */
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v70'
-import { toEpisodeShape, normalizeBoosts, episodeApiToBoosts } from '/assets/js/ob-data.js?v=ob-v70'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v71'
+import { toEpisodeShape, normalizeBoosts, episodeApiToBoosts } from '/assets/js/ob-data.js?v=ob-v71'
 import {
   getEpisodePage, searchEpisodes, SEARCH_HITS, SEARCH_MIN_CHARS,
-} from '/assets/js/ob-live.js?v=ob-v70'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v70'
+} from '/assets/js/ob-live.js?v=ob-v71'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v71'
 import {
   rangeDays, rangeControl, sortControl, mountFeedControls,
-} from '/assets/js/feed-controls.js?v=ob-v70'
+} from '/assets/js/feed-controls.js?v=ob-v71'
 // Its own module, not two more exports of feed-controls.js — see the ⚠️ note
 // at the top of that file for the four-hour window that shape opens.
-import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v70'
+import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v71'
 import {
-  LANG_ALL, languageOptions, langControl, langNote, langNoMatchText,
-} from '/assets/js/feed-lang.js?v=ob-v70'
-import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v70'
+  LANG_ALL, languageOptions, langControl, langNote, langNoMatchText, langLabelFor,
+} from '/assets/js/feed-lang.js?v=ob-v71'
+import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v71'
 // The card, and the card's verbs. One definition each, shared with the edge.
 import {
   COPY, buildEpisodes, renderEpisodeCards, RANKED_SORTS, SORT_OPTIONS,
-} from '/assets/js/episode-card.js?v=ob-v70'
+} from '/assets/js/episode-card.js?v=ob-v71'
 import {
   wireEpisodeCards, hydrateCardProfiles, prewarmBoosting,
-} from '/assets/js/episode-card-actions.js?v=ob-v70'
+} from '/assets/js/episode-card-actions.js?v=ob-v71'
 
 const INITIAL_CARDS = 30       // episodes rendered per "load more" batch
+
+/* ── The hash's language, on an already-hydrated feed ──
+ *
+ * A feed hydrates once and then owns its own control, so the inline controller
+ * in index.html cannot reach it by re-running the loader: a URL pasted into an
+ * open tab would move the hash and leave the cards alone. This is the way in.
+ *
+ * Module-level, with ONE listener and a map keyed by feed, so the two feeds this
+ * module serves share it and a re-render (a Follows account switch) overwrites
+ * its entry rather than stacking a second listener that requeries twice.
+ */
+const LANG_APPLY = new Map()
+document.addEventListener('lb:set-feed-lang', (e) => {
+  const detail = e && e.detail
+  const apply = detail && detail.feed && LANG_APPLY.get(detail.feed)
+  if (apply) apply(detail.lang || LANG_ALL)
+})
 
 /* Re-exported because this module's name is the one three other files learned.
  *
@@ -207,8 +224,11 @@ async function loadEpisodePage({ medium, sort, range, lang, offset, follows, q =
  * @param {string}  opts.scope   'global' | 'follows'
  * @param {string}  opts.medium  'other' (Episodes) | 'music' (Songs) — which
  *                               side of <podcast:medium> this feed shows
+ * @param {string}  [opts.lang]  the feed's OPENING language, off the hash
+ *                               (`#songs-global?lang=de`). Must reach the first
+ *                               query, not be applied after one.
  */
-export async function renderPodcasts({ panel, list, scope = 'global', medium = 'other' }) {
+export async function renderPodcasts({ panel, list, scope = 'global', medium = 'other', lang = null }) {
   const copy = COPY[medium] || COPY.other
   // Ranks are meaningful on Global, where the ordering is a leaderboard over
   // the whole network. On Follows the population is just "whoever you happen
@@ -258,8 +278,14 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
   // The menu itself is fetched, so the control is mounted below rather than
   // here; until it resolves this is the only language state there is, and it is
   // the state the feed shipped in before the filter existed.
-  let langKey = LANG_ALL
-  let langLabel = 'All'
+  const feedKey = panel?.dataset.feed || `episodes-${scope}`
+  // The hash's language is the opening state. langLabelFor derives the name from
+  // the subtag so the feed note can say "German-language shows only" on the
+  // first paint, rather than a beat later when the menu lands.
+  let langKey = (typeof lang === 'string' && lang) ? lang : LANG_ALL
+  let langLabel = langLabelFor(langKey)
+  let langOptions = null
+  let langCtl = null
   // The SHOW-level noun, because <language> is a channel element. The cards on
   // these two feeds are episodes and tracks, but what the filter selects is
   // their feed, so the prose it produces has to say so.
@@ -337,6 +363,13 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
     // being hydrated, which should be impossible and must not paint the wrong
     // list if it ever is.
     if (state.scope !== scope || state.medium !== medium) return null
+    /* ⚠️ THE SERVER'S CARDS ARE UNFILTERED, AND THE SERVER CANNOT KNOW OTHERWISE.
+     * functions/index.js renders the opening Episodes · Global page with no
+     * language, and a hash is never sent to the server, so it could not honour
+     * one if it wanted to. A `#episodes-global?lang=de` load therefore has to
+     * FETCH rather than adopt — adopting would paint thirty English episodes
+     * under a German filter, with a note beneath them saying otherwise. */
+    if (langKey !== LANG_ALL) return null
     stateEl.remove()
     return { state, painted }
   }
@@ -644,12 +677,46 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
   function applyLang(key, label) {
     if (key === langKey) return
     langKey = key
-    langLabel = label
+    langLabel = label || langLabelFor(key)
     mountFeedNote(panel, langNote(
       follows ? copy.noteFollows : copy.noteGlobal, langKey, langLabel, langNoun,
     ))
+    // The controller writes the hash from this, so a shareable URL is a
+    // side-effect of the control rather than a thing the reader has to build.
+    // Reported on a COERCION too (see the menu check below), which is what takes
+    // an unshowable language back out of the address bar.
+    document.dispatchEvent(new CustomEvent('lb:feed-lang', {
+      detail: { feed: feedKey, lang: langKey === LANG_ALL ? '' : langKey },
+    }))
     requery()
   }
+
+  // Build the pill at the current key, replacing any previous one. A rebuild
+  // rather than a mutation because sortControl owns its own label and checkmark
+  // state, and an externally-set language has to move both.
+  function mountLangControl() {
+    if (!langOptions || !controls) return
+    const next = langControl(langOptions, langKey, applyLang)
+    if (langCtl && langCtl.parentNode === controls) controls.replaceChild(next, langCtl)
+    // Before the sort pill — mountControls puts it last, and the language menu
+    // is a filter, so it belongs on the range side of it.
+    else controls.insertBefore(next, controls.lastElementChild)
+    langCtl = next
+  }
+
+  /* The hash, on a feed that is already on screen. Registered even when the menu
+   * never arrives: the QUERY works without it (a different endpoint), so a URL
+   * can still filter a feed whose control was withheld. */
+  LANG_APPLY.set(feedKey, (key) => {
+    // ⚠️ A URL can name a language THIS feed has none of — German is 38 shows on
+    // the podcast side and 2 on music. Coerce rather than paint an empty feed
+    // under a filter the menu cannot even display as selected.
+    const want = (key && key !== LANG_ALL && langOptions
+      && !langOptions.some((o) => o[0] === key)) ? LANG_ALL : (key || LANG_ALL)
+    if (want === langKey) return
+    applyLang(want, langLabelFor(want))
+    mountLangControl()
+  })
 
   const controls = mountControls(panel?.dataset.feed || `episodes-${scope}`,
     { sortKey, rangeKey, onSort: applySort, onRange: applyRange, copy })
@@ -669,14 +736,17 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
    * A null menu (the endpoint unavailable, or one bucket) simply never inserts,
    * which leaves exactly the control bar that shipped before this existed.
    */
-  langOptionsP.then((langOptions) => {
-    if (!langOptions || !controls) return
-    controls.insertBefore(
-      langControl(langOptions, langKey, applyLang),
-      // The sort pill — mountControls puts it last, and the language menu is a
-      // filter, so it belongs on the range side of it.
-      controls.lastElementChild,
-    )
+  langOptionsP.then((opts) => {
+    if (!opts || !controls) return
+    langOptions = opts
+    // ⚠️ The opening language came from a URL and nothing has checked it against
+    // what this feed actually holds. A stale or hand-written `?lang=` that the
+    // menu has no row for is dropped here, which reports and rewrites the hash —
+    // the same coercion a signed-out `#episodes-follows` gets.
+    if (langKey !== LANG_ALL && !opts.some((o) => o[0] === langKey)) {
+      applyLang(LANG_ALL, 'All')
+    }
+    mountLangControl()
   })
 
   // Search the episodes in the current range. The show's name is the sub-line

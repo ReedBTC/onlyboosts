@@ -33,7 +33,7 @@
  * feed-bar controller in index.html, plus a load of whichever feed is active
  * when this module first runs).
  */
-import { STATIC_RELAYS, fetchProfilesFromPrimal } from '/assets/js/boosts-thread.js?v=ob-v70'
+import { STATIC_RELAYS, fetchProfilesFromPrimal } from '/assets/js/boosts-thread.js?v=ob-v71'
 import {
   parseCalendarEvent,
   renderCalendarCard,
@@ -44,13 +44,13 @@ import {
   clearPendingPromote,
   KIND_DATE_EVENT,
   KIND_TIME_EVENT,
-} from '/assets/js/calendar-events.js?v=ob-v70'
-import { SimplePool, verifyEvent, nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v70'
+} from '/assets/js/calendar-events.js?v=ob-v71'
+import { SimplePool, verifyEvent, nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v71'
 // Supporter-set resolution lives in one shared module; re-exported below so
 // home-feeds.js keeps importing resolveSupporters from feeds.js unchanged.
-import { resolveSupporters } from '/assets/js/supporter-set.js?v=ob-v70'
+import { resolveSupporters } from '/assets/js/supporter-set.js?v=ob-v71'
 // Identity, for keeping the Follows feeds in sync with who's signed in.
-import { getSessionPubkey, clearFollowCache } from '/assets/js/follow-set.js?v=ob-v70'
+import { getSessionPubkey, clearFollowCache } from '/assets/js/follow-set.js?v=ob-v71'
 
 // Hourly events snapshot (Cloudflare Pages Function proxying the file
 // bots/community-feeds pushes to the VPS). It carries the same raw signed
@@ -1035,7 +1035,7 @@ async function loadEvents() {
 // Every renderer reads the collector's published feed through ob-data.js
 // (Follows also through ob-live.js). Lazy-imported on first view so a visitor
 // who only opens one feed doesn't pay for the others' modules.
-async function hydrate(panelId, mod, scope, medium) {
+async function hydrate(panelId, mod, scope, medium, lang) {
   const panel = document.getElementById(panelId)
   if (!panel) return
   const list = panel.querySelector('[data-feed-list]')
@@ -1057,8 +1057,9 @@ async function hydrate(panelId, mod, scope, medium) {
     if (typeof fn !== 'function') throw new Error(`no renderer export for ${mod}`)
     // Every renderer takes the panel: it carries the feed key their range/sort
     // controls are tagged with in the sticky bar. `medium` is undefined for
-    // the Boosts feeds, which don't split.
-    await fn({ panel, list, scope, medium })
+    // the Boosts feeds, which don't split, and so is `lang` — they have no
+    // language axis, and the inline controller never puts one in their hash.
+    await fn({ panel, list, scope, medium, lang })
   } catch (e) {
     console.error('[feeds] load failed', mod, scope, medium, e)
     renderPlaceholder(list, 'Couldn\u2019t load this feed', 'Something went wrong reaching the boosts data \u2014 please try again later.')
@@ -1066,9 +1067,9 @@ async function hydrate(panelId, mod, scope, medium) {
 }
 
 // ── Lazy per-feed dispatch ───────────────────────────────────────────
-const BOOSTS = '/assets/js/boosts-feed.js?v=ob-v70'
-const PODCASTS = '/assets/js/feeds-podcasts.js?v=ob-v70'
-const SHOWS = '/assets/js/shows-feed.js?v=ob-v70'
+const BOOSTS = '/assets/js/boosts-feed.js?v=ob-v71'
+const PODCASTS = '/assets/js/feeds-podcasts.js?v=ob-v71'
+const SHOWS = '/assets/js/shows-feed.js?v=ob-v71'
 // Each module's entry point, by module. Named rather than sniffed out of the
 // path, so adding a feed is one line here instead of another branch.
 const RENDERERS = {
@@ -1076,29 +1077,36 @@ const RENDERERS = {
   [PODCASTS]: 'renderPodcasts',
   [SHOWS]: 'renderShows',
 }
+// `lang` is the feed's OPENING language, off the hash (`#shows?lang=de`) and
+// carried in the lb:feed-activate detail. It has to reach the renderer's first
+// query rather than being applied afterwards, or a shared link paints the
+// unfiltered feed and then corrects itself. The Boosts loaders take none: those
+// endpoints have no language axis.
 const LOADERS = {
   'boosts-global':    () => hydrate('panel-boosts-global', BOOSTS, 'global'),
   'boosts-follows':   () => hydrate('panel-boosts-follows', BOOSTS, 'follows'),
-  'episodes-global':  () => hydrate('panel-episodes-global', PODCASTS, 'global', 'other'),
-  'episodes-follows': () => hydrate('panel-episodes-follows', PODCASTS, 'follows', 'other'),
-  'songs-global':     () => hydrate('panel-songs-global', PODCASTS, 'global', 'music'),
-  'songs-follows':    () => hydrate('panel-songs-follows', PODCASTS, 'follows', 'music'),
+  'episodes-global':  (lang) => hydrate('panel-episodes-global', PODCASTS, 'global', 'other', lang),
+  'episodes-follows': (lang) => hydrate('panel-episodes-follows', PODCASTS, 'follows', 'other', lang),
+  'songs-global':     (lang) => hydrate('panel-songs-global', PODCASTS, 'global', 'music', lang),
+  'songs-follows':    (lang) => hydrate('panel-songs-follows', PODCASTS, 'follows', 'music', lang),
   // Both Global only — see the scope note at the top of shows-feed.js.
-  'shows':            () => hydrate('panel-shows', SHOWS, 'global', 'other'),
-  'albums':           () => hydrate('panel-albums', SHOWS, 'global', 'music'),
+  'shows':            (lang) => hydrate('panel-shows', SHOWS, 'global', 'other', lang),
+  'albums':           (lang) => hydrate('panel-albums', SHOWS, 'global', 'music', lang),
 }
 const loaded = new Set()
 
-function loadFeed(feed) {
+function loadFeed(feed, lang) {
   const loader = LOADERS[feed]
   if (!loader || loaded.has(feed)) return
   loaded.add(feed)
-  loader()
+  loader(lang)
 }
 
 document.addEventListener('lb:feed-activate', (e) => {
   const feed = e?.detail?.feed
-  if (feed) loadFeed(feed)
+  // Only read on the FIRST activation of a feed; afterwards the mounted control
+  // owns the language and the controller talks to it through lb:set-feed-lang.
+  if (feed) loadFeed(feed, e?.detail?.lang)
 })
 
 // ── Session-driven refresh ───────────────────────────────────────────

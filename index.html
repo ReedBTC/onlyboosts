@@ -49,17 +49,17 @@
 
   <!-- Shared note / card styles (.note-card, .embed-note) — the boosts
        feeds render through the same kind-1 card as boosts-thread.js. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v70" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v71" />
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v70" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v71" />
   <!-- The episode card and its drawer, extracted from the inline block below
        when /episode/<guid> pages needed the same cards. See the file header. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v70" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v71" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. Must stay last
        among the stylesheets so the inline block below still wins. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v70" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v71" />
 
   <style>
     :root {
@@ -570,8 +570,8 @@
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
     }
   </style>
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v70" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v70" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v71" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v71" />
 </head>
 <body data-active-feed="episodes-global">
 
@@ -942,6 +942,65 @@
     'podcasts-global':  'episodes-global',
     'podcasts-follows': 'episodes-follows',
   };
+  /* ── The language in the hash ──
+     `#shows?lang=de` — the feed key, then a query string. The key stays intact
+     as the part before the `?`, so FEEDS and ALIASES look up exactly as before
+     and a retired hash still upgrades; and there is room for range and sort
+     later without a second redesign of the shape.
+
+     ⚠️ LANGUAGE IS IN THE HASH AND RANGE AND SORT ARE NOT, which is a
+     deliberate asymmetry rather than an oversight. A language names a body of
+     work somebody would want to hand to somebody else ("the top German
+     podcasts"); a range and a sort are how one reader is currently looking at a
+     list. Adding them is a two-line change here when a reason turns up.
+
+     Feeds with no language axis are listed out rather than in: the Boosts feeds
+     take no `lang` at the API, so `#boosts-global?lang=de` drops the parameter
+     and rewrites, the same coercion a signed-out `#episodes-follows` gets. */
+  const LANG_FEEDS = {
+    'episodes-global': 1, 'episodes-follows': 1,
+    'songs-global': 1, 'songs-follows': 1,
+    'shows': 1, 'albums': 1,
+  };
+  // What each feed is currently filtered to, '' meaning no filter. The renderers
+  // own the control; this is the controller's copy, kept in step by the
+  // lb:feed-lang report below, and it is what the hash is written from.
+  //
+  // Per-feed rather than one shared value: each renderer hydrates once and keeps
+  // its own control, so carrying a language across a feed switch would need a
+  // command channel into an already-mounted control. The two menus also differ
+  // (German is 38 shows on the podcast side and 2 on music), so a carried value
+  // could name something the destination cannot show.
+  const langByFeed = Object.create(null);
+
+  /* ⚠️ 'all' NORMALIZES TO NO FILTER, and that guard is load-bearing. The API
+     validates `lang` by SHAPE, so 'all' is a well-formed three-letter subtag
+     that matches nothing and answers zero rows — a hand-written
+     `#shows?lang=all` would otherwise paint an empty feed. Everything else is
+     normalized the way the collector normalizes on write, so `?lang=en-US`
+     resolves to the English the reader plainly meant. */
+  function normLang(value) {
+    if (!value) return '';
+    const raw = String(value).trim().toLowerCase();
+    if (raw === 'unknown') return raw;
+    const primary = raw.split(/[-_]/)[0];
+    if (primary === 'all' || !/^[a-z]{2,3}$/.test(primary)) return '';
+    return primary;
+  }
+
+  function parseHash() {
+    const raw = (location.hash || '').replace(/^#/, '');
+    const q = raw.indexOf('?');
+    if (q < 0) return { key: raw, lang: '' };
+    var params;
+    try { params = new URLSearchParams(raw.slice(q + 1)); } catch (e) { params = null; }
+    return { key: raw.slice(0, q), lang: normLang(params && params.get('lang')) };
+  }
+
+  function hashFor(feed) {
+    const lang = langByFeed[feed] || '';
+    return '#' + feed + (lang ? '?lang=' + encodeURIComponent(lang) : '');
+  }
   const DEFAULT_TYPE = 'episodes';
   const DEFAULT_SCOPE = 'global';
   const bar = document.querySelector('.feed-bar');
@@ -1007,24 +1066,66 @@
       panel.hidden = !isActive;
     });
     syncMenus();
-    if (updateHash && ('#' + feed) !== location.hash) {
-      history.replaceState(null, '', '#' + feed);
+    if (updateHash && hashFor(feed) !== location.hash) {
+      history.replaceState(null, '', hashFor(feed));
     }
-    // Tell feeds.js (if loaded) to lazily hydrate this feed on first view.
-    document.dispatchEvent(new CustomEvent('lb:feed-activate', { detail: { feed } }));
+    // Tell feeds.js (if loaded) to lazily hydrate this feed on first view. The
+    // language rides along because it is the feed's OPENING state: a renderer
+    // has to make its first query with it, not adopt an unfiltered view and
+    // correct itself afterwards.
+    document.dispatchEvent(new CustomEvent('lb:feed-activate', {
+      detail: { feed: feed, lang: langByFeed[feed] || 'all' },
+    }));
   }
 
   function fromHash(updateHash) {
-    const raw = (location.hash || '').replace('#', '');
+    const parsed = parseHash();
+    const raw = parsed.key;
     const key = ALIASES[raw] || raw;
     const cfg = FEEDS[key];
     // An unknown hash falls back to the default *and* rewrites, so the URL
     // never keeps naming something that isn't on screen.
     if (!cfg) { setFeed(DEFAULT_TYPE, DEFAULT_SCOPE, { updateHash: true }); return; }
+    // A feed with no language axis drops the parameter rather than carrying one
+    // it cannot apply, and the rewrite below takes it out of the URL.
+    const wanted = LANG_FEEDS[key] ? parsed.lang : '';
+    const changed = (langByFeed[key] || '') !== wanted;
+    langByFeed[key] = wanted;
     // An aliased hash always rewrites, whatever the caller asked for — that's
-    // what upgrades an old link's URL to the current name.
-    setFeed(cfg.type, cfg.scope, { updateHash: key !== raw ? true : updateHash });
+    // what upgrades an old link's URL to the current name. So does a language
+    // this feed had to drop.
+    const force = key !== raw || (parsed.lang && !wanted);
+    setFeed(cfg.type, cfg.scope, { updateHash: force ? true : updateHash });
+    /* ⚠️ A HASH CHANGE ON AN ALREADY-HYDRATED FEED NEEDS A SECOND SIGNAL. The
+       activate event above is a no-op once feeds.js has loaded a feed, so a URL
+       pasted into an open tab would move the hash and leave the cards alone —
+       the view and the address bar disagreeing, which is the one thing this
+       feature must never do. This asks the mounted control to change instead.
+       It is dispatched AFTER setFeed, so on a cold load the renderer's dynamic
+       import has not resolved and nothing is listening yet; the opening state
+       comes from the activate detail and is applied exactly once. */
+    if (changed) {
+      document.dispatchEvent(new CustomEvent('lb:set-feed-lang', {
+        detail: { feed: key, lang: wanted || 'all' },
+      }));
+    }
   }
+
+  /* The renderers own the control, so they report what the reader picked and
+     the hash is written from that. Only the ACTIVE feed's language is in the
+     URL; the others are remembered so that coming back to a feed restores both
+     the view and the address. */
+  document.addEventListener('lb:feed-lang', function (e) {
+    const d = e && e.detail;
+    if (!d || !d.feed || !LANG_FEEDS[d.feed]) return;
+    const lang = normLang(d.lang);
+    if ((langByFeed[d.feed] || '') === lang) return;
+    langByFeed[d.feed] = lang;
+    if (d.feed !== feedKey(type, scope)) return;
+    // replaceState, not push: changing a filter is not a navigation, and a
+    // history entry per press would bury the page the reader arrived from.
+    if (hashFor(d.feed) !== location.hash) history.replaceState(null, '', hashFor(d.feed));
+  });
 
   // Menu behaviour, shared by both: click to toggle, outside-click or Escape
   // to close, arrows to move within an open list. Same mechanics as the sort
@@ -1098,17 +1199,17 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v70"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v71"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v70" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v71" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v70" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v71" defer></script>
 
 <!-- Feed hydration — lazily loads the active feed on first view. -->
-<script type="module" src="/assets/js/feeds.js?v=ob-v70"></script>
-<script src="/assets/js/nav.js?v=ob-v70" defer></script>
+<script type="module" src="/assets/js/feeds.js?v=ob-v71"></script>
+<script src="/assets/js/nav.js?v=ob-v71" defer></script>
 
 </body>
 </html>

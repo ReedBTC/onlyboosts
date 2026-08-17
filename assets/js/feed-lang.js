@@ -43,8 +43,8 @@
  * scrolls it (feed-cards.css). That is the real constraint; a floor would have
  * been a cap on the data to avoid solving it.
  */
-import { sortControl } from '/assets/js/feed-controls.js?v=ob-v70'
-import { getLanguages } from '/assets/js/ob-live.js?v=ob-v70'
+import { sortControl } from '/assets/js/feed-controls.js?v=ob-v71'
+import { getLanguages } from '/assets/js/ob-live.js?v=ob-v71'
 
 /** No filter. The opening state of every feed, and never sent to the API. */
 export const LANG_ALL = 'all'
@@ -74,6 +74,20 @@ function languageName(subtag) {
     } catch { /* fall through */ }
   }
   return subtag.toUpperCase()
+}
+
+/**
+ * The label for a key, without waiting for the menu.
+ *
+ * The menu is fetched, but a language arriving in the URL has to name itself in
+ * the feed note on the FIRST paint, before that request has landed. Deriving it
+ * from the subtag is what makes `#shows?lang=de` say "German-language shows
+ * only" immediately rather than a beat later.
+ */
+export function langLabelFor(key) {
+  if (!key || key === LANG_ALL) return 'All'
+  if (key === LANG_UNKNOWN) return 'Not tagged'
+  return languageName(key)
 }
 
 /**

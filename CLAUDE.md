@@ -67,6 +67,12 @@ The inline feed-bar controller in `index.html` owns the menus, which panel is on
 screen, and the hash, and dispatches `lb:feed-activate`; `assets/js/feeds.js`
 listens and lazily hydrates.
 
+**A hash may carry a language: `#shows?lang=de`.** The feed key stays intact as
+the part before the `?`, so `FEEDS` and `ALIASES` look up exactly as they did and
+a retired hash still upgrades. `LANG_FEEDS` lists the six that have the axis; the
+two Boosts feeds drop the parameter and rewrite, the same coercion a signed-out
+`#episodes-follows` gets. See **The Language Filter** for the whole mechanism.
+
 `SCOPELESS` in that controller is the set of types with no whose-axis (`shows`,
 `albums`) — their key is the bare type, and picking one leaves the scope *state*
 alone, so Boosts · Follows → Shows → Episodes returns you to Follows. Adding
@@ -1008,6 +1014,49 @@ pattern the three detail pages share.
 
 **The Boosts feeds have no language axis**: `/api/v1/boosts` and
 `/api/v1/boosts/follows` take no `lang`. That is backend work, not a decision.
+
+### The Language In The Hash
+
+`#shows?lang=de` is a shareable view: the top German shows, the top German
+episodes. **Language is in the hash and range and sort are not**, which is a
+decision rather than an oversight. A language names a body of work somebody would
+hand to somebody else; a range and a sort are how one reader is currently looking
+at a list. The shape leaves room for them if a reason turns up.
+
+Five pieces, and the awkward ones are all about a feed that is *already on
+screen*:
+
+- **`normLang` in the controller.** `?lang=en-US` normalizes to `en` the way the
+  collector normalizes on write. **⚠️ `?lang=all` normalizes to NO FILTER**,
+  because the API validates by shape and would take `all` as a well-formed subtag
+  matching zero rows.
+- **The opening language rides `lb:feed-activate`** into `feeds.js` and on into
+  the renderer, so it reaches the **first** query. Applying it after one would
+  paint the unfiltered feed and then correct itself.
+- **⚠️ A LANGUAGE IN THE HASH REFUSES THE SERVER'S CARDS.** `functions/index.js`
+  renders the opening Episodes · Global page unfiltered, and a hash never reaches
+  the server, so `adoptServerCards()` returns null whenever `langKey` is set.
+  Adopting would paint thirty English episodes under a German filter with a note
+  beneath them saying otherwise.
+- **⚠️ `lb:set-feed-lang` exists because a hydrated feed cannot be re-loaded.**
+  `feeds.js` runs each loader once, so a URL pasted into an open tab would move
+  the hash and leave the cards alone. Each renderer module keeps a `LANG_APPLY`
+  map and **one** listener, so a re-render replaces its entry rather than
+  stacking a second listener that requeries twice.
+- **`lb:feed-lang` reports back**, and the controller writes the hash from it. So
+  a shareable URL is a side effect of using the control, not something the reader
+  assembles.
+
+**Coercion happens twice, and both are the `#episodes-follows` precedent.** A
+feed with no language axis drops the parameter; and when the menu lands, a
+language it has no row for is dropped, reported, and taken out of the address
+bar. The report is what keeps the URL from naming a view that is not on screen.
+
+**Language does not carry across a feed switch.** Each renderer hydrates once and
+owns its own control, so carrying one would need a command channel into an
+already-mounted control; the two menus also differ, so a carried value could name
+something the destination cannot show. `langByFeed` remembers each feed's
+language, so returning to a feed restores both the view and the address.
 
 ### Search
 
