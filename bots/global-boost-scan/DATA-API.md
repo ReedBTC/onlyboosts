@@ -264,9 +264,10 @@ Follows views light up only once someone signs in.
   `<itunes:image>` (e.g. Homegrown Hits, whose `<image>` 404s), so an `<img>` that just
   points at `img` shows nothing. Wire an `onError` that advances `img → art2 → placeholder`
   tile (see BMB's `PodcastCover`). Present in the boost-feed `podcast` object and the
-  per-show `show` object; **not yet in the D1 `/api/v1` `podcasts` table** (pending a remote
-  `ALTER TABLE podcasts ADD COLUMN artwork TEXT` + backfill), so SSR/API consumers get null
-  there until that ships.
+  per-show `show` object, **and in the D1 `/api/v1` `podcasts` table** — the remote
+  `ALTER TABLE podcasts ADD COLUMN artwork TEXT` + backfill shipped, and `d1_sync.py`
+  un-gated the projection in `6be0eb5`, so SSR/API consumers get it too. (Verified live:
+  2 of the top 200 shows carry one — coverage is genuinely small, not missing.)
 - **⚠️ `client` IS ALMOST ALWAYS NULL; USE `client_id`.** The NIP-89 `client` tag is on
   **1.3%** of the corpus (291 of 22,968) and is absent from the app behind ~94% of it, so
   the raw tag alone reports the ecosystem as five hobby projects. `client_id` and
