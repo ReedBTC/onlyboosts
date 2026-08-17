@@ -42,7 +42,8 @@ def write_json(path, obj):
 _EFF = db.effective_guid("b")
 _FEED_SQL = f"""
 SELECT b.event_id, b.booster_pubkey, b.booster_npub, b.created_at, b.sats,
-       b.amount_source, b.message, b.client, {_EFF} AS podcast_guid, b.item_guid,
+       b.amount_source, b.message, b.client, b.client_id, b.client_via,
+       {_EFF} AS podcast_guid, b.item_guid,
        b.item_url, b.show_url,
        e.title AS ep_title, e.image AS ep_image, e.published AS ep_pub,
        e.enclosure_url AS ep_url, e.episode_number AS ep_num,
@@ -64,7 +65,14 @@ def _record(r):
         "sats":   r["sats"],
         "src":    r["amount_source"],
         "msg":    r["message"],
+        # The publisher's own NIP-89 tag, as signed. On ~1.3% of boosts.
         "client": r["client"],
+        # DERIVED attribution — see bots/global-boost-scan/clients.py. `client_id`
+        # is the app that PUBLISHED the note; `client_via` is the app a relayed
+        # boost came from, and is only ever set under a relaying publisher. Null
+        # client_id means unattributed (~0.2%) and must not be read as any app.
+        "client_id": r["client_id"],
+        "client_via": r["client_via"],
         "booster": {
             "pk":   r["booster_pubkey"],
             "npub": r["booster_npub"],

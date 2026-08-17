@@ -36,7 +36,15 @@ CREATE TABLE IF NOT EXISTS boosts (
     item_url        TEXT,
     show_url        TEXT,
     message         TEXT,
-    client          TEXT,
+    client          TEXT,          -- RAW NIP-89 client tag, exactly as signed. On 1.3%
+                                   -- of boosts. Never overwritten by the classifier.
+    -- Derived by clients.py — OUR inference, not anything a publisher wrote.
+    client_id       TEXT,          -- slug of the app that PUBLISHED the note
+    client_via      TEXT,          -- for a relayed boost, the app it came FROM. Only
+                                   -- chadf-boostbot sets this; those apps published
+                                   -- nothing to Nostr, so they are never a client_id.
+    client_src      TEXT,          -- how client_id was reached: boostbot-pubkey |
+                                   -- client-tag | fountain-itag. NULL = unattributed.
     r_urls          TEXT,          -- JSON array
     raw_json        TEXT,          -- full signed event, for anything we didn't model
     excluded        INTEGER NOT NULL DEFAULT 0
@@ -345,6 +353,12 @@ def _migrate(conn):
         conn.execute("ALTER TABLE boosts ADD COLUMN canonical_guid TEXT")
     if "excluded" not in cols:
         conn.execute("ALTER TABLE boosts ADD COLUMN excluded INTEGER NOT NULL DEFAULT 0")
+    for col in ("client_id", "client_via", "client_src"):
+        if col not in cols:
+            conn.execute(f"ALTER TABLE boosts ADD COLUMN {col} TEXT")
+    # Rows migrate with these NULL; `reclassify-clients` fills them from raw_json,
+    # which is the only input the classifier needs.
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_boosts_client_id ON boosts(client_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_boosts_canonical ON boosts(canonical_guid)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_boosts_excluded  ON boosts(excluded)")
     show_cols = {r[1] for r in conn.execute("PRAGMA table_info(shows)")}
@@ -411,10 +425,10 @@ def upsert_boosts(conn, boosts):
         """INSERT OR IGNORE INTO boosts
            (event_id, booster_pubkey, booster_npub, created_at, sats,
             amount_source, podcast_guid, item_guid, item_url, show_url,
-            message, client, r_urls, raw_json)
+            message, client, client_id, client_via, client_src, r_urls, raw_json)
            VALUES (:event_id, :booster_pubkey, :booster_npub, :created_at, :sats,
             :amount_source, :podcast_guid, :item_guid, :item_url, :show_url,
-            :message, :client, :r_urls, :raw_json)""",
+            :message, :client, :client_id, :client_via, :client_src, :r_urls, :raw_json)""",
         [{
             "event_id":       b["event_id"],
             "booster_pubkey": b["booster_pubkey"],
@@ -428,6 +442,11 @@ def upsert_boosts(conn, boosts):
             "show_url":       b.get("show_url"),
             "message":        b.get("message"),
             "client":         b.get("client"),
+            # Derived, defaulted so a caller that predates the classifier writes
+            # NULL rather than failing the bind — `reclassify-clients` fills them.
+            "client_id":      b.get("client_id"),
+            "client_via":     b.get("client_via"),
+            "client_src":     b.get("client_src"),
             "r_urls":         json.dumps(b.get("r_urls") or []),
             "raw_json":       json.dumps(b["raw"]) if b.get("raw") is not None else None,
         } for b in boosts],

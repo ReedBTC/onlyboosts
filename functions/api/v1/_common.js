@@ -166,6 +166,7 @@ export function langWhere(lang, col, args) {
 export const BOOST_SELECT = `
   SELECT b.event_id, b.booster_pubkey, b.booster_npub, b.created_at, b.sats,
          b.amount_source, b.podcast_guid, b.item_guid, b.item_url, b.client, b.message,
+         b.client_id, b.client_via,
          p.title AS p_title, p.image AS p_image, p.feed_url AS p_feed,
          e.title AS e_title, e.image AS e_image, e.published AS e_pub,
          e.episode_number AS e_num, e.enclosure_url AS e_url,
@@ -182,7 +183,12 @@ export function boostRecord(r) {
     sats: r.sats,
     src: r.amount_source,
     msg: r.message,
+    // The publisher's own NIP-89 tag, as signed — present on ~1.3% of boosts.
     client: r.client,
+    // DERIVED attribution (collector's clients.py): `id` is the app that
+    // PUBLISHED the note, `via` the app a relayed boost came from. A null `id`
+    // is unattributed and must not be rendered as any app.
+    client_app: { id: r.client_id || null, via: r.client_via || null },
     /* ⚠️ `dname` IS ADDITIVE AND `name` DID NOT CHANGE MEANING. The three detail
      * pages print `display_name` in preference to `name` — that is what
      * boost-list.js#displayName does, and it is what those pages have always

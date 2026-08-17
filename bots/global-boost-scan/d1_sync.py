@@ -49,7 +49,8 @@ def _boost_rows(conn):
     eg = db.effective_guid("")
     rows = conn.execute(
         f"""SELECT event_id, booster_pubkey, booster_npub, created_at, sats, amount_source,
-                  {eg} AS podcast_guid, item_guid, item_url, client, message
+                  {eg} AS podcast_guid, item_guid, item_url, client,
+                  client_id, client_via, message
            FROM boosts WHERE {db.not_excluded('')}""").fetchall()
     for r in rows:
         yield r
@@ -97,10 +98,11 @@ def build_full_sql(conn):
     for r in _boost_rows(conn):
         out.append(
             "INSERT INTO boosts (event_id,booster_pubkey,booster_npub,created_at,sats,"
-            "amount_source,podcast_guid,item_guid,item_url,client,message) VALUES ("
+            "amount_source,podcast_guid,item_guid,item_url,client,client_id,client_via,message) VALUES ("
             f"{q(r['event_id'])},{q(r['booster_pubkey'])},{q(r['booster_npub'])},{q(r['created_at'])},"
             f"{q(r['sats'])},{q(r['amount_source'])},{q(r['podcast_guid'])},"
-            f"{q(r['item_guid'])},{q(r['item_url'])},{q(r['client'])},{q(r['message'])});")
+            f"{q(r['item_guid'])},{q(r['item_url'])},{q(r['client'])},"
+            f"{q(r['client_id'])},{q(r['client_via'])},{q(r['message'])});")
         if r["message"]:
             out.append("INSERT INTO boosts_fts (event_id,message) VALUES ("
                        f"{q(r['event_id'])},{q(r['message'])});")
@@ -280,10 +282,11 @@ def build_delta_sql(conn, rows):
     for r in rows:
         out.append(
             "INSERT OR IGNORE INTO boosts (event_id,booster_pubkey,booster_npub,created_at,sats,"
-            "amount_source,podcast_guid,item_guid,item_url,client,message) VALUES ("
+            "amount_source,podcast_guid,item_guid,item_url,client,client_id,client_via,message) VALUES ("
             f"{q(r['event_id'])},{q(r['booster_pubkey'])},{q(r['booster_npub'])},{q(r['created_at'])},"
             f"{q(r['sats'])},{q(r['amount_source'])},{q(r['podcast_guid'])},"
-            f"{q(r['item_guid'])},{q(r['item_url'])},{q(r['client'])},{q(r['message'])});")
+            f"{q(r['item_guid'])},{q(r['item_url'])},{q(r['client'])},"
+            f"{q(r['client_id'])},{q(r['client_via'])},{q(r['message'])});")
         if r["message"]:
             out.append("INSERT INTO boosts_fts (event_id,message) VALUES ("
                        f"{q(r['event_id'])},{q(r['message'])});")
@@ -438,7 +441,8 @@ def _unsynced_boosts(conn):
     eg = db.effective_guid("b")
     return conn.execute(
         f"""SELECT b.event_id,b.booster_pubkey,b.booster_npub,b.created_at,b.sats,
-                  b.amount_source,{eg} AS podcast_guid,b.item_guid,b.item_url,b.client,b.message
+                  b.amount_source,{eg} AS podcast_guid,b.item_guid,b.item_url,b.client,
+                  b.client_id,b.client_via,b.message
            FROM boosts b LEFT JOIN d1_boosts_synced d ON d.event_id=b.event_id
            WHERE d.event_id IS NULL AND {db.not_excluded('b')}""").fetchall()
 
@@ -632,6 +636,44 @@ def cmd_remote_podroll(args):
     print(f"D1 podroll: replaced with {len(stmts) - 1} edge(s)")
 
 
+def cmd_remote_clients(args):
+    """Push client attribution onto boosts D1 ALREADY HAS, as UPDATEs.
+
+    ⚠️ THE DELTA CANNOT DO THIS. `build_delta_sql` is INSERT OR IGNORE — it
+    carries NEW boosts, so a re-derived column on an existing row is silently
+    dropped. Attribution is derived rather than signed, so it changes when
+    clients.py changes, on rows that were pushed long ago. Hence a separate
+    verb, run after `onlyboosts_globalscan.py reclassify-clients`.
+
+    New boosts need none of this: the delta's INSERT carries the columns, so
+    this is only ever for a rule change or the initial population.
+    """
+    cf = _cf(load_config(CREDENTIALS))
+    if not cf:
+        print("[error] CF_ACCOUNT_ID / CF_D1_DATABASE_ID / CF_API_TOKEN missing from credentials.env")
+        return
+    conn = db.connect(DB_PATH)
+    rows = conn.execute(
+        f"""SELECT event_id, client_id, client_via FROM boosts
+            WHERE {db.not_excluded('')}""").fetchall()
+    # Only rows with something to say: a NULL/NULL update over ~22k rows would be
+    # thousands of statements asserting the default D1 already holds.
+    rows = [r for r in rows if r["client_id"] or r["client_via"]]
+    stmts = [f"UPDATE boosts SET client_id={q(r['client_id'])},"
+             f"client_via={q(r['client_via'])} WHERE event_id={q(r['event_id'])};"
+             for r in rows]
+    print(f"pushing attribution for {len(stmts)} boost(s)...")
+    BATCH = 100
+    for i in range(0, len(stmts), BATCH):
+        ok, detail = _d1_exec(*cf, "\n".join(stmts[i:i + BATCH]))
+        if not ok:
+            print(f"[error] batch {i // BATCH} failed: {detail}")
+            return
+        if (i // BATCH) % 50 == 0:
+            print(f"  …{min(i + BATCH, len(stmts))}/{len(stmts)}", flush=True)
+    print(f"pushed {len(stmts)} statements to D1")
+
+
 def cmd_rebuild_fts(args):
     """Drop and repopulate the podcasts/episodes FTS tables.
 
@@ -701,6 +743,8 @@ def main():
     ap.add_argument("--remote-delta", action="store_true", help="push only boosts new since last sync (for the timer)")
     ap.add_argument("--remote-podroll", action="store_true",
                     help="replace the podroll projection (run after the weekly podroll pass)")
+    ap.add_argument("--remote-clients", action="store_true",
+                    help="push re-derived client attribution onto existing D1 boosts")
     ap.add_argument("--rebuild-fts", action="store_true",
                     help="drop + repopulate podcasts_fts/episodes_fts (needed after a column change)")
     ap.add_argument("--mark-all-synced", action="store_true", help="one-time: mark all current boosts as already in D1")
@@ -715,6 +759,8 @@ def main():
         cmd_remote_delta(args)
     elif args.remote_podroll:
         cmd_remote_podroll(args)
+    elif args.remote_clients:
+        cmd_remote_clients(args)
     elif args.rebuild_fts:
         cmd_rebuild_fts(args)
     elif args.mark_all_synced:

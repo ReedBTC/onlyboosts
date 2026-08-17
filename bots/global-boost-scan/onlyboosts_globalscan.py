@@ -27,6 +27,7 @@ import subprocess
 import sys
 import threading
 import time
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
@@ -37,6 +38,7 @@ sys.path.insert(0, str(HERE.parent / "shared"))
 import db                                                       # noqa: E402
 import enrich                                                   # noqa: E402
 import excludes                                                 # noqa: E402
+import clients                                                  # noqa: E402
 import fountain                                                 # noqa: E402
 import export as export_mod                                     # noqa: E402
 import podroll                                                  # noqa: E402
@@ -668,6 +670,66 @@ def cmd_push(args):
         print("push OK" if not args.dry_run else "dry-run OK (nothing written)")
 
 
+def cmd_reclassify_clients(args):
+    """Recompute client attribution for stored boosts from their signed events.
+
+    A RE-DERIVATION, NOT A BACKFILL, and that is why it is a standing command
+    rather than a one-shot script: the classifier's inputs are all in `raw_json`,
+    so when a rule changes — a new relay bot, a client that starts tagging
+    itself — the fix is to edit clients.py and run this again. It rewrites
+    `client_id`/`client_via`/`client_src` in place and never touches the raw
+    `client` tag.
+
+    Idempotent. `--only-missing` restricts to rows never classified, which is the
+    normal case after a migration; the default re-derives everything, which is
+    what you want after a rule change.
+    """
+    conn = db.connect(DB_PATH, check_same_thread=False)
+    where = "WHERE client_src IS NULL" if args.only_missing else ""
+    rows = conn.execute(f"SELECT event_id, raw_json, client_id, client_via, client_src "
+                        f"FROM boosts {where}").fetchall()
+    print(f"classifying {len(rows)} boost(s)...")
+    updates, changed, no_raw = [], 0, 0
+    tally, vias = Counter(), Counter()
+    for r in rows:
+        if not r["raw_json"]:
+            no_raw += 1
+            continue
+        try:
+            event = json.loads(r["raw_json"])
+        except (ValueError, TypeError):
+            no_raw += 1
+            continue
+        c = clients.classify_client(event)
+        tally[c["client_id"] or "(unattributed)"] += 1
+        if c["client_via"]:
+            vias[c["client_via"]] += 1
+        if (c["client_id"], c["client_via"], c["client_src"]) != (
+                r["client_id"], r["client_via"], r["client_src"]):
+            changed += 1
+            updates.append((c["client_id"], c["client_via"], c["client_src"], r["event_id"]))
+    if not args.dry_run and updates:
+        conn.executemany("UPDATE boosts SET client_id=?, client_via=?, client_src=? "
+                         "WHERE event_id=?", updates)
+        conn.commit()
+    print(f"  changed {changed} row(s)" + ("   (dry-run, nothing written)" if args.dry_run else ""))
+    if changed and not args.dry_run:
+        # ⚠️ The boost delta is INSERT OR IGNORE — it exists to carry NEW boosts,
+        # so it will not update a column on a row D1 already has. A re-derivation
+        # reaches the query layer through `d1_sync.py --remote-clients`, which
+        # emits UPDATEs. Nothing else re-pushes these columns.
+        print("  → run `python3 d1_sync.py --remote-clients` to push these to D1")
+    if no_raw:
+        print(f"  {no_raw} row(s) had no usable raw event and were left alone")
+    print("\n  client_id:")
+    for k, v in tally.most_common():
+        print(f"    {clients.display_name(k):22} {v:6}")
+    if vias:
+        print("\n  client_via (relayed through chadf-boostbot):")
+        for k, v in vias.most_common():
+            print(f"    {clients.display_name(k):22} {v:6}")
+
+
 def cmd_excludes(args):
     """Validate excludes.json and report what each entry currently hides.
 
@@ -788,6 +850,13 @@ def main():
     xc = sub.add_parser("excludes",
                         help="validate excludes.json and report what each entry hides")
     xc.set_defaults(func=cmd_excludes)
+
+    rc = sub.add_parser("reclassify-clients",
+                        help="re-derive which app published each boost (clients.py)")
+    rc.add_argument("--only-missing", action="store_true",
+                    help="only rows never classified (default: re-derive all)")
+    rc.add_argument("--dry-run", action="store_true")
+    rc.set_defaults(func=cmd_reclassify_clients)
 
     s = sub.add_parser("stats", help="print index counts")
     s.set_defaults(func=cmd_stats)

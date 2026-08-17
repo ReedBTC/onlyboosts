@@ -18,6 +18,8 @@ import bech32
 
 from nostr_utils import hex_to_npub
 
+import clients
+
 # ── OnlyBoosts scope toggles ──────────────────────────────────────────────────
 INCLUDE_SHOW_LEVEL = True        # keep boosts that only name the show, no episode
 EXCLUDE_FEED_GUIDS = frozenset() # feed guids to drop (empty = keep everything)
@@ -227,6 +229,11 @@ def classify_boost(event, receipt_cache, receipt_fetch=None):
         "amount_source":  amount_source or "none",
         "message":        strip_fountain_trailer(event.get("content", "") or ""),
         "client":         client,
+        # Derived attribution — see clients.py. Computed here so a boost is
+        # classified once, at ingest, from the event we already have in hand.
+        # `reclassify-clients` recomputes the same thing for stored rows when a
+        # rule changes; both read the signed event and nothing else.
+        **clients.classify_client(event),
         "podcast_guid":   podcast_guid,
         "item_guid":      item_guid,
         "item_url":       item_url,

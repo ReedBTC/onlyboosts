@@ -96,7 +96,9 @@ export derives both from one list, so they can't disagree. Two consequences:
   "sats": 4500,               // integer, or null if the amount couldn't be resolved
   "src": "zap_receipt",       // how sats were derived: amount_tag | zap_receipt | t_tag | none
   "msg": "…boostagram text…", // verbatim (may contain nostr: mentions / URLs); may be ""
-  "client": null,             // e.g. "Fountain" — often null (no client tag)
+  "client": null,             // RAW NIP-89 client tag, as signed. Null on 98.7% — see below
+  "client_id": "fountain",    // DERIVED: the app that PUBLISHED the note. Null = unattributed
+  "client_via": null,         // DERIVED: for a RELAYED boost, the app it came from
   "booster": {
     "pk":   "0427…63e5",      // pubkey hex
     "npub": "npub1…",         // always present
@@ -265,6 +267,25 @@ Follows views light up only once someone signs in.
   per-show `show` object; **not yet in the D1 `/api/v1` `podcasts` table** (pending a remote
   `ALTER TABLE podcasts ADD COLUMN artwork TEXT` + backfill), so SSR/API consumers get null
   there until that ships.
+- **⚠️ `client` IS ALMOST ALWAYS NULL; USE `client_id`.** The NIP-89 `client` tag is on
+  **1.3%** of the corpus (291 of 22,968) and is absent from the app behind ~94% of it, so
+  the raw tag alone reports the ecosystem as five hobby projects. `client_id` and
+  `client_via` are the collector's own attribution (`clients.py`), derived from three
+  signals: a `fountain.fm` URL in the NIP-73 i-tag (21,615 boosts), a known publisher
+  pubkey (1,025), and the NIP-89 tag itself (291). ~39 boosts resolve to nothing and are
+  left **null** rather than guessed. The raw `client` is never overwritten — a consumer
+  has to be able to tell the publisher's own claim from our inference.
+  Live split: `fountain` 21,615 · `chadf-boostbot` 994 · `boostmebitch` 193 ·
+  `localbitcoiners` 70 · `lnaddress-music` 31 · `bowlafterbowl` 18 · `onlyboosts` 8 ·
+  `pv4v` 2 · unattributed 39.
+- **⚠️ `client_via` IS A SUBCATEGORY, NOT A CLIENT, and flattening the two misreports the
+  ecosystem.** `chadf-boostbot` republishes boosts made in apps that speak **no NIP-73 at
+  all** — Castamatic (294), StableKraft (260), PodcastGuru (157), CurioCaster (56),
+  LN Beats (21), Podverse (3) — naming each in its own message body. Those apps published
+  nothing to Nostr; the bot did. So they appear under `client_via`, nested inside the
+  bot's row, and must never be promoted to a top-level client: doing so credits six apps
+  with supporting a spec none of them implement. `GET /api/v1/clients` returns them nested
+  for exactly this reason.
 - **`episode.guid` may be a URL**, not a UUID — don't parse it as one.
 - **`msg` is verbatim** — may contain `nostr:` mentions and links; render/escape accordingly (don't strip).
 - **Timestamps are unix seconds** (multiply by 1000 for JS `Date`).

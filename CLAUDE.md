@@ -2007,8 +2007,75 @@ column to an existing table, so `d1/schema.sql` and the live remote are kept in
 step by hand. The backfill reached D1 through the **metadata-drift pass**: bumping
 `shows.updated_at` is what makes a row due.
 
-**Still open: the UI.** No feed carries a language control yet, and the Boosts
-endpoints take no `lang`.
+The UI shipped in `e870b93` — see the language-menu section under Feed loaders.
+**Still open:** the Boosts endpoints take no `lang`, so the note feeds have no
+language axis.
+
+## Who published a boost: `client_id`
+
+`clients.py` in the collector, `client_id` / `client_via` / `client_src` on
+`boosts`, `client_id` + `client_via` in D1 and the shards, `GET /api/v1/clients`
+for the breakdown. **A derived classification, not a field anyone published** —
+the raw `client` column stays exactly as signed and is never overwritten, which
+is why the derivation lands in its own columns with a `client_src` recording how
+each answer was reached.
+
+**The NIP-89 `client` tag is on 1.3% of the corpus** (291 of 22,968) and is
+absent from the app behind ~94% of it, so reading the tag alone reports the
+ecosystem as five hobby projects. Three signals cover everything but 39 boosts:
+
+| signal | boosts | `client_src` |
+|---|---|---|
+| `fountain.fm` URL in the NIP-73 i-tag | 21,615 | `fountain-itag` |
+| a known publisher pubkey | 1,025 | `publisher-pubkey` |
+| the NIP-89 tag itself | 291 | `client-tag` |
+| nothing — left **null**, never guessed | 39 | — |
+
+Live: `fountain` 21,615 · `chadf-boostbot` 994 · `boostmebitch` 193 ·
+`localbitcoiners` 70 · `lnaddress-music` 31 · `bowlafterbowl` 18 · `onlyboosts` 8
+· `pv4v` 2.
+
+**⚠️ THE PUBLISHER IS THE CLIENT; THE APP IT RELAYS IS NOT.** `chadf-boostbot`
+republishes boosts made in apps that speak **no NIP-73 at all** — Castamatic 294,
+StableKraft 260, PodcastGuru 157, CurioCaster 56, LN Beats 21, Podverse 3 —
+naming each in its own message body as `📱 via <App>`. Those apps land in
+`client_via`, nested under the bot, and are **never** promoted to `client_id`:
+they published nothing to Nostr, and listing them as clients would credit six
+apps with supporting a spec none of them implement. `/api/v1/clients` returns
+them nested rather than flat so a consumer cannot accidentally merge the two.
+
+That precedence is structural, not conventional — the publisher pubkey is tested
+**first**, so a `client` tag naming a relayed app could never promote it.
+
+Three measurements that shaped the rules, each of which would otherwise be a
+plausible-looking mistake:
+
+- **⚠️ `fountain.fm` and `feeds.fountain.fm` are different things.** The first is
+  the app, linked from its own i-tags; the second is Fountain's RSS *hosting*,
+  which appears in a boost from any app to a show hosted there — 24 of them, every
+  one published by the bot. The host is matched **exactly**; a substring test reads
+  Chad's PodcastGuru relays as Fountain.
+- **A bare `via X` regex over message text is unusable.** It finds 110 matches
+  outside the bot that are ordinary prose ("Ark is amazing.", "…exporting products
+  via NIP-99!"), so `via` is only ever read from the bot's own emoji-anchored line.
+- **The `nostr:nevent` in a Fountain note** quotes a zap receipt whose author hint
+  is a constant Fountain pubkey — a real second identifier that adds **0** rows the
+  i-tag rule doesn't already have, so the bech32 decoder it needs isn't carried.
+
+`SLUG_ALIASES` is deliberately tiny. A slug is opaque and unique, so merging two
+is a **claim** that two projects are one; `v4v-music`/`v4vmusic-com` and
+`itdv-app`/`itdv-lightning` are each plausibly one thing and are **not** merged,
+because that is a display decision made with knowledge the module doesn't have.
+
+**Re-derivation, not a backfill.** `onlyboosts_globalscan.py reclassify-clients`
+recomputes every row from `raw_json`, so a rule change is an edit plus a re-run;
+new boosts are classified inline at ingest by `classify.py`. **⚠️ The boost delta
+is `INSERT OR IGNORE`** and will not update a column on a row D1 already has, so
+a re-derivation reaches the query layer only through
+`d1_sync.py --remote-clients`, which emits UPDATEs. Nothing else re-pushes them.
+
+**Still open: the UI.** Nothing renders attribution yet; `/stats` is where a
+"boosts by app" breakdown belongs, and `/api/v1/clients` is what it reads.
 
 ## Not indexed: `podcast:person`
 

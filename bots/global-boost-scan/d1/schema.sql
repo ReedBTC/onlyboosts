@@ -16,9 +16,17 @@ CREATE TABLE IF NOT EXISTS boosts (
   podcast_guid   TEXT,
   item_guid      TEXT,
   item_url       TEXT,
-  client         TEXT,
+  client         TEXT,                   -- RAW NIP-89 tag as signed; on ~1.3% of boosts
+  -- ⚠️ ADDED OUT-OF-BAND with ALTER TABLE ... ADD COLUMN on the live remote, the
+  -- same way `language`, `artwork` and the profiles fields were.
+  -- DERIVED by the collector's clients.py — our inference, not a publisher's claim.
+  client_id      TEXT,                   -- app that PUBLISHED the note; NULL = unattributed
+  client_via     TEXT,                   -- app a RELAYED boost came from (only under a
+                                         -- relaying publisher, e.g. chadf-boostbot). Those
+                                         -- apps speak no NIP-73 and are never a client_id.
   message        TEXT
 );
+CREATE INDEX IF NOT EXISTS idx_boosts_client ON boosts(client_id);
 CREATE INDEX IF NOT EXISTS idx_boosts_created ON boosts(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_boosts_podcast ON boosts(podcast_guid, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_boosts_item    ON boosts(item_guid, created_at DESC);
