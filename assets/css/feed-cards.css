@@ -380,10 +380,17 @@ a.pcast-show-link:hover { text-decoration: underline; }
 /* Rank badge — only rendered on the quantitative sorts (most boosters /
    boosts / sats), where position is a ranking rather than chronology.
    Tabular figures keep the column steady from 1 to 999. */
+/* ⚠️ THE MIN-WIDTH IS AN ALIGNMENT FLOOR, NOT DECORATION. Each card is its own
+   flex row, so a wider numeral pushes that card's artwork right and the run of
+   cards stops lining up. `T` costs roughly one character, which is what took
+   this from 1.6rem: it holds "T99" and "999" at this size, covering what a
+   reader sees before they have paged deep enough for four digits. A rank wider
+   than the floor still grows the column — the floor buys alignment for the
+   common case rather than clipping the uncommon one. */
 .pcast-rank {
   flex: 0 0 auto;
   align-self: flex-start;
-  min-width: 1.6rem;
+  min-width: 2.3rem;
   padding-top: 0.15rem;
   font-family: 'Playfair Display', Georgia, serif;
   font-weight: 700;
@@ -394,7 +401,7 @@ a.pcast-show-link:hover { text-decoration: underline; }
   text-align: right;
 }
 @media (max-width: 640px) {
-  .pcast-rank { min-width: 1.2rem; font-size: 0.95rem; }
+  .pcast-rank { min-width: 1.8rem; font-size: 0.95rem; }
 }
 
 /* ── Boost drawer — a low-profile full-width toggle under the head. ──

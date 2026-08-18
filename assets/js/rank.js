@@ -18,12 +18,10 @@
  * Competition ranking is honest at both ends, which is why no cutoff is needed:
  * that same episode prints #2274 and every word of it is true.
  *
- * ⚠️ THE FEEDS PRINT THE NUMERAL AND NOT THE "T", and the detail pages print
- * both. That is not an inconsistency: a tie on a feed is VISIBLE, because the
- * two cards sit next to each other showing one numeral and the same figure,
- * where a stat tile on /show has no list around it and needs the marker to say
- * so. It also means a feed never has to know whether a tie continues past the
- * rows it has loaded, which it cannot know.
+ * ⚠️ THE "T" IS ON EVERY SURFACE, in two forms: a feed card prints `T4` beside
+ * the card and a detail-page tile prints `T#4` in its chip, because the tile
+ * stands alone where the card sits in the list it is a rank on. `T4` is golf's
+ * own form; `T#4` would be the two conventions stacked.
  *
  * TWO-SIDED, so it is imported by the browser and inlined into a Pages Function
  * off the filesystem, and therefore carries no imports of its own at all.
@@ -38,31 +36,54 @@
  * 0 and only ever append, so the browser always holds every row ahead of the
  * one it is numbering.
  *
+ * ⚠️ `tied` IS ONLY AS COMPLETE AS THE ROWS YOU PASS. It is true when a loaded
+ * neighbour (or the seed) shares the value, so the LAST row of an open-ended
+ * list reports a tie it shares backwards and cannot see one that continues into
+ * rows not yet fetched. That direction of error is the safe one — the rank
+ * itself is still right, and the row simply does not yet disclose its tie — and
+ * it resolves the moment more rows arrive and this is recomputed. The feeds
+ * therefore re-sync their painted labels after every append.
+ *
  * @param {Array} list        rows already in rank order
  * @param {(row:any, i:number)=>number} valueOf  the figure the sort ranks on
  * @param {object} [seed]
  * @param {number} [seed.startIndex]  absolute position of list[0] (default 0)
  * @param {?number} [seed.prevValue]  value of the row before list[0], if any
  * @param {?number} [seed.prevRank]   rank of that row
- * @returns {number[]} one 1-based rank per row
+ * @returns {{rank:number, tied:boolean}[]}
  */
 export function competitionRanks(list, valueOf, seed = null) {
   const startIndex = seed && Number.isFinite(seed.startIndex) ? seed.startIndex : 0
   const hasPrev = seed != null && seed.prevValue != null && Number.isFinite(seed.prevRank)
+  const vals = list.map(valueOf)
   const out = new Array(list.length)
   // The rank of the equal-value run currently open. A run that began before
   // list[0] keeps the rank it was given there, which is the whole point of the
   // seed: the first row of a page can be tied with the last row of the one
   // before it, and must not be renumbered as if the page started a new run.
   let runRank = hasPrev ? seed.prevRank : startIndex + 1
-  let last = hasPrev ? seed.prevValue : null
-  for (let i = 0; i < list.length; i++) {
-    const v = valueOf(list[i], i)
-    if (i > 0 || hasPrev) {
-      if (v !== last) runRank = startIndex + i + 1
+  for (let i = 0; i < vals.length; i++) {
+    const v = vals[i]
+    const prev = i > 0 ? vals[i - 1] : (hasPrev ? seed.prevValue : null)
+    const hasBack = i > 0 || hasPrev
+    if (hasBack && v !== prev) runRank = startIndex + i + 1
+    out[i] = {
+      rank: runRank,
+      tied: (hasBack && v === prev) || (i + 1 < vals.length && v === vals[i + 1]),
     }
-    out[i] = runRank
-    last = v
   }
   return out
+}
+
+/**
+ * The numeral as a reader sees it: `4`, or `T4` where the place is shared.
+ *
+ * ⚠️ NO `#` HERE. The feed card prints a bare position beside the card, where
+ * the detail page's chip prints `#4` because it stands alone in a tile with no
+ * list around it. `T4` is golf's own form, which is where the notation comes
+ * from; `T#4` would be the two conventions stacked.
+ */
+export function rankLabel(rank, tied) {
+  if (rank == null) return null
+  return `${tied ? 'T' : ''}${rank}`
 }

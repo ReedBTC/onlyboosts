@@ -45,31 +45,31 @@
  * Entry point: renderPodcasts({ panel, list }) — lazy-imported by feeds.js
  * the first time the feed is opened.
  */
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v81'
-import { toEpisodeShape, normalizeBoosts, episodeApiToBoosts } from '/assets/js/ob-data.js?v=ob-v81'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v82'
+import { toEpisodeShape, normalizeBoosts, episodeApiToBoosts } from '/assets/js/ob-data.js?v=ob-v82'
 import {
   getEpisodePage, searchEpisodes, SEARCH_HITS, SEARCH_MIN_CHARS,
-} from '/assets/js/ob-live.js?v=ob-v81'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v81'
+} from '/assets/js/ob-live.js?v=ob-v82'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v82'
 import {
   rangeDays, rangeControl, sortControl, mountFeedControls,
-} from '/assets/js/feed-controls.js?v=ob-v81'
+} from '/assets/js/feed-controls.js?v=ob-v82'
 // Its own module, not two more exports of feed-controls.js — see the ⚠️ note
 // at the top of that file for the four-hour window that shape opens.
-import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v81'
+import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v82'
 import {
   LANG_ALL, languageOptions, langControl, langNote, langNoMatchText, langLabelFor,
-} from '/assets/js/feed-lang.js?v=ob-v81'
-import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v81'
+} from '/assets/js/feed-lang.js?v=ob-v82'
+import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v82'
 // The card, and the card's verbs. One definition each, shared with the edge.
 import {
   COPY, HOME_CARD_PARTS, buildEpisodes, renderEpisodeCards, RANKED_SORTS, SORT_OPTIONS,
   episodeRankValue,
-} from '/assets/js/episode-card.js?v=ob-v81'
-import { competitionRanks } from '/assets/js/rank.js?v=ob-v81'
+} from '/assets/js/episode-card.js?v=ob-v82'
+import { competitionRanks, rankLabel } from '/assets/js/rank.js?v=ob-v82'
 import {
   wireEpisodeCards, hydrateCardProfiles, prewarmBoosting,
-} from '/assets/js/episode-card-actions.js?v=ob-v81'
+} from '/assets/js/episode-card-actions.js?v=ob-v82'
 
 const INITIAL_CARDS = 30       // episodes rendered per "load more" batch
 
@@ -464,7 +464,7 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
   }
 
   function rankOf(it) {
-    return (showRanks && RANKED_SORTS.has(sortKey)) ? it._rank : null
+    return (showRanks && RANKED_SORTS.has(sortKey)) ? rankLabel(it._rank, it._tied) : null
   }
 
   function cardsHtml(list_) {
@@ -547,6 +547,9 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
           renumber()
           nextOffset = next.nextOffset
           appendPage(next.items)
+          // The rows just added are what tell the previous last card whether it
+          // was tied all along.
+          syncRankLabels()
         } catch (e) {
           console.warn('[podcasts] load more failed', e)
           btn.disabled = false
@@ -587,7 +590,36 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
       prevValue: adoptedLastValue,
       prevRank: adoptedLastRank,
     })
-    items.forEach((it, i) => { it._rank = ranks[i] })
+    items.forEach((it, i) => { it._rank = ranks[i].rank; it._tied = ranks[i].tied })
+  }
+
+  /* ⚠️ THE LAST PAINTED CARD'S "T" IS THE ONE THING AN APPEND CAN CHANGE, and
+   * appending does not re-render what is already on screen. A card at the end
+   * of the loaded run cannot see a tie continuing into rows not yet fetched, so
+   * it paints its bare rank; once those rows arrive, renumber() knows better and
+   * this writes the corrected label back. Cheap and idempotent — every other
+   * card's label is already what it should be, so the loop finds one at most.
+   *
+   * It walks the CARD elements rather than the rank nodes, because an unranked
+   * sort renders no rank node at all and indexing those would slide by one. The
+   * server's adopted block sits ahead of `items` in the DOM, hence the offset. */
+  function syncRankLabels() {
+    if (picked) return
+    const els = cards.querySelectorAll('[data-episode-card]')
+    items.forEach((it, i) => {
+      const node = els[adoptedCount + i]?.querySelector('.pcast-rank')
+      if (!node) return
+      const label = rankLabel(it._rank, it._tied)
+      if (label != null && node.textContent !== label) node.textContent = label
+    })
+    // The seam itself: the server painted its last card without knowing what
+    // followed it, and that card is not in `items` to be re-labelled above.
+    if (adoptedCount && items.length && adoptedLastRank != null
+        && episodeRankValue(sortKey)(items[0]) === adoptedLastValue) {
+      const seam = els[adoptedCount - 1]?.querySelector('.pcast-rank')
+      const label = rankLabel(adoptedLastRank, true)
+      if (seam && seam.textContent !== label) seam.textContent = label
+    }
   }
 
   function rebuild() {

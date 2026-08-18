@@ -53,29 +53,29 @@
  */
 import {
   getShowPage, searchShows, getShowEpisodes, SEARCH_HITS, SEARCH_MIN_CHARS,
-} from '/assets/js/ob-live.js?v=ob-v81'
+} from '/assets/js/ob-live.js?v=ob-v82'
 import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls,
-} from '/assets/js/feed-controls.js?v=ob-v81'
+} from '/assets/js/feed-controls.js?v=ob-v82'
 // Its own module, not two more exports of feed-controls.js — see the ⚠️ note
 // at the top of that file for the four-hour window that shape opens.
-import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v81'
+import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v82'
 import {
   LANG_ALL, languageOptions, langControl, langNote, langNoMatchText, langLabelFor,
-} from '/assets/js/feed-lang.js?v=ob-v81'
-import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v81'
-import { competitionRanks } from '/assets/js/rank.js?v=ob-v81'
-import { showPageHref, episodePageHref } from '/assets/js/show-link.js?v=ob-v81'
+} from '/assets/js/feed-lang.js?v=ob-v82'
+import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v82'
+import { competitionRanks, rankLabel } from '/assets/js/rank.js?v=ob-v82'
+import { showPageHref, episodePageHref } from '/assets/js/show-link.js?v=ob-v82'
 // Show-level boosting. Same four pieces the episode feed uses, and deliberately
 // the same ones: fromApiValue / applyExternalOverrides are where the split
 // logic lives, and sharing them is what keeps every surface paying the value
 // block a feed actually published.
-import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v81'
-import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v81'
-import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v81'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v81'
-import { boostButton, withBoostBusy } from '/assets/js/boost-button.js?v=ob-v81'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v81'
+import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v82'
+import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v82'
+import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v82'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v82'
+import { boostButton, withBoostBusy } from '/assets/js/boost-button.js?v=ob-v82'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v82'
 
 /* ── The hash's language, on an already-hydrated feed ──
  * The twin of the map in feeds-podcasts.js, and there for the same reason: a
@@ -672,7 +672,7 @@ export async function renderShows({ panel, list, medium = 'other', lang = null }
     const slice = view.slice(shown, shown + PAGE_SIZE)
     slice.forEach((s) => {
       cards.appendChild(renderShowCard(
-        s, RANKED_SORTS.has(sortKey) ? s._rank : null, copy, cutoff(),
+        s, RANKED_SORTS.has(sortKey) ? rankLabel(s._rank, s._tied) : null, copy, cutoff(),
       ))
     })
     shown += slice.length
@@ -724,6 +724,23 @@ export async function renderShows({ panel, list, medium = 'other', lang = null }
    * Ranking the filtered list would tell a searched show it is #1 of 1, which
    * answers a different question.
    */
+  /* ⚠️ THE LAST PAINTED CARD'S "T" IS THE ONE THING AN APPEND CAN CHANGE.
+   * `keepShown` paints from `shown` onward and never re-renders what is already
+   * on screen, but a card at the end of the loaded run could not see a tie
+   * continuing into rows it had not fetched, so it painted a bare rank. Once
+   * those rows arrive this writes the corrected label back. Idempotent, and on
+   * a full repaint every label already matches, so it is a no-op. */
+  function syncRankLabels() {
+    if (picked) return
+    const els = cards.querySelectorAll('.pcast-card')
+    view.forEach((s, i) => {
+      const node = els[i]?.querySelector('.pcast-rank')
+      if (!node) return
+      const label = RANKED_SORTS.has(sortKey) ? rankLabel(s._rank, s._tied) : null
+      if (label != null && node.textContent !== label) node.textContent = label
+    })
+  }
+
   function rebuild({ keepShown = false } = {}) {
     /* ⚠️ COMPETITION RANKS, NOT POSITIONS: ties share the better place and the
      * next distinct value skips the group, so two shows with the same boost
@@ -732,7 +749,7 @@ export async function renderShows({ panel, list, medium = 'other', lang = null }
      * and needs no seed. See assets/js/rank.js. */
     if (!picked) {
       const ranks = competitionRanks(shows, (s) => Number(s[sortKey]) || 0)
-      shows.forEach((s, i) => { s._rank = ranks[i] })
+      shows.forEach((s, i) => { s._rank = ranks[i].rank; s._tied = ranks[i].tied })
     }
     search?.refresh()
     view = picked ? (pickedItem ? [pickedItem] : []) : shows
@@ -758,6 +775,7 @@ export async function renderShows({ panel, list, medium = 'other', lang = null }
       return
     }
     paintMore()
+    syncRankLabels()
   }
 
   /* Fetch the picked show under the feed's CURRENT range and sort.

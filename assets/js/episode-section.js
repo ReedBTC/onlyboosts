@@ -34,13 +34,13 @@
  * the same comparators, from episode-card.js, so the two cases share code
  * without sharing the mistake.
  */
-import { competitionRanks } from '/assets/js/rank.js?v=ob-v81'
+import { competitionRanks, rankLabel } from '/assets/js/rank.js?v=ob-v82'
 import { renderEpisodeCards, sortEpisodeItems, filterEpisodeItems, buildEpisodes, COPY, episodeRankValue }
-  from '/assets/js/episode-card.js?v=ob-v81'
+  from '/assets/js/episode-card.js?v=ob-v82'
 import { wireEpisodeCards, hydrateCardProfiles, prewarmBoosting }
-  from '/assets/js/episode-card-actions.js?v=ob-v81'
-import { normalizeBoosts, toEpisodeShape } from '/assets/js/ob-data.js?v=ob-v81'
-import { rangeControl, sortControl, rangeDays, rangeCutoff } from '/assets/js/feed-controls.js?v=ob-v81'
+  from '/assets/js/episode-card-actions.js?v=ob-v82'
+import { normalizeBoosts, toEpisodeShape } from '/assets/js/ob-data.js?v=ob-v82'
+import { rangeControl, sortControl, rangeDays, rangeCutoff } from '/assets/js/feed-controls.js?v=ob-v82'
 
 const CARDS_PER_PAGE = 30   // matches CARDS_PER_PAGE in functions/_shared/episode-cards.js
 
@@ -187,11 +187,13 @@ export function initEpisodeSection({
    * rather than being split by the sats tiebreak inside sortEpisodeItems. */
   function stampRanks() {
     const ranks = competitionRanks(view, episodeRankValue(sortKey))
-    view.forEach((it, i) => { it._rank = ranks[i] })
+    // No open end here and so no seam to re-sync: `view` IS the whole ordering,
+    // which is what lets these sections mark every tie on the first paint.
+    view.forEach((it, i) => { it._rank = ranks[i].rank; it._tied = ranks[i].tied })
   }
 
   function rankOf(it) {
-    return rankedSorts.has(sortKey) ? it._rank : null
+    return rankedSorts.has(sortKey) ? rankLabel(it._rank, it._tied) : null
   }
 
   /* Rank first, filter second — the same ordering the feeds' search contract

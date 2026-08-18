@@ -1014,11 +1014,32 @@ It is two-sided and dependency-free, so the edge and the browser number a card
 identically. The full argument, and the dense-ranking measurement that was
 rejected, is under **The Rank Line In The Stat Tiles**.
 
-**⚠️ The feeds print the numeral and NOT the `T`; the detail pages print both.**
-That is not drift. A tie on a feed is *visible* — the two cards sit next to each
-other showing one numeral and the same figure — where a stat tile on `/show` has
-no list around it. It also means a feed never has to know whether a tie
-continues past the rows it has loaded, which it cannot know.
+**⚠️ The `T` is on every surface, in two forms.** A feed card prints `T4` beside
+the card; a detail-page tile prints `T#4` in its chip, because the tile stands
+alone where the card sits in the list it is a rank on. `T4` is golf's own form —
+`T#4` would be the two conventions stacked. `rankLabel()` in `rank.js` owns both.
+
+**⚠️ `tied` is only as complete as the rows the caller holds, so the last card of
+an open-ended feed cannot see a tie continuing into rows not yet fetched.** That
+direction of error is the safe one — the rank is still right and the row simply
+does not yet disclose its tie — and both feeds re-sync their painted labels after
+an append (`syncRankLabels`), because appending does not re-render what is
+already on screen. `feeds-podcasts.js` also patches the **seam**: the server
+painted the adopted block's last card without knowing what followed it, and that
+card is not in `items` to be re-labelled. The `/episode` and `/booster` rollups
+need none of this — `view` is their whole ordering, so every tie is marked on the
+first paint.
+
+**⚠️ `competitionRanks` assumes the list is ALREADY ORDERED BY THE VALUE IT
+RANKS.** Hand it rows in another order and it returns confident nonsense rather
+than an error. Every caller satisfies it by construction (the API returns the
+page in the active sort, and `episodeRankValue` reads the same aggregate the
+endpoint ordered by), but a new caller has to check.
+
+**⚠️ `.pcast-rank`'s `min-width` is an alignment floor.** Each card is its own
+flex row, so a wider numeral pushes that card's artwork right and the run stops
+lining up. The `T` costs about a character, which is what took it from 1.6rem to
+2.3rem (1.2 to 1.8 on a phone).
 
 **⚠️ The client can compute this with no new server field, and that is what
 makes it cheap.** A competition rank is the position of the first row sharing

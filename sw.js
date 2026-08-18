@@ -452,7 +452,12 @@
 // ob-v81: the chip's rule was losing the cascade to `.show-stat dd` (0,1,1 vs
 // 0,1,0), so it rendered at 1.5rem Playfair in brand blue — the figure's own
 // type — inside a pill sized for 0.63rem. Selector is now compound. CSS only.
-const VERSION = 'ob-v81';
+// ob-v82: the feed cards carry the tie marker too, as golf's bare `T4` beside
+// the card rather than the tile chip's `T#4`. rank.js gained rankLabel() and
+// competitionRanks() now reports `tied`, so every renderer that imports it
+// changed together — required, since a returning visitor holding one half gets
+// a card numbered by a function whose shape moved.
+const VERSION = 'ob-v82';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;
@@ -484,27 +489,27 @@ const PRECACHE_URLS = [
   '/assets/onlyboosts_pfp.png',
   '/assets/onlyboosts_banner.png',
   '/assets/avatar-fallback.svg',
-  '/assets/css/theme.css?v=ob-v81',
-  '/assets/css/page.css?v=ob-v81',
-  '/assets/css/nav.css?v=ob-v81',
-  '/assets/css/footer.css?v=ob-v81',
-  '/assets/css/boosts-thread.css?v=ob-v81',
-  '/assets/css/boost-actions.css?v=ob-v81',
+  '/assets/css/theme.css?v=ob-v82',
+  '/assets/css/page.css?v=ob-v82',
+  '/assets/css/nav.css?v=ob-v82',
+  '/assets/css/footer.css?v=ob-v82',
+  '/assets/css/boosts-thread.css?v=ob-v82',
+  '/assets/css/boost-actions.css?v=ob-v82',
   // The episode card and its drawer. Precached alongside the others because the
   // homepage's feeds are painted in it and it used to be inline in index.html,
   // which IS precached — leaving it out would trade an inline block for a
   // network round trip on the one page this list exists to make fast.
-  '/assets/css/feed-cards.css?v=ob-v81',
-  '/assets/js/boosts-thread.js?v=ob-v81',
+  '/assets/css/feed-cards.css?v=ob-v82',
+  '/assets/js/boosts-thread.js?v=ob-v82',
   // A static import of boosts-thread.js, so precaching that without this one
   // leaves a returning visitor fetching half the graph from the network.
-  '/assets/js/primal-profiles.js?v=ob-v81',
-  '/assets/js/calendar-events.js?v=ob-v81',
-  '/assets/js/boost-actions.js?v=ob-v81',
-  '/assets/js/nav.js?v=ob-v81',
-  '/assets/js/nav-widget-boot.js?v=ob-v81',
-  '/assets/js/widget-loader.js?v=ob-v81',
-  '/assets/js/sw-register.js?v=ob-v81',
+  '/assets/js/primal-profiles.js?v=ob-v82',
+  '/assets/js/calendar-events.js?v=ob-v82',
+  '/assets/js/boost-actions.js?v=ob-v82',
+  '/assets/js/nav.js?v=ob-v82',
+  '/assets/js/nav-widget-boot.js?v=ob-v82',
+  '/assets/js/widget-loader.js?v=ob-v82',
+  '/assets/js/sw-register.js?v=ob-v82',
 ];
 
 self.addEventListener('install', (event) => {

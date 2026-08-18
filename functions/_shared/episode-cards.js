@@ -22,7 +22,7 @@ import {
   COPY, CARD_PARTS, buildEpisodes, renderEpisodeCards, sortEpisodeItems, RANKED_SORTS,
   episodeRankValue,
 } from "../../assets/js/episode-card.js";
-import { competitionRanks } from "../../assets/js/rank.js";
+import { competitionRanks, rankLabel } from "../../assets/js/rank.js";
 import { normalizeBoosts, toEpisodeShape } from "../../assets/js/ob-data.js";
 import { jsonForScript } from "./detail-page.js";
 
@@ -81,7 +81,10 @@ export function renderCardPage(items, {
     copy,
     profiles,
     parts,
-    rankOf: (_it, i) => (ranks ? ranks[i] : null),
+    // The label, not the number: `T4` where the place is shared. The last card
+    // of this page can only see the ties inside it — the client re-syncs that
+    // one row once it has fetched what follows. See assets/js/rank.js.
+    rankOf: (_it, i) => (ranks ? rankLabel(ranks[i].rank, ranks[i].tied) : null),
   });
   // ⚠️ `card` RIDES THE STATE, and that is not incidental. episode-section.js and
   // feeds-podcasts.js both repaint these cards on a re-sort, so the variant has to
@@ -95,7 +98,10 @@ export function renderCardPage(items, {
    * and every card below it would be off by the size of the tie. Absent on an
    * unranked sort, where the client numbers nothing. */
   const boundary = ranks && page.length
-    ? { lastRank: ranks[page.length - 1], lastValue: valueOf(page[page.length - 1], page.length - 1) }
+    ? {
+        lastRank: ranks[page.length - 1].rank,
+        lastValue: valueOf(page[page.length - 1], page.length - 1),
+      }
     : {};
 
   return html + stateScript({
