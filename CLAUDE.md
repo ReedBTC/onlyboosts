@@ -1366,30 +1366,51 @@ The type scales with `clamp()` rather than stepping, and **the binding constrain
 is the LABEL, not the number** — "episodes" and "boosters" are eight characters,
 where the widest figure is five.
 
-### The rank line in the stat tiles
+### The Rank Line In The Stat Tiles
 
-On `/show` and `/episode` each stat tile carries a third line, "#8 of 818":
+On `/show` and `/episode` each stat tile carries a third line, `#4` or `T#118`:
 the subject's **all-time, all-language, Global** rank by that tile's own sort
 (sats, boosts, boosters) on the feed its card lives on (Shows or Albums,
-Episodes or Songs, chosen by the same medium partition the API uses).
+Episodes or Songs, chosen by the same medium partition the API uses). One
+shared caption under the row names the feed and links to it.
 `functions/_shared/feed-rank.js` is both halves: `feedRanks(db, kind, row)`
 runs one scan of `podcasts` or `episodes`, and `renderStatTiles(stats, ranks,
-copy)` prints the tiles, rank line included, for both pages. It began as a
-separate row above the tiles and was folded in the same day: the three ranks
-are the three tiles' own sorts, so a second row restated the columns.
+copy)` prints the tiles for both pages.
 
-- **⚠️ The rank is 1 + the rows the feed orders BEFORE the subject, using the
-  feed's own tiebreak** (`<sort> DESC, total_sats DESC, guid`). Counting a
-  strictly greater sort value alone would give every member of a tie the same
-  number, and the card on the feed carries the position. Change either API's
-  `ORDER BY` and this follows.
-- **It fails quietly**, the podroll discipline: null resolves to a tile with
-  no third line, which is the tile `/booster` has.
-- The line links to the feed (`backHref`); the tooltip names the feed and the
-  sort, since a hash cannot carry one. `rankFeed` / `rankNoun` are on `COPY`.
-- `.show-stat` is now `flex-direction: column` with explicit `order`s
-  (dd 1, dt 2, `.show-stat-rank` 3), and the "of N" is hidden below 360px,
-  where "#1,234 of 6,682" is the widest thing in a tile.
+**⚠️ THE SCHEME IS STANDARD COMPETITION RANKING (1-2-2-4), and the site has
+exactly one.** A rank is the count of rows **strictly ahead, plus one**;
+everything tied shares the better place and the next distinct value skips the
+whole group. Golf's `T` prefix marks a shared place. Two properties are the
+whole reason for it:
+
+- **No tiebreak decides a standing.** The feeds order ties by sats then guid so
+  paging is stable; that is a display order, and it must never be what makes one
+  of two equal shows 4th.
+- **It cannot inflate.** An episode with 2 boosts is `T#2274`, because 2,273
+  episodes are ahead of it.
+
+**⚠️ DENSE RANKING (1-2-2-3) WAS PROPOSED AND REJECTED**, and it is the
+intuitive choice, so the measurement is worth keeping: there are only **31
+distinct boost counts across 6,422 episodes**, so dense collapses the corpus
+into 31 places and that same 2-boost episode prints `#30` with 2,273 ahead.
+Ordinal is arbitrary inside a tie; dense inflates the tail; competition is
+honest at both ends. Measured 2026-08-18.
+
+**⚠️ NO DENOMINATOR, ANYWHERE.** Under any tie-aware scheme the count of places
+and the count of rows are different numbers and neither belongs next to a rank.
+"of 811" also flatters the tail: 51% of shows have two boosts or fewer.
+
+**No cutoff.** Every page with a rank prints it, however large, because a
+competition rank is never false. That was Reed's call on 2026-08-18.
+
+Three more things a change would break:
+
+- **It fails quietly**, the podroll discipline: null resolves to tiles with no
+  third line, which is what `/booster` renders.
+- **The caption defines the `T` only when a `T` is on screen.** Explaining a
+  notation the reader cannot see is worse than saying nothing.
+- **The chips are not links and the caption is.** Three links to one feed under
+  three tiles is one destination said three times.
 
 ### Where the shared code lives
 

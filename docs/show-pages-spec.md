@@ -809,15 +809,19 @@ travels into a preview card with no page around it.
 
 ## The Rank Line
 
-Each tile carries a third line, "#8 of 818": the show's all-time rank on the
-Global Shows (or Albums) feed by that tile's own sort, linking to the feed.
-The list is the feed's list exactly: all languages, no window, the same medium
-partition, and the feed's own tiebreak, so the number is the position the
-show's card holds there. `/episode` carries the same line against Episodes or
-Songs; both come from `functions/_shared/feed-rank.js`, and a failed query
-costs the line and nothing else. It began as a separate row of three tiles
-above these and was folded in, since the three ranks are the three tiles'
-own sorts.
+Each tile carries a third line, `#4`, or `T#118` where the place is shared: the
+show's rank on the Global Shows (or Albums) feed by that tile's own sort. One
+caption under the row names the feed and links to it, and defines the `T` only
+when one is on screen.
+
+The scheme is **standard competition ranking**: the count of shows strictly
+ahead, plus one, with ties sharing the better place. It is the notation golf,
+the Olympics and the US News rankings display, and it was chosen over dense
+ranking because dense collapses 6,422 episodes into 31 places and would print
+`#30` for an episode with 2,273 ahead of it. There is no denominator and no
+cutoff; a competition rank is never false, so every page that has one prints it.
+`/episode` carries the same line against Episodes or Songs. Both come from
+`functions/_shared/feed-rank.js`, and a failed query costs the line only.
 
 ---
 

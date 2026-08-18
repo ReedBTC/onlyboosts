@@ -215,10 +215,9 @@ const COPY = {
     // history.back() when the previous document was ours.
     backHref: "/#episodes-global",
     backLabel: "All Episodes",
-    // The rank line in each stat tile links to backHref; its tooltip names the
-    // feed and the noun. See functions/_shared/feed-rank.js.
+    // The rank line in each stat tile, and the shared caption under the row,
+    // both name this feed and link to backHref. See _shared/feed-rank.js.
     rankFeed: "Episodes",
-    rankNoun: "episodes",
     // Deliberately "By", never "Host" or "Creator". The source is
     // <itunes:author> on the show, whoever the publisher named there: usually
     // the host, sometimes a network ("Jupiter Broadcasting"), occasionally a
@@ -245,7 +244,6 @@ const COPY = {
     backHref: "/#songs-global",
     backLabel: "All Songs",
     rankFeed: "Songs",
-    rankNoun: "songs",
     // On a music feed <itunes:author> IS the artist, and cleanly so: 97.4% of
     // album pages carry a usable one. The stronger label is earned here in a
     // way it is not on the podcast side.
@@ -414,21 +412,21 @@ function renderEpisodePage({ ep, supporters, boosts, boosterCount, latestTs, nam
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v76" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v76" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v76" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v76" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v77" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v77" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v77" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v77" />
   <!-- The hero, the community wall and the boost list are the show page's, so
        this page links its stylesheet and adds only the deltas. -->
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v76" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v77" />
   <!-- The episode card, for the community-episodes section: the same chrome
        feeds-podcasts.js paints on the homepage. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v76" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v77" />
   <!-- The boost thread inside a card's drawer, and its reply / like / repost /
        zap bar. Only this page's community section needs them; /show does not. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v76" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v76" />
-  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v76" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v77" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v77" />
+  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v77" />
 </head>
 <body data-episode-guid="${htmlEscape(ep.item_guid)}"${ep.podcast_guid ? ` data-show-guid="${htmlEscape(ep.podcast_guid)}"` : ""}>
 
@@ -614,12 +612,12 @@ function renderEpisodePage({ ep, supporters, boosts, boosterCount, latestTs, nam
 
 <script type="application/json" id="episode-boost-payload">${jsonForScript(boostPayload)}</script>
 
-<script src="/assets/js/nav.js?v=ob-v76" defer></script>
-<script src="/assets/js/episode-page.js?v=ob-v76" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v77" defer></script>
+<script src="/assets/js/episode-page.js?v=ob-v77" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v76"></script>
-<script src="/assets/js/sw-register.js?v=ob-v76" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v77"></script>
+<script src="/assets/js/sw-register.js?v=ob-v77" defer></script>
 </body>
 </html>`;
 }
@@ -992,10 +990,10 @@ function notFound(guid) {
   <meta name="robots" content="noindex" />
   <title>Episode not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v76" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v76" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v76" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v76" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v77" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v77" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v77" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v77" />
 </head>
 <body>
 <section class="page-header">
@@ -1013,7 +1011,7 @@ function notFound(guid) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v76" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v77" defer></script>
 </body>
 </html>`;
   return new Response(html, {

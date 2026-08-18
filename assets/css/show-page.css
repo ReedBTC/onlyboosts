@@ -214,31 +214,44 @@
 }
 .show-stat dd { order: 1; }
 
-/* The subject's all-time rank on the Global feed its card lives on, by the
-   tile's own sort: "#8 of 818". Rendered by functions/_shared/feed-rank.js as
-   the tile's third line, absent when the rank query failed, so a tile without
-   it is the same tile the /booster page has. It is a link to the feed; the
-   tooltip names the feed and the sort. Small and muted with the position in
-   brand: the number above it is the fact, this is where it stands. */
+/* The subject's rank on the all-time Global feed its card lives on, by the
+   tile's own sort: "#4", or "T#118" where the place is shared. Rendered by
+   functions/_shared/feed-rank.js as the tile's third line, absent when the
+   query failed, so a tile without one is the tile /booster already renders.
+
+   Small and in brand, under a number that is larger and also in brand: the
+   figure is the fact and this is where it stands. It is NOT a link — three
+   links to one feed under three tiles is the same destination said three
+   times, so the caption below carries the single link instead. */
 .show-stat-rank {
   order: 3;
   margin: 0.35rem 0 0;
-  font-size: 0.74rem;
+  font-size: 0.78rem;
+  font-weight: 700;
   line-height: 1.2;
+  color: var(--brand-d);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-.show-stat-rank a {
-  color: var(--brand-d);
-  font-weight: 700;
-  text-decoration: none;
-}
-.show-stat-rank a span {
+
+/* ⚠️ THE CAPTION IS WHAT MAKES THE CHIPS LEGIBLE, and it is one line for three
+   tiles. It names the list the ranks are on, links to it, and defines the T —
+   but only when a T is actually on screen, since explaining a notation the
+   reader cannot see is worse than saying nothing. Under the tiles rather than
+   over them: the heading above already qualifies the whole block, and a second
+   line of chrome above the figures pushes them down a phone screen. */
+.show-stats-cap {
+  margin: 0.6rem 0 0;
+  font-size: 0.78rem;
   color: var(--muted);
-  font-weight: 400;
 }
-.show-stat-rank a:hover,
-.show-stat-rank a:focus-visible { text-decoration: underline; text-underline-offset: 2px; }
+.show-stats-cap a {
+  color: var(--brand-d);
+  text-decoration: none;
+  font-weight: 600;
+}
+.show-stats-cap a:hover,
+.show-stats-cap a:focus-visible { text-decoration: underline; text-underline-offset: 3px; }
 
 /* ── The show's description ───────────────────────────────────────────── */
 
@@ -1347,9 +1360,10 @@ a.boost-who:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px
     font-size: clamp(0.55rem, 2.1vw, 0.72rem);
     letter-spacing: 0.05em;
   }
-  /* "#1,234 of 6,682" is fifteen characters, the widest thing in a tile.
-     Fits at 375px; the "of N" comes off below 360px rather than the position. */
-  .show-stat-rank { margin-top: 0.3rem; font-size: clamp(0.58rem, 2.4vw, 0.74rem); }
+  /* "T#2,274" is seven characters, and the tile's label ("boosters", eight)
+     is still the binding constraint rather than the rank. */
+  .show-stat-rank { margin-top: 0.3rem; font-size: clamp(0.6rem, 2.5vw, 0.78rem); }
+  .show-stats-cap { font-size: 0.72rem; }
   /* Three across on a phone, five on desktop. Cards four and five wrap to a
      centered second line rather than disappearing — PODIUM is decided by the
      server, and no supporter is dropped for being on a small screen. */
@@ -1380,6 +1394,3 @@ a.boost-who:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px
   .pr-title { font-size: 0.86rem; }
 }
 
-@media (max-width: 360px) {
-  .show-stat-rank a span { display: none; }
-}

@@ -1,69 +1,66 @@
-// A subject's rank on the all-time global feed it belongs to — three ranks, one
-// per quantitative sort, rendered as the third line of each stat tile on /show
-// and /episode ("1.2M / sats / #8 of 818"). Server-side facts only; nothing
-// here is a verb. It began as a separate row above the tiles and was folded in
-// on 2026-08-18: the three ranks are the three tiles' own sorts, so a second
-// row restated the columns to save nothing.
+// A subject's rank on the all-time global feed it belongs to, rendered as the
+// third line of each stat tile on /show and /episode. Server-side facts only;
+// nothing here is a verb.
 //
-// WHICH LIST. "Rank" here means the position the subject's card holds on the
-// homepage feed a reader could scroll to, so the query restates that feed's
-// definition exactly rather than a plausible cousin of it:
+// ── THE SCHEME: STANDARD COMPETITION RANKING (1-2-2-4) ───────────────────────
+//
+// ⚠️ A RANK IS THE NUMBER OF ROWS STRICTLY AHEAD, PLUS ONE. Everything tied
+// shares the better place and the next distinct value skips past the whole
+// group, which is what golf ("T4"), the Olympics and the US News rankings all
+// display. Two consequences, and both were the reason for choosing it:
+//
+//   • It cannot be set by a tiebreak the reader cannot see. The feeds order
+//     ties by sats then guid so that paging is stable; that is a display order,
+//     not a standing, and it must never decide which of two equal shows is 4th.
+//   • It cannot inflate. Measured 2026-08-18: an episode with 2 boosts is
+//     T#2274 because 2,273 episodes really are ahead of it.
+//
+// DENSE RANKING (1-2-2-3) WAS CONSIDERED AND REJECTED, which is worth recording
+// because it is the intuitive choice and it is wrong here. There are only 31
+// distinct boost counts across 6,422 episodes, so dense collapses the corpus
+// into 31 places and that same 2-boost episode would print "#30" with 2,273
+// episodes ahead of it. Dense is honest at the head and inflates the tail;
+// ordinal is honest at the head and arbitrary within every tie.
+//
+// NO DENOMINATOR, EVER. Under any tie-aware scheme the count of places and the
+// count of rows are different numbers, and neither is usable next to a rank:
+// "of 811" reads as mid-table for a show with two boosts, since 51% of shows
+// have two or fewer. The caption names the feed and links to it instead.
+//
+// ── WHICH LIST ───────────────────────────────────────────────────────────────
+//
+// "Rank" means the position the subject's card holds on the feed a reader can
+// go and scroll, so the query restates that feed's definition rather than a
+// plausible cousin of it:
 //   • the FEED is chosen by the medium partition — a music show ranks among
-//     Albums and every other show ranks among Shows, an episode of a music
-//     feed ranks among Songs and every other episode among Episodes. Same
-//     `COALESCE(medium,'podcast') <> 'music'` the two API endpoints use, so an
-//     unidentified show ranks where its card is: on Shows.
-//   • ALL TIME, and ALL LANGUAGES: the precomputed aggregate columns, no
-//     window, no `lang`. A rank on a windowed or filtered list would be true
-//     of a view most readers of this page will never have on screen.
+//     Albums and every other show among Shows, an episode of a music feed among
+//     Songs and every other among Episodes. The same
+//     `COALESCE(medium,'podcast') <> 'music'` the API uses, so an unidentified
+//     show ranks where its card actually is: on Shows.
+//   • ALL TIME and ALL LANGUAGES: the precomputed aggregate columns, no window
+//     and no `lang`. A rank on a filtered view would be true of a list most
+//     readers of this page will never have on screen.
 //   • Global, never Follows.
 //
-// ⚠️ THE TIEBREAK IS THE FEED'S TIEBREAK, or the number is wrong. A rank is
-// 1 + the count of rows the feed orders BEFORE this one, and the feed's order
-// is `<sort col> DESC, total_sats DESC, guid` (`total_sats DESC, guid` when the
-// sort is sats itself) — see the ORDER BY in functions/api/v1/podcasts.js and
-// globalEpisodes() in functions/api/v1/episodes.js. Counting rows with a
-// strictly greater sort value alone would hand every member of a tie the same
-// rank, and the card on the feed carries the position, not the tie. Change one
-// of those ORDER BYs and this must follow.
-//
 // COST. One scan of `podcasts` (~1.3k rows) or `episodes` (~6.7k rows, joined
-// to `podcasts` for the medium) per page render, in the page's Promise.all and
-// behind its 300s edge cache. Cheaper than the community rollup beside it.
+// to `podcasts` for the medium) per render, inside the page's existing
+// Promise.all and behind its 300s edge cache. Cheaper than the community
+// rollup beside it, and cheaper than the ordinal version this replaced, which
+// had to restate the feed's whole tiebreak to place a row inside its own tie.
 //
-// ⚠️ IT NEVER THROWS. A rank row is decoration on a page about a show's
-// boosts; a failure here costs the row and nothing else, the discipline the
+// ⚠️ IT NEVER THROWS. A rank is decoration on a page about a show's boosts, so
+// a failure costs the rank line and nothing else — the discipline the two
 // podroll queries set. `feedRanks` resolves null on any error and the renderer
-// prints nothing for null.
+// prints tiles without a rank line, which is exactly what /booster renders.
 
-// The three sorts, in the order of the stat tiles beneath (sats, boosts,
-// boosters), so the rank row and the figure row line up column for column:
-// "#8 most sats" over "1.2M sats", "#12 most boosts" over "506 boosts".
+// The three sorts, which are also the three stat tiles' keys.
 const RANK_KEYS = ["sats", "boosts", "boosters"];
 
-const RANK_LABELS = { boosts: "most boosts", sats: "most sats", boosters: "most boosters" };
-
 /**
- * `1 + COUNT(rows ordered before the subject)` for one sort, as a CASE inside a
- * COUNT so the three ranks and the list size come off one scan. `sortCol` is
- * the SQL column of the sort key, `sortVal` the subject's value of it; `sats`
- * and `id` are the subject's total_sats and guid, `satsCol` / `idCol` theirs.
- * The sats sort has no separate sats tiebreak, so it drops the middle clause.
- */
-function rankExpr({ sortCol, satsCol, idCol }, isSats, args, sortVal, sats, id) {
-  const beforeOnSats = `(COALESCE(${satsCol},0) > ? OR (COALESCE(${satsCol},0) = ? AND ${idCol} < ?))`;
-  if (isSats) {
-    args.push(sats, sats, id);
-    return `1 + COUNT(CASE WHEN ${beforeOnSats} THEN 1 END)`;
-  }
-  args.push(sortVal, sortVal, sats, sats, id);
-  return `1 + COUNT(CASE WHEN COALESCE(${sortCol},0) > ? OR (COALESCE(${sortCol},0) = ? AND ${beforeOnSats}) THEN 1 END)`;
-}
-
-/**
- * The three all-time global ranks for a show or an episode, and the size of
- * the list they are ranks on. Resolves `{ boosts, sats, boosters, of }` or
- * null; never rejects.
+ * The three all-time global ranks for a show or an episode.
+ *
+ * Resolves `{ sats:{rank,tied}, boosts:{…}, boosters:{…} }` or null; never
+ * rejects. `tied` is true when at least one other row holds the same place.
  *
  * @param {D1Database} db
  * @param {"show"|"episode"} kind
@@ -77,45 +74,54 @@ export async function feedRanks(db, kind, row) {
     const id = isEpisode ? row.item_guid : row.podcast_guid;
     if (!id) return null;
     const music = (isEpisode ? row.p_medium : row.medium) === "music";
-    // ⚠️ Every subject value is COALESCEd to 0 exactly as the SQL side is: the
-    // aggregate columns are nullable in principle, and a null on either side of
-    // the comparison would silently drop the row from the count.
-    const boosts = Number(row.boost_count) || 0;
-    const sats = Number(row.total_sats) || 0;
-    const boosters = Number(row.booster_count) || 0;
 
-    // Same alias on both tables so the CASE expressions read the same.
+    // ⚠️ Every subject value is COALESCEd to 0 exactly as the SQL side is. The
+    // aggregate columns are nullable in principle, and a NULL on either side of
+    // a comparison is NULL rather than false, which would silently drop the row
+    // from both counts and report the subject as rank 1, untied.
+    const val = {
+      sats: Number(row.total_sats) || 0,
+      boosts: Number(row.boost_count) || 0,
+      boosters: Number(row.booster_count) || 0,
+    };
+
     const cols = isEpisode
-      ? { boosts: "e.boost_count", sats: "e.total_sats", boosters: "e.booster_count", id: "e.item_guid" }
-      : { boosts: "p.boost_count", sats: "p.total_sats", boosters: "p.booster_count", id: "p.podcast_guid" };
+      ? { sats: "e.total_sats", boosts: "e.boost_count", boosters: "e.booster_count" }
+      : { sats: "p.total_sats", boosts: "p.boost_count", boosters: "p.booster_count" };
     const from = isEpisode
       ? "FROM episodes e LEFT JOIN podcasts pc ON pc.podcast_guid = e.podcast_guid"
       : "FROM podcasts p";
     const mediumCol = isEpisode ? "pc.medium" : "p.medium";
 
+    // Two counts per stat off one scan: how many are strictly ahead, and how
+    // many share the value (including the subject itself, so `at > 1` is the
+    // tie test).
     const args = [];
-    const parts = {
-      boosts:   rankExpr({ sortCol: cols.boosts,   satsCol: cols.sats, idCol: cols.id }, false, args, boosts,   sats, id),
-      sats:     rankExpr({ sortCol: cols.sats,     satsCol: cols.sats, idCol: cols.id }, true,  args, sats,     sats, id),
-      boosters: rankExpr({ sortCol: cols.boosters, satsCol: cols.sats, idCol: cols.id }, false, args, boosters, sats, id),
-    };
+    const parts = RANK_KEYS.map((k) => {
+      args.push(val[k], val[k]);
+      return `COUNT(CASE WHEN COALESCE(${cols[k]},0) > ? THEN 1 END) AS a_${k},
+              COUNT(CASE WHEN COALESCE(${cols[k]},0) = ? THEN 1 END) AS t_${k}`;
+    }).join(",\n             ");
+
     // The medium partition, restated from the API: `music` is Albums/Songs and
-    // EVERYTHING ELSE — podcasts, video, and shows the collector cannot
+    // EVERYTHING else — podcasts, video, and shows the collector cannot
     // identify — is Shows/Episodes. Never `= 'podcast'`.
     const where = music
       ? `COALESCE(${mediumCol},'podcast') = 'music'`
       : `COALESCE(${mediumCol},'podcast') <> 'music'`;
-    const sql = `SELECT ${parts.boosts} AS r_boosts, ${parts.sats} AS r_sats,
-                        ${parts.boosters} AS r_boosters, COUNT(*) AS n
-                 ${from} WHERE ${where}`;
-    const r = await db.prepare(sql).bind(...args).first();
+
+    const r = await db.prepare(`SELECT ${parts} ${from} WHERE ${where}`).bind(...args).first();
     if (!r) return null;
-    const out = { boosts: r.r_boosts, sats: r.r_sats, boosters: r.r_boosters, of: r.n };
-    // A rank past the list's end means the subject is not on the list this
-    // query describes (a row the feed filters that this does not, or a value
-    // that changed between two reads). Print nothing rather than a wrong number.
+
+    const out = {};
     for (const k of RANK_KEYS) {
-      if (!Number.isFinite(out[k]) || out[k] < 1 || out[k] > out.of) return null;
+      const ahead = Number(r[`a_${k}`]);
+      const at = Number(r[`t_${k}`]);
+      // `at` counts the subject, so 0 means the subject was not in the set the
+      // WHERE admits — a medium mismatch between this query and the row we were
+      // handed. Print nothing rather than a rank on a list it is not on.
+      if (!Number.isFinite(ahead) || !Number.isFinite(at) || at < 1) return null;
+      out[k] = { rank: ahead + 1, tied: at > 1 };
     }
     return out;
   } catch (err) {
@@ -127,32 +133,50 @@ export async function feedRanks(db, kind, row) {
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const numFmt = (n) => Number(n).toLocaleString("en-US");
 
+/** `#4`, or `T#118` when the place is shared. The T is golf's notation and is
+ *  the most widely recognised tie marker there is; the caption defines it. */
+function chip(r) {
+  return `${r.tied ? "T" : ""}#${numFmt(r.rank)}`;
+}
+
 /**
- * The stat tiles with the rank folded into each: value, label, then "#8 of
- * 818" as a third line. One tile per stat, in the order given; the rank line
- * is drawn only when `ranks` resolved and the stat has a `key` the ranks
- * know (sats, boosts, boosters), so a failed rank query costs the third
- * line and nothing else, and a page with no ranks (/booster) can pass null.
+ * The stat tiles with the rank folded into each: value, label, then the rank as
+ * a third line. One tile per stat, in the order given; the rank is drawn only
+ * where `ranks` resolved and the stat carries a `key` the ranks know, so a
+ * failed query costs the third line and nothing else and /booster can pass null.
  *
- * The rank line is a link to the feed the rank is on (`copy.backHref`); its
- * tooltip says which list and which sort, since a tile has no room to. The
- * hash cannot carry a sort, so all three point at the same feed.
+ * ⚠️ THE CAPTION IS SHARED AND THE TILES ARE BARE. Three tiles cannot each
+ * carry "rank on the Shows feed" without saying it three times, and a tooltip
+ * cannot say it at all on a phone. One line under the row names the list once,
+ * links to it, and — only when a T is actually on screen — defines the T.
  *
  * @param {{key?:string,label:string,value:string,exact:string}[]} stats
- * @param {{sats:number,boosts:number,boosters:number,of:number}|null} ranks
- * @param {{rankFeed:string, backHref:string, rankNoun:string}} copy
+ * @param {object|null} ranks  from feedRanks
+ * @param {{rankFeed:string, backHref:string}} copy
  */
 export function renderStatTiles(stats, ranks, copy) {
+  let anyRank = false;
+  let anyTie = false;
+
   const tiles = stats.map((s) => {
-    let rank = "";
-    if (ranks && s.key && Number.isFinite(ranks[s.key])) {
-      const noun = copy.rankNoun || copy.rankFeed.toLowerCase();
-      const tip = `All-time rank on the ${copy.rankFeed} feed by ${s.key}: #${numFmt(ranks[s.key])} of ${numFmt(ranks.of)} ${noun}`;
-      rank = `<dd class="show-stat-rank"><a href="${esc(copy.backHref)}" title="${esc(tip)}">#${esc(numFmt(ranks[s.key]))} <span>of ${esc(numFmt(ranks.of))}</span></a></dd>`;
+    const r = ranks && s.key ? ranks[s.key] : null;
+    let rankEl = "";
+    if (r) {
+      anyRank = true;
+      if (r.tied) anyTie = true;
+      const tip = r.tied
+        ? `Tied for ${chip(r).slice(1)} by ${s.key} on the all-time ${copy.rankFeed} feed`
+        : `${chip(r)} by ${s.key} on the all-time ${copy.rankFeed} feed`;
+      rankEl = `<dd class="show-stat-rank" title="${esc(tip)}">${esc(chip(r))}</dd>`;
     }
-    return `<div class="show-stat"><dt>${esc(s.label)}</dt><dd title="${esc(s.exact)}">${esc(s.value)}</dd>${rank}</div>`;
+    return `<div class="show-stat"><dt>${esc(s.label)}</dt><dd title="${esc(s.exact)}">${esc(s.value)}</dd>${rankEl}</div>`;
   });
+
+  const caption = anyRank
+    ? `<p class="show-stats-cap">Rank on the all-time <a href="${esc(copy.backHref)}">${esc(copy.rankFeed)} feed</a>${anyTie ? "; T marks a tie" : ""}</p>`
+    : "";
+
   return `<dl class="show-stats">
       ${tiles.join("\n      ")}
-    </dl>`;
+    </dl>${caption ? "\n    " + caption : ""}`;
 }
