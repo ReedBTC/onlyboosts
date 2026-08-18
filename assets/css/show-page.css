@@ -164,6 +164,7 @@
 }
 
 .show-stat {
+  position: relative;   /* the rank chip pins to this corner */
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -216,49 +217,46 @@
 
 /* The subject's rank on the all-time Global feed its card lives on, by the
    tile's own sort: "#4", or "T#118" where the place is shared. Rendered by
-   functions/_shared/feed-rank.js as the tile's third line.
+   functions/_shared/feed-rank.js and pinned to the tile's top corner.
 
-   ⚠️ IT IS A BAND, AND SEPARATION BY GROUND IS THE WHOLE POINT. The first
-   version set it as a third line in the flow and it read as bolted on, for a
-   reason worth recording: `.show-stat dd` sets its type with the `font:`
-   SHORTHAND, which carries the family, so a rule that overrode only the size
-   left the rank in Playfair at brand blue — the same face and colour as the
-   figure above it, and larger than the label between them. Three lines, three
-   type treatments, no hierarchy.
+   ⚠️ IT IS A CORNER CHIP, WHICH SEPARATES BY POSITION RATHER THAN BY WEIGHT,
+   and that is the point. It shipped first as a third line in the flow and read
+   as bolted on for a reason worth recording: `.show-stat dd` sets its type with
+   the `font:` SHORTHAND, which carries the family, so a rule overriding only
+   the size left the rank in Playfair at brand blue — the same face and colour
+   as the figure above it, and larger than the label between them. Three lines,
+   three type treatments, no hierarchy.
 
-   The tile has three channels and each now owns one: the figure has brand blue
-   and Playfair, the label has muted uppercase sans, and the rank has the tint.
-   Nothing shrinks to get out of the way, which is what keeps it readable at
-   375px where a corner chip fights the centred figure for 107px of tile.
+   Out of the centred column entirely, the chip stops competing with the figure
+   at all, and it is the most compact of the treatments measured: it adds
+   ~0.65rem of reserved line against ~1.6rem for a ruled footer band. The device
+   is the sports stat card's — NBA.com and Sofascore pin a league position to a
+   card corner — which is the same borrowing as the "T" itself.
 
-   The device is a fund fact sheet's: Morningstar rules "Rank in Category" off
-   under the return figure rather than setting it as another line of the same
-   kind, and the rule is what says the thing below is ABOUT the number above.
-   The bleed to the tile's edges is this site's own idiom — the same call the
-   /episode player card's drawers make, so the card reads as one object with
-   bands instead of a panel holding a panel.
+   ⚠️ THE TILE MUST RESERVE THE LINE, or the chip overlaps the figure. At 375px
+   a tile is ~107px and "3.0M" is ~40px centred, leaving ~33px of clearance
+   where "T#2,274" needs ~38px. Letting it float works until the data gets wide,
+   which is the worst kind of works. `.show-stat--ranked` is emitted by the
+   renderer for exactly the tiles that carry one, so /booster's rankless tiles
+   keep their own spacing. */
+.show-stat--ranked { padding-top: 1.45rem; }
 
-   Absent entirely when there is no rank, leaving exactly the tile /booster
-   renders: no reserved space and no empty rule. */
 .show-stat-rank {
-  order: 3;
-  /* ⚠️ CANCELS .show-stat's PADDING ON THREE SIDES so the band meets the
-     border, the negative bottom pulling it over the tile's own bottom padding.
-     It therefore TRACKS THAT PADDING in the base rule and in the 640px block
-     both — the same standing requirement the /episode player card's drawers
-     carry. A :has() rule dropping the padding instead would leave a white
-     strip under the band anywhere :has() is unsupported. */
-  margin: 0.7rem -0.6rem -0.8rem;
-  padding: 0.34rem 0.3rem;
-  border-top: 1px solid var(--border);
+  position: absolute;
+  top: 0.4rem;
+  right: 0.45rem;
+  margin: 0;
+  padding: 0.1rem 0.4rem;
   background: var(--cream-d);
-  /* One less than .show-stat's 12px, because the border sits outside it. */
-  border-radius: 0 0 11px 11px;
+  border-radius: 999px;
+  /* Explicitly NOT Playfair. `.show-stat dd` sets the family through its `font:`
+     shorthand, so the family has to be restated here or the chip inherits the
+     figure's face — the original bug. */
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  font-size: 0.68rem;
+  font-size: 0.63rem;
   font-weight: 700;
-  line-height: 1.5;
-  letter-spacing: 0.04em;
+  line-height: 1.55;
+  letter-spacing: 0.03em;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -1384,13 +1382,16 @@ a.boost-who:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px
     font-size: clamp(0.55rem, 2.1vw, 0.72rem);
     letter-spacing: 0.05em;
   }
-  /* The band's side margins track .show-stat's padding, which changed above.
-     "T#2,274" is seven characters against a 107px tile, so the binding
-     constraint here is still the label ("boosters"), not the rank. */
+  /* The reserved line tracks the tile's own padding, which shrank above. The
+     chip keeps a floor of 0.55rem: below that "T#2,274" stops being readable,
+     and shrinking a control until it fits is what makes it look like a
+     different control. */
+  .show-stat--ranked { padding-top: 1.15rem; }
   .show-stat-rank {
-    margin: 0.55rem -0.25rem -0.6rem;
-    padding: 0.28rem 0.2rem;
-    font-size: clamp(0.55rem, 2.2vw, 0.68rem);
+    top: 0.28rem;
+    right: 0.3rem;
+    padding: 0.08rem 0.3rem;
+    font-size: clamp(0.55rem, 2.2vw, 0.63rem);
   }
   .show-stats-cap { font-size: 0.72rem; }
   /* Three across on a phone, five on desktop. Cards four and five wrap to a

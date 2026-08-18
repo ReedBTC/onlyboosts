@@ -1466,19 +1466,26 @@ Three more things a change would break:
   notation the reader cannot see is worse than saying nothing.
 - **The chips are not links and the caption is.** Three links to one feed under
   three tiles is one destination said three times.
-- **⚠️ The rank is a BAND across the tile's foot, not a third line in the flow**,
-  and it separates by **ground** because that is the one channel the tile was
-  not already using: the figure owns brand blue and Playfair, the label owns
-  muted uppercase sans, the band owns `--cream-d`. It shipped as a plain line
-  first and read as bolted on, because **`.show-stat dd` sets its type with the
-  `font:` shorthand** — which carries the family — so a rule overriding only the
-  size left the rank in Playfair at brand blue, the same face and colour as the
-  figure and larger than the label between them. **Its negative margins cancel
-  `.show-stat`'s padding and must track it in the base rule and the 640px block
-  both**, the same standing requirement the `/episode` player card's drawers
-  carry. Alternatives measured and rejected: a corner chip (NBA.com) fights the
-  centred figure for 107px of tile at 375px, and an ordinal word (ESPN) needs
-  one string for desktop and a shorter one for the phone.
+- **⚠️ The rank is a CORNER CHIP pinned to the tile's top-right**, separating by
+  **position** rather than by weight, and borrowed from the sports stat card
+  (NBA.com, Sofascore) — the same place the `T` comes from, so a reader meets
+  one idea rather than two. It shipped first as a plain third line and read as
+  bolted on, because **`.show-stat dd` sets its type with the `font:`
+  shorthand** — which carries the family — so a rule overriding only the size
+  left the rank in Playfair at brand blue, the same face and colour as the
+  figure and larger than the label between them. **The chip therefore restates
+  its font-family explicitly**; dropping that line brings the bug straight back.
+- **⚠️ `.show-stat--ranked` reserves the chip's line, and it is emitted by the
+  renderer rather than inferred by `:has()`.** Left floating the chip overlaps
+  the figure: at 375px a tile is ~107px and "3.0M" is ~40px centred, leaving
+  ~33px where `T#2,274` needs ~38px — it works until the data gets wide. The
+  class is on exactly the tiles carrying a rank, so `/booster`'s keep their own
+  spacing; `:has()` would be silently a no-op where unsupported and fail as an
+  overlapping number rather than a spacing nit.
+- **It is the most compact treatment measured**: ~0.65rem of reserved line
+  against ~1.6rem for a ruled footer band, which was built and rejected for
+  that. An ordinal word (ESPN) was rejected too, needing one string for desktop
+  and a shorter one for the phone.
 
 ### Where the shared code lives
 

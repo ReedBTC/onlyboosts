@@ -169,7 +169,14 @@ export function renderStatTiles(stats, ranks, copy) {
         : `${chip(r)} by ${s.key} on the all-time ${copy.rankFeed} feed`;
       rankEl = `<dd class="show-stat-rank" title="${esc(tip)}">${esc(chip(r))}</dd>`;
     }
-    return `<div class="show-stat"><dt>${esc(s.label)}</dt><dd title="${esc(s.exact)}">${esc(s.value)}</dd>${rankEl}</div>`;
+    // ⚠️ THE MODIFIER IS WHAT RESERVES THE CHIP'S LINE. The rank is pinned to
+    // the tile's top corner, so the tile has to open a gap for it — but only a
+    // tile that HAS one, or /booster's rankless tiles would carry dead space
+    // above the figure. A `:has()` rule would do it without the class and is
+    // silently a no-op wherever :has() is unsupported, which is the one failure
+    // mode here that shows as an overlapping number rather than a spacing nit.
+    const cls = rankEl ? "show-stat show-stat--ranked" : "show-stat";
+    return `<div class="${cls}"><dt>${esc(s.label)}</dt><dd title="${esc(s.exact)}">${esc(s.value)}</dd>${rankEl}</div>`;
   });
 
   const caption = anyRank
