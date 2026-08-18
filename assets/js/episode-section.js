@@ -34,12 +34,13 @@
  * the same comparators, from episode-card.js, so the two cases share code
  * without sharing the mistake.
  */
-import { renderEpisodeCards, sortEpisodeItems, filterEpisodeItems, buildEpisodes, COPY }
-  from '/assets/js/episode-card.js?v=ob-v77'
+import { competitionRanks } from '/assets/js/rank.js?v=ob-v78'
+import { renderEpisodeCards, sortEpisodeItems, filterEpisodeItems, buildEpisodes, COPY, episodeRankValue }
+  from '/assets/js/episode-card.js?v=ob-v78'
 import { wireEpisodeCards, hydrateCardProfiles, prewarmBoosting }
-  from '/assets/js/episode-card-actions.js?v=ob-v77'
-import { normalizeBoosts, toEpisodeShape } from '/assets/js/ob-data.js?v=ob-v77'
-import { rangeControl, sortControl, rangeDays, rangeCutoff } from '/assets/js/feed-controls.js?v=ob-v77'
+  from '/assets/js/episode-card-actions.js?v=ob-v78'
+import { normalizeBoosts, toEpisodeShape } from '/assets/js/ob-data.js?v=ob-v78'
+import { rangeControl, sortControl, rangeDays, rangeCutoff } from '/assets/js/feed-controls.js?v=ob-v78'
 
 const CARDS_PER_PAGE = 30   // matches CARDS_PER_PAGE in functions/_shared/episode-cards.js
 
@@ -179,6 +180,16 @@ export function initEpisodeSection({
   }
 
   // ── Painting ───────────────────────────────────────────────────────
+
+  /* ⚠️ COMPETITION RANKS, NOT POSITIONS. This section holds its subject's whole
+   * corpus in memory and sorts it here, so `view` is the complete ordering and
+   * needs no seed. Two episodes with the same booster count share a place
+   * rather than being split by the sats tiebreak inside sortEpisodeItems. */
+  function stampRanks() {
+    const ranks = competitionRanks(view, episodeRankValue(sortKey))
+    view.forEach((it, i) => { it._rank = ranks[i] })
+  }
+
   function rankOf(it) {
     return rankedSorts.has(sortKey) ? it._rank : null
   }
@@ -188,7 +199,7 @@ export function initEpisodeSection({
    * narrowing: rank over everything in the window, then paint. */
   function rebuild() {
     view = sortEpisodeItems(filterEpisodeItems(items, rangeCutoff(rangeKey)), sortKey)
-    view.forEach((it, i) => { it._rank = i + 1 })
+    stampRanks()
     total = view.length
     painted = 0
     cards.textContent = ''
@@ -261,7 +272,7 @@ export function initEpisodeSection({
         // view yet. Build it without repainting what the server already showed.
         if (!view.length) {
           view = sortEpisodeItems(filterEpisodeItems(items, rangeCutoff(rangeKey)), sortKey)
-          view.forEach((it, i) => { it._rank = i + 1 })
+          stampRanks()
           total = view.length
         }
         paintNextPage()

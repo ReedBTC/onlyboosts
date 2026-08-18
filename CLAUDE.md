@@ -1005,6 +1005,61 @@ in place under those sorts; under `recent` it appends.
 **Neither Boosts scope pages backwards hunting for matches any more.** The D1
 query answers in one indexed hit, so an empty first page genuinely means empty.
 
+### Ranking, And The One Definition Of It
+
+**`assets/js/rank.js` is the site's single definition: standard competition
+ranking (1-2-2-4).** A rank is the count of rows **strictly ahead, plus one**;
+ties share the better place and the next distinct value skips the whole group.
+It is two-sided and dependency-free, so the edge and the browser number a card
+identically. The full argument, and the dense-ranking measurement that was
+rejected, is under **The Rank Line In The Stat Tiles**.
+
+**⚠️ The feeds print the numeral and NOT the `T`; the detail pages print both.**
+That is not drift. A tie on a feed is *visible* — the two cards sit next to each
+other showing one numeral and the same figure — where a stat tile on `/show` has
+no list around it. It also means a feed never has to know whether a tie
+continues past the rows it has loaded, which it cannot know.
+
+**⚠️ The client can compute this with no new server field, and that is what
+makes it cheap.** A competition rank is the position of the first row sharing
+your value, and the ranked feeds page forward from offset 0 and only ever
+append, so the browser always holds every row ahead of the one it is numbering.
+A `RANK()` window over the default listing was **not** used: the `q=` path's
+window already reads ~31k rows against ~200 for a plain page, and that shape is
+documented as not for the feed.
+
+Four renderers stamp it, all through `competitionRanks`:
+
+| | |
+|---|---|
+| `functions/_shared/episode-cards.js` | the edge's card page; `page` is a prefix from 0, so no seed |
+| `feeds-podcasts.js#renumber` | Episodes / Songs, **with a seed** — see below |
+| `shows-feed.js#rebuild` | Shows / Albums; never adopted, so no seed |
+| `episode-section.js#stampRanks` | the `/episode` and `/booster` rollups, whole corpus in memory |
+
+**⚠️ `lastRank` / `lastValue` ride the homepage's state element**, and they exist
+for exactly one case: the homepage **adopts** thirty server-rendered cards as
+markup with no data behind them, so when it fetches page two it holds no row
+ahead of the first one it must number. A tie straddling that seam would restart
+as a new run and every card below it would be off by the size of the tie. Both
+are cleared wherever `adoptedCount` is, since they describe cards no longer on
+screen.
+
+**⚠️ `episodeRankValue` reads `totals` before the built fields**, and that is
+the correctness half rather than a preference: `boosts.length` is the inline
+note count, **capped at 50 per episode** by `include=boosts`, where `totals`
+carries the true aggregate the server ranked by. Comparing capped counts reads
+two episodes with 60 and 55 boosts as tied. It lives beside `EPISODE_SORTERS`
+and `RANKED_SORTS` in `episode-card.js` so all three move together.
+
+**⚠️ The `q=` paths use `RANK()`, never `ROW_NUMBER()`, and carry NO tiebreak
+inside the window.** The tiebreak stays on the outer `ORDER BY`, where it makes
+paging a total order; inside the window it would hand every member of a tie a
+distinct rank again. A searched card has to agree with the number the same card
+carries on the unfiltered feed. Verified against `d1/schema.sql` in local
+sqlite: 400 random corpora x 3 sorts, SQLite's `RANK()`, `competitionRanks` and
+a brute-force reference all agreeing, plus the split-page seam.
+
 ### The Language Filter
 
 `assets/js/feed-lang.js`, mounted as a third control on **all four ranked feeds**
@@ -2441,6 +2496,7 @@ would. Never remove an entry** — those links are in the wild.
 | `boosts-feed.js` / `feeds-podcasts.js` | the boost feeds and the episode-level rollup behind Episodes and Songs |
 | `episode-card.js` + `episode-card-actions.js` | **the** episode card, facts and verbs, shared by the edge and the browser |
 | `episode-section.js` | the card rollup on `/episode` and `/booster` |
+| `rank.js` | **the** definition of a rank, competition-style, shared by the edge and the browser |
 | `boost-list.js` + `boost-section.js` | **the** boost row and the `#boosts` range and sort, facts and verbs, shared by the edge and the browser |
 | `shows-feed.js` | the show-level rollup behind Shows and Albums |
 | `feed-controls.js` / `feed-search.js` | the range/sort chrome and the per-feed typeahead |

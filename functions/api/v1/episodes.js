@@ -267,10 +267,18 @@ export async function globalEpisodes(env, p) {
     // Results stay in the ACTIVE SORT, not relevance order: the feed reads as
     // the same leaderboard with non-matches removed, which is what makes the
     // rank numbers legible.
+    // ⚠️ RANK(), NOT ROW_NUMBER(), AND NO TIEBREAK INSIDE THE WINDOW. SQLite's
+    // RANK() is standard competition ranking, which is the site's one
+    // definition (see assets/js/rank.js): ties share the better place and the
+    // next distinct value skips the group. The tiebreak stays on the OUTER
+    // ORDER BY, where it exists to make paging a total order — putting it in
+    // the window would hand every member of a tie a distinct rank again, which
+    // is exactly the bug this replaced. A searched card must agree with the
+    // number the same card carries on the unfiltered feed.
     sql = `
       WITH ranked AS (
         SELECT e.item_guid,
-               ROW_NUMBER() OVER (ORDER BY ${col} DESC, ${tiebreak}) AS rank
+               RANK() OVER (ORDER BY ${col} DESC) AS rank
         FROM episodes e
         LEFT JOIN podcasts pc ON pc.podcast_guid = e.podcast_guid
         ${whereSql}
@@ -384,11 +392,18 @@ export async function onRequestPost({ request, env }) {
     // essentially nothing beyond what this endpoint always pays.
     // Outside the GROUP BY the sort key exists only under its projected alias.
     const a = SORTS[p.sortKey].alias;
-    const rankTiebreak = a === "total_sats" ? "item_guid" : "total_sats DESC, item_guid";
+    // ⚠️ RANK(), NOT ROW_NUMBER(), AND NO TIEBREAK INSIDE THE WINDOW. SQLite's
+    // RANK() is standard competition ranking, which is the site's one
+    // definition (see assets/js/rank.js): ties share the better place and the
+    // next distinct value skips the group. The tiebreak stays on the OUTER
+    // ORDER BY, where it exists to make paging a total order — putting it in
+    // the window would hand every member of a tie a distinct rank again, which
+    // is exactly the bug this replaced. A searched card must agree with the
+    // number the same card carries on the unfiltered feed.
     sql = `
       WITH agg AS (${AGG_SELECT}),
       ranked AS (
-        SELECT agg.*, ROW_NUMBER() OVER (ORDER BY ${a} DESC, ${rankTiebreak}) AS rank
+        SELECT agg.*, RANK() OVER (ORDER BY ${a} DESC) AS rank
         FROM agg
       )
       SELECT r.* FROM ranked r

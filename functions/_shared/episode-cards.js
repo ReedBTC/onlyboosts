@@ -20,7 +20,9 @@
 // Only the corpus and the opening sort differ, which is why they share this.
 import {
   COPY, CARD_PARTS, buildEpisodes, renderEpisodeCards, sortEpisodeItems, RANKED_SORTS,
+  episodeRankValue,
 } from "../../assets/js/episode-card.js";
+import { competitionRanks } from "../../assets/js/rank.js";
 import { normalizeBoosts, toEpisodeShape } from "../../assets/js/ob-data.js";
 import { jsonForScript } from "./detail-page.js";
 
@@ -59,23 +61,46 @@ export function renderCardPage(items, {
   limit = CARDS_PER_PAGE, showRanks = true, parts = CARD_PARTS, state = {},
 } = {}) {
   const page = items.slice(0, limit);
+
+  /* ⚠️ COMPETITION RANKS, NOT POSITIONS. This was `i + 1` until 2026-08-18,
+   * which meant two episodes with the same boost count were numbered #4 and #5
+   * by whichever had more sats — a tiebreak the ORDER BY carries so that paging
+   * is stable, and which must not decide a standing. Ties now share the better
+   * place and the next value skips the group. See assets/js/rank.js.
+   *
+   * `page` is a prefix of the full ranked view from index 0, which is what makes
+   * this exact with no seed. Stamped here rather than left to the client so a
+   * card is numbered the same whichever side rendered it. Chronological sorts
+   * pass no rank at all — a numeral under "Latest boost" reads as a score when
+   * it is only order. */
+  const ranked = showRanks && RANKED_SORTS.has(sort);
+  const valueOf = ranked ? episodeRankValue(sort) : null;
+  const ranks = ranked ? competitionRanks(page, valueOf) : null;
+
   const html = renderEpisodeCards(page, {
     copy,
     profiles,
     parts,
-    // The rank is the position in the FULL ranked view, and it is stamped here
-    // rather than left to the client so a card is numbered the same whichever
-    // side rendered it. Chronological sorts pass no rank at all — a numeral
-    // under "Latest boost" reads as a score when it is only order.
-    rankOf: (_it, i) => (showRanks && RANKED_SORTS.has(sort) ? i + 1 : null),
+    rankOf: (_it, i) => (ranks ? ranks[i] : null),
   });
   // ⚠️ `card` RIDES THE STATE, and that is not incidental. episode-section.js and
   // feeds-podcasts.js both repaint these cards on a re-sort, so the variant has to
   // travel with them — a surface that hid the player at the edge and re-rendered
   // it in the browser would grow one the first time the reader changed a sort.
   // One declaration per surface, here, in the Function.
+  /* ⚠️ THE LAST PAINTED CARD'S RANK AND VALUE RIDE THE STATE, and they exist
+   * for exactly one case: the homepage adopts these cards without their data,
+   * so when it later fetches page two it holds no row ahead of the first one it
+   * has to number. A tie straddling that boundary would restart as a new run
+   * and every card below it would be off by the size of the tie. Absent on an
+   * unranked sort, where the client numbers nothing. */
+  const boundary = ranks && page.length
+    ? { lastRank: ranks[page.length - 1], lastValue: valueOf(page[page.length - 1], page.length - 1) }
+    : {};
+
   return html + stateScript({
-    sort, range, count: page.length, total: items.length, card: parts, ...state,
+    sort, range, count: page.length, total: items.length, card: parts,
+    ...boundary, ...state,
   });
 }
 

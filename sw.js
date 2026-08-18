@@ -437,7 +437,12 @@
 // ob-v77: the rank is a STANDARD COMPETITION rank now (ties share the better
 // place, golf's T marks one) with no denominator, and a shared caption under
 // the tiles names the feed. .show-stats-cap is new in show-page.css.
-const VERSION = 'ob-v77';
+// ob-v78: the FEEDS rank the same way, so a card's numeral agrees with the page
+// it links to. assets/js/rank.js is a new two-sided module and four renderers
+// import it; REQUIRED, since a returning visitor holding the previous
+// feeds-podcasts.js or episode-section.js has no such module to resolve and an
+// unresolved import is a link-time error that blanks the whole feed.
+const VERSION = 'ob-v78';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;
@@ -469,27 +474,27 @@ const PRECACHE_URLS = [
   '/assets/onlyboosts_pfp.png',
   '/assets/onlyboosts_banner.png',
   '/assets/avatar-fallback.svg',
-  '/assets/css/theme.css?v=ob-v77',
-  '/assets/css/page.css?v=ob-v77',
-  '/assets/css/nav.css?v=ob-v77',
-  '/assets/css/footer.css?v=ob-v77',
-  '/assets/css/boosts-thread.css?v=ob-v77',
-  '/assets/css/boost-actions.css?v=ob-v77',
+  '/assets/css/theme.css?v=ob-v78',
+  '/assets/css/page.css?v=ob-v78',
+  '/assets/css/nav.css?v=ob-v78',
+  '/assets/css/footer.css?v=ob-v78',
+  '/assets/css/boosts-thread.css?v=ob-v78',
+  '/assets/css/boost-actions.css?v=ob-v78',
   // The episode card and its drawer. Precached alongside the others because the
   // homepage's feeds are painted in it and it used to be inline in index.html,
   // which IS precached — leaving it out would trade an inline block for a
   // network round trip on the one page this list exists to make fast.
-  '/assets/css/feed-cards.css?v=ob-v77',
-  '/assets/js/boosts-thread.js?v=ob-v77',
+  '/assets/css/feed-cards.css?v=ob-v78',
+  '/assets/js/boosts-thread.js?v=ob-v78',
   // A static import of boosts-thread.js, so precaching that without this one
   // leaves a returning visitor fetching half the graph from the network.
-  '/assets/js/primal-profiles.js?v=ob-v77',
-  '/assets/js/calendar-events.js?v=ob-v77',
-  '/assets/js/boost-actions.js?v=ob-v77',
-  '/assets/js/nav.js?v=ob-v77',
-  '/assets/js/nav-widget-boot.js?v=ob-v77',
-  '/assets/js/widget-loader.js?v=ob-v77',
-  '/assets/js/sw-register.js?v=ob-v77',
+  '/assets/js/primal-profiles.js?v=ob-v78',
+  '/assets/js/calendar-events.js?v=ob-v78',
+  '/assets/js/boost-actions.js?v=ob-v78',
+  '/assets/js/nav.js?v=ob-v78',
+  '/assets/js/nav-widget-boot.js?v=ob-v78',
+  '/assets/js/widget-loader.js?v=ob-v78',
+  '/assets/js/sw-register.js?v=ob-v78',
 ];
 
 self.addEventListener('install', (event) => {

@@ -198,10 +198,18 @@ export async function onRequestGet({ request, env }) {
     // Results stay in the ACTIVE SORT, not relevance order: the feed reads as
     // the same leaderboard with non-matches removed, which is what keeps the
     // rank numbers legible. Same call /api/v1/episodes?q= makes.
+    // ⚠️ RANK(), NOT ROW_NUMBER(), AND NO TIEBREAK INSIDE THE WINDOW. SQLite's
+    // RANK() is standard competition ranking, which is the site's one
+    // definition (see assets/js/rank.js): ties share the better place and the
+    // next distinct value skips the group. The tiebreak stays on the OUTER
+    // ORDER BY, where it exists to make paging a total order — putting it in
+    // the window would hand every member of a tie a distinct rank again, which
+    // is exactly the bug this replaced. A searched card must agree with the
+    // number the same card carries on the unfiltered feed.
     sql = `
       WITH base AS (${base}),
            ranked AS (
-             SELECT guid, ROW_NUMBER() OVER (${ORDER}) AS rank FROM base
+             SELECT guid, RANK() OVER (ORDER BY ${orderCol} DESC) AS rank FROM base
            )
       SELECT base.*, ranked.rank
       FROM base

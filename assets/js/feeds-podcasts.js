@@ -45,29 +45,31 @@
  * Entry point: renderPodcasts({ panel, list }) — lazy-imported by feeds.js
  * the first time the feed is opened.
  */
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v77'
-import { toEpisodeShape, normalizeBoosts, episodeApiToBoosts } from '/assets/js/ob-data.js?v=ob-v77'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v78'
+import { toEpisodeShape, normalizeBoosts, episodeApiToBoosts } from '/assets/js/ob-data.js?v=ob-v78'
 import {
   getEpisodePage, searchEpisodes, SEARCH_HITS, SEARCH_MIN_CHARS,
-} from '/assets/js/ob-live.js?v=ob-v77'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v77'
+} from '/assets/js/ob-live.js?v=ob-v78'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v78'
 import {
   rangeDays, rangeControl, sortControl, mountFeedControls,
-} from '/assets/js/feed-controls.js?v=ob-v77'
+} from '/assets/js/feed-controls.js?v=ob-v78'
 // Its own module, not two more exports of feed-controls.js — see the ⚠️ note
 // at the top of that file for the four-hour window that shape opens.
-import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v77'
+import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v78'
 import {
   LANG_ALL, languageOptions, langControl, langNote, langNoMatchText, langLabelFor,
-} from '/assets/js/feed-lang.js?v=ob-v77'
-import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v77'
+} from '/assets/js/feed-lang.js?v=ob-v78'
+import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v78'
 // The card, and the card's verbs. One definition each, shared with the edge.
 import {
   COPY, HOME_CARD_PARTS, buildEpisodes, renderEpisodeCards, RANKED_SORTS, SORT_OPTIONS,
-} from '/assets/js/episode-card.js?v=ob-v77'
+  episodeRankValue,
+} from '/assets/js/episode-card.js?v=ob-v78'
+import { competitionRanks } from '/assets/js/rank.js?v=ob-v78'
 import {
   wireEpisodeCards, hydrateCardProfiles, prewarmBoosting,
-} from '/assets/js/episode-card-actions.js?v=ob-v77'
+} from '/assets/js/episode-card-actions.js?v=ob-v78'
 
 const INITIAL_CARDS = 30       // episodes rendered per "load more" batch
 
@@ -319,6 +321,8 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
    * every rank is offset by it. Any requery drops it to zero, because a requery
    * replaces those cards. */
   let adoptedCount = 0
+  let adoptedLastRank = null
+  let adoptedLastValue = null
   /* Which parts of the card this surface shows. HOME_CARD_PARTS is the whole
    * card with the drawer filled on open (see `drawer` under CARD_PARTS), and it
    * is the same object functions/index.js declares into the state element for
@@ -394,6 +398,12 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
     if (adopted.state.card) parts = adopted.state.card
     adoptedCount = Number(adopted.state.count) || 0
     nextOffset = adopted.state.nextOffset ?? null
+    /* The last server-painted card's rank and figure. The adopted cards are
+     * markup with no data behind them, so without these the first fetched page
+     * cannot tell whether its opening row continues the tie the last painted
+     * one was part of. See the boundary note in _shared/episode-cards.js. */
+    adoptedLastRank = Number.isFinite(adopted.state.lastRank) ? adopted.state.lastRank : null
+    adoptedLastValue = adopted.state.lastValue ?? null
     // The container the server painted IS the one this module appends to, so a
     // "load more" adds to the list already on screen instead of starting a
     // second one beside it — and no node is rebuilt.
@@ -531,9 +541,10 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
             medium, sort: sortKey, range: rangeKey, lang: langKey, offset: nextOffset, follows,
           })
           mergeProfiles(next.profiles)
-          const start = adoptedCount + items.length
-          next.items.forEach((it, i) => { it._rank = start + i + 1 })
+          // Concat BEFORE numbering: a competition rank reads the row ahead of
+          // it, so the new page has to be part of the run before it is stamped.
           items = items.concat(next.items)
+          renumber()
           nextOffset = next.nextOffset
           appendPage(next.items)
         } catch (e) {
@@ -564,8 +575,23 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
    * standing is a fact about the whole index, so it carries the `rank` the
    * server computed and `pickedItem` is never renumbered here.
    */
+  /* ⚠️ COMPETITION RANKS, NOT POSITIONS — ties share the better place and the
+   * next distinct value skips the group, so nothing about a standing is decided
+   * by the sats-then-guid tiebreak the endpoint orders by. `items` is a
+   * contiguous prefix of the ranked view (the feed only ever appends), and the
+   * seed carries the adopted block's last card across the one gap in it. */
+  function renumber() {
+    if (picked) return
+    const ranks = competitionRanks(items, episodeRankValue(sortKey), {
+      startIndex: adoptedCount,
+      prevValue: adoptedLastValue,
+      prevRank: adoptedLastRank,
+    })
+    items.forEach((it, i) => { it._rank = ranks[i] })
+  }
+
   function rebuild() {
-    if (!picked) items.forEach((it, i) => { it._rank = adoptedCount + i + 1 })
+    renumber()
     search?.refresh()
     view = picked ? (pickedItem ? [pickedItem] : []) : items
     paint()
@@ -588,7 +614,11 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
     const mine = ++pickSeq
     // A pick paints one card in place of the list, so the server's cards are
     // gone the moment one resolves — and their count must stop offsetting ranks.
+    // The boundary seed goes with the count: it describes a card that is no
+    // longer on screen, and left behind it would tie the first fetched row to it.
     adoptedCount = 0
+    adoptedLastRank = null
+    adoptedLastValue = null
     // Dropping the filter comes through here too (editing the box or pressing
     // ×), and it has to repaint: bumping pickSeq above has already retired any
     // resolve still in flight, so nothing else is going to.
@@ -652,8 +682,10 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
       items = page.items
       nextOffset = page.nextOffset
       // The answer arrived, so the server's opening page is about to be replaced
-      // wholesale and stops offsetting anything.
+      // wholesale and stops offsetting anything, boundary seed included.
       adoptedCount = 0
+      adoptedLastRank = null
+      adoptedLastValue = null
       rebuild()
       // The unfiltered list is still fetched under a live search filter, since
       // clearing the box has to reveal the new range rather than fetch again.

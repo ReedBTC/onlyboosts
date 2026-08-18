@@ -42,11 +42,11 @@
  * what functions/_shared/detail-page.js has always done, so the site now has one
  * date format rather than one for the feeds and another for the detail pages.
  */
-import { showPageHref, episodePageHref } from './show-link.js?v=ob-v77'
-import { episodeBoostLink } from './episode-link.js?v=ob-v77'
-import { boosterPageHref, boosterLinkAttrs } from './booster-link.js?v=ob-v77'
-import { coverChain } from './cover-art.js?v=ob-v77'
-import { htmlEscape, isSafeUrl, renderMessage } from './nostr-text.js?v=ob-v77'
+import { showPageHref, episodePageHref } from './show-link.js?v=ob-v78'
+import { episodeBoostLink } from './episode-link.js?v=ob-v78'
+import { boosterPageHref, boosterLinkAttrs } from './booster-link.js?v=ob-v78'
+import { coverChain } from './cover-art.js?v=ob-v78'
+import { htmlEscape, isSafeUrl, renderMessage } from './nostr-text.js?v=ob-v78'
 
 const esc = htmlEscape
 
@@ -325,6 +325,29 @@ export const EPISODE_SORTERS = {
 // drift — adding a quantitative sort means adding it here too. On "Latest boost"
 // or "Latest episode" a rank badge would read as a score when it is chronology.
 export const RANKED_SORTS = new Set(['count', 'boosts', 'sats'])
+
+/* The figure each ranked sort ranks ON, which a competition rank has to compare
+ * to know where one run of equal values ends — ordinal numbering never had to
+ * look at a value at all. Kept beside the sorters and RANKED_SORTS so all three
+ * move together.
+ *
+ * ⚠️ IT READS `totals` FIRST, AND THAT IS THE CORRECTNESS HALF. `boosts.length`
+ * is the INLINE note count, capped at 50 per episode by `include=boosts`, where
+ * `totals` carries the true all-time aggregate the server actually ranked by.
+ * Comparing the capped counts would read two episodes with 60 and 55 boosts as
+ * tied. The fallbacks are for a card built from raw boost rows with no
+ * aggregates attached, and they are the same expressions the card DISPLAYS
+ * (see nBoosters / nBoosts / totalSats below), so a rank always compares the
+ * numbers the reader can see.
+ */
+export function episodeRankValue(sortKey) {
+  switch (sortKey) {
+    case 'count':  return (it) => it.totals?.boosters ?? it.distinctBoosters?.length ?? 0
+    case 'boosts': return (it) => it.totals?.boosts ?? it.boosts?.length ?? 0
+    case 'sats':   return (it) => it.totals?.sats ?? it.totalSats ?? 0
+    default:       return () => 0
+  }
+}
 
 export const SORT_OPTIONS = [
   ['recent', 'Latest boost'],
