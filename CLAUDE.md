@@ -1466,6 +1466,19 @@ Three more things a change would break:
   notation the reader cannot see is worse than saying nothing.
 - **The chips are not links and the caption is.** Three links to one feed under
   three tiles is one destination said three times.
+- **⚠️ The rank is a BAND across the tile's foot, not a third line in the flow**,
+  and it separates by **ground** because that is the one channel the tile was
+  not already using: the figure owns brand blue and Playfair, the label owns
+  muted uppercase sans, the band owns `--cream-d`. It shipped as a plain line
+  first and read as bolted on, because **`.show-stat dd` sets its type with the
+  `font:` shorthand** — which carries the family — so a rule overriding only the
+  size left the rank in Playfair at brand blue, the same face and colour as the
+  figure and larger than the label between them. **Its negative margins cancel
+  `.show-stat`'s padding and must track it in the base rule and the 640px block
+  both**, the same standing requirement the `/episode` player card's drawers
+  carry. Alternatives measured and rejected: a corner chip (NBA.com) fights the
+  centred figure for 107px of tile at 375px, and an ordinal word (ESPN) needs
+  one string for desktop and a shorter one for the phone.
 
 ### Where the shared code lives
 

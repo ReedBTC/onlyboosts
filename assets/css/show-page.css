@@ -216,30 +216,54 @@
 
 /* The subject's rank on the all-time Global feed its card lives on, by the
    tile's own sort: "#4", or "T#118" where the place is shared. Rendered by
-   functions/_shared/feed-rank.js as the tile's third line, absent when the
-   query failed, so a tile without one is the tile /booster already renders.
+   functions/_shared/feed-rank.js as the tile's third line.
 
-   Small and in brand, under a number that is larger and also in brand: the
-   figure is the fact and this is where it stands. It is NOT a link — three
-   links to one feed under three tiles is the same destination said three
-   times, so the caption below carries the single link instead. */
+   ⚠️ IT IS A BAND, AND SEPARATION BY GROUND IS THE WHOLE POINT. The first
+   version set it as a third line in the flow and it read as bolted on, for a
+   reason worth recording: `.show-stat dd` sets its type with the `font:`
+   SHORTHAND, which carries the family, so a rule that overrode only the size
+   left the rank in Playfair at brand blue — the same face and colour as the
+   figure above it, and larger than the label between them. Three lines, three
+   type treatments, no hierarchy.
+
+   The tile has three channels and each now owns one: the figure has brand blue
+   and Playfair, the label has muted uppercase sans, and the rank has the tint.
+   Nothing shrinks to get out of the way, which is what keeps it readable at
+   375px where a corner chip fights the centred figure for 107px of tile.
+
+   The device is a fund fact sheet's: Morningstar rules "Rank in Category" off
+   under the return figure rather than setting it as another line of the same
+   kind, and the rule is what says the thing below is ABOUT the number above.
+   The bleed to the tile's edges is this site's own idiom — the same call the
+   /episode player card's drawers make, so the card reads as one object with
+   bands instead of a panel holding a panel.
+
+   Absent entirely when there is no rank, leaving exactly the tile /booster
+   renders: no reserved space and no empty rule. */
 .show-stat-rank {
   order: 3;
-  margin: 0.35rem 0 0;
-  font-size: 0.78rem;
+  /* ⚠️ CANCELS .show-stat's PADDING ON THREE SIDES so the band meets the
+     border, the negative bottom pulling it over the tile's own bottom padding.
+     It therefore TRACKS THAT PADDING in the base rule and in the 640px block
+     both — the same standing requirement the /episode player card's drawers
+     carry. A :has() rule dropping the padding instead would leave a white
+     strip under the band anywhere :has() is unsupported. */
+  margin: 0.7rem -0.6rem -0.8rem;
+  padding: 0.34rem 0.3rem;
+  border-top: 1px solid var(--border);
+  background: var(--cream-d);
+  /* One less than .show-stat's 12px, because the border sits outside it. */
+  border-radius: 0 0 11px 11px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 0.68rem;
   font-weight: 700;
-  line-height: 1.2;
-  color: var(--brand-d);
+  line-height: 1.5;
+  letter-spacing: 0.04em;
+  color: var(--ink);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
-/* ⚠️ THE CAPTION IS WHAT MAKES THE CHIPS LEGIBLE, and it is one line for three
-   tiles. It names the list the ranks are on, links to it, and defines the T —
-   but only when a T is actually on screen, since explaining a notation the
-   reader cannot see is worse than saying nothing. Under the tiles rather than
-   over them: the heading above already qualifies the whole block, and a second
-   line of chrome above the figures pushes them down a phone screen. */
 .show-stats-cap {
   margin: 0.6rem 0 0;
   font-size: 0.78rem;
@@ -1360,9 +1384,14 @@ a.boost-who:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px
     font-size: clamp(0.55rem, 2.1vw, 0.72rem);
     letter-spacing: 0.05em;
   }
-  /* "T#2,274" is seven characters, and the tile's label ("boosters", eight)
-     is still the binding constraint rather than the rank. */
-  .show-stat-rank { margin-top: 0.3rem; font-size: clamp(0.6rem, 2.5vw, 0.78rem); }
+  /* The band's side margins track .show-stat's padding, which changed above.
+     "T#2,274" is seven characters against a 107px tile, so the binding
+     constraint here is still the label ("boosters"), not the rank. */
+  .show-stat-rank {
+    margin: 0.55rem -0.25rem -0.6rem;
+    padding: 0.28rem 0.2rem;
+    font-size: clamp(0.55rem, 2.2vw, 0.68rem);
+  }
   .show-stats-cap { font-size: 0.72rem; }
   /* Three across on a phone, five on desktop. Cards four and five wrap to a
      centered second line rather than disappearing — PODIUM is decided by the
