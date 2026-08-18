@@ -28,6 +28,8 @@ import {
   renderSupporters, renderBoosts,
 } from "../_shared/detail-page.js";
 import { itemsFromBoosts, renderCardPage, CARDS_PER_PAGE } from "../_shared/episode-cards.js";
+// The three all-time global ranks above the stat tiles; /show shares it.
+import { feedRanks, renderRankRow } from "../_shared/feed-rank.js";
 import { fetchCommunityBoosts } from "../api/v1/episodes/[guid].js";
 import { COPY as CARD_COPY } from "../../assets/js/episode-card.js";
 
@@ -80,6 +82,7 @@ export async function onRequestGet({ env, params }) {
     // JavaScript off — and it costs nothing extra: this is already the row.
     `SELECT e.item_guid, e.podcast_guid, e.title, e.image, e.published, e.duration,
             e.episode_number, e.enclosure_url, e.description, e.boost_count, e.total_sats,
+            e.booster_count,
             p.title AS p_title, p.image AS p_image, p.artwork AS p_artwork,
             p.feed_url AS p_feed, p.medium AS p_medium, p.author AS p_author
      FROM episodes e
@@ -115,7 +118,7 @@ export async function onRequestGet({ env, params }) {
    * the rest of the page is complete without it, and a reader who came for this
    * episode's own boosts must not get a 500 because a rollup below the fold
    * could not be built. Same discipline as the two podroll queries on /show. */
-  const [sups, boosts, boosters, community] = await Promise.all([
+  const [sups, boosts, boosters, community, ranks] = await Promise.all([
     env.DB.prepare(
       // Ranked by sats sent to THIS EPISODE, all time. idx_boosts_item covers
       // the WHERE. The ORDER BY is a total order deliberately: this response is
@@ -152,6 +155,10 @@ export async function onRequestGet({ env, params }) {
       console.warn("[episode] community corpus unavailable", err);
       return null;
     }),
+    // The episode's all-time rank on Episodes or Songs, by boosts, sats and
+    // boosters, compared on the same `episodes` aggregate columns the feed
+    // sorts on. Never rejects; the header prints no row for null.
+    feedRanks(env.DB, "episode", ep),
   ]);
 
   const boostRows = boosts.results || [];
@@ -165,6 +172,7 @@ export async function onRequestGet({ env, params }) {
     latestTs: boosters?.latest || null,
     names,
     community,
+    ranks,
   });
 
   return new Response(html, {
@@ -207,6 +215,10 @@ const COPY = {
     // history.back() when the previous document was ours.
     backHref: "/#episodes-global",
     backLabel: "All Episodes",
+    // The rank row's caption: "All-time rank among 6,150 episodes", the count
+    // linking to backHref. See functions/_shared/feed-rank.js.
+    rankFeed: "Episodes",
+    rankNoun: "episodes",
     // Deliberately "By", never "Host" or "Creator". The source is
     // <itunes:author> on the show, whoever the publisher named there: usually
     // the host, sometimes a network ("Jupiter Broadcasting"), occasionally a
@@ -232,6 +244,8 @@ const COPY = {
     seriesProp: "inAlbum",
     backHref: "/#songs-global",
     backLabel: "All Songs",
+    rankFeed: "Songs",
+    rankNoun: "songs",
     // On a music feed <itunes:author> IS the artist, and cleanly so: 97.4% of
     // album pages carry a usable one. The stronger label is earned here in a
     // way it is not on the podcast side.
@@ -266,7 +280,7 @@ function usableAuthor(ep) {
 
 // ── the page ─────────────────────────────────────────────────────────────────
 
-function renderEpisodePage({ ep, supporters, boosts, boosterCount, latestTs, names, community }) {
+function renderEpisodePage({ ep, supporters, boosts, boosterCount, latestTs, names, community, ranks }) {
   const copy = copyFor(ep.p_medium);
   const title = ep.title;
   const showTitle = ep.p_title || "";
@@ -400,21 +414,21 @@ function renderEpisodePage({ ep, supporters, boosts, boosterCount, latestTs, nam
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v74" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v74" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v74" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v74" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v75" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v75" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v75" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v75" />
   <!-- The hero, the community wall and the boost list are the show page's, so
        this page links its stylesheet and adds only the deltas. -->
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v74" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v75" />
   <!-- The episode card, for the community-episodes section: the same chrome
        feeds-podcasts.js paints on the homepage. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v74" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v75" />
   <!-- The boost thread inside a card's drawer, and its reply / like / repost /
        zap bar. Only this page's community section needs them; /show does not. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v74" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v74" />
-  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v74" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v75" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v75" />
+  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v75" />
 </head>
 <body data-episode-guid="${htmlEscape(ep.item_guid)}"${ep.podcast_guid ? ` data-show-guid="${htmlEscape(ep.podcast_guid)}"` : ""}>
 
@@ -512,7 +526,7 @@ function renderEpisodePage({ ep, supporters, boosts, boosterCount, latestTs, nam
     <span class="show-back-arrow" aria-hidden="true">←</span><span data-back-label>${copy.backLabel}</span>
   </a>
 
-  ${renderHeader(ep, { art, art2, art3, copy, showTitle, showUrl, boosterCount, latestTs })}
+  ${renderHeader(ep, { art, art2, art3, copy, showTitle, showUrl, boosterCount, latestTs, ranks })}
 
   ${renderCommunityEpisodes(copy, community)}
 
@@ -600,12 +614,12 @@ function renderEpisodePage({ ep, supporters, boosts, boosterCount, latestTs, nam
 
 <script type="application/json" id="episode-boost-payload">${jsonForScript(boostPayload)}</script>
 
-<script src="/assets/js/nav.js?v=ob-v74" defer></script>
-<script src="/assets/js/episode-page.js?v=ob-v74" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v75" defer></script>
+<script src="/assets/js/episode-page.js?v=ob-v75" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v74"></script>
-<script src="/assets/js/sw-register.js?v=ob-v74" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v75"></script>
+<script src="/assets/js/sw-register.js?v=ob-v75" defer></script>
 </body>
 </html>`;
 }
@@ -616,7 +630,7 @@ function creditLine(ep, copy) {
   return `<p class="show-credit"><span class="show-credit-label">${htmlEscape(copy.credit)}</span> ${htmlEscape(truncate(author, 120))}</p>`;
 }
 
-function renderHeader(ep, { art, art2, art3, copy, showTitle, showUrl, boosterCount, latestTs }) {
+function renderHeader(ep, { art, art2, art3, copy, showTitle, showUrl, boosterCount, latestTs, ranks }) {
   // The same three tiles as the show page, scoped to this episode, under the
   // same heading. THE STAT HEADING IS THIS PAGE'S QUALIFIER: "Nostr Boost Stats"
   // with the link carrying what the numbers exclude, rather than a caveat
@@ -695,6 +709,7 @@ function renderHeader(ep, { art, art2, art3, copy, showTitle, showUrl, boosterCo
     <h2 class="show-stats-title">
       <a href="/about#keysend">Nostr Boost</a> Stats
     </h2>
+    ${renderRankRow(ranks, copy)}
     <dl class="show-stats">
       ${stats.map((s) => `<div class="show-stat"><dt>${htmlEscape(s.label)}</dt><dd title="${htmlEscape(s.exact)}">${htmlEscape(s.value)}</dd></div>`).join("\n      ")}
     </dl>
@@ -980,10 +995,10 @@ function notFound(guid) {
   <meta name="robots" content="noindex" />
   <title>Episode not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v74" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v74" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v74" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v74" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v75" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v75" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v75" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v75" />
 </head>
 <body>
 <section class="page-header">
@@ -1001,7 +1016,7 @@ function notFound(guid) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v74" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v75" defer></script>
 </body>
 </html>`;
   return new Response(html, {

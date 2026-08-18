@@ -289,6 +289,67 @@
 
 .show-stats { margin-top: 0; }
 
+/* ── Rank row ─────────────────────────────────────────────────────────── */
+
+/* Three ranks under the stats heading and above the stat tiles: the subject's
+   position on the all-time global feed it belongs to, by boosts, sats and
+   boosters, in the order of the tiles beneath so "#12 most boosts" sits over
+   "506 boosts" and each rank reads against its own figure. Rendered by functions/_shared/feed-rank.js on /show and
+   /episode; absent entirely when the query fails, so nothing reserves space.
+
+   The tiles are the stat tiles' shape at a smaller scale, and deliberately
+   NOT their treatment: --cream-d fill with no border and an --ink numeral,
+   where a stat tile is a white bordered card with a brand numeral. A rank is a
+   position and a stat is an amount, and a reader should be able to tell the two
+   rows apart at a glance without reading the labels. */
+.show-ranks-cap {
+  margin: 0 0 0.45rem;
+  font-size: 0.74rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.show-ranks-cap a {
+  color: var(--brand-d);
+  text-decoration: none;
+  font-weight: 600;
+}
+.show-ranks-cap a:hover,
+.show-ranks-cap a:focus-visible { text-decoration: underline; text-underline-offset: 3px; }
+
+.show-ranks {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0 0 0.75rem;
+  padding: 0;
+}
+.show-rank {
+  display: flex;
+  flex-direction: column-reverse;
+  justify-content: center;
+  min-width: 0;
+  padding: 0.55rem 0.5rem;
+  border-radius: 12px;
+  background: var(--cream-d);
+  text-align: center;
+}
+.show-rank dd {
+  margin: 0;
+  font: 700 1.2rem/1.1 'Playfair Display', Georgia, serif;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.show-rank dt {
+  order: 2;
+  margin-top: 0.2rem;
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
 /* ── Sections ─────────────────────────────────────────────────────────── */
 
 /* scroll-margin-top because EVERY SECTION id HERE IS A SHAREABLE URL
@@ -1318,6 +1379,16 @@ a.boost-who:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px
   .show-stat dt {
     font-size: clamp(0.55rem, 2.1vw, 0.72rem);
     letter-spacing: 0.05em;
+  }
+  /* The rank row scales with the tiles under it: three columns already, so
+     only the gap, padding and type step down. "most boosters" is the binding
+     label, thirteen characters against the tiles' eight. */
+  .show-ranks { gap: 0.4rem; }
+  .show-rank { padding: 0.45rem 0.2rem; }
+  .show-rank dd { font-size: clamp(0.85rem, 3.8vw, 1.1rem); }
+  .show-rank dt {
+    font-size: clamp(0.5rem, 1.9vw, 0.66rem);
+    letter-spacing: 0.04em;
   }
   /* Three across on a phone, five on desktop. Cards four and five wrap to a
      centered second line rather than disappearing — PODIUM is decided by the

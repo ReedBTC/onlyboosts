@@ -807,6 +807,18 @@ states the scope inside its sentence and is now the only place the full wording
 survives, which matters more than the on-page copy: it is the string that
 travels into a preview card with no page around it.
 
+## The Rank Row
+
+Between that heading and the tiles sit three smaller tiles: the show's
+all-time rank on the Global Shows (or Albums) feed by sats, boosts and
+boosters, in the tiles' own order so each rank reads against its figure. The
+caption ("All-time rank among 818 shows") links the count to the feed. The
+list is the feed's list exactly: all languages, no window, the same medium
+partition, and the feed's own tiebreak, so the number is the position the
+show's card holds there. `/episode` carries the same row against Episodes or
+Songs; both come from `functions/_shared/feed-rank.js`, and a failed query
+costs the row and nothing else.
+
 ---
 
 ## Site Wiring

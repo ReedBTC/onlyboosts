@@ -29,6 +29,8 @@ import {
 // from neither D1 nor the collector. See fetchShowDescription below.
 import { piHeaders, piGet } from "../_shared/podcast-index.js";
 import { parseNotes } from "../_shared/rich-text.js";
+// The three all-time global ranks above the stat tiles; /episode shares it.
+import { feedRanks, renderRankRow } from "../_shared/feed-rank.js";
 
 const SITE_ORIGIN = "https://onlyboosts.social";
 
@@ -103,7 +105,7 @@ export async function onRequestGet({ request, env, params }) {
   // is why nothing here is counted or capped — the rule does the work.
   if (!show || !show.title) return notFound(guid);
 
-  const [eps, sups, boosts, community, podroll, podrolledBy, description] = await Promise.all([
+  const [eps, sups, boosts, community, podroll, podrolledBy, description, ranks] = await Promise.all([
     env.DB.prepare(
       // Newest episode first. `published` is null on a meaningful slice of
       // rows, and SQLite sorts NULL below every value, so DESC sinks the
@@ -197,13 +199,17 @@ export async function onRequestGet({ request, env, params }) {
        LIMIT ?`
     ).bind(guid, guid, COMMUNITY_SHOWS_LIMIT).all(),
     // Both directions of <podcast:podroll>. See the note over podrollQuery for
-    // why these two are the only queries on the page allowed to fail quietly.
+    // why these two (and the rank query below) may fail quietly.
     podrollQuery(env, guid, "forward"),
     podrollQuery(env, guid, "reverse"),
     // ⚠️ THE ONE OUTBOUND THIRD-PARTY FETCH IN THIS RENDER. It sits inside the
     // batch rather than after it so the page pays max(D1, PI) instead of the
     // sum; see fetchShowDescription for the rest of the bargain.
     fetchShowDescription(env, show),
+    // The show's all-time rank on Shows or Albums, by boosts, sats and
+    // boosters. One scan of `podcasts`; never rejects, resolves null instead,
+    // and the header prints no row for null. See functions/_shared/feed-rank.js.
+    feedRanks(env.DB, "show", show),
   ]);
 
   const boostRows = boosts.results || [];
@@ -219,6 +225,7 @@ export async function onRequestGet({ request, env, params }) {
     podrolledBy: podrolledBy.results || [],
     description,
     names,
+    ranks,
   });
 
   return new Response(html, {
@@ -316,6 +323,11 @@ const COPY = {
     // when the previous document was ours; see the note over .show-back.
     backHref: "/#shows",
     backLabel: "All Shows",
+    // The rank row's caption: "All-time rank among 818 shows", the count
+    // linking to backHref. The noun names what the feed lists; the feed name
+    // rides the link's tooltip. See functions/_shared/feed-rank.js.
+    rankFeed: "Shows",
+    rankNoun: "shows",
     // Deliberately "By", never "Host" or "Creator". The source is
     // <itunes:author>, whoever the publisher named there: usually the host,
     // sometimes a network ("Jupiter Broadcasting"), occasionally a tagline.
@@ -337,6 +349,8 @@ const COPY = {
     boostsHeading: "Album Boosts",
     backHref: "/#albums",
     backLabel: "All Albums",
+    rankFeed: "Albums",
+    rankNoun: "albums",
     // On a music feed <itunes:author> IS the artist, and cleanly so: 97.4% of
     // album pages carry a usable one. The stronger label is earned here in a
     // way it is not on the podcast side.
@@ -348,7 +362,7 @@ const copyFor = (medium) => (medium === "music" ? COPY.music : COPY.podcast);
 
 // ── the page ─────────────────────────────────────────────────────────────────
 
-function renderShowPage({ show, episodes, supporters, boosts, community, podroll, podrolledBy, description, names }) {
+function renderShowPage({ show, episodes, supporters, boosts, community, podroll, podrolledBy, description, names, ranks }) {
   const copy = copyFor(show.medium);
   const title = show.title;
   const pageUrl = `${SITE_ORIGIN}/show/${encodeURIComponent(show.podcast_guid)}`;
@@ -482,18 +496,18 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v74" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v74" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v74" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v74" />
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v74" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v75" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v75" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v75" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v75" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v75" />
   <!-- The boost note card and its reaction bar. Added when the boost list at
        the foot of this page became the same .note-card the homepage Boosts
        feed paints; this page linked neither before, which is why show-page.css
        restates .nostr-mention. That restatement is now redundant rather than
        load-bearing, and is left in place rather than removed in the same pass. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v74" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v74" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v75" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v75" />
 </head>
 <body data-show-guid="${htmlEscape(show.podcast_guid)}">
 
@@ -591,7 +605,7 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
     <span class="show-back-arrow" aria-hidden="true">←</span><span data-back-label>${copy.backLabel}</span>
   </a>
 
-  ${renderHeader(show, art, title, copy, art2, description)}
+  ${renderHeader(show, art, title, copy, art2, description, ranks)}
 
   ${renderEpisodes(episodes, show, copy)}
 
@@ -687,12 +701,12 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
 
 <script type="application/json" id="show-boost-payload">${jsonForScript(boostPayload)}</script>
 
-<script src="/assets/js/nav.js?v=ob-v74" defer></script>
-<script src="/assets/js/show-page.js?v=ob-v74" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v75" defer></script>
+<script src="/assets/js/show-page.js?v=ob-v75" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v74"></script>
-<script src="/assets/js/sw-register.js?v=ob-v74" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v75"></script>
+<script src="/assets/js/sw-register.js?v=ob-v75" defer></script>
 </body>
 </html>`;
 }
@@ -822,7 +836,7 @@ function creditLine(show, copy) {
   return `<p class="show-credit"><span class="show-credit-label">${htmlEscape(copy.credit)}</span> ${htmlEscape(truncate(author, 120))}</p>`;
 }
 
-function renderHeader(show, art, title, copy, art2, description) {
+function renderHeader(show, art, title, copy, art2, description, ranks) {
   // Three tiles, not four. There was an episode count here and it was removed
   // deliberately: sats, boosts and boosters are measures of boost activity
   // and have no meaning outside it, so "as published to Nostr" is the only
@@ -881,6 +895,7 @@ function renderHeader(show, art, title, copy, art2, description) {
     <h2 class="show-stats-title">
       <a href="/about#keysend">Nostr Boost</a> Stats
     </h2>
+    ${renderRankRow(ranks, copy)}
     <dl class="show-stats">
       ${stats.map((s) => `<div class="show-stat"><dt>${htmlEscape(s.label)}</dt><dd title="${htmlEscape(s.exact)}">${htmlEscape(s.value)}</dd></div>`).join("\n      ")}
     </dl>
@@ -1231,10 +1246,10 @@ function notFound(guid) {
   <meta name="robots" content="noindex" />
   <title>Show not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v74" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v74" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v74" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v74" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v75" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v75" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v75" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v75" />
 </head>
 <body>
 <section class="page-header">
@@ -1253,7 +1268,7 @@ function notFound(guid) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v74" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v75" defer></script>
 </body>
 </html>`;
   return new Response(html, {

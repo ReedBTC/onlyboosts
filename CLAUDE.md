@@ -1366,6 +1366,25 @@ The type scales with `clamp()` rather than stepping, and **the binding constrain
 is the LABEL, not the number** — "episodes" and "boosters" are eight characters,
 where the widest figure is five.
 
+### The rank row
+
+`/show` and `/episode` carry three tiles between the `Nostr Boost Stats`
+heading and the stat tiles: the subject's **all-time, all-language, Global**
+rank by sats, boosts and boosters on the feed its card lives on (Shows or
+Albums, Episodes or Songs, chosen by the same medium partition the API uses).
+`functions/_shared/feed-rank.js` is both halves: `feedRanks(db, kind, row)`
+runs one scan of `podcasts` or `episodes` and `renderRankRow` prints the row;
+the tiles are ordered sats · boosts · boosters so each sits over its figure.
+
+- **⚠️ The rank is 1 + the rows the feed orders BEFORE the subject, using the
+  feed's own tiebreak** (`<sort> DESC, total_sats DESC, guid`). Counting a
+  strictly greater sort value alone would give every member of a tie the same
+  number, and the card on the feed carries the position. Change either API's
+  `ORDER BY` and this follows.
+- **It fails quietly**, the podroll discipline: null resolves to no row.
+- The caption's count links to the feed (`backHref`); the tiles link nowhere,
+  because a hash cannot carry a sort. `rankFeed` / `rankNoun` are on `COPY`.
+
 ### Where the shared code lives
 
 | | |
