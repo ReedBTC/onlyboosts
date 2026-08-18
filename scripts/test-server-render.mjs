@@ -157,9 +157,50 @@ check('the server ranking survives buildEpisodes’ recency sort', () => {
   }
 })
 
-check('cards are numbered 1..N with no gaps', () => {
-  const ranks = [...block.matchAll(/<div class="pcast-rank" aria-hidden="true">(\d+)</g)].map((m) => Number(m[1]))
-  assert.deepEqual(ranks, ranks.map((_, i) => i + 1))
+/* ⚠️ THIS ASSERTED `1..N WITH NO GAPS` UNTIL 2026-08-18, AND THAT WAS THE OLD
+ * SCHEME. Ranks are standard competition ranks now (assets/js/rank.js): tied
+ * cards share the better place and the next distinct value skips the whole
+ * group, so `1 2 3 4 5 T6 T6 8` is CORRECT and a gapless run would mean the
+ * tiebreak was deciding standings again. The invariants below are what actually
+ * hold, and the live capture exercises them — the homepage's opening sort is
+ * Most boosters, whose counts are quantised enough that the first page ties
+ * heavily.
+ */
+check('cards carry competition ranks: ties share a place, the next value skips', () => {
+  const labels = [...block.matchAll(/<div class="pcast-rank" aria-hidden="true">(T?\d+)</g)].map((m) => m[1])
+  assert.equal(labels.length, Math.min(CARDS_PER_PAGE, items.length), 'every card carries a rank')
+  const ranks = labels.map((l) => Number(l.replace(/^T/, '')))
+  const values = items.slice(0, labels.length).map((it) => it.totals?.boosters ?? it.distinctBoosters.length)
+
+  assert.equal(ranks[0], 1, 'the first card is rank 1')
+  for (let i = 0; i < ranks.length; i++) {
+    // The definition, checked directly against the page's own figures.
+    const ahead = values.filter((v) => v > values[i]).length
+    assert.equal(ranks[i], ahead + 1, `card ${i + 1} is #${ranks[i]} with ${ahead} ahead of it`)
+    // Equal figures share a place; different figures cannot.
+    if (i > 0) {
+      const same = values[i] === values[i - 1]
+      assert.equal(ranks[i] === ranks[i - 1], same, `card ${i + 1} vs ${i}: rank/figure disagree`)
+    }
+  }
+})
+
+check('the T marks a shared place, and only a shared place', () => {
+  const labels = [...block.matchAll(/<div class="pcast-rank" aria-hidden="true">(T?\d+)</g)].map((m) => m[1])
+  const values = items.slice(0, labels.length).map((it) => it.totals?.boosters ?? it.distinctBoosters.length)
+  labels.forEach((label, i) => {
+    const shared = values.filter((v) => v === values[i]).length > 1
+    // ⚠️ The LAST card is exempt in one direction only: it cannot see whether
+    // its run continues into row 31, so it may under-report a tie it shares
+    // forward. It must never over-report one. The client re-syncs that row once
+    // it has fetched what follows — see syncRankLabels in feeds-podcasts.js.
+    const lastRow = i === labels.length - 1
+    if (label.startsWith('T')) {
+      assert.ok(shared, `card ${i + 1} is marked T but its figure ${values[i]} is unique on the page`)
+    } else if (!lastRow) {
+      assert.ok(!shared, `card ${i + 1} shares figure ${values[i]} but carries no T`)
+    }
+  })
 })
 
 check('the figures come from the aggregates, not the inlined rows', () => {
