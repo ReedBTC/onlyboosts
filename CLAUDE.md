@@ -1944,6 +1944,20 @@ it reads as a broken picture rather than a missing one.** Artwork now gets
 `summary`; only the fallback keeps the large card, `OG_FALLBACK` being the
 1800x600 site banner. Two shapes, two cards, chosen by which is in use.
 
+**⚠️ `/booster`'s share image is served through `/api/og/booster/<npub>`, not
+named as the raw avatar URL.** A preview fetcher makes one request and cannot
+fall back, and it stops reading at a size the page cannot see: **Signal Desktop
+at 1MB** (`MAX_IMAGE_BYTES_TO_LOAD`), Android and iOS at 2MB. Measured
+2026-08-18 over the 49 stored avatars behind the last 100 boosts, 5 answered 404
+and 7 were over 1MB (largest 4.3MB), so a quarter of booster pages drew a card
+with no image on Desktop while the phones were fine. The route looks the picture
+up **by npub in D1** (never off the query string, so it is not an open proxy),
+fetches it bounded, asks Cloudflare to resize it to 600x600 JPEG on the way
+through (`cf.image`; ignored on a zone without Image Transformations enabled),
+and answers with the banner for anything that is not a 200 raster under 900KB.
+The header `<img>` still uses the raw URL, because a browser can run `onerror`.
+`X-OB-Image: avatar|fallback` on the response says which path answered.
+
 Two things that follow. **A platform caches OG data per URL**, so a link shared
 before a page existed keeps its 404 card until the TTL expires or someone forces
 a re-scrape — worth knowing before concluding a card is broken. And **`node

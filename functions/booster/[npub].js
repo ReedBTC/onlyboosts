@@ -279,6 +279,14 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
   const pageUrl = `${SITE_ORIGIN}/booster/${encodeURIComponent(npub || hex)}`;
   const pic = isSafeUrl(prof?.picture) ? prof.picture : null;
   const banner = isSafeUrl(prof?.banner) ? prof.banner : null;
+  // ⚠️ THE SHARE CARD DOES NOT NAME THE AVATAR URL DIRECTLY. A preview fetcher
+  // makes one request and cannot fall back, and the stored picture is a URL a
+  // third party may have moved (10% answer 404) or a file bigger than the
+  // fetcher will read (Signal Desktop stops at 1MB, the phones at 2MB). The
+  // route under /api/og/booster/ fetches, resizes and size-caps it, and serves
+  // the banner when it cannot. See functions/api/og/booster/[npub].js. The
+  // header <img> below still uses the raw URL: a browser can run onerror.
+  const ogImage = pic ? `${SITE_ORIGIN}/api/og/booster/${encodeURIComponent(npub || hex)}` : OG_FALLBACK;
 
   const satsTotal = Number(totals.sats || 0);
   const boostTotal = Number(totals.boosts || 0);
@@ -360,7 +368,7 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
        a headline in most clients, and a 3:1 banner cropped to that is a strip of
        someone's wallpaper; the face is what identifies the page. Same principle
        as og:image staying on a show's primary artwork. -->
-  <meta property="og:image" content="${htmlEscape(pic || OG_FALLBACK)}" />
+  <meta property="og:image" content="${htmlEscape(ogImage)}" />
   <meta property="og:image:alt" content="${htmlEscape(pic ? `${label}’s profile picture` : "OnlyBoosts")}" />
   <!-- ⚠️ THE CARD TYPE FOLLOWS THE IMAGE, and this is the one page where it has
        to. A large-image card crops to about 1.91:1; a profile picture is nothing
@@ -378,7 +386,7 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
   <meta name="twitter:card" content="${pic ? "summary" : "summary_large_image"}" />
   <meta name="twitter:title" content="${htmlEscape(ogTitle)}" />
   <meta name="twitter:description" content="${htmlEscape(ogDesc)}" />
-  <meta name="twitter:image" content="${htmlEscape(pic || OG_FALLBACK)}" />
+  <meta name="twitter:image" content="${htmlEscape(ogImage)}" />
   <meta name="twitter:image:alt" content="${htmlEscape(pic ? `${label}’s profile picture` : "OnlyBoosts")}" />
 
   <script type="application/ld+json">
