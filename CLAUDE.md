@@ -190,9 +190,17 @@ Four test scripts, all plain `node scripts/<name>.mjs` with no runner:
 | | |
 |---|---|
 | `test-episode-card.mjs` | the card's HTML against fixtures |
-| `test-server-render.mjs` | the assembled homepage against a captured production response, including a 256KB first-view budget. Takes the capture as an argument |
+| `test-server-render.mjs` | the assembled homepage against a captured production response: the injection, the state element, a 256KB first-view budget, **and the ranking invariants**. Takes the capture as an argument |
 | `test-feed-hash.mjs` | the inline feed-bar controller: hash parsing, and the boot sequence |
 | `test-feed-lang.mjs` | `feed-lang.js`: menu ordering, the withholding rule, and the copy |
+
+**⚠️ `test-server-render.mjs` IS THE ONE THAT NEEDS AN ARGUMENT, SO IT IS THE ONE
+THAT GOES UNRUN.** Its header carries the `curl` that produces the capture; take
+a fresh one rather than reusing an old file, since it is also the size
+measurement. It asserted `cards are numbered 1..N with no gaps` — the *ordinal*
+scheme's invariant — until competition ranking shipped on 2026-08-18, and it
+would have been merged red had it not been run. **Run all four before a merge**,
+and treat this one as the guard on the ranking scheme rather than only on weight.
 
 **⚠️ `test-feed-hash.mjs` EXTRACTS THE CONTROLLER OUT OF `index.html` and runs
 it**, because it is an inline `<script>` and cannot be imported. That is the
@@ -1029,6 +1037,22 @@ painted the adopted block's last card without knowing what followed it, and that
 card is not in `items` to be re-labelled. The `/episode` and `/booster` rollups
 need none of this — `view` is their whole ordering, so every tie is marked on the
 first paint.
+
+**⚠️ THE OPENING HOMEPAGE FEED TIES HEAVILY, AND THAT IS THE DATA RATHER THAN A
+BUG.** Measured against production on 2026-08-18, the first thirty cards of
+Episodes · Global under the default sort (Most boosters) number:
+
+```
+1 2 3 4 5 T6 T6 8 T9 T9 T9 T12 ×6 T18 ×13
+```
+
+Booster counts are quantised — 29, 27, 25, 23, 22, 21×2, 20, 19×3, 18×6, then
+**17 thirteen times** — so the bottom thirteen cards of the page genuinely share
+18th. Those cards were always tied; ordinal ranking numbered them 18 through 30
+as though they were not, and competition ranking is what discloses it. If it ever
+reads as too heavy the honest levers are the default sort or a depth past which
+no numeral is painted, **never softening the tie marking**, which would put the
+invisible tiebreak back in charge.
 
 **⚠️ `competitionRanks` assumes the list is ALREADY ORDERED BY THE VALUE IT
 RANKS.** Hand it rows in another order and it returns confident nonsense rather
