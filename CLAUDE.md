@@ -257,6 +257,29 @@ Three details before editing the script:
 
 `sw.js` routes on `url.pathname`, so the query string doesn't disturb it.
 
+### What The Service Worker Caches, And How
+
+`sw.js`'s fetch handler is four routes, and **which route a URL lands in decides
+whether a returning visitor can be shown a stale answer**:
+
+| Request | Route | Cache |
+|---|---|---|
+| HTML / navigations | network-first, cached copy offline | `HTML_CACHE` |
+| `/api/` except `/api/data/` | **network-first, cached copy offline** | `API_CACHE` |
+| `/api/value` | network only, never cached | — |
+| `/api/data/` | stale-while-revalidate (5-minute snapshot) | `SNAPSHOT_CACHE` |
+| `/assets/widgets/` | stale-while-revalidate | `WIDGET_CACHE` |
+| everything else same-origin | stale-while-revalidate | `STATIC_CACHE` |
+
+**⚠️ The catch-all is for ASSETS, and a live endpoint that falls into it is
+served from the previous visit.** `/api/v1/*` sat there until `ob-v73`: a boost
+live in D1 took two reloads to appear, and only for returning visitors, so it
+read as intermittent. The Follows feeds never showed it because they POST and
+the handler ignores non-GET. Any new live endpoint belongs under `/api/`, where
+`isLiveAPIRequest` picks it up with no SW change; one placed anywhere else needs
+its own route before it ships. `/api/value` is excluded from every cache
+because a stale value block would pay a split the show no longer publishes.
+
 ## ⚠️ The Rendering Rule: The Server Renders The Facts, JavaScript Adds The Verbs
 
 **The standard every page is held to.**
