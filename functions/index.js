@@ -27,7 +27,7 @@
 // does — measured at 431KB raw / 155KB gzipped for this page of thirty.
 import { readParams, globalEpisodes } from "./api/v1/episodes.js";
 import { itemsFromBoosts, renderCardPage, CARDS_PER_PAGE } from "./_shared/episode-cards.js";
-import { COPY } from "../assets/js/episode-card.js";
+import { COPY, HOME_CARD_PARTS } from "../assets/js/episode-card.js";
 import { episodeApiToBoosts } from "../assets/js/ob-data.js";
 
 // The slot in index.html. A marker PAIR, not a single point: the block it wraps
@@ -140,6 +140,15 @@ async function openingPage(env) {
     sort: FEED.sort,
     range: FEED.range,
     limit: CARDS_PER_PAGE,
+    // ⚠️ THE HOMEPAGE'S VARIANT: the whole card, with the drawer's boost notes
+    // fetched on open rather than rendered into the document. With them inline
+    // the drawer bodies were 82% of the document (995KB of 1.21MB, 744 rows
+    // inside closed <details>), and the feed-bar controller at the foot of
+    // <body> sat 1.16MB after the first card, so every #shows / #albums /
+    // #boosts-global load flashed the Episodes feed before the hash was read.
+    // The variant rides the state element (`card`), so feeds-podcasts.js
+    // paints every later page the same way. See `drawer` under CARD_PARTS.
+    parts: HOME_CARD_PARTS,
     // The state the client adopts through. `scope` and `medium` are checked
     // against the panel being hydrated, so a shell rendered for one feed can
     // never be adopted by another.

@@ -481,6 +481,10 @@ a.pcast-show-link:hover { text-decoration: underline; }
   border-left: 2px solid var(--accent);
 }
 .pcast-details[hidden] { display: none; }
+/* A lazy drawer's one line while its rows are fetched, or after the fetch
+   failed (episode-card-actions.js#fillLazyDrawer). Set like the row's timestamp
+   so it reads as part of the thread and not as a banner over it. */
+.pcast-boosts-status { font-size: 0.8rem; color: var(--muted); padding: 0.1rem 0; }
 .pcast-boost { border-top: 1px solid var(--border); padding-top: 0.6rem; }
 .pcast-boost:first-child { border-top: none; padding-top: 0; }
 .pcast-boost-head { display: flex; align-items: center; gap: 0.55rem; }

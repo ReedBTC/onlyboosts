@@ -347,13 +347,31 @@ The episode card is the worked example, split along the facts/verbs line:
 comparators, the range filter) and `assets/js/boost-section.js` is the verbs.
 See "Range And Sort On `#boosts`" under the detail pages.
 
-**Two knobs decide what a surface shows of the card, and only two.** `CARD_PARTS`
-in `episode-card.js` is the whole table:
+**Three knobs decide what a surface shows of the card, and only three.**
+`CARD_PARTS` in `episode-card.js` is the whole table:
 
 | | |
 |---|---|
 | `stats` | the `Nostr Stats:` line. Off on `/booster/<npub>`, where every card aggregates one person's boosts and the booster count is 1 by construction. |
 | `layout` | `feed` or `compact`. Compact is the detail-page drawers and means three things that move together: no inline `<audio>`, no ⋮ subscribe menu, and the boost pill in a right-hand rail of its own, vertically centred. |
+| `drawer` | `inline` or `lazy`. **Where the drawer's boost notes come from.** Inline (the default, and both detail pages) renders them into the `<details>` body with the card. Lazy (`HOME_CARD_PARTS`, the homepage only) ships the body holding only its footer, and `episode-card-actions.js#fillLazyDrawer` fetches `/api/v1/episodes/<guid>?names=1` on the first open and renders the rows through the exported `boostRowsHtml`, the same function, so a fetched row is byte-identical to an inline one (verified against production data). |
+
+**⚠️ Lazy is not the homepage being exempted from the rendering rule; it is the
+rule's beneficiaries being named.** Server-rendered notes exist for the crawler,
+and the crawler's pages are the ~930 show and ~2,000 episode pages in the
+sitemap. The homepage is not one of them, and every card on it links to the
+`/episode/<guid>` page where those same notes *are* in the document, so nothing
+is un-indexed. What it buys is measured under The Cost, Stated. What it costs is
+one small fetch per drawer opened, and the drawer becomes *complete*: the inline
+rows are capped at 50 per episode by `include=boosts`, where the per-episode
+endpoint returns all of them (cap 500, worst case 55). A failed fetch leaves a
+status line and the footer's "See all boosts" link, and the next open retries.
+
+**`include=boosts` stays on the homepage's query on both sides**, because the
+drawer bar's booster faces are computed from the boost rows. The notes still
+travel D1 → edge and, on a client-fetched page, D1 → browser as JSON; they stop
+being *rendered* into the document. A lighter faces-only include is the follow-up
+if that JSON ever matters.
 
 The player and the ⋮ both come off for one reason: every card's title links to
 that episode's own page, which carries both on a surface with room for them.
@@ -393,8 +411,9 @@ and the feed hydrates as before.
 Three things that fell out of the split:
 
 - **The drawer is a `<details>`**, not a button beside a hidden div. The boost
-  notes inside it are facts and are in the document, so a control only JavaScript
-  could open would leave them unreachable.
+  notes inside it are facts and, on the detail pages, are in the document, so a
+  control only JavaScript could open would leave them unreachable. On the
+  homepage the same `<details>` fills on open; see the `drawer` knob above.
 - **Dates are `en-US` in UTC on the feeds**, not the reader's locale, because the
   edge and the browser have to produce the same string. The site has one date
   format rather than two.
@@ -413,7 +432,31 @@ Measured against production when the episode card closed the last exception:
 | | |
 |---|---|
 | Homepage first view | **206.6KB → 217.7KB brotli**, and one round trip instead of two. The 431KB JSON fetch is gone; the document went 14.5KB → 150.6KB br. |
-| Homepage raw markup | **54KB → 1.15MB**: ~5,000 extra DOM nodes for 737 boost rows, all inside closed `<details>`. This is the one cost worth revisiting. |
+| Homepage raw markup | **54KB → 1.15MB**: ~5,000 extra DOM nodes for 737 boost rows, all inside closed `<details>`. |
+
+**And re-measured on 2026-08-18 when the homepage's drawers went lazy** (the
+`drawer` knob), same capture, `test-server-render.mjs`:
+
+| | inline drawers | lazy drawers |
+|---|---|---|
+| Document, raw | 1,190.7KB | **226.5KB** |
+| Document, brotli | 153.8KB | **33.0KB** |
+| First view, brotli (document + module graph) | 221.4KB | **100.6KB**, under the old two-round-trip page's 210.2KB for the first time |
+| Elements in the card block | 9,774 | **1,449** |
+| Feed-bar controller after the first card | 1,160,125 bytes | **~172KB** |
+
+The last row is the one that was the bug: with the controller 1.16MB after the
+first card, the browser painted the whole Episodes · Global feed before any
+script could read which feed the hash named, and every `#shows` / `#albums` /
+`#boosts-global` load flashed Episodes first. **That flash was fixed here, at the
+cause, and two patches for it were rejected on 2026-08-17 for that reason**:
+skeletons painted over the server's cards, and a boot script in `<head>`
+carrying its own copy of the feed-key list. Don't re-propose either.
+
+**It did not touch the eager-avatar problem, and the two are easy to confuse**:
+148 of the 236 distinct avatar URLs sit on the visible drawer *bar* as well as
+in the rows inside, so those requests were never in the drawer markup. That was
+fixed separately and earlier, by making every avatar `loading="lazy"`.
 | `/episode/<guid>` | one extra query in the existing `Promise.all` — median 248 rows, capped at 2,000. ~190ms for a heavy episode against a page TTFB of ~170ms, so the page pays `max()` rather than `sum()`. |
 | `/booster/<npub>` | the same, and cheaper: one indexed scan, heaviest booster 975 rows. |
 
@@ -2406,32 +2449,7 @@ would. Never remove an entry** — those links are in the wild.
    quotes inside boost notes — that circular import is what makes the cleanup
    fiddly. All of it ships to every visitor.
 
-6. **The homepage's server-rendered drawer payload.** See The Cost, Stated: the
-   homepage's raw markup is 1.15MB, ~5,000 DOM nodes for 737 boost rows inside
-   closed `<details>`. Deferred deliberately; the question is whether the drawer
-   *contents* should be a verb rather than a fact on that one surface.
-
-   **It costs more than DOM weight, and the second cost is the one to lead
-   with.** The inline feed-bar controller is the last thing in `<body>`, so it
-   sits **1,159,545 bytes after the first card**: the browser parses and paints
-   the whole Episodes · Global feed before any script can say which feed the hash
-   actually named. Every `#shows`, `#albums` and `#boosts-global` load therefore
-   flashes the Episodes feed first, and a `?lang=` load flashes it unfiltered.
-   Measured 2026-08-17, and it predates the language filter entirely.
-
-   **So this is also the fix for that flash**, and the reason two patches for it
-   were considered and rejected on 2026-08-17 (skeletons over the server's cards;
-   a boot script in `<head>` carrying its own copy of the feed-key list). Dropping
-   the payload moves the controller to roughly byte 40,000 and largely dissolves
-   the flash without either. Reed's call: fix it here, not with patches that would
-   then be deleted.
-
-   **⚠️ Removing the drawer markup does NOT fix the eager-avatar problem**, and
-   the two are easy to confuse. 148 of the 236 distinct avatar URLs appear on the
-   visible drawer *bar* as well as in the rows inside, so the requests survive the
-   markup. That was fixed separately, by making every avatar `loading="lazy"`.
-
-7. **Typography.** The brand wordmark is a bold sans; the site is still on LB's
+6. **Typography.** The brand wordmark is a bold sans; the site is still on LB's
    Playfair Display / Source Serif 4. It reads fine, but the serif is inherited,
    not chosen. Only those two families are self-hosted in `assets/fonts/`.
 

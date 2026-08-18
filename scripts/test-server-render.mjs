@@ -20,7 +20,7 @@ import { readFileSync } from 'node:fs'
 import { gzipSync, brotliCompressSync, constants } from 'node:zlib'
 import { itemsFromBoosts, renderCardPage, CARDS_PER_PAGE } from '../functions/_shared/episode-cards.js'
 import { episodeApiToBoosts } from '../assets/js/ob-data.js'
-import { COPY } from '../assets/js/episode-card.js'
+import { COPY, HOME_CARD_PARTS } from '../assets/js/episode-card.js'
 
 const capture = process.argv[2]
 if (!capture) {
@@ -40,8 +40,12 @@ const { boosts, totals } = episodeApiToBoosts(records)
 const { items, profiles } = itemsFromBoosts(boosts, { sort: 'boosts' })
 for (const it of items) it.totals = totals.get(it.guid) || null
 
+// The same call functions/index.js makes, variant included: HOME_CARD_PARTS is
+// the homepage's card, whose drawers fill on open rather than shipping their
+// rows. That is what the weight numbers below are about.
 const block = `<div class="pcast-list">${renderCardPage(items, {
   copy: COPY.other, profiles, sort: 'boosts', range: 'all', limit: CARDS_PER_PAGE,
+  parts: HOME_CARD_PARTS,
   state: { scope: 'global', medium: 'other', sort: 'boosts', range: 'all', nextOffset: api.next_offset },
 })}</div>`
 
@@ -104,7 +108,34 @@ check('it carries the scope and medium the client checks', () => {
 check('it carries state and not content', () => {
   const m = block.match(/data-feed-state>([^<]*)</)
   // The whole point: the rows are the markup, not a second copy of themselves.
-  assert.ok(m[1].length < 200, `state element is ${m[1].length} bytes — is it carrying rows?`)
+  assert.ok(m[1].length < 260, `state element is ${m[1].length} bytes — is it carrying rows?`)
+})
+
+check('it declares the homepage variant, so a client repaint matches the edge', () => {
+  const m = block.match(/data-feed-state>([^<]*)</)
+  const state = JSON.parse(m[1])
+  assert.deepEqual(state.card, HOME_CARD_PARTS)
+  assert.equal(state.card.drawer, 'lazy')
+})
+
+// ── The drawers ─────────────────────────────────────────────────────────────
+console.log('\nThe drawers, filled on open:')
+
+check('no boost row is in the document; every drawer is a lazy <details>', () => {
+  // The measurement this exists for: with the rows inline the drawer bodies
+  // were 82% of the document and the feed-bar controller sat 1.16MB after the
+  // first card, which is the flash of Episodes on every #shows load.
+  assert.equal((block.match(/data-boost-note/g) || []).length, 0)
+  const drawers = (block.match(/<details class="pcast-card-details">/g) || []).length
+  const lazy = (block.match(/<div class="pcast-details" data-lazy-boosts>/g) || []).length
+  assert.equal(drawers, Math.min(CARDS_PER_PAGE, items.length))
+  assert.equal(lazy, drawers)
+})
+
+check('the drawer bar still carries the booster faces and the sats', () => {
+  const faces = (block.match(/<span class="pcast-avatars">/g) || []).length
+  assert.equal(faces, Math.min(CARDS_PER_PAGE, items.length))
+  assert.match(block, /class="pcast-sats"/)
 })
 
 // ── Ranking ─────────────────────────────────────────────────────────────────
@@ -162,7 +193,7 @@ const graphBr = moduleGraphBytes('assets/js/feeds.js')
 const beforeTotal = shellBr + apiBr + graphBr
 const afterTotal = brNew + graphBr
 
-console.log(`  cards           ${items.length} episodes, ${notes} boost notes`)
+console.log(`  cards           ${items.length} episodes, ${notes} boost notes behind them (fetched on open, none in the document)`)
 console.log(`  document        ${kb(shellRaw)} → ${kb(raw)} raw, ${kb(shellBr)} → ${kb(brNew)} br  (gz ${kb(gzipSync(shell).length)} → ${kb(gz)})`)
 console.log(`  the JSON fetch  ${kb(apiBr)} br, now not made at all`)
 console.log(`  module graph    ${kb(graphBr)} br, unchanged either way`)
@@ -192,12 +223,22 @@ check(`the first view fits the ${kb(BUDGET_BR)} brotli budget`, () => {
     `first view is ${kb(afterTotal)} br against a ${kb(BUDGET_BR)} budget`)
 })
 
-check('the raw document stays under a megabyte and a half', () => {
-  // The parse cost is the one that does not compress away: ~5,000 extra DOM
-  // nodes for the boost rows, all of them inside a closed <details> so nothing
-  // lays them out until a drawer opens. This is the ceiling to notice if the
-  // per-episode note cap or the page size ever moves.
-  assert.ok(raw < 1_572_864, `${kb(raw)} raw`)
+check('the raw document stays small enough that the hash is read before the paint', () => {
+  // The parse cost is the one that does not compress away. With every boost
+  // note inline the document was 1.19MB raw and the feed-bar controller sat
+  // 1.16MB after the first card, so the browser painted the whole Episodes
+  // feed before any script could read which feed the hash named. The lazy
+  // drawer took it to ~220KB. 400KB is headroom over that, not a target; the
+  // number to notice if the page size or the card grows.
+  assert.ok(raw < 409_600, `${kb(raw)} raw`)
+})
+
+check('the feed-bar controller is close behind the first card', () => {
+  const first = page.indexOf('data-episode-card')
+  const ctrl = page.indexOf('FEED BAR CONTROLLER')
+  assert.ok(first > 0 && ctrl > first, 'controller or first card missing')
+  console.log(`  controller      ${kb(ctrl - first)} after the first card`)
+  assert.ok(ctrl - first < 307_200, `${kb(ctrl - first)} between the first card and the controller`)
 })
 
 function br(buf) {

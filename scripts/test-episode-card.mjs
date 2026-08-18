@@ -12,7 +12,10 @@
  * Run: node scripts/test-episode-card.mjs
  */
 import assert from 'node:assert/strict'
-import { buildEpisodes, episodeCardHtml, COPY, sortEpisodeItems, filterEpisodeItems, RANKED_SORTS }
+import {
+  buildEpisodes, episodeCardHtml, COPY, sortEpisodeItems, filterEpisodeItems, RANKED_SORTS,
+  CARD_PARTS, HOME_CARD_PARTS, boostRowsHtml, namesFrom,
+}
   from '../assets/js/episode-card.js'
 import { renderMessage, renderBioText } from '../assets/js/nostr-text.js'
 import { toEpisodeShape, normalizeBoosts, episodeApiToBoosts } from '../assets/js/ob-data.js'
@@ -282,6 +285,45 @@ check('the feed layout is unchanged — pill on the stats line, ⋮ present', ()
   assert.doesNotMatch(html, /pcast-card-rail/)
   // The pill closes the stats row rather than standing alone.
   assert.match(html, /3 boosts<\/span><button type="button" class="ob-boost-pill"/)
+})
+
+// The homepage's variant: the whole card, the drawer's rows fetched on open.
+const home = episodeCardHtml(byGuid['item-guid-1'], {
+  rank: 1, copy: COPY.other, profiles, parts: HOME_CARD_PARTS,
+})
+
+check('the default drawer is inline, and the homepage declares lazy off the same table', () => {
+  assert.equal(CARD_PARTS.drawer, 'inline')
+  assert.equal(HOME_CARD_PARTS.drawer, 'lazy')
+  assert.equal(HOME_CARD_PARTS.layout, CARD_PARTS.layout)
+  assert.equal(HOME_CARD_PARTS.stats, CARD_PARTS.stats)
+})
+
+check('a lazy drawer ships no rows, keeps the <details>, the faces and the footer', () => {
+  assert.equal((home.match(/data-boost-note/g) || []).length, 0)
+  assert.match(home, /<details class="pcast-card-details"><summary class="pcast-drawer">/)
+  assert.match(home, /Nostr Interactions:/)
+  assert.match(home, /pcast-avatars/)
+  assert.match(home, /<div class="pcast-details" data-lazy-boosts>/)
+  assert.match(home, /<a class="pcast-seeall" href="\/episode\/item-guid-1"/)
+  assert.match(home, /data-drawer-hide/)
+})
+
+check('a lazy drawer changes nothing outside the drawer body', () => {
+  const outside = (s) => s.replace(/<div class="pcast-details"[\s\S]*?<\/details>/, '')
+  assert.equal(outside(home), outside(html))
+})
+
+check('the rows a lazy drawer fetches render through the same function, byte for byte', () => {
+  // What episode-card-actions.js#fillLazyDrawer does with the endpoint's answer:
+  // rows newest-first, the profile names, then boostRowsHtml. The result has to
+  // be exactly the rows the inline card carried, or the two variants have forked.
+  const item = byGuid['item-guid-1']
+  const rows = [...item.boosts].sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
+  const fetched = boostRowsHtml(rows, profiles, namesFrom(profiles))
+  const inline = html.match(/<div class="pcast-details">([\s\S]*?)<div class="pcast-details-foot">/)[1]
+  assert.equal(fetched, inline)
+  assert.equal((fetched.match(/data-boost-note/g) || []).length, 3)
 })
 
 // ── Message truncation ──────────────────────────────────────────────────────

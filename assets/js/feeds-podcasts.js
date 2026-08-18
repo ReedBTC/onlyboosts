@@ -45,29 +45,29 @@
  * Entry point: renderPodcasts({ panel, list }) — lazy-imported by feeds.js
  * the first time the feed is opened.
  */
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v73'
-import { toEpisodeShape, normalizeBoosts, episodeApiToBoosts } from '/assets/js/ob-data.js?v=ob-v73'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v74'
+import { toEpisodeShape, normalizeBoosts, episodeApiToBoosts } from '/assets/js/ob-data.js?v=ob-v74'
 import {
   getEpisodePage, searchEpisodes, SEARCH_HITS, SEARCH_MIN_CHARS,
-} from '/assets/js/ob-live.js?v=ob-v73'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v73'
+} from '/assets/js/ob-live.js?v=ob-v74'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v74'
 import {
   rangeDays, rangeControl, sortControl, mountFeedControls,
-} from '/assets/js/feed-controls.js?v=ob-v73'
+} from '/assets/js/feed-controls.js?v=ob-v74'
 // Its own module, not two more exports of feed-controls.js — see the ⚠️ note
 // at the top of that file for the four-hour window that shape opens.
-import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v73'
+import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v74'
 import {
   LANG_ALL, languageOptions, langControl, langNote, langNoMatchText, langLabelFor,
-} from '/assets/js/feed-lang.js?v=ob-v73'
-import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v73'
+} from '/assets/js/feed-lang.js?v=ob-v74'
+import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v74'
 // The card, and the card's verbs. One definition each, shared with the edge.
 import {
-  COPY, buildEpisodes, renderEpisodeCards, RANKED_SORTS, SORT_OPTIONS,
-} from '/assets/js/episode-card.js?v=ob-v73'
+  COPY, HOME_CARD_PARTS, buildEpisodes, renderEpisodeCards, RANKED_SORTS, SORT_OPTIONS,
+} from '/assets/js/episode-card.js?v=ob-v74'
 import {
   wireEpisodeCards, hydrateCardProfiles, prewarmBoosting,
-} from '/assets/js/episode-card-actions.js?v=ob-v73'
+} from '/assets/js/episode-card-actions.js?v=ob-v74'
 
 const INITIAL_CARDS = 30       // episodes rendered per "load more" batch
 
@@ -316,6 +316,15 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
    * every rank is offset by it. Any requery drops it to zero, because a requery
    * replaces those cards. */
   let adoptedCount = 0
+  /* Which parts of the card this surface shows. HOME_CARD_PARTS is the whole
+   * card with the drawer filled on open (see `drawer` under CARD_PARTS), and it
+   * is the same object functions/index.js declares into the state element for
+   * the page it rendered. When that page is adopted the declaration is read
+   * back off it below, so a later "Load more" or re-sort paints the variant the
+   * edge did rather than one this module chose for itself; when nothing was
+   * adopted (Songs, Follows, a language in the hash) the same constant is the
+   * declaration, and the two cannot differ because they are one import. */
+  let parts = HOME_CARD_PARTS
   // The search filter lives here rather than being read back off the module,
   // because resolving a pick is a FETCH: `picked` is the chosen suggestion,
   // `pickedItem` the card built for it, and the gap between them is a state the
@@ -379,6 +388,7 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
   if (adopted) {
     sortKey = adopted.state.sort || sortKey
     rangeKey = adopted.state.range || rangeKey
+    if (adopted.state.card) parts = adopted.state.card
     adoptedCount = Number(adopted.state.count) || 0
     nextOffset = adopted.state.nextOffset ?? null
     // The container the server painted IS the one this module appends to, so a
@@ -445,7 +455,7 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
   }
 
   function cardsHtml(list_) {
-    return renderEpisodeCards(list_, { copy, profiles, rankOf })
+    return renderEpisodeCards(list_, { copy, profiles, rankOf, parts })
   }
 
   /* Paint the cards currently in `view`, and the control under them.

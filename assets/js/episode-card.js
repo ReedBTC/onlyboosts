@@ -10,10 +10,13 @@
  *
  *   facts, here          artwork and its fallback chain, title, show, air date,
  *                        rank, the "Nostr Stats:" line, and the boost notes
- *                        inside the drawer
+ *                        inside the drawer (on the homepage those rows are
+ *                        rendered by this module too, but on open rather than
+ *                        with the card; see `drawer` under CARD_PARTS)
  *   verbs, next door     the ⋮ subscribe menu, the boost pill, the drawer's
- *                        hide control, the per-boost ⋮ menu, and the
- *                        reply / like / repost / zap bars
+ *                        hide control, the fetch that fills a lazy drawer, the
+ *                        per-boost ⋮ menu, and the reply / like / repost / zap
+ *                        bars
  *
  * WHAT THIS REPLACED. `feeds-podcasts.js#episodeCard` built the card as DOM with
  * event listeners closed over an item object, so it existed only as JavaScript
@@ -39,11 +42,11 @@
  * what functions/_shared/detail-page.js has always done, so the site now has one
  * date format rather than one for the feeds and another for the detail pages.
  */
-import { showPageHref, episodePageHref } from './show-link.js?v=ob-v73'
-import { episodeBoostLink } from './episode-link.js?v=ob-v73'
-import { boosterPageHref, boosterLinkAttrs } from './booster-link.js?v=ob-v73'
-import { coverChain } from './cover-art.js?v=ob-v73'
-import { htmlEscape, isSafeUrl, renderMessage } from './nostr-text.js?v=ob-v73'
+import { showPageHref, episodePageHref } from './show-link.js?v=ob-v74'
+import { episodeBoostLink } from './episode-link.js?v=ob-v74'
+import { boosterPageHref, boosterLinkAttrs } from './booster-link.js?v=ob-v74'
+import { coverChain } from './cover-art.js?v=ob-v74'
+import { htmlEscape, isSafeUrl, renderMessage } from './nostr-text.js?v=ob-v74'
 
 const esc = htmlEscape
 
@@ -157,6 +160,33 @@ export function copyFor(medium) {
  *            On the homepage none of that holds: it is a browsing surface with
  *            no page behind each card, so the card is whole.
  *
+ *   drawer   'inline' (default) or 'lazy'. WHERE THE DRAWER'S BOOST NOTES COME
+ *            FROM. Inline, they are rendered into the <details> body as the
+ *            card is built, which is the rendering rule at its most literal:
+ *            the notes are facts and they ship. Lazy, the body ships holding
+ *            only its footer, and episode-card-actions.js#wireDrawer fetches
+ *            the episode's boosts from /api/v1/episodes/<guid> the first time
+ *            the reader opens it, rendering them through boostRowsHtml below,
+ *            so a lazily-filled row is byte-identical to an inline one.
+ *
+ *            Lazy exists for ONE surface, the homepage (HOME_CARD_PARTS), and
+ *            the reason is measured rather than argued: with thirty cards and
+ *            every note inline, the drawer bodies were 995KB of a 1.21MB
+ *            document, 82% of it, holding 744 rows nobody sees until a drawer
+ *            opens. The inline feed-bar controller at the end of <body> sat
+ *            1.16MB after the first card, so the browser parsed and painted the
+ *            whole Episodes feed before any script could read which feed the
+ *            hash named, and every #shows / #albums / #boosts-global load
+ *            flashed Episodes first. Dropping the bodies is what fixes that.
+ *
+ *            ⚠️ THE TWO DETAIL PAGES STAY INLINE, and this is not the homepage
+ *            being exempted from the rendering rule so much as the rule's
+ *            beneficiaries being named. Server-rendered notes exist for the
+ *            crawler, and the crawler's pages are the ~930 show and ~2,000
+ *            episode pages in the sitemap. The homepage is not one of them, and
+ *            every card on it links to the /episode/<guid> page where those same
+ *            notes ARE in the document. Nothing is un-indexed by this.
+ *
  * ⚠️ THE SERVER DECLARES THE VARIANT AND THE CLIENT INHERITS IT, through the
  * `card` key in the state element. That is the whole reason it is data rather
  * than a flag each side sets for itself: a re-sort in the browser repaints these
@@ -168,7 +198,13 @@ export function copyFor(medium) {
  * are CSS, scoped to `.ce-scroll` in episode-page.css, because a padding value
  * cannot make the two sides render different markup and does not need to travel.
  */
-export const CARD_PARTS = { stats: true, layout: 'feed' }
+export const CARD_PARTS = { stats: true, layout: 'feed', drawer: 'inline' }
+
+/* The homepage's variant: the whole card, drawers filled on open. One
+ * definition, imported by functions/index.js (which declares it into the state
+ * element) and by feeds-podcasts.js (which paints every later page with it), so
+ * the two sides cannot disagree about what a homepage card is. */
+export const HOME_CARD_PARTS = { ...CARD_PARTS, drawer: 'lazy' }
 
 // ── Formatting ───────────────────────────────────────────────────────
 function fmtSats(n) {
@@ -477,6 +513,7 @@ export function episodeCardHtml(item, {
   const nameMap = names || namesFrom(profiles)
   const showStats = parts.stats !== false
   const compact = parts.layout === 'compact'
+  const lazyDrawer = parts.drawer === 'lazy'
   // Same rule as the counts below: the server's total, falling back to the rows.
   const totalSats = item.totals?.sats ?? item.totalSats
 
@@ -664,7 +701,13 @@ export function episodeCardHtml(item, {
       `<span class="pcast-drawer-label">Nostr Interactions:</span>` +
       drawerMeta +
     `</summary>` +
-    `<div class="pcast-details">${boostRowsHtml(boosts, profiles, nameMap)}${detailsFootHtml(epHref, outHref, copy)}</div>` +
+    // A lazy body is the footer alone, and `data-lazy-boosts` is the hook the
+    // client fills on first open. The rows land in front of the footer, so an
+    // opened lazy drawer and an inline one are the same markup.
+    `<div class="pcast-details"${lazyDrawer ? ' data-lazy-boosts' : ''}>` +
+      (lazyDrawer ? '' : boostRowsHtml(boosts, profiles, nameMap)) +
+      detailsFootHtml(epHref, outHref, copy) +
+    `</div>` +
     `</details>`
 
   /* The card's data attributes are the whole contract with
@@ -707,14 +750,19 @@ function subscribeMenuHtml(item) {
 /* Every boost in the drawer — no truncation, since hiding comments implied some
  * weren't worth showing.
  *
- * ⚠️ THE ROWS ARE IN THE DOCUMENT, WHERE THEY USED TO BE BUILT ON FIRST OPEN.
- * That laziness was the DOM builder's, and it was the reason a crawler saw an
- * episode card with no boosts under it. They are facts; they ship. The cost is
- * paid where it is smallest — the rows are inside a closed <details>, so the
- * browser lays out none of them until the reader opens one — and the bytes are
- * bytes the homepage already downloaded as JSON before this changed.
+ * ⚠️ ON THE DETAIL PAGES THE ROWS ARE IN THE DOCUMENT, where the old DOM builder
+ * built them on first open — which was the reason a crawler saw an episode card
+ * with no boosts under it. They are facts; they ship, inside a closed <details>
+ * so nothing lays them out until a drawer opens.
+ *
+ * ⚠️ ON THE HOMEPAGE THEY ARE NOT, and this function is how the two stay one
+ * card: `parts.drawer === 'lazy'` leaves the body empty and
+ * episode-card-actions.js calls THIS function with the rows it fetched on open.
+ * See the `drawer` entry over CARD_PARTS for why, and note the argument shapes:
+ * `boosts` are buildEpisodes() rows, `profiles` pk → {name, picture}, `names`
+ * pk → display name for the @mention chips. Exported for that one caller.
  */
-function boostRowsHtml(boosts, profiles, names) {
+export function boostRowsHtml(boosts, profiles, names) {
   return boosts.map((b) => boostRowHtml(b, profiles, names)).join('')
 }
 
@@ -813,7 +861,7 @@ function detailsFootHtml(epHref, outHref, copy) {
  * names from the first page forever. renderEpisodeCards below is the answer to
  * the cost — it derives this once for a whole page of cards.
  */
-function namesFrom(profiles) {
+export function namesFrom(profiles) {
   const m = new Map()
   for (const [pk, p] of profiles) if (p?.name) m.set(pk, p.name)
   return m

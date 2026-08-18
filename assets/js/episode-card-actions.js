@@ -14,6 +14,10 @@
  *   the drawer's hide control  ships hidden; <details> opens on its own, but
  *                              closing from the FOOT of a long thread is a
  *                              convenience only JavaScript can offer
+ *   a lazy drawer's rows       on the homepage only, the boost notes are not
+ *                              in the document; this fetches them the first
+ *                              time a drawer opens and renders them through
+ *                              the card module's own row function
  *   the per-boost ⋮ menu       copy npub / copy nevent, both clipboard gestures
  *   the reaction bars          reply / like / repost / zap, on every note
  *   artwork and avatar         the error-path fallbacks, which need an event
@@ -36,11 +40,17 @@
  * bundle having shrunk — measured, it grew by 12.3KB gzipped. See the header of
  * feeds-podcasts.js.
  */
-import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v73'
-import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v73'
-import { copyText, showToast, copyNpub } from '/assets/js/copy-npub.js?v=ob-v73'
-import { withBoostBusy } from '/assets/js/boost-button.js?v=ob-v73'
-import { wireArt2, blankTile, hydrateProfiles } from '/assets/js/detail-page.js?v=ob-v73'
+import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v74'
+import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v74'
+import { copyText, showToast, copyNpub } from '/assets/js/copy-npub.js?v=ob-v74'
+import { withBoostBusy } from '/assets/js/boost-button.js?v=ob-v74'
+import { wireArt2, blankTile, hydrateProfiles } from '/assets/js/detail-page.js?v=ob-v74'
+// The row renderer, for a drawer that fills on open. THE SAME FUNCTION the edge
+// and the inline card run, so a row fetched here is byte-identical to one that
+// shipped in the document. episode-card.js is already in the graph on every
+// surface this module runs on, so a static import costs nothing.
+import { boostRowsHtml, namesFrom } from '/assets/js/episode-card.js?v=ob-v74'
+import { normalizeBoosts, toEpisodeShape } from '/assets/js/ob-data.js?v=ob-v74'
 
 const VALUE_API = '/api/value'   // Podcast Index value-block proxy (splits)
 
@@ -294,11 +304,18 @@ async function onBoostClick(card, btn) {
 // ── The drawer ───────────────────────────────────────────────────────
 /* <details> opens on its own; this adds what it cannot.
  *
- * ⚠️ THE ROWS ARE ALREADY IN THE DOCUMENT. The old DOM builder created them on
- * first open, which is why a crawler saw an episode card with no boosts under it
- * and why this section could not exist without JavaScript. They are facts and
- * they ship; what is deferred now is the ~200KB of reaction machinery behind
- * them, which is the part that was worth deferring all along.
+ * ⚠️ ON THE DETAIL PAGES THE ROWS ARE ALREADY IN THE DOCUMENT. The old DOM
+ * builder created them on first open, which is why a crawler saw an episode
+ * card with no boosts under it and why this section could not exist without
+ * JavaScript. They are facts and they ship; what is deferred is the ~200KB of
+ * reaction machinery behind them, which is the part worth deferring.
+ *
+ * ⚠️ ON THE HOMEPAGE THEY ARE NOT (`data-lazy-boosts` on the body), and the
+ * first open fetches them — see `drawer` under CARD_PARTS in episode-card.js
+ * for the measurement that decided it. The fetch is the one thing here that
+ * can fail, so the enrichment guard is set only once rows are on screen: a
+ * failed open leaves a status line and the footer's "See all boosts" link, and
+ * the next open tries again.
  *
  * `toggle` fires on open AND on close, so the one-shot guard is explicit.
  */
@@ -318,12 +335,85 @@ function wireDrawer(card) {
   }
 
   let enriched = false
-  details.addEventListener('toggle', () => {
-    if (!details.open || enriched) return
+  let filling = false
+  details.addEventListener('toggle', async () => {
+    if (!details.open || enriched || filling) return
+    const body = details.querySelector('.pcast-details[data-lazy-boosts]')
+    if (body) {
+      filling = true
+      let ok = false
+      try { ok = await fillLazyDrawer(card, body) }
+      finally { filling = false }
+      // The reader may have closed it while the rows were in flight; the rows
+      // are in place either way, so the next open finds them and needs nothing.
+      if (!ok) return
+      // The rows arrived after wireCard ran, so the two per-card passes that
+      // touched the inline rows run again over these: the avatar error
+      // fallback, and the Primal backfill for whatever the index couldn't name.
+      wireAvatars(details)
+      hydrateCardProfiles(details)
+    }
     enriched = true
     for (const row of details.querySelectorAll('.pcast-boost')) wireBoostMenu(row)
     attachActionBars(details)
   })
+}
+
+/* Fetch one episode's boosts and render them into a lazy drawer.
+ *
+ * `/api/v1/episodes/<guid>?names=1` is the endpoint /episode/<guid>#boosts
+ * already rebuilds its rows from: every boost sent to the episode (capped at
+ * 500 against a measured worst case of 55), in the published record shape,
+ * plus the display names for any npub MENTIONED in a message. So a homepage
+ * drawer holds the episode's whole thread where the inline cap was 50, and its
+ * @mention chips come off the same D1 lookup the detail pages use.
+ *
+ * The rows go through normalizeBoosts → toEpisodeShape, which is the chain
+ * every card is built from, and then boostRowsHtml — the function that renders
+ * an inline drawer. `data-lazy-boosts` comes off on success and the guard in
+ * wireDrawer takes it from there; on failure the attribute stays, the status
+ * line says so, and the footer's link to the episode page is the way through.
+ *
+ * ⚠️ item_guid IS NOT ALWAYS A UUID — 9% carry a slash and some are full URLs —
+ * so it is encoded whole into one path segment, exactly as /episode/<guid> is.
+ * Returns true when rows are on screen.
+ */
+async function fillLazyDrawer(card, body) {
+  const guid = card.dataset.guid
+  if (!guid) return false
+  const foot = body.querySelector('.pcast-details-foot')
+  let status = body.querySelector('.pcast-boosts-status')
+  if (!status) {
+    status = el('div', { class: 'pcast-boosts-status', role: 'status' })
+    body.insertBefore(status, foot || null)
+  }
+  status.textContent = 'Loading boosts…'
+  try {
+    const res = await fetch(`/api/v1/episodes/${encodeURIComponent(guid)}?names=1`, {
+      headers: { accept: 'application/json' },
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const data = await res.json()
+    const shaped = toEpisodeShape(normalizeBoosts({ boosts: data?.boosts || [] }))
+    // Newest first, the order buildEpisodes gives an inline drawer.
+    const rows = shaped.boosts.sort((a, b) => (b.created_at || 0) - (a.created_at || 0))
+    // Booster names first, then the mention lookup on top — the server's map
+    // is the better answer for a chip and the profiles fill in behind it.
+    const names = namesFrom(shaped.profiles)
+    for (const [pk, name] of Object.entries(data?.names || {})) if (name) names.set(pk, name)
+    const html = boostRowsHtml(rows, shaped.profiles, names)
+    status.remove()
+    if (foot) foot.insertAdjacentHTML('beforebegin', html)
+    else body.insertAdjacentHTML('beforeend', html)
+    body.removeAttribute('data-lazy-boosts')
+    return true
+  } catch (err) {
+    console.warn('[episode-card] drawer fetch failed', err)
+    status.textContent = foot?.querySelector('.pcast-seeall')
+      ? 'Couldn’t load these boosts. “See all boosts” below has every one.'
+      : 'Couldn’t load these boosts.'
+    return false
+  }
 }
 
 /* The per-boost ⋮ menu: copy npub, copy nevent.
@@ -372,7 +462,7 @@ function wireBoostMenu(row) {
 async function copyNevent(eventId, author) {
   let nevent = ''
   try {
-    const { nip19 } = await import('/assets/widgets/nostr-tools.js?v=ob-v73')
+    const { nip19 } = await import('/assets/widgets/nostr-tools.js?v=ob-v74')
     nevent = nip19.neventEncode({ id: eventId, author: author || undefined })
   } catch {}
   if (!nevent) { showToast('Could not build nevent', true); return }
@@ -400,7 +490,7 @@ async function copyNevent(eventId, author) {
 async function attachActionBars(details) {
   let actions
   try {
-    actions = await import('/assets/js/boost-actions.js?v=ob-v73')
+    actions = await import('/assets/js/boost-actions.js?v=ob-v74')
     // The signer. Without it the bar still renders and each button reports that
     // it needs a sign-in, which is the same behaviour every other surface has.
     await ensureLoginWidget()
