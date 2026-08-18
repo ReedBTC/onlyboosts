@@ -241,7 +241,18 @@
    keep their own spacing. */
 .show-stat--ranked { padding-top: 1.45rem; }
 
-.show-stat-rank {
+/* ⚠️ `.show-stat dd.show-stat-rank`, AND THE `dd` IS LOAD-BEARING. `.show-stat
+   dd` above is a class plus an element — specificity (0,1,1) — where a lone
+   `.show-stat-rank` is (0,1,0), so the tile's own dd rule WINS and its `font:`
+   shorthand puts the chip back to 1.5rem Playfair in brand blue: the figure's
+   exact type, inside a pill padded for 0.63rem text. It shipped that way once
+   and read as the number spilling out of its pill.
+
+   Specificity beats source order, so moving this rule later in the file does
+   NOT fix it. The compound selector is (0,2,1) and cannot lose. The same trap
+   is re-armed in the 640px block, where `.show-stat dd` sets a clamp() of its
+   own — both selectors have to carry the `dd`. */
+.show-stat dd.show-stat-rank {
   position: absolute;
   top: 0.4rem;
   right: 0.45rem;
@@ -1387,7 +1398,9 @@ a.boost-who:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px
      and shrinking a control until it fits is what makes it look like a
      different control. */
   .show-stat--ranked { padding-top: 1.15rem; }
-  .show-stat-rank {
+  /* Carries the `dd` for the same reason the base rule does: `.show-stat dd`
+     two rules up sets a clamp() at (0,1,1) and would win over a lone class. */
+  .show-stat dd.show-stat-rank {
     top: 0.28rem;
     right: 0.3rem;
     padding: 0.08rem 0.3rem;

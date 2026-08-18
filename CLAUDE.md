@@ -1475,6 +1475,18 @@ Three more things a change would break:
   left the rank in Playfair at brand blue, the same face and colour as the
   figure and larger than the label between them. **The chip therefore restates
   its font-family explicitly**; dropping that line brings the bug straight back.
+- **⚠️ ITS SELECTOR IS `.show-stat dd.show-stat-rank` AND THE `dd` IS
+  LOAD-BEARING.** `.show-stat dd` is a class plus an element, specificity
+  **(0,1,1)**, where a lone `.show-stat-rank` is **(0,1,0)** — so the tile's own
+  rule wins and its `font:` shorthand puts the chip back to 1.5rem Playfair in
+  brand blue, the figure's exact type, inside a pill padded for 0.63rem. That
+  shipped and read as the number spilling out of its pill. **Specificity beats
+  source order, so moving the rule later does not fix it**, and the trap is
+  re-armed inside the 640px block where `.show-stat dd` sets a `clamp()` of its
+  own: both selectors carry the `dd`. This is the same font-shorthand bug as the
+  bullet above, arriving the second time through the cascade rather than through
+  an omitted property — when a stat-tile rule looks ignored, check specificity
+  before changing values.
 - **⚠️ `.show-stat--ranked` reserves the chip's line, and it is emitted by the
   renderer rather than inferred by `:has()`.** Left floating the chip overlaps
   the figure: at 375px a tile is ~107px and "3.0M" is ~40px centred, leaving
