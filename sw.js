@@ -431,8 +431,10 @@
 // ob-v74: the homepage's boost drawers fill on open (episode-card-actions.js#fillLazyDrawer) instead of shipping every note.
 // ob-v75: /show and /episode carry a rank row above the stat tiles — the
 // subject's all-time global rank by boosts, sats and boosters, from
-// functions/_shared/feed-rank.js. The .show-ranks rules are in show-page.css.
-const VERSION = 'ob-v75';
+// functions/_shared/feed-rank.js.
+// ob-v76: the rank row folded into the stat tiles as each tile's third line
+// (.show-stat-rank in show-page.css); the tiles' flex order changed with it.
+const VERSION = 'ob-v76';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;
@@ -464,27 +466,27 @@ const PRECACHE_URLS = [
   '/assets/onlyboosts_pfp.png',
   '/assets/onlyboosts_banner.png',
   '/assets/avatar-fallback.svg',
-  '/assets/css/theme.css?v=ob-v75',
-  '/assets/css/page.css?v=ob-v75',
-  '/assets/css/nav.css?v=ob-v75',
-  '/assets/css/footer.css?v=ob-v75',
-  '/assets/css/boosts-thread.css?v=ob-v75',
-  '/assets/css/boost-actions.css?v=ob-v75',
+  '/assets/css/theme.css?v=ob-v76',
+  '/assets/css/page.css?v=ob-v76',
+  '/assets/css/nav.css?v=ob-v76',
+  '/assets/css/footer.css?v=ob-v76',
+  '/assets/css/boosts-thread.css?v=ob-v76',
+  '/assets/css/boost-actions.css?v=ob-v76',
   // The episode card and its drawer. Precached alongside the others because the
   // homepage's feeds are painted in it and it used to be inline in index.html,
   // which IS precached — leaving it out would trade an inline block for a
   // network round trip on the one page this list exists to make fast.
-  '/assets/css/feed-cards.css?v=ob-v75',
-  '/assets/js/boosts-thread.js?v=ob-v75',
+  '/assets/css/feed-cards.css?v=ob-v76',
+  '/assets/js/boosts-thread.js?v=ob-v76',
   // A static import of boosts-thread.js, so precaching that without this one
   // leaves a returning visitor fetching half the graph from the network.
-  '/assets/js/primal-profiles.js?v=ob-v75',
-  '/assets/js/calendar-events.js?v=ob-v75',
-  '/assets/js/boost-actions.js?v=ob-v75',
-  '/assets/js/nav.js?v=ob-v75',
-  '/assets/js/nav-widget-boot.js?v=ob-v75',
-  '/assets/js/widget-loader.js?v=ob-v75',
-  '/assets/js/sw-register.js?v=ob-v75',
+  '/assets/js/primal-profiles.js?v=ob-v76',
+  '/assets/js/calendar-events.js?v=ob-v76',
+  '/assets/js/boost-actions.js?v=ob-v76',
+  '/assets/js/nav.js?v=ob-v76',
+  '/assets/js/nav-widget-boot.js?v=ob-v76',
+  '/assets/js/widget-loader.js?v=ob-v76',
+  '/assets/js/sw-register.js?v=ob-v76',
 ];
 
 self.addEventListener('install', (event) => {

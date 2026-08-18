@@ -35,11 +35,11 @@
  * without sharing the mistake.
  */
 import { renderEpisodeCards, sortEpisodeItems, filterEpisodeItems, buildEpisodes, COPY }
-  from '/assets/js/episode-card.js?v=ob-v75'
+  from '/assets/js/episode-card.js?v=ob-v76'
 import { wireEpisodeCards, hydrateCardProfiles, prewarmBoosting }
-  from '/assets/js/episode-card-actions.js?v=ob-v75'
-import { normalizeBoosts, toEpisodeShape } from '/assets/js/ob-data.js?v=ob-v75'
-import { rangeControl, sortControl, rangeDays, rangeCutoff } from '/assets/js/feed-controls.js?v=ob-v75'
+  from '/assets/js/episode-card-actions.js?v=ob-v76'
+import { normalizeBoosts, toEpisodeShape } from '/assets/js/ob-data.js?v=ob-v76'
+import { rangeControl, sortControl, rangeDays, rangeCutoff } from '/assets/js/feed-controls.js?v=ob-v76'
 
 const CARDS_PER_PAGE = 30   // matches CARDS_PER_PAGE in functions/_shared/episode-cards.js
 

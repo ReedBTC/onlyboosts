@@ -1366,24 +1366,30 @@ The type scales with `clamp()` rather than stepping, and **the binding constrain
 is the LABEL, not the number** — "episodes" and "boosters" are eight characters,
 where the widest figure is five.
 
-### The rank row
+### The rank line in the stat tiles
 
-`/show` and `/episode` carry three tiles between the `Nostr Boost Stats`
-heading and the stat tiles: the subject's **all-time, all-language, Global**
-rank by sats, boosts and boosters on the feed its card lives on (Shows or
-Albums, Episodes or Songs, chosen by the same medium partition the API uses).
+On `/show` and `/episode` each stat tile carries a third line, "#8 of 818":
+the subject's **all-time, all-language, Global** rank by that tile's own sort
+(sats, boosts, boosters) on the feed its card lives on (Shows or Albums,
+Episodes or Songs, chosen by the same medium partition the API uses).
 `functions/_shared/feed-rank.js` is both halves: `feedRanks(db, kind, row)`
-runs one scan of `podcasts` or `episodes` and `renderRankRow` prints the row;
-the tiles are ordered sats · boosts · boosters so each sits over its figure.
+runs one scan of `podcasts` or `episodes`, and `renderStatTiles(stats, ranks,
+copy)` prints the tiles, rank line included, for both pages. It began as a
+separate row above the tiles and was folded in the same day: the three ranks
+are the three tiles' own sorts, so a second row restated the columns.
 
 - **⚠️ The rank is 1 + the rows the feed orders BEFORE the subject, using the
   feed's own tiebreak** (`<sort> DESC, total_sats DESC, guid`). Counting a
   strictly greater sort value alone would give every member of a tie the same
   number, and the card on the feed carries the position. Change either API's
   `ORDER BY` and this follows.
-- **It fails quietly**, the podroll discipline: null resolves to no row.
-- The caption's count links to the feed (`backHref`); the tiles link nowhere,
-  because a hash cannot carry a sort. `rankFeed` / `rankNoun` are on `COPY`.
+- **It fails quietly**, the podroll discipline: null resolves to a tile with
+  no third line, which is the tile `/booster` has.
+- The line links to the feed (`backHref`); the tooltip names the feed and the
+  sort, since a hash cannot carry one. `rankFeed` / `rankNoun` are on `COPY`.
+- `.show-stat` is now `flex-direction: column` with explicit `order`s
+  (dd 1, dt 2, `.show-stat-rank` 3), and the "of N" is hidden below 360px,
+  where "#1,234 of 6,682" is the widest thing in a tile.
 
 ### Where the shared code lives
 

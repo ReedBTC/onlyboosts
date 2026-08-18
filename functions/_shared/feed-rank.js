@@ -1,6 +1,9 @@
 // A subject's rank on the all-time global feed it belongs to — three ranks, one
-// per quantitative sort, rendered as a row above the stat tiles on /show and
-// /episode. Server-side facts only; nothing here is a verb.
+// per quantitative sort, rendered as the third line of each stat tile on /show
+// and /episode ("1.2M / sats / #8 of 818"). Server-side facts only; nothing
+// here is a verb. It began as a separate row above the tiles and was folded in
+// on 2026-08-18: the three ranks are the three tiles' own sorts, so a second
+// row restated the columns to save nothing.
 //
 // WHICH LIST. "Rank" here means the position the subject's card holds on the
 // homepage feed a reader could scroll to, so the query restates that feed's
@@ -125,30 +128,31 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 const numFmt = (n) => Number(n).toLocaleString("en-US");
 
 /**
- * The rank row: a caption naming the list, then three tiles. Sits under the
- * "Nostr Boost Stats" heading and above the stat tiles, so it inherits the
- * heading's qualifier — these are ranks among boosts published to Nostr, and
- * the link in the heading is what says so.
+ * The stat tiles with the rank folded into each: value, label, then "#8 of
+ * 818" as a third line. One tile per stat, in the order given; the rank line
+ * is drawn only when `ranks` resolved and the stat has a `key` the ranks
+ * know (sats, boosts, boosters), so a failed rank query costs the third
+ * line and nothing else, and a page with no ranks (/booster) can pass null.
  *
- * `copy.rankFeed` is the feed's name ("Shows", "Albums", "Episodes", "Songs")
- * and `copy.backHref` where it lives; the caption links there. The tiles link
- * nowhere: a hash cannot carry a sort, so three links would open one list
- * three times.
+ * The rank line is a link to the feed the rank is on (`copy.backHref`); its
+ * tooltip says which list and which sort, since a tile has no room to. The
+ * hash cannot carry a sort, so all three point at the same feed.
  *
- * @param {{boosts:number,sats:number,boosters:number,of:number}|null} ranks
+ * @param {{key?:string,label:string,value:string,exact:string}[]} stats
+ * @param {{sats:number,boosts:number,boosters:number,of:number}|null} ranks
  * @param {{rankFeed:string, backHref:string, rankNoun:string}} copy
  */
-export function renderRankRow(ranks, copy) {
-  if (!ranks) return "";
-  const noun = copy.rankNoun || copy.rankFeed.toLowerCase();
-  const tiles = RANK_KEYS.map((k) => {
-    const label = RANK_LABELS[k];
-    const tip = `#${numFmt(ranks[k])} of ${numFmt(ranks.of)} ${noun} by ${label.replace(/^most /, "")}, all time`;
-    return `<div class="show-rank" title="${esc(tip)}"><dt>${esc(label)}</dt><dd>#${esc(numFmt(ranks[k]))}</dd></div>`;
-  }).join("\n      ");
-  return `<p class="show-ranks-cap">All-time rank among
-      <a href="${esc(copy.backHref)}" title="The ${esc(copy.rankFeed)} feed">${esc(numFmt(ranks.of))} ${esc(noun)}</a></p>
-    <dl class="show-ranks">
-      ${tiles}
+export function renderStatTiles(stats, ranks, copy) {
+  const tiles = stats.map((s) => {
+    let rank = "";
+    if (ranks && s.key && Number.isFinite(ranks[s.key])) {
+      const noun = copy.rankNoun || copy.rankFeed.toLowerCase();
+      const tip = `All-time rank on the ${copy.rankFeed} feed by ${s.key}: #${numFmt(ranks[s.key])} of ${numFmt(ranks.of)} ${noun}`;
+      rank = `<dd class="show-stat-rank"><a href="${esc(copy.backHref)}" title="${esc(tip)}">#${esc(numFmt(ranks[s.key]))} <span>of ${esc(numFmt(ranks.of))}</span></a></dd>`;
+    }
+    return `<div class="show-stat"><dt>${esc(s.label)}</dt><dd title="${esc(s.exact)}">${esc(s.value)}</dd>${rank}</div>`;
+  });
+  return `<dl class="show-stats">
+      ${tiles.join("\n      ")}
     </dl>`;
 }

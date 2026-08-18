@@ -28,8 +28,8 @@ import {
   renderSupporters, renderBoosts,
 } from "../_shared/detail-page.js";
 import { itemsFromBoosts, renderCardPage, CARDS_PER_PAGE } from "../_shared/episode-cards.js";
-// The three all-time global ranks above the stat tiles; /show shares it.
-import { feedRanks, renderRankRow } from "../_shared/feed-rank.js";
+// The stat tiles, each carrying its all-time global rank; /show shares it.
+import { feedRanks, renderStatTiles } from "../_shared/feed-rank.js";
 import { fetchCommunityBoosts } from "../api/v1/episodes/[guid].js";
 import { COPY as CARD_COPY } from "../../assets/js/episode-card.js";
 
@@ -215,8 +215,8 @@ const COPY = {
     // history.back() when the previous document was ours.
     backHref: "/#episodes-global",
     backLabel: "All Episodes",
-    // The rank row's caption: "All-time rank among 6,150 episodes", the count
-    // linking to backHref. See functions/_shared/feed-rank.js.
+    // The rank line in each stat tile links to backHref; its tooltip names the
+    // feed and the noun. See functions/_shared/feed-rank.js.
     rankFeed: "Episodes",
     rankNoun: "episodes",
     // Deliberately "By", never "Host" or "Creator". The source is
@@ -414,21 +414,21 @@ function renderEpisodePage({ ep, supporters, boosts, boosterCount, latestTs, nam
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v75" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v75" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v75" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v75" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v76" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v76" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v76" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v76" />
   <!-- The hero, the community wall and the boost list are the show page's, so
        this page links its stylesheet and adds only the deltas. -->
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v75" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v76" />
   <!-- The episode card, for the community-episodes section: the same chrome
        feeds-podcasts.js paints on the homepage. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v75" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v76" />
   <!-- The boost thread inside a card's drawer, and its reply / like / repost /
        zap bar. Only this page's community section needs them; /show does not. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v75" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v75" />
-  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v75" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v76" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v76" />
+  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v76" />
 </head>
 <body data-episode-guid="${htmlEscape(ep.item_guid)}"${ep.podcast_guid ? ` data-show-guid="${htmlEscape(ep.podcast_guid)}"` : ""}>
 
@@ -614,12 +614,12 @@ function renderEpisodePage({ ep, supporters, boosts, boosterCount, latestTs, nam
 
 <script type="application/json" id="episode-boost-payload">${jsonForScript(boostPayload)}</script>
 
-<script src="/assets/js/nav.js?v=ob-v75" defer></script>
-<script src="/assets/js/episode-page.js?v=ob-v75" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v76" defer></script>
+<script src="/assets/js/episode-page.js?v=ob-v76" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v75"></script>
-<script src="/assets/js/sw-register.js?v=ob-v75" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v76"></script>
+<script src="/assets/js/sw-register.js?v=ob-v76" defer></script>
 </body>
 </html>`;
 }
@@ -637,9 +637,9 @@ function renderHeader(ep, { art, art2, art3, copy, showTitle, showUrl, boosterCo
   // paragraph under them. See the vocabulary note in CLAUDE.md — the pattern
   // across every surface is a short label at the point of the numbers.
   const stats = [
-    { label: "sats", value: compact(ep.total_sats), exact: num(ep.total_sats) },
-    { label: ep.boost_count === 1 ? "boost" : "boosts", value: num(ep.boost_count), exact: num(ep.boost_count) },
-    { label: boosterCount === 1 ? "booster" : "boosters", value: num(boosterCount), exact: num(boosterCount) },
+    { key: "sats", label: "sats", value: compact(ep.total_sats), exact: num(ep.total_sats) },
+    { key: "boosts", label: ep.boost_count === 1 ? "boost" : "boosts", value: num(ep.boost_count), exact: num(ep.boost_count) },
+    { key: "boosters", label: boosterCount === 1 ? "booster" : "boosters", value: num(boosterCount), exact: num(boosterCount) },
   ];
 
   // The show's name is the eyebrow, where /show puts the bare word "Show". It
@@ -709,10 +709,7 @@ function renderHeader(ep, { art, art2, art3, copy, showTitle, showUrl, boosterCo
     <h2 class="show-stats-title">
       <a href="/about#keysend">Nostr Boost</a> Stats
     </h2>
-    ${renderRankRow(ranks, copy)}
-    <dl class="show-stats">
-      ${stats.map((s) => `<div class="show-stat"><dt>${htmlEscape(s.label)}</dt><dd title="${htmlEscape(s.exact)}">${htmlEscape(s.value)}</dd></div>`).join("\n      ")}
-    </dl>
+    ${renderStatTiles(stats, ranks, copy)}
   </header>`;
 }
 
@@ -995,10 +992,10 @@ function notFound(guid) {
   <meta name="robots" content="noindex" />
   <title>Episode not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v75" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v75" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v75" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v75" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v76" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v76" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v76" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v76" />
 </head>
 <body>
 <section class="page-header">
@@ -1016,7 +1013,7 @@ function notFound(guid) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v75" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v76" defer></script>
 </body>
 </html>`;
   return new Response(html, {

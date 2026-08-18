@@ -807,17 +807,17 @@ states the scope inside its sentence and is now the only place the full wording
 survives, which matters more than the on-page copy: it is the string that
 travels into a preview card with no page around it.
 
-## The Rank Row
+## The Rank Line
 
-Between that heading and the tiles sit three smaller tiles: the show's
-all-time rank on the Global Shows (or Albums) feed by sats, boosts and
-boosters, in the tiles' own order so each rank reads against its figure. The
-caption ("All-time rank among 818 shows") links the count to the feed. The
-list is the feed's list exactly: all languages, no window, the same medium
+Each tile carries a third line, "#8 of 818": the show's all-time rank on the
+Global Shows (or Albums) feed by that tile's own sort, linking to the feed.
+The list is the feed's list exactly: all languages, no window, the same medium
 partition, and the feed's own tiebreak, so the number is the position the
-show's card holds there. `/episode` carries the same row against Episodes or
+show's card holds there. `/episode` carries the same line against Episodes or
 Songs; both come from `functions/_shared/feed-rank.js`, and a failed query
-costs the row and nothing else.
+costs the line and nothing else. It began as a separate row of three tiles
+above these and was folded in, since the three ranks are the three tiles'
+own sorts.
 
 ---
 
