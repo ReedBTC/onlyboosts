@@ -415,11 +415,25 @@
 // triangle beside the caret and no rotation. And `/` is a Pages Function
 // response rather than a static file, so the precached copy of it is a document
 // that no longer exists; it is dropped from PRECACHE_URLS below for that reason.
-const VERSION = 'ob-v72';
+// ob-v73: /api/v1/*, /api/value and /api/episode-meta leave the static-asset
+// catch-all. Every one of them fell through to staleWhileRevalidate(STATIC_CACHE),
+// which answers with the CACHED copy whenever one exists, so a returning visitor
+// was served the boost list from their previous visit and the fresh response
+// only landed for the next load: a boost live in D1 took two reloads to appear.
+// The Follows feeds never showed it because they POST, which this handler
+// ignores. Those endpoints are network-first now, with the cached copy as an
+// offline fallback only; /api/value is never cached at all, since a stale value
+// block is the one answer here that would move sats to a split the show no
+// longer publishes. /api/data/ keeps stale-while-revalidate: it is a 5-minute
+// snapshot where instant paint is the right trade. REQUIRED: the bump renames
+// STATIC_CACHE, which is what drops the poisoned API entries a returning
+// visitor already holds; without it the fix reaches nobody currently affected.
+const VERSION = 'ob-v73';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;
 const SNAPSHOT_CACHE = `${VERSION}-snapshot`;
+const API_CACHE = `${VERSION}-api`;
 
 // What we precache on SW install. Widget bundle deliberately excluded —
 // it's only needed when a user clicks Boost, not on every visit. Lazy
@@ -446,27 +460,27 @@ const PRECACHE_URLS = [
   '/assets/onlyboosts_pfp.png',
   '/assets/onlyboosts_banner.png',
   '/assets/avatar-fallback.svg',
-  '/assets/css/theme.css?v=ob-v72',
-  '/assets/css/page.css?v=ob-v72',
-  '/assets/css/nav.css?v=ob-v72',
-  '/assets/css/footer.css?v=ob-v72',
-  '/assets/css/boosts-thread.css?v=ob-v72',
-  '/assets/css/boost-actions.css?v=ob-v72',
+  '/assets/css/theme.css?v=ob-v73',
+  '/assets/css/page.css?v=ob-v73',
+  '/assets/css/nav.css?v=ob-v73',
+  '/assets/css/footer.css?v=ob-v73',
+  '/assets/css/boosts-thread.css?v=ob-v73',
+  '/assets/css/boost-actions.css?v=ob-v73',
   // The episode card and its drawer. Precached alongside the others because the
   // homepage's feeds are painted in it and it used to be inline in index.html,
   // which IS precached — leaving it out would trade an inline block for a
   // network round trip on the one page this list exists to make fast.
-  '/assets/css/feed-cards.css?v=ob-v72',
-  '/assets/js/boosts-thread.js?v=ob-v72',
+  '/assets/css/feed-cards.css?v=ob-v73',
+  '/assets/js/boosts-thread.js?v=ob-v73',
   // A static import of boosts-thread.js, so precaching that without this one
   // leaves a returning visitor fetching half the graph from the network.
-  '/assets/js/primal-profiles.js?v=ob-v72',
-  '/assets/js/calendar-events.js?v=ob-v72',
-  '/assets/js/boost-actions.js?v=ob-v72',
-  '/assets/js/nav.js?v=ob-v72',
-  '/assets/js/nav-widget-boot.js?v=ob-v72',
-  '/assets/js/widget-loader.js?v=ob-v72',
-  '/assets/js/sw-register.js?v=ob-v72',
+  '/assets/js/primal-profiles.js?v=ob-v73',
+  '/assets/js/calendar-events.js?v=ob-v73',
+  '/assets/js/boost-actions.js?v=ob-v73',
+  '/assets/js/nav.js?v=ob-v73',
+  '/assets/js/nav-widget-boot.js?v=ob-v73',
+  '/assets/js/widget-loader.js?v=ob-v73',
+  '/assets/js/sw-register.js?v=ob-v73',
 ];
 
 self.addEventListener('install', (event) => {
@@ -510,6 +524,20 @@ function isWidgetRequest(url) {
 
 function isSnapshotRequest(url) {
   return url.pathname.startsWith('/api/data/');
+}
+
+// Everything under /api/ that is not the static snapshot proxy: the D1 query
+// API (/api/v1/*), the value-block resolver (/api/value) and the Podcast Index
+// metadata lookup (/api/episode-meta). These are live answers, not assets, and
+// must never be served stale while the network is up.
+function isLiveAPIRequest(url) {
+  return url.pathname.startsWith('/api/') && !isSnapshotRequest(url);
+}
+
+// /api/value resolves value blocks, and a wrong answer moves sats. It gets no
+// cache in either direction: network or nothing.
+function isValueRequest(url) {
+  return url.pathname === '/api/value' || url.pathname.startsWith('/api/value/');
 }
 
 // Stale-while-revalidate helper: serve cached immediately if present,
@@ -566,6 +594,25 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  if (isLiveAPIRequest(url)) {
+    if (isValueRequest(url)) return; // network only, never cached
+    // Network-first: the response is the live state of the index, so a cached
+    // copy is only ever the offline fallback. Cached in its own bucket so an
+    // API answer can never be confused with a static asset.
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response.ok && response.type === 'basic') {
+            const copy = response.clone();
+            caches.open(API_CACHE).then((cache) => cache.put(request, copy)).catch(() => {});
+          }
+          return response;
+        })
+        .catch(() => caches.match(request).then((cached) => cached || Response.error()))
+    );
+    return;
+  }
+
   if (isSnapshotRequest(url)) {
     // Boosts show up instantly on repeat visits from the cached snapshot;
     // the fresh one updates the cache in background. The Pages Function
@@ -579,7 +626,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Other same-origin static assets (CSS, JS, data, images): serve the
+  // Other same-origin static assets (CSS, JS, images): serve the
   // cached copy instantly and revalidate in the background. A cached
   // asset stays usable through a transient network failure, and a deploy
   // is picked up on the next navigation without needing a VERSION bump.
