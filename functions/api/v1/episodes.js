@@ -37,7 +37,7 @@ const SORTS = {
   boosts:  { col: "e.boost_count",   agg: "COUNT(*)",                        alias: "boost_count" },
   sats:    { col: "e.total_sats",    agg: "COALESCE(SUM(b.sats),0)",         alias: "total_sats" },
 };
-const DEFAULT_SORT = "boosts";      // matches the feed's opening sort
+const DEFAULT_SORT = "boosts";      // the API's default for callers passing none; the feed itself always passes its opening sort (`count`, see functions/index.js)
 
 // Air-date windows, matching RANGE_OPTIONS in feed-controls.js. The range
 // filters on when the episode AIRED, not when it was boosted — an old episode

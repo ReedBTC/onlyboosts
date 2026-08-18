@@ -38,8 +38,10 @@ const CLOSE = "<!--/OB:SSR-EPISODES-->";
 
 /* The opening feed, and it must match feeds-podcasts.js's opening state exactly.
  *
- * `boosts` because raw boost volume is the ranking the feed is FOR, `all`
- * because that is the useful opening window on a corpus this size, and
+ * `count` (Most boosters) because distinct people is the higher-signal ranking:
+ * one listener boosting an episode forty times is one vote, not forty. It
+ * opened on `boosts` (raw volume) until 2026-08-18. `all` because that is the
+ * useful opening window on a corpus this size, and
  * not_medium=music because Episodes and Songs are a PARTITION — music goes to
  * Songs, and everything else, including video and the feeds Podcast Index cannot
  * identify, comes here. A mismatch would not break anything; it would just make
@@ -48,7 +50,7 @@ const CLOSE = "<!--/OB:SSR-EPISODES-->";
 const FEED = {
   scope: "global",
   medium: "other",
-  sort: "boosts",
+  sort: "count",
   range: "all",
 };
 
@@ -108,15 +110,15 @@ export async function onRequestGet(context) {
  *
  * ⚠️ THE ORDER COMES FROM THE SERVER AND MUST SURVIVE buildEpisodes, which ends
  * with a sort by recency — the same trap loadEpisodePage documents in
- * feeds-podcasts.js. itemsFromBoosts re-sorts by the feed's key afterwards,
- * which restores it: `boosts` is the endpoint's ranking and the comparator's,
- * and the tiebreakers agree (total sats, then latest). A future sort key that
- * exists in SQL and not in EPISODE_SORTERS would silently reorder the page, so
- * the two tables move together.
+ * feeds-podcasts.js, and it takes the same cure: the built items are put back
+ * into the records' order by guid. It used to re-sort by the feed's comparator
+ * instead, which agreed with SQL only while the comparator's inputs did — and
+ * they do not: the inline rows are capped at 50 an episode, so
+ * `distinctBoosters.length` and `boosts.length` both undercount past the cap,
+ * and a `count` ranking re-derived from them could reorder the top of the page
+ * against the ranking D1 answered. The server's order is the answer.
  *
- * The figures are stamped from the aggregates rather than counted off the
- * inlined rows, because the endpoint caps notes at 50 an episode while reporting
- * true all-time totals.
+ * The figures are stamped from the aggregates for the same reason.
  */
 async function openingPage(env) {
   const u = new URL("https://ob.invalid/api/v1/episodes");
@@ -166,9 +168,16 @@ async function openingPage(env) {
  */
 function fromRecords(records) {
   const { boosts, totals } = episodeApiToBoosts(records);
-  const { items, profiles } = itemsFromBoosts(boosts, { sort: FEED.sort });
-  for (const it of items) it.totals = totals.get(it.guid) || null;
-  return { items, profiles, totals };
+  const built = itemsFromBoosts(boosts, { sort: FEED.sort });
+  const byGuid = new Map(built.items.map((it) => [it.guid, it]));
+  const items = [];
+  for (const r of records) {
+    const it = byGuid.get(r.guid);
+    if (!it) continue;
+    it.totals = totals.get(r.guid) || null;
+    items.push(it);
+  }
+  return { items, profiles: built.profiles, totals };
 }
 
 function injectFeed(html, block) {

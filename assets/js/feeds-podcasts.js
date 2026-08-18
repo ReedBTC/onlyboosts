@@ -265,10 +265,13 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
     follows = res.follows
   }
 
-  // Most boosts is the opening sort on both feeds — raw boost volume is the
-  // ranking the feed is FOR. ('count' ranks by distinct boosters instead; the
-  // two differ on the ~16% of episodes someone boosted more than once.)
-  let sortKey = 'boosts'
+  // Most boosters is the opening sort on both feeds: distinct people is the
+  // higher-signal ranking, since one listener boosting an episode forty times
+  // is one vote rather than forty. ('boosts' ranks by raw volume instead; the
+  // two differ on the ~16% of episodes someone boosted more than once. It was
+  // the opening sort until 2026-08-18.) ⚠️ Must match FEED.sort in
+  // functions/index.js, or the reader watches the server's list get replaced.
+  let sortKey = 'count'
   // Both scopes open on All now. Global always did; Follows used to widen from
   // 1W until something appeared, which needed the whole corpus in hand to test
   // — three requests to reproduce, against a feed whose whole history is thin

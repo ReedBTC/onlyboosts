@@ -11,7 +11,7 @@
  * wrangler is unauthenticated, so the input is a saved response from production:
  *
  *   curl -s 'https://onlyboosts.social/api/v1/episodes?not_medium=music\
- * &include=boosts&limit=30&sort=boosts&range=all' > <file>
+ * &include=boosts&limit=30&sort=count&range=all' > <file>
  *
  * Run: node scripts/test-server-render.mjs <captured-episodes.json>
  */
@@ -37,16 +37,21 @@ function check(name, fn) {
 const api = JSON.parse(readFileSync(capture, 'utf8'))
 const records = api.episodes || []
 const { boosts, totals } = episodeApiToBoosts(records)
-const { items, profiles } = itemsFromBoosts(boosts, { sort: 'boosts' })
+// The same reordering functions/index.js#fromRecords does: built items put back
+// into the records' order, never re-sorted over the capped inline rows.
+const built = itemsFromBoosts(boosts, { sort: 'count' })
+const byGuid = new Map(built.items.map((it) => [it.guid, it]))
+const items = records.map((r) => byGuid.get(r.guid)).filter(Boolean)
+const profiles = built.profiles
 for (const it of items) it.totals = totals.get(it.guid) || null
 
 // The same call functions/index.js makes, variant included: HOME_CARD_PARTS is
 // the homepage's card, whose drawers fill on open rather than shipping their
 // rows. That is what the weight numbers below are about.
 const block = `<div class="pcast-list">${renderCardPage(items, {
-  copy: COPY.other, profiles, sort: 'boosts', range: 'all', limit: CARDS_PER_PAGE,
+  copy: COPY.other, profiles, sort: 'count', range: 'all', limit: CARDS_PER_PAGE,
   parts: HOME_CARD_PARTS,
-  state: { scope: 'global', medium: 'other', sort: 'boosts', range: 'all', nextOffset: api.next_offset },
+  state: { scope: 'global', medium: 'other', sort: 'count', range: 'all', nextOffset: api.next_offset },
 })}</div>`
 
 // ── The injection, run against the real index.html ──────────────────────────
@@ -99,7 +104,7 @@ check('it carries the scope and medium the client checks', () => {
   const state = JSON.parse(m[1])
   assert.equal(state.scope, 'global')
   assert.equal(state.medium, 'other')
-  assert.equal(state.sort, 'boosts')
+  assert.equal(state.sort, 'count')
   assert.equal(state.range, 'all')
   assert.equal(state.count, Math.min(CARDS_PER_PAGE, items.length))
   assert.equal(state.nextOffset, api.next_offset)
@@ -143,9 +148,10 @@ console.log('\nRanking:')
 
 check('the server ranking survives buildEpisodes’ recency sort', () => {
   // buildEpisodes ends with a sort by latest boost, which would throw the
-  // endpoint's ordering away; itemsFromBoosts re-sorts by the feed's key. The
-  // check is that the painted order is descending by boost count.
-  const counts = items.slice(0, CARDS_PER_PAGE).map((it) => it.totals?.boosts ?? it.boosts.length)
+  // endpoint's ordering away; fromRecords restores the records' order. The
+  // check is that the painted order is descending by the aggregate booster
+  // count, which is what the endpoint ranked on.
+  const counts = items.slice(0, CARDS_PER_PAGE).map((it) => it.totals?.boosters ?? it.distinctBoosters.length)
   for (let i = 1; i < counts.length; i++) {
     assert.ok(counts[i] <= counts[i - 1], `card ${i + 1} outranks card ${i} (${counts[i]} > ${counts[i - 1]})`)
   }
