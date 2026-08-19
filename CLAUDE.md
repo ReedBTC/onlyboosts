@@ -2801,6 +2801,17 @@ would. Never remove an entry** — those links are in the wild.
    quotes inside boost notes — that circular import is what makes the cleanup
    fiddly. All of it ships to every visitor.
 
+   **⚠️ `EpisodeBoostModal.jsx` is dead too, and knowing that is worth real
+   time.** `openEpisodeBoost` has no caller anywhere in `assets/js` or
+   `functions` — it is LB's own-podcast boost flow. The live map is: **every
+   podcast boost on this site goes through `openExternalBoost` →
+   `ExternalBoostModal`**, from all six surfaces in the boost-button table
+   above; `openShowBoost` → `BoostModal` → `MultiLegBoostForm` is the site tip
+   only, one leg at 100%, so it can never partial. A change to "the boost modal"
+   is one file, not three, and `MultiLegBoostForm`'s presign-then-publish design
+   is deliberately untouched because nothing on this fork exercises it
+   multi-leg.
+
 6. **Typography.** The brand wordmark is a bold sans; the site is still on LB's
    Playfair Display / Source Serif 4. It reads fine, but the serif is inherited,
    not chosen. Only those two families are self-hosted in `assets/fonts/`.
