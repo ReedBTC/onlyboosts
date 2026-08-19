@@ -11,13 +11,16 @@
  * Run: node scripts/test-sign-boost.mjs
  */
 import assert from 'node:assert/strict'
-import { validateBoostTemplate, secretKeyFrom, onRequestPost } from '../functions/api/sign-boost.js'
+import { validateBoostTemplate, secretKeyFrom, overRateLimit, onRequestPost } from '../functions/api/sign-boost.js'
 import { verifyEvent, getPublicKey, nip19 } from '../functions/_shared/nostr-sign.js'
 import { buildExternalNoteTemplate } from '../login-widget/src/lib/externalBoostagram.js'
 
 let passed = 0
-function ok(label, fn) {
-  fn()
+// ⚠️ AWAITS. It used to call fn() bare, so an async assertion that failed became
+// an unhandled rejection AFTER the ✓ had already printed — a test that reports
+// success and then crashes, which is worse than one that fails.
+async function ok(label, fn) {
+  await fn()
   passed++
   console.log(`  ✓ ${label}`)
 }
@@ -47,18 +50,18 @@ function realTemplate(over = {}) {
 }
 
 console.log('\nThe real template passes:')
-ok('the shipped builder’s output validates unchanged', () => {
+await ok('the shipped builder’s output validates unchanged', () => {
   const t = validateBoostTemplate(realTemplate())
   assert.equal(t.kind, 1)
   assert.equal(t.content, realTemplate().content)
 })
-ok('every tag it emits is in the allowlist', () => {
+await ok('every tag it emits is in the allowlist', () => {
   // The assertion above already proves it; this one names the failure so a
   // rejected new tag reads as "add it to ALLOWED_TAGS" rather than as a puzzle.
   const names = [...new Set(realTemplate().tags.map((t) => t[0]))].sort()
   assert.deepEqual(names, ['amount', 'client', 'i', 'k', 'r', 't'])
 })
-ok('a boost with no message and no episode still validates', () => {
+await ok('a boost with no message and no episode still validates', () => {
   validateBoostTemplate(realTemplate({ message: '', episodeTitle: '', itemGuid: '', bmbUrl: '' }))
 })
 
@@ -119,14 +122,14 @@ rejects('a back-dated note', { ...realTemplate(), created_at: Math.floor(Date.no
 rejects('a post-dated note', { ...realTemplate(), created_at: Math.floor(Date.now() / 1000) + 4000 }, /created_at/)
 
 console.log('\nThe key:')
-ok('an nsec is accepted', () => {
+await ok('an nsec is accepted', () => {
   const bytes = new Uint8Array(32).fill(9)
   assert.deepEqual(secretKeyFrom(nip19.nsecEncode(bytes)), bytes)
 })
-ok('64-char hex is accepted', () => {
+await ok('64-char hex is accepted', () => {
   assert.deepEqual(secretKeyFrom('0a'.repeat(32)), new Uint8Array(32).fill(10))
 })
-ok('anything else reads as unconfigured, not as an error', () => {
+await ok('anything else reads as unconfigured, not as an error', () => {
   for (const v of ['', '   ', 'hunter2', 'npub1xxx', undefined, null, 42]) {
     assert.equal(secretKeyFrom(v), null)
   }
@@ -134,10 +137,21 @@ ok('anything else reads as unconfigured, not as an error', () => {
 
 console.log('\nEnd to end, through the handler:')
 const SK = new Uint8Array(32).fill(3)
+
+// A KV namespace, near enough: get/put over a Map. The real one is eventually
+// consistent, which this cannot model and which the endpoint's comment is
+// honest about — the limiter is friction rather than a boundary.
+function fakeKV(store = new Map()) {
+  return {
+    store,
+    get: async (k) => (store.has(k) ? store.get(k) : null),
+    put: async (k, v) => { store.set(k, v) },
+  }
+}
 function envWith(over = {}) {
   return {
     BOOSTBOT_NSEC: nip19.nsecEncode(SK),
-    SIGN_RATELIMIT: { limit: async () => ({ success: true }) },
+    SIGN_RATELIMIT: fakeKV(),
     ...over,
   }
 }
@@ -155,19 +169,19 @@ function post(body, env = envWith()) {
 const res = await post(realTemplate())
 assert.equal(res.status, 200)
 const { event } = await res.json()
-ok('the signed event verifies', () => assert.equal(verifyEvent(event), true))
-ok('it is signed by the configured key and nothing else', () => {
+await ok('the signed event verifies', () => assert.equal(verifyEvent(event), true))
+await ok('it is signed by the configured key and nothing else', () => {
   assert.equal(event.pubkey, getPublicKey(SK))
 })
-ok('the amount tag survives signing unchanged', () => {
+await ok('the amount tag survives signing unchanged', () => {
   assert.equal(event.tags.find((t) => t[0] === 'amount')[1], '1000000')
 })
-ok('the response is never cached', () => {
+await ok('the response is never cached', () => {
   assert.equal(res.headers.get('cache-control'), 'no-store')
 })
 
 const noKey = await post(realTemplate(), envWith({ BOOSTBOT_NSEC: '' }))
-ok('no key configured answers 503, so the feature is simply off', () => {
+await ok('no key configured answers 503, so the feature is simply off', () => {
   assert.equal(noKey.status, 503)
 })
 
@@ -175,20 +189,62 @@ ok('no key configured answers 503, so the feature is simply off', () => {
 // per-isolate on Cloudflare and is no limit at all, so a missing binding must
 // not degrade to "unlimited".
 const noLimiter = await post(realTemplate(), envWith({ SIGN_RATELIMIT: undefined }))
-ok('no rate limiter answers 503 rather than running unrated', () => {
+await ok('no counter bound answers 503 rather than running unrated', () => {
   assert.equal(noLimiter.status, 503)
 })
 
-const limited = await post(realTemplate(), envWith({
-  SIGN_RATELIMIT: { limit: async () => ({ success: false }) },
+const brokenLimiter = await post(realTemplate(), envWith({
+  SIGN_RATELIMIT: { get: async () => { throw new Error('kv down') }, put: async () => {} },
 }))
-ok('over the limit answers 429', () => assert.equal(limited.status, 429))
+await ok('a counter that throws answers 503, not an unrated 200', () => {
+  assert.equal(brokenLimiter.status, 503)
+})
+
+const notAKV = await post(realTemplate(), envWith({ SIGN_RATELIMIT: 'true' }))
+await ok('a plain text variable is not mistaken for a namespace', () => {
+  assert.equal(notAKV.status, 503)
+})
+
+// The counter, exercised directly so the window boundary doesn't cost a minute.
+console.log('\nThe rate limiter:')
+const kv = fakeKV()
+const T0 = 1_800_000_000_000
+await ok('the first five requests in a window pass', async () => {
+  for (let i = 0; i < 5; i++) {
+    assert.equal(await overRateLimit(kv, '203.0.113.7', T0), false, `request ${i + 1}`)
+  }
+})
+await ok('the sixth is refused', async () => {
+  assert.equal(await overRateLimit(kv, '203.0.113.7', T0), true)
+})
+await ok('a different address has its own count', async () => {
+  assert.equal(await overRateLimit(kv, '198.51.100.4', T0), false)
+})
+await ok('the next window starts clean', async () => {
+  assert.equal(await overRateLimit(kv, '203.0.113.7', T0 + 60_000), false)
+})
+await ok('the key expires on its own, so nothing accumulates', async () => {
+  const seen = fakeKV()
+  await overRateLimit(seen, '203.0.113.7', T0)
+  // put() is called with a TTL that outlives the window; KV's floor is 60s.
+  assert.equal([...seen.store.keys()][0], `sign-boost:203.0.113.7:${Math.floor(T0 / 1000 / 60)}`)
+})
+
+// ⚠️ Filled at the CURRENT window, not at T0. The handler reads its own clock,
+// so a counter spent in some other minute is a counter it never looks at — the
+// first version of this test asserted 429 and got a clean 200.
+const spent = fakeKV()
+for (let i = 0; i < 5; i++) await overRateLimit(spent, '203.0.113.7', Date.now())
+const limited = await post(realTemplate(), envWith({ SIGN_RATELIMIT: spent }))
+await ok('over the limit the handler answers 429 and signs nothing', () => {
+  assert.equal(limited.status, 429)
+})
 
 const badJson = await post('{not json')
-ok('malformed JSON answers 400, not 500', () => assert.equal(badJson.status, 400))
+await ok('malformed JSON answers 400, not 500', () => assert.equal(badJson.status, 400))
 
 const rejected = await post({ ...realTemplate(), kind: 0 })
-ok('a refused template answers 400 and signs nothing', async () => {
+await ok('a refused template answers 400 and signs nothing', async () => {
   assert.equal(rejected.status, 400)
 })
 

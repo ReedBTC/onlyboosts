@@ -14,8 +14,8 @@
  *
  * Two bindings are needed and it refuses to run without either:
  *
- *   BOOSTBOT_NSEC   secret     the bot's key, nsec or 64-char hex
- *   SIGN_RATELIMIT  ratelimit  keyed on CF-Connecting-IP
+ *   BOOSTBOT_NSEC   secret        the bot's key, nsec or 64-char hex
+ *   SIGN_RATELIMIT  KV namespace  the rate-limit counters
  *
  * The signer is `functions/_shared/nostr-sign.js`, a vendored build rather than
  * an npm import, because this repo has no root package.json and the Functions
@@ -79,6 +79,24 @@ const MAX_TAG_ITEMS = 4
 const MAX_TAG_ITEM_LEN = 512
 const MAX_TAGS_TOTAL_LEN = 4096
 const CREATED_AT_SKEW_SECS = 300
+
+// ⚠️ KV, BECAUSE PAGES HAS NO RATE LIMITING BINDING. Checked against the
+// supported list on 2026-08-19: KV, Durable Objects, R2, D1, Vectorize, Workers
+// AI, service bindings, Queues, Hyperdrive, Analytics Engine, variables and
+// secrets. Durable Objects would be the textbook counter, but a Pages Function
+// can only BIND to a DO class and not define one, so it would mean standing up
+// a separate Worker to host it. Don't re-propose the native binding; it isn't
+// on this platform.
+//
+// ⚠️ AND THIS IS FRICTION, NOT A SECURITY BOUNDARY. Two reasons to hold that
+// clearly. KV is eventually consistent, so a caller spread across data centres
+// is undercounted, and the read-modify-write below loses concurrent increments;
+// and an IP limit is bypassed by anyone with a proxy pool regardless of how
+// exactly it counts. What actually contains this endpoint is D11's argument:
+// one identifiable publisher, `excludes.json`, and the caps above. The limit is
+// here to stop casual volume, and being approximate is fine for that.
+const RATE_LIMIT = 5
+const RATE_WINDOW_SECS = 60
 
 // One boost, capped. Nothing here can tell a real 500k-sat boost from an
 // invented one, so the cap is about how large a single invented figure may be,
@@ -189,24 +207,44 @@ export function secretKeyFrom(value) {
   return null
 }
 
+/**
+ * Fixed-window counter in KV. Exported for the test, which is the only way to
+ * exercise the window boundary without waiting a minute.
+ *
+ * The window is derived from the clock rather than stored, so there is nothing
+ * to initialise and an abandoned counter expires itself. `expirationTtl` is
+ * twice the window because KV's minimum is 60 seconds and a key must outlive
+ * the window it counts.
+ */
+export async function overRateLimit(kv, ip, now = Date.now()) {
+  const window = Math.floor(now / 1000 / RATE_WINDOW_SECS)
+  const key = `sign-boost:${ip}:${window}`
+  const current = Number(await kv.get(key)) || 0
+  if (current >= RATE_LIMIT) return true
+  await kv.put(key, String(current + 1), { expirationTtl: RATE_WINDOW_SECS * 2 })
+  return false
+}
+
 export async function onRequestPost({ request, env }) {
   const sk = secretKeyFrom(env.BOOSTBOT_NSEC)
   if (!sk) return bad('site signing identity not configured', 503)
 
-  // ⚠️ FAIL CLOSED WITHOUT A RATE LIMITER. An in-memory counter is per-isolate
-  // on Cloudflare and is therefore no limit at all — the plan calls that out
-  // and it is the reason this refuses to run rather than running unrated. Bind
-  // a Rate Limiting binding named SIGN_RATELIMIT on Preview and Production.
-  if (!env.SIGN_RATELIMIT || typeof env.SIGN_RATELIMIT.limit !== 'function') {
+  // ⚠️ FAIL CLOSED WITH NO COUNTER BOUND. An in-memory counter is per-isolate
+  // on Cloudflare and is therefore no limit at all, which is the shape the plan
+  // called out in BMB's version. Refusing to run is what forces the operator to
+  // decide, rather than shipping an oracle with nothing in front of it.
+  const kv = env.SIGN_RATELIMIT
+  if (!kv || typeof kv.get !== 'function' || typeof kv.put !== 'function') {
     return bad('site signing identity not configured', 503)
   }
   // Keyed on the caller's address. CF-Connecting-IP is set by the edge and
   // cannot be spoofed by a client header, unlike X-Forwarded-For.
-  const key = request.headers.get('CF-Connecting-IP') || 'unknown'
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown'
   try {
-    const { success } = await env.SIGN_RATELIMIT.limit({ key })
-    if (!success) return bad('too many requests', 429)
+    if (await overRateLimit(kv, ip)) return bad('too many requests', 429)
   } catch {
+    // A counter we cannot read is a counter we cannot honour. Same answer as
+    // no binding at all, for the same reason.
     return bad('site signing identity not configured', 503)
   }
 

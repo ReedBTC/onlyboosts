@@ -204,7 +204,7 @@ Five test scripts, all plain `node scripts/<name>.mjs` with no runner:
 | `test-server-render.mjs` | the assembled homepage against a captured production response: the injection, the state element, a 256KB first-view budget, **and the ranking invariants**. Takes the capture as an argument |
 | `test-feed-hash.mjs` | the inline feed-bar controller: hash parsing, and the boot sequence |
 | `test-feed-lang.mjs` | `feed-lang.js`: menu ordering, the withholding rule, and the copy |
-| `test-sign-boost.mjs` | the signing oracle's validator, fed by the **shipped** note builder |
+| `test-sign-boost.mjs` | the signing oracle's validator and its KV rate limiter, fed by the **shipped** note builder |
 
 **⚠️ `test-server-render.mjs` IS THE ONE THAT NEEDS AN ARGUMENT, SO IT IS THE ONE
 THAT GOES UNRUN.** Its header carries the `curl` that produces the capture; take
