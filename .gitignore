@@ -17,6 +17,11 @@
 *HANDOFF*.md
 *handoff*.md
 
+# The boost/login/wallet project's running plan. Same rule as a handoff, but it
+# spans many sessions rather than one, so it is named for the project instead
+# of matching the globs above.
+boost-login.md
+
 # --- Wrangler local dev server scratch (created by `wrangler pages dev`) ---
 .wrangler/
 

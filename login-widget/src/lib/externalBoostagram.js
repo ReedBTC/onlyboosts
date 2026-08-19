@@ -96,16 +96,34 @@ export function toWeblnRecords(boostagram, recipient) {
  * client=onlyboosts.social; NO `nostr:` mention (external shows have no
  * Nostr identity we can vouch for). Published only when the booster is signed
  * in (user-signed), after settlement confirms — the caller enforces that.
+ *
+ * ⚠️ `paidSats` IS WHAT ACTUALLY SETTLED, NOT WHAT THE DONOR TYPED. A boost
+ * distributes across a show's value block and any leg of it can fail, so the
+ * two numbers differ on every partial. Reporting the intended amount credits
+ * the donor with sats no recipient received, and because OnlyBoosts indexes
+ * its own notes, that number then becomes a row in this site's own dataset —
+ * the `amount` tag below is exactly what the collector reads. The caller
+ * recomputes this from live leg state at the moment of sharing, so a leg that
+ * succeeded on retry is counted.
+ *
+ * `legsPaid` / `legsTotal` disclose the shortfall in words. `legsTotal`
+ * excludes legs allocated zero sats: a leg that was never attempted did not
+ * fail, and counting it would understate the outcome.
  */
 export function buildExternalNoteTemplate({
-  amountSats, message, showTitle, episodeTitle, podcastGuid, itemGuid, bmbUrl,
+  paidSats, legsPaid, legsTotal, message, showTitle, episodeTitle, podcastGuid, itemGuid, bmbUrl,
 }) {
-  const sats = Number(amountSats) || 0
+  const sats = Number(paidSats) || 0
+  const paid = Number(legsPaid) || 0
+  const total = Number(legsTotal) || 0
   const msg = (message || '').trim()
   const showEp = episodeTitle
     ? `${showTitle || 'a podcast'} • ${episodeTitle}`
     : (showTitle || 'a podcast')
   const lines = [`⚡Just boosted ${sats.toLocaleString()} sats 📱 via onlyboosts.social`]
+  // "splits" rather than "legs": it is the word the value-block spec and the
+  // podcast apps use, and this line is read by people outside this codebase.
+  if (total > 0 && paid < total) lines.push(`⚠️ ${paid} of ${total} splits paid`)
   if (msg) lines.push(`💬 "${msg.slice(0, MAX_MESSAGE_CHARS)}"`)
   lines.push('')
   lines.push(`🎙️ ${showEp}`)

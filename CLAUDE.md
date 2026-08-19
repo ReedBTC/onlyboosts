@@ -618,6 +618,47 @@ Code edits, dry runs, and read-only inspection are fine without asking.
 event, or that moves sats.** Published events can't be unpublished. **New bots
 start with `DRY_RUN = True`.**
 
+### The Share Note Reports What Settled
+
+A boost distributes across a value block and **any leg of it can fail**, so what
+the donor typed and what recipients received are different numbers on every
+partial. `buildExternalNoteTemplate` therefore takes `paidSats`, never the form
+amount, and its `amount` tag carries the same figure. **⚠️ That tag is what this
+site's own collector reads**, so an overstated note is not merely a wrong claim
+on someone's feed; it is a wrong row in this index. It shipped that way until
+2026-08-19.
+
+**⚠️ The share is a VERB pressed on the done screen, not a checkbox ticked
+before paying.** The settled total is unknown until every leg has run *and* the
+donor has finished retrying, and an event cannot be edited, so a note published
+when the first pass ends can never reflect a successful retry. The figures are
+recomputed from live leg state at the moment of the press. The screen names the
+number the note will carry before it is signed.
+
+`legsTotal` **excludes SKIPPED legs**: a leg allocated zero sats by the split
+was never attempted, and counting it would report a shortfall that never
+happened. Where `legsPaid < legsTotal` the note adds one line, `⚠️ 2 of 3 splits
+paid` — *splits* rather than *legs*, being the word the value spec and the
+podcast apps use, and this line is read outside this codebase.
+
+**⚠️ ONE BOOST PUBLISHES AT MOST ONE NOTE.** `shareState` latches at `shared`,
+and a retry that lands afterwards does not republish. Two notes for one payment
+would be two rows in the index, which is the same double-count the
+OnlyBoosts-signs-it path has to avoid by never being offered alongside a
+donor-signed note.
+
+Withheld entirely when nothing paid, and **withheld entirely on an anonymous
+boost** rather than shown disabled: signing with the donor's own npub would undo
+the anonymity they chose one field up. That case is what the site-signed path is
+for, and it does not exist yet.
+
+**The LB path is different and is deliberately not being changed.**
+`MultiLegBoostForm` signs its kind-1 *before* paying, batched into one signer
+approval with the receipts, and `boostQueue.js` publishes it if any leg paid.
+Its content is frozen before any outcome is known. It is unaffected here because
+the only surface using it on this fork is the site tip, which is one leg at 100%
+and cannot partial.
+
 ### The one boost button
 
 Boosting a SHOW (as opposed to an episode) pays the **feed-level** value block —

@@ -5,8 +5,12 @@
  * boost path, untouched). This runs the external orchestrator (lib/
  * externalBoost.js): pays the episode's value-block recipients via LNURL
  * (lnaddress) and keysend (node), publishes NO kind 30078, and — only when the
- * booster is signed in and opts in — posts a kind-1 note tagged to the external
- * show's guid + Boost Me Bitch URL. Nothing here touches LB stats/bots.
+ * booster is signed in and PRESSES SHARE ON THE DONE SCREEN — posts a kind-1
+ * note tagged to the external show's guid + Boost Me Bitch URL. Nothing here
+ * touches LB stats/bots.
+ *
+ * ⚠️ The share is a post-settlement verb, not a pre-flight checkbox, and the
+ * note reports SETTLED sats rather than typed ones. See `handleShare`.
  *
  * Progress UI is self-contained (not the LB BoostProgressView) so the external
  * leg shape / skipped legs / keysend-uncertain retry rules stay independent.
@@ -103,10 +107,28 @@ export default function ExternalBoostModal({ user, onClose, episode, recipientsB
   const [amount, setAmount] = useState('1000')
   const [message, setMessage] = useState('')
   const [anonymous, setAnonymous] = useState(false)
-  const [shareToFeed, setShareToFeed] = useState(false)
   const [error, setError] = useState('')
+
+  // Sharing is a VERB pressed after settlement, not a checkbox ticked before
+  // it. Two reasons, and the first is the one that made this a bug:
+  //
+  //   - The note has to report what actually settled, and that is not known
+  //     until every leg has run AND the donor has finished retrying the ones
+  //     that didn't. A note published the instant the first pass ends can
+  //     never reflect a successful retry, and an event cannot be edited.
+  //   - The signer prompt then arrives at a moment the donor asked for it,
+  //     rather than unannounced after a payment they thought was the end of
+  //     the interaction.
+  //
+  // ⚠️ AN ANONYMOUS BOOST GETS NO SHARE CONTROL AT ALL, not a disabled one.
+  // Signing the note with the donor's own npub would undo the anonymity they
+  // chose one field up. The OnlyBoosts-signs-it path is what serves that case
+  // and it does not exist yet (boost-login.md, Phase 3); when it lands it
+  // belongs here as a second choice on this same control, NOT as a
+  // resurrected pre-flight checkbox.
   const canShareToFeed = !anonymous && signedIn
-  useEffect(() => { if (anonymous && shareToFeed) setShareToFeed(false) }, [anonymous, shareToFeed])
+  const [shareState, setShareState] = useState('idle')   // 'idle' | 'signing' | 'shared' | 'error'
+  const [shareError, setShareError] = useState('')
 
   const [phase, setPhase] = useState('form')       // 'form' | 'sending' | 'done'
   const [legs, setLegs] = useState([])             // per-recipient live state (aligned to recipients)
@@ -159,11 +181,47 @@ export default function ExternalBoostModal({ user, onClose, episode, recipientsB
     setLegs((prev) => { const next = prev.slice(); next[index] = { ...next[index], ...patch }; return next })
   }, [])
 
-  async function maybeShareNote(totalSats) {
-    if (!canShareToFeed || !shareToFeed) return
+  // The live tally, recomputed every render off leg state, which is what makes
+  // a successful Retry count toward the note. Declared here rather than beside
+  // the render so `handleShare` and the summary line read the same numbers;
+  // two derivations of "how much actually landed" is how the reported figure
+  // drifts from the published one.
+  //
+  // SKIPPED legs are excluded from the denominator: those were allocated zero
+  // sats by the split and never attempted, so counting them as unpaid would
+  // report a shortfall that never happened.
+  const visibleLegs = phase !== 'form'
+    ? recipients.map((r, i) => ({ r, leg: legs[i] })).filter(({ leg }) => leg && leg.status !== STATUS.SKIPPED)
+    : []
+  const paidCount = legs.filter((l) => l?.status === STATUS.PAID).length
+  const activeCount = visibleLegs.length
+  const paidSats = legs.reduce((a, l) => a + (l?.status === STATUS.PAID ? (l.sats || 0) : 0), 0)
+
+  /**
+   * Publish the donor's kind-1 share note, on their press, from their npub.
+   *
+   * ⚠️ THE FIGURES COME FROM LIVE LEG STATE, NOT FROM THE FORM. `paidSats` and
+   * the leg counts are recomputed on every render, so pressing this after a
+   * successful Retry reports the retried leg. This is the whole reason the
+   * control moved out of the form: the old pre-flight checkbox fired the note
+   * with the typed amount the instant the first pass ended, which overstated
+   * every partial and could never see a retry.
+   *
+   * Failure is reported here rather than swallowed to the console. The donor
+   * asked for this explicitly, so a silent no-op would leave them believing
+   * they had shared. The sats are already gone either way, which is why a
+   * failure offers a retry instead of unwinding anything.
+   */
+  async function handleShare() {
+    if (!canShareToFeed || shareState === 'signing' || shareState === 'shared') return
+    if (paidSats <= 0) return
+    setShareState('signing')
+    setShareError('')
     try {
       const template = buildExternalNoteTemplate({
-        amountSats: totalSats,
+        paidSats,
+        legsPaid: paidCount,
+        legsTotal: activeCount,
         message: message.trim(),
         showTitle: episode?.showTitle,
         episodeTitle: episode?.episodeTitle,
@@ -173,8 +231,13 @@ export default function ExternalBoostModal({ user, onClose, episode, recipientsB
       })
       const signed = await signKindOneShareWithUser(template)
       await publishSignedKindOne(signed)
+      if (cancelledRef.current) return
+      setShareState('shared')
     } catch (e) {
       console.warn('[lb] external boost share note failed', e?.message || e)
+      if (cancelledRef.current) return
+      setShareError(e?.message || 'Couldn\u2019t post the note. Your boost still went through.')
+      setShareState('error')
     }
   }
 
@@ -215,10 +278,7 @@ export default function ExternalBoostModal({ user, onClose, episode, recipientsB
     }
     if (cancelledRef.current) return
     setPhase('done')
-    if (result.anyPaid) {
-      fireConfetti()
-      maybeShareNote(sats)
-    }
+    if (result.anyPaid) fireConfetti()
   }
 
   // Retry a single leg in place. Double-spend guard: an 'uncertain' lnaddress
@@ -273,9 +333,6 @@ export default function ExternalBoostModal({ user, onClose, episode, recipientsB
   }
 
   const headerTitle = '⚡ Boost episode'
-  const visibleLegs = phase !== 'form' ? recipients.map((r, i) => ({ r, leg: legs[i] })).filter(({ leg }) => leg && leg.status !== STATUS.SKIPPED) : []
-  const paidCount = legs.filter((l) => l?.status === STATUS.PAID).length
-  const activeCount = visibleLegs.length
   const allPaid = phase === 'done' && activeCount > 0 && paidCount === activeCount
 
   // Only tell the booster to retry when a row can actually be retried. An
@@ -344,19 +401,6 @@ export default function ExternalBoostModal({ user, onClose, episode, recipientsB
                   <p className="mt-1 text-[10px] text-neutral-600 text-right">{message.length}/{MAX_MESSAGE_CHARS}</p>
                 </div>
 
-                {canShareToFeed && (
-                  <label className="flex items-start gap-2 text-xs text-neutral-400 cursor-pointer select-none">
-                    <input type="checkbox" checked={shareToFeed} onChange={(e) => setShareToFeed(e.target.checked)} className="accent-orange-500 mt-0.5" />
-                    <span className="leading-snug">Share to my feed
-                      <span className="block text-[10px] text-neutral-600 mt-0.5">
-                        Posts a kind-1 note tagged to this episode with a link back.
-                        OnlyBoosts counts boosts it can find on Nostr, so this is what
-                        puts yours in the feeds and the totals.
-                      </span>
-                    </span>
-                  </label>
-                )}
-
                 {error && <p className="text-xs text-red-400">{error}</p>}
 
                 <button onClick={handleBoost}
@@ -384,6 +428,45 @@ export default function ExternalBoostModal({ user, onClose, episode, recipientsB
                     return <LegRow key={`${r.address}-${realIndex}`} recipient={r} leg={leg} onRetry={phase === 'done' ? () => handleRetry(realIndex) : null} />
                   })}
                 </ul>
+                {/* The share control. Withheld until something actually paid,
+                    because a note about a boost that didn't land is worse than
+                    no note. Withheld entirely on an anonymous boost — see the
+                    canShareToFeed note above. */}
+                {phase === 'done' && canShareToFeed && paidSats > 0 && (
+                  <div className="rounded-md border border-neutral-800 bg-neutral-800/40 p-3 space-y-2">
+                    {shareState === 'shared' ? (
+                      <p className="text-xs text-green-400 leading-snug">
+                        ✓ Posted to your feed{paidCount < activeCount ? ` — ${fmtSats(paidSats)} sats, ${paidCount} of ${activeCount} splits` : ''}.
+                      </p>
+                    ) : (
+                      <>
+                        <p className="text-xs text-neutral-300 leading-snug">
+                          Share this boost on Nostr?
+                          <span className="block text-[10px] text-neutral-500 mt-1">
+                            Posts a kind-1 note from your npub, tagged to this episode.
+                            OnlyBoosts counts boosts it can find on Nostr, so this is what
+                            puts yours in the feeds and the totals.
+                          </span>
+                        </p>
+                        {/* Naming the figure the note will carry, before it is
+                            signed. On a partial the number is not the one the
+                            donor typed, and finding that out by reading their
+                            own published note is the wrong order. */}
+                        <p className="text-[10px] text-neutral-500 leading-snug">
+                          The note will say <span className="tabular-nums text-neutral-400">{fmtSats(paidSats)} sats</span>
+                          {paidCount < activeCount && <> and <span className="text-neutral-400">{paidCount} of {activeCount} splits paid</span></>}.
+                        </p>
+                        {shareState === 'error' && shareError && (
+                          <p className="text-[11px] text-red-400/90 leading-snug">{shareError}</p>
+                        )}
+                        <button onClick={handleShare} disabled={shareState === 'signing'}
+                          className="w-full py-2 rounded bg-orange-500 hover:bg-orange-600 disabled:bg-neutral-700 disabled:text-neutral-400 text-xs font-medium text-white transition-colors">
+                          {shareState === 'signing' ? 'Approve in your signer…' : shareState === 'error' ? 'Try posting again' : 'Share to Nostr'}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
                 {phase === 'done' && (
                   <button onClick={requestClose} className="mt-1 w-full py-2.5 rounded bg-neutral-700 hover:bg-neutral-600 text-sm text-neutral-200 transition-colors">Done</button>
                 )}
