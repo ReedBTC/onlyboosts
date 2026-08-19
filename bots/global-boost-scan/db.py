@@ -238,12 +238,24 @@ PROFILE_BATCH = 100
 # ~16s of the 5-minute tick. The steady state is ~4 rows a tick; the cap exists for
 # the day the corpus comes due together, which it does — see guids_needing_episode.
 #
-# ⚠️ IF EVERY EPISODE EVER NEEDS TO BE DAILY, DO NOT JUST DROP EPISODE_MAX_AGE.
-# `episodes/byfeedid` returns a whole show in ONE request — verified 2026-08-19 to
-# cover 100% of our stored episodes on every feed tried — which makes a full daily
-# sweep 902 requests rather than 7,044. It needs paging for the few feeds with more
-# than 1,000 items (one already returns exactly 1,000, i.e. truncated) and a
-# fallback for episodes with no feed_id, which is why it is not what shipped here.
+# ⚠️ `episodes/byfeedid` LOOKS LIKE THE CHEAP WAY TO MAKE EVERYTHING DAILY. IT IS
+# NOT — MEASURE BYTES, NOT REQUESTS. It returns a whole show in one call and covers
+# 100% of our stored episodes, so a full daily sweep is 902 requests against 7,044,
+# and on request count alone it beats even the tiered scheme above. But its median
+# response is 214KB where `episodes/byguid` is 2.7KB:
+#
+#   tiered per-episode (this file)  1,169 req x 2.7KB  =   3.1 MB/day
+#   bulk per-feed, everything         902 req x 214KB  = 188.5 MB/day
+#
+# 62x the bandwidth to save 267 requests, and the thing it buys is the BACK
+# CATALOGUE going from monthly to daily — episodes measured drifting at ~0.08%/day,
+# which nobody is waiting on. It does not close the enrichment gap either: tested
+# against the 198 boosted-but-unenriched episodes on the 15 feeds holding most of
+# them, it recovered 1. Those items are genuinely absent from Podcast Index.
+#
+# So bulk is the answer to a question we do not have. Revisit it only if the fast
+# tier ever has to cover the whole corpus AND the bandwidth is acceptable; it would
+# also need paging past 1,000 items and a fallback for episodes with no feed_id.
 EPISODE_RECENT_WINDOW = 90 * 24 * 60 * 60    # "recent" = aired inside this
 EPISODE_MAX_AGE_RECENT = 24 * 60 * 60        # re-read a recent episode daily
 EPISODE_MAX_AGE = 30 * 24 * 60 * 60          # re-read everything else monthly
