@@ -247,6 +247,22 @@ export default function ExternalBoostModal({ user, onClose, episode, recipientsB
   const [checking, setChecking] = useState({})
   const stillChecking = Object.values(checking).some(Boolean)
 
+  /**
+   * ⚠️ ONE CELEBRATION PER BOOST, LATCHED. It used to fire the moment the first
+   * pass returned and again after every retry that landed, so a boost with a
+   * failed leg could burst two or three times for one payment.
+   *
+   * Keyed on `paidCount` rather than on the pass finishing, so a leg the
+   * background watcher resolves late still earns the burst if nothing had
+   * landed yet — and the ref means it cannot earn a second one.
+   */
+  const celebratedRef = useRef(false)
+  useEffect(() => {
+    if (phase !== 'done' || paidCount === 0 || celebratedRef.current) return
+    celebratedRef.current = true
+    fireConfetti()
+  }, [phase, paidCount])
+
   useEffect(() => {
     if (phase !== 'done') return
     const targets = recipients
@@ -354,7 +370,6 @@ export default function ExternalBoostModal({ user, onClose, episode, recipientsB
     }
     if (cancelledRef.current) return
     setPhase('done')
-    if (result.anyPaid) fireConfetti()
   }
 
   /**
@@ -390,7 +405,6 @@ export default function ExternalBoostModal({ user, onClose, episode, recipientsB
         lnurlCache,
         onLeg: (_i, ls) => updateLeg(index, { ...ls, sats: leg.sats }),
       })
-      if (res?.anyPaid) fireConfetti()
     } catch (e) {
       updateLeg(index, { status: STATUS.FAILED, error: e?.message || 'Retry failed' })
     }
