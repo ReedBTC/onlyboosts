@@ -317,9 +317,18 @@ export async function payExternalBoost({
         // "something may be in flight": past that point an exception is
         // ignorance, not evidence, and the leg is UNCERTAIN — which carries no
         // re-pay button. Same rule as confirmInvoiceSettled.
+        // ⚠️ A REASON FROM THE RECIPIENT'S OWN SERVER IS USED VERBATIM AND
+        // ATTRIBUTED, never run through friendlyError. That function rewrites
+        // on keywords — a provider whose message happens to contain "declined"
+        // or "expired" would be reported to the donor as *their wallet*
+        // declining, which is a lie about whose fault it is and sends them to
+        // check the wrong thing.
+        const detail = e?.lnurlReason
+          ? `Their Lightning provider said: ${e.lnurlReason}`
+          : friendlyError(e?.message || e)
         update(leg.paymentHash
-          ? { status: STATUS.UNCERTAIN, error: friendlyError(e?.message || e) }
-          : { status: STATUS.FAILED, error: friendlyError(e?.message || e) })
+          ? { status: STATUS.UNCERTAIN, error: detail }
+          : { status: STATUS.FAILED, error: detail })
       }
       const { totalMs, phases } = timer.summary()
       // Address rather than name: `name` is empty on most value blocks (the

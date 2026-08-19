@@ -669,6 +669,42 @@ The one true negative signal is bolt11 expiry, which provably ends an invoice.
 LNURL invoices typically live an hour, far too long to hold a modal open for, so
 it is not used. Do not reintroduce a shorter inference in its place.
 
+### What A Recipient's Server Says Is Shown To The Donor
+
+`fetchJsonCappedOnce` threw `Request failed (${status})` and discarded the
+response body. Measured on a real leg, 2026-08-19:
+`intuitiveocelot66@zeuspay.com` answered the invoice request **HTTP 400** with
+`{"success":false,"error":"Zaplocker payments are temporarily disabled. Check
+back later."}`. The donor was shown `Request failed (400)` and pressed Retry
+four times against a server that had already explained itself in plain English.
+
+`readErrorReason` now reads that body, through the same bounded reader as any
+other third-party response, and the leg prints **"Their Lightning provider said:
+…"**. Three shapes, because LUD-06's `reason` is not what everyone sends:
+`{status:'ERROR',reason}`, `{error}`, `{message}`. Capped at 2KB of body and 180
+characters of message, control characters stripped; React escapes it at render.
+
+**⚠️ A reason from the recipient's server is used VERBATIM and never passed
+through `friendlyError`.** That function rewrites on keywords, so a provider
+whose message happens to contain *declined* or *expired* would be reported to
+the donor as **their own wallet** declining. That is a lie about whose fault it
+is, and it sends them to check the wrong thing.
+
+**A 4xx is never retried.** The server understood and refused; asking again
+1.2s later gets the same answer and only delays the donor's first sight of the
+reason. 5xx and network faults still get the retry.
+
+**⚠️ ZEUS PAY ADDRESSES USE HODL INVOICES, AND THEY ARE THE CASE THE UNCERTAIN
+RULE EXISTS FOR.** That endpoint's own metadata reads *"Hodl invoice will settle
+when user comes online within 24hrs or you'll be refunded."* So a payment there
+is **accepted and held**, not settled — LUD-21 will answer `settled: false` for
+up to a day, and the payer's wallet may report a timeout. Under the pre-2026-08-19
+code that is a guaranteed double payment: reported FAILED, offered a re-pay,
+paid again, and both eventually settle. Under the current rule it is UNCERTAIN,
+the 90s watcher gives up, and the only offer is **Check again**. Any
+hodl-invoice recipient behaves this way **by design**, so this is a recurring
+case and not an edge one.
+
 ### The Share Note Reports What Settled
 
 A boost distributes across a value block and **any leg of it can fail**, so what
