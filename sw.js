@@ -457,7 +457,7 @@
 // competitionRanks() now reports `tied`, so every renderer that imports it
 // changed together — required, since a returning visitor holding one half gets
 // a card numbered by a function whose shape moved.
-const VERSION = 'ob-v85';
+const VERSION = 'ob-v86';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;
@@ -489,27 +489,27 @@ const PRECACHE_URLS = [
   '/assets/onlyboosts_pfp.png',
   '/assets/onlyboosts_banner.png',
   '/assets/avatar-fallback.svg',
-  '/assets/css/theme.css?v=ob-v85',
-  '/assets/css/page.css?v=ob-v85',
-  '/assets/css/nav.css?v=ob-v85',
-  '/assets/css/footer.css?v=ob-v85',
-  '/assets/css/boosts-thread.css?v=ob-v85',
-  '/assets/css/boost-actions.css?v=ob-v85',
+  '/assets/css/theme.css?v=ob-v86',
+  '/assets/css/page.css?v=ob-v86',
+  '/assets/css/nav.css?v=ob-v86',
+  '/assets/css/footer.css?v=ob-v86',
+  '/assets/css/boosts-thread.css?v=ob-v86',
+  '/assets/css/boost-actions.css?v=ob-v86',
   // The episode card and its drawer. Precached alongside the others because the
   // homepage's feeds are painted in it and it used to be inline in index.html,
   // which IS precached — leaving it out would trade an inline block for a
   // network round trip on the one page this list exists to make fast.
-  '/assets/css/feed-cards.css?v=ob-v85',
-  '/assets/js/boosts-thread.js?v=ob-v85',
+  '/assets/css/feed-cards.css?v=ob-v86',
+  '/assets/js/boosts-thread.js?v=ob-v86',
   // A static import of boosts-thread.js, so precaching that without this one
   // leaves a returning visitor fetching half the graph from the network.
-  '/assets/js/primal-profiles.js?v=ob-v85',
-  '/assets/js/calendar-events.js?v=ob-v85',
-  '/assets/js/boost-actions.js?v=ob-v85',
-  '/assets/js/nav.js?v=ob-v85',
-  '/assets/js/nav-widget-boot.js?v=ob-v85',
-  '/assets/js/widget-loader.js?v=ob-v85',
-  '/assets/js/sw-register.js?v=ob-v85',
+  '/assets/js/primal-profiles.js?v=ob-v86',
+  '/assets/js/calendar-events.js?v=ob-v86',
+  '/assets/js/boost-actions.js?v=ob-v86',
+  '/assets/js/nav.js?v=ob-v86',
+  '/assets/js/nav-widget-boot.js?v=ob-v86',
+  '/assets/js/widget-loader.js?v=ob-v86',
+  '/assets/js/sw-register.js?v=ob-v86',
 ];
 
 self.addEventListener('install', (event) => {

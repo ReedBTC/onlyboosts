@@ -33,7 +33,7 @@
  * feed-bar controller in index.html, plus a load of whichever feed is active
  * when this module first runs).
  */
-import { STATIC_RELAYS, fetchProfilesFromPrimal } from '/assets/js/boosts-thread.js?v=ob-v85'
+import { STATIC_RELAYS, fetchProfilesFromPrimal } from '/assets/js/boosts-thread.js?v=ob-v86'
 import {
   parseCalendarEvent,
   renderCalendarCard,
@@ -44,13 +44,13 @@ import {
   clearPendingPromote,
   KIND_DATE_EVENT,
   KIND_TIME_EVENT,
-} from '/assets/js/calendar-events.js?v=ob-v85'
-import { SimplePool, verifyEvent, nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v85'
+} from '/assets/js/calendar-events.js?v=ob-v86'
+import { SimplePool, verifyEvent, nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v86'
 // Supporter-set resolution lives in one shared module; re-exported below so
 // home-feeds.js keeps importing resolveSupporters from feeds.js unchanged.
-import { resolveSupporters } from '/assets/js/supporter-set.js?v=ob-v85'
+import { resolveSupporters } from '/assets/js/supporter-set.js?v=ob-v86'
 // Identity, for keeping the Follows feeds in sync with who's signed in.
-import { getSessionPubkey, clearFollowCache } from '/assets/js/follow-set.js?v=ob-v85'
+import { getSessionPubkey, clearFollowCache } from '/assets/js/follow-set.js?v=ob-v86'
 
 // Hourly events snapshot (Cloudflare Pages Function proxying the file
 // bots/community-feeds pushes to the VPS). It carries the same raw signed
@@ -1067,9 +1067,9 @@ async function hydrate(panelId, mod, scope, medium, lang) {
 }
 
 // ── Lazy per-feed dispatch ───────────────────────────────────────────
-const BOOSTS = '/assets/js/boosts-feed.js?v=ob-v85'
-const PODCASTS = '/assets/js/feeds-podcasts.js?v=ob-v85'
-const SHOWS = '/assets/js/shows-feed.js?v=ob-v85'
+const BOOSTS = '/assets/js/boosts-feed.js?v=ob-v86'
+const PODCASTS = '/assets/js/feeds-podcasts.js?v=ob-v86'
+const SHOWS = '/assets/js/shows-feed.js?v=ob-v86'
 // Each module's entry point, by module. Named rather than sniffed out of the
 // path, so adding a feed is one line here instead of another branch.
 const RENDERERS = {

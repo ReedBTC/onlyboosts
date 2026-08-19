@@ -306,9 +306,20 @@ export async function payExternalBoost({
           : await payKeysendLeg(leg, ctx, update, timer)
         update(result)
       } catch (e) {
-        // Pre-payment failures (LNURL resolve, below-min, invoice fetch) — these
-        // are definitively not-paid.
-        update({ status: STATUS.FAILED, error: friendlyError(e?.message || e) })
+        // Pre-payment failures (LNURL resolve, below-min, invoice fetch) are
+        // definitively not-paid, and today that is everything that reaches
+        // here — nothing throws out of the leg helpers once they have asked a
+        // wallet to pay.
+        //
+        // ⚠️ BUT THAT IS AN ARGUMENT ABOUT TODAY'S CALL GRAPH, AND THE COST OF
+        // IT BECOMING UNTRUE IS A RECIPIENT PAID TWICE. `paymentHash` is set
+        // the moment an invoice exists, so it is the structural test for
+        // "something may be in flight": past that point an exception is
+        // ignorance, not evidence, and the leg is UNCERTAIN — which carries no
+        // re-pay button. Same rule as confirmInvoiceSettled.
+        update(leg.paymentHash
+          ? { status: STATUS.UNCERTAIN, error: friendlyError(e?.message || e) }
+          : { status: STATUS.FAILED, error: friendlyError(e?.message || e) })
       }
       const { totalMs, phases } = timer.summary()
       // Address rather than name: `name` is empty on most value blocks (the

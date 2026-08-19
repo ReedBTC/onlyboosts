@@ -406,6 +406,13 @@ export default function ExternalBoostModal({ user, onClose, episode, recipientsB
         onLeg: (_i, ls) => updateLeg(index, { ...ls, sats: leg.sats }),
       })
     } catch (e) {
+      // ⚠️ Never downgrade a leg that already reported in. payExternalBoost
+      // throws only on its own pre-flight validation, so today this cannot
+      // clobber anything — but `onLeg` writes leg state on the way through, and
+      // turning an UNCERTAIN leg into a FAILED one hands it back a re-pay
+      // button it must not have.
+      const cur = legsRef.current[index]?.status
+      if (cur === STATUS.PAID || cur === STATUS.UNCERTAIN) return
       updateLeg(index, { status: STATUS.FAILED, error: e?.message || 'Retry failed' })
     }
   }
