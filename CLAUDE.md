@@ -705,6 +705,42 @@ the 90s watcher gives up, and the only offer is **Check again**. Any
 hodl-invoice recipient behaves this way **by design**, so this is a recurring
 case and not an edge one.
 
+### Waiting Is Not The Same Event As Giving Up
+
+The unconfirmed-leg screen said both at once. A leg that returned no preimage
+arrived carrying *"Don't re-send; it may already be on its way"* the instant the
+pay run ended, under a heading reading *"Still checking the rest — don't re-send
+them"*, in warning amber, and held that unchanged for the whole 90-second watch.
+Every word was true. **Observed on a real boost on 2026-08-19**, a leg to a slow
+provider settled after about a minute and the wait was the only part of the
+boost that felt broken: it read as a fault, and as a *stuck* fault.
+
+**⚠️ A SCREEN THAT CANNOT BE HURRIED AND NEVER CHANGES IS INDISTINGUISHABLE
+FROM ONE THAT HAS STOPPED WORKING.** So the copy moves even though the state
+does not. `CHECK_STAGES` in `ExternalBoostModal.jsx` escalates at 0, 15, 35 and
+60 seconds, in patience rather than in alarm, and one line under the list
+carries it however many legs are in flight.
+
+**The warning belongs at the end of the watch, not during it.** While the
+watcher runs the donor has no decision to make, since an unconfirmed leg is
+never offered a re-pay; when the watcher gives up, a decision arrives and the
+give-up text it writes is where "check your wallet rather than re-sending"
+lives. What the waiting copy must keep carrying is that **the sats may already
+be moving**, because the double-pay risk on this screen was never a button. It
+is a donor who closes the modal and boosts the episode again.
+
+Three consequences a change would undo: a row suppresses its own message while
+it is being watched, that message being the give-up message; the summary line
+takes the sending phase's orange rather than a shortfall's amber while checking,
+so the screen reads as continuous with the phase before it; and the escalating
+line renders for **every** donor rather than only one who can share, an
+anonymous booster being sat in front of the same spinner.
+
+`externalBoost.js`'s UNCERTAIN string is the leg's **resting** message, not its
+waiting message, and must not claim that checking is under way. What it serves
+is the leg nothing is watching: a keysend, or a provider that returned no
+verify URL.
+
 ### The Share Note Reports What Settled
 
 A boost distributes across a value block and **any leg of it can fail**, so what
