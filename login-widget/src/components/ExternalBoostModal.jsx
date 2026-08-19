@@ -123,7 +123,7 @@ function LegRow({ recipient, leg, onRepay, onCheck, checking, locked }) {
   )
 }
 
-export default function ExternalBoostModal({ user, onClose, episode, recipientsBundle }) {
+export default function ExternalBoostModal({ user, onClose, onRequestSignIn, episode, recipientsBundle }) {
   const { visible, requestClose } = useModalTransition(onClose)
   const cancelledRef = useRef(false)
   useEffect(() => () => { cancelledRef.current = true }, [])
@@ -139,6 +139,14 @@ export default function ExternalBoostModal({ user, onClose, episode, recipientsB
   const [amount, setAmount] = useState('1000')
   const [message, setMessage] = useState('')
   const [anonymous, setAnonymous] = useState(false)
+  // ⚠️ A SIGNED-OUT BOOST IS ANONYMOUS, and this is what the wire sees.
+  // Since Phase 1 a wallet can be connected with no Nostr identity, so
+  // `anonymous` is no longer the only way the sender fields end up empty.
+  // Reading the toggle alone would be right today by accident — there is
+  // no profile to read — and wrong the moment a typed name lands (the
+  // note picker, Phase 2). Deriving it once here keeps the three wire
+  // sites saying the same thing.
+  const boostAnonymously = anonymous || !signedIn
   const [error, setError] = useState('')
 
   // Sharing is a VERB pressed after settlement, not a checkbox ticked before
@@ -158,7 +166,13 @@ export default function ExternalBoostModal({ user, onClose, episode, recipientsB
   // and it does not exist yet (boost-login.md, Phase 3); when it lands it
   // belongs here as a second choice on this same control, NOT as a
   // resurrected pre-flight checkbox.
-  const canShareToFeed = !anonymous && signedIn
+  //
+  // A signed-out booster is inside `boostAnonymously` for the same reason
+  // and by a different route: there is no npub to sign with at all. That
+  // is the case the OnlyBoosts-signs-it path exists to serve, and it is
+  // why Phase 1 shipping before Phase 2 leaves a real gap — a wallet-only
+  // boost pays the show and puts nothing in this index.
+  const canShareToFeed = !boostAnonymously
   const [shareState, setShareState] = useState('idle')   // 'idle' | 'signing' | 'shared' | 'error'
   const [shareError, setShareError] = useState('')
 
@@ -351,8 +365,8 @@ export default function ExternalBoostModal({ user, onClose, episode, recipientsB
         totalWeight,
         totalSats: sats,
         message: message.trim(),
-        senderName: anonymous ? '' : (profile?.displayName || profile?.name || ''),
-        senderPubkey: anonymous ? '' : (user?.pubkey || ''),
+        senderName: boostAnonymously ? '' : (profile?.displayName || profile?.name || ''),
+        senderPubkey: boostAnonymously ? '' : (user?.pubkey || ''),
         meta: {
           showTitle: episode?.showTitle,
           episodeTitle: episode?.episodeTitle,
@@ -393,8 +407,8 @@ export default function ExternalBoostModal({ user, onClose, episode, recipientsB
         totalWeight: recipient.splitWeight || 1,
         totalSats: leg.sats || 0,
         message: message.trim(),
-        senderName: anonymous ? '' : (profile?.displayName || profile?.name || ''),
-        senderPubkey: anonymous ? '' : (user?.pubkey || ''),
+        senderName: boostAnonymously ? '' : (profile?.displayName || profile?.name || ''),
+        senderPubkey: boostAnonymously ? '' : (user?.pubkey || ''),
         meta: {
           showTitle: episode?.showTitle, episodeTitle: episode?.episodeTitle,
           podcastGuid: episode?.podcastGuid, itemGuid: episode?.itemGuid, url: episode?.bmbUrl,
@@ -492,18 +506,43 @@ export default function ExternalBoostModal({ user, onClose, episode, recipientsB
                   <p className="mt-1 text-[10px] text-neutral-600">Splits across {recipients.length} {recipients.length === 1 ? 'recipient' : 'recipients'} per the show's value block.</p>
                 </div>
 
+                {/* ⚠️ NO IDENTITY TOGGLE WHEN THERE IS NO IDENTITY. Both of
+                    its buttons would send the same empty sender fields, so
+                    the control could only lie about having an effect. What
+                    replaces it says what will happen and offers the one
+                    thing that would change it. */}
+                {!signedIn && (
+                  <div className="rounded-md border border-neutral-800 bg-neutral-800/40 px-3 py-2.5 space-y-1.5">
+                    <p className="text-xs text-neutral-300 leading-snug">
+                      Boosting anonymously. The show sees your message and your
+                      sats, not your name.
+                    </p>
+                    {onRequestSignIn && (
+                      <button
+                        type="button"
+                        onClick={onRequestSignIn}
+                        className="text-[11px] font-medium text-orange-400 hover:text-orange-300 transition-colors"
+                      >
+                        Sign in with Nostr to boost as yourself
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {signedIn && (
                 <div>
                   <label className="block text-xs text-neutral-400 mb-1.5">Boost as</label>
                   <div className="flex gap-2 text-xs">
                     <button onClick={() => setAnonymous(false)} aria-pressed={!anonymous}
                       className={`flex-1 flex items-center justify-center gap-1.5 py-3 px-3 rounded-md border transition-colors ${!anonymous ? 'bg-orange-500/15 border-orange-500 text-orange-200 font-semibold' : 'bg-neutral-800 border-neutral-700 text-neutral-500 hover:text-neutral-300 hover:border-neutral-600'}`}>
                       {profile?.image && isSafeUrl(profile.image) && <img src={profile.image} alt="" className="w-4 h-4 rounded-full object-cover" onError={(e) => { e.target.style.display = 'none' }} />}
-                      <span className="truncate max-w-[140px]">{profile?.displayName || profile?.name || (signedIn ? 'Your npub' : 'You')}</span>
+                      <span className="truncate max-w-[140px]">{profile?.displayName || profile?.name || 'Your npub'}</span>
                     </button>
                     <button onClick={() => setAnonymous(true)} aria-pressed={anonymous}
                       className={`flex-1 py-3 px-3 rounded-md border transition-colors ${anonymous ? 'bg-orange-500/15 border-orange-500 text-orange-200 font-semibold' : 'bg-neutral-800 border-neutral-700 text-neutral-500 hover:text-neutral-300 hover:border-neutral-600'}`}>Anon</button>
                   </div>
                 </div>
+                )}
 
                 <div>
                   <label className="block text-xs text-neutral-400 mb-1.5">Message (optional)</label>

@@ -746,6 +746,56 @@ Its content is frozen before any outcome is known. It is unaffected here because
 the only surface using it on this fork is the site tip, which is one leg at 100%
 and cannot partial.
 
+### The Login Is Not A Gate On The Wallet
+
+A boost is a payment, and a payment needs no Nostr identity. `openExternalBoost`
+therefore has **no Gate 1**: a visitor with no account connects a wallet and
+boosts with it. The gates that remain are conditional on there *being* an
+identity, and each still earns its place for a signed-in user; a stub cannot
+unlock the encrypted NWC blob, and a signer that has switched accounts would
+sign a payload claiming the wrong pubkey. They are skipped, never weakened.
+
+**⚠️ A WALLET CONNECTED WITH NO LOGIN IS SESSION-ONLY, and that is structural.**
+Both at-rest schemes are keyed to an identity: NWC stores the connection URI
+encrypted to the user's own signer, and WebLN stores a per-pubkey enabled bit.
+With no signer there is nothing to encrypt to, so the connection lives in memory
+and dies with the page. **⚠️ Never "fix" this by writing a plaintext NWC URI to
+localStorage** — that URI is a bearer credential with a spend budget.
+`getStatus().sessionOnly` is how the UI says so, in the connect modal before the
+paste and in the identity dropdown afterwards.
+
+**⚠️ A session-only disconnect leaves the stored blob alone.** Any blob present
+belongs to an account that is not signed in, and a signed-out visitor
+disconnecting the wallet they pasted this page must not delete the saved wallet
+of whoever uses this browser signed in. `nwc.disconnect()` reads the flag; the
+same rule governs the WebLN wipe in `wallet.connectWebln`.
+
+**The identity slot has a second logged-out form**: a wallet pill with the
+dropdown behind it, because that wallet is real, spendable and theirs to
+disconnect. A signed-out visitor with no wallet still gets the plain Sign in
+pill.
+
+**Signing in afterwards does not save the wallet retroactively.** Only the live
+client is held, never the URI, so the dropdown offers **Reconnect to save it**
+rather than a one-tap save that would fail silently. Keeping a session wallet
+across a sign-in is safe on the same reasoning that makes it session-only: it
+cannot survive a page load, so it cannot reach a different visitor.
+
+**A signed-out boost is anonymous, and that is where the money path stops and
+the index gap begins.** `boostAnonymously` in `ExternalBoostModal` is the single
+derivation the three wire sites read (`sender_id`, `sender_name`, the share
+control); it is *not* the toggle, because with no profile the toggle would be
+right by accident today and wrong the moment a typed name lands. The identity
+toggle is withheld entirely when there is no identity, since both of its buttons
+would send the same empty fields. So a wallet-only boost pays the show and puts
+nothing in this index; the OnlyBoosts-signs-it path is what closes that, and it
+is Phase 2/3 of `boost-login.md`.
+
+**The site tip is unchanged and still login-gated.** `openShowBoost` →
+`BoostModal` → `MultiLegBoostForm` signs a kind-1 before paying, so it needs a
+signer by construction. `_ensureWalletForPay` (the merch checkout) is likewise
+untouched.
+
 ### The one boost button
 
 Boosting a SHOW (as opposed to an episode) pays the **feed-level** value block —

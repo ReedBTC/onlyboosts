@@ -419,7 +419,14 @@ function LoginPromptHost() {
         setLoginOpen(false)
         // User dismissed the login modal — abandon any pending action
         // so they're not surprised by a modal opening minutes later.
-        cancelPendingAction()
+        //
+        // ⚠️ Unless the wallet-connect modal is still open behind us.
+        // Its "Sign in with Nostr first" link opens this modal over a
+        // flow the user is in the middle of, and a boost queued at the
+        // wallet gate has to survive them backing out of the login —
+        // otherwise connecting the wallet completes a gate with nothing
+        // left to run, and the boost they clicked never opens.
+        if (!walletConnectIsOpen) cancelPendingAction()
       }}
     />,
     document.body,
@@ -448,6 +455,7 @@ function WalletConnectHost() {
   return createPortal(
     <WalletConnectModal
       user={user || null}
+      onRequestSignIn={() => api.requestLogin()}
       onConnected={() => {
         // NWC successfully connected. Run any pending action that was
         // gated on having a wallet (e.g. an episode boost the user
@@ -520,6 +528,7 @@ function ExternalBoostHost() {
   return createPortal(
     <ExternalBoostModal
       user={user || null}
+      onRequestSignIn={() => api.requestLogin()}
       onClose={() => setExternalBoostState(null)}
       episode={state.episode}
       recipientsBundle={state.recipientsBundle}
@@ -780,13 +789,31 @@ const api = {
     setLoginOpen(true)
   },
 
-  /** Open the wallet-connect modal. No-op if not signed in (the
-   *  identity dropdown should hide the option in that case). */
+  /**
+   * Open the wallet-connect modal.
+   *
+   * ⚠️ NOT LOGIN-GATED. A visitor with no Nostr identity can connect a
+   * wallet and boost with it; the connection is session-only, because
+   * the at-rest scheme encrypts the NWC URI to the user's own signer and
+   * there isn't one (see the header in lib/wallet.js). Requiring a login
+   * to reach a payment control was the single largest reason someone
+   * bounced off a boost.
+   *
+   * The gates below still run for a user who IS signed in: the encrypted
+   * path needs the real signer, and it must be the right one.
+   */
   async openWalletConnect() {
-    if (!currentUser || currentUser === undefined) {
-      // Pending action so connecting requires login first.
+    if (currentUser === undefined) {
+      // Restore in flight — we don't yet know whether this is a signed-in
+      // user whose wallet should persist. Queue and let the restore land;
+      // ensureRealRestore is what guarantees something drains the queue if
+      // the ambient restore already failed silently.
       setPendingAction(() => api.openWalletConnect())
-      api.requestLogin()
+      ensureRealRestore()
+      return
+    }
+    if (!currentUser) {
+      setWalletConnectOpen(true)
       return
     }
     if (isStubUser(currentUser)) {
@@ -977,20 +1004,37 @@ const api = {
     }
     const args = { episode, recipientsBundle }
 
-    // Gate 1: signed in?
-    if (!currentUser || currentUser === undefined) {
-      setPendingAction(() => api.openExternalBoost(args))
-      api.requestLogin()
-      return
-    }
-    // Gate 1.5: stub user — wait for real restore (NWC unlock needs the real signer).
-    if (isStubUser(currentUser)) {
+    // ⚠️ THERE IS NO LONGER A LOGIN GATE ON THIS PATH. A boost is a
+    // payment, and a payment does not need a Nostr identity: the
+    // boostagram's sender fields are optional, and the note that would
+    // carry the identity is a separate act pressed after settlement. A
+    // signed-out booster pays anonymously and is offered no share
+    // control (ExternalBoostModal's `canShareToFeed`).
+    //
+    // The identity gates below are therefore conditional on there BEING
+    // an identity, and each still earns its place for a signed-in user:
+    // the stub can't unlock the encrypted NWC blob, and a signer that
+    // has switched accounts would sign a payload claiming the wrong
+    // pubkey. They are skipped, not weakened.
+    if (currentUser === undefined) {
+      // Restore in flight. Wait for it rather than treating a returning
+      // user as signed out — their remembered wallet is one tick away,
+      // and routing them to the connect modal would ask them to paste a
+      // URI they already saved.
       setPendingAction(() => api.openExternalBoost(args))
       ensureRealRestore()
       return
     }
-    // Gate 1.75: signer-account match (the boostagram embeds the sender pubkey).
-    if (!await ensureSignerVerified()) return
+    if (currentUser) {
+      // Gate 1.5: stub user — wait for real restore (NWC unlock needs the real signer).
+      if (isStubUser(currentUser)) {
+        setPendingAction(() => api.openExternalBoost(args))
+        ensureRealRestore()
+        return
+      }
+      // Gate 1.75: signer-account match (the boostagram embeds the sender pubkey).
+      if (!await ensureSignerVerified()) return
+    }
 
     // Gate 2: wallet connected?
     if (!wallet.isReady()) {

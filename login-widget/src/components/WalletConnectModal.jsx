@@ -16,11 +16,14 @@ import { scrubSecrets } from '../lib/utils.js'
  *   3. Encrypt the URI to the user's Nostr key (NIP-44 → NIP-04, 8s timeout)
  *   4. Persist + activate, fire onConnected so any pending action runs
  *
- * If the user is signed out when this opens, fail fast — wallet
- * encryption requires a signer. The dropdown only surfaces this option
- * when logged in, so this is a safety guard.
+ * ⚠️ A SIGNED-OUT VISITOR MAY CONNECT HERE, and the modal says what that
+ * costs: steps 3 and 4 are skipped, so the wallet is live for this page
+ * and gone on reload. There is nothing to encrypt the URI to without a
+ * signer, and writing it in the clear is not an option — it is a bearer
+ * credential with a spend budget. The copy states the trade before the
+ * paste rather than letting the user discover it by reloading.
  */
-export default function WalletConnectModal({ user, onClose, onConnected }) {
+export default function WalletConnectModal({ user, onClose, onConnected, onRequestSignIn }) {
   const { visible, requestClose } = useModalTransition(onClose)
 
   const [uri, setUri] = useState('')
@@ -41,13 +44,6 @@ export default function WalletConnectModal({ user, onClose, onConnected }) {
 
   async function handleConnectWebln() {
     setError('')
-    if (!user) {
-      // Defence-in-depth: the modal's own gate guarantees a logged-in
-      // user, but the WebLN at-rest flag is per-pubkey now and would
-      // throw further down without one. Fail clearly here instead.
-      setError('Sign in with Nostr first — your browser-extension wallet is tied to your account on this device.')
-      return
-    }
     setConnecting(true)
     try {
       await wallet.connectWebln(user)
@@ -65,12 +61,9 @@ export default function WalletConnectModal({ user, onClose, onConnected }) {
 
   async function handleConnect() {
     setError('')
-    if (!user) {
-      setError('Sign in with Nostr first — your wallet connection is encrypted with your account.')
-      return
-    }
     const trimmed = uri.trim()
     if (!trimmed) { setError('Paste your NWC connection string above.'); return }
+
     setConnecting(true)
     try {
       await wallet.connectNwc(trimmed, user)
@@ -125,6 +118,34 @@ export default function WalletConnectModal({ user, onClose, onConnected }) {
               all of its split recipients in one shot).
             </p>
 
+            {/* The session-only trade, stated before the paste. A wallet
+                that quietly vanished on reload would read as a bug, and
+                the reason it can't persist is worth one sentence: the
+                connection is encrypted to the user's own Nostr key, and
+                a signed-out visitor hasn't got one. */}
+            {!user && (
+              <div className="rounded border border-neutral-800 bg-neutral-800/40 px-3 py-2.5 space-y-1.5">
+                <p className="text-[11px] text-neutral-300 leading-snug">
+                  You're not signed in with Nostr, so this connection lasts
+                  until you close the tab. You can boost with it right away.
+                </p>
+                <p className="text-[10px] text-neutral-500 leading-snug">
+                  Saved connections are encrypted to your Nostr key, so
+                  remembering one needs an account.
+                </p>
+                {onRequestSignIn && (
+                  <button
+                    type="button"
+                    onClick={onRequestSignIn}
+                    disabled={connecting}
+                    className="text-[11px] font-medium text-orange-400 hover:text-orange-300 disabled:opacity-40 transition-colors"
+                  >
+                    Sign in with Nostr first
+                  </button>
+                )}
+              </div>
+            )}
+
             {/* WebLN button — surfaced only when the browser actually
                 provides window.webln. One tap, no copy/paste, no
                 signer round-trip. */}
@@ -165,8 +186,9 @@ export default function WalletConnectModal({ user, onClose, onConnected }) {
               <p className="mt-1.5 text-[10px] text-neutral-600 leading-snug">
                 Cross-device option. Get a connection string from Alby
                 Hub, Primal, Mutiny, Coinos, or any wallet that
-                supports NIP-47. Encrypted to your Nostr key before
-                saving.
+                supports NIP-47. {user
+                  ? 'Encrypted to your Nostr key before saving.'
+                  : 'Kept in this tab only — never written to storage.'}
               </p>
             </div>
 

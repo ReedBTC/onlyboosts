@@ -25,9 +25,10 @@ export default function IdentityDropdown({
   triggerRef,           // ref to the trigger button, so a click on it
                         // is recognized as the toggle (not "outside")
   user,
-  walletStatus,         // { connected, kind, alias }
+  walletStatus,         // { connected, kind, alias, sessionOnly }
   onConnectWallet,
   onDisconnectWallet,
+  onSignIn,             // only used on the signed-out branch
   onSignOut,
   onClose,
 }) {
@@ -38,6 +39,11 @@ export default function IdentityDropdown({
   const truncatedNpub = npub
     ? `${npub.slice(0, 10)}…${npub.slice(-6)}`
     : ''
+  // A signed-out visitor reaches this menu only by connecting a wallet
+  // without a Nostr account. There is no identity to head the menu with
+  // and nothing to sign out of, so the pill and the sign-out button are
+  // replaced rather than emptied.
+  const signedOut = !user
 
   // In-flight boosts. submitBoost fires-and-forgets; the modal closes
   // immediately and these entries appear here while payAllLegs is
@@ -87,13 +93,22 @@ export default function IdentityDropdown({
       }}
     >
       {/* User pill */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-neutral-800">
-        <AvatarPill profile={profile} npub={npub} size={36} />
-        <div className="min-w-0 flex-1">
-          <p className="font-semibold text-neutral-100 truncate">{displayName}</p>
-          <p className="text-[11px] text-neutral-500 font-mono truncate">{truncatedNpub}</p>
+      {signedOut ? (
+        <div className="px-4 py-3 border-b border-neutral-800">
+          <p className="font-semibold text-neutral-100">Not signed in</p>
+          <p className="text-[11px] text-neutral-500 leading-snug mt-0.5">
+            Boosts you send are anonymous, and none of them post to Nostr.
+          </p>
         </div>
-      </div>
+      ) : (
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-neutral-800">
+          <AvatarPill profile={profile} npub={npub} size={36} />
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-neutral-100 truncate">{displayName}</p>
+            <p className="text-[11px] text-neutral-500 font-mono truncate">{truncatedNpub}</p>
+          </div>
+        </div>
+      )}
 
       {/* Wallet section */}
       <div className="px-4 py-3 border-b border-neutral-800 space-y-2">
@@ -109,6 +124,37 @@ export default function IdentityDropdown({
               <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5 align-middle" />
               {walletKindLabel(walletStatus)}
             </p>
+            {/* Said once, here, where the user can act on it. A saved
+                connection is encrypted to the user's own Nostr key, so
+                without an account there is nothing to encrypt to and the
+                honest answer is a wallet that lasts one tab.
+                ⚠️ A session wallet can outlive the sign-in that follows it
+                — signing in does not retroactively save a URI we no longer
+                hold — so the second string is not a copy of the first with
+                the sign-in cut off; it names a different next step. */}
+            {walletStatus.sessionOnly && (
+              <p className="text-[11px] text-amber-400/90 leading-snug">
+                {signedOut
+                  ? 'This tab only — sign in with Nostr to save it.'
+                  : 'This tab only — reconnect now to save it to your account.'}
+              </p>
+            )}
+            {/* The route out of session-only for a user who has since
+                signed in. It re-opens the connect modal rather than
+                promising a one-click save: the URI itself was never kept
+                — only the live client was — so saving it means pasting
+                it again, and a button that said otherwise would fail
+                silently. */}
+            {walletStatus.sessionOnly && !signedOut && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => { onClose(); onConnectWallet() }}
+                className="w-full px-3 py-2 rounded bg-orange-500 hover:bg-orange-600 text-xs font-medium text-white transition-colors"
+              >
+                Reconnect to save it
+              </button>
+            )}
             <button
               type="button"
               role="menuitem"
@@ -168,9 +214,25 @@ export default function IdentityDropdown({
         </div>
       )}
 
-      {/* Sign out — outlined button styling marks this as a real
-          action surface, not just a text link. Red-tinted hover
-          signals the destructive nature without screaming when idle. */}
+      {/* Sign in / sign out. Signed out, this is the way back to an
+          identity — the pill that normally offers it was replaced by the
+          wallet pill, so the offer moves in here rather than vanishing. */}
+      {signedOut ? (
+        <div className="px-4 py-3">
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => { onClose(); onSignIn?.() }}
+            className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded bg-orange-500 hover:bg-orange-600 text-xs font-medium text-white transition-colors"
+          >
+            Sign in with Nostr
+          </button>
+          <p className="mt-2 text-[11px] text-neutral-500 leading-snug">
+            Signing in lets you post your boosts to Nostr, and a wallet you
+            connect after that is remembered.
+          </p>
+        </div>
+      ) : (
       <div className="px-4 py-3">
         <button
           type="button"
@@ -196,6 +258,7 @@ export default function IdentityDropdown({
           Sign out
         </button>
       </div>
+      )}
     </div>,
     document.body,
   )
