@@ -876,10 +876,38 @@ async function verifyPreimageMatches(preimageHex, expectedHashHex) {
  * A handful of quick polls covers the case where the payment settled a beat
  * after our pay attempt returned/timed out. Never throws.
  */
-export async function confirmInvoiceSettled(verifyUrl, paymentHash, { attempts = 4, intervalMs = 1500 } = {}) {
+/*
+ * ⚠️ THIS FUNCTION NEVER REPORTS A PAYMENT AS FAILED, AND THAT IS THE WHOLE
+ * POINT OF IT. It returns 'settled' or 'unknown', nothing else.
+ *
+ * LUD-21 has no negative signal. `settled: false` means "not settled AT THE
+ * MOMENT I ASKED"; an invoice still in flight and an invoice that will never
+ * land answer byte-identically. This used to return 'unsettled' whenever the
+ * endpoint answered at least once, and both callers mapped that to a definitive
+ * FAILED — which is the status with no re-pay guard on it. Measured against a
+ * real boost on 2026-08-19: a leg to `chadf@getalby.com` settled after the
+ * 4.5-second poll window closed, was reported "your wallet wasn't charged",
+ * was re-paid by the donor on that advice, and the recipient received the
+ * money TWICE.
+ *
+ * So the only honest answers are "I saw it settle" and "I don't know", and a
+ * caller holding 'unknown' must never re-pay on the strength of it.
+ *
+ * (The one true negative signal is bolt11 expiry: an expired invoice provably
+ * cannot settle. LNURL invoices are typically good for an hour, which is far
+ * too long to hold a modal open for, so it is not used here.)
+ *
+ * `deadlineMs` runs the poll to a wall-clock budget instead of a fixed attempt
+ * count, for the background watcher that keeps checking after the run ends.
+ * `signal` aborts it when the modal unmounts.
+ */
+export async function confirmInvoiceSettled(verifyUrl, paymentHash, {
+  attempts = 4, intervalMs = 1500, deadlineMs = null, signal = null,
+} = {}) {
   if (typeof verifyUrl !== 'string' || !verifyUrl.startsWith('https://')) return 'unknown'
-  let sawResponse = false
-  for (let i = 0; i < attempts; i++) {
+  const until = deadlineMs ? Date.now() + deadlineMs : null
+  for (let i = 0; (i < attempts) || (until && Date.now() < until); i++) {
+    if (signal?.aborted) return 'unknown'
     try {
       // Bounded per poll. The verify URL comes from the LNURL response
       // (third-party, only https-checked), and this function sits on every
@@ -888,7 +916,6 @@ export async function confirmInvoiceSettled(verifyUrl, paymentHash, { attempts =
       // minutes on the browser's default fetch timeout.
       const res = await withTimeout(fetch(verifyUrl), 6000, 'verify-timeout')
       if (res.ok) {
-        sawResponse = true
         const data = await res.json().catch(() => null)
         if (data && data.settled) {
           if (paymentHash && typeof data.preimage === 'string' && data.preimage.length > 0) {
@@ -899,9 +926,9 @@ export async function confirmInvoiceSettled(verifyUrl, paymentHash, { attempts =
         }
       }
     } catch { /* network blip — try again */ }
-    if (i < attempts - 1) await new Promise(r => setTimeout(r, intervalMs))
+    if (until && Date.now() + intervalMs >= until) break
+    if (!until && i >= attempts - 1) break
+    await new Promise(r => setTimeout(r, intervalMs))
   }
-  // If the endpoint answered at least once (always settled:false) we trust it
-  // as unpaid; if it never answered we genuinely don't know.
-  return sawResponse ? 'unsettled' : 'unknown'
+  return 'unknown'
 }

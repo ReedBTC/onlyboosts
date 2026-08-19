@@ -618,6 +618,57 @@ Code edits, dry runs, and read-only inspection are fine without asking.
 event, or that moves sats.** Published events can't be unpublished. **New bots
 start with `DRY_RUN = True`.**
 
+### ⚠️ A Payment We Cannot Confirm Is Not A Payment That Failed
+
+**LUD-21 has no negative signal.** `settled: false` means *not settled at the
+moment I asked*; an invoice still in flight and an invoice that will never land
+answer byte-identically. `confirmInvoiceSettled` in `boostagram.js` therefore
+returns **`'settled'` or `'unknown'` and nothing else**, and its two callers
+(`externalBoost.js`, `payAllLegs.js`) may never derive a failure from it.
+
+**This cost a recipient a double payment on 2026-08-19.** The function used to
+return `'unsettled'` whenever the verify endpoint answered at least once, over a
+poll window of **4 attempts 1500ms apart, so 4.5 seconds**. A leg to
+`chadf@getalby.com` settled after that window closed, was reported FAILED with
+"your wallet wasn't charged", was re-paid by the donor on that advice, and the
+recipient received the money twice. Both attempts settled and both were reported
+failed, because the inference was deterministic rather than a race.
+
+**FAILED and UNCERTAIN are now different claims, and only one of them may be
+re-paid.**
+
+| | Means | Button |
+|---|---|---|
+| `FAILED` | the wallet never sent it: a pre-payment error, or a clean decline (`isCleanDecline`) | **Retry**, which re-pays |
+| `UNCERTAIN` | an invoice was handed over and no settlement was observed | **Check again**, which only re-polls |
+| `PAID` | a preimage, or verify said settled | — |
+
+**⚠️ THERE IS NO RE-PAY PATH OUT OF UNCERTAIN, ANYWHERE, AND THAT IS DELIBERATE**
+(Reed's call, 2026-08-19). `handleRetry` used to fall through to a re-pay on
+`'unsettled'` with the comment "safe to re-pay"; it was not. A donor whose leg
+genuinely did not land boosts again from the top, which is one deliberate act
+rather than a button that quietly risks their money. `canRepayLeg` and
+`canCheckLeg` in `ExternalBoostModal.jsx` are the split.
+
+**The 90-second watcher is the other half.** Waiting 4.5s inline is right, since
+the leg loop is sequential and a donor should not watch a spinner; so every
+unconfirmed lnaddress leg keeps being polled *after* the run, to a **90s**
+wall-clock budget (`WATCH_MS`, 3s interval), and flips itself to Paid if it
+lands late. A donor-pressed re-check runs 30s (`RECHECK_MS`). Most unconfirmed
+legs resolve with no decision from anybody, which is the point: the bug was a
+screen asking the donor to decide on bad information. `deadlineMs` and `signal`
+on `confirmInvoiceSettled` exist for this.
+
+**Two consequences for the share note**, both from the same rule that the note
+is a *final statement*: Share is **withheld while any leg is still being
+checked**, and once the note is published every row's button **goes inert**,
+because a leg that changed afterwards could not be reflected in an event that
+cannot be edited.
+
+The one true negative signal is bolt11 expiry, which provably ends an invoice.
+LNURL invoices typically live an hour, far too long to hold a modal open for, so
+it is not used. Do not reintroduce a shorter inference in its place.
+
 ### The Share Note Reports What Settled
 
 A boost distributes across a value block and **any leg of it can fail**, so what
