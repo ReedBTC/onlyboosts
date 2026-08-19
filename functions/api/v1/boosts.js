@@ -1,5 +1,6 @@
 // GET /api/v1/boosts — the boost feed, filterable + cursor-paginated (newest first).
-// Query params: podcast=<guid> item=<guid> booster=<npub|hex> since= until= cursor= limit=
+// Query params: id=<event id> podcast=<guid> item=<guid> booster=<npub|hex>
+//               since= until= cursor= limit=
 import { json, preflight, BOOST_SELECT, boostRecord, toHexPubkey,
          encodeCursor, decodeCursor, clampLimit } from "./_common.js";
 
@@ -11,6 +12,28 @@ export async function onRequestGet({ request, env }) {
   const where = [];
   const args = [];
 
+  /* `id` is an exact lookup on the note's event id, and it exists to answer one
+   * question for another publisher: IS THIS NOTE ALREADY INDEXED? Local
+   * Bitcoiners' bot publishes a boost note on the show's behalf only when the
+   * donor's app published none, and it asks here first. Its previous check was a
+   * fuzzy amount-and-identity match over a `podcast=…&since=…` page; an event id
+   * makes it exact, so a note the index already holds cannot be published twice.
+   *
+   * ⚠️ A MISS IS `200` WITH AN EMPTY LIST, NOT A `404`. "Not indexed" is the
+   * answer the caller acts on, so it has to arrive as data rather than as an
+   * error a client might retry or treat as an outage.
+   *
+   * Validated as 64 hex on shape alone — a nostr event id is a sha256 and
+   * nothing else, and `event_id` is the table's primary key, so a well-formed
+   * id that is not ours costs one index probe.
+   */
+  const id = (u.searchParams.get("id") || "").trim().toLowerCase();
+  if (id) {
+    if (!/^[0-9a-f]{64}$/.test(id)) {
+      return json(request, { error: "bad id (64-char hex event id)" }, { status: 400 });
+    }
+    where.push("b.event_id = ?"); args.push(id);
+  }
   const podcast = u.searchParams.get("podcast");
   if (podcast) { where.push("b.podcast_guid = ?"); args.push(podcast); }
   const item = u.searchParams.get("item");

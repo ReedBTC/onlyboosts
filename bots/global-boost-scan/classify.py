@@ -222,6 +222,18 @@ def classify_boost(event, receipt_cache, receipt_fetch=None):
 
     return {
         "event_id":       event["id"],
+        # ⚠️ THE BOOSTER IS WHOEVER SIGNED THE NOTE, INCLUDING WHEN THAT IS A
+        # PUBLISHING ACCOUNT RATHER THAN THE PERSON WHO PAID. The 994
+        # chadf-boostbot rows are already this, and the Local Bitcoiners show
+        # account (clients.py) publishes on behalf of donors the same way.
+        #
+        # Those notes may carry an uppercase `["P", <donor pubkey>]`, NIP-57's
+        # sender convention, and it is DELIBERATELY NOT READ. The claim
+        # originates in a receipt signed by a burner key, so nothing here can
+        # verify that the named donor authorised it; crediting them would put an
+        # unverified identity into booster pages, per-npub counts and every
+        # leaderboard. If it is ever surfaced it belongs in a column of its own,
+        # rendered as "on behalf of …", and never as the booster.
         "booster_pubkey": event["pubkey"],
         "booster_npub":   hex_to_npub(event["pubkey"]),
         "created_at":     event["created_at"],

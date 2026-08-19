@@ -121,7 +121,7 @@ pagination (`cursor` = base64 of `created_at:event_id`), newest-first. npub or
 hex accepted anywhere a pubkey is taken.
 
 ```
-GET  /api/v1/boosts?podcast=&item=&booster=&since=&until=&cursor=&limit=
+GET  /api/v1/boosts?id=&podcast=&item=&booster=&since=&until=&cursor=&limit=
 POST /api/v1/boosts/follows        body: { authors:[npub|hex,…], since?, cursor?, limit? }
 GET  /api/v1/episodes?sort=recent|episode|count|boosts|sats&range=1w|1m|all
                      &medium=|not_medium=&podcast=&include=boosts&limit=&offset=
@@ -134,6 +134,14 @@ GET  /api/v1/search?q=&type=boosts|podcasts&limit=
 GET  /api/v1/stats                 → totals (mirrors meta.json)
 ```
 
+- **`id=` is an exact event-id lookup**, and it is there for another
+  publisher rather than for a feed. Local Bitcoiners' bot publishes a boost note
+  on the show's behalf only when the donor's app published none, and asks this
+  endpoint first; an event id turns that from a fuzzy amount-and-identity match
+  over a `podcast=&since=` page into an exact one. **A miss is `200` with an
+  empty list, never a `404`** — "not indexed" is the answer the caller acts on,
+  so it has to arrive as data. 64 hex, validated on shape; `event_id` is the
+  table's primary key, so a miss costs one index probe.
 - **Follows** is a POST (follow lists get large); server does
   `WHERE booster_pubkey IN (…)` against the indexed column — the thing that's
   painful client-side becomes a fast indexed query.

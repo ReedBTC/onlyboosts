@@ -58,9 +58,29 @@ from urllib.parse import urlparse
 # speak no NIP-73 at all. `lnaddress music app` publishes its own, and is here
 # rather than left unattributed because it does exactly what the bot does —
 # signs the note, names the originating app in the body.
+#
+# The Local Bitcoiners SHOW ACCOUNT is the third, and it is the same case again:
+# roughly a quarter of that show's boosts (Castamatic, PodcastGuru and
+# CurioCaster keysends, anonymous website boosts, Fountain boosts from donors
+# with no linked Nostr identity) never produced a donor-signed note, so the show
+# account publishes one carrying the payment evidence and it counts as the
+# boost. Those notes name the originating app in the same `📱 via <App>` line
+# `_VIA_RE` already reads, so the app lands in `client_via` and never in
+# `client_id` — a keysend from Castamatic published nothing to Nostr.
+#
+# ⚠️ THE SHOW ACCOUNT ALSO SIGNS ITS OWN BOOSTS, from the LB widget, and those
+# carry no `via` line. They classify as `localbitcoiners` with no `via`, which
+# is correct, so the two cases need no separating rule.
+#
+# ⚠️ THE PUBKEY IS TESTED BEFORE THE `client` TAG, AND THAT MATTERS HERE. These
+# notes carry `["client","localbitcoiners.com"]`, which resolves to the same
+# slug through SLUG_ALIASES, so today the precedence changes only `client_src`
+# (client-tag → publisher-pubkey) — but it is what makes the `via` line readable
+# at all, since the tag path returns before it is looked for.
 PUBLISHER_PUBKEYS = {
     "f3bd42a91af5f3f1c40ca45ad2269464ab79996b32da78e8ed2ab91111b08e65": "chadf-boostbot",
     "d35ae076512c29b01a5b33aa764ed4db44a9d0bbd96009705f48101f6cfe76a2": "lnaddress-music",
+    "c330881e28768381dd8bdfd274341dca0c5882c29b8642ea4bc82f7563264592": "localbitcoiners",
 }
 
 # Fountain links its own episode/show pages from the URL slot of each NIP-73

@@ -1101,8 +1101,8 @@ and `RANKED_SORTS` in `episode-card.js` so all three move together.
 inside the window.** The tiebreak stays on the outer `ORDER BY`, where it makes
 paging a total order; inside the window it would hand every member of a tie a
 distinct rank again. A searched card has to agree with the number the same card
-carries on the unfiltered feed. Verified against `d1/schema.sql` in local
-sqlite: 400 random corpora x 3 sorts, SQLite's `RANK()`, `competitionRanks` and
+carries on the unfiltered feed. Verified against `bots/global-boost-scan/d1/schema.sql`
+in local sqlite: 400 random corpora x 3 sorts, SQLite's `RANK()`, `competitionRanks` and
 a brute-force reference all agreeing, plus the split-page seam.
 
 ### The Language Filter
@@ -2333,9 +2333,9 @@ and nothing needs to *search* a language.
 
 Remote D1 got `ALTER TABLE podcasts ADD COLUMN language TEXT` out-of-band, as
 `artwork` and the profiles fields did — `CREATE TABLE IF NOT EXISTS` adds no
-column to an existing table, so `d1/schema.sql` and the live remote are kept in
-step by hand. The backfill reached D1 through the **metadata-drift pass**: bumping
-`shows.updated_at` is what makes a row due.
+column to an existing table, so `bots/global-boost-scan/d1/schema.sql` and the
+live remote are kept in step by hand. The backfill reached D1 through the
+**metadata-drift pass**: bumping `shows.updated_at` is what makes a row due.
 
 The UI shipped in `e870b93` — see the language-menu section under Feed loaders.
 **Still open:** the Boosts endpoints take no `lang`, so the note feeds have no
@@ -2406,6 +2406,51 @@ a re-derivation reaches the query layer only through
 
 **Still open: the UI.** Nothing renders attribution yet; `/stats` is where a
 "boosts by app" breakdown belongs, and `/api/v1/clients` is what it reads.
+
+### Local Bitcoiners Publishes On Behalf Of Its Donors
+
+Registered 2026-08-18. `c330881e…64592` is the Local Bitcoiners **show account**,
+and it is the third entry in `PUBLISHER_PUBKEYS` alongside `chadf-boostbot` and
+`lnaddress-music`. About a quarter of that show's boosts never produced a
+donor-signed note at all — Castamatic, PodcastGuru and CurioCaster keysends,
+anonymous website boosts, Fountain boosts from donors with no linked Nostr
+identity — so the show account publishes one carrying the payment evidence, and
+**only when no donor note exists**. Volume is small: 8 notes over 14 days.
+
+Nothing in the scan changed. Those notes already match the `#k` filter and were
+being fetched; what was missing was the evidence tags (`amount`, the `t` topic
+tags) that make `classify_boost` keep one, and that is LB's half. The
+originating app is named in the same `📱 via <App>` line `_VIA_RE` already
+reads, so it lands in `client_via` and never in `client_id`.
+
+**⚠️ THE BOOSTER IS THE SHOW ACCOUNT, NOT THE DONOR NAMED IN `P`.** These notes
+may carry an uppercase `["P", <donor pubkey>]`, NIP-57's sender convention. It
+is read nowhere and must stay that way: the claim originates in a receipt signed
+by a burner key, so nothing here can verify the named donor authorised it.
+Crediting them would put an unverified identity into booster pages, per-npub
+counts and every leaderboard. Reed's call, 2026-08-18, and the same treatment
+the 994 `chadf-boostbot` rows already get. If it is ever surfaced it wants a
+column of its own (`proxy_for_pubkey`), rendered as "on behalf of …", and kept
+out of every count.
+
+**⚠️ THE INDEX IS NOW LOAD-BEARING FOR SOMEONE ELSE'S PUBLISH DECISION.** LB's
+bot asks `/api/v1/boosts?podcast=56fbb1aa-…&since=…` before deciding whether to
+publish, and `?id=<event id>` makes that check exact rather than a fuzzy
+amount-and-identity match. It sweeps relays directly as a second veto, so a
+duplicate needs both checks to fail — but two ordinary-looking changes here have
+that shape:
+
+- **A reclassification that drops rows.** If previously-indexed LB boosts stop
+  being indexed, the bot reads "no note exists" and publishes a second one.
+  **Flag it rather than shipping it quietly.**
+- **A stale D1 sync**, which is the same failure with no code change behind it.
+  The delta sync in every incremental cycle is what keeps the answer fresh.
+
+LB runs a daily audit (`bots/boost-publisher/coverage_audit.py` in that repo)
+comparing node payments against relays against this index, and files a GitHub
+issue on a double-count or on a note that is on relays but unindexed after 24h.
+**So a miss here arrives as an issue carrying the event id**, which is the cheap
+way to find out.
 
 ## Not indexed: `podcast:person`
 
