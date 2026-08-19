@@ -419,6 +419,100 @@ def cmd_fountain_shows(args):
 
 
 # ── enrichment ────────────────────────────────────────────────────────────────
+def _enrich_episodes(conn, key, secret, eps=None):
+    """Resolve episode metadata for whatever `db.guids_needing_episode` hands back.
+
+    ⚠️ A FIRST FETCH AND A REFRESH ARE NOT THE SAME PASS, and the split is the
+    whole of why this function is not one loop:
+
+    | | first fetch (`known` 0) | refresh (`known` 1) |
+    |---|---|---|
+    | Podcast Index answers | store it | store it |
+    | Podcast Index misses | fall back to the publisher's RSS, then negative-cache | **leave the row alone** |
+
+    The refresh half deliberately does NOT reach the raw-RSS fallback. Two
+    reasons, and both are about not turning a metadata refresh into a crawl:
+
+    - **Data.** The fallback exists for episodes we have nothing for — live items
+      PI never indexes, items it has not caught up with. Every one of those keeps
+      its row on a refresh, and a PI miss on a row we already hold is a failed
+      look, not news that the episode changed. Rewriting it from a second source
+      is how a good row gets replaced by a thinner one.
+    - **Traffic.** It is one RSS fetch per feed per pass. On the first-fetch path
+      that is bounded by how many new episodes were boosted; on the refresh path
+      it would be every feed holding a live item, every 30 days, forever, and it
+      would owe podroll.py's serial-per-host politeness rule a lot more care than
+      a fallback batched behind a PI loop currently takes.
+
+    A refresh that misses still bumps `checked_at` (db.mark_episode_checked), or
+    the same rows fill the cap on every tick for ever.
+    """
+    if eps is None:
+        new_due, stale_due = db.episode_refresh_backlog(conn)
+        eps = db.guids_needing_episode(conn)
+        print(f"Enriching {len(eps)} episode(s) "
+              f"({new_due} never fetched, {stale_due} stale)...")
+    else:
+        new_due = stale_due = None
+        print(f"Enriching {len(eps)} episode(s)...")
+
+    # map item_guid -> its show's canonical guid so we can pass feedid
+    eg = db.effective_guid("boosts")
+    rss_pending = {}      # feed_url -> [{item_guid, podcast_guid, feed_id, show_image}]
+    rss_unreachable = []  # PI missed it and we have no feed to fall back to
+    changed = refreshed_miss = 0
+    for i, (ig, known) in enumerate(eps, 1):
+        row = conn.execute(
+            f"SELECT {eg} AS g FROM boosts WHERE item_guid=? AND {eg} IS NOT NULL LIMIT 1",
+            (ig,)).fetchone()
+        pg = row[0] if row else None
+        feed_id = db.feed_id_for_guid(conn, pg) if pg else None
+        info = enrich.resolve_episode(ig, feed_id, key, secret)
+        if info:
+            changed += bool(db.upsert_episode(conn, info))
+        elif known:
+            # A refresh that found nothing. The stored row stands; record the look.
+            db.mark_episode_checked(conn, ig)
+            refreshed_miss += 1
+        else:
+            # Don't negative-cache yet — the publisher's own feed still gets
+            # a say (live items and not-yet-indexed episodes are invisible to
+            # PI but present in the RSS). Batched below, one fetch per feed.
+            show = db.show_feed_for_guid(conn, pg) if pg else None
+            if show and show["feed_url"]:
+                rss_pending.setdefault(show["feed_url"], []).append(
+                    {"item_guid": ig, "podcast_guid": pg, "feed_id": feed_id,
+                     "show_image": show["image"]})
+            else:
+                rss_unreachable.append(ig)
+        if i % 50 == 0:
+            print(f"  episodes {i}/{len(eps)}")
+
+    db.mark_enrich_failed(conn, "episode", rss_unreachable)
+    if rss_pending:
+        chasing = sum(len(v) for v in rss_pending.values())
+        print(f"  raw-RSS fallback: {chasing} episode(s) PI missed, across "
+              f"{len(rss_pending)} feed(s)")
+        found = enrich.resolve_episodes_from_feeds(rss_pending, log=print)
+        for info in found.values():
+            changed += bool(db.upsert_episode(conn, info))
+        still_missing = [w["item_guid"] for wanted in rss_pending.values()
+                         for w in wanted if w["item_guid"] not in found]
+        db.mark_enrich_failed(conn, "episode", still_missing)
+        print(f"  raw-RSS fallback: recovered {len(found)}, "
+              f"{len(still_missing)} still unresolved")
+
+    # `changed` is the number the D1 metadata-drift pass will carry, NOT the
+    # number we looked at — the point of the two-timestamp split is that most
+    # refreshes are a no-op downstream. Saying both makes a silent sweep legible.
+    print(f"  episodes: {changed} row(s) changed, {refreshed_miss} refresh(es) "
+          f"found nothing (row kept)")
+    if new_due is not None and len(eps) >= db.EPISODE_BATCH:
+        print(f"  episode queue capped at {db.EPISODE_BATCH}; "
+              f"{new_due + stale_due - len(eps)} left for the next pass")
+    return changed
+
+
 def cmd_enrich(args):
     conn = db.connect(DB_PATH, check_same_thread=False)
     key, secret = _pi_creds()
@@ -435,48 +529,7 @@ def cmd_enrich(args):
             if i % 25 == 0:
                 print(f"  shows {i}/{len(shows)}")
 
-        eps = db.guids_needing_episode(conn)
-        print(f"Enriching {len(eps)} episode(s)...")
-        # map item_guid -> its show's canonical guid so we can pass feedid
-        eg = db.effective_guid("boosts")
-        rss_pending = {}     # feed_url -> [{item_guid, podcast_guid, feed_id, show_image}]
-        rss_unreachable = []  # PI missed it and we have no feed to fall back to
-        for i, ig in enumerate(eps, 1):
-            row = conn.execute(
-                f"SELECT {eg} AS g FROM boosts WHERE item_guid=? AND {eg} IS NOT NULL LIMIT 1",
-                (ig,)).fetchone()
-            pg = row[0] if row else None
-            feed_id = db.feed_id_for_guid(conn, pg) if pg else None
-            info = enrich.resolve_episode(ig, feed_id, key, secret)
-            if info:
-                db.upsert_episode(conn, info)
-            else:
-                # Don't negative-cache yet — the publisher's own feed still gets
-                # a say (live items and not-yet-indexed episodes are invisible to
-                # PI but present in the RSS). Batched below, one fetch per feed.
-                show = db.show_feed_for_guid(conn, pg) if pg else None
-                if show and show["feed_url"]:
-                    rss_pending.setdefault(show["feed_url"], []).append(
-                        {"item_guid": ig, "podcast_guid": pg, "feed_id": feed_id,
-                         "show_image": show["image"]})
-                else:
-                    rss_unreachable.append(ig)
-            if i % 50 == 0:
-                print(f"  episodes {i}/{len(eps)}")
-
-        db.mark_enrich_failed(conn, "episode", rss_unreachable)
-        if rss_pending:
-            chasing = sum(len(v) for v in rss_pending.values())
-            print(f"  raw-RSS fallback: {chasing} episode(s) PI missed, across "
-                  f"{len(rss_pending)} feed(s)")
-            found = enrich.resolve_episodes_from_feeds(rss_pending, log=print)
-            for info in found.values():
-                db.upsert_episode(conn, info)
-            still_missing = [w["item_guid"] for wanted in rss_pending.values()
-                             for w in wanted if w["item_guid"] not in found]
-            db.mark_enrich_failed(conn, "episode", still_missing)
-            print(f"  raw-RSS fallback: recovered {len(found)}, "
-                  f"{len(still_missing)} still unresolved")
+        _enrich_episodes(conn, key, secret)
     else:
         print("[warn] no Podcast Index credentials — skipping show/episode enrichment")
 
@@ -500,6 +553,38 @@ def cmd_enrich(args):
         print(f"  profile queue capped at {db.PROFILE_BATCH}; "
               f"{new_due + stale_due - len(pubkeys)} left for the next pass")
     _print_stats(conn)
+
+
+def cmd_reenrich_episodes(args):
+    """Re-read episode metadata now, rather than waiting on the natural cadence.
+
+    The refresh gate turns the corpus over about monthly, which is the right
+    cadence for drift nobody is watching and the wrong one for a publisher who
+    has just corrected their feed and wants to see it. `--guid` / `--show` bypass
+    the age gate for exactly that; a bare run just pulls the next capped batch
+    forward, the same work the incremental tick would have done.
+
+    ⚠️ Nothing here reaches D1 by itself. A changed row rides the metadata-drift
+    pass, which selects on `updated_at` — which is why upsert_episode only moves
+    that on a real change. That pass has NO flag of its own: it runs inside
+    `d1_sync.py --remote-delta`, unconditionally, on every incremental tick. So a
+    correction reaches the site within five minutes on its own, and running that
+    command by hand is only how you make it sooner.
+    """
+    conn = db.connect(DB_PATH, check_same_thread=False)
+    key, secret = _pi_creds()
+    if not (key and secret):
+        print("[error] no Podcast Index credentials — nothing to re-read")
+        return
+    eps = db.guids_needing_episode(conn, limit=args.limit,
+                                   only_guids=args.guid or None, only_show=args.show)
+    if not eps:
+        print("re-enrich: nothing due")
+        return
+    changed = _enrich_episodes(conn, key, secret, eps=eps)
+    if changed:
+        print("  the next incremental tick carries these to /api/v1; "
+              "`python3 d1_sync.py --remote-delta` does it now")
 
 
 # ── podroll ───────────────────────────────────────────────────────────────────
@@ -810,6 +895,18 @@ def main():
 
     e = sub.add_parser("enrich", help="Podcast Index + profile enrichment")
     e.set_defaults(func=cmd_enrich)
+
+    re_ = sub.add_parser("re-enrich-episodes",
+                         help="re-read episode metadata from Podcast Index now "
+                              "(the refresh gate, pulled forward)")
+    re_.add_argument("--guid", action="append", metavar="ITEM_GUID",
+                     help="one episode's item_guid; repeatable. Bypasses the age gate")
+    re_.add_argument("--show", metavar="PODCAST_GUID",
+                     help="every boosted episode of one show. Bypasses the age gate")
+    re_.add_argument("--limit", type=int, default=db.EPISODE_BATCH,
+                     help=f"cap for this run (default {db.EPISODE_BATCH}, "
+                          f"the per-tick batch)")
+    re_.set_defaults(func=cmd_reenrich_episodes)
 
     fs = sub.add_parser("fountain-shows",
                         help="identify unresolved shows via their Fountain episode page")

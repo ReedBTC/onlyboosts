@@ -141,7 +141,8 @@ CREATE TABLE IF NOT EXISTS episodes (
     enclosure_url   TEXT,
     enclosure_type  TEXT,
     description     TEXT,          -- full shownotes (plain text, NOT length-capped)
-    updated_at      INTEGER
+    checked_at      INTEGER,       -- when we last LOOKED (the refresh gate)
+    updated_at      INTEGER        -- when the row last CHANGED (the D1 drift gate)
 );
 
 CREATE TABLE IF NOT EXISTS profiles (
@@ -215,6 +216,19 @@ ENRICH_RETRY_COOLDOWN = 7 * 24 * 60 * 60
 # one pass may spend on it. See pubkeys_needing_profile for why both exist.
 PROFILE_MAX_AGE = 30 * 24 * 60 * 60
 PROFILE_BATCH = 100
+
+# The same pair for episode metadata. 30 days matches profiles deliberately —
+# both answer "how long is a third party's copy of something trusted", and one
+# number is easier to reason about than two.
+#
+# The cap is sized on the PODCAST INDEX budget, not the row count. One episode is
+# one serial `episodes/byguid` call, measured at 0.16s median on 2026-08-19, so a
+# full batch is ~16s of the 5-minute incremental tick. At 7,043 episodes the whole
+# corpus turns over in ~71 ticks (~6h) on the one day it all comes due, and the
+# steady state is a handful of rows a tick. Without a cap that day is a single
+# tick trying to make 7,043 requests. See guids_needing_episode.
+EPISODE_MAX_AGE = 30 * 24 * 60 * 60
+EPISODE_BATCH = 100
 
 # The show a boost really belongs to: its resolved canonical guid if the as-signed
 # podcast_guid was a phantom, else the as-signed value. Used everywhere boosts are
@@ -361,6 +375,18 @@ def _migrate(conn):
     conn.execute("CREATE INDEX IF NOT EXISTS idx_boosts_client_id ON boosts(client_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_boosts_canonical ON boosts(canonical_guid)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_boosts_excluded  ON boosts(excluded)")
+    # Episodes gained the same two-timestamp split profiles have. Existing rows
+    # migrate with checked_at = updated_at: before the split, updated_at meant
+    # "last written", which is the closer of the two meanings to "last looked".
+    # ⚠️ Seeding it is not cosmetic — left NULL, every episode in the index would
+    # be due on the first tick after deploy. Measured 2026-08-19: 6,615 of 7,043
+    # rows share one updated_at day (the initial backfill), so the seed does not
+    # spread them either; the per-tick cap in guids_needing_episode is what does.
+    ep_cols = {r[1] for r in conn.execute("PRAGMA table_info(episodes)")}
+    if "checked_at" not in ep_cols:
+        conn.execute("ALTER TABLE episodes ADD COLUMN checked_at INTEGER")
+        conn.execute("UPDATE episodes SET checked_at = updated_at "
+                     "WHERE checked_at IS NULL")
     show_cols = {r[1] for r in conn.execute("PRAGMA table_info(shows)")}
     if "author" not in show_cols:
         conn.execute("ALTER TABLE shows ADD COLUMN author TEXT")
@@ -481,21 +507,69 @@ def upsert_show(conn, show, discovered_via="boost"):
     conn.commit()
 
 
+# The columns that make up the row's CONTENT — everything upsert_episode writes
+# except the two timestamps. What "the row changed" is measured over.
+EPISODE_CONTENT_COLS = ("title", "image", "published", "duration", "episode_number",
+                        "podcast_guid", "feed_id", "enclosure_url", "enclosure_type",
+                        "description")
+
+
 def upsert_episode(conn, ep):
+    """Store the metadata we just read for one episode.
+
+    ⚠️ TWO TIMESTAMPS, AND THEY ARE NOT THE SAME QUESTION — the same split
+    upsert_profile documents. `checked_at` is when we last LOOKED and is the
+    refresh gate guids_needing_episode reads; `updated_at` is when the row last
+    CHANGED and is what the D1 metadata-drift pass selects on.
+
+    This function used to stamp `updated_at` unconditionally, which was harmless
+    while an episode was fetched exactly once. Under the refresh gate it is not:
+    every sweep would bump `updated_at` on all 7,043 rows whether or not Podcast
+    Index said anything new, and the drift pass would re-push the entire episodes
+    table to D1 on every sweep — thousands of statements to carry no change.
+
+    So `updated_at` moves only on a real difference in EPISODE_CONTENT_COLS, and
+    `checked_at` is written unconditionally in its own statement, because a look
+    that found nothing new is still a look. Without that a row nobody edits is
+    due again on the very next tick.
+    """
+    now = int(time.time())
+    before = conn.execute(
+        f"SELECT updated_at, {', '.join(EPISODE_CONTENT_COLS)} "
+        f"FROM episodes WHERE item_guid=?",
+        (ep["item_guid"],)).fetchone()
+    changed = before is None or any(before[c] != ep.get(c) for c in EPISODE_CONTENT_COLS)
     conn.execute(
         """INSERT INTO episodes (item_guid, title, image, published, duration,
                                  episode_number, podcast_guid, feed_id,
-                                 enclosure_url, enclosure_type, description, updated_at)
+                                 enclosure_url, enclosure_type, description,
+                                 checked_at, updated_at)
            VALUES (:item_guid, :title, :image, :published, :duration,
                    :episode_number, :podcast_guid, :feed_id,
-                   :enclosure_url, :enclosure_type, :description, :updated_at)
+                   :enclosure_url, :enclosure_type, :description, :now, :updated_at)
            ON CONFLICT(item_guid) DO UPDATE SET
              title=excluded.title, image=excluded.image, published=excluded.published,
              duration=excluded.duration, episode_number=excluded.episode_number,
              podcast_guid=excluded.podcast_guid, feed_id=excluded.feed_id,
              enclosure_url=excluded.enclosure_url, enclosure_type=excluded.enclosure_type,
              description=excluded.description, updated_at=excluded.updated_at""",
-        {**ep, "updated_at": int(time.time())})
+        {**ep, "now": now,
+         "updated_at": now if changed else (before["updated_at"] if before else now)})
+    # Unconditional: we looked, whether or not the look changed anything.
+    conn.execute("UPDATE episodes SET checked_at=? WHERE item_guid=?", (now, ep["item_guid"]))
+    conn.commit()
+    return changed
+
+
+def mark_episode_checked(conn, item_guid):
+    """Record a look that produced nothing, without touching the stored row.
+
+    ⚠️ THE MISS PATH NEEDS THIS OR THE GATE HOT-LOOPS. A refresh where Podcast
+    Index no longer answers must still count as a look; otherwise that episode is
+    due on every tick forever and the cap fills with the same rows.
+    """
+    conn.execute("UPDATE episodes SET checked_at=? WHERE item_guid=?",
+                 (int(time.time()), item_guid))
     conn.commit()
 
 
@@ -576,14 +650,81 @@ def guids_needing_show(conn):
     return [r[0] for r in rows]
 
 
-def guids_needing_episode(conn):
+def guids_needing_episode(conn, limit=EPISODE_BATCH, max_age=EPISODE_MAX_AGE,
+                         only_guids=None, only_show=None):
+    """Episodes to ask Podcast Index about: the ones we have never resolved, then
+    the ones whose stored metadata has gone stale. Returns (item_guid, known)
+    pairs — `known` is 0 for a first fetch and 1 for a refresh, and the caller
+    must treat the two differently. See cmd_enrich.
+
+    ⚠️ THIS USED TO BE `WHERE e.item_guid IS NULL` — enrich once, on the first
+    tick after an episode's first boost, and never look again. Whatever Podcast
+    Index happened to report in that moment was frozen permanently. That is the
+    same defect `pubkeys_needing_profile` documents having fixed for kind-0s, and
+    it shipped here as a reader-visible bug: two episodes of Chad and Reeds
+    Podcast both rendered "Ep. 1" because PI answered `episode: 1` for the second
+    one at first sight, and by 2026-08-19 PI itself said 2 while our row did not.
+
+    `checked_at` is the gate, NOT `updated_at` — see upsert_episode. Gating on
+    `updated_at` would re-read every episode nobody has edited on every tick.
+
+    Two properties carried over from the profile gate, for the same reasons:
+
+    - **New guids sort first.** A refresh makes an existing page better; a first
+      fetch is what makes /episode/<guid> render at all. Under the cap, refreshes
+      are what gets starved.
+    - **The cap is per-tick and sized on the Podcast Index budget** — see
+      EPISODE_BATCH. Measured 2026-08-19, 6,615 of 7,043 rows share one
+      `updated_at` day, so the corpus does come due together and the cap is the
+      only thing standing between that and one tick making 7,043 requests.
+
+    `only_guids` / `only_show` are for the `re-enrich-episodes` subcommand, which
+    exists so a corrected feed can be picked up now rather than on the natural
+    cadence. Both bypass the age gate — an operator asking for a specific episode
+    has already decided it is stale — but never the exclusion list.
+    """
+    where, params = [], []
+    if only_guids:
+        where.append(f"b.item_guid IN ({','.join('?' * len(only_guids))})")
+        params += list(only_guids)
+    if only_show:
+        where.append(f"{effective_guid('b')} = ?")
+        params.append(only_show)
+    if only_guids or only_show:
+        gate = "1"                      # explicit target: age gate off, cooldown off
+    else:
+        gate = ("(e.item_guid IS NULL OR COALESCE(e.checked_at, 0) < ?) "
+                "AND (f.id IS NULL OR f.last_try < ?)")
+        params += [int(time.time()) - max_age, _cutoff()]
     rows = conn.execute(
-        f"""SELECT DISTINCT b.item_guid FROM boosts b
+        f"""SELECT b.item_guid, MIN(e.item_guid IS NOT NULL) AS known,
+                   MIN(COALESCE(e.checked_at, 0)) AS seen
+           FROM boosts b
            LEFT JOIN episodes e ON e.item_guid = b.item_guid
            LEFT JOIN enrich_failed f ON f.kind='episode' AND f.id = b.item_guid
-           WHERE b.item_guid IS NOT NULL AND e.item_guid IS NULL AND {not_excluded('b')}
-             AND (f.id IS NULL OR f.last_try < ?)""", (_cutoff(),)).fetchall()
-    return [r[0] for r in rows]
+           WHERE b.item_guid IS NOT NULL AND {not_excluded('b')}
+             AND {' AND '.join(where) if where else '1'}
+             AND {gate}
+           GROUP BY b.item_guid
+           ORDER BY known ASC, seen ASC
+           LIMIT ?""", (*params, limit)).fetchall()
+    return [(r[0], r[1]) for r in rows]
+
+
+def episode_refresh_backlog(conn, max_age=EPISODE_MAX_AGE):
+    """(never-fetched, stale) counts, so a capped pass can say what it left."""
+    return conn.execute(
+        f"""SELECT COUNT(*) FILTER (WHERE known = 0),
+                   COUNT(*) FILTER (WHERE known = 1)
+           FROM (SELECT b.item_guid, MIN(e.item_guid IS NOT NULL) AS known
+                 FROM boosts b
+                 LEFT JOIN episodes e ON e.item_guid = b.item_guid
+                 LEFT JOIN enrich_failed f ON f.kind='episode' AND f.id = b.item_guid
+                 WHERE b.item_guid IS NOT NULL AND {not_excluded('b')}
+                   AND (e.item_guid IS NULL OR COALESCE(e.checked_at, 0) < ?)
+                   AND (f.id IS NULL OR f.last_try < ?)
+                 GROUP BY b.item_guid)""",
+        (int(time.time()) - max_age, _cutoff())).fetchone()
 
 
 def pubkeys_needing_profile(conn, limit=PROFILE_BATCH, max_age=PROFILE_MAX_AGE):
