@@ -171,6 +171,17 @@ React), compiling to `assets/widgets/login-widget.js`:
 cd login-widget && npm install && npm run build
 ```
 
+**That one command has three targets**, and the third is not for the browser:
+`assets/widgets/login-widget.js` (the React widget),
+`assets/widgets/nostr-tools.js` (nostr-tools for the static pages), and
+`functions/_shared/nostr-sign.js` (**the edge signer**). The last exists because
+the Pages Functions have no npm dependencies and this repo has no root
+`package.json` — every Function imports relative paths only, which is what keeps
+"no build step for the site itself" true. Signing a Nostr event needs schnorr
+and WebCrypto has no secp256k1, so the one dependency the edge needs is vendored
+the same way the browser's copy already is. `scripts/stamp-assets.js` leaves it
+alone: its relative-import rule runs only inside `assets/js`.
+
 Local dev: `wrangler pages dev .` (so `/api/*` Functions resolve).
 
 **Two scripts run before a commit that touches shared markup or assets, in this
@@ -185,7 +196,7 @@ node scripts/stamp-assets.js --check   # verify; non-zero exit if anything is st
 **Order matters.** `sync-partials` injects markup into the page files; anything
 it injects has to be stamped afterwards.
 
-Four test scripts, all plain `node scripts/<name>.mjs` with no runner:
+Five test scripts, all plain `node scripts/<name>.mjs` with no runner:
 
 | | |
 |---|---|
@@ -193,13 +204,14 @@ Four test scripts, all plain `node scripts/<name>.mjs` with no runner:
 | `test-server-render.mjs` | the assembled homepage against a captured production response: the injection, the state element, a 256KB first-view budget, **and the ranking invariants**. Takes the capture as an argument |
 | `test-feed-hash.mjs` | the inline feed-bar controller: hash parsing, and the boot sequence |
 | `test-feed-lang.mjs` | `feed-lang.js`: menu ordering, the withholding rule, and the copy |
+| `test-sign-boost.mjs` | the signing oracle's validator, fed by the **shipped** note builder |
 
 **⚠️ `test-server-render.mjs` IS THE ONE THAT NEEDS AN ARGUMENT, SO IT IS THE ONE
 THAT GOES UNRUN.** Its header carries the `curl` that produces the capture; take
 a fresh one rather than reusing an old file, since it is also the size
 measurement. It asserted `cards are numbered 1..N with no gaps` — the *ordinal*
 scheme's invariant — until competition ranking shipped on 2026-08-18, and it
-would have been merged red had it not been run. **Run all four before a merge**,
+would have been merged red had it not been run. **Run all five before a merge**,
 and treat this one as the guard on the ranking scheme rather than only on weight.
 
 **⚠️ `test-feed-hash.mjs` EXTRACTS THE CONTROLLER OUT OF `index.html` and runs
