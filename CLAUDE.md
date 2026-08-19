@@ -721,6 +721,22 @@ does not. `CHECK_STAGES` in `ExternalBoostModal.jsx` escalates at 0, 15, 35 and
 60 seconds, in patience rather than in alarm, and one line under the list
 carries it however many legs are in flight.
 
+**⚠️ THE LONGEST WAIT IS BEFORE THE WATCHER EVER STARTS, so `PAY_STAGES` is the
+same ladder one state earlier.** Measured on a second real boost the same day,
+four legs through one WebLN extension: `chadf@getalby.com` spent **45.5 seconds
+inside the wallet's own `sendPayment`** while its siblings answered in 2.3s and
+0.4s. The hang is in the wallet, and nothing here can hurry it, shorten it or
+see progress inside it. `PAY_STAGES` times the paying leg from a `startedAt`
+stamped in `externalBoost.js` where the wait actually is, at the moment the
+wallet is handed the invoice; legs are sequential, so there is at most one. **Its
+first stage is deliberately silent**, a normal leg paying in one to four seconds
+and a reassurance that flashes up and vanishes making a fast boost look
+eventful.
+
+**⚠️ DO NOT SHORTEN THE WALLET ADAPTERS' TIMEOUTS TO MAKE THIS TIDIER** (90s for
+WebLN, ~60s inside NWC's SDK). That leg took 45.5 seconds and then paid; a
+tighter bound would have turned a successful payment into an UNCERTAIN one.
+
 **The warning belongs at the end of the watch, not during it.** While the
 watcher runs the donor has no decision to make, since an unconfirmed leg is
 never offered a re-pay; when the watcher gives up, a decision arrives and the
