@@ -217,17 +217,36 @@ ENRICH_RETRY_COOLDOWN = 7 * 24 * 60 * 60
 PROFILE_MAX_AGE = 30 * 24 * 60 * 60
 PROFILE_BATCH = 100
 
-# The same pair for episode metadata. 30 days matches profiles deliberately —
-# both answer "how long is a third party's copy of something trusted", and one
-# number is easier to reason about than two.
+# How long a stored episode's metadata is trusted before it is re-read.
 #
-# The cap is sized on the PODCAST INDEX budget, not the row count. One episode is
-# one serial `episodes/byguid` call, measured at 0.16s median on 2026-08-19, so a
-# full batch is ~16s of the 5-minute incremental tick. At 7,043 episodes the whole
-# corpus turns over in ~71 ticks (~6h) on the one day it all comes due, and the
-# steady state is a handful of rows a tick. Without a cap that day is a single
-# tick trying to make 7,043 requests. See guids_needing_episode.
-EPISODE_MAX_AGE = 30 * 24 * 60 * 60
+# ⚠️ TWO WINDOWS, BECAUSE FRESHNESS IS WORTH MORE ON A RECENT EPISODE. A monthly
+# sweep is the wrong answer for the case that produced this feature: a weekly show
+# corrects an episode, and nobody sees the correction for up to 30 days — four more
+# episodes published in the meantime. It is the right answer for a three-year-old
+# back-catalogue item nobody is editing and nobody is looking at.
+#
+# So an episode that AIRED inside EPISODE_RECENT_WINDOW is re-read daily and
+# everything else monthly. Measured 2026-08-19 over 7,044 episodes, only 967 (14%)
+# aired inside 90 days, which is what makes the fast tier cheap:
+#
+#   everything daily          7,044 Podcast Index requests/day   (24.5 per tick)
+#   recent daily, rest monthly  1,169 requests/day               ( 4.1 per tick)  <-
+#   monthly (what shipped first)  234 requests/day
+#
+# The cap is still sized on the Podcast Index budget rather than the row count. One
+# episode is one serial `episodes/byguid` call at 0.16s median, so a full batch is
+# ~16s of the 5-minute tick. The steady state is ~4 rows a tick; the cap exists for
+# the day the corpus comes due together, which it does — see guids_needing_episode.
+#
+# ⚠️ IF EVERY EPISODE EVER NEEDS TO BE DAILY, DO NOT JUST DROP EPISODE_MAX_AGE.
+# `episodes/byfeedid` returns a whole show in ONE request — verified 2026-08-19 to
+# cover 100% of our stored episodes on every feed tried — which makes a full daily
+# sweep 902 requests rather than 7,044. It needs paging for the few feeds with more
+# than 1,000 items (one already returns exactly 1,000, i.e. truncated) and a
+# fallback for episodes with no feed_id, which is why it is not what shipped here.
+EPISODE_RECENT_WINDOW = 90 * 24 * 60 * 60    # "recent" = aired inside this
+EPISODE_MAX_AGE_RECENT = 24 * 60 * 60        # re-read a recent episode daily
+EPISODE_MAX_AGE = 30 * 24 * 60 * 60          # re-read everything else monthly
 EPISODE_BATCH = 100
 
 # The show a boost really belongs to: its resolved canonical guid if the as-signed
@@ -650,8 +669,26 @@ def guids_needing_show(conn):
     return [r[0] for r in rows]
 
 
-def guids_needing_episode(conn, limit=EPISODE_BATCH, max_age=EPISODE_MAX_AGE,
-                         only_guids=None, only_show=None):
+def _episode_stale_expr():
+    """The staleness test, as SQL. Recent episodes go stale after a day, the rest
+    after a month — see EPISODE_MAX_AGE. Shared by the gate and the backlog count
+    so the two can never disagree about what "due" means.
+
+    Binds, in order: recent-window cutoff, recent max-age cutoff, old max-age
+    cutoff. `published` NULL counts as old: an episode with no air date is not
+    evidence of a recent one.
+    """
+    return ("COALESCE(e.checked_at, 0) < "
+            "(CASE WHEN COALESCE(e.published, 0) >= ? THEN ? ELSE ? END)")
+
+
+def _episode_stale_binds(now=None):
+    now = now or int(time.time())
+    return [now - EPISODE_RECENT_WINDOW, now - EPISODE_MAX_AGE_RECENT,
+            now - EPISODE_MAX_AGE]
+
+
+def guids_needing_episode(conn, limit=EPISODE_BATCH, only_guids=None, only_show=None):
     """Episodes to ask Podcast Index about: the ones we have never resolved, then
     the ones whose stored metadata has gone stale. Returns (item_guid, known)
     pairs — `known` is 0 for a first fetch and 1 for a refresh, and the caller
@@ -674,9 +711,17 @@ def guids_needing_episode(conn, limit=EPISODE_BATCH, max_age=EPISODE_MAX_AGE,
       fetch is what makes /episode/<guid> render at all. Under the cap, refreshes
       are what gets starved.
     - **The cap is per-tick and sized on the Podcast Index budget** — see
-      EPISODE_BATCH. Measured 2026-08-19, 6,615 of 7,043 rows share one
+      EPISODE_MAX_AGE. Measured 2026-08-19, 6,615 of 7,043 rows share one
       `updated_at` day, so the corpus does come due together and the cap is the
       only thing standing between that and one tick making 7,043 requests.
+
+    And one that is not carried over, because episodes have an axis profiles do
+    not: **an episode that aired recently is re-read daily, the rest monthly**,
+    and a recent one also outranks an old one under the cap. A month is far too
+    long for the case this whole feature exists for — a weekly show correcting an
+    episode and waiting four more episodes to see it — and about right for a
+    back-catalogue item nobody is editing. See EPISODE_MAX_AGE for the arithmetic
+    that makes the fast tier affordable.
 
     `only_guids` / `only_show` are for the `re-enrich-episodes` subcommand, which
     exists so a corrected feed can be picked up now rather than on the natural
@@ -690,14 +735,19 @@ def guids_needing_episode(conn, limit=EPISODE_BATCH, max_age=EPISODE_MAX_AGE,
     if only_show:
         where.append(f"{effective_guid('b')} = ?")
         params.append(only_show)
+    now = int(time.time())
     if only_guids or only_show:
         gate = "1"                      # explicit target: age gate off, cooldown off
     else:
-        gate = ("(e.item_guid IS NULL OR COALESCE(e.checked_at, 0) < ?) "
+        gate = (f"(e.item_guid IS NULL OR {_episode_stale_expr()}) "
                 "AND (f.id IS NULL OR f.last_try < ?)")
-        params += [int(time.time()) - max_age, _cutoff()]
+        params += _episode_stale_binds(now) + [_cutoff()]
+    # Under the cap, a recent episode outranks an old one: it is the one somebody
+    # is looking at, and the one a publisher has just corrected. New guids still
+    # outrank both — a refresh improves a page, a first fetch is what makes it exist.
     rows = conn.execute(
         f"""SELECT b.item_guid, MIN(e.item_guid IS NOT NULL) AS known,
+                   MAX(COALESCE(e.published, 0) >= ?) AS recent,
                    MIN(COALESCE(e.checked_at, 0)) AS seen
            FROM boosts b
            LEFT JOIN episodes e ON e.item_guid = b.item_guid
@@ -706,12 +756,12 @@ def guids_needing_episode(conn, limit=EPISODE_BATCH, max_age=EPISODE_MAX_AGE,
              AND {' AND '.join(where) if where else '1'}
              AND {gate}
            GROUP BY b.item_guid
-           ORDER BY known ASC, seen ASC
-           LIMIT ?""", (*params, limit)).fetchall()
+           ORDER BY known ASC, recent DESC, seen ASC
+           LIMIT ?""", (now - EPISODE_RECENT_WINDOW, *params, limit)).fetchall()
     return [(r[0], r[1]) for r in rows]
 
 
-def episode_refresh_backlog(conn, max_age=EPISODE_MAX_AGE):
+def episode_refresh_backlog(conn):
     """(never-fetched, stale) counts, so a capped pass can say what it left."""
     return conn.execute(
         f"""SELECT COUNT(*) FILTER (WHERE known = 0),
@@ -721,10 +771,10 @@ def episode_refresh_backlog(conn, max_age=EPISODE_MAX_AGE):
                  LEFT JOIN episodes e ON e.item_guid = b.item_guid
                  LEFT JOIN enrich_failed f ON f.kind='episode' AND f.id = b.item_guid
                  WHERE b.item_guid IS NOT NULL AND {not_excluded('b')}
-                   AND (e.item_guid IS NULL OR COALESCE(e.checked_at, 0) < ?)
+                   AND (e.item_guid IS NULL OR {_episode_stale_expr()})
                    AND (f.id IS NULL OR f.last_try < ?)
                  GROUP BY b.item_guid)""",
-        (int(time.time()) - max_age, _cutoff())).fetchone()
+        (*_episode_stale_binds(), _cutoff())).fetchone()
 
 
 def pubkeys_needing_profile(conn, limit=PROFILE_BATCH, max_age=PROFILE_MAX_AGE):
