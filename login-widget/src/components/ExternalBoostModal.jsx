@@ -41,6 +41,44 @@ const RECHECK_MS = 30_000
 function fmtSats(n) { return Number(n || 0).toLocaleString() }
 
 /**
+ * ⚠️ WAITING IS NOT THE SAME EVENT AS GIVING UP, AND THE OLD SCREEN SAID BOTH
+ * AT ONCE. An unconfirmed leg arrived carrying "Don't re-send; it may already
+ * be on its way" the instant the pay run ended, on a screen headed "Still
+ * checking the rest — don't re-send them", in warning amber, and then held
+ * that for up to ninety seconds without changing. Every word of it was true.
+ * It still read as a fault, and it read as a *stuck* fault, because a screen
+ * that cannot be hurried and never changes is indistinguishable from one that
+ * has stopped working. Observed on a real boost, 2026-08-19: a leg to a slow
+ * provider settled after about a minute, and the wait was the only part of the
+ * boost that felt broken.
+ *
+ * So the two are separated. While the background watcher is running the donor
+ * has NO decision to make — there is no Retry on an unconfirmed leg by design
+ * — so the screen only reports that it is still working, and does it in copy
+ * that CHANGES, which is the part that proves it is alive. The warning belongs
+ * at the end of the watch, where a decision finally arrives, and that is where
+ * it still is (see the give-up text the watcher writes).
+ *
+ * The stages escalate in patience, never in alarm. The one thing they must
+ * keep carrying is that the sats may already be moving, since the double-pay
+ * risk here is not a button — it is a donor who closes this modal and boosts
+ * the episode again.
+ */
+const CHECK_STAGES = [
+  { at: 0,  text: 'Waiting for their wallet to confirm this one.' },
+  { at: 15, text: 'Still waiting. Some wallets take a minute to confirm, and nothing has failed.' },
+  { at: 35, text: 'Still working on it. Hang tight — the sats may already be on their way.' },
+  { at: 60, text: 'Still going. We\u2019ll stop checking shortly and tell you exactly where it stands.' },
+]
+function checkStageText(seconds) {
+  let text = CHECK_STAGES[0].text
+  for (const stage of CHECK_STAGES) {
+    if (seconds >= stage.at) text = stage.text
+  }
+  return text
+}
+
+/**
  * ⚠️ TWO DIFFERENT AFFORDANCES, AND THE SPLIT BETWEEN THEM IS THE DOUBLE-PAY
  * GUARD. They used to be one "Retry" button and that is what paid a recipient
  * twice on 2026-08-19.
@@ -74,7 +112,12 @@ function LegRow({ recipient, leg, onRepay, onCheck, checking, locked }) {
   const sats = leg?.sats
   const repayable = !!onRepay && canRepayLeg(recipient, leg)
   const checkable = !!onCheck && canCheckLeg(recipient, leg)
-  const showError = (status === STATUS.FAILED || status === STATUS.UNCERTAIN) && !!leg?.error
+  // ⚠️ Suppressed while the watcher runs. The row's own message is the
+  // give-up message, and showing it mid-watch is the confusion described on
+  // CHECK_STAGES. The spinner and the label carry the row; the one escalating
+  // line under the list carries the explanation, once, however many legs are
+  // in flight.
+  const showError = !checking && (status === STATUS.FAILED || status === STATUS.UNCERTAIN) && !!leg?.error
   const spinner = (
     <svg className="animate-spin w-3.5 h-3.5 text-orange-400" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -92,7 +135,9 @@ function LegRow({ recipient, leg, onRepay, onCheck, checking, locked }) {
   // reflected in an event that cannot be edited.
   let action = null
   if (checking) {
-    action = <span className="shrink-0 text-[11px] px-2 py-0.5 text-amber-400/80">Checking…</span>
+    // Orange, not amber: this is the working tone the sending phase uses, not
+    // the warning tone a shortfall uses.
+    action = <span className="shrink-0 text-[11px] px-2 py-0.5 text-orange-300/90">Checking…</span>
   } else if (repayable || checkable) {
     action = (
       <button onClick={locked ? undefined : (repayable ? onRepay : onCheck)} disabled={locked}
@@ -260,6 +305,20 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, epi
   legsRef.current = legs
   const [checking, setChecking] = useState({})
   const stillChecking = Object.values(checking).some(Boolean)
+
+  // Seconds since the current watch began, which is the only input the stage
+  // copy needs. Keyed on `stillChecking` rather than on the checking map, so a
+  // second leg finishing does not restart the clock on the one still running.
+  const [checkSeconds, setCheckSeconds] = useState(0)
+  useEffect(() => {
+    if (!stillChecking) { setCheckSeconds(0); return }
+    const startedAt = Date.now()
+    setCheckSeconds(0)
+    const id = setInterval(() => {
+      setCheckSeconds(Math.floor((Date.now() - startedAt) / 1000))
+    }, 1000)
+    return () => clearInterval(id)
+  }, [stillChecking])
 
   /**
    * ⚠️ ONE CELEBRATION PER BOOST, LATCHED. It used to fire the moment the first
@@ -463,7 +522,11 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, epi
   const repayableCount = visibleLegs.filter(({ r, leg }) => canRepayLeg(r, leg)).length
   const unconfirmedCount = visibleLegs.filter(({ leg }) => leg?.status === STATUS.UNCERTAIN).length
   let tail
-  if (stillChecking) tail = 'Still checking the rest — don’t re-send them.'
+  // ⚠️ Calm while the watcher runs. This line is the loudest thing on the
+  // screen, and a leg that is merely slow is not a shortfall yet. See
+  // CHECK_STAGES.
+  const checkingCount = Object.values(checking).filter(Boolean).length
+  if (stillChecking) tail = checkingCount === 1 ? 'Still confirming the last one.' : 'Still confirming the rest.'
   else if (repayableCount > 0) tail = 'Retry any that were declined.'
   else if (unconfirmedCount > 0) tail = 'The rest are unconfirmed — check your wallet rather than re-sending.'
   else tail = 'Check your wallet for the rest.'
@@ -569,7 +632,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, epi
                 )}
                 {allPaid && <p className="text-base font-semibold text-green-400">⚡ Boost delivered!</p>}
                 {phase === 'done' && !allPaid && (
-                  <p className="text-sm font-semibold text-amber-400">
+                  <p className={`text-sm font-semibold ${stillChecking ? 'text-orange-300' : 'text-amber-400'}`}>
                     {summaryLine}
                   </p>
                 )}
@@ -591,9 +654,13 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, epi
                     note is a final statement about the boost, and a leg that
                     settles thirty seconds from now would make it wrong with no
                     way to correct it. */}
-                {phase === 'done' && canShareToFeed && stillChecking && (
-                  <p className="text-[11px] text-neutral-500 leading-snug">
-                    Checking {Object.values(checking).filter(Boolean).length === 1 ? 'one payment' : 'some payments'} before you share — the note should report what actually landed.
+                {/* The one line that changes. Rendered for every donor, not
+                    only one who can share: an anonymous booster is watching
+                    the same spinner and is owed the same account of it. */}
+                {phase === 'done' && stillChecking && (
+                  <p className="text-[11px] text-neutral-400 leading-snug">
+                    {checkStageText(checkSeconds)}
+                    {canShareToFeed && ' You can post the note once this settles, so it reports what actually landed.'}
                   </p>
                 )}
                 {phase === 'done' && canShareToFeed && paidSats > 0 && !stillChecking && (

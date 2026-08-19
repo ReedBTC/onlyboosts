@@ -457,12 +457,15 @@
 // competitionRanks() now reports `tied`, so every renderer that imports it
 // changed together — required, since a returning visitor holding one half gets
 // a card numbered by a function whose shape moved.
+// ob-v89: waiting on a slow leg is presented as work in progress rather than
+// as a warning, with copy that changes so the screen cannot read as hung. The
+// warning moved to the end of the watch, where the donor first has a decision.
 // ob-v88: the Nostr login is no longer a gate on the wallet. A visitor with
 // no identity can connect a wallet and boost with it; the connection is
 // session-only because the at-rest scheme encrypts the NWC URI to the user's
 // own signer. The widget bundle changed, so a returning visitor needs the new
 // URL.
-const VERSION = 'ob-v88';
+const VERSION = 'ob-v89';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;
@@ -494,27 +497,27 @@ const PRECACHE_URLS = [
   '/assets/onlyboosts_pfp.png',
   '/assets/onlyboosts_banner.png',
   '/assets/avatar-fallback.svg',
-  '/assets/css/theme.css?v=ob-v88',
-  '/assets/css/page.css?v=ob-v88',
-  '/assets/css/nav.css?v=ob-v88',
-  '/assets/css/footer.css?v=ob-v88',
-  '/assets/css/boosts-thread.css?v=ob-v88',
-  '/assets/css/boost-actions.css?v=ob-v88',
+  '/assets/css/theme.css?v=ob-v89',
+  '/assets/css/page.css?v=ob-v89',
+  '/assets/css/nav.css?v=ob-v89',
+  '/assets/css/footer.css?v=ob-v89',
+  '/assets/css/boosts-thread.css?v=ob-v89',
+  '/assets/css/boost-actions.css?v=ob-v89',
   // The episode card and its drawer. Precached alongside the others because the
   // homepage's feeds are painted in it and it used to be inline in index.html,
   // which IS precached — leaving it out would trade an inline block for a
   // network round trip on the one page this list exists to make fast.
-  '/assets/css/feed-cards.css?v=ob-v88',
-  '/assets/js/boosts-thread.js?v=ob-v88',
+  '/assets/css/feed-cards.css?v=ob-v89',
+  '/assets/js/boosts-thread.js?v=ob-v89',
   // A static import of boosts-thread.js, so precaching that without this one
   // leaves a returning visitor fetching half the graph from the network.
-  '/assets/js/primal-profiles.js?v=ob-v88',
-  '/assets/js/calendar-events.js?v=ob-v88',
-  '/assets/js/boost-actions.js?v=ob-v88',
-  '/assets/js/nav.js?v=ob-v88',
-  '/assets/js/nav-widget-boot.js?v=ob-v88',
-  '/assets/js/widget-loader.js?v=ob-v88',
-  '/assets/js/sw-register.js?v=ob-v88',
+  '/assets/js/primal-profiles.js?v=ob-v89',
+  '/assets/js/calendar-events.js?v=ob-v89',
+  '/assets/js/boost-actions.js?v=ob-v89',
+  '/assets/js/nav.js?v=ob-v89',
+  '/assets/js/nav-widget-boot.js?v=ob-v89',
+  '/assets/js/widget-loader.js?v=ob-v89',
+  '/assets/js/sw-register.js?v=ob-v89',
 ];
 
 self.addEventListener('install', (event) => {

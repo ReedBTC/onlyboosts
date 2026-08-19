@@ -190,7 +190,13 @@ async function payLnaddressLeg(leg, ctx, update, timer) {
   const settled = await confirmInvoiceSettled(verify, paymentHash)
   timer?.mark('verify')
   if (settled === 'settled') return { status: STATUS.PAID }
-  return { status: STATUS.UNCERTAIN, error: 'Not confirmed yet — still checking. Don’t re-send; it may already be on its way.' }
+  // ⚠️ This is the leg's RESTING message, not its waiting message. The modal
+  // starts a background watch on every checkable leg and suppresses this text
+  // for as long as that runs (see CHECK_STAGES in ExternalBoostModal), so what
+  // this string has to serve is the leg nothing is watching: a keysend, or a
+  // provider that returned no verify URL. It must therefore not claim that
+  // checking is under way, which the previous wording did.
+  return { status: STATUS.UNCERTAIN, error: 'Not confirmed yet. Don’t re-send it — it may already be on its way.' }
 }
 
 async function payKeysendLeg(leg, ctx, update, timer) {
