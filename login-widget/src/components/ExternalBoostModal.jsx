@@ -64,6 +64,47 @@ function fmtSats(n) { return Number(n || 0).toLocaleString() }
  * risk here is not a button — it is a donor who closes this modal and boosts
  * the episode again.
  */
+/**
+ * ⚠️ THE LONGEST WAIT IS BEFORE THE WATCHER EVER STARTS, and CHECK_STAGES did
+ * not cover it. Measured on a real boost, 2026-08-19, four legs through one
+ * WebLN extension:
+ *
+ *   greyturkey26@primal.net   invoice 1.9s   pay  2.3s
+ *   chadf@getalby.com         invoice 0.6s   pay 45.5s   → uncertain, settled later
+ *   reed@getalby.com          invoice 0.8s   pay  0.4s
+ *
+ * So the donor sat in front of a spinner and one unchanging line for
+ * three-quarters of a minute, and the escalating copy only began once the run
+ * ended. **The hang is inside the wallet's own `sendPayment`** — same
+ * extension, same session, two sibling legs answering in seconds — so nothing
+ * here can hurry it, shorten it, or see progress inside it. What it can do is
+ * say how long it has been going, which is the whole of CHECK_STAGES' argument
+ * arriving one state earlier.
+ *
+ * ⚠️ The first stage is deliberately SILENT. A normal leg pays in one to four
+ * seconds, and a reassurance that flashes up and vanishes is noise that makes
+ * a fast boost look eventful. The line appears only once the wait is long
+ * enough to be worth explaining.
+ *
+ * The ceiling these run under is the wallet adapter's, not this file's: 90s for
+ * WebLN, ~60s for NWC's SDK. **Do not shorten either to make this tidier** —
+ * the leg above took 45.5 seconds and then paid, and a tighter bound would have
+ * turned a successful payment into an UNCERTAIN one.
+ */
+const PAY_STAGES = [
+  { at: 0, text: null },
+  { at: 12, text: (name) => `Still waiting on your wallet for ${name}. That happens when a route is slow.` },
+  { at: 30, text: (name) => `Still trying to reach ${name}. Nothing has failed; some destinations take longer than others.` },
+  { at: 60, text: (name) => `Still going. If ${name} doesn\u2019t answer shortly we\u2019ll move on and tell you exactly where it stands.` },
+]
+function payStageText(seconds, name) {
+  let fn = null
+  for (const stage of PAY_STAGES) {
+    if (seconds >= stage.at) fn = stage.text
+  }
+  return typeof fn === 'function' ? fn(name || 'this recipient') : null
+}
+
 const CHECK_STAGES = [
   { at: 0,  text: 'Waiting for their wallet to confirm this one.' },
   { at: 15, text: 'Still waiting. Some wallets take a minute to confirm, and nothing has failed.' },
@@ -288,6 +329,20 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, epi
   const activeCount = visibleLegs.length
   const paidSats = legs.reduce((a, l) => a + (l?.status === STATUS.PAID ? (l.sats || 0) : 0), 0)
 
+  // The leg the wallet is currently working on, and how long it has been at
+  // it. Legs are paid sequentially (see D9 in boost-login.md), so there is at
+  // most one, and its own `startedAt` is the clock — the ticker above only
+  // forces the re-render that re-reads it.
+  const payingIndex = legs.findIndex((l) => l?.status === WORKING)
+  const payingLeg = payingIndex >= 0 ? legs[payingIndex] : null
+  const payingName = payingIndex >= 0
+    ? (recipients[payingIndex]?.name || recipients[payingIndex]?.address || '')
+    : ''
+  const paySeconds = payingLeg?.startedAt
+    ? Math.floor(((payTick || Date.now()) - payingLeg.startedAt) / 1000)
+    : 0
+  const payNote = phase === 'sending' ? payStageText(paySeconds, payingName) : null
+
   /**
    * ⚠️ THE OTHER HALF OF THE DOUBLE-PAY FIX. A leg can settle after the 4.5
    * seconds the payment path is willing to wait inline, and the donor is left
@@ -305,6 +360,16 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, epi
   legsRef.current = legs
   const [checking, setChecking] = useState({})
   const stillChecking = Object.values(checking).some(Boolean)
+
+  // Re-render once a second while a payment is outstanding, so the pay-stage
+  // copy can be computed from the leg's own `startedAt` rather than from a
+  // second clock that would have to be kept in step with it.
+  const [payTick, setPayTick] = useState(0)
+  useEffect(() => {
+    if (phase !== 'sending') return
+    const id = setInterval(() => setPayTick(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [phase])
 
   // Seconds since the current watch began, which is the only input the stage
   // copy needs. Keyed on `stillChecking` rather than on the checking map, so a
@@ -629,6 +694,13 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, epi
               <div className="flex flex-col gap-3 min-h-[280px]">
                 {phase === 'sending' && (
                   <p className="text-sm font-semibold text-orange-300">Sending your boost — keep this window open</p>
+                )}
+                {/* Silent on a normal leg; see PAY_STAGES. It sits under the
+                    headline rather than on the row, because the row already
+                    carries the spinner that says WHICH leg, and one moving
+                    line beats the same sentence repeated per row. */}
+                {payNote && (
+                  <p className="text-[11px] text-neutral-400 leading-snug">{payNote}</p>
                 )}
                 {allPaid && <p className="text-base font-semibold text-green-400">⚡ Boost delivered!</p>}
                 {phase === 'done' && !allPaid && (

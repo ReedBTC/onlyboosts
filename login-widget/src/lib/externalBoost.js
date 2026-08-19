@@ -165,7 +165,13 @@ async function payLnaddressLeg(leg, ctx, update, timer) {
   const paymentHash = bolt11PaymentHash(pr)
   update({ verifyUrl: verify || null, paymentHash })
 
-  update({ status: STATUS.PAYING })
+  // ⚠️ `startedAt` is stamped where the WAIT actually is: the moment the wallet
+  // is handed the invoice. Measured on a real boost, 2026-08-19, one leg spent
+  // **45.5 seconds inside `sendPayment`** while its two siblings took 2.3s and
+  // 0.4s through the same extension. Nothing here can hurry that or observe
+  // progress inside it, so the only honest thing to do is say how long it has
+  // been going. See PAY_STAGES in ExternalBoostModal.
+  update({ status: STATUS.PAYING, startedAt: Date.now() })
   let preimage = null
   let payError = null
   try {
@@ -211,7 +217,7 @@ async function payKeysendLeg(leg, ctx, update, timer) {
     ...ctx.meta,
   })
 
-  update({ status: STATUS.PAYING })
+  update({ status: STATUS.PAYING, startedAt: Date.now() })
   try {
     if (ctx.kind === 'nwc') {
       const client = nwc.getClient()
