@@ -181,11 +181,16 @@ async function payLnaddressLeg(leg, ctx, update, timer) {
 
   // Ambiguous — never blind-fail an NWC leg (the reply can be lost while the
   // payment settles). Confirm via LUD-21 before deciding.
+  //
+  // ⚠️ A NON-SETTLEMENT IS NOT A FAILURE. Once the wallet has been handed this
+  // invoice there is no observation that proves it did not pay, so the only
+  // outcomes here are PAID and UNCERTAIN. The modal keeps polling this leg in
+  // the background and flips it to PAID if it lands late; until then it offers
+  // "Check again" and NOT a re-pay. See confirmInvoiceSettled.
   const settled = await confirmInvoiceSettled(verify, paymentHash)
   timer?.mark('verify')
   if (settled === 'settled') return { status: STATUS.PAID }
-  if (settled === 'unsettled') return { status: STATUS.FAILED, error: friendlyError(msg) || 'Payment did not settle.' }
-  return { status: STATUS.UNCERTAIN, error: 'Couldn’t confirm this payment — check your wallet before retrying.' }
+  return { status: STATUS.UNCERTAIN, error: 'Not confirmed yet — still checking. Don’t re-send; it may already be on its way.' }
 }
 
 async function payKeysendLeg(leg, ctx, update, timer) {
@@ -301,9 +306,29 @@ export async function payExternalBoost({
           : await payKeysendLeg(leg, ctx, update, timer)
         update(result)
       } catch (e) {
-        // Pre-payment failures (LNURL resolve, below-min, invoice fetch) — these
-        // are definitively not-paid.
-        update({ status: STATUS.FAILED, error: friendlyError(e?.message || e) })
+        // Pre-payment failures (LNURL resolve, below-min, invoice fetch) are
+        // definitively not-paid, and today that is everything that reaches
+        // here — nothing throws out of the leg helpers once they have asked a
+        // wallet to pay.
+        //
+        // ⚠️ BUT THAT IS AN ARGUMENT ABOUT TODAY'S CALL GRAPH, AND THE COST OF
+        // IT BECOMING UNTRUE IS A RECIPIENT PAID TWICE. `paymentHash` is set
+        // the moment an invoice exists, so it is the structural test for
+        // "something may be in flight": past that point an exception is
+        // ignorance, not evidence, and the leg is UNCERTAIN — which carries no
+        // re-pay button. Same rule as confirmInvoiceSettled.
+        // ⚠️ A REASON FROM THE RECIPIENT'S OWN SERVER IS USED VERBATIM AND
+        // ATTRIBUTED, never run through friendlyError. That function rewrites
+        // on keywords — a provider whose message happens to contain "declined"
+        // or "expired" would be reported to the donor as *their wallet*
+        // declining, which is a lie about whose fault it is and sends them to
+        // check the wrong thing.
+        const detail = e?.lnurlReason
+          ? `Their Lightning provider said: ${e.lnurlReason}`
+          : friendlyError(e?.message || e)
+        update(leg.paymentHash
+          ? { status: STATUS.UNCERTAIN, error: detail }
+          : { status: STATUS.FAILED, error: detail })
       }
       const { totalMs, phases } = timer.summary()
       // Address rather than name: `name` is empty on most value blocks (the

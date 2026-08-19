@@ -5,8 +5,12 @@
  * boost path, untouched). This runs the external orchestrator (lib/
  * externalBoost.js): pays the episode's value-block recipients via LNURL
  * (lnaddress) and keysend (node), publishes NO kind 30078, and — only when the
- * booster is signed in and opts in — posts a kind-1 note tagged to the external
- * show's guid + Boost Me Bitch URL. Nothing here touches LB stats/bots.
+ * booster is signed in and PRESSES SHARE ON THE DONE SCREEN — posts a kind-1
+ * note tagged to the external show's guid + Boost Me Bitch URL. Nothing here
+ * touches LB stats/bots.
+ *
+ * ⚠️ The share is a post-settlement verb, not a pre-flight checkbox, and the
+ * note reports SETTLED sats rather than typed ones. See `handleShare`.
  *
  * Progress UI is self-contained (not the LB BoostProgressView) so the external
  * leg shape / skipped legs / keysend-uncertain retry rules stay independent.
@@ -27,56 +31,88 @@ import ConfirmLeaveOverlay from './ConfirmLeaveOverlay.jsx'
 const MIN_SATS = 21
 const MAX_SATS = 5_000_000
 const WORKING = STATUS.PAYING
+// How long an unconfirmed leg keeps being checked after the run ends, and how
+// long a donor-pressed re-check runs for. Both are wall-clock budgets rather
+// than attempt counts: what matters is how long Lightning is given to settle,
+// not how many times we asked.
+const WATCH_MS = 90_000
+const RECHECK_MS = 30_000
 
 function fmtSats(n) { return Number(n || 0).toLocaleString() }
 
 /**
- * Can this leg actually be retried?
+ * ⚠️ TWO DIFFERENT AFFORDANCES, AND THE SPLIT BETWEEN THEM IS THE DOUBLE-PAY
+ * GUARD. They used to be one "Retry" button and that is what paid a recipient
+ * twice on 2026-08-19.
  *
- * A FAILED leg definitively never left the wallet, so it always can. An
- * UNCERTAIN one can only be re-paid after confirming it didn't settle, which
- * needs a LUD-21 verify URL — keysend has none, and neither does an lnaddress
- * whose provider didn't hand one back. Offering the button anyway produced a
- * click whose only effect was to rewrite an error message that was rendered
- * `sr-only`, so it read as a dead button.
+ * A FAILED leg is one we know did not pay: it fell over before an invoice was
+ * ever handed to the wallet, or the wallet cleanly declined it. Re-paying is
+ * safe, because nothing is in flight.
+ *
+ * An UNCERTAIN leg is one an invoice WAS handed over for and no settlement has
+ * been observed. Nothing can prove that leg unpaid — LUD-21 has no negative
+ * signal, see confirmInvoiceSettled — so **it is never re-paid from this UI**.
+ * The only offer is to look again, which is free and cannot go wrong. If it
+ * truly did not land, the donor boosts again from the top, which is one
+ * deliberate act rather than a button that quietly risks their money.
  */
-function canRetryLeg(recipient, leg) {
-  const status = leg?.status
-  if (status === STATUS.FAILED) return true
-  if (status !== STATUS.UNCERTAIN) return false
-  return recipient?.type === 'lnaddress' && !!leg.verifyUrl && !!leg.paymentHash
+function canRepayLeg(recipient, leg) {
+  return leg?.status === STATUS.FAILED
+}
+
+/** An unconfirmed leg can be re-checked only when there is something to check
+ *  against: LUD-21 needs the invoice's own verify URL, which keysend has none
+ *  of and some lnaddress providers don't return. */
+function canCheckLeg(recipient, leg) {
+  return leg?.status === STATUS.UNCERTAIN &&
+    recipient?.type === 'lnaddress' && !!leg?.verifyUrl && !!leg?.paymentHash
 }
 
 // One per-recipient row in the progress list.
-function LegRow({ recipient, leg, onRetry }) {
+function LegRow({ recipient, leg, onRepay, onCheck, checking, locked }) {
   const status = leg?.status || STATUS.PENDING
   const sats = leg?.sats
-  const canRetry = !!onRetry && canRetryLeg(recipient, leg)
+  const repayable = !!onRepay && canRepayLeg(recipient, leg)
+  const checkable = !!onCheck && canCheckLeg(recipient, leg)
   const showError = (status === STATUS.FAILED || status === STATUS.UNCERTAIN) && !!leg?.error
-  let icon = <span className="inline-block w-3.5 h-3.5 rounded-full border border-neutral-600" aria-hidden="true" />
-  if (status === STATUS.PAID) icon = <span className="text-green-400" aria-hidden="true">✓</span>
-  else if (status === STATUS.FAILED) icon = <span className="text-red-400" aria-hidden="true">✕</span>
-  else if (status === STATUS.UNCERTAIN) icon = <span className="text-amber-400" aria-hidden="true">!</span>
-  else if (status === WORKING) icon = (
+  const spinner = (
     <svg className="animate-spin w-3.5 h-3.5 text-orange-400" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
       <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4z" />
     </svg>
   )
+  let icon = <span className="inline-block w-3.5 h-3.5 rounded-full border border-neutral-600" aria-hidden="true" />
+  if (status === STATUS.PAID) icon = <span className="text-green-400" aria-hidden="true">✓</span>
+  else if (status === STATUS.FAILED) icon = <span className="text-red-400" aria-hidden="true">✕</span>
+  else if (status === STATUS.UNCERTAIN) icon = checking ? spinner : <span className="text-amber-400" aria-hidden="true">!</span>
+  else if (status === WORKING) icon = spinner
+
+  // One button slot. `locked` keeps it on screen but inert once the note has
+  // been published, because a leg that changed afterwards could not be
+  // reflected in an event that cannot be edited.
+  let action = null
+  if (checking) {
+    action = <span className="shrink-0 text-[11px] px-2 py-0.5 text-amber-400/80">Checking…</span>
+  } else if (repayable || checkable) {
+    action = (
+      <button onClick={locked ? undefined : (repayable ? onRepay : onCheck)} disabled={locked}
+        title={locked ? 'Your note is already published, so a change here couldn’t be reflected in it.' : undefined}
+        className="shrink-0 text-[11px] px-2 py-0.5 rounded border border-neutral-700 text-neutral-300 hover:border-orange-500 hover:text-orange-300 disabled:opacity-40 disabled:hover:border-neutral-700 disabled:hover:text-neutral-300 disabled:cursor-not-allowed transition-colors">
+        {repayable ? 'Retry' : 'Check again'}
+      </button>
+    )
+  }
+
   return (
     <li className="py-1.5 text-xs">
       <div className="flex items-center gap-2">
         <span className="w-4 flex justify-center shrink-0">{icon}</span>
         <span className="flex-1 min-w-0 truncate text-neutral-300">{recipient?.name || recipient?.address || 'Recipient'}</span>
         {sats != null && <span className="shrink-0 tabular-nums text-neutral-500">{fmtSats(sats)} sats</span>}
-        {canRetry && (
-          <button onClick={onRetry} className="shrink-0 text-[11px] px-2 py-0.5 rounded border border-neutral-700 text-neutral-300 hover:border-orange-500 hover:text-orange-300 transition-colors">
-            Retry
-          </button>
-        )}
+        {action}
       </div>
       {/* The wallet's own reason, shown rather than hidden: it is the only
-          account of why a leg didn't land, and on a leg with no Retry button
+          account of why a leg didn't land, and on a leg with no button
           it is the entire response the row has to give. */}
       {showError && (
         <p className={`mt-1 ml-6 text-[11px] leading-snug ${status === STATUS.UNCERTAIN ? 'text-amber-400/90' : 'text-red-400/90'}`}>
@@ -103,10 +139,28 @@ export default function ExternalBoostModal({ user, onClose, episode, recipientsB
   const [amount, setAmount] = useState('1000')
   const [message, setMessage] = useState('')
   const [anonymous, setAnonymous] = useState(false)
-  const [shareToFeed, setShareToFeed] = useState(false)
   const [error, setError] = useState('')
+
+  // Sharing is a VERB pressed after settlement, not a checkbox ticked before
+  // it. Two reasons, and the first is the one that made this a bug:
+  //
+  //   - The note has to report what actually settled, and that is not known
+  //     until every leg has run AND the donor has finished retrying the ones
+  //     that didn't. A note published the instant the first pass ends can
+  //     never reflect a successful retry, and an event cannot be edited.
+  //   - The signer prompt then arrives at a moment the donor asked for it,
+  //     rather than unannounced after a payment they thought was the end of
+  //     the interaction.
+  //
+  // ⚠️ AN ANONYMOUS BOOST GETS NO SHARE CONTROL AT ALL, not a disabled one.
+  // Signing the note with the donor's own npub would undo the anonymity they
+  // chose one field up. The OnlyBoosts-signs-it path is what serves that case
+  // and it does not exist yet (boost-login.md, Phase 3); when it lands it
+  // belongs here as a second choice on this same control, NOT as a
+  // resurrected pre-flight checkbox.
   const canShareToFeed = !anonymous && signedIn
-  useEffect(() => { if (anonymous && shareToFeed) setShareToFeed(false) }, [anonymous, shareToFeed])
+  const [shareState, setShareState] = useState('idle')   // 'idle' | 'signing' | 'shared' | 'error'
+  const [shareError, setShareError] = useState('')
 
   const [phase, setPhase] = useState('form')       // 'form' | 'sending' | 'done'
   const [legs, setLegs] = useState([])             // per-recipient live state (aligned to recipients)
@@ -159,11 +213,107 @@ export default function ExternalBoostModal({ user, onClose, episode, recipientsB
     setLegs((prev) => { const next = prev.slice(); next[index] = { ...next[index], ...patch }; return next })
   }, [])
 
-  async function maybeShareNote(totalSats) {
-    if (!canShareToFeed || !shareToFeed) return
+  // The live tally, recomputed every render off leg state, which is what makes
+  // a successful Retry count toward the note. Declared here rather than beside
+  // the render so `handleShare` and the summary line read the same numbers;
+  // two derivations of "how much actually landed" is how the reported figure
+  // drifts from the published one.
+  //
+  // SKIPPED legs are excluded from the denominator: those were allocated zero
+  // sats by the split and never attempted, so counting them as unpaid would
+  // report a shortfall that never happened.
+  const visibleLegs = phase !== 'form'
+    ? recipients.map((r, i) => ({ r, leg: legs[i] })).filter(({ leg }) => leg && leg.status !== STATUS.SKIPPED)
+    : []
+  const paidCount = legs.filter((l) => l?.status === STATUS.PAID).length
+  const activeCount = visibleLegs.length
+  const paidSats = legs.reduce((a, l) => a + (l?.status === STATUS.PAID ? (l.sats || 0) : 0), 0)
+
+  /**
+   * ⚠️ THE OTHER HALF OF THE DOUBLE-PAY FIX. A leg can settle after the 4.5
+   * seconds the payment path is willing to wait inline, and the donor is left
+   * looking at a screen that has to say something in the meantime. Rather than
+   * guess, keep asking: every unconfirmed lnaddress leg is polled to a
+   * 90-second budget and flips itself to Paid if it lands late. Most of these
+   * resolve with no decision from the donor at all, which is the point — the
+   * bug was a screen that asked them to decide on bad information.
+   *
+   * Keyed on `phase` only. Depending on `legs` would restart the watcher on
+   * every poll result it wrote, so the targets are read through a ref at the
+   * moment the run finishes.
+   */
+  const legsRef = useRef(legs)
+  legsRef.current = legs
+  const [checking, setChecking] = useState({})
+  const stillChecking = Object.values(checking).some(Boolean)
+
+  /**
+   * ⚠️ ONE CELEBRATION PER BOOST, LATCHED. It used to fire the moment the first
+   * pass returned and again after every retry that landed, so a boost with a
+   * failed leg could burst two or three times for one payment.
+   *
+   * Keyed on `paidCount` rather than on the pass finishing, so a leg the
+   * background watcher resolves late still earns the burst if nothing had
+   * landed yet — and the ref means it cannot earn a second one.
+   */
+  const celebratedRef = useRef(false)
+  useEffect(() => {
+    if (phase !== 'done' || paidCount === 0 || celebratedRef.current) return
+    celebratedRef.current = true
+    fireConfetti()
+  }, [phase, paidCount])
+
+  useEffect(() => {
+    if (phase !== 'done') return
+    const targets = recipients
+      .map((r, i) => ({ r, i }))
+      .filter(({ r, i }) => canCheckLeg(r, legsRef.current[i]))
+    if (targets.length === 0) return
+    const ctrl = new AbortController()
+    setChecking(Object.fromEntries(targets.map(({ i }) => [i, true])))
+    for (const { i } of targets) {
+      const leg = legsRef.current[i]
+      confirmInvoiceSettled(leg.verifyUrl, leg.paymentHash, {
+        attempts: 0, deadlineMs: WATCH_MS, intervalMs: 3000, signal: ctrl.signal,
+      }).then((res) => {
+        if (ctrl.signal.aborted || cancelledRef.current) return
+        if (res === 'settled') updateLeg(i, { status: STATUS.PAID, error: null })
+        else updateLeg(i, { error: 'Still unconfirmed. Check your wallet before sending anything — this may already have gone through.' })
+        setChecking((prev) => ({ ...prev, [i]: false }))
+      }).catch(() => {
+        if (ctrl.signal.aborted || cancelledRef.current) return
+        setChecking((prev) => ({ ...prev, [i]: false }))
+      })
+    }
+    return () => ctrl.abort()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase])
+
+  /**
+   * Publish the donor's kind-1 share note, on their press, from their npub.
+   *
+   * ⚠️ THE FIGURES COME FROM LIVE LEG STATE, NOT FROM THE FORM. `paidSats` and
+   * the leg counts are recomputed on every render, so pressing this after a
+   * successful Retry reports the retried leg. This is the whole reason the
+   * control moved out of the form: the old pre-flight checkbox fired the note
+   * with the typed amount the instant the first pass ended, which overstated
+   * every partial and could never see a retry.
+   *
+   * Failure is reported here rather than swallowed to the console. The donor
+   * asked for this explicitly, so a silent no-op would leave them believing
+   * they had shared. The sats are already gone either way, which is why a
+   * failure offers a retry instead of unwinding anything.
+   */
+  async function handleShare() {
+    if (!canShareToFeed || shareState === 'signing' || shareState === 'shared') return
+    if (paidSats <= 0) return
+    setShareState('signing')
+    setShareError('')
     try {
       const template = buildExternalNoteTemplate({
-        amountSats: totalSats,
+        paidSats,
+        legsPaid: paidCount,
+        legsTotal: activeCount,
         message: message.trim(),
         showTitle: episode?.showTitle,
         episodeTitle: episode?.episodeTitle,
@@ -173,8 +323,13 @@ export default function ExternalBoostModal({ user, onClose, episode, recipientsB
       })
       const signed = await signKindOneShareWithUser(template)
       await publishSignedKindOne(signed)
+      if (cancelledRef.current) return
+      setShareState('shared')
     } catch (e) {
       console.warn('[lb] external boost share note failed', e?.message || e)
+      if (cancelledRef.current) return
+      setShareError(e?.message || 'Couldn\u2019t post the note. Your boost still went through.')
+      setShareState('error')
     }
   }
 
@@ -215,37 +370,21 @@ export default function ExternalBoostModal({ user, onClose, episode, recipientsB
     }
     if (cancelledRef.current) return
     setPhase('done')
-    if (result.anyPaid) {
-      fireConfetti()
-      maybeShareNote(sats)
-    }
   }
 
-  // Retry a single leg in place. Double-spend guard: an 'uncertain' lnaddress
-  // leg is confirmed via LUD-21 before any re-pay; an 'uncertain' keysend leg
-  // (no verify URL) is never auto-retried.
-  async function handleRetry(index) {
+  /**
+   * Re-pay a leg. ⚠️ FAILED ONLY — see canRepayLeg. There is deliberately no
+   * branch here for an unconfirmed leg: the version of this function that had
+   * one decided it was "safe to re-pay" off a LUD-21 `settled: false`, which
+   * is not a statement that the payment failed, and a recipient was paid
+   * twice as a result.
+   */
+  async function handleRepay(index) {
     const recipient = recipients[index]
     const leg = legs[index]
     if (!recipient || !leg) return
-    if (leg.status === STATUS.UNCERTAIN) {
-      if (recipient.type === 'lnaddress' && leg.verifyUrl && leg.paymentHash) {
-        updateLeg(index, { status: STATUS.PAYING, error: null })
-        const settled = await confirmInvoiceSettled(leg.verifyUrl, leg.paymentHash)
-        if (settled === 'settled') { updateLeg(index, { status: STATUS.PAID, error: null }); return }
-        if (settled !== 'unsettled') {
-          updateLeg(index, { status: STATUS.UNCERTAIN, error: 'Still can’t confirm — check your wallet before retrying.' })
-          return
-        }
-        // 'unsettled' → safe to re-pay, fall through.
-      } else {
-        // Backstop only: canRetryLeg no longer offers a button in this case,
-        // so reaching here means the guard was bypassed. Leave the leg's own
-        // error in place rather than overwriting the wallet's account of it.
-        updateLeg(index, { status: STATUS.UNCERTAIN })
-        return
-      }
-    }
+    if (!canRepayLeg(recipient, leg)) return
+    if (shareState === 'shared') return
     if (!wallet.isReady()) { updateLeg(index, { status: STATUS.FAILED, error: 'Wallet not connected' }); return }
     updateLeg(index, { status: STATUS.PAYING, error: null })
     try {
@@ -266,27 +405,57 @@ export default function ExternalBoostModal({ user, onClose, episode, recipientsB
         lnurlCache,
         onLeg: (_i, ls) => updateLeg(index, { ...ls, sats: leg.sats }),
       })
-      if (res?.anyPaid) fireConfetti()
     } catch (e) {
+      // ⚠️ Never downgrade a leg that already reported in. payExternalBoost
+      // throws only on its own pre-flight validation, so today this cannot
+      // clobber anything — but `onLeg` writes leg state on the way through, and
+      // turning an UNCERTAIN leg into a FAILED one hands it back a re-pay
+      // button it must not have.
+      const cur = legsRef.current[index]?.status
+      if (cur === STATUS.PAID || cur === STATUS.UNCERTAIN) return
       updateLeg(index, { status: STATUS.FAILED, error: e?.message || 'Retry failed' })
     }
   }
 
+  /** Look at an unconfirmed leg again. Pays nothing and can never pay anything;
+   *  it re-polls the ORIGINAL invoice's verify URL, so the worst outcome is
+   *  learning nothing new. */
+  async function handleCheck(index) {
+    const recipient = recipients[index]
+    const leg = legs[index]
+    if (!canCheckLeg(recipient, leg)) return
+    if (shareState === 'shared' || checking[index]) return
+    setChecking((prev) => ({ ...prev, [index]: true }))
+    try {
+      const res = await confirmInvoiceSettled(leg.verifyUrl, leg.paymentHash, {
+        attempts: 0, deadlineMs: RECHECK_MS, intervalMs: 3000,
+      })
+      if (cancelledRef.current) return
+      if (res === 'settled') updateLeg(index, { status: STATUS.PAID, error: null })
+      else updateLeg(index, { error: 'Still unconfirmed. Check your wallet before sending anything — this may already have gone through.' })
+    } finally {
+      if (!cancelledRef.current) setChecking((prev) => ({ ...prev, [index]: false }))
+    }
+  }
+
   const headerTitle = '⚡ Boost episode'
-  const visibleLegs = phase !== 'form' ? recipients.map((r, i) => ({ r, leg: legs[i] })).filter(({ leg }) => leg && leg.status !== STATUS.SKIPPED) : []
-  const paidCount = legs.filter((l) => l?.status === STATUS.PAID).length
-  const activeCount = visibleLegs.length
   const allPaid = phase === 'done' && activeCount > 0 && paidCount === activeCount
 
-  // Only tell the booster to retry when a row can actually be retried. An
-  // uncertain keysend never can, so on a boost whose only shortfall is one of
-  // those the summary has to point at the wallet instead of at a button that
-  // isn't there.
-  const retryableCount = visibleLegs.filter(({ r, leg }) => canRetryLeg(r, leg)).length
+  // ⚠️ THE SUMMARY MUST NOT TELL THE DONOR TO RE-SEND A LEG WE CANNOT PROVE
+  // UNPAID. It used to say "Retry any that didn't", which on an unconfirmed
+  // leg was advice to pay twice. So the three states are named separately: a
+  // leg still being checked is not a shortfall yet, a re-payable leg is one
+  // the wallet declined, and an unconfirmed one points at the wallet.
+  const repayableCount = visibleLegs.filter(({ r, leg }) => canRepayLeg(r, leg)).length
+  const unconfirmedCount = visibleLegs.filter(({ leg }) => leg?.status === STATUS.UNCERTAIN).length
+  let tail
+  if (stillChecking) tail = 'Still checking the rest — don’t re-send them.'
+  else if (repayableCount > 0) tail = 'Retry any that were declined.'
+  else if (unconfirmedCount > 0) tail = 'The rest are unconfirmed — check your wallet rather than re-sending.'
+  else tail = 'Check your wallet for the rest.'
   const summaryLine = paidCount > 0
-    ? `${paidCount} of ${activeCount} legs sent. ` +
-      (retryableCount > 0 ? 'Retry any that didn’t.' : 'Check your wallet for the rest.')
-    : 'Boost didn’t go through. Check your wallet' + (retryableCount > 0 ? ', then retry.' : '.')
+    ? `${paidCount} of ${activeCount} legs sent. ${tail}`
+    : `Nothing confirmed yet. ${tail}`
 
   return (
     <>
@@ -344,19 +513,6 @@ export default function ExternalBoostModal({ user, onClose, episode, recipientsB
                   <p className="mt-1 text-[10px] text-neutral-600 text-right">{message.length}/{MAX_MESSAGE_CHARS}</p>
                 </div>
 
-                {canShareToFeed && (
-                  <label className="flex items-start gap-2 text-xs text-neutral-400 cursor-pointer select-none">
-                    <input type="checkbox" checked={shareToFeed} onChange={(e) => setShareToFeed(e.target.checked)} className="accent-orange-500 mt-0.5" />
-                    <span className="leading-snug">Share to my feed
-                      <span className="block text-[10px] text-neutral-600 mt-0.5">
-                        Posts a kind-1 note tagged to this episode with a link back.
-                        OnlyBoosts counts boosts it can find on Nostr, so this is what
-                        puts yours in the feeds and the totals.
-                      </span>
-                    </span>
-                  </label>
-                )}
-
                 {error && <p className="text-xs text-red-400">{error}</p>}
 
                 <button onClick={handleBoost}
@@ -381,9 +537,61 @@ export default function ExternalBoostModal({ user, onClose, episode, recipientsB
                 <ul className="flex-1 min-h-0 overflow-y-auto divide-y divide-neutral-800">
                   {visibleLegs.map(({ r, leg }) => {
                     const realIndex = recipients.indexOf(r)
-                    return <LegRow key={`${r.address}-${realIndex}`} recipient={r} leg={leg} onRetry={phase === 'done' ? () => handleRetry(realIndex) : null} />
+                    return <LegRow key={`${r.address}-${realIndex}`} recipient={r} leg={leg}
+                      onRepay={phase === 'done' ? () => handleRepay(realIndex) : null}
+                      onCheck={phase === 'done' ? () => handleCheck(realIndex) : null}
+                      checking={!!checking[realIndex]}
+                      locked={shareState === 'shared'} />
                   })}
                 </ul>
+                {/* The share control. Withheld until something actually paid,
+                    because a note about a boost that didn't land is worse than
+                    no note. Withheld entirely on an anonymous boost — see the
+                    canShareToFeed note above. */}
+                {/* ⚠️ NOT OFFERED WHILE A LEG IS STILL BEING CHECKED. The
+                    note is a final statement about the boost, and a leg that
+                    settles thirty seconds from now would make it wrong with no
+                    way to correct it. */}
+                {phase === 'done' && canShareToFeed && stillChecking && (
+                  <p className="text-[11px] text-neutral-500 leading-snug">
+                    Checking {Object.values(checking).filter(Boolean).length === 1 ? 'one payment' : 'some payments'} before you share — the note should report what actually landed.
+                  </p>
+                )}
+                {phase === 'done' && canShareToFeed && paidSats > 0 && !stillChecking && (
+                  <div className="rounded-md border border-neutral-800 bg-neutral-800/40 p-3 space-y-2">
+                    {shareState === 'shared' ? (
+                      <p className="text-xs text-green-400 leading-snug">
+                        ✓ Posted to your feed{paidCount < activeCount ? ` — ${fmtSats(paidSats)} sats, ${paidCount} of ${activeCount} splits` : ''}.
+                      </p>
+                    ) : (
+                      <>
+                        <p className="text-xs text-neutral-300 leading-snug">
+                          Share this boost on Nostr?
+                          <span className="block text-[10px] text-neutral-500 mt-1">
+                            Posts a kind-1 note from your npub, tagged to this episode.
+                            OnlyBoosts counts boosts it can find on Nostr, so this is what
+                            puts yours in the feeds and the totals.
+                          </span>
+                        </p>
+                        {/* Naming the figure the note will carry, before it is
+                            signed. On a partial the number is not the one the
+                            donor typed, and finding that out by reading their
+                            own published note is the wrong order. */}
+                        <p className="text-[10px] text-neutral-500 leading-snug">
+                          The note will say <span className="tabular-nums text-neutral-400">{fmtSats(paidSats)} sats</span>
+                          {paidCount < activeCount && <> and <span className="text-neutral-400">{paidCount} of {activeCount} splits paid</span></>}.
+                        </p>
+                        {shareState === 'error' && shareError && (
+                          <p className="text-[11px] text-red-400/90 leading-snug">{shareError}</p>
+                        )}
+                        <button onClick={handleShare} disabled={shareState === 'signing'}
+                          className="w-full py-2 rounded bg-orange-500 hover:bg-orange-600 disabled:bg-neutral-700 disabled:text-neutral-400 text-xs font-medium text-white transition-colors">
+                          {shareState === 'signing' ? 'Approve in your signer…' : shareState === 'error' ? 'Try posting again' : 'Share to Nostr'}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
                 {phase === 'done' && (
                   <button onClick={requestClose} className="mt-1 w-full py-2.5 rounded bg-neutral-700 hover:bg-neutral-600 text-sm text-neutral-200 transition-colors">Done</button>
                 )}

@@ -206,10 +206,68 @@ const LNURL_FETCH_TIMEOUT_MS = 10_000
  * the leg's existing resolving state). A served LNURL ERROR response is
  * NOT retried — that's a definitive answer, parsed by the callers.
  */
+// Bound on an LNURL error body and on the message pulled out of it. Small:
+// this is third-party text headed for a one-line row under a leg.
+const LNURL_ERROR_BODY_CAP = 2048
+const LNURL_ERROR_MSG_CHARS = 180
+
+/**
+ * ⚠️ AN LNURL ERROR BODY IS OFTEN THE ONLY EXPLANATION THE DONOR WILL EVER
+ * GET, so it is read rather than discarded.
+ *
+ * Measured against a real leg on 2026-08-19: `intuitiveocelot66@zeuspay.com`
+ * answered the invoice request with HTTP 400 and the body
+ * `{"success":false,"error":"Zaplocker payments are temporarily disabled.
+ * Check back later."}`. The donor was shown `Request failed (400)` and pressed
+ * Retry four times against a server that had already explained itself.
+ *
+ * Three shapes, because LUD-06's `reason` is not what everyone sends:
+ * `{status:'ERROR',reason}`, `{error}`, `{message}`. Read through the same
+ * bounded reader as any other third-party body, then stripped of control
+ * characters and truncated. React escapes it at render; the cap is what stops
+ * a hostile endpoint filling the modal.
+ */
+async function readErrorReason(res) {
+  try {
+    const cl = parseInt(res.headers.get('content-length') || '', 10)
+    if (Number.isFinite(cl) && cl > LNURL_ERROR_BODY_CAP) return ''
+    let text = ''
+    if (!res.body || typeof res.body.getReader !== 'function') {
+      text = await res.text()
+      if (text.length > LNURL_ERROR_BODY_CAP) return ''
+    } else {
+      const reader = res.body.getReader()
+      const chunks = []
+      let total = 0
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        if (!value) continue
+        total += value.byteLength
+        if (total > LNURL_ERROR_BODY_CAP) { try { await reader.cancel() } catch {} ; return '' }
+        chunks.push(value)
+      }
+      const buf = new Uint8Array(total)
+      let at = 0
+      for (const c of chunks) { buf.set(c, at); at += c.byteLength }
+      text = new TextDecoder().decode(buf)
+    }
+    let data = null
+    try { data = JSON.parse(text) } catch { return '' }
+    const raw = data?.reason || data?.error || data?.message || ''
+    if (typeof raw !== 'string' || !raw) return ''
+    return raw.replace(/[\u0000-\u001f\u007f]+/g, ' ').trim().slice(0, LNURL_ERROR_MSG_CHARS)
+  } catch { return '' }
+}
+
 async function fetchJsonCapped(url, errLabel) {
   try {
     return await fetchJsonCappedOnce(url, errLabel)
   } catch (e) {
+    // ⚠️ Never retry a 4xx. The server understood the request and refused it;
+    // asking again 1.2 seconds later gets the same answer and only delays the
+    // donor's first sight of the reason. 5xx and network faults still retry.
+    if (e?.lnurlStatus >= 400 && e.lnurlStatus < 500) throw e
     await new Promise(r => setTimeout(r, 1200))
     return fetchJsonCappedOnce(url, errLabel)
   }
@@ -222,7 +280,13 @@ async function fetchJsonCappedOnce(url, errLabel) {
     LNURL_FETCH_TIMEOUT_MS,
     errLabel,
   )
-  if (!res.ok) throw new Error(`Request failed (${res.status})`)
+  if (!res.ok) {
+    const reason = await readErrorReason(res)
+    const err = new Error(reason || `Request failed (${res.status})`)
+    err.lnurlStatus = res.status
+    if (reason) err.lnurlReason = reason
+    throw err
+  }
   // Pre-flight check on Content-Length when present. Hostile servers
   // can lie or omit this; the streamed read below is the real guard.
   const cl = parseInt(res.headers.get('content-length') || '', 10)
@@ -876,10 +940,38 @@ async function verifyPreimageMatches(preimageHex, expectedHashHex) {
  * A handful of quick polls covers the case where the payment settled a beat
  * after our pay attempt returned/timed out. Never throws.
  */
-export async function confirmInvoiceSettled(verifyUrl, paymentHash, { attempts = 4, intervalMs = 1500 } = {}) {
+/*
+ * ⚠️ THIS FUNCTION NEVER REPORTS A PAYMENT AS FAILED, AND THAT IS THE WHOLE
+ * POINT OF IT. It returns 'settled' or 'unknown', nothing else.
+ *
+ * LUD-21 has no negative signal. `settled: false` means "not settled AT THE
+ * MOMENT I ASKED"; an invoice still in flight and an invoice that will never
+ * land answer byte-identically. This used to return 'unsettled' whenever the
+ * endpoint answered at least once, and both callers mapped that to a definitive
+ * FAILED — which is the status with no re-pay guard on it. Measured against a
+ * real boost on 2026-08-19: a leg to `chadf@getalby.com` settled after the
+ * 4.5-second poll window closed, was reported "your wallet wasn't charged",
+ * was re-paid by the donor on that advice, and the recipient received the
+ * money TWICE.
+ *
+ * So the only honest answers are "I saw it settle" and "I don't know", and a
+ * caller holding 'unknown' must never re-pay on the strength of it.
+ *
+ * (The one true negative signal is bolt11 expiry: an expired invoice provably
+ * cannot settle. LNURL invoices are typically good for an hour, which is far
+ * too long to hold a modal open for, so it is not used here.)
+ *
+ * `deadlineMs` runs the poll to a wall-clock budget instead of a fixed attempt
+ * count, for the background watcher that keeps checking after the run ends.
+ * `signal` aborts it when the modal unmounts.
+ */
+export async function confirmInvoiceSettled(verifyUrl, paymentHash, {
+  attempts = 4, intervalMs = 1500, deadlineMs = null, signal = null,
+} = {}) {
   if (typeof verifyUrl !== 'string' || !verifyUrl.startsWith('https://')) return 'unknown'
-  let sawResponse = false
-  for (let i = 0; i < attempts; i++) {
+  const until = deadlineMs ? Date.now() + deadlineMs : null
+  for (let i = 0; (i < attempts) || (until && Date.now() < until); i++) {
+    if (signal?.aborted) return 'unknown'
     try {
       // Bounded per poll. The verify URL comes from the LNURL response
       // (third-party, only https-checked), and this function sits on every
@@ -888,7 +980,6 @@ export async function confirmInvoiceSettled(verifyUrl, paymentHash, { attempts =
       // minutes on the browser's default fetch timeout.
       const res = await withTimeout(fetch(verifyUrl), 6000, 'verify-timeout')
       if (res.ok) {
-        sawResponse = true
         const data = await res.json().catch(() => null)
         if (data && data.settled) {
           if (paymentHash && typeof data.preimage === 'string' && data.preimage.length > 0) {
@@ -899,9 +990,9 @@ export async function confirmInvoiceSettled(verifyUrl, paymentHash, { attempts =
         }
       }
     } catch { /* network blip — try again */ }
-    if (i < attempts - 1) await new Promise(r => setTimeout(r, intervalMs))
+    if (until && Date.now() + intervalMs >= until) break
+    if (!until && i >= attempts - 1) break
+    await new Promise(r => setTimeout(r, intervalMs))
   }
-  // If the endpoint answered at least once (always settled:false) we trust it
-  // as unpaid; if it never answered we genuinely don't know.
-  return sawResponse ? 'unsettled' : 'unknown'
+  return 'unknown'
 }

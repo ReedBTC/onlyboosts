@@ -618,6 +618,134 @@ Code edits, dry runs, and read-only inspection are fine without asking.
 event, or that moves sats.** Published events can't be unpublished. **New bots
 start with `DRY_RUN = True`.**
 
+### ⚠️ A Payment We Cannot Confirm Is Not A Payment That Failed
+
+**LUD-21 has no negative signal.** `settled: false` means *not settled at the
+moment I asked*; an invoice still in flight and an invoice that will never land
+answer byte-identically. `confirmInvoiceSettled` in `boostagram.js` therefore
+returns **`'settled'` or `'unknown'` and nothing else**, and its two callers
+(`externalBoost.js`, `payAllLegs.js`) may never derive a failure from it.
+
+**This cost a recipient a double payment on 2026-08-19.** The function used to
+return `'unsettled'` whenever the verify endpoint answered at least once, over a
+poll window of **4 attempts 1500ms apart, so 4.5 seconds**. A leg to
+`chadf@getalby.com` settled after that window closed, was reported FAILED with
+"your wallet wasn't charged", was re-paid by the donor on that advice, and the
+recipient received the money twice. Both attempts settled and both were reported
+failed, because the inference was deterministic rather than a race.
+
+**FAILED and UNCERTAIN are now different claims, and only one of them may be
+re-paid.**
+
+| | Means | Button |
+|---|---|---|
+| `FAILED` | the wallet never sent it: a pre-payment error, or a clean decline (`isCleanDecline`) | **Retry**, which re-pays |
+| `UNCERTAIN` | an invoice was handed over and no settlement was observed | **Check again**, which only re-polls |
+| `PAID` | a preimage, or verify said settled | — |
+
+**⚠️ THERE IS NO RE-PAY PATH OUT OF UNCERTAIN, ANYWHERE, AND THAT IS DELIBERATE**
+(Reed's call, 2026-08-19). `handleRetry` used to fall through to a re-pay on
+`'unsettled'` with the comment "safe to re-pay"; it was not. A donor whose leg
+genuinely did not land boosts again from the top, which is one deliberate act
+rather than a button that quietly risks their money. `canRepayLeg` and
+`canCheckLeg` in `ExternalBoostModal.jsx` are the split.
+
+**The 90-second watcher is the other half.** Waiting 4.5s inline is right, since
+the leg loop is sequential and a donor should not watch a spinner; so every
+unconfirmed lnaddress leg keeps being polled *after* the run, to a **90s**
+wall-clock budget (`WATCH_MS`, 3s interval), and flips itself to Paid if it
+lands late. A donor-pressed re-check runs 30s (`RECHECK_MS`). Most unconfirmed
+legs resolve with no decision from anybody, which is the point: the bug was a
+screen asking the donor to decide on bad information. `deadlineMs` and `signal`
+on `confirmInvoiceSettled` exist for this.
+
+**Two consequences for the share note**, both from the same rule that the note
+is a *final statement*: Share is **withheld while any leg is still being
+checked**, and once the note is published every row's button **goes inert**,
+because a leg that changed afterwards could not be reflected in an event that
+cannot be edited.
+
+The one true negative signal is bolt11 expiry, which provably ends an invoice.
+LNURL invoices typically live an hour, far too long to hold a modal open for, so
+it is not used. Do not reintroduce a shorter inference in its place.
+
+### What A Recipient's Server Says Is Shown To The Donor
+
+`fetchJsonCappedOnce` threw `Request failed (${status})` and discarded the
+response body. Measured on a real leg, 2026-08-19:
+`intuitiveocelot66@zeuspay.com` answered the invoice request **HTTP 400** with
+`{"success":false,"error":"Zaplocker payments are temporarily disabled. Check
+back later."}`. The donor was shown `Request failed (400)` and pressed Retry
+four times against a server that had already explained itself in plain English.
+
+`readErrorReason` now reads that body, through the same bounded reader as any
+other third-party response, and the leg prints **"Their Lightning provider said:
+…"**. Three shapes, because LUD-06's `reason` is not what everyone sends:
+`{status:'ERROR',reason}`, `{error}`, `{message}`. Capped at 2KB of body and 180
+characters of message, control characters stripped; React escapes it at render.
+
+**⚠️ A reason from the recipient's server is used VERBATIM and never passed
+through `friendlyError`.** That function rewrites on keywords, so a provider
+whose message happens to contain *declined* or *expired* would be reported to
+the donor as **their own wallet** declining. That is a lie about whose fault it
+is, and it sends them to check the wrong thing.
+
+**A 4xx is never retried.** The server understood and refused; asking again
+1.2s later gets the same answer and only delays the donor's first sight of the
+reason. 5xx and network faults still get the retry.
+
+**⚠️ ZEUS PAY ADDRESSES USE HODL INVOICES, AND THEY ARE THE CASE THE UNCERTAIN
+RULE EXISTS FOR.** That endpoint's own metadata reads *"Hodl invoice will settle
+when user comes online within 24hrs or you'll be refunded."* So a payment there
+is **accepted and held**, not settled — LUD-21 will answer `settled: false` for
+up to a day, and the payer's wallet may report a timeout. Under the pre-2026-08-19
+code that is a guaranteed double payment: reported FAILED, offered a re-pay,
+paid again, and both eventually settle. Under the current rule it is UNCERTAIN,
+the 90s watcher gives up, and the only offer is **Check again**. Any
+hodl-invoice recipient behaves this way **by design**, so this is a recurring
+case and not an edge one.
+
+### The Share Note Reports What Settled
+
+A boost distributes across a value block and **any leg of it can fail**, so what
+the donor typed and what recipients received are different numbers on every
+partial. `buildExternalNoteTemplate` therefore takes `paidSats`, never the form
+amount, and its `amount` tag carries the same figure. **⚠️ That tag is what this
+site's own collector reads**, so an overstated note is not merely a wrong claim
+on someone's feed; it is a wrong row in this index. It shipped that way until
+2026-08-19.
+
+**⚠️ The share is a VERB pressed on the done screen, not a checkbox ticked
+before paying.** The settled total is unknown until every leg has run *and* the
+donor has finished retrying, and an event cannot be edited, so a note published
+when the first pass ends can never reflect a successful retry. The figures are
+recomputed from live leg state at the moment of the press. The screen names the
+number the note will carry before it is signed.
+
+`legsTotal` **excludes SKIPPED legs**: a leg allocated zero sats by the split
+was never attempted, and counting it would report a shortfall that never
+happened. Where `legsPaid < legsTotal` the note adds one line, `⚠️ 2 of 3 splits
+paid` — *splits* rather than *legs*, being the word the value spec and the
+podcast apps use, and this line is read outside this codebase.
+
+**⚠️ ONE BOOST PUBLISHES AT MOST ONE NOTE.** `shareState` latches at `shared`,
+and a retry that lands afterwards does not republish. Two notes for one payment
+would be two rows in the index, which is the same double-count the
+OnlyBoosts-signs-it path has to avoid by never being offered alongside a
+donor-signed note.
+
+Withheld entirely when nothing paid, and **withheld entirely on an anonymous
+boost** rather than shown disabled: signing with the donor's own npub would undo
+the anonymity they chose one field up. That case is what the site-signed path is
+for, and it does not exist yet.
+
+**The LB path is different and is deliberately not being changed.**
+`MultiLegBoostForm` signs its kind-1 *before* paying, batched into one signer
+approval with the receipts, and `boostQueue.js` publishes it if any leg paid.
+Its content is frozen before any outcome is known. It is unaffected here because
+the only surface using it on this fork is the site tip, which is one leg at 100%
+and cannot partial.
+
 ### The one boost button
 
 Boosting a SHOW (as opposed to an episode) pays the **feed-level** value block —

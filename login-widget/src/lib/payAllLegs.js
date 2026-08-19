@@ -369,12 +369,12 @@ async function runLeg({
       update({ status: STATUSES.PAID })
       return { ...baseResult }
     }
-    if (settlement === 'unsettled') {
-      update({ status: STATUSES.FAILED, error: friendlyPayError(payMsg) || 'Payment did not settle.' })
-      return { ...baseResult }
-    }
-    // 'unknown' — verify URL missing/unreachable. We genuinely can't tell,
-    // so we must NOT claim it failed (no "wallet wasn't charged", no auto-retry).
+    // 'unknown' — everything that is not a confirmed settlement. The verify URL
+    // may be missing or unreachable, or it may simply still be answering
+    // `settled: false` on an invoice that has not landed YET. ⚠️ Those are not
+    // distinguishable and must not be treated as failure: see the warning over
+    // confirmInvoiceSettled for the boost this cost. No "wallet wasn't
+    // charged", no auto-retry.
     update({
       status: STATUSES.UNCERTAIN,
       error: 'Couldn’t confirm this payment. Check your wallet before retrying — it may have already gone through.',
