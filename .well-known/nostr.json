@@ -1,10 +1,17 @@
 {
   "names": {
     "_": "9edbee5534cba129e9c1a89a50e2b29f5abdff9d9a6fb521e61906d477d9f18c",
-    "onlyboosts": "9edbee5534cba129e9c1a89a50e2b29f5abdff9d9a6fb521e61906d477d9f18c"
+    "onlyboosts": "9edbee5534cba129e9c1a89a50e2b29f5abdff9d9a6fb521e61906d477d9f18c",
+    "boostbot": "3a87a19c801d57111b0905569225d2b20b39d154fc93bef5a8f2860c409b84d9"
   },
   "relays": {
     "9edbee5534cba129e9c1a89a50e2b29f5abdff9d9a6fb521e61906d477d9f18c": [
+      "wss://relay.ditto.pub",
+      "wss://nos.lol",
+      "wss://relay.mostr.pub",
+      "wss://relay.fountain.fm"
+    ],
+    "3a87a19c801d57111b0905569225d2b20b39d154fc93bef5a8f2860c409b84d9": [
       "wss://relay.ditto.pub",
       "wss://nos.lol",
       "wss://relay.mostr.pub",

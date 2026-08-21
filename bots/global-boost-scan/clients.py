@@ -77,10 +77,32 @@ from urllib.parse import urlparse
 # slug through SLUG_ALIASES, so today the precedence changes only `client_src`
 # (client-tag → publisher-pubkey) — but it is what makes the `via` line readable
 # at all, since the tag path returns before it is looked for.
+# ⚠️ THE FOURTH IS OUR OWN, and it is the first one that is not somebody else's
+# bot. `onlyboosts_boostbot` signs a boost note for a donor who paid a show with
+# no Nostr account of their own, through the site's `/api/sign-boost` endpoint;
+# the browser publishes it. Registered 2026-08-20.
+#
+# It takes the SAME SLUG as the donor-signed path, which is deliberate
+# (boost-login.md D3): both are boosts made on this site, and splitting them
+# into two clients would report one product as two. `client_src` is what tells
+# them apart — `publisher-pubkey` for bot-signed, `client-tag` for donor-signed —
+# and it is free, since the pubkey is tested before the tag.
+#
+# ⚠️ THE SELF-NAMING GUARD BELOW IS NOW LOAD-BEARING FOR OUR OWN NOTES. The
+# template's attribution line reads `📱 via onlyboosts.social`, which is exactly
+# the shape `_VIA_RE` reads, and `slugify` takes it to `onlyboosts` — the slug
+# itself. Without `via != slug` every bot note would nest OnlyBoosts under
+# OnlyBoosts on `/api/v1/clients`. Verified against a real signed event.
+#
+# ⚠️ THE BOOSTER IS THE BOT, NOT THE DONOR, per D2. These notes carry no claim
+# about who paid, and must not gain one: nothing here can verify a donor
+# authorised a note signed by a key they do not hold. Same treatment the 994
+# `chadf-boostbot` rows and the LB show account already get.
 PUBLISHER_PUBKEYS = {
     "f3bd42a91af5f3f1c40ca45ad2269464ab79996b32da78e8ed2ab91111b08e65": "chadf-boostbot",
     "d35ae076512c29b01a5b33aa764ed4db44a9d0bbd96009705f48101f6cfe76a2": "lnaddress-music",
     "c330881e28768381dd8bdfd274341dca0c5882c29b8642ea4bc82f7563264592": "localbitcoiners",
+    "3a87a19c801d57111b0905569225d2b20b39d154fc93bef5a8f2860c409b84d9": "onlyboosts",
 }
 
 # Fountain links its own episode/show pages from the URL slot of each NIP-73
