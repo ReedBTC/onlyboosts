@@ -576,7 +576,14 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
         // person; and nothing anywhere may turn this string into a `p` tag or
         // an author field, because nothing can verify that the person named
         // authorised a note signed by a key they do not hold.
-        senderName: noteRoute === 'bot' ? typedName : '',
+        //
+        // ⚠️ THE DEFAULT GOES IN TOO, so every bot-signed note carries the same
+        // line whether or not anybody typed. Without it an anonymous note is
+        // just the bot's own voice, which reads as OnlyBoosts boosting rather
+        // than OnlyBoosts publishing for somebody — a different claim, and the
+        // wrong one. It also keeps the note and the boostagram saying the same
+        // string, which is the thing a podcaster can cross-check.
+        senderName: noteRoute === 'bot' ? (typedName || DEFAULT_SENDER_NAME) : '',
         showTitle: episode?.showTitle,
         episodeTitle: episode?.episodeTitle,
         podcastGuid: episode?.podcastGuid,
@@ -602,21 +609,30 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
   }
 
   /**
-   * ⚠️ A BOT-SIGNED NOTE PUBLISHES ITSELF ON A CLEAN BOOST (D14), and this is
-   * the one place the two routes are deliberately asymmetric.
+   * ⚠️ A CLEAN BOOST PUBLISHES ITS NOTE BY ITSELF, ON BOTH ROUTES. Reed's call,
+   * 2026-08-21, correcting the version that auto-published only the bot route:
+   * *"shouldn't the opt-in to share be enough?"*
    *
-   * The press exists on the donor-signed path because a signer prompt has to be
-   * ASKED for: an approval dialog arriving unannounced after a payment the
-   * donor thought was the end of the interaction is worse than a button. There
-   * is no prompt on the bot path, so the press there buys nothing and costs the
-   * newcomer this feature exists for one more thing to understand.
+   * It is, and the argument for the exception does not survive contact with the
+   * form. The press was kept on the donor path because a signer prompt has to
+   * be ASKED for, an approval dialog arriving unannounced after a payment being
+   * worse than a button. But the ask now happens in the form, one field above
+   * the amount: leaving the private box unchecked IS the request. A second
+   * press afterwards asks the same question twice and reads as the first answer
+   * not having counted.
    *
-   * ⚠️ IT FIRES ONLY WHERE THE PRESS COULD NOT HAVE CHANGED THE ANSWER: every
-   * active leg PAID and nothing still being checked. A shortfall or an
+   * ⚠️ IT STILL FIRES ONLY WHERE THE PRESS COULD NOT HAVE CHANGED THE ANSWER:
+   * every active leg PAID and nothing still being checked. A shortfall or an
    * UNCERTAIN leg is exactly the state in which the donor may still retry and
-   * change what the note should say, so those get the button. That is the same
-   * "reports what settled" rule with the press removed from the case where it
-   * was ceremony, not a decision.
+   * change what the note should say, so those get the button, and the screen
+   * says which of the two it is. That is the "reports what settled" rule with
+   * the press removed from every case where it was ceremony.
+   *
+   * The one thing this costs is that a NIP-07 or NIP-46 signer prompt now
+   * arrives without a press behind it. It is not unannounced — the donor asked
+   * for the note in the form — and the screen names what it is waiting for. A
+   * signer that times out lands in `shareState === 'error'`, which offers the
+   * press back.
    *
    * `autoSharedRef` is what stops a late-settling leg from firing a second
    * publish. `shareState` latches at 'shared' as well, so one boost publishes
@@ -624,7 +640,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
    */
   const autoSharedRef = useRef(false)
   useEffect(() => {
-    if (phase !== 'done' || noteRoute !== 'bot') return
+    if (phase !== 'done' || noteRoute === 'none') return
     if (autoSharedRef.current || shareState !== 'idle') return
     if (stillChecking || paidSats <= 0) return
     if (activeCount === 0 || paidCount !== activeCount) return
@@ -932,8 +948,8 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
                       {noNote
                         ? 'Your sats and message still reach the show. Nothing is posted to Nostr from any account, so this boost stays out of the OnlyBoosts feeds and totals.'
                         : noteRoute === 'bot'
-                          ? 'OnlyBoosts counts boosts it can find on Nostr, so a note is what puts yours in the feeds and the totals. Tick this to keep it off Nostr entirely.'
-                          : 'You choose whether to post it once the sats have landed, so the note reports what actually went through. Tick this to keep it off Nostr entirely.'}
+                          ? 'Left unticked, OnlyBoosts posts the boost for you once your sats land. That is what puts it in the feeds and the totals.'
+                          : 'Left unticked, the note posts from your own account once your sats land, so it reports what actually went through. That is what puts it in the feeds and the totals.'}
                     </span>
                   </span>
                 </label>
@@ -1032,29 +1048,37 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
                           </span>
                         )}
                       </p>
-                    ) : shareState === 'signing' && noteRoute === 'bot' ? (
-                      /* The auto-publish window (D14). Named rather than left
-                         silent: this is the one moment the screen is doing
-                         something the donor did not press. */
-                      <p className="text-xs text-neutral-300 leading-snug">Posting your boost to Nostr…</p>
+                    ) : shareState === 'signing' ? (
+                      /* ⚠️ THE AUTO-PUBLISH WINDOW, AND ON THE DONOR ROUTE IT
+                         CARRIES AN INSTRUCTION RATHER THAN A STATUS. Nothing
+                         was pressed, so a signer prompt is about to appear with
+                         no obvious cause; a donor who does not know to go and
+                         approve it will simply watch this time out. The bot
+                         route has nothing to approve and says so. */
+                      <p className="text-xs text-neutral-300 leading-snug">
+                        {noteRoute === 'bot'
+                          ? 'Posting your boost to Nostr…'
+                          : 'Approve this in your signer to post it to Nostr…'}
+                      </p>
                     ) : (
                       <>
                         <p className="text-xs text-neutral-300 leading-snug">
-                          {noteRoute === 'bot' ? 'Post this boost to Nostr?' : 'Share this boost on Nostr?'}
+                          {shareState === 'error' ? 'The note didn’t post' : 'Post this boost to Nostr?'}
                           <span className="block text-[10px] text-neutral-500 mt-1">
                             {noteRoute === 'bot'
                               ? `OnlyBoosts counts boosts it can find on Nostr, so this is what puts yours in the feeds and the totals. It posts under the OnlyBoosts account${signedIn ? ', not yours' : ''}.`
-                              : 'Posts a kind-1 note from your npub, tagged to this episode. OnlyBoosts counts boosts it can find on Nostr, so this is what puts yours in the feeds and the totals.'}
+                              : 'Posts a note from your own account, tagged to this episode. OnlyBoosts counts boosts it can find on Nostr, so this is what puts yours in the feeds and the totals.'}
                           </span>
                         </p>
-                        {/* ⚠️ WHY THE BOT ROUTE IS ASKING AT ALL. It publishes
-                            itself on a clean boost, so reaching this branch
-                            means a leg fell short or went unconfirmed — which
-                            is exactly the state in which a retry would change
-                            what the note should say. Saying so is what makes
-                            the button read as a decision rather than a step
-                            that appears at random. */}
-                        {noteRoute === 'bot' && shareState !== 'error' && (
+                        {/* ⚠️ WHY IT IS ASKING AT ALL, ON EITHER ROUTE. A clean
+                            boost publishes itself, so reaching this branch means
+                            a leg fell short or went unconfirmed — exactly the
+                            state in which a retry would change what the note
+                            should say. Saying so is what makes the button read
+                            as a decision rather than a step appearing at
+                            random, which is the whole reason the press was
+                            removed from the clean case. */}
+                        {shareState !== 'error' && (
                           <p className="text-[10px] text-amber-400/90 leading-snug">
                             Waiting on you because not every split landed. Retry what you can first;
                             the note reports whatever has settled when you press.
@@ -1067,7 +1091,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
                         <p className="text-[10px] text-neutral-500 leading-snug">
                           The note will say <span className="tabular-nums text-neutral-400">{fmtSats(paidSats)} sats</span>
                           {paidCount < activeCount && <> and <span className="text-neutral-400">{paidCount} of {activeCount} splits paid</span></>}
-                          {noteRoute === 'bot' && typedName && <>, from <span className="text-neutral-400">{typedName}</span></>}.
+                          {noteRoute === 'bot' && <>, from <span className="text-neutral-400">{typedName || DEFAULT_SENDER_NAME}</span></>}.
                         </p>
                         {/* ⚠️ A FAILED SIGN IS NOT A FAILED BOOST, and the copy
                             has to say so or a donor reads it as their sats
@@ -1079,10 +1103,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
                         )}
                         <button onClick={handleShare} disabled={shareState === 'signing'}
                           className="w-full py-2 rounded bg-orange-500 hover:bg-orange-600 disabled:bg-neutral-700 disabled:text-neutral-400 text-xs font-medium text-white transition-colors">
-                          {shareState === 'signing'
-                            ? (noteRoute === 'bot' ? 'Posting\u2026' : 'Approve in your signer\u2026')
-                            : shareState === 'error' ? 'Try posting again'
-                            : noteRoute === 'bot' ? 'Post to Nostr' : 'Share to Nostr'}
+                          {shareState === 'error' ? 'Try posting again' : 'Post to Nostr'}
                         </button>
                       </>
                     )}

@@ -1024,15 +1024,25 @@ its own scope**: *Boost privately (no Nostr note)*, never a bare *Boost
 privately*. The sats and the message still cross Lightning to the show's own
 app, which is the half the word "privately" does not cover.
 
-**⚠️ A BOT-SIGNED NOTE PUBLISHES ITSELF ON A CLEAN BOOST AND ASKS ON A MESSY
-ONE.** The press exists on the donor path because a signer prompt has to be
-asked for; there is no prompt on the bot path, so the press there is friction
-charged to precisely the newcomer this feature exists for. It fires only when
-every active leg is `PAID` and nothing is being checked — a shortfall or an
-`UNCERTAIN` leg is exactly the state in which a retry could still change what
-the note should say, so those render the button, with a line saying why. The
-withhold-while-checking rule is untouched and `shareState` still latches at
-`shared`, so **one boost still publishes at most one note**.
+**⚠️ A CLEAN BOOST PUBLISHES ITS NOTE BY ITSELF, ON BOTH ROUTES.** The press
+survived on the donor path for one day, on the argument that a signer prompt has
+to be asked for. Reed's correction, 2026-08-21: *"shouldn't the opt-in to share
+be enough?"* It is. **The ask now happens in the form**, one field above the
+amount, and leaving the private box unchecked *is* the request; asking again
+afterwards puts the same question twice and reads as the first answer not having
+counted.
+
+It fires only when every active leg is `PAID` and nothing is being checked. A
+shortfall or an `UNCERTAIN` leg is exactly the state in which a retry could
+still change what the note should say, so those render the button **with a line
+saying why** — without it the button appears at random rather than as a
+decision. The withhold-while-checking rule is untouched and `shareState` still
+latches at `shared`, so **one boost still publishes at most one note**.
+
+**⚠️ ON THE DONOR ROUTE THE WAITING COPY IS AN INSTRUCTION, NOT A STATUS**:
+*Approve this in your signer to post it to Nostr…* Nothing was pressed, so the
+prompt arrives with no obvious cause, and a donor who does not know to go and
+approve it will just watch it time out.
 
 **⚠️ A BLANK "From" IS REPLACED, NOT OMITTED.** `DEFAULT_SENDER_NAME` is
 `onlyboosts.social user`, and it fills the boostagram's `sender_name` only. An
@@ -1040,10 +1050,15 @@ empty one renders blank in one aggregator and "Unknown" in the next, so a boost
 with nobody's name on it presents differently everywhere it lands; the default
 makes it one consistent thing, and it names the **site** rather than a person,
 so it discloses nothing the note's own author does not. Same call BMB makes.
-**It never reaches the note**, whose author is already the OnlyBoosts bot and
-where a "From onlyboosts.social user" line would be the account restating
-itself. The field is labelled `From`, placeholders the default, and says
-*Left blank, boosts are sent as "onlyboosts.social user"*.
+**It reaches the note as well**, so every bot-signed note carries a `👤 From`
+line whether or not anybody typed. That was scoped to the boostagram for a day
+and the absence was the first thing Reed went looking for. Without it an
+anonymous note is only the bot's own voice, which reads as *OnlyBoosts boosted
+this* rather than *OnlyBoosts published this for somebody* — a different claim,
+and the wrong one. It also keeps the note and the boostagram saying the same
+string, which is what a podcaster can cross-check. The field is labelled `From`,
+placeholders the default, and says *Left blank, boosts are sent as
+"onlyboosts.social user"*.
 
 **⚠️ THE TYPED NAME IS PROSE AND NOTHING ELSE** (`👤 From <name>`). It rides the
 boostagram TLV, which is what the podcaster's Helipad reads, and it becomes one
