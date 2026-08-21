@@ -1,0 +1,17 @@
+[Unit]
+Description=OnlyBoosts daily PC 2.0 adoption snapshot (Podcast Index public tracking/stats files)
+After=network-online.target
+Wants=network-online.target
+# Fires only on a real breakage: a fetch that failed after retries, a body
+# that stopped parsing as JSON, or the DB rebuild raising.
+OnFailure=lb-bot-alert@%n.service
+
+[Service]
+Type=oneshot
+User=reed
+WorkingDirectory=/home/reed/onlyboosts/bots/pc20-stats
+ExecStart=/home/reed/onlyboosts/bots/pc20-stats/run-pc20stats.sh
+# ~51MB across four files plus a 33k-row DB rebuild; minutes, not more.
+TimeoutStartSec=900
+StandardOutput=journal
+StandardError=journal

@@ -1,0 +1,14 @@
+[Unit]
+Description=Run the OnlyBoosts PC 2.0 adoption snapshot daily
+
+[Timer]
+# 11:10 UTC — clear of the outbox (08:30), podroll (09:40+15m jitter) and the
+# incremental's 5-minute tick. The cadence PI regenerates these files on is
+# not published; once a day is the point (each day archived is a day of value-
+# block history that cannot be reconstructed later), not freshness.
+OnCalendar=*-*-* 11:10:00 UTC
+RandomizedDelaySec=600
+Persistent=true
+
+[Install]
+WantedBy=timers.target

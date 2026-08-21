@@ -52,6 +52,12 @@ bots/CLAUDE.md
 # functions/api/data/ (the proxy Function) on first commit.
 /data/
 
+# --- PC 2.0 stats bot: daily gzipped snapshots of Podcast Index's public
+# tracking/stats files, plus the SQLite built from them. Multi-MB per day and
+# regenerable only FORWARD (PI serves current state only), so the archive
+# lives on this box, not in git.
+bots/pc20-stats/data/
+
 # --- Python ---
 bots/**/__pycache__/
 bots/**/*.pyc
