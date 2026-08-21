@@ -468,7 +468,7 @@
 // session-only because the at-rest scheme encrypts the NWC URI to the user's
 // own signer. The widget bundle changed, so a returning visitor needs the new
 // URL.
-const VERSION = 'ob-v90';
+const VERSION = 'ob-v91';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;
@@ -500,27 +500,27 @@ const PRECACHE_URLS = [
   '/assets/onlyboosts_pfp.png',
   '/assets/onlyboosts_banner.png',
   '/assets/avatar-fallback.svg',
-  '/assets/css/theme.css?v=ob-v90',
-  '/assets/css/page.css?v=ob-v90',
-  '/assets/css/nav.css?v=ob-v90',
-  '/assets/css/footer.css?v=ob-v90',
-  '/assets/css/boosts-thread.css?v=ob-v90',
-  '/assets/css/boost-actions.css?v=ob-v90',
+  '/assets/css/theme.css?v=ob-v91',
+  '/assets/css/page.css?v=ob-v91',
+  '/assets/css/nav.css?v=ob-v91',
+  '/assets/css/footer.css?v=ob-v91',
+  '/assets/css/boosts-thread.css?v=ob-v91',
+  '/assets/css/boost-actions.css?v=ob-v91',
   // The episode card and its drawer. Precached alongside the others because the
   // homepage's feeds are painted in it and it used to be inline in index.html,
   // which IS precached — leaving it out would trade an inline block for a
   // network round trip on the one page this list exists to make fast.
-  '/assets/css/feed-cards.css?v=ob-v90',
-  '/assets/js/boosts-thread.js?v=ob-v90',
+  '/assets/css/feed-cards.css?v=ob-v91',
+  '/assets/js/boosts-thread.js?v=ob-v91',
   // A static import of boosts-thread.js, so precaching that without this one
   // leaves a returning visitor fetching half the graph from the network.
-  '/assets/js/primal-profiles.js?v=ob-v90',
-  '/assets/js/calendar-events.js?v=ob-v90',
-  '/assets/js/boost-actions.js?v=ob-v90',
-  '/assets/js/nav.js?v=ob-v90',
-  '/assets/js/nav-widget-boot.js?v=ob-v90',
-  '/assets/js/widget-loader.js?v=ob-v90',
-  '/assets/js/sw-register.js?v=ob-v90',
+  '/assets/js/primal-profiles.js?v=ob-v91',
+  '/assets/js/calendar-events.js?v=ob-v91',
+  '/assets/js/boost-actions.js?v=ob-v91',
+  '/assets/js/nav.js?v=ob-v91',
+  '/assets/js/nav-widget-boot.js?v=ob-v91',
+  '/assets/js/widget-loader.js?v=ob-v91',
+  '/assets/js/sw-register.js?v=ob-v91',
 ];
 
 self.addEventListener('install', (event) => {

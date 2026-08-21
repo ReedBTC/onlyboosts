@@ -271,7 +271,7 @@ async function runLeg({
       const sendComment = allowed > 0 ? comment.slice(0, allowed) : ''
 
       update({ status: STATUSES.REQUESTING })
-      const { pr, verify } = await fetchLnurlInvoice(meta.callback, leg.msats, sendComment)
+      const { pr, verify } = await fetchLnurlInvoice(meta.callback, leg.msats, sendComment, leg.recipient.address)
       invoice = pr
       if (verify) update({ verifyUrl: verify })
     }
@@ -463,7 +463,7 @@ export async function presignAllowlistedLegs({
         const allowed = meta.commentAllowed || 0
         const sendComment = allowed > 0 ? comment.slice(0, allowed) : ''
 
-        const { pr, verify } = await fetchLnurlInvoice(meta.callback, leg.msats, sendComment)
+        const { pr, verify } = await fetchLnurlInvoice(meta.callback, leg.msats, sendComment, r.address)
         const paymentHash = bolt11PaymentHash(pr)
         if (!paymentHash) continue
 

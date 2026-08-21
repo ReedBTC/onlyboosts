@@ -160,7 +160,7 @@ async function payLnaddressLeg(leg, ctx, update, timer) {
   }
   const allowed = meta.commentAllowed || 0
   const comment = allowed > 0 ? (ctx.message || '').slice(0, Math.min(allowed, MAX_MESSAGE_CHARS)) : ''
-  const { pr, verify } = await fetchLnurlInvoice(meta.callback, msats, comment)
+  const { pr, verify } = await fetchLnurlInvoice(meta.callback, msats, comment, leg.recipient.address)
   timer?.mark('invoice')
   const paymentHash = bolt11PaymentHash(pr)
   update({ verifyUrl: verify || null, paymentHash })

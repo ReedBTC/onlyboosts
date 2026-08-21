@@ -343,6 +343,69 @@ const CALLBACK_HOST_ALLOWLIST = {
   'walletofsatoshi.com': ['livingroomofsatoshi.com'],
 }
 
+/**
+ * ⚠️ A LIGHTNING ADDRESS WHOSE SERVER SENDS NO CORS HEADERS CANNOT BE PAID FROM
+ * A BROWSER AT ALL, AND THE FAILURE LOOKS LIKE THE HOST BEING DOWN.
+ *
+ * Both LNURL hops run here in the page. A cross-origin response with no
+ * `Access-Control-Allow-Origin` is unreadable to JavaScript however healthy the
+ * server is, so the leg dies before an invoice is ever requested. Every
+ * provider we had measured sends `*` (getalby.com, fountain.fm), which is why
+ * this went unnoticed; a SELF-HOSTED address generally sends nothing. Measured
+ * 2026-08-21 on `spencer@bowlafterbowl.com`, 44% of that show's value block:
+ * metadata, keysend document and invoice callback all 200, no CORS on any.
+ *
+ * `functions/api/lnurl.js` is the way out, and it is a FALLBACK rather than the
+ * route. Every leg still tries the recipient's own server first, so a host that
+ * works today does not touch our edge and a Pages outage cannot take down a
+ * boost path that never needed us.
+ *
+ * ⚠️ THE PROXY TAKES THE ADDRESS, NEVER A URL — see the Function's header.
+ */
+const lnurlProxyUrl = (params) => `/api/lnurl?${new URLSearchParams(params)}`
+
+/**
+ * Hosts whose direct fetch has already failed this session.
+ *
+ * Not an optimisation. The metadata hop is prefetched on modal mount, off the
+ * critical path, but the invoice hop happens with the donor watching a
+ * spinner — and `fetchJsonCapped` retries once with a 1.2s backoff before
+ * giving up, so a doomed direct attempt costs a visible ~2.5s per leg. Once one
+ * hop has proved the host unreadable, the rest go straight to the proxy.
+ *
+ * Never persisted: a provider adding the header should recover on a reload,
+ * not stay routed through us until a cache expires.
+ */
+const corsBlockedHosts = new Set()
+
+/**
+ * The amount an invoice actually demands, in msats, or null if it cannot be
+ * read. Parses the bolt11 human-readable part (`lnbc<value><multiplier>`).
+ *
+ * ⚠️ AN UNPARSEABLE AMOUNT IS ALLOWED THROUGH, DELIBERATELY. The check exists
+ * to catch an invoice for the wrong figure; treating "I could not read this"
+ * as a failure would break a working payment on an encoding nobody anticipated,
+ * and the behaviour it replaces is no check at all. Refusing a MISMATCH is the
+ * whole value, and that is what the caller does.
+ */
+export function bolt11AmountMsats(invoice) {
+  const m = /^lnbc(\d+)([munp])?1/i.exec(String(invoice || '').toLowerCase())
+  if (!m) return null
+  const value = Number(m[1])
+  if (!Number.isSafeInteger(value) || value <= 0) return null
+  // 1 BTC = 1e11 msat. The multiplier scales the value down from whole bitcoin.
+  switch (m[2]) {
+    case 'm': return value * 1e8
+    case 'u': return value * 1e5
+    case 'n': return value * 100
+    // pico-bitcoin is the only unit finer than a msat, so it must be a
+    // multiple of 10 to name a whole number of them.
+    case 'p': return value % 10 === 0 ? value / 10 : null
+    case undefined: return value * 1e11
+    default: return null
+  }
+}
+
 export async function fetchLnurlMeta(lud16) {
   if (!LUD16_RE.test(lud16)) throw new Error('Invalid lightning address format')
   const [name, domain] = lud16.split('@')
@@ -360,7 +423,23 @@ export async function fetchLnurlMeta(lud16) {
   } catch {
     throw new Error('Invalid lightning address host')
   }
-  const data = await fetchJsonCapped(metaUrl.toString(), 'lnurl-meta-timeout')
+  let data
+  if (corsBlockedHosts.has(domain.toLowerCase())) {
+    data = await fetchJsonCapped(lnurlProxyUrl({ addr: lud16 }), 'lnurl-meta-timeout')
+  } else {
+    try {
+      data = await fetchJsonCapped(metaUrl.toString(), 'lnurl-meta-timeout')
+    } catch (e) {
+      // ⚠️ A CORS BLOCK AND A DEAD HOST ARE THE SAME TypeError HERE, and the
+      // browser will not tell us which. So the proxy is tried after ANY
+      // failure that isn't the server's own considered answer: a served 4xx or
+      // 5xx means we reached them and they refused, and asking again through
+      // our edge would get the same refusal a second later.
+      if (e?.lnurlStatus) throw e
+      data = await fetchJsonCapped(lnurlProxyUrl({ addr: lud16 }), 'lnurl-meta-timeout')
+      corsBlockedHosts.add(domain.toLowerCase())
+    }
+  }
   if (!data || typeof data !== 'object') throw new Error('LNURL metadata response was not an object')
   if (typeof data.callback !== 'string' || !data.callback.startsWith('https://')) {
     throw new Error('LNURL metadata missing valid https callback URL')
@@ -391,17 +470,56 @@ export async function fetchLnurlMeta(lud16) {
   return data
 }
 
-// Returns { pr: bolt11String, verify: verifyUrlOrNull }
-export async function fetchLnurlInvoice(callbackUrl, amountMsats, comment) {
+/**
+ * Returns { pr: bolt11String, verify: verifyUrlOrNull }
+ *
+ * `lud16` is optional and is only the key the proxy fallback needs; a caller
+ * that omits it keeps exactly the behaviour this function has always had.
+ */
+export async function fetchLnurlInvoice(callbackUrl, amountMsats, comment, lud16) {
   if (!callbackUrl.startsWith('https://')) throw new Error('LNURL callback must use HTTPS')
   const url = new URL(callbackUrl)
   url.searchParams.set('amount', String(amountMsats))
   if (comment) url.searchParams.set('comment', comment)
-  const data = await fetchJsonCapped(url.toString(), 'lnurl-invoice-timeout')
+
+  const proxyable = typeof lud16 === 'string' && lud16.includes('@')
+  const host = proxyable ? lud16.split('@')[1].toLowerCase() : ''
+  const viaProxy = () => fetchJsonCapped(
+    lnurlProxyUrl(comment
+      ? { addr: lud16, amount: String(amountMsats), comment }
+      : { addr: lud16, amount: String(amountMsats) }),
+    'lnurl-invoice-timeout',
+  )
+
+  let data
+  if (proxyable && corsBlockedHosts.has(host)) {
+    data = await viaProxy()
+  } else {
+    try {
+      data = await fetchJsonCapped(url.toString(), 'lnurl-invoice-timeout')
+    } catch (e) {
+      if (!proxyable || e?.lnurlStatus) throw e
+      data = await viaProxy()
+      corsBlockedHosts.add(host)
+    }
+  }
   if (!data || typeof data !== 'object') throw new Error('Invoice response was not an object')
   if (data.status === 'ERROR') throw new Error(data.reason || 'Unknown error from server')
   if (typeof data.pr !== 'string' || !data.pr.toLowerCase().startsWith('lnbc')) {
     throw new Error('Invoice response missing valid bolt11 (pr field)')
+  }
+  // ⚠️ THE INVOICE MUST DEMAND WHAT WE ASKED FOR. Nothing checked this before,
+  // on either path: the split decides a leg's share, and the wallet pays
+  // whatever the bolt11 says, so a server answering with a larger figure spends
+  // the donor's sats without anything on this site noticing. It is not a threat
+  // the proxy introduces, but the proxy is the path where being able to state
+  // the amount matters most. An unreadable amount is allowed through; see
+  // bolt11AmountMsats.
+  const invoiceMsats = bolt11AmountMsats(data.pr)
+  if (invoiceMsats !== null && invoiceMsats !== amountMsats) {
+    throw new Error(
+      `Invoice is for ${Math.round(invoiceMsats / 1000).toLocaleString()} sats, not the ${Math.round(amountMsats / 1000).toLocaleString()} this leg asked for.`,
+    )
   }
   return { pr: data.pr, verify: typeof data.verify === 'string' ? data.verify : null }
 }
