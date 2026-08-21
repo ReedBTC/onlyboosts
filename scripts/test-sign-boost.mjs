@@ -13,7 +13,7 @@
 import assert from 'node:assert/strict'
 import { validateBoostTemplate, secretKeyFrom, overRateLimit, onRequestPost } from '../functions/api/sign-boost.js'
 import { verifyEvent, getPublicKey, nip19 } from '../functions/_shared/nostr-sign.js'
-import { buildExternalNoteTemplate } from '../login-widget/src/lib/externalBoostagram.js'
+import { buildExternalNoteTemplate, sanitizeSenderName, MAX_SENDER_NAME_CHARS } from '../login-widget/src/lib/externalBoostagram.js'
 
 let passed = 0
 // ⚠️ AWAITS. It used to call fn() bare, so an async assertion that failed became
@@ -63,6 +63,64 @@ await ok('every tag it emits is in the allowlist', () => {
 })
 await ok('a boost with no message and no episode still validates', () => {
   validateBoostTemplate(realTemplate({ message: '', episodeTitle: '', itemGuid: '', bmbUrl: '' }))
+})
+
+// ─── The typed "From" name (boost-login.md D15) ────────────────────────────
+// The bot path is the ONLY one that carries a name, and the name is the one
+// piece of donor-typed text that becomes a line of the bot's own prose. So it
+// gets its own block: the validator has to keep accepting the note, and the
+// line has to stay a line.
+console.log('\nThe typed sender name rides in the body and nowhere else:')
+await ok('a note carrying a From line still validates', () => {
+  const t = validateBoostTemplate(realTemplate({ senderName: 'Reed' }))
+  assert.match(t.content, /^👤 From Reed$/m)
+})
+await ok('it adds NO tag, so ALLOWED_TAGS is unaffected', () => {
+  const withName = realTemplate({ senderName: 'Reed' }).tags
+  const without = realTemplate({ senderName: '' }).tags
+  assert.deepEqual(withName, without)
+})
+await ok('⚠️ it is never a p tag, an author claim or a proxy field', () => {
+  // D2/D15: nothing can verify that the person named authorised a note signed
+  // by a key they do not hold, so the name may not reach anything the index
+  // credits. A `p` tag would also be refused by the oracle's allowlist, which
+  // is the second line of defence rather than the first.
+  const tags = realTemplate({ senderName: 'Reed' }).tags
+  assert.equal(tags.some((t) => t[0] === 'p'), false)
+  assert.equal(tags.some((t) => t.includes('Reed')), false)
+})
+await ok('⚠️ a newline in the name cannot add a line to the note', () => {
+  // The body is read line by line by consumers including our own collector,
+  // so a name carrying a newline could otherwise post a whole line of its own
+  // under the bot's identity.
+  const t = realTemplate({ senderName: 'Reed\n🎙️ Some Other Show\nhttps://evil.example' })
+  const lines = t.content.split('\n').filter((l) => l.startsWith('👤 From '))
+  assert.equal(lines.length, 1)
+  // Flattened onto the one line it was given, and then cut by the cap — which
+  // is why the URL cannot survive whole either.
+  assert.equal(lines[0], '👤 From Reed 🎙️ Some Other Show https://evil.ex')
+  validateBoostTemplate(t)
+})
+await ok('⚠️ a 📱 in the name cannot forge the attribution line', () => {
+  // `clients.py#_VIA_RE` fills `client_via` from `📱 via <App>`. It `.search`es,
+  // so line 1 wins today whatever the name says; stripping the emoji is what
+  // keeps that true if the lines are ever reordered.
+  const t = realTemplate({ senderName: '📱 via Fountain' })
+  assert.equal(t.content.split('\n').filter((l) => l.includes('📱')).length, 1)
+  assert.match(t.content.split('\n')[0], /📱 via onlyboosts\.social$/)
+})
+await ok('the name is capped, and the cap is applied in the builder', () => {
+  const long = 'x'.repeat(200)
+  const t = realTemplate({ senderName: long })
+  const line = t.content.split('\n').find((l) => l.startsWith('👤 From '))
+  assert.equal(line.length, '👤 From '.length + MAX_SENDER_NAME_CHARS)
+  validateBoostTemplate(t)
+})
+await ok('a blank or whitespace name emits no line at all', () => {
+  for (const name of ['', '   ', '\n\n', undefined, null]) {
+    assert.equal(realTemplate({ senderName: name }).content.includes('👤'), false)
+  }
+  assert.equal(sanitizeSenderName('  \n  '), '')
 })
 
 console.log('\nThe oracle refuses to be a general-purpose signer:')

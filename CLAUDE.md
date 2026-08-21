@@ -849,12 +849,22 @@ site's own collector reads**, so an overstated note is not merely a wrong claim
 on someone's feed; it is a wrong row in this index. It shipped that way until
 2026-08-19.
 
-**⚠️ The share is a VERB pressed on the done screen, not a checkbox ticked
-before paying.** The settled total is unknown until every leg has run *and* the
-donor has finished retrying, and an event cannot be edited, so a note published
-when the first pass ends can never reflect a successful retry. The figures are
-recomputed from live leg state at the moment of the press. The screen names the
-number the note will carry before it is signed.
+**⚠️ THE INTENT IS DECLARED IN THE FORM AND THE FIGURES ARE NOT, and holding
+those two apart is what keeps this honest.** This rule read "the share is a VERB
+pressed on the done screen, not a checkbox ticked before paying" until Phase 2
+shipped on 2026-08-21, and the half of it that was load-bearing is untouched:
+**the settled total is unknown until every leg has run *and* the donor has
+finished retrying**, an event cannot be edited, and a note published when the
+first pass ends can never reflect a successful retry. So the figures are still
+recomputed from live leg state at the moment of publishing, and the screen still
+names the number the note will carry before it is signed.
+
+What moved into the form is the **choice**: whether a note is posted at all, and
+whose identity signs it. That is a decision about the donor rather than about
+the outcome, and the done screen is the wrong place to ask it — see *The Boost
+Modal Declares What Happens To The Note* below. **A pre-flight control over the
+FIGURES is still the bug it always was**; a pre-flight control over the
+*intent* is not the same object.
 
 `legsTotal` **excludes SKIPPED legs**: a leg allocated zero sats by the split
 was never attempted, and counting it would report a shortfall that never
@@ -870,8 +880,8 @@ donor-signed note.
 
 Withheld entirely when nothing paid, and **withheld entirely on an anonymous
 boost** rather than shown disabled: signing with the donor's own npub would undo
-the anonymity they chose one field up. That case is what the site-signed path is
-for, and it does not exist yet.
+the anonymity they chose one field up. A signed-out booster is served by the
+site-signed path instead; see below.
 
 **The LB path is different and is deliberately not being changed.**
 `MultiLegBoostForm` signs its kind-1 *before* paying, batched into one signer
@@ -915,20 +925,121 @@ rather than a one-tap save that would fail silently. Keeping a session wallet
 across a sign-in is safe on the same reasoning that makes it session-only: it
 cannot survive a page load, so it cannot reach a different visitor.
 
-**A signed-out boost is anonymous, and that is where the money path stops and
-the index gap begins.** `boostAnonymously` in `ExternalBoostModal` is the single
-derivation the three wire sites read (`sender_id`, `sender_name`, the share
-control); it is *not* the toggle, because with no profile the toggle would be
-right by accident today and wrong the moment a typed name lands. The identity
-toggle is withheld entirely when there is no identity, since both of its buttons
-would send the same empty fields. So a wallet-only boost pays the show and puts
-nothing in this index; the OnlyBoosts-signs-it path is what closes that, and it
-is Phase 2/3 of `boost-login.md`.
+**`boostAnonymously` in `ExternalBoostModal` is the single derivation the wire
+sites read** (`sender_id` and `sender_name`, on the first pass and on a retry);
+it is *not* the toggle, because with no profile the toggle would be right by
+accident. Signed in it is the Anon toggle; **signed out it is the typed name**,
+absent meaning anonymous. **⚠️ It must not grow a third meaning** — whether a
+note publishes and who signs it is `noteRoute` beside it, a separate derivation.
+BMB shipped that promise broken twice by letting one expression carry both.
+
+**The identity toggle is still withheld when there is no identity**, but what
+replaced it is no longer a notice. That was right when both of the toggle's
+buttons would have sent the same empty fields; a typed name is what gives the
+signed-out case something to say. See *The Boost Modal Declares What Happens To
+The Note*.
 
 **The site tip is unchanged and still login-gated.** `openShowBoost` →
 `BoostModal` → `MultiLegBoostForm` signs a kind-1 before paying, so it needs a
 signer by construction. `_ensureWalletForPay` (the merch checkout) is likewise
 untouched.
+
+### The Boost Modal Declares What Happens To The Note
+
+**Two controls in the form, four outcomes, and one automatic publish.** Shipped
+2026-08-21; `boost-login.md` D12 through D15 carry the arguments.
+
+| Identity | Note box | What happens |
+|---|---|---|
+| Signed in | unchecked | the donor's own npub signs it, on their press. **Unchanged** |
+| Name typed | unchecked | OnlyBoosts signs it, the name is a line of the body, published by itself on a clean boost |
+| Nothing typed | unchecked | OnlyBoosts signs it with no name; the booster this index credits is the bot |
+| Either | **checked** | nothing is published from any key, and the done screen says so |
+
+`noteRoute` in `ExternalBoostModal.jsx` is the whole derivation
+(`'donor' | 'bot' | 'none'`), and it stands **beside** `boostAnonymously` rather
+than inside it. `signKindOneWithSite` in `assets/../lib/siteSign.js` is the only
+difference between the two publishing routes: both produce a signed event and
+both publish it from the browser through the same relay set.
+
+**⚠️ THE TWO IDENTITY ROUTES ARE EXCLUSIVE AND THE FORM SHOWS IT.** A typed name
+on a signed-in account would be a second identity claim on one note, so the
+field is not rendered at all once there is an account behind the boost.
+
+**⚠️ A SIGNED-IN DONOR WHO PICKS ANON STILL GETS NO NOTE.** Signing with their
+own npub would undo the anonymity they chose one field up, and publishing a
+bot note instead would be that control quietly acquiring a second effect nobody
+asked it for. The checkbox reports this rather than offering a press that could
+only be a no-op.
+
+**⚠️ THE CHECKBOX SUPPRESSES THE NOTE AND NOTHING ELSE, so its label carries
+its own scope**: *Boost privately (no Nostr note)*, never a bare *Boost
+privately*. Anon is about the **boostagram**, which is what the show's own app
+receives; this is about **Nostr**. A donor may reasonably want the show to know
+who boosted while wanting nothing published, and a merged control has no way to
+say that.
+
+**⚠️ A BOT-SIGNED NOTE PUBLISHES ITSELF ON A CLEAN BOOST AND ASKS ON A MESSY
+ONE.** The press exists on the donor path because a signer prompt has to be
+asked for; there is no prompt on the bot path, so the press there is friction
+charged to precisely the newcomer this feature exists for. It fires only when
+every active leg is `PAID` and nothing is being checked — a shortfall or an
+`UNCERTAIN` leg is exactly the state in which a retry could still change what
+the note should say, so those render the button, with a line saying why. The
+withhold-while-checking rule is untouched and `shareState` still latches at
+`shared`, so **one boost still publishes at most one note**.
+
+**⚠️ THE TYPED NAME IS PROSE AND NOTHING ELSE** (`👤 From <name>`). It rides the
+boostagram TLV, which is what the podcaster's Helipad reads, and it becomes one
+line of the bot's own body. It must never become a `p` tag, an author claim or a
+`proxy_for_pubkey`: nothing can verify that the person named authorised a note
+signed by a key they do not hold. Same treatment the `chadf-boostbot` rows and
+the LB show account get. `sanitizeSenderName` bounds it at 40 characters and
+strips **newlines** (the body is read line by line) and the **mobile-phone
+emoji** (`📱 via <App>` is the line `clients.py#_VIA_RE` fills `client_via`
+from). `scripts/test-sign-boost.mjs` pins all of that against the shipped
+builder.
+
+**⚠️ SILENCE IS WHAT A FAILURE LOOKS LIKE**, so the suppressed case says out
+loud that nothing was posted and that it was the donor's own choice. Without it
+the screen a private boost ends on is identical to the screen a broken one would
+end on. For the same reason **a failed sign is never allowed to read as a failed
+boost**: the sats are gone before the note is attempted, so the offer is another
+attempt at the note and never anything resembling unwinding a payment.
+
+**⚠️ THE ORACLE'S 100k-SAT CAP IS DECLARED IN THE FORM.** Its own answer is
+`invalid amount`, which is accurate and useless to someone who has just sent
+200k sats. `SITE_SIGN_MAX_SATS` in `siteSign.js` restates `MAX_AMOUNT_MSAT` in
+`functions/api/sign-boost.js` — a Function cannot import from the widget source
+and the bundle cannot import from `functions/`, the same split
+`CALLBACK_HOST_ALLOWLIST` lives with. **The two copies must stay in step.**
+Above the cap the boost is unaffected and only the note is withheld.
+
+### The Wallet Gate Is Behind The Boost Button
+
+**Compose first, pay second.** `openExternalBoost` ran the wallet gate before
+the modal ever mounted, so a visitor who pressed Boost was asked to paste an NWC
+connection string before seeing what they were boosting or what it would cost.
+It now lives in `handleBoost`, where the connect modal arrives at the moment its
+purpose is obvious, and the form says one more step is coming rather than
+springing a second modal on the reader.
+
+**⚠️ IT COSTS NOTHING TO PRESERVE, AND THE REASON IS Z-INDEX.**
+`WalletConnectModal` is `z-[78/79]` and `LoginModal` is `z-[80]`, both already
+above the boost modal's `z-[70/71]`. So the boost modal **stays mounted
+underneath with its state intact**; there is no draft to save and restore, and
+the LNURL prefetch that runs on mount gets the whole detour as extra runway.
+
+**⚠️ THE RESUME IS THE MODAL'S OWN `wallet.onChange` SUBSCRIPTION, NEVER A
+`pendingAction`.** That queue re-enters an api method from the top, and
+re-entering `openExternalBoost` with the modal already open would mount a second
+one over the first. `api.requestWalletForBoost` therefore queues nothing and its
+promise is deliberately **not** the resume signal — a second path into
+`startPay` is a second way to pay twice. It keeps everything else the retired
+gate did: the at-rest restore first, so a returning visitor with a saved blob
+never sees the connect modal; and `handleWalletGateFailure`'s distinction
+between "no wallet" and "a remembered extension that stalled", since a slow
+extension must not be told it has no wallet.
 
 ### The Site Signs For A Booster Who Has No Key
 

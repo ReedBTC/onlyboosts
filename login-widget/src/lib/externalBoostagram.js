@@ -18,6 +18,36 @@ export const MAX_MESSAGE_CHARS = 200  // match Boost Me Bitch's message cap
 // boost sent before this was mislabelled to the podcaster.
 const APP_NAME = 'OnlyBoosts'
 
+/**
+ * A typed "From" name, as it is allowed to appear in a note the BOT signs.
+ *
+ * ⚠️ THIS IS THE ONLY PLACE A DONOR'S TYPED TEXT BECOMES ONE OF THE BOT'S OWN
+ * STRUCTURED LINES, so it is bounded here rather than at the call site. Two
+ * things are stripped and both are about the collector rather than about
+ * looks:
+ *
+ *   - **Newlines**, because the body is read line by line. A name carrying one
+ *     could add a whole line of its own to a note published under our identity.
+ *   - **The mobile-phone emoji**, because `📱 via <App>` is the attribution
+ *     line `clients.py#_VIA_RE` reads to fill `client_via`. That regex
+ *     `.search`es, so our own line 1 wins today whatever the name says; the
+ *     strip is what keeps that true if the lines are ever reordered.
+ *
+ * The cap is 40 characters, matching the 16-character display cap on
+ * `/booster` in spirit rather than in figure: this one is a line of prose in a
+ * permanent public note, not a button label.
+ */
+export const MAX_SENDER_NAME_CHARS = 40
+export function sanitizeSenderName(value) {
+  return String(value || '')
+    .replace(/[\u0000-\u001f\u007f\u2028\u2029]+/g, ' ')
+    .replace(/\u{1F4F1}/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, MAX_SENDER_NAME_CHARS)
+    .trim()
+}
+
 // Hex-encode a UTF-8 string (browser — no Buffer).
 export function hexEncode(str) {
   return [...new TextEncoder().encode(str)].map((b) => b.toString(16).padStart(2, '0')).join('')
@@ -111,7 +141,7 @@ export function toWeblnRecords(boostagram, recipient) {
  * fail, and counting it would understate the outcome.
  */
 export function buildExternalNoteTemplate({
-  paidSats, legsPaid, legsTotal, message, showTitle, episodeTitle, podcastGuid, itemGuid, bmbUrl,
+  paidSats, legsPaid, legsTotal, message, senderName, showTitle, episodeTitle, podcastGuid, itemGuid, bmbUrl,
 }) {
   const sats = Number(paidSats) || 0
   const paid = Number(legsPaid) || 0
@@ -120,10 +150,22 @@ export function buildExternalNoteTemplate({
   const showEp = episodeTitle
     ? `${showTitle || 'a podcast'} • ${episodeTitle}`
     : (showTitle || 'a podcast')
+  const from = sanitizeSenderName(senderName)
   const lines = [`⚡Just boosted ${sats.toLocaleString()} sats 📱 via onlyboosts.social`]
   // "splits" rather than "legs": it is the word the value-block spec and the
   // podcast apps use, and this line is read by people outside this codebase.
   if (total > 0 && paid < total) lines.push(`⚠️ ${paid} of ${total} splits paid`)
+  // ⚠️ THE NAME IS PROSE AND NOTHING ELSE — no `p` tag, no author claim, no
+  // `proxy_for_pubkey` (boost-login.md D2/D15). Nothing can verify that the
+  // person named authorised a note signed by a key they do not hold, so the
+  // booster this index credits is the signing identity and only that. The line
+  // exists so a reader of the note can see who the sats came from; the same
+  // string rides the boostagram TLV, which is what the podcaster reads.
+  //
+  // Only the caller on the bot path passes it. A donor-signed note is already
+  // from the donor, and a "From" line on it would be the author naming
+  // themselves in the third person.
+  if (from) lines.push(`👤 From ${from}`)
   if (msg) lines.push(`💬 "${msg.slice(0, MAX_MESSAGE_CHARS)}"`)
   lines.push('')
   lines.push(`🎙️ ${showEp}`)

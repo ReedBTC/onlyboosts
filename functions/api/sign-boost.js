@@ -102,6 +102,11 @@ const RATE_WINDOW_SECS = 60
 // invented one, so the cap is about how large a single invented figure may be,
 // not about what anyone is likely to send. Above it the donor still has the
 // donor-signed path, where the claim is their own to make.
+// ⚠️ RESTATED AS `SITE_SIGN_MAX_SATS` IN `login-widget/src/lib/siteSign.js`,
+// where the modal reads it to say so in the form rather than letting a donor
+// discover it as "invalid amount" after paying. A Pages Function cannot import
+// from the widget source and the bundle cannot import from here, the same split
+// `CALLBACK_HOST_ALLOWLIST` lives with. **The two copies must stay in step.**
 const MAX_AMOUNT_MSAT = 100_000_000   // 100k sats
 
 // The attribution is OURS and is not caller-settable. A `client` tag naming

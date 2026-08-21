@@ -4,13 +4,25 @@
  * DELIBERATELY SEPARATE from EpisodeBoostModal / MultiLegBoostForm (the LB
  * boost path, untouched). This runs the external orchestrator (lib/
  * externalBoost.js): pays the episode's value-block recipients via LNURL
- * (lnaddress) and keysend (node), publishes NO kind 30078, and — only when the
- * booster is signed in and PRESSES SHARE ON THE DONE SCREEN — posts a kind-1
- * note tagged to the external show's guid + Boost Me Bitch URL. Nothing here
- * touches LB stats/bots.
+ * (lnaddress) and keysend (node), publishes NO kind 30078, and posts a kind-1
+ * note tagged to the external show's guid + episode URL. Nothing here touches
+ * LB stats/bots.
  *
- * ⚠️ The share is a post-settlement verb, not a pre-flight checkbox, and the
- * note reports SETTLED sats rather than typed ones. See `handleShare`.
+ * ⚠️ WHAT IS DECLARED IN THE FORM AND WHAT WAITS FOR SETTLEMENT ARE DIFFERENT
+ * THINGS, and the distinction is the whole design of this file. The INTENT —
+ * whether a note is posted at all, and whose identity signs it — is declared
+ * in the form, because it is a choice about the donor rather than about the
+ * outcome, and asking for it on the done screen charges the friction to the
+ * newcomer this flow exists for. The FIGURES are recomputed at the moment of
+ * publishing, because a note reports what settled and no earlier moment knows
+ * that (see `handleShare` and D14 in boost-login.md).
+ *
+ * The four outcomes, all falling out of two form controls:
+ *
+ *   signed in, note on     the donor's own npub signs it, on their press
+ *   name typed, note on    OnlyBoosts signs it, the name is a line of prose
+ *   nothing typed, note on OnlyBoosts signs it with no name
+ *   note off               nothing is published from any key
  *
  * Progress UI is self-contained (not the LB BoostProgressView) so the external
  * leg shape / skipped legs / keysend-uncertain retry rules stay independent.
@@ -22,8 +34,9 @@ import { useModalTransition } from '../lib/useModalTransition.js'
 import { isSafeUrl } from '../lib/utils.js'
 import * as wallet from '../lib/wallet.js'
 import { payExternalBoost, STATUS } from '../lib/externalBoost.js'
-import { buildExternalNoteTemplate, MAX_MESSAGE_CHARS } from '../lib/externalBoostagram.js'
+import { buildExternalNoteTemplate, sanitizeSenderName, MAX_MESSAGE_CHARS, MAX_SENDER_NAME_CHARS } from '../lib/externalBoostagram.js'
 import { signKindOneShareWithUser, publishSignedKindOne, confirmInvoiceSettled, fetchLnurlMeta } from '../lib/boostagram.js'
+import { signKindOneWithSite, SITE_SIGN_MAX_SATS } from '../lib/siteSign.js'
 import { setBoostModalProgressVisible } from '../lib/boostModalSignal.js'
 import { fireConfetti } from '../lib/confetti.js'
 import ConfirmLeaveOverlay from './ConfirmLeaveOverlay.jsx'
@@ -209,7 +222,7 @@ function LegRow({ recipient, leg, onRepay, onCheck, checking, locked }) {
   )
 }
 
-export default function ExternalBoostModal({ user, onClose, onRequestSignIn, episode, recipientsBundle }) {
+export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onRequestWallet, episode, recipientsBundle }) {
   const { visible, requestClose } = useModalTransition(onClose)
   const cancelledRef = useRef(false)
   useEffect(() => () => { cancelledRef.current = true }, [])
@@ -225,40 +238,92 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, epi
   const [amount, setAmount] = useState('1000')
   const [message, setMessage] = useState('')
   const [anonymous, setAnonymous] = useState(false)
-  // ⚠️ A SIGNED-OUT BOOST IS ANONYMOUS, and this is what the wire sees.
-  // Since Phase 1 a wallet can be connected with no Nostr identity, so
-  // `anonymous` is no longer the only way the sender fields end up empty.
-  // Reading the toggle alone would be right today by accident — there is
-  // no profile to read — and wrong the moment a typed name lands (the
-  // note picker, Phase 2). Deriving it once here keeps the three wire
-  // sites saying the same thing.
-  const boostAnonymously = anonymous || !signedIn
+  // The signed-out identity route: a name, or nothing. Held raw so the field
+  // behaves like a field; every read of it goes through `typedName`.
+  const [nameInput, setNameInput] = useState('')
+  // The note control, unchecked by default. ⚠️ IT SUPPRESSES THE NOTE AND
+  // NOTHING ELSE — see D12. `anonymous` is about the BOOSTAGRAM, which is what
+  // the show's own app receives, and this is about NOSTR. A donor may
+  // reasonably want the show to know who boosted while wanting nothing
+  // published, and folding the two together leaves no way to say that. The
+  // cost accepted is that the word "privately" does not cover the wire, which
+  // is why the label carries its own scope rather than reading "Boost
+  // privately" alone.
+  const [noNote, setNoNote] = useState(false)
   const [error, setError] = useState('')
 
-  // Sharing is a VERB pressed after settlement, not a checkbox ticked before
-  // it. Two reasons, and the first is the one that made this a bug:
-  //
-  //   - The note has to report what actually settled, and that is not known
-  //     until every leg has run AND the donor has finished retrying the ones
-  //     that didn't. A note published the instant the first pass ends can
-  //     never reflect a successful retry, and an event cannot be edited.
-  //   - The signer prompt then arrives at a moment the donor asked for it,
-  //     rather than unannounced after a payment they thought was the end of
-  //     the interaction.
-  //
-  // ⚠️ AN ANONYMOUS BOOST GETS NO SHARE CONTROL AT ALL, not a disabled one.
-  // Signing the note with the donor's own npub would undo the anonymity they
-  // chose one field up. The OnlyBoosts-signs-it path is what serves that case
-  // and it does not exist yet (boost-login.md, Phase 3); when it lands it
-  // belongs here as a second choice on this same control, NOT as a
-  // resurrected pre-flight checkbox.
-  //
-  // A signed-out booster is inside `boostAnonymously` for the same reason
-  // and by a different route: there is no npub to sign with at all. That
-  // is the case the OnlyBoosts-signs-it path exists to serve, and it is
-  // why Phase 1 shipping before Phase 2 leaves a real gap — a wallet-only
-  // boost pays the show and puts nothing in this index.
-  const canShareToFeed = !boostAnonymously
+  const typedName = sanitizeSenderName(nameInput)
+
+  /**
+   * ⚠️ ONE DERIVATION OF "ANONYMOUS", AND IT IS THE BOOSTAGRAM'S ANSWER ONLY.
+   *
+   * This flag governs three wire sites and nothing else: `sender_name` and
+   * `sender_id` in the TLV record, and the same two on a retried leg. It must
+   * not grow a third meaning. Whether a note is published and who signs it is
+   * `noteRoute` below, a separate derivation standing beside this one — Boost
+   * Me Bitch shipped that promise broken twice by letting one expression carry
+   * both, each time because one surface learned a rule another didn't (read
+   * the header of its `use-share-picker.ts`).
+   *
+   * Signed in, the Anon toggle decides it, as it always has. Signed out there
+   * is no toggle and no profile, so the typed name decides it: a name means
+   * the podcaster sees who boosted, which is the half of this field Helipad
+   * reads (boost-login.md, Phase 10). No name means anonymous, which is the
+   * behaviour every signed-out boost had before this field existed.
+   */
+  const boostAnonymously = signedIn ? anonymous : !typedName
+  const wireSenderName = boostAnonymously
+    ? ''
+    : (signedIn ? (profile?.displayName || profile?.name || '') : typedName)
+  // Never a pubkey we don't have. A signed-out booster has none, so this is
+  // empty by construction as well as by rule.
+  const wireSenderPubkey = (!boostAnonymously && signedIn) ? (user?.pubkey || '') : ''
+
+  /**
+   * ⚠️ WHO SIGNS THE NOTE, AND WHETHER THERE IS ONE. Three values, and every
+   * surface below reads this rather than re-deriving it:
+   *
+   *   'donor'  the donor's own npub signs it, on their press
+   *   'bot'    OnlyBoosts signs it through /api/sign-boost, published per D14
+   *   'none'   nothing is published, from any key
+   *
+   * ⚠️ THE INTENT IS DECLARED IN THE FORM; THE FIGURES ARE NOT. That is the
+   * correction to the rule this file used to state as "the share is a verb, not
+   * a checkbox", and the reasoning under that rule is untouched: a note reports
+   * what SETTLED, which is unknown until every leg has run and the donor has
+   * finished retrying, and an event cannot be edited. So the numbers are still
+   * recomputed at the moment of publishing (`handleShare`). What moved into the
+   * form is the *choice*, because it is a choice about the donor rather than
+   * about the outcome. Asking a newcomer to press a second button after the
+   * payment charges the friction to precisely the visitor this flow exists for.
+   *
+   * ⚠️ A SIGNED-IN DONOR WHO PICKS ANON GETS NO NOTE, unchanged. Signing with
+   * their own npub would undo the anonymity they chose one field up, and
+   * publishing a bot note instead would be this control quietly acquiring a
+   * second effect nobody asked it for. If that is ever wanted it is a decision
+   * about the Anon toggle, made deliberately, not a fall-through here.
+   *
+   * A signed-out booster is never in 'none' by accident: with no key to sign
+   * with, the bot route is the only thing standing between a wallet-only boost
+   * and this index holding no record of it at all.
+   */
+  const noteRoute = noNote
+    ? 'none'
+    : (signedIn ? (anonymous ? 'none' : 'donor') : 'bot')
+  const canShareToFeed = noteRoute === 'donor'
+  // The checkbox's two display facts, named so the markup reads as what it is.
+  // `noteImpliedOff` is the Anon case: there is no note to suppress, so the box
+  // reports that rather than offering a control that could only be a no-op.
+  const noteImpliedOff = signedIn && anonymous
+  const noteSuppressed = noNote || noteImpliedOff
+  // ⚠️ THE ONE THING THE BOT ROUTE CANNOT DO, DECLARED IN THE FORM RATHER THAN
+  // DISCOVERED ON THE DONE SCREEN. The oracle refuses an `amount` above its own
+  // cap, and its answer is "invalid amount" — accurate, and no use at all to
+  // someone who has just sent 200k sats. Above the cap the boost is unaffected
+  // and only the note is withheld, so the line says which of the two it is and
+  // names the route that has no cap.
+  const typedSats = parseInt(amount, 10)
+  const botNoteTooLarge = noteRoute === 'bot' && Number.isFinite(typedSats) && typedSats > SITE_SIGN_MAX_SATS
   const [shareState, setShareState] = useState('idle')   // 'idle' | 'signing' | 'shared' | 'error'
   const [shareError, setShareError] = useState('')
 
@@ -328,6 +393,10 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, epi
   const paidCount = legs.filter((l) => l?.status === STATUS.PAID).length
   const activeCount = visibleLegs.length
   const paidSats = legs.reduce((a, l) => a + (l?.status === STATUS.PAID ? (l.sats || 0) : 0), 0)
+  // The done-screen half of the cap above. Declared here rather than beside
+  // `botNoteTooLarge` because it reads the settled figure, which is not
+  // computed until the leg tally is.
+  const paidTooLargeToPost = noteRoute === 'bot' && paidSats > SITE_SIGN_MAX_SATS
 
   // The leg the wallet is currently working on, and how long it has been at
   // it. Legs are paid sequentially (see D9 in boost-login.md), so there is at
@@ -428,22 +497,26 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, epi
   }, [phase])
 
   /**
-   * Publish the donor's kind-1 share note, on their press, from their npub.
+   * Publish the kind-1 boost note, by whichever route the form declared.
    *
-   * ⚠️ THE FIGURES COME FROM LIVE LEG STATE, NOT FROM THE FORM. `paidSats` and
-   * the leg counts are recomputed on every render, so pressing this after a
-   * successful Retry reports the retried leg. This is the whole reason the
-   * control moved out of the form: the old pre-flight checkbox fired the note
-   * with the typed amount the instant the first pass ended, which overstated
-   * every partial and could never see a retry.
+   * ⚠️ THE FIGURES COME FROM LIVE LEG STATE, NOT FROM THE FORM, and that has
+   * not changed. `paidSats` and the leg counts are recomputed on every render,
+   * so publishing after a successful Retry reports the retried leg. The bug
+   * this closed is worth restating because Phase 2 moved a *different* control
+   * into the form: the old pre-flight checkbox fired the note with the TYPED
+   * amount the instant the first pass ended, which overstated every partial and
+   * could never see a retry. What the form declares now is the intent; the
+   * numbers are still read here, at the moment of publishing.
    *
-   * Failure is reported here rather than swallowed to the console. The donor
-   * asked for this explicitly, so a silent no-op would leave them believing
-   * they had shared. The sats are already gone either way, which is why a
-   * failure offers a retry instead of unwinding anything.
+   * Failure is reported rather than swallowed to the console. On the donor
+   * route they asked for this explicitly, so a silent no-op would leave them
+   * believing they had shared; on the bot route the publish was automatic, so
+   * silence would leave them believing it worked. ⚠️ EITHER WAY THE SATS ARE
+   * ALREADY GONE, which is why a failure offers another attempt at the NOTE
+   * and never anything that resembles unwinding a payment.
    */
   async function handleShare() {
-    if (!canShareToFeed || shareState === 'signing' || shareState === 'shared') return
+    if (noteRoute === 'none' || shareState === 'signing' || shareState === 'shared') return
     if (paidSats <= 0) return
     setShareState('signing')
     setShareError('')
@@ -453,13 +526,26 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, epi
         legsPaid: paidCount,
         legsTotal: activeCount,
         message: message.trim(),
+        // ⚠️ BOT ROUTE ONLY, and it is a line of prose rather than any kind of
+        // claim (D15). A donor-signed note is already from the donor, so a
+        // "From" line on it would be the author naming themselves in the third
+        // person; and nothing anywhere may turn this string into a `p` tag or
+        // an author field, because nothing can verify that the person named
+        // authorised a note signed by a key they do not hold.
+        senderName: noteRoute === 'bot' ? typedName : '',
         showTitle: episode?.showTitle,
         episodeTitle: episode?.episodeTitle,
         podcastGuid: episode?.podcastGuid,
         itemGuid: episode?.itemGuid,
         bmbUrl: episode?.bmbUrl,
       })
-      const signed = await signKindOneShareWithUser(template)
+      // The only difference between the two routes is where the signature
+      // comes from. Both produce a signed event and both publish it from the
+      // browser through the same relay set, so a bot-signed boost reaches the
+      // same audience a donor-signed one does.
+      const signed = noteRoute === 'bot'
+        ? await signKindOneWithSite(template)
+        : await signKindOneShareWithUser(template)
       await publishSignedKindOne(signed)
       if (cancelledRef.current) return
       setShareState('shared')
@@ -471,12 +557,80 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, epi
     }
   }
 
+  /**
+   * ⚠️ A BOT-SIGNED NOTE PUBLISHES ITSELF ON A CLEAN BOOST (D14), and this is
+   * the one place the two routes are deliberately asymmetric.
+   *
+   * The press exists on the donor-signed path because a signer prompt has to be
+   * ASKED for: an approval dialog arriving unannounced after a payment the
+   * donor thought was the end of the interaction is worse than a button. There
+   * is no prompt on the bot path, so the press there buys nothing and costs the
+   * newcomer this feature exists for one more thing to understand.
+   *
+   * ⚠️ IT FIRES ONLY WHERE THE PRESS COULD NOT HAVE CHANGED THE ANSWER: every
+   * active leg PAID and nothing still being checked. A shortfall or an
+   * UNCERTAIN leg is exactly the state in which the donor may still retry and
+   * change what the note should say, so those get the button. That is the same
+   * "reports what settled" rule with the press removed from the case where it
+   * was ceremony, not a decision.
+   *
+   * `autoSharedRef` is what stops a late-settling leg from firing a second
+   * publish. `shareState` latches at 'shared' as well, so one boost publishes
+   * at most one note either way.
+   */
+  const autoSharedRef = useRef(false)
+  useEffect(() => {
+    if (phase !== 'done' || noteRoute !== 'bot') return
+    if (autoSharedRef.current || shareState !== 'idle') return
+    if (stillChecking || paidSats <= 0) return
+    if (activeCount === 0 || paidCount !== activeCount) return
+    // Nothing is gained by spending a rate-limit slot on a request the oracle
+    // is certain to refuse; the line beside this explains it instead.
+    if (paidSats > SITE_SIGN_MAX_SATS) return
+    autoSharedRef.current = true
+    handleShare()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, noteRoute, stillChecking, paidCount, activeCount, paidSats, shareState])
+
+  /**
+   * ⚠️ THE WALLET GATE LIVES HERE NOW, NOT IN FRONT OF THE MODAL (D13). It ran
+   * inside `openExternalBoost` until Phase 2, so a visitor who pressed Boost
+   * was asked to paste an NWC connection string before seeing what they were
+   * boosting or what it would cost. Compose first, pay second.
+   *
+   * ⚠️ THE RESUME IS THE EFFECT BELOW, NOT A CALLBACK AND NOT A pendingAction.
+   * `WalletConnectModal` opens OVER this one (z-[78/79] against z-[70/71]), so
+   * this modal stays mounted with its state intact and there is nothing to
+   * save or restore; re-entering `openExternalBoost` to resume would mount a
+   * second modal over the first. What resumes the boost is this component's
+   * own `wallet.onChange` subscription seeing a wallet arrive.
+   */
+  const payStartedRef = useRef(false)
+  const [awaitingWallet, setAwaitingWallet] = useState(false)
+
   async function handleBoost() {
     setError('')
     const sats = parseInt(amount, 10)
     if (!Number.isFinite(sats) || sats < MIN_SATS) { setError(`Minimum boost is ${MIN_SATS} sats.`); return }
     if (sats > MAX_SATS) { setError(`Max ${MAX_SATS.toLocaleString()} sats per boost.`); return }
-    if (!wallet.isReady()) { setError('Connect a Lightning wallet from your account menu first.'); return }
+
+    if (!wallet.isReady()) {
+      // Fire and forget. It either unlocks a remembered wallet (in which case
+      // the effect below picks the boost straight back up), opens the connect
+      // modal, or reports a stalled extension in a toast. Its promise is
+      // deliberately not the resume signal: a second path into `startPay`
+      // would be a second way to pay twice.
+      setAwaitingWallet(true)
+      try { await onRequestWallet?.() } catch {}
+      return
+    }
+    startPay(sats)
+  }
+
+  async function startPay(sats) {
+    if (payStartedRef.current) return
+    payStartedRef.current = true
+    setAwaitingWallet(false)
 
     // Seed one pending row per recipient so the list renders immediately.
     setLegs(recipients.map(() => ({ status: STATUS.PENDING })))
@@ -489,8 +643,8 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, epi
         totalWeight,
         totalSats: sats,
         message: message.trim(),
-        senderName: boostAnonymously ? '' : (profile?.displayName || profile?.name || ''),
-        senderPubkey: boostAnonymously ? '' : (user?.pubkey || ''),
+        senderName: wireSenderName,
+        senderPubkey: wireSenderPubkey,
         meta: {
           showTitle: episode?.showTitle,
           episodeTitle: episode?.episodeTitle,
@@ -504,11 +658,24 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, epi
     } catch (e) {
       setError(e?.message || 'Boost failed to start')
       setPhase('form')
+      payStartedRef.current = false
       return
     }
     if (cancelledRef.current) return
     setPhase('done')
   }
+
+  // The resume. Keyed on the wallet actually being connected rather than on
+  // whatever `onRequestWallet` reported, so a connection made in the modal, an
+  // at-rest unlock and a wallet connected in another tab all land the same way.
+  useEffect(() => {
+    if (!awaitingWallet || !walletStatus.connected) return
+    if (phase !== 'form' || payStartedRef.current) return
+    const sats = parseInt(amount, 10)
+    if (!Number.isFinite(sats) || sats < MIN_SATS || sats > MAX_SATS) { setAwaitingWallet(false); return }
+    startPay(sats)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [awaitingWallet, walletStatus.connected, phase])
 
   /**
    * Re-pay a leg. ⚠️ FAILED ONLY — see canRepayLeg. There is deliberately no
@@ -531,8 +698,8 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, epi
         totalWeight: recipient.splitWeight || 1,
         totalSats: leg.sats || 0,
         message: message.trim(),
-        senderName: boostAnonymously ? '' : (profile?.displayName || profile?.name || ''),
-        senderPubkey: boostAnonymously ? '' : (user?.pubkey || ''),
+        senderName: wireSenderName,
+        senderPubkey: wireSenderPubkey,
         meta: {
           showTitle: episode?.showTitle, episodeTitle: episode?.episodeTitle,
           podcastGuid: episode?.podcastGuid, itemGuid: episode?.itemGuid, url: episode?.bmbUrl,
@@ -632,26 +799,54 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, epi
                     className="w-full bg-neutral-800 border border-neutral-700 rounded px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30"
                     placeholder={`${MIN_SATS} minimum`} />
                   <p className="mt-1 text-[10px] text-neutral-600">Splits across {recipients.length} {recipients.length === 1 ? 'recipient' : 'recipients'} per the show's value block.</p>
+                  {botNoteTooLarge && (
+                    <p className="mt-1 text-[10px] text-amber-400/90 leading-snug">
+                      The boost itself is fine at this size. OnlyBoosts only posts notes up to{' '}
+                      {fmtSats(SITE_SIGN_MAX_SATS)} sats on someone else\u2019s behalf, so this one
+                      won\u2019t reach the feeds unless you log in with Nostr and post it yourself.
+                    </p>
+                  )}
                 </div>
 
-                {/* ⚠️ NO IDENTITY TOGGLE WHEN THERE IS NO IDENTITY. Both of
-                    its buttons would send the same empty sender fields, so
-                    the control could only lie about having an effect. What
-                    replaces it says what will happen and offers the one
-                    thing that would change it. */}
+                {/* ⚠️ TWO EXCLUSIVE ROUTES, AND THE FORM HAS TO SHOW THAT THEY
+                    ARE EXCLUSIVE. A typed name on a signed-in account would be
+                    a second identity claim on one note, so the field is not
+                    rendered at all once there is an account behind the boost.
+
+                    This replaces the notice that read "Boosting anonymously",
+                    which was right when both halves of an identity toggle
+                    would have sent the same empty fields. A typed name is what
+                    gives the signed-out case something to say: it rides the
+                    boostagram TLV, which is what the podcaster's Helipad
+                    reads, and it becomes a line of the note OnlyBoosts signs.
+
+                    Vocabulary is deliberate. "Your name" and "Log in", never
+                    anything about keys — this is someone's first contact with
+                    Nostr and they need not know that is what it is. */}
                 {!signedIn && (
-                  <div className="rounded-md border border-neutral-800 bg-neutral-800/40 px-3 py-2.5 space-y-1.5">
-                    <p className="text-xs text-neutral-300 leading-snug">
-                      Boosting anonymously. The show sees your message and your
-                      sats, not your name.
+                  <div>
+                    <label htmlFor="ob-boost-from" className="block text-xs text-neutral-400 mb-1.5">Your name (optional)</label>
+                    <input
+                      id="ob-boost-from"
+                      type="text"
+                      value={nameInput}
+                      onChange={(e) => setNameInput(e.target.value.slice(0, MAX_SENDER_NAME_CHARS))}
+                      maxLength={MAX_SENDER_NAME_CHARS}
+                      autoComplete="off"
+                      className="w-full bg-neutral-800 border border-neutral-700 rounded px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30"
+                      placeholder="Who should the show thank?" />
+                    <p className="mt-1 text-[10px] text-neutral-600 leading-snug">
+                      {typedName
+                        ? `The show sees this name alongside your sats, and OnlyBoosts posts the boost for you under its own account.`
+                        : 'Leave it blank to boost anonymously. The show still sees your sats and your message.'}
                     </p>
                     {onRequestSignIn && (
                       <button
                         type="button"
                         onClick={onRequestSignIn}
-                        className="text-[11px] font-medium text-orange-400 hover:text-orange-300 transition-colors"
+                        className="mt-2 text-[11px] font-medium text-orange-400 hover:text-orange-300 transition-colors"
                       >
-                        Sign in with Nostr to boost as yourself
+                        Or log in with Nostr and boost as yourself
                       </button>
                     )}
                   </div>
@@ -680,6 +875,37 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, epi
                   <p className="mt-1 text-[10px] text-neutral-600 text-right">{message.length}/{MAX_MESSAGE_CHARS}</p>
                 </div>
 
+                {/* ⚠️ THE LABEL CARRIES ITS OWN SCOPE, and a bare "Boost
+                    privately" is not allowed to replace it (D12). This
+                    suppresses the NOTE. The sats and the message still cross
+                    Lightning to the show's own app, which is the half the word
+                    "privately" does not cover, so the parenthesis is the whole
+                    point of the string rather than decoration on it.
+
+                    When a signed-in donor has already picked Anon there is no
+                    note to suppress, so the box says so instead of offering a
+                    control that could only be a no-op. */}
+                <label className={`flex items-start gap-2.5 rounded-md border px-3 py-2.5 transition-colors ${noteSuppressed ? 'border-neutral-700 bg-neutral-800/60' : 'border-neutral-800 bg-neutral-800/40 hover:border-neutral-700'} ${noteImpliedOff ? 'cursor-default opacity-70' : 'cursor-pointer'}`}>
+                  <input
+                    type="checkbox"
+                    checked={noteSuppressed}
+                    disabled={noteImpliedOff}
+                    onChange={(e) => setNoNote(e.target.checked)}
+                    className="mt-0.5 w-3.5 h-3.5 shrink-0 accent-orange-500" />
+                  <span className="min-w-0">
+                    <span className="block text-xs text-neutral-300 leading-snug">Boost privately (no Nostr note)</span>
+                    <span className="block text-[10px] text-neutral-500 leading-snug mt-0.5">
+                      {noteImpliedOff
+                        ? 'Anon already means no note, so there is nothing to post.'
+                        : noteSuppressed
+                          ? 'Your sats and message still reach the show. Nothing is posted to Nostr from any account, so this boost stays out of the OnlyBoosts feeds and totals.'
+                          : noteRoute === 'bot'
+                            ? 'OnlyBoosts counts boosts it can find on Nostr, so a note is what puts yours in the feeds and the totals. Tick this to keep it off Nostr entirely.'
+                            : 'You choose whether to post it once the sats have landed, so the note reports what actually went through. Tick this to keep it off Nostr entirely.'}
+                    </span>
+                  </span>
+                </label>
+
                 {error && <p className="text-xs text-red-400">{error}</p>}
 
                 <button onClick={handleBoost}
@@ -687,6 +913,20 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, epi
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path fillRule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clipRule="evenodd"/></svg>
                   Boost episode
                 </button>
+                {/* Said before the press rather than only after it, because
+                    the wallet gate now sits behind this button: a reader who
+                    has none should know one more step is coming rather than
+                    meeting a second modal unannounced. The awaiting line
+                    stays until the wallet lands, and pressing Boost again
+                    re-opens the connect modal, so a dismissed one is never a
+                    dead end. */}
+                {!walletStatus.connected && (
+                  <p className="text-[10px] text-neutral-500 leading-snug text-center">
+                    {awaitingWallet
+                      ? 'Waiting for a wallet. Connect one and this boost sends itself.'
+                      : 'No wallet connected yet. We\u2019ll ask for one when you press Boost.'}
+                  </p>
+                )}
               </>
             )}
 
@@ -732,43 +972,96 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, epi
                 {phase === 'done' && stillChecking && (
                   <p className="text-[11px] text-neutral-400 leading-snug">
                     {checkStageText(checkSeconds)}
-                    {canShareToFeed && ' You can post the note once this settles, so it reports what actually landed.'}
+                    {noteRoute !== 'none' && ' The Nostr note waits for this, so it reports what actually landed.'}
                   </p>
                 )}
-                {phase === 'done' && canShareToFeed && paidSats > 0 && !stillChecking && (
+                {phase === 'done' && paidTooLargeToPost && !stillChecking && shareState !== 'shared' && (
+                  <p className="text-[11px] text-amber-400/90 leading-snug">
+                    Your boost landed. OnlyBoosts only posts notes up to {fmtSats(SITE_SIGN_MAX_SATS)} sats
+                    on someone else\u2019s behalf, so this one isn\u2019t in the feeds. Logging in with
+                    Nostr and boosting from your own account is the way to have one this size counted.
+                  </p>
+                )}
+                {phase === 'done' && noteRoute !== 'none' && !paidTooLargeToPost && paidSats > 0 && !stillChecking && (
                   <div className="rounded-md border border-neutral-800 bg-neutral-800/40 p-3 space-y-2">
                     {shareState === 'shared' ? (
                       <p className="text-xs text-green-400 leading-snug">
-                        ✓ Posted to your feed{paidCount < activeCount ? ` — ${fmtSats(paidSats)} sats, ${paidCount} of ${activeCount} splits` : ''}.
+                        {noteRoute === 'bot'
+                          ? `\u2713 Posted to Nostr by OnlyBoosts${paidCount < activeCount ? ` (${fmtSats(paidSats)} sats, ${paidCount} of ${activeCount} splits)` : ''}.`
+                          : `\u2713 Posted to your feed${paidCount < activeCount ? ` (${fmtSats(paidSats)} sats, ${paidCount} of ${activeCount} splits)` : ''}.`}
+                        {noteRoute === 'bot' && (
+                          <span className="block text-[10px] text-neutral-500 mt-1">
+                            Your boost is in the OnlyBoosts feeds and totals. It is posted from the
+                            OnlyBoosts account, since this browser has no Nostr account of its own.
+                          </span>
+                        )}
                       </p>
+                    ) : shareState === 'signing' && noteRoute === 'bot' ? (
+                      /* The auto-publish window (D14). Named rather than left
+                         silent: this is the one moment the screen is doing
+                         something the donor did not press. */
+                      <p className="text-xs text-neutral-300 leading-snug">Posting your boost to Nostr\u2026</p>
                     ) : (
                       <>
                         <p className="text-xs text-neutral-300 leading-snug">
-                          Share this boost on Nostr?
+                          {noteRoute === 'bot' ? 'Post this boost to Nostr?' : 'Share this boost on Nostr?'}
                           <span className="block text-[10px] text-neutral-500 mt-1">
-                            Posts a kind-1 note from your npub, tagged to this episode.
-                            OnlyBoosts counts boosts it can find on Nostr, so this is what
-                            puts yours in the feeds and the totals.
+                            {noteRoute === 'bot'
+                              ? 'OnlyBoosts counts boosts it can find on Nostr, so this is what puts yours in the feeds and the totals. It posts from the OnlyBoosts account.'
+                              : 'Posts a kind-1 note from your npub, tagged to this episode. OnlyBoosts counts boosts it can find on Nostr, so this is what puts yours in the feeds and the totals.'}
                           </span>
                         </p>
+                        {/* ⚠️ WHY THE BOT ROUTE IS ASKING AT ALL. It publishes
+                            itself on a clean boost, so reaching this branch
+                            means a leg fell short or went unconfirmed — which
+                            is exactly the state in which a retry would change
+                            what the note should say. Saying so is what makes
+                            the button read as a decision rather than a step
+                            that appears at random. */}
+                        {noteRoute === 'bot' && shareState !== 'error' && (
+                          <p className="text-[10px] text-amber-400/90 leading-snug">
+                            Waiting on you because not every split landed. Retry what you can first;
+                            the note reports whatever has settled when you press.
+                          </p>
+                        )}
                         {/* Naming the figure the note will carry, before it is
                             signed. On a partial the number is not the one the
                             donor typed, and finding that out by reading their
                             own published note is the wrong order. */}
                         <p className="text-[10px] text-neutral-500 leading-snug">
                           The note will say <span className="tabular-nums text-neutral-400">{fmtSats(paidSats)} sats</span>
-                          {paidCount < activeCount && <> and <span className="text-neutral-400">{paidCount} of {activeCount} splits paid</span></>}.
+                          {paidCount < activeCount && <> and <span className="text-neutral-400">{paidCount} of {activeCount} splits paid</span></>}
+                          {noteRoute === 'bot' && typedName && <>, from <span className="text-neutral-400">{typedName}</span></>}.
                         </p>
+                        {/* ⚠️ A FAILED SIGN IS NOT A FAILED BOOST, and the copy
+                            has to say so or a donor reads it as their sats
+                            being lost. The sats are gone either way, which is
+                            why the offer is another attempt at the note rather
+                            than anything that looks like unwinding a payment. */}
                         {shareState === 'error' && shareError && (
                           <p className="text-[11px] text-red-400/90 leading-snug">{shareError}</p>
                         )}
                         <button onClick={handleShare} disabled={shareState === 'signing'}
                           className="w-full py-2 rounded bg-orange-500 hover:bg-orange-600 disabled:bg-neutral-700 disabled:text-neutral-400 text-xs font-medium text-white transition-colors">
-                          {shareState === 'signing' ? 'Approve in your signer…' : shareState === 'error' ? 'Try posting again' : 'Share to Nostr'}
+                          {shareState === 'signing'
+                            ? (noteRoute === 'bot' ? 'Posting\u2026' : 'Approve in your signer\u2026')
+                            : shareState === 'error' ? 'Try posting again'
+                            : noteRoute === 'bot' ? 'Post to Nostr' : 'Share to Nostr'}
                         </button>
                       </>
                     )}
                   </div>
+                )}
+                {/* ⚠️ SILENCE IS WHAT A FAILURE LOOKS LIKE, so the suppressed
+                    case says out loud that nothing was posted and that it was
+                    the donor's own choice. Without it the screen a private
+                    boost ends on is identical to the screen a broken one would
+                    end on. */}
+                {phase === 'done' && noteRoute === 'none' && paidSats > 0 && !stillChecking && (
+                  <p className="text-[11px] text-neutral-500 leading-snug">
+                    Nothing was posted to Nostr, as you asked. Your sats and your message reached
+                    the show, and this boost stays out of the OnlyBoosts feeds and totals.
+                  </p>
                 )}
                 {phase === 'done' && (
                   <button onClick={requestClose} className="mt-1 w-full py-2.5 rounded bg-neutral-700 hover:bg-neutral-600 text-sm text-neutral-200 transition-colors">Done</button>

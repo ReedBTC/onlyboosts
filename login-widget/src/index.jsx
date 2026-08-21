@@ -529,6 +529,7 @@ function ExternalBoostHost() {
     <ExternalBoostModal
       user={user || null}
       onRequestSignIn={() => api.requestLogin()}
+      onRequestWallet={() => api.requestWalletForBoost()}
       onClose={() => setExternalBoostState(null)}
       episode={state.episode}
       recipientsBundle={state.recipientsBundle}
@@ -987,11 +988,19 @@ const api = {
 
   /**
    * Open the EXTERNAL-episode boost modal (another podcast's episode, from
-   * /feeds). Same login → real-user → signer → wallet gate chain as
-   * openEpisodeBoost, but renders ExternalBoostModal and applies NO recipient
-   * overrides. Nothing here rewrites a leg: the caller (value-block.js) hands
-   * over the show's published value block verbatim, and its own override map
-   * is empty by design. See the warning there before adding one.
+   * /feeds). Renders ExternalBoostModal and applies NO recipient
+   * overrides.
+   *
+   * ⚠️ ITS GATE CHAIN IS NO LONGER openEpisodeBoost's. Both the login gate
+   * (Phase 1) and the wallet gate (D13) are gone from in front of the modal:
+   * a boost is a payment, a payment needs no Nostr identity, and asking for a
+   * wallet before the reader has seen the amount is the wrong order. What
+   * remains is conditional on there BEING an identity, and each part still
+   * earns its place for a signed-in user.
+   *
+   * Nothing here rewrites a leg: the caller (value-block.js) hands over the
+   * show's published value block verbatim, and its own override map is empty
+   * by design. See the warning there before adding one.
    *
    * @param {object} args
    * @param {object} args.episode          - { showTitle, episodeTitle, podcastGuid, itemGuid, bmbUrl }
@@ -1006,10 +1015,10 @@ const api = {
 
     // ⚠️ THERE IS NO LONGER A LOGIN GATE ON THIS PATH. A boost is a
     // payment, and a payment does not need a Nostr identity: the
-    // boostagram's sender fields are optional, and the note that would
-    // carry the identity is a separate act pressed after settlement. A
-    // signed-out booster pays anonymously and is offered no share
-    // control (ExternalBoostModal's `canShareToFeed`).
+    // boostagram's sender fields are optional, and the note is decided
+    // inside the modal. A signed-out booster types a name or leaves it
+    // blank, and OnlyBoosts signs the note for them (Phase 2 /
+    // `/api/sign-boost`), so the boost reaches this index either way.
     //
     // The identity gates below are therefore conditional on there BEING
     // an identity, and each still earns its place for a signed-in user:
@@ -1036,18 +1045,59 @@ const api = {
       if (!await ensureSignerVerified()) return
     }
 
-    // Gate 2: wallet connected?
-    if (!wallet.isReady()) {
-      wallet.ensureReady(currentUser)
-        .then((ok) => {
-          if (ok) api.openExternalBoost(args)
-          else handleWalletGateFailure(() => api.openExternalBoost(args))
-        })
-        .catch(() => handleWalletGateFailure(() => api.openExternalBoost(args)))
-      return
-    }
-
+    // ⚠️ AND THERE IS NO LONGER A WALLET GATE HERE EITHER — see D13 in
+    // boost-login.md. It used to run before the modal ever mounted, so a
+    // visitor who pressed Boost was asked to paste an NWC connection string
+    // before seeing what they were boosting or what it would cost. Compose
+    // first, pay second: the gate now lives behind the modal's own Boost
+    // button (`api.requestWalletForBoost`), where the connect modal arrives
+    // at the moment its purpose is obvious.
+    //
+    // ⚠️ THE RESUME MUST NOT COME BACK THROUGH HERE. `pendingAction` re-enters
+    // an api method from the top, and re-entering this one with the modal
+    // already open would mount a second one over the first. The modal stays
+    // mounted underneath the connect modal instead (`WalletConnectModal` is
+    // z-[78/79] against this one's z-[70/71]), keeps its state, and resumes
+    // off its own `wallet.onChange` subscription.
     setExternalBoostState({ episode, recipientsBundle })
+  },
+
+  /**
+   * Engage a wallet on behalf of a boost modal that is ALREADY OPEN (D13).
+   *
+   * Everything the retired Gate 2 did, minus the part that re-opened the
+   * modal: try the at-rest restore first, so a returning visitor with a saved
+   * NWC blob or a remembered extension never sees the connect modal at all;
+   * fall back to the connect modal for someone who genuinely has no wallet;
+   * and keep `handleWalletGateFailure`'s distinction between those two, since
+   * a slow extension that is merely stalled must not be told it has no wallet.
+   *
+   * ⚠️ IT QUEUES NO PENDING ACTION, and that is the difference from the gate
+   * it replaces. There is nothing to re-run: the caller is a mounted component
+   * watching `wallet.onChange`, and it resumes itself when a wallet lands.
+   * Queueing as well would run the boost twice.
+   *
+   * @returns {Promise<boolean>} true if a wallet is ready NOW. False means
+   *   either the connect modal is open or a retry toast was shown; the caller
+   *   waits on its own wallet subscription rather than on this promise.
+   */
+  async requestWalletForBoost() {
+    if (wallet.isReady()) return true
+    try {
+      if (await wallet.ensureReady(currentUser || null)) return true
+    } catch (e) {
+      console.warn('[lb] wallet ensureReady failed', e?.message || e)
+    }
+    const status = wallet.getStatus()
+    if (status.remembered) {
+      const msg = status.rememberedKind === 'nwc'
+        ? 'Couldn\'t unlock your saved wallet connection. Press Boost to try again.'
+        : 'Your wallet extension didn\'t respond. Check that it\'s unlocked, then press Boost again.'
+      try { pushToast({ kind: 'error', message: msg }) } catch {}
+      return false
+    }
+    api.openWalletConnect()
+    return false
   },
 
   /**
