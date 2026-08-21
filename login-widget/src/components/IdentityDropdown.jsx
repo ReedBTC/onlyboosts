@@ -259,8 +259,8 @@ export default function IdentityDropdown({
         </button>
       </div>
       )}
-    </div>,
-    document.body</div>,
+    </div></div>,
+    document.body,
   )
 }
 

@@ -648,6 +648,17 @@ simultaneously outlined and undefined.
 `document.body` and would otherwise sit outside any scope. A new portal without
 the wrapper is a modal back in OS chrome.
 
+**⚠️ AND A WRAPPED PORTAL STILL HAS TO BE PASSED A CONTAINER.** Adding that
+wrapper put the closing `</div>` on the wrong side of the comma in **eight of
+ten** call sites, producing
+`createPortal(<div className="lb-w">…document.body</div>)` — one argument, so
+React rendered nothing. It is valid JSX (`document.body` just becomes text
+inside the div), so **the build was silent and every test passed**, and the only
+symptom was that the Boost button and the nav Log in button stopped opening
+anything. `scripts/test-boost-modal-render.mjs` now walks to the matching paren
+and counts top-level commas, because the broken form and the correct one differ
+by six characters in the middle of a JSX block.
+
 **⚠️ `:where(.lb-w)` IS LOAD-BEARING, NOT TIDINESS.** Preflight's own selectors
 are bare elements at specificity 0,0,0 and 0,0,1, which is exactly why `py-3`
 beats the `padding: 0` preflight just set. Scoping naively to `.lb-w button`

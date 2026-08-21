@@ -309,13 +309,43 @@ console.log('\nThe themed classes emit real CSS:')
     'the scoped preflight is gone — every button reverts to native OS chrome')
   ok('the scoped reset is in the bundle')
 
+  /**
+   * ⚠️ AND EVERY PORTAL STILL HAS TO BE PASSED A CONTAINER. Adding the wrapper
+   * by hand put the closing `</div>` on the wrong side of the comma in **eight
+   * of ten** call sites, so `createPortal(<div>…document.body</div>)` received
+   * ONE argument and rendered nothing. It is valid JSX — `document.body` simply
+   * became text inside the div — so the build was silent, every test passed,
+   * and the only symptom was that the Boost button and the nav Log in button
+   * stopped opening anything at all.
+   *
+   * So this walks to the matching paren and counts top-level commas rather than
+   * pattern-matching the source, because the broken form and the correct form
+   * differ by six characters in the middle of a JSX block.
+   */
+  const portalFiles = ['index.jsx', 'components/IdentityDropdown.jsx', 'components/ToastHost.jsx', 'components/BoostProgressBanner.jsx']
   const unwrapped = []
-  for (const file of ['index.jsx', 'components/IdentityDropdown.jsx', 'components/ToastHost.jsx', 'components/BoostProgressBanner.jsx']) {
+  const argless = []
+  for (const file of portalFiles) {
     const text = readFileSync(new URL(`../login-widget/src/${file}`, import.meta.url), 'utf8')
-    for (const m of text.matchAll(/createPortal\(([\s\S]{0,120})/g)) {
-      if (!m[1].includes('lb-w')) unwrapped.push(`${file}: ${m[1].split('\n')[1]?.trim() ?? m[1].trim()}`)
+    for (const m of text.matchAll(/createPortal\(/g)) {
+      let i = m.index + m[0].length
+      let depth = 1
+      let commas = 0
+      while (i < text.length && depth > 0) {
+        const c = text[i]
+        if ('([{'.includes(c)) depth++
+        else if (')]}'.includes(c)) { depth--; if (!depth) break }
+        else if (c === ',' && depth === 1) commas++
+        i++
+      }
+      const call = text.slice(m.index, i)
+      const line = text.slice(0, m.index).split('\n').length
+      if (!call.includes('lb-w')) unwrapped.push(`${file}:${line}`)
+      if (commas < 1 || /document\.body<\//.test(call)) argless.push(`${file}:${line}`)
     }
   }
+  assert.deepEqual(argless, [], `createPortal called with no container — it renders NOTHING:\n  ${argless.join('\n  ')}`)
+  ok('every createPortal is passed a container')
   assert.deepEqual(unwrapped, [], `a portal renders outside the .lb-w scope:\n  ${unwrapped.join('\n  ')}`)
   ok('every createPortal wraps its children in the scope')
 

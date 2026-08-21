@@ -46,7 +46,7 @@ export default function ToastHost() {
           </button>
         </div>
       ))}
-    </div>,
-    document.body</div>,
+    </div></div>,
+    document.body,
   )
 }

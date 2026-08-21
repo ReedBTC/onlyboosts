@@ -109,7 +109,7 @@ export default function BoostProgressBanner() {
         </svg>
         <span className="leading-none">{label}</span>
       </button>
-    </div>,
-    document.body</div>,
+    </div></div>,
+    document.body,
   )
 }

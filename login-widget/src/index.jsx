@@ -374,8 +374,8 @@ function ShowBoostHost() {
           window.dispatchEvent(new CustomEvent('lb:show-boost-settled', { detail: r }))
         } catch {}
       }}
-    />,
-    document.body</div>,
+    /></div>,
+    document.body,
   )
 }
 
@@ -429,8 +429,8 @@ function LoginPromptHost() {
         // left to run, and the boost they clicked never opens.
         if (!walletConnectIsOpen) cancelPendingAction()
       }}
-    />,
-    document.body</div>,
+    /></div>,
+    document.body,
   )
 }
 
@@ -469,8 +469,8 @@ function WalletConnectHost() {
         // queued action so a stray click later doesn't surprise them.
         cancelPendingAction()
       }}
-    />,
-    document.body</div>,
+    /></div>,
+    document.body,
   )
 }
 
@@ -500,8 +500,8 @@ function EpisodeBoostHost() {
       onClose={() => setEpisodeBoostState(null)}
       episode={state.episode}
       splitsBundle={state.splits}
-    />,
-    document.body</div>,
+    /></div>,
+    document.body,
   )
 }
 
@@ -542,8 +542,8 @@ function ExternalBoostHost() {
         episode={state.episode}
         recipientsBundle={state.recipientsBundle}
       />
-    </ModalErrorBoundary>,
-    document.body</div>,
+    </ModalErrorBoundary></div>,
+    document.body,
   )
 }
 
