@@ -286,7 +286,7 @@ whether a returning visitor can be shown a stale answer**:
 |---|---|---|
 | HTML / navigations | network-first, cached copy offline | `HTML_CACHE` |
 | `/api/` except `/api/data/` | **network-first, cached copy offline** | `API_CACHE` |
-| `/api/value` | network only, never cached | — |
+| `/api/value`, `/api/lnurl` | network only, never cached | — |
 | `/api/data/` | stale-while-revalidate (5-minute snapshot) | `SNAPSHOT_CACHE` |
 | `/assets/widgets/` | stale-while-revalidate | `WIDGET_CACHE` |
 | everything else same-origin | stale-while-revalidate | `STATIC_CACHE` |
@@ -297,8 +297,19 @@ live in D1 took two reloads to appear, and only for returning visitors, so it
 read as intermittent. The Follows feeds never showed it because they POST and
 the handler ignores non-GET. Any new live endpoint belongs under `/api/`, where
 `isLiveAPIRequest` picks it up with no SW change; one placed anywhere else needs
-its own route before it ships. `/api/value` is excluded from every cache
-because a stale value block would pay a split the show no longer publishes.
+its own route before it ships.
+
+**⚠️ BUT A MONEY ENDPOINT NEEDS ONE MORE STEP, AND LANDING UNDER `/api/` IS WHAT
+HIDES IT.** That bucket is network-first **with a cached copy served when the
+network is down**, which is right for a feed and wrong for anything that moves
+sats. `isUncacheableMoneyRequest` is the opt-out and holds both:
+`/api/value`, because a stale value block pays a split the show no longer
+publishes, and `/api/lnurl`, because it returns a **bolt11 invoice** and a
+cached invoice is one the donor may already have paid. `/api/lnurl` shipped
+without the exclusion in `ob-v91` and was caught before deploy; the reason it
+was easy to miss is that placing it under `/api/` was the correct, documented
+thing to do. **Ask of any new endpoint not just where it routes, but whether an
+offline answer is worse than no answer.**
 
 ## ⚠️ The Rendering Rule: The Server Renders The Facts, JavaScript Adds The Verbs
 
@@ -629,6 +640,55 @@ merged or dropped** — `applyExternalOverrides` is a documented passthrough, an
 the external boost pays exactly what the show published. If OnlyBoosts ever takes
 a cut it gets its own leg under its own name. Grep both maps after any restore
 from `lb/main`.
+
+### A Lightning Address With No CORS Headers Cannot Be Paid From A Browser
+
+Both LNURL hops run in the page, and a cross-origin response carrying no
+`Access-Control-Allow-Origin` is unreadable to JavaScript however healthy the
+server is. **The leg therefore dies before an invoice is ever requested**, and it
+surfaces as a generic fetch failure indistinguishable from the host being down:
+the browser sends the request and then refuses to hand us the answer, so nothing
+upstream logs anything either.
+
+**⚠️ EVERY PROVIDER THIS SITE HAD MEASURED SENDS `*`, WHICH IS WHY IT WENT
+UNSEEN.** getalby.com and fountain.fm carry 58 of the 63 lightning-address legs
+across the top thirty shows. A **self-hosted** address generally sends nothing.
+Measured 2026-08-21 on `spencer@bowlafterbowl.com`, 44% of that show's value
+block: the metadata document, the keysend document and the invoice callback all
+answer 200 with no access-control headers at all. Bowl After Bowl could not be
+boosted from this site.
+
+`functions/api/lnurl.js` is the way out and is a **fallback, not the route**.
+Every leg still tries the recipient's own server first, so a host that works
+today never touches our edge and a Pages outage cannot take down a boost path
+that never needed us; verified, a working host makes two direct calls and zero
+proxied ones. Four rules hold it together:
+
+- **⚠️ It accepts a lightning address and NEVER a URL**, so a caller cannot steer
+  the outbound fetch. The callback the recipient's own metadata returns is held
+  to the same host rule the client applies (`CALLBACK_HOST_ALLOWLIST`), which is
+  restated in the Function because a Pages Function cannot import from
+  `login-widget/src`. **The two copies must stay in step.**
+- **An upstream error is mirrored, not replaced.** `readErrorReason` prints the
+  recipient's own explanation, which is often the only account a donor gets of
+  why a leg failed; answering with our own wording would delete it.
+- **A served 4xx is never retried through the proxy.** The server understood and
+  refused, and asking again through our edge gets the same refusal.
+- **The client remembers which hosts proved unreadable**, per session and never
+  persisted. The metadata hop is prefetched on mount, but the invoice hop happens
+  with the donor watching, and `fetchJsonCapped` retries once with a 1.2s
+  backoff, so a doomed direct attempt costs a visible ~2.5s per leg.
+
+It is excluded from every service-worker cache; see the money-endpoint note
+under **What The Service Worker Caches**.
+
+**The invoice must demand what the leg asked for**, and nothing checked this
+before, on either path. The split decides a leg's share and the wallet pays
+whatever the bolt11 says, so a server answering with a larger figure spent the
+donor's sats with nothing here noticing. `bolt11AmountMsats` reads the amount out
+of the human-readable part; **an unreadable amount is allowed through**, because
+the check exists to catch a mismatch and refusing an encoding nobody anticipated
+would break a working payment.
 
 `FEED_GUID` in `boostagram.js` is deliberately `null` — OnlyBoosts is a client,
 not a podcast, so it has no feed to claim. Inheriting LB's GUID would have
