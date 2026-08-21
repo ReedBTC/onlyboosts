@@ -45,20 +45,20 @@ export default function LoginModal({ onLogin, onClose }) {
     // modal (z-[70/71]) when launched from inside it via the inline
     // Sign-in button. Standalone use is unaffected.
     <div
-      className={`fixed inset-0 bg-[var(--scrim)] flex items-start sm:items-center justify-center z-[80] p-3 pt-20 sm:p-4 overflow-y-auto overflow-x-hidden transition-opacity duration-200 ${visible ? 'opacity-100' : 'opacity-0'}`}
+      className={`fixed inset-0 bg-[var(--scrim,rgba(11,58,82,0.55))] flex items-start sm:items-center justify-center z-[80] p-3 pt-20 sm:p-4 overflow-y-auto overflow-x-hidden transition-opacity duration-200 ${visible ? 'opacity-100' : 'opacity-0'}`}
       onMouseDown={requestClose}
       role="dialog"
       aria-modal="true"
       aria-label="Login"
     >
       <div
-        className={`relative bg-[var(--modal-field)] border border-[var(--border)] rounded-lg shadow-[0_24px_60px_-12px_rgba(11,58,82,0.28),0_0_0_1px_rgba(11,58,82,0.06)] w-full max-w-md my-4 sm:my-8 max-h-[calc(100dvh-2rem)] flex flex-col overflow-hidden transition-[opacity,transform] duration-200 ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}
+        className={`relative bg-[var(--modal-field,#ffffff)] border border-[var(--border,#cfe2ee)] rounded-lg shadow-[0_24px_60px_-12px_rgba(11,58,82,0.28),0_0_0_1px_rgba(11,58,82,0.06)] w-full max-w-md my-4 sm:my-8 max-h-[calc(100dvh-2rem)] flex flex-col overflow-hidden transition-[opacity,transform] duration-200 ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}
         onMouseDown={e => e.stopPropagation()}
       >
         <button
           type="button"
           onClick={requestClose}
-          className="absolute top-2 right-2 z-10 text-[var(--muted)] hover:text-[var(--ink)] bg-[var(--scrim)] p-2 rounded-full transition-colors"
+          className="absolute top-2 right-2 z-10 text-[var(--muted,#5a7488)] hover:text-[var(--ink,#0f2733)] bg-[var(--scrim,rgba(11,58,82,0.55))] p-2 rounded-full transition-colors"
           aria-label="Close login"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

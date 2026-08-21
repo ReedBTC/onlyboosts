@@ -149,26 +149,32 @@ const REGRESSION = `export default function Thing() {
 console.log('\nThe themed classes emit real CSS:')
 {
   const bundle = readFileSync(new URL('../assets/widgets/login-widget.js', import.meta.url), 'utf8')
+  // [css property, token] — the pair that has to appear together in the built
+  // CSS. Kept as pairs rather than as one string because `--tw-ring-color` has
+  // a space after its colon and the minifier trims `0.55` to `.55`, so any
+  // exact-string form passes today and rots on the next build.
   const REQUIRED = [
-    'background-color:var(--modal-bg)',
-    'background-color:var(--modal-field)',
-    'background-color:var(--modal-inset)',
-    'background-color:var(--brand)',
-    'background-color:var(--brand-tint)',
-    'background-color:var(--scrim)',
-    'color:var(--ink)',
-    'color:var(--muted)',
-    'color:var(--ok)',
-    'color:var(--warn)',
-    'color:var(--danger)',
-    'border-color:var(--border)',
-    'accent-color:var(--brand)',
-    // The two that were wrong. Family, not weight; ring COLOUR, not width.
-    'font-family:var(--font-display)',
-    '--tw-ring-color: var(--brand-ring)',
+    ['background-color', '--modal-bg'],
+    ['background-color', '--modal-field'],
+    ['background-color', '--modal-inset'],
+    ['background-color', '--brand'],
+    ['background-color', '--brand-tint'],
+    ['background-color', '--scrim'],
+    ['color', '--ink'],
+    ['color', '--muted'],
+    ['color', '--ok'],
+    ['color', '--warn'],
+    ['color', '--danger'],
+    ['border-color', '--border'],
+    ['accent-color', '--brand'],
+    // The two that compiled wrong once. Family, not weight; ring COLOUR, not width.
+    ['font-family', '--font-display'],
+    ['--tw-ring-color', '--brand-ring'],
   ]
-  const missing = REQUIRED.filter((d) => !bundle.includes(d))
-  assert.deepEqual(missing, [], `the built widget emits no rule for:\n  ${missing.join('\n  ')}`)
+  const missing = REQUIRED.filter(([prop, token]) =>
+    !new RegExp(`${prop}:\\s*var\\(${token}[,)]`).test(bundle))
+  assert.deepEqual(missing.map(([p, t]) => `${p}:var(${t})`), [],
+    'the built widget emits no rule for the above')
   ok(`${REQUIRED.length} declarations present in the built bundle`)
 
   // And the wrong-property version must not come back.
@@ -203,6 +209,73 @@ console.log('\nThe themed classes emit real CSS:')
   }
   assert.deepEqual(offenders, [], `an opacity modifier on a var() colour emits no CSS:\n  ${offenders.join('\n  ')}`)
   ok('no class applies an alpha to a var() colour')
+
+  /**
+   * ⚠️ EVERY `var()` IN THE WIDGET CARRIES A LITERAL FALLBACK, AND AN INVISIBLE
+   * MODAL IS WHY.
+   *
+   * The widget's colours live in `assets/css/theme.css`, a file it does not
+   * control and cannot version together with itself. `scripts/stamp-assets.js`
+   * gives every asset URL a `?v=` so one version of one file can never meet
+   * another — except that **`assets/widgets/` files are stamped at the
+   * reference site and never rewritten**, so `login-widget.js?v=ob-v94` and
+   * `?v=ob-v95` are the same file on disk and the server hands back the current
+   * build for either. A browser holding `theme.css?v=ob-v94` in its four-hour
+   * HTTP cache while fetching the widget fresh therefore gets **a new widget
+   * against an old stylesheet**, which is precisely the `ob-v53` class of
+   * failure the stamper exists to prevent, arriving through the one door it
+   * cannot close.
+   *
+   * An undefined custom property makes the whole declaration invalid at
+   * computed-value time, so `background-color: var(--modal-bg)` resolves to
+   * **transparent**. Observed 2026-08-21: the boost modal rendered as a
+   * near-invisible outline over the dimmed page, mid-payment-flow.
+   *
+   * The fallbacks are mirrors, not a second source of truth: this assertion
+   * reads `theme.css` and requires each one to equal the token's current value,
+   * so editing the palette without re-running the mirror fails here.
+   */
+  const themeCss = readFileSync(new URL('../assets/css/theme.css', import.meta.url), 'utf8')
+  const rootBlock = themeCss.slice(themeCss.indexOf('\n:root {'))
+  const declared = {}
+  for (const m of rootBlock.slice(0, rootBlock.indexOf('\n}')).matchAll(/^\s*(--[a-z0-9-]+):\s*([^;]+);/gm)) {
+    declared[m[1]] = m[2].replace(/\s+/g, '')
+  }
+  // The two font tokens degrade to a generic rather than mirroring: Tailwind
+  // strips the space out of `'Playfair Display'` unless it is written `_`, and
+  // `PlayfairDisplay` is not a font. A missing token there costs the face, not
+  // legibility, which is the right trade for the one value that cannot mirror.
+  const GENERIC_FALLBACK = new Set(['--font-display', '--font-body'])
+
+  const bare = []
+  const wrong = []
+  for (const name of styled) {
+    const text = readFileSync(new URL(`../login-widget/src/components/${name}.jsx`, import.meta.url), 'utf8')
+    for (const m of text.matchAll(/var\((--[a-z0-9-]+)\)/g)) bare.push(`${name}: var(${m[1]})`)
+    // ⚠️ A BALANCED WALK, NOT A REGEX. A fallback can be `rgba(0,175,240,0.32)`,
+    // and `[^)]*` stops at the FIRST `)` — which reports every nested-paren
+    // fallback as drifted while quoting a value identical to the one it is
+    // compared against. That is a test failing on its own parser, which is the
+    // most expensive kind of red.
+    for (const m of text.matchAll(/var\((--[a-z0-9-]+),/g)) {
+      const token = m[1]
+      let i = m.index + m[0].length
+      let depth = 1
+      while (i < text.length && depth > 0) {
+        if (text[i] === '(') depth++
+        else if (text[i] === ')') { depth--; if (depth === 0) break }
+        i++
+      }
+      const fallback = text.slice(m.index + m[0].length, i)
+      if (GENERIC_FALLBACK.has(token)) continue
+      if (declared[token] === undefined) { wrong.push(`${name}: ${token} is not in theme.css`); continue }
+      if (declared[token] !== fallback) wrong.push(`${name}: ${token} falls back to ${fallback}, theme.css says ${declared[token]}`)
+    }
+  }
+  assert.deepEqual(bare, [], `a var() with no fallback renders TRANSPARENT against a stale theme.css:\n  ${bare.join('\n  ')}`)
+  ok('every var() in the widget carries a fallback')
+  assert.deepEqual(wrong, [], `a fallback has drifted from theme.css:\n  ${wrong.join('\n  ')}`)
+  ok('every fallback still equals its token in theme.css')
 
   // ⚠️ The bundle is a build artifact. If it is stale the two assertions above
   // pass against yesterday's CSS, so the source is checked to agree with it.

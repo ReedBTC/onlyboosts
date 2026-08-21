@@ -82,9 +82,9 @@ function clearPendingNip46() {
 // so <input> identity is stable across renders.
 const Divider = () => (
   <div className="flex items-center gap-3">
-    <div className="flex-1 h-px bg-[var(--modal-field)]" />
-    <span className="text-xs text-[var(--muted)]">or</span>
-    <div className="flex-1 h-px bg-[var(--modal-field)]" />
+    <div className="flex-1 h-px bg-[var(--modal-field,#ffffff)]" />
+    <span className="text-xs text-[var(--muted,#5a7488)]">or</span>
+    <div className="flex-1 h-px bg-[var(--modal-field,#ffffff)]" />
   </div>
 )
 
@@ -635,7 +635,7 @@ export default function LoginScreen({ onLogin, embedded = false }) {
   const renderKeySection = () => (
     <div className="space-y-3">
       <div className="space-y-1">
-        <label htmlFor="nsec-input" className="block text-sm text-[var(--muted)]">
+        <label htmlFor="nsec-input" className="block text-sm text-[var(--muted,#5a7488)]">
           {isMobile ? 'Paste your nsec' : 'Private key (nsec)'}
         </label>
         <input
@@ -650,19 +650,19 @@ export default function LoginScreen({ onLogin, embedded = false }) {
           inputMode="text"
           autoCapitalize="none"
           autoCorrect="off"
-          className="w-full px-4 py-3 rounded-lg bg-[var(--modal-bg)] border border-[var(--border)] text-[var(--ink)] placeholder-[var(--muted)] focus:outline-none focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--brand-ring)] font-mono text-sm"
+          className="w-full px-4 py-3 rounded-lg bg-[var(--modal-bg,#f4fafd)] border border-[var(--border,#cfe2ee)] text-[var(--ink,#0f2733)] placeholder-[var(--muted,#5a7488)] focus:outline-none focus:border-[var(--brand,#00aff0)] focus:ring-2 focus:ring-[var(--brand-ring,rgba(0,175,240,0.32))] font-mono text-sm"
           aria-label="Nostr nsec input"
         />
       </div>
 
-      <p className="text-xs text-[var(--warn)] leading-relaxed">
+      <p className="text-xs text-[var(--warn,#b45309)] leading-relaxed">
         Your key is held in memory only and cleared when you close this page. Never stored.
       </p>
 
       <button
         onClick={loginWithKey}
         disabled={loading || !nsecValue.trim()}
-        className="w-full py-3 px-4 rounded-lg bg-[var(--modal-field)] hover:bg-[var(--modal-inset)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--ink)] font-medium transition-colors border border-[var(--border)]"
+        className="w-full py-3 px-4 rounded-lg bg-[var(--modal-field,#ffffff)] hover:bg-[var(--modal-inset,#e6f1f9)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--ink,#0f2733)] font-medium transition-colors border border-[var(--border,#cfe2ee)]"
       >
         {loading ? 'Connecting...' : 'Login with Key'}
       </button>
@@ -674,7 +674,7 @@ export default function LoginScreen({ onLogin, embedded = false }) {
       <button
         onClick={loginWithExtension}
         disabled={loading}
-        className="w-full py-3 px-4 rounded-lg bg-[var(--brand)] hover:bg-[var(--brand-d)] disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium transition-colors"
+        className="w-full py-3 px-4 rounded-lg bg-[var(--brand,#00aff0)] hover:bg-[var(--brand-d,#068ace)] disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium transition-colors"
       >
         {loading ? 'Connecting...' : 'Login with Extension'}
       </button>
@@ -683,13 +683,13 @@ export default function LoginScreen({ onLogin, embedded = false }) {
           on mobile where the extension's permission popup may not be
           obvious (Firefox Android tucks them under the menu). */}
       {loading && loadingStep && (
-        <p className="text-xs text-[var(--brand-d)] flex items-center gap-1.5 justify-center">
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-[var(--brand)] animate-pulse" />
+        <p className="text-xs text-[var(--brand-d,#068ace)] flex items-center gap-1.5 justify-center">
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-[var(--brand,#00aff0)] animate-pulse" />
           {loadingStep}
         </p>
       )}
       {!hasExtension && !isMobile && (
-        <p className="text-xs text-[var(--muted)] text-center">
+        <p className="text-xs text-[var(--muted,#5a7488)] text-center">
           Works with Alby, nos2x, Nostore, keys.band, and other NIP-07 extensions.
         </p>
       )}
@@ -699,18 +699,18 @@ export default function LoginScreen({ onLogin, embedded = false }) {
   const renderNostrConnectSection = () => (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <span className="text-sm text-[var(--muted)]">Nostr Connect</span>
+        <span className="text-sm text-[var(--muted,#5a7488)]">Nostr Connect</span>
         {!isMobile && (
-          <div className="flex rounded-md overflow-hidden border border-[var(--border)] text-xs">
+          <div className="flex rounded-md overflow-hidden border border-[var(--border,#cfe2ee)] text-xs">
             <button
               onClick={() => switchNcTab('qr')}
-              className={`px-3 py-1.5 transition-colors ${ncTab === 'qr' ? 'bg-[var(--modal-inset)] text-[var(--ink)]' : 'bg-[var(--modal-bg)] text-[var(--muted)] hover:text-[var(--ink)]'}`}
+              className={`px-3 py-1.5 transition-colors ${ncTab === 'qr' ? 'bg-[var(--modal-inset,#e6f1f9)] text-[var(--ink,#0f2733)]' : 'bg-[var(--modal-bg,#f4fafd)] text-[var(--muted,#5a7488)] hover:text-[var(--ink,#0f2733)]'}`}
             >
               Scan QR
             </button>
             <button
               onClick={() => switchNcTab('paste')}
-              className={`px-3 py-1.5 transition-colors border-l border-[var(--border)] ${ncTab === 'paste' ? 'bg-[var(--modal-inset)] text-[var(--ink)]' : 'bg-[var(--modal-bg)] text-[var(--muted)] hover:text-[var(--ink)]'}`}
+              className={`px-3 py-1.5 transition-colors border-l border-[var(--border,#cfe2ee)] ${ncTab === 'paste' ? 'bg-[var(--modal-inset,#e6f1f9)] text-[var(--ink,#0f2733)]' : 'bg-[var(--modal-bg,#f4fafd)] text-[var(--muted,#5a7488)] hover:text-[var(--ink,#0f2733)]'}`}
             >
               Paste string
             </button>
@@ -729,7 +729,7 @@ export default function LoginScreen({ onLogin, embedded = false }) {
           {qrUri ? (
             <a
               href={qrUri}
-              className="w-full py-3 px-4 rounded-lg bg-[var(--brand)] hover:bg-[var(--brand-d)] text-white font-medium transition-colors flex items-center justify-center gap-2"
+              className="w-full py-3 px-4 rounded-lg bg-[var(--brand,#00aff0)] hover:bg-[var(--brand-d,#068ace)] text-white font-medium transition-colors flex items-center justify-center gap-2"
               style={{ textDecoration: 'none' }}
               aria-label="Open in signer app"
             >
@@ -739,7 +739,7 @@ export default function LoginScreen({ onLogin, embedded = false }) {
             <button
               type="button"
               disabled
-              className="w-full py-3 px-4 rounded-lg bg-[var(--brand)] opacity-40 cursor-not-allowed text-white font-medium flex items-center justify-center gap-2"
+              className="w-full py-3 px-4 rounded-lg bg-[var(--brand,#00aff0)] opacity-40 cursor-not-allowed text-white font-medium flex items-center justify-center gap-2"
             >
               <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
             </button>
@@ -748,21 +748,21 @@ export default function LoginScreen({ onLogin, embedded = false }) {
             <button
               onClick={copyQrUri}
               disabled={loading}
-              className="w-full py-2 px-4 rounded-lg bg-[var(--modal-field)] hover:bg-[var(--modal-inset)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--ink)] text-xs border border-[var(--border)] transition-colors"
+              className="w-full py-2 px-4 rounded-lg bg-[var(--modal-field,#ffffff)] hover:bg-[var(--modal-inset,#e6f1f9)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--ink,#0f2733)] text-xs border border-[var(--border,#cfe2ee)] transition-colors"
             >
               {copied ? 'Copied!' : 'Copy connection link'}
             </button>
           )}
           {qrWaiting && qrUri && !qrStuckPrompt && (
-            <div className="flex items-center justify-center gap-2 text-xs text-[var(--muted)]">
-              <span className="inline-block w-2 h-2 rounded-full bg-[var(--brand)] animate-pulse" />
+            <div className="flex items-center justify-center gap-2 text-xs text-[var(--muted,#5a7488)]">
+              <span className="inline-block w-2 h-2 rounded-full bg-[var(--brand,#00aff0)] animate-pulse" />
               Waiting for signer...
             </div>
           )}
 
           {qrWaiting && qrUri && qrStuckPrompt && (
             <div className="space-y-2 px-3 py-2.5 rounded-lg border border-[#d8a76a] bg-[rgba(180,83,9,0.08)]">
-              <p className="text-xs text-[var(--warn)] leading-snug">
+              <p className="text-xs text-[var(--warn,#b45309)] leading-snug">
                 Didn't see your approval. Mobile can drop the connection
                 while you're in the signer — try again with a fresh
                 connection link.
@@ -770,14 +770,14 @@ export default function LoginScreen({ onLogin, embedded = false }) {
               <button
                 type="button"
                 onClick={cancelQrFlow}
-                className="w-full py-1.5 px-3 rounded-lg text-xs bg-[var(--warn)] hover:bg-[#96490a] text-white transition-colors"
+                className="w-full py-1.5 px-3 rounded-lg text-xs bg-[var(--warn,#b45309)] hover:bg-[#96490a] text-white transition-colors"
               >
                 Try again
               </button>
             </div>
           )}
 
-          <p className="text-xs text-[var(--muted)] text-center">
+          <p className="text-xs text-[var(--muted,#5a7488)] text-center">
             Your phone will open whichever signer app claimed the nostrconnect link. Using a different signer? Copy the link above and paste it in.
           </p>
 
@@ -789,14 +789,14 @@ export default function LoginScreen({ onLogin, embedded = false }) {
               recommended fallback (the bunker:// URL flow below) avoids
               all of this — Amber generates a stable URL with the user's
               pubkey already embedded, no relay round-trip handshake. */}
-          <div className="rounded-md border border-[var(--border)] bg-[var(--modal-inset)] px-3 py-2 text-[11px] text-[var(--muted)] leading-relaxed">
-            <strong className="text-[var(--ink)]">Amber on Android?</strong> If login gets stuck, tap "Open in Signer App" again — Amber will remember your approval and reconnect quickly. Still stuck? Use the <strong>bunker URL</strong> option below instead: in Amber, go to Settings → Connected Apps → Generate bunker URL, then paste it here. That path is more reliable on mobile.
+          <div className="rounded-md border border-[var(--border,#cfe2ee)] bg-[var(--modal-inset,#e6f1f9)] px-3 py-2 text-[11px] text-[var(--muted,#5a7488)] leading-relaxed">
+            <strong className="text-[var(--ink,#0f2733)]">Amber on Android?</strong> If login gets stuck, tap "Open in Signer App" again — Amber will remember your approval and reconnect quickly. Still stuck? Use the <strong>bunker URL</strong> option below instead: in Amber, go to Settings → Connected Apps → Generate bunker URL, then paste it here. That path is more reliable on mobile.
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="flex-1 h-px bg-[var(--modal-field)]" />
-            <span className="text-xs text-[var(--muted)]">or paste a bunker string</span>
-            <div className="flex-1 h-px bg-[var(--modal-field)]" />
+            <div className="flex-1 h-px bg-[var(--modal-field,#ffffff)]" />
+            <span className="text-xs text-[var(--muted,#5a7488)]">or paste a bunker string</span>
+            <div className="flex-1 h-px bg-[var(--modal-field,#ffffff)]" />
           </div>
 
           <div className="space-y-2">
@@ -812,12 +812,12 @@ export default function LoginScreen({ onLogin, embedded = false }) {
               inputMode="text"
               autoCapitalize="none"
               autoCorrect="off"
-              className="w-full px-4 py-3 rounded-lg bg-[var(--modal-bg)] border border-[var(--border)] text-[var(--ink)] placeholder-[var(--muted)] focus:outline-none focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--brand-ring)] font-mono text-sm"
+              className="w-full px-4 py-3 rounded-lg bg-[var(--modal-bg,#f4fafd)] border border-[var(--border,#cfe2ee)] text-[var(--ink,#0f2733)] placeholder-[var(--muted,#5a7488)] focus:outline-none focus:border-[var(--brand,#00aff0)] focus:ring-2 focus:ring-[var(--brand-ring,rgba(0,175,240,0.32))] font-mono text-sm"
             />
             <button
               onClick={loginWithBunker}
               disabled={loading || !bunkerValue.trim()}
-              className="w-full py-3 px-4 rounded-lg bg-[var(--modal-field)] hover:bg-[var(--modal-inset)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--ink)] font-medium transition-colors border border-[var(--border)]"
+              className="w-full py-3 px-4 rounded-lg bg-[var(--modal-field,#ffffff)] hover:bg-[var(--modal-inset,#e6f1f9)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--ink,#0f2733)] font-medium transition-colors border border-[var(--border,#cfe2ee)]"
             >
               {loading ? 'Connecting...' : 'Connect'}
             </button>
@@ -827,8 +827,8 @@ export default function LoginScreen({ onLogin, embedded = false }) {
                 one is invisible to the user — they think login is stuck
                 when really there's a prompt waiting in their signer. */}
             {loading && loadingStep && (
-              <p className="text-xs text-[var(--brand-d)] flex items-center gap-1.5 leading-snug">
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-[var(--brand)] animate-pulse flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-[var(--brand-d,#068ace)] flex items-center gap-1.5 leading-snug">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-[var(--brand,#00aff0)] animate-pulse flex-shrink-0 mt-0.5" />
                 <span>{loadingStep}</span>
               </p>
             )}
@@ -845,32 +845,32 @@ export default function LoginScreen({ onLogin, embedded = false }) {
                 <div className="p-3 bg-white rounded-lg">
                   <QRCodeSVG value={qrUri} size={200} />
                 </div>
-                <p className="text-xs text-[var(--muted)] text-center">
+                <p className="text-xs text-[var(--muted,#5a7488)] text-center">
                   Scan with Amber, Primal, or any NIP-46 signer app
                 </p>
                 <div className="flex gap-2 w-full">
                   <button
                     onClick={copyQrUri}
-                    className="flex-1 py-2 px-3 rounded-lg bg-[var(--modal-field)] hover:bg-[var(--modal-inset)] text-[var(--ink)] text-xs border border-[var(--border)] transition-colors"
+                    className="flex-1 py-2 px-3 rounded-lg bg-[var(--modal-field,#ffffff)] hover:bg-[var(--modal-inset,#e6f1f9)] text-[var(--ink,#0f2733)] text-xs border border-[var(--border,#cfe2ee)] transition-colors"
                   >
                     {copied ? 'Copied!' : 'Copy link'}
                   </button>
                   <button
                     onClick={cancelQrFlow}
-                    className="flex-1 py-2 px-3 rounded-lg bg-[var(--modal-field)] hover:bg-[var(--modal-inset)] text-[var(--ink)] text-xs border border-[var(--border)] transition-colors"
+                    className="flex-1 py-2 px-3 rounded-lg bg-[var(--modal-field,#ffffff)] hover:bg-[var(--modal-inset,#e6f1f9)] text-[var(--ink,#0f2733)] text-xs border border-[var(--border,#cfe2ee)] transition-colors"
                   >
                     Refresh QR
                   </button>
                 </div>
                 {!qrStuckPrompt && (
-                  <div className="flex items-center gap-2 text-xs text-[var(--muted)]">
-                    <span className="inline-block w-2 h-2 rounded-full bg-[var(--brand)] animate-pulse" />
+                  <div className="flex items-center gap-2 text-xs text-[var(--muted,#5a7488)]">
+                    <span className="inline-block w-2 h-2 rounded-full bg-[var(--brand,#00aff0)] animate-pulse" />
                     Waiting for signer to connect...
                   </div>
                 )}
                 {qrStuckPrompt && (
                   <div className="w-full space-y-2 px-3 py-2.5 rounded-lg border border-[#d8a76a] bg-[rgba(180,83,9,0.08)]">
-                    <p className="text-xs text-[var(--warn)] leading-snug">
+                    <p className="text-xs text-[var(--warn,#b45309)] leading-snug">
                       Didn't see your approval. The connection may have
                       been dropped while you were in the signer — try
                       again with a fresh QR.
@@ -878,7 +878,7 @@ export default function LoginScreen({ onLogin, embedded = false }) {
                     <button
                       type="button"
                       onClick={cancelQrFlow}
-                      className="w-full py-1.5 px-3 rounded-lg text-xs bg-[var(--warn)] hover:bg-[#96490a] text-white transition-colors"
+                      className="w-full py-1.5 px-3 rounded-lg text-xs bg-[var(--warn,#b45309)] hover:bg-[#96490a] text-white transition-colors"
                     >
                       Try again
                     </button>
@@ -888,19 +888,19 @@ export default function LoginScreen({ onLogin, embedded = false }) {
             </>
           ) : qrWaiting ? (
             <div className="flex flex-col items-center py-4">
-              <div className="w-8 h-8 border-2 border-[var(--brand)] border-t-transparent rounded-full animate-spin" />
-              <p className="text-xs text-[var(--muted)] mt-2">Generating QR...</p>
+              <div className="w-8 h-8 border-2 border-[var(--brand,#00aff0)] border-t-transparent rounded-full animate-spin" />
+              <p className="text-xs text-[var(--muted,#5a7488)] mt-2">Generating QR...</p>
             </div>
           ) : (
             <div className="flex flex-col items-center py-4 gap-2">
               <button
                 type="button"
                 onClick={startQrFlow}
-                className="py-2 px-4 rounded-lg bg-[var(--modal-field)] hover:bg-[var(--modal-inset)] text-[var(--ink)] text-sm border border-[var(--border)] transition-colors"
+                className="py-2 px-4 rounded-lg bg-[var(--modal-field,#ffffff)] hover:bg-[var(--modal-inset,#e6f1f9)] text-[var(--ink,#0f2733)] text-sm border border-[var(--border,#cfe2ee)] transition-colors"
               >
                 Generate QR code
               </button>
-              <p className="text-[11px] text-[var(--muted)] text-center max-w-[260px]">
+              <p className="text-[11px] text-[var(--muted,#5a7488)] text-center max-w-[260px]">
                 Click to open a one-time NIP-46 signer invite.
               </p>
             </div>
@@ -912,7 +912,7 @@ export default function LoginScreen({ onLogin, embedded = false }) {
       {!isMobile && ncTab === 'paste' && (
         <div className="space-y-3">
           <div className="space-y-1">
-            <label htmlFor="bunker-input" className="block text-xs text-[var(--muted)]">
+            <label htmlFor="bunker-input" className="block text-xs text-[var(--muted,#5a7488)]">
               Paste your bunker:// connection string
             </label>
             <input
@@ -927,22 +927,22 @@ export default function LoginScreen({ onLogin, embedded = false }) {
               inputMode="text"
               autoCapitalize="none"
               autoCorrect="off"
-              className="w-full px-4 py-3 rounded-lg bg-[var(--modal-bg)] border border-[var(--border)] text-[var(--ink)] placeholder-[var(--muted)] focus:outline-none focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--brand-ring)] font-mono text-sm"
+              className="w-full px-4 py-3 rounded-lg bg-[var(--modal-bg,#f4fafd)] border border-[var(--border,#cfe2ee)] text-[var(--ink,#0f2733)] placeholder-[var(--muted,#5a7488)] focus:outline-none focus:border-[var(--brand,#00aff0)] focus:ring-2 focus:ring-[var(--brand-ring,rgba(0,175,240,0.32))] font-mono text-sm"
             />
           </div>
-          <p className="text-xs text-[var(--muted)] leading-relaxed">
+          <p className="text-xs text-[var(--muted,#5a7488)] leading-relaxed">
             Generate a connection string from Nsec.app or any NIP-46 bunker, then paste it here.
           </p>
           <button
             onClick={loginWithBunker}
             disabled={loading || !bunkerValue.trim()}
-            className="w-full py-3 px-4 rounded-lg bg-[var(--modal-field)] hover:bg-[var(--modal-inset)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--ink)] font-medium transition-colors border border-[var(--border)]"
+            className="w-full py-3 px-4 rounded-lg bg-[var(--modal-field,#ffffff)] hover:bg-[var(--modal-inset,#e6f1f9)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--ink,#0f2733)] font-medium transition-colors border border-[var(--border,#cfe2ee)]"
           >
             {loading ? 'Connecting...' : 'Login with Bunker'}
           </button>
           {loading && loadingStep && (
-            <p className="text-xs text-[var(--brand-d)] flex items-center gap-1.5 leading-snug">
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-[var(--brand)] animate-pulse flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-[var(--brand-d,#068ace)] flex items-center gap-1.5 leading-snug">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-[var(--brand,#00aff0)] animate-pulse flex-shrink-0 mt-0.5" />
               <span>{loadingStep}</span>
             </p>
           )}
@@ -964,7 +964,7 @@ export default function LoginScreen({ onLogin, embedded = false }) {
         {/* Logo */}
         <div className="text-center">
           <img src="/assets/onlyboosts_pfp.png" alt="OnlyBoosts" className="h-16 w-16 mx-auto mb-2" />
-          <p className="mt-2 text-[var(--muted)] text-sm">Sign in with Nostr</p>
+          <p className="mt-2 text-[var(--muted,#5a7488)] text-sm">Sign in with Nostr</p>
         </div>
 
         {isMobile ? (
@@ -992,19 +992,19 @@ export default function LoginScreen({ onLogin, embedded = false }) {
         {/* Bunker requested web approval — surface the URL as a real <a>
             so mobile popup blockers don't eat it. */}
         {authUrl && (
-          <div className="rounded-lg border border-[var(--brand)] bg-[var(--brand-tint)] p-3 text-center space-y-2">
-            <p className="text-xs text-[var(--brand-dd)]">
+          <div className="rounded-lg border border-[var(--brand,#00aff0)] bg-[var(--brand-tint,rgba(0,175,240,0.12))] p-3 text-center space-y-2">
+            <p className="text-xs text-[var(--brand-dd,#0a6fa8)]">
               Your bunker is asking you to approve this connection.
             </p>
             <a
               href={authUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-block w-full py-2 px-4 rounded-lg bg-[var(--brand-d)] hover:bg-[var(--brand-dd)] text-white text-sm font-medium transition-colors"
+              className="inline-block w-full py-2 px-4 rounded-lg bg-[var(--brand-d,#068ace)] hover:bg-[var(--brand-dd,#0a6fa8)] text-white text-sm font-medium transition-colors"
             >
               Open approval page
             </a>
-            <p className="text-[11px] text-[var(--muted)] leading-relaxed">
+            <p className="text-[11px] text-[var(--muted,#5a7488)] leading-relaxed">
               Approve in the new tab, then return here. Login finishes automatically.
             </p>
           </div>
@@ -1012,7 +1012,7 @@ export default function LoginScreen({ onLogin, embedded = false }) {
 
         {/* Error display */}
         {error && (
-          <p className="text-sm text-[var(--danger)] text-center" role="alert">
+          <p className="text-sm text-[var(--danger,#b3261e)] text-center" role="alert">
             {error}
           </p>
         )}

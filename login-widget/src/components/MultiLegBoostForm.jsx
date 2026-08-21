@@ -444,13 +444,13 @@ export default function MultiLegBoostForm({
   if (walletGone) {
     return (
       <div className="space-y-3 text-center py-2">
-        <p className="text-xs text-[var(--muted)]">
+        <p className="text-xs text-[var(--muted,#5a7488)]">
           Lightning wallet isn't connected. Open your account menu in
           the top-right to connect one, then come back.
         </p>
         <button
           onClick={cancelAndClose}
-          className="px-4 py-2 rounded-lg bg-[var(--modal-inset)] hover:bg-[var(--border)] text-sm text-[var(--ink)] transition-colors"
+          className="px-4 py-2 rounded-lg bg-[var(--modal-inset,#e6f1f9)] hover:bg-[var(--border,#cfe2ee)] text-sm text-[var(--ink,#0f2733)] transition-colors"
         >
           Close
         </button>
@@ -461,13 +461,13 @@ export default function MultiLegBoostForm({
   return (
     <>
       {subtitle && (
-        <p className="text-xs text-[var(--muted)] italic leading-snug">
+        <p className="text-xs text-[var(--muted,#5a7488)] italic leading-snug">
           "{subtitle}"
         </p>
       )}
 
       <div>
-        <label className="block text-xs text-[var(--muted)] mb-1.5">Amount (sats)</label>
+        <label className="block text-xs text-[var(--muted,#5a7488)] mb-1.5">Amount (sats)</label>
         {presets && presets.length > 0 && (
           <div className="flex gap-1.5 mb-2">
             {presets.map(p => (
@@ -476,8 +476,8 @@ export default function MultiLegBoostForm({
                 onClick={() => setAmount(String(p))}
                 className={`flex-1 text-xs py-2 rounded-lg border transition-colors ${
                   amount === String(p)
-                    ? 'border-[var(--brand)] text-[var(--brand-d)] bg-[var(--brand-tint)]'
-                    : 'border-[var(--border)] text-[var(--muted)] hover:border-[var(--brand)] hover:text-[var(--ink)]'
+                    ? 'border-[var(--brand,#00aff0)] text-[var(--brand-d,#068ace)] bg-[var(--brand-tint,rgba(0,175,240,0.12))]'
+                    : 'border-[var(--border,#cfe2ee)] text-[var(--muted,#5a7488)] hover:border-[var(--brand,#00aff0)] hover:text-[var(--ink,#0f2733)]'
                 }`}
               >
                 {p.toLocaleString()}
@@ -491,24 +491,24 @@ export default function MultiLegBoostForm({
           max={MAX_SATS}
           value={amount}
           onChange={e => setAmount(e.target.value)}
-          className="w-full bg-[var(--modal-field)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--brand-ring)]"
+          className="w-full bg-[var(--modal-field,#ffffff)] border border-[var(--border,#cfe2ee)] rounded-lg px-3 py-2 text-sm text-[var(--ink,#0f2733)] focus:outline-none focus:border-[var(--brand,#00aff0)] focus:ring-2 focus:ring-[var(--brand-ring,rgba(0,175,240,0.32))]"
           placeholder={presets ? 'Custom amount' : `${MIN_SATS} minimum`}
         />
-        <p className="mt-1 text-[10px] text-[var(--muted)]">
+        <p className="mt-1 text-[10px] text-[var(--muted,#5a7488)]">
           {MIN_SATS} sat minimum (covers splits + fees).
           Splits across {splitsCount} {splitsCount === 1 ? 'recipient' : 'recipients'}.
         </p>
       </div>
 
       <div>
-        <label className="block text-xs text-[var(--muted)] mb-1.5">Boost as</label>
+        <label className="block text-xs text-[var(--muted,#5a7488)] mb-1.5">Boost as</label>
         <div className="flex gap-2 text-xs">
           <button
             onClick={() => setAnonymous(false)}
             className={`flex-1 flex items-center justify-center gap-1.5 py-3 px-3 rounded-md border transition-colors ${
               !anonymous
-                ? 'bg-[var(--brand-tint)] border-[var(--brand)] text-[var(--brand-dd)] font-semibold'
-                : 'bg-[var(--modal-field)] border-[var(--border)] text-[var(--muted)] hover:text-[var(--ink)] hover:border-[var(--brand)]'
+                ? 'bg-[var(--brand-tint,rgba(0,175,240,0.12))] border-[var(--brand,#00aff0)] text-[var(--brand-dd,#0a6fa8)] font-semibold'
+                : 'bg-[var(--modal-field,#ffffff)] border-[var(--border,#cfe2ee)] text-[var(--muted,#5a7488)] hover:text-[var(--ink,#0f2733)] hover:border-[var(--brand,#00aff0)]'
             }`}
             aria-pressed={!anonymous}
           >
@@ -523,8 +523,8 @@ export default function MultiLegBoostForm({
             onClick={() => setAnonymous(true)}
             className={`flex-1 py-3 px-3 rounded-md border transition-colors ${
               anonymous
-                ? 'bg-[var(--brand-tint)] border-[var(--brand)] text-[var(--brand-dd)] font-semibold'
-                : 'bg-[var(--modal-field)] border-[var(--border)] text-[var(--muted)] hover:text-[var(--ink)] hover:border-[var(--brand)]'
+                ? 'bg-[var(--brand-tint,rgba(0,175,240,0.12))] border-[var(--brand,#00aff0)] text-[var(--brand-dd,#0a6fa8)] font-semibold'
+                : 'bg-[var(--modal-field,#ffffff)] border-[var(--border,#cfe2ee)] text-[var(--muted,#5a7488)] hover:text-[var(--ink,#0f2733)] hover:border-[var(--brand,#00aff0)]'
             }`}
             aria-pressed={anonymous}
           >
@@ -537,7 +537,7 @@ export default function MultiLegBoostForm({
             boost" by burner pubkey + boost_session UUID. Surfaced
             here so users aren't misled by the "Anon" label. */}
         {anonymous && (
-          <p className="mt-1.5 text-[10px] text-[var(--muted)] leading-snug">
+          <p className="mt-1.5 text-[10px] text-[var(--muted,#5a7488)] leading-snug">
             Anon hides your npub from the boost record. Note that
             observers can still correlate the legs of one boost
             together (shared burner key + session ID).
@@ -546,7 +546,7 @@ export default function MultiLegBoostForm({
       </div>
 
       <div>
-        <label className="block text-xs text-[var(--muted)] mb-1.5">Message (optional)</label>
+        <label className="block text-xs text-[var(--muted,#5a7488)] mb-1.5">Message (optional)</label>
         <textarea
           value={message}
           onChange={(e) => {
@@ -561,22 +561,22 @@ export default function MultiLegBoostForm({
           }}
           rows={4}
           maxLength={10000}
-          className="w-full bg-[var(--modal-field)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--brand-ring)] resize-none max-h-40 overflow-y-auto leading-relaxed"
+          className="w-full bg-[var(--modal-field,#ffffff)] border border-[var(--border,#cfe2ee)] rounded-lg px-3 py-2 text-sm text-[var(--ink,#0f2733)] focus:outline-none focus:border-[var(--brand,#00aff0)] focus:ring-2 focus:ring-[var(--brand-ring,rgba(0,175,240,0.32))] resize-none max-h-40 overflow-y-auto leading-relaxed"
           placeholder={messagePlaceholder}
         />
       </div>
 
       {canShareToFeed && (
-        <label className="flex items-start gap-2 text-xs text-[var(--muted)] cursor-pointer select-none">
+        <label className="flex items-start gap-2 text-xs text-[var(--muted,#5a7488)] cursor-pointer select-none">
           <input
             type="checkbox"
             checked={shareToFeed}
             onChange={e => setShareToFeed(e.target.checked)}
-            className="accent-[var(--brand)] mt-0.5"
+            className="accent-[var(--brand,#00aff0)] mt-0.5"
           />
           <span className="leading-snug">
             Share to my feed
-            <span className="block text-[10px] text-[var(--muted)] mt-0.5">
+            <span className="block text-[10px] text-[var(--muted,#5a7488)] mt-0.5">
               {shareTagline}
             </span>
           </span>
@@ -592,11 +592,11 @@ export default function MultiLegBoostForm({
         splitsCount={splitsCount}
       />
 
-      {error && <p className="text-xs text-[var(--danger)]">{error}</p>}
+      {error && <p className="text-xs text-[var(--danger,#b3261e)]">{error}</p>}
 
       {prepareLabel && (
-        <p className="text-xs text-[var(--brand-d)] flex items-center gap-1.5">
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-[var(--brand)] animate-pulse" aria-hidden="true" />
+        <p className="text-xs text-[var(--brand-d,#068ace)] flex items-center gap-1.5">
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-[var(--brand,#00aff0)] animate-pulse" aria-hidden="true" />
           {prepareLabel}
         </p>
       )}
@@ -604,7 +604,7 @@ export default function MultiLegBoostForm({
       <button
         onClick={handleBoost}
         disabled={!!prepareLabel}
-        className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-lg bg-[var(--brand)] hover:bg-[var(--brand-d)] disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium text-white transition-colors"
+        className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-lg bg-[var(--brand,#00aff0)] hover:bg-[var(--brand-d,#068ace)] disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium text-white transition-colors"
       >
         <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
           <path fillRule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clipRule="evenodd"/>

@@ -53,23 +53,23 @@ export default class ModalErrorBoundary extends Component {
     if (!this.state.failed) return this.props.children
     return (
       <>
-        <div className="fixed inset-0 bg-[var(--scrim)] z-[70]" aria-hidden="true" />
+        <div className="fixed inset-0 bg-[var(--scrim,rgba(11,58,82,0.55))] z-[70]" aria-hidden="true" />
         <div className="fixed inset-0 z-[71] flex items-center justify-center p-3" role="dialog" aria-label="Something went wrong">
-          <div className="bg-[var(--modal-bg)] border border-[var(--border)] rounded-lg w-full max-w-sm p-5 space-y-3 shadow-[0_24px_60px_-12px_rgba(11,58,82,0.28)]">
-            <h2 className="text-base font-semibold text-[var(--ink)] font-[family-name:var(--font-display)]">Something went wrong on this screen</h2>
+          <div className="bg-[var(--modal-bg,#f4fafd)] border border-[var(--border,#cfe2ee)] rounded-lg w-full max-w-sm p-5 space-y-3 shadow-[0_24px_60px_-12px_rgba(11,58,82,0.28)]">
+            <h2 className="text-base font-semibold text-[var(--ink,#0f2733)] font-[family-name:var(--font-display,Georgia,serif)]">Something went wrong on this screen</h2>
             {/* ⚠️ Never "your boost failed". This boundary cannot know: the
                 component's state died with it, and the payment may well have
                 gone through. Pointing at the wallet is the only honest
                 instruction, and "don't re-send" is the same double-pay guard
                 the UNCERTAIN leg state carries. */}
-            <p className="text-xs text-[var(--muted)] leading-relaxed">
+            <p className="text-xs text-[var(--muted,#5a7488)] leading-relaxed">
               If you had already pressed Boost, check your wallet before sending anything
               again. The payment may have gone through even though this screen didn’t
               finish.
             </p>
             <button
               onClick={() => this.props.onClose?.()}
-              className="w-full py-2.5 rounded-lg bg-[var(--modal-inset)] hover:bg-[var(--border)] text-sm text-[var(--ink)] transition-colors">
+              className="w-full py-2.5 rounded-lg bg-[var(--modal-inset,#e6f1f9)] hover:bg-[var(--border,#cfe2ee)] text-sm text-[var(--ink,#0f2733)] transition-colors">
               Close
             </button>
           </div>

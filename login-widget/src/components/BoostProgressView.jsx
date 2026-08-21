@@ -33,7 +33,7 @@ const WORKING = new Set(['resolving', 'requesting', 'publishing', 'paying'])
 function Spinner() {
   return (
     <svg
-      className="animate-spin w-3.5 h-3.5 text-[var(--brand-d)]"
+      className="animate-spin w-3.5 h-3.5 text-[var(--brand-d,#068ace)]"
       viewBox="0 0 24 24"
       fill="none"
       aria-hidden="true"
@@ -47,14 +47,14 @@ function Spinner() {
 function StatusIcon({ status }) {
   if (status === 'paid') {
     return (
-      <svg className="w-4 h-4 text-[var(--ok)]" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+      <svg className="w-4 h-4 text-[var(--ok,#0b7a4b)]" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
         <path fillRule="evenodd" d="M16.704 5.29a1 1 0 0 1 .006 1.414l-7.5 7.6a1 1 0 0 1-1.42.006l-3.5-3.5a1 1 0 1 1 1.414-1.414l2.79 2.79 6.796-6.886a1 1 0 0 1 1.414-.006Z" clipRule="evenodd" />
       </svg>
     )
   }
   if (status === 'failed') {
     return (
-      <svg className="w-4 h-4 text-[var(--danger)]" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+      <svg className="w-4 h-4 text-[var(--danger,#b3261e)]" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
         <path fillRule="evenodd" d="M10 8.586 6.707 5.293a1 1 0 0 0-1.414 1.414L8.586 10l-3.293 3.293a1 1 0 1 0 1.414 1.414L10 11.414l3.293 3.293a1 1 0 0 0 1.414-1.414L11.414 10l3.293-3.293a1 1 0 0 0-1.414-1.414L10 8.586Z" clipRule="evenodd" />
       </svg>
     )
@@ -62,14 +62,14 @@ function StatusIcon({ status }) {
   if (status === 'uncertain') {
     // Amber warning triangle — payment status unknown, not a failure.
     return (
-      <svg className="w-4 h-4 text-[var(--warn)]" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+      <svg className="w-4 h-4 text-[var(--warn,#b45309)]" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
         <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495ZM10 6a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 10 6Zm0 8a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clipRule="evenodd" />
       </svg>
     )
   }
   if (WORKING.has(status)) return <Spinner />
   // pending / unknown — dim dot
-  return <span className="inline-block w-2 h-2 rounded-full bg-[var(--muted)]" aria-hidden="true" />
+  return <span className="inline-block w-2 h-2 rounded-full bg-[var(--muted,#5a7488)]" aria-hidden="true" />
 }
 
 function statusWord(status) {
@@ -132,22 +132,22 @@ export default function BoostProgressView({
           <>
             <div className="flex items-center gap-2">
               <Spinner />
-              <p className="text-base font-semibold text-[var(--brand-d)]">
+              <p className="text-base font-semibold text-[var(--brand-d,#068ace)]">
                 Sending your boost — keep this window open
               </p>
             </div>
-            <p className="text-xs leading-relaxed text-[var(--muted)]">
+            <p className="text-xs leading-relaxed text-[var(--muted,#5a7488)]">
               A boost is split across {total} {total === 1 ? 'recipient' : 'recipients'},
               and each one is paid as a separate Lightning payment — one at a
               time, which takes a few seconds. This is normal.
             </p>
-            <p className="text-xs leading-relaxed text-[var(--muted)]">
+            <p className="text-xs leading-relaxed text-[var(--muted,#5a7488)]">
               Please don't close this or leave the page until it finishes —
               anything that hasn't been sent yet{' '}
-              <span className="text-[var(--ink)]">won't go through</span> if you
+              <span className="text-[var(--ink,#0f2733)]">won't go through</span> if you
               leave early. We'll let you know the moment it's done.
             </p>
-            <p className="text-xs font-medium text-[var(--ink)] pt-0.5">
+            <p className="text-xs font-medium text-[var(--ink,#0f2733)] pt-0.5">
               {paidCount} of {total} sent so far…
             </p>
           </>
@@ -155,8 +155,8 @@ export default function BoostProgressView({
 
         {allOk && (
           <>
-            <p className="text-base font-semibold text-[var(--ok)]">⚡ Boost delivered!</p>
-            <p className="text-xs text-[var(--muted)]">
+            <p className="text-base font-semibold text-[var(--ok,#0b7a4b)]">⚡ Boost delivered!</p>
+            <p className="text-xs text-[var(--muted,#5a7488)]">
               All {total} {total === 1 ? 'recipient' : 'recipients'} paid
               ({totalSats.toLocaleString()} sats). Thanks for the support.
             </p>
@@ -164,8 +164,8 @@ export default function BoostProgressView({
         )}
         {partial && (
           <>
-            <p className="text-base font-semibold text-[var(--warn)]">Boost partly delivered</p>
-            <p className="text-xs leading-relaxed text-[var(--muted)]">
+            <p className="text-base font-semibold text-[var(--warn,#b45309)]">Boost partly delivered</p>
+            <p className="text-xs leading-relaxed text-[var(--muted,#5a7488)]">
               {paidCount} of {total} sent.{' '}
               {failedCount > 0
                 ? 'A failed leg is confirmed not paid — your wallet wasn’t charged for it. Hit Retry next to any that failed.'
@@ -175,20 +175,20 @@ export default function BoostProgressView({
         )}
         {uncertainPresent && (
           <>
-            <p className="text-base font-semibold text-[var(--warn)]">Some payments couldn’t be confirmed</p>
-            <p className="text-xs leading-relaxed text-[var(--muted)]">
+            <p className="text-base font-semibold text-[var(--warn,#b45309)]">Some payments couldn’t be confirmed</p>
+            <p className="text-xs leading-relaxed text-[var(--muted,#5a7488)]">
               {paidCount > 0 && `${paidCount} confirmed sent. `}
               {uncertainCount} {uncertainCount === 1 ? 'payment' : 'payments'} couldn’t be confirmed
               {failedCount > 0 ? `, ${failedCount} failed` : ''}.{' '}
-              <span className="text-[var(--warn)]">Check your wallet before retrying</span> — an
+              <span className="text-[var(--warn,#b45309)]">Check your wallet before retrying</span> — an
               unconfirmed leg may have already gone through, so retrying it could pay twice.
             </p>
           </>
         )}
         {failedAll && (
           <>
-            <p className="text-base font-semibold text-[var(--danger)]">Boost didn't go through</p>
-            <p className="text-xs leading-relaxed text-[var(--muted)]">
+            <p className="text-base font-semibold text-[var(--danger,#b3261e)]">Boost didn't go through</p>
+            <p className="text-xs leading-relaxed text-[var(--muted,#5a7488)]">
               None of the payments settled — when every leg fails it's almost
               always your wallet (disconnected, not enough balance, or it
               declined). Your wallet wasn't charged. Check it, then retry.
@@ -198,10 +198,10 @@ export default function BoostProgressView({
       </div>
 
       {/* Progress bar */}
-      <div className="h-1.5 w-full rounded-full bg-[var(--modal-field)] overflow-hidden shrink-0">
+      <div className="h-1.5 w-full rounded-full bg-[var(--modal-field,#ffffff)] overflow-hidden shrink-0">
         <div
           className={`h-full rounded-full transition-[width] duration-300 ${
-            failedAll ? 'bg-[var(--danger)]' : (partial || uncertainPresent) ? 'bg-[var(--warn)]' : 'bg-[var(--brand)]'
+            failedAll ? 'bg-[var(--danger,#b3261e)]' : (partial || uncertainPresent) ? 'bg-[var(--warn,#b45309)]' : 'bg-[var(--brand,#00aff0)]'
           }`}
           style={{ width: `${done && !partial && !uncertainPresent ? 100 : pct}%` }}
         />
@@ -239,10 +239,10 @@ export default function BoostProgressView({
                       onError={(e) => { e.target.style.display = 'none' }}
                     />
                   )}
-                  <span className="text-[var(--ink)] truncate min-w-0">
+                  <span className="text-[var(--ink,#0f2733)] truncate min-w-0">
                     {r?.name || r?.address || `Recipient ${i + 1}`}
                   </span>
-                  <span className="text-[var(--muted)] flex-shrink-0 text-xs">
+                  <span className="text-[var(--muted,#5a7488)] flex-shrink-0 text-xs">
                     {sats.toLocaleString()} sats
                   </span>
                 </span>
@@ -251,18 +251,18 @@ export default function BoostProgressView({
                   {(status === 'failed' || status === 'uncertain') && onRetryLeg && !unpayable && (
                     <button
                       onClick={() => onRetryLeg(i)}
-                      className="text-[11px] font-medium px-2 py-0.5 rounded-lg bg-[var(--brand)] hover:bg-[var(--brand-d)] text-white transition-colors"
+                      className="text-[11px] font-medium px-2 py-0.5 rounded-lg bg-[var(--brand,#00aff0)] hover:bg-[var(--brand-d,#068ace)] text-white transition-colors"
                     >
                       {status === 'uncertain' ? 'Check' : 'Retry'}
                     </button>
                   )}
                   <span className={`text-right ${
-                    status === 'paid' ? 'text-[var(--ok)]'
-                      : unpayable ? 'text-[var(--warn)]'
-                        : status === 'failed' ? 'text-[var(--danger)]'
-                          : status === 'uncertain' ? 'text-[var(--warn)]'
-                            : WORKING.has(status) ? 'text-[var(--brand-d)]'
-                              : 'text-[var(--muted)]'
+                    status === 'paid' ? 'text-[var(--ok,#0b7a4b)]'
+                      : unpayable ? 'text-[var(--warn,#b45309)]'
+                        : status === 'failed' ? 'text-[var(--danger,#b3261e)]'
+                          : status === 'uncertain' ? 'text-[var(--warn,#b45309)]'
+                            : WORKING.has(status) ? 'text-[var(--brand-d,#068ace)]'
+                              : 'text-[var(--muted,#5a7488)]'
                   }`}>
                     {unpayable ? 'Skipped' : statusWord(status)}
                   </span>
@@ -272,7 +272,7 @@ export default function BoostProgressView({
                 </span>
               </div>
               {unpayable && (r.unpayableReason || st.error) && (
-                <span className="text-[11px] text-[var(--warn)] leading-snug">
+                <span className="text-[11px] text-[var(--warn,#b45309)] leading-snug">
                   {r.unpayableReason || st.error}
                 </span>
               )}
@@ -284,7 +284,7 @@ export default function BoostProgressView({
       {done && (
         <button
           onClick={onDone}
-          className="shrink-0 w-full py-3 rounded-lg bg-[var(--brand)] hover:bg-[var(--brand-d)] text-sm font-medium text-white transition-colors"
+          className="shrink-0 w-full py-3 rounded-lg bg-[var(--brand,#00aff0)] hover:bg-[var(--brand-d,#068ace)] text-sm font-medium text-white transition-colors"
         >
           Done
         </button>

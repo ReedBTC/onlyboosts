@@ -36,7 +36,7 @@ export default function LoginButton({ variant = 'nav', onClick, className = '' }
       <button
         type="button"
         onClick={onClick}
-        className={`inline-flex items-center justify-center gap-2 py-2.5 px-3.5 rounded-lg border-2 border-[var(--brand)] bg-[var(--modal-field)] text-[var(--brand-dd)] text-sm font-semibold whitespace-nowrap hover:bg-[var(--brand-tint)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-ring)] transition-colors ${className}`}
+        className={`inline-flex items-center justify-center gap-2 py-2.5 px-3.5 rounded-lg border-2 border-[var(--brand,#00aff0)] bg-[var(--modal-field,#ffffff)] text-[var(--brand-dd,#0a6fa8)] text-sm font-semibold whitespace-nowrap hover:bg-[var(--brand-tint,rgba(0,175,240,0.12))] focus:outline-none focus:ring-2 focus:ring-[var(--brand-ring,rgba(0,175,240,0.32))] transition-colors ${className}`}
         aria-label="Log in to OnlyBoosts"
       >
         {/* Decorative: the label already says what the button does, so the mark

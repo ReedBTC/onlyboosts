@@ -586,8 +586,32 @@ site's visual world entirely. It is now on the site's own tokens.
 
 **⚠️ THE TOKENS ARE READ, NOT COPIED.** `theme.css` defines the palette on
 `:root`, the widget mounts into that same document through a portal, and Tailwind
-runs there with **preflight off**, so `bg-[var(--surface)]` works with no config
+runs there with **preflight off**, so `bg-[var(--modal-bg)]` works with no config
 change. Never hardcode a hex into JSX; the palette has one source.
+
+**⚠️ BUT EVERY `var()` CARRIES A LITERAL FALLBACK, AND AN INVISIBLE MODAL IS
+WHY.** `scripts/stamp-assets.js` exists so one version of one file can never
+meet another — except that **`assets/widgets/` files are stamped at the
+reference site and never rewritten**, so `login-widget.js?v=ob-v94` and
+`?v=ob-v95` are the same file on disk and the server returns the current build
+for either. A browser holding `theme.css?v=ob-v94` in its four-hour HTTP cache
+while fetching the widget fresh therefore gets **a new widget against an old
+stylesheet**: the `ob-v53` failure class arriving through the one door the
+stamper cannot close.
+
+**An undefined custom property makes the whole declaration invalid at
+computed-value time**, so `background-color: var(--modal-bg)` resolves to
+*transparent*. Observed 2026-08-21: the boost modal rendered as a near-invisible
+outline over the dimmed page, in the middle of a payment flow.
+
+The fallbacks are **mirrors, not a second source of truth**:
+`scripts/test-boost-modal-render.mjs` reads `theme.css` and asserts that every
+`var()` in the widget has a fallback *and* that each one equals the token's
+current value. Edit the palette without re-mirroring and that test fails. The
+two font tokens are the deliberate exception, degrading to `Georgia,serif`,
+because Tailwind strips the space out of `'Playfair Display'` unless it is
+written `Playfair_Display` and `PlayfairDisplay` is not a font — a missing token
+there costs the face, not legibility.
 
 `theme.css` carries a block for exactly this: `--brand-tint`, `--brand-ring`,
 `--ok`, `--warn`, `--danger`, `--scrim`, `--font-display`, `--font-body`.

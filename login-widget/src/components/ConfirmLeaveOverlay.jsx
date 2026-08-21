@@ -12,23 +12,23 @@
  */
 export default function ConfirmLeaveOverlay({ paid = 0, total = 0, onStay, onLeave }) {
   return (
-    <div className="absolute inset-0 z-10 rounded-lg bg-[var(--scrim)] backdrop-blur-sm flex items-center justify-center p-6">
+    <div className="absolute inset-0 z-10 rounded-lg bg-[var(--scrim,rgba(11,58,82,0.55))] backdrop-blur-sm flex items-center justify-center p-6">
       <div className="text-center space-y-4 max-w-xs">
-        <p className="text-sm font-semibold text-[var(--brand-d)]">Payment still processing</p>
-        <p className="text-xs text-[var(--muted)] leading-relaxed">
+        <p className="text-sm font-semibold text-[var(--brand-d,#068ace)]">Payment still processing</p>
+        <p className="text-xs text-[var(--muted,#5a7488)] leading-relaxed">
           {paid} of {total} recipients paid so far. If you leave now, the
           remaining payments may not finish.
         </p>
         <div className="flex gap-2">
           <button
             onClick={onStay}
-            className="flex-1 py-2.5 rounded-lg bg-[var(--brand)] hover:bg-[var(--brand-d)] text-sm font-medium text-white transition-colors"
+            className="flex-1 py-2.5 rounded-lg bg-[var(--brand,#00aff0)] hover:bg-[var(--brand-d,#068ace)] text-sm font-medium text-white transition-colors"
           >
             Keep waiting
           </button>
           <button
             onClick={onLeave}
-            className="flex-1 py-2.5 rounded-lg border border-[var(--border)] text-sm text-[var(--ink)] hover:bg-[var(--modal-inset)] transition-colors"
+            className="flex-1 py-2.5 rounded-lg border border-[var(--border,#cfe2ee)] text-sm text-[var(--ink,#0f2733)] hover:bg-[var(--modal-inset,#e6f1f9)] transition-colors"
           >
             Leave anyway
           </button>
