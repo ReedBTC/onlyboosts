@@ -202,9 +202,14 @@ function scanSpans(src, mentionRe = NOSTR_URI_RE) {
 function linkOut(url) {
   const raw = String(url).replace(/[.,;:!?)\]]+$/, "");
   const tail = String(url).slice(raw.length);
-  const body = isSafeUrl(raw)
-    ? `<a href="${htmlEscape(raw)}" target="_blank" rel="noopener noreferrer">${htmlEscape(truncate(raw, 60))}</a>`
-    : htmlEscape(raw);
+  const body = !isSafeUrl(raw)
+    ? htmlEscape(raw)
+    // An image renders as the picture rather than as its address. A bare image
+    // URL on its own line is how Nostr clients have always shown one, and this
+    // site's own boost notes open with exactly that.
+    : IMAGE_URL.test(raw)
+      ? imageOut(raw)
+      : `<a href="${htmlEscape(raw)}" target="_blank" rel="noopener noreferrer">${htmlEscape(truncate(raw, 60))}</a>`;
   return body + htmlEscape(tail);
 }
 
@@ -288,6 +293,55 @@ export function renderBioText(text, profiles) {
  */
 const MESSAGE_MAX = 2000;
 
+/* The same cap, but keeping the line breaks the author typed.
+ *
+ * ⚠️ `truncate` COLLAPSES ALL WHITESPACE, AND renderMessage USED IT. Every
+ * `.pcast-boost-msg` and `.note-body` already carries `white-space: pre-wrap`,
+ * so the CSS was ready and the newlines were being destroyed one layer above
+ * it — a multi-line boost note arrived as one run-on paragraph. That is
+ * invisible on the ~84% of boosts with no message and on most of the rest,
+ * which are a single line; it shows up hard on a structured note, which is what
+ * this site's own bot publishes.
+ *
+ * Runs of blank lines collapse to one, because a note padded with six of them
+ * would otherwise push everything after it off the card. Spaces and tabs still
+ * collapse; only the newline survives, which is the character carrying meaning.
+ */
+function capMessage(s, n) {
+  const t = String(s || "")
+    .replace(/\r\n?/g, "\n")
+    .replace(/[^\S\n]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/^[ \n]+|[ \n]+$/g, "");
+  return t.length <= n ? t : t.slice(0, n - 1).trimEnd() + "\u2026";
+}
+
+/* An http(s) URL that names an image file. Extension-based on purpose: the only
+ * alternative is fetching it to look, which a string→string renderer running at
+ * the edge cannot do. A URL that lies about its extension renders as a broken
+ * image, which is the same outcome a dead link already has.
+ */
+const IMAGE_URL = /\.(?:png|jpe?g|gif|webp|avif|bmp|svg)(?:[?#]|$)/i;
+
+/* ⚠️ THE SIZING IS INLINE RATHER THAN A CLASS, AND THAT IS DELIBERATE. This
+ * module is imported from both sides and its output lands in three different
+ * class contexts — `.pcast-boost-msg` (feed-cards.css), `.note-body`
+ * (boosts-thread.css) and `.boost-msg` (show-page.css) — which are not all
+ * loaded by the same pages. A class would need the same rule written into three
+ * stylesheets that must then agree forever; the CSP already allows
+ * `style-src 'unsafe-inline'`, so the renderer can own its own appearance.
+ *
+ * `max-height` is the load-bearing one: an unbounded remote image in a boost
+ * message is a third party deciding how tall a card on this site is.
+ */
+const IMG_STYLE = "max-width:100%;max-height:18rem;height:auto;border-radius:8px;display:block;margin:0.35rem 0";
+
+function imageOut(url) {
+  return `<a href="${htmlEscape(url)}" target="_blank" rel="noopener noreferrer">` +
+    `<img src="${htmlEscape(url)}" alt="" loading="lazy" decoding="async" style="${IMG_STYLE}">` +
+    `</a>`;
+}
+
 /* A boost message as HTML: nostr: URIs become @Name chips, bare URLs become
  * links, everything else is escaped text.
  *
@@ -297,7 +351,7 @@ const MESSAGE_MAX = 2000;
  * renders the same way in both places.
  */
 export function renderMessage(text, names) {
-  const src = truncate(String(text || ""), MESSAGE_MAX);
+  const src = capMessage(text, MESSAGE_MAX);
   const spans = scanSpans(src);
 
   let out = "", cursor = 0;

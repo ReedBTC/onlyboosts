@@ -1075,7 +1075,6 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
                     </div>
                     <p className="mt-1.5 text-[10px] text-[var(--muted,#5a7488)] leading-snug">
                       Left blank, boosts are sent as “{DEFAULT_SENDER_NAME}”.
-                      {signedIn && ' Your account is not attached to this one either way.'}
                     </p>
 
                   </div>

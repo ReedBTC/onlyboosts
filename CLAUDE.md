@@ -474,6 +474,20 @@ Three things that fell out of the split:
   format rather than two.
 - **Boost messages tokenize through `nostr-text.js`**, so a `nostr:note1…` inside
   a message is the same njump chip on every surface.
+- **A message keeps its line breaks, and an image URL renders as the image.**
+  `renderMessage` ran its text through `truncate`, which collapses *all*
+  whitespace, so a multi-line note arrived as one run-on paragraph —
+  with `white-space: pre-wrap` already set on all three message classes
+  (`.pcast-boost-msg`, `.note-body`, `.boost-msg`), so the CSS had been ready the
+  whole time and the newlines were being destroyed one layer above it. It shows
+  up hardest on this site's **own** bot notes, which are structured and open with
+  a banner. `capMessage` keeps newlines and collapses only runs of blank lines;
+  spaces and tabs still collapse. **⚠️ The image's sizing is inline rather than a
+  class**: this module is two-sided and its output lands in three class contexts
+  in stylesheets that are not all loaded by the same pages, so a class would mean
+  one rule written three times and kept in step forever. `max-height` is the
+  load-bearing part — an unbounded remote image is a third party deciding how
+  tall a card on this site is.
 
 ### The Cost, Stated
 
@@ -665,6 +679,11 @@ beats the `padding: 0` preflight just set. Scoping naively to `.lb-w button`
 makes it 0,1,1, which **beats `.py-3` and flattens every button in the widget**.
 `:where()` contributes nothing, so these land at preflight's own weight. The
 test counts any `.lb-w` used without it.
+
+**Lists are reset too** (`list-style: none`): the host page's global
+`*{padding:0}` had already flattened the indent, so UA disc markers sat *outside*
+the content box and were clipped by the container's rounded border — the boost
+progress list looked like every row had something cut off its left edge.
 
 **No `img` / `svg` rule is included**, deliberately: preflight's
 `max-width:100%; height:auto` would resize icons that are currently correct,

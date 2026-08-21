@@ -80,6 +80,18 @@
 }
 :where(.lb-w) :disabled { cursor: default; }
 
+/* ⚠️ THE LEG LIST WAS SHOWING UA BULLETS, CLIPPED BY ITS OWN CONTAINER. The
+   host page's `*{padding:0}` had already flattened the list's indent, so the
+   disc markers sat OUTSIDE the content box and were cut off by the rounded
+   border — "something thats getting cut off on the left". Preflight normally
+   removes them; this is the third thing it supplies that a Tailwind UI assumes
+   without saying so. */
+:where(.lb-w) ol,
+:where(.lb-w) ul,
+:where(.lb-w) menu {
+  list-style: none;
+}
+
 /* ⚠️ NO `img` / `svg` RULE HERE. Preflight sets `max-width:100%; height:auto`
    on them, and this widget has run without that since the fork — adding it now
    would resize icons that are currently correct, which is a visual change
