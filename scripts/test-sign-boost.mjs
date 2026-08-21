@@ -14,6 +14,7 @@ import assert from 'node:assert/strict'
 import { validateBoostTemplate, secretKeyFrom, overRateLimit, onRequestPost } from '../functions/api/sign-boost.js'
 import { verifyEvent, getPublicKey, nip19 } from '../functions/_shared/nostr-sign.js'
 import { buildExternalNoteTemplate, sanitizeSenderName, MAX_SENDER_NAME_CHARS } from '../login-widget/src/lib/externalBoostagram.js'
+import { SITE_SIGN_MAX_SATS } from '../login-widget/src/lib/siteSign.js'
 
 let passed = 0
 // ⚠️ AWAITS. It used to call fn() bare, so an async assertion that failed became
@@ -149,8 +150,20 @@ rejects('two amount tags', {
 }, /invalid amount/)
 rejects('an amount above the cap', {
   ...realTemplate(),
-  tags: realTemplate().tags.map((t) => (t[0] === 'amount' ? ['amount', '999000000'] : t)),
+  tags: realTemplate().tags.map((t) => (t[0] === 'amount' ? ['amount', String(SITE_SIGN_MAX_SATS * 1000 + 1)] : t)),
 }, /invalid amount/)
+// ⚠️ THE ONE THING PINNING THE TWO COPIES OF THE CAP TOGETHER. The endpoint's
+// `MAX_AMOUNT_MSAT` and the widget's `SITE_SIGN_MAX_SATS` live in files that
+// cannot import each other, so this pair of assertions is the enforcement. If
+// it fails, the modal is either promising a note it cannot get signed or
+// refusing one it could.
+await ok('the widget\u2019s declared cap is exactly the endpoint\u2019s', () => {
+  validateBoostTemplate({
+    ...realTemplate(),
+    tags: realTemplate().tags.map((t) => (t[0] === 'amount' ? ['amount', String(SITE_SIGN_MAX_SATS * 1000)] : t)),
+  })
+})
+
 rejects('a non-integer amount', {
   ...realTemplate(),
   tags: realTemplate().tags.map((t) => (t[0] === 'amount' ? ['amount', '1.5e6'] : t)),

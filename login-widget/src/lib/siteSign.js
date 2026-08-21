@@ -30,12 +30,19 @@ export const SITE_SIGN_ENDPOINT = '/api/sign-boost'
  * `login-widget/src` and this bundle cannot import from `functions/`, which is
  * the same split `CALLBACK_HOST_ALLOWLIST` lives with on the LNURL path.
  *
- * It is here so the modal can SAY SO rather than discover it: the endpoint's
- * own answer is `invalid amount`, which is accurate and tells a donor who just
- * sent 200k sats nothing about what to do. Above the cap the donor-signed path
- * is unaffected, because there the claim is their own to make.
+ * It is here so the modal can SAY SO rather than have a donor discover it: the
+ * endpoint's own answer is `invalid amount`, which is accurate and tells
+ * somebody who has just paid nothing about what to do.
+ *
+ * **It equals `MAX_SATS` in `ExternalBoostModal.jsx`, so in practice it never
+ * bites.** That is deliberate as of 2026-08-21: the endpoint's cap used to be
+ * 100k on the argument that a larger claim could go down the donor-signed path
+ * instead, and Anon routing to this endpoint took that escape away. The guard
+ * kept here is only that one request cannot claim a figure the product itself
+ * would refuse. See the long note at `MAX_AMOUNT_MSAT` for why the number was
+ * never the thing containing this endpoint.
  */
-export const SITE_SIGN_MAX_SATS = 100_000
+export const SITE_SIGN_MAX_SATS = 5_000_000
 
 // The signature is one secp256k1 operation in a V8 isolate, so the budget is
 // almost entirely network. Long enough to survive a cold isolate, short enough

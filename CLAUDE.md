@@ -927,11 +927,12 @@ cannot survive a page load, so it cannot reach a different visitor.
 
 **`boostAnonymously` in `ExternalBoostModal` is the single derivation the wire
 sites read** (`sender_id` and `sender_name`, on the first pass and on a retry);
-it is *not* the toggle, because with no profile the toggle would be right by
-accident. Signed in it is the Anon toggle; **signed out it is the typed name**,
-absent meaning anonymous. **⚠️ It must not grow a third meaning** — whether a
-note publishes and who signs it is `noteRoute` beside it, a separate derivation.
-BMB shipped that promise broken twice by letting one expression carry both.
+it is *not* the toggle, because the toggle alone would be right by accident.
+Under a signed-in profile it is false; **off the profile, whether by pressing
+Anon or by being signed out, the typed name decides it**, absent meaning
+anonymous. **⚠️ It must not grow a second meaning** — whether a note publishes
+and who signs it is `noteRoute` beside it, a separate derivation. BMB shipped
+that promise broken twice by letting one expression carry both.
 
 **The identity toggle is still withheld when there is no identity**, but what
 replaced it is no longer a notice. That was right when both of the toggle's
@@ -949,35 +950,55 @@ untouched.
 **Two controls in the form, four outcomes, and one automatic publish.** Shipped
 2026-08-21; `boost-login.md` D12 through D15 carry the arguments.
 
-| Identity | Note box | What happens |
+**⚠️ ANONYMOUS AND PRIVATE ARE DIFFERENT ANSWERS TO DIFFERENT QUESTIONS.**
+**Anonymous** is about whose name is on the boost: not the donor's Nostr
+account, and optionally a name they type instead. **Private** is about whether a
+note exists at all. So **an anonymous boost is still published**, by OnlyBoosts,
+with no npub attached, which is the whole point: an anonymous booster still
+counts in the feeds and the totals.
+
+| Boost as | Note box | What happens |
 |---|---|---|
-| Signed in | unchecked | the donor's own npub signs it, on their press. **Unchanged** |
-| Name typed | unchecked | OnlyBoosts signs it, the name is a line of the body, published by itself on a clean boost |
-| Nothing typed | unchecked | OnlyBoosts signs it with no name; the booster this index credits is the bot |
+| Yourself | unchecked | the donor's own npub signs it, on their press |
+| Anon, name typed | unchecked | OnlyBoosts signs it, the name is a line of the body, published by itself on a clean boost |
+| Anon, no name | unchecked | OnlyBoosts signs it with no name; the booster this index credits is the bot |
 | Either | **checked** | nothing is published from any key, and the done screen says so |
 
-`noteRoute` in `ExternalBoostModal.jsx` is the whole derivation
-(`'donor' | 'bot' | 'none'`), and it stands **beside** `boostAnonymously` rather
-than inside it. `signKindOneWithSite` in `assets/../lib/siteSign.js` is the only
+**Signed out there is no "yourself" row and everything else is identical.** That
+is the whole difference the login makes here.
+
+**`usingProfile` (`signedIn && !anonymous`) is the one question everything
+hangs off**, and the two ways it can be false behave identically. Two
+derivations stand beside each other and neither may absorb the other:
+`boostAnonymously` is the **boostagram's** answer and governs `sender_name` and
+`sender_id` only; `noteRoute` (`'donor' | 'bot' | 'none'`) is who signs.
+BMB shipped that promise broken twice by letting one expression carry both.
+`signKindOneWithSite` in `login-widget/src/lib/siteSign.js` is the only
 difference between the two publishing routes: both produce a signed event and
 both publish it from the browser through the same relay set.
 
-**⚠️ THE TWO IDENTITY ROUTES ARE EXCLUSIVE AND THE FORM SHOWS IT.** A typed name
-on a signed-in account would be a second identity claim on one note, so the
-field is not rendered at all once there is an account behind the boost.
+**⚠️ `'none'` IS REACHABLE ONLY THROUGH THE CHECKBOX.** Anon routes to the bot;
+it does not suppress. The version that shipped for a few hours on 2026-08-21 had
+Anon fall through to no note at all, reasoning from the true premise that the
+donor's own npub must not sign it. That conclusion quietly cost an anonymous
+booster their place in the index, which is the opposite of what this project is
+for. **Reed's correction, same day.**
 
-**⚠️ A SIGNED-IN DONOR WHO PICKS ANON STILL GETS NO NOTE.** Signing with their
-own npub would undo the anonymity they chose one field up, and publishing a
-bot note instead would be that control quietly acquiring a second effect nobody
-asked it for. The checkbox reports this rather than offering a press that could
-only be a no-op.
+**⚠️ THE TWO ATTRIBUTION ROUTES ARE EXCLUSIVE AND THE FORM SHOWS IT.** The name
+field is rendered when `!usingProfile` — so a signed-in donor who presses Anon
+gets it too, since their position is identical to a signed-out one's. It is
+**absent rather than disabled** while the profile is in use: a typed name beside
+a signed-in identity would be a second identity claim on one note.
+
+**⚠️ `sender_id` NEVER RIDES WITHOUT THE PROFILE BEHIND IT.** Recipient
+aggregators resolve that pubkey to an avatar and a name, so carrying it on an
+Anon boost would undo the anonymity in the one place the donor cannot see it.
+That is the exact leak BMB shipped, twice.
 
 **⚠️ THE CHECKBOX SUPPRESSES THE NOTE AND NOTHING ELSE, so its label carries
 its own scope**: *Boost privately (no Nostr note)*, never a bare *Boost
-privately*. Anon is about the **boostagram**, which is what the show's own app
-receives; this is about **Nostr**. A donor may reasonably want the show to know
-who boosted while wanting nothing published, and a merged control has no way to
-say that.
+privately*. The sats and the message still cross Lightning to the show's own
+app, which is the half the word "privately" does not cover.
 
 **⚠️ A BOT-SIGNED NOTE PUBLISHES ITSELF ON A CLEAN BOOST AND ASKS ON A MESSY
 ONE.** The press exists on the donor path because a signer prompt has to be
@@ -1007,13 +1028,23 @@ end on. For the same reason **a failed sign is never allowed to read as a failed
 boost**: the sats are gone before the note is attempted, so the offer is another
 attempt at the note and never anything resembling unwinding a payment.
 
-**⚠️ THE ORACLE'S 100k-SAT CAP IS DECLARED IN THE FORM.** Its own answer is
-`invalid amount`, which is accurate and useless to someone who has just sent
-200k sats. `SITE_SIGN_MAX_SATS` in `siteSign.js` restates `MAX_AMOUNT_MSAT` in
-`functions/api/sign-boost.js` — a Function cannot import from the widget source
-and the bundle cannot import from `functions/`, the same split
-`CALLBACK_HOST_ALLOWLIST` lives with. **The two copies must stay in step.**
-Above the cap the boost is unaffected and only the note is withheld.
+**⚠️ THE ORACLE'S AMOUNT CAP AND THE MODAL'S ARE THE SAME NUMBER, 5,000,000
+SATS, AND KEEPING THEM EQUAL IS THE POINT.** They were 100k and 5M until
+2026-08-21, so a large Anon or signed-out boost paid fine and could then not be
+posted, with the endpoint's whole account of itself being `invalid amount`. The
+100k figure rested on "above the cap the donor still has the donor-signed path",
+and Anon routing here took that escape away. It was raised on Reed's call, on
+the reasoning that **the index already accepts unauthenticated writes from the
+whole of Nostr** — anyone may publish a fabricated boost note from a burner key
+— so a cap changes what a fake looks like, never whether one is possible. What
+contains this endpoint is D11's argument, not this number.
+
+`SITE_SIGN_MAX_SATS` in `login-widget/src/lib/siteSign.js` restates
+`MAX_AMOUNT_MSAT` in `functions/api/sign-boost.js`; a Function cannot import
+from the widget source and the bundle cannot import from `functions/`, the same
+split `CALLBACK_HOST_ALLOWLIST` lives with. **`scripts/test-sign-boost.mjs` is
+what enforces the equality**, asserting that exactly that figure validates and
+one msat more does not. Lower either copy and it fails.
 
 ### The Wallet Gate Is Behind The Boost Button
 

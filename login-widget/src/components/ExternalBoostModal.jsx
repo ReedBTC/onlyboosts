@@ -17,12 +17,23 @@
  * publishing, because a note reports what settled and no earlier moment knows
  * that (see `handleShare` and D14 in boost-login.md).
  *
- * The four outcomes, all falling out of two form controls:
+ * ⚠️ ANONYMOUS AND PRIVATE ARE DIFFERENT ANSWERS TO DIFFERENT QUESTIONS, and
+ * conflating them is what this file used to do. **Anonymous** is about WHOSE
+ * name is on the boost: not your Nostr account, and optionally a name you type
+ * instead. **Private** is about whether a note exists at all. So an anonymous
+ * boost is still published, by OnlyBoosts, with no npub attached — which is the
+ * whole point, because it means an anonymous booster still counts in the feeds
+ * and the totals.
  *
- *   signed in, note on     the donor's own npub signs it, on their press
- *   name typed, note on    OnlyBoosts signs it, the name is a line of prose
- *   nothing typed, note on OnlyBoosts signs it with no name
- *   note off               nothing is published from any key
+ * The outcomes, all falling out of two controls:
+ *
+ *   as yourself, note on    the donor's own npub signs it, on their press
+ *   anon + name, note on    OnlyBoosts signs it, the name is a line of prose
+ *   anon, no name, note on  OnlyBoosts signs it with no name at all
+ *   note off                nothing is published from any key
+ *
+ * Signed out there is no "as yourself", so the first row simply does not
+ * arise; everything else is identical.
  *
  * Progress UI is self-contained (not the LB BoostProgressView) so the external
  * leg shape / skipped legs / keysend-uncertain retry rules stay independent.
@@ -36,12 +47,18 @@ import * as wallet from '../lib/wallet.js'
 import { payExternalBoost, STATUS } from '../lib/externalBoost.js'
 import { buildExternalNoteTemplate, sanitizeSenderName, MAX_MESSAGE_CHARS, MAX_SENDER_NAME_CHARS } from '../lib/externalBoostagram.js'
 import { signKindOneShareWithUser, publishSignedKindOne, confirmInvoiceSettled, fetchLnurlMeta } from '../lib/boostagram.js'
-import { signKindOneWithSite, SITE_SIGN_MAX_SATS } from '../lib/siteSign.js'
+import { signKindOneWithSite } from '../lib/siteSign.js'
 import { setBoostModalProgressVisible } from '../lib/boostModalSignal.js'
 import { fireConfetti } from '../lib/confetti.js'
 import ConfirmLeaveOverlay from './ConfirmLeaveOverlay.jsx'
 
 const MIN_SATS = 21
+// ⚠️ `SITE_SIGN_MAX_SATS` IS THE SAME NUMBER AND IS MEANT TO BE. The signing
+// oracle refuses an `amount` above its own cap, and the two were 5M and 100k
+// until 2026-08-21, so a large signed-out or Anon boost paid fine and then
+// could not be posted. Keeping them equal is what makes the advisory lines
+// below dead code in practice; they are kept because the two constants live in
+// files that cannot import each other, so nothing enforces the equality.
 const MAX_SATS = 5_000_000
 const WORKING = STATUS.PAYING
 // How long an unconfirmed leg keeps being checked after the run ends, and how
@@ -255,29 +272,46 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
   const typedName = sanitizeSenderName(nameInput)
 
   /**
+   * ⚠️ THE ONE QUESTION EVERYTHING ELSE HANGS OFF: is this boost going out
+   * under the donor's Nostr account, or not?
+   *
+   * Signed out it never is, because there is no account. Signed in it is
+   * unless they pressed Anon. Everything below reads this rather than testing
+   * `signedIn` and `anonymous` separately, because the two cases where it is
+   * false behave identically and had drifted apart once already.
+   */
+  const usingProfile = signedIn && !anonymous
+
+  /**
    * ⚠️ ONE DERIVATION OF "ANONYMOUS", AND IT IS THE BOOSTAGRAM'S ANSWER ONLY.
    *
-   * This flag governs three wire sites and nothing else: `sender_name` and
-   * `sender_id` in the TLV record, and the same two on a retried leg. It must
-   * not grow a third meaning. Whether a note is published and who signs it is
+   * This flag governs the wire and nothing else: `sender_name` and `sender_id`
+   * in the TLV record, on the first pass and on a retry. It must not grow a
+   * second meaning. Whether a note is published and who signs it is
    * `noteRoute` below, a separate derivation standing beside this one — Boost
    * Me Bitch shipped that promise broken twice by letting one expression carry
    * both, each time because one surface learned a rule another didn't (read
    * the header of its `use-share-picker.ts`).
    *
-   * Signed in, the Anon toggle decides it, as it always has. Signed out there
-   * is no toggle and no profile, so the typed name decides it: a name means
-   * the podcaster sees who boosted, which is the half of this field Helipad
-   * reads (boost-login.md, Phase 10). No name means anonymous, which is the
-   * behaviour every signed-out boost had before this field existed.
+   * ⚠️ ANONYMOUS DOES NOT MEAN UNPUBLISHED. Pressing Anon detaches the Nostr
+   * account from the boost; OnlyBoosts still posts the note, so the boost
+   * still counts. What suppresses the note is the private checkbox, and only
+   * that. The two used to be folded together here and it made Anon quietly
+   * cost a booster their place in the index.
+   *
+   * Off the profile, the typed name decides it, and a name is not merely
+   * cosmetic: it is `sender_name`, which is what the podcaster's Helipad reads
+   * (boost-login.md, Phase 10).
    */
-  const boostAnonymously = signedIn ? anonymous : !typedName
+  const boostAnonymously = usingProfile ? false : !typedName
   const wireSenderName = boostAnonymously
     ? ''
-    : (signedIn ? (profile?.displayName || profile?.name || '') : typedName)
-  // Never a pubkey we don't have. A signed-out booster has none, so this is
-  // empty by construction as well as by rule.
-  const wireSenderPubkey = (!boostAnonymously && signedIn) ? (user?.pubkey || '') : ''
+    : (usingProfile ? (profile?.displayName || profile?.name || '') : typedName)
+  // ⚠️ NEVER A PUBKEY WITHOUT THE PROFILE BEHIND IT. `sender_id` is what
+  // recipient aggregators resolve to an avatar and a name, so carrying it on an
+  // Anon boost would undo the anonymity in the one place the donor cannot see.
+  // That is the exact leak BMB shipped twice.
+  const wireSenderPubkey = usingProfile ? (user?.pubkey || '') : ''
 
   /**
    * ⚠️ WHO SIGNS THE NOTE, AND WHETHER THERE IS ONE. Three values, and every
@@ -297,33 +331,20 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
    * about the outcome. Asking a newcomer to press a second button after the
    * payment charges the friction to precisely the visitor this flow exists for.
    *
-   * ⚠️ A SIGNED-IN DONOR WHO PICKS ANON GETS NO NOTE, unchanged. Signing with
-   * their own npub would undo the anonymity they chose one field up, and
-   * publishing a bot note instead would be this control quietly acquiring a
-   * second effect nobody asked it for. If that is ever wanted it is a decision
-   * about the Anon toggle, made deliberately, not a fall-through here.
+   * ⚠️ ANON ROUTES TO THE BOT, IT DOES NOT SUPPRESS. Reed's call, 2026-08-21,
+   * correcting the shape this shipped with hours earlier. Signing with the
+   * donor's own npub would undo the anonymity they chose one field up — that
+   * part was always right — but the conclusion drawn from it was that no note
+   * should exist, which quietly cost an anonymous booster their place in the
+   * index. Anonymity is about attribution; the bot route is what serves it.
+   * **`'none'` is reachable only through the checkbox.**
    *
-   * A signed-out booster is never in 'none' by accident: with no key to sign
-   * with, the bot route is the only thing standing between a wallet-only boost
-   * and this index holding no record of it at all.
+   * Nothing is ever in 'none' by accident, which matters most for a signed-out
+   * booster: with no key to sign with, the bot route is the only thing standing
+   * between a wallet-only boost and this index holding no record of it at all.
    */
-  const noteRoute = noNote
-    ? 'none'
-    : (signedIn ? (anonymous ? 'none' : 'donor') : 'bot')
+  const noteRoute = noNote ? 'none' : (usingProfile ? 'donor' : 'bot')
   const canShareToFeed = noteRoute === 'donor'
-  // The checkbox's two display facts, named so the markup reads as what it is.
-  // `noteImpliedOff` is the Anon case: there is no note to suppress, so the box
-  // reports that rather than offering a control that could only be a no-op.
-  const noteImpliedOff = signedIn && anonymous
-  const noteSuppressed = noNote || noteImpliedOff
-  // ⚠️ THE ONE THING THE BOT ROUTE CANNOT DO, DECLARED IN THE FORM RATHER THAN
-  // DISCOVERED ON THE DONE SCREEN. The oracle refuses an `amount` above its own
-  // cap, and its answer is "invalid amount" — accurate, and no use at all to
-  // someone who has just sent 200k sats. Above the cap the boost is unaffected
-  // and only the note is withheld, so the line says which of the two it is and
-  // names the route that has no cap.
-  const typedSats = parseInt(amount, 10)
-  const botNoteTooLarge = noteRoute === 'bot' && Number.isFinite(typedSats) && typedSats > SITE_SIGN_MAX_SATS
   const [shareState, setShareState] = useState('idle')   // 'idle' | 'signing' | 'shared' | 'error'
   const [shareError, setShareError] = useState('')
 
@@ -393,10 +414,6 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
   const paidCount = legs.filter((l) => l?.status === STATUS.PAID).length
   const activeCount = visibleLegs.length
   const paidSats = legs.reduce((a, l) => a + (l?.status === STATUS.PAID ? (l.sats || 0) : 0), 0)
-  // The done-screen half of the cap above. Declared here rather than beside
-  // `botNoteTooLarge` because it reads the settled figure, which is not
-  // computed until the leg tally is.
-  const paidTooLargeToPost = noteRoute === 'bot' && paidSats > SITE_SIGN_MAX_SATS
 
   // The leg the wallet is currently working on, and how long it has been at
   // it. Legs are paid sequentially (see D9 in boost-login.md), so there is at
@@ -584,9 +601,6 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
     if (autoSharedRef.current || shareState !== 'idle') return
     if (stillChecking || paidSats <= 0) return
     if (activeCount === 0 || paidCount !== activeCount) return
-    // Nothing is gained by spending a rate-limit slot on a request the oracle
-    // is certain to refuse; the line beside this explains it instead.
-    if (paidSats > SITE_SIGN_MAX_SATS) return
     autoSharedRef.current = true
     handleShare()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -799,58 +813,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
                     className="w-full bg-neutral-800 border border-neutral-700 rounded px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30"
                     placeholder={`${MIN_SATS} minimum`} />
                   <p className="mt-1 text-[10px] text-neutral-600">Splits across {recipients.length} {recipients.length === 1 ? 'recipient' : 'recipients'} per the show's value block.</p>
-                  {botNoteTooLarge && (
-                    <p className="mt-1 text-[10px] text-amber-400/90 leading-snug">
-                      The boost itself is fine at this size. OnlyBoosts only posts notes up to{' '}
-                      {fmtSats(SITE_SIGN_MAX_SATS)} sats on someone else\u2019s behalf, so this one
-                      won\u2019t reach the feeds unless you log in with Nostr and post it yourself.
-                    </p>
-                  )}
                 </div>
-
-                {/* ⚠️ TWO EXCLUSIVE ROUTES, AND THE FORM HAS TO SHOW THAT THEY
-                    ARE EXCLUSIVE. A typed name on a signed-in account would be
-                    a second identity claim on one note, so the field is not
-                    rendered at all once there is an account behind the boost.
-
-                    This replaces the notice that read "Boosting anonymously",
-                    which was right when both halves of an identity toggle
-                    would have sent the same empty fields. A typed name is what
-                    gives the signed-out case something to say: it rides the
-                    boostagram TLV, which is what the podcaster's Helipad
-                    reads, and it becomes a line of the note OnlyBoosts signs.
-
-                    Vocabulary is deliberate. "Your name" and "Log in", never
-                    anything about keys — this is someone's first contact with
-                    Nostr and they need not know that is what it is. */}
-                {!signedIn && (
-                  <div>
-                    <label htmlFor="ob-boost-from" className="block text-xs text-neutral-400 mb-1.5">Your name (optional)</label>
-                    <input
-                      id="ob-boost-from"
-                      type="text"
-                      value={nameInput}
-                      onChange={(e) => setNameInput(e.target.value.slice(0, MAX_SENDER_NAME_CHARS))}
-                      maxLength={MAX_SENDER_NAME_CHARS}
-                      autoComplete="off"
-                      className="w-full bg-neutral-800 border border-neutral-700 rounded px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30"
-                      placeholder="Who should the show thank?" />
-                    <p className="mt-1 text-[10px] text-neutral-600 leading-snug">
-                      {typedName
-                        ? `The show sees this name alongside your sats, and OnlyBoosts posts the boost for you under its own account.`
-                        : 'Leave it blank to boost anonymously. The show still sees your sats and your message.'}
-                    </p>
-                    {onRequestSignIn && (
-                      <button
-                        type="button"
-                        onClick={onRequestSignIn}
-                        className="mt-2 text-[11px] font-medium text-orange-400 hover:text-orange-300 transition-colors"
-                      >
-                        Or log in with Nostr and boost as yourself
-                      </button>
-                    )}
-                  </div>
-                )}
 
                 {signedIn && (
                 <div>
@@ -865,6 +828,52 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
                       className={`flex-1 py-3 px-3 rounded-md border transition-colors ${anonymous ? 'bg-orange-500/15 border-orange-500 text-orange-200 font-semibold' : 'bg-neutral-800 border-neutral-700 text-neutral-500 hover:text-neutral-300 hover:border-neutral-600'}`}>Anon</button>
                   </div>
                 </div>
+                )}
+
+                {/* ⚠️ THE NAME FIELD BELONGS TO "NOT UNDER A NOSTR ACCOUNT",
+                    NOT TO "SIGNED OUT". A signed-in donor who presses Anon is
+                    in exactly the same position as a signed-out one: their
+                    account is detached from the boost, and a typed name is the
+                    only attribution left. Rendering it only when signed out
+                    would have made Anon mean "no name, ever", which is a
+                    narrower thing than the button says.
+
+                    ⚠️ AND IT IS EXCLUSIVE WITH THE PROFILE, which is why it is
+                    absent rather than disabled while the profile is in use: a
+                    typed name beside a signed-in identity would be a second
+                    identity claim on one note.
+
+                    Vocabulary is deliberate. "Your name" and "Log in", never
+                    anything about keys — this may be someone's first contact
+                    with Nostr and they need not know that is what it is. */}
+                {!usingProfile && (
+                  <div>
+                    <label htmlFor="ob-boost-from" className="block text-xs text-neutral-400 mb-1.5">Your name (optional)</label>
+                    <input
+                      id="ob-boost-from"
+                      type="text"
+                      value={nameInput}
+                      onChange={(e) => setNameInput(e.target.value.slice(0, MAX_SENDER_NAME_CHARS))}
+                      maxLength={MAX_SENDER_NAME_CHARS}
+                      autoComplete="off"
+                      className="w-full bg-neutral-800 border border-neutral-700 rounded px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30"
+                      placeholder="Who should the show thank?" />
+                    <p className="mt-1 text-[10px] text-neutral-600 leading-snug">
+                      {typedName
+                        ? 'The show sees this name alongside your sats, and OnlyBoosts posts the boost under its own account so it counts in the feeds.'
+                        : 'Leave it blank and no name goes anywhere. OnlyBoosts still posts the boost under its own account, so it counts in the feeds either way.'}
+                      {signedIn && ' Your account is not attached to this one.'}
+                    </p>
+                    {!signedIn && onRequestSignIn && (
+                      <button
+                        type="button"
+                        onClick={onRequestSignIn}
+                        className="mt-2 text-[11px] font-medium text-orange-400 hover:text-orange-300 transition-colors"
+                      >
+                        Or log in with Nostr and boost as yourself
+                      </button>
+                    )}
+                  </div>
                 )}
 
                 <div>
@@ -882,26 +891,24 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
                     "privately" does not cover, so the parenthesis is the whole
                     point of the string rather than decoration on it.
 
-                    When a signed-in donor has already picked Anon there is no
-                    note to suppress, so the box says so instead of offering a
-                    control that could only be a no-op. */}
-                <label className={`flex items-start gap-2.5 rounded-md border px-3 py-2.5 transition-colors ${noteSuppressed ? 'border-neutral-700 bg-neutral-800/60' : 'border-neutral-800 bg-neutral-800/40 hover:border-neutral-700'} ${noteImpliedOff ? 'cursor-default opacity-70' : 'cursor-pointer'}`}>
+                    ⚠️ IT IS NEVER IMPLIED BY ANON. Anonymous is about whose
+                    name is on the boost; private is about whether a note
+                    exists. This is the only control that reaches 'none', which
+                    is what lets an anonymous booster still count. */}
+                <label className={`flex items-start gap-2.5 rounded-md border px-3 py-2.5 cursor-pointer transition-colors ${noNote ? 'border-neutral-700 bg-neutral-800/60' : 'border-neutral-800 bg-neutral-800/40 hover:border-neutral-700'}`}>
                   <input
                     type="checkbox"
-                    checked={noteSuppressed}
-                    disabled={noteImpliedOff}
+                    checked={noNote}
                     onChange={(e) => setNoNote(e.target.checked)}
                     className="mt-0.5 w-3.5 h-3.5 shrink-0 accent-orange-500" />
                   <span className="min-w-0">
                     <span className="block text-xs text-neutral-300 leading-snug">Boost privately (no Nostr note)</span>
                     <span className="block text-[10px] text-neutral-500 leading-snug mt-0.5">
-                      {noteImpliedOff
-                        ? 'Anon already means no note, so there is nothing to post.'
-                        : noteSuppressed
-                          ? 'Your sats and message still reach the show. Nothing is posted to Nostr from any account, so this boost stays out of the OnlyBoosts feeds and totals.'
-                          : noteRoute === 'bot'
-                            ? 'OnlyBoosts counts boosts it can find on Nostr, so a note is what puts yours in the feeds and the totals. Tick this to keep it off Nostr entirely.'
-                            : 'You choose whether to post it once the sats have landed, so the note reports what actually went through. Tick this to keep it off Nostr entirely.'}
+                      {noNote
+                        ? 'Your sats and message still reach the show. Nothing is posted to Nostr from any account, so this boost stays out of the OnlyBoosts feeds and totals.'
+                        : noteRoute === 'bot'
+                          ? 'OnlyBoosts counts boosts it can find on Nostr, so a note is what puts yours in the feeds and the totals. Tick this to keep it off Nostr entirely.'
+                          : 'You choose whether to post it once the sats have landed, so the note reports what actually went through. Tick this to keep it off Nostr entirely.'}
                     </span>
                   </span>
                 </label>
@@ -975,14 +982,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
                     {noteRoute !== 'none' && ' The Nostr note waits for this, so it reports what actually landed.'}
                   </p>
                 )}
-                {phase === 'done' && paidTooLargeToPost && !stillChecking && shareState !== 'shared' && (
-                  <p className="text-[11px] text-amber-400/90 leading-snug">
-                    Your boost landed. OnlyBoosts only posts notes up to {fmtSats(SITE_SIGN_MAX_SATS)} sats
-                    on someone else\u2019s behalf, so this one isn\u2019t in the feeds. Logging in with
-                    Nostr and boosting from your own account is the way to have one this size counted.
-                  </p>
-                )}
-                {phase === 'done' && noteRoute !== 'none' && !paidTooLargeToPost && paidSats > 0 && !stillChecking && (
+                {phase === 'done' && noteRoute !== 'none' && paidSats > 0 && !stillChecking && (
                   <div className="rounded-md border border-neutral-800 bg-neutral-800/40 p-3 space-y-2">
                     {shareState === 'shared' ? (
                       <p className="text-xs text-green-400 leading-snug">
@@ -991,8 +991,10 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
                           : `\u2713 Posted to your feed${paidCount < activeCount ? ` (${fmtSats(paidSats)} sats, ${paidCount} of ${activeCount} splits)` : ''}.`}
                         {noteRoute === 'bot' && (
                           <span className="block text-[10px] text-neutral-500 mt-1">
-                            Your boost is in the OnlyBoosts feeds and totals. It is posted from the
-                            OnlyBoosts account, since this browser has no Nostr account of its own.
+                            Your boost is in the OnlyBoosts feeds and totals.
+                            {signedIn
+                              ? ' It went out under the OnlyBoosts account, so your own account is not on it.'
+                              : ' It went out under the OnlyBoosts account, since this browser has none of its own.'}
                           </span>
                         )}
                       </p>
@@ -1000,14 +1002,14 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
                       /* The auto-publish window (D14). Named rather than left
                          silent: this is the one moment the screen is doing
                          something the donor did not press. */
-                      <p className="text-xs text-neutral-300 leading-snug">Posting your boost to Nostr\u2026</p>
+                      <p className="text-xs text-neutral-300 leading-snug">Posting your boost to Nostr…</p>
                     ) : (
                       <>
                         <p className="text-xs text-neutral-300 leading-snug">
                           {noteRoute === 'bot' ? 'Post this boost to Nostr?' : 'Share this boost on Nostr?'}
                           <span className="block text-[10px] text-neutral-500 mt-1">
                             {noteRoute === 'bot'
-                              ? 'OnlyBoosts counts boosts it can find on Nostr, so this is what puts yours in the feeds and the totals. It posts from the OnlyBoosts account.'
+                              ? `OnlyBoosts counts boosts it can find on Nostr, so this is what puts yours in the feeds and the totals. It posts under the OnlyBoosts account${signedIn ? ', not yours' : ''}.`
                               : 'Posts a kind-1 note from your npub, tagged to this episode. OnlyBoosts counts boosts it can find on Nostr, so this is what puts yours in the feeds and the totals.'}
                           </span>
                         </p>

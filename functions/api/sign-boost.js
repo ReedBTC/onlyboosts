@@ -98,16 +98,33 @@ const CREATED_AT_SKEW_SECS = 300
 const RATE_LIMIT = 5
 const RATE_WINDOW_SECS = 60
 
-// One boost, capped. Nothing here can tell a real 500k-sat boost from an
-// invented one, so the cap is about how large a single invented figure may be,
-// not about what anyone is likely to send. Above it the donor still has the
-// donor-signed path, where the claim is their own to make.
+// One boost, capped, and the cap is the modal's own ceiling rather than a
+// tighter figure of this endpoint's own.
+//
+// ⚠️ IT IS A SHAPE BOUND, NOT AN ABUSE BOUND, AND IT WAS RAISED FROM 100k SATS
+// ON 2026-08-21 ONCE IT STOPPED BEING BOTH. Reed's call. The reasoning it was
+// set on — nothing here can tell a real 500k-sat boost from an invented one —
+// is still true, but the escape hatch it leaned on was "above the cap the donor
+// still has the donor-signed path", and Anon now routes to this endpoint too.
+// So a tight cap no longer only refused fakes; it refused a real anonymous
+// booster with no other route, which is the thing this project exists to
+// remove.
+//
+// What actually contains this endpoint is D11's argument rather than this
+// number: **the index already accepts unauthenticated writes from the whole of
+// Nostr**, since anyone may publish a fabricated boost note from a burner key
+// and the collector will index it. A cap here changes what a fake looks like,
+// never whether one is possible. What it does still buy is that a single
+// request cannot claim a figure the product itself would refuse, so the two
+// ceilings are now deliberately the same one.
+//
 // ⚠️ RESTATED AS `SITE_SIGN_MAX_SATS` IN `login-widget/src/lib/siteSign.js`,
 // where the modal reads it to say so in the form rather than letting a donor
 // discover it as "invalid amount" after paying. A Pages Function cannot import
 // from the widget source and the bundle cannot import from here, the same split
-// `CALLBACK_HOST_ALLOWLIST` lives with. **The two copies must stay in step.**
-const MAX_AMOUNT_MSAT = 100_000_000   // 100k sats
+// `CALLBACK_HOST_ALLOWLIST` lives with. **The two copies must stay in step, and
+// the widget's `MAX_SATS` is now a third: all three are 5,000,000 sats.**
+const MAX_AMOUNT_MSAT = 5_000_000_000   // 5M sats, matching the modal's MAX_SATS
 
 // The attribution is OURS and is not caller-settable. A `client` tag naming
 // something else would put a false publisher on a note we signed.
