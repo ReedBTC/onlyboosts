@@ -18,7 +18,7 @@ export default function ToastHost() {
   if (list.length === 0) return null
 
   return createPortal(
-    <div
+    <div className="lb-w"><div
       className="fixed z-[95] bottom-4 right-4 left-4 sm:left-auto sm:max-w-sm flex flex-col gap-2 pointer-events-none"
       role="region"
       aria-label="Notifications"
@@ -47,6 +47,6 @@ export default function ToastHost() {
         </div>
       ))}
     </div>,
-    document.body,
+    document.body</div>,
   )
 }

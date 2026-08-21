@@ -362,7 +362,7 @@ function ShowBoostHost() {
   }, [])
   if (!state) return null
   return createPortal(
-    <BoostModal
+    <div className="lb-w"><BoostModal
       user={user || null}
       prefillMessage={state.prefillMessage || ''}
       onClose={() => setShowBoostState(null)}
@@ -375,7 +375,7 @@ function ShowBoostHost() {
         } catch {}
       }}
     />,
-    document.body,
+    document.body</div>,
   )
 }
 
@@ -398,7 +398,7 @@ function LoginPromptHost() {
   }, [])
   if (!open) return null
   return createPortal(
-    <LoginModal
+    <div className="lb-w"><LoginModal
       onLogin={(u) => {
         abortRestore()
         // Fresh login — pubkey came from the signer itself, so we can
@@ -430,7 +430,7 @@ function LoginPromptHost() {
         if (!walletConnectIsOpen) cancelPendingAction()
       }}
     />,
-    document.body,
+    document.body</div>,
   )
 }
 
@@ -454,7 +454,7 @@ function WalletConnectHost() {
   }, [])
   if (!open) return null
   return createPortal(
-    <WalletConnectModal
+    <div className="lb-w"><WalletConnectModal
       user={user || null}
       onRequestSignIn={() => api.requestLogin()}
       onConnected={() => {
@@ -470,7 +470,7 @@ function WalletConnectHost() {
         cancelPendingAction()
       }}
     />,
-    document.body,
+    document.body</div>,
   )
 }
 
@@ -494,14 +494,14 @@ function EpisodeBoostHost() {
   }, [])
   if (!state) return null
   return createPortal(
-    <EpisodeBoostModal
+    <div className="lb-w"><EpisodeBoostModal
       user={user || null}
       onUserChange={(u) => { abortRestore(); setUser(u) }}
       onClose={() => setEpisodeBoostState(null)}
       episode={state.episode}
       splitsBundle={state.splits}
     />,
-    document.body,
+    document.body</div>,
   )
 }
 
@@ -533,7 +533,7 @@ function ExternalBoostHost() {
   // this widget this is the one where that matters most: it is the only one a
   // payment is running underneath.
   return createPortal(
-    <ModalErrorBoundary label="ExternalBoostModal" onClose={() => setExternalBoostState(null)}>
+    <div className="lb-w"><ModalErrorBoundary label="ExternalBoostModal" onClose={() => setExternalBoostState(null)}>
       <ExternalBoostModal
         user={user || null}
         onRequestSignIn={() => api.requestLogin()}
@@ -543,7 +543,7 @@ function ExternalBoostHost() {
         recipientsBundle={state.recipientsBundle}
       />
     </ModalErrorBoundary>,
-    document.body,
+    document.body</div>,
   )
 }
 
@@ -618,7 +618,8 @@ function MeetupModalHost() {
   }
 
   if (!body) return null
-  return createPortal(body, document.body)
+  return createPortal(
+    <div className="lb-w">{body}</div>, document.body)
 }
 
 // ── Bug-report modal host ────────────────────────────────────────────────
@@ -642,7 +643,7 @@ function BugReportHost() {
   }, [])
   if (!state) return null
   return createPortal(
-    <BugReportModal user={realUser} onClose={() => setBugReportState(null)} />,
+    <div className="lb-w"><BugReportModal user={realUser} onClose={() => setBugReportState(null)} /></div>,
     document.body,
   )
 }
@@ -724,6 +725,10 @@ const api = {
     function makeHost(id) {
       const el = document.createElement('div')
       el.id = id
+      // ⚠️ THE SCOPE FOR THE WIDGET'S OWN CSS RESET. See `.lb-w` in
+      // styles.css: without it every button and input in this bundle wears
+      // the browser's native chrome.
+      el.className = 'lb-w'
       el.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;'
       document.body.appendChild(el)
       return el

@@ -74,7 +74,7 @@ export default function BoostProgressBanner() {
   }
 
   return createPortal(
-    <div
+    <div className="lb-w"><div
       className="fixed top-0 inset-x-0 z-[110] flex justify-center pointer-events-none px-3 pt-3"
       role="status"
       aria-live="polite"
@@ -110,6 +110,6 @@ export default function BoostProgressBanner() {
         <span className="leading-none">{label}</span>
       </button>
     </div>,
-    document.body,
+    document.body</div>,
   )
 }

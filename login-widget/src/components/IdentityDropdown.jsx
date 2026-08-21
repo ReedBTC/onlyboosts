@@ -81,7 +81,7 @@ export default function IdentityDropdown({
   const position = computePosition(triggerRect)
 
   return createPortal(
-    <div
+    <div className="lb-w"><div
       ref={menuRef}
       role="menu"
       aria-label="Account menu"
@@ -260,7 +260,7 @@ export default function IdentityDropdown({
       </div>
       )}
     </div>,
-    document.body,
+    document.body</div>,
   )
 }
 

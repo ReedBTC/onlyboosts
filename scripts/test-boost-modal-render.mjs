@@ -241,11 +241,13 @@ console.log('\nThe themed classes emit real CSS:')
   for (const m of rootBlock.slice(0, rootBlock.indexOf('\n}')).matchAll(/^\s*(--[a-z0-9-]+):\s*([^;]+);/gm)) {
     declared[m[1]] = m[2].replace(/\s+/g, '')
   }
-  // The two font tokens degrade to a generic rather than mirroring: Tailwind
-  // strips the space out of `'Playfair Display'` unless it is written `_`, and
-  // `PlayfairDisplay` is not a font. A missing token there costs the face, not
-  // legibility, which is the right trade for the one value that cannot mirror.
-  const GENERIC_FALLBACK = new Set(['--font-display', '--font-body'])
+  // ⚠️ THE FONT TOKENS MIRROR TOO, VIA THE UNDERSCORE. Tailwind converts `_` to
+  // a space inside an arbitrary value, so `'Playfair_Display'` compiles to the
+  // real family — which matters, because the earlier `Georgia,serif` fallback
+  // meant a stale theme.css rendered every heading in a face this site uses
+  // nowhere. Reported as "some weird font we dont use anywhere". Both sides are
+  // stripped of `_` before comparing so the mirror still holds.
+  const unspace = (v) => v.replace(/_/g, '')
 
   const bare = []
   const wrong = []
@@ -267,9 +269,10 @@ console.log('\nThe themed classes emit real CSS:')
         i++
       }
       const fallback = text.slice(m.index + m[0].length, i)
-      if (GENERIC_FALLBACK.has(token)) continue
       if (declared[token] === undefined) { wrong.push(`${name}: ${token} is not in theme.css`); continue }
-      if (declared[token] !== fallback) wrong.push(`${name}: ${token} falls back to ${fallback}, theme.css says ${declared[token]}`)
+      if (unspace(declared[token]) !== unspace(fallback)) {
+        wrong.push(`${name}: ${token} falls back to ${fallback}, theme.css says ${declared[token]}`)
+      }
     }
   }
   assert.deepEqual(bare, [], `a var() with no fallback renders TRANSPARENT against a stale theme.css:\n  ${bare.join('\n  ')}`)
@@ -293,6 +296,38 @@ console.log('\nThe themed classes emit real CSS:')
   assert.equal(bundle.includes('border-style:solid'), true,
     'the base layer in styles.css is gone — every border in the widget is invisible')
   ok('borders have a style, so they actually draw')
+
+  /**
+   * ⚠️ THE RESET IS SCOPED TO `.lb-w` AND EVERY PORTAL MUST WEAR IT. A portal
+   * renders into `document.body`, outside any wrapper, so a `createPortal` that
+   * forgets the wrapper puts a modal back in the browser's native form chrome —
+   * the "weird button outlines" of 2026-08-21, which were the operating
+   * system's own. That reads as a styling bug rather than a missing div, so it
+   * is checked here instead of being left to be noticed.
+   */
+  assert.equal(/:where\(\.lb-w\)/.test(bundle), true,
+    'the scoped preflight is gone — every button reverts to native OS chrome')
+  ok('the scoped reset is in the bundle')
+
+  const unwrapped = []
+  for (const file of ['index.jsx', 'components/IdentityDropdown.jsx', 'components/ToastHost.jsx', 'components/BoostProgressBanner.jsx']) {
+    const text = readFileSync(new URL(`../login-widget/src/${file}`, import.meta.url), 'utf8')
+    for (const m of text.matchAll(/createPortal\(([\s\S]{0,120})/g)) {
+      if (!m[1].includes('lb-w')) unwrapped.push(`${file}: ${m[1].split('\n')[1]?.trim() ?? m[1].trim()}`)
+    }
+  }
+  assert.deepEqual(unwrapped, [], `a portal renders outside the .lb-w scope:\n  ${unwrapped.join('\n  ')}`)
+  ok('every createPortal wraps its children in the scope')
+
+  // ⚠️ `:where()` is what keeps the reset at preflight's own specificity. Drop
+  // it and `.lb-w button { padding: 0 }` outranks `.py-3`, flattening every
+  // button in the widget — a far worse outcome than the bug it was fixing.
+  const css = readFileSync(new URL('../login-widget/src/styles.css', import.meta.url), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')   // the prose names `.lb-w` constantly
+  const naked = [...css.matchAll(/(?<!:where\()\.lb-w\b/g)].length
+  assert.equal(naked, 0,
+    `${naked} selector(s) use .lb-w without :where() — the reset now outranks the padding utilities`)
+  ok('the reset stays at preflight specificity')
 
   // ⚠️ The bundle is a build artifact. If it is stale the two assertions above
   // pass against yesterday's CSS, so the source is checked to agree with it.

@@ -632,7 +632,34 @@ full-bleed `#fff` rectangle over a dimmed page is the brightest thing on screen
 by a wide margin, which at modal size is glare rather than emphasis. The fields
 are the white now, which is also the right way round: white is where you type.
 
-**⚠️ AND THE WIDGET RESTORES `border-style` ITSELF, IN A SCOPED BASE LAYER.**
+**⚠️ THE WIDGET CARRIES ITS OWN SCOPED PREFLIGHT, AND EVERY PORTAL MUST WEAR
+THE SCOPE.** Tailwind's preflight is off here — correctly, since this bundle
+mounts into the live site and must not reset the host page — but preflight also
+supplies two things every Tailwind UI silently assumes: `border-width:0;
+border-style:solid` on everything, and a form-control reset. Without them the
+modals rendered with the **browser's native button outlines** (reported as
+"weird button outlines that make it look unprofessional" — they were the
+operating system's) while every border the markup *did* ask for drew nothing.
+Two opposite faults from one missing base layer, which is why the modals looked
+simultaneously outlined and undefined.
+
+`.lb-w` is the scope. `makeHost` puts it on every host div and **every
+`createPortal` wraps its children in one**, because a portal renders into
+`document.body` and would otherwise sit outside any scope. A new portal without
+the wrapper is a modal back in OS chrome.
+
+**⚠️ `:where(.lb-w)` IS LOAD-BEARING, NOT TIDINESS.** Preflight's own selectors
+are bare elements at specificity 0,0,0 and 0,0,1, which is exactly why `py-3`
+beats the `padding: 0` preflight just set. Scoping naively to `.lb-w button`
+makes it 0,1,1, which **beats `.py-3` and flattens every button in the widget**.
+`:where()` contributes nothing, so these land at preflight's own weight. The
+test counts any `.lb-w` used without it.
+
+**No `img` / `svg` rule is included**, deliberately: preflight's
+`max-width:100%; height:auto` would resize icons that are currently correct,
+which is a visual change wearing the costume of a bug fix.
+
+**⚠️ AND THE WIDGET RESTORES `border-style` ITSELF, IN THAT SAME LAYER.**
 Tailwind's `border` utility sets `border-width` and nothing else; the
 `border-style: solid` comes from **preflight**, which is off here so the bundle
 cannot reset the host page. So `border-width: 1px` sat over CSS's initial
@@ -2243,8 +2270,24 @@ honest at both ends. Measured 2026-08-18.
 and the count of rows are different numbers and neither belongs next to a rank.
 "of 811" also flatters the tail: 51% of shows have two boosts or fewer.
 
-**No cutoff.** Every page with a rank prints it, however large, because a
-competition rank is never false. That was Reed's call on 2026-08-18.
+**⚠️ THE CHIP IS DRAWN ONLY INSIDE THE TOP 100** (`RANK_CUTOFF` in
+`feed-rank.js`). *Reed's call, 2026-08-21, reversing "no cutoff" from
+2026-08-18* — and the reasoning that decision rested on still holds, which is
+why this is a **display rule and not a change to `feedRanks`**. A competition
+rank is never false however large; `T#2,274` is an honest statement about an
+episode with two boosts.
+
+What changed is what the chip is *for*. It sits in a tile's corner, the
+sports-card idiom for a standing worth knowing, and **51% of shows have two
+boosts or fewer** — so on most pages it was labelling the long tail with a
+number nobody would quote. A distinction printed on every page is not a
+distinction.
+
+**It is a boundary on the rank, not on the tie group**: a rank of exactly 100
+prints even when it is `T#100` shared by fifty rows, because the rank is what
+the reader is told and it is correct. Everything else falls out for free —
+`anyRank` stays false when nothing qualifies, so the caption and the reserved
+chip line go with it and the page renders exactly as `/booster` already does.
 
 Three more things a change would break:
 

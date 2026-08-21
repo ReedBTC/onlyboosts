@@ -89,7 +89,7 @@ export default function BoostModal({ user, onClose, prefillMessage = '', onSettl
       >
         <div className={`relative bg-[var(--modal-bg,#f4fafd)] border border-[var(--modal-line,#b9d4e6)] rounded-lg w-full max-w-lg max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2rem)] flex flex-col shadow-[0_24px_60px_-12px_rgba(11,58,82,0.28),0_0_0_1px_rgba(11,58,82,0.06)] transition-[opacity,transform] duration-200 ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}>
           <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-[var(--modal-line,#b9d4e6)] shrink-0">
-            <h2 className="text-base font-semibold text-[var(--ink,#0f2733)] font-[family-name:var(--font-display,Georgia,serif)]">⚡ Donate to OnlyBoosts</h2>
+            <h2 className="text-base font-semibold text-[var(--ink,#0f2733)] font-[family-name:var(--font-display,'Playfair_Display',Georgia,serif)]">⚡ Donate to OnlyBoosts</h2>
             <button
               onClick={guardedClose}
               className="text-[var(--muted,#5a7488)] hover:text-[var(--ink,#0f2733)] transition-colors text-lg leading-none"

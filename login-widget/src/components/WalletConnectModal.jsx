@@ -100,7 +100,7 @@ export default function WalletConnectModal({ user, onClose, onConnected, onReque
 
           {/* Header */}
           <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-[var(--modal-line,#b9d4e6)]">
-            <h2 className="text-base font-semibold text-[var(--ink,#0f2733)] font-[family-name:var(--font-display,Georgia,serif)]">⚡ Connect Lightning Wallet</h2>
+            <h2 className="text-base font-semibold text-[var(--ink,#0f2733)] font-[family-name:var(--font-display,'Playfair_Display',Georgia,serif)]">⚡ Connect Lightning Wallet</h2>
             <button
               onClick={requestClose}
               disabled={connecting}
@@ -199,7 +199,7 @@ export default function WalletConnectModal({ user, onClose, onConnected, onReque
             <button
               onClick={handleConnect}
               disabled={connecting}
-              className="w-full py-3 rounded-lg bg-[var(--modal-field,#ffffff)] border border-[var(--modal-line,#b9d4e6)] hover:bg-[var(--modal-inset,#e6f1f9)] disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium text-[var(--ink,#0f2733)] transition-colors"
+              className="w-full py-3 rounded-lg bg-[var(--modal-inset,#e6f1f9)] border border-[var(--brand,#00aff0)] hover:bg-[var(--brand-tint,rgba(0,175,240,0.12))] disabled:opacity-40 disabled:cursor-not-allowed text-sm font-semibold text-[var(--brand-dd,#0a6fa8)] transition-colors"
             >
               {connecting ? 'Connecting…' : 'Connect via NWC'}
             </button>

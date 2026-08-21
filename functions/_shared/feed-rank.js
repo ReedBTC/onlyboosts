@@ -140,10 +140,37 @@ function chip(r) {
 }
 
 /**
+ * ⚠️ THE CHIP IS DRAWN ONLY INSIDE THE TOP 100. Reed's call, 2026-08-21,
+ * reversing the "no cutoff" decision of 2026-08-18 — and the reasoning that
+ * decision rested on still holds, which is why this is a display rule rather
+ * than a change to `feedRanks`. **A competition rank is never false**, however
+ * large; `T#2,274` is an honest statement about an episode with two boosts.
+ *
+ * What changed is what it is FOR. The chip sits in a stat tile's corner, which
+ * is the sports-card idiom for a standing worth knowing — and 51% of shows have
+ * two boosts or fewer, so on most pages it was labelling the long tail with a
+ * number nobody would quote. A distinction printed on every page is not a
+ * distinction; it is a row count wearing a medal.
+ *
+ * ⚠️ IT IS A BOUNDARY ON THE RANK, NOT ON THE TIE GROUP. A rank of exactly 100
+ * prints even when it is `T#100` shared by fifty rows, because the rank is what
+ * the reader is being told and it is correct. Nothing here re-derives standing.
+ *
+ * The rest falls out for free: `anyRank` stays false when nothing qualifies, so
+ * the caption and the reserved chip line disappear with it and the page renders
+ * exactly as `/booster` already does.
+ */
+const RANK_CUTOFF = 100;
+
+/**
  * The stat tiles with the rank folded into each: value, label, then the rank as
  * a third line. One tile per stat, in the order given; the rank is drawn only
  * where `ranks` resolved and the stat carries a `key` the ranks know, so a
  * failed query costs the third line and nothing else and /booster can pass null.
+ *
+ * ⚠️ ONLY A TOP-100 RANK IS DRAWN — see RANK_CUTOFF. A page whose every stat
+ * falls outside it renders bare tiles and no caption, which is the same output
+ * /booster has always produced.
  *
  * ⚠️ THE CAPTION IS SHARED AND THE TILES ARE BARE. Three tiles cannot each
  * carry "rank on the Shows feed" without saying it three times, and a tooltip
@@ -161,7 +188,7 @@ export function renderStatTiles(stats, ranks, copy) {
   const tiles = stats.map((s) => {
     const r = ranks && s.key ? ranks[s.key] : null;
     let rankEl = "";
-    if (r) {
+    if (r && r.rank <= RANK_CUTOFF) {
       anyRank = true;
       if (r.tied) anyTie = true;
       const tip = r.tied

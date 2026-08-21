@@ -167,7 +167,7 @@ export default function BugReportModal({ user, onClose }) {
           onDrop={onDrop}
         >
           <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--modal-line,#b9d4e6)] shrink-0">
-            <h2 className="text-base font-semibold text-[var(--ink,#0f2733)] font-[family-name:var(--font-display,Georgia,serif)]">🐛 Report a bug</h2>
+            <h2 className="text-base font-semibold text-[var(--ink,#0f2733)] font-[family-name:var(--font-display,'Playfair_Display',Georgia,serif)]">🐛 Report a bug</h2>
             <button
               onClick={onClose}
               disabled={submitting}

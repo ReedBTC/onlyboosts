@@ -3,47 +3,87 @@
 @tailwind utilities;
 
 /**
- * ⚠️ EVERY BORDER IN THIS WIDGET WAS INVISIBLE, AND THIS IS WHY.
+ * ⚠️ THE WIDGET'S OWN RESET, AND WITHOUT IT EVERY CONTROL WEARS THE BROWSER'S
+ * NATIVE CHROME.
  *
- * Tailwind's `border` utility sets `border-width` and nothing else. The
- * `border-style: solid` that makes it visible comes from **preflight**, which
- * is switched off in `tailwind.config.js` — deliberately, because this bundle
- * mounts into the live site and must not reset the host page's styles. So
- * `border-width: 1px` sat on top of CSS's initial `border-style: none` and drew
- * nothing: `border-style` appeared nowhere in the built bundle at all.
+ * Tailwind's preflight is switched off in `tailwind.config.js` — correctly,
+ * because this bundle mounts into the live site and must not reset the host
+ * page. But preflight is also what supplies two things every Tailwind UI
+ * silently assumes:
  *
- * ⚠️ IT WENT UNNOTICED FOR AS LONG AS THE WIDGET WAS DARK, because there the
- * surfaces differ by FILL — a #171717 panel on a #0a0a0a page reads as an edge
- * whether or not a line is drawn. On the light theme every surface is within a
- * few percent of every other and the borders were carrying all of the
- * definition, so their absence flattened each modal into one pale rectangle.
- * Reported as "these colors and lines all washout", which is exactly right
- * except that the lines were not washed out; they were never drawn.
+ *   1. `border-width: 0; border-style: solid` on everything, so a `border`
+ *      utility (which sets WIDTH only) actually draws a line, and so a
+ *      `<button>` does not keep its UA `2px outset ButtonBorder`;
+ *   2. `background-color: transparent` and inherited type on form controls.
  *
- * ⚠️ THE SELECTOR IS GLOBAL AND THAT IS SAFE, FOR A REASON WORTH RE-CHECKING
- * BEFORE CHANGING IT. Tailwind only scans `./src/**` (the `content` key), so
- * these utility class names are generated for this widget alone, and the host
- * site styles itself with semantic classes (`.show-stat`, `.pcast-card`) rather
- * than utilities — verified: nothing outside this bundle carries a class named
- * `border`, `border-2` or `divide-y`. **If the site ever adopts Tailwind this
- * needs scoping to the widget's own subtree instead.**
+ * Without them the modals rendered with **native button outlines** around
+ * every button — reported as "weird button outlines that make it look
+ * unprofessional", and they were: they were the operating system's. At the
+ * same time `border-style` appeared nowhere in the bundle, so every border we
+ * DID ask for drew nothing. Two opposite faults from one missing base layer,
+ * which is why the modals looked simultaneously outlined and undefined.
  *
- * The alternative was appending `border-solid` beside all ~60 border utilities
- * in the JSX, which works anywhere but has to be remembered every time anyone
- * adds one. `scripts/test-boost-modal-render.mjs` asserts the built bundle
- * carries `border-style:solid`, so dropping this block is a red test rather
- * than another flat modal.
+ * ⚠️ THE SCOPE IS `.lb-w` AND IT HAS TO BE ON EVERY ROOT. `makeHost` puts it on
+ * each host div, and **every `createPortal` wraps its children in one**,
+ * because a portal renders into `document.body` and would otherwise sit
+ * outside any scope. A new portal without the wrapper is a modal wearing OS
+ * chrome again — which looks like a styling bug, not a missing wrapper.
+ *
+ * An earlier version of this keyed on the utility class names themselves
+ * (`.border`, `.border-2`, …) to avoid needing a scope. That fixed the
+ * invisible borders and did nothing for the UA chrome, because a `<button>`
+ * with no border class at all was never selected.
  */
-@layer base {
-  .border,
-  .border-2,
-  .border-t, .border-r, .border-b, .border-l,
-  .border-x, .border-y,
-  [class*="divide-y"] > * + *,
-  [class*="divide-x"] > * + * {
-    border-style: solid;
-  }
+/**
+ * ⚠️ `:where()` IS LOAD-BEARING, NOT TIDINESS. Preflight's own selectors are
+ * bare elements (`*`, `button`) with specificity 0,0,0 and 0,0,1, so every
+ * Tailwind utility beats them — which is the entire reason `py-3` works on a
+ * button that preflight just set `padding: 0` on.
+ *
+ * Scoping naively to `.lb-w button` makes it 0,1,1, which BEATS `.py-3`
+ * (0,1,0) and flattens every button in the widget. `:where(.lb-w)` contributes
+ * nothing to specificity, so these land at exactly preflight's own weight and
+ * the utilities keep winning. **Do not remove the `:where()` to "simplify" the
+ * selector.**
+ */
+:where(.lb-w),
+:where(.lb-w) *,
+:where(.lb-w) *::before,
+:where(.lb-w) *::after {
+  border-width: 0;
+  border-style: solid;
+  border-color: currentColor;
 }
+
+/* The form-control half of preflight, at the same weight. */
+:where(.lb-w) button,
+:where(.lb-w) input,
+:where(.lb-w) optgroup,
+:where(.lb-w) select,
+:where(.lb-w) textarea {
+  font-family: inherit;
+  font-size: 100%;
+  font-weight: inherit;
+  line-height: inherit;
+  color: inherit;
+  margin: 0;
+  padding: 0;
+}
+:where(.lb-w) button,
+:where(.lb-w) [type='button'],
+:where(.lb-w) [type='reset'],
+:where(.lb-w) [type='submit'] {
+  -webkit-appearance: button;
+  background-color: transparent;
+  background-image: none;
+  cursor: pointer;
+}
+:where(.lb-w) :disabled { cursor: default; }
+
+/* ⚠️ NO `img` / `svg` RULE HERE. Preflight sets `max-width:100%; height:auto`
+   on them, and this widget has run without that since the fork — adding it now
+   would resize icons that are currently correct, which is a visual change
+   nobody asked for wearing the costume of a bug fix. */
 
 /* The /newevent composer + boost-existing card use type="search"
    inputs to suppress LastPass / 1Password / Bitwarden autofill —

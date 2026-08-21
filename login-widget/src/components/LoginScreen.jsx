@@ -80,11 +80,23 @@ function clearPendingNip46() {
 // mobile keyboard) on every keystroke in the nsec/bunker fields. Calling
 // them as functions inlines their elements into LoginScreen's own tree,
 // so <input> identity is stable across renders.
+/**
+ * ⚠️ THE RULES WERE WHITE ON A WHITE PANEL, so this rendered as a bare "or"
+ * floating between two blocks. The mechanical dark-to-light recolour took the
+ * dark theme's `bg-neutral-800` (a line lighter than its page) to
+ * `--modal-field`, which on the light theme is the brightest surface there is.
+ *
+ * It matters more here than the same pattern did in the boost modal, where a
+ * divider was removed for reading as a section break: **these three ARE
+ * different sections.** An extension, a pasted key and a remote signer are
+ * three unrelated ways in, not two halves of one choice, so the break is the
+ * information rather than noise.
+ */
 const Divider = () => (
-  <div className="flex items-center gap-3">
-    <div className="flex-1 h-px bg-[var(--modal-field,#ffffff)]" />
-    <span className="text-xs text-[var(--muted,#5a7488)]">or</span>
-    <div className="flex-1 h-px bg-[var(--modal-field,#ffffff)]" />
+  <div className="flex items-center gap-3" aria-hidden="true">
+    <div className="flex-1 h-px bg-[var(--modal-line,#b9d4e6)]" />
+    <span className="text-[10px] uppercase tracking-wider text-[var(--muted,#5a7488)]">or</span>
+    <div className="flex-1 h-px bg-[var(--modal-line,#b9d4e6)]" />
   </div>
 )
 
@@ -974,7 +986,7 @@ export default function LoginScreen({ onLogin, embedded = false }) {
               extension, key, Nostr Connect — because those ARE what they are;
               the vocabulary rule is about the way in, not about hiding the
               mechanism from someone already looking at it. */}
-          <h2 className="mt-3 text-lg font-semibold text-[var(--ink,#0f2733)] font-[family-name:var(--font-display,Georgia,serif)]">Log in to OnlyBoosts</h2>
+          <h2 className="mt-3 text-lg font-semibold text-[var(--ink,#0f2733)] font-[family-name:var(--font-display,'Playfair_Display',Georgia,serif)]">Log in to OnlyBoosts</h2>
         </div>
 
         {isMobile ? (
