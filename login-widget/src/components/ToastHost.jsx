@@ -27,19 +27,19 @@ export default function ToastHost() {
       {list.map(t => (
         <div
           key={t.id}
-          className={`pointer-events-auto rounded-lg shadow-[0_25px_60px_-12px_rgba(0,0,0,0.8),0_0_0_1px_rgba(255,255,255,0.04)] px-4 py-3 flex items-start gap-3 text-sm text-neutral-100 ${
+          className={`pointer-events-auto rounded-lg shadow-[0_24px_60px_-12px_rgba(11,58,82,0.28),0_0_0_1px_rgba(11,58,82,0.06)] px-4 py-3 flex items-start gap-3 text-sm text-[var(--ink)] ${
             t.kind === 'error'
-              ? 'bg-red-950/95 border border-red-800'
+              ? 'bg-[var(--surface)] border border-[var(--danger)]'
               : t.kind === 'success'
-              ? 'bg-green-950/95 border border-green-800'
-              : 'bg-neutral-900/95 border border-neutral-700'
+              ? 'bg-[var(--surface)] border border-[var(--ok)]'
+              : 'bg-[var(--surface)]/95 border border-[var(--border)]'
           }`}
         >
           <span className="flex-1 leading-snug">{t.message}</span>
           <button
             type="button"
             onClick={() => dismissToast(t.id)}
-            className="text-neutral-500 hover:text-neutral-200 transition-colors text-base leading-none flex-shrink-0"
+            className="text-[var(--muted)] hover:text-[var(--ink)] transition-colors text-base leading-none flex-shrink-0"
             aria-label="Dismiss notification"
           >
             ✕

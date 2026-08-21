@@ -40,7 +40,7 @@
       }
       const s = document.createElement('script');
       // Absolute — this file is shared by pages at more than one path.
-      s.src = '/assets/widgets/login-widget.js?v=ob-v93';
+      s.src = '/assets/widgets/login-widget.js?v=ob-v94';
       s.async = true;
       s.onload = () => { Promise.resolve().then(resolve); };
       s.onerror = () => {
@@ -78,7 +78,11 @@
   function renderIdentitySignIn() {
     if (!identitySlot) return;
     identitySlot.innerHTML =
-      '<button type="button" class="lb-identity-placeholder" aria-label="Sign in with Nostr">Sign in</button>';
+      '<button type="button" class="lb-identity-placeholder" aria-label="Log in to OnlyBoosts">' +
+      // ⚠️ THE MARK AND THE WORD MUST MATCH `LoginButton`'s nav skin, which
+      // replaces this the moment the 1MB bundle lands. Any drift between the
+      // two shows up as the button visibly changing shape on every page load.
+      '<img src="/assets/onlyboosts_favicon.png" alt="" aria-hidden="true" width="18" height="18">Log in</button>';
     const btn = identitySlot.querySelector('button');
     btn.addEventListener('click', async () => {
       btn.disabled = true;

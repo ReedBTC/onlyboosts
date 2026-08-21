@@ -85,7 +85,7 @@ export default function IdentityDropdown({
       ref={menuRef}
       role="menu"
       aria-label="Account menu"
-      className="fixed z-[90] bg-neutral-900 border border-neutral-700 rounded-lg shadow-[0_25px_60px_-12px_rgba(0,0,0,0.8),0_0_0_1px_rgba(255,255,255,0.04)] text-sm text-neutral-200 overflow-hidden"
+      className="fixed z-[90] bg-[var(--surface)] border border-[var(--border)] rounded-lg shadow-[0_24px_60px_-12px_rgba(11,58,82,0.28),0_0_0_1px_rgba(11,58,82,0.06)] text-sm text-[var(--ink)] overflow-hidden"
       style={{
         top: `${position.top}px`,
         left: `${position.left}px`,
@@ -94,25 +94,25 @@ export default function IdentityDropdown({
     >
       {/* User pill */}
       {signedOut ? (
-        <div className="px-4 py-3 border-b border-neutral-800">
-          <p className="font-semibold text-neutral-100">Not signed in</p>
-          <p className="text-[11px] text-neutral-500 leading-snug mt-0.5">
+        <div className="px-4 py-3 border-b border-[var(--border)]">
+          <p className="font-semibold text-[var(--ink)]">Not signed in</p>
+          <p className="text-[11px] text-[var(--muted)] leading-snug mt-0.5">
             Boosts you send are anonymous, and none of them post to Nostr.
           </p>
         </div>
       ) : (
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-neutral-800">
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border)]">
           <AvatarPill profile={profile} npub={npub} size={36} />
           <div className="min-w-0 flex-1">
-            <p className="font-semibold text-neutral-100 truncate">{displayName}</p>
-            <p className="text-[11px] text-neutral-500 font-mono truncate">{truncatedNpub}</p>
+            <p className="font-semibold text-[var(--ink)] truncate">{displayName}</p>
+            <p className="text-[11px] text-[var(--muted)] font-mono truncate">{truncatedNpub}</p>
           </div>
         </div>
       )}
 
       {/* Wallet section */}
-      <div className="px-4 py-3 border-b border-neutral-800 space-y-2">
-        <p className="text-[11px] text-neutral-500 uppercase tracking-wide">⚡ Lightning Wallet</p>
+      <div className="px-4 py-3 border-b border-[var(--border)] space-y-2">
+        <p className="text-[11px] text-[var(--muted)] uppercase tracking-wide">⚡ Lightning Wallet</p>
         {/* `remembered` = a browser extension this user already enabled here,
             still installed, not yet engaged this page load (we no longer prod
             it before the user asks — see wallet.prewarm). It engages on the
@@ -120,8 +120,8 @@ export default function IdentityDropdown({
             user re-connect something they never disconnected. */}
         {walletStatus.connected || walletStatus.remembered ? (
           <>
-            <p className="text-xs text-neutral-300 truncate">
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5 align-middle" />
+            <p className="text-xs text-[var(--ink)] truncate">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-[var(--ok)] mr-1.5 align-middle" />
               {walletKindLabel(walletStatus)}
             </p>
             {/* Said once, here, where the user can act on it. A saved
@@ -133,7 +133,7 @@ export default function IdentityDropdown({
                 hold — so the second string is not a copy of the first with
                 the sign-in cut off; it names a different next step. */}
             {walletStatus.sessionOnly && (
-              <p className="text-[11px] text-amber-400/90 leading-snug">
+              <p className="text-[11px] text-[var(--warn)] leading-snug">
                 {signedOut
                   ? 'This tab only — sign in with Nostr to save it.'
                   : 'This tab only — reconnect now to save it to your account.'}
@@ -150,7 +150,7 @@ export default function IdentityDropdown({
                 type="button"
                 role="menuitem"
                 onClick={() => { onClose(); onConnectWallet() }}
-                className="w-full px-3 py-2 rounded bg-orange-500 hover:bg-orange-600 text-xs font-medium text-white transition-colors"
+                className="w-full px-3 py-2 rounded-lg bg-[var(--brand)] hover:bg-[var(--brand-d)] text-xs font-medium text-white transition-colors"
               >
                 Reconnect to save it
               </button>
@@ -159,19 +159,19 @@ export default function IdentityDropdown({
               type="button"
               role="menuitem"
               onClick={() => { onClose(); onDisconnectWallet() }}
-              className="w-full px-3 py-2 rounded border border-neutral-700 bg-transparent text-xs font-medium text-neutral-300 hover:bg-red-500/10 hover:border-red-500/40 hover:text-red-300 transition-colors"
+              className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-transparent text-xs font-medium text-[var(--ink)] hover:bg-[rgba(179,38,30,0.08)] hover:border-[var(--danger)] hover:text-[var(--danger)] transition-colors"
             >
               Disconnect wallet
             </button>
           </>
         ) : (
           <>
-            <p className="text-xs text-neutral-500">Not connected</p>
+            <p className="text-xs text-[var(--muted)]">Not connected</p>
             <button
               type="button"
               role="menuitem"
               onClick={() => { onClose(); onConnectWallet() }}
-              className="w-full px-3 py-2 rounded bg-orange-500 hover:bg-orange-600 text-xs font-medium text-white transition-colors"
+              className="w-full px-3 py-2 rounded-lg bg-[var(--brand)] hover:bg-[var(--brand-d)] text-xs font-medium text-white transition-colors"
             >
               Connect Lightning Wallet
             </button>
@@ -186,8 +186,8 @@ export default function IdentityDropdown({
           that window — the casual user has the same opacity
           Podcasting 2.0 ships with: click and trust. */}
       {pending.length > 0 && (
-        <div className="px-4 py-3 border-b border-neutral-800 space-y-2">
-          <p className="text-[11px] text-neutral-500 uppercase tracking-wide">In Progress</p>
+        <div className="px-4 py-3 border-b border-[var(--border)] space-y-2">
+          <p className="text-[11px] text-[var(--muted)] uppercase tracking-wide">In Progress</p>
           <ul className="space-y-1.5">
             {pending.map((p) => {
               // `kind: 'show'` is set by BoostModal so a site-wide
@@ -202,7 +202,7 @@ export default function IdentityDropdown({
               return (
                 <li key={p.sessionId} className="text-xs">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-neutral-300 truncate">
+                    <span className="text-[var(--ink)] truncate">
                       {epLabel} · {p.totalSats.toLocaleString()} sats
                     </span>
                     <BoostStatusBadge status={p.status} />
@@ -223,11 +223,11 @@ export default function IdentityDropdown({
             type="button"
             role="menuitem"
             onClick={() => { onClose(); onSignIn?.() }}
-            className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded bg-orange-500 hover:bg-orange-600 text-xs font-medium text-white transition-colors"
+            className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-[var(--brand)] hover:bg-[var(--brand-d)] text-xs font-medium text-white transition-colors"
           >
             Sign in with Nostr
           </button>
-          <p className="mt-2 text-[11px] text-neutral-500 leading-snug">
+          <p className="mt-2 text-[11px] text-[var(--muted)] leading-snug">
             Signing in lets you post your boosts to Nostr, and a wallet you
             connect after that is remembered.
           </p>
@@ -238,7 +238,7 @@ export default function IdentityDropdown({
           type="button"
           role="menuitem"
           onClick={() => { onClose(); onSignOut() }}
-          className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded border border-neutral-700 bg-transparent text-xs font-medium text-neutral-300 hover:bg-red-500/10 hover:border-red-500/40 hover:text-red-300 transition-colors"
+          className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-[var(--border)] bg-transparent text-xs font-medium text-[var(--ink)] hover:bg-[rgba(179,38,30,0.08)] hover:border-[var(--danger)] hover:text-[var(--danger)] transition-colors"
         >
           <svg
             width="13"
@@ -304,15 +304,15 @@ function BoostStatusBadge({ status }) {
   // above.
   if (status === 'in-flight') {
     return (
-      <span className="text-orange-400 text-[10px] flex-shrink-0 inline-flex items-center gap-1">
-        <span className="inline-block w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" aria-hidden="true" />
+      <span className="text-[var(--brand-d)] text-[10px] flex-shrink-0 inline-flex items-center gap-1">
+        <span className="inline-block w-1.5 h-1.5 rounded-full bg-[var(--brand)] animate-pulse" aria-hidden="true" />
         Sending…
       </span>
     )
   }
   if (status === 'paid') {
     return (
-      <span className="text-green-400 text-[10px] flex-shrink-0 inline-flex items-center gap-1">
+      <span className="text-[var(--ok)] text-[10px] flex-shrink-0 inline-flex items-center gap-1">
         <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M3 8.5l3.5 3.5L13 5" />
         </svg>
@@ -322,16 +322,16 @@ function BoostStatusBadge({ status }) {
   }
   if (status === 'partial') {
     return (
-      <span className="text-amber-400 text-[10px] flex-shrink-0 inline-flex items-center gap-1">
-        <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500" aria-hidden="true" />
+      <span className="text-[var(--warn)] text-[10px] flex-shrink-0 inline-flex items-center gap-1">
+        <span className="inline-block w-1.5 h-1.5 rounded-full bg-[var(--warn)]" aria-hidden="true" />
         Partial
       </span>
     )
   }
   if (status === 'failed') {
     return (
-      <span className="text-red-400 text-[10px] flex-shrink-0 inline-flex items-center gap-1">
-        <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500" aria-hidden="true" />
+      <span className="text-[var(--danger)] text-[10px] flex-shrink-0 inline-flex items-center gap-1">
+        <span className="inline-block w-1.5 h-1.5 rounded-full bg-[var(--danger)]" aria-hidden="true" />
         Failed
       </span>
     )

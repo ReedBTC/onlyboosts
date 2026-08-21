@@ -108,7 +108,20 @@ function uuid4() {
  * sats out one at a time to the largest-weight legs so rounding never starves
  * the biggest recipient.
  */
-function distributeSats(totalSats, recipients, totalWeight) {
+/**
+ * The split, computed with no network and no wallet. Exported because the modal
+ * needs to know **before paying** how many legs will actually be attempted, so
+ * it can pre-sign a note whose figures are right for the clean case.
+ *
+ * ⚠️ THE REMAINDER LOOP IS WHAT MAKES THAT SOUND. Every leg floors, then the
+ * shortfall is handed back a sat at a time, so the legs sum to `totalSats`
+ * exactly. A leg allocated zero is SKIPPED and contributes zero. Therefore **if
+ * every attempted leg pays, `paidSats === totalSats`** — which is the identity a
+ * pre-signed note stakes itself on. Change the rounding here and that note
+ * silently starts overstating; the caller re-checks the equality before
+ * publishing, and that check is the guard, not this comment.
+ */
+export function distributeSats(totalSats, recipients, totalWeight) {
   const legs = recipients.map((r, index) => ({
     recipient: r,
     index,

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import AvatarPill from './AvatarPill.jsx'
+import LoginButton from './LoginButton.jsx'
 import IdentityDropdown from './IdentityDropdown.jsx'
 import { onIdentityOpenRequest } from '../lib/identitySignal.js'
 
@@ -68,7 +69,7 @@ export default function IdentityWidget({
   if (user === undefined) {
     return (
       <div
-        className="inline-block w-7 h-7 rounded-full bg-neutral-700 animate-pulse"
+        className="inline-block w-7 h-7 rounded-full bg-white/20 animate-pulse"
         aria-label="Loading account"
       />
     )
@@ -79,17 +80,14 @@ export default function IdentityWidget({
   // swap to the React button is invisible. Defers visually to the
   // orange "Boost the Show" CTA next to it.
   if (user === null && !walletStatus?.connected) {
-    return (
-      <button
-        type="button"
-        onClick={onSignInClick}
-        className="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium border border-white/20 bg-white/[0.08] hover:bg-white/[0.16] hover:border-white/[0.34] transition-colors"
-        style={{ color: '#f5eedc' }}
-        aria-label="Sign in with Nostr"
-      >
-        Sign in
-      </button>
-    )
+    // ⚠️ THE SAME CONTROL THE BOOST MODAL OFFERS, in its nav skin. A visitor
+    // meets it here and then again inside the boost modal, and if those read as
+    // two different things the second one is a stranger asking for an account
+    // at the moment they are about to spend money. `LoginButton` owns both
+    // skins; the word is "Log in" and the mark is the site's own favicon,
+    // because this is logging into OnlyBoosts as far as the reader is
+    // concerned. What it opens is unchanged.
+    return <LoginButton variant="nav" onClick={onSignInClick} />
   }
 
   // ── Logged out, wallet connected ─────────────────────────────────

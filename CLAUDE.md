@@ -577,6 +577,48 @@ stylesheets** so a page's own inline `<style>` still wins.
 the `body[data-active-feed]` mapping. `assets/css/page.css` is the counterpart
 for the plain content pages (`.page-header`, `.soon-card`).
 
+### The Widget Wears The Site's Palette
+
+**The login/boost widget is a fork of LB's and wore LB's dark palette until
+2026-08-21** — `bg-neutral-900`, `border-neutral-700`, `text-orange-500` on every
+primary button. OnlyBoosts is light, so pressing Boost took the reader out of the
+site's visual world entirely. It is now on the site's own tokens.
+
+**⚠️ THE TOKENS ARE READ, NOT COPIED.** `theme.css` defines the palette on
+`:root`, the widget mounts into that same document through a portal, and Tailwind
+runs there with **preflight off**, so `bg-[var(--surface)]` works with no config
+change. Never hardcode a hex into JSX; the palette has one source.
+
+`theme.css` carries a block for exactly this: `--brand-tint`, `--brand-ring`,
+`--ok`, `--warn`, `--danger`, `--scrim`, `--font-display`, `--font-body`.
+
+**⚠️ THE THREE STATE COLOURS WERE RE-PICKED, NOT RE-TONED.** Amber is
+`UNCERTAIN` and red is `FAILED`, and the whole double-pay guard rests on a donor
+telling them apart at a glance: one may be re-paid and the other may never be.
+The dark theme's `amber-400` and `red-400` are near-identical on cream. `--warn`
+is a burnt orange and `--danger` a true red, different in hue as well as value.
+`--warn` is also deliberately outside the brand family, since brand is cyan and
+"warning" must not read as "in progress".
+
+**⚠️ A TAILWIND ARBITRARY VALUE TAILWIND CANNOT CLASSIFY EMITS THE WRONG
+PROPERTY, SILENTLY.** `font-[var(--font-display)]` compiled to
+`font-weight: var(--font-display)` — it cannot tell a family from a weight in a
+bare `font-[…]`, so it guessed, and the browser dropped the declaration. Every
+heading was in the default sans while every class name in the markup looked
+right. The fix is the type hint, `font-[family-name:var(--font-display)]`, and
+the same trap sits on `ring-`, `text-` and `bg-` wherever a value could be read
+as a length or a colour. **`scripts/test-boost-modal-render.mjs` now asserts
+against the BUILT BUNDLE** that each token produces a real declaration, because
+nothing else about this failure is visible.
+
+**Two surfaces stay dark on purpose**: `IdentityWidget`'s pill and
+`BoostButton`, which sit on the navy nav bar rather than on a modal.
+
+**Known and deliberately not changed:** `boosts-thread.css` and
+`boost-actions.css` still tint hover states with `rgba(247,147,26,…)`, LB's
+bitcoin orange. Those are the site's own reaction bars, not the widget, and they
+were out of scope for the widget restyle.
+
 `assets/css/feed-cards.css` holds the **episode card and everything that hangs
 off it** — the range/sort controls, the card, the boost drawer, the inline boost
 thread, the copy toast, `.ob-stats-label` and `.feed-placeholder`. Every rule in
@@ -1024,6 +1066,28 @@ its own scope**: *Boost privately (no Nostr note)*, never a bare *Boost
 privately*. The sats and the message still cross Lightning to the show's own
 app, which is the half the word "privately" does not cover.
 
+**⚠️ THE DONOR'S SIGNATURE IS TAKEN AT THE PRESS, NOT AFTER THE PAYMENT.**
+Auto-publishing at the end put an approval dialog on screen up to a minute after
+the donor thought they were finished, with nothing having asked for it. So the
+donor route now **pre-signs**: `presignNote` runs inside `startPay`, before the
+first leg, and the two prompts arrive back to back the way a checkout does.
+
+**⚠️ AND IT DOES NOT REOPEN THE PHASE 0 BUG, BECAUSE OF ONE IDENTITY.**
+`distributeSats` floors every leg then hands the remainder back a sat at a time,
+so **the legs it will attempt sum to exactly the typed amount** (a leg allocated
+zero is skipped and contributes zero). A note signed in advance for the full
+amount, with no shortfall line, is therefore precisely correct in exactly one
+case: every attempted leg pays. **The publish step re-checks that identity —
+`pre.sats === paidSats && pre.legs === activeCount` — and discards the
+pre-signed note if it does not hold**, falling back to the button, which signs
+fresh against live leg state. Change the rounding in `distributeSats` and that
+check is what catches it, not this paragraph.
+
+Nothing about pre-signing is allowed to be fatal: a declined prompt, a signer
+timeout or a dismissed extension all leave `presignedRef` null, the boost
+proceeds regardless, and the done screen offers the press. **A boost must never
+fail because a note could not be signed.**
+
 **⚠️ A CLEAN BOOST PUBLISHES ITS NOTE BY ITSELF, ON BOTH ROUTES.** The press
 survived on the donor path for one day, on the argument that a signer prompt has
 to be asked for. Reed's correction, 2026-08-21: *"shouldn't the opt-in to share
@@ -1040,9 +1104,35 @@ decision. The withhold-while-checking rule is untouched and `shareState` still
 latches at `shared`, so **one boost still publishes at most one note**.
 
 **⚠️ ON THE DONOR ROUTE THE WAITING COPY IS AN INSTRUCTION, NOT A STATUS**:
-*Approve this in your signer to post it to Nostr…* Nothing was pressed, so the
-prompt arrives with no obvious cause, and a donor who does not know to go and
-approve it will just watch it time out.
+*Approve this in your signer to post it to Nostr…* It is reached only when the
+pre-sign did not happen or its figures no longer hold, so nothing was pressed
+and the prompt arrives with no obvious cause.
+
+**The form's other three controls**, all 2026-08-21 and all Reed's calls: the
+amount **ships empty** with four presets (420 / 2100 / 3333 / 6969) rather than
+prefilled at 1000, which is a number nobody chose and a donor in a hurry sends
+by accident; the note checkbox reads **Private Boost** / *Do not share to
+Nostr*; and the `From` field carries **five password-manager opt-out
+attributes**, because `autoComplete="off"` is not one — LastPass ignores it
+outright and was offering to fill it, and several managers match on the token in
+the `id` before they read anything else.
+
+**⚠️ THE LOGIN CONTROL IS ONE COMPONENT IN TWO SKINS**, `LoginButton.jsx`:
+`nav` on the navy bar and `checkout` inside the boost modal. A visitor meets it
+in the nav and again inside the modal, and if those read as two different things
+the second is a stranger asking for an account at the moment they are about to
+spend money. **It says "Log in" and shows the site's favicon, never the word
+Nostr** — the same vocabulary rule the `From` field and `Private Boost` follow.
+In the modal it is the **express-checkout shape**, offered under a divider
+*below* the name field: an alternative, not a gate, because the boost works
+without ever pressing it and putting it first would make an account look
+required.
+
+**⚠️ `nav-widget-boot.js`'s STATIC PLACEHOLDER AND `LoginButton`'s NAV SKIN MUST
+MATCH TO THE PIXEL.** The React button replaces that element in place once the
+1MB bundle lands, so any drift is a visible jump on every page load. The
+placeholder's mark, word, padding, radius and type size are all pinned to it in
+`nav.css` with a note saying so.
 
 **⚠️ A BLANK "From" IS REPLACED, NOT OMITTED.** `DEFAULT_SENDER_NAME` is
 `onlyboosts.social user`, and it fills the boostagram's `sender_name` only. An

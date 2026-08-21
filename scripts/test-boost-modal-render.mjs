@@ -129,4 +129,58 @@ const REGRESSION = `export default function Thing() {
   ok('a binding named in a comment above itself is not a use')
 }
 
+// ─── The theme actually reaches the page ───────────────────────────────────
+/**
+ * ⚠️ A TAILWIND ARBITRARY VALUE THAT TAILWIND CANNOT CLASSIFY EMITS THE WRONG
+ * PROPERTY, SILENTLY, AND THE BUILD SAYS NOTHING. Caught while shipping the
+ * light theme: `font-[var(--font-display)]` compiled to
+ * `font-weight: var(--font-display)` — Tailwind cannot tell a family from a
+ * weight in a bare `font-[…]`, guessed weight, and produced a declaration the
+ * browser then ignored. Every heading was in the default sans and every class
+ * name in the markup looked correct. `font-[family-name:var(--font-display)]`
+ * is the fix, and the same trap sits on `ring-`, `text-` and `bg-` wherever a
+ * value could be read as a length or a colour.
+ *
+ * So the check is on the OUTPUT, not the source: for each token the modals
+ * depend on, assert the built bundle carries a rule that actually sets it.
+ * The CSS is injected as a JS string, so its selector escapes are doubled;
+ * matching on the declaration side avoids that entirely.
+ */
+console.log('\nThe themed classes emit real CSS:')
+{
+  const bundle = readFileSync(new URL('../assets/widgets/login-widget.js', import.meta.url), 'utf8')
+  const REQUIRED = [
+    'background-color:var(--surface)',
+    'background-color:var(--cream)',
+    'background-color:var(--brand)',
+    'background-color:var(--brand-tint)',
+    'background-color:var(--scrim)',
+    'color:var(--ink)',
+    'color:var(--muted)',
+    'color:var(--ok)',
+    'color:var(--warn)',
+    'color:var(--danger)',
+    'border-color:var(--border)',
+    'accent-color:var(--brand)',
+    // The two that were wrong. Family, not weight; ring COLOUR, not width.
+    'font-family:var(--font-display)',
+    '--tw-ring-color: var(--brand-ring)',
+  ]
+  const missing = REQUIRED.filter((d) => !bundle.includes(d))
+  assert.deepEqual(missing, [], `the built widget emits no rule for:\n  ${missing.join('\n  ')}`)
+  ok(`${REQUIRED.length} declarations present in the built bundle`)
+
+  // And the wrong-property version must not come back.
+  assert.equal(bundle.includes('font-weight:var(--font-display)'), false,
+    'font-[var(--font-display)] is compiling to font-weight again — it needs the family-name hint')
+  ok('no token is being applied as the wrong property')
+
+  // ⚠️ The bundle is a build artifact. If it is stale the two assertions above
+  // pass against yesterday's CSS, so the source is checked to agree with it.
+  const src = readFileSync(new URL('../login-widget/src/components/ExternalBoostModal.jsx', import.meta.url), 'utf8')
+  assert.equal(/\bbg-neutral-|\btext-neutral-|\bbg-orange-|\btext-amber-400\b/.test(src), false,
+    'ExternalBoostModal still carries dark-theme classes — was the widget rebuilt?')
+  ok('the boost modal carries no dark-theme classes')
+}
+
 console.log(`\n${passed} assertions passed.\n`)

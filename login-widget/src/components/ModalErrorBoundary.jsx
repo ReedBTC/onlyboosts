@@ -53,23 +53,23 @@ export default class ModalErrorBoundary extends Component {
     if (!this.state.failed) return this.props.children
     return (
       <>
-        <div className="fixed inset-0 bg-black/70 z-[70]" aria-hidden="true" />
+        <div className="fixed inset-0 bg-[var(--scrim)] z-[70]" aria-hidden="true" />
         <div className="fixed inset-0 z-[71] flex items-center justify-center p-3" role="dialog" aria-label="Something went wrong">
-          <div className="bg-neutral-900 border border-neutral-700 rounded-lg w-full max-w-sm p-5 space-y-3 shadow-[0_25px_60px_-12px_rgba(0,0,0,0.8)]">
-            <h2 className="text-sm font-semibold text-neutral-200">Something went wrong on this screen</h2>
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg w-full max-w-sm p-5 space-y-3 shadow-[0_24px_60px_-12px_rgba(11,58,82,0.28)]">
+            <h2 className="text-base font-semibold text-[var(--ink)] font-[family-name:var(--font-display)]">Something went wrong on this screen</h2>
             {/* ⚠️ Never "your boost failed". This boundary cannot know: the
                 component's state died with it, and the payment may well have
                 gone through. Pointing at the wallet is the only honest
                 instruction, and "don't re-send" is the same double-pay guard
                 the UNCERTAIN leg state carries. */}
-            <p className="text-xs text-neutral-400 leading-relaxed">
+            <p className="text-xs text-[var(--muted)] leading-relaxed">
               If you had already pressed Boost, check your wallet before sending anything
               again. The payment may have gone through even though this screen didn’t
               finish.
             </p>
             <button
               onClick={() => this.props.onClose?.()}
-              className="w-full py-2.5 rounded bg-neutral-700 hover:bg-neutral-600 text-sm text-neutral-200 transition-colors">
+              className="w-full py-2.5 rounded-lg bg-[var(--cream-d)] hover:bg-[var(--border)] text-sm text-[var(--ink)] transition-colors">
               Close
             </button>
           </div>

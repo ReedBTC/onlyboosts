@@ -65,6 +65,39 @@ html, body { overflow-x: hidden; max-width: 100vw; }
   /* Preferred names for anything written from here on. */
   --ink:     #0f2733;
   --surface: #ffffff;
+
+  /* ── The widget's palette ─────────────────────────────────────
+     The login/boost widget is a React bundle mounted into this page
+     through a portal, so it inherits :root and can read these
+     directly rather than hardcoding hexes into JSX. That is the whole
+     reason it can be themed at all: Tailwind runs there with preflight
+     off, so `bg-[var(--surface)]` works with no config change.
+
+     ⚠️ THE THREE STATE COLOURS ARE LOAD-BEARING ON THE BOOST PATH, and
+     they were re-picked rather than re-toned for a light surface.
+     Amber is UNCERTAIN and red is FAILED, and the whole double-pay
+     guard rests on a donor telling them apart at a glance: one may be
+     re-paid and the other may never be. The dark theme's amber-400 and
+     red-400 are near-identical on cream. These are a burnt orange and
+     a true red, different in hue as well as in value.
+
+     --warn is also deliberately NOT --brand's family. Brand is cyan,
+     so "warning" cannot be allowed to read as "in progress". */
+  /* The two families, as tokens, so the widget can reach them. It mounts into
+     this page through a portal but styles itself with Tailwind classes, and a
+     modal set in the browser's default sans is the loudest single signal that
+     it is a different product's UI. */
+  --font-display: 'Playfair Display', Georgia, serif;
+  --font-body:    'Source Serif 4', Georgia, serif;
+
+  --brand-tint: rgba(0, 175, 240, 0.12);
+  --brand-ring: rgba(0, 175, 240, 0.32);
+  --ok:         #0b7a4b;
+  --warn:       #b45309;
+  --danger:     #b3261e;
+  /* Modal scrim: navy rather than black, so the dimmed page behind a
+     modal stays in the site's own colour world. */
+  --scrim:      rgba(11, 58, 82, 0.55);
 }
 
 html { scroll-behavior: smooth; }

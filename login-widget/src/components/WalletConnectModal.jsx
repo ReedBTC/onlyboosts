@@ -87,7 +87,7 @@ export default function WalletConnectModal({ user, onClose, onConnected, onReque
   return (
     <>
       <div
-        className={`fixed inset-0 bg-black/70 z-[78] transition-opacity duration-200 ${visible ? 'opacity-100' : 'opacity-0'}`}
+        className={`fixed inset-0 bg-[var(--scrim)] z-[78] transition-opacity duration-200 ${visible ? 'opacity-100' : 'opacity-0'}`}
         aria-hidden="true"
       />
 
@@ -96,15 +96,15 @@ export default function WalletConnectModal({ user, onClose, onConnected, onReque
         role="dialog"
         aria-label="Connect Lightning Wallet"
       >
-        <div className={`bg-neutral-900 border border-neutral-700 rounded-lg w-full max-w-sm flex flex-col shadow-[0_25px_60px_-12px_rgba(0,0,0,0.8),0_0_0_1px_rgba(255,255,255,0.04)] my-4 sm:my-8 transition-[opacity,transform] duration-200 ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}>
+        <div className={`bg-[var(--surface)] border border-[var(--border)] rounded-lg w-full max-w-sm flex flex-col shadow-[0_24px_60px_-12px_rgba(11,58,82,0.28),0_0_0_1px_rgba(11,58,82,0.06)] my-4 sm:my-8 transition-[opacity,transform] duration-200 ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}>
 
           {/* Header */}
-          <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-neutral-800">
-            <h2 className="text-sm font-semibold text-neutral-200">⚡ Connect Lightning Wallet</h2>
+          <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-[var(--border)]">
+            <h2 className="text-base font-semibold text-[var(--ink)] font-[family-name:var(--font-display)]">⚡ Connect Lightning Wallet</h2>
             <button
               onClick={requestClose}
               disabled={connecting}
-              className="text-neutral-500 hover:text-neutral-300 transition-colors text-lg leading-none disabled:opacity-30"
+              className="text-[var(--muted)] hover:text-[var(--ink)] transition-colors text-lg leading-none disabled:opacity-30"
               aria-label="Close"
             >
               ✕
@@ -112,7 +112,7 @@ export default function WalletConnectModal({ user, onClose, onConnected, onReque
           </div>
 
           <div className="px-4 sm:px-6 py-5 space-y-4 flex-1">
-            <p className="text-xs text-neutral-400 leading-snug">
+            <p className="text-xs text-[var(--muted)] leading-snug">
               Connect a Lightning wallet to enable one-tap boosts on
               the show and on every episode (each episode boost pays
               all of its split recipients in one shot).
@@ -124,12 +124,12 @@ export default function WalletConnectModal({ user, onClose, onConnected, onReque
                 connection is encrypted to the user's own Nostr key, and
                 a signed-out visitor hasn't got one. */}
             {!user && (
-              <div className="rounded border border-neutral-800 bg-neutral-800/40 px-3 py-2.5 space-y-1.5">
-                <p className="text-[11px] text-neutral-300 leading-snug">
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--cream)] px-3 py-2.5 space-y-1.5">
+                <p className="text-[11px] text-[var(--ink)] leading-snug">
                   You're not signed in with Nostr, so this connection lasts
                   until you close the tab. You can boost with it right away.
                 </p>
-                <p className="text-[10px] text-neutral-500 leading-snug">
+                <p className="text-[10px] text-[var(--muted)] leading-snug">
                   Saved connections are encrypted to your Nostr key, so
                   remembering one needs an account.
                 </p>
@@ -138,7 +138,7 @@ export default function WalletConnectModal({ user, onClose, onConnected, onReque
                     type="button"
                     onClick={onRequestSignIn}
                     disabled={connecting}
-                    className="text-[11px] font-medium text-orange-400 hover:text-orange-300 disabled:opacity-40 transition-colors"
+                    className="text-[11px] font-medium text-[var(--brand-d)] hover:text-[var(--brand-dd)] disabled:opacity-40 transition-colors"
                   >
                     Sign in with Nostr first
                   </button>
@@ -154,36 +154,36 @@ export default function WalletConnectModal({ user, onClose, onConnected, onReque
                 <button
                   onClick={handleConnectWebln}
                   disabled={connecting}
-                  className="w-full inline-flex items-center justify-center gap-2 py-3 rounded bg-orange-500 hover:bg-orange-600 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium text-white transition-colors"
+                  className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-lg bg-[var(--brand)] hover:bg-[var(--brand-d)] disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium text-white transition-colors"
                 >
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                     <path fillRule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clipRule="evenodd"/>
                   </svg>
                   {connecting ? 'Connecting…' : 'Use my browser extension'}
                 </button>
-                <p className="text-[10px] text-neutral-600 leading-snug -mt-2">
+                <p className="text-[10px] text-[var(--muted)] leading-snug -mt-2">
                   Detected a Lightning extension (Alby, Mutiny, etc.) —
                   one tap to enable, no copy/paste required.
                 </p>
 
                 <div className="flex items-center gap-3 my-1">
-                  <div className="flex-1 h-px bg-neutral-800" />
-                  <span className="text-[10px] uppercase tracking-wider text-neutral-600">or</span>
-                  <div className="flex-1 h-px bg-neutral-800" />
+                  <div className="flex-1 h-px bg-[var(--cream)]" />
+                  <span className="text-[10px] uppercase tracking-wider text-[var(--muted)]">or</span>
+                  <div className="flex-1 h-px bg-[var(--cream)]" />
                 </div>
               </>
             )}
 
             <div>
-              <label className="block text-xs text-neutral-400 mb-1.5">NWC connection string</label>
+              <label className="block text-xs text-[var(--muted)] mb-1.5">NWC connection string</label>
               <textarea
                 value={uri}
                 onChange={e => setUri(e.target.value)}
                 rows={3}
                 placeholder="nostr+walletconnect://…"
-                className="w-full bg-neutral-800 border border-neutral-700 rounded px-3 py-2 text-xs text-neutral-100 font-mono focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30"
+                className="w-full bg-[var(--cream)] border border-[var(--border)] rounded-lg px-3 py-2 text-xs text-[var(--ink)] font-mono focus:outline-none focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--brand-ring)]"
               />
-              <p className="mt-1.5 text-[10px] text-neutral-600 leading-snug">
+              <p className="mt-1.5 text-[10px] text-[var(--muted)] leading-snug">
                 Cross-device option. Get a connection string from Alby
                 Hub, Primal, Mutiny, Coinos, or any wallet that
                 supports NIP-47. {user
@@ -193,13 +193,13 @@ export default function WalletConnectModal({ user, onClose, onConnected, onReque
             </div>
 
             {error && (
-              <p className="text-xs text-red-400">{error}</p>
+              <p className="text-xs text-[var(--danger)]">{error}</p>
             )}
 
             <button
               onClick={handleConnect}
               disabled={connecting}
-              className="w-full py-3 rounded bg-neutral-800 border border-neutral-700 hover:bg-neutral-700 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium text-neutral-200 transition-colors"
+              className="w-full py-3 rounded-lg bg-[var(--cream)] border border-[var(--border)] hover:bg-[var(--cream-d)] disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium text-[var(--ink)] transition-colors"
             >
               {connecting ? 'Connecting…' : 'Connect via NWC'}
             </button>
