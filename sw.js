@@ -424,7 +424,9 @@
 // ignores. Those endpoints are network-first now, with the cached copy as an
 // offline fallback only; /api/value is never cached at all, since a stale value
 // block is the one answer here that would move sats to a split the show no
-// longer publishes. /api/data/ keeps stale-while-revalidate: it is a 5-minute
+// longer publishes. /api/lnurl joined it in ob-v91 for a sharper version of the
+// same reason: it returns bolt11 invoices, and a cached invoice is one the
+// donor may already have paid. /api/data/ keeps stale-while-revalidate: it is a 5-minute
 // snapshot where instant paint is the right trade. REQUIRED: the bump renames
 // STATIC_CACHE, which is what drops the poisoned API entries a returning
 // visitor already holds; without it the fix reaches nobody currently affected.
@@ -468,7 +470,7 @@
 // session-only because the at-rest scheme encrypts the NWC URI to the user's
 // own signer. The widget bundle changed, so a returning visitor needs the new
 // URL.
-const VERSION = 'ob-v91';
+const VERSION = 'ob-v92';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;
@@ -500,27 +502,27 @@ const PRECACHE_URLS = [
   '/assets/onlyboosts_pfp.png',
   '/assets/onlyboosts_banner.png',
   '/assets/avatar-fallback.svg',
-  '/assets/css/theme.css?v=ob-v91',
-  '/assets/css/page.css?v=ob-v91',
-  '/assets/css/nav.css?v=ob-v91',
-  '/assets/css/footer.css?v=ob-v91',
-  '/assets/css/boosts-thread.css?v=ob-v91',
-  '/assets/css/boost-actions.css?v=ob-v91',
+  '/assets/css/theme.css?v=ob-v92',
+  '/assets/css/page.css?v=ob-v92',
+  '/assets/css/nav.css?v=ob-v92',
+  '/assets/css/footer.css?v=ob-v92',
+  '/assets/css/boosts-thread.css?v=ob-v92',
+  '/assets/css/boost-actions.css?v=ob-v92',
   // The episode card and its drawer. Precached alongside the others because the
   // homepage's feeds are painted in it and it used to be inline in index.html,
   // which IS precached — leaving it out would trade an inline block for a
   // network round trip on the one page this list exists to make fast.
-  '/assets/css/feed-cards.css?v=ob-v91',
-  '/assets/js/boosts-thread.js?v=ob-v91',
+  '/assets/css/feed-cards.css?v=ob-v92',
+  '/assets/js/boosts-thread.js?v=ob-v92',
   // A static import of boosts-thread.js, so precaching that without this one
   // leaves a returning visitor fetching half the graph from the network.
-  '/assets/js/primal-profiles.js?v=ob-v91',
-  '/assets/js/calendar-events.js?v=ob-v91',
-  '/assets/js/boost-actions.js?v=ob-v91',
-  '/assets/js/nav.js?v=ob-v91',
-  '/assets/js/nav-widget-boot.js?v=ob-v91',
-  '/assets/js/widget-loader.js?v=ob-v91',
-  '/assets/js/sw-register.js?v=ob-v91',
+  '/assets/js/primal-profiles.js?v=ob-v92',
+  '/assets/js/calendar-events.js?v=ob-v92',
+  '/assets/js/boost-actions.js?v=ob-v92',
+  '/assets/js/nav.js?v=ob-v92',
+  '/assets/js/nav-widget-boot.js?v=ob-v92',
+  '/assets/js/widget-loader.js?v=ob-v92',
+  '/assets/js/sw-register.js?v=ob-v92',
 ];
 
 self.addEventListener('install', (event) => {
@@ -574,10 +576,24 @@ function isLiveAPIRequest(url) {
   return url.pathname.startsWith('/api/') && !isSnapshotRequest(url);
 }
 
-// /api/value resolves value blocks, and a wrong answer moves sats. It gets no
-// cache in either direction: network or nothing.
-function isValueRequest(url) {
-  return url.pathname === '/api/value' || url.pathname.startsWith('/api/value/');
+// ⚠️ THE TWO MONEY ENDPOINTS GET NO CACHE IN EITHER DIRECTION: network or
+// nothing. Both would otherwise land in isLiveAPIRequest's network-first
+// bucket, which keeps a copy to serve when the network is down, and for these
+// two an offline answer is worse than no answer.
+//
+// /api/value resolves value blocks, and a stale one pays a split the show no
+// longer publishes.
+//
+// /api/lnurl hands back a BOLT11 INVOICE, which is single-use and expires. A
+// cached one offered again is an invoice the donor may already have paid or
+// that is long dead — the same double-pay shape Phase 0 spent a week closing,
+// arriving through the cache instead of through a button. Its metadata mode
+// would be harmless to cache, but one path serves both and the invoice is the
+// one that matters.
+function isUncacheableMoneyRequest(url) {
+  return url.pathname === '/api/value'
+    || url.pathname.startsWith('/api/value/')
+    || url.pathname === '/api/lnurl';
 }
 
 // Stale-while-revalidate helper: serve cached immediately if present,
@@ -635,7 +651,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (isLiveAPIRequest(url)) {
-    if (isValueRequest(url)) return; // network only, never cached
+    if (isUncacheableMoneyRequest(url)) return; // network only, never cached
     // Network-first: the response is the live state of the index, so a cached
     // copy is only ever the offline fallback. Cached in its own bucket so an
     // API answer can never be confused with a static asset.
