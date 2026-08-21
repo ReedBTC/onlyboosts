@@ -85,7 +85,7 @@ export default function IdentityDropdown({
       ref={menuRef}
       role="menu"
       aria-label="Account menu"
-      className="fixed z-[90] bg-[var(--modal-bg,#f4fafd)] border border-[var(--border,#cfe2ee)] rounded-lg shadow-[0_24px_60px_-12px_rgba(11,58,82,0.28),0_0_0_1px_rgba(11,58,82,0.06)] text-sm text-[var(--ink,#0f2733)] overflow-hidden"
+      className="fixed z-[90] bg-[var(--modal-bg,#f4fafd)] border border-[var(--modal-line,#b9d4e6)] rounded-lg shadow-[0_24px_60px_-12px_rgba(11,58,82,0.28),0_0_0_1px_rgba(11,58,82,0.06)] text-sm text-[var(--ink,#0f2733)] overflow-hidden"
       style={{
         top: `${position.top}px`,
         left: `${position.left}px`,
@@ -94,14 +94,14 @@ export default function IdentityDropdown({
     >
       {/* User pill */}
       {signedOut ? (
-        <div className="px-4 py-3 border-b border-[var(--border,#cfe2ee)]">
+        <div className="px-4 py-3 border-b border-[var(--modal-line,#b9d4e6)]">
           <p className="font-semibold text-[var(--ink,#0f2733)]">Not signed in</p>
           <p className="text-[11px] text-[var(--muted,#5a7488)] leading-snug mt-0.5">
             Boosts you send are anonymous, and none of them post to Nostr.
           </p>
         </div>
       ) : (
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border,#cfe2ee)]">
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--modal-line,#b9d4e6)]">
           <AvatarPill profile={profile} npub={npub} size={36} />
           <div className="min-w-0 flex-1">
             <p className="font-semibold text-[var(--ink,#0f2733)] truncate">{displayName}</p>
@@ -111,7 +111,7 @@ export default function IdentityDropdown({
       )}
 
       {/* Wallet section */}
-      <div className="px-4 py-3 border-b border-[var(--border,#cfe2ee)] space-y-2">
+      <div className="px-4 py-3 border-b border-[var(--modal-line,#b9d4e6)] space-y-2">
         <p className="text-[11px] text-[var(--muted,#5a7488)] uppercase tracking-wide">⚡ Lightning Wallet</p>
         {/* `remembered` = a browser extension this user already enabled here,
             still installed, not yet engaged this page load (we no longer prod
@@ -159,7 +159,7 @@ export default function IdentityDropdown({
               type="button"
               role="menuitem"
               onClick={() => { onClose(); onDisconnectWallet() }}
-              className="w-full px-3 py-2 rounded-lg border border-[var(--border,#cfe2ee)] bg-transparent text-xs font-medium text-[var(--ink,#0f2733)] hover:bg-[rgba(179,38,30,0.08)] hover:border-[var(--danger,#b3261e)] hover:text-[var(--danger,#b3261e)] transition-colors"
+              className="w-full px-3 py-2 rounded-lg border border-[var(--modal-line,#b9d4e6)] bg-transparent text-xs font-medium text-[var(--ink,#0f2733)] hover:bg-[rgba(179,38,30,0.08)] hover:border-[var(--danger,#b3261e)] hover:text-[var(--danger,#b3261e)] transition-colors"
             >
               Disconnect wallet
             </button>
@@ -186,7 +186,7 @@ export default function IdentityDropdown({
           that window — the casual user has the same opacity
           Podcasting 2.0 ships with: click and trust. */}
       {pending.length > 0 && (
-        <div className="px-4 py-3 border-b border-[var(--border,#cfe2ee)] space-y-2">
+        <div className="px-4 py-3 border-b border-[var(--modal-line,#b9d4e6)] space-y-2">
           <p className="text-[11px] text-[var(--muted,#5a7488)] uppercase tracking-wide">In Progress</p>
           <ul className="space-y-1.5">
             {pending.map((p) => {
@@ -238,7 +238,7 @@ export default function IdentityDropdown({
           type="button"
           role="menuitem"
           onClick={() => { onClose(); onSignOut() }}
-          className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-[var(--border,#cfe2ee)] bg-transparent text-xs font-medium text-[var(--ink,#0f2733)] hover:bg-[rgba(179,38,30,0.08)] hover:border-[var(--danger,#b3261e)] hover:text-[var(--danger,#b3261e)] transition-colors"
+          className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-[var(--modal-line,#b9d4e6)] bg-transparent text-xs font-medium text-[var(--ink,#0f2733)] hover:bg-[rgba(179,38,30,0.08)] hover:border-[var(--danger,#b3261e)] hover:text-[var(--danger,#b3261e)] transition-colors"
         >
           <svg
             width="13"

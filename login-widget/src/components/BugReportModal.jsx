@@ -162,11 +162,11 @@ export default function BugReportModal({ user, onClose }) {
         aria-label="Report a bug"
       >
         <div
-          className="bg-[var(--modal-bg,#f4fafd)] border border-[var(--border,#cfe2ee)] rounded-lg w-full max-w-lg flex flex-col max-h-[90vh] shadow-[0_24px_60px_-12px_rgba(11,58,82,0.28)]"
+          className="bg-[var(--modal-bg,#f4fafd)] border border-[var(--modal-line,#b9d4e6)] rounded-lg w-full max-w-lg flex flex-col max-h-[90vh] shadow-[0_24px_60px_-12px_rgba(11,58,82,0.28)]"
           onDragOver={e => e.preventDefault()}
           onDrop={onDrop}
         >
-          <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border,#cfe2ee)] shrink-0">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--modal-line,#b9d4e6)] shrink-0">
             <h2 className="text-base font-semibold text-[var(--ink,#0f2733)] font-[family-name:var(--font-display,Georgia,serif)]">🐛 Report a bug</h2>
             <button
               onClick={onClose}
@@ -218,7 +218,7 @@ export default function BugReportModal({ user, onClose }) {
                     placeholder="Your npub (optional — so we can follow up)"
                     spellCheck={false}
                     autoComplete="off"
-                    className="w-full bg-[var(--modal-field,#ffffff)] border border-[var(--border,#cfe2ee)] rounded-lg px-3 py-1.5 text-xs text-[var(--ink,#0f2733)] font-mono focus:outline-none focus:border-[var(--brand,#00aff0)] focus:ring-2 focus:ring-[var(--brand-ring,rgba(0,175,240,0.32))] placeholder:text-[var(--muted,#5a7488)]"
+                    className="w-full bg-[var(--modal-field,#ffffff)] border border-[var(--modal-line,#b9d4e6)] rounded-lg px-3 py-1.5 text-xs text-[var(--ink,#0f2733)] font-mono focus:outline-none focus:border-[var(--brand,#00aff0)] focus:ring-2 focus:ring-[var(--brand-ring,rgba(0,175,240,0.32))] placeholder:text-[var(--muted,#5a7488)]"
                   />
                 </div>
               )}
@@ -231,13 +231,13 @@ export default function BugReportModal({ user, onClose }) {
                   onPaste={onPaste}
                   rows={14}
                   spellCheck
-                  className="w-full bg-[var(--modal-field,#ffffff)] border border-[var(--border,#cfe2ee)] rounded-lg px-3 py-2 text-xs text-[var(--ink,#0f2733)] font-mono resize-y focus:outline-none focus:border-[var(--brand,#00aff0)] focus:ring-2 focus:ring-[var(--brand-ring,rgba(0,175,240,0.32))]"
+                  className="w-full bg-[var(--modal-field,#ffffff)] border border-[var(--modal-line,#b9d4e6)] rounded-lg px-3 py-2 text-xs text-[var(--ink,#0f2733)] font-mono resize-y focus:outline-none focus:border-[var(--brand,#00aff0)] focus:ring-2 focus:ring-[var(--brand-ring,rgba(0,175,240,0.32))]"
                   placeholder="Describe the bug…"
                 />
               </div>
 
-              <div className="px-4 py-3 border-t border-[var(--border,#cfe2ee)] shrink-0 flex items-center gap-2 flex-wrap">
-                <label className={`text-xs px-2.5 py-1.5 rounded-lg border border-[var(--border,#cfe2ee)] text-[var(--ink,#0f2733)] hover:bg-[var(--modal-inset,#e6f1f9)] cursor-pointer transition-colors ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
+              <div className="px-4 py-3 border-t border-[var(--modal-line,#b9d4e6)] shrink-0 flex items-center gap-2 flex-wrap">
+                <label className={`text-xs px-2.5 py-1.5 rounded-lg border border-[var(--modal-line,#b9d4e6)] text-[var(--ink,#0f2733)] hover:bg-[var(--modal-inset,#e6f1f9)] cursor-pointer transition-colors ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
                   {uploading ? 'Uploading…' : '📎 Attach image'}
                   <input
                     type="file"

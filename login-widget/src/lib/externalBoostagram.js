@@ -36,7 +36,7 @@ const APP_NAME = 'OnlyBoosts'
  * and this index both read as "what this note is about". A second one pointing
  * at a decoration would make that ambiguous.
  */
-export const BOOST_BANNER_URL = 'https://i.nostr.build/8dtrQIw6lr1Nikv0bmw2tJ.png'
+export const BOOST_BANNER_URL = 'https://i.nostr.build/iQ4vHJ88xTrGZ36eey9lWJ.png'
 
 /**
  * A typed "From" name, as it is allowed to appear in a note the BOT signs.

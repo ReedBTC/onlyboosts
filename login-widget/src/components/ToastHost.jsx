@@ -32,7 +32,7 @@ export default function ToastHost() {
               ? 'bg-[var(--modal-bg,#f4fafd)] border border-[var(--danger,#b3261e)]'
               : t.kind === 'success'
               ? 'bg-[var(--modal-bg,#f4fafd)] border border-[var(--ok,#0b7a4b)]'
-              : 'bg-[var(--modal-bg,#f4fafd)] border border-[var(--border,#cfe2ee)]'
+              : 'bg-[var(--modal-bg,#f4fafd)] border border-[var(--modal-line,#b9d4e6)]'
           }`}
         >
           <span className="flex-1 leading-snug">{t.message}</span>

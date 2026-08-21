@@ -632,6 +632,25 @@ full-bleed `#fff` rectangle over a dimmed page is the brightest thing on screen
 by a wide margin, which at modal size is glare rather than emphasis. The fields
 are the white now, which is also the right way round: white is where you type.
 
+**⚠️ AND THE WIDGET RESTORES `border-style` ITSELF, IN A SCOPED BASE LAYER.**
+Tailwind's `border` utility sets `border-width` and nothing else; the
+`border-style: solid` comes from **preflight**, which is off here so the bundle
+cannot reset the host page. So `border-width: 1px` sat over CSS's initial
+`border-style: none` and **every border in the widget drew nothing** —
+`border-style` appeared nowhere in the built bundle at all. It survived the dark
+theme because those surfaces differ by *fill*: a `#171717` panel on `#0a0a0a`
+reads as an edge whether or not a line exists. On the light theme the borders
+carry all the definition, so their absence flattened every modal into one pale
+rectangle. `login-widget/src/styles.css` puts it back, keyed on the border
+utility class names, which are safe to select globally **only because Tailwind
+scans `./src/**` alone and the site styles itself with semantic classes.** If
+the site ever adopts Tailwind, scope it. The test asserts the bundle carries
+`border-style:solid`.
+
+**⚠️ `--modal-line` IS A STEP DARKER THAN `--border`, and it earns the extra
+token.** `--border` was drawn for cards on the cream *page*; inside a modal every
+surface is within a few percent of every other, so the same line disappears.
+
 **⚠️ TWO TAILWIND SHAPES FAIL SILENTLY HERE AND BOTH HAVE BITTEN.**
 
 *An arbitrary value Tailwind cannot classify emits the wrong property.* `font-[var(--font-display)]` compiled to

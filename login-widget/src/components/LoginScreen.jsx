@@ -650,19 +650,24 @@ export default function LoginScreen({ onLogin, embedded = false }) {
           inputMode="text"
           autoCapitalize="none"
           autoCorrect="off"
-          className="w-full px-4 py-3 rounded-lg bg-[var(--modal-bg,#f4fafd)] border border-[var(--border,#cfe2ee)] text-[var(--ink,#0f2733)] placeholder-[var(--muted,#5a7488)] focus:outline-none focus:border-[var(--brand,#00aff0)] focus:ring-2 focus:ring-[var(--brand-ring,rgba(0,175,240,0.32))] font-mono text-sm"
+          className="w-full px-4 py-3 rounded-lg bg-[var(--modal-field,#ffffff)] border border-[var(--modal-line,#b9d4e6)] text-[var(--ink,#0f2733)] placeholder-[var(--muted,#5a7488)] focus:outline-none focus:border-[var(--brand,#00aff0)] focus:ring-2 focus:ring-[var(--brand-ring,rgba(0,175,240,0.32))] font-mono text-sm"
           aria-label="Nostr nsec input"
         />
       </div>
 
-      <p className="text-xs text-[var(--warn,#b45309)] leading-relaxed">
+      {/* ⚠️ NOT `--warn`. This is reassurance — nothing is stored, nothing can
+          leak — and in warning colour it read as an error the reader had
+          caused. Warn is UNCERTAIN and danger is FAILED on the boost path, and
+          spending either on a calm fact is what makes them stop meaning
+          anything. Muted, in an inset panel, is what a footnote looks like. */}
+      <p className="text-xs text-[var(--muted,#5a7488)] leading-relaxed rounded-lg bg-[var(--modal-inset,#e6f1f9)] px-3 py-2">
         Your key is held in memory only and cleared when you close this page. Never stored.
       </p>
 
       <button
         onClick={loginWithKey}
         disabled={loading || !nsecValue.trim()}
-        className="w-full py-3 px-4 rounded-lg bg-[var(--modal-field,#ffffff)] hover:bg-[var(--modal-inset,#e6f1f9)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--ink,#0f2733)] font-medium transition-colors border border-[var(--border,#cfe2ee)]"
+        className="w-full py-3 px-4 rounded-lg bg-[var(--modal-inset,#e6f1f9)] hover:bg-[var(--brand-tint,rgba(0,175,240,0.12))] text-[var(--brand-dd,#0a6fa8)] font-semibold transition-colors border border-[var(--brand,#00aff0)] disabled:opacity-40 disabled:cursor-not-allowed"
       >
         {loading ? 'Connecting...' : 'Login with Key'}
       </button>
@@ -701,16 +706,16 @@ export default function LoginScreen({ onLogin, embedded = false }) {
       <div className="flex items-center justify-between">
         <span className="text-sm text-[var(--muted,#5a7488)]">Nostr Connect</span>
         {!isMobile && (
-          <div className="flex rounded-md overflow-hidden border border-[var(--border,#cfe2ee)] text-xs">
+          <div className="flex rounded-md overflow-hidden border border-[var(--modal-line,#b9d4e6)] text-xs">
             <button
               onClick={() => switchNcTab('qr')}
-              className={`px-3 py-1.5 transition-colors ${ncTab === 'qr' ? 'bg-[var(--modal-inset,#e6f1f9)] text-[var(--ink,#0f2733)]' : 'bg-[var(--modal-bg,#f4fafd)] text-[var(--muted,#5a7488)] hover:text-[var(--ink,#0f2733)]'}`}
+              className={`px-3 py-1.5 transition-colors ${ncTab === 'qr' ? 'bg-[var(--brand,#00aff0)] text-white font-semibold' : 'bg-[var(--modal-field,#ffffff)] text-[var(--muted,#5a7488)] hover:text-[var(--ink,#0f2733)]'}`}
             >
               Scan QR
             </button>
             <button
               onClick={() => switchNcTab('paste')}
-              className={`px-3 py-1.5 transition-colors border-l border-[var(--border,#cfe2ee)] ${ncTab === 'paste' ? 'bg-[var(--modal-inset,#e6f1f9)] text-[var(--ink,#0f2733)]' : 'bg-[var(--modal-bg,#f4fafd)] text-[var(--muted,#5a7488)] hover:text-[var(--ink,#0f2733)]'}`}
+              className={`px-3 py-1.5 transition-colors border-l border-[var(--modal-line,#b9d4e6)] ${ncTab === 'paste' ? 'bg-[var(--brand,#00aff0)] text-white font-semibold' : 'bg-[var(--modal-field,#ffffff)] text-[var(--muted,#5a7488)] hover:text-[var(--ink,#0f2733)]'}`}
             >
               Paste string
             </button>
@@ -748,7 +753,7 @@ export default function LoginScreen({ onLogin, embedded = false }) {
             <button
               onClick={copyQrUri}
               disabled={loading}
-              className="w-full py-2 px-4 rounded-lg bg-[var(--modal-field,#ffffff)] hover:bg-[var(--modal-inset,#e6f1f9)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--ink,#0f2733)] text-xs border border-[var(--border,#cfe2ee)] transition-colors"
+              className="w-full py-2 px-4 rounded-lg bg-[var(--modal-field,#ffffff)] hover:bg-[var(--modal-inset,#e6f1f9)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--ink,#0f2733)] text-xs border border-[var(--modal-line,#b9d4e6)] transition-colors"
             >
               {copied ? 'Copied!' : 'Copy connection link'}
             </button>
@@ -789,7 +794,7 @@ export default function LoginScreen({ onLogin, embedded = false }) {
               recommended fallback (the bunker:// URL flow below) avoids
               all of this — Amber generates a stable URL with the user's
               pubkey already embedded, no relay round-trip handshake. */}
-          <div className="rounded-md border border-[var(--border,#cfe2ee)] bg-[var(--modal-inset,#e6f1f9)] px-3 py-2 text-[11px] text-[var(--muted,#5a7488)] leading-relaxed">
+          <div className="rounded-md border border-[var(--modal-line,#b9d4e6)] bg-[var(--modal-inset,#e6f1f9)] px-3 py-2 text-[11px] text-[var(--muted,#5a7488)] leading-relaxed">
             <strong className="text-[var(--ink,#0f2733)]">Amber on Android?</strong> If login gets stuck, tap "Open in Signer App" again — Amber will remember your approval and reconnect quickly. Still stuck? Use the <strong>bunker URL</strong> option below instead: in Amber, go to Settings → Connected Apps → Generate bunker URL, then paste it here. That path is more reliable on mobile.
           </div>
 
@@ -812,12 +817,12 @@ export default function LoginScreen({ onLogin, embedded = false }) {
               inputMode="text"
               autoCapitalize="none"
               autoCorrect="off"
-              className="w-full px-4 py-3 rounded-lg bg-[var(--modal-bg,#f4fafd)] border border-[var(--border,#cfe2ee)] text-[var(--ink,#0f2733)] placeholder-[var(--muted,#5a7488)] focus:outline-none focus:border-[var(--brand,#00aff0)] focus:ring-2 focus:ring-[var(--brand-ring,rgba(0,175,240,0.32))] font-mono text-sm"
+              className="w-full px-4 py-3 rounded-lg bg-[var(--modal-field,#ffffff)] border border-[var(--modal-line,#b9d4e6)] text-[var(--ink,#0f2733)] placeholder-[var(--muted,#5a7488)] focus:outline-none focus:border-[var(--brand,#00aff0)] focus:ring-2 focus:ring-[var(--brand-ring,rgba(0,175,240,0.32))] font-mono text-sm"
             />
             <button
               onClick={loginWithBunker}
               disabled={loading || !bunkerValue.trim()}
-              className="w-full py-3 px-4 rounded-lg bg-[var(--modal-field,#ffffff)] hover:bg-[var(--modal-inset,#e6f1f9)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--ink,#0f2733)] font-medium transition-colors border border-[var(--border,#cfe2ee)]"
+              className="w-full py-3 px-4 rounded-lg bg-[var(--modal-field,#ffffff)] hover:bg-[var(--modal-inset,#e6f1f9)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--ink,#0f2733)] font-medium transition-colors border border-[var(--modal-line,#b9d4e6)]"
             >
               {loading ? 'Connecting...' : 'Connect'}
             </button>
@@ -851,13 +856,13 @@ export default function LoginScreen({ onLogin, embedded = false }) {
                 <div className="flex gap-2 w-full">
                   <button
                     onClick={copyQrUri}
-                    className="flex-1 py-2 px-3 rounded-lg bg-[var(--modal-field,#ffffff)] hover:bg-[var(--modal-inset,#e6f1f9)] text-[var(--ink,#0f2733)] text-xs border border-[var(--border,#cfe2ee)] transition-colors"
+                    className="flex-1 py-2 px-3 rounded-lg bg-[var(--modal-field,#ffffff)] hover:bg-[var(--modal-inset,#e6f1f9)] text-[var(--ink,#0f2733)] text-xs border border-[var(--modal-line,#b9d4e6)] transition-colors"
                   >
                     {copied ? 'Copied!' : 'Copy link'}
                   </button>
                   <button
                     onClick={cancelQrFlow}
-                    className="flex-1 py-2 px-3 rounded-lg bg-[var(--modal-field,#ffffff)] hover:bg-[var(--modal-inset,#e6f1f9)] text-[var(--ink,#0f2733)] text-xs border border-[var(--border,#cfe2ee)] transition-colors"
+                    className="flex-1 py-2 px-3 rounded-lg bg-[var(--modal-field,#ffffff)] hover:bg-[var(--modal-inset,#e6f1f9)] text-[var(--ink,#0f2733)] text-xs border border-[var(--modal-line,#b9d4e6)] transition-colors"
                   >
                     Refresh QR
                   </button>
@@ -896,7 +901,7 @@ export default function LoginScreen({ onLogin, embedded = false }) {
               <button
                 type="button"
                 onClick={startQrFlow}
-                className="py-2 px-4 rounded-lg bg-[var(--modal-field,#ffffff)] hover:bg-[var(--modal-inset,#e6f1f9)] text-[var(--ink,#0f2733)] text-sm border border-[var(--border,#cfe2ee)] transition-colors"
+                className="py-2 px-4 text-sm rounded-lg bg-[var(--modal-inset,#e6f1f9)] hover:bg-[var(--brand-tint,rgba(0,175,240,0.12))] text-[var(--brand-dd,#0a6fa8)] font-semibold transition-colors border border-[var(--brand,#00aff0)]"
               >
                 Generate QR code
               </button>
@@ -927,7 +932,7 @@ export default function LoginScreen({ onLogin, embedded = false }) {
               inputMode="text"
               autoCapitalize="none"
               autoCorrect="off"
-              className="w-full px-4 py-3 rounded-lg bg-[var(--modal-bg,#f4fafd)] border border-[var(--border,#cfe2ee)] text-[var(--ink,#0f2733)] placeholder-[var(--muted,#5a7488)] focus:outline-none focus:border-[var(--brand,#00aff0)] focus:ring-2 focus:ring-[var(--brand-ring,rgba(0,175,240,0.32))] font-mono text-sm"
+              className="w-full px-4 py-3 rounded-lg bg-[var(--modal-field,#ffffff)] border border-[var(--modal-line,#b9d4e6)] text-[var(--ink,#0f2733)] placeholder-[var(--muted,#5a7488)] focus:outline-none focus:border-[var(--brand,#00aff0)] focus:ring-2 focus:ring-[var(--brand-ring,rgba(0,175,240,0.32))] font-mono text-sm"
             />
           </div>
           <p className="text-xs text-[var(--muted,#5a7488)] leading-relaxed">
@@ -936,7 +941,7 @@ export default function LoginScreen({ onLogin, embedded = false }) {
           <button
             onClick={loginWithBunker}
             disabled={loading || !bunkerValue.trim()}
-            className="w-full py-3 px-4 rounded-lg bg-[var(--modal-field,#ffffff)] hover:bg-[var(--modal-inset,#e6f1f9)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--ink,#0f2733)] font-medium transition-colors border border-[var(--border,#cfe2ee)]"
+            className="w-full py-3 px-4 rounded-lg bg-[var(--modal-field,#ffffff)] hover:bg-[var(--modal-inset,#e6f1f9)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--ink,#0f2733)] font-medium transition-colors border border-[var(--modal-line,#b9d4e6)]"
           >
             {loading ? 'Connecting...' : 'Login with Bunker'}
           </button>
@@ -963,8 +968,13 @@ export default function LoginScreen({ onLogin, embedded = false }) {
 
         {/* Logo */}
         <div className="text-center">
-          <img src="/assets/onlyboosts_pfp.png" alt="OnlyBoosts" className="h-16 w-16 mx-auto mb-2" />
-          <p className="mt-2 text-[var(--muted,#5a7488)] text-sm">Sign in with Nostr</p>
+          <img src="/assets/onlyboosts_pfp.png" alt="OnlyBoosts" className="h-14 w-14 mx-auto rounded-full" />
+          {/* The reader pressed a button reading "Log in", so this says the
+              same thing. The methods below still name themselves honestly —
+              extension, key, Nostr Connect — because those ARE what they are;
+              the vocabulary rule is about the way in, not about hiding the
+              mechanism from someone already looking at it. */}
+          <h2 className="mt-3 text-lg font-semibold text-[var(--ink,#0f2733)] font-[family-name:var(--font-display,Georgia,serif)]">Log in to OnlyBoosts</h2>
         </div>
 
         {isMobile ? (

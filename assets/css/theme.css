@@ -100,6 +100,12 @@ html, body { overflow-x: hidden; max-width: 100vw; }
      size that is glare rather than emphasis. The fields are the white
      now, which is also the right way round — white is where you type. */
   --modal-bg:    #f4fafd;
+  /* ⚠️ A STEP DARKER THAN `--border`, and it earns the extra token. `--border`
+     (#cfe2ee) was drawn for cards sitting on the cream PAGE; inside a modal
+     every surface is within a few percent of every other, so the same line
+     disappears and the panel reads as one flat rectangle. This is the widget's
+     chrome line: panel edges, field outlines, row rules. */
+  --modal-line:  #b9d4e6;
   --modal-field: #ffffff;
   --modal-inset: #e6f1f9;
 

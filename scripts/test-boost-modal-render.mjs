@@ -277,6 +277,23 @@ console.log('\nThe themed classes emit real CSS:')
   assert.deepEqual(wrong, [], `a fallback has drifted from theme.css:\n  ${wrong.join('\n  ')}`)
   ok('every fallback still equals its token in theme.css')
 
+  /**
+   * ⚠️ WITHOUT THIS, EVERY BORDER IN THE WIDGET DRAWS NOTHING. Tailwind's
+   * `border` utility sets `border-width` only; the `border-style: solid` comes
+   * from preflight, which is off here so the bundle cannot reset the host page.
+   * `border-width: 1px` over CSS's initial `border-style: none` renders no
+   * line, and `border-style` appeared nowhere in the built bundle at all.
+   *
+   * It survived the dark theme because those surfaces differ by fill. On the
+   * light theme the borders carry all the definition, so their absence
+   * flattened every modal into one pale rectangle — reported as "these colors
+   * and lines all washout", which was right except that the lines were never
+   * drawn. `login-widget/src/styles.css` restores it in a scoped base layer.
+   */
+  assert.equal(bundle.includes('border-style:solid'), true,
+    'the base layer in styles.css is gone — every border in the widget is invisible')
+  ok('borders have a style, so they actually draw')
+
   // ⚠️ The bundle is a build artifact. If it is stale the two assertions above
   // pass against yesterday's CSS, so the source is checked to agree with it.
   const src = readFileSync(new URL('../login-widget/src/components/ExternalBoostModal.jsx', import.meta.url), 'utf8')

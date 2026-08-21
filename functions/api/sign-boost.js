@@ -72,7 +72,7 @@ import { finalizeEvent, nip19 } from '../_shared/nostr-sign.js'
 // the widget source, so **the two must be changed together**;
 // `scripts/test-sign-boost.mjs` feeds this validator from the shipped builder
 // and asserts they agree, so a drift fails there rather than in production.
-const BOOST_BANNER_URL = 'https://i.nostr.build/8dtrQIw6lr1Nikv0bmw2tJ.png'
+const BOOST_BANNER_URL = 'https://i.nostr.build/iQ4vHJ88xTrGZ36eey9lWJ.png'
 const CONTENT_PREFIX = '⚡Just boosted '
 const ALLOWED_OPENINGS = [CONTENT_PREFIX, `${BOOST_BANNER_URL}\n${CONTENT_PREFIX}`]
 const MAX_CONTENT = 2000

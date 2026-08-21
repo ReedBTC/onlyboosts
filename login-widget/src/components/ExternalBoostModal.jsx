@@ -212,7 +212,11 @@ function LegRow({ recipient, leg, onRepay, onCheck, checking, locked }) {
       <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.373 0 0 5.373 0 12h4z" />
     </svg>
   )
-  let icon = <span className="inline-block w-3.5 h-3.5 rounded-full border border-[var(--muted,#5a7488)]" aria-hidden="true" />
+  // ⚠️ A PENDING LEG HAD NO MARK AT ALL. The empty ring was a 1px border on a
+  // near-white field, which is invisible — so a queued recipient rendered as a
+  // name floating in space with a gap where the others have a tick. Filled and
+  // ringed, it reads as "waiting its turn", which is what it is.
+  let icon = <span className="inline-block w-3 h-3 rounded-full bg-[var(--modal-inset,#e6f1f9)] ring-1 ring-[var(--modal-line,#b9d4e6)]" aria-hidden="true" />
   if (status === STATUS.PAID) icon = <span className="text-[var(--ok,#0b7a4b)]" aria-hidden="true">✓</span>
   else if (status === STATUS.FAILED) icon = <span className="text-[var(--danger,#b3261e)]" aria-hidden="true">✕</span>
   else if (status === STATUS.UNCERTAIN) icon = checking ? spinner : <span className="text-[var(--warn,#b45309)]" aria-hidden="true">!</span>
@@ -230,18 +234,27 @@ function LegRow({ recipient, leg, onRepay, onCheck, checking, locked }) {
     action = (
       <button onClick={locked ? undefined : (repayable ? onRepay : onCheck)} disabled={locked}
         title={locked ? 'Your note is already published, so a change here couldn’t be reflected in it.' : undefined}
-        className="shrink-0 text-[11px] px-2 py-0.5 rounded-lg border border-[var(--border,#cfe2ee)] text-[var(--ink,#0f2733)] hover:border-[var(--brand,#00aff0)] hover:text-[var(--brand-dd,#0a6fa8)] disabled:opacity-40 disabled:hover:border-[var(--border,#cfe2ee)] disabled:hover:text-[var(--muted,#5a7488)] disabled:cursor-not-allowed transition-colors">
+        className="shrink-0 text-[11px] px-2 py-0.5 rounded-lg border border-[var(--modal-line,#b9d4e6)] text-[var(--ink,#0f2733)] hover:border-[var(--brand,#00aff0)] hover:text-[var(--brand-dd,#0a6fa8)] disabled:opacity-40 disabled:hover:border-[var(--modal-line,#b9d4e6)] disabled:hover:text-[var(--muted,#5a7488)] disabled:cursor-not-allowed transition-colors">
         {repayable ? 'Retry' : 'Check again'}
       </button>
     )
   }
 
+  // A leg that has not been reached yet is deliberately quieter than one that
+  // has: the eye should land on what is happening now, not on the queue.
+  const idle = status === STATUS.PENDING
   return (
-    <li className="py-1.5 text-xs">
-      <div className="flex items-center gap-2">
+    <li className="py-2.5 text-xs">
+      <div className="flex items-center gap-2.5">
         <span className="w-4 flex justify-center shrink-0">{icon}</span>
-        <span className="flex-1 min-w-0 truncate text-[var(--ink,#0f2733)]">{recipient?.name || recipient?.address || 'Recipient'}</span>
-        {sats != null && <span className="shrink-0 tabular-nums text-[var(--muted,#5a7488)]">{fmtSats(sats)} sats</span>}
+        <span className={`flex-1 min-w-0 truncate ${idle ? 'text-[var(--muted,#5a7488)]' : 'text-[var(--ink,#0f2733)] font-medium'}`}>
+          {recipient?.name || recipient?.address || 'Recipient'}
+        </span>
+        {sats != null && (
+          <span className={`shrink-0 tabular-nums ${status === STATUS.PAID ? 'text-[var(--ink,#0f2733)] font-semibold' : 'text-[var(--muted,#5a7488)]'}`}>
+            {fmtSats(sats)} sats
+          </span>
+        )}
         {action}
       </div>
       {/* The wallet's own reason, shown rather than hidden: it is the only
@@ -936,8 +949,8 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
     <>
       <div className={`fixed inset-0 bg-[var(--scrim,rgba(11,58,82,0.55))] z-[70] transition-opacity duration-200 ${visible ? 'opacity-100' : 'opacity-0'}`} aria-hidden="true" />
       <div className="fixed inset-0 z-[71] flex items-center justify-center p-3 sm:p-4 overflow-hidden" role="dialog" aria-label={headerTitle}>
-        <div className={`relative bg-[var(--modal-bg,#f4fafd)] border border-[var(--border,#cfe2ee)] rounded-lg w-full max-w-lg max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2rem)] flex flex-col shadow-[0_24px_60px_-12px_rgba(11,58,82,0.28),0_0_0_1px_rgba(11,58,82,0.06)] transition-[opacity,transform] duration-200 ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}>
-          <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-[var(--border,#cfe2ee)] shrink-0">
+        <div className={`relative bg-[var(--modal-bg,#f4fafd)] border border-[var(--modal-line,#b9d4e6)] rounded-lg w-full max-w-lg max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2rem)] flex flex-col shadow-[0_24px_60px_-12px_rgba(11,58,82,0.28),0_0_0_1px_rgba(11,58,82,0.06)] transition-[opacity,transform] duration-200 ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}>
+          <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-[var(--modal-line,#b9d4e6)] shrink-0">
             <h2 className="text-base font-semibold text-[var(--ink,#0f2733)] font-[family-name:var(--font-display,Georgia,serif)]">{headerTitle}</h2>
             <button onClick={guardedClose} className="text-[var(--muted,#5a7488)] hover:text-[var(--ink,#0f2733)] transition-colors text-lg leading-none" aria-label="Close">✕</button>
           </div>
@@ -986,7 +999,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
                   </div>
                   <input id="ob-boost-amount" type="number" inputMode="numeric" min={MIN_SATS} max={MAX_SATS}
                     value={amount} onChange={(e) => setAmount(e.target.value)}
-                    className="w-full bg-[var(--modal-field,#ffffff)] border border-[var(--border,#cfe2ee)] rounded-lg px-3 py-2.5 text-sm text-[var(--ink,#0f2733)] focus:outline-none focus:border-[var(--brand,#00aff0)] focus:ring-2 focus:ring-[var(--brand-ring,rgba(0,175,240,0.32))]"
+                    className="w-full bg-[var(--modal-field,#ffffff)] border border-[var(--modal-line,#b9d4e6)] rounded-lg px-3 py-2.5 text-sm text-[var(--ink,#0f2733)] focus:outline-none focus:border-[var(--brand,#00aff0)] focus:ring-2 focus:ring-[var(--brand-ring,rgba(0,175,240,0.32))]"
                     placeholder="Or type any amount" />
                 </div>
 
@@ -995,12 +1008,12 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
                   <label className="block text-xs text-[var(--muted,#5a7488)] mb-1.5">Boost as</label>
                   <div className="flex gap-2 text-xs">
                     <button onClick={() => setAnonymous(false)} aria-pressed={!anonymous}
-                      className={`flex-1 flex items-center justify-center gap-1.5 py-3 px-3 rounded-md border transition-colors ${!anonymous ? 'bg-[var(--brand-tint,rgba(0,175,240,0.12))] border-[var(--brand,#00aff0)] text-[var(--brand-dd,#0a6fa8)] font-semibold' : 'bg-[var(--modal-field,#ffffff)] border-[var(--border,#cfe2ee)] text-[var(--muted,#5a7488)] hover:text-[var(--ink,#0f2733)] hover:border-[var(--brand,#00aff0)]'}`}>
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-3 px-3 rounded-md border transition-colors ${!anonymous ? 'bg-[var(--brand-tint,rgba(0,175,240,0.12))] border-[var(--brand,#00aff0)] text-[var(--brand-dd,#0a6fa8)] font-semibold' : 'bg-[var(--modal-field,#ffffff)] border-[var(--modal-line,#b9d4e6)] text-[var(--muted,#5a7488)] hover:text-[var(--ink,#0f2733)] hover:border-[var(--brand,#00aff0)]'}`}>
                       {profile?.image && isSafeUrl(profile.image) && <img src={profile.image} alt="" className="w-4 h-4 rounded-full object-cover" onError={(e) => { e.target.style.display = 'none' }} />}
                       <span className="truncate max-w-[140px]">{profile?.displayName || profile?.name || 'Your npub'}</span>
                     </button>
                     <button onClick={() => setAnonymous(true)} aria-pressed={anonymous}
-                      className={`flex-1 py-3 px-3 rounded-md border transition-colors ${anonymous ? 'bg-[var(--brand-tint,rgba(0,175,240,0.12))] border-[var(--brand,#00aff0)] text-[var(--brand-dd,#0a6fa8)] font-semibold' : 'bg-[var(--modal-field,#ffffff)] border-[var(--border,#cfe2ee)] text-[var(--muted,#5a7488)] hover:text-[var(--ink,#0f2733)] hover:border-[var(--brand,#00aff0)]'}`}>Anon</button>
+                      className={`flex-1 py-3 px-3 rounded-md border transition-colors ${anonymous ? 'bg-[var(--brand-tint,rgba(0,175,240,0.12))] border-[var(--brand,#00aff0)] text-[var(--brand-dd,#0a6fa8)] font-semibold' : 'bg-[var(--modal-field,#ffffff)] border-[var(--modal-line,#b9d4e6)] text-[var(--muted,#5a7488)] hover:text-[var(--ink,#0f2733)] hover:border-[var(--brand,#00aff0)]'}`}>Anon</button>
                   </div>
                 </div>
                 )}
@@ -1051,7 +1064,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
                       data-1p-ignore=""
                       data-bwignore="true"
                       data-form-type="other"
-                      className="flex-1 min-w-0 bg-[var(--modal-field,#ffffff)] border border-[var(--border,#cfe2ee)] rounded-lg px-3 py-2.5 text-sm text-[var(--ink,#0f2733)] focus:outline-none focus:border-[var(--brand,#00aff0)] focus:ring-2 focus:ring-[var(--brand-ring,rgba(0,175,240,0.32))]"
+                      className="flex-1 min-w-0 bg-[var(--modal-field,#ffffff)] border border-[var(--modal-line,#b9d4e6)] rounded-lg px-3 py-2.5 text-sm text-[var(--ink,#0f2733)] focus:outline-none focus:border-[var(--brand,#00aff0)] focus:ring-2 focus:ring-[var(--brand-ring,rgba(0,175,240,0.32))]"
                       placeholder={DEFAULT_SENDER_NAME} />
                       {!signedIn && onRequestSignIn && (
                         <>
@@ -1071,7 +1084,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
                 <div>
                   <label className="block text-xs text-[var(--muted,#5a7488)] mb-1.5">Message (optional)</label>
                   <textarea value={message} onChange={(e) => setMessage(e.target.value.slice(0, MAX_MESSAGE_CHARS))} rows={3} maxLength={MAX_MESSAGE_CHARS}
-                    className="w-full bg-[var(--modal-field,#ffffff)] border border-[var(--border,#cfe2ee)] rounded-lg px-3 py-2 text-sm text-[var(--ink,#0f2733)] focus:outline-none focus:border-[var(--brand,#00aff0)] focus:ring-2 focus:ring-[var(--brand-ring,rgba(0,175,240,0.32))] resize-none leading-relaxed"
+                    className="w-full bg-[var(--modal-field,#ffffff)] border border-[var(--modal-line,#b9d4e6)] rounded-lg px-3 py-2 text-sm text-[var(--ink,#0f2733)] focus:outline-none focus:border-[var(--brand,#00aff0)] focus:ring-2 focus:ring-[var(--brand-ring,rgba(0,175,240,0.32))] resize-none leading-relaxed"
                     placeholder="Say something to the show (rides along with the boost)" />
                   <p className="mt-1 text-[10px] text-[var(--muted,#5a7488)] text-right">{message.length}/{MAX_MESSAGE_CHARS}</p>
                 </div>
@@ -1087,7 +1100,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
                     name is on the boost; private is about whether a note
                     exists. This is the only control that reaches 'none', which
                     is what lets an anonymous booster still count. */}
-                <label className={`flex items-start gap-2.5 rounded-md border px-3 py-2.5 cursor-pointer transition-colors ${noNote ? 'border-[var(--border,#cfe2ee)] bg-[var(--modal-inset,#e6f1f9)]' : 'border-[var(--border,#cfe2ee)] bg-[var(--modal-field,#ffffff)] hover:border-[var(--brand,#00aff0)]'}`}>
+                <label className={`flex items-start gap-2.5 rounded-md border px-3 py-2.5 cursor-pointer transition-colors ${noNote ? 'border-[var(--modal-line,#b9d4e6)] bg-[var(--modal-inset,#e6f1f9)]' : 'border-[var(--modal-line,#b9d4e6)] bg-[var(--modal-field,#ffffff)] hover:border-[var(--brand,#00aff0)]'}`}>
                   <input
                     type="checkbox"
                     checked={noNote}
@@ -1138,7 +1151,10 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
             {hasValue && phase !== 'form' && (
               <div className="flex flex-col gap-3 min-h-[280px]">
                 {phase === 'sending' && (
-                  <p className="text-sm font-semibold text-[var(--brand-d,#068ace)]">Sending your boost — keep this window open</p>
+                  <div className="rounded-lg bg-[var(--brand-tint,rgba(0,175,240,0.12))] border border-[var(--brand,#00aff0)] px-3 py-2.5">
+                    <p className="text-sm font-semibold text-[var(--brand-dd,#0a6fa8)]">Sending your boost</p>
+                    <p className="text-[11px] text-[var(--muted,#5a7488)] mt-0.5">Keep this window open.</p>
+                  </div>
                 )}
                 {/* Silent on a normal leg; see PAY_STAGES. It sits under the
                     headline rather than on the row, because the row already
@@ -1153,7 +1169,14 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
                     {summaryLine}
                   </p>
                 )}
-                <ul className="flex-1 min-h-0 overflow-y-auto divide-y divide-[var(--border,#cfe2ee)]">
+                {/* ⚠️ THE LIST IS A CARD, NOT LOOSE TEXT. Four names and four
+                    figures floating on the panel with invisible rules between
+                    them read as an unfinished screen rather than as a payment
+                    running — and this is the surface a donor watches for up to
+                    ninety seconds while their sats move. A filled, bordered,
+                    rounded container is what says "these four things belong
+                    together and something is happening to them". */}
+                <ul className="flex-1 min-h-0 overflow-y-auto rounded-lg border border-[var(--modal-line,#b9d4e6)] bg-[var(--modal-field,#ffffff)] px-3 divide-y divide-[var(--modal-line,#b9d4e6)]">
                   {visibleLegs.map(({ r, leg }) => {
                     const realIndex = recipients.indexOf(r)
                     return <LegRow key={`${r.address}-${realIndex}`} recipient={r} leg={leg}
@@ -1181,7 +1204,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
                   </p>
                 )}
                 {phase === 'done' && noteRoute !== 'none' && paidSats > 0 && !stillChecking && (
-                  <div className="rounded-md border border-[var(--border,#cfe2ee)] bg-[var(--modal-field,#ffffff)] p-3 space-y-2">
+                  <div className="rounded-md border border-[var(--modal-line,#b9d4e6)] bg-[var(--modal-field,#ffffff)] p-3 space-y-2">
                     {shareState === 'shared' ? (
                       <p className="text-xs text-[var(--ok,#0b7a4b)] leading-snug">
                         {noteRoute === 'bot'

@@ -477,7 +477,7 @@ export default function MultiLegBoostForm({
                 className={`flex-1 text-xs py-2 rounded-lg border transition-colors ${
                   amount === String(p)
                     ? 'border-[var(--brand,#00aff0)] text-[var(--brand-d,#068ace)] bg-[var(--brand-tint,rgba(0,175,240,0.12))]'
-                    : 'border-[var(--border,#cfe2ee)] text-[var(--muted,#5a7488)] hover:border-[var(--brand,#00aff0)] hover:text-[var(--ink,#0f2733)]'
+                    : 'border-[var(--modal-line,#b9d4e6)] text-[var(--muted,#5a7488)] hover:border-[var(--brand,#00aff0)] hover:text-[var(--ink,#0f2733)]'
                 }`}
               >
                 {p.toLocaleString()}
@@ -491,7 +491,7 @@ export default function MultiLegBoostForm({
           max={MAX_SATS}
           value={amount}
           onChange={e => setAmount(e.target.value)}
-          className="w-full bg-[var(--modal-field,#ffffff)] border border-[var(--border,#cfe2ee)] rounded-lg px-3 py-2 text-sm text-[var(--ink,#0f2733)] focus:outline-none focus:border-[var(--brand,#00aff0)] focus:ring-2 focus:ring-[var(--brand-ring,rgba(0,175,240,0.32))]"
+          className="w-full bg-[var(--modal-field,#ffffff)] border border-[var(--modal-line,#b9d4e6)] rounded-lg px-3 py-2 text-sm text-[var(--ink,#0f2733)] focus:outline-none focus:border-[var(--brand,#00aff0)] focus:ring-2 focus:ring-[var(--brand-ring,rgba(0,175,240,0.32))]"
           placeholder={presets ? 'Custom amount' : `${MIN_SATS} minimum`}
         />
         <p className="mt-1 text-[10px] text-[var(--muted,#5a7488)]">
@@ -508,7 +508,7 @@ export default function MultiLegBoostForm({
             className={`flex-1 flex items-center justify-center gap-1.5 py-3 px-3 rounded-md border transition-colors ${
               !anonymous
                 ? 'bg-[var(--brand-tint,rgba(0,175,240,0.12))] border-[var(--brand,#00aff0)] text-[var(--brand-dd,#0a6fa8)] font-semibold'
-                : 'bg-[var(--modal-field,#ffffff)] border-[var(--border,#cfe2ee)] text-[var(--muted,#5a7488)] hover:text-[var(--ink,#0f2733)] hover:border-[var(--brand,#00aff0)]'
+                : 'bg-[var(--modal-field,#ffffff)] border-[var(--modal-line,#b9d4e6)] text-[var(--muted,#5a7488)] hover:text-[var(--ink,#0f2733)] hover:border-[var(--brand,#00aff0)]'
             }`}
             aria-pressed={!anonymous}
           >
@@ -524,7 +524,7 @@ export default function MultiLegBoostForm({
             className={`flex-1 py-3 px-3 rounded-md border transition-colors ${
               anonymous
                 ? 'bg-[var(--brand-tint,rgba(0,175,240,0.12))] border-[var(--brand,#00aff0)] text-[var(--brand-dd,#0a6fa8)] font-semibold'
-                : 'bg-[var(--modal-field,#ffffff)] border-[var(--border,#cfe2ee)] text-[var(--muted,#5a7488)] hover:text-[var(--ink,#0f2733)] hover:border-[var(--brand,#00aff0)]'
+                : 'bg-[var(--modal-field,#ffffff)] border-[var(--modal-line,#b9d4e6)] text-[var(--muted,#5a7488)] hover:text-[var(--ink,#0f2733)] hover:border-[var(--brand,#00aff0)]'
             }`}
             aria-pressed={anonymous}
           >
@@ -561,7 +561,7 @@ export default function MultiLegBoostForm({
           }}
           rows={4}
           maxLength={10000}
-          className="w-full bg-[var(--modal-field,#ffffff)] border border-[var(--border,#cfe2ee)] rounded-lg px-3 py-2 text-sm text-[var(--ink,#0f2733)] focus:outline-none focus:border-[var(--brand,#00aff0)] focus:ring-2 focus:ring-[var(--brand-ring,rgba(0,175,240,0.32))] resize-none max-h-40 overflow-y-auto leading-relaxed"
+          className="w-full bg-[var(--modal-field,#ffffff)] border border-[var(--modal-line,#b9d4e6)] rounded-lg px-3 py-2 text-sm text-[var(--ink,#0f2733)] focus:outline-none focus:border-[var(--brand,#00aff0)] focus:ring-2 focus:ring-[var(--brand-ring,rgba(0,175,240,0.32))] resize-none max-h-40 overflow-y-auto leading-relaxed"
           placeholder={messagePlaceholder}
         />
       </div>
