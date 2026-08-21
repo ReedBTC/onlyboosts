@@ -52,6 +52,16 @@ import { setBoostModalProgressVisible } from '../lib/boostModalSignal.js'
 import { fireConfetti } from '../lib/confetti.js'
 import ConfirmLeaveOverlay from './ConfirmLeaveOverlay.jsx'
 
+// ⚠️ WHAT A BOOST IS "FROM" WHEN NOBODY TYPED ANYTHING. It fills the
+// boostagram's `sender_name` only — the field a podcaster's Helipad prints —
+// and never the note, whose author is already the OnlyBoosts bot, where a
+// "From onlyboosts.social user" line would be the account restating itself.
+//
+// It names the site rather than a person, so it takes nothing away from an
+// anonymous boost; what it buys is that the boost presents as one consistent
+// thing instead of blank in one aggregator and "Unknown" in the next.
+const DEFAULT_SENDER_NAME = 'onlyboosts.social user'
+
 const MIN_SATS = 21
 // ⚠️ `SITE_SIGN_MAX_SATS` IS THE SAME NUMBER AND IS MEANT TO BE. The signing
 // oracle refuses an `amount` above its own cap, and the two were 5M and 100k
@@ -283,30 +293,26 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
   const usingProfile = signedIn && !anonymous
 
   /**
-   * ⚠️ ONE DERIVATION OF "ANONYMOUS", AND IT IS THE BOOSTAGRAM'S ANSWER ONLY.
-   *
-   * This flag governs the wire and nothing else: `sender_name` and `sender_id`
-   * in the TLV record, on the first pass and on a retry. It must not grow a
-   * second meaning. Whether a note is published and who signs it is
-   * `noteRoute` below, a separate derivation standing beside this one — Boost
-   * Me Bitch shipped that promise broken twice by letting one expression carry
-   * both, each time because one surface learned a rule another didn't (read
+   * ⚠️ THE TWO WIRE SITES, DERIVED ONCE. `sender_name` and `sender_id` in the
+   * boostagram TLV, on the first pass and on a retry. They must not be
+   * recomputed at a call site: Boost Me Bitch shipped this promise broken
+   * twice, each time because one surface learned a rule another didn't (read
    * the header of its `use-share-picker.ts`).
    *
-   * ⚠️ ANONYMOUS DOES NOT MEAN UNPUBLISHED. Pressing Anon detaches the Nostr
-   * account from the boost; OnlyBoosts still posts the note, so the boost
-   * still counts. What suppresses the note is the private checkbox, and only
-   * that. The two used to be folded together here and it made Anon quietly
-   * cost a booster their place in the index.
+   * ⚠️ ANONYMOUS DOES NOT MEAN UNPUBLISHED, and it does not mean nameless
+   * either. Pressing Anon detaches the Nostr account; OnlyBoosts still posts
+   * the note, so the boost still counts, and the boostagram still carries a
+   * name. What suppresses the note is the private checkbox, and only that.
    *
-   * Off the profile, the typed name decides it, and a name is not merely
-   * cosmetic: it is `sender_name`, which is what the podcaster's Helipad reads
-   * (boost-login.md, Phase 10).
+   * ⚠️ A BLANK NAME IS REPLACED, NOT OMITTED. An empty `sender_name` renders as
+   * blank in one aggregator and "Unknown" in the next, so a boost with nobody's
+   * name on it presents differently everywhere it lands. `DEFAULT_SENDER_NAME`
+   * makes it one consistent thing, and it names the SITE rather than a person,
+   * so it discloses nothing the note's own author does not. Same call BMB makes.
    */
-  const boostAnonymously = usingProfile ? false : !typedName
-  const wireSenderName = boostAnonymously
-    ? ''
-    : (usingProfile ? (profile?.displayName || profile?.name || '') : typedName)
+  const wireSenderName = usingProfile
+    ? (profile?.displayName || profile?.name || '')
+    : (typedName || DEFAULT_SENDER_NAME)
   // ⚠️ NEVER A PUBKEY WITHOUT THE PROFILE BEHIND IT. `sender_id` is what
   // recipient aggregators resolve to an avatar and a name, so carrying it on an
   // Anon boost would undo the anonymity in the one place the donor cannot see.
@@ -415,6 +421,37 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
   const activeCount = visibleLegs.length
   const paidSats = legs.reduce((a, l) => a + (l?.status === STATUS.PAID ? (l.sats || 0) : 0), 0)
 
+  /**
+   * ⚠️ DECLARED ABOVE ITS FIRST READ, AND THAT IS THE WHOLE POINT OF WHERE IT
+   * SITS. `paySeconds` below reads `payTick`, and this `useState` used to come
+   * after it — a temporal dead zone that threw `Cannot access 'payTick' before
+   * initialization` **during render**.
+   *
+   * It hid for two days because the read is inside a ternary:
+   * `payingLeg?.startedAt ? (… payTick …) : 0`. With no leg paying the branch
+   * is never evaluated, so the form, the done screen and every test rendered
+   * fine. It threw only once a leg was actually in flight, about a second into
+   * a real boost — and a render error with no boundary above it **unmounts the
+   * React root**, so the symptom was: the modal vanishes mid-payment, the
+   * payment completes anyway (the promise is detached and does not care), no
+   * note is ever published because `phase` never reaches 'done', and the page's
+   * Boost button is dead until a reload because the host root is gone.
+   *
+   * `scripts/test-boost-modal-render.mjs` now fails on any binding in this
+   * component read before its declaration. There is no linter in this repo, so
+   * that scan is the only thing standing between here and a repeat.
+   *
+   * The ticker itself just forces a re-render once a second while a payment is
+   * outstanding, so the pay-stage copy can be computed from the leg's own
+   * `startedAt` rather than from a second clock kept in step with it.
+   */
+  const [payTick, setPayTick] = useState(0)
+  useEffect(() => {
+    if (phase !== 'sending') return
+    const id = setInterval(() => setPayTick(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [phase])
+
   // The leg the wallet is currently working on, and how long it has been at
   // it. Legs are paid sequentially (see D9 in boost-login.md), so there is at
   // most one, and its own `startedAt` is the clock — the ticker above only
@@ -446,16 +483,6 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
   legsRef.current = legs
   const [checking, setChecking] = useState({})
   const stillChecking = Object.values(checking).some(Boolean)
-
-  // Re-render once a second while a payment is outstanding, so the pay-stage
-  // copy can be computed from the leg's own `startedAt` rather than from a
-  // second clock that would have to be kept in step with it.
-  const [payTick, setPayTick] = useState(0)
-  useEffect(() => {
-    if (phase !== 'sending') return
-    const id = setInterval(() => setPayTick(Date.now()), 1000)
-    return () => clearInterval(id)
-  }, [phase])
 
   // Seconds since the current watch began, which is the only input the stage
   // copy needs. Keyed on `stillChecking` rather than on the checking map, so a
@@ -848,7 +875,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
                     with Nostr and they need not know that is what it is. */}
                 {!usingProfile && (
                   <div>
-                    <label htmlFor="ob-boost-from" className="block text-xs text-neutral-400 mb-1.5">Your name (optional)</label>
+                    <label htmlFor="ob-boost-from" className="block text-xs text-neutral-400 mb-1.5">From</label>
                     <input
                       id="ob-boost-from"
                       type="text"
@@ -857,12 +884,10 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
                       maxLength={MAX_SENDER_NAME_CHARS}
                       autoComplete="off"
                       className="w-full bg-neutral-800 border border-neutral-700 rounded px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/30"
-                      placeholder="Who should the show thank?" />
+                      placeholder={DEFAULT_SENDER_NAME} />
                     <p className="mt-1 text-[10px] text-neutral-600 leading-snug">
-                      {typedName
-                        ? 'The show sees this name alongside your sats, and OnlyBoosts posts the boost under its own account so it counts in the feeds.'
-                        : 'Leave it blank and no name goes anywhere. OnlyBoosts still posts the boost under its own account, so it counts in the feeds either way.'}
-                      {signedIn && ' Your account is not attached to this one.'}
+                      Left blank, boosts are sent as “{DEFAULT_SENDER_NAME}”.
+                      {signedIn && ' Your Nostr account is not attached to this one either way.'}
                     </p>
                     {!signedIn && onRequestSignIn && (
                       <button
@@ -923,11 +948,20 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
                 {/* Said before the press rather than only after it, because
                     the wallet gate now sits behind this button: a reader who
                     has none should know one more step is coming rather than
-                    meeting a second modal unannounced. The awaiting line
-                    stays until the wallet lands, and pressing Boost again
-                    re-opens the connect modal, so a dismissed one is never a
-                    dead end. */}
-                {!walletStatus.connected && (
+                    meeting a second modal unannounced. The awaiting line stays
+                    until the wallet lands, and pressing Boost again re-opens
+                    the connect modal, so a dismissed one is never a dead end.
+
+                    ⚠️ REMEMBERED IS NOT DISCONNECTED, and this line said it was.
+                    `connected` means a live client; a saved NWC blob or an
+                    enabled extension reports `remembered` and engages on the
+                    first press. The old gate ran that unlock BEFORE the modal
+                    mounted, so the distinction never surfaced here; now the
+                    modal opens first, and a returning user with a wallet — with
+                    the identity dot showing green — was being told they had
+                    none. They are one press from paying, so the honest thing is
+                    to say nothing at all. */}
+                {!walletStatus.connected && (awaitingWallet || !walletStatus.remembered) && (
                   <p className="text-[10px] text-neutral-500 leading-snug text-center">
                     {awaitingWallet
                       ? 'Waiting for a wallet. Connect one and this boost sends itself.'

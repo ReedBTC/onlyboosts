@@ -196,7 +196,7 @@ node scripts/stamp-assets.js --check   # verify; non-zero exit if anything is st
 **Order matters.** `sync-partials` injects markup into the page files; anything
 it injects has to be stamped afterwards.
 
-Five test scripts, all plain `node scripts/<name>.mjs` with no runner:
+Six test scripts, all plain `node scripts/<name>.mjs` with no runner:
 
 | | |
 |---|---|
@@ -205,13 +205,14 @@ Five test scripts, all plain `node scripts/<name>.mjs` with no runner:
 | `test-feed-hash.mjs` | the inline feed-bar controller: hash parsing, and the boot sequence |
 | `test-feed-lang.mjs` | `feed-lang.js`: menu ordering, the withholding rule, and the copy |
 | `test-sign-boost.mjs` | the signing oracle's validator and its KV rate limiter, fed by the **shipped** note builder |
+| `test-boost-modal-render.mjs` | every binding in `ExternalBoostModal`'s body is declared before it is read. See the ⚠️ below |
 
 **⚠️ `test-server-render.mjs` IS THE ONE THAT NEEDS AN ARGUMENT, SO IT IS THE ONE
 THAT GOES UNRUN.** Its header carries the `curl` that produces the capture; take
 a fresh one rather than reusing an old file, since it is also the size
 measurement. It asserted `cards are numbered 1..N with no gaps` — the *ordinal*
 scheme's invariant — until competition ranking shipped on 2026-08-18, and it
-would have been merged red had it not been run. **Run all five before a merge**,
+would have been merged red had it not been run. **Run all six before a merge**,
 and treat this one as the guard on the ranking scheme rather than only on weight.
 
 **⚠️ `test-feed-hash.mjs` EXTRACTS THE CONTROLLER OUT OF `index.html` and runs
@@ -231,6 +232,29 @@ screen. **Anything about how this page boots wants a test here, not a unit test.
 `test-feed-lang.mjs` imports the real module and rewrites only its two
 version-stamped absolute imports to stubs, so the module under test is the
 shipped source.
+
+**⚠️ `test-boost-modal-render.mjs` EXISTS BECAUSE A TEMPORAL DEAD ZONE REACHED
+PRODUCTION AND DID NOT LOOK LIKE A CRASH.** `paySeconds` read `payTick` thirty
+lines above its `useState`, inside the ternary
+`payingLeg?.startedAt ? (… payTick …) : 0` — so the branch was only evaluated
+once a leg was actually paying. The form rendered, the done screen rendered,
+every test passed, and a live boost threw during render about a second in.
+
+**A render error with no boundary above it unmounts the whole `createRoot`**,
+which is why one missing line-order produced four unrelated-looking faults: the
+modal vanished mid-payment; the payment completed anyway, its promise being
+detached; **no Nostr note was ever published**, because the publish lives in
+`phase === 'done'` and phase never got there; and the page's Boost button was
+dead until a reload, because the host root was gone. Nothing anywhere said an
+error had been thrown.
+
+Two things came out of it and both are load-bearing. The scan is a **text
+check, not a render** — advancing state past `'form'` needs a DOM, and
+`renderToString` runs no effects, so a real render test would mean adding jsdom.
+And **this repo has no linter**: `no-use-before-define` would catch the class in
+one rule, and adding eslint to `login-widget/` is the better fix whenever anyone
+wants it. Until then the scan is the whole defence, so point it at any component
+that renders while a payment is in flight.
 
 ### Asset Stamping, And The Rule It Replaced
 
@@ -1010,6 +1034,17 @@ the note should say, so those render the button, with a line saying why. The
 withhold-while-checking rule is untouched and `shareState` still latches at
 `shared`, so **one boost still publishes at most one note**.
 
+**⚠️ A BLANK "From" IS REPLACED, NOT OMITTED.** `DEFAULT_SENDER_NAME` is
+`onlyboosts.social user`, and it fills the boostagram's `sender_name` only. An
+empty one renders blank in one aggregator and "Unknown" in the next, so a boost
+with nobody's name on it presents differently everywhere it lands; the default
+makes it one consistent thing, and it names the **site** rather than a person,
+so it discloses nothing the note's own author does not. Same call BMB makes.
+**It never reaches the note**, whose author is already the OnlyBoosts bot and
+where a "From onlyboosts.social user" line would be the account restating
+itself. The field is labelled `From`, placeholders the default, and says
+*Left blank, boosts are sent as "onlyboosts.social user"*.
+
 **⚠️ THE TYPED NAME IS PROSE AND NOTHING ELSE** (`👤 From <name>`). It rides the
 boostagram TLV, which is what the podcaster's Helipad reads, and it becomes one
 line of the bot's own body. It must never become a `p` tag, an author claim or a
@@ -1071,6 +1106,15 @@ gate did: the at-rest restore first, so a returning visitor with a saved blob
 never sees the connect modal; and `handleWalletGateFailure`'s distinction
 between "no wallet" and "a remembered extension that stalled", since a slow
 extension must not be told it has no wallet.
+
+**⚠️ `remembered` IS NOT `connected`, AND MOVING THE GATE IS WHAT MADE THAT
+VISIBLE.** `connected` means a live client; a saved NWC blob or an enabled
+extension reports `remembered` and engages on the first press. The old gate ran
+that unlock *before* the modal mounted, so the modal only ever saw a connected
+wallet. Now it opens first — and the form's wallet hint told a returning user
+with the identity dot showing green that they had no wallet. They are one press
+from paying, so the line is withheld for `remembered` entirely. **Any new copy
+about wallet state has to test both.**
 
 ### The Site Signs For A Booster Who Has No Key
 

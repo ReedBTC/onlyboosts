@@ -7,6 +7,7 @@ import BoostButton from './components/BoostButton.jsx'
 import LoginModal from './components/LoginModal.jsx'
 import EpisodeBoostModal from './components/EpisodeBoostModal.jsx'
 import ExternalBoostModal from './components/ExternalBoostModal.jsx'
+import ModalErrorBoundary from './components/ModalErrorBoundary.jsx'
 import BoostModal from './components/BoostModal.jsx'
 import IdentityWidget from './components/IdentityWidget.jsx'
 import WalletConnectModal from './components/WalletConnectModal.jsx'
@@ -525,15 +526,23 @@ function ExternalBoostHost() {
     return () => { externalBoostListeners.delete(fn) }
   }, [])
   if (!state) return null
+  // ⚠️ THE BOUNDARY IS NOT DECORATION — SEE ITS OWN HEADER. A render error in
+  // this modal used to unmount this whole root, which meant the modal vanished
+  // mid-payment AND the page's Boost button stopped working until a reload,
+  // because nothing was left here to answer the next open. Of every modal in
+  // this widget this is the one where that matters most: it is the only one a
+  // payment is running underneath.
   return createPortal(
-    <ExternalBoostModal
-      user={user || null}
-      onRequestSignIn={() => api.requestLogin()}
-      onRequestWallet={() => api.requestWalletForBoost()}
-      onClose={() => setExternalBoostState(null)}
-      episode={state.episode}
-      recipientsBundle={state.recipientsBundle}
-    />,
+    <ModalErrorBoundary label="ExternalBoostModal" onClose={() => setExternalBoostState(null)}>
+      <ExternalBoostModal
+        user={user || null}
+        onRequestSignIn={() => api.requestLogin()}
+        onRequestWallet={() => api.requestWalletForBoost()}
+        onClose={() => setExternalBoostState(null)}
+        episode={state.episode}
+        recipientsBundle={state.recipientsBundle}
+      />
+    </ModalErrorBoundary>,
     document.body,
   )
 }
