@@ -569,6 +569,16 @@ the only names the shared chrome sees.
 | npub | `npub1nmd7u4f5ewsjn6wp4zd9pc4jnadtmluanfhm2g0xryrdga7e7xxq0as4ck` |
 | pubkey (hex) | `9edbee5534cba129e9c1a89a50e2b29f5abdff9d9a6fb521e61906d477d9f18c` |
 | Lightning | `onlyboosts@getalby.com` |
+| Bot npub | `npub182r6r8yqr4t3zxcfq4tfyfwjkg9nn525ljfmaadg72rqcsymsnvslda3ge` |
+| Bot pubkey (hex) | `3a87a19c801d57111b0905569225d2b20b39d154fc93bef5a8f2860c409b84d9` |
+
+**⚠️ THE BOT IS A SECOND IDENTITY AND THE SEPARATION IS THE POINT.** It signs
+boost notes for donors with no Nostr account (see "The Site Signs For A Booster
+Who Has No Key"), and a signing endpoint is an attack surface however well
+validated. Rotating a bot key costs a profile and one booster page; rotating the
+site npub costs NIP-05, `.well-known/nostr.json`, and the `client` tag on every
+event ever published. Both names resolve from the one `.well-known/nostr.json`:
+`onlyboosts@` and `boostbot@`.
 
 The domain appears in `robots.txt`, `manifest.webmanifest`,
 `functions/sitemap.xml.js`, the CORS allowlist in
@@ -859,6 +869,72 @@ is Phase 2/3 of `boost-login.md`.
 `BoostModal` → `MultiLegBoostForm` signs a kind-1 before paying, so it needs a
 signer by construction. `_ensureWalletForPay` (the merch checkout) is likewise
 untouched.
+
+### The Site Signs For A Booster Who Has No Key
+
+`functions/api/sign-boost.js`. A visitor who boosted without a Nostr account has
+paid a show and no way to put that boost in this index, because the index counts
+notes and they have no key to sign one with. The endpoint signs a boost note
+under the bot identity and **the browser publishes it** — the endpoint never
+touches a relay, an outbound socket per request being a second thing to abuse.
+
+Two bindings, and it refuses to run without either: `BOOSTBOT_NSEC` (secret) and
+`SIGN_RATELIMIT` (**a KV namespace**), on Preview *and* Production. Unconfigured,
+it answers 503 and the feature is simply off.
+
+**⚠️ IT CANNOT VERIFY THAT ANYTHING WAS PAID, AND NO CHEAP VERSION OF IT CAN.**
+Proof-of-payment was designed and rejected on 2026-08-19: a preimage proves only
+that someone *knows* the preimage, which is the payer **or whoever issued the
+invoice**, so an attacker self-issues an invoice for any amount and passes. A
+caller-supplied LUD-21 verify URL is worse. The only real version has this server
+issuing the invoices, which puts it in the middle of a money path. Don't
+re-propose it in either form.
+
+**So the evidence standard is the SAME as the donor-signed path's**: the
+browser's own observation of what settled. That is Reed's call and the symmetry
+is the argument — if the evidence is good enough to publish from the donor's
+account it is good enough to publish from ours. What differs between the two
+paths is not evidence but **accountability**: on the donor path, possession of
+the key proves an identity chose to stake itself on the claim. Here there is no
+key to possess, so what stands in for it is **containment**:
+
+- one identifiable publisher, so the bot's whole output is a single filterable
+  set (`client_src = publisher-pubkey`);
+- `excludes.json` removes all of it in one edit, reversibly;
+- the caps below bound what one caller can do with it.
+
+Keep it in proportion: **the index already accepts unauthenticated writes from
+the whole of Nostr**, since anyone may publish a boost note from a burner key and
+the collector indexes it. The endpoint removes the friction of generating a key,
+not the capability.
+
+**⚠️ THE VALIDATOR IS AN ALLOWLIST, and `e` and `p` are refused by omission.**
+Our template emits neither, so refusing them is provably not a regression — and
+with an `e` tag a note signed by this key appears to **reply** to any note in the
+world, which is a far better vehicle for harassment than a standalone post nobody
+follows; with `p` tags it becomes a mention blast at strangers from an identity
+carrying our NIP-05. **If `buildExternalNoteTemplate` ever emits a new tag, add
+it to `ALLOWED_TAGS` in the same change** or every site-signed note starts
+failing. `scripts/test-sign-boost.mjs` feeds the validator from the **shipped**
+builder rather than a fixture, so that coupling fails in the test rather than in
+production.
+
+Four more rules, each closing something specific: the `amount` must be **plain
+digits**, because `Number('1.5e6')` is an integer and the string `1.5e6` reads as
+1,500,000 to a JavaScript consumer and raises in the collector's `int()`;
+`client` is not caller-settable, being our own attribution; an `r` URL is checked,
+being a link published under our identity; and `created_at` is held to ±5min.
+
+**⚠️ THE RATE LIMIT IS FRICTION, NOT A SECURITY BOUNDARY, and Pages has no rate
+limiting binding.** The supported binding types are KV, Durable Objects, R2, D1,
+Vectorize, Workers AI, service bindings, Queues, Hyperdrive, Analytics Engine,
+variables and secrets; a Pages Function can only *bind* to a Durable Object class
+and never define one, so the textbook counter would mean standing up a separate
+Worker. It is a fixed-window KV counter instead, 5/min/IP. KV is eventually
+consistent so a caller spread across data centres is undercounted, the
+read-modify-write loses concurrent increments, and an IP limit falls to anyone
+with a proxy pool. It still **fails closed** with nothing bound, because refusing
+to run is what makes the operator decide.
 
 ### The one boost button
 
@@ -2649,6 +2725,32 @@ a re-derivation reaches the query layer only through
 **Still open: the UI.** Nothing renders attribution yet; `/stats` is where a
 "boosts by app" breakdown belongs, and `/api/v1/clients` is what it reads.
 
+### OnlyBoosts Publishes On Behalf Of Its Own Donors
+
+Registered 2026-08-20. `3a87a19c…84d9` is the **fourth** entry in
+`PUBLISHER_PUBKEYS` and the first that is not somebody else's bot: it is the key
+behind `/api/sign-boost` (see "The Site Signs For A Booster Who Has No Key").
+
+**It takes the SAME SLUG as the donor-signed path**, `onlyboosts`, because both
+are boosts made on this site and splitting them into two clients would report one
+product as two. `client_src` tells them apart for free, the pubkey being tested
+before the tag: **`publisher-pubkey` for bot-signed, `client-tag` for
+donor-signed**. Verified against a real signed event.
+
+**⚠️ THE `via != slug` GUARD IS NOW LOAD-BEARING FOR OUR OWN NOTES, and it does
+not look it.** The note template's attribution line reads `📱 via
+onlyboosts.social`, which is exactly the shape `_VIA_RE` reads, and `slugify`
+takes it to `onlyboosts` — the slug itself. That guard was written for somebody
+else's bot naming itself; without it **every** bot note would nest OnlyBoosts
+under OnlyBoosts on `/api/v1/clients`. Don't remove it as dead defensive code.
+
+**⚠️ THE BOOSTER IS THE BOT, NOT THE DONOR.** These notes carry no claim about
+who paid and must not gain one: nothing can verify a donor authorised a note
+signed by a key they do not hold. The typed "From" name rides the boostagram TLV
+and the note body, and nowhere the index credits. Same treatment the 994
+`chadf-boostbot` rows and the LB show account get, and the same reasoning as the
+`P`-tag rule below.
+
 ### Local Bitcoiners Publishes On Behalf Of Its Donors
 
 Registered 2026-08-18. `c330881e…64592` is the Local Bitcoiners **show account**,
@@ -2869,6 +2971,7 @@ would. Never remove an entry** — those links are in the wild.
 | `functions/index.js` | the homepage's opening feed, rendered at the edge |
 | `functions/{show,episode,booster}/…` | the three edge-rendered detail pages |
 | `functions/api/v1/*` | the D1 query API |
+| `functions/api/sign-boost.js` | the signing oracle for the boost bot, with `functions/_shared/nostr-sign.js` |
 | `functions/api/data/[[path]].js` + `ob-data.js` | the static shard proxy and the shape layer |
 | `login-widget/` | NIP-07/46/nsec login, NWC + WebLN wallets, boost modals, multi-leg value-split payments, bug reports |
 | `bots/bug-watcher/` | polls the bug relay, opens GitHub issues |
