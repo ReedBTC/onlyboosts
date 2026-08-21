@@ -1,0 +1,10 @@
+[Unit]
+Description=Run OnlyBoosts incremental every 5 minutes
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -2052,6 +2052,17 @@ pushes an episode only in the tick where a boost for it arrives and silently ski
 it when enrichment hasn't yet written the local row, never revisiting it. **The
 fix belongs in the collector; this is the graceful failure meanwhile.**
 
+**⚠️ A WRONG episode field is a different problem from a MISSING page, and it is
+not fixed here either.** Every surface prints `episodes.episode_number`, `title`,
+`image` and `published` exactly as stored — no derivation, no fallback — because
+the row is the truth and the collector owns keeping it true. It re-reads Podcast
+Index on a `checked_at` gate: **daily for an episode that aired inside 90 days,
+monthly for the rest** (`db.EPISODE_MAX_AGE`), so a publisher's correction lands
+on its own. Two episodes of one show both rendering "Ep. 1" was that gate not
+existing yet, not a render bug; `onlyboosts_globalscan.py re-enrich-episodes
+--show <guid>` forces it early. **Don't add a client- or edge-side repair for a
+field that looks stale** — it would mask the collector and then disagree with it.
+
 **⚠️ `item_guid` IS NOT ALWAYS A UUID, and it is the URL key.** 9% of distinct
 guids contain a slash and 30 are full http(s) URLs, so it is only ever
 `encodeURIComponent`d and bound, never parsed or split. Pages keeps an encoded
