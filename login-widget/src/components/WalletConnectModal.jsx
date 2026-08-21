@@ -96,7 +96,7 @@ export default function WalletConnectModal({ user, onClose, onConnected, onReque
         role="dialog"
         aria-label="Connect Lightning Wallet"
       >
-        <div className={`bg-[var(--surface)] border border-[var(--border)] rounded-lg w-full max-w-sm flex flex-col shadow-[0_24px_60px_-12px_rgba(11,58,82,0.28),0_0_0_1px_rgba(11,58,82,0.06)] my-4 sm:my-8 transition-[opacity,transform] duration-200 ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}>
+        <div className={`bg-[var(--modal-bg)] border border-[var(--border)] rounded-lg w-full max-w-sm flex flex-col shadow-[0_24px_60px_-12px_rgba(11,58,82,0.28),0_0_0_1px_rgba(11,58,82,0.06)] my-4 sm:my-8 transition-[opacity,transform] duration-200 ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}>
 
           {/* Header */}
           <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-[var(--border)]">
@@ -124,7 +124,7 @@ export default function WalletConnectModal({ user, onClose, onConnected, onReque
                 connection is encrypted to the user's own Nostr key, and
                 a signed-out visitor hasn't got one. */}
             {!user && (
-              <div className="rounded-lg border border-[var(--border)] bg-[var(--cream)] px-3 py-2.5 space-y-1.5">
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--modal-field)] px-3 py-2.5 space-y-1.5">
                 <p className="text-[11px] text-[var(--ink)] leading-snug">
                   You're not signed in with Nostr, so this connection lasts
                   until you close the tab. You can boost with it right away.
@@ -167,9 +167,9 @@ export default function WalletConnectModal({ user, onClose, onConnected, onReque
                 </p>
 
                 <div className="flex items-center gap-3 my-1">
-                  <div className="flex-1 h-px bg-[var(--cream)]" />
+                  <div className="flex-1 h-px bg-[var(--modal-field)]" />
                   <span className="text-[10px] uppercase tracking-wider text-[var(--muted)]">or</span>
-                  <div className="flex-1 h-px bg-[var(--cream)]" />
+                  <div className="flex-1 h-px bg-[var(--modal-field)]" />
                 </div>
               </>
             )}
@@ -181,7 +181,7 @@ export default function WalletConnectModal({ user, onClose, onConnected, onReque
                 onChange={e => setUri(e.target.value)}
                 rows={3}
                 placeholder="nostr+walletconnect://…"
-                className="w-full bg-[var(--cream)] border border-[var(--border)] rounded-lg px-3 py-2 text-xs text-[var(--ink)] font-mono focus:outline-none focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--brand-ring)]"
+                className="w-full bg-[var(--modal-field)] border border-[var(--border)] rounded-lg px-3 py-2 text-xs text-[var(--ink)] font-mono focus:outline-none focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--brand-ring)]"
               />
               <p className="mt-1.5 text-[10px] text-[var(--muted)] leading-snug">
                 Cross-device option. Get a connection string from Alby
@@ -199,7 +199,7 @@ export default function WalletConnectModal({ user, onClose, onConnected, onReque
             <button
               onClick={handleConnect}
               disabled={connecting}
-              className="w-full py-3 rounded-lg bg-[var(--cream)] border border-[var(--border)] hover:bg-[var(--cream-d)] disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium text-[var(--ink)] transition-colors"
+              className="w-full py-3 rounded-lg bg-[var(--modal-field)] border border-[var(--border)] hover:bg-[var(--modal-inset)] disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium text-[var(--ink)] transition-colors"
             >
               {connecting ? 'Connecting…' : 'Connect via NWC'}
             </button>

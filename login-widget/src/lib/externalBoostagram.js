@@ -19,6 +19,26 @@ export const MAX_MESSAGE_CHARS = 200  // match Boost Me Bitch's message cap
 const APP_NAME = 'OnlyBoosts'
 
 /**
+ * The banner every boost note opens with.
+ *
+ * A bare image URL on its own line is what Nostr clients render inline, so this
+ * is the note's picture rather than a link in it. It leads the content because
+ * that is where a client puts the preview.
+ *
+ * ⚠️ THE SIGNING ORACLE PINS THIS EXACT STRING. `functions/api/sign-boost.js`
+ * refuses anything that does not open with a boost note's own shape, and with a
+ * URL in front of that shape the check has to know the URL. **Change it here
+ * and change `BOOST_BANNER_URL` there in the same commit**, or every site-signed
+ * note starts failing; `scripts/test-sign-boost.mjs` asserts the two agree, so
+ * that failure lands in the test rather than in production.
+ *
+ * ⚠️ IT IS NOT AN `r` TAG. `r` is the episode's own URL, which is what a client
+ * and this index both read as "what this note is about". A second one pointing
+ * at a decoration would make that ambiguous.
+ */
+export const BOOST_BANNER_URL = 'https://i.nostr.build/8dtrQIw6lr1Nikv0bmw2tJ.png'
+
+/**
  * A typed "From" name, as it is allowed to appear in a note the BOT signs.
  *
  * ⚠️ THIS IS THE ONLY PLACE A DONOR'S TYPED TEXT BECOMES ONE OF THE BOT'S OWN
@@ -151,7 +171,10 @@ export function buildExternalNoteTemplate({
     ? `${showTitle || 'a podcast'} • ${episodeTitle}`
     : (showTitle || 'a podcast')
   const from = sanitizeSenderName(senderName)
-  const lines = [`⚡Just boosted ${sats.toLocaleString()} sats 📱 via onlyboosts.social`]
+  const lines = [
+    BOOST_BANNER_URL,
+    `⚡Just boosted ${sats.toLocaleString()} sats 📱 via onlyboosts.social`,
+  ]
   // "splits" rather than "legs": it is the word the value-block spec and the
   // podcast apps use, and this line is read by people outside this codebase.
   if (total > 0 && paid < total) lines.push(`⚠️ ${paid} of ${total} splits paid`)

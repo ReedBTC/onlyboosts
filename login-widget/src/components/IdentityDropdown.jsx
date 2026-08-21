@@ -85,7 +85,7 @@ export default function IdentityDropdown({
       ref={menuRef}
       role="menu"
       aria-label="Account menu"
-      className="fixed z-[90] bg-[var(--surface)] border border-[var(--border)] rounded-lg shadow-[0_24px_60px_-12px_rgba(11,58,82,0.28),0_0_0_1px_rgba(11,58,82,0.06)] text-sm text-[var(--ink)] overflow-hidden"
+      className="fixed z-[90] bg-[var(--modal-bg)] border border-[var(--border)] rounded-lg shadow-[0_24px_60px_-12px_rgba(11,58,82,0.28),0_0_0_1px_rgba(11,58,82,0.06)] text-sm text-[var(--ink)] overflow-hidden"
       style={{
         top: `${position.top}px`,
         left: `${position.left}px`,

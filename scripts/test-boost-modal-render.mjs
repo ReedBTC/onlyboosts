@@ -150,8 +150,9 @@ console.log('\nThe themed classes emit real CSS:')
 {
   const bundle = readFileSync(new URL('../assets/widgets/login-widget.js', import.meta.url), 'utf8')
   const REQUIRED = [
-    'background-color:var(--surface)',
-    'background-color:var(--cream)',
+    'background-color:var(--modal-bg)',
+    'background-color:var(--modal-field)',
+    'background-color:var(--modal-inset)',
     'background-color:var(--brand)',
     'background-color:var(--brand-tint)',
     'background-color:var(--scrim)',
@@ -174,6 +175,34 @@ console.log('\nThe themed classes emit real CSS:')
   assert.equal(bundle.includes('font-weight:var(--font-display)'), false,
     'font-[var(--font-display)] is compiling to font-weight again — it needs the family-name hint')
   ok('no token is being applied as the wrong property')
+
+  /**
+   * ⚠️ THE SECOND SILENT-FAILURE SHAPE, FOUND THE SAME WAY: Tailwind cannot
+   * apply an opacity modifier to an arbitrary `var()` colour. `border-[var(--
+   * brand)]/40` emits **nothing at all** — not a wrong property this time, just
+   * no rule — so the element falls back to `currentColor` and the build says
+   * nothing. Five of these had crept in across the modals.
+   *
+   * There is no way to express it in the token, so the rule is: an alpha on a
+   * var is a literal `rgba()` or a different token. This scan is what enforces
+   * it, since neither Tailwind nor the bundler will.
+   */
+  const ALPHA_ON_VAR = /(?:bg|text|border|ring|divide|from|to|via)-\[var\(--[a-z-]+\)\]\/\d/
+  const styled = [
+    'ExternalBoostModal', 'WalletConnectModal', 'LoginModal', 'LoginScreen', 'BoostModal',
+    'MultiLegBoostForm', 'BugReportModal', 'ConfirmLeaveOverlay', 'ModalErrorBoundary',
+    'IdentityDropdown', 'BoostProgressView', 'BoostExpectations', 'ToastHost', 'LoginButton',
+  ]
+  const offenders = []
+  for (const name of styled) {
+    const text = readFileSync(new URL(`../login-widget/src/components/${name}.jsx`, import.meta.url), 'utf8')
+    for (const line of text.split('\n')) {
+      const hit = line.match(ALPHA_ON_VAR)
+      if (hit) offenders.push(`${name}: ${hit[0]}`)
+    }
+  }
+  assert.deepEqual(offenders, [], `an opacity modifier on a var() colour emits no CSS:\n  ${offenders.join('\n  ')}`)
+  ok('no class applies an alpha to a var() colour')
 
   // ⚠️ The bundle is a build artifact. If it is stale the two assertions above
   // pass against yesterday's CSS, so the source is checked to agree with it.

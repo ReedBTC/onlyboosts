@@ -90,6 +90,19 @@ html, body { overflow-x: hidden; max-width: 100vw; }
   --font-display: 'Playfair Display', Georgia, serif;
   --font-body:    'Source Serif 4', Georgia, serif;
 
+  /* ── Modal surfaces ───────────────────────────────────────────
+     Three steps, because a modal needs a panel, fields sunk into it,
+     and boxes raised off it, and two tokens cannot express that.
+
+     ⚠️ THE PANEL IS NOT PURE WHITE, DELIBERATELY. It was `--surface`
+     and read as a slab: a full-bleed #fff rectangle over a dimmed page
+     is the brightest thing on screen by a wide margin, and at modal
+     size that is glare rather than emphasis. The fields are the white
+     now, which is also the right way round — white is where you type. */
+  --modal-bg:    #f4fafd;
+  --modal-field: #ffffff;
+  --modal-inset: #e6f1f9;
+
   --brand-tint: rgba(0, 175, 240, 0.12);
   --brand-ring: rgba(0, 175, 240, 0.32);
   --ok:         #0b7a4b;

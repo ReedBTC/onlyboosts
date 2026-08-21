@@ -28,7 +28,7 @@ export default function ConfirmLeaveOverlay({ paid = 0, total = 0, onStay, onLea
           </button>
           <button
             onClick={onLeave}
-            className="flex-1 py-2.5 rounded-lg border border-[var(--border)] text-sm text-[var(--ink)] hover:bg-[var(--cream-d)] transition-colors"
+            className="flex-1 py-2.5 rounded-lg border border-[var(--border)] text-sm text-[var(--ink)] hover:bg-[var(--modal-inset)] transition-colors"
           >
             Leave anyway
           </button>

@@ -55,7 +55,7 @@ export default class ModalErrorBoundary extends Component {
       <>
         <div className="fixed inset-0 bg-[var(--scrim)] z-[70]" aria-hidden="true" />
         <div className="fixed inset-0 z-[71] flex items-center justify-center p-3" role="dialog" aria-label="Something went wrong">
-          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg w-full max-w-sm p-5 space-y-3 shadow-[0_24px_60px_-12px_rgba(11,58,82,0.28)]">
+          <div className="bg-[var(--modal-bg)] border border-[var(--border)] rounded-lg w-full max-w-sm p-5 space-y-3 shadow-[0_24px_60px_-12px_rgba(11,58,82,0.28)]">
             <h2 className="text-base font-semibold text-[var(--ink)] font-[family-name:var(--font-display)]">Something went wrong on this screen</h2>
             {/* ⚠️ Never "your boost failed". This boundary cannot know: the
                 component's state died with it, and the payment may well have
@@ -69,7 +69,7 @@ export default class ModalErrorBoundary extends Component {
             </p>
             <button
               onClick={() => this.props.onClose?.()}
-              className="w-full py-2.5 rounded-lg bg-[var(--cream-d)] hover:bg-[var(--border)] text-sm text-[var(--ink)] transition-colors">
+              className="w-full py-2.5 rounded-lg bg-[var(--modal-inset)] hover:bg-[var(--border)] text-sm text-[var(--ink)] transition-colors">
               Close
             </button>
           </div>

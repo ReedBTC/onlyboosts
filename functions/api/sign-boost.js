@@ -58,7 +58,23 @@ import { finalizeEvent, nip19 } from '../_shared/nostr-sign.js'
 // is the feature rather than a hole in it. What it does buy is that this
 // endpoint cannot be repurposed to sign something that does not even look like
 // a boost.
+//
+// ⚠️ THE BANNER IS PINNED, NOT SKIPPED, AND THAT IS THE WHOLE POINT. The note
+// now opens with an image URL on its own line, so the boost line is line two.
+// The lazy fix is to test `/^⚡Just boosted /m` and let anything precede it —
+// which hands a caller a free paragraph of arbitrary text at the top of a note
+// published under our identity, and a paragraph of arbitrary text is a far
+// better vehicle for abuse than the boost line that follows it. So exactly one
+// prefix is allowed before the boost line, and it is a constant.
+//
+// ⚠️ RESTATED FROM `BOOST_BANNER_URL` IN
+// `login-widget/src/lib/externalBoostagram.js`. A Function cannot import from
+// the widget source, so **the two must be changed together**;
+// `scripts/test-sign-boost.mjs` feeds this validator from the shipped builder
+// and asserts they agree, so a drift fails there rather than in production.
+const BOOST_BANNER_URL = 'https://i.nostr.build/8dtrQIw6lr1Nikv0bmw2tJ.png'
 const CONTENT_PREFIX = '⚡Just boosted '
+const ALLOWED_OPENINGS = [CONTENT_PREFIX, `${BOOST_BANNER_URL}\n${CONTENT_PREFIX}`]
 const MAX_CONTENT = 2000
 
 // The complete tag vocabulary of `buildExternalNoteTemplate` in
@@ -158,7 +174,7 @@ export function validateBoostTemplate(body) {
   if (typeof body.content !== 'string' || body.content.length > MAX_CONTENT) {
     throw new Error('invalid content')
   }
-  if (!body.content.startsWith(CONTENT_PREFIX)) throw new Error('not a boost note')
+  if (!ALLOWED_OPENINGS.some((p) => body.content.startsWith(p))) throw new Error('not a boost note')
 
   if (!Array.isArray(body.tags) || body.tags.length > MAX_TAGS) throw new Error('invalid tags')
   const shaped = body.tags.every((tag) =>

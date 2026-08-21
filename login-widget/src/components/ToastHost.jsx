@@ -29,10 +29,10 @@ export default function ToastHost() {
           key={t.id}
           className={`pointer-events-auto rounded-lg shadow-[0_24px_60px_-12px_rgba(11,58,82,0.28),0_0_0_1px_rgba(11,58,82,0.06)] px-4 py-3 flex items-start gap-3 text-sm text-[var(--ink)] ${
             t.kind === 'error'
-              ? 'bg-[var(--surface)] border border-[var(--danger)]'
+              ? 'bg-[var(--modal-bg)] border border-[var(--danger)]'
               : t.kind === 'success'
-              ? 'bg-[var(--surface)] border border-[var(--ok)]'
-              : 'bg-[var(--surface)]/95 border border-[var(--border)]'
+              ? 'bg-[var(--modal-bg)] border border-[var(--ok)]'
+              : 'bg-[var(--modal-bg)] border border-[var(--border)]'
           }`}
         >
           <span className="flex-1 leading-snug">{t.message}</span>

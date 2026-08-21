@@ -44,7 +44,7 @@ export default function BoostExpectations({
   if (!showSigner && !showWallet) return null
 
   return (
-    <div className="text-[11px] text-[var(--muted)] leading-snug rounded-md border border-[var(--border)] bg-[var(--surface)]/60 px-3 py-2.5 space-y-1.5">
+    <div className="text-[11px] text-[var(--muted)] leading-snug rounded-md border border-[var(--border)] bg-[var(--modal-inset)] px-3 py-2.5 space-y-1.5">
       <p className="text-[10px] uppercase tracking-wider text-[var(--muted)]">
         <span className="text-[var(--brand-d)]">This boost has zap splits!</span>
         {' — '}What to expect:

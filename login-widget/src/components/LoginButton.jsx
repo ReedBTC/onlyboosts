@@ -16,11 +16,16 @@
  *   `nav`      on the navy bar. Translucent white, sized to sit beside Donate.
  *   `checkout` on a light modal surface. Brand-bordered and full width.
  *
- * The `checkout` skin is deliberately shaped like the express-checkout buttons
- * a shopper already knows — the mark, the verb, and a line underneath saying
- * what it saves you. It is offered as an ALTERNATIVE to typing a name, not as
- * a gate in front of it, so it sits beside that field under a divider rather
- * than above it: the boost works without ever pressing it.
+ * The `checkout` skin is the express-checkout shape a shopper already knows: the
+ * mark and the verb, nothing else. It is offered as an ALTERNATIVE to typing a
+ * name, not as a gate in front of it — which is why it sits **on the same line
+ * as the From field**, right-aligned past it, with a small "or" between. It had
+ * a full-width divider above it first and that was worse than the text link it
+ * replaced: a rule across the modal reads as a section break, so the two halves
+ * of one choice looked like two unrelated things.
+ *
+ * ⚠️ IT DOES NOT SET ITS OWN WIDTH. The caller does, because it is inline here
+ * and full-width elsewhere.
  */
 
 const MARK = '/assets/onlyboosts_favicon.png'
@@ -31,12 +36,12 @@ export default function LoginButton({ variant = 'nav', onClick, className = '' }
       <button
         type="button"
         onClick={onClick}
-        className={`w-full inline-flex items-center justify-center gap-2.5 py-2.5 px-3 rounded-lg border-2 border-[var(--brand)] bg-[var(--surface)] text-[var(--brand-dd)] text-sm font-semibold hover:bg-[var(--brand-tint)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-ring)] transition-colors ${className}`}
+        className={`inline-flex items-center justify-center gap-2 py-2.5 px-3.5 rounded-lg border-2 border-[var(--brand)] bg-[var(--modal-field)] text-[var(--brand-dd)] text-sm font-semibold whitespace-nowrap hover:bg-[var(--brand-tint)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-ring)] transition-colors ${className}`}
         aria-label="Log in to OnlyBoosts"
       >
         {/* Decorative: the label already says what the button does, so the mark
             is not given alt text a screen reader would read as a second word. */}
-        <img src={MARK} alt="" aria-hidden="true" width="20" height="20" className="w-5 h-5 rounded-full shrink-0" />
+        <img src={MARK} alt="" aria-hidden="true" width="18" height="18" className="w-[18px] h-[18px] rounded-full shrink-0" />
         <span>Log in</span>
       </button>
     )

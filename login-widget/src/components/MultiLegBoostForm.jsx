@@ -450,7 +450,7 @@ export default function MultiLegBoostForm({
         </p>
         <button
           onClick={cancelAndClose}
-          className="px-4 py-2 rounded-lg bg-[var(--cream-d)] hover:bg-[var(--border)] text-sm text-[var(--ink)] transition-colors"
+          className="px-4 py-2 rounded-lg bg-[var(--modal-inset)] hover:bg-[var(--border)] text-sm text-[var(--ink)] transition-colors"
         >
           Close
         </button>
@@ -491,7 +491,7 @@ export default function MultiLegBoostForm({
           max={MAX_SATS}
           value={amount}
           onChange={e => setAmount(e.target.value)}
-          className="w-full bg-[var(--cream)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--brand-ring)]"
+          className="w-full bg-[var(--modal-field)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--brand-ring)]"
           placeholder={presets ? 'Custom amount' : `${MIN_SATS} minimum`}
         />
         <p className="mt-1 text-[10px] text-[var(--muted)]">
@@ -508,7 +508,7 @@ export default function MultiLegBoostForm({
             className={`flex-1 flex items-center justify-center gap-1.5 py-3 px-3 rounded-md border transition-colors ${
               !anonymous
                 ? 'bg-[var(--brand-tint)] border-[var(--brand)] text-[var(--brand-dd)] font-semibold'
-                : 'bg-[var(--cream)] border-[var(--border)] text-[var(--muted)] hover:text-[var(--ink)] hover:border-[var(--brand)]'
+                : 'bg-[var(--modal-field)] border-[var(--border)] text-[var(--muted)] hover:text-[var(--ink)] hover:border-[var(--brand)]'
             }`}
             aria-pressed={!anonymous}
           >
@@ -524,7 +524,7 @@ export default function MultiLegBoostForm({
             className={`flex-1 py-3 px-3 rounded-md border transition-colors ${
               anonymous
                 ? 'bg-[var(--brand-tint)] border-[var(--brand)] text-[var(--brand-dd)] font-semibold'
-                : 'bg-[var(--cream)] border-[var(--border)] text-[var(--muted)] hover:text-[var(--ink)] hover:border-[var(--brand)]'
+                : 'bg-[var(--modal-field)] border-[var(--border)] text-[var(--muted)] hover:text-[var(--ink)] hover:border-[var(--brand)]'
             }`}
             aria-pressed={anonymous}
           >
@@ -561,7 +561,7 @@ export default function MultiLegBoostForm({
           }}
           rows={4}
           maxLength={10000}
-          className="w-full bg-[var(--cream)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--brand-ring)] resize-none max-h-40 overflow-y-auto leading-relaxed"
+          className="w-full bg-[var(--modal-field)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--ink)] focus:outline-none focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--brand-ring)] resize-none max-h-40 overflow-y-auto leading-relaxed"
           placeholder={messagePlaceholder}
         />
       </div>

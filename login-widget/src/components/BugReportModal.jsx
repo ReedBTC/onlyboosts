@@ -162,7 +162,7 @@ export default function BugReportModal({ user, onClose }) {
         aria-label="Report a bug"
       >
         <div
-          className="bg-[var(--surface)] border border-[var(--border)] rounded-lg w-full max-w-lg flex flex-col max-h-[90vh] shadow-[0_24px_60px_-12px_rgba(11,58,82,0.28)]"
+          className="bg-[var(--modal-bg)] border border-[var(--border)] rounded-lg w-full max-w-lg flex flex-col max-h-[90vh] shadow-[0_24px_60px_-12px_rgba(11,58,82,0.28)]"
           onDragOver={e => e.preventDefault()}
           onDrop={onDrop}
         >
@@ -188,7 +188,7 @@ export default function BugReportModal({ user, onClose }) {
               </p>
               <button
                 onClick={onClose}
-                className="px-4 py-2 rounded-lg bg-[var(--cream)] hover:bg-[var(--cream-d)] text-sm text-[var(--ink)] transition-colors"
+                className="px-4 py-2 rounded-lg bg-[var(--modal-field)] hover:bg-[var(--modal-inset)] text-sm text-[var(--ink)] transition-colors"
               >
                 Done
               </button>
@@ -218,7 +218,7 @@ export default function BugReportModal({ user, onClose }) {
                     placeholder="Your npub (optional — so we can follow up)"
                     spellCheck={false}
                     autoComplete="off"
-                    className="w-full bg-[var(--cream)] border border-[var(--border)] rounded-lg px-3 py-1.5 text-xs text-[var(--ink)] font-mono focus:outline-none focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--brand-ring)] placeholder:text-[var(--muted)]"
+                    className="w-full bg-[var(--modal-field)] border border-[var(--border)] rounded-lg px-3 py-1.5 text-xs text-[var(--ink)] font-mono focus:outline-none focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--brand-ring)] placeholder:text-[var(--muted)]"
                   />
                 </div>
               )}
@@ -231,13 +231,13 @@ export default function BugReportModal({ user, onClose }) {
                   onPaste={onPaste}
                   rows={14}
                   spellCheck
-                  className="w-full bg-[var(--cream)] border border-[var(--border)] rounded-lg px-3 py-2 text-xs text-[var(--ink)] font-mono resize-y focus:outline-none focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--brand-ring)]"
+                  className="w-full bg-[var(--modal-field)] border border-[var(--border)] rounded-lg px-3 py-2 text-xs text-[var(--ink)] font-mono resize-y focus:outline-none focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--brand-ring)]"
                   placeholder="Describe the bug…"
                 />
               </div>
 
               <div className="px-4 py-3 border-t border-[var(--border)] shrink-0 flex items-center gap-2 flex-wrap">
-                <label className={`text-xs px-2.5 py-1.5 rounded-lg border border-[var(--border)] text-[var(--ink)] hover:bg-[var(--cream-d)] cursor-pointer transition-colors ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                <label className={`text-xs px-2.5 py-1.5 rounded-lg border border-[var(--border)] text-[var(--ink)] hover:bg-[var(--modal-inset)] cursor-pointer transition-colors ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
                   {uploading ? 'Uploading…' : '📎 Attach image'}
                   <input
                     type="file"

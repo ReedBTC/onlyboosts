@@ -600,16 +600,34 @@ is a burnt orange and `--danger` a true red, different in hue as well as value.
 `--warn` is also deliberately outside the brand family, since brand is cyan and
 "warning" must not read as "in progress".
 
-**⚠️ A TAILWIND ARBITRARY VALUE TAILWIND CANNOT CLASSIFY EMITS THE WRONG
-PROPERTY, SILENTLY.** `font-[var(--font-display)]` compiled to
+**⚠️ THE MODAL PANEL IS NOT PURE WHITE, DELIBERATELY.** Three surface tokens,
+because a modal needs a panel, fields sunk into it and boxes raised off it, and
+two cannot express that: `--modal-bg` (panel), `--modal-field` (inputs),
+`--modal-inset` (sub-boxes). The panel was `--surface` and read as a slab — a
+full-bleed `#fff` rectangle over a dimmed page is the brightest thing on screen
+by a wide margin, which at modal size is glare rather than emphasis. The fields
+are the white now, which is also the right way round: white is where you type.
+
+**⚠️ TWO TAILWIND SHAPES FAIL SILENTLY HERE AND BOTH HAVE BITTEN.**
+
+*An arbitrary value Tailwind cannot classify emits the wrong property.* `font-[var(--font-display)]` compiled to
 `font-weight: var(--font-display)` — it cannot tell a family from a weight in a
 bare `font-[…]`, so it guessed, and the browser dropped the declaration. Every
 heading was in the default sans while every class name in the markup looked
 right. The fix is the type hint, `font-[family-name:var(--font-display)]`, and
 the same trap sits on `ring-`, `text-` and `bg-` wherever a value could be read
-as a length or a colour. **`scripts/test-boost-modal-render.mjs` now asserts
-against the BUILT BUNDLE** that each token produces a real declaration, because
-nothing else about this failure is visible.
+as a length or a colour.
+
+*An opacity modifier on an arbitrary `var()` colour emits nothing at all.*
+`border-[var(--brand)]/40` produces **no rule**, so the element falls back to
+`currentColor`. Five of these had crept in. There is no way to express it, so
+the rule is: **an alpha on a var is a literal `rgba()` or a different token.**
+
+**`scripts/test-boost-modal-render.mjs` catches both**, the first by asserting
+against the **built bundle** that each token produces a real declaration, the
+second by refusing the `/\d` shape in source. Nothing else about either failure
+is visible: the class names look right, the build is silent, and the page is
+simply unstyled in one place.
 
 **Two surfaces stay dark on purpose**: `IdentityWidget`'s pill and
 `BoostButton`, which sit on the navy nav bar rather than on a modal.
@@ -1133,6 +1151,19 @@ MATCH TO THE PIXEL.** The React button replaces that element in place once the
 1MB bundle lands, so any drift is a visible jump on every page load. The
 placeholder's mark, word, padding, radius and type size are all pinned to it in
 `nav.css` with a note saying so.
+
+**⚠️ THE NOTE OPENS WITH A BANNER, AND THE ORACLE PINS THE EXACT URL.**
+`BOOST_BANNER_URL` in `externalBoostagram.js` is a bare image URL on line one,
+which is what Nostr clients render inline, so it is the note's picture rather
+than a link in it. `functions/api/sign-boost.js` restates it as its own constant
+and accepts **two** openings and no others: the boost line, or that URL plus a
+newline plus the boost line. **The lazy version tests `/^⚡Just boosted /m` and
+lets anything precede it**, which hands a caller a free paragraph of arbitrary
+text at the top of a note published under our identity — a far better vehicle
+for abuse than the boost line under it. The two copies must move together;
+`scripts/test-sign-boost.mjs` feeds the validator from the shipped builder and
+fails if they drift. **It is deliberately not an `r` tag**: `r` is the episode's
+URL, which is what a client and this index both read as what the note is about.
 
 **⚠️ A BLANK "From" IS REPLACED, NOT OMITTED.** `DEFAULT_SENDER_NAME` is
 `onlyboosts.social user`, and it fills the boostagram's `sender_name` only. An

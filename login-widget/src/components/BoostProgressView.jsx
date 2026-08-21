@@ -198,7 +198,7 @@ export default function BoostProgressView({
       </div>
 
       {/* Progress bar */}
-      <div className="h-1.5 w-full rounded-full bg-[var(--cream)] overflow-hidden shrink-0">
+      <div className="h-1.5 w-full rounded-full bg-[var(--modal-field)] overflow-hidden shrink-0">
         <div
           className={`h-full rounded-full transition-[width] duration-300 ${
             failedAll ? 'bg-[var(--danger)]' : (partial || uncertainPresent) ? 'bg-[var(--warn)]' : 'bg-[var(--brand)]'
@@ -272,7 +272,7 @@ export default function BoostProgressView({
                 </span>
               </div>
               {unpayable && (r.unpayableReason || st.error) && (
-                <span className="text-[11px] text-[var(--warn)]/80 leading-snug">
+                <span className="text-[11px] text-[var(--warn)] leading-snug">
                   {r.unpayableReason || st.error}
                 </span>
               )}

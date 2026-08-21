@@ -15,6 +15,7 @@ import { validateBoostTemplate, secretKeyFrom, overRateLimit, onRequestPost } fr
 import { verifyEvent, getPublicKey, nip19 } from '../functions/_shared/nostr-sign.js'
 import { buildExternalNoteTemplate, sanitizeSenderName, MAX_SENDER_NAME_CHARS } from '../login-widget/src/lib/externalBoostagram.js'
 import { SITE_SIGN_MAX_SATS } from '../login-widget/src/lib/siteSign.js'
+import { BOOST_BANNER_URL } from '../login-widget/src/lib/externalBoostagram.js'
 
 let passed = 0
 // ⚠️ AWAITS. It used to call fn() bare, so an async assertion that failed became
@@ -108,7 +109,9 @@ await ok('⚠️ a 📱 in the name cannot forge the attribution line', () => {
   // keeps that true if the lines are ever reordered.
   const t = realTemplate({ senderName: '📱 via Fountain' })
   assert.equal(t.content.split('\n').filter((l) => l.includes('📱')).length, 1)
-  assert.match(t.content.split('\n')[0], /📱 via onlyboosts\.social$/)
+  // Line TWO since the banner landed; `_VIA_RE.search` still finds it first
+  // because nothing above it carries the emoji.
+  assert.match(t.content.split('\n')[1], /📱 via onlyboosts\.social$/)
 })
 await ok('the name is capped, and the cap is applied in the builder', () => {
   const long = 'x'.repeat(200)
@@ -122,6 +125,37 @@ await ok('a blank or whitespace name emits no line at all', () => {
     assert.equal(realTemplate({ senderName: name }).content.includes('👤'), false)
   }
   assert.equal(sanitizeSenderName('  \n  '), '')
+})
+
+// ─── The banner, and the opening it is allowed to be ──────────────────────
+// ⚠️ THE ORACLE HARDCODES THIS URL because a Function cannot import it. These
+// three assertions are the whole of what keeps the two copies honest: change
+// the banner in the builder alone and the first one fails here rather than
+// every site-signed note failing in production.
+console.log('\nThe banner leads the note, and the oracle knows exactly which one:')
+await ok('the note opens with the banner on its own line', () => {
+  const lines = realTemplate().content.split('\n')
+  assert.equal(lines[0], BOOST_BANNER_URL)
+  assert.match(lines[1], /^⚡Just boosted /)
+})
+await ok('⚠️ the oracle accepts the banner the shipped builder actually emits', () => {
+  validateBoostTemplate(realTemplate())
+})
+rejects('⚠️ any OTHER text before the boost line', {
+  ...realTemplate(),
+  content: 'vote for me\n' + realTemplate().content,
+}, /not a boost note/)
+rejects('a lookalike banner from another host', {
+  ...realTemplate(),
+  content: realTemplate().content.replace(BOOST_BANNER_URL, 'https://evil.example/x.png'),
+}, /not a boost note/)
+await ok('a bare boost line with no banner still validates', () => {
+  // The un-bannered opening stays legal so a note built before this shipped,
+  // or by anything that omits it, is not refused.
+  validateBoostTemplate({
+    ...realTemplate(),
+    content: realTemplate().content.split('\n').slice(1).join('\n'),
+  })
 })
 
 console.log('\nThe oracle refuses to be a general-purpose signer:')

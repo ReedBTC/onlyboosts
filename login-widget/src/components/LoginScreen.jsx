@@ -82,9 +82,9 @@ function clearPendingNip46() {
 // so <input> identity is stable across renders.
 const Divider = () => (
   <div className="flex items-center gap-3">
-    <div className="flex-1 h-px bg-[var(--cream)]" />
+    <div className="flex-1 h-px bg-[var(--modal-field)]" />
     <span className="text-xs text-[var(--muted)]">or</span>
-    <div className="flex-1 h-px bg-[var(--cream)]" />
+    <div className="flex-1 h-px bg-[var(--modal-field)]" />
   </div>
 )
 
@@ -650,7 +650,7 @@ export default function LoginScreen({ onLogin, embedded = false }) {
           inputMode="text"
           autoCapitalize="none"
           autoCorrect="off"
-          className="w-full px-4 py-3 rounded-lg bg-[var(--surface)] border border-[var(--border)] text-[var(--ink)] placeholder-[var(--muted)] focus:outline-none focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--brand-ring)] font-mono text-sm"
+          className="w-full px-4 py-3 rounded-lg bg-[var(--modal-bg)] border border-[var(--border)] text-[var(--ink)] placeholder-[var(--muted)] focus:outline-none focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--brand-ring)] font-mono text-sm"
           aria-label="Nostr nsec input"
         />
       </div>
@@ -662,7 +662,7 @@ export default function LoginScreen({ onLogin, embedded = false }) {
       <button
         onClick={loginWithKey}
         disabled={loading || !nsecValue.trim()}
-        className="w-full py-3 px-4 rounded-lg bg-[var(--cream)] hover:bg-[var(--cream-d)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--ink)] font-medium transition-colors border border-[var(--border)]"
+        className="w-full py-3 px-4 rounded-lg bg-[var(--modal-field)] hover:bg-[var(--modal-inset)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--ink)] font-medium transition-colors border border-[var(--border)]"
       >
         {loading ? 'Connecting...' : 'Login with Key'}
       </button>
@@ -704,13 +704,13 @@ export default function LoginScreen({ onLogin, embedded = false }) {
           <div className="flex rounded-md overflow-hidden border border-[var(--border)] text-xs">
             <button
               onClick={() => switchNcTab('qr')}
-              className={`px-3 py-1.5 transition-colors ${ncTab === 'qr' ? 'bg-[var(--cream-d)] text-[var(--ink)]' : 'bg-[var(--surface)] text-[var(--muted)] hover:text-[var(--ink)]'}`}
+              className={`px-3 py-1.5 transition-colors ${ncTab === 'qr' ? 'bg-[var(--modal-inset)] text-[var(--ink)]' : 'bg-[var(--modal-bg)] text-[var(--muted)] hover:text-[var(--ink)]'}`}
             >
               Scan QR
             </button>
             <button
               onClick={() => switchNcTab('paste')}
-              className={`px-3 py-1.5 transition-colors border-l border-[var(--border)] ${ncTab === 'paste' ? 'bg-[var(--cream-d)] text-[var(--ink)]' : 'bg-[var(--surface)] text-[var(--muted)] hover:text-[var(--ink)]'}`}
+              className={`px-3 py-1.5 transition-colors border-l border-[var(--border)] ${ncTab === 'paste' ? 'bg-[var(--modal-inset)] text-[var(--ink)]' : 'bg-[var(--modal-bg)] text-[var(--muted)] hover:text-[var(--ink)]'}`}
             >
               Paste string
             </button>
@@ -748,7 +748,7 @@ export default function LoginScreen({ onLogin, embedded = false }) {
             <button
               onClick={copyQrUri}
               disabled={loading}
-              className="w-full py-2 px-4 rounded-lg bg-[var(--cream)] hover:bg-[var(--cream-d)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--ink)] text-xs border border-[var(--border)] transition-colors"
+              className="w-full py-2 px-4 rounded-lg bg-[var(--modal-field)] hover:bg-[var(--modal-inset)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--ink)] text-xs border border-[var(--border)] transition-colors"
             >
               {copied ? 'Copied!' : 'Copy connection link'}
             </button>
@@ -789,14 +789,14 @@ export default function LoginScreen({ onLogin, embedded = false }) {
               recommended fallback (the bunker:// URL flow below) avoids
               all of this — Amber generates a stable URL with the user's
               pubkey already embedded, no relay round-trip handshake. */}
-          <div className="rounded-md border border-[var(--border)] bg-[var(--surface)]/50 px-3 py-2 text-[11px] text-[var(--muted)] leading-relaxed">
+          <div className="rounded-md border border-[var(--border)] bg-[var(--modal-inset)] px-3 py-2 text-[11px] text-[var(--muted)] leading-relaxed">
             <strong className="text-[var(--ink)]">Amber on Android?</strong> If login gets stuck, tap "Open in Signer App" again — Amber will remember your approval and reconnect quickly. Still stuck? Use the <strong>bunker URL</strong> option below instead: in Amber, go to Settings → Connected Apps → Generate bunker URL, then paste it here. That path is more reliable on mobile.
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="flex-1 h-px bg-[var(--cream)]" />
+            <div className="flex-1 h-px bg-[var(--modal-field)]" />
             <span className="text-xs text-[var(--muted)]">or paste a bunker string</span>
-            <div className="flex-1 h-px bg-[var(--cream)]" />
+            <div className="flex-1 h-px bg-[var(--modal-field)]" />
           </div>
 
           <div className="space-y-2">
@@ -812,12 +812,12 @@ export default function LoginScreen({ onLogin, embedded = false }) {
               inputMode="text"
               autoCapitalize="none"
               autoCorrect="off"
-              className="w-full px-4 py-3 rounded-lg bg-[var(--surface)] border border-[var(--border)] text-[var(--ink)] placeholder-[var(--muted)] focus:outline-none focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--brand-ring)] font-mono text-sm"
+              className="w-full px-4 py-3 rounded-lg bg-[var(--modal-bg)] border border-[var(--border)] text-[var(--ink)] placeholder-[var(--muted)] focus:outline-none focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--brand-ring)] font-mono text-sm"
             />
             <button
               onClick={loginWithBunker}
               disabled={loading || !bunkerValue.trim()}
-              className="w-full py-3 px-4 rounded-lg bg-[var(--cream)] hover:bg-[var(--cream-d)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--ink)] font-medium transition-colors border border-[var(--border)]"
+              className="w-full py-3 px-4 rounded-lg bg-[var(--modal-field)] hover:bg-[var(--modal-inset)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--ink)] font-medium transition-colors border border-[var(--border)]"
             >
               {loading ? 'Connecting...' : 'Connect'}
             </button>
@@ -851,13 +851,13 @@ export default function LoginScreen({ onLogin, embedded = false }) {
                 <div className="flex gap-2 w-full">
                   <button
                     onClick={copyQrUri}
-                    className="flex-1 py-2 px-3 rounded-lg bg-[var(--cream)] hover:bg-[var(--cream-d)] text-[var(--ink)] text-xs border border-[var(--border)] transition-colors"
+                    className="flex-1 py-2 px-3 rounded-lg bg-[var(--modal-field)] hover:bg-[var(--modal-inset)] text-[var(--ink)] text-xs border border-[var(--border)] transition-colors"
                   >
                     {copied ? 'Copied!' : 'Copy link'}
                   </button>
                   <button
                     onClick={cancelQrFlow}
-                    className="flex-1 py-2 px-3 rounded-lg bg-[var(--cream)] hover:bg-[var(--cream-d)] text-[var(--ink)] text-xs border border-[var(--border)] transition-colors"
+                    className="flex-1 py-2 px-3 rounded-lg bg-[var(--modal-field)] hover:bg-[var(--modal-inset)] text-[var(--ink)] text-xs border border-[var(--border)] transition-colors"
                   >
                     Refresh QR
                   </button>
@@ -896,7 +896,7 @@ export default function LoginScreen({ onLogin, embedded = false }) {
               <button
                 type="button"
                 onClick={startQrFlow}
-                className="py-2 px-4 rounded-lg bg-[var(--cream)] hover:bg-[var(--cream-d)] text-[var(--ink)] text-sm border border-[var(--border)] transition-colors"
+                className="py-2 px-4 rounded-lg bg-[var(--modal-field)] hover:bg-[var(--modal-inset)] text-[var(--ink)] text-sm border border-[var(--border)] transition-colors"
               >
                 Generate QR code
               </button>
@@ -927,7 +927,7 @@ export default function LoginScreen({ onLogin, embedded = false }) {
               inputMode="text"
               autoCapitalize="none"
               autoCorrect="off"
-              className="w-full px-4 py-3 rounded-lg bg-[var(--surface)] border border-[var(--border)] text-[var(--ink)] placeholder-[var(--muted)] focus:outline-none focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--brand-ring)] font-mono text-sm"
+              className="w-full px-4 py-3 rounded-lg bg-[var(--modal-bg)] border border-[var(--border)] text-[var(--ink)] placeholder-[var(--muted)] focus:outline-none focus:border-[var(--brand)] focus:ring-2 focus:ring-[var(--brand-ring)] font-mono text-sm"
             />
           </div>
           <p className="text-xs text-[var(--muted)] leading-relaxed">
@@ -936,7 +936,7 @@ export default function LoginScreen({ onLogin, embedded = false }) {
           <button
             onClick={loginWithBunker}
             disabled={loading || !bunkerValue.trim()}
-            className="w-full py-3 px-4 rounded-lg bg-[var(--cream)] hover:bg-[var(--cream-d)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--ink)] font-medium transition-colors border border-[var(--border)]"
+            className="w-full py-3 px-4 rounded-lg bg-[var(--modal-field)] hover:bg-[var(--modal-inset)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--ink)] font-medium transition-colors border border-[var(--border)]"
           >
             {loading ? 'Connecting...' : 'Login with Bunker'}
           </button>
