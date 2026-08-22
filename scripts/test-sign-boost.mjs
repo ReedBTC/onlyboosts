@@ -11,11 +11,11 @@
  * Run: node scripts/test-sign-boost.mjs
  */
 import assert from 'node:assert/strict'
-import { validateBoostTemplate, secretKeyFrom, overRateLimit, onRequestPost } from '../functions/api/sign-boost.js'
+import { validateBoostTemplate, validateDonationTemplate, validateTemplate, secretKeyFrom, overRateLimit, onRequestPost } from '../functions/api/sign-boost.js'
 import { verifyEvent, getPublicKey, nip19 } from '../functions/_shared/nostr-sign.js'
-import { buildExternalNoteTemplate, sanitizeSenderName, MAX_SENDER_NAME_CHARS } from '../login-widget/src/lib/externalBoostagram.js'
+import { buildExternalNoteTemplate, buildDonationNoteTemplate, donationHeadline, sanitizeSenderName, MAX_SENDER_NAME_CHARS } from '../login-widget/src/lib/externalBoostagram.js'
 import { SITE_SIGN_MAX_SATS } from '../login-widget/src/lib/siteSign.js'
-import { BOOST_BANNER_URL } from '../login-widget/src/lib/externalBoostagram.js'
+import { BOOST_BANNER_URL, DONATION_BANNER_URL, DONATION_URL } from '../login-widget/src/lib/externalBoostagram.js'
 
 let passed = 0
 // ⚠️ AWAITS. It used to call fn() bare, so an async assertion that failed became
@@ -351,6 +351,106 @@ await ok('malformed JSON answers 400, not 500', () => assert.equal(badJson.statu
 const rejected = await post({ ...realTemplate(), kind: 0 })
 await ok('a refused template answers 400 and signs nothing', async () => {
   assert.equal(rejected.status, 400)
+})
+
+
+// ─── The donation family ───────────────────────────────────────────────────
+//
+// ⚠️ THE POINT OF THESE IS THAT THE TWO FAMILIES ARE DISJOINT. A donation note
+// is not a boost note with fields left out: it must be refused by the boost
+// validator and a boost note must be refused by the donation one, or the looser
+// looking shape becomes a way around the stricter one. Every template below is
+// built by the SHIPPED builder, so a drift between the widget's constants and
+// the Function's restatements fails here rather than in production.
+
+function donation(over = {}) {
+  return buildDonationNoteTemplate({ paidSats: 2100, message: 'thanks', ...over })
+}
+
+await ok('the shipped donation builder validates', () => {
+  const t = validateTemplate(donation())
+  assert.equal(t.kind, 1)
+  assert.equal(t.content, donation().content)
+})
+
+await ok('the banner and headline the Function pins are the ones shipped', () => {
+  const lines = donation({ paidSats: 2100 }).content.split('\n')
+  assert.equal(lines[0], DONATION_BANNER_URL)
+  assert.equal(lines[1], donationHeadline(2100))
+})
+
+await ok('the dispatcher routes by opening line, with no fallback', () => {
+  // A donation reaching the boost validator, and a boost reaching the donation
+  // one, must BOTH be refused. If either passed, `validateTemplate` picking the
+  // wrong family would be silent.
+  assert.throws(() => validateBoostTemplate(donation()))
+  assert.throws(() => validateDonationTemplate(realTemplate()))
+})
+
+await ok('a donation carries none of the three markers that make it a boost', () => {
+  const names = donation().tags.map((t) => t[0])
+  for (const forbidden of ['amount', 'i', 'k']) {
+    assert.equal(names.includes(forbidden), false, `donation note carries ${forbidden}`)
+  }
+  const topics = donation().tags.filter((t) => t[0] === 't').map((t) => t[1])
+  for (const forbidden of ['boost', 'boostagram', 'value4value']) {
+    assert.equal(topics.includes(forbidden), false, `donation note carries t=${forbidden}`)
+  }
+})
+
+await ok('a boost topic tag smuggled onto a donation is refused', () => {
+  // `t` IS an allowed tag name here, so the allowlist alone does not stop this.
+  // Without the explicit refusal a caller could put a fabricated boost into
+  // this index under the bot identity.
+  for (const topic of ['boost', 'boostagram', 'value4value']) {
+    const t = donation()
+    t.tags = [...t.tags, ['t', topic]]
+    assert.throws(() => validateTemplate(t), /unsupported topic/)
+  }
+})
+
+await ok('an amount tag on a donation is refused by the allowlist', () => {
+  const t = donation()
+  t.tags = [...t.tags, ['amount', '2100000']]
+  assert.throws(() => validateTemplate(t), /unsupported tag/)
+})
+
+await ok('a donation may point only at the site itself', () => {
+  const t = donation()
+  t.tags = t.tags.map((tag) => (tag[0] === 'r' ? ['r', 'https://evil.example/'] : tag))
+  assert.throws(() => validateTemplate(t), /unsupported url/)
+  assert.equal(donation().tags.find((tag) => tag[0] === 'r')[1], DONATION_URL)
+})
+
+await ok('the headline is matched whole, so nothing may precede or follow it', () => {
+  const t = donation()
+  t.content = t.content.replace(donationHeadline(2100), donationHeadline(2100) + ' and also')
+  assert.throws(() => validateTemplate(t), /not a donation note/)
+  // ⚠️ Prepending text does not merely break the donation match, it routes the
+  // template to the BOOST validator (the dispatcher keys on the first line), so
+  // the refusal arrives under that family's wording. Either way nothing signs,
+  // which is the property being asserted; pinning the message here would be
+  // pinning which validator happened to answer.
+  const t2 = donation()
+  t2.content = 'free text\n' + t2.content
+  assert.throws(() => validateTemplate(t2))
+  assert.throws(() => validateDonationTemplate(t2), /not a donation note/)
+})
+
+await ok('the donation cap is the boost cap, read out of the headline', () => {
+  // ⚠️ The figure has no tag to live in, so the cap is only as good as the
+  // headline match. Same number as SITE_SIGN_MAX_SATS, one sat apart.
+  validateTemplate(donation({ paidSats: SITE_SIGN_MAX_SATS }))
+  assert.throws(() => validateTemplate(donation({ paidSats: SITE_SIGN_MAX_SATS + 1 })), /invalid amount/)
+  assert.throws(() => validateTemplate(donation({ paidSats: 0 })), /invalid amount/)
+})
+
+await ok('a donation carries the typed name as prose and never as a tag', () => {
+  const t = donation({ senderName: 'Reed' })
+  validateTemplate(t)
+  assert.match(t.content, /^👤 From Reed$/m)
+  assert.equal(t.tags.some((tag) => tag[0] === 'p'), false)
+  assert.equal(t.tags.some((tag) => tag.includes('Reed')), false)
 })
 
 console.log(`\n${passed} assertions passed.\n`)

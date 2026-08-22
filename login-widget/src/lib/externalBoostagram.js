@@ -39,6 +39,24 @@ const APP_NAME = 'OnlyBoosts'
 export const BOOST_BANNER_URL = 'https://i.nostr.build/iQ4vHJ88xTrGZ36eey9lWJ.png'
 
 /**
+ * The banner a SITE DONATION note opens with.
+ *
+ * ⚠️ A DONATION IS NOT A BOOST, AND THE TWO NOTES ARE DELIBERATELY DIFFERENT
+ * OBJECTS. A boost pays a third party's value block and belongs in this index;
+ * a donation pays OnlyBoosts and must not. Giving them one banner would make
+ * the one visible difference between them the wording of a single line.
+ *
+ * ⚠️ THE SIGNING ORACLE PINS THIS STRING TOO, exactly as it pins the boost
+ * banner. `functions/api/sign-boost.js` restates it as `DONATION_BANNER_URL`;
+ * change it here and there in one commit, and `scripts/test-sign-boost.mjs`
+ * fails if the two drift.
+ */
+export const DONATION_BANNER_URL = 'https://i.nostr.build/QoXlTuDurz3b4EqNefAzoC.png'
+
+/** Where a donation note points. The site itself: there is no episode. */
+export const DONATION_URL = 'https://onlyboosts.social/'
+
+/**
  * A typed "From" name, as it is allowed to appear in a note the BOT signs.
  *
  * ⚠️ THIS IS THE ONLY PLACE A DONOR'S TYPED TEXT BECOMES ONE OF THE BOT'S OWN
@@ -211,4 +229,127 @@ export function buildExternalNoteTemplate({
   tags.push(['amount', String(Math.round(sats * 1000))])
 
   return { kind: 1, created_at: Math.floor(Date.now() / 1000), content: lines.join('\n'), tags }
+}
+
+/**
+ * The Nostr note for a SITE DONATION: sats to OnlyBoosts itself, one leg at
+ * 100% to `RECIPIENT_LUD16`, no podcast and no episode behind it.
+ *
+ * It is the boost note's twin by design — same banner-then-⚡-line shape, same
+ * `👤 From` line on the bot path, same `💬 "…"` message — because a reader
+ * should recognise it instantly as the same site speaking. What differs is
+ * every machine-readable part, and that is the whole point of it being a
+ * separate builder:
+ *
+ * ⚠️ IT CARRIES NO NIP-73 TAGS, NO BOOST TOPIC TAGS AND NO `amount` TAG, AND
+ * ALL THREE OMISSIONS ARE LOAD-BEARING. This site's own collector decides what
+ * is a boost in two places, and a donation must fail both:
+ *
+ *   - `scan.py` REQs `{kinds:[1], "#k": BOOST_FILTER_K}`, so a note with no `k`
+ *     tag is never even fetched. That is what keeps the existing site tip out
+ *     of the index today, and it is the outer guard here.
+ *   - `classify.py` then sets `is_boost` from EITHER a `t` tag in
+ *     {boostagram, value4value, boost} OR a positive `amount` tag. So carrying
+ *     either one would make a donation an indexed boost the moment anything
+ *     widened that filter — a boost to no show, in an index whose whole subject
+ *     is podcast boosts.
+ *
+ * This follows the decision `FEED_GUID = null` already records: OnlyBoosts is a
+ * client, not a podcast, so it has nothing to claim a boost against. The sats
+ * figure lives in the note's own text, where a reader can see it and no indexer
+ * will mistake it for a boostagram.
+ *
+ * ⚠️ AND IT IS WHY THE ORACLE NEEDS A SECOND SHAPE. `validateBoostTemplate`
+ * REQUIRES `t=boostagram`, `t=value4value` and exactly one `amount` — the exact
+ * three things this note must not have — so a donation cannot be signed by the
+ * bot through the boost path. See `validateDonationTemplate` there.
+ */
+export function buildDonationNoteTemplate({ paidSats, message, senderName }) {
+  const sats = Number(paidSats) || 0
+  const msg = (message || '').trim()
+  const from = sanitizeSenderName(senderName)
+  const lines = [
+    DONATION_BANNER_URL,
+    donationHeadline(sats),
+  ]
+  // Same rule as the boost note: prose only, never a `p` tag or an author
+  // claim. Only the bot path passes a name; a donor-signed note is already
+  // from the donor.
+  if (from) lines.push(`👤 From ${from}`)
+  if (msg) lines.push(`💬 "${msg.slice(0, MAX_MESSAGE_CHARS)}"`)
+  lines.push('')
+  lines.push(DONATION_URL)
+
+  const tags = [
+    // `donation` and `onlyboosts` are deliberately outside the collector's
+    // BOOST_TOPIC_TAGS set. Do not add `boost`, `boostagram` or `value4value`
+    // here to "make it findable"; that is the one change that files a donation
+    // as a podcast boost.
+    ['t', 'donation'],
+    ['t', 'onlyboosts'],
+    ['client', 'onlyboosts.social'],
+    ['r', DONATION_URL],
+  ]
+
+  return { kind: 1, created_at: Math.floor(Date.now() / 1000), content: lines.join('\n'), tags }
+}
+
+/**
+ * The donation note's second line, and the ONLY place its wording is decided.
+ *
+ * ⚠️ THE ORACLE MATCHES THIS LINE WHOLE, NOT AS A PREFIX. A donation note
+ * carries no `amount` tag, so this string is where the figure lives, and
+ * `functions/api/sign-boost.js` reads the sats back out of it to apply the same
+ * cap the boost path applies to its tag. Change the wording here and the
+ * regex there in one commit; `scripts/test-sign-boost.mjs` feeds the validator
+ * from this builder, so a drift fails the test rather than production.
+ */
+export function donationHeadline(sats) {
+  return `⚡Just donated ${Number(sats || 0).toLocaleString('en-US')} sats to OnlyBoosts 📱 via onlyboosts.social`
+}
+
+/**
+ * The LNURL comment an lnaddress leg sends, carrying a BoostBox descriptor when
+ * one could be stored.
+ *
+ * Helipad reads `rss::payment::boost <url>` out of the invoice memo, HEADs that
+ * URL and pulls the full boostagram from an `x-rss-payment` header. That is the
+ * only channel an lnaddress leg has: a keysend leg carries its metadata inline
+ * in the TLV, and this one has nothing but the comment.
+ *
+ * ⚠️ THE DESCRIPTOR IS WHOLE OR IT IS ABSENT, AND THAT IS THE ENTIRE POINT OF
+ * THIS FUNCTION. The obvious version is `${desc} ${message}`.slice(0, allowed),
+ * and it is wrong in a way that looks fine: `commentAllowed` is 255 at Alby, a
+ * truncation cuts from the RIGHT, and the descriptor is on the left — so a long
+ * message does not lose its own tail, it shortens the URL into a dead link
+ * while having spent the whole allowance on it. The podcaster then gets a
+ * comment that is mostly a broken URL and a fetch that 404s, which is worse
+ * than the bare message they get today.
+ *
+ * So: if the descriptor does not fit whole, it is dropped and the message takes
+ * the full allowance. If it fits, the message takes whatever is left.
+ *
+ * ⚠️ AND A MISSING DESCRIPTOR IS NEVER FATAL. `/api/boostbox` fails closed on an
+ * unconfigured key, a timeout or an upstream refusal, and every one of those
+ * arrives here as an empty `descriptorUrl`. The leg still pays and the
+ * podcaster still gets the message, which is exactly what shipped before any of
+ * this existed.
+ */
+export function buildLnurlComment({ descriptorUrl, message, commentAllowed }) {
+  const allowed = Number(commentAllowed) || 0
+  if (allowed <= 0) return ''
+  const msg = (message || '').trim().slice(0, MAX_MESSAGE_CHARS)
+  const url = (descriptorUrl || '').trim()
+  if (!url) return msg.slice(0, allowed)
+
+  const descriptor = `rss::payment::boost ${url}`
+  // Not merely "too long to be useful": a partial URL is an active harm,
+  // because the recipient's tooling will try to fetch it.
+  if (descriptor.length > allowed) return msg.slice(0, allowed)
+  if (!msg) return descriptor
+
+  // One space between them, so the remaining budget is what is left after it.
+  const remaining = allowed - descriptor.length - 1
+  if (remaining <= 0) return descriptor
+  return `${descriptor} ${msg.slice(0, remaining)}`
 }

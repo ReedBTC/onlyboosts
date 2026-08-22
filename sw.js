@@ -470,7 +470,7 @@
 // session-only because the at-rest scheme encrypts the NWC URI to the user's
 // own signer. The widget bundle changed, so a returning visitor needs the new
 // URL.
-const VERSION = 'ob-v101';
+const VERSION = 'ob-v104';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;
@@ -502,27 +502,27 @@ const PRECACHE_URLS = [
   '/assets/onlyboosts_pfp.png',
   '/assets/onlyboosts_banner.png',
   '/assets/avatar-fallback.svg',
-  '/assets/css/theme.css?v=ob-v101',
-  '/assets/css/page.css?v=ob-v101',
-  '/assets/css/nav.css?v=ob-v101',
-  '/assets/css/footer.css?v=ob-v101',
-  '/assets/css/boosts-thread.css?v=ob-v101',
-  '/assets/css/boost-actions.css?v=ob-v101',
+  '/assets/css/theme.css?v=ob-v104',
+  '/assets/css/page.css?v=ob-v104',
+  '/assets/css/nav.css?v=ob-v104',
+  '/assets/css/footer.css?v=ob-v104',
+  '/assets/css/boosts-thread.css?v=ob-v104',
+  '/assets/css/boost-actions.css?v=ob-v104',
   // The episode card and its drawer. Precached alongside the others because the
   // homepage's feeds are painted in it and it used to be inline in index.html,
   // which IS precached — leaving it out would trade an inline block for a
   // network round trip on the one page this list exists to make fast.
-  '/assets/css/feed-cards.css?v=ob-v101',
-  '/assets/js/boosts-thread.js?v=ob-v101',
+  '/assets/css/feed-cards.css?v=ob-v104',
+  '/assets/js/boosts-thread.js?v=ob-v104',
   // A static import of boosts-thread.js, so precaching that without this one
   // leaves a returning visitor fetching half the graph from the network.
-  '/assets/js/primal-profiles.js?v=ob-v101',
-  '/assets/js/calendar-events.js?v=ob-v101',
-  '/assets/js/boost-actions.js?v=ob-v101',
-  '/assets/js/nav.js?v=ob-v101',
-  '/assets/js/nav-widget-boot.js?v=ob-v101',
-  '/assets/js/widget-loader.js?v=ob-v101',
-  '/assets/js/sw-register.js?v=ob-v101',
+  '/assets/js/primal-profiles.js?v=ob-v104',
+  '/assets/js/calendar-events.js?v=ob-v104',
+  '/assets/js/boost-actions.js?v=ob-v104',
+  '/assets/js/nav.js?v=ob-v104',
+  '/assets/js/nav-widget-boot.js?v=ob-v104',
+  '/assets/js/widget-loader.js?v=ob-v104',
+  '/assets/js/sw-register.js?v=ob-v104',
 ];
 
 self.addEventListener('install', (event) => {
@@ -593,7 +593,13 @@ function isLiveAPIRequest(url) {
 function isUncacheableMoneyRequest(url) {
   return url.pathname === '/api/value'
     || url.pathname.startsWith('/api/value/')
-    || url.pathname === '/api/lnurl';
+    || url.pathname === '/api/lnurl'
+    // ⚠️ A CACHED DESCRIPTOR IS ANOTHER BOOST'S METADATA. `/api/boostbox`
+    // answers with a URL that a podcaster's Helipad will fetch to learn what
+    // this payment was for, so serving a previous response would attach the
+    // wrong message, amount and episode to this leg — the same class of harm as
+    // a cached bolt11, arriving at the recipient's end rather than the donor's.
+    || url.pathname === '/api/boostbox';
 }
 
 // Stale-while-revalidate helper: serve cached immediately if present,

@@ -30,6 +30,7 @@ import * as wallet from './wallet.js'
 import * as nwc from './nwc.js'
 import {
   buildBoostagram,
+  buildLnurlComment,
   toTlvHex,
   toWeblnRecords,
   randomPreimageHex,
@@ -155,6 +156,64 @@ function isCleanDecline(msg) {
     /not_implemented|not implemented|unsupported|method not found/i.test(String(msg || ''))
 }
 
+/**
+ * Store this leg's boostagram with BoostBox and return the URL a podcaster's
+ * Helipad can read it back from, or `''` if anything at all went wrong.
+ *
+ * ⚠️ IT NEVER THROWS AND NEVER REJECTS, AND THAT IS THE WHOLE CONTRACT. It runs
+ * inside a leg the donor is watching pay, one leg at a time, so a hang here is
+ * a hang in the boost. Every outcome — unconfigured key, rate limit, upstream
+ * refusal, timeout, a body that will not parse — resolves to the empty string,
+ * and the comment falls back to the bare message. **Metadata is a courtesy to
+ * the recipient; the payment is the point.**
+ *
+ * ⚠️ IT IS SKIPPED ON A SITE DONATION. The descriptor exists so a PODCASTER can
+ * resolve who boosted them; on a donation OnlyBoosts is the recipient, so the
+ * record would be metadata about ourselves.
+ *
+ * ⚠️ AND IT GOES THROUGH OUR OWN EDGE, NOT STRAIGHT TO TARDBOX. Not for CORS —
+ * tardbox sends `access-control-allow-origin: *` and would answer the browser
+ * fine — but because the API key is ours by name and a key in a public bundle
+ * is a key anyone can write records with. See `functions/api/boostbox.js`.
+ */
+const DESCRIPTOR_TIMEOUT_MS = 7_000
+
+async function fetchBoostDescriptor(leg, ctx) {
+  if (ctx.donation) return ''
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), DESCRIPTOR_TIMEOUT_MS)
+  try {
+    const res = await fetch('/api/boostbox', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: ctrl.signal,
+      body: JSON.stringify({
+        value_msat: leg.sats * 1000,
+        // ⚠️ THE FIGURE THAT WAS MISSING. Without it Helipad computes the split
+        // against the leg's own amount and renders every boost as "(100% split)",
+        // so a podcaster is shown one leg's sats as the whole thing.
+        value_msat_total: (ctx.totalSats || leg.sats) * 1000,
+        message: ctx.message || '',
+        sender_name: ctx.senderName || '',
+        recipient_name: leg.recipient?.name || '',
+        recipient_address: leg.recipient?.address || '',
+        podcast: ctx.meta?.showTitle || '',
+        episode: ctx.meta?.episodeTitle || '',
+        feed_guid: ctx.meta?.podcastGuid || '',
+        item_guid: ctx.meta?.itemGuid || '',
+        url: ctx.meta?.url || '',
+      }),
+    })
+    if (!res.ok) return ''
+    const body = await res.json()
+    return typeof body?.url === 'string' ? body.url : ''
+  } catch {
+    return ''
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 async function payLnaddressLeg(leg, ctx, update, timer) {
   // Prefer the modal's prefetched metadata over a fresh fetch. The modal
   // resolves every lnaddress recipient in parallel on mount, so by boost time
@@ -171,8 +230,20 @@ async function payLnaddressLeg(leg, ctx, update, timer) {
   if (typeof meta.maxSendable === 'number' && msats > meta.maxSendable) {
     throw new Error(`This leg accepts at most ${Math.floor(meta.maxSendable / 1000).toLocaleString()} sats.`)
   }
+  // ⚠️ THE ONLY CHANNEL THIS LEG HAS. A keysend carries its boostagram inline in
+  // the TLV and reaches Helipad's first tier; an lnaddress leg has nothing but
+  // the LNURL comment, which lands in Helipad's third tier as
+  // `sender = "Lightning Invoice"` with the split reading 100% because the
+  // total never travelled. A BoostBox descriptor in the comment is what closes
+  // that: Helipad HEADs the URL and reads the whole boostagram back.
+  //
+  // ⚠️ IT IS FETCHED BEFORE THE INVOICE AND IS NEVER ALLOWED TO STOP ONE. Every
+  // failure path resolves to an empty string, and `buildLnurlComment` then
+  // sends the bare message — which is exactly what shipped before this existed.
   const allowed = meta.commentAllowed || 0
-  const comment = allowed > 0 ? (ctx.message || '').slice(0, Math.min(allowed, MAX_MESSAGE_CHARS)) : ''
+  const descriptorUrl = allowed > 0 ? await fetchBoostDescriptor(leg, ctx) : ''
+  timer?.mark('descriptor')
+  const comment = buildLnurlComment({ descriptorUrl, message: ctx.message, commentAllowed: allowed })
   const { pr, verify } = await fetchLnurlInvoice(meta.callback, msats, comment, leg.recipient.address)
   timer?.mark('invoice')
   const paymentHash = bolt11PaymentHash(pr)

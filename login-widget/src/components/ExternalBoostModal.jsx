@@ -45,7 +45,7 @@ import { useModalTransition } from '../lib/useModalTransition.js'
 import { isSafeUrl } from '../lib/utils.js'
 import * as wallet from '../lib/wallet.js'
 import { payExternalBoost, distributeSats, STATUS } from '../lib/externalBoost.js'
-import { buildExternalNoteTemplate, sanitizeSenderName, MAX_MESSAGE_CHARS, MAX_SENDER_NAME_CHARS } from '../lib/externalBoostagram.js'
+import { buildExternalNoteTemplate, buildDonationNoteTemplate, sanitizeSenderName, MAX_MESSAGE_CHARS, MAX_SENDER_NAME_CHARS } from '../lib/externalBoostagram.js'
 import { signKindOneShareWithUser, publishSignedKindOne, confirmInvoiceSettled, fetchLnurlMeta } from '../lib/boostagram.js'
 import { signKindOneWithSite } from '../lib/siteSign.js'
 import { setBoostModalProgressVisible } from '../lib/boostModalSignal.js'
@@ -269,7 +269,7 @@ function LegRow({ recipient, leg, onRepay, onCheck, checking, locked }) {
   )
 }
 
-export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onRequestWallet, episode, recipientsBundle }) {
+export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onRequestWallet, episode, recipientsBundle, donation = false }) {
   const { visible, requestClose } = useModalTransition(onClose)
   const cancelledRef = useRef(false)
   useEffect(() => () => { cancelledRef.current = true }, [])
@@ -561,6 +561,32 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
   }, [phase])
 
   /**
+   * The note this modal publishes, for whichever subject it is boosting.
+   *
+   * ⚠️ ONE BUILDER FOR BOTH CALL SITES, and that is the point of it existing.
+   * The template is built twice — once by `presignNote` before the first leg,
+   * once by `handleShare` at publish time — and the publish step re-checks that
+   * the pre-signed note's figures still hold. Two separate construction sites
+   * choosing their own builder is how a donation gets pre-signed as a boost and
+   * then published as a donation, or the reverse.
+   *
+   * ⚠️ A DONATION IS NOT A BOOST WITH THE SHOW LEFT BLANK. It carries no NIP-73
+   * tags, no boost topic tags and no `amount` tag, because this site's own
+   * collector would otherwise index sats paid to OnlyBoosts as a podcast boost
+   * to no show. `buildDonationNoteTemplate` carries the full argument, and
+   * `functions/api/sign-boost.js` validates the two families as disjoint
+   * shapes, so passing the wrong one here fails at the oracle rather than
+   * publishing something wrong.
+   */
+  function noteTemplate(args) {
+    if (donation) {
+      const { paidSats, message: msg, senderName } = args
+      return buildDonationNoteTemplate({ paidSats, message: msg, senderName })
+    }
+    return buildExternalNoteTemplate(args)
+  }
+
+  /**
    * Publish the kind-1 boost note, by whichever route the form declared.
    *
    * ⚠️ THE FIGURES COME FROM LIVE LEG STATE, NOT FROM THE FORM, and that has
@@ -585,7 +611,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
     setShareState('signing')
     setShareError('')
     try {
-      const template = buildExternalNoteTemplate({
+      const template = noteTemplate({
         paidSats,
         legsPaid: paidCount,
         legsTotal: activeCount,
@@ -778,7 +804,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
     const projected = distributeSats(sats, recipients, totalWeight).filter((l) => l.sats > 0).length
     if (projected === 0) return
     try {
-      const template = buildExternalNoteTemplate({
+      const template = noteTemplate({
         paidSats: sats,
         // Equal on purpose: a pre-signed note is only ever published when
         // nothing fell short, so it must carry no shortfall line.
@@ -831,6 +857,12 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
           itemGuid: episode?.itemGuid,
           url: episode?.bmbUrl,
         },
+        // ⚠️ A DONATION SKIPS THE BOOSTBOX DESCRIPTOR. That descriptor exists so
+        // a PODCASTER's Helipad can resolve who boosted them and for what; on a
+        // donation the recipient is OnlyBoosts, so there is no third party to
+        // inform and the record would be metadata about ourselves, spending the
+        // rate budget to say nothing.
+        donation,
         lnurlCache,
         onLeg: (i, legState) => updateLeg(i, legState),
       })
@@ -883,6 +915,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
           showTitle: episode?.showTitle, episodeTitle: episode?.episodeTitle,
           podcastGuid: episode?.podcastGuid, itemGuid: episode?.itemGuid, url: episode?.bmbUrl,
         },
+        donation,
         // A leg that failed at the LNURL step has a null cache entry, so a
         // retry re-fetches it live; one that failed at the payment reuses the
         // metadata it already had. Both are what the retry wants.
@@ -922,7 +955,24 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
     }
   }
 
-  const headerTitle = '⚡ Boost episode'
+  // ⚠️ ONE COPY TABLE, THE SAME PATTERN THE FEED RENDERERS USE. The donation
+  // and the boost are one flow with one subject swapped, so the wording is a
+  // lookup rather than a branch scattered through the markup. Anything that
+  // differs beyond these strings is a sign the subjects have really diverged.
+  const copy = donation
+    ? {
+        header: '⚡ Donate to OnlyBoosts',
+        subject: 'OnlyBoosts',
+        subjectNote: 'Every sat goes to the site. There are no other splits.',
+        noteHint: 'Posts a note saying you donated to OnlyBoosts. It carries no podcast tags, so it does not appear in the boost feeds.',
+      }
+    : {
+        header: '⚡ Boost episode',
+        subject: episode?.showTitle || '',
+        subjectNote: '',
+        noteHint: '',
+      }
+  const headerTitle = copy.header
   const allPaid = phase === 'done' && activeCount > 0 && paidCount === activeCount
 
   // ⚠️ THE SUMMARY MUST NOT TELL THE DONOR TO RE-SEND A LEG WE CANNOT PROVE
@@ -956,16 +1006,17 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
           </div>
 
           <div className="px-4 sm:px-6 py-5 space-y-4 flex-1 min-h-0 overflow-y-auto">
-            {episode?.showTitle && (
+            {copy.subject && (
               <div className="text-xs text-[var(--muted,#5a7488)] leading-snug">
-                <span className="font-semibold text-[var(--ink,#0f2733)]">{episode.showTitle}</span>
-                {episode?.episodeTitle && <span className="block italic mt-0.5">"{episode.episodeTitle}"</span>}
+                <span className="font-semibold text-[var(--ink,#0f2733)]">{copy.subject}</span>
+                {!donation && episode?.episodeTitle && <span className="block italic mt-0.5">"{episode.episodeTitle}"</span>}
+                {copy.subjectNote && <span className="block mt-0.5">{copy.subjectNote}</span>}
               </div>
             )}
 
             {!hasValue && (
               <div className="space-y-3 text-center py-2">
-                <p className="text-sm text-[var(--muted,#5a7488)]">This episode doesn't have a Podcasting 2.0 value block, so there's no split to boost to.</p>
+                <p className="text-sm text-[var(--muted,#5a7488)]">{donation ? "OnlyBoosts' own Lightning address isn't configured, so there's nothing to donate to." : "This episode doesn't have a Podcasting 2.0 value block, so there's no split to boost to."}</p>
                 <button onClick={requestClose} className="px-4 py-2 rounded-lg bg-[var(--modal-inset,#e6f1f9)] hover:bg-[var(--border,#cfe2ee)] text-sm text-[var(--ink,#0f2733)] transition-colors">Close</button>
               </div>
             )}
@@ -1233,11 +1284,23 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
                     ) : (
                       <>
                         <p className="text-xs text-[var(--ink,#0f2733)] leading-snug">
-                          {shareState === 'error' ? 'The note didn’t post' : 'Post this boost to Nostr?'}
+                          {shareState === 'error'
+                            ? 'The note didn’t post'
+                            : (donation ? 'Post this donation to Nostr?' : 'Post this boost to Nostr?')}
                           <span className="block text-[10px] text-[var(--muted,#5a7488)] mt-1">
-                            {noteRoute === 'bot'
-                              ? `OnlyBoosts counts boosts it can find on Nostr, so this is what puts yours in the feeds and the totals. It posts under the OnlyBoosts account${signedIn ? ', not yours' : ''}.`
-                              : 'Posts a note from your own account, tagged to this episode. OnlyBoosts counts boosts it can find on Nostr, so this is what puts yours in the feeds and the totals.'}
+                            {/* ⚠️ A DONATION'S NOTE MAKES THE OPPOSITE PROMISE
+                                TO A BOOST'S, so it cannot share the boost copy.
+                                A boost note is what puts a boost in the feeds
+                                and the totals; a donation note deliberately
+                                carries no podcast tags and so appears in
+                                neither. Telling a donor otherwise would be
+                                selling them a place in an index they will then
+                                go and fail to find themselves in. */}
+                            {donation
+                              ? `${copy.noteHint}${noteRoute === 'bot' ? ` It posts under the OnlyBoosts account${signedIn ? ', not yours' : ''}.` : ''}`
+                              : noteRoute === 'bot'
+                                ? `OnlyBoosts counts boosts it can find on Nostr, so this is what puts yours in the feeds and the totals. It posts under the OnlyBoosts account${signedIn ? ', not yours' : ''}.`
+                                : 'Posts a note from your own account, tagged to this episode. OnlyBoosts counts boosts it can find on Nostr, so this is what puts yours in the feeds and the totals.'}
                           </span>
                         </p>
                         {/* ⚠️ WHY IT IS ASKING AT ALL, ON EITHER ROUTE. A clean

@@ -26,7 +26,7 @@ import {
 import { markStubUser, isStubUser } from './lib/stubUser.js'
 import { getNDK, resetNDK, connectAndWait, signWithTimeout } from './lib/ndk.js'
 import * as wallet from './lib/wallet.js'
-import { bolt11PaymentHash, confirmInvoiceSettled } from './lib/boostagram.js'
+import { bolt11PaymentHash, confirmInvoiceSettled, RECIPIENT_LUD16 } from './lib/boostagram.js'
 import { isCleanPaymentDecline } from './lib/utils.js'
 import { applyRecipientOverrides } from './lib/recipientOverrides.js'
 import { pushToast } from './lib/toast.js'
@@ -541,6 +541,7 @@ function ExternalBoostHost() {
         onClose={() => setExternalBoostState(null)}
         episode={state.episode}
         recipientsBundle={state.recipientsBundle}
+        donation={!!state.donation}
       />
     </ModalErrorBoundary></div>,
     document.body,
@@ -1020,12 +1021,15 @@ const api = {
    * @param {object} args.episode          - { showTitle, episodeTitle, podcastGuid, itemGuid, bmbUrl }
    * @param {object} args.recipientsBundle - { recipients, totalWeight }
    */
-  async openExternalBoost({ episode, recipientsBundle }) {
-    if (!episode || !recipientsBundle || !Array.isArray(recipientsBundle.recipients) || recipientsBundle.recipients.length === 0) {
+  async openExternalBoost({ episode, recipientsBundle, donation = false }) {
+    // ⚠️ A DONATION HAS NO EPISODE, AND THAT IS THE ONLY THING IT RELAXES HERE.
+    // The recipients requirement is unchanged, because a payment with no
+    // recipients is the one payload this flow can do nothing with.
+    if ((!episode && !donation) || !recipientsBundle || !Array.isArray(recipientsBundle.recipients) || recipientsBundle.recipients.length === 0) {
       console.warn('[LBLogin] openExternalBoost: missing episode/recipients payload')
       return
     }
-    const args = { episode, recipientsBundle }
+    const args = { episode, recipientsBundle, donation }
 
     // ⚠️ THERE IS NO LONGER A LOGIN GATE ON THIS PATH. A boost is a
     // payment, and a payment does not need a Nostr identity: the
@@ -1073,7 +1077,55 @@ const api = {
     // mounted underneath the connect modal instead (`WalletConnectModal` is
     // z-[78/79] against this one's z-[70/71]), keeps its state, and resumes
     // off its own `wallet.onChange` subscription.
-    setExternalBoostState({ episode, recipientsBundle })
+    setExternalBoostState({ episode, recipientsBundle, donation })
+  },
+
+  /**
+   * A donation to OnlyBoosts itself, behind the nav's Donate button.
+   *
+   * ⚠️ IT IS THE BOOST FLOW WITH ONE LEG, NOT A SECOND FLOW. Everything a
+   * donor gets on a podcast boost they get here: the wallet gate behind the
+   * button, the four note outcomes, anonymity, the private-boost opt-out, the
+   * per-leg retry, the 90-second watcher and the site-signed note for someone
+   * with no account. Writing a parallel modal would have meant maintaining two
+   * copies of a money path, and the copy that is exercised less is the one
+   * that rots.
+   *
+   * ⚠️ IT REPLACES `openShowBoost`, WHICH IS THE LB PATH AND STAYS AS IT IS.
+   * That one signs its kind-1 BEFORE paying and batches the approval with the
+   * receipts, so its content is frozen before any outcome is known. That is
+   * safe there only because a single leg at 100% cannot partial — but it also
+   * cannot offer the bot route, so it is login-gated by construction, which is
+   * the whole thing this change is undoing. `MultiLegBoostForm` is deliberately
+   * untouched; see the note in CLAUDE.md under the dead-code list.
+   *
+   * ⚠️ THE SPLIT IS BUILT HERE AND NEVER FETCHED. A podcast boost resolves its
+   * value block from the show's own RSS through `/api/value`; this one is
+   * OnlyBoosts paying OnlyBoosts, so there is no third party's block to read
+   * and nothing that could reroute it. One leg, 100%, to the address the site
+   * publishes. `applyExternalOverrides` is not in this path because there is no
+   * external recipient to override.
+   */
+  async openSiteDonation() {
+    if (!RECIPIENT_LUD16) {
+      console.warn('[LBLogin] openSiteDonation: no recipient address configured')
+      return
+    }
+    return api.openExternalBoost({
+      episode: null,
+      donation: true,
+      recipientsBundle: {
+        recipients: [{
+          name: 'OnlyBoosts',
+          type: 'lnaddress',
+          address: RECIPIENT_LUD16,
+          splitWeight: 100,
+          fee: false,
+        }],
+        totalWeight: 100,
+        level: 'site',
+      },
+    })
   },
 
   /**

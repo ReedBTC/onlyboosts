@@ -40,7 +40,7 @@
       }
       const s = document.createElement('script');
       // Absolute — this file is shared by pages at more than one path.
-      s.src = '/assets/widgets/login-widget.js?v=ob-v101';
+      s.src = '/assets/widgets/login-widget.js?v=ob-v104';
       s.async = true;
       s.onload = () => { Promise.resolve().then(resolve); };
       s.onerror = () => {
@@ -64,7 +64,15 @@
       if (short) short.textContent = '…';
       try {
         await ensureWidgetLoaded();
-        if (window.LBLogin?.openShowBoost) window.LBLogin.openShowBoost();
+        // ⚠️ `openSiteDonation`, NOT `openShowBoost`. The nav's Donate button
+        // used to open the LB tip form, which signs its note before paying and
+        // therefore needs a signer by construction — so a visitor with no Nostr
+        // account could not donate at all. It now opens the same modal a podcast
+        // boost opens, with one leg at 100% to the site's own address.
+        // `openShowBoost` is still exported and still works; nothing on this
+        // fork calls it.
+        if (window.LBLogin?.openSiteDonation) window.LBLogin.openSiteDonation();
+        else if (window.LBLogin?.openShowBoost) window.LBLogin.openShowBoost();
       } catch (e) {
         if (long) long.textContent = prevLong;
         if (short) short.textContent = prevShort;

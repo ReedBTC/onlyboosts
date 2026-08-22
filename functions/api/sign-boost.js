@@ -77,6 +77,42 @@ const CONTENT_PREFIX = '⚡Just boosted '
 const ALLOWED_OPENINGS = [CONTENT_PREFIX, `${BOOST_BANNER_URL}\n${CONTENT_PREFIX}`]
 const MAX_CONTENT = 2000
 
+// ── The donation shape ───────────────────────────────────────────────────────
+//
+// ⚠️ A DONATION IS A SECOND TEMPLATE FAMILY, NOT A LOOSENING OF THE FIRST. Sats
+// to OnlyBoosts itself are not a podcast boost, so that note deliberately
+// carries no NIP-73 `i`/`k` tags, no boost topic tags and no `amount` tag —
+// which is exactly the set `validateBoostTemplate` REQUIRES. The two validators
+// therefore accept disjoint shapes and neither can be reached by relaxing the
+// other. `buildDonationNoteTemplate` in
+// `login-widget/src/lib/externalBoostagram.js` is the builder they mirror.
+//
+// ⚠️ RESTATED FROM `DONATION_BANNER_URL` THERE, same rule as the boost banner:
+// change both in one commit, and `scripts/test-sign-boost.mjs` fails on drift.
+const DONATION_BANNER_URL = 'https://i.nostr.build/QoXlTuDurz3b4EqNefAzoC.png'
+
+// ⚠️ THE WHOLE LINE, NOT A PREFIX, AND THAT IS DELIBERATE. The boost family can
+// afford a prefix test because its figure rides an `amount` tag this validator
+// checks separately. A donation note has no such tag, so this line is the only
+// place its figure exists — which means the line has to be matched whole and
+// the figure read back out of it, or the cap below would be guarding nothing.
+// Mirrors `donationHeadline()` in the widget source.
+const DONATION_LINE_RE = /^⚡Just donated ([0-9](?:[0-9,]{0,14})) sats to OnlyBoosts 📱 via onlyboosts\.social$/
+
+// The complete tag vocabulary of `buildDonationNoteTemplate`. Narrower than the
+// boost allowlist by three entries, and every omission is load-bearing:
+// `amount`, `i` and `k` are the markers that would file this as a boost.
+const DONATION_ALLOWED_TAGS = new Set(['t', 'client', 'r'])
+
+// ⚠️ RESTATED FROM `BOOST_TOPIC_TAGS` IN `bots/global-boost-scan/classify.py`.
+// Any one of these on a note makes this site's own collector treat it as a
+// boost, so they are the exact set a donation note must never carry. This is a
+// third copy of a constant that cannot be imported across the Python/JS split,
+// like CALLBACK_HOST_ALLOWLIST and SITE_SIGN_MAX_SATS before it; if the
+// collector's set ever grows, grow this one.
+const BOOST_TOPIC_TAGS = new Set(['boostagram', 'value4value', 'boost'])
+const DONATION_URL = 'https://onlyboosts.social/'
+
 // The complete tag vocabulary of `buildExternalNoteTemplate` in
 // `login-widget/src/lib/externalBoostagram.js`. An allowlist, not a denylist.
 // ⚠️ IF THAT BUILDER EMITS A NEW TAG, ADD IT HERE IN THE SAME CHANGE or every
@@ -167,6 +203,40 @@ function isSafeUrl(value) {
  * Bound the oracle to one shape of one kind. Throws with a caller-facing
  * message; every message is safe to return, none of them echo the input back.
  */
+/**
+ * Structural checks every template family shares: the tags are an array of
+ * bounded string arrays, they are within the total-size budget, and every tag
+ * name is in the caller's allowlist.
+ *
+ * ⚠️ SHARED ON PURPOSE. Two validators with their own copies of this is one
+ * validator getting a fix the other does not, which in an allowlist is the
+ * failure that does not announce itself. What each family may CONTAIN stays in
+ * its own function; only the shape lives here.
+ */
+function checkTagShape(rawTags, allowed) {
+  if (!Array.isArray(rawTags) || rawTags.length > MAX_TAGS) throw new Error('invalid tags')
+  const shaped = rawTags.every((tag) =>
+    Array.isArray(tag) &&
+    tag.length > 0 &&
+    tag.length <= MAX_TAG_ITEMS &&
+    tag.every((x) => typeof x === 'string' && x.length <= MAX_TAG_ITEM_LEN))
+  if (!shaped) throw new Error('invalid tags')
+  const totalLen = rawTags.reduce((n, tag) => n + tag.reduce((m, x) => m + x.length, 0), 0)
+  if (totalLen > MAX_TAGS_TOTAL_LEN) throw new Error('invalid tags')
+  if (!rawTags.every((tag) => allowed.has(tag[0]))) throw new Error('unsupported tag')
+  return rawTags
+}
+
+/** ±5 minutes, shared by both families. A note dated outside this window is
+ *  either a clock problem or an attempt to place it somewhere else in the
+ *  timeline. */
+function checkCreatedAt(value) {
+  const now = Math.floor(Date.now() / 1000)
+  const createdAt = Number.isFinite(value) ? Math.floor(value) : now
+  if (Math.abs(createdAt - now) > CREATED_AT_SKEW_SECS) throw new Error('created_at out of range')
+  return createdAt
+}
+
 export function validateBoostTemplate(body) {
   if (!body || typeof body !== 'object') throw new Error('bad template')
   if (body.kind !== 1) throw new Error('only kind 1 boost notes may be signed')
@@ -176,18 +246,7 @@ export function validateBoostTemplate(body) {
   }
   if (!ALLOWED_OPENINGS.some((p) => body.content.startsWith(p))) throw new Error('not a boost note')
 
-  if (!Array.isArray(body.tags) || body.tags.length > MAX_TAGS) throw new Error('invalid tags')
-  const shaped = body.tags.every((tag) =>
-    Array.isArray(tag) &&
-    tag.length > 0 &&
-    tag.length <= MAX_TAG_ITEMS &&
-    tag.every((x) => typeof x === 'string' && x.length <= MAX_TAG_ITEM_LEN))
-  if (!shaped) throw new Error('invalid tags')
-
-  const tags = body.tags
-  const totalLen = tags.reduce((n, tag) => n + tag.reduce((m, x) => m + x.length, 0), 0)
-  if (totalLen > MAX_TAGS_TOTAL_LEN) throw new Error('invalid tags')
-  if (!tags.every((tag) => ALLOWED_TAGS.has(tag[0]))) throw new Error('unsupported tag')
+  const tags = checkTagShape(body.tags, ALLOWED_TAGS)
 
   // The two markers every NIP-73 boost consumer keys on. Their presence is what
   // makes this a boost note rather than a kind 1 that merely opens like one.
@@ -217,13 +276,95 @@ export function validateBoostTemplate(body) {
     throw new Error('invalid amount')
   }
 
-  // A note dated outside this window is either a clock problem or an attempt to
-  // place a boost somewhere else in the timeline.
-  const now = Math.floor(Date.now() / 1000)
-  const createdAt = Number.isFinite(body.created_at) ? Math.floor(body.created_at) : now
-  if (Math.abs(createdAt - now) > CREATED_AT_SKEW_SECS) throw new Error('created_at out of range')
+  const createdAt = checkCreatedAt(body.created_at)
 
   return { kind: 1, created_at: createdAt, tags, content: body.content }
+}
+
+/**
+ * A SITE DONATION note: sats to OnlyBoosts itself, no podcast behind them.
+ *
+ * ⚠️ THIS IS NOT `validateBoostTemplate` WITH THE REQUIREMENTS REMOVED. The two
+ * families accept disjoint shapes: a boost MUST carry `t=boostagram`,
+ * `t=value4value` and exactly one `amount`, and a donation may carry NONE of
+ * them, because those are precisely the markers that would make this site's own
+ * collector file a donation as a podcast boost. Anything that satisfies one
+ * validator is refused by the other, which is what stops the looser-looking
+ * shape here from becoming a way around the stricter one.
+ *
+ * The figure is read out of the headline rather than a tag, so the amount cap
+ * applies to donations exactly as it does to boosts.
+ */
+export function validateDonationTemplate(body) {
+  if (!body || typeof body !== 'object') throw new Error('bad template')
+  if (body.kind !== 1) throw new Error('only kind 1 notes may be signed')
+
+  if (typeof body.content !== 'string' || body.content.length > MAX_CONTENT) {
+    throw new Error('invalid content')
+  }
+
+  // ⚠️ THE BANNER IS MANDATORY HERE, where the boost family allows the bare
+  // line too. That leniency exists for boost notes published before the banner
+  // did; a donation note has no such history, so there is nothing to be
+  // backward-compatible with and no reason to accept a second opening.
+  const lines = body.content.split('\n')
+  if (lines[0] !== DONATION_BANNER_URL) throw new Error('not a donation note')
+  const m = DONATION_LINE_RE.exec(lines[1] || '')
+  if (!m) throw new Error('not a donation note')
+
+  // ⚠️ THE FIGURE IS RE-DERIVED FROM THE MATCHED TEXT, NOT TRUSTED AS TYPED.
+  // The regex admits comma grouping because the builder emits it via
+  // toLocaleString, so `1,000,000` and `1000000` both reach here; stripping the
+  // separators is what makes the cap below compare numbers rather than strings.
+  const sats = Number(m[1].replace(/,/g, ''))
+  if (!Number.isInteger(sats) || sats <= 0 || sats * 1000 > MAX_AMOUNT_MSAT) {
+    throw new Error('invalid amount')
+  }
+
+  const tags = checkTagShape(body.tags, DONATION_ALLOWED_TAGS)
+
+  // The marker that makes this a donation note rather than a kind 1 that merely
+  // opens like one, and the mirror of the boost family's topic requirement.
+  if (!tags.some((tag) => tag[0] === 't' && tag[1] === 'donation')) {
+    throw new Error('not a donation note')
+  }
+  // ⚠️ REFUSED EXPLICITLY, NOT MERELY ABSENT FROM THE ALLOWLIST. `t` IS an
+  // allowed tag name here, so without this a caller could ask for
+  // `t=boostagram` on a note the bot signs and put a fabricated boost into this
+  // index under our own identity. The allowlist stops `i`, `k` and `amount`;
+  // only this stops the third marker.
+  if (tags.some((tag) => tag[0] === 't' && BOOST_TOPIC_TAGS.has(tag[1]))) {
+    throw new Error('unsupported topic')
+  }
+
+  for (const tag of tags) {
+    // The only URL a donation note names is the site's own front door. It is
+    // published under our identity and points at us, so unlike the boost
+    // family's `r` there is no third-party URL to allow.
+    if (tag[0] === 'r' && tag[1] !== DONATION_URL) throw new Error('unsupported url')
+    if (tag[0] === 'client' && tag[1] !== CLIENT_TAG) throw new Error('unsupported client')
+  }
+
+  const createdAt = checkCreatedAt(body.created_at)
+
+  return { kind: 1, created_at: createdAt, tags, content: body.content }
+}
+
+/**
+ * Which family a submitted template belongs to, decided by its opening line and
+ * nothing else.
+ *
+ * ⚠️ THERE IS NO FALLBACK BETWEEN THEM. A template that opens as a donation is
+ * validated as a donation and refused if it does not hold up; it is never
+ * retried against the boost validator. Trying both and accepting either would
+ * turn two strict shapes into one loose one, and the error a caller sees would
+ * name whichever validator happened to complain last.
+ */
+export function validateTemplate(body) {
+  const content = body && typeof body.content === 'string' ? body.content : ''
+  return content.startsWith(DONATION_BANNER_URL)
+    ? validateDonationTemplate(body)
+    : validateBoostTemplate(body)
 }
 
 /** nsec or 64-char hex, to a 32-byte key. Returns null on anything else, which
@@ -290,7 +431,7 @@ export async function onRequestPost({ request, env }) {
   try { body = await request.json() } catch { return bad('invalid JSON') }
 
   let template
-  try { template = validateBoostTemplate(body) } catch (e) {
+  try { template = validateTemplate(body) } catch (e) {
     return bad(e instanceof Error ? e.message : 'invalid template')
   }
 
