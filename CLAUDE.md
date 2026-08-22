@@ -205,7 +205,7 @@ Six test scripts, all plain `node scripts/<name>.mjs` with no runner:
 | `test-feed-hash.mjs` | the inline feed-bar controller: hash parsing, and the boot sequence |
 | `test-feed-lang.mjs` | `feed-lang.js`: menu ordering, the withholding rule, and the copy |
 | `test-sign-boost.mjs` | the signing oracle's validator and its KV rate limiter, fed by the **shipped** note builder |
-| `test-boost-modal-render.mjs` | every binding in `ExternalBoostModal`'s body is declared before it is read. See the ⚠️ below |
+| `test-boost-modal-render.mjs` | the widget's four silent-failure classes: use-before-declare, themed classes that emit no CSS, portals with no container, and the missing preflight. See the ⚠️ below |
 
 **⚠️ `test-server-render.mjs` IS THE ONE THAT NEEDS AN ARGUMENT, SO IT IS THE ONE
 THAT GOES UNRUN.** Its header carries the `curl` that produces the capture; take
@@ -3485,6 +3485,8 @@ would. Never remove an entry** — those links are in the wild.
 | `functions/{show,episode,booster}/…` | the three edge-rendered detail pages |
 | `functions/api/v1/*` | the D1 query API |
 | `functions/api/sign-boost.js` | the signing oracle for the boost bot, with `functions/_shared/nostr-sign.js` |
+| `login-widget/src/lib/siteSign.js` | its client half: a wallet-only boost gets a note without a key |
+| `login-widget/src/components/LoginButton.jsx` | **the** log-in control, one component in a nav skin and a checkout skin |
 | `functions/api/data/[[path]].js` + `ob-data.js` | the static shard proxy and the shape layer |
 | `login-widget/` | NIP-07/46/nsec login, NWC + WebLN wallets, boost modals, multi-leg value-split payments, bug reports |
 | `bots/bug-watcher/` | polls the bug relay, opens GitHub issues |
@@ -3545,6 +3547,8 @@ would. Never remove an entry** — those links are in the wild.
 6. **Typography.** The brand wordmark is a bold sans; the site is still on LB's
    Playfair Display / Source Serif 4. It reads fine, but the serif is inherited,
    not chosen. Only those two families are self-hosted in `assets/fonts/`.
+   **The widget now reads both as `--font-display` / `--font-body` tokens**, so
+   a change here reaches the modals without touching them.
 
 `/about` is done. Its copy is distilled from `docs/about-and-faq-source.md` —
 **that file is the factual source of record**, so correct it there first if the
