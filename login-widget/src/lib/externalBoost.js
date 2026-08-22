@@ -222,10 +222,22 @@ async function fetchBoostDescriptor(leg, ctx) {
         url: ctx.meta?.url || '',
       }),
     })
-    if (!res.ok) return ''
+    if (!res.ok) {
+      // ⚠️ THE FAILURE IS ANNOUNCED, BECAUSE ITS SYMPTOM IS INVISIBLE. A missing
+      // descriptor is deliberately not fatal: the leg pays, the message still
+      // arrives, and the only trace is a row in someone else's Helipad reading
+      // "Lightning Invoice" instead of a name. Nothing on this side looks
+      // wrong, so without this line the next person debugging it is back to
+      // reasoning about a payment that already happened.
+      console.warn('[lb] boost descriptor refused', res.status, await res.text().catch(() => ''))
+      return ''
+    }
     const body = await res.json()
-    return typeof body?.url === 'string' ? body.url : ''
-  } catch {
+    const url = typeof body?.url === 'string' ? body.url : ''
+    if (!url) console.warn('[lb] boost descriptor returned no url', body)
+    return url
+  } catch (e) {
+    console.warn('[lb] boost descriptor unavailable', e?.name === 'AbortError' ? 'timed out' : (e?.message || e))
     return ''
   } finally {
     clearTimeout(timer)
@@ -262,6 +274,10 @@ async function payLnaddressLeg(leg, ctx, update, timer) {
   const descriptorUrl = allowed > 0 ? await fetchBoostDescriptor(leg, ctx) : ''
   timer?.mark('descriptor')
   const comment = buildLnurlComment({ descriptorUrl, message: ctx.message, commentAllowed: allowed })
+  // Says which of the three outcomes this leg got, since the difference is only
+  // ever visible at the recipient's end: no comment allowed, a bare message, or
+  // a message behind a descriptor.
+  console.debug('[lb] leg comment', leg.recipient?.address, { commentAllowed: allowed, descriptor: descriptorUrl || null, comment })
   const { pr, verify } = await fetchLnurlInvoice(meta.callback, msats, comment, leg.recipient.address)
   timer?.mark('invoice')
   const paymentHash = bolt11PaymentHash(pr)
