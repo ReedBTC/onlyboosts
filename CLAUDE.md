@@ -196,7 +196,7 @@ node scripts/stamp-assets.js --check   # verify; non-zero exit if anything is st
 **Order matters.** `sync-partials` injects markup into the page files; anything
 it injects has to be stamped afterwards.
 
-Seven test scripts, all plain `node scripts/<name>.mjs` with no runner:
+Eight test scripts, all plain `node scripts/<name>.mjs` with no runner:
 
 | | |
 |---|---|
@@ -207,13 +207,14 @@ Seven test scripts, all plain `node scripts/<name>.mjs` with no runner:
 | `test-sign-boost.mjs` | the signing oracle's validator and its KV rate limiter, fed by the **shipped** note builder |
 | `test-boost-modal-render.mjs` | the widget's four silent-failure classes: use-before-declare, themed classes that emit no CSS, portals with no container, and the missing preflight. See the ⚠️ below |
 | `test-boostbox.mjs` | the BoostBox descriptor path: the comment's whole-or-nothing rule, the record allowlist, and every way `/api/boostbox` is allowed to fail. **Stubs `fetch`**, so it never writes a record to a third party's service |
+| `test-keysend-upgrade.mjs` | the keysend upgrade: the `fountain.fm` exclusion's exact-or-parent rule, the routing pair's whole-or-nothing rule, the strict node-pubkey check, every way `/api/keysend` answers "no endpoint", and the wallet gate. **Stubs `fetch`**, so it probes nobody's well-known |
 
 **⚠️ `test-server-render.mjs` IS THE ONE THAT NEEDS AN ARGUMENT, SO IT IS THE ONE
 THAT GOES UNRUN.** Its header carries the `curl` that produces the capture; take
 a fresh one rather than reusing an old file, since it is also the size
 measurement. It asserted `cards are numbered 1..N with no gaps` — the *ordinal*
 scheme's invariant — until competition ranking shipped on 2026-08-18, and it
-would have been merged red had it not been run. **Run all seven before a merge**,
+would have been merged red had it not been run. **Run all eight before a merge**,
 and treat this one as the guard on the ranking scheme rather than only on weight.
 
 **⚠️ `test-feed-hash.mjs` EXTRACTS THE CONTROLLER OUT OF `index.html` and runs
@@ -327,12 +328,15 @@ its own route before it ships.
 **⚠️ BUT A MONEY ENDPOINT NEEDS ONE MORE STEP, AND LANDING UNDER `/api/` IS WHAT
 HIDES IT.** That bucket is network-first **with a cached copy served when the
 network is down**, which is right for a feed and wrong for anything that moves
-sats. `isUncacheableMoneyRequest` is the opt-out and holds three:
+sats. `isUncacheableMoneyRequest` is the opt-out and holds four:
 `/api/value`, because a stale value block pays a split the show no longer
 publishes; `/api/lnurl`, because it returns a **bolt11 invoice** and a cached
-invoice is one the donor may already have paid; and `/api/boostbox`, because it
+invoice is one the donor may already have paid; `/api/boostbox`, because it
 returns a descriptor URL a podcaster's Helipad will fetch, so a cached one
-attaches **another boost's** message, amount and episode to this payment. `/api/lnurl` shipped
+attaches **another boost's** message, amount and episode to this payment; and
+`/api/keysend`, which is the most direct of the four — it names the **node the
+sats are addressed to** and the record routing them to an account on it, so a
+stale copy pays the wrong destination outright. `/api/lnurl` shipped
 without the exclusion in `ob-v91` and was caught before deploy; the reason it
 was easy to miss is that placing it under `/api/` was the correct, documented
 thing to do. **Ask of any new endpoint not just where it routes, but whether an
@@ -1380,13 +1384,120 @@ tags are invisible to it.
 
 | Tier | Source | Our path |
 |---|---|---|
-| 1 | boostagram TLV 7629169 on the HTLC | keysend legs, already complete |
-| 2 | `rss::payment::boost <url>` in the invoice memo → HEAD → `x-rss-payment` | **lnaddress legs, via `/api/boostbox`** |
+| 1 | boostagram TLV 7629169 on the HTLC | keysend legs, **and every lnaddress leg the upgrade can reach** |
+| 2 | `rss::payment::boost <url>` in the invoice memo → HEAD → `x-rss-payment` | the lnaddress legs it cannot, via `/api/boostbox` |
 | 3 | the memo verbatim | the bare message, which is what shipped before |
 
 `functions/api/boostbox.js` stores the metadata with BoostBox
 (podcast-namespace PR #734) and `buildLnurlComment` puts the returned URL in the
 LNURL comment.
+
+**⚠️ TIER ONE IS PREFERRED WHEREVER IT IS REACHABLE, AND THE REASON IS NOT
+PERFORMANCE.** `parse_boost_from_invoice` reads the TLV in its **first** branch,
+before any memo or metadata handling, so a keysend needs nothing switched on at
+the podcaster's end; tier two is gated on Helipad's `fetch_metadata`, which
+**defaults to false**, and puts a third party's service in the path of the
+metadata. So the two are not alternatives of equal standing — tier two is the
+answer for the legs tier one cannot have.
+
+### The Keysend Upgrade
+
+`login-widget/src/lib/keysendLookup.js` + `functions/api/keysend.js`. Some
+providers publish `/.well-known/keysend/<name>` beside the usual
+`/.well-known/lnurlp/<name>`, naming the node pubkey and the custom record that
+routes a payment to that account. Where one exists, `resolveKeysendUpgrade` in
+`externalBoost.js` swaps the destination and the leg runs the keysend branch the
+value block's own node recipients have always run. **The boostagram builder, the
+TLV encoding, both wallet calls and the UNCERTAIN rules are untouched; the whole
+of the feature is which destination the branch is handed.**
+
+Measured over the top-30 shows' value blocks, 2026-08-21: 48 of 111 legs were
+already keysend, 34 more upgrade, 25 are at `fountain.fm` and are deliberately
+excluded, 4 publish no usable document. **Tier-one coverage goes from 48 legs to
+82.**
+
+**⚠️ THE DECISION IS MADE BEFORE THE PAYMENT AND IS NEVER REVISITED AFTER IT.**
+Once a wallet has been handed a keysend there is no observation proving it did
+not go out, so falling back to LNURL on a failure is the 2026-08-19 double-pay
+bug arriving through a new door. `test-keysend-upgrade.mjs` asserts there is
+**exactly one call site** for `payLnaddressLeg` for that reason. Everything that
+could disqualify a leg is therefore asked up front:
+
+- **⚠️ THE WALLET IS ASKED FIRST, AND THAT GATE IS WHAT KEEPS THE UPGRADE FROM
+  COSTING A PAYMENT.** An lnaddress leg pays over BOLT11, which every rail
+  speaks; a keysend leg does not — most WebLN extensions have no `keysend`
+  method and an NWC connection is only as capable as the wallet behind it. So
+  upgrading blindly converts 34 of 111 legs into legs that cannot be paid, in
+  exchange for metadata. **The metadata is a courtesy to the recipient; the
+  payment is the point.** `walletCanKeysend` answers off `window.webln.keysend`
+  or the NWC service's `pay_keysend` capability, cached for the session, and
+  **every uncertainty answers no** — a wallet that will not answer `get_info` is
+  treated as incapable, because a missed upgrade costs metadata where a wrong
+  yes costs the payment. It is asked before the address probe so an incapable
+  wallet costs one lookup for the whole boost rather than one per leg.
+- **⚠️ AND WHAT THE WALLET *SAID* OUTRANKS WHAT IT ADVERTISED.** A capability
+  error out of a real attempt latches for the session (`noteKeysendUnsupported`),
+  so no later leg is upgraded. The leg it just cost is `FAILED`, so it carries a
+  Retry, and the retry re-enters with the latch set and pays over LNURL. **Both
+  capability memos are dropped on `wallet.onChange`**: going from a capable
+  wallet to one without it and keeping the old yes upgrades legs the new wallet
+  cannot pay. The address cache is a fact about recipients and deliberately
+  survives.
+- **⚠️ `fountain.fm` IS EXCLUDED THOUGH IT QUALIFIES, and this is the largest
+  single decision in the file** — 25 of the 111 legs. It has keysend, it
+  publishes the document, the payment arrives and the sats land; it just never
+  surfaces the TLV to the recipient, so the upgrade fires and the metadata is
+  discarded at the far end. The LUD-21 comment is the only channel Fountain
+  shows, which is the channel `/api/boostbox` already fills. **Do not "correct"
+  this by testing whether the host serves the well-known: it does, and that is
+  the trap.** Nothing observable from our side separates a provider that renders
+  the TLV from one that drops it. Membership in `LNURL_ONLY_DOMAINS` is
+  knowledge about the provider, never a probe.
+- **⚠️ THE EXCLUSION IS MATCHED EXACT-OR-PARENT, NEVER `endsWith`.** A bare
+  suffix test also matches `notfountain.fm`, which hands anyone who can register
+  a hostname the ability to strip the inline boostagram off other people's
+  payments. The value block is attacker-authored text.
+- **⚠️ THE PUBKEY IS VALIDATED STRICTLY** (`/^0[23][0-9a-f]{64}$/`), because
+  there is no second chance. `primal.net` answers the probe **HTTP 200 with its
+  SPA's HTML** — three legs of the measured corpus — so a status check alone
+  reads them as upgradeable.
+- **⚠️ THE ROUTING PAIR IS TAKEN WHOLE OR NOT AT ALL.** `customKey` and
+  `customValue` address a sub-account on a shared node, so a key from one entry
+  paired with a value from another pays a stranger and the payment still
+  succeeds. The upgraded destination is built **field by field and never spread
+  from the original recipient**, for the same reason one level up: a value
+  block's own pair routes to an account on the node *it* named, which is not
+  this node.
+
+**⚠️ `/api/keysend` IS THE ROUTE, NOT A FALLBACK, WHICH IS THE OPPOSITE OF
+`/api/lnurl`.** LNURL is browser-facing by design and those endpoints almost all
+send CORS headers, so that proxy exists for the minority that do not. The
+keysend well-known is a **server-to-server convention** and providers generally
+send none, so a direct browser fetch is blocked for a *healthy* endpoint and the
+client's catch reads that as "publishes no keysend document" — silently
+downgrading every leg. That is exactly how BMB's own upgrade never fired. There
+is no direct attempt before it.
+
+**A non-2xx is the ordinary case here**, which is why that Function does not
+share `/api/lnurl`'s helpers: mirroring the upstream status and surfacing the
+recipient's own words is right where a donor is owed an explanation, and wrong
+where the leg pays over LNURL either way. **Everything that is not a usable
+document is one 404 with one reason.** The document comes back **verbatim** so
+`keysendLookup.js` is the single parser. **It is not rate limited, deliberately**
+— `/api/lnurl` is the same shape and carries no counter either; `/api/boostbox`
+has one because it *writes*, under our key, to a third party.
+
+**⚠️ THE LEG'S IDENTITY DOES NOT CHANGE, ONLY ITS DESTINATION.** `leg.recipient`
+stays exactly as the value block published it — the lightning address is what
+the donor sees, what a retry is issued against, and what the boostagram credits.
+`leg.keysendUpgrade` and a `→keysend` marker in the console line are the only
+trace, and they exist because whether the upgrade fired is the first thing
+anyone debugging a podcaster's missing row needs to know.
+
+**Still unverified: a real upgraded leg reaching a real Helipad.** The wallet
+gate, the exclusion and the parser are all covered by the test; the end-to-end
+path has not been run with sats. **⚠️ And a self-paid leg cannot verify it** —
+see the note above on an invoice that never settles.
 
 **⚠️ IT PROXIES BECAUSE OF THE KEY, NOT BECAUSE OF CORS**, which is the opposite
 of `/api/lnurl`. tardbox answers with `access-control-allow-origin: *`, so the
@@ -3589,6 +3700,8 @@ would. Never remove an entry** — those links are in the wild.
 | `functions/api/v1/*` | the D1 query API |
 | `functions/api/sign-boost.js` | the signing oracle for the boost bot, with `functions/_shared/nostr-sign.js` |
 | `login-widget/src/lib/siteSign.js` | its client half: a wallet-only boost gets a note without a key |
+| `functions/api/keysend.js` + `keysendLookup.js` | the keysend upgrade: an lnaddress leg reaches Helipad's first tier |
+| `functions/api/boostbox.js` | the BoostBox descriptor for the legs the upgrade cannot reach |
 | `login-widget/src/components/LoginButton.jsx` | **the** log-in control, one component in a nav skin and a checkout skin |
 | `functions/api/data/[[path]].js` + `ob-data.js` | the static shard proxy and the shape layer |
 | `login-widget/` | NIP-07/46/nsec login, NWC + WebLN wallets, boost modals, multi-leg value-split payments, bug reports |

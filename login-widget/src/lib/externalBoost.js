@@ -9,6 +9,19 @@
  *                      boostagram as TLV 7629169 + the recipient's customKey/
  *                      customValue for shared-node routing.
  *
+ * ⚠️ AND AN LNADDRESS LEG MAY BECOME A NODE LEG BEFORE IT IS PAID. Where the
+ * address publishes `/.well-known/keysend/<name>` and the wallet can keysend,
+ * `resolveKeysendUpgrade` swaps in the node the document names, so the
+ * boostagram rides in the HTLC and reaches Helipad's first tier rather than
+ * its third. See `keysendLookup.js` for what the upgrade is worth and for the
+ * two rules that keep it from ever costing a payment: the wallet is asked
+ * before the address, and `fountain.fm` is excluded despite qualifying.
+ *
+ * The probe adds one bounded round trip per distinct address, inside the leg
+ * and therefore inside the wait. Prefetching it on mount beside the modal's
+ * LNURL metadata is the follow-up if that ever shows; it is in the leg for now
+ * because that is one place to get it wrong rather than two.
+ *
  * Same best-effort model as payAllLegs: legs run sequentially (NWC reliability),
  * each in its own try/catch, and one failing leg never aborts the others — so a
  * wallet that can't keysend still pays the lnaddress legs (exactly how Boost Me
@@ -28,6 +41,11 @@ import {
 import { withTimeout, isCleanPaymentDecline } from './utils.js'
 import * as wallet from './wallet.js'
 import * as nwc from './nwc.js'
+import {
+  lookupKeysendTarget,
+  walletCanKeysend,
+  noteKeysendUnsupported,
+} from './keysendLookup.js'
 import {
   buildBoostagram,
   buildLnurlComment,
@@ -135,9 +153,15 @@ export function distributeSats(totalSats, recipients, totalWeight) {
   return legs
 }
 
+// The signature of a wallet saying it cannot keysend at all, as opposed to
+// declining this particular payment. Three readers now — the friendly message,
+// the clean-decline test, and the capability latch that stops later legs being
+// upgraded — so it is one expression rather than three copies that drift.
+const KEYSEND_UNSUPPORTED_RE = /not_implemented|not implemented|unsupported|method not found/i
+
 function friendlyError(msg) {
   const s = String(msg || '')
-  if (/not_implemented|not implemented|unsupported|method not found/i.test(s)) {
+  if (KEYSEND_UNSUPPORTED_RE.test(s)) {
     return 'Your wallet doesn\'t support keysend payments. Try connecting Alby or Mutiny.'
   }
   if (/rejected|denied|declined/i.test(s)) return 'Payment declined in your wallet.'
@@ -152,8 +176,7 @@ function friendlyError(msg) {
 // of the shared classifier: keysend-capability errors (wallet can't keysend at
 // all), which also mean nothing was sent.
 function isCleanDecline(msg) {
-  return isCleanPaymentDecline(msg) ||
-    /not_implemented|not implemented|unsupported|method not found/i.test(String(msg || ''))
+  return isCleanPaymentDecline(msg) || KEYSEND_UNSUPPORTED_RE.test(String(msg || ''))
 }
 
 /**
@@ -264,6 +287,52 @@ async function fetchBoostDescriptor(leg, ctx) {
   }
 }
 
+/**
+ * Can this lnaddress leg be paid as a keysend instead, and to what?
+ *
+ * ⚠️ THE DECISION IS MADE BEFORE THE PAYMENT AND IS NEVER REVISITED AFTER IT.
+ * Once a wallet has been handed a keysend there is no observation that proves
+ * it did not go out, so falling back to LNURL on a failure would be the
+ * double-pay bug arriving through a new door. That is why the two questions
+ * below are both asked up front and why the pubkey is validated strictly in
+ * `keysendLookup.js`: everything that could disqualify this leg has to be
+ * known while the leg is still unpaid.
+ *
+ * ⚠️ AND THE ORDER OF THE TWO IS DELIBERATE. The wallet is asked FIRST because
+ * its answer is cached for the session and disqualifies every leg at once,
+ * where the address probe is per-recipient. On a wallet that cannot keysend
+ * this costs one lookup for the whole boost rather than one per leg.
+ *
+ * Returns a node-shaped recipient, or null to stay on LNURL.
+ */
+async function resolveKeysendUpgrade(leg, timer) {
+  let target = null
+  try {
+    if (await walletCanKeysend()) target = await lookupKeysendTarget(leg.recipient.address)
+  } catch {
+    // Neither helper is supposed to throw. If one ever does, the leg is
+    // unaffected: this is an upgrade with a working fallback, and the fallback
+    // is what shipped before the upgrade existed.
+    target = null
+  }
+  timer?.mark('keysend-probe')
+  if (!target) return null
+  // ⚠️ BUILT FIELD BY FIELD, NEVER SPREAD FROM THE ORIGINAL. A value block may
+  // name a `customKey` / `customValue` of its own, and that pair routes to a
+  // sub-account on the node the value block named — which is not the node this
+  // document names. Carrying it across would address a stranger's account on
+  // the provider's node. The document's pair is the only routing record that
+  // means anything at this destination, and `firstCustomPair` guarantees it
+  // was taken whole.
+  return {
+    name: leg.recipient.name,
+    type: 'node',
+    address: target.pubkey,
+    customKey: target.customKey,
+    customValue: target.customValue,
+  }
+}
+
 async function payLnaddressLeg(leg, ctx, update, timer) {
   // Prefer the modal's prefetched metadata over a fresh fetch. The modal
   // resolves every lnaddress recipient in parallel on mount, so by boost time
@@ -343,7 +412,18 @@ async function payLnaddressLeg(leg, ctx, update, timer) {
   return { status: STATUS.UNCERTAIN, error: 'Not confirmed yet. Don’t re-send it — it may already be on its way.' }
 }
 
-async function payKeysendLeg(leg, ctx, update, timer) {
+/**
+ * @param {object} [upgraded] - the synthetic node recipient an upgraded
+ *   lnaddress leg pays to. Absent for a leg the value block already declared
+ *   as `type: 'node'`.
+ */
+async function payKeysendLeg(leg, ctx, update, timer, upgraded) {
+  // ⚠️ THE DESTINATION MAY NOT BE THE RECIPIENT THE MODAL IS SHOWING, and only
+  // this variable knows it. `leg.recipient` stays exactly as the value block
+  // published it — the lightning address is what the donor sees, what a retry
+  // is issued against, and what the boostagram credits — while `dest` is where
+  // the sats are actually addressed.
+  const dest = upgraded || leg.recipient
   const boostagram = buildBoostagram({
     legMsats: leg.sats * 1000,
     totalMsats: ctx.totalSats * 1000,
@@ -361,9 +441,9 @@ async function payKeysendLeg(leg, ctx, update, timer) {
       const client = nwc.getClient()
       const res = await client.payKeysend({
         amount: leg.sats * 1000,           // msats
-        pubkey: leg.recipient.address,     // node pubkey
+        pubkey: dest.address,              // node pubkey
         preimage: randomPreimageHex(),
-        tlv_records: toTlvHex(boostagram, leg.recipient),
+        tlv_records: toTlvHex(boostagram, dest),
       })
       if (res?.preimage) return { status: STATUS.PAID }
       // No preimage but no throw — we supplied one, so it likely settled, but
@@ -380,9 +460,9 @@ async function payKeysendLeg(leg, ctx, update, timer) {
     if (!window.webln) throw new Error('No WebLN provider')
     const res = await withTimeout(
       Promise.resolve(window.webln.keysend({
-        destination: leg.recipient.address,
+        destination: dest.address,
         amount: leg.sats,
-        customRecords: toWeblnRecords(boostagram, leg.recipient),
+        customRecords: toWeblnRecords(boostagram, dest),
       })),
       90000,
       'Your wallet extension didn\'t respond to the keysend in time. It may still be going through — check your wallet before retrying.',
@@ -391,6 +471,12 @@ async function payKeysendLeg(leg, ctx, update, timer) {
     return { status: STATUS.UNCERTAIN, error: 'Couldn’t confirm this keysend — check your wallet.' }
   } catch (e) {
     const msg = String(e?.message || e)
+    // ⚠️ WHAT THE WALLET ITSELF SAID OUTRANKS WHAT IT ADVERTISED. A capability
+    // error is the one measurement about keysend support that cannot be wrong,
+    // so it is latched here and no later leg of this boost is upgraded. It
+    // matters most for the leg it just cost: that leg is FAILED, so it carries
+    // a Retry, and the retry re-enters with the latch set and pays over LNURL.
+    if (KEYSEND_UNSUPPORTED_RE.test(msg)) noteKeysendUnsupported()
     if (isCleanDecline(msg)) return { status: STATUS.FAILED, error: friendlyError(msg) }
     return { status: STATUS.UNCERTAIN, error: friendlyError(msg) }
   } finally {
@@ -405,6 +491,9 @@ async function payKeysendLeg(leg, ctx, update, timer) {
  *
  * @param {object} p
  * @param {Array}  p.recipients   - [{ name, type:'node'|'lnaddress', address, splitWeight, customKey?, customValue? }]
+ *                                   Passed through untouched: an upgraded leg
+ *                                   builds its own destination and never
+ *                                   rewrites the recipient the modal shows.
  * @param {number} p.totalWeight
  * @param {number} p.totalSats
  * @param {string} [p.message]
@@ -456,9 +545,18 @@ export async function payExternalBoost({
 
       const timer = legTimer()
       try {
-        const result = leg.recipient.type === 'lnaddress'
+        // ⚠️ AN UPGRADED LEG IS A KEYSEND LEG IN EVERY RESPECT AFTER THIS
+        // LINE. It runs the branch the value block's own node recipients have
+        // always run, so the boostagram builder, the TLV encoding, the WebLN
+        // and NWC calls and the UNCERTAIN rules are all untouched by this
+        // feature — the whole of the change is which destination it is handed.
+        const upgraded = leg.recipient.type === 'lnaddress'
+          ? await resolveKeysendUpgrade(leg, timer)
+          : null
+        if (upgraded) leg.keysendUpgrade = true
+        const result = (leg.recipient.type === 'lnaddress' && !upgraded)
           ? await payLnaddressLeg(leg, ctx, update, timer)
-          : await payKeysendLeg(leg, ctx, update, timer)
+          : await payKeysendLeg(leg, ctx, update, timer, upgraded)
         update(result)
       } catch (e) {
         // Pre-payment failures (LNURL resolve, below-min, invoice fetch) are
@@ -490,7 +588,12 @@ export async function payExternalBoost({
       // show's own leg usually carries none), and the address is public data
       // straight out of the feed either way.
       console.info(
-        `[lb-boost] leg ${leg.index + 1}/${legs.length} ${leg.recipient.type} ` +
+        `[lb-boost] leg ${leg.index + 1}/${legs.length} ${leg.recipient.type}` +
+        // Says which of the two rails this leg actually took. Without it an
+        // upgraded leg is indistinguishable from an LNURL one in the log, and
+        // whether the upgrade fired is the first thing anyone debugging a
+        // podcaster's missing Helipad row needs to know.
+        `${leg.keysendUpgrade ? '→keysend' : ''} ` +
         `${leg.recipient.address} ${leg.sats} sats → ${leg.status} in ${totalMs}ms` +
         (phases ? ` (${phases})` : ''),
       )

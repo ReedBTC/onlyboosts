@@ -470,7 +470,7 @@
 // session-only because the at-rest scheme encrypts the NWC URI to the user's
 // own signer. The widget bundle changed, so a returning visitor needs the new
 // URL.
-const VERSION = 'ob-v108';
+const VERSION = 'ob-v109';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;
@@ -502,27 +502,27 @@ const PRECACHE_URLS = [
   '/assets/onlyboosts_pfp.png',
   '/assets/onlyboosts_banner.png',
   '/assets/avatar-fallback.svg',
-  '/assets/css/theme.css?v=ob-v108',
-  '/assets/css/page.css?v=ob-v108',
-  '/assets/css/nav.css?v=ob-v108',
-  '/assets/css/footer.css?v=ob-v108',
-  '/assets/css/boosts-thread.css?v=ob-v108',
-  '/assets/css/boost-actions.css?v=ob-v108',
+  '/assets/css/theme.css?v=ob-v109',
+  '/assets/css/page.css?v=ob-v109',
+  '/assets/css/nav.css?v=ob-v109',
+  '/assets/css/footer.css?v=ob-v109',
+  '/assets/css/boosts-thread.css?v=ob-v109',
+  '/assets/css/boost-actions.css?v=ob-v109',
   // The episode card and its drawer. Precached alongside the others because the
   // homepage's feeds are painted in it and it used to be inline in index.html,
   // which IS precached — leaving it out would trade an inline block for a
   // network round trip on the one page this list exists to make fast.
-  '/assets/css/feed-cards.css?v=ob-v108',
-  '/assets/js/boosts-thread.js?v=ob-v108',
+  '/assets/css/feed-cards.css?v=ob-v109',
+  '/assets/js/boosts-thread.js?v=ob-v109',
   // A static import of boosts-thread.js, so precaching that without this one
   // leaves a returning visitor fetching half the graph from the network.
-  '/assets/js/primal-profiles.js?v=ob-v108',
-  '/assets/js/calendar-events.js?v=ob-v108',
-  '/assets/js/boost-actions.js?v=ob-v108',
-  '/assets/js/nav.js?v=ob-v108',
-  '/assets/js/nav-widget-boot.js?v=ob-v108',
-  '/assets/js/widget-loader.js?v=ob-v108',
-  '/assets/js/sw-register.js?v=ob-v108',
+  '/assets/js/primal-profiles.js?v=ob-v109',
+  '/assets/js/calendar-events.js?v=ob-v109',
+  '/assets/js/boost-actions.js?v=ob-v109',
+  '/assets/js/nav.js?v=ob-v109',
+  '/assets/js/nav-widget-boot.js?v=ob-v109',
+  '/assets/js/widget-loader.js?v=ob-v109',
+  '/assets/js/sw-register.js?v=ob-v109',
 ];
 
 self.addEventListener('install', (event) => {
@@ -599,7 +599,14 @@ function isUncacheableMoneyRequest(url) {
     // this payment was for, so serving a previous response would attach the
     // wrong message, amount and episode to this leg — the same class of harm as
     // a cached bolt11, arriving at the recipient's end rather than the donor's.
-    || url.pathname === '/api/boostbox';
+    || url.pathname === '/api/boostbox'
+    // ⚠️ A CACHED KEYSEND DOCUMENT ADDRESSES THE PAYMENT ITSELF. `/api/keysend`
+    // answers with the node pubkey an upgraded lnaddress leg is paid to, and
+    // the custom record that routes it to that account on a shared node. A
+    // stale copy therefore sends the sats to the wrong destination outright —
+    // the most direct harm of anything in this list, and the same class as
+    // `/api/value` paying a split the show no longer publishes.
+    || url.pathname === '/api/keysend';
 }
 
 // Stale-while-revalidate helper: serve cached immediately if present,
