@@ -46,5 +46,12 @@
 
   "boosters": [],
 
-  "boosts": []
+  "boosts": [
+    {
+      "id": "1272b59aae10a44e396257ca0c29177475f6ff4cccf5a5d9099a87c19ee86c17",
+      "reason": "Misclassified: this is a 121-sat boost to Chad and Reeds Podcast that the Local Bitcoiners publisher bot claimed as a boost to Local Bitcoiners, so the note carries LB's podcast guid and would be counted against that show. The cause was on our side: OnlyBoosts had just started attaching BoostBox payment metadata to lnaddress legs and was sending the show and episode under the boostagram TLV's field names (podcast, episode) rather than the RSS-payment names (feed_title, item_title). Tardbox renders only the fields it knows, so the boost page had no Show row, and LB's feed gate accepts a boost whose feed is ABSENT rather than positively another show. Fixed in ob-v108, which sends feed_title and item_title; the same boost is separately and correctly indexed from the note OnlyBoosts published for it.",
+      "added": "2026-08-22",
+      "source": "Found by Reed on 2026-08-21 while testing the Helipad metadata work; diagnosed against LB's boost_formatter.py and the two tardbox pages."
+    }
+  ]
 }
