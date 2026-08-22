@@ -1,13 +1,23 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import AvatarPill from './AvatarPill.jsx'
+import LoginButton from './LoginButton.jsx'
 import { getInFlight, onInFlightChange } from '../lib/boostQueue.js'
 
 /**
  * Dropdown menu anchored to the IdentityWidget trigger button.
  *
  * Rendered via portal to document.body so it can escape the nav's
- * overflow-clip. Position is computed from the trigger's bounding box
+ * overflow-clip.
+ *
+ * ⚠️ ITS z-INDEX IS SET AGAINST THE SITE'S NAV, NOT AGAINST THE WIDGET'S OWN
+ * LADDER. `#top-nav` in assets/css/nav.css is `position: sticky; z-index: 100`,
+ * and this menu portals to document.body, so the two compete directly at body
+ * level. It sat at z-[90] and lost, which put the menu behind the very bar it
+ * hangs from — the one overlay on this site where that is guaranteed to show,
+ * because the trigger is *in* the nav. 120 clears the nav and also the boost
+ * progress banner's z-[110], which has to stay true: clicking that banner is
+ * what opens this menu. Position is computed from the trigger's bounding box
  * each time the dropdown opens; on resize the host re-renders and
  * recomputes. Right-edge clamp keeps the menu on-screen on phones.
  *
@@ -85,7 +95,7 @@ export default function IdentityDropdown({
       ref={menuRef}
       role="menu"
       aria-label="Account menu"
-      className="fixed z-[90] bg-[var(--modal-bg,#f4fafd)] border border-[var(--modal-line,#b9d4e6)] rounded-lg shadow-[0_24px_60px_-12px_rgba(11,58,82,0.28),0_0_0_1px_rgba(11,58,82,0.06)] text-sm text-[var(--ink,#0f2733)] overflow-hidden"
+      className="fixed z-[120] bg-[var(--modal-bg,#f4fafd)] border border-[var(--modal-line,#b9d4e6)] rounded-lg shadow-[0_24px_60px_-12px_rgba(11,58,82,0.28),0_0_0_1px_rgba(11,58,82,0.06)] text-sm text-[var(--ink,#0f2733)] overflow-hidden"
       style={{
         top: `${position.top}px`,
         left: `${position.left}px`,
@@ -95,9 +105,17 @@ export default function IdentityDropdown({
       {/* User pill */}
       {signedOut ? (
         <div className="px-4 py-3 border-b border-[var(--modal-line,#b9d4e6)]">
-          <p className="font-semibold text-[var(--ink,#0f2733)]">Not signed in</p>
+          <p className="font-semibold text-[var(--ink,#0f2733)]">Not logged in</p>
+          {/* ⚠️ THIS SAID "none of them post to Nostr" AND PHASE 2 MADE THAT
+              FALSE. A signed-out boost with the Private Boost box left
+              unchecked is published by OnlyBoosts under the bot identity —
+              that is the whole point, since an anonymous booster still counts
+              in the feeds and the totals. The old line told a visitor their
+              boost left no public record, which is the one claim about their
+              own data they must not be misled on. */}
           <p className="text-[11px] text-[var(--muted,#5a7488)] leading-snug mt-0.5">
-            Boosts you send are anonymous, and none of them post to Nostr.
+            Boosts you send carry no account. OnlyBoosts posts them for you
+            unless you mark one private.
           </p>
         </div>
       ) : (
@@ -135,7 +153,7 @@ export default function IdentityDropdown({
             {walletStatus.sessionOnly && (
               <p className="text-[11px] text-[var(--warn,#b45309)] leading-snug">
                 {signedOut
-                  ? 'This tab only — sign in with Nostr to save it.'
+                  ? 'This tab only — log in to save it.'
                   : 'This tab only — reconnect now to save it to your account.'}
               </p>
             )}
@@ -219,16 +237,23 @@ export default function IdentityDropdown({
           wallet pill, so the offer moves in here rather than vanishing. */}
       {signedOut ? (
         <div className="px-4 py-3">
-          <button
-            type="button"
+          {/* ⚠️ THE SAME CONTROL THE NAV AND THE BOOST MODAL OFFER, in its
+              checkout skin, so a visitor who has met it twice already meets it
+              a third time rather than something new. It said "Sign in with
+              Nostr" in white on `--brand` until 2026-08-21, which is a
+              contrast ratio of 2.5:1 — the label only became readable on
+              hover, where `--brand-d` takes it to 3.8:1. The checkout skin
+              carries its text in `--brand-dd` on white, 5.5:1, and it is a
+              shape that was already approved rather than a fourth colour
+              decision. See LoginButton's own header for the vocabulary rule. */}
+          <LoginButton
+            variant="checkout"
             role="menuitem"
+            className="w-full"
             onClick={() => { onClose(); onSignIn?.() }}
-            className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-[var(--brand,#00aff0)] hover:bg-[var(--brand-d,#068ace)] text-xs font-medium text-white transition-colors"
-          >
-            Sign in with Nostr
-          </button>
+          />
           <p className="mt-2 text-[11px] text-[var(--muted,#5a7488)] leading-snug">
-            Signing in lets you post your boosts to Nostr, and a wallet you
+            Logging in posts your boosts under your own name, and a wallet you
             connect after that is remembered.
           </p>
         </div>

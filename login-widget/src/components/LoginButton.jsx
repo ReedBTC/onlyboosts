@@ -26,15 +26,20 @@
  *
  * ⚠️ IT DOES NOT SET ITS OWN WIDTH. The caller does, because it is inline here
  * and full-width elsewhere.
+ *
+ * `role` is a passthrough for the one caller that mounts this inside a
+ * `role="menu"`: the identity dropdown's signed-out branch, where the offer has
+ * to be a `menuitem` like every other row of that menu.
  */
 
 const MARK = '/assets/onlyboosts_favicon.png'
 
-export default function LoginButton({ variant = 'nav', onClick, className = '' }) {
+export default function LoginButton({ variant = 'nav', onClick, className = '', role }) {
   if (variant === 'checkout') {
     return (
       <button
         type="button"
+        role={role}
         onClick={onClick}
         className={`inline-flex items-center justify-center gap-2 py-2.5 px-3.5 rounded-lg border-2 border-[var(--brand,#00aff0)] bg-[var(--modal-field,#ffffff)] text-[var(--brand-dd,#0a6fa8)] text-sm font-semibold whitespace-nowrap hover:bg-[var(--brand-tint,rgba(0,175,240,0.12))] focus:outline-none focus:ring-2 focus:ring-[var(--brand-ring,rgba(0,175,240,0.32))] transition-colors ${className}`}
         aria-label="Log in to OnlyBoosts"
