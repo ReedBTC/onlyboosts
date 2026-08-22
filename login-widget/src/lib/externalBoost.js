@@ -215,10 +215,30 @@ async function fetchBoostDescriptor(leg, ctx) {
         sender_name: ctx.senderName || '',
         recipient_name: leg.recipient?.name || '',
         recipient_address: leg.recipient?.address || '',
-        podcast: ctx.meta?.showTitle || '',
-        episode: ctx.meta?.episodeTitle || '',
+        // ⚠️ `feed_title` / `item_title`, NEVER `podcast` / `episode`. Those are
+        // the BOOSTAGRAM TLV's names for the same two facts, and this document
+        // is not a boostagram — Helipad deserializes an `RssPayment` with nine
+        // fields and maps `feed_title` onto its own `podcast` and `item_title`
+        // onto its own `episode` (src/metadata.rs). Sending the TLV names put
+        // both strings in the record, where BoostBox stored them faithfully and
+        // Helipad ignored them, so the row rendered with a sender and a total
+        // and no show. Verified live 2026-08-22.
+        feed_title: ctx.meta?.showTitle || '',
+        item_title: ctx.meta?.episodeTitle || '',
+        // ⚠️ THE GUIDS GO IN TWICE ON PURPOSE. `feed_guid` / `item_guid` are
+        // BoostBox's own documented fields and are what its web page shows;
+        // `remote_feed_guid` / `remote_item_guid` are the only two guid fields
+        // in Helipad's struct, and are what it resolves against Podcast Index
+        // to turn the show and episode into a link. BMB sends exactly this
+        // duplication, and it is the reference implementation the podcaster on
+        // the other end of this is already running.
         feed_guid: ctx.meta?.podcastGuid || '',
         item_guid: ctx.meta?.itemGuid || '',
+        remote_feed_guid: ctx.meta?.podcastGuid || '',
+        remote_item_guid: ctx.meta?.itemGuid || '',
+        // Groups the legs of one boost, so a podcaster reading four payments
+        // can see they were one press rather than four boosts.
+        group: ctx.boostUuid || '',
         url: ctx.meta?.url || '',
       }),
     })

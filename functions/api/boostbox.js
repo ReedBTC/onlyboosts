@@ -85,12 +85,25 @@ const APP_NAME = 'OnlyBoosts';
 // The complete set of fields forwarded upstream, with the shape each must have.
 // `action` is pinned rather than accepted: this endpoint serves boosts, and
 // `stream` is a different product decision that would need its own thought.
+// ⚠️ THE FIRST FOUR ARE THE ONLY STRINGS HELIPAD READS. Its `RssPayment` struct
+// (src/metadata.rs) deserializes exactly nine fields — `action`, `app_name`,
+// `feed_title`, `item_title`, `message`, `remote_feed_guid`,
+// `remote_item_guid`, `sender_name`, `value_msat_total` — and silently drops
+// everything else. `podcast` and `episode` were in this list and are NOT among
+// them: they are the boostagram TLV's names for the same two facts, so the
+// record stored them faithfully and the podcaster's row rendered with a sender,
+// a total, and no show. The rest are BoostBox's own documented fields, kept
+// because its web page displays them.
 const STRING_FIELDS = [
-  'message', 'sender_name', 'sender_id',
-  'recipient_name', 'recipient_address',
-  'feed_guid', 'feed_title', 'item_guid', 'item_title',
-  'podcast', 'episode', 'url',
+  'feed_title', 'item_title', 'message', 'sender_name',
+  'remote_feed_guid', 'remote_item_guid',
+  'sender_id', 'recipient_name', 'recipient_address',
+  'feed_guid', 'item_guid', 'group', 'url',
 ];
+
+// The fields a podcaster's Helipad actually renders. Exported so the test can
+// assert on them by name rather than on the shape of the whole body.
+export const HELIPAD_READS = ['feed_title', 'item_title', 'message', 'sender_name'];
 const MAX_STRING_LEN = 512;
 
 // Control characters, stripped from every forwarded string. The payload is

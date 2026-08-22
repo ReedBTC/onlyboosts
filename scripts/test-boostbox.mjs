@@ -23,7 +23,7 @@
  *      those must end as a boost that still pays with a bare message.
  */
 import assert from 'node:assert/strict'
-import { buildRecord, overRateLimit, onRequestPost } from '../functions/api/boostbox.js'
+import { buildRecord, overRateLimit, onRequestPost, HELIPAD_READS } from '../functions/api/boostbox.js'
 import { buildLnurlComment, MAX_MESSAGE_CHARS } from '../login-widget/src/lib/externalBoostagram.js'
 
 let passed = 0
@@ -134,6 +134,40 @@ await ok('⚠️ value_msat_total rides every record, since its absence is the b
   // Helipad computes the split against this. Without it every boost renders as
   // "(100% split)" and the podcaster sees one leg as the whole payment.
   assert.equal(Object.hasOwn(buildRecord(LEG), 'value_msat_total'), true)
+})
+
+await ok('⚠️ the four strings Helipad reads survive, under ITS names', () => {
+  // Helipad deserializes an `RssPayment` of nine fields and drops the rest, so a
+  // field it does not name is a field that does not exist. `podcast` and
+  // `episode` are the BOOSTAGRAM TLV's names for two of these, and sending
+  // those instead is what produced a live row with a sender, a total and no
+  // show at all. Measured 2026-08-22 against a real Helipad.
+  const r = buildRecord({
+    ...LEG,
+    feed_title: 'Chad and Reeds Podcast',
+    item_title: '003. Dimly LIT',
+    message: 'hi',
+    sender_name: 'Reed',
+  })
+  for (const f of HELIPAD_READS) assert.equal(Object.hasOwn(r, f), true, `${f} was dropped`)
+  assert.equal(r.feed_title, 'Chad and Reeds Podcast')
+  assert.equal(r.item_title, '003. Dimly LIT')
+})
+
+await ok('the TLV names are refused, so they cannot come back by habit', () => {
+  const r = buildRecord({ ...LEG, podcast: 'Show', episode: 'Ep' })
+  assert.equal(Object.hasOwn(r, 'podcast'), false)
+  assert.equal(Object.hasOwn(r, 'episode'), false)
+})
+
+await ok('the guids ride twice, because only the remote pair reaches Helipad', () => {
+  const r = buildRecord({
+    ...LEG,
+    feed_guid: 'F', item_guid: 'I', remote_feed_guid: 'F', remote_item_guid: 'I',
+  })
+  assert.equal(r.remote_feed_guid, 'F')
+  assert.equal(r.remote_item_guid, 'I')
+  assert.equal(r.feed_guid, 'F')
 })
 
 await ok('app_name is ours and is not caller-settable', () => {
