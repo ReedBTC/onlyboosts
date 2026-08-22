@@ -113,11 +113,21 @@ await ok('the message cap still applies inside the comment', () => {
 
 console.log('\nThe record, and what a caller may not put in it:\n')
 
-await ok('the split is derived from the two figures, never accepted', () => {
-  const r = buildRecord({ ...LEG, split: 99 })
+await ok('⚠️ the DECLARED split wins over the realised one', () => {
+  // The live test that caught this: a 33% leg of a 111-sat boost is floored to
+  // 36 sats, which reads back as 32.4%. Deriving published 32 where the show's
+  // own value block declares 33, and every other app reports the declared one.
+  const r = buildRecord({ value_msat: 36_000, value_msat_total: 111_000, split: 33 })
   assert.equal(r.split, 33)
-  assert.equal(r.value_msat, 33_000)
-  assert.equal(r.value_msat_total, 100_000)
+  assert.equal(Math.round((36_000 / 111_000) * 100), 32)
+})
+
+await ok('an absent or unusable split still falls back to the derivation', () => {
+  assert.equal(buildRecord(LEG).split, 33)
+  assert.equal(buildRecord({ ...LEG, split: 0 }).split, 33)
+  assert.equal(buildRecord({ ...LEG, split: 101 }).split, 33)
+  assert.equal(buildRecord({ ...LEG, split: 'lots' }).split, 33)
+  assert.equal(buildRecord({ ...LEG, value_msat: 33_000, value_msat_total: 100_000 }).value_msat, 33_000)
 })
 
 await ok('⚠️ value_msat_total rides every record, since its absence is the bug', () => {

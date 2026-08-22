@@ -148,9 +148,23 @@ export function buildRecord(body) {
   if (valueMsat > totalMsat) throw new Error('invalid amount');
 
   // A leg's share of the whole, which is what Helipad renders as "(33% split)".
-  // Derived rather than accepted: it is a function of the two figures above, and
-  // a caller-supplied third number could disagree with them.
-  const split = Math.round((valueMsat / totalMsat) * 100);
+  //
+  // ⚠️ THE DECLARED SPLIT IS PREFERRED OVER THE REALISED ONE, and deriving it
+  // was wrong in a way only a live test showed. `distributeSats` floors every
+  // leg, so a 33% leg of a 111-sat boost is 36 sats and reads back as 32.4%.
+  // The first version derived from the two amounts and published `32` where the
+  // show's own value block declares `33`. Every other app reports the
+  // publisher's declared number, and rows are only comparable across apps if
+  // ours does too.
+  //
+  // It is still bounded here rather than trusted: this is a display figure in a
+  // record published under our name, so a caller may not put an arbitrary
+  // number in it, and an absent or unusable one still falls back to the
+  // derivation.
+  const declared = Number(body.split);
+  const split = (Number.isFinite(declared) && declared > 0 && declared <= 100)
+    ? declared
+    : Math.round((valueMsat / totalMsat) * 100);
 
   const record = {
     action: 'boost',

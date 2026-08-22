@@ -14,30 +14,30 @@
  * block we haven't resolved at render time, and a button that only ever
  * reports failure is worse than no button. See docs/show-pages-spec.md.
  */
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v105'
-import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v105'
-import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v105'
-import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v105'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v106'
+import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v106'
+import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v106'
+import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v106'
 // The same "Sort: X ▾" dropdown the feeds use. feed-controls.js imports
 // nothing, so this costs the page ~4KB and no transitive dependencies;
 // rangeControl and mountFeedControls are deliberately not used (no range here,
 // and no sticky bar to mount into).
-import { sortControl } from '/assets/js/feed-controls.js?v=ob-v105'
+import { sortControl } from '/assets/js/feed-controls.js?v=ob-v106'
 // The drawer's per-row buttons are server-rendered, so only the busy-state
 // helper is needed here — the builder is for the feeds, which make theirs in JS.
-import { withBoostBusy } from '/assets/js/boost-button.js?v=ob-v105'
+import { withBoostBusy } from '/assets/js/boost-button.js?v=ob-v106'
 import {
   initCopyNpub, initShowMore, initShare, initBackLink,
   initHashRouting, initHashSpy, initArt2, hydrateProfiles,
-} from '/assets/js/detail-page.js?v=ob-v105'
+} from '/assets/js/detail-page.js?v=ob-v106'
 // Its own module rather than a ninth export from detail-page.js, deliberately:
 // a stale copy of that file against a fresh copy of this one is a link-time
 // error that takes the whole page's JavaScript down. See the note at its head.
-import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v105'
+import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v106'
 // The reaction bar and ⋮ on this page's server-rendered boost notes. Its own
 // module for the same reason show-desc.js is; see the note at its head.
-import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v105'
-import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v105'
+import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v106'
+import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v106'
 
 const VALUE_API = '/api/value'
 

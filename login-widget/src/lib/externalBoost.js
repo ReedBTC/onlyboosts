@@ -176,6 +176,16 @@ function isCleanDecline(msg) {
  * fine — but because the API key is ours by name and a key in a public bundle
  * is a key anyone can write records with. See `functions/api/boostbox.js`.
  */
+/** A leg's share as the value block declares it, or null when the weights are
+ *  not knowable. Never computed from the paid sats; see the call site. */
+function legSplitPercent(leg, ctx) {
+  const weight = Number(leg.recipient?.splitWeight)
+  const total = Number(ctx.totalWeight)
+  if (!Number.isFinite(weight) || !Number.isFinite(total) || total <= 0) return null
+  const pct = Math.round((weight / total) * 100)
+  return pct > 0 && pct <= 100 ? pct : null
+}
+
 const DESCRIPTOR_TIMEOUT_MS = 7_000
 
 async function fetchBoostDescriptor(leg, ctx) {
@@ -193,6 +203,14 @@ async function fetchBoostDescriptor(leg, ctx) {
         // against the leg's own amount and renders every boost as "(100% split)",
         // so a podcaster is shown one leg's sats as the whole thing.
         value_msat_total: (ctx.totalSats || leg.sats) * 1000,
+        // ⚠️ THE DECLARED SPLIT, NOT THE REALISED ONE. `distributeSats` floors
+        // each leg, so a 33% leg of 111 sats is 36 and reads back as 32.4% —
+        // and the edge, deriving from the two amounts, published `32` where the
+        // show's own value block says `33`. Every other app reports the number
+        // the publisher declared, which is what makes rows comparable across
+        // apps, so that is the number that travels. The edge still bounds it and
+        // still derives one when it is absent.
+        split: legSplitPercent(leg, ctx),
         message: ctx.message || '',
         sender_name: ctx.senderName || '',
         recipient_name: leg.recipient?.name || '',
@@ -366,7 +384,7 @@ async function payKeysendLeg(leg, ctx, update, timer) {
  * @returns {Promise<{legs:Array, anyPaid:boolean, paidSats:number}>}
  */
 export async function payExternalBoost({
-  recipients, totalWeight, totalSats, message, senderName, senderPubkey, meta, lnurlCache, onLeg,
+  recipients, totalWeight, totalSats, message, senderName, senderPubkey, meta, donation, lnurlCache, onLeg,
 }) {
   if (!wallet.isReady()) throw new Error('Connect a wallet first')
   if (!Array.isArray(recipients) || recipients.length === 0) throw new Error('No recipients to pay')
@@ -375,7 +393,12 @@ export async function payExternalBoost({
   const kind = wallet.getStatus().kind
   const wal = wallet.getActiveWallet()
   const boostUuid = uuid4()
-  const ctx = { kind, wal, message, senderName, senderPubkey, totalSats, boostUuid, meta, lnurlCache }
+  // ⚠️ `donation` AND `totalWeight` BOTH RIDE THE CONTEXT, and both were missing
+  // from the first version of the descriptor work. A parameter that is accepted
+  // by the caller but never destructured here is silently `undefined` in every
+  // leg: the donation skip never fired, and the declared split was unavailable
+  // so it had to be re-derived from already-rounded sats.
+  const ctx = { kind, wal, message, senderName, senderPubkey, totalSats, totalWeight, boostUuid, meta, donation, lnurlCache }
 
   const legs = distributeSats(totalSats, recipients, totalWeight).map((l) => ({
     ...l, status: STATUS.PENDING, error: null, paymentHash: null, verifyUrl: null,
