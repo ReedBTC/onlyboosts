@@ -346,10 +346,20 @@ function setShowBoostState(v) {
 }
 
 function BoostApp() {
-  // Route through the gated api wrapper rather than flipping the
-  // signal directly, so the show-boost flow honours the same
-  // login → wallet gates the episode-boost flow does.
-  return <BoostButton onOpen={() => api.openShowBoost()} />
+  // ⚠️ THIS IS THE NAV'S DONATE BUTTON, AND IT IS THE ONE THAT ACTUALLY RUNS.
+  // React mounts over `#lb-boost-slot` as soon as the bundle lands, replacing
+  // the static placeholder — so `nav-widget-boot.js`'s click handler governs
+  // only the first press, before this exists. Pointing that handler at the new
+  // flow and leaving this one alone is why Donate still opened the login modal
+  // after the rest of the work was done, and the fallback branch over there
+  // made it look like a plausible wiring rather than a miss.
+  //
+  // ⚠️ `openSiteDonation`, NEVER `openShowBoost`. That one's Gate 1 is a bare
+  // `api.requestLogin()`, because `MultiLegBoostForm` signs its kind-1 BEFORE
+  // paying and therefore needs a signer by construction. Donating is a payment
+  // and a payment needs no Nostr identity: the wallet gate belongs behind the
+  // Boost press inside the modal, and the note is decided in the form.
+  return <BoostButton onOpen={() => api.openSiteDonation()} />
 }
 
 function ShowBoostHost() {

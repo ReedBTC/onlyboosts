@@ -367,4 +367,32 @@ console.log('\nThe themed classes emit real CSS:')
   ok('the boost modal carries no dark-theme classes')
 }
 
+// ─── The nav's Donate button points at the flow that has no login gate ──────
+//
+// ⚠️ THIS SHIPPED WIRED THE WRONG WAY AND LOOKED FINE. `nav-widget-boot.js`'s
+// click handler was pointed at `openSiteDonation`, but React mounts `BoostApp`
+// over `#lb-boost-slot` the moment the bundle lands, so that handler governs
+// only the press before the widget exists. `BoostApp` still called
+// `openShowBoost`, whose first gate is a bare `api.requestLogin()` — so Donate
+// went on demanding a Nostr account, while every file anyone would grep said it
+// did not. Nothing errored, and the boot script's fallback branch made the
+// wiring read as deliberate.
+{
+  const src = readFileSync(new URL('../login-widget/src/index.jsx', import.meta.url), 'utf8')
+  const m = /function BoostApp\(\)\s*\{([\s\S]*?)\n\}/.exec(src)
+  assert.notEqual(m, null, 'BoostApp not found — was it renamed?')
+  assert.match(m[1], /api\.openSiteDonation\(\)/,
+    'the nav Donate button must open the donation flow')
+  assert.equal(/api\.openShowBoost\(/.test(m[1]), false,
+    'BoostApp calls openShowBoost, whose Gate 1 is api.requestLogin() — Donate is login-gated again')
+  ok('the nav Donate button opens the donation flow, not the login-gated tip')
+
+  const boot = readFileSync(new URL('../assets/js/nav-widget-boot.js', import.meta.url), 'utf8')
+  // The fallback is the part that hid it: degrading to openShowBoost turns a
+  // stale bundle into a login wall rather than into a visible nothing.
+  assert.equal(/LBLogin\?\.openShowBoost|LBLogin\.openShowBoost/.test(boot), false,
+    'nav-widget-boot falls back to openShowBoost, which degrades into a login gate')
+  ok('the boot script has no silent fallback to the login-gated flow')
+}
+
 console.log(`\n${passed} assertions passed.\n`)

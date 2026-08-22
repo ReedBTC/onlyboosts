@@ -40,7 +40,7 @@
       }
       const s = document.createElement('script');
       // Absolute — this file is shared by pages at more than one path.
-      s.src = '/assets/widgets/login-widget.js?v=ob-v104';
+      s.src = '/assets/widgets/login-widget.js?v=ob-v105';
       s.async = true;
       s.onload = () => { Promise.resolve().then(resolve); };
       s.onerror = () => {
@@ -71,8 +71,14 @@
         // boost opens, with one leg at 100% to the site's own address.
         // `openShowBoost` is still exported and still works; nothing on this
         // fork calls it.
+        // ⚠️ NO FALLBACK TO `openShowBoost`, DELIBERATELY. There was one, and it
+        // is how this stayed broken: that method's first gate is a bare
+        // `api.requestLogin()`, so a missing `openSiteDonation` degraded into
+        // the exact login wall this flow exists to remove, silently and
+        // plausibly. A method that is not there should do nothing visible and
+        // say so in the console, not quietly run a different product.
         if (window.LBLogin?.openSiteDonation) window.LBLogin.openSiteDonation();
-        else if (window.LBLogin?.openShowBoost) window.LBLogin.openShowBoost();
+        else console.error('[lb] openSiteDonation missing; the widget bundle is stale');
       } catch (e) {
         if (long) long.textContent = prevLong;
         if (short) short.textContent = prevShort;
