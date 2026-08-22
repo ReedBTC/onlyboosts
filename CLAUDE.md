@@ -327,10 +327,12 @@ its own route before it ships.
 **⚠️ BUT A MONEY ENDPOINT NEEDS ONE MORE STEP, AND LANDING UNDER `/api/` IS WHAT
 HIDES IT.** That bucket is network-first **with a cached copy served when the
 network is down**, which is right for a feed and wrong for anything that moves
-sats. `isUncacheableMoneyRequest` is the opt-out and holds both:
+sats. `isUncacheableMoneyRequest` is the opt-out and holds three:
 `/api/value`, because a stale value block pays a split the show no longer
-publishes, and `/api/lnurl`, because it returns a **bolt11 invoice** and a
-cached invoice is one the donor may already have paid. `/api/lnurl` shipped
+publishes; `/api/lnurl`, because it returns a **bolt11 invoice** and a cached
+invoice is one the donor may already have paid; and `/api/boostbox`, because it
+returns a descriptor URL a podcaster's Helipad will fetch, so a cached one
+attaches **another boost's** message, amount and episode to this payment. `/api/lnurl` shipped
 without the exclusion in `ob-v91` and was caught before deploy; the reason it
 was easy to miss is that placing it under `/api/` was the correct, documented
 thing to do. **Ask of any new endpoint not just where it routes, but whether an
@@ -798,9 +800,12 @@ Two separate things are both called "boost":
 - **Boosting a podcast** — sats go to that show's own value split, parsed from
   its RSS feed. `externalBoost.js` / `externalBoostagram.js` / `payAllLegs.js`.
   This is the main event and it pays third parties.
-- **Boosting the site** — a tip to OnlyBoosts, one leg at 100% to
-  `RECIPIENT_LUD16`. `boostagram.js` + `BoostModal.jsx`, behind the nav's Boost
-  button.
+- **Donating to the site** — one leg at 100% to `RECIPIENT_LUD16`, behind the
+  nav's Donate button. **It runs the BOOST flow, not a flow of its own**:
+  `openSiteDonation` → `openExternalBoost` → `ExternalBoostModal` with a
+  synthetic one-leg bundle. See *A Donation Is The Boost Flow With One Leg*.
+  `boostagram.js` + `BoostModal.jsx` + `MultiLegBoostForm` are the retired LB
+  path and now have **no caller on this fork**.
 
 All LB payment and identity values were replaced on fork and the shipped
 `assets/widgets/login-widget.js` was rebuilt — verified zero occurrences of LB's
@@ -1129,10 +1134,13 @@ buttons would have sent the same empty fields; a typed name is what gives the
 signed-out case something to say. See *The Boost Modal Declares What Happens To
 The Note*.
 
-**The site tip is unchanged and still login-gated.** `openShowBoost` →
-`BoostModal` → `MultiLegBoostForm` signs a kind-1 before paying, so it needs a
-signer by construction. `_ensureWalletForPay` (the merch checkout) is likewise
-untouched.
+**⚠️ THE SITE TIP USED TO BE THE EXCEPTION AND IS NOT ANY MORE.**
+`openShowBoost` → `BoostModal` → `MultiLegBoostForm` signs a kind-1 before
+paying, so it needs a signer by construction — which meant the nav's Donate
+button demanded a Nostr account long after the episode boosts stopped doing so.
+It now opens `openSiteDonation` instead. `openShowBoost` is still exported and
+still works; nothing on this fork calls it. `_ensureWalletForPay` (the merch
+checkout) keeps its gate.
 
 ### The Boost Modal Declares What Happens To The Note
 
@@ -1321,6 +1329,100 @@ from the widget source and the bundle cannot import from `functions/`, the same
 split `CALLBACK_HOST_ALLOWLIST` lives with. **`scripts/test-sign-boost.mjs` is
 what enforces the equality**, asserting that exactly that figure validates and
 one msat more does not. Lower either copy and it fails.
+
+### A Donation Is The Boost Flow With One Leg
+
+**The nav's Donate button opens `ExternalBoostModal`**, driven by a synthetic
+bundle of one `lnaddress` recipient at 100% to `RECIPIENT_LUD16`. A donor gets
+everything a podcast boost gets: the wallet gate behind the press, the four note
+outcomes, Anon, Private Boost, per-leg retry, the 90-second watcher, and the
+site-signed note for someone with no account. Writing a parallel modal would
+have meant two copies of a money path, and the copy exercised less is the one
+that rots.
+
+**⚠️ REACT OWNS THAT BUTTON, NOT `nav-widget-boot.js`.** The boot script's click
+handler governs only the press before the bundle lands; `createRoot(boostEl)`
+then mounts `BoostApp` over `#lb-boost-slot` and owns every press after. Wiring
+the boot script alone left Donate opening the login modal while every file
+anyone would grep said otherwise. `test-boost-modal-render.mjs` walks `BoostApp`
+and asserts it calls `openSiteDonation` and never `openShowBoost`, whose Gate 1
+is a bare `api.requestLogin()`.
+
+**⚠️ A DONATION NOTE IS NOT A BOOST NOTE, AND DROPPING THE NIP-73 TAGS IS NOT
+ENOUGH TO MAKE THAT TRUE.** `classify.py` sets `is_boost` from **either** a `t`
+tag in `{boostagram, value4value, boost}` **or** a positive `amount` tag. So
+`buildDonationNoteTemplate` emits `t=donation`, `t=onlyboosts`, `client` and
+`r`, and **no `amount` tag at all** — the figure lives in the text. Sats paid to
+OnlyBoosts are not a podcast boost and must never be counted as one, which is
+the decision `FEED_GUID = null` already records. The outer guard is `scan.py`,
+which REQs `{kinds:[1], "#k": BOOST_FILTER_K}`, so a note with no `k` tag is
+never fetched; the tag rules are the inner one.
+
+**⚠️ SO THE ORACLE HAS TWO TEMPLATE FAMILIES AND THEY ARE DISJOINT.**
+`validateBoostTemplate` **requires** `t=boostagram`, `t=value4value` and exactly
+one `amount` — precisely what a donation must not have — so neither family is
+reachable by relaxing the other. `validateTemplate` routes on the opening line
+with **no fallback between them**: trying both and accepting either would turn
+two strict shapes into one loose one. A donation carries no `amount` tag to cap,
+so its headline is matched **whole** and the figure read back out of it.
+`t` is an allowed tag name there, so a boost topic smuggled onto a donation is
+refused **explicitly** rather than by the allowlist.
+
+**A consequence to state plainly: site donations appear in no feed, no total and
+no stat.** That is deliberate. If they should ever be counted, it is a different
+tag design and a different decision.
+
+### Getting A Boost Into Helipad
+
+Helipad reads three tiers, and **it never reads Nostr at all** — it polls an LND
+node (`LND_URL`, `LND_ADMINMACAROON`, `LND_TLSCERT`). The kind-1 note and its
+tags are invisible to it.
+
+| Tier | Source | Our path |
+|---|---|---|
+| 1 | boostagram TLV 7629169 on the HTLC | keysend legs, already complete |
+| 2 | `rss::payment::boost <url>` in the invoice memo → HEAD → `x-rss-payment` | **lnaddress legs, via `/api/boostbox`** |
+| 3 | the memo verbatim | the bare message, which is what shipped before |
+
+`functions/api/boostbox.js` stores the metadata with BoostBox
+(podcast-namespace PR #734) and `buildLnurlComment` puts the returned URL in the
+LNURL comment.
+
+**⚠️ IT PROXIES BECAUSE OF THE KEY, NOT BECAUSE OF CORS**, which is the opposite
+of `/api/lnurl`. tardbox answers with `access-control-allow-origin: *`, so the
+browser could call it directly; it must not, because a shared key in a 1MB
+public bundle is one anyone can write records under our name with.
+`BOOSTBOX_API_KEY` is a secret binding on Preview **and** Production, and Pages
+binds at deploy time so a new secret needs a redeploy.
+
+**⚠️ `feed_title` AND `item_title`, NEVER `podcast` AND `episode`.** Helipad
+deserializes an `RssPayment` of exactly nine fields — `action`, `app_name`,
+`feed_title`, `item_title`, `message`, `remote_feed_guid`, `remote_item_guid`,
+`sender_name`, `value_msat_total` — and drops the rest. `podcast`/`episode` are
+the **boostagram TLV's** names for the same two facts; sending those stored them
+faithfully and rendered a podcaster's row with a sender, a total and no show.
+The guids go in **twice** for the same reason: the plain pair drives BoostBox's
+own page, the `remote_` pair is the only guid Helipad reads.
+
+**⚠️ THE DESCRIPTOR IS WHOLE OR ABSENT.** Truncation cuts from the right with
+the URL on the left, so `${desc} ${msg}`.slice() shortens the URL into a dead
+link having spent the whole 255-character allowance on it.
+
+**⚠️ AND A MISSING DESCRIPTOR IS NEVER FATAL.** Every failure — no key, no KV,
+rate limit, timeout, upstream refusal — resolves to the bare message. It also
+**warns to the console**, because the only other symptom is a row in somebody
+else's Helipad. `sender_id` is deliberately never sent, so an anonymous boost
+cannot leak a pubkey to a recipient's aggregator through this channel, and the
+descriptor is skipped entirely on a site donation.
+
+**⚠️ A SELF-PAID LEG NEVER SETTLES, AND IT IS NOT A BUG IN ANY OF THIS.** Where
+the donor is also a split recipient, that leg is their own hub paying an address
+it hosts; it can be credited internally with no HTLC, leaving the LND invoice
+`OPEN` forever, so nothing reaches Helipad's stream. Measured 2026-08-22: the
+memo was intact on the node and the invoice was never settled. **It costs an
+ordinary donor nothing** — they are not a recipient of the show they boost — but
+it means this phase cannot be verified on such a leg, by keysend or by
+descriptor.
 
 ### The Wallet Gate Is Behind The Boost Button
 
@@ -3539,8 +3641,9 @@ would. Never remove an entry** — those links are in the wild.
    `functions` — it is LB's own-podcast boost flow. The live map is: **every
    podcast boost on this site goes through `openExternalBoost` →
    `ExternalBoostModal`**, from all six surfaces in the boost-button table
-   above; `openShowBoost` → `BoostModal` → `MultiLegBoostForm` is the site tip
-   only, one leg at 100%, so it can never partial. A change to "the boost modal"
+   above, **and the nav's Donate button now joins them through
+   `openSiteDonation`**. `openShowBoost` → `BoostModal` → `MultiLegBoostForm`
+   has no caller left on this fork at all. A change to "the boost modal"
    is one file, not three, and `MultiLegBoostForm`'s presign-then-publish design
    is deliberately untouched because nothing on this fork exercises it
    multi-leg.
