@@ -474,20 +474,24 @@ Three things that fell out of the split:
   format rather than two.
 - **Boost messages tokenize through `nostr-text.js`**, so a `nostr:note1…` inside
   a message is the same njump chip on every surface.
-- **A message keeps its line breaks, and an image URL renders as the image.**
-  `renderMessage` ran its text through `truncate`, which collapses *all*
-  whitespace, so a multi-line note arrived as one run-on paragraph —
-  with `white-space: pre-wrap` already set on all three message classes
-  (`.pcast-boost-msg`, `.note-body`, `.boost-msg`), so the CSS had been ready the
-  whole time and the newlines were being destroyed one layer above it. It shows
-  up hardest on this site's **own** bot notes, which are structured and open with
-  a banner. `capMessage` keeps newlines and collapses only runs of blank lines;
-  spaces and tabs still collapse. **⚠️ The image's sizing is inline rather than a
-  class**: this module is two-sided and its output lands in three class contexts
-  in stylesheets that are not all loaded by the same pages, so a class would mean
-  one rule written three times and kept in step forever. `max-height` is the
-  load-bearing part — an unbounded remote image is a third party deciding how
-  tall a card on this site is.
+- **A message keeps its line breaks.** `renderMessage` capped its text through
+  `truncate`, which collapses *all* whitespace, so a multi-line note arrived as
+  one run-on paragraph — with `white-space: pre-wrap` already set on all three
+  message classes (`.pcast-boost-msg`, `.note-body`, `.boost-msg`), so the CSS
+  had been ready the whole time and the newlines were being destroyed one layer
+  above it. It shows up hardest on this site's **own** bot notes, which are
+  structured. `capMessage` keeps newlines and collapses only runs of blank
+  lines, so a note padded with six cannot push the rest off a card; spaces and
+  tabs still collapse.
+- **⚠️ AN IMAGE URL IS A LINK, NEVER AN `<img>`, AND THIS WAS TRIED THE OTHER
+  WAY.** Inline images shipped on 2026-08-21 and were reverted the same day:
+  **they make the notes way too big** (Reed). A boost card is a dense row in a
+  long list and one picture turns it into a post — several to a screen instead
+  of a dozen. That the height was capped is beside the point; the objection is
+  to the block existing, so **it does not come back as a thumbnail either.**
+  Nothing is lost — the URL still links out, and clients that render the picture
+  inline are unaffected. `test-episode-card.mjs` asserts the revert stayed,
+  because re-adding it is a two-line change that looks like an improvement.
 
 ### The Cost, Stated
 

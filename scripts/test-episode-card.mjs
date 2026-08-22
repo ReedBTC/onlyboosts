@@ -346,13 +346,13 @@ check('a pathological message is still bounded', () => {
   assert.match(out, /…$/)
 })
 
-// ── Line structure and images in a boost message ────────────────────────────
+// ── Line structure and URLs in a boost message ──────────────────────────────
 // ⚠️ ADDED 2026-08-21 BECAUSE THIS SITE'S OWN NOTES RENDERED WORST OF ALL. A
 // boost note is multi-line and opens with an image URL; `renderMessage` ran the
 // text through `truncate`, which collapses ALL whitespace, so every line
 // arrived as one run-on paragraph — with `white-space: pre-wrap` already set on
 // all three message classes, so the CSS had been ready the whole time.
-console.log('\nLine structure and images:')
+console.log('\nLine structure and URLs:')
 
 const NOTE = [
   'https://i.nostr.build/iQ4vHJ88xTrGZ36eey9lWJ.png',
@@ -368,24 +368,26 @@ check('the author\u2019s line breaks survive', () => {
   assert.equal((out.match(/\n/g) || []).length, 5, 'newlines were collapsed')
 })
 
-check('an image URL renders as the picture, bounded', () => {
+check('⚠️ an image URL is a LINK, never an <img>', () => {
+  // Tried the other way on 2026-08-21 and reverted the same day: an inline
+  // picture turns a dense list row into a post. See the note above `linkOut`.
+  // This asserts the revert stayed, because re-adding it is a two-line change
+  // that looks like an improvement.
   const out = renderMessage(NOTE, new Map())
-  assert.match(out, /<img src="https:\/\/i\.nostr\.build\/[^"]+"/)
-  assert.match(out, /loading="lazy"/)
-  // ⚠️ The cap is the point: an unbounded remote image is a third party
-  // deciding how tall a card on this site is.
-  assert.match(out, /max-height:18rem/)
+  assert.doesNotMatch(out, /<img/)
+  assert.match(out, /<a href="https:\/\/i\.nostr\.build\/[^"]+"[^>]*>https/)
 })
 
-check('a non-image URL is still a link, not an image', () => {
+check('every URL is a link, image-shaped or not', () => {
   const out = renderMessage(NOTE, new Map())
   assert.match(out, /<a href="https:\/\/onlyboosts\.social\/episode\/2c0b0505"[^>]*>https/)
 })
 
-check('⚠️ a non-http image URL reaches neither src nor href', () => {
+check('⚠️ a javascript: or data: URL still reaches no href', () => {
   const out = renderMessage('javascript:alert(1).png and data:image/png;base64,AAAA.png', new Map())
   assert.doesNotMatch(out, /<img/)
   assert.doesNotMatch(out, /href="javascript:/)
+  assert.doesNotMatch(out, /href="data:/)
 })
 
 check('blank-line runs collapse so a padded note cannot push the card apart', () => {

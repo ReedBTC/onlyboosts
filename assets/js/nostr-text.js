@@ -202,14 +202,9 @@ function scanSpans(src, mentionRe = NOSTR_URI_RE) {
 function linkOut(url) {
   const raw = String(url).replace(/[.,;:!?)\]]+$/, "");
   const tail = String(url).slice(raw.length);
-  const body = !isSafeUrl(raw)
-    ? htmlEscape(raw)
-    // An image renders as the picture rather than as its address. A bare image
-    // URL on its own line is how Nostr clients have always shown one, and this
-    // site's own boost notes open with exactly that.
-    : IMAGE_URL.test(raw)
-      ? imageOut(raw)
-      : `<a href="${htmlEscape(raw)}" target="_blank" rel="noopener noreferrer">${htmlEscape(truncate(raw, 60))}</a>`;
+  const body = isSafeUrl(raw)
+    ? `<a href="${htmlEscape(raw)}" target="_blank" rel="noopener noreferrer">${htmlEscape(truncate(raw, 60))}</a>`
+    : htmlEscape(raw);
   return body + htmlEscape(tail);
 }
 
@@ -316,31 +311,17 @@ function capMessage(s, n) {
   return t.length <= n ? t : t.slice(0, n - 1).trimEnd() + "\u2026";
 }
 
-/* An http(s) URL that names an image file. Extension-based on purpose: the only
- * alternative is fetching it to look, which a string→string renderer running at
- * the edge cannot do. A URL that lies about its extension renders as a broken
- * image, which is the same outcome a dead link already has.
- */
-const IMAGE_URL = /\.(?:png|jpe?g|gif|webp|avif|bmp|svg)(?:[?#]|$)/i;
-
-/* ⚠️ THE SIZING IS INLINE RATHER THAN A CLASS, AND THAT IS DELIBERATE. This
- * module is imported from both sides and its output lands in three different
- * class contexts — `.pcast-boost-msg` (feed-cards.css), `.note-body`
- * (boosts-thread.css) and `.boost-msg` (show-page.css) — which are not all
- * loaded by the same pages. A class would need the same rule written into three
- * stylesheets that must then agree forever; the CSP already allows
- * `style-src 'unsafe-inline'`, so the renderer can own its own appearance.
+/* ⚠️ A BARE IMAGE URL IS LEFT AS A LINK, AND THIS WAS TRIED THE OTHER WAY.
+ * Rendering an `<img>` for a URL ending in an image extension shipped on
+ * 2026-08-21 and came straight back out: **it makes the notes way too big**
+ * (Reed's call, same day). A boost card is a dense row in a long list, and one
+ * picture in a message turns it into a post — several to a screen instead of a
+ * dozen. That the height was capped is beside the point; the objection is to
+ * the block existing at all, so **don't re-propose it as a thumbnail either.**
  *
- * `max-height` is the load-bearing one: an unbounded remote image in a boost
- * message is a third party deciding how tall a card on this site is.
+ * Nothing is lost: the URL still links out, and clients that DO render the
+ * picture inline are unaffected. This is only how a message looks here.
  */
-const IMG_STYLE = "max-width:100%;max-height:18rem;height:auto;border-radius:8px;display:block;margin:0.35rem 0";
-
-function imageOut(url) {
-  return `<a href="${htmlEscape(url)}" target="_blank" rel="noopener noreferrer">` +
-    `<img src="${htmlEscape(url)}" alt="" loading="lazy" decoding="async" style="${IMG_STYLE}">` +
-    `</a>`;
-}
 
 /* A boost message as HTML: nostr: URIs become @Name chips, bare URLs become
  * links, everything else is escaped text.
