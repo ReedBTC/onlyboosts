@@ -3096,7 +3096,8 @@ where the widest figure is five.
 
 ### The Rank Line In The Stat Tiles
 
-On `/show` and `/episode` each stat tile carries a third line, `#4` or `T#118`:
+On `/show`, `/episode` **and `/booster`** each stat tile carries a third line,
+`#4` or `T#118`:
 the subject's **all-time, all-language, Global** rank by that tile's own sort
 (sats, boosts, boosters) on the feed its card lives on (Shows or Albums,
 Episodes or Songs, chosen by the same medium partition the API uses). One
@@ -3150,7 +3151,51 @@ chip line go with it and the page renders exactly as `/booster` already does.
 Three more things a change would break:
 
 - **It fails quietly**, the podroll discipline: null resolves to tiles with no
-  third line, which is what `/booster` renders.
+  third line, which is what every page rendered before this and what any page
+  still renders when the query fails.
+
+**⚠️ `/booster` JOINED ON 2026-08-23, AND ITS THIRD KEY IS DIFFERENT.** *Reed's
+call.* A show or an episode's third figure is how many **people** boosted it
+(`boosters`); a booster's is how many **shows** they boosted (`shows`). Both are
+the breadth axis of the list the subject is ranked on, but they are different
+columns and different words, so `BOOSTER_RANK_KEYS` sits beside `RANK_KEYS`
+rather than one array serving both.
+
+**⚠️ THE EPISODES TILE CAME OFF, AND DROPPING IT IS WHAT LET THE OTHERS RANK.**
+The members wall orders by sats, boosts and shows and by nothing else, so an
+episodes tile could never carry a chip — and a fourth tile with a visibly empty
+corner reads as a rank that failed to load rather than as a figure with no list
+behind it. The figure is not lost: the `#shows` rollup's own rows still print
+it, and the `#episodes` heading below opens with the count.
+
+**⚠️ THE POPULATION IS THE WALL'S, PUBLISHER EXCLUSION AND ALL.** `RANK_PUBLISHERS`
+in `feed-rank.js` restates `PUBLISHERS` from `functions/api/v1/_common.js`,
+which it may not import without dragging the API surface in — **the two copies
+must stay in step**. Ranking over a population that included those five keys
+would be a rank on a list nobody can scroll: every member below `chadf-boostbot`
+would read one place worse here than on the wall itself.
+
+**⚠️ AND A PUBLISHER'S OWN PAGE GETS NO CHIPS, WHICH FALLS OUT FOR FREE.** The
+subject is not in the CTE, so `at` is 0 and the shared `ranksFrom` guard returns
+null — the same guard that catches a medium mismatch. That is the honest answer:
+those keys are deliberately not on the wall, so they hold no place on it, and
+printing one would contradict the Boost Bots section that says they were left
+out.
+
+**It rides the SECOND `Promise.all`, not the first**, because it needs `totals`
+and the first batch is what produces them. So `/booster` pays
+`first + max(second)` rather than one `max()`. Cost is one scan of `boosts`
+(~23k rows) grouped to ~2k, against ~1.3k for a show — heavier than its
+siblings, still behind the 300s edge cache, and it never throws.
+
+**⚠️ `test-members-search.mjs`'s `env.DB` SHIM HAD NO `.first()` AND D1 DOES.**
+`feedRanks` uses it, so every rank call threw inside that function's own
+try/catch and came back null — which is its *documented failure mode*, so
+"a publisher gets no rank" passed for entirely the wrong reason. A shim that
+models less than the thing it stands in for turns a hard failure into a quiet
+one. The rank block there brute-forces every rank against "strictly ahead, plus
+one" over the same population, and was confirmed to go red with the exclusion
+removed.
 - **The caption defines the `T` only when a `T` is on screen.** Explaining a
   notation the reader cannot see is worse than saying nothing.
 - **The chips are not links and the caption is.** Three links to one feed under

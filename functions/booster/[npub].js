@@ -38,6 +38,7 @@ import {
   renderBoosts,
 } from "../_shared/detail-page.js";
 import { itemsFromBoosts, renderCardPage, CARDS_PER_PAGE } from "../_shared/episode-cards.js";
+import { feedRanks, renderStatTiles } from "../_shared/feed-rank.js";
 import { fetchBoosterCorpus } from "../api/v1/boosters/[npub].js";
 import { COPY as CARD_COPY } from "../../assets/js/episode-card.js";
 
@@ -214,11 +215,23 @@ export async function onRequestGet({ env, params }) {
   // wants names for its text chips; the bio wants names AND pictures for its
   // face chips, and merging them would make every /show and /episode render
   // carry a `picture` column it has no use for.
-  const [names, bioProfiles] = await Promise.all([
+  const [names, bioProfiles, ranks] = await Promise.all([
     lookupMentionNames(env, boostRows.map((r) => r.message)),
     // Skipped entirely when the bio has no mention in it, which is the common
     // case — mentionedPubkeys returns empty and the helper never queries.
     lookupMentionProfiles(env, [prof?.about || ""]),
+    /* ⚠️ THE SECOND BATCH, NOT THE FIRST, because it needs `totals` — which the
+       first batch is what produces. So this page pays `first + max(second)`
+       rather than one `max()`, which is the cost of a rank that has to be
+       compared against figures the page has just computed. It never throws
+       (see _shared/feed-rank.js), so the worst case is the tiles rendering
+       exactly as they did before this existed. */
+    feedRanks(env.DB, "booster", {
+      pk: hex,
+      sats: totals.sats,
+      boosts: totals.boosts,
+      shows: totals.shows,
+    }),
   ]);
 
   const html = renderBoosterPage({
@@ -230,6 +243,7 @@ export async function onRequestGet({ env, params }) {
     boosts: boostRows,
     names,
     bioProfiles,
+    ranks,
     corpus,
   });
 
@@ -273,7 +287,7 @@ function toHexPubkey(s) {
 
 // ── the page ─────────────────────────────────────────────────────────────────
 
-function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioProfiles, corpus }) {
+function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioProfiles, ranks, corpus }) {
   const realName = prof?.display_name || prof?.name || null;
   const label = realName || shortId(npub, hex);
   const pageUrl = `${SITE_ORIGIN}/booster/${encodeURIComponent(npub || hex)}`;
@@ -291,7 +305,8 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
   const satsTotal = Number(totals.sats || 0);
   const boostTotal = Number(totals.boosts || 0);
   const showTotal = Number(totals.shows || 0);
-  const epTotal = Number(totals.eps || 0);
+  /* `totals.eps` is still SELECTed and still used by the #shows rollup's own
+     per-row meta line; it just no longer has a tile of its own. */
 
   const ogTitle = `${label} — Boosts on Nostr | OnlyBoosts`;
 
@@ -319,11 +334,19 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
     },
   };
 
+  /* ⚠️ THREE TILES, NOT FOUR: THE EPISODES ONE CAME OFF ON 2026-08-23 (Reed's
+     call), and dropping it is what let the other three carry a rank. The
+     members wall ranks by sats, boosts and shows and by nothing else, so an
+     episodes tile could never have a chip beside it — a fourth tile with a
+     visibly empty corner reads as a rank that failed to load rather than as a
+     figure with no list behind it. The figure is not lost: the #episodes
+     rollup below opens with "N sats across M episodes".
+
+     `key` is what pairs a tile with its rank; see _shared/feed-rank.js. */
   const stats = [
-    { label: "sats", value: compact(satsTotal), exact: num(satsTotal) },
-    { label: boostTotal === 1 ? "boost" : "boosts", value: num(boostTotal), exact: num(boostTotal) },
-    { label: showTotal === 1 ? "show" : "shows", value: num(showTotal), exact: num(showTotal) },
-    { label: epTotal === 1 ? "episode" : "episodes", value: num(epTotal), exact: num(epTotal) },
+    { key: "sats", label: "sats", value: compact(satsTotal), exact: num(satsTotal) },
+    { key: "boosts", label: boostTotal === 1 ? "boost" : "boosts", value: num(boostTotal), exact: num(boostTotal) },
+    { key: "shows", label: showTotal === 1 ? "show" : "shows", value: num(showTotal), exact: num(showTotal) },
   ];
 
   return `<!DOCTYPE html>
@@ -397,23 +420,23 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v131" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v131" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v131" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v131" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v132" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v132" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v132" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v132" />
   <!-- The hero, the drawers and the boost list are the show page's, so this
        page links its stylesheet and adds only the deltas. -->
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v131" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v131" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v132" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v132" />
   <!-- The episode card, for the #episodes rollup: the same chrome
        feeds-podcasts.js paints on the homepage. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v131" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v132" />
   <!-- The boost thread inside a card's drawer, and its reply / like / repost /
        zap bar, both reached through that same card. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v131" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v131" />
-  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v131" />
-  <link rel="stylesheet" href="/assets/css/booster-page.css?v=ob-v131" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v132" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v132" />
+  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v132" />
+  <link rel="stylesheet" href="/assets/css/booster-page.css?v=ob-v132" />
 </head>
 <body data-booster-pk="${htmlEscape(hex)}"${npub ? ` data-booster-npub="${htmlEscape(npub)}"` : ""}>
 
@@ -515,7 +538,7 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
     <span class="show-back-arrow" aria-hidden="true">←</span><span data-back-label>All Boosts</span>
   </a>
 
-  ${renderHeader({ hex, npub, prof, label, realName, pic, banner, stats, totals, bioProfiles })}
+  ${renderHeader({ hex, npub, prof, label, realName, pic, banner, stats, ranks, totals, bioProfiles })}
 
   ${renderShows(shows, realName)}
 
@@ -612,12 +635,12 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav.js?v=ob-v131" defer></script>
-<script src="/assets/js/booster-page.js?v=ob-v131" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v132" defer></script>
+<script src="/assets/js/booster-page.js?v=ob-v132" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v131"></script>
-<script src="/assets/js/sw-register.js?v=ob-v131" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v132"></script>
+<script src="/assets/js/sw-register.js?v=ob-v132" defer></script>
 </body>
 </html>`;
 }
@@ -633,7 +656,7 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
 // the 1,948 stored profiles: about 53.9%, lud16 64.7%, website 18.8%,
 // banner 42.5%, lud06 4.4%. A header built as a form with empty rows would be
 // mostly empty rows; every one of these prints or is absent.
-function renderHeader({ hex, npub, prof, label, realName, pic, banner, stats, totals, bioProfiles }) {
+function renderHeader({ hex, npub, prof, label, realName, pic, banner, stats, ranks, totals, bioProfiles }) {
   const nip05 = String(prof?.nip05 || "").trim();
   const about = String(prof?.about || "").trim();
   const website = isSafeUrl(prof?.website) ? prof.website : null;
@@ -710,9 +733,14 @@ function renderHeader({ hex, npub, prof, label, realName, pic, banner, stats, to
     <h2 class="show-stats-title">
       <a href="/about#keysend">Nostr Boost</a> Stats
     </h2>
-    <dl class="show-stats">
-      ${stats.map((s) => `<div class="show-stat"><dt>${htmlEscape(s.label)}</dt><dd title="${htmlEscape(s.exact)}">${htmlEscape(s.value)}</dd></div>`).join("\n      ")}
-    </dl>
+    ${renderStatTiles(stats, ranks, {
+      rankFeed: "Members",
+      /* The wall, not this page's back link. `/#members` is where those three
+         orderings live and where a reader can go and find the row; the back
+         link above points at the same place, which is a coincidence of this
+         page rather than something to rely on. */
+      backHref: "/#members",
+    })}
   </header>`;
 }
 
@@ -1040,10 +1068,10 @@ function notFound(raw) {
   <meta name="robots" content="noindex" />
   <title>Booster not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v131" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v131" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v131" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v131" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v132" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v132" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v132" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v132" />
 </head>
 <body>
 <section class="page-header">
@@ -1061,7 +1089,7 @@ function notFound(raw) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v131" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v132" defer></script>
 </body>
 </html>`;
   return new Response(html, {

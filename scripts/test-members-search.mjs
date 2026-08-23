@@ -22,6 +22,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { onRequestGet } from '../functions/api/v1/members.js'
+import { feedRanks } from '../functions/_shared/feed-rank.js'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -140,7 +141,16 @@ const env = {
     prepare(sql) {
       return {
         bind(...args) {
-          return { all: async () => ({ results: db.prepare(sql).all(...args) }) }
+          return {
+            all: async () => ({ results: db.prepare(sql).all(...args) }),
+            /* ⚠️ D1 HAS `.first()` AND THIS SHIM DID NOT. `feedRanks` uses it,
+               so every rank call threw inside that function's own try/catch and
+               came back null — which is its documented failure mode, so the
+               assertions read as "a publisher gets no rank" passing for the
+               wrong reason. A shim that models less than the thing it stands in
+               for turns a hard failure into a quiet one. */
+            first: async () => db.prepare(sql).get(...args) ?? null,
+          }
         },
       }
     },
@@ -463,6 +473,71 @@ console.log('\n⚠️ range scopes a LISTING and never a SEARCH:')
       assert.equal(status, 400)
       assert.match(body.error, /range/)
     })
+  }
+}
+
+console.log('\n⚠️ A booster\'s rank is over the WALL\'s population:')
+{
+  /* The three chips on /booster/<npub> are that person's place on the members
+     wall by sats, boosts and shows. Ranking them over a population that
+     included the publisher keys would be a rank on a list nobody can scroll:
+     every member below chadf-boostbot would read one place worse here than on
+     the wall itself. */
+  const BOT = 'f3bd42a91af5f3f1c40ca45ad2269464ab79996b32da78e8ed2ab91111b08e65'
+  const totals = (pk) => db.prepare(
+    'SELECT COALESCE(SUM(sats),0) sats, COUNT(*) boosts, COUNT(DISTINCT podcast_guid) shows'
+    + ' FROM boosts WHERE booster_pubkey = ?').get(pk)
+  const rank = async (pk) => feedRanks(env.DB, 'booster', { pk, ...totals(pk) })
+
+  {
+    /* Piez leads the fixture on sats among non-publishers; the bot has far
+       more. A rank of 1 here is the exclusion working. */
+    const r = await rank('1'.repeat(64))
+    check('the sats leader is #1 even though a publisher has more', () => {
+      assert.equal(r.sats.rank, 1)
+      assert.equal(r.sats.tied, false)
+    })
+    check('all three keys are present', () =>
+      assert.deepEqual(Object.keys(r).sort(), ['boosts', 'sats', 'shows']))
+  }
+  {
+    /* ⚠️ A PUBLISHER'S OWN PAGE GETS NO CHIPS. It is not on the wall, so it
+       holds no place on it, and printing one would contradict the Boost Bots
+       section that says it was left out. Falls out of the `at < 1` guard. */
+    const r = await rank(BOT)
+    check('⚠️ a publisher gets no ranks at all, not a rank of 1', () =>
+      assert.equal(r, null))
+  }
+  {
+    /* Competition ranking, on the population this query builds rather than on
+       a hand-made one: two members tied on a value share the better place and
+       the next distinct value skips the group. */
+    const rows = db.prepare(
+      `SELECT booster_pubkey pk, COUNT(*) n FROM boosts
+        WHERE booster_pubkey NOT IN (${new Array(5).fill('?').join(',')})
+        GROUP BY booster_pubkey ORDER BY n DESC`).all(
+      BOT,
+      'd35ae076512c29b01a5b33aa764ed4db44a9d0bbd96009705f48101f6cfe76a2',
+      'c330881e28768381dd8bdfd274341dca0c5882c29b8642ea4bc82f7563264592',
+      '3a87a19c801d57111b0905569225d2b20b39d154fc93bef5a8f2860c409b84d9',
+      '3820f4ff8587747530c7feafe47c1e592e3ce0fd2929b4f907e40714bd26f408')
+    const top = rows[0]
+    const r = await rank(top.pk)
+    check('the boosts leader is #1', () => assert.equal(r.boosts.rank, 1))
+    /* Brute force: every member's rank must equal the count strictly ahead of
+       them, plus one — checked against the same population, independently. */
+    let mismatch = null
+    for (const row of rows.slice(0, 8)) {
+      const got = await rank(row.pk)
+      const want = rows.filter((o) => o.n > row.n).length + 1
+      const tied = rows.filter((o) => o.n === row.n).length > 1
+      if (got.boosts.rank !== want || got.boosts.tied !== tied) {
+        mismatch = `${row.pk.slice(0, 6)}: got ${got.boosts.tied ? 'T' : ''}#${got.boosts.rank}, want ${tied ? 'T' : ''}#${want}`
+        break
+      }
+    }
+    check('⚠️ every rank equals "strictly ahead, plus one", ties marked', () =>
+      assert.equal(mismatch, null, mismatch || ''))
   }
 }
 
