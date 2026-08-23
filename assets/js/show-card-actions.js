@@ -23,20 +23,20 @@
  * objects with different hooks, and merging them would put a switch inside the
  * seam.
  */
-import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v118'
-import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v118'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v118'
-import { withBoostBusy } from '/assets/js/boost-button.js?v=ob-v118'
-import { wireArt2 } from '/assets/js/detail-page.js?v=ob-v118'
-import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v118'
-import { getShowEpisodes } from '/assets/js/ob-live.js?v=ob-v118'
+import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v119'
+import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v119'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v119'
+import { withBoostBusy } from '/assets/js/boost-button.js?v=ob-v119'
+import { wireArt2 } from '/assets/js/detail-page.js?v=ob-v119'
+import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v119'
+import { getShowEpisodes } from '/assets/js/ob-live.js?v=ob-v119'
 // The row renderer, for a drawer that fills on open. THE SAME FUNCTION the card
 // module would have run inline, so a fetched row is byte-identical to one the
 // edge could have shipped. show-card.js is already in the graph on every surface
 // this module runs on, so a static import costs nothing.
 import {
   episodeRowsHtml, sortEpisodeRows, copyFor, num,
-} from '/assets/js/show-card.js?v=ob-v118'
+} from '/assets/js/show-card.js?v=ob-v119'
 
 const VALUE_API = '/api/value'   // Podcast Index value-block proxy (splits)
 const DRAWER_EPISODES = 50       // episodes listed per expanded show

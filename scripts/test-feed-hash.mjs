@@ -314,6 +314,28 @@ console.log('\nThe tab grid and the sub grid line up:')
       eq('desktop: both are 3 columns', u['grid-template-columns'], t['grid-template-columns'])
     }
   }
+
+  /* ⚠️ THE FOUR ELEMENTS OF THE PAGE TRACK MOVE TOGETHER. The tabs, the
+   * sub-row, the control bar and the panels are one column; widening three of
+   * them leaves the fourth as a visible step down the page. They read a single
+   * custom property so this cannot drift, and this asserts the property is what
+   * they read rather than a number that happens to match today.
+   *
+   * The track is 60rem because `.show-main` is — the homepage was 240px
+   * narrower than /show, /episode and /booster, so the column changed width
+   * when a reader clicked through. That is a decision, not an accident, which
+   * is why the value is checked and not just the agreement. */
+  {
+    const base = html.slice(0, cut)
+    for (const sel of ['.feed-tabs', '.feed-subs', '.feed-bar', '.feed-panels-inner']) {
+      eq(`${sel} reads the shared track`, decls(sel, base)?.['max-width'], 'var(--feed-track)')
+    }
+    const root = /--feed-track:\s*([^;]+);/.exec(html)
+    eq('the track is the detail pages\' own width', root && root[1].trim(), '60rem')
+    const showMain = readFileSync(join(ROOT, 'assets/css/show-page.css'), 'utf8')
+    const sm = /\.show-main\s*\{[^}]*max-width:\s*([^;]+);/.exec(showMain)
+    eq('and .show-main still is too', sm && sm[1].trim(), '60rem')
+  }
 }
 
 console.log(`\n${pass} assertions passed${fail ? `, ${fail} FAILED` : ''}.`)

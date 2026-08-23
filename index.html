@@ -50,17 +50,17 @@
 
   <!-- Shared note / card styles (.note-card, .embed-note) — the boosts
        feeds render through the same kind-1 card as boosts-thread.js. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v118" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v119" />
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v118" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v119" />
   <!-- The episode card and its drawer, extracted from the inline block below
        when /episode/<guid> pages needed the same cards. See the file header. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v118" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v119" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. Must stay last
        among the stylesheets so the inline block below still wins. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v118" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v119" />
 
   <style>
     :root {
@@ -170,6 +170,19 @@
 
        Width matches .feed-panels-inner rather than the old ribbon's wider
        track, so the menus line up with the left edge of the cards below. */
+    /* ⚠️ ONE TRACK WIDTH FOR THE WHOLE PAGE, AND IT MATCHES THE DETAIL PAGES.
+       `.show-main` is 60rem with 1.25rem of padding, so the homepage was 240px
+       narrower than /show, /episode and /booster and the whole column jumped
+       width when a reader clicked through to one. The four elements below —
+       the tabs, the sub-row, the control bar and the panels — are the page
+       track and move together or not at all; `--feed-track` is what makes that
+       true by construction rather than by four numbers agreeing.
+
+       The masthead's logo and subtitle keep their own smaller measures. Those
+       are typographic — a 960px line of subtitle is a bad measure however wide
+       the page is. */
+    :root { --feed-track: 60rem; }
+
     .feed-bar-wrap {
       position: sticky;
       top: 64px; /* height of #top-nav */
@@ -191,7 +204,7 @@
        An INACTIVE tab has no active feed to read, so it carries its family's
        representative shade as `--tab`. Nothing here adds a token. */
     .feed-tabs {
-      max-width: 720px;
+      max-width: var(--feed-track);
       margin: 0 auto;
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -278,7 +291,7 @@
        another tab's sub-feeds, or none. */
     .feed-subs-wrap { border-bottom: 1px solid var(--border); }
     .feed-subs {
-      max-width: 720px;
+      max-width: var(--feed-track);
       margin: 0 auto;
       /* ⚠️ NO HORIZONTAL PADDING, because `.feed-tabs` has none. The two grids
          have to share a content box or their columns do not line up, and a
@@ -331,7 +344,7 @@
     .feed-sub[aria-selected="true"]:hover { color: var(--white); }
 
     .feed-bar {
-      max-width: 720px;
+      max-width: var(--feed-track);
       margin: 0 auto;
       padding: 0.55rem 1.25rem;
       display: flex;
@@ -409,7 +422,7 @@
       min-height: 60vh;
     }
     .feed-panels-inner {
-      max-width: 720px;
+      max-width: var(--feed-track);
       margin: 0 auto;
       padding: 2rem 1.25rem 3rem;
     }
@@ -753,8 +766,8 @@
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
     }
   </style>
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v118" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v118" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v119" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v119" />
 </head>
 <body data-active-feed="episodes-global">
 
@@ -1518,17 +1531,17 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v118"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v119"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v118" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v119" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v118" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v119" defer></script>
 
 <!-- Feed hydration — lazily loads the active feed on first view. -->
-<script type="module" src="/assets/js/feeds.js?v=ob-v118"></script>
-<script src="/assets/js/nav.js?v=ob-v118" defer></script>
+<script type="module" src="/assets/js/feeds.js?v=ob-v119"></script>
+<script src="/assets/js/nav.js?v=ob-v119" defer></script>
 
 </body>
 </html>
