@@ -173,13 +173,51 @@ function friendlyError(msg) {
   return s.length > 140 ? s.slice(0, 140) + '…' : (s || 'Payment failed.')
 }
 
+/**
+ * ⚠️ THE WALLET'S OWN FAILURE CODES, WHICH THE SHARED CLASSIFIER MISSES ON A
+ * TECHNICALITY: IT LOOKS FOR `no route` AND NIP-47 SAYS `NO_ROUTE`.
+ *
+ * Observed on a real boost, 2026-08-22. An upgraded keysend leg to
+ * `podcastindex@getalby.com` came back `Nip47WalletError:
+ * FAILURE_REASON_NO_ROUTE` — the node the address names has no public channel
+ * record, which is the exact case the invoice fallback was built for. The
+ * underscore meant `isCleanPaymentDecline` did not match, so the leg was
+ * classified UNCERTAIN instead of FAILED, and UNCERTAIN is the one status with
+ * no way out: the fallback is gated on FAILED, Retry is gated on FAILED, and
+ * "Check again" needs a verify URL a keysend has never had. **The donor was
+ * left looking at a leg with no action available at all.** Reed reported it as
+ * a leg that failed and offered no retry, which is precisely what it was.
+ *
+ * ⚠️ WHAT IS DELIBERATELY NOT IN THIS LIST IS THE WHOLE OF ITS SAFETY.
+ * `FAILURE_REASON_TIMEOUT` means the attempt ran out of time, and an HTLC in
+ * flight when the clock expired can still settle — treating it as a clean
+ * decline would offer a re-pay on a payment that may land, which is the
+ * 2026-08-19 double payment. `FAILURE_REASON_ERROR` is a catch-all and says
+ * nothing about settlement. Both stay ambiguous, and so does anything not
+ * named here. **Only add a code whose meaning is that no HTLC survived.**
+ */
+const WALLET_CLEAN_FAILURE_RE =
+  /FAILURE_REASON_(NO_ROUTE|INSUFFICIENT_BALANCE|INCORRECT_PAYMENT_DETAILS)/i
+
 // A clean decline means the payment definitively never left the wallet → safe
 // to FAIL without a settlement round-trip. Anything else is ambiguous. On top
 // of the shared classifier: keysend-capability errors (wallet can't keysend at
-// all), which also mean nothing was sent.
+// all) and the wallet failure codes above, both of which mean nothing was sent.
+//
+// ⚠️ The same gap exists in `payAllLegs.js`, which reads the shared classifier
+// directly. It is not patched here because nothing on this fork calls that path
+// (see the dead-code note in CLAUDE.md) and the direction of its error is the
+// safe one: a missed clean decline reports UNCERTAIN, which offers no re-pay.
 function isCleanDecline(msg) {
-  return isCleanPaymentDecline(msg) || KEYSEND_UNSUPPORTED_RE.test(String(msg || ''))
+  const s = String(msg || '')
+  return isCleanPaymentDecline(s) ||
+    KEYSEND_UNSUPPORTED_RE.test(s) ||
+    WALLET_CLEAN_FAILURE_RE.test(s)
 }
+
+/** Exported for `scripts/test-keysend-upgrade.mjs`, which pins the real
+ *  `FAILURE_REASON_NO_ROUTE` string observed in production. */
+export { isCleanDecline as _isCleanDeclineForTests }
 
 /**
  * Store this leg's boostagram with BoostBox and return the URL a podcaster's

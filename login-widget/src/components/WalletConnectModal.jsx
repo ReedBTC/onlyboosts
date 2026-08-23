@@ -112,10 +112,15 @@ export default function WalletConnectModal({ user, onClose, onConnected, onReque
           </div>
 
           <div className="px-4 sm:px-6 py-5 space-y-4 flex-1">
+            {/* ⚠️ ONE LINE, AND IT SAYS THE ONLY THING THIS SCREEN HAS TO
+                SAY. It ran to three lines explaining that an episode boost
+                pays every split recipient in one shot — true, and an answer
+                to a question nobody has while looking at a Connect button.
+                Reed's note, 2026-08-22: nobody reads this much. The gate now
+                opens FROM the Boost button, so the reader already knows why
+                they are here; what they do not know is whose wallet pays. */}
             <p className="text-xs text-[var(--muted,#5a7488)] leading-snug">
-              Connect a Lightning wallet to enable one-tap boosts on
-              the show and on every episode (each episode boost pays
-              all of its split recipients in one shot).
+              Boosts are paid from your own wallet.
             </p>
 
             {/* The session-only trade, stated before the paste. A wallet
@@ -125,13 +130,16 @@ export default function WalletConnectModal({ user, onClose, onConnected, onReque
                 a signed-out visitor hasn't got one. */}
             {!user && (
               <div className="rounded-lg border border-[var(--modal-line,#b9d4e6)] bg-[var(--modal-field,#ffffff)] px-3 py-2.5 space-y-1.5">
+                {/* ⚠️ THE TRADE IS STILL STATED BEFORE THE PASTE, which is the
+                    rule — a wallet that quietly vanished on reload reads as a
+                    bug. What went is the MECHANISM: two sentences about
+                    connections being encrypted to a Nostr key answered "why"
+                    when the reader only needed "what happens". The three
+                    Nostr words went with it; this modal predates the
+                    vocabulary rule the rest of the widget follows. */}
                 <p className="text-[11px] text-[var(--ink,#0f2733)] leading-snug">
-                  You're not signed in with Nostr, so this connection lasts
-                  until you close the tab. You can boost with it right away.
-                </p>
-                <p className="text-[10px] text-[var(--muted,#5a7488)] leading-snug">
-                  Saved connections are encrypted to your Nostr key, so
-                  remembering one needs an account.
+                  <strong className="font-semibold">This tab only.</strong>{' '}
+                  You can boost right away, but it won't be here next time.
                 </p>
                 {onRequestSignIn && (
                   <button
@@ -140,7 +148,7 @@ export default function WalletConnectModal({ user, onClose, onConnected, onReque
                     disabled={connecting}
                     className="text-[11px] font-medium text-[var(--brand-d,#068ace)] hover:text-[var(--brand-dd,#0a6fa8)] disabled:opacity-40 transition-colors"
                   >
-                    Sign in with Nostr first
+                    Log in to save it
                   </button>
                 )}
               </div>
@@ -161,10 +169,11 @@ export default function WalletConnectModal({ user, onClose, onConnected, onReque
                   </svg>
                   {connecting ? 'Connecting…' : 'Use my browser extension'}
                 </button>
-                <p className="text-[10px] text-[var(--muted,#5a7488)] leading-snug -mt-2">
-                  Detected a Lightning extension (Alby, Mutiny, etc.) —
-                  one tap to enable, no copy/paste required.
-                </p>
+                {/* The caption here read "Detected a Lightning extension
+                    (Alby, Mutiny, etc.) — one tap to enable, no copy/paste
+                    required." The button above it says "Use my browser
+                    extension" and only renders when one was detected, so
+                    every word of that was already on screen. */}
 
                 <div className="flex items-center gap-3 my-1">
                   <div className="flex-1 h-px bg-[var(--modal-field,#ffffff)]" />
@@ -183,12 +192,14 @@ export default function WalletConnectModal({ user, onClose, onConnected, onReque
                 placeholder="nostr+walletconnect://…"
                 className="w-full bg-[var(--modal-field,#ffffff)] border border-[var(--modal-line,#b9d4e6)] rounded-lg px-3 py-2 text-xs text-[var(--ink,#0f2733)] font-mono focus:outline-none focus:border-[var(--brand,#00aff0)] focus:ring-2 focus:ring-[var(--brand-ring,rgba(0,175,240,0.32))]"
               />
+              {/* The wallet names stay: they are how a reader recognises
+                  that they have one of these. What went is "Cross-device
+                  option" (the label above already implies it) and the
+                  restatement of the storage rule, which the box above
+                  makes for a signed-out reader. */}
               <p className="mt-1.5 text-[10px] text-[var(--muted,#5a7488)] leading-snug">
-                Cross-device option. Get a connection string from Alby
-                Hub, Primal, Mutiny, Coinos, or any wallet that
-                supports NIP-47. {user
-                  ? 'Encrypted to your Nostr key before saving.'
-                  : 'Kept in this tab only — never written to storage.'}
+                From Alby Hub, Primal, Mutiny, Coinos or any NIP-47 wallet.{' '}
+                {user ? 'Encrypted before saving.' : 'Never written to storage.'}
               </p>
             </div>
 

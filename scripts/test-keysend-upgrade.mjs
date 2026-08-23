@@ -35,6 +35,11 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { onRequestGet, parseAddress } from '../functions/api/keysend.js'
+/* ⚠️ STATICALLY, AND BEFORE THE WALLET-GATE SECTION STUBS `globalThis.window`.
+ * externalBoost.js registers a `beforeunload` guard at module scope, so a
+ * lazy import lands after the stub and calls addEventListener on a bare
+ * object. Node runs static imports first, which is the whole fix. */
+import { _isCleanDeclineForTests as isCleanDecline } from '../login-widget/src/lib/externalBoost.js'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -433,6 +438,38 @@ try {
   })
   await ok('a capability decline latches for the rest of the boost', () => {
     assert.match(boost, /if \(KEYSEND_UNSUPPORTED_RE\.test\(msg\)\) noteKeysendUnsupported\(\)/)
+  })
+
+  console.log('\nThe wallet failure codes — the string that got a leg stuck')
+
+  await ok('⚠️ the production FAILURE_REASON_NO_ROUTE string is a clean decline', () => {
+    // Pinned verbatim from Reed's console, 2026-08-22. The shared classifier
+    // looks for `no route`; NIP-47 says `NO_ROUTE`, and that underscore left an
+    // upgraded leg UNCERTAIN — the one status with no way out, since the
+    // fallback and Retry are both gated on FAILED and a keysend has no verify
+    // URL for "Check again". The donor had no action available at all.
+    assert.equal(
+      isCleanDecline('Failed to request pay_keysend Nip47WalletError: FAILURE_REASON_NO_ROUTE'),
+      true,
+    )
+    assert.equal(isCleanDecline('FAILURE_REASON_NO_ROUTE'), true)
+    assert.equal(isCleanDecline('FAILURE_REASON_INSUFFICIENT_BALANCE'), true)
+    assert.equal(isCleanDecline('FAILURE_REASON_INCORRECT_PAYMENT_DETAILS'), true)
+  })
+  await ok('⚠️ TIMEOUT and ERROR stay ambiguous, and that is the safety', () => {
+    // An HTLC in flight when the clock expired can still settle. Calling that a
+    // clean decline offers a re-pay on a payment that may land, which is the
+    // 2026-08-19 double payment arriving through the classifier instead of
+    // through the button.
+    assert.equal(isCleanDecline('FAILURE_REASON_TIMEOUT'), false)
+    assert.equal(isCleanDecline('FAILURE_REASON_ERROR'), false)
+    assert.equal(isCleanDecline('FAILURE_REASON_NONE'), false)
+    assert.equal(isCleanDecline('some unrelated wallet noise'), false)
+  })
+  await ok('the classifier still recognises what it always did', () => {
+    assert.equal(isCleanDecline('Payment rejected by user'), true)
+    assert.equal(isCleanDecline('no route'), true)
+    assert.equal(isCleanDecline('method not found'), true, 'keysend capability')
   })
 
   console.log(`\n${passed} assertions passed.`)

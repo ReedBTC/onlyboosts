@@ -1036,13 +1036,29 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
                         <button key={n} type="button" onClick={() => { setAmount(String(n)); setError('') }}
                           aria-pressed={active}
                           className={`flex-1 py-2 rounded-lg border text-xs font-semibold tabular-nums transition-colors ${active
-                            ? 'bg-[var(--brand,#00aff0)] border-[var(--brand,#00aff0)] text-white shadow-[0_1px_0_rgba(11,58,82,0.10)]'
+                            /* ⚠️ --brand-dd, NOT --brand, AND THIS IS THE SECOND
+                               TIME. White on --brand is a contrast ratio of
+                               2.50:1 — Reed reported the picked amount as
+                               "basically invisible", the same words the wallet
+                               menu's log-in button drew in `b7cba03`, which was
+                               white on the same fill. --brand-dd takes it to
+                               5.45:1, and a DARKER fill also reads as pressed
+                               where a lighter one reads as disabled. Ink on
+                               --brand measures higher still (6.18:1) and was not
+                               used: the unpicked state is already dark-on-tint,
+                               so it would say "more of the same" rather than
+                               "this one". Any new filled control in this widget
+                               is the same trap. */
+                            ? 'bg-[var(--brand-dd,#0a6fa8)] border-[var(--brand-dd,#0a6fa8)] text-white shadow-[0_1px_0_rgba(11,58,82,0.10)]'
                             /* ⚠️ Tinted, not white. Unset they were a white
                                button on a near-white panel with a hairline
                                border, which is the same thing as no button.
                                The tint is what makes the row read as four
                                choices before anything is pressed. */
-                            : 'bg-[var(--brand-tint,rgba(0,175,240,0.12))] border-[rgba(0,175,240,0.45)] text-[var(--brand-dd,#0a6fa8)] hover:bg-[var(--brand,#00aff0)] hover:border-[var(--brand,#00aff0)] hover:text-white'}`}>
+                            /* The hover carried the identical fault: it swapped
+                               to white on --brand, so the label thinned out at
+                               the moment the pointer was on it. */
+                            : 'bg-[var(--brand-tint,rgba(0,175,240,0.12))] border-[rgba(0,175,240,0.45)] text-[var(--brand-dd,#0a6fa8)] hover:bg-[var(--brand-dd,#0a6fa8)] hover:border-[var(--brand-dd,#0a6fa8)] hover:text-white'}`}>
                           {n.toLocaleString()}
                         </button>
                       )

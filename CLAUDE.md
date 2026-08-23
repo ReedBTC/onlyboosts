@@ -1431,6 +1431,23 @@ front of a donor. So the fallback is exactly as safe as a button that already
 ships; the one thing new about it is that nobody had to press it. The descriptor
 runs on the fallback path, so such a leg still reaches tier two.
 
+**⚠️ THE CLASSIFIER HAS TO RECOGNISE THE WALLET'S OWN CODES, AND IT DID NOT.**
+Observed on a real boost, 2026-08-22: an upgraded leg to
+`podcastindex@getalby.com` came back `Nip47WalletError:
+FAILURE_REASON_NO_ROUTE`, and `isCleanPaymentDecline` looks for `no route` —
+one underscore, and the leg was classified **UNCERTAIN instead of FAILED**.
+**UNCERTAIN is the one status with no way out**: the fallback is gated on
+FAILED, Retry is gated on FAILED, and "Check again" needs a verify URL a
+keysend has never had. The donor was left with a leg offering no action at all,
+in the exact case the fallback was built for. `WALLET_CLEAN_FAILURE_RE` in
+`externalBoost.js` closes it, and **what it leaves out is the whole of its
+safety**: `FAILURE_REASON_TIMEOUT` is excluded because an HTLC in flight when
+the clock expired can still settle, and `FAILURE_REASON_ERROR` says nothing
+about settlement. **Only add a code whose meaning is that no HTLC survived.**
+The same gap is still in `payAllLegs.js`, which reads the shared classifier
+directly; it is unpatched because nothing on this fork calls that path and its
+error runs the safe way.
+
 **⚠️ AND `UNCERTAIN` MUST NEVER REACH THAT BRANCH.** An attempt was made and
 nothing observable came back, so re-paying it on another rail is the 2026-08-19
 double payment. There is no re-pay out of UNCERTAIN anywhere on this site and
