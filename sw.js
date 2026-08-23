@@ -483,7 +483,11 @@
 // them. index.html's markup and inline CSS changed; no module did. Bumped so
 // the build is identifiable from sw.js, which is how a deploy gets verified
 // here, and because /index.html is precached under the versioned cache name.
-const VERSION = 'ob-v115';
+// ob-v116: the sub-feeds are blocks aligned under the tab they belong to, and
+// the sticky chrome is one ground again. The sub-row carried `--tint`, which
+// put the feed's own wash between two bands of `--cream` and made the header
+// read as four alternating stripes. index.html only.
+const VERSION = 'ob-v116';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;
@@ -515,27 +519,27 @@ const PRECACHE_URLS = [
   '/assets/onlyboosts_pfp.png',
   '/assets/onlyboosts_banner.png',
   '/assets/avatar-fallback.svg',
-  '/assets/css/theme.css?v=ob-v115',
-  '/assets/css/page.css?v=ob-v115',
-  '/assets/css/nav.css?v=ob-v115',
-  '/assets/css/footer.css?v=ob-v115',
-  '/assets/css/boosts-thread.css?v=ob-v115',
-  '/assets/css/boost-actions.css?v=ob-v115',
+  '/assets/css/theme.css?v=ob-v116',
+  '/assets/css/page.css?v=ob-v116',
+  '/assets/css/nav.css?v=ob-v116',
+  '/assets/css/footer.css?v=ob-v116',
+  '/assets/css/boosts-thread.css?v=ob-v116',
+  '/assets/css/boost-actions.css?v=ob-v116',
   // The episode card and its drawer. Precached alongside the others because the
   // homepage's feeds are painted in it and it used to be inline in index.html,
   // which IS precached — leaving it out would trade an inline block for a
   // network round trip on the one page this list exists to make fast.
-  '/assets/css/feed-cards.css?v=ob-v115',
-  '/assets/js/boosts-thread.js?v=ob-v115',
+  '/assets/css/feed-cards.css?v=ob-v116',
+  '/assets/js/boosts-thread.js?v=ob-v116',
   // A static import of boosts-thread.js, so precaching that without this one
   // leaves a returning visitor fetching half the graph from the network.
-  '/assets/js/primal-profiles.js?v=ob-v115',
-  '/assets/js/calendar-events.js?v=ob-v115',
-  '/assets/js/boost-actions.js?v=ob-v115',
-  '/assets/js/nav.js?v=ob-v115',
-  '/assets/js/nav-widget-boot.js?v=ob-v115',
-  '/assets/js/widget-loader.js?v=ob-v115',
-  '/assets/js/sw-register.js?v=ob-v115',
+  '/assets/js/primal-profiles.js?v=ob-v116',
+  '/assets/js/calendar-events.js?v=ob-v116',
+  '/assets/js/boost-actions.js?v=ob-v116',
+  '/assets/js/nav.js?v=ob-v116',
+  '/assets/js/nav-widget-boot.js?v=ob-v116',
+  '/assets/js/widget-loader.js?v=ob-v116',
+  '/assets/js/sw-register.js?v=ob-v116',
 ];
 
 self.addEventListener('install', (event) => {

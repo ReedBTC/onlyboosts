@@ -50,17 +50,17 @@
 
   <!-- Shared note / card styles (.note-card, .embed-note) — the boosts
        feeds render through the same kind-1 card as boosts-thread.js. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v115" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v116" />
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v115" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v116" />
   <!-- The episode card and its drawer, extracted from the inline block below
        when /episode/<guid> pages needed the same cards. See the file header. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v115" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v116" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. Must stay last
        among the stylesheets so the inline block below still wins. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v115" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v116" />
 
   <style>
     :root {
@@ -196,6 +196,13 @@
       display: grid;
       grid-template-columns: repeat(3, 1fr);
     }
+    /* ⚠️ THE WHOLE STICKY CHROME IS ONE GROUND AND ONLY THE PANEL IS TINTED.
+       The sub-row carried `--tint` at first, which put the feed's own wash
+       between two bands of `--cream` and made the header read as four
+       alternating stripes — cream, violet, cream, violet on Albums. LB's
+       feeds.html is two-tone for this reason: `.feed-tabs-wrap` is cream and
+       `.feed-panels` is the tint. Keep any new band in the chrome on `--cream`
+       and let the accent arrive through the tabs and the blocks themselves. */
     .feed-tab {
       --tab: var(--muted);
       appearance: none;
@@ -238,44 +245,68 @@
     .feed-tab[aria-selected="true"] .feed-tab-icon { color: #fff; }
 
     /* ══ THE SUB-CATEGORY ROW ══
-       Which feed inside the tab. Tinted with the active feed's own wash so the
-       tabs and this read as one block rather than two stacked bars.
+       Which feed inside the tab, as blocks rather than as text.
 
-       ⚠️ WHICH BUTTONS ARE ON SCREEN IS CSS OFF body[data-active-tab], NOT JS —
-       the same call .feed-bar-controls makes one rule up, and for the same
-       reason: an imperative swap is the version that can leave a tab you come
-       back to showing another tab's sub-feeds, or none. */
+       ⚠️ IT IS THE SAME THREE-COLUMN GRID AS `.feed-tabs`, AND EACH GROUP IS
+       PINNED TO ITS OWN COLUMN. That is what puts Shows and Episodes exactly
+       under Podcasts and makes the pair add up to one tab's width, whatever the
+       gap or padding is at that breakpoint. Placing the buttons in a flat
+       six-column grid instead only lines up while both rows share a gap — and
+       they do not on a phone, where the tabs are separated chips.
+
+       The explicit grid-column is what makes hiding the other groups safe: with
+       `display:none` and auto placement, whichever group survived would fall
+       into column 1 and sit under Podcasts however the reader got there.
+
+       ⚠️ WHICH GROUP IS ON SCREEN IS CSS OFF body[data-active-tab], NOT JS —
+       the same call .feed-bar-controls makes below, and for the same reason: an
+       imperative swap is the version that leaves a tab you come back to showing
+       another tab's sub-feeds, or none. */
+    .feed-subs-wrap { border-bottom: 1px solid var(--border); }
     .feed-subs {
       max-width: 720px;
       margin: 0 auto;
-      display: flex;
-      gap: 1.15rem;
-      padding: 0.3rem 1.25rem 0.28rem;
+      /* ⚠️ NO HORIZONTAL PADDING, because `.feed-tabs` has none. The two grids
+         have to share a content box or their columns do not line up, and a
+         1.25rem inset here narrows every sub-block and shifts the pair left of
+         the tab it belongs to. Whatever padding one row takes, the other takes
+         — see the 640px block. */
+      padding: 0 0 0.4rem;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
     }
-    .feed-subs-wrap { background: var(--tint); border-bottom: 1px solid var(--border); }
+    .feed-sub-group { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 0.3rem; }
+    .feed-sub-group[data-tab="podcasts"] { grid-column: 1; }
+    .feed-sub-group[data-tab="music"]    { grid-column: 2; }
+    .feed-sub-group[data-tab="members"]  { grid-column: 3; }
+    .feed-subs > .feed-sub-group { display: none; }
+    body[data-active-tab="podcasts"] .feed-subs > [data-tab="podcasts"],
+    body[data-active-tab="music"]    .feed-subs > [data-tab="music"],
+    body[data-active-tab="members"]  .feed-subs > [data-tab="members"] {
+      display: grid;
+    }
     /* Members holds one feed today, and a one-option picker is worse than none —
        the same call the scope menu makes while signed out. */
     body[data-active-tab="members"] .feed-subs-wrap { display: none; }
-    .feed-subs > [data-tab] { display: none; }
-    body[data-active-tab="podcasts"] .feed-subs > [data-tab="podcasts"],
-    body[data-active-tab="music"]    .feed-subs > [data-tab="music"],
-    body[data-active-tab="members"]  .feed-subs > [data-tab="members"] { display: inline-flex; }
     .feed-sub {
       appearance: none;
-      background: none;
       border: 0;
-      border-bottom: 2px solid transparent;
+      border-radius: 0 0 7px 7px;
       font: inherit;
       font-size: 0.82rem;
       font-weight: 700;
+      background: var(--cream-d);
       color: var(--muted);
-      padding: 0.1rem 0 0.18rem;
+      padding: 0.34rem 0.4rem 0.38rem;
       cursor: pointer;
-      transition: color 0.15s, border-color 0.15s;
+      transition: background 0.15s, color 0.15s;
     }
     .feed-sub:hover { color: var(--accent-d); }
-    .feed-sub:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-    .feed-sub[aria-selected="true"] { color: var(--accent-d); border-bottom-color: var(--accent); }
+    .feed-sub:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+    /* The selected block continues the tab's fill downward, so the tab and the
+       feed under it read as one column rather than as two separate controls. */
+    .feed-sub[aria-selected="true"] { background: var(--accent); color: var(--white); }
+    .feed-sub[aria-selected="true"]:hover { color: var(--white); }
 
     .feed-bar {
       max-width: 720px;
@@ -684,7 +715,12 @@
       .feed-tab-icon { width: 16px; height: 16px; }
       .feed-tab-label { font-size: 0.82rem; }
       .feed-tab:hover { background: transparent; }
-      .feed-subs { padding: 0.28rem 1rem 0.26rem; gap: 1rem; }
+      /* Same padding and gap as the chips above, so each group still splits
+         exactly the width of its own tab. */
+      .feed-tabs { gap: 0.4rem; }
+      .feed-subs { padding: 0 1rem 0.4rem; gap: 0.4rem; }
+      .feed-sub-group { gap: 0.25rem; }
+      .feed-sub { font-size: 0.76rem; padding: 0.3rem 0.2rem 0.34rem; }
       /* All four controls rarely fit one line here, so the range + sort group
          wraps onto its own. Kept right-aligned: left-aligned it would sit at
          the screen edge and the sort menu's right-anchored popover (min-width
@@ -695,8 +731,8 @@
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
     }
   </style>
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v115" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v115" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v116" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v116" />
 </head>
 <body data-active-feed="episodes-global">
 
@@ -838,13 +874,26 @@
 
   <!-- Which feed inside the tab. Every button ships; CSS shows the active
        tab's. `data-tab` is what that rule keys on, `data-value` is the type. -->
+  <!-- Which feed inside the tab. Every group ships; CSS shows the active tab's.
+       ⚠️ THE GROUP IS WHAT ALIGNS THE BLOCKS UNDER THEIR TAB. `.feed-subs` is
+       the same three-column grid as `.feed-tabs` and each group is pinned to
+       its own column, so the pair inside it splits exactly the width of the tab
+       above — at any gap, any padding, any breakpoint. A flat six-column grid
+       gets this right only while the two rows share a gap, which they do not on
+       a phone, where the tabs are chips with space between them. -->
   <div class="feed-subs-wrap">
     <div class="feed-subs" data-feed-subs>
-      <button type="button" class="feed-sub" data-tab="podcasts" data-value="shows"    aria-selected="false">Shows</button>
-      <button type="button" class="feed-sub" data-tab="podcasts" data-value="episodes" aria-selected="true">Episodes</button>
-      <button type="button" class="feed-sub" data-tab="music"    data-value="albums"   aria-selected="false">Albums</button>
-      <button type="button" class="feed-sub" data-tab="music"    data-value="songs"    aria-selected="false">Songs</button>
-      <button type="button" class="feed-sub" data-tab="members"  data-value="boosts"   aria-selected="false">Boosts</button>
+      <div class="feed-sub-group" data-tab="podcasts">
+        <button type="button" class="feed-sub" data-value="shows"    aria-selected="false">Shows</button>
+        <button type="button" class="feed-sub" data-value="episodes" aria-selected="true">Episodes</button>
+      </div>
+      <div class="feed-sub-group" data-tab="music">
+        <button type="button" class="feed-sub" data-value="albums" aria-selected="false">Albums</button>
+        <button type="button" class="feed-sub" data-value="songs"  aria-selected="false">Songs</button>
+      </div>
+      <div class="feed-sub-group" data-tab="members">
+        <button type="button" class="feed-sub" data-value="boosts" aria-selected="false">Boosts</button>
+      </div>
     </div>
   </div>
 
@@ -1447,17 +1496,17 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v115"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v116"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v115" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v116" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v115" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v116" defer></script>
 
 <!-- Feed hydration — lazily loads the active feed on first view. -->
-<script type="module" src="/assets/js/feeds.js?v=ob-v115"></script>
-<script src="/assets/js/nav.js?v=ob-v115" defer></script>
+<script type="module" src="/assets/js/feeds.js?v=ob-v116"></script>
+<script src="/assets/js/nav.js?v=ob-v116" defer></script>
 
 </body>
 </html>

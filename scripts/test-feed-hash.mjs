@@ -75,11 +75,11 @@ function boot(hash, { signedIn = false } = {}) {
   const bar = new El('div')
   const mk = (attrs) => { const e = new El('button'); Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, v)); return e }
   const tabEls = ['podcasts', 'music', 'members'].map((t) => mk({ 'data-tab': t }))
-  const subEls = [
-    ['podcasts', 'shows'], ['podcasts', 'episodes'],
-    ['music', 'albums'], ['music', 'songs'],
-    ['members', 'boosts'],
-  ].map(([t, v]) => mk({ 'data-tab': t, 'data-value': v }))
+  /* `data-value` only: `data-tab` moved to the wrapping .feed-sub-group when
+     the sub-feeds became blocks aligned under their tab, and the controller has
+     never read it off a button. Mirroring the real shape here is what keeps
+     this a test of the shipped selector. */
+  const subEls = ['shows', 'episodes', 'albums', 'songs', 'boosts'].map((v) => mk({ 'data-value': v }))
   const listeners = {}
   const events = []
   const doc = {
@@ -247,6 +247,73 @@ for (const hash of ['#shows', '#episodes-follows', '#songs-follows', '#boosts-fo
   const type = feed.replace(/-(global|follows)$/, '')
   const want = { shows: 'podcasts', episodes: 'podcasts', albums: 'music', songs: 'music', boosts: 'members' }[type]
   eq(`${hash} → feed ${feed}, tab ${want}`, b.body.getAttribute('data-active-tab'), want)
+}
+
+/* ── The two grids' boxes ──────────────────────────────────────────────
+ * ⚠️ `.feed-subs` PUTS ITS BLOCKS UNDER THE TAB THEY BELONG TO ONLY WHILE IT
+ * SHARES `.feed-tabs`' CONTENT BOX. Both are three-column grids; if one takes a
+ * horizontal padding or a gap the other does not, every sub-block narrows and
+ * the pair slides out from under its tab. It is a few pixels at a time and it
+ * looks like nothing, which is why it is asserted rather than eyeballed.
+ *
+ * A declaration scan, not a render: the rule bodies are read out of index.html
+ * and the properties that decide column geometry are compared per scope. */
+console.log('\nThe tab grid and the sub grid line up:')
+{
+  /* All declarations for `sel` in `scope`, later ones winning — an indexOf
+     walk rather than a regex, because a selector is a literal string here and
+     an escaped-dot pattern is one backslash away from silently matching
+     nothing, which is a check that passes by asserting zero times. */
+  const decls = (sel, scope) => {
+    const out = {}
+    let found = false
+    let i = 0
+    for (;;) {
+      i = scope.indexOf(sel + ' {', i)
+      if (i < 0) break
+      // Only a rule that STARTS with this selector; skip `.x .feed-tabs {`.
+      const before = scope[i - 1]
+      if (before !== '\n' && before !== ' ') { i += sel.length; continue }
+      const open = i + sel.length + 2
+      const close = scope.indexOf('}', open)
+      if (close < 0) break
+      found = true
+      /* ⚠️ STRIP COMMENTS FIRST. A `/* … *\/` inside the rule body otherwise
+         becomes part of the next property's NAME, so `padding` reads as
+         undefined — and since the other selector may not declare padding
+         either, the comparison then matches two undefineds and passes while
+         the rule it is guarding is broken. Found by mutation: inserting a
+         1.25rem inset on one grid did not fail this test until this line
+         existed. */
+      const body = scope.slice(open, close).replace(/\/\*[\s\S]*?\*\//g, '')
+      for (const d of body.split(';')) {
+        const c = d.indexOf(':')
+        if (c < 0) continue
+        out[d.slice(0, c).trim()] = d.slice(c + 1).trim()
+      }
+      i = close
+    }
+    return found ? out : null
+  }
+  // Everything before the 640px block is the base scope; inside it is the phone.
+  const cut = html.indexOf('@media (max-width: 640px) {', html.indexOf('.feed-bar-wrap'))
+  const scopes = { desktop: html.slice(0, cut), phone: html.slice(cut) }
+  const xpad = (v) => {
+    if (!v) return '0'
+    const parts = v.split(/\s+/)
+    return parts.length === 1 ? parts[0] : parts[1]   // shorthand: y x [y x]
+  }
+  for (const [name, scope] of Object.entries(scopes)) {
+    const t = decls('.feed-tabs', scope)
+    const u = decls('.feed-subs', scope)
+    if (!t || !u) continue
+    eq(`${name}: same horizontal padding`, xpad(u.padding), xpad(t.padding))
+    eq(`${name}: same column gap`, u.gap ?? '0', t.gap ?? '0')
+    if (name === 'desktop') {
+      eq('desktop: same track width', u['max-width'], t['max-width'])
+      eq('desktop: both are 3 columns', u['grid-template-columns'], t['grid-template-columns'])
+    }
+  }
 }
 
 console.log(`\n${pass} assertions passed${fail ? `, ${fail} FAILED` : ''}.`)
