@@ -69,6 +69,12 @@ const FIXED = [
      here, so it would top the listing if it were not excluded. */
   { pk: 'f3bd42a91af5f3f1c40ca45ad2269464ab79996b32da78e8ed2ab91111b08e65',
     npub: 'npub1bot', name: 'chadf_boostbot', sats: 9000, n: 40, spread: 30 },
+  /* ⚠️ A SECOND PUBLISHER, and it earns its place: with one, `publishers=1`
+     returning a single row proves nothing about whether the mode asks for the
+     whole list or happens to have found the loudest key. lnaddress-music's real
+     pubkey, and deliberately SMALL, so it would never surface by accident. */
+  { pk: 'd35ae076512c29b01a5b33aa764ed4db44a9d0bbd96009705f48101f6cfe76a2',
+    npub: 'npub1lna', name: 'lnaddress music', sats: 5, n: 2, spread: 2 },
   { pk: '4'.repeat(64), npub: 'npub1ddd', name: 'Bitcoin Audible', sats: 300, n: 1 },
   { pk: '6'.repeat(64), npub: 'npub1fff', name: 'Ünïcödé',          sats: 250, n: 1, sameCase: true },
   { pk: '5'.repeat(64), npub: 'npub1eee', name: null,              sats: 200, n: 1 }, // no profile
@@ -353,6 +359,52 @@ console.log('\n⚠️ Publisher keys: out of the LISTING, still in the SEARCH:')
   {
     const { body } = await call('?q=' + BOT)
     check('and so does its pubkey', () => assert.equal(body.count, 1))
+  }
+}
+
+console.log('\n⚠️ publishers=1 is the exact complement of the listing:')
+{
+  const BOT = 'f3bd42a91af5f3f1c40ca45ad2269464ab79996b32da78e8ed2ab91111b08e65'
+  const LNA = 'd35ae076512c29b01a5b33aa764ed4db44a9d0bbd96009705f48101f6cfe76a2'
+  const { body } = await call('?publishers=1&sort=boosts&limit=50')
+  check('the mode is echoed back', () => assert.equal(body.publishers, true))
+  check('it is not also the listing', () => assert.equal(body.listing, false))
+  check('it returns EVERY publisher present, not just the loudest', () => {
+    const got = new Set(body.members.map((m) => m.pk))
+    assert.ok(got.has(BOT), 'chadf_boostbot missing')
+    assert.ok(got.has(LNA), 'lnaddress-music missing — the mode found one key, not the list')
+  })
+  check('and nobody else', () => {
+    /* The complement claim: every row is a publisher. A leak here is the wall's
+       own exclusion inverted, so it would put a person in the bots section. */
+    for (const m of body.members) {
+      assert.ok(m.pk === BOT || m.pk === LNA, `${m.name || m.pk} is not a publisher`)
+    }
+  })
+  check('rows carry all three figures, as every other mode does', () => {
+    for (const m of body.members) {
+      for (const k of ['sats', 'boosts', 'shows']) assert.equal(typeof m[k], 'number', k)
+    }
+  })
+  check('sort is honoured', () => {
+    const v = body.members.map((m) => m.boosts)
+    assert.deepEqual(v, [...v].sort((a, b) => b - a))
+  })
+  {
+    /* ⚠️ THE FLAG MUST NOT WIDEN A SEARCH. `publishers=1` beats an empty q, and a
+       q alongside it must still be a search rather than the union of both. */
+    const { body: b2 } = await call('?publishers=1&q=Piez')
+    check('⚠️ a q alongside it does not union in the search', () => {
+      assert.ok(!b2.members.some((m) => m.name === 'Piez'),
+        'the bots mode leaked a searched member into the bots section')
+    })
+  }
+  {
+    const { body: b3 } = await call('?publishers=0')
+    check('publishers=0 is the ordinary listing', () => {
+      assert.equal(b3.listing, true)
+      assert.ok(!b3.members.some((m) => m.pk === BOT), 'the exclusion stopped applying')
+    })
   }
 }
 

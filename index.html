@@ -50,18 +50,18 @@
 
   <!-- Shared note / card styles (.note-card, .embed-note) — the boosts
        feeds render through the same kind-1 card as boosts-thread.js. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v125" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v126" />
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v125" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v126" />
   <!-- The episode card and its drawer, extracted from the inline block below
        when /episode/<guid> pages needed the same cards. See the file header. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v125" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v125" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v126" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v126" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. Must stay last
        among the stylesheets so the inline block below still wins. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v125" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v126" />
 
   <style>
     :root {
@@ -441,6 +441,23 @@
     }
     .members-intro strong { color: var(--ink); font-weight: 700; }
 
+    /* The (i) badge. Sits on the same baseline run as the sentence it belongs
+       to, so it is separated by a margin rather than by a space character:
+       a text space here can break the line and leave the badge alone at the
+       start of the next one. */
+    .members-info {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 1.05rem; height: 1.05rem; margin-left: 0.4rem;
+      vertical-align: 0.05em;
+      border: 1px solid var(--brand); border-radius: 50%;
+      color: var(--brand-dd); background: transparent;
+      font-family: var(--font-body, Georgia, serif);
+      font-size: 0.7rem; font-weight: 700; font-style: italic;
+      line-height: 1; text-decoration: none;
+    }
+    .members-info:hover { background: var(--brand-dd); border-color: var(--brand-dd); color: #fff; }
+    .members-info:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
     .hpw { margin: 0 0 2.25rem; }
     .hpw-heading {
       font-family: 'Playfair Display', Georgia, serif;
@@ -528,6 +545,58 @@
       padding: 0.35rem 0.9rem; cursor: pointer;
     }
     .members-wall-section .show-more:hover { border-color: var(--brand); color: var(--brand-ddd); }
+
+    /* ── Boost Bots ────────────────────────────────────────────────────────
+       ⚠️ NOT THE WALL'S IDIOM, DELIBERATELY. The wall is a grid of faces
+       because it is a community; these are four accounts, each of which needs
+       a sentence saying what it does, so they are rows. Rendering them as more
+       faces would put them back in the list they were taken out of. */
+    .bots { margin: 0 0 2.25rem; }
+    .bots:empty { display: none; }
+    .bots-title {
+      font: 700 1.35rem/1.2 var(--font-display, Georgia, serif);
+      color: var(--ink); margin: 0 0 0.35rem;
+    }
+    .bots-sub { margin: 0 0 1rem; font-size: 0.88rem; color: var(--muted); }
+    .bots-more { color: var(--brand-dd); text-decoration: underline; text-decoration-color: var(--brand-tint, var(--brand)); white-space: nowrap; }
+    .bots-more:hover { color: var(--brand-ddd); text-decoration-color: currentColor; }
+    .bots-list {
+      list-style: none; margin: 0; padding: 0;
+      border: 1px solid var(--border); border-radius: 10px;
+      background: var(--surface); overflow: hidden;
+    }
+    .bots-row {
+      display: flex; align-items: center; gap: 0.75rem;
+      padding: 0.7rem 0.9rem; border-top: 1px solid var(--border);
+    }
+    .bots-row:first-child { border-top: 0; }
+    .bots-link { display: flex; flex: none; }
+    .bots-face {
+      width: 34px; height: 34px; border-radius: 50%; flex: none;
+      object-fit: cover; background: var(--cream-d);
+    }
+    .bots-face--none {
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.8rem; font-weight: 700; color: var(--muted);
+    }
+    .bots-who { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 0.1rem; }
+    .bots-name {
+      font-weight: 700; font-size: 0.9rem; color: var(--ink);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    a.bots-name:hover { color: var(--accent-d); text-decoration: underline; }
+    .bots-role { font-size: 0.76rem; color: var(--muted); line-height: 1.35; }
+    /* The figures are a fixed column so the four rows line up; on a phone they
+       drop under the name rather than squeezing the role text to nothing. */
+    .bots-figs { display: flex; gap: 1rem; flex: none; text-align: right; }
+    .bots-fig { font-weight: 700; font-size: 0.85rem; color: var(--accent-d); white-space: nowrap; }
+    .bots-fig small { font-weight: 400; font-size: 0.7rem; color: var(--muted); }
+
+    @media (max-width: 560px) {
+      .bots-row { align-items: flex-start; }
+      .bots-figs { flex-basis: 100%; order: 3; margin-left: 2.9rem; text-align: left; }
+      .bots-row { flex-wrap: wrap; }
+    }
 
     /* The rules link, and the dialog behind it. */
     .hpw-rules-line { margin: 0.85rem 0 0; }
@@ -921,8 +990,8 @@
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
     }
   </style>
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v125" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v125" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v126" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v126" />
 </head>
 <body data-active-feed="episodes-global">
 
@@ -1133,10 +1202,20 @@
          that plainly and puts the mechanics on a second line a reader can skip:
          the front door is not where somebody learns what a protocol is. -->
     <div class="members-block" data-members-block>
+      <!-- ⚠️ THE (i) IS A REAL LINK TO /about#membership, NOT A TOOLTIP. What
+           it has to answer is "which app do I use", and the answer is three
+           named applications with a caveat on each; that is a section, not a
+           hover. It is also the one thing on this tab a crawler should follow.
+
+           The badge is a CSS circle rather than the ⓘ character, whose glyph is
+           missing or differently sized in several of the faces this site
+           falls back to; the same call .drawer-hint's chevron makes. -->
       <p class="members-intro">
-        <strong>A member is anyone who has boosted a show.</strong>
-        Send a boost from an app that tags what you are listening to, and you
-        show up here — no sign-up, nothing to join.
+        <strong>Become a member by boosting one podcast or musician and sharing
+        the boost with your Nostr identity.</strong><a class="members-info"
+          href="/about#membership"
+          aria-label="How membership works"
+          title="How membership works"><span aria-hidden="true">i</span></a>
       </p>
       <!-- ⚠️ ONE LINE OF EXPLANATION, NOT TWO. The sub-line and the caveat under
            the boards said the same thing twice at two sizes; the mechanics moved
@@ -1204,6 +1283,14 @@
            /show and /episode use; the section markup, the podium and the
            "Show N more" toggle all come from that module. -->
       <div class="members-wall" data-members-wall></div>
+
+      <!-- ⚠️ THE BOTS SECTION IS THE WALL'S EXCLUSION, SHOWN. Four publisher
+           keys are dropped from every ranked listing above; this names them
+           rather than leaving them silently missing, and gives them their
+           totals. Filled by members-board.js from /api/v1/members?publishers=1,
+           and empty until it lands — a section that cannot load must not leave
+           an error where a disclosure was promised. -->
+      <div class="bots" data-members-bots></div>
     </div>
 
 
@@ -1770,17 +1857,17 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v125"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v126"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v125" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v126" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v125" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v126" defer></script>
 
 <!-- Feed hydration — lazily loads the active feed on first view. -->
-<script type="module" src="/assets/js/feeds.js?v=ob-v125"></script>
-<script src="/assets/js/nav.js?v=ob-v125" defer></script>
+<script type="module" src="/assets/js/feeds.js?v=ob-v126"></script>
+<script src="/assets/js/nav.js?v=ob-v126" defer></script>
 
 </body>
 </html>

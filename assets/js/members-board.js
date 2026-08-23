@@ -14,15 +14,20 @@
  * A repeated name is authentic to it rather than a bug to collapse — Piez holds
  * five of the top ten and that is the actual story of the board.
  */
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v125'
-import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v125'
-import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v125'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v126'
+import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v126'
+import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v126'
 /* ⚠️ THE SAME WALL /show AND /episode RENDER, not a copy of it. It moved out of
  * functions/_shared/detail-page.js into a two-sided module for exactly this;
  * that file re-exports every name, so both Functions were untouched. A reader
  * who screenshots the wall here and on a show page must not be able to tell
  * them apart. */
-import { renderSupporters, initShowMore } from '/assets/js/supporter-wall.js?v=ob-v125'
+import { renderSupporters, initShowMore, compact } from '/assets/js/supporter-wall.js?v=ob-v126'
+/* ⚠️ EXACT BOOST COUNTS HERE, COMPACT SATS. On the wall a row is one of a
+ * hundred and `1k` is plenty; here there are four rows and the count is the
+ * disclosure itself — "1,021 boosts from dozens of listeners" is the claim the
+ * section exists to make, and `1k` rounds the evidence away. */
+import { num } from '/assets/js/boost-list.js?v=ob-v126'
 
 const esc = htmlEscape
 const HOURS_API = '/api/v1/members/hours'
@@ -152,6 +157,94 @@ async function wall(sort, signal) {
   return Array.isArray(data?.members) ? data.members : []
 }
 
+/* ⚠️ THE BOTS SECTION IS THE WALL'S EXCLUSION, SHOWN. `/api/v1/members` drops
+ * four publisher keys from every ranked listing because one of them stands in
+ * for dozens of listeners; `?publishers=1` asks for exactly those four, so what
+ * the wall removes is named directly under it rather than silently missing.
+ * Reed's call, 2026-08-23: "either way we need to be transparent about anything
+ * we are NOT including on this page".
+ *
+ * ⚠️ AND IT IS CREDIT, NOT A DISCLOSURE NOTICE. These accounts are the only
+ * reason a listener who wants no Nostr account is represented here at all, so
+ * the section carries their totals and links to their pages the way any other
+ * member's row does.
+ */
+
+/* What each key does, keyed by pubkey and maintained BY HAND, which is the same
+ * discipline PUBLISHERS itself is under: naming an account a bot is a claim,
+ * and nothing detects these automatically.
+ *
+ * ⚠️ A KEY WITH NO ENTRY STILL RENDERS. The server owns the list and this table
+ * owns the prose, so a fifth publisher added to PUBLISHERS appears here with its
+ * figures and no description — which is a row missing a sentence, where the
+ * alternative is a bot the section quietly fails to disclose. */
+const BOT_ROLES = {
+  f3bd42a91af5f3f1c40ca45ad2269464ab79996b32da78e8ed2ab91111b08e65:
+    'Republishes boosts sent from Castamatic, StableKraft, PodcastGuru, CurioCaster and a dozen more apps that publish nothing to Nostr.',
+  d35ae076512c29b01a5b33aa764ed4db44a9d0bbd96009705f48101f6cfe76a2:
+    'Publishes boosts sent to music feeds through a Lightning address.',
+  c330881e28768381dd8bdfd274341dca0c5882c29b8642ea4bc82f7563264592:
+    'Publishes for a Local Bitcoiners donor whose own boost produced no note.',
+  '3a87a19c801d57111b0905569225d2b20b39d154fc93bef5a8f2860c409b84d9':
+    'Signs a note for a boost sent from this site by someone with no Nostr identity.',
+}
+
+async function bots(signal) {
+  /* Sorted by boosts rather than sats: lnaddress-music carries no sats figure at
+     all, so a sats ordering puts the emptiest row in a fixed last place that
+     reads as a ranking. */
+  const resp = await fetch(`${MEMBERS_API}?publishers=1&sort=boosts&limit=20`, {
+    headers: { Accept: 'application/json' }, signal,
+  })
+  if (!resp.ok) throw new Error(`publishers: HTTP ${resp.status}`)
+  const data = await resp.json()
+  return Array.isArray(data?.members) ? data.members : []
+}
+
+function botRowHtml(m) {
+  const href = boosterPageHref(m.npub, m.pk)
+  const name = m.name || (m.npub ? m.npub.slice(0, 12) + '…' : (m.pk || '').slice(0, 12) + '…')
+  const pic = httpsUrl(m.pic)
+  const face = pic
+    ? `<img class="bots-face" src="${esc(pic)}" alt="" loading="lazy" referrerpolicy="no-referrer" />`
+    : `<span class="bots-face bots-face--none" aria-hidden="true">${esc(initials(m.name, m.pk))}</span>`
+  const role = BOT_ROLES[m.pk]
+  return `<li class="bots-row">` +
+    (href ? `<a class="bots-link" href="${esc(href)}">${face}</a>` : face) +
+    `<span class="bots-who">` +
+      (href ? `<a class="bots-name" href="${esc(href)}">${esc(name)}</a>`
+            : `<span class="bots-name">${esc(name)}</span>`) +
+      (role ? `<span class="bots-role">${esc(role)}</span>` : '') +
+    `</span>` +
+    `<span class="bots-figs">` +
+      `<span class="bots-fig">${esc(num(m.boosts))}<small> boosts</small></span>` +
+      `<span class="bots-fig">${esc(compact(m.sats))}<small> sats</small></span>` +
+    `</span>` +
+  `</li>`
+}
+
+/* ⚠️ A FAILED FETCH LEAVES NOTHING BEHIND, and that is the one case worth
+ * thinking about: an error line here would read as "something is being hidden
+ * from you", which is the opposite of what the section is for. The claim it
+ * makes is additive, so its absence costs a reader nothing they were promised.
+ * The wall above is unaffected either way. */
+async function paintBots(root) {
+  try {
+    const members = await bots()
+    if (!members.length) return
+    root.innerHTML =
+      `<h2 class="bots-title">Boost Bots</h2>` +
+      `<p class="bots-sub">These accounts publish boost notes for listeners whose apps do not, ` +
+      `and they are the only reason a boost from someone with no Nostr account appears here at all. ` +
+      `Their boosts count in every total, feed and ranking on this site; they are left out of the ` +
+      `boards and the wall above, which rank people, because one key stands in for dozens of them. ` +
+      `<a class="bots-more" href="/about#bots">How this works</a></p>` +
+      `<ul class="bots-list">${members.map(botRowHtml).join('')}</ul>`
+  } catch (err) {
+    console.warn('[members] bots failed', err)
+  }
+}
+
 /* The rules dialog. Wired once, alongside the boards, because it is the only
  * thing on this tab that is in the document before anything is fetched — a
  * reader can open it while the boards are still loading, or after they failed.
@@ -228,6 +321,12 @@ export async function renderMembersBoards(root) {
         paintWall(wallRoot)
       })
     }
+    /* Below the wall, and started after it: this section explains what is
+       missing from the wall, so it must never be the thing that delays it.
+       Not awaited — the boards are 'done' either way, and a bots section that
+       never lands must not leave the tab looking unfinished. */
+    const botsRoot = document.querySelector('[data-members-bots]')
+    if (botsRoot) paintBots(botsRoot)
   } catch (err) {
     console.warn('[hpw] boards failed', err)
     root.innerHTML = '<p class="hpw-empty">The boards are unavailable right now.</p>'

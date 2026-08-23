@@ -57,6 +57,16 @@ function likeEscape(s) {
   return s.replace(/[\\%_]/g, (c) => "\\" + c);
 }
 
+/* ⚠️ THE PUBLISHER LIST IS BOUND ONCE AND REFERENCED TWICE, so its placeholders
+ * are NUMBERED rather than bare. The listing excludes these keys and the bots
+ * mode asks for exactly them; two bare `?` runs would need eight binds of the
+ * same four values, and SQLite numbers a bare `?` from the highest index used
+ * *so far*, which makes the second run's numbering depend on where the first
+ * one happens to sit in the statement. */
+const PUB_FIRST = 6;
+const PUB_HOLES = PUBLISHERS.map((_, i) => "?" + (PUB_FIRST + i)).join(",");
+const PUB_FLAG = "?" + (PUB_FIRST + PUBLISHERS.length);
+
 export async function onRequestGet({ request, env }) {
   const u = new URL(request.url);
   const raw = (u.searchParams.get("q") || "").trim().slice(0, MAX_Q);
@@ -75,8 +85,18 @@ export async function onRequestGet({ request, env }) {
    * named profiles, which is not a search result — it is the whole list at the
    * cost of aggregating every one of them. An EMPTY query asks for the list on
    * purpose, so it is served. */
-  const listing = raw.length === 0;
-  if (!listing && raw.length < MIN_CHARS) {
+  /* ⚠️ `publishers=1` IS A THIRD MODE AND IT IS THE EXACT COMPLEMENT OF THE
+   * LISTING. The wall excludes these four keys; the Boost Bots section under it
+   * asks for those four and nothing else, which is what makes the exclusion
+   * visible rather than silent. It is the same endpoint for the same reason the
+   * listing is: one definition of a member, one shape of row, one place the
+   * aggregate is computed. A separate path would be a second answer that could
+   * disagree with the first.
+   *
+   * It wins over an empty q, so `?publishers=1` is never also the listing. */
+  const bots = u.searchParams.get("publishers") === "1";
+  const listing = !bots && raw.length === 0;
+  if (!bots && !listing && raw.length < MIN_CHARS) {
     return json(request, { q: raw, count: 0, members: [] });
   }
 
@@ -88,13 +108,13 @@ export async function onRequestGet({ request, env }) {
    * falls back to a prefix LIKE over `booster_npub`, which is not indexed — a
    * scan of the boosts table, measured at ~2ms against the live corpus. Worth
    * knowing before that column grows a lot; not worth an index today. */
-  const hex = listing ? "" : (toHexPubkey(raw) || "");
-  const partialNpub = !listing && !hex && /^npub1[02-9ac-hj-np-z]+$/i.test(raw)
+  const hex = (listing || bots) ? "" : (toHexPubkey(raw) || "");
+  const partialNpub = !listing && !bots && !hex && /^npub1[02-9ac-hj-np-z]+$/i.test(raw)
     ? likeEscape(raw.toLowerCase()) + "%"
     : "";
   // A string that is plainly an identifier is not also a name. Searching both
   // would let a half-typed npub match somebody whose display name contains it.
-  const like = (listing || hex || partialNpub) ? "" : "%" + likeEscape(raw) + "%";
+  const like = (listing || bots || hex || partialNpub) ? "" : "%" + likeEscape(raw) + "%";
 
   /* ⚠️ CANDIDATES FIRST, AGGREGATE SECOND. The obvious shape puts the three
    * tests in one WHERE over the join, and the ORs defeat index seeking: the
@@ -129,7 +149,12 @@ export async function onRequestGet({ request, env }) {
          so typing its name still finds it. Ranked lists are a claim; a search
          result is not. */
       SELECT booster_pubkey FROM boosts
-       WHERE ?5 = 1 AND booster_pubkey NOT IN (${PUBLISHERS.map(() => "?").join(",")})
+       WHERE ?5 = 1 AND booster_pubkey NOT IN (${PUB_HOLES})
+      UNION
+      /* The bots mode: exactly the keys the branch above removes. Guarded by its
+         own flag, so it can never widen a search or a listing. */
+      SELECT booster_pubkey FROM boosts
+       WHERE ${PUB_FLAG} = 1 AND booster_pubkey IN (${PUB_HOLES})
     )
     SELECT b.booster_pubkey AS pk,
            MAX(b.booster_npub) AS npub,
@@ -151,10 +176,11 @@ export async function onRequestGet({ request, env }) {
 
   try {
     const { results } = await env.DB.prepare(sql)
-      .bind(like, hex, partialNpub, limit, listing ? 1 : 0, ...PUBLISHERS).all();
+      .bind(like, hex, partialNpub, limit, listing ? 1 : 0, ...PUBLISHERS, bots ? 1 : 0).all();
     return json(request, {
       q: raw,
       listing,
+      publishers: bots,
       sort,
       count: results.length,
       members: results.map((r) => ({

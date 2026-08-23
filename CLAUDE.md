@@ -260,7 +260,7 @@ Twelve test scripts, all plain `node scripts/<name>.mjs` with no runner:
 | `test-boost-modal-render.mjs` | the widget's four silent-failure classes: use-before-declare, themed classes that emit no CSS, portals with no container, and the missing preflight. See the ⚠️ below |
 | `test-boostbox.mjs` | the BoostBox descriptor path: the comment's whole-or-nothing rule, the record allowlist, and every way `/api/boostbox` is allowed to fail. **Stubs `fetch`**, so it never writes a record to a third party's service |
 | `test-show-card.mjs` | the show card's two-sided contract. Its own reason for existing is the crossing: `renderShowCard` was a DOM builder and could afford `Date.now()` and an unpinned locale, which a two-sided module cannot — see the note under the card |
-| `test-members-search.mjs` | `/api/v1/members`, running the **shipped handler** against a database built from the real `schema.sql` through an `env.DB` shim over `node:sqlite`. LIKE escaping, the identifier/name split, the listing, and the publisher asymmetry |
+| `test-members-search.mjs` | `/api/v1/members`, running the **shipped handler** against a database built from the real `schema.sql` through an `env.DB` shim over `node:sqlite`. LIKE escaping, the identifier/name split, the listing, the publisher asymmetry, and `publishers=1` as its exact complement. **Two publisher keys are in the fixture deliberately**: with one, a single-row answer says nothing about whether the mode asks for the list or found the loudest key |
 | `test-members-hours.mjs` | the 40 HPW boards, same shim, with a fixture built to known answers. Dedupe, week boundaries, the publisher exclusion, and the row-multiplying join |
 | `test-keysend-upgrade.mjs` | the keysend upgrade: the `fountain.fm` exclusion's exact-or-parent rule, the routing pair's whole-or-nothing rule, the strict node-pubkey check, every way `/api/keysend` answers "no endpoint", and the wallet gate. **Stubs `fetch`**, so it probes nobody's well-known |
 
@@ -2642,6 +2642,80 @@ Three more rules in `functions/api/v1/members.js`:
   bare `%` typed into the box otherwise returns everyone, ordered by sats.
   SQLite's LIKE folds ASCII only, so a query differing from a name by the case
   of a non-ASCII letter will not match; nothing cheap fixes that.
+
+#### The Boost Bots section, and what the tab discloses
+
+`/api/v1/members?publishers=1` is the **exact complement of the listing**: the
+wall drops the four `PUBLISHERS` keys, and this asks for those four and nothing
+else. Same endpoint, same row shape, one place the aggregate is computed; a
+second path would be two answers to "who is a member" that could disagree. It
+wins over an empty `q`, so it is never also the listing, and a `q` alongside it
+does not union in the search — `test-members-search.mjs` pins both.
+
+**⚠️ THE PUBLISHER LIST IS BOUND ONCE AND ITS PLACEHOLDERS ARE NUMBERED.** The
+statement references it twice (`NOT IN` for the listing, `IN` for the bots), and
+SQLite numbers a bare `?` from the highest index used *so far*, which would make
+the second run's numbering depend on where the first happens to sit in the SQL.
+`PUB_FIRST` / `PUB_HOLES` / `PUB_FLAG` in `members.js` are the whole of it.
+
+**⚠️ THE SECTION IS THE EXCLUSION, SHOWN — it is not a disclosure notice.**
+*Reed's call, 2026-08-23: "either way we need to be transparent about anything
+we are NOT including on this page."* These four accounts are the only reason a
+listener who wants no Nostr account is represented here at all, so the section
+carries their totals and links to their pages the way any member's row does.
+
+Four rules a change would break:
+
+- **Rows, not faces.** The wall is a grid of avatars because it is a community;
+  these are four accounts each needing a sentence saying what it does. Rendering
+  them as more faces puts them back in the list they were taken out of.
+- **⚠️ A KEY WITH NO `BOT_ROLES` ENTRY STILL RENDERS.** The server owns the list
+  and `members-board.js` owns the prose, so a fifth publisher appears with its
+  figures and no description. A row missing a sentence beats a bot the section
+  quietly fails to disclose.
+- **Exact boost counts, compact sats.** `num(m.boosts)` and `compact(m.sats)`.
+  On the wall a row is one of a hundred and `1k` is plenty; here the count *is*
+  the claim, and `1k` for 1,021 rounds the evidence away.
+- **⚠️ A FAILED FETCH LEAVES NOTHING BEHIND.** An error line here would read as
+  "something is being hidden from you", which is the opposite of the point. The
+  claim is additive, so its absence costs a reader nothing they were promised.
+  It is started after the wall and never awaited.
+
+**How the four were determined: by hand, and nothing detects them.**
+`PUBLISHERS` in `functions/api/v1/_common.js` mirrors `PUBLISHER_PUBKEYS` in the
+collector's `clients.py`. Naming an account a bot is a claim, and the cost of
+getting it wrong is a real person left off a leaderboard.
+
+#### The Members intro, and the (i)
+
+The intro is **one sentence** and the mechanics live behind a badge: *"Become a
+member by boosting one podcast or musician and sharing the boost with your Nostr
+identity."* Reed's wording, 2026-08-23.
+
+**⚠️ THE (i) IS A REAL LINK TO `/about#membership`, NOT A TOOLTIP.** What it has
+to answer is "which app do I use", and the answer is three named applications
+with a caveat on each; that is a section, not a hover. It is also the one thing
+on this tab a crawler should follow. The badge is a CSS circle rather than the
+`ⓘ` character, whose glyph is missing or differently sized in several of the
+fallback faces — the same call `.drawer-hint`'s chevron makes.
+
+**⚠️ `/about#membership` AND `/about#bots` ARE IN THE WILD, so treat them as
+frozen** the way the detail pages' section ids are. Two surfaces point at them:
+this badge and the Boost Bots section's "How this works".
+
+**⚠️ AND THERE IS NO `#members` HASH.** The tab is derived from the feed key, so
+`/#members` falls through to the default feed and lands the reader on Podcasts.
+Every off-site link to this tab is `/#boosts-global`. Adding an alias would be a
+second address space for a view that already has one.
+
+**⚠️ TWO LISTS OF APPS EXIST ON `/about` AND THEY ANSWER DIFFERENT QUESTIONS.**
+`#pipeline`'s *Applications Publishing Boost Notes* is the technical inventory
+and holds **four**, Local Bitcoiners among them. `#membership` holds **three** —
+Fountain, BoostMeBitch and OnlyBoosts — being the apps that publish a note signed
+by a key the *listener* controls. LB is deliberately off that list: it is one
+show's own website widget, not a route a listener can take to boosting podcasts
+generally. **Reed's call.** Each section cross-references the other so the two
+counts cannot read as a contradiction.
 
 ### The episode feed adapter
 
