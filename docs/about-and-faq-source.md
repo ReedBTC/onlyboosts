@@ -149,6 +149,15 @@ framings separate because they answer different questions.
 Both lists are open. Any app publishing in the NIP-73 format appears with no
 registration and no coordination.
 
+**And the /about section leads with Nostr, deliberately.** Reed, 2026-08-23:
+this is one of the places where a reader has dug deep enough to be told what is
+under the hood. The definition it opens on is his — *a member is anyone who has
+shared a boost publicly using their Nostr account* — followed by why an ordinary
+boost is private, what a boost note actually is (an announcement of a payment,
+not the payment), and that the membership belongs to a keypair the reader holds
+rather than to a profile on this site. It also says plainly that boosting
+without publishing anything is not worse, only unrecorded.
+
 A caveat that belongs with Fountain specifically: the key it signs with is one
 Fountain manages on the listener's behalf, not an identity they brought with
 them. So a Fountain booster's name here may not match the one they use
@@ -165,7 +174,7 @@ of this list" question.
 Most podcast apps publish nothing to Nostr at all. A handful of automated
 accounts fill that gap: they watch for boosts sent from apps with no Nostr
 support and publish a note for each one, so the boost is recorded rather than
-lost. **Four such keys are known to this index**, and the list is maintained by
+lost. **Five such keys are known to this index**, and the list is maintained by
 hand (`PUBLISHER_PUBKEYS` in the collector's `clients.py`, mirrored as
 `PUBLISHERS` in `functions/api/v1/_common.js`). Nothing detects them
 automatically and nothing should: calling an account a bot is a claim, and the
@@ -174,6 +183,7 @@ cost of getting it wrong is leaving a real person off a leaderboard.
 | Key | Boosts | Sats | What it does |
 |---|---|---|---|
 | ChadF Boost Bot | 1,021 | 628,608 | Republishes boosts sent from Castamatic (294), StableKraft (260), PodcastGuru (159), BoostMeBitch (56), CurioCaster (56), LN Beats (21), Podverse (3) and ten more apps that speak no NIP-73 |
+| BoostMeBitch (site account) | 35 | 114,753 | Publishes for a boostmebitch.com listener who connected no identity. ⚠️ **The app is ALSO in the members list above** — it signs under the donor's own key when they have one, under this account when they do not. Added 2026-08-23 on Reed's instruction |
 | lnaddress music | 31 | 0 | Boosts sent to music feeds through a Lightning address |
 | Local Bitcoiners (show account) | ~8 over 14 days | — | Publishes for a donor to that show who produced no note themselves |
 | OnlyBoosts (boost bot) | part of 23 | — | Signs a note for a boost sent from this site by someone with no Nostr identity |

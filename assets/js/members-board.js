@@ -14,20 +14,23 @@
  * A repeated name is authentic to it rather than a bug to collapse — Piez holds
  * five of the top ten and that is the actual story of the board.
  */
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v126'
-import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v126'
-import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v126'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v127'
+import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v127'
+import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v127'
 /* ⚠️ THE SAME WALL /show AND /episode RENDER, not a copy of it. It moved out of
  * functions/_shared/detail-page.js into a two-sided module for exactly this;
  * that file re-exports every name, so both Functions were untouched. A reader
  * who screenshots the wall here and on a show page must not be able to tell
  * them apart. */
-import { renderSupporters, initShowMore, compact } from '/assets/js/supporter-wall.js?v=ob-v126'
+import { renderSupporters, initShowMore, compact } from '/assets/js/supporter-wall.js?v=ob-v127'
 /* ⚠️ EXACT BOOST COUNTS HERE, COMPACT SATS. On the wall a row is one of a
  * hundred and `1k` is plenty; here there are four rows and the count is the
  * disclosure itself — "1,021 boosts from dozens of listeners" is the claim the
  * section exists to make, and `1k` rounds the evidence away. */
-import { num } from '/assets/js/boost-list.js?v=ob-v126'
+import { num } from '/assets/js/boost-list.js?v=ob-v127'
+import { rangeControl, sortControl } from '/assets/js/feed-controls.js?v=ob-v127'
+import { mountFeedSearch } from '/assets/js/feed-search.js?v=ob-v127'
+import { searchMembers, SEARCH_HITS } from '/assets/js/ob-live.js?v=ob-v127'
 
 const esc = htmlEscape
 const HOURS_API = '/api/v1/members/hours'
@@ -43,13 +46,40 @@ const WALL_CAP = 100
  * generosity and rewards one large boost; boosts rewards turning up; shows
  * rewards spreading it around. On the live corpus the leaders barely overlap,
  * so a single ordering would present one of them as "the" top member and hide
- * the other two stories. Reed's call. */
+ * the other two stories. Reed's call.
+ *
+ * ⚠️ IT IS THE FEEDS' OWN `sortControl` NOW, not a segmented group of its own.
+ * Reed's call, 2026-08-23: this is the same kind of choice the feeds' Sort pill
+ * makes, so it is the same control. A second shape for one idea makes the site
+ * look like two sites. */
 const WALL_VIEWS = [
   ['sats', 'Most sats'],
   ['boosts', 'Most boosts'],
   ['shows', 'Most shows'],
 ]
 let wallView = 'sats'
+
+/* ⚠️ THE RANGE MEANS WHEN THE BOOST WAS SENT, which is the reading
+ * /api/v1/podcasts and every `#boosts` section give it, and NOT the air-date
+ * reading /api/v1/episodes gives the same word. A member is in the 1W wall
+ * because they boosted this week.
+ *
+ * All four, not the Boosts feed's three: that feed WALKS month archives to
+ * cover a window, so a year is ~70 sequential requests before the first card.
+ * This is one indexed query whatever the window, so 1Y costs nothing. */
+const WALL_RANGES = [
+  ['1w', '1W'],
+  ['1m', '1M'],
+  ['1y', '1Y'],
+  ['all', 'All'],
+]
+const RANGE_SUB = {
+  '1w': 'Everyone who boosted a show in the last 7 days.',
+  '1m': 'Everyone who boosted a show in the last 30 days.',
+  '1y': 'Everyone who boosted a show in the last year.',
+  all: 'Everyone who has boosted a show, all time.',
+}
+let wallRange = 'all'
 
 /* en-US in UTC, matching every other date on the site. A board row names the
  * Monday its week started, so the reader can see the hall of fame is old. */
@@ -137,19 +167,40 @@ function wallRows(members) {
   }))
 }
 
-/* The view switcher, built here rather than shipped in index.html because the
- * wall it acts on is client-rendered and there is nothing to switch until it
- * lands. Same shape as the feeds' sort control, deliberately. */
-function viewsHtml(active) {
-  return `<div class="mw-views" role="group" aria-label="Rank members by">` +
-    WALL_VIEWS.map(([key, label]) =>
-      `<button type="button" class="mw-view" data-view="${esc(key)}"` +
-      ` aria-pressed="${key === active ? 'true' : 'false'}">${esc(label)}</button>`).join('') +
-    `</div>`
+/* ⚠️ THE CONTROLS ARE BUILT ONCE AND MOVED, NEVER REBUILT. The wall's markup is
+ * replaced wholesale on every change, so a control rendered inside it would be
+ * destroyed by the repaint it just triggered — losing its open menu, its
+ * listeners and the focus the reader is holding. `appendChild` moves a live
+ * node, so state survives.
+ *
+ * They are the feeds' own `rangeControl` and `sortControl`, wrapped in the same
+ * `.pcast-controls` row, so the wall's chrome and a feed's chrome are one
+ * thing. Order matches the feeds: filters, then ordering. */
+let wallControls = null
+function mountWallControls(host, onChange) {
+  if (wallControls) return wallControls
+  wallControls = document.createElement('div')
+  wallControls.className = 'pcast-controls'
+  wallControls.append(
+    rangeControl(wallRange, (key) => { wallRange = key; onChange() }, {
+      options: WALL_RANGES,
+      label: 'Filter members by when they boosted',
+      titleFor: (key, label) => (key === 'all'
+        ? 'Every boost in the index'
+        : `Members who boosted in the last ${label.toLowerCase()}`),
+    }),
+    sortControl(WALL_VIEWS, wallView, (key) => { wallView = key; onChange() }, {
+      title: 'Rank members by',
+    }),
+  )
+  host.hidden = false
+  host.replaceChildren(wallControls)
+  return wallControls
 }
 
-async function wall(sort, signal) {
-  const resp = await fetch(`${MEMBERS_API}?limit=${WALL_CAP}&sort=${encodeURIComponent(sort)}`, {
+async function wall(sort, range, signal) {
+  const qs = new URLSearchParams({ limit: String(WALL_CAP), sort, range })
+  const resp = await fetch(`${MEMBERS_API}?${qs}`, {
     headers: { Accept: 'application/json' }, signal,
   })
   if (!resp.ok) throw new Error(`members: HTTP ${resp.status}`)
@@ -187,6 +238,11 @@ const BOT_ROLES = {
     'Publishes for a Local Bitcoiners donor whose own boost produced no note.',
   '3a87a19c801d57111b0905569225d2b20b39d154fc93bef5a8f2860c409b84d9':
     'Signs a note for a boost sent from this site by someone with no Nostr identity.',
+  /* ⚠️ BOOSTMEBITCH IS ALSO AN APP A MEMBER CAN JOIN THROUGH, and that is not a
+     contradiction: it signs under the donor's own key when they have one, and
+     under this account when they do not. Exactly the arrangement above. */
+  '3820f4ff8587747530c7feafe47c1e592e3ce0fd2929b4f907e40714bd26f408':
+    'Signs a note for a boost sent from boostmebitch.com without a connected identity.',
 }
 
 async function bots(signal) {
@@ -234,11 +290,14 @@ async function paintBots(root) {
     if (!members.length) return
     root.innerHTML =
       `<h2 class="bots-title">Boost Bots</h2>` +
-      `<p class="bots-sub">These accounts publish boost notes for listeners whose apps do not, ` +
-      `and they are the only reason a boost from someone with no Nostr account appears here at all. ` +
-      `Their boosts count in every total, feed and ranking on this site; they are left out of the ` +
-      `boards and the wall above, which rank people, because one key stands in for dozens of them. ` +
-      `<a class="bots-more" href="/about#bots">How this works</a></p>` +
+      /* ⚠️ TWO SENTENCES, AND THE LINK CARRIES THE REST. Reed's call,
+         2026-08-23: the first version ran four and turned a short section into
+         a paragraph with a list under it. What has to be said here is what
+         these accounts are and that they are deliberately not ranked; why the
+         rule exists, and what it costs, is /about#bots. */
+      `<p class="bots-sub">These accounts publish boost notes for listeners whose apps do not. ` +
+      `Their boosts count everywhere on this site, but they are left off the rankings above. ` +
+      `<a class="bots-more" href="/about#bots" target="_blank" rel="noopener">How this works</a></p>` +
       `<ul class="bots-list">${members.map(botRowHtml).join('')}</ul>`
   } catch (err) {
     console.warn('[members] bots failed', err)
@@ -287,6 +346,12 @@ export async function renderMembersBoards(root) {
   root.innerHTML = '<p class="hpw-empty">Loading the boards…</p>'
   // Before the fetch, so the rules open even if the boards never arrive.
   wireRules()
+  /* ⚠️ ALSO BEFORE THE FETCH, and for the same reason. The lookup leads the tab
+     and needs no data of its own, so a reader can find somebody while the
+     boards are still loading or after they have failed. It is what this tab is
+     FOR; making it wait on two leaderboards would be the old mistake in a new
+     place. */
+  mountMemberLookup(document.querySelector('[data-members-block]'))
   try {
     const [week, all] = await Promise.all([board('week'), board('all')])
     const goal = week.goal_hours || all.goal_hours || 40
@@ -311,15 +376,12 @@ export async function renderMembersBoards(root) {
        the boards standing, and vice versa. */
     const wallRoot = document.querySelector('[data-members-wall]')
     if (wallRoot) {
+      /* Built before the first paint, so the controls are on screen while the
+         first query is in flight rather than appearing under the reader's
+         cursor when it lands. */
+      const host = wallRoot.querySelector('[data-members-controls]')
+      if (host) mountWallControls(host, () => paintWall(wallRoot))
       await paintWall(wallRoot)
-      /* Delegated, so it survives every repaint — the wall's markup is replaced
-         wholesale each time the view changes. */
-      wallRoot.addEventListener('click', (e) => {
-        const btn = e.target.closest?.('[data-view]')
-        if (!btn || btn.dataset.view === wallView) return
-        wallView = btn.dataset.view
-        paintWall(wallRoot)
-      })
     }
     /* Below the wall, and started after it: this section explains what is
        missing from the wall, so it must never be the thing that delays it.
@@ -335,27 +397,86 @@ export async function renderMembersBoards(root) {
   }
 }
 
+/* ⚠️ EVERY REPAINT IS A QUERY, exactly as the ranked feeds' range and sort are.
+ * Filtering the loaded hundred in the browser would rank a member against the
+ * ninety-nine who happened to lead all-time, and could only ever find people
+ * inside that prefix.
+ *
+ * `seq` guards the reply: a reader pressing 1W then 1M has two requests in
+ * flight, and the slower one must not paint over the newer. */
+let wallSeq = 0
 async function paintWall(wallRoot) {
-      try {
-        const rows = wallRows(await wall(wallView))
-        wallRoot.innerHTML = rows.length
-          ? viewsHtml(wallView) + renderSupporters(rows, {
-              // ⚠️ "Members" HERE AND "Nostr Community" ON THE DETAIL PAGES.
-              // One component, two words, deliberately: the protocol is not the
-              // greeting, and a reader who has drilled into a show has chosen to
-              // go deeper than one who just landed. See supporter-wall.js.
-              heading: 'Members',
-              id: 'members-wall',
-              sectionClass: 'members-wall-section',
-              metric: wallView,
-              sub: `Everyone who has boosted a show, all time. Top ${WALL_CAP}.`,
-              empty: '',
-            })
-          : ''
-        // The wall ships its overflow hidden behind a "Show N more" button; the
-        // handler is delegated, so one call covers every repaint.
-        initShowMore()
-      } catch (err) {
-        console.warn('[members] wall failed', err)
-      }
+  const body = wallRoot.querySelector('[data-members-wall-body]') || wallRoot
+  const controlsHost = wallRoot.querySelector('[data-members-controls]')
+  const mine = ++wallSeq
+  try {
+    const rows = wallRows(await wall(wallView, wallRange))
+    if (mine !== wallSeq) return
+    body.innerHTML = rows.length
+      ? renderSupporters(rows, {
+          // ⚠️ "Members" HERE AND "Nostr Community" ON THE DETAIL PAGES.
+          // One component, two words, deliberately: the protocol is not the
+          // greeting, and a reader who has drilled into a show has chosen to
+          // go deeper than one who just landed. See supporter-wall.js.
+          heading: 'Members',
+          id: 'members-wall',
+          sectionClass: 'members-wall-section',
+          metric: wallView,
+          /* The sub-line names the WINDOW, not a fixed "all time" — a caption
+             contradicting the control above it is worse than none. */
+          sub: `${RANGE_SUB[wallRange] || RANGE_SUB.all} Top ${WALL_CAP}.`,
+          empty: '',
+        })
+      : `<p class="hpw-empty">Nobody boosted a show in this range.</p>`
+    /* Moved into the fresh section head rather than rebuilt. The heading and
+       the controls share a line, the way a feed's do. */
+    const head = body.querySelector('.show-section-head')
+    if (controlsHost && head) head.appendChild(controlsHost)
+    else if (controlsHost) body.prepend(controlsHost)
+    // The wall ships its overflow hidden behind a "Show N more" button; the
+    // handler is delegated, so one call covers every repaint.
+    initShowMore()
+  } catch (err) {
+    if (mine !== wallSeq) return
+    console.warn('[members] wall failed', err)
+  }
+}
+
+/* ⚠️ THE LOOKUP NAVIGATES; IT DOES NOT FILTER. Reed's call, 2026-08-23. It was
+ * a filter over the Boosts feed's loaded window, which is the bug that put it
+ * inside that panel in the first place — a reader had to reach the feed to find
+ * the control that finds people. The question it answers is "where is this
+ * person", and the answer is `/booster/<npub>`: their whole history, their
+ * shows, their totals, rather than a narrowed slice of one feed.
+ *
+ * ⚠️ IT IS THE SHARED WIDGET, so the debounce, the abort, the sequence guard
+ * and the keyboard handling are the four ranked feeds' own. The suggestion rows
+ * are `role="option"` buttons rather than anchors because that is what a
+ * combobox listbox is; the navigation lives in onPick. */
+function mountMemberLookup(block) {
+  if (!block || block.dataset.findWired) return
+  block.dataset.findWired = '1'
+  mountFeedSearch(block, {
+    placeholder: 'Find a member by name or npub…',
+    label: 'Find a member',
+    noun: 'member',
+    glyph: '👤',
+    /* ⚠️ THE ENDPOINT'S SEARCH IS DELIBERATELY NOT RANGE-SCOPED AND DOES NOT
+       EXCLUDE PUBLISHERS. A ranked listing is a claim; this is a lookup, and a
+       member who last boosted in March is still the person being looked for. */
+    searchRemote: async (q, { signal } = {}) => {
+      const found = await searchMembers({ q, limit: SEARCH_HITS, signal })
+      return found.map((m) => ({
+        key: m.pk,
+        href: boosterPageHref(m.npub, m.pk),
+        label: m.name || (m.npub ? m.npub.slice(0, 12) + '…' : m.pk.slice(0, 12) + '…'),
+        sub: `${num(m.boosts)} boost${m.boosts === 1 ? '' : 's'} · ${compact(m.sats)} sats`,
+        img: m.pic,
+      }))
+    },
+    onPick: (entry) => {
+      /* A clear passes null. Nothing to undo — the list was never filtered. */
+      if (entry?.href) window.location.assign(entry.href)
+    },
+  })
 }

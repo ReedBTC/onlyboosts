@@ -43,11 +43,18 @@ order. They are the site map, so **they're regrouped together or not at all**:
 
 | Group | Items |
 |---|---|
-| **Feeds** | Episodes `/#episodes-global` · Shows `/#shows` · Songs `/#songs-global` · Albums `/#albums` · Boosts `/#boosts-global` |
+| **Feeds** | Podcasts `/#episodes-global` · Music `/#albums` · Members `/#boosts-global` |
 | **Stats** | Boost Stats `/stats` · Community `/boosters` — both coming soon |
 | **More** (footer: *Connect*) | About · Source · Report a bug |
 
-Feeds has one entry per feed, matching the homepage's what-menu exactly.
+**⚠️ FEEDS IS ONE ENTRY PER TAB, NOT PER FEED, AND EACH LANDS ON THAT TAB'S
+DEFAULT SUB-FEED.** *Reed's call, 2026-08-23.* It listed all five sub-feeds,
+which was right while the homepage hid them behind a dropdown and wrong the
+moment the tabs put them on screen: the nav then restated a control the page
+carries, in a different order, using different words for the same things.
+**Those three hrefs and `TAB_DEFAULT` in the `index.html` controller move
+together** — Podcasts opens Episodes, Music opens Albums, Members opens Boosts.
+
 **The Global/Follows axis is deliberately not in the nav**: it's the second
 dropdown on the page, and listing both scopes would double the group into a grid
 restating a control the page already has.
@@ -2597,6 +2604,44 @@ inconsistency to tidy up: the protocol is not the greeting, and someone who has
 drilled into one show's page has chosen to go deeper than someone who just
 landed.
 
+**⚠️ THE WALL CARRIES A RANGE AND A SORT, AND THEY ARE THE FEEDS' OWN
+CONTROLS.** *Reed's call, 2026-08-23.* `rangeControl` + `sortControl` from
+`feed-controls.js` in a `.pcast-controls` row, not a shape of their own: this is
+the same kind of choice a feed's Sort pill makes, and a second shape for one
+idea makes the site look like two sites. Order matches the feeds — filters, then
+ordering.
+
+**⚠️ `range` MEANS WHEN THE BOOST WAS SENT**, the reading `/api/v1/podcasts` and
+every `#boosts` section give it, never the air-date reading `/api/v1/episodes`
+gives the same word. A member is in the 1W wall because they boosted this week.
+
+All four ranges, where the Boosts note feed offers three: that feed **walks**
+month archives to cover a window, so a year is ~70 sequential requests before
+the first card. This is one indexed query whatever the window.
+
+**⚠️ THE WINDOW IS ON THE JOIN, NOT ONLY ON THE CANDIDATE SCAN.** Narrowing
+candidates alone picks the right people and then sums their **whole history**,
+so the 1W wall would rank this week's boosters by their all-time sats — a
+plausible-looking board answering neither question. It also drops a member with
+no in-window boost for free: the join yields no rows, so the `GROUP BY` yields
+none either.
+
+**⚠️ THE RANGE SCOPES A LISTING AND NEVER A SEARCH**, the same asymmetry the
+publisher exclusion has and for the same reason. A ranked listing is a claim
+about a window; a search answers "where is this person", and a member who last
+boosted in March is still the person being looked for. Windowing it would report
+a real member as not existing.
+
+**⚠️ THE CONTROLS ARE BUILT ONCE AND MOVED, NEVER REBUILT.** The wall's markup
+is replaced wholesale on every change, so a control rendered inside it would be
+destroyed by the repaint it just triggered, losing its open menu, its listeners
+and the reader's focus. `appendChild` moves a live node into each fresh
+`.show-section-head`. `wallSeq` guards the reply, since 1W then 1M puts two
+requests in flight and the slower must not paint over the newer.
+
+**The sub-line names the window** rather than a fixed "all time": a caption
+contradicting the control above it is worse than no caption.
+
 **⚠️ THREE ORDERINGS, BECAUSE THEY ARE THREE DIFFERENT PEOPLE.** `sort=sats`
 ranks by generosity and rewards one large boost; `boosts` rewards turning up;
 `shows` (`COUNT(DISTINCT podcast_guid)`) rewards spreading it around. Live, the
@@ -2606,14 +2651,54 @@ ordered by** — a `metric` parameter on `supporterCard`, defaulting to `sats` s
 the detail pages are byte-identical.
 
 **⚠️ THE LISTING EXCLUDES PUBLISHER KEYS AND THE SEARCH DOES NOT.** `PUBLISHERS`
-in `functions/api/v1/_common.js` is the four keys that sign boosts for many
-donors. `chadf_boostbot` topped both the boosts and shows orderings on other
+in `functions/api/v1/_common.js` is the five keys that sign boosts for many
+donors.
+
+**⚠️ BOOSTMEBITCH IS IN BOTH LISTS AND THAT IS NOT A CONTRADICTION.** The app
+publishes under the donor's **own** key when they are signed in — 13 distinct
+pubkeys behind the `boostmebitch` slug — and its site account
+(`3820f4ff…f408`, 35 boosts / 114,753 sats / 13 shows) publishes for everyone
+else, exactly the arrangement this site has. So `boostmebitch` is an application
+a listener can become a member through **and** that pubkey is a publisher key
+that must not rank. Added 2026-08-23 on Reed's instruction. Do not "resolve" the
+apparent duplication by removing either one.
+
+**⚠️ THE COLLECTOR'S HALF IS SEPARATE AND WAS NOT TOUCHED HERE.**
+`PUBLISHER_PUBKEYS` in `bots/global-boost-scan/clients.py` lives on the other
+machine and governs `client_via` nesting on `/api/v1/clients`, not the wall.
+The two lists are mirrors and have now drifted by one entry. `chadf_boostbot` topped both the boosts and shows orderings on other
 people's listening before this landed. A ranked list is a claim about who the
 top members are; a search result is not, and it is a real account somebody may
 want to look up. **One list in one place**, because the boards had the exclusion
 from day one and the wall never did, which is how the gap opened.
 
-#### The member search
+#### The member lookup
+
+**⚠️ IT LEADS THE TAB AND IT NAVIGATES; IT DOES NOT FILTER THE BOOST LIST.**
+*Reed's call, 2026-08-23.* The question is "where is this person" and the answer
+is `/booster/<npub>` — their whole history, their shows, their totals — not a
+narrowed slice of one feed. It sat inside the Boosts panel while it was a
+filter, which is also how a reader had to reach the feed to find the control
+that finds people.
+
+It is the shared `mountFeedSearch`, so the debounce, the abort, the sequence
+guard and the keyboard handling are the four ranked feeds' own. The suggestion
+rows stay `role="option"` **buttons rather than anchors**, because that is what
+a combobox listbox is; the navigation lives in `onPick`.
+
+**Two retired attempts are buried in `boosts-feed.js` so neither comes back**:
+`boosterEntries()` indexed the boosts in memory (34 of 2,011 members on the
+first page, 684 after paging in all 23,259), and `pickedRows` fixed that by
+fetching the picked member's own corpus — at which point the feed was rendering
+a different subject than its own controls described. `getMemberBoosts` in
+`ob-live.js` now has no caller.
+
+**⚠️ `resetFeedSearch(panel)` IS STILL CALLED THOUGH NOTHING MOUNTS THERE.** A
+reader holding a cached module from before the move may have mounted a box into
+that host; clearing it is one call, and the alternative is a live search box
+over a feed that no longer reads it.
+
+#### The member search endpoint
 
 **⚠️ IT ASKS THE INDEX, AND THE THING IT REPLACED COULD NOT.**
 `boosts-feed.js#boosterEntries` indexed `scopedRows` — the boosts in memory — so
@@ -2676,6 +2761,11 @@ Four rules a change would break:
 - **Exact boost counts, compact sats.** `num(m.boosts)` and `compact(m.sats)`.
   On the wall a row is one of a hundred and `1k` is plenty; here the count *is*
   the claim, and `1k` for 1,021 rounds the evidence away.
+- **⚠️ TWO SENTENCES, AND THE LINK CARRIES THE REST.** *Reed's call,
+  2026-08-23.* The first version ran four and turned a short section into a
+  paragraph with a list under it. What has to be said here is what these
+  accounts are and that they are deliberately not ranked; why the rule exists,
+  and what it costs, is `/about#bots`.
 - **⚠️ A FAILED FETCH LEAVES NOTHING BEHIND.** An error line here would read as
   "something is being hidden from you", which is the opposite of the point. The
   claim is additive, so its absence costs a reader nothing they were promised.
@@ -2692,7 +2782,9 @@ The intro is **one sentence** and the mechanics live behind a badge: *"Become a
 member by boosting one podcast or musician and sharing the boost with your Nostr
 identity."* Reed's wording, 2026-08-23.
 
-**⚠️ THE (i) IS A REAL LINK TO `/about#membership`, NOT A TOOLTIP.** What it has
+**⚠️ THE (i) IS A REAL LINK TO `/about#membership`, NOT A TOOLTIP, AND IT
+OPENS IN A NEW TAB** (Reed's call, 2026-08-23) — a reader consulting a
+definition has not finished with the tab they are standing on. What it has
 to answer is "which app do I use", and the answer is three named applications
 with a caveat on each; that is a section, not a hover. It is also the one thing
 on this tab a crawler should follow. The badge is a CSS circle rather than the
@@ -2707,6 +2799,21 @@ this badge and the Boost Bots section's "How this works".
 `/#members` falls through to the default feed and lands the reader on Podcasts.
 Every off-site link to this tab is `/#boosts-global`. Adding an alias would be a
 second address space for a view that already has one.
+
+**⚠️ `#membership` LEADS WITH NOSTR AND EXPLAINS IT, which is the one place on
+this site that should.** *Reed's call, 2026-08-23:* the front door says
+"Members" and never says Nostr; a reader who has clicked through to the about
+page has dug deeper, and here the answer to "how is a boost public at all" **is**
+the protocol. So the section states the definition — *a member is anyone who has
+shared a boost publicly using their Nostr account* — and then explains that an
+ordinary boost is a private transaction, that a boost note is an announcement of
+one rather than the payment itself, and that the membership belongs to a keypair
+the reader holds rather than to a profile here. See
+[[nostr-vocabulary-by-depth]]; this is the depth.
+
+**It also says boosting without any of this is not worse**, only unrecorded.
+The sats and the message arrive identically; what is missing is the public
+record, which is the whole of what membership means here.
 
 **⚠️ TWO LISTS OF APPS EXIST ON `/about` AND THEY ANSWER DIFFERENT QUESTIONS.**
 `#pipeline`'s *Applications Publishing Boost Notes* is the technical inventory

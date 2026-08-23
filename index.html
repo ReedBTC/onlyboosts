@@ -50,18 +50,18 @@
 
   <!-- Shared note / card styles (.note-card, .embed-note) — the boosts
        feeds render through the same kind-1 card as boosts-thread.js. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v126" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v127" />
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v126" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v127" />
   <!-- The episode card and its drawer, extracted from the inline block below
        when /episode/<guid> pages needed the same cards. See the file header. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v126" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v126" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v127" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v127" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. Must stay last
        among the stylesheets so the inline block below still wins. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v126" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v127" />
 
   <style>
     :root {
@@ -637,18 +637,31 @@
     .hpw-rules-list dt:first-child { margin-top: 0; }
     .hpw-rules-list dd { margin: 0.2rem 0 0; font-size: 0.84rem; color: var(--muted); }
 
-    /* The wall's three views. Same pill shape as the feeds' controls. */
-    .mw-views { display: flex; gap: 0.35rem; margin: 0 0 1rem; flex-wrap: wrap; }
-    .mw-view {
-      font: inherit; font-size: 0.76rem; font-weight: 700;
-      color: var(--muted); background: var(--white);
-      border: 1px solid var(--border); border-radius: 999px;
-      padding: 0.26rem 0.7rem; cursor: pointer;
-      transition: background 0.12s, color 0.12s, border-color 0.12s;
+    /* ⚠️ THE WALL'S CONTROLS ARE THE FEEDS' OWN, so there is no pill styling
+       here: `.pcast-range` and `.pcast-sort` come from feed-cards.css, which
+       this page already links. The three-button `.mw-views` group they replaced
+       was a second shape for the same idea. The only rule needed is where the
+       row sits — beside the heading, the way a feed's bar sits beside its
+       tabs. */
+    .mw-controls[hidden] { display: none; }
+    .members-wall-section .show-section-head {
+      display: flex; align-items: flex-end; justify-content: space-between;
+      gap: 0.75rem 1rem; flex-wrap: wrap;
     }
-    .mw-view:hover { border-color: var(--brand); color: var(--brand-dd); }
-    .mw-view[aria-pressed="true"] { background: var(--brand-dd); border-color: var(--brand-dd); color: var(--white); }
-    .mw-view:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+    /* The heading and its sub-line stay one block; the controls take the far
+       end and drop to their own line before the sub-line has to wrap. */
+    .members-wall-section .show-section-head > :not(.mw-controls) { min-width: 0; }
+    .members-wall-section .mw-controls { margin-left: auto; }
+    .members-wall-section .mw-controls .pcast-controls { margin: 0; }
+    @media (max-width: 640px) {
+      .members-wall-section .mw-controls { margin-left: 0; flex-basis: 100%; }
+    }
+
+    /* ⚠️ THE LOOKUP LEADS THE TAB, so it is not `hidden` the way a feed's
+       search host is — mountFeedSearch reveals it, and this only gives it the
+       room a leading control needs. */
+    .members-find { margin: 0 0 1.75rem; }
+    .members-find [data-feed-search] { margin: 0; }
 
     .feed-panel { display: none; }
     .feed-panel.is-active { display: block; }
@@ -990,8 +1003,8 @@
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
     }
   </style>
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v126" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v126" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v127" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v127" />
 </head>
 <body data-active-feed="episodes-global">
 
@@ -1023,21 +1036,24 @@
           </div>
           <a class="nav-explore-home" href="/"><span aria-hidden="true">🏠</span> Home</a>
           <div class="nav-explore-groups">
-            <!-- Feeds: one entry per feed, matching the homepage's what-menu
-                 exactly (Episodes / Shows / Songs / Albums / Boosts). The
-                 Global vs Follows axis is deliberately absent — it's the
+            <!-- ⚠️ FEEDS IS ONE ENTRY PER TAB, NOT PER FEED. Reed's call,
+                 2026-08-23. It listed all five sub-feeds, which was right while
+                 the homepage hid them behind a dropdown and wrong the moment
+                 the tabs put them on screen: the nav then restated a control
+                 the page carries, in a different order, using different words
+                 for the same things. Each entry lands on that tab's DEFAULT
+                 sub-feed — TAB_DEFAULT in the index.html controller — so
+                 Podcasts opens Episodes, Music opens Albums and Members opens
+                 Boosts. **Those three hrefs and TAB_DEFAULT move together.**
+
+                 The Global vs Follows axis stays deliberately absent: it is the
                  second dropdown on the page itself, and listing both scopes
-                 here made the nav a grid restating a control the page already
-                 has. Songs and Albums are the music half of Episodes and
-                 Shows, split on <podcast:medium>; they sit next to the feeds
-                 they mirror rather than in a group of their own. -->
+                 here made the nav a grid restating a control the page has. -->
             <div class="nav-explore-group">
               <h4>Feeds</h4>
-              <a href="/#episodes-global"><span aria-hidden="true">🎙</span> Episodes</a>
-              <a href="/#shows"><span aria-hidden="true">📻</span> Shows</a>
-              <a href="/#songs-global"><span aria-hidden="true">🎵</span> Songs</a>
-              <a href="/#albums"><span aria-hidden="true">💿</span> Albums</a>
-              <a href="/#boosts-global"><span aria-hidden="true">⚡</span> Boosts</a>
+              <a href="/#episodes-global"><span aria-hidden="true">🎙</span> Podcasts</a>
+              <a href="/#albums"><span aria-hidden="true">🎵</span> Music</a>
+              <a href="/#boosts-global"><span aria-hidden="true">👥</span> Members</a>
             </div>
             <!-- Stats: the aggregate views over the same data. Both are
                  coming-soon pages for now (noindex, out of the sitemap). -->
@@ -1213,10 +1229,21 @@
       <p class="members-intro">
         <strong>Become a member by boosting one podcast or musician and sharing
         the boost with your Nostr identity.</strong><a class="members-info"
-          href="/about#membership"
-          aria-label="How membership works"
+          href="/about#membership" target="_blank" rel="noopener"
+          aria-label="How membership works (opens in a new tab)"
           title="How membership works"><span aria-hidden="true">i</span></a>
       </p>
+
+      <!-- ⚠️ THE LOOKUP LEADS THE TAB AND IT NAVIGATES; IT NO LONGER FILTERS
+           THE BOOST LIST. Reed's call, 2026-08-23: the question is "where is
+           this person", and the answer is their page. It sat inside the Boosts
+           panel while it was a filter, which is also why it could only be found
+           by a reader who had already scrolled to the feed. It is the same
+           `[data-feed-search]` host and the same mountFeedSearch the four
+           ranked feeds use. -->
+      <div class="members-find">
+        <div data-feed-search hidden></div>
+      </div>
       <!-- ⚠️ ONE LINE OF EXPLANATION, NOT TWO. The sub-line and the caveat under
            the boards said the same thing twice at two sizes; the mechanics moved
            behind Rules, where a reader who wants them can have all of them and a
@@ -1281,8 +1308,17 @@
 
       <!-- The wall. Filled by members-board.js through the SAME renderSupporters
            /show and /episode use; the section markup, the podium and the
-           "Show N more" toggle all come from that module. -->
-      <div class="members-wall" data-members-wall></div>
+           "Show N more" toggle all come from that module.
+
+           ⚠️ TWO CONTAINERS, BECAUSE THE CONTROLS OUTLIVE THE WALL. The body is
+           replaced wholesale on every range or sort change; a control rebuilt
+           with it would lose its open menu and its listeners mid-gesture. The
+           controls element is built once and MOVED into each fresh section
+           head, which preserves both. -->
+      <div class="members-wall" data-members-wall>
+        <div class="mw-controls" data-members-controls hidden></div>
+        <div data-members-wall-body></div>
+      </div>
 
       <!-- ⚠️ THE BOTS SECTION IS THE WALL'S EXCLUSION, SHOWN. Four publisher
            keys are dropped from every ranked listing above; this names them
@@ -1434,13 +1470,14 @@
          footer is the nav's site map repeated, so they're regrouped together
          or not at all. -->
     <div class="footer-col">
+      <!-- ⚠️ ONE ENTRY PER TAB, and it mirrors the nav's Explore menu exactly.
+           The two are the site map and are regrouped together or not at all;
+           each lands on that tab's default sub-feed. See partials/nav.html. -->
       <h3>Feeds</h3>
       <ul>
-        <li><a href="/#episodes-global">🎙 Episodes</a></li>
-        <li><a href="/#shows">📻 Shows</a></li>
-        <li><a href="/#songs-global">🎵 Songs</a></li>
-        <li><a href="/#albums">💿 Albums</a></li>
-        <li><a href="/#boosts-global">⚡ Boosts</a></li>
+        <li><a href="/#episodes-global">🎙 Podcasts</a></li>
+        <li><a href="/#albums">🎵 Music</a></li>
+        <li><a href="/#boosts-global">👥 Members</a></li>
       </ul>
     </div>
 
@@ -1857,17 +1894,17 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v126"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v127"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v126" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v127" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v126" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v127" defer></script>
 
 <!-- Feed hydration — lazily loads the active feed on first view. -->
-<script type="module" src="/assets/js/feeds.js?v=ob-v126"></script>
-<script src="/assets/js/nav.js?v=ob-v126" defer></script>
+<script type="module" src="/assets/js/feeds.js?v=ob-v127"></script>
+<script src="/assets/js/nav.js?v=ob-v127" defer></script>
 
 </body>
 </html>

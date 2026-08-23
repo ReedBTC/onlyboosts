@@ -30,8 +30,8 @@
  * need only id + pubkey. The object handed to buildActionBar below is a
  * projection, not a verified event; don't pass it anywhere that assumes one.
  */
-import { nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v126'
-import { buildActionBar, configureBoostActions } from '/assets/js/boost-actions.js?v=ob-v126'
+import { nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v127'
+import { buildActionBar, configureBoostActions } from '/assets/js/boost-actions.js?v=ob-v127'
 // ⚠️ wireNpubCopy WAS IMPORTED HERE and is not any more. The avatar and the name
 // were its only two callers on this feed, and both are now links to
 // /booster/<npub>. Unlike the Episodes drawer — where the per-boost ⋮ menu
@@ -39,21 +39,21 @@ import { buildActionBar, configureBoostActions } from '/assets/js/boost-actions.
 // from this feed means opening their page, which leads with the button.
 // Its own module rather than a third export from show-link.js; see the note at
 // the head of booster-link.js and the ob-v53 entry in CLAUDE.md.
-import { boosterPageHref, markBoosterLink } from '/assets/js/booster-link.js?v=ob-v126'
-import { parseSegments, renderSegmentsInto, setCachedProfile } from '/assets/js/boosts-thread.js?v=ob-v126'
-import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v126'
-import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v126'
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v126'
-import { boosterLabel } from '/assets/js/ob-data.js?v=ob-v126'
-import { followsBoostReader, globalBoostReader } from '/assets/js/ob-live.js?v=ob-v126'
+import { boosterPageHref, markBoosterLink } from '/assets/js/booster-link.js?v=ob-v127'
+import { parseSegments, renderSegmentsInto, setCachedProfile } from '/assets/js/boosts-thread.js?v=ob-v127'
+import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v127'
+import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v127'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v127'
+import { boosterLabel } from '/assets/js/ob-data.js?v=ob-v127'
+import { followsBoostReader, globalBoostReader } from '/assets/js/ob-live.js?v=ob-v127'
+import { resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v127'
 import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls,
   RANGE_OPTIONS,
-} from '/assets/js/feed-controls.js?v=ob-v126'
-import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v126'
-import { searchMembers, getMemberBoosts, SEARCH_HITS } from '/assets/js/ob-live.js?v=ob-v126'
-import { showPageHref, episodePageHref } from '/assets/js/show-link.js?v=ob-v126'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v126'
+} from '/assets/js/feed-controls.js?v=ob-v127'
+
+import { showPageHref, episodePageHref } from '/assets/js/show-link.js?v=ob-v127'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v127'
 
 const PAGE_SIZE = 30
 
@@ -395,8 +395,11 @@ async function createFollowsSource(authors) {
  */
 export async function renderBoosts({ panel, list, scope = 'global' }) {
   if (!list) return
-  // A re-render (account switch) may end on a placeholder, so clear any box a
-  // previous run left behind before deciding whether this one gets one.
+  /* ⚠️ STILL CALLED THOUGH NOTHING MOUNTS HERE ANY MORE, and deliberately: a
+     reader who loaded this page before the lookup moved may still be holding a
+     cached module that mounted a box into this panel's host. Clearing it is one
+     call and the alternative is a dead search box over a feed that no longer
+     reads it. */
   resetFeedSearch(panel)
 
   // Resolve the audience first — a signed-out Follows tab should say so
@@ -465,51 +468,28 @@ export async function renderBoosts({ panel, list, scope = 'global' }) {
   // Guards an in-flight coverage fetch against a newer selection landing
   // while it's still running.
   let seq = 0
-  let search = null
-  // The window's rows before the search narrows them — what the booster index
-  // is built over, so a suggestion is always someone this window can show.
-  let scopedRows = rows
 
   // The rows in the selected window, in the selected order. 'recent' over
   // 'all' is the source's own order, so the default view is the source's own
   // array — paging appends to it and nothing has to be copied or re-sorted.
   //
-  // A search here narrows to one BOOSTER rather than one card: this feed's
-  // subject is the person, and a single note is not something anyone knows the
-  // name of. There's no rank to retain — a card is one boost, so the feed has
-  // no ranked sort and never paints a rank badge.
+  /* ⚠️ THIS FEED HAS NO SEARCH, AND THAT IS NOT AN OMISSION. It carried a
+     member filter until 2026-08-23; the lookup now leads the Members tab and
+     NAVIGATES to /booster/<npub> instead. Reed's call, and the argument is that
+     a filter was answering the wrong question — "where is this person" is
+     answered by their page, not by a narrowed slice of one feed.
+
+     Two attempts are buried here, so neither comes back: `boosterEntries()`
+     indexed the boosts in memory, which reached 34 of 2,011 members on the
+     first page and only 684 after paging in all 23,259; `pickedRows` fixed that
+     by fetching the member's own corpus, at which point the feed was rendering
+     a different subject than the one its controls described. See
+     mountMemberLookup in members-board.js. */
   function buildView() {
     const cutoff = rangeCutoff(rangeKey)
-    scopedRows = cutoff ? rows.filter((b) => b.ts >= cutoff) : rows
-    // The corpus behind the index just changed (new window, or a page of older
-    // rows landed), so drop it; it rebuilds on the next keystroke.
-    search?.refresh()
-    const picked = search?.selection || null
-    /* ⚠️ A PICKED MEMBER'S BOOSTS COME FROM `pickedRows`, NOT FROM FILTERING
-       WHAT IS LOADED. The filter is what used to be here, and it fails for the
-       same reason the old in-memory search did: the member was chosen out of
-       the whole index, so they will usually have no boosts at all in the window
-       the browser is holding — the list emptied itself at the moment the search
-       succeeded. `pickedRows` is that member's own corpus, fetched on the pick;
-       the range still applies to it, so "no boosts in this range" stays a real
-       answer rather than an artefact of what had been scrolled past. */
-    const scoped = picked
-      ? (cutoff ? pickedRows.filter((b) => b.ts >= cutoff) : pickedRows)
-      : scopedRows
+    const scoped = cutoff ? rows.filter((b) => b.ts >= cutoff) : rows
     return sortKey === 'recent' ? scoped : [...scoped].sort(SORTERS[sortKey])
   }
-
-  /* ⚠️ `boosterEntries()` IS GONE AND MUST NOT COME BACK. It indexed
-     `scopedRows` — the boosts in memory — so a member was findable only if they
-     turned up in what the reader had already scrolled past. Measured against
-     the whole corpus on 2026-08-23: the first page reaches 34 of 2,011 members
-     (2%), 500 boosts reaches 164 (8%), and paging in every one of the 23,259
-     boosts still only reaches 684 (34%). A third of members have never appeared
-     in this feed at all, so no amount of loading closes it. The question "where
-     is this person" is asked of the index now; see searchMembers in ob-live.js.
-
-     One member's own boosts, fetched when they are picked. Empty until then. */
-  let pickedRows = []
 
   function oldestTs() { return rows.length ? rows[rows.length - 1].ts : Infinity }
 
@@ -555,16 +535,10 @@ export async function renderBoosts({ panel, list, scope = 'global' }) {
     if (reset) { shown = 0; cards.replaceChildren() }
     view = buildView()
     if (!view.length) {
-      const picked = search?.selection || null
-      cards.replaceChildren(picked
-        ? h('div', { class: 'feed-placeholder' }, [
-            h('strong', { text: 'Nothing in this window' }),
-            ` ${picked.label} sent no boosts in this time range — widen the range, or clear the search.`,
-          ])
-        : h('div', { class: 'feed-placeholder' }, [
-            h('strong', { text: 'No boosts in this window' }),
-            ' Nothing was boosted in this time range — try a wider one.',
-          ]))
+      cards.replaceChildren(h('div', { class: 'feed-placeholder' }, [
+        h('strong', { text: 'No boosts in this window' }),
+        ' Nothing was boosted in this time range — try a wider one.',
+      ]))
       moreWrap.replaceChildren()
       return
     }
@@ -649,46 +623,6 @@ export async function renderBoosts({ panel, list, scope = 'global' }) {
       if (key !== sortKey) apply(() => { sortKey = key })
     }, { title: 'Sort boosts' }),
   ])
-
-  // Boosters, not boosts: see buildView. The index covers the loaded window,
-  // so on All it grows as older pages land.
-  /* ⚠️ A QUERY, NOT AN IN-MEMORY INDEX — see the note over `pickedRows`. The
-     suggestions come from the whole index and the pick then fetches that
-     member's own boosts, because a member chosen out of 2,011 will usually have
-     none in the window this feed is holding.
-     `searchRemote` is the backend the four ranked feeds already use; it is
-     debounced, abortable and sequence-guarded in feed-search.js. */
-  search = mountFeedSearch(panel, {
-    placeholder: 'Search members by name or npub…',
-    label: 'Search members',
-    noun: 'member',
-    glyph: '👤',
-    searchRemote: async (q, { signal } = {}) => {
-      const found = await searchMembers({ q, limit: SEARCH_HITS, signal })
-      return found.map((m) => ({
-        key: m.pk,
-        label: m.name || (m.npub ? m.npub.slice(0, 12) + '…' : m.pk.slice(0, 12) + '…'),
-        sub: `${m.boosts.toLocaleString('en-US')} boost${m.boosts === 1 ? '' : 's'}`,
-        img: m.pic,
-      }))
-    },
-    onPick: async (entry) => {
-      pickedRows = []
-      if (!entry) { paint({ reset: true }); return }
-      /* Painting twice is deliberate: the first call empties the list under the
-         reader immediately so the pick visibly took, and the fetch fills it.
-         A failure leaves `pickedRows` empty, which paints the feed's own
-         "nothing in this window" line rather than a stack trace — the member
-         exists, we just could not read their boosts this second. */
-      paint({ reset: true })
-      try {
-        pickedRows = await getMemberBoosts({ pk: entry.key })
-      } catch (err) {
-        console.warn('[boosts] member corpus failed', entry.key, err)
-      }
-      paint({ reset: true })
-    },
-  })
 
   list.replaceChildren(cards, moreWrap)
 

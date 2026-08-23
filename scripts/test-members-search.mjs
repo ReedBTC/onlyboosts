@@ -76,21 +76,33 @@ const FIXED = [
   { pk: 'd35ae076512c29b01a5b33aa764ed4db44a9d0bbd96009705f48101f6cfe76a2',
     npub: 'npub1lna', name: 'lnaddress music', sats: 5, n: 2, spread: 2 },
   { pk: '4'.repeat(64), npub: 'npub1ddd', name: 'Bitcoin Audible', sats: 300, n: 1 },
+  /* ⚠️ AN OLD MEMBER, and the range tests are untestable without one: with every
+     fixture boost stamped 2023, a 1W window returns nothing and "the window
+     excluded them" is indistinguishable from "the window excluded everyone".
+     `ageDays` back-dates this member's boosts; every other row is stamped NOW by
+     addBoost, so it is inside every window. */
+  { pk: 'c'.repeat(64), npub: 'npub1old', name: 'Long Gone', sats: 700, n: 12, ageDays: 400 },
   { pk: '6'.repeat(64), npub: 'npub1fff', name: 'Ünïcödé',          sats: 250, n: 1, sameCase: true },
   { pk: '5'.repeat(64), npub: 'npub1eee', name: null,              sats: 200, n: 1 }, // no profile
 ]
 let ev = 0
-const addBoost = (pk, npub, sats, show = null) =>
+const NOW = Math.floor(Date.now() / 1000)
+/* ⚠️ THE FIXTURE IS STAMPED RELATIVE TO NOW, not at a fixed 2023 epoch. The
+   endpoint computes its cutoff from Date.now(), so a fixed timestamp puts the
+   entire corpus outside every bounded window and each range assertion passes on
+   an empty list. */
+const addBoost = (pk, npub, sats, show = null, ts = NOW - 60) =>
   db.prepare('INSERT INTO boosts(event_id,booster_pubkey,booster_npub,created_at,sats,podcast_guid) VALUES(?,?,?,?,?,?)')
     /* ⚠️ PAD THE COUNTER, NOT THE WHOLE STRING. `\`e${n}\`.padEnd(64,'0')`
        makes e1 and e10 the same 64 characters, so the eleventh insert hits the
        primary key. Event ids are opaque here; only their uniqueness matters. */
-    .run('e' + String(ev++).padStart(63, '0'), pk, npub, 1_700_000_000 + ev, sats, show)
+    .run('e' + String(ev++).padStart(63, '0'), pk, npub, ts, sats, show)
 
 for (const m of FIXED) {
   // Each member's boosts land on `spread` distinct shows, cycling — so sats,
   // boosts and shows genuinely order the fixture differently.
-  for (let i = 0; i < m.n; i++) addBoost(m.pk, m.npub, Math.round(m.sats / m.n), 'show' + (i % (m.spread || 1)))
+  const ts = NOW - 60 - (m.ageDays || 0) * 86400
+  for (let i = 0; i < m.n; i++) addBoost(m.pk, m.npub, Math.round(m.sats / m.n), 'show' + (i % (m.spread || 1)), ts)
   if (m.name !== null) {
     /* `name` is normally the lowercase handle and `display_name` the pretty
        form, which is what the collector stores. `sameCase` pins both columns to
@@ -404,6 +416,52 @@ console.log('\n⚠️ publishers=1 is the exact complement of the listing:')
     check('publishers=0 is the ordinary listing', () => {
       assert.equal(b3.listing, true)
       assert.ok(!b3.members.some((m) => m.pk === BOT), 'the exclusion stopped applying')
+    })
+  }
+}
+
+console.log('\n⚠️ range scopes a LISTING and never a SEARCH:')
+{
+  const OLD = 'c'.repeat(64)
+  {
+    const { body } = await call('?limit=50')
+    check('all-time includes a member who last boosted 400 days ago', () =>
+      assert.ok(body.members.some((m) => m.pk === OLD)))
+    check('the range is echoed back', () => assert.equal(body.range, 'all'))
+  }
+  for (const r of ['1w', '1m', '1y']) {
+    const { body } = await call(`?limit=50&range=${r}`)
+    check(`range=${r} drops them`, () => {
+      assert.equal(body.range, r)
+      assert.ok(!body.members.some((m) => m.pk === OLD), `a 400-day-old boost survived ${r}`)
+    })
+  }
+  {
+    /* ⚠️ THE FIGURES HAVE TO BE THE WINDOW'S. Narrowing candidates without
+       windowing the JOIN picks the right people and sums their whole history,
+       which is a plausible-looking board answering neither question. Piez's
+       boosts are all inside every window, so a member whose totals CHANGE is
+       what proves it — the old member is gone from 1w entirely, so it cannot. */
+    const a = (await call('?limit=50')).body.members.find((m) => m.name === 'Long Gone')
+    check('all-time totals are the whole history', () => assert.equal(a.boosts, 12))
+    const { body } = await call('?limit=50&range=1w')
+    const total = body.members.reduce((n, m) => n + m.boosts, 0)
+    const allTotal = (await call('?limit=50')).body.members
+      .reduce((n, m) => n + m.boosts, 0)
+    check('⚠️ the 1w listing counts fewer boosts than all-time', () =>
+      assert.ok(total < allTotal, `1w summed ${total}, all-time ${allTotal} — the JOIN is not windowed`))
+  }
+  {
+    const { body } = await call('?q=Long Gone&range=1w')
+    check('⚠️ but a SEARCH is never windowed — they are still findable', () =>
+      assert.ok(body.members.some((m) => m.pk === OLD),
+        'the range scoped a search and reported a real member as not existing'))
+  }
+  {
+    const { status, body } = await call('?range=3d')
+    check('an unknown range is a 400, not a silent all-time answer', () => {
+      assert.equal(status, 400)
+      assert.match(body.error, /range/)
     })
   }
 }

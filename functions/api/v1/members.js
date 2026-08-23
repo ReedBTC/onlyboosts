@@ -47,6 +47,17 @@ const SORTS = {
 };
 const DEFAULT_SORT = "sats";
 
+/* ⚠️ `range` MEANS WHEN THE BOOST WAS SENT, matching /api/v1/podcasts and the
+ * `#boosts` sections, and NOT the air-date reading /api/v1/episodes gives the
+ * same parameter name. A member is in the 1W wall because they boosted this
+ * week, however old the episodes were. The site carries exactly two readings of
+ * this word and there must not be a third — see CLAUDE.md under Range and sort.
+ *
+ * The four keys mirror RANGE_OPTIONS in feed-controls.js. Those two tables move
+ * together, or a range button on the wall answers 400. */
+const RANGE_DAYS = { "1w": 7, "1m": 30, "1y": 365, all: null };
+const DAY = 86400;
+
 /* ⚠️ LIKE'S OWN WILDCARDS HAVE TO BE ESCAPED OR THE READER CAN TYPE THEM. A
  * bare `%` matches everything and `_` matches any character, so a pasted string
  * containing either quietly returns the wrong people rather than nothing. The
@@ -66,6 +77,7 @@ function likeEscape(s) {
 const PUB_FIRST = 6;
 const PUB_HOLES = PUBLISHERS.map((_, i) => "?" + (PUB_FIRST + i)).join(",");
 const PUB_FLAG = "?" + (PUB_FIRST + PUBLISHERS.length);
+const SINCE_HOLE = "?" + (PUB_FIRST + PUBLISHERS.length + 1);
 
 export async function onRequestGet({ request, env }) {
   const u = new URL(request.url);
@@ -73,6 +85,11 @@ export async function onRequestGet({ request, env }) {
   const limit = clampLimit(u.searchParams.get("limit"), 8, 200);
   const askedSort = u.searchParams.get("sort");
   const sort = Object.hasOwn(SORTS, askedSort) ? askedSort : DEFAULT_SORT;
+  const range = (u.searchParams.get("range") || "all").toLowerCase();
+  if (!Object.hasOwn(RANGE_DAYS, range)) {
+    return json(request, { error: "bad range (1w|1m|1y|all)" }, { status: 400, cache: 0 });
+  }
+
 
   /* ⚠️ NO QUERY IS A LIST, NOT AN ERROR. `?limit=100` with no `q` is the top
    * members by sats — what the wall on the Members tab renders — and it is the
@@ -96,6 +113,19 @@ export async function onRequestGet({ request, env }) {
    * It wins over an empty q, so `?publishers=1` is never also the listing. */
   const bots = u.searchParams.get("publishers") === "1";
   const listing = !bots && raw.length === 0;
+
+  /* ⚠️ THE RANGE SCOPES A LISTING AND NEVER A SEARCH, the same asymmetry the
+   * publisher exclusion has and for the same reason. A ranked listing is a
+   * claim about a window, so its aggregates have to be computed over that
+   * window; a search answers "where is this person", and a member who last
+   * boosted in March is still the person being looked for. Windowing the search
+   * would report them as not existing.
+   *
+   * 0 rather than null, so the bound value is always a number and the join can
+   * carry `created_at >= ?` unconditionally. Every boost is after the epoch. */
+  const since = (listing || bots) && RANGE_DAYS[range]
+    ? Math.floor(Date.now() / 1000) - RANGE_DAYS[range] * DAY
+    : 0;
   if (!bots && !listing && raw.length < MIN_CHARS) {
     return json(request, { q: raw, count: 0, members: [] });
   }
@@ -149,7 +179,8 @@ export async function onRequestGet({ request, env }) {
          so typing its name still finds it. Ranked lists are a claim; a search
          result is not. */
       SELECT booster_pubkey FROM boosts
-       WHERE ?5 = 1 AND booster_pubkey NOT IN (${PUB_HOLES})
+       WHERE ?5 = 1 AND created_at >= ${SINCE_HOLE}
+         AND booster_pubkey NOT IN (${PUB_HOLES})
       UNION
       /* The bots mode: exactly the keys the branch above removes. Guarded by its
          own flag, so it can never widen a search or a listing. */
@@ -165,7 +196,13 @@ export async function onRequestGet({ request, env }) {
            MAX(p.display_name) AS dname,
            MAX(p.picture)      AS pic
       FROM hits h
-      JOIN boosts b ON b.booster_pubkey = h.pk
+      /* ⚠️ THE WINDOW IS ON THE JOIN, NOT ONLY ON THE CANDIDATE SCAN. Narrowing
+         candidates alone picks the right people and then sums their WHOLE
+         history, so the 1W wall would rank this week's boosters by their
+         all-time sats — a plausible-looking board that answers neither
+         question. It also drops a member with no in-window boost for free: the
+         join yields no rows, so the GROUP BY yields none either. */
+      JOIN boosts b ON b.booster_pubkey = h.pk AND b.created_at >= ${SINCE_HOLE}
       LEFT JOIN profiles p ON p.pubkey = h.pk
      GROUP BY b.booster_pubkey
      /* The two trailing keys are a tiebreak, never a ranking: sats settles a
@@ -176,12 +213,13 @@ export async function onRequestGet({ request, env }) {
 
   try {
     const { results } = await env.DB.prepare(sql)
-      .bind(like, hex, partialNpub, limit, listing ? 1 : 0, ...PUBLISHERS, bots ? 1 : 0).all();
+      .bind(like, hex, partialNpub, limit, listing ? 1 : 0, ...PUBLISHERS, bots ? 1 : 0, since).all();
     return json(request, {
       q: raw,
       listing,
       publishers: bots,
       sort,
+      range,
       count: results.length,
       members: results.map((r) => ({
         pk: r.pk,

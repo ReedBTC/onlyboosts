@@ -228,4 +228,13 @@ export const PUBLISHERS = [
   "d35ae076512c29b01a5b33aa764ed4db44a9d0bbd96009705f48101f6cfe76a2", // lnaddress-music
   "c330881e28768381dd8bdfd274341dca0c5882c29b8642ea4bc82f7563264592", // Local Bitcoiners show account
   "3a87a19c801d57111b0905569225d2b20b39d154fc93bef5a8f2860c409b84d9", // OnlyBoosts' own bot
+  "3820f4ff8587747530c7feafe47c1e592e3ce0fd2929b4f907e40714bd26f408", // BoostMeBitch's site account
 ];
+
+/* ⚠️ BOOSTMEBITCH IS IN BOTH LISTS AND THAT IS NOT A CONTRADICTION. The app
+ * publishes under the donor's OWN key when they are signed in — 13 distinct
+ * pubkeys behind the `boostmebitch` slug — and its site account publishes for
+ * everyone else, exactly the arrangement this site has. So `boostmebitch` is an
+ * application a listener can become a member through, AND `3820f4ff…f408` is a
+ * publisher key that must not rank. Reed's call, 2026-08-23. Do not "resolve"
+ * the apparent duplication by removing either one. */
