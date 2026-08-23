@@ -50,18 +50,18 @@
 
   <!-- Shared note / card styles (.note-card, .embed-note) — the boosts
        feeds render through the same kind-1 card as boosts-thread.js. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v127" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v128" />
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v127" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v128" />
   <!-- The episode card and its drawer, extracted from the inline block below
        when /episode/<guid> pages needed the same cards. See the file header. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v127" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v127" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v128" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v128" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. Must stay last
        among the stylesheets so the inline block below still wins. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v127" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v128" />
 
   <style>
     :root {
@@ -458,14 +458,7 @@
     .members-info:hover { background: var(--brand-dd); border-color: var(--brand-dd); color: #fff; }
     .members-info:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 
-    .hpw { margin: 0 0 2.25rem; }
-    .hpw-heading {
-      font-family: 'Playfair Display', Georgia, serif;
-      font-size: 1.6rem; font-weight: 700; color: var(--ink);
-      margin: 0; letter-spacing: 0.01em;
-    }
-    .hpw-sub { margin: 0.2rem 0 1rem; font-size: 0.88rem; color: var(--muted); }
-
+        
     /* Two boards side by side where there is room, stacked where there is not.
        This Week is first in the source and so is first on a phone — it is the
        board with a live race in it. */
@@ -527,16 +520,43 @@
     /* The wall's own section chrome. `.show-section` and friends live in
        show-page.css, which this page does not link — the wall's `.sup-*` rules
        come from supporter-wall.css and the section around them is here. */
-    .members-wall-section { margin: 0 0 2.25rem; }
-    .members-wall-section h2 {
+    /* ══ THE MEMBERS TAB'S SECTIONS ══
+       ⚠️ ONE IDIOM FOR ALL FOUR, LIFTED FROM THE DETAIL PAGES. Reed's call,
+       2026-08-23: the boards, the wall, the bots and the boost list read as
+       four loose blocks stacked in a column, where /show and /episode read as
+       a page made of definite parts. Those pages get that from three things
+       and this restates all three — a generous top margin, a Playfair h2 at
+       the same clamp, and a sub-line in the same muted 0.88rem.
+
+       ⚠️ THE HAIRLINE IS THE ONE ADDITION. The detail pages separate sections
+       by space alone, which works there because each is a bordered drawer or
+       a shell; here the wall is deliberately chrome-less avatars, so space
+       alone left it floating between two boxes. A rule above each heading is
+       the lightest thing that draws the boundary without putting a box round
+       a component whose whole design is not having one.
+
+       :first-child carries no rule — a line above the first section would
+       fence it off from the intro that introduces it. */
+    .mb-section { margin: 0 0 2.75rem; padding-top: 2rem; border-top: 1px solid var(--border); }
+    .mb-section:first-of-type { padding-top: 0; border-top: 0; }
+    .mb-section > h2,
+    .mb-section .show-section-head > h2 {
       font-family: 'Playfair Display', Georgia, serif;
-      font-size: 1.6rem; font-weight: 700; color: var(--ink);
+      font-size: clamp(1.2rem, 3vw, 1.6rem); font-weight: 700; color: var(--ink);
       margin: 0; letter-spacing: 0.01em;
     }
-    .members-wall-section .show-section-head { margin-bottom: 1.1rem; }
-    .members-wall-section .show-section-sub {
-      margin: 0.2rem 0 0; font-size: 0.88rem; color: var(--muted);
+    .mb-section .show-section-head,
+    .mb-section-head { margin-bottom: 1.1rem; }
+    .mb-section .show-section-sub,
+    .mb-section-sub {
+      margin: 0.35rem 0 0; font-size: 0.88rem; color: var(--muted);
     }
+    /* ⚠️ AN EMPTY SUB-LINE MUST TAKE NO SPACE. renderSupporters emits the <p>
+       unconditionally, and the wall now passes no sub — without this the wall's
+       heading carries a blank line under it. */
+    .mb-section .show-section-sub:empty { display: none; }
+
+    .members-wall-section { margin: 0; }
     .members-wall-section .show-more {
       margin-top: 1rem;
       font: inherit; font-size: 0.82rem; font-weight: 700;
@@ -551,13 +571,12 @@
        because it is a community; these are four accounts, each of which needs
        a sentence saying what it does, so they are rows. Rendering them as more
        faces would put them back in the list they were taken out of. */
-    .bots { margin: 0 0 2.25rem; }
+    /* ⚠️ NO HEADING OR SPACING RULES HERE. `.mb-section` owns both for all
+       four sections on this tab; a `font:` shorthand on `.bots-title` at
+       (0,1,0) against `.mb-section > h2` at (0,1,1) is the exact specificity
+       trap `.show-stat dd` documents in show-page.css. The section renders its
+       head through the shared `.mb-section-head` markup instead. */
     .bots:empty { display: none; }
-    .bots-title {
-      font: 700 1.35rem/1.2 var(--font-display, Georgia, serif);
-      color: var(--ink); margin: 0 0 0.35rem;
-    }
-    .bots-sub { margin: 0 0 1rem; font-size: 0.88rem; color: var(--muted); }
     .bots-more { color: var(--brand-dd); text-decoration: underline; text-decoration-color: var(--brand-tint, var(--brand)); white-space: nowrap; }
     .bots-more:hover { color: var(--brand-ddd); text-decoration-color: currentColor; }
     .bots-list {
@@ -1003,8 +1022,8 @@
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
     }
   </style>
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v127" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v127" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v128" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v128" />
 </head>
 <body data-active-feed="episodes-global">
 
@@ -1248,16 +1267,18 @@
            the boards said the same thing twice at two sizes; the mechanics moved
            behind Rules, where a reader who wants them can have all of them and a
            reader who does not is not charged two paragraphs for the boards. -->
-      <div class="hpw" data-hpw>
-        <h2 class="hpw-heading">#40HPW</h2>
-        <p class="hpw-sub">
-          40HPW Challenge! Share boosts for 40 hours of podcasts in a week.
-        </p>
+      <section class="mb-section hpw" data-hpw>
+        <div class="mb-section-head">
+          <h2>#40HPW</h2>
+          <p class="mb-section-sub">
+            40HPW Challenge! Share boosts for 40 hours of podcasts in a week.
+          </p>
+        </div>
         <div class="hpw-boards" data-hpw-boards></div>
         <p class="hpw-rules-line">
           <button type="button" class="hpw-rules" data-hpw-rules aria-haspopup="dialog">Rules</button>
         </p>
-      </div>
+      </section>
 
       <!-- The rules, as a dialog rather than as a third paragraph. Ships closed
            and in the document, so it needs no fetch and reads with the boards
@@ -1315,10 +1336,10 @@
            with it would lose its open menu and its listeners mid-gesture. The
            controls element is built once and MOVED into each fresh section
            head, which preserves both. -->
-      <div class="members-wall" data-members-wall>
+      <section class="mb-section members-wall" data-members-wall>
         <div class="mw-controls" data-members-controls hidden></div>
         <div data-members-wall-body></div>
-      </div>
+      </section>
 
       <!-- ⚠️ THE BOTS SECTION IS THE WALL'S EXCLUSION, SHOWN. Four publisher
            keys are dropped from every ranked listing above; this names them
@@ -1326,7 +1347,31 @@
            totals. Filled by members-board.js from /api/v1/members?publishers=1,
            and empty until it lands — a section that cannot load must not leave
            an error where a disclosure was promised. -->
-      <div class="bots" data-members-bots></div>
+      <section class="mb-section bots" data-members-bots></section>
+
+      <!-- ⚠️ THE BOOST LIST'S OWN HEADING AND ITS CONTROLS, and both are here
+           because the list is here. The scope menu and the range/sort sat in
+           the sticky bar at the top of the page, which is right on every other
+           tab and wrong on this one: the Members tab puts three sections above
+           the boost list, so the controls were a screen and a half from the
+           thing they act on and the list itself had no name at all. Reed's
+           call, 2026-08-23.
+
+           ⚠️ THE BAR IS MOVED, NOT DUPLICATED. `.feed-bar` is one element; the
+           controller relocates it into this slot on the Members tab and back
+           into `.feed-bar-wrap` on every other. A second bar would be a second
+           set of controls over one feed, which is the class of bug the
+           declarative body[data-active-feed] rule exists to avoid. See
+           `placeFeedBar` in the controller. -->
+      <section class="mb-section members-boosts">
+        <div class="mb-section-head">
+          <h2>Boosts</h2>
+          <p class="mb-section-sub">
+            Every boost note as it was published, newest first.
+          </p>
+        </div>
+        <div data-feed-bar-slot></div>
+      </section>
     </div>
 
 
@@ -1697,7 +1742,31 @@
     subs.forEach(function (el) {
       el.setAttribute('aria-selected', el.dataset.value === type ? 'true' : 'false');
     });
+    placeFeedBar(tab);
     return tab;
+  }
+
+  /* ⚠️ THE FEED BAR IS MOVED, NEVER DUPLICATED, AND THE MOVE IS WHY THIS IS
+     SAFE. `.feed-bar` holds the scope menu and every feed's mounted range/sort
+     group; `appendChild` relocates the live element with its listeners, its
+     open-menu state and all eight `[data-controls-for]` groups intact, so the
+     declarative body[data-active-feed] rule that decides which group is on
+     screen is untouched. A second bar rendered into the Members tab would be a
+     second set of controls over one feed, which is exactly the failure that
+     rule exists to prevent.
+
+     WHY ONLY THIS TAB. Every other tab puts its feed directly under the bar, so
+     sticky-at-the-top is right. Members puts three sections above the boost
+     list, which left the scope menu and the range/sort a screen and a half from
+     the list they act on. Reed's call, 2026-08-23.
+
+     The bar stops being sticky for free: `.feed-bar-wrap` is what carries
+     `position: sticky`, and the slot is an ordinary section. */
+  var barHome = bar.parentNode;
+  function placeFeedBar(tab) {
+    var slot = document.querySelector('[data-feed-bar-slot]');
+    var want = (tab === 'members' && slot) ? slot : barHome;
+    if (bar.parentNode !== want) want.appendChild(bar);
   }
 
   function setFeed(nextType, nextScope, opts) {
@@ -1894,17 +1963,17 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v127"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v128"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v127" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v128" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v127" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v128" defer></script>
 
 <!-- Feed hydration — lazily loads the active feed on first view. -->
-<script type="module" src="/assets/js/feeds.js?v=ob-v127"></script>
-<script src="/assets/js/nav.js?v=ob-v127" defer></script>
+<script type="module" src="/assets/js/feeds.js?v=ob-v128"></script>
+<script src="/assets/js/nav.js?v=ob-v128" defer></script>
 
 </body>
 </html>

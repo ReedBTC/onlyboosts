@@ -2539,6 +2539,57 @@ a card showing the week's would contradict the card it opened from.
 Three sections above the boost firehose, all client-rendered by
 `assets/js/members-board.js` and hydrated on the tab's first activation.
 
+**⚠️ THE TAB IS FOUR SECTIONS AND THEY SHARE ONE IDIOM.** #40HPW, Members,
+Boost Bots, Boosts. *Reed's call, 2026-08-23:* they read as four loose blocks
+stacked in a column where `/show` and `/episode` read as a page made of definite
+parts. `.mb-section` restates what those pages get their definition from — a
+2.75rem top margin, a Playfair `h2` at the same `clamp(1.2rem, 3vw, 1.6rem)`,
+and a `.mb-section-sub` at the same muted 0.88rem.
+
+**⚠️ THE HAIRLINE ABOVE EACH HEADING IS THE ONE ADDITION**, and it is there
+because the wall is deliberately chrome-less avatars: the detail pages separate
+sections by space alone, which works when each is a bordered drawer or a shell,
+and left the wall floating between two boxes here. `:first-of-type` carries no
+rule, since a line above the first section fences it off from the intro that
+introduces it.
+
+**⚠️ NO SECTION STYLES ITS OWN HEADING ANY MORE.** `.hpw-heading`, `.hpw-sub`,
+`.bots-title` and `.bots-sub` are gone, and `members-board.js` emits the shared
+`.mb-section-head` markup. `.bots-title` set its type with a `font:` shorthand
+at (0,1,0) against `.mb-section > h2` at (0,1,1) — the exact specificity trap
+`.show-stat dd` documents in `show-page.css`, and it would have won on
+line-height while losing on family.
+
+**⚠️ THE FEED BAR IS MOVED INTO THIS TAB, AND MOVED BACK.** `placeFeedBar` in
+the controller relocates `.feed-bar` — the scope menu plus every feed's mounted
+range/sort group — into `[data-feed-bar-slot]` inside the Boosts section, and
+returns it to `.feed-bar-wrap` on every other tab. *Reed's call, 2026-08-23:*
+every other tab puts its feed directly under the bar, so sticky-at-the-top is
+right; Members puts three sections above the boost list, which left the controls
+a screen and a half from the list they act on, and the list itself unnamed.
+
+- **It is a MOVE, never a duplicate.** `appendChild` relocates the live element
+  with its listeners, its open-menu state and all eight `[data-controls-for]`
+  groups intact, so the declarative `body[data-active-feed]` rule that decides
+  which group is on screen is untouched. A second bar would be two sets of
+  controls over one feed, which is the failure that rule exists to prevent.
+- **⚠️ THE MOVE BACK IS THE HALF THAT BREAKS.** `.members-block` is
+  `display:none` off this tab, so a bar left in the slot vanishes from every
+  other feed: no scope menu, no range, no sort, and nothing saying why.
+- It stops being sticky for free — `.feed-bar-wrap` carries the `position`, and
+  the slot is an ordinary section.
+- `test-feed-hash.mjs` pins both directions, and **its window stub now keeps its
+  listeners** so `hashchange` can be fired. It was `{ addEventListener(){} }`,
+  which silently dropped that handler and made every test in the file a
+  cold-load test; anything that happens when a reader moves between tabs was
+  untestable before this.
+
+**⚠️ THE WALL CARRIES NO SUB-LINE.** *Reed's call, 2026-08-23.* It read
+"Everyone who has boosted a show, all time. Top 100." — a definition the intro
+at the top of the tab has already given, a window the range control beside it
+already names, and a cap nobody asked about. `.show-section-sub:empty` is what
+keeps the `<p>` `renderSupporters` always emits from costing a blank line.
+
 **⚠️ THE BLOCK SITS ABOVE THE PANELS, NOT INSIDE ONE.** Members holds two boosts
 PANELS — Global and Follows — so a section inside one would either be duplicated
 or vanish when the reader switches scope. Shown by CSS off

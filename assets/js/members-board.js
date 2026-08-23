@@ -14,23 +14,23 @@
  * A repeated name is authentic to it rather than a bug to collapse — Piez holds
  * five of the top ten and that is the actual story of the board.
  */
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v127'
-import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v127'
-import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v127'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v128'
+import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v128'
+import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v128'
 /* ⚠️ THE SAME WALL /show AND /episode RENDER, not a copy of it. It moved out of
  * functions/_shared/detail-page.js into a two-sided module for exactly this;
  * that file re-exports every name, so both Functions were untouched. A reader
  * who screenshots the wall here and on a show page must not be able to tell
  * them apart. */
-import { renderSupporters, initShowMore, compact } from '/assets/js/supporter-wall.js?v=ob-v127'
+import { renderSupporters, initShowMore, compact } from '/assets/js/supporter-wall.js?v=ob-v128'
 /* ⚠️ EXACT BOOST COUNTS HERE, COMPACT SATS. On the wall a row is one of a
  * hundred and `1k` is plenty; here there are four rows and the count is the
  * disclosure itself — "1,021 boosts from dozens of listeners" is the claim the
  * section exists to make, and `1k` rounds the evidence away. */
-import { num } from '/assets/js/boost-list.js?v=ob-v127'
-import { rangeControl, sortControl } from '/assets/js/feed-controls.js?v=ob-v127'
-import { mountFeedSearch } from '/assets/js/feed-search.js?v=ob-v127'
-import { searchMembers, SEARCH_HITS } from '/assets/js/ob-live.js?v=ob-v127'
+import { num } from '/assets/js/boost-list.js?v=ob-v128'
+import { rangeControl, sortControl } from '/assets/js/feed-controls.js?v=ob-v128'
+import { mountFeedSearch } from '/assets/js/feed-search.js?v=ob-v128'
+import { searchMembers, SEARCH_HITS } from '/assets/js/ob-live.js?v=ob-v128'
 
 const esc = htmlEscape
 const HOURS_API = '/api/v1/members/hours'
@@ -73,12 +73,6 @@ const WALL_RANGES = [
   ['1y', '1Y'],
   ['all', 'All'],
 ]
-const RANGE_SUB = {
-  '1w': 'Everyone who boosted a show in the last 7 days.',
-  '1m': 'Everyone who boosted a show in the last 30 days.',
-  '1y': 'Everyone who boosted a show in the last year.',
-  all: 'Everyone who has boosted a show, all time.',
-}
 let wallRange = 'all'
 
 /* en-US in UTC, matching every other date on the site. A board row names the
@@ -288,16 +282,20 @@ async function paintBots(root) {
   try {
     const members = await bots()
     if (!members.length) return
+    /* ⚠️ THE SAME HEAD MARKUP THE OTHER THREE SECTIONS SHIP. Reed's call,
+       2026-08-23: the four blocks on this tab read as four loose things
+       stacked in a column, so they now share one head structure and one set of
+       rules rather than each styling its own heading. */
     root.innerHTML =
-      `<h2 class="bots-title">Boost Bots</h2>` +
+      `<div class="mb-section-head"><h2>Boost Bots</h2>` +
       /* ⚠️ TWO SENTENCES, AND THE LINK CARRIES THE REST. Reed's call,
          2026-08-23: the first version ran four and turned a short section into
          a paragraph with a list under it. What has to be said here is what
          these accounts are and that they are deliberately not ranked; why the
          rule exists, and what it costs, is /about#bots. */
-      `<p class="bots-sub">These accounts publish boost notes for listeners whose apps do not. ` +
+      `<p class="mb-section-sub">These accounts publish boost notes for listeners whose apps do not. ` +
       `Their boosts count everywhere on this site, but they are left off the rankings above. ` +
-      `<a class="bots-more" href="/about#bots" target="_blank" rel="noopener">How this works</a></p>` +
+      `<a class="bots-more" href="/about#bots" target="_blank" rel="noopener">How this works</a></p></div>` +
       `<ul class="bots-list">${members.map(botRowHtml).join('')}</ul>`
   } catch (err) {
     console.warn('[members] bots failed', err)
@@ -422,9 +420,14 @@ async function paintWall(wallRoot) {
           id: 'members-wall',
           sectionClass: 'members-wall-section',
           metric: wallView,
-          /* The sub-line names the WINDOW, not a fixed "all time" — a caption
-             contradicting the control above it is worse than none. */
-          sub: `${RANGE_SUB[wallRange] || RANGE_SUB.all} Top ${WALL_CAP}.`,
+          /* ⚠️ NO SUB-LINE. Reed's call, 2026-08-23. It said "Everyone who has
+             boosted a show, all time. Top 100." — a definition the reader has
+             already been given by the intro at the top of the tab, a window the
+             range control beside it already names, and a cap nobody asked
+             about. Three restatements in one line. `.show-section-sub:empty`
+             is what keeps the empty <p> renderSupporters always emits from
+             costing a blank line. */
+          sub: '',
           empty: '',
         })
       : `<p class="hpw-empty">Nobody boosted a show in this range.</p>`

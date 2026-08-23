@@ -7,8 +7,8 @@
  *
  * Vendored nostr-tools — same bundle the rest of the site uses.
  */
-import { SimplePool, verifyEvent, nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v127'
-import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v127'
+import { SimplePool, verifyEvent, nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v128'
+import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v128'
 
 export const KIND_DATE_EVENT = 31922
 export const KIND_TIME_EVENT = 31923
@@ -496,7 +496,7 @@ async function runEventAction(action, parsed, btn) {
   try {
     if (btn) btn.disabled = true
     await ensureLoginWidget()
-    const actions = await import('/assets/js/boost-actions.js?v=ob-v127')
+    const actions = await import('/assets/js/boost-actions.js?v=ob-v128')
     if (action === 'zap') actions.openZapModal(parsed)
     else await actions.repostAnyEvent(parsed, btn)
   } catch (e) {

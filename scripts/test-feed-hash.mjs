@@ -67,12 +67,21 @@ class El {
   querySelectorAll() { return [] }
   addEventListener() {} ; removeEventListener() {}
   contains() { return false }
+  /* Enough of a tree for placeFeedBar: it reads `parentNode` and calls
+     `appendChild`, which is the whole of how the feed bar relocates. */
+  appendChild(child) { child.parentNode = this; return child }
 }
 
 /** Boot the real controller at `hash` and report what it did. */
 function boot(hash, { signedIn = false } = {}) {
   const body = new El('body')
   const bar = new El('div')
+  /* ⚠️ THE BAR STARTS IN ITS STICKY WRAPPER, which is what makes "moved back"
+     a real assertion rather than "never moved". `barHome` is captured from
+     `bar.parentNode` at boot, so the stub has to give it one. */
+  const barWrap = new El('div')
+  barWrap.appendChild(bar)
+  const barSlot = new El('div')
   const mk = (attrs) => { const e = new El('button'); Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, v)); return e }
   const tabEls = ['podcasts', 'music', 'members'].map((t) => mk({ 'data-tab': t }))
   /* `data-value` only: `data-tab` moved to the wrapping .feed-sub-group when
@@ -84,7 +93,11 @@ function boot(hash, { signedIn = false } = {}) {
   const events = []
   const doc = {
     body,
-    querySelector: (s) => (s === '.feed-bar' ? bar : null),
+    querySelector: (s) => {
+      if (s === '.feed-bar') return bar
+      if (s === '[data-feed-bar-slot]') return barSlot
+      return null
+    },
     /* The tabs and the sub-row live OUTSIDE .feed-bar, so the controller queries
        them off the document. Returning real elements here is what makes the
        aria-selected assertions below test the shipped syncTabs() rather than a
@@ -107,8 +120,17 @@ function boot(hash, { signedIn = false } = {}) {
   }
   const storage = { getItem: () => (signedIn ? JSON.stringify({ pubkey: 'a'.repeat(64) }) : null) }
   class CE { constructor(type, init) { this.type = type; this.detail = init && init.detail } }
+  /* ⚠️ THE WINDOW KEEPS ITS LISTENERS NOW. It was `{ addEventListener(){} }`,
+     which silently dropped the controller's `hashchange` handler — so every
+     test here could only ever exercise a COLD load, and anything that happens
+     when a reader moves between tabs was untestable. The feed bar moving back
+     out of the Members tab is exactly that kind of thing, and it is the half
+     that breaks: `.members-block` is display:none off the tab, so a bar left
+     behind would vanish from every other feed. */
+  const winListeners = {}
+  const win = { addEventListener: (t, fn) => { (winListeners[t] ||= []).push(fn) }, removeEventListener: () => {} }
   new Function('document', 'window', 'location', 'history', 'localStorage', 'CustomEvent', 'console', SRC)(
-    doc, { addEventListener: () => {} }, location, history, storage, CE, console)
+    doc, win, location, history, storage, CE, console)
   const selected = (els) => els.filter((e) => e.getAttribute('aria-selected') === 'true')
   return {
     body,
@@ -116,6 +138,8 @@ function boot(hash, { signedIn = false } = {}) {
     events,
     tab: () => (selected(tabEls)[0] || {}).dataset?.tab ?? null,
     sub: () => (selected(subEls)[0] || {}).dataset?.value ?? null,
+    barParent: () => (bar.parentNode === barSlot ? 'slot' : bar.parentNode === barWrap ? 'wrap' : 'nowhere'),
+    fire: (type) => (winListeners[type] || []).forEach((f) => f({ type })),
     tabsSelected: () => selected(tabEls).length,
     subsSelected: () => selected(subEls).length,
   }
@@ -363,6 +387,37 @@ console.log('\nBoth hydration entry points are wired:')
     eq(`${what}: hydrated from the event`, inListener.includes(call), true)
     eq(`${what}: AND on the cold load`, afterListener.includes(call), true)
   }
+}
+
+console.log('\n⚠️ The feed bar is MOVED into the Members tab, and moved back:')
+{
+  /* The Members tab puts three sections above the boost list, so the scope menu
+     and the range/sort belong with the list rather than a screen and a half
+     above it. Moving one live element is what keeps the eight mounted
+     [data-controls-for] groups and their listeners intact; a second bar
+     rendered into the tab would be two sets of controls over one feed, which is
+     the failure the declarative body[data-active-feed] rule exists to prevent. */
+  eq('a cold load on #boosts-global puts the bar in the slot', boot('#boosts-global').barParent(), 'slot')
+  eq('#episodes-global leaves it in the sticky wrap', boot('#episodes-global').barParent(), 'wrap')
+  eq('#shows too', boot('#shows').barParent(), 'wrap')
+  eq('#albums too', boot('#albums').barParent(), 'wrap')
+  eq('a signed-in #boosts-follows also lands in the slot',
+     boot('#boosts-follows', { signedIn: true }).barParent(), 'slot')
+  {
+    /* ⚠️ THE MOVE BACK IS THE HALF THAT BREAKS. `.members-block` is
+       display:none off the Members tab, so a bar left in the slot disappears
+       from every other feed entirely — no scope menu, no range, no sort, and
+       nothing on screen saying why. */
+    const b = boot('#boosts-global')
+    eq('  (starts in the slot)', b.barParent(), 'slot')
+    b.location.hash = '#shows'
+    b.fire('hashchange')
+    eq('⚠️ switching away from Members moves it back to the wrap', b.barParent(), 'wrap')
+    b.location.hash = '#boosts-global'
+    b.fire('hashchange')
+    eq('and switching back returns it to the slot', b.barParent(), 'slot')
+  }
+  eq('the bar is never left parentless', boot('#episodes-global').barParent() !== 'nowhere', true)
 }
 
 console.log(`\n${pass} assertions passed${fail ? `, ${fail} FAILED` : ''}.`)
