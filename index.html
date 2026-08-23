@@ -50,18 +50,18 @@
 
   <!-- Shared note / card styles (.note-card, .embed-note) — the boosts
        feeds render through the same kind-1 card as boosts-thread.js. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v128" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v129" />
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v128" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v129" />
   <!-- The episode card and its drawer, extracted from the inline block below
        when /episode/<guid> pages needed the same cards. See the file header. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v128" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v128" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v129" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v129" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. Must stay last
        among the stylesheets so the inline block below still wins. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v128" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v129" />
 
   <style>
     :root {
@@ -463,8 +463,10 @@
        This Week is first in the source and so is first on a phone — it is the
        board with a live race in it. */
     .hpw-boards { display: grid; gap: 1.1rem; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); }
+    /* Same radius and fill as `.mb-shell`; a board IS a shell, it just holds a
+       list rather than a lid. */
     .hpw-board {
-      background: var(--white);
+      background: var(--cream);
       border: 1px solid var(--border);
       border-radius: 12px;
       padding: 0.9rem 1rem 1rem;
@@ -537,8 +539,13 @@
 
        :first-child carries no rule — a line above the first section would
        fence it off from the intro that introduces it. */
-    .mb-section { margin: 0 0 2.75rem; padding-top: 2rem; border-top: 1px solid var(--border); }
-    .mb-section:first-of-type { padding-top: 0; border-top: 0; }
+    .mb-section { margin: 0 0 2.75rem; }
+    /* ⚠️ THE HAIRLINE ABOVE EACH HEADING CAME BACK OUT. It was a guess at what
+       makes the detail pages read as definite; Reed named the real answer on
+       2026-08-23 — the boost list on /booster and /episode lives in a SHELL,
+       and that is what those pages get their edges from. With every section's
+       content inside one, a rule above the heading as well is a second boundary
+       for one break. Spacing plus the shell, exactly as /show does it. */
     .mb-section > h2,
     .mb-section .show-section-head > h2 {
       font-family: 'Playfair Display', Georgia, serif;
@@ -546,7 +553,17 @@
       margin: 0; letter-spacing: 0.01em;
     }
     .mb-section .show-section-head,
+    [data-members-wall-head],
     .mb-section-head { margin-bottom: 1.1rem; }
+    /* The lifted heading arrives in either of renderSupporters' two shapes — a
+       `.show-section-head` wrapper on a populated wall, a bare <h2> on the
+       empty one — so the type is set on the host's h2 whichever landed. */
+    [data-members-wall-head] h2 {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: clamp(1.2rem, 3vw, 1.6rem); font-weight: 700; color: var(--ink);
+      margin: 0; letter-spacing: 0.01em;
+    }
+    [data-members-wall-head]:empty { display: none; }
     .mb-section .show-section-sub,
     .mb-section-sub {
       margin: 0.35rem 0 0; font-size: 0.88rem; color: var(--muted);
@@ -555,6 +572,65 @@
        unconditionally, and the wall now passes no sub — without this the wall's
        heading carries a blank line under it. */
     .mb-section .show-section-sub:empty { display: none; }
+
+    /* ══ THE SHELL ══
+       ⚠️ `.bs-shell` AND `.bs-controls` FROM show-page.css, RESTATED RATHER
+       THAN IMPORTED. Reed's call, 2026-08-23: "the boosts live in their own
+       little shell… can you do that for the members page?" This page does not
+       link show-page.css — 30KB of detail-page chrome for four rules — so the
+       values are copied and this comment is the pointer. **They must stay in
+       step**; a shell here that is 10px where /booster is 12px reads as a
+       different component to anyone who visits both.
+
+       The band is a LID: it carries the shell's fill one step darker and a
+       bottom border, and no top border of its own, because the shell's own
+       border is already the line above it. */
+    .mb-shell {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--cream);
+      overflow: hidden;
+    }
+    .mb-lid {
+      display: flex; align-items: center; justify-content: flex-end;
+      flex-wrap: wrap; gap: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--cream-d);
+    }
+    .mb-lid[hidden] { display: none; }
+    /* The body's own padding, since `.bs-shell` puts none on the shell itself
+       and lets each list bring its own. */
+    .mb-body { padding: 1.1rem 1rem; }
+
+    /* ⚠️ THE TWO HALVES OF THE BOOSTS SHELL. The lid closes its own bottom and
+       the panel below opens its own top, so the pair draws one box across two
+       elements. Both are scoped to the Members tab: everywhere else the bar is
+       back in its sticky wrapper and the panel is an ordinary panel. */
+    .mb-shell--lid-only { border-bottom: 0; border-radius: 12px 12px 0 0; }
+    /* ⚠️ NO `max-width` AND NO `margin` HERE, DELIBERATELY. Both would be
+       no-ops — the shell is already inside `.feed-panels-inner`, which reads
+       the track, so the bar cannot exceed it and has nothing to centre within.
+       And `test-feed-hash.mjs` asserts that four elements read
+       `var(--feed-track)` by scanning declarations for `.feed-bar`, so a scoped
+       `max-width: none` reads to it as the track declaration going away. It
+       failed exactly that way once. Restyle the fill and the padding here;
+       leave the box model to the base rule. */
+    body[data-active-tab="members"] .mb-shell--lid-only > .feed-bar {
+      background: var(--cream-d);
+      border-bottom: 1px solid var(--border);
+      padding: 0.5rem 0.75rem;
+    }
+    /* The panel finishes the box. `margin-top: 0` is load-bearing: any gap here
+       is a visible break in a border that is meant to be continuous. */
+    body[data-active-tab="members"] .feed-panel.is-active {
+      margin-top: 0;
+      border: 1px solid var(--border);
+      border-top: 0;
+      border-radius: 0 0 12px 12px;
+      background: var(--cream);
+      padding: 1.1rem 1rem;
+    }
 
     .members-wall-section { margin: 0; }
     .members-wall-section .show-more {
@@ -579,14 +655,19 @@
     .bots:empty { display: none; }
     .bots-more { color: var(--brand-dd); text-decoration: underline; text-decoration-color: var(--brand-tint, var(--brand)); white-space: nowrap; }
     .bots-more:hover { color: var(--brand-ddd); text-decoration-color: currentColor; }
+    /* ⚠️ THE LIST IS THE SHELL. Same border, same 12px, same `--cream` as
+       `.mb-shell` above and as `.bs-shell` on the detail pages — it was 10px
+       on `--surface`, which is close enough to read as a near-miss rather than
+       as the same component. It carries no lid, having no controls. */
     .bots-list {
       list-style: none; margin: 0; padding: 0;
-      border: 1px solid var(--border); border-radius: 10px;
-      background: var(--surface); overflow: hidden;
+      border: 1px solid var(--border); border-radius: 12px;
+      background: var(--cream); overflow: hidden;
     }
     .bots-row {
       display: flex; align-items: center; gap: 0.75rem;
       padding: 0.7rem 0.9rem; border-top: 1px solid var(--border);
+      background: var(--surface);
     }
     .bots-row:first-child { border-top: 0; }
     .bots-link { display: flex; flex: none; }
@@ -618,12 +699,14 @@
     }
 
     /* The rules link, and the dialog behind it. */
-    .hpw-rules-line { margin: 0.85rem 0 0; }
+    /* Inline in the sub-line's sentence, so it takes the surrounding type and
+       sits on its baseline; it is a button because it opens a dialog, and
+       everything here is what stops it looking like one. */
     .hpw-rules {
-      font: inherit; font-size: 0.8rem; font-weight: 700;
-      color: var(--brand-dd); background: none; border: 0; padding: 0;
-      cursor: pointer; text-decoration: underline;
-      text-underline-offset: 3px; text-decoration-color: rgba(10,111,168,0.4);
+      font: inherit; color: var(--brand-dd); background: none;
+      border: 0; padding: 0; margin-left: 0.15rem; cursor: pointer;
+      text-decoration: underline; text-decoration-color: var(--brand-tint, var(--brand));
+      text-underline-offset: 2px;
     }
     .hpw-rules:hover { color: var(--brand-ddd); text-decoration-color: currentColor; }
     .hpw-rules:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; border-radius: 4px; }
@@ -1022,8 +1105,8 @@
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
     }
   </style>
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v128" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v128" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v129" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v129" />
 </head>
 <body data-active-feed="episodes-global">
 
@@ -1270,14 +1353,16 @@
       <section class="mb-section hpw" data-hpw>
         <div class="mb-section-head">
           <h2>#40HPW</h2>
+          <!-- ⚠️ RULES SITS IN THE SUB-LINE, NOT UNDER THE BOARDS. Reed's call,
+               2026-08-23. Below them it was a footnote to two tall boxes and
+               read as belonging to the second one; on the line that states the
+               challenge it is where the question it answers is asked. -->
           <p class="mb-section-sub">
             40HPW Challenge! Share boosts for 40 hours of podcasts in a week.
+            <button type="button" class="hpw-rules" data-hpw-rules aria-haspopup="dialog">Rules</button>
           </p>
         </div>
         <div class="hpw-boards" data-hpw-boards></div>
-        <p class="hpw-rules-line">
-          <button type="button" class="hpw-rules" data-hpw-rules aria-haspopup="dialog">Rules</button>
-        </p>
       </section>
 
       <!-- The rules, as a dialog rather than as a third paragraph. Ships closed
@@ -1336,9 +1421,26 @@
            with it would lose its open menu and its listeners mid-gesture. The
            controls element is built once and MOVED into each fresh section
            head, which preserves both. -->
+      <!-- ⚠️ THE HEADING IS OUTSIDE THE SHELL AND THE CONTROLS ARE ITS LID,
+           which is exactly how /booster#boosts is built: an <h2> over a
+           bordered box whose first row is the band. That is also why the
+           controls stopped going into `.show-section-head` — a lid is part of
+           the box, not part of the heading above it. -->
+      <!-- ⚠️ THE HEADING IS OUTSIDE THE SHELL AND THE CONTROLS ARE ITS LID,
+           which is how /booster#boosts is built: an <h2> over a bordered box
+           whose first row is the band.
+
+           ⚠️ THE HEADING IS STILL renderSupporters'. It is a parameter — this
+           tab says "Members" where the detail pages say "Nostr Community" —
+           so it is rendered inside that section and then MOVED up here, rather
+           than written twice in two places that could disagree. Same move the
+           controls make, and safe for the same reason. -->
       <section class="mb-section members-wall" data-members-wall>
-        <div class="mw-controls" data-members-controls hidden></div>
-        <div data-members-wall-body></div>
+        <div data-members-wall-head></div>
+        <div class="mb-shell">
+          <div class="mw-controls mb-lid" data-members-controls hidden></div>
+          <div class="mb-body" data-members-wall-body></div>
+        </div>
       </section>
 
       <!-- ⚠️ THE BOTS SECTION IS THE WALL'S EXCLUSION, SHOWN. Four publisher
@@ -1370,7 +1472,15 @@
             Every boost note as it was published, newest first.
           </p>
         </div>
-        <div data-feed-bar-slot></div>
+        <!-- ⚠️ THE SHELL IS TWO ELEMENTS HERE AND THE SEAM IS THE WHOLE
+             RISK. The bar is the lid and the cards are the body, but the cards
+             live in `.feed-panel`s outside this section — the panel system is
+             shared with seven other feeds and moving them into here would fork
+             it. So the lid closes its own bottom and the panel opens its own
+             top, with no margin between them, and `body[data-active-tab]`
+             scopes both. Any vertical margin added to either half opens a gap
+             the border makes visible. -->
+        <div class="mb-shell mb-shell--lid-only" data-feed-bar-slot></div>
       </section>
     </div>
 
@@ -1963,17 +2073,17 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v128"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v129"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v128" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v129" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v128" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v129" defer></script>
 
 <!-- Feed hydration — lazily loads the active feed on first view. -->
-<script type="module" src="/assets/js/feeds.js?v=ob-v128"></script>
-<script src="/assets/js/nav.js?v=ob-v128" defer></script>
+<script type="module" src="/assets/js/feeds.js?v=ob-v129"></script>
+<script src="/assets/js/nav.js?v=ob-v129" defer></script>
 
 </body>
 </html>

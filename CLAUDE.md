@@ -2546,12 +2546,69 @@ parts. `.mb-section` restates what those pages get their definition from — a
 2.75rem top margin, a Playfair `h2` at the same `clamp(1.2rem, 3vw, 1.6rem)`,
 and a `.mb-section-sub` at the same muted 0.88rem.
 
-**⚠️ THE HAIRLINE ABOVE EACH HEADING IS THE ONE ADDITION**, and it is there
-because the wall is deliberately chrome-less avatars: the detail pages separate
-sections by space alone, which works when each is a bordered drawer or a shell,
-and left the wall floating between two boxes here. `:first-of-type` carries no
-rule, since a line above the first section fences it off from the intro that
-introduces it.
+**⚠️ AND EACH SECTION'S CONTENT LIVES IN A SHELL**, which is where those pages
+actually get their edges from. *Reed's call, 2026-08-23: "the boosts live in
+their own little shell… can you do that for the members page?"* A hairline above
+each heading shipped first as a guess at the same effect and **came back out** —
+with the content boxed, a rule above the heading is a second boundary for one
+break.
+
+**⚠️ `.mb-shell` AND `.mb-lid` RESTATE `.bs-shell` AND `.bs-controls`, THEY DO
+NOT IMPORT THEM.** This page does not link `show-page.css` (30KB of detail-page
+chrome for four rules), so the values are copied: 1px `--border`, **12px**
+radius, `--cream` fill, and a lid one step darker on `--cream-d` with a bottom
+border and no top one. **They must stay in step** — a shell here at 10px where
+`/booster` is 12px reads as a different component to anyone who visits both.
+`.bots-list` and `.hpw-board` were exactly that near-miss and were corrected.
+
+| Section | Shell |
+|---|---|
+| #40HPW | each board is one, no lid (no controls) |
+| Members | heading outside, range + sort as the lid |
+| Boost Bots | the `<ul>` is the shell, no lid |
+| Boosts | **two elements** — see below |
+
+**⚠️ THE BOOSTS SHELL IS TWO ELEMENTS AND THE SEAM IS THE WHOLE RISK.** The bar
+is the lid and the cards are the body, but the cards live in `.feed-panel`s
+outside the section — that panel system serves seven other feeds and moving them
+in would fork it. So the lid closes its own bottom (`.mb-shell--lid-only`) and
+the active panel opens its own top, both scoped to
+`body[data-active-tab="members"]`. **Any vertical margin on either half opens a
+gap the border makes visible.**
+
+**⚠️ NO `max-width` OR `margin` IN THE SCOPED `.feed-bar` RULE.** Both are
+no-ops (the shell already sits inside `.feed-panels-inner`, which reads the
+track), and `test-feed-hash.mjs` scans declarations for `.feed-bar` to assert
+four elements read `var(--feed-track)` — so a scoped `max-width: none` reads to
+it as the track declaration going away. It failed exactly that way once.
+Restyle the fill and the padding there; leave the box model to the base rule.
+
+**⚠️ THE WALL'S HEADING IS renderSupporters' AND IS MOVED, NOT REWRITTEN.** The
+word is a parameter — "Members" here, "Nostr Community" on the detail pages — so
+it is rendered inside that section and lifted into
+`[data-members-wall-head]` above the shell, the same `appendChild` move the
+controls make. Writing it a second time in `index.html` would be two copies that
+could disagree.
+
+**⚠️ AND IT HAS TWO SHAPES.** A populated wall wraps the heading in
+`.show-section-head`; the empty branch emits a **bare `<h2>`**. Selecting only
+the first left an empty range untitled.
+
+**⚠️ THE EMPTY RANGE GOES THROUGH `renderSupporters` TOO, and that is not
+tidiness.** A hand-written "nothing here" paragraph replaced the whole body,
+taking the shell and its lid with it — so a reader who narrowed to 1W and found
+nobody **lost the range control that would have widened it again**. The dead end
+was the bug, not the empty list.
+
+**⚠️ `shows` IS THE WALL'S DEFAULT ORDERING, NOT `sats`.** *Reed's call,
+2026-08-23.* Sats ranks by generosity, which one large boost can win; breadth is
+what rewards listening across the network, which is what a wall of *members* is
+a claim about. The other two are one press away.
+
+**Rules sits in the #40HPW sub-line**, not under the boards. *Reed's call,
+2026-08-23.* Below them it was a footnote to two tall boxes and read as
+belonging to the second one; on the line stating the challenge it is where the
+question it answers gets asked.
 
 **⚠️ NO SECTION STYLES ITS OWN HEADING ANY MORE.** `.hpw-heading`, `.hpw-sub`,
 `.bots-title` and `.bots-sub` are gone, and `members-board.js` emits the shared

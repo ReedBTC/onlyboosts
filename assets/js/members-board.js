@@ -14,23 +14,23 @@
  * A repeated name is authentic to it rather than a bug to collapse — Piez holds
  * five of the top ten and that is the actual story of the board.
  */
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v128'
-import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v128'
-import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v128'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v129'
+import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v129'
+import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v129'
 /* ⚠️ THE SAME WALL /show AND /episode RENDER, not a copy of it. It moved out of
  * functions/_shared/detail-page.js into a two-sided module for exactly this;
  * that file re-exports every name, so both Functions were untouched. A reader
  * who screenshots the wall here and on a show page must not be able to tell
  * them apart. */
-import { renderSupporters, initShowMore, compact } from '/assets/js/supporter-wall.js?v=ob-v128'
+import { renderSupporters, initShowMore, compact } from '/assets/js/supporter-wall.js?v=ob-v129'
 /* ⚠️ EXACT BOOST COUNTS HERE, COMPACT SATS. On the wall a row is one of a
  * hundred and `1k` is plenty; here there are four rows and the count is the
  * disclosure itself — "1,021 boosts from dozens of listeners" is the claim the
  * section exists to make, and `1k` rounds the evidence away. */
-import { num } from '/assets/js/boost-list.js?v=ob-v128'
-import { rangeControl, sortControl } from '/assets/js/feed-controls.js?v=ob-v128'
-import { mountFeedSearch } from '/assets/js/feed-search.js?v=ob-v128'
-import { searchMembers, SEARCH_HITS } from '/assets/js/ob-live.js?v=ob-v128'
+import { num } from '/assets/js/boost-list.js?v=ob-v129'
+import { rangeControl, sortControl } from '/assets/js/feed-controls.js?v=ob-v129'
+import { mountFeedSearch } from '/assets/js/feed-search.js?v=ob-v129'
+import { searchMembers, SEARCH_HITS } from '/assets/js/ob-live.js?v=ob-v129'
 
 const esc = htmlEscape
 const HOURS_API = '/api/v1/members/hours'
@@ -57,7 +57,11 @@ const WALL_VIEWS = [
   ['boosts', 'Most boosts'],
   ['shows', 'Most shows'],
 ]
-let wallView = 'sats'
+/* ⚠️ `shows` IS THE DEFAULT, NOT `sats`. Reed's call, 2026-08-23. Sats ranks by
+ * generosity, which one large boost can win; breadth is the ordering that
+ * rewards listening across the network, which is what a wall of MEMBERS is a
+ * claim about. The other two are one press away. */
+let wallView = 'shows'
 
 /* ⚠️ THE RANGE MEANS WHEN THE BOOST WAS SENT, which is the reading
  * /api/v1/podcasts and every `#boosts` section give it, and NOT the air-date
@@ -187,7 +191,6 @@ function mountWallControls(host, onChange) {
       title: 'Rank members by',
     }),
   )
-  host.hidden = false
   host.replaceChildren(wallControls)
   return wallControls
 }
@@ -406,12 +409,18 @@ let wallSeq = 0
 async function paintWall(wallRoot) {
   const body = wallRoot.querySelector('[data-members-wall-body]') || wallRoot
   const controlsHost = wallRoot.querySelector('[data-members-controls]')
+  const headHost = wallRoot.querySelector('[data-members-wall-head]')
   const mine = ++wallSeq
   try {
     const rows = wallRows(await wall(wallView, wallRange))
     if (mine !== wallSeq) return
-    body.innerHTML = rows.length
-      ? renderSupporters(rows, {
+    /* ⚠️ THE EMPTY CASE GOES THROUGH renderSupporters TOO, and that is not
+       tidiness. A hand-written "nothing here" paragraph has no heading in it,
+       so moving the head out left an untitled section; and it replaced the
+       whole body, taking the shell and its lid with it — so a reader who
+       narrowed to 1W and found nobody lost the range control that would have
+       widened it again. The dead end was the bug, not the empty list. */
+    body.innerHTML = renderSupporters(rows, {
           // ⚠️ "Members" HERE AND "Nostr Community" ON THE DETAIL PAGES.
           // One component, two words, deliberately: the protocol is not the
           // greeting, and a reader who has drilled into a show has chosen to
@@ -428,14 +437,20 @@ async function paintWall(wallRoot) {
              is what keeps the empty <p> renderSupporters always emits from
              costing a blank line. */
           sub: '',
-          empty: '',
+          empty: 'Nobody boosted a show in this range.',
         })
-      : `<p class="hpw-empty">Nobody boosted a show in this range.</p>`
-    /* Moved into the fresh section head rather than rebuilt. The heading and
-       the controls share a line, the way a feed's do. */
-    const head = body.querySelector('.show-section-head')
-    if (controlsHost && head) head.appendChild(controlsHost)
-    else if (controlsHost) body.prepend(controlsHost)
+    /* ⚠️ THE HEADING IS LIFTED OUT OF THE SHELL. renderSupporters owns the word
+       ("Members" here, "Nostr Community" on the detail pages) so it is rendered
+       inside its section and moved, never written a second time up here where
+       the two copies could disagree. The controls stay where the markup put
+       them, as the shell's lid — a lid belongs to the box, not to the heading
+       above it. */
+    /* ⚠️ TWO SHAPES, BECAUSE renderSupporters HAS TWO. A populated wall wraps
+       its heading in `.show-section-head`; the empty branch emits a bare <h2>.
+       Selecting only the first left the empty view untitled. */
+    const head = body.querySelector('.show-section-head') || body.querySelector('h2')
+    if (headHost && head) headHost.replaceChildren(head)
+    if (controlsHost) controlsHost.hidden = false
     // The wall ships its overflow hidden behind a "Show N more" button; the
     // handler is delegated, so one call covers every repaint.
     initShowMore()
