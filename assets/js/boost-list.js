@@ -30,16 +30,16 @@
  */
 import {
   htmlEscape, isSafeUrl, truncate, renderMessage,
-} from './nostr-text.js?v=ob-v130';
-import { episodePageHref, showPageHref } from './show-link.js?v=ob-v130';
+} from './nostr-text.js?v=ob-v131';
+import { episodePageHref, showPageHref } from './show-link.js?v=ob-v131';
 /* ⚠️ THE REAL MODULE, NOT A FOURTH COPY OF THE RULE. booster-link.js has been
  * dependency-free since it was written, so esbuild inlines it here exactly as it
  * does nostr-text.js, and the boost rows link a booster by the same test every
  * feed surface uses rather than by a transcription of it. This is the collapse
  * that functions/_shared/detail-page.js#boosterPageUrl said was available; that
  * name is now an alias for this function rather than a second copy of it. */
-import { boosterPageHref } from './booster-link.js?v=ob-v130';
-import { httpsUrl } from './cover-art.js?v=ob-v130';
+import { boosterPageHref } from './booster-link.js?v=ob-v131';
+import { httpsUrl } from './cover-art.js?v=ob-v131';
 
 // ── The formatters the row needs ─────────────────────────────────────────────
 //
@@ -142,7 +142,7 @@ export function rowsFromRecords(records) {
 // ── Range and sort ───────────────────────────────────────────────────────────
 //
 // ⚠️ THE RANGE MEANS WHEN THE BOOST WAS SENT, on all three pages, matching
-// /#boosts-global and /api/v1/podcasts. It does NOT mean when the episode aired;
+// /#members and /api/v1/podcasts. It does NOT mean when the episode aired;
 // that axis belongs to the Episodes feeds and to /api/v1/episodes. Two readings
 // of that parameter name already exist on this site deliberately, and there must
 // not be a third.

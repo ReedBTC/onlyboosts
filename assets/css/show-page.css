@@ -682,7 +682,7 @@
    actually in force on these rows is boosts-thread.css's
    `.ob-boost-list { gap: 0.85rem }` — that file is linked after this one, so
    `.boost-list` alone loses the tie — and it is the SAME <ul> class the
-   /#boosts-global cards use. Tightening it there too would be a change to a feed
+   /#members cards use. Tightening it there too would be a change to a feed
    nobody asked about; this two-class selector outruns it on specificity and
    reaches only these three sections.
 

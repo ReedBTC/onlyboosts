@@ -48,12 +48,12 @@
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v130" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v130" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v131" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v131" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v130" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v130" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v131" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v131" />
 </head>
 <body>
 
@@ -102,7 +102,7 @@
               <h4>Feeds</h4>
               <a href="/#episodes-global"><span aria-hidden="true">🎙</span> Podcasts</a>
               <a href="/#albums"><span aria-hidden="true">🎵</span> Music</a>
-              <a href="/#boosts-global"><span aria-hidden="true">👥</span> Members</a>
+              <a href="/#members"><span aria-hidden="true">👥</span> Members</a>
             </div>
             <!-- Stats: the aggregate views over the same data. Both are
                  coming-soon pages for now (noindex, out of the sitemap). -->
@@ -222,7 +222,7 @@
         <h3>Why the Boost Is Credited to the Key</h3>
         <p>These notes frequently name the person who sent the boost, either in the message or in a sender field. That name is not treated as an identity here and cannot be, because nothing verifies that the person named authorised a note signed by a key they do not hold. The booster credited is therefore the key that signed the note, and the name travels as ordinary text. The same rule is applied to this site&rsquo;s own bot.</p>
         <p>The consequence is worth stating plainly, because it runs in both directions. Every one of these boosts is indexed: it counts toward the sats and boost totals, appears on the show and episode pages, and ranks in the feeds exactly as any other boost does. Nothing about it is second class. What these keys are excluded from is the two surfaces that rank <em>people</em>, being the member wall and the #40HPW boards. A single key carrying a thousand boosts from dozens of different listeners would lead both, on other people&rsquo;s listening, and that is a claim about who the top members are that the data cannot support. They remain findable by search, since a search result is not a ranking, and each has an ordinary booster page.</p>
-        <p>They are listed on the <a href="/#boosts-global">Members</a> tab with their totals rather than quietly removed. The role they fill is a real one: they are the only reason a listener who wants no Nostr account is represented on this site at all.</p>
+        <p>They are listed on the <a href="/#members">Members</a> tab with their totals rather than quietly removed. The role they fill is a real one: they are the only reason a listener who wants no Nostr account is represented on this site at all.</p>
       </section>
 
       <section id="stats">
@@ -533,7 +533,7 @@
       <ul>
         <li><a href="/#episodes-global">🎙 Podcasts</a></li>
         <li><a href="/#albums">🎵 Music</a></li>
-        <li><a href="/#boosts-global">👥 Members</a></li>
+        <li><a href="/#members">👥 Members</a></li>
       </ul>
     </div>
 
@@ -612,15 +612,15 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v130"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v131"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v130" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v131" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v130" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v131" defer></script>
 
-<script src="/assets/js/nav.js?v=ob-v130" defer></script>
+<script src="/assets/js/nav.js?v=ob-v131" defer></script>
 
 </body>
 </html>

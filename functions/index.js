@@ -147,7 +147,7 @@ async function openingPage(env) {
     // the drawer bodies were 82% of the document (995KB of 1.21MB, 744 rows
     // inside closed <details>), and the feed-bar controller at the foot of
     // <body> sat 1.16MB after the first card, so every #shows / #albums /
-    // #boosts-global load flashed the Episodes feed before the hash was read.
+    // #members load flashed the Episodes feed before the hash was read.
     // The variant rides the state element (`card`), so feeds-podcasts.js
     // paints every later page the same way. See `drawer` under CARD_PARTS.
     parts: HOME_CARD_PARTS,

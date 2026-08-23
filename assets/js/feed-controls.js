@@ -23,7 +23,7 @@
  * holds each module URL for up to four hours ON ITS OWN CLOCK. A reader
  * carrying a three-hour-old copy of this file who fetches a fresh renderer gets
  *
- *   SyntaxError: The requested module '/assets/js/feed-controls.js?v=ob-v130' does not
+ *   SyntaxError: The requested module '/assets/js/feed-controls.js?v=ob-v131' does not
  *   provide an export named 'X'
  *
  * and an unresolved named import is a LINK-TIME error: the renderer never
@@ -187,7 +187,7 @@ export function sortControl(options, initialKey, onPick, opts = {}) {
  * them. Replaces that feed's previous group if it had one (a Follows feed
  * re-renders on an account switch), and leaves every other feed's alone.
  *
- * @param {string}    feed      feed key, e.g. 'boosts-global'
+ * @param {string}    feed      feed key, e.g. 'members-global'
  * @param {Element[]} children  controls, in display order
  */
 export function mountFeedControls(feed, children) {

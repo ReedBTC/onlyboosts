@@ -77,7 +77,7 @@ check('the placeholder between them is replaced, not appended to', () => {
 
 check('the cards land inside the Episodes · Global panel', () => {
   const panel = page.slice(page.indexOf('id="panel-episodes-global"'))
-  const nextPanel = panel.indexOf('id="panel-boosts-global"')
+  const nextPanel = panel.indexOf('id="panel-members-global"')
   const mine = panel.slice(0, nextPanel)
   assert.match(mine, /<div class="pcast-list">/)
   assert.match(mine, /data-episode-card/)
@@ -86,7 +86,7 @@ check('the cards land inside the Episodes · Global panel', () => {
 check('nothing else in the shell was disturbed', () => {
   // The eight panels, the feed bar and the generated nav/footer all survive: the
   // Function does one string splice and must never reformat the file.
-  for (const id of ['panel-episodes-follows', 'panel-boosts-global', 'panel-shows', 'panel-albums']) {
+  for (const id of ['panel-episodes-follows', 'panel-members-global', 'panel-shows', 'panel-albums']) {
     assert.ok(page.includes(id), `${id} missing`)
   }
   assert.ok(page.includes('NAV:START') || page.includes('id="top-nav"'), 'nav missing')

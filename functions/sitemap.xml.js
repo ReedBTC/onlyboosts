@@ -41,7 +41,7 @@ const MAX_SHOWS = 20000;
 const EPISODE_MIN_BOOSTERS = 3;
 const MAX_EPISODES = 20000;
 
-// The eight feeds are hash routes on "/" (#boosts-global etc.), and crawlers
+// The eight feeds are hash routes on "/" (#members etc.), and crawlers
 // don't index fragments separately — listing them would just be duplicate
 // entries for the same URL.
 //

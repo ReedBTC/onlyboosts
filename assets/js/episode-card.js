@@ -42,11 +42,11 @@
  * what functions/_shared/detail-page.js has always done, so the site now has one
  * date format rather than one for the feeds and another for the detail pages.
  */
-import { showPageHref, episodePageHref } from './show-link.js?v=ob-v130'
-import { episodeBoostLink } from './episode-link.js?v=ob-v130'
-import { boosterPageHref, boosterLinkAttrs } from './booster-link.js?v=ob-v130'
-import { coverChain, httpsUrl } from './cover-art.js?v=ob-v130'
-import { htmlEscape, isSafeUrl, renderMessage } from './nostr-text.js?v=ob-v130'
+import { showPageHref, episodePageHref } from './show-link.js?v=ob-v131'
+import { episodeBoostLink } from './episode-link.js?v=ob-v131'
+import { boosterPageHref, boosterLinkAttrs } from './booster-link.js?v=ob-v131'
+import { coverChain, httpsUrl } from './cover-art.js?v=ob-v131'
+import { htmlEscape, isSafeUrl, renderMessage } from './nostr-text.js?v=ob-v131'
 
 const esc = htmlEscape
 
@@ -176,7 +176,7 @@ export function copyFor(medium) {
  *            opens. The inline feed-bar controller at the end of <body> sat
  *            1.16MB after the first card, so the browser parsed and painted the
  *            whole Episodes feed before any script could read which feed the
- *            hash named, and every #shows / #albums / #boosts-global load
+ *            hash named, and every #shows / #albums / #members load
  *            flashed Episodes first. Dropping the bodies is what fixes that.
  *
  *            ⚠️ THE TWO DETAIL PAGES STAY INLINE, and this is not the homepage

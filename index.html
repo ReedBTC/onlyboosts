@@ -50,18 +50,18 @@
 
   <!-- Shared note / card styles (.note-card, .embed-note) — the boosts
        feeds render through the same kind-1 card as boosts-thread.js. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v130" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v131" />
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v130" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v131" />
   <!-- The episode card and its drawer, extracted from the inline block below
        when /episode/<guid> pages needed the same cards. See the file header. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v130" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v130" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v131" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v131" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. Must stay last
        among the stylesheets so the inline block below still wins. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v130" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v131" />
 
   <style>
     :root {
@@ -94,8 +94,8 @@
     }
 
     /* Active-feed → accent mapping. Set on <body data-active-feed>. */
-    body[data-active-feed="boosts-global"]    { --accent: var(--bg-accent); --accent-d: var(--bg-accent-d); --tint: var(--bg-tint); }
-    body[data-active-feed="boosts-follows"]   { --accent: var(--bf-accent); --accent-d: var(--bf-accent-d); --tint: var(--bf-tint); }
+    body[data-active-feed="members-global"]    { --accent: var(--bg-accent); --accent-d: var(--bg-accent-d); --tint: var(--bg-tint); }
+    body[data-active-feed="members-follows"]   { --accent: var(--bf-accent); --accent-d: var(--bf-accent-d); --tint: var(--bf-tint); }
     body[data-active-feed="shows"]            { --accent: var(--sh-accent); --accent-d: var(--sh-accent-d); --tint: var(--sh-tint); }
     body[data-active-feed="episodes-global"]  { --accent: var(--eg-accent); --accent-d: var(--eg-accent-d); --tint: var(--eg-tint); }
     body[data-active-feed="episodes-follows"] { --accent: var(--ef-accent); --accent-d: var(--ef-accent-d); --tint: var(--ef-tint); }
@@ -371,8 +371,8 @@
     body[data-active-feed="episodes-follows"] .feed-bar-controls > [data-controls-for="episodes-follows"],
     body[data-active-feed="songs-global"]     .feed-bar-controls > [data-controls-for="songs-global"],
     body[data-active-feed="songs-follows"]    .feed-bar-controls > [data-controls-for="songs-follows"],
-    body[data-active-feed="boosts-global"]    .feed-bar-controls > [data-controls-for="boosts-global"],
-    body[data-active-feed="boosts-follows"]   .feed-bar-controls > [data-controls-for="boosts-follows"],
+    body[data-active-feed="members-global"]    .feed-bar-controls > [data-controls-for="members-global"],
+    body[data-active-feed="members-follows"]   .feed-bar-controls > [data-controls-for="members-follows"],
     body[data-active-feed="shows"]            .feed-bar-controls > [data-controls-for="shows"],
     body[data-active-feed="albums"]           .feed-bar-controls > [data-controls-for="albums"] {
       display: flex;
@@ -1123,8 +1123,8 @@
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
     }
   </style>
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v130" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v130" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v131" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v131" />
 </head>
 <body data-active-feed="episodes-global">
 
@@ -1173,7 +1173,7 @@
               <h4>Feeds</h4>
               <a href="/#episodes-global"><span aria-hidden="true">🎙</span> Podcasts</a>
               <a href="/#albums"><span aria-hidden="true">🎵</span> Music</a>
-              <a href="/#boosts-global"><span aria-hidden="true">👥</span> Members</a>
+              <a href="/#members"><span aria-hidden="true">👥</span> Members</a>
             </div>
             <!-- Stats: the aggregate views over the same data. Both are
                  coming-soon pages for now (noindex, out of the sitemap). -->
@@ -1287,7 +1287,7 @@
         <button type="button" class="feed-sub" data-value="songs"  aria-selected="false">Songs</button>
       </div>
       <div class="feed-sub-group" data-tab="members">
-        <button type="button" class="feed-sub" data-value="boosts" aria-selected="false">Boosts</button>
+        <button type="button" class="feed-sub" data-value="members" aria-selected="false">Boosts</button>
       </div>
     </div>
   </div>
@@ -1410,7 +1410,7 @@
 
             <dt>Weeks run Monday to Monday, UTC</dt>
             <dd>
-              This Week resets Monday at 00:00 UTC. The Hall of Fame is one row
+              This Week resets Monday at 00:00 UTC. High Scores is one row
               per person per week, so the same name can hold several places.
             </dd>
 
@@ -1424,7 +1424,14 @@
             <dt>Accounts that post for other people are left out</dt>
             <dd>
               A few keys publish boosts on behalf of many donors. Ranking one of
-              those would add up dozens of people's weeks into a single row.
+              those would add up dozens of people&rsquo;s weeks into a single row.
+              They are named under
+              <!-- ⚠️ NOT A PLAIN <a href="#boost-bots">. The dialog sits over
+                   the page, so following an in-page anchor scrolls the document
+                   BEHIND the scrim and leaves the reader looking at the rules
+                   they just left. wireRules closes it first, then jumps. -->
+              <button type="button" class="hpw-rules" data-hpw-goto="boost-bots">Boost Bots</button>
+              below.
             </dd>
           </dl>
         </div>
@@ -1538,7 +1545,7 @@
       </div>
     </section>
 
-    <section class="feed-panel" id="panel-boosts-global" role="region" aria-label="Boosts, global" data-feed="boosts-global" data-scope="global" hidden>
+    <section class="feed-panel" id="panel-members-global" role="region" aria-label="Boosts, global" data-feed="members-global" data-scope="global" hidden>
       <div class="feed-search" data-feed-search hidden></div>
       <div class="feed-list" data-feed-list>
         <div class="feed-placeholder">
@@ -1559,7 +1566,7 @@
       </div>
     </section>
 
-    <section class="feed-panel" id="panel-boosts-follows" role="region" aria-label="Boosts from your follows" data-feed="boosts-follows" data-scope="follows" hidden>
+    <section class="feed-panel" id="panel-members-follows" role="region" aria-label="Boosts from your follows" data-feed="members-follows" data-scope="follows" hidden>
       <div class="feed-search" data-feed-search hidden></div>
       <div class="feed-list" data-feed-list>
         <div class="feed-placeholder">
@@ -1650,7 +1657,7 @@
       <ul>
         <li><a href="/#episodes-global">🎙 Podcasts</a></li>
         <li><a href="/#albums">🎵 Music</a></li>
-        <li><a href="/#boosts-global">👥 Members</a></li>
+        <li><a href="/#members">👥 Members</a></li>
       </ul>
     </div>
 
@@ -1701,8 +1708,8 @@
     'episodes-follows': { type: 'episodes', scope: 'follows' },
     'songs-global':     { type: 'songs',    scope: 'global' },
     'songs-follows':    { type: 'songs',    scope: 'follows' },
-    'boosts-global':    { type: 'boosts',   scope: 'global' },
-    'boosts-follows':   { type: 'boosts',   scope: 'follows' },
+    'members-global':   { type: 'members',  scope: 'global' },
+    'members-follows':  { type: 'members',  scope: 'follows' },
     'shows':            { type: 'shows',    scope: 'global' },
     'albums':           { type: 'albums',   scope: 'global' },
   };
@@ -1713,7 +1720,7 @@
   const SCOPELESS = { shows: true, albums: true };
   /* ── The tab a feed belongs to ──
      ⚠️ A TAB IS DERIVED FROM THE FEED KEY, NEVER STORED IN THE HASH. That is
-     the whole reason `#shows`, `#songs-global`, `#boosts-global` and the two
+     the whole reason `#shows`, `#songs-global`, `#members` and the two
      retired `#podcasts-*` aliases keep resolving with no entry added anywhere:
      the URL still names a FEED, and which tab is on screen is a fact computed
      from it. A `#podcasts/shows` scheme would have been a second address space
@@ -1727,10 +1734,10 @@
   const TAB_OF = {
     shows: 'podcasts', episodes: 'podcasts',
     albums: 'music',   songs:    'music',
-    boosts: 'members',
+    members: 'members',
   };
   // What a tab opens on when it is pressed and has no remembered sub-feed.
-  const TAB_DEFAULT = { podcasts: 'episodes', music: 'albums', members: 'boosts' };
+  const TAB_DEFAULT = { podcasts: 'episodes', music: 'albums', members: 'members' };
   /* Which sub-feed each tab was last on, so leaving Podcasts on Shows and
      coming back returns you to Shows rather than to the default. The twin of
      langByFeed below, and there for the same reason: a reader's place in a tab
@@ -1758,7 +1765,7 @@
      list. Adding them is a two-line change here when a reason turns up.
 
      Feeds with no language axis are listed out rather than in: the Boosts feeds
-     take no `lang` at the API, so `#boosts-global?lang=de` drops the parameter
+     take no `lang` at the API, so `#members?lang=de` drops the parameter
      and rewrites, the same coercion a signed-out `#episodes-follows` gets. */
   const LANG_FEEDS = {
     'episodes-global': 1, 'episodes-follows': 1,
@@ -1800,9 +1807,28 @@
     return { key: raw.slice(0, q), lang: normLang(params && params.get('lang')) };
   }
 
+  /* ⚠️ THE HASH A FEED IS WRITTEN AS, where it should not simply be the key.
+     One entry: `members-global` is `#members`. Reed's call, 2026-08-23 — the
+     tab is called Members, the sections above the list are about members, and
+     `#members` named the smallest part of the page.
+
+     ⚠️ THIS IS NOT `ALIASES`, and the difference matters. An alias is a RETIRED
+     hash that gets upgraded in place, so `fromHash` force-rewrites the URL when
+     it resolves one. `#members` is the CANONICAL address, so it must not
+     rewrite itself to anything. The inverse is derived rather than written out,
+     because two hand-maintained maps that must stay inverse are one edit away
+     from disagreeing.
+
+     ⚠️ ONLY THE GLOBAL SCOPE ELIDES. `#members-follows` keeps its suffix, the
+     shape every other scoped feed has. A bare `#members` meaning "whichever
+     scope you were last on" would be an address that does not name a view. */
+  const HASH_OF = { 'members-global': 'members' };
+  const KEY_OF = Object.create(null);
+  Object.keys(HASH_OF).forEach(function (k) { KEY_OF[HASH_OF[k]] = k; });
+
   function hashFor(feed) {
     const lang = langByFeed[feed] || '';
-    return '#' + feed + (lang ? '?lang=' + encodeURIComponent(lang) : '');
+    return '#' + (HASH_OF[feed] || feed) + (lang ? '?lang=' + encodeURIComponent(lang) : '');
   }
   const DEFAULT_TYPE = 'episodes';
   const DEFAULT_SCOPE = 'global';
@@ -1963,7 +1989,9 @@
   function fromHash(updateHash) {
     const parsed = parseHash();
     const raw = parsed.key;
-    const key = ALIASES[raw] || raw;
+    /* KEY_OF first: `#members` is canonical, so it resolves without the
+       force-rewrite an alias triggers below. */
+    const key = KEY_OF[raw] || ALIASES[raw] || raw;
     const cfg = FEEDS[key];
     // An unknown hash falls back to the default *and* rewrites, so the URL
     // never keeps naming something that isn't on screen.
@@ -2082,7 +2110,7 @@
     if (!e || e.key === null || e.key === 'lb_nostr_session') onSessionChange();
   });
 
-  // Deep-link support: /#boosts-global lands on Boosts · Global.
+  // Deep-link support: /#members lands on Members · Global.
   fromHash(false);
 })();
 </script>
@@ -2091,17 +2119,17 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v130"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v131"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v130" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v131" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v130" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v131" defer></script>
 
 <!-- Feed hydration — lazily loads the active feed on first view. -->
-<script type="module" src="/assets/js/feeds.js?v=ob-v130"></script>
-<script src="/assets/js/nav.js?v=ob-v130" defer></script>
+<script type="module" src="/assets/js/feeds.js?v=ob-v131"></script>
+<script src="/assets/js/nav.js?v=ob-v131" defer></script>
 
 </body>
 </html>

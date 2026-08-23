@@ -88,7 +88,7 @@ function boot(hash, { signedIn = false } = {}) {
      the sub-feeds became blocks aligned under their tab, and the controller has
      never read it off a button. Mirroring the real shape here is what keeps
      this a test of the shipped selector. */
-  const subEls = ['shows', 'episodes', 'albums', 'songs', 'boosts'].map((v) => mk({ 'data-value': v }))
+  const subEls = ['shows', 'episodes', 'albums', 'songs', 'members'].map((v) => mk({ 'data-value': v }))
   const listeners = {}
   const events = []
   const doc = {
@@ -156,10 +156,33 @@ const eq = (name, got, want) => {
 // ── 1. Parsing, against the real functions ───────────────────────────
 const loc = { hash: '' }
 const langByFeed = Object.create(null)
-const { normLang, parseHash, hashFor } = new Function(
+/* ⚠️ THE HASH↔KEY MAPS ARE EXTRACTED, NOT STUBBED. `hashFor` reads HASH_OF and
+   `fromHash` reads KEY_OF, so a copy here would let the shipped table say
+   `#members` while this file still believed `#members-global` and every
+   assertion below would pass. Grabbing the declarations is what makes the round
+   trip a test of the shipped mapping. */
+const grabConst = (name) => {
+  const m = new RegExp(`^\\s*const ${name} = [^;]+;`, 'm').exec(SRC)
+  if (!m) throw new Error(`index.html no longer declares ${name}`)
+  return m[0]
+}
+const HASH_MAPS = [
+  grabConst('HASH_OF'),
+  grabConst('KEY_OF'),
+  /* KEY_OF is derived from HASH_OF by a loop rather than written out, so the
+     loop has to come across too or the inverse is empty. */
+  /* Matched to the end of its line, not to the first `;` — the callback body
+     contains one, so a `[^;]+` stops inside it and hands back half a call. */
+  /^\s*Object\.keys\(HASH_OF\)\.forEach\(.*$/m.exec(SRC)?.[0] || (() => {
+    throw new Error('the KEY_OF derivation is gone — is the inverse hand-written now?')
+  })(),
+].join('\n')
+
+const { normLang, parseHash, hashFor, HASH_OF, KEY_OF } = new Function(
   'location', 'langByFeed',
-  `${[grab('normLang'), grab('parseHash'), grab('hashFor')].join('\n')}
-   return { normLang, parseHash, hashFor }`,
+  `${HASH_MAPS}
+   ${[grab('normLang'), grab('parseHash'), grab('hashFor')].join('\n')}
+   return { normLang, parseHash, hashFor, HASH_OF, KEY_OF }`,
 )(loc, langByFeed)
 const at = (h) => { loc.hash = h; return parseHash() }
 
@@ -191,11 +214,40 @@ eq('no filter writes the hash it always wrote', hashFor('shows'), '#shows')
 langByFeed['shows'] = 'de'
 eq('a filter appends it', hashFor('shows'), '#shows?lang=de')
 eq('another feed is unaffected', hashFor('albums'), '#albums')
-for (const [feed, lang] of [['shows', 'de'], ['albums', 'en'], ['songs-follows', 'unknown'], ['episodes-global', 'nb']]) {
+/* ⚠️ THE ROUND TRIP RESOLVES THROUGH KEY_OF, the way fromHash does. Comparing
+   `back.key` to the feed directly would fail for any feed whose hash is not its
+   key, and "fix" it by dropping that feed from the list — which is how a
+   mapping stops being tested. */
+const keyOf = (raw) => KEY_OF[raw] || raw
+for (const [feed, lang] of [
+  ['shows', 'de'], ['albums', 'en'], ['songs-follows', 'unknown'],
+  ['episodes-global', 'nb'], ['members-global', ''], ['members-follows', ''],
+]) {
   langByFeed[feed] = lang
   const h = hashFor(feed)
   const back = at(h)
-  eq(`${h} survives a round trip`, [back.key, back.lang], [feed, lang])
+  eq(`${h} survives a round trip`, [keyOf(back.key), back.lang], [feed, lang])
+}
+
+console.log('\n⚠️ The Members feed is addressed as #members, not #members-global:')
+{
+  /* Reed's call, 2026-08-23: the tab is Members, the sections above the list
+     are about members, and `#boosts-global` named the smallest part of the
+     page. Only the GLOBAL scope elides — a bare `#members` meaning "whichever
+     scope you were last on" would be an address that does not name a view. */
+  eq('the global feed writes the bare hash', hashFor('members-global'), '#members')
+  eq('#members resolves back to it', keyOf(at('#members').key), 'members-global')
+  eq('⚠️ follows keeps its suffix', hashFor('members-follows'), '#members-follows')
+  eq('and resolves to itself', keyOf(at('#members-follows').key), 'members-follows')
+  /* Compared without the query string: the round-trip loop above leaves a
+     language on several feeds, and this is an assertion about the KEY half of
+     the hash, not about the language riding it. */
+  const bare = (feed) => hashFor(feed).split('?')[0]
+  eq('⚠️ nothing else elides — shows is still #shows', bare('shows'), '#shows')
+  eq('  nor episodes', bare('episodes-global'), '#episodes-global')
+  eq('  nor songs', bare('songs-follows'), '#songs-follows')
+  eq('the map has exactly one entry', Object.keys(HASH_OF), ['members-global'])
+  eq('and the derived inverse matches it', KEY_OF.members, 'members-global')
 }
 
 // ── 2. The boot sequence, which is where both bugs lived ─────────────
@@ -217,9 +269,9 @@ eq('and carries the same language', act.detail, { feed: 'albums', lang: 'en' })
 eq('the attribute matches it', r.body.dataset.feedLang, 'en')
 
 console.log('\nCoercion, with the hash rewritten to match what is on screen:')
-r = boot('#boosts-global?lang=de')
+r = boot('#members?lang=de')
 eq('a feed with no language axis drops it', r.body.dataset.feedLang, '')
-eq('and the URL stops claiming it', r.location.hash, '#boosts-global')
+eq('and the URL stops claiming it', r.location.hash, '#members')
 r = boot('#shows?lang=all')
 eq('?lang=all is no filter', r.body.dataset.feedLang, '')
 r = boot('#podcasts-global?lang=de')
@@ -248,7 +300,7 @@ for (const [hash, tab, sub] of [
   ['#episodes-global', 'podcasts', 'episodes'],
   ['#albums', 'music', 'albums'],
   ['#songs-global', 'music', 'songs'],
-  ['#boosts-global', 'members', 'boosts'],
+  ['#members', 'members', 'members'],
   ['#podcasts-global', 'podcasts', 'episodes'],   // retired hash, still resolves
   ['', 'podcasts', 'episodes'],                   // no hash at all
   ['#nonsense', 'podcasts', 'episodes'],          // unknown falls back
@@ -265,11 +317,11 @@ console.log('\nExactly one tab and one sub-feed are ever marked selected:')
 }
 
 console.log('\nThe tab attribute can never disagree with the feed:')
-for (const hash of ['#shows', '#episodes-follows', '#songs-follows', '#boosts-follows', '#albums']) {
+for (const hash of ['#shows', '#episodes-follows', '#songs-follows', '#members-follows', '#albums']) {
   const b = boot(hash, { signedIn: true })
   const feed = b.body.getAttribute('data-active-feed')
   const type = feed.replace(/-(global|follows)$/, '')
-  const want = { shows: 'podcasts', episodes: 'podcasts', albums: 'music', songs: 'music', boosts: 'members' }[type]
+  const want = { shows: 'podcasts', episodes: 'podcasts', albums: 'music', songs: 'music', members: 'members' }[type]
   eq(`${hash} → feed ${feed}, tab ${want}`, b.body.getAttribute('data-active-tab'), want)
 }
 
@@ -397,23 +449,23 @@ console.log('\n⚠️ The feed bar is MOVED into the Members tab, and moved back
      [data-controls-for] groups and their listeners intact; a second bar
      rendered into the tab would be two sets of controls over one feed, which is
      the failure the declarative body[data-active-feed] rule exists to prevent. */
-  eq('a cold load on #boosts-global puts the bar in the slot', boot('#boosts-global').barParent(), 'slot')
+  eq('a cold load on #members puts the bar in the slot', boot('#members').barParent(), 'slot')
   eq('#episodes-global leaves it in the sticky wrap', boot('#episodes-global').barParent(), 'wrap')
   eq('#shows too', boot('#shows').barParent(), 'wrap')
   eq('#albums too', boot('#albums').barParent(), 'wrap')
-  eq('a signed-in #boosts-follows also lands in the slot',
-     boot('#boosts-follows', { signedIn: true }).barParent(), 'slot')
+  eq('a signed-in #members-follows also lands in the slot',
+     boot('#members-follows', { signedIn: true }).barParent(), 'slot')
   {
     /* ⚠️ THE MOVE BACK IS THE HALF THAT BREAKS. `.members-block` is
        display:none off the Members tab, so a bar left in the slot disappears
        from every other feed entirely — no scope menu, no range, no sort, and
        nothing on screen saying why. */
-    const b = boot('#boosts-global')
+    const b = boot('#members')
     eq('  (starts in the slot)', b.barParent(), 'slot')
     b.location.hash = '#shows'
     b.fire('hashchange')
     eq('⚠️ switching away from Members moves it back to the wrap', b.barParent(), 'wrap')
-    b.location.hash = '#boosts-global'
+    b.location.hash = '#members'
     b.fire('hashchange')
     eq('and switching back returns it to the slot', b.barParent(), 'slot')
   }

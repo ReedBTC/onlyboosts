@@ -14,23 +14,23 @@
  * A repeated name is authentic to it rather than a bug to collapse — Piez holds
  * five of the top ten and that is the actual story of the board.
  */
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v130'
-import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v130'
-import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v130'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v131'
+import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v131'
+import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v131'
 /* ⚠️ THE SAME WALL /show AND /episode RENDER, not a copy of it. It moved out of
  * functions/_shared/detail-page.js into a two-sided module for exactly this;
  * that file re-exports every name, so both Functions were untouched. A reader
  * who screenshots the wall here and on a show page must not be able to tell
  * them apart. */
-import { renderSupporters, initShowMore, compact } from '/assets/js/supporter-wall.js?v=ob-v130'
+import { renderSupporters, initShowMore, compact } from '/assets/js/supporter-wall.js?v=ob-v131'
 /* ⚠️ EXACT BOOST COUNTS HERE, COMPACT SATS. On the wall a row is one of a
  * hundred and `1k` is plenty; here there are four rows and the count is the
  * disclosure itself — "1,021 boosts from dozens of listeners" is the claim the
  * section exists to make, and `1k` rounds the evidence away. */
-import { num } from '/assets/js/boost-list.js?v=ob-v130'
-import { rangeControl, sortControl } from '/assets/js/feed-controls.js?v=ob-v130'
-import { mountFeedSearch } from '/assets/js/feed-search.js?v=ob-v130'
-import { searchMembers, SEARCH_HITS } from '/assets/js/ob-live.js?v=ob-v130'
+import { num } from '/assets/js/boost-list.js?v=ob-v131'
+import { rangeControl, sortControl } from '/assets/js/feed-controls.js?v=ob-v131'
+import { mountFeedSearch } from '/assets/js/feed-search.js?v=ob-v131'
+import { searchMembers, SEARCH_HITS } from '/assets/js/ob-live.js?v=ob-v131'
 
 const esc = htmlEscape
 const HOURS_API = '/api/v1/members/hours'
@@ -205,6 +205,10 @@ async function wall(sort, range, signal) {
   return Array.isArray(data?.members) ? data.members : []
 }
 
+/* The id the Rules dialog links to, and the only thing that makes that link
+ * work — the section is client-rendered, so nothing in index.html can carry it. */
+const BOTS_ID = 'boost-bots'
+
 /* ⚠️ THE BOTS SECTION IS THE WALL'S EXCLUSION, SHOWN. `/api/v1/members` drops
  * four publisher keys from every ranked listing because one of them stands in
  * for dozens of listeners; `?publishers=1` asks for exactly those four, so what
@@ -289,6 +293,7 @@ async function paintBots(root) {
        2026-08-23: the four blocks on this tab read as four loose things
        stacked in a column, so they now share one head structure and one set of
        rules rather than each styling its own heading. */
+    root.id = BOTS_ID
     root.innerHTML =
       `<div class="mb-section-head"><h2>Boost Bots</h2>` +
       /* ⚠️ TWO SENTENCES, AND THE LINK CARRIES THE REST. Reed's call,
@@ -330,6 +335,26 @@ function wireRules() {
   function onKey(e) { if (e.key === 'Escape') hide() }
   open.addEventListener('click', show)
   for (const el of modal.querySelectorAll('[data-hpw-close]')) el.addEventListener('click', hide)
+
+  /* ⚠️ A LINK OUT OF THE DIALOG CLOSES IT FIRST. A bare in-page anchor scrolls
+     the document behind the scrim, so the reader arrives at the right section
+     with the rules still over it. Closing also returns focus to the Rules
+     button, which is why focus is moved to the target explicitly afterwards.
+     `getElementById`, never a selector built from the attribute: the value is
+     markup here, but the same rule detail-page.js#revealHashTarget follows. */
+  for (const el of modal.querySelectorAll('[data-hpw-goto]')) {
+    el.addEventListener('click', () => {
+      const target = document.getElementById(el.dataset.hpwGoto)
+      hide()
+      if (!target) return
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      /* The section is a plain <section>, so it takes focus only if told it
+         can; removed again so it never becomes a tab stop. */
+      target.setAttribute('tabindex', '-1')
+      target.focus({ preventScroll: true })
+      target.addEventListener('blur', () => target.removeAttribute('tabindex'), { once: true })
+    })
+  }
 }
 
 /**
@@ -365,7 +390,11 @@ export async function renderMembersBoards(root) {
         empty: 'No boosts with a known episode length yet this week.',
       }) +
       boardHtml({
-        title: 'Hall of Fame',
+        // "High Scores" rather than "Hall of Fame", Reed's call 2026-08-23. It
+        // is the arcade idiom the whole board is built on, and a hall of fame
+        // is a place you are inducted into where a high-score table is one you
+        // get onto by playing — which is the invitation This Week is making.
+        title: 'High Scores',
         sub: `The best weeks ever recorded. Gold clears ${goal} hours.`,
         members: all.members || [],
         goal,

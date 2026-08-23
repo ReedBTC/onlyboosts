@@ -43,7 +43,7 @@ order. They are the site map, so **they're regrouped together or not at all**:
 
 | Group | Items |
 |---|---|
-| **Feeds** | Podcasts `/#episodes-global` · Music `/#albums` · Members `/#boosts-global` |
+| **Feeds** | Podcasts `/#episodes-global` · Music `/#albums` · Members `/#members` |
 | **Stats** | Boost Stats `/stats` · Community `/boosters` — both coming soon |
 | **More** (footer: *Connect*) | About · Source · Report a bug |
 
@@ -65,8 +65,8 @@ restating a control the page already has.
 | Episodes · Follows | `#episodes-follows` | same, filtered to your kind-3 contacts |
 | Songs · Global | `#songs-global` | the same rollup, music feeds only |
 | Songs · Follows | `#songs-follows` | same, filtered to your kind-3 contacts |
-| Boosts · Global | `#boosts-global` | the kind-1 boost notes themselves |
-| Boosts · Follows | `#boosts-follows` | same, filtered to your kind-3 contacts |
+| Members · Global | `#members` | the kind-1 boost notes themselves |
+| Members · Follows | `#members-follows` | same, filtered to your kind-3 contacts |
 | Shows | `#shows` | per-show rollup, Global only |
 | Albums | `#albums` | the same rollup, music feeds only, Global only |
 
@@ -90,7 +90,7 @@ behind a control you had to know to open, which is idea #18's whole complaint.
 
 **⚠️ THE TAB IS DERIVED FROM THE FEED KEY AND IS NOT IN THE HASH.** `TAB_OF` in
 the controller computes it, which is why nothing in the wild changed: `#shows`,
-`#episodes-global`, `#songs-follows`, `#albums`, `#boosts-global` and the two
+`#episodes-global`, `#songs-follows`, `#albums`, `#members` and the two
 retired `#podcasts-*` aliases all resolve exactly as before. A `#podcasts/shows`
 scheme would have been a second address space for the same eight views.
 
@@ -615,7 +615,7 @@ Measured against production when the episode card closed the last exception:
 The last row is the one that was the bug: with the controller 1.16MB after the
 first card, the browser painted the whole Episodes · Global feed before any
 script could read which feed the hash named, and every `#shows` / `#albums` /
-`#boosts-global` load flashed Episodes first. **That flash was fixed here, at the
+`#members` load flashed Episodes first. **That flash was fixed here, at the
 cause, and two patches for it were rejected on 2026-08-17 for that reason**:
 skeletons painted over the server's cards, and a boot script in `<head>`
 carrying its own copy of the feed-key list. Don't re-propose either.
@@ -2134,8 +2134,8 @@ renderer on first view.
 
 | Feed | Module | Source |
 |---|---|---|
-| `boosts-global` | `boosts-feed.js` | `GET /api/v1/boosts`, cursor-paged |
-| `boosts-follows` | `boosts-feed.js` | `POST /api/v1/boosts/follows`, cursor-paged |
+| `members-global` | `boosts-feed.js` | `GET /api/v1/boosts`, cursor-paged |
+| `members-follows` | `boosts-feed.js` | `POST /api/v1/boosts/follows`, cursor-paged |
 | `episodes-global` | `feeds-podcasts.js` | `GET /api/v1/episodes?not_medium=music&include=boosts` |
 | `episodes-follows` | `feeds-podcasts.js` | the same endpoint as `POST`, body `{follows:[…]}` |
 | `songs-global` | `feeds-podcasts.js` | same, `medium=music` |
@@ -2699,13 +2699,13 @@ link. `test-feed-hash.mjs` asserts both call sites exist.
 Boost an episode and the board assumes you heard all of it, then adds up the
 durations. **It is an assumption, not a measurement**, and the Rules dialog says
 so. Two boards: **This Week** leads (it resets Monday and has a live race in
-it), **Hall of Fame** follows.
+it), **High Scores** follows.
 
 **⚠️ NOBODY CLEARS FORTY HOURS.** Over all 9,977 booster-weeks since 2024-10,
 exactly two did — the same person, both in autumn 2025. Eighteen weeks ever
 passed 30; a typical winning week in mid-2026 is 14 to 20 hours. Eight of the
-all-time top ten are from 2025, which is why This Week exists beside the hall of
-fame rather than instead of it. The name is the provocation, not a threshold,
+all-time top ten are from 2025, which is why This Week exists beside the high-score
+table rather than instead of it. The name is the provocation, not a threshold,
 and gold marks the two rows above forty. **If gold ever marks a third of a
 board the fix is the goal, not the styling.**
 
@@ -2728,6 +2728,18 @@ whole boost count, so `COUNT(*)` stops being episodes and `SUM(duration)` stops
 being hours — both inflated by the same factor and both still a plausible board.
 
 **Units are `hpw`, not `h`:** every row is one member's one week.
+
+**The all-time board is "High Scores", not "Hall of Fame"** (*Reed's call,
+2026-08-23*). It is the arcade idiom the whole board is built on, and a hall of
+fame is a place you are inducted into where a high-score table is one you get
+onto by playing — which is the invitation This Week is making.
+
+**⚠️ THE RULES DIALOG LINKS OUT TO THE BOOST BOTS SECTION, AND CLOSES ITSELF
+FIRST.** A bare `<a href="#boost-bots">` scrolls the document *behind the
+scrim*, so the reader arrives at the right section with the rules still over it.
+`data-hpw-goto` is the hook; `wireRules` hides the dialog, then scrolls and
+moves focus. The id is set by `members-board.js` (`BOTS_ID`), the section being
+client-rendered, so nothing in `index.html` can carry it.
 
 **The Rules are a dialog, in the document rather than fetched**, so they open
 while the boards are loading or after they failed. It replaced a sub-line and a
@@ -2938,10 +2950,11 @@ fallback faces — the same call `.drawer-hint`'s chevron makes.
 frozen** the way the detail pages' section ids are. Two surfaces point at them:
 this badge and the Boost Bots section's "How this works".
 
-**⚠️ AND THERE IS NO `#members` HASH.** The tab is derived from the feed key, so
-`/#members` falls through to the default feed and lands the reader on Podcasts.
-Every off-site link to this tab is `/#boosts-global`. Adding an alias would be a
-second address space for a view that already has one.
+**`/#members` IS THE TAB'S ADDRESS** since the feed was renamed on 2026-08-23.
+It was `/#boosts-global`, and for one day this note said there was no `#members`
+hash and that adding one would be a second address space. That was true of an
+*alias*; it is not true of a rename, which is what shipped. See **The Three
+Tabs** for the mechanism.
 
 **⚠️ `#membership` LEADS WITH NOSTR AND EXPLAINS IT, which is the one place on
 this site that should.** *Reed's call, 2026-08-23:* the front door says
@@ -3496,7 +3509,7 @@ as a paragraph.
 
 The `#boosts` section on all three pages carries a range and a sort, built by
 `assets/js/boost-section.js`. **The range means when the boost was SENT**,
-matching `/#boosts-global` and `/api/v1/podcasts`. It does not mean when the
+matching `/#members` and `/api/v1/podcasts`. It does not mean when the
 episode aired; that axis belongs to the Episodes feeds and to
 `/api/v1/episodes`. Two readings of that parameter name exist on this site
 deliberately and there must not be a third.
@@ -3521,7 +3534,7 @@ the sort would be a no-op that looked like a ranking — the same call `/booster
 episode rollup makes in leaving "Most boosters" out of its menu. **No sort here
 paints a rank numeral**: a row is one boost, so there is no aggregate to rank.
 
-**Ranges are 1W/1M/1Y/All, the same four `/#boosts-global` offers** since
+**Ranges are 1W/1M/1Y/All, the same four `/#members` offers** since
 2026-08-23. These sections hold a bounded corpus in memory, so every window is
 complete and the count line can always claim so; that feed pages, so its 1Y is
 covered progressively and its count line says which. Same buttons, different
