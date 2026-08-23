@@ -359,6 +359,56 @@ console.log('\nThe themed classes emit real CSS:')
     `${naked} selector(s) use .lb-w without :where() — the reset now outranks the padding utilities`)
   ok('the reset stays at preflight specificity')
 
+  /* ⚠️ AND THE `.lb-w` CHECK ABOVE IS NOT ENOUGH, BECAUSE AN ATTRIBUTE
+   * SELECTOR CARRIES CLASS WEIGHT.
+   *
+   * `:where(.lb-w) [type='button']` passes that check — the scope IS wrapped —
+   * and is still (0,1,0), dead level with `.bg-[var(--brand-dd,#0a6fa8)]`.
+   * This file is appended AFTER `@tailwind utilities`, so the tie broke in the
+   * reset's favour and `background-color: transparent` won. Every element in
+   * the widget carrying an explicit `type="button"` had its `bg-*` utility
+   * silently killed, from the day the reset shipped until 2026-08-22. It
+   * surfaced as four boost presets rendering at the modal's own background
+   * with the picked one white-on-white, and it was reported as a colour bug
+   * twice before anyone measured the pixels.
+   *
+   * So this computes the real specificity of every selector in the scoped
+   * reset and demands (0,0,0). `:where()` contributes nothing, which is what
+   * makes that reachable. */
+  const specificity = (sel) => {
+    // :where(...) contributes zero, so remove it and its contents, innermost
+    // first, before counting anything.
+    let s = sel
+    for (let guard = 0; guard < 20; guard++) {
+      const next = s.replace(/:where\(([^()]*)\)/g, '')
+      if (next === s) break
+      s = next
+    }
+    return {
+      a: (s.match(/#[\w-]+/g) || []).length,
+      b: (s.match(/\.[\w-]+/g) || []).length + (s.match(/\[/g) || []).length,
+    }
+  }
+  const overweight = []
+  for (const [, selector] of css.matchAll(/([^{}]+)\{[^{}]*\}/g)) {
+    if (!selector.includes('.lb-w')) continue
+    // Strip :where() first: its contents may hold the commas that would
+    // otherwise split one selector into several.
+    let flat = selector
+    for (let guard = 0; guard < 20; guard++) {
+      const next = flat.replace(/:where\(([^()]*)\)/g, ':where()')
+      if (next === flat) break
+      flat = next
+    }
+    for (const part of flat.split(',')) {
+      const { a, b } = specificity(part)
+      if (a || b) overweight.push(`(0,${b},…) ${part.trim()}`)
+    }
+  }
+  assert.deepEqual(overweight, [], 
+    `the scoped reset outranks a Tailwind utility and will silently beat it:\n  ${overweight.join('\n  ')}`)
+  ok('no reset selector can outrank a utility class')
+
   // ⚠️ The bundle is a build artifact. If it is stale the two assertions above
   // pass against yesterday's CSS, so the source is checked to agree with it.
   const src = readFileSync(new URL('../login-widget/src/components/ExternalBoostModal.jsx', import.meta.url), 'utf8')

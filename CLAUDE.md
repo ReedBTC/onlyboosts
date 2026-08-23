@@ -684,6 +684,26 @@ anything. `scripts/test-boost-modal-render.mjs` now walks to the matching paren
 and counts top-level commas, because the broken form and the correct one differ
 by six characters in the middle of a JSX block.
 
+**⚠️ AND THE INNER `:where()` IS LOAD-BEARING FOR THE OPPOSITE REASON, BECAUSE
+AN ATTRIBUTE SELECTOR CARRIES CLASS WEIGHT.** `:where(.lb-w) [type='button']`
+has the scope correctly wrapped and is still **(0,1,0)** — dead level with
+`.bg-[var(--brand-dd,#0a6fa8)]` — and `styles.css` is appended **after**
+`@tailwind utilities`, so the tie broke in the reset's favour and
+`background-color: transparent` won. **Every element in the widget carrying an
+explicit `type="button"` had its `bg-*` utility silently killed**, from the day
+the reset shipped until 2026-08-22. It surfaced as the four boost presets
+rendering at `#f4fafd`, the modal's own background, with the picked one
+white-on-white; it was reported as a colour bug and "fixed" as one twice before
+anybody sampled the pixels and found all four buttons identical. A bare
+`button` is (0,0,1) and was never the problem, which is exactly why it hid: the
+buttons with no `type` attribute looked right. The list is wrapped —
+`:where(.lb-w) :where(button, [type='button'], …)` — which takes the whole
+selector to (0,0,0). **Tailwind's own preflight writes these unwrapped and gets
+away with it because it lands in `@layer base` BEFORE the utilities; do not
+"match upstream" here.** `test-boost-modal-render.mjs` now computes the real
+specificity of every selector in the reset and demands (0,0,0), which is a
+strictly stronger check than the `.lb-w`-is-wrapped one beside it.
+
 **⚠️ `:where(.lb-w)` IS LOAD-BEARING, NOT TIDINESS.** Preflight's own selectors
 are bare elements at specificity 0,0,0 and 0,0,1, which is exactly why `py-3`
 beats the `padding: 0` preflight just set. Scoping naively to `.lb-w button`

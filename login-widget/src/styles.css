@@ -69,10 +69,32 @@
   margin: 0;
   padding: 0;
 }
-:where(.lb-w) button,
-:where(.lb-w) [type='button'],
-:where(.lb-w) [type='reset'],
-:where(.lb-w) [type='submit'] {
+/**
+ * ⚠️ THE INNER `:where()` IS THE SAME LESSON AS THE OUTER ONE, AND LEAVING IT
+ * OFF COST A DAY. An ATTRIBUTE selector carries CLASS weight, so
+ * `:where(.lb-w) [type='button']` is (0,1,0) — dead level with
+ * `.bg-[var(--brand-dd,#0a6fa8)]` — and this block is emitted AFTER
+ * `@tailwind utilities`, so the tie broke in the reset's favour and
+ * `background-color: transparent` won.
+ *
+ * The result: **every element in this widget carrying an explicit
+ * `type="button"` had its `bg-*` utility silently killed.** Measured off a
+ * screenshot on 2026-08-22 — all four boost presets rendered at
+ * `#f4fafd`, the modal's own background, with the picked one white-on-white
+ * and invisible. It read as a colour bug and was reported twice as one; the
+ * fill had never been drawn at all, on any of them, since this reset shipped.
+ *
+ * Wrapping the list in `:where()` takes the whole selector to (0,0,0), which
+ * is where preflight's own rules sit and what the comment above always meant.
+ * A bare `button` was (0,0,1) and was never the problem, which is exactly why
+ * this hid: the buttons with no `type` attribute looked right.
+ *
+ * ⚠️ Tailwind's real preflight writes these same selectors unwrapped and gets
+ * away with it, because it lands in `@layer base` BEFORE the utilities. This
+ * file is appended after them. **Do not "match upstream" by removing the
+ * `:where()`.**
+ */
+:where(.lb-w) :where(button, [type='button'], [type='reset'], [type='submit']) {
   -webkit-appearance: button;
   background-color: transparent;
   background-image: none;
