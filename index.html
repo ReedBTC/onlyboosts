@@ -50,18 +50,18 @@
 
   <!-- Shared note / card styles (.note-card, .embed-note) — the boosts
        feeds render through the same kind-1 card as boosts-thread.js. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v129" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v130" />
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v129" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v130" />
   <!-- The episode card and its drawer, extracted from the inline block below
        when /episode/<guid> pages needed the same cards. See the file header. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v129" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v129" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v130" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v130" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. Must stay last
        among the stylesheets so the inline block below still wins. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v129" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v130" />
 
   <style>
     :root {
@@ -585,17 +585,24 @@
        The band is a LID: it carries the shell's fill one step darker and a
        bottom border, and no top border of its own, because the shell's own
        border is already the line above it. */
+    /* ⚠️ NO `overflow: hidden` ON A SHELL WHOSE LID HOLDS A DROPDOWN. `.bs-shell`
+       carries it and gets away with it because its lid sits on top of a tall
+       list, so the sort menu opens downward INTO the shell. The Boosts lid has
+       nothing under it inside its own shell, so the menu was clipped the
+       instant it opened — reported as "the dropdowns get hidden in the gap".
+       The lid takes the top corners itself instead, which is what the clip was
+       doing. */
     .mb-shell {
       border: 1px solid var(--border);
       border-radius: 12px;
       background: var(--cream);
-      overflow: hidden;
     }
     .mb-lid {
       display: flex; align-items: center; justify-content: flex-end;
       flex-wrap: wrap; gap: 0.5rem;
       padding: 0.5rem 0.75rem;
       border-bottom: 1px solid var(--border);
+      border-radius: 12px 12px 0 0;
       background: var(--cream-d);
     }
     .mb-lid[hidden] { display: none; }
@@ -603,10 +610,19 @@
        and lets each list bring its own. */
     .mb-body { padding: 1.1rem 1rem; }
 
-    /* ⚠️ THE TWO HALVES OF THE BOOSTS SHELL. The lid closes its own bottom and
-       the panel below opens its own top, so the pair draws one box across two
-       elements. Both are scoped to the Members tab: everywhere else the bar is
-       back in its sticky wrapper and the panel is an ordinary panel. */
+    /* ⚠️ THE TWO HALVES OF THE BOOSTS SHELL, AND THE SEAM IS THE WHOLE RISK.
+       The lid closes its own bottom and the panel below opens its own top, so
+       the pair draws one box across two elements. Both are scoped to the
+       Members tab: everywhere else the bar is back in its sticky wrapper and
+       the panel is an ordinary panel.
+
+       ⚠️ THE SECTION'S OWN BOTTOM MARGIN IS THE GAP, and it shipped that way.
+       `.mb-section` carries `margin-bottom: 2.75rem` for the space between
+       sections; on the one section whose box CONTINUES into the element after
+       it, that margin is 2.75rem of nothing between a lid and its body, with
+       the border drawing both edges of the hole. Reported the day it shipped.
+       Anything that puts vertical space between these two halves reopens it. */
+    .members-boosts { margin-bottom: 0; }
     .mb-shell--lid-only { border-bottom: 0; border-radius: 12px 12px 0 0; }
     /* ⚠️ NO `max-width` AND NO `margin` HERE, DELIBERATELY. Both would be
        no-ops — the shell is already inside `.feed-panels-inner`, which reads
@@ -662,6 +678,8 @@
     .bots-list {
       list-style: none; margin: 0; padding: 0;
       border: 1px solid var(--border); border-radius: 12px;
+      /* Keeps its clip, unlike `.mb-shell`: no dropdown lives in here, and the
+         rows carry their own fill right up to the rounded edge. */
       background: var(--cream); overflow: hidden;
     }
     .bots-row {
@@ -1105,8 +1123,8 @@
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
     }
   </style>
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v129" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v129" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v130" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v130" />
 </head>
 <body data-active-feed="episodes-global">
 
@@ -2073,17 +2091,17 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v129"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v130"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v129" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v130" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v129" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v130" defer></script>
 
 <!-- Feed hydration — lazily loads the active feed on first view. -->
-<script type="module" src="/assets/js/feeds.js?v=ob-v129"></script>
-<script src="/assets/js/nav.js?v=ob-v129" defer></script>
+<script type="module" src="/assets/js/feeds.js?v=ob-v130"></script>
+<script src="/assets/js/nav.js?v=ob-v130" defer></script>
 
 </body>
 </html>

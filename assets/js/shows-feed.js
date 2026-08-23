@@ -53,18 +53,18 @@
  */
 import {
   getShowPage, searchShows, getShowEpisodes, SEARCH_HITS, SEARCH_MIN_CHARS,
-} from '/assets/js/ob-live.js?v=ob-v129'
+} from '/assets/js/ob-live.js?v=ob-v130'
 import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls,
-} from '/assets/js/feed-controls.js?v=ob-v129'
+} from '/assets/js/feed-controls.js?v=ob-v130'
 // Its own module, not two more exports of feed-controls.js — see the ⚠️ note
 // at the top of that file for the four-hour window that shape opens.
-import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v129'
+import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v130'
 import {
   LANG_ALL, languageOptions, langControl, langNote, langNoMatchText, langLabelFor,
-} from '/assets/js/feed-lang.js?v=ob-v129'
-import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v129'
-import { competitionRanks, rankLabel } from '/assets/js/rank.js?v=ob-v129'
+} from '/assets/js/feed-lang.js?v=ob-v130'
+import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v130'
+import { competitionRanks, rankLabel } from '/assets/js/rank.js?v=ob-v130'
 /* ⚠️ THE CARD ITSELF IS NOT IN THIS FILE ANY MORE. show-card.js emits it as an
  * HTML string and show-card-actions.js attaches its verbs, which is what lets
  * functions/index.js render the opening page of this feed at the edge — a
@@ -81,9 +81,9 @@ import {
   COPY, copyFor, toCard, showCardHtml, showRankValue,
   SORT_OPTIONS, RANKED_SORTS, SHOW_CARDS_PER_PAGE,
   num, fmtSats, plural,
-} from '/assets/js/show-card.js?v=ob-v129'
-import { wireShowCards } from '/assets/js/show-card-actions.js?v=ob-v129'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v129'
+} from '/assets/js/show-card.js?v=ob-v130'
+import { wireShowCards } from '/assets/js/show-card-actions.js?v=ob-v130'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v130'
 
 /* ── The hash's language, on an already-hydrated feed ──
  * The twin of the map in feeds-podcasts.js, and there for the same reason: a

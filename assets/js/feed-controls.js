@@ -23,7 +23,7 @@
  * holds each module URL for up to four hours ON ITS OWN CLOCK. A reader
  * carrying a three-hour-old copy of this file who fetches a fresh renderer gets
  *
- *   SyntaxError: The requested module '/assets/js/feed-controls.js?v=ob-v129' does not
+ *   SyntaxError: The requested module '/assets/js/feed-controls.js?v=ob-v130' does not
  *   provide an export named 'X'
  *
  * and an unresolved named import is a LINK-TIME error: the renderer never
@@ -36,7 +36,7 @@
  * Two shapes are safe. Put new behaviour in a NEW module (a URL with no cached
  * old version can only resolve or 404) — assets/js/feed-note.js is the worked
  * example. Or have callers derive what they need from a table this module
- * ALREADY exports, which degrades instead of throwing: WALKED_RANGES in
+ * ALREADY exports, which degrades instead of throwing: BOOST_RANGES in
  * boosts-feed.js filters RANGE_OPTIONS, so an older copy without the '1y' row
  * simply yields no 1Y button.
  *
@@ -100,7 +100,8 @@ export function rangeCutoff(key) {
  *   different things per feed, so the wording is the caller's to own.
  * @param {Array}    [opts.options]  the range rows to offer, defaulting to all
  *   of them. A feed that pages its window in rather than querying it filters
- *   RANGE_OPTIONS down itself — see WALKED_RANGES in boosts-feed.js.
+ *   RANGE_OPTIONS down itself — see BOOST_RANGES in boosts-feed.js, which
+ *   no longer narrows it but is still the feed's own table.
  */
 export function rangeControl(initialKey, onPick, opts = {}) {
   const options = opts.options || RANGE_OPTIONS

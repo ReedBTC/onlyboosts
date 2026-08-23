@@ -2175,15 +2175,33 @@ The note feed's shorter menu is not an omission — a card there is one boost, s
 explicitly: `episode.date` is null on ~12% of records, and a `0` fallback would
 float them to the top.
 
-**The ranked feeds offer 1W/1M/1Y/All; the Boosts note feed offers 1W/1M/All.**
+**Every feed offers 1W/1M/1Y/All.**
 On the ranked feeds the range is a **query parameter** — `RANGE_DAYS` in
 `functions/api/v1/episodes.js` and `…/podcasts.js` — so a wider window is a
 different `WHERE` clause and costs nothing. **Those two tables and
 `RANGE_OPTIONS` move together, or a range button answers 400.** The note feed
 **walks** its window instead (`ensureCoverage`), and at ~38 boosts a day a year
 is ~13,900 rows: ~70 sequential requests before the first card paints.
-`WALKED_RANGE_OPTIONS` is the subset it passes. Giving it a year means giving it
-a `since`-scoped query, not a fourth button.
+**⚠️ THE BOOSTS NOTE FEED GOT ITS 1Y ON 2026-08-23, AND NOT BY GAINING A
+QUERY.** *Reed's call, on seeing it missing beside the members wall's four
+buttons.* `/api/v1/boosts` does take `since`, but `globalBoostReader` still does
+not pass it — a `since`-bounded page returns no cursor, so the client could not
+page back **out** when the reader widens the range again. What 1Y got instead is
+**the treatment All already had**: it is not pre-walked, a non-chronological sort
+ranks only what has been loaded, and the count line says so in those words. The
+honesty was already built; 1Y was the one bounded window big enough to need it.
+
+**⚠️ `needsCoverage()` IS A FACT AND `shouldPreWalk()` IS A POLICY, and they are
+separate on purpose.** The first says the loaded corpus does not yet reach the
+window's cutoff; the second says we will sit and page until it does. Folding
+`1y` into the fact takes the **load-older button** away from it too, because
+that button is gated on the same condition — and a 1Y view that neither walks
+nor offers to load more is a window the reader can never fill. `UNWALKED` is
+the policy's whole content.
+
+**⚠️ AND THE COUNT LINE KEYS ON COVERAGE, NOT ON THE RANGE.** `rangeKey !== 'all'`
+was right while every bounded window was pre-walked, and would have made a
+half-loaded 1Y claim completeness.
 
 **Sorting is over the selected window, so a bounded window is paged in completely
 before it's painted**; otherwise "largest boost" would rank whichever pages
@@ -2575,6 +2593,23 @@ in would fork it. So the lid closes its own bottom (`.mb-shell--lid-only`) and
 the active panel opens its own top, both scoped to
 `body[data-active-tab="members"]`. **Any vertical margin on either half opens a
 gap the border makes visible.**
+
+**⚠️ AND IT OPENED ONE ON THE FIRST TRY: `.mb-section`'s OWN `margin-bottom`.**
+That rule gives every section on the tab 2.75rem of space beneath it, which is
+right for three of them and wrong for the one whose box *continues into the
+element after it* — the result was 2.75rem of nothing between a lid and its
+body with the border drawing both edges of the hole. `.members-boosts` zeroes
+it. The warning above was written before this shipped and did not save it;
+**check the containing section's margin, not only the two halves.**
+
+**⚠️ AND NO `overflow: hidden` ON A SHELL WHOSE LID HOLDS A DROPDOWN.**
+`.bs-shell` carries it and gets away with it because its lid sits on top of a
+tall list, so the sort menu opens downward *into* the shell. The Boosts lid has
+nothing under it inside its own shell, so the menu was clipped the instant it
+opened — reported as "the dropdowns get hidden in the gap", the two faults
+compounding into one symptom. `.mb-lid` takes the top corners itself, which is
+all the clip was doing. `.bots-list` keeps its clip: no dropdown, and its rows
+carry their own fill to the rounded edge.
 
 **⚠️ NO `max-width` OR `margin` IN THE SCOPED `.feed-bar` RULE.** Both are
 no-ops (the shell already sits inside `.feed-panels-inner`, which reads the
@@ -3486,9 +3521,11 @@ the sort would be a no-op that looked like a ranking — the same call `/booster
 episode rollup makes in leaving "Most boosters" out of its menu. **No sort here
 paints a rank numeral**: a row is one boost, so there is no aggregate to rank.
 
-**Ranges are 1W/1M/1Y/All, one more than `/#boosts-global` offers.** That feed
-omits 1Y because it *walks* month archives to cover a window; these sections hold
-a bounded corpus in memory, so a year costs nothing.
+**Ranges are 1W/1M/1Y/All, the same four `/#boosts-global` offers** since
+2026-08-23. These sections hold a bounded corpus in memory, so every window is
+complete and the count line can always claim so; that feed pages, so its 1Y is
+covered progressively and its count line says which. Same buttons, different
+guarantees, and only the note feed has to disclose one.
 
 Six things a change would break:
 

@@ -30,8 +30,8 @@
  * need only id + pubkey. The object handed to buildActionBar below is a
  * projection, not a verified event; don't pass it anywhere that assumes one.
  */
-import { nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v129'
-import { buildActionBar, configureBoostActions } from '/assets/js/boost-actions.js?v=ob-v129'
+import { nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v130'
+import { buildActionBar, configureBoostActions } from '/assets/js/boost-actions.js?v=ob-v130'
 // ⚠️ wireNpubCopy WAS IMPORTED HERE and is not any more. The avatar and the name
 // were its only two callers on this feed, and both are now links to
 // /booster/<npub>. Unlike the Episodes drawer — where the per-boost ⋮ menu
@@ -39,21 +39,21 @@ import { buildActionBar, configureBoostActions } from '/assets/js/boost-actions.
 // from this feed means opening their page, which leads with the button.
 // Its own module rather than a third export from show-link.js; see the note at
 // the head of booster-link.js and the ob-v53 entry in CLAUDE.md.
-import { boosterPageHref, markBoosterLink } from '/assets/js/booster-link.js?v=ob-v129'
-import { parseSegments, renderSegmentsInto, setCachedProfile } from '/assets/js/boosts-thread.js?v=ob-v129'
-import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v129'
-import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v129'
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v129'
-import { boosterLabel } from '/assets/js/ob-data.js?v=ob-v129'
-import { followsBoostReader, globalBoostReader } from '/assets/js/ob-live.js?v=ob-v129'
-import { resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v129'
+import { boosterPageHref, markBoosterLink } from '/assets/js/booster-link.js?v=ob-v130'
+import { parseSegments, renderSegmentsInto, setCachedProfile } from '/assets/js/boosts-thread.js?v=ob-v130'
+import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v130'
+import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v130'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v130'
+import { boosterLabel } from '/assets/js/ob-data.js?v=ob-v130'
+import { followsBoostReader, globalBoostReader } from '/assets/js/ob-live.js?v=ob-v130'
+import { resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v130'
 import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls,
   RANGE_OPTIONS,
-} from '/assets/js/feed-controls.js?v=ob-v129'
+} from '/assets/js/feed-controls.js?v=ob-v130'
 
-import { showPageHref, episodePageHref } from '/assets/js/show-link.js?v=ob-v129'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v129'
+import { showPageHref, episodePageHref } from '/assets/js/show-link.js?v=ob-v130'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v130'
 
 const PAGE_SIZE = 30
 
@@ -67,26 +67,34 @@ function rangeTitle(key) {
   return days ? `Boosts sent in the last ${days} days` : 'All boosts'
 }
 
-// 1W / 1M / All, and deliberately no 1Y where the ranked feeds have one.
+// ⚠️ ALL FOUR RANGES NOW, AND 1Y IS NOT WALKED. Reed's call, 2026-08-23, on
+// seeing it missing beside the members wall's four buttons.
 //
-// This feed WALKS its window in rather than querying it: ensureCoverage below
+// This feed WALKS a bounded window in rather than querying it: `ensureCoverage`
 // has to hold every boost in the range before it can sort them, or "largest
-// boost" ranks whichever pages happened to land. The network publishes ~38
-// boosts a day, so 1W is ~280 rows and 1M ~1,140, both a handful of 200-row
-// requests; a year is ~13,900 rows, which is ~70 sequential requests and
-// several megabytes before the first card paints. Widening this feed to a year
-// means giving it a `since`-scoped query the way /api/v1/episodes and
-// /api/v1/podcasts have, so the window is answered rather than walked. That is
-// a different feature, not a fourth button.
+// boost" ranks whichever pages happened to land. At ~38 boosts a day 1W is ~280
+// rows and 1M ~1,140, both a handful of 200-row requests. A year is ~13,900,
+// which is ~70 sequential requests and several megabytes before the first card
+// paints, and that is why 1Y was left out rather than merely slow.
 //
-// Derived here rather than exported from feed-controls.js on purpose. Assets
-// ship max-age=14400 and each module URL expires on its own clock, so a new
-// named export there is unresolvable for up to four hours in any browser
-// holding the older copy — and an unresolved named import is a LINK-TIME error
-// that takes the whole module down. Filtering a table that module already
-// exported degrades instead: an older RANGE_OPTIONS has no '1y' row, so this is
-// a no-op and the feed still renders. See feed-note.js for the full note.
-const WALKED_RANGES = RANGE_OPTIONS.filter(([key]) => key !== '1y')
+// ⚠️ WHAT UNBLOCKED IT WAS NOT A NEW QUERY. `/api/v1/boosts` does take `since`,
+// but `globalBoostReader` deliberately does not pass it — a `since`-bounded page
+// returns no cursor, so the client could not page back OUT when the reader
+// widens their range again. That note still stands.
+//
+// What 1Y gets instead is the treatment **All already has**: it is not
+// pre-walked, a non-chronological sort ranks only what has been loaded, and the
+// count line says so in those words. The honesty was already built; 1Y was the
+// one bounded window big enough to need it. See UNWALKED below.
+/* Named for what it is rather than for what it filtered: it was
+   `WALKED_RANGES`, a subset with '1y' removed, and both halves of that name are
+   now wrong. */
+const BOOST_RANGES = RANGE_OPTIONS
+
+/* The windows that are NOT paged in before they are painted. `all` has no
+   cutoff to page to; `1y` has one and is deliberately left unwalked, because
+   reaching it costs ~70 sequential requests before the first card. */
+const UNWALKED = new Set(['all', '1y'])
 
 // Deliberately shorter than the Episodes rollup's menu: an episode card
 // aggregates many boosts and can be ranked by boosters / boosts / sats, but a
@@ -502,6 +510,15 @@ export async function renderBoosts({ panel, list, scope = 'global' }) {
     return !!cutoff && source.hasMore && oldestTs() > cutoff
   }
 
+  /* ⚠️ ONE FACT, ONE POLICY, AND THEY ARE SEPARATE ON PURPOSE.
+     `needsCoverage()` is the FACT that the loaded corpus does not yet reach the
+     window's cutoff; `shouldPreWalk()` is the POLICY that we will sit and page
+     until it does. Folding 1Y into the fact would have taken the load-older
+     button away from it too, because that button is gated on the same
+     condition — and a 1Y view that neither walks nor offers to load more is a
+     window the reader can never actually fill. */
+  function shouldPreWalk() { return needsCoverage() && !UNWALKED.has(rangeKey) }
+
   // Cheap by construction, and now identically so on both scopes: a page is
   // ob-live.js's 200 rows. The network publishes ~38 boosts a day, so 1W is
   // ~280 rows (2 requests) and 1M ~1,140 (6) even on Global, where every boost
@@ -519,7 +536,7 @@ export async function renderBoosts({ panel, list, scope = 'global' }) {
   // it returns no cursor, and the client can't mint the opaque cursor it would
   // then need to keep paging *past* the window when the range widens again.
   async function ensureCoverage() {
-    while (needsCoverage()) {
+    while (shouldPreWalk()) {
       let got = 0
       try {
         got = await source.loadMore()
@@ -556,10 +573,13 @@ export async function renderBoosts({ panel, list, scope = 'global' }) {
   function updateMoreButton() {
     moreWrap.replaceChildren()
     const remaining = view.length - shown
-    // Paging further back only means anything on All: a bounded window is
-    // already covered in full, so once it's all on screen there is nothing
-    // left to fetch *for that window*.
-    const canLoadOlder = rangeKey === 'all' && source.hasMore
+    /* Paging further back means something on All, and on any window the corpus
+       does not yet reach back to — which is 1Y until it has been filled. A
+       pre-walked window is already covered in full, so once it is all on screen
+       there is nothing left to fetch *for that window*, and the button goes.
+       ⚠️ The 1Y button therefore disappears by itself when the year is covered,
+       rather than sitting there loading rows the range filter discards. */
+    const canLoadOlder = source.hasMore && (rangeKey === 'all' || needsCoverage())
     if (remaining <= 0 && !canLoadOlder) return
 
     const btn = h('button', { class: 'pcast-showmore', type: 'button' },
@@ -581,9 +601,13 @@ export async function renderBoosts({ panel, list, scope = 'global' }) {
       else updateMoreButton()
     })
 
-    // On All, a non-chronological order can only rank what's been loaded, so
-    // say what that is rather than implying it's the whole archive.
-    const note = rangeKey !== 'all'
+    /* ⚠️ THE CLAIM THE COUNT LINE MAKES DEPENDS ON COVERAGE, NOT ON THE RANGE.
+       A window that is fully in hand can say "of N in this window"; one that is
+       not can only describe what has been loaded, whatever button produced it.
+       Keying this on `rangeKey !== 'all'` was right while every bounded window
+       was pre-walked, and would have made a half-loaded 1Y claim completeness. */
+    const covered = rangeKey !== 'all' && !needsCoverage()
+    const note = covered
       ? `Showing ${shown} of ${view.length} in this window`
       : (sortKey === 'recent'
           ? `Showing ${shown} of ${view.length} loaded`
@@ -617,7 +641,7 @@ export async function renderBoosts({ panel, list, scope = 'global' }) {
     }, {
       label: 'Filter by when the boost was sent',
       titleFor: rangeTitle,
-      options: WALKED_RANGES,
+      options: BOOST_RANGES,
     }),
     sortControl(SORT_OPTIONS, sortKey, (key) => {
       if (key !== sortKey) apply(() => { sortKey = key })
