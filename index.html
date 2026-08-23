@@ -50,17 +50,17 @@
 
   <!-- Shared note / card styles (.note-card, .embed-note) — the boosts
        feeds render through the same kind-1 card as boosts-thread.js. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v120" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v121" />
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v120" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v121" />
   <!-- The episode card and its drawer, extracted from the inline block below
        when /episode/<guid> pages needed the same cards. See the file header. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v120" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v121" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. Must stay last
        among the stylesheets so the inline block below still wins. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v120" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v121" />
 
   <style>
     :root {
@@ -426,6 +426,84 @@
       margin: 0 auto;
       padding: 2rem 1.25rem 3rem;
     }
+    /* ══ The Members tab's sections ══ */
+    .members-block { display: none; }
+    body[data-active-tab="members"] .members-block { display: block; }
+    .members-intro {
+      margin: 0 0 1.5rem;
+      font-size: 0.95rem;
+      color: var(--muted);
+      max-width: 46rem;
+    }
+    .members-intro strong { color: var(--ink); font-weight: 700; }
+
+    .hpw { margin: 0 0 2.25rem; }
+    .hpw-heading {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 1.6rem; font-weight: 700; color: var(--ink);
+      margin: 0; letter-spacing: 0.01em;
+    }
+    .hpw-sub { margin: 0.2rem 0 1rem; font-size: 0.88rem; color: var(--muted); max-width: 44rem; }
+    .hpw-caveat { margin: 0.85rem 0 0; font-size: 0.78rem; color: var(--muted); max-width: 44rem; }
+
+    /* Two boards side by side where there is room, stacked where there is not.
+       This Week is first in the source and so is first on a phone — it is the
+       board with a live race in it. */
+    .hpw-boards { display: grid; gap: 1.1rem; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); }
+    .hpw-board {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 0.9rem 1rem 1rem;
+    }
+    .hpw-title {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 1.02rem; font-weight: 700; color: var(--ink); margin: 0 0 0.6rem;
+    }
+    .hpw-title small {
+      display: block; margin-top: 0.15rem;
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-size: 0.72rem; font-weight: 400; color: var(--muted);
+    }
+    .hpw-list { list-style: none; margin: 0; padding: 0; }
+    .hpw-empty { font-size: 0.82rem; color: var(--muted); margin: 0; }
+    .hpw-row {
+      display: flex; align-items: center; gap: 0.55rem;
+      padding: 0.32rem 0.4rem;
+      border-top: 1px solid var(--border);
+      font-variant-numeric: tabular-nums;
+      border-radius: 6px;
+    }
+    .hpw-row:first-child { border-top: 0; }
+    /* ⚠️ GOLD IS THE ONLY DECORATION ON THIS BOARD, and it marks the two rows in
+       the whole history that cleared forty hours. If it ever marks a third of
+       the list it has stopped meaning anything — the fix would be the goal, not
+       the styling. The tint is a wash rather than a fill so the row still reads
+       as a row. */
+    .hpw-row--gold {
+      background: linear-gradient(90deg, rgba(198,150,32,0.16), rgba(198,150,32,0.02));
+      box-shadow: inset 3px 0 0 #c69620;
+    }
+    .hpw-pos { width: 1.4rem; text-align: right; font-size: 0.78rem; color: var(--muted); flex: none; }
+    .hpw-face {
+      width: 26px; height: 26px; border-radius: 50%; flex: none;
+      object-fit: cover; background: var(--cream-d);
+    }
+    .hpw-face--none {
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.7rem; font-weight: 700; color: var(--muted);
+    }
+    .hpw-who { min-width: 0; flex: 1; display: flex; flex-direction: column; line-height: 1.2; }
+    .hpw-name {
+      font-weight: 700; font-size: 0.86rem; color: var(--ink); text-decoration: none;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    a.hpw-name:hover { color: var(--accent-d); text-decoration: underline; }
+    .hpw-week { font-size: 0.68rem; color: var(--muted); }
+    .hpw-hours { font-weight: 700; font-size: 0.92rem; color: var(--accent-d); flex: none; }
+    .hpw-unit { font-weight: 400; font-size: 0.72rem; color: var(--muted); }
+    .hpw-eps { font-size: 0.7rem; color: var(--muted); width: 3.6rem; text-align: right; flex: none; }
+
     .feed-panel { display: none; }
     .feed-panel.is-active { display: block; }
 
@@ -766,8 +844,8 @@
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
     }
   </style>
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v120" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v120" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v121" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v121" />
 </head>
 <body data-active-feed="episodes-global">
 
@@ -967,6 +1045,37 @@
      rank that subject holds under the current sort. -->
 <main class="feed-panels">
   <div class="feed-panels-inner">
+
+    <!-- ══ THE MEMBERS TAB'S OWN SECTIONS ══
+         Above the panels rather than inside one, because the Members tab holds
+         two boosts PANELS (Global and Follows) and these sections belong to the
+         tab, not to either of them. CSS shows the block only on that tab, the
+         same call .feed-bar-controls and .feed-subs make.
+
+         A member is anyone who has boosted at least one show. The intro says
+         that plainly and puts the mechanics on a second line a reader can skip:
+         the front door is not where somebody learns what a protocol is. -->
+    <div class="members-block" data-members-block>
+      <p class="members-intro">
+        <strong>A member is anyone who has boosted a show.</strong>
+        Send a boost from an app that tags what you are listening to, and you
+        show up here — no sign-up, nothing to join.
+      </p>
+      <div class="hpw" data-hpw>
+        <h2 class="hpw-heading">40 HPW</h2>
+        <p class="hpw-sub">
+          Boost an episode and we assume you heard all of it. Forty hours a
+          week is the question, not the entry fee.
+        </p>
+        <div class="hpw-boards" data-hpw-boards></div>
+        <p class="hpw-caveat">
+          Counts one listen per episode per week, over boosts that name an
+          episode we know the length of — about 14% do not. Accounts that
+          publish boosts on other people's behalf are left out.
+        </p>
+      </div>
+    </div>
+
 
     <!-- No caveat paragraph here. One above every feed was
          tried and removed: it is the first thing on the page, it is three
@@ -1531,17 +1640,17 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v120"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v121"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v120" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v121" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v120" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v121" defer></script>
 
 <!-- Feed hydration — lazily loads the active feed on first view. -->
-<script type="module" src="/assets/js/feeds.js?v=ob-v120"></script>
-<script src="/assets/js/nav.js?v=ob-v120" defer></script>
+<script type="module" src="/assets/js/feeds.js?v=ob-v121"></script>
+<script src="/assets/js/nav.js?v=ob-v121" defer></script>
 
 </body>
 </html>

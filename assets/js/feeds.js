@@ -33,7 +33,7 @@
  * feed-bar controller in index.html, plus a load of whichever feed is active
  * when this module first runs).
  */
-import { STATIC_RELAYS, fetchProfilesFromPrimal } from '/assets/js/boosts-thread.js?v=ob-v120'
+import { STATIC_RELAYS, fetchProfilesFromPrimal } from '/assets/js/boosts-thread.js?v=ob-v121'
 import {
   parseCalendarEvent,
   renderCalendarCard,
@@ -44,13 +44,13 @@ import {
   clearPendingPromote,
   KIND_DATE_EVENT,
   KIND_TIME_EVENT,
-} from '/assets/js/calendar-events.js?v=ob-v120'
-import { SimplePool, verifyEvent, nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v120'
+} from '/assets/js/calendar-events.js?v=ob-v121'
+import { SimplePool, verifyEvent, nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v121'
 // Supporter-set resolution lives in one shared module; re-exported below so
 // home-feeds.js keeps importing resolveSupporters from feeds.js unchanged.
-import { resolveSupporters } from '/assets/js/supporter-set.js?v=ob-v120'
+import { resolveSupporters } from '/assets/js/supporter-set.js?v=ob-v121'
 // Identity, for keeping the Follows feeds in sync with who's signed in.
-import { getSessionPubkey, clearFollowCache } from '/assets/js/follow-set.js?v=ob-v120'
+import { getSessionPubkey, clearFollowCache } from '/assets/js/follow-set.js?v=ob-v121'
 
 // Hourly events snapshot (Cloudflare Pages Function proxying the file
 // bots/community-feeds pushes to the VPS). It carries the same raw signed
@@ -1067,9 +1067,9 @@ async function hydrate(panelId, mod, scope, medium, lang) {
 }
 
 // ── Lazy per-feed dispatch ───────────────────────────────────────────
-const BOOSTS = '/assets/js/boosts-feed.js?v=ob-v120'
-const PODCASTS = '/assets/js/feeds-podcasts.js?v=ob-v120'
-const SHOWS = '/assets/js/shows-feed.js?v=ob-v120'
+const BOOSTS = '/assets/js/boosts-feed.js?v=ob-v121'
+const PODCASTS = '/assets/js/feeds-podcasts.js?v=ob-v121'
+const SHOWS = '/assets/js/shows-feed.js?v=ob-v121'
 // Each module's entry point, by module. Named rather than sniffed out of the
 // path, so adding a feed is one line here instead of another branch.
 const RENDERERS = {
@@ -1102,11 +1102,35 @@ function loadFeed(feed, lang) {
   loader(lang)
 }
 
+/* The Members tab's own sections, which belong to the TAB rather than to either
+ * of the two boosts panels under it. Hydrated off the same activate event, on
+ * whichever boosts feed the reader arrives at; renderMembersBoards is
+ * idempotent, so the second arrival costs a marker check.
+ *
+ * ⚠️ IT IS NEVER AWAITED AND NEVER ALLOWED TO THROW. The bottom half of that
+ * tab is a working feed, and a board that cannot load must not delay or break
+ * it — the same discipline the podroll queries have on /show. */
+const MEMBER_TABS = new Set(['boosts-global', 'boosts-follows'])
+let boardsWired = false
+function loadMemberBoards() {
+  if (boardsWired) return
+  const root = document.querySelector('[data-hpw-boards]')
+  if (!root) return
+  boardsWired = true
+  import('/assets/js/members-board.js?v=ob-v121')
+    .then((m) => m.renderMembersBoards(root))
+    .catch((err) => {
+      console.warn('[feeds] member boards failed to load', err)
+      boardsWired = false
+    })
+}
+
 document.addEventListener('lb:feed-activate', (e) => {
   const feed = e?.detail?.feed
   // Only read on the FIRST activation of a feed; afterwards the mounted control
   // owns the language and the controller talks to it through lb:set-feed-lang.
   if (feed) loadFeed(feed, e?.detail?.lang)
+  if (feed && MEMBER_TABS.has(feed)) loadMemberBoards()
 })
 
 // ── Session-driven refresh ───────────────────────────────────────────
