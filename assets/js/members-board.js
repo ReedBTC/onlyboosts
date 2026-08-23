@@ -14,9 +14,9 @@
  * A repeated name is authentic to it rather than a bug to collapse — Piez holds
  * five of the top ten and that is the actual story of the board.
  */
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v121'
-import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v121'
-import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v121'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v122'
+import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v122'
+import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v122'
 
 const esc = htmlEscape
 const HOURS_API = '/api/v1/members/hours'

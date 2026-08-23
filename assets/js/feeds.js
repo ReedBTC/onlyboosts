@@ -33,7 +33,7 @@
  * feed-bar controller in index.html, plus a load of whichever feed is active
  * when this module first runs).
  */
-import { STATIC_RELAYS, fetchProfilesFromPrimal } from '/assets/js/boosts-thread.js?v=ob-v121'
+import { STATIC_RELAYS, fetchProfilesFromPrimal } from '/assets/js/boosts-thread.js?v=ob-v122'
 import {
   parseCalendarEvent,
   renderCalendarCard,
@@ -44,13 +44,13 @@ import {
   clearPendingPromote,
   KIND_DATE_EVENT,
   KIND_TIME_EVENT,
-} from '/assets/js/calendar-events.js?v=ob-v121'
-import { SimplePool, verifyEvent, nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v121'
+} from '/assets/js/calendar-events.js?v=ob-v122'
+import { SimplePool, verifyEvent, nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v122'
 // Supporter-set resolution lives in one shared module; re-exported below so
 // home-feeds.js keeps importing resolveSupporters from feeds.js unchanged.
-import { resolveSupporters } from '/assets/js/supporter-set.js?v=ob-v121'
+import { resolveSupporters } from '/assets/js/supporter-set.js?v=ob-v122'
 // Identity, for keeping the Follows feeds in sync with who's signed in.
-import { getSessionPubkey, clearFollowCache } from '/assets/js/follow-set.js?v=ob-v121'
+import { getSessionPubkey, clearFollowCache } from '/assets/js/follow-set.js?v=ob-v122'
 
 // Hourly events snapshot (Cloudflare Pages Function proxying the file
 // bots/community-feeds pushes to the VPS). It carries the same raw signed
@@ -1067,9 +1067,9 @@ async function hydrate(panelId, mod, scope, medium, lang) {
 }
 
 // ── Lazy per-feed dispatch ───────────────────────────────────────────
-const BOOSTS = '/assets/js/boosts-feed.js?v=ob-v121'
-const PODCASTS = '/assets/js/feeds-podcasts.js?v=ob-v121'
-const SHOWS = '/assets/js/shows-feed.js?v=ob-v121'
+const BOOSTS = '/assets/js/boosts-feed.js?v=ob-v122'
+const PODCASTS = '/assets/js/feeds-podcasts.js?v=ob-v122'
+const SHOWS = '/assets/js/shows-feed.js?v=ob-v122'
 // Each module's entry point, by module. Named rather than sniffed out of the
 // path, so adding a feed is one line here instead of another branch.
 const RENDERERS = {
@@ -1117,7 +1117,7 @@ function loadMemberBoards() {
   const root = document.querySelector('[data-hpw-boards]')
   if (!root) return
   boardsWired = true
-  import('/assets/js/members-board.js?v=ob-v121')
+  import('/assets/js/members-board.js?v=ob-v122')
     .then((m) => m.renderMembersBoards(root))
     .catch((err) => {
       console.warn('[feeds] member boards failed to load', err)
@@ -1180,7 +1180,13 @@ window.addEventListener('storage', (e) => {
  * lb:feed-activate that carried the language fired before this module existed.
  * Taking only the feed here is what made a shared link paint the unfiltered
  * feed while the URL claimed otherwise. */
-loadFeed(
-  document.body.dataset.activeFeed || 'episodes-global',
-  document.body.dataset.feedLang || '',
-)
+const bootFeed = document.body.dataset.activeFeed || 'episodes-global'
+loadFeed(bootFeed, document.body.dataset.feedLang || '')
+/* ⚠️ AND THE MEMBERS BOARDS TOO, ON THIS PATH AS WELL AS ON THE EVENT. The cold
+ * load does not go through the lb:feed-activate listener — the controller fired
+ * that during parse, before this module existed, which is the whole reason the
+ * line above re-reads the attribute. Hooking only the listener meant the boards
+ * rendered when a reader CLICKED to Members and stayed empty on every reload,
+ * every shared `#boosts-global` link, and every back-navigation onto the tab.
+ * Two entry points, one guard: loadMemberBoards is idempotent. */
+if (MEMBER_TABS.has(bootFeed)) loadMemberBoards()

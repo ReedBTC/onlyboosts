@@ -338,5 +338,32 @@ console.log('\nThe tab grid and the sub grid line up:')
   }
 }
 
+/* ── The two ways a feed gets hydrated ─────────────────────────────────
+ * ⚠️ THE COLD LOAD DOES NOT GO THROUGH lb:feed-activate. The inline controller
+ * dispatches that during parse, before feeds.js — a deferred module — exists,
+ * which is why feeds.js re-reads body[data-active-feed] at the end and calls
+ * loadFeed itself. Anything hooked to the event ALONE therefore runs when a
+ * reader clicks to a feed and never on a reload, a shared link, or a back
+ * navigation onto it.
+ *
+ * That shipped once: the 40 HPW boards were wired to the listener only, so the
+ * Members tab rendered its heading and its caveat with an empty gap between
+ * them on every cold load. A source scan rather than a render, because the bug
+ * is which call sites exist, not what any of them does. */
+console.log('\nBoth hydration entry points are wired:')
+{
+  const feeds = readFileSync(join(ROOT, 'assets/js/feeds.js'), 'utf8')
+  const listenerAt = feeds.indexOf("document.addEventListener('lb:feed-activate'")
+  eq('feeds.js still has the activate listener', listenerAt > -1, true)
+  // The listener block ends at the first `})` at the start of a line after it.
+  const listenerEnd = feeds.indexOf('\n})', listenerAt)
+  const inListener = feeds.slice(listenerAt, listenerEnd)
+  const afterListener = feeds.slice(listenerEnd)
+  for (const [what, call] of [['the feed itself', 'loadFeed('], ['the members boards', 'loadMemberBoards()']]) {
+    eq(`${what}: hydrated from the event`, inListener.includes(call), true)
+    eq(`${what}: AND on the cold load`, afterListener.includes(call), true)
+  }
+}
+
 console.log(`\n${pass} assertions passed${fail ? `, ${fail} FAILED` : ''}.`)
 process.exit(fail ? 1 : 0)
