@@ -19,10 +19,11 @@
  *
  * Extracted from boosts-thread.js so the show pages can use it without
  * importing that module — /show/<guid> is server-rendered and pulling in
- * boosts-thread.js (30KB) plus calendar-events.js (24KB) plus nostr-tools
- * (102KB) to resolve a handful of names would defeat the point of rendering it
- * on the server. boosts-thread.js now imports from here, so there is one
- * implementation and one timeout.
+ * boosts-thread.js plus nostr-tools (102KB) to resolve a handful of names
+ * would defeat the point of rendering it on the server. boosts-thread.js now
+ * imports from here, so there is one implementation and one timeout.
+ * (calendar-events.js was the third file in that sum until 2026-08-23, when it
+ * was deleted along with the LB thread fetch that was its only live caller.)
  */
 
 const PRIMAL_WS_URL = 'wss://cache1.primal.net/v1'

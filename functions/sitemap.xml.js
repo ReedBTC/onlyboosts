@@ -45,9 +45,15 @@ const MAX_EPISODES = 20000;
 // don't index fragments separately — listing them would just be duplicate
 // entries for the same URL.
 //
-// /stats and /boosters are deliberately absent: they're coming-soon
-// placeholders and carry `noindex` themselves. Add them here when they have a
-// feature behind them.
+// /stats is deliberately absent: it is a coming-soon placeholder and carries
+// `noindex` itself. Add it here when it has a feature behind it.
+//
+// /boosters was the second such placeholder. It was DELETED on 2026-08-23
+// rather than redirected — the homepage's Members tab answers what it promised
+// (the member lookup, the top-members wall, the #40HPW boards), and a page that
+// was noindex, out of this sitemap and linked from nowhere but the nav and
+// footer has no inbound traffic to preserve. `/api/v1/boosters/<npub>` is a
+// different path entirely and is live; do not confuse the two.
 //
 // /shows was a third such placeholder and is now a 301 to /#shows, since the
 // Shows feed replaced it. The idea it was holding open is still open, and is

@@ -29,7 +29,7 @@ paragraph that used to explain any name in here.
 | `/episode/<item-guid>` | one episode, edge-rendered |
 | `/booster/<npub>` | one person, edge-rendered |
 | `/about` | the project's own explanation of what the data is and isn't |
-| `/stats`, `/boosters` | coming-soon placeholders: nav + header + soon-card, `noindex`, out of the sitemap |
+| `/stats` | a coming-soon placeholder: nav + header + soon-card, `noindex`, out of the sitemap. `/boosters` was the second one and was **deleted** on 2026-08-23 — see the Stats row of the site map |
 | `/404.html` | see the ⚠️ under LB conventions |
 
 `/shows` and `/podcasts` are both 301s to `/#shows` now; the Shows feed replaced
@@ -44,7 +44,16 @@ order. They are the site map, so **they're regrouped together or not at all**:
 | Group | Items |
 |---|---|
 | **Feeds** | Podcasts `/#episodes-global` · Music `/#albums` · Members `/#members` |
-| **Stats** | Boost Stats `/stats` · Community `/boosters` — both coming soon |
+| **Stats** | Boost Stats `/stats` — coming soon |
+
+**⚠️ `/boosters` (Community) WAS THE SECOND STATS ENTRY AND THE PAGE IS DELETED,
+NOT REDIRECTED.** *Reed's call, 2026-08-23.* The Members tab now answers what it
+promised — the member lookup, the top-members wall, the #40HPW boards — so the
+placeholder pointed a reader at a promise for content that exists one tab over.
+It was `noindex`, out of the sitemap, and linked from nowhere but this menu and
+the footer, so there is nothing to redirect: no inbound links, no bookmarks, no
+search presence. **`/api/v1/boosters/<npub>` and `/booster/<npub>` are different
+paths entirely and are live** — do not confuse the plural page with either.
 | **More** (footer: *Connect*) | About · Source · Report a bug |
 
 **⚠️ FEEDS IS ONE ENTRY PER TAB, NOT PER FEED, AND EACH LANDS ON THAT TAB'S
@@ -254,6 +263,50 @@ Design and code are also expected to be pulled from:
 - `~/Desktop/Files/nostr/mynostr` — the full React Nostr client
 - `ChadFarrow/boostmebitch` (BMB) — Podcast Index proxy, wallet rails,
   signed-out boosts via a server-side identity, live-stream zaps
+
+### What The Strip Removed
+
+The fork left LB's own products in the tree, unreachable but shipped. They were
+deleted on 2026-08-23, before the `homepage` branch merged. **~6,600 lines of
+source, and what a homepage visitor downloads went down by 202KB raw:**
+
+| | |
+|---|---|
+| `assets/js/feeds.js` | 50.4KB → **12.4KB**. The whole Events path: `loadEvents`, the NIP-52 calendar machinery, the streaming relay subscription, the month browser. Unreachable since the Events tab went on fork — `LOADERS` never mapped it — and two endpoints it read, `/api/community-events` and `/api/meetups`, do not exist on this fork at all. |
+| `assets/js/boosts-thread.js` | 29.6KB → **18.4KB**. `ROOT_NEVENT`, `EXCLUDED_NOTE_IDS`, `fetchBoostThread` and the six helpers only it called. |
+| `assets/js/calendar-events.js` | **deleted** (24.4KB, and it was precached). |
+| `assets/js/supporter-set.js` | **deleted** (7.1KB). Its only importer was `feeds.js`. |
+| `assets/widgets/login-widget.js` | 1,051KB → **929KB**. 22 source files: `BoostModal`, `EpisodeBoostModal`, `MultiLegBoostForm`, `BoostProgressView`, `BoostExpectations`, and the entire LB meetup product (`CreateMeetupModal`, `MyMeetupsModal`, `SearchMeetupsModal`, `EventComposer`, `eventForm`, `eventPublish`, `eventTypes`, `eventAnnouncement`, `primalSearch`, …), plus `openShowBoost`, `openEpisodeBoost`, `openMeetupModal` and `mountFindFlow` out of `index.jsx`. |
+
+**⚠️ THE CALENDAR CARD HAD ALREADY BEEN UNREACHABLE, AND THE NOTE HERE SAID
+OTHERWISE FOR MONTHS.** This file used to claim `calendar-events.js` was
+"retained because `boosts-thread.js` imports it to render calendar-event quotes
+inside boost notes — that circular import is what makes the cleanup fiddly."
+Both halves were wrong. There was no circular import: the module had two
+ordinary importers. And the rich card could never appear, because the only
+writer of the cache it read was `fetchBoostThread`, which has had no caller
+since the fork — so every quoted calendar event fell through to the naddr chip,
+every time. **The chip's own reading of the two NIP-52 kinds is what survives**,
+inlined as two integers in `boosts-thread.js`, so a quoted event still links out
+as "📅 Linked event on Nostr →" rather than as an article. Nothing a reader
+could see changed.
+
+**⚠️ THE BUILD DOES NOT CATCH A DELETION THAT GOES TOO FAR, AND THIS ONE DID.**
+Cutting `index.jsx` by banner-comment ranges swallowed `BoostApp` — the nav's
+Donate button — and `let mounted = false`, which `api.mount()` guards on. Vite
+built both away without a word: an undeclared module-level identifier is a
+runtime `ReferenceError`, not a build error, and there is no linter here.
+`scripts/test-boost-modal-render.mjs` is what failed, because it walks for
+`function BoostApp()` by name. **A widget deletion is verified by that test and
+by a declared-versus-referenced diff against the previous revision, never by a
+green build.**
+
+**Two checks are worth reusing for any future strip**, and neither is a test in
+the repo: a module-graph walk that resolves every import *and* every named
+import against the target's exports (the `ob-v53` failure class), and a
+reachability walk over `login-widget/src` from `index.jsx` that lists orphaned
+files. The second one must count bare side-effect imports (`import './x.js'`)
+or it reports `styles.css` and `navigationGuard.js` as dead.
 
 ## Stack
 
@@ -4470,10 +4523,10 @@ would. Never remove an entry** — those links are in the wild.
 
 **Still to build:**
 
-1. **The two Stats pages.** `/stats` (Boost Stats) and `/boosters` (Community) are
-   coming-soon placeholders and are the whole Stats column of the Explore menu, so
-   both are visible and both promise something. **`/stats` has a rich ancestor
-   upstream** and it's the thing to pull from rather than starting over:
+1. **`/stats` (Boost Stats).** A coming-soon placeholder, and now the whole
+   Stats column of the Explore menu, so it is visible and it promises something.
+   **It has a rich ancestor upstream** and that's the thing to pull from rather
+   than starting over:
 
    ```
    git show lb/main:stats.html            # 38KB, the charts + view switcher
@@ -4483,14 +4536,12 @@ would. Never remove an entry** — those links are in the wild.
 
    It was built against LB's own sats log, so the data layer is wrong for us, but
    the chart code, the broken-axis outlier handling and the view switcher are
-   directly relevant. **`/boosters` is now much closer than it was**, since
-   `/booster/<npub>` exists and `functions/api/v1/boosters/[npub].js` is the query
-   it would page. **The path stayed `/boosters` when the label became Community**:
-   the URL is in the wild and the rename was a label change. **⚠️ And the
-   homepage's Members tab now answers most of what `/boosters` promised** — the
-   member search, the top-members wall and the #40HPW boards all live there, so
-   the open question is whether `/boosters` becomes a 301 to `/#members` rather
-   than a page of its own.
+   directly relevant. `/api/v1/clients` is already built and renders nowhere,
+   which makes "boosts by app" the obvious first view.
+
+   **⚠️ `/boosters` IS NO LONGER THE SECOND HALF OF THIS ITEM.** It was deleted
+   on 2026-08-23 rather than built or redirected: the Members tab answers what
+   it promised. See the Stats row of the site map.
 
 2. **Shows · Follows.** The scope menu is hidden on Shows because the show-level
    rollup is computed over everyone. See the scope note at the top of
@@ -4505,25 +4556,18 @@ would. Never remove an entry** — those links are in the wild.
    `relay.mynostr.app`'s strfry write-policy plugin still has to whitelist that
    literal string. **VPS-side — reports are silently rejected until it's made.**
 
-5. **Dead LB code still in the tree.** `feeds.js` keeps `loadEvents` and the
-   NIP-52 calendar machinery, unreachable since the Events tab went away
-   (`LOADERS` doesn't map it). `boosts-thread.js` still has LB's `ROOT_NEVENT` and
-   `EXCLUDED_NOTE_IDS`, and `fetchBoostThread` has no caller. `calendar-events.js`
-   is only retained because `boosts-thread.js` imports it to render calendar-event
-   quotes inside boost notes — that circular import is what makes the cleanup
-   fiddly. All of it ships to every visitor.
+5. **Dead LB code — mostly gone, one layer left.** The bulk of it was deleted
+   on 2026-08-23 (`git show 75f88ef` and the commit after it); what that
+   removed and what it did not is under **What The Strip Removed** below.
 
-   **⚠️ `EpisodeBoostModal.jsx` is dead too, and knowing that is worth real
-   time.** `openEpisodeBoost` has no caller anywhere in `assets/js` or
-   `functions` — it is LB's own-podcast boost flow. The live map is: **every
-   podcast boost on this site goes through `openExternalBoost` →
-   `ExternalBoostModal`**, from all six surfaces in the boost-button table
-   above, **and the nav's Donate button now joins them through
-   `openSiteDonation`**. `openShowBoost` → `BoostModal` → `MultiLegBoostForm`
-   has no caller left on this fork at all. A change to "the boost modal"
-   is one file, not three, and `MultiLegBoostForm`'s presign-then-publish design
-   is deliberately untouched because nothing on this fork exercises it
-   multi-leg.
+   **What is left is `boostQueue.js` and `payAllLegs.js`.** `submitBoost`'s only
+   caller was `MultiLegBoostForm`, so both are now dead — but `boostQueue.js` is
+   still *imported*, by `navigationGuard.js` and `IdentityDropdown.jsx`, for the
+   in-flight tracking those two read. That tracking can no longer become
+   non-empty, so the dropdown's in-flight UI and the navigation guard are dead
+   with it. Removing them means editing two live components rather than deleting
+   files, which is why it was left. `payAllLegs.js`'s stale keysend classifier
+   (see the ⚠️ under The Keysend Upgrade) is the same finding from the other end.
 
 6. **Typography.** The brand wordmark is a bold sans; the site is still on LB's
    Playfair Display / Source Serif 4. It reads fine, but the serif is inherited,

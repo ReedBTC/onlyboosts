@@ -5,18 +5,12 @@ import { createPortal } from 'react-dom'
 import { NDKEvent } from '@nostr-dev-kit/ndk'
 import BoostButton from './components/BoostButton.jsx'
 import LoginModal from './components/LoginModal.jsx'
-import EpisodeBoostModal from './components/EpisodeBoostModal.jsx'
 import ExternalBoostModal from './components/ExternalBoostModal.jsx'
 import ModalErrorBoundary from './components/ModalErrorBoundary.jsx'
-import BoostModal from './components/BoostModal.jsx'
 import IdentityWidget from './components/IdentityWidget.jsx'
 import WalletConnectModal from './components/WalletConnectModal.jsx'
 import ToastHost from './components/ToastHost.jsx'
 import BoostProgressBanner from './components/BoostProgressBanner.jsx'
-import MyMeetupsModal from './components/MyMeetupsModal.jsx'
-import SearchMeetupsModal from './components/SearchMeetupsModal.jsx'
-import BoostExistingMeetupModal from './components/BoostExistingMeetupModal.jsx'
-import CreateMeetupModal from './components/CreateMeetupModal.jsx'
 import BugReportModal from './components/BugReportModal.jsx'
 import {
   loadSession, restoreSession, clearSession,
@@ -316,8 +310,8 @@ function setPendingAction(fn) {
 }
 function consumePendingAction() {
   if (pendingActions.length === 0) return
-  // Drain into a local copy so callbacks that re-enqueue (e.g. an
-  // openEpisodeBoost that re-hits another gate) don't race with this
+  // Drain into a local copy so callbacks that re-enqueue (e.g. a gated
+  // open* call that re-hits another gate) don't race with this
   // loop. Defer one tick so React state from the gate completion has
   // a chance to settle before each action checks currentUser / nwc.
   const drained = pendingActions.splice(0, pendingActions.length)
@@ -329,64 +323,6 @@ function consumePendingAction() {
 }
 function cancelPendingAction() {
   pendingActions.length = 0
-}
-
-// ── Show-boost modal signal ──────────────────────────────────────────────
-// Tri-state: null (closed) | { prefillMessage?: string } (open).
-// Wrapping the open flag in a state object lets callers pass a
-// prefilled boostagram message — used by the /newevent composer to
-// open the boost modal with the announcement text already filled in.
-const showBoostOpenListeners = new Set()
-let showBoostState = null
-function setShowBoostState(v) {
-  showBoostState = v || null
-  for (const fn of showBoostOpenListeners) {
-    try { fn(showBoostState) } catch {}
-  }
-}
-
-function BoostApp() {
-  // ⚠️ THIS IS THE NAV'S DONATE BUTTON, AND IT IS THE ONE THAT ACTUALLY RUNS.
-  // React mounts over `#lb-boost-slot` as soon as the bundle lands, replacing
-  // the static placeholder — so `nav-widget-boot.js`'s click handler governs
-  // only the first press, before this exists. Pointing that handler at the new
-  // flow and leaving this one alone is why Donate still opened the login modal
-  // after the rest of the work was done, and the fallback branch over there
-  // made it look like a plausible wiring rather than a miss.
-  //
-  // ⚠️ `openSiteDonation`, NEVER `openShowBoost`. That one's Gate 1 is a bare
-  // `api.requestLogin()`, because `MultiLegBoostForm` signs its kind-1 BEFORE
-  // paying and therefore needs a signer by construction. Donating is a payment
-  // and a payment needs no Nostr identity: the wallet gate belongs behind the
-  // Boost press inside the modal, and the note is decided in the form.
-  return <BoostButton onOpen={() => api.openSiteDonation()} />
-}
-
-function ShowBoostHost() {
-  const user = useSharedUser()
-  const [state, setLocalState] = useState(showBoostState)
-  useEffect(() => {
-    const fn = (v) => setLocalState(v)
-    showBoostOpenListeners.add(fn)
-    return () => { showBoostOpenListeners.delete(fn) }
-  }, [])
-  if (!state) return null
-  return createPortal(
-    <div className="lb-w"><BoostModal
-      user={user || null}
-      prefillMessage={state.prefillMessage || ''}
-      onClose={() => setShowBoostState(null)}
-      onSettled={(r) => {
-        // Let the community-status chip (community-status.js) know this npub
-        // just boosted the show, so it can flip to its "pending member" state
-        // while the bot adds them to the follow pack. Show boost only.
-        try {
-          window.dispatchEvent(new CustomEvent('lb:show-boost-settled', { detail: r }))
-        } catch {}
-      }}
-    /></div>,
-    document.body,
-  )
 }
 
 // ── Standalone login prompt ──────────────────────────────────────────────
@@ -484,35 +420,26 @@ function WalletConnectHost() {
   )
 }
 
-// ── Episode boost host ───────────────────────────────────────────────────
-const episodeBoostListeners = new Set()
-let episodeBoostState = null   // { episode, splits } or null when closed
-function setEpisodeBoostState(v) {
-  episodeBoostState = v
-  for (const fn of episodeBoostListeners) {
-    try { fn(episodeBoostState) } catch {}
-  }
-}
-
-function EpisodeBoostHost() {
-  const user = useSharedUser()
-  const [state, setLocalState] = useState(episodeBoostState)
-  useEffect(() => {
-    const fn = (v) => setLocalState(v)
-    episodeBoostListeners.add(fn)
-    return () => { episodeBoostListeners.delete(fn) }
-  }, [])
-  if (!state) return null
-  return createPortal(
-    <div className="lb-w"><EpisodeBoostModal
-      user={user || null}
-      onUserChange={(u) => { abortRestore(); setUser(u) }}
-      onClose={() => setEpisodeBoostState(null)}
-      episode={state.episode}
-      splitsBundle={state.splits}
-    /></div>,
-    document.body,
-  )
+// ── The nav's Donate button ──────────────────────────────────────────────
+function BoostApp() {
+  // ⚠️ THIS IS THE NAV'S DONATE BUTTON, AND IT IS THE ONE THAT ACTUALLY RUNS.
+  // React mounts over `#lb-boost-slot` as soon as the bundle lands, replacing
+  // the static placeholder — so `nav-widget-boot.js`'s click handler governs
+  // only the first press, before this exists. Pointing that handler at the new
+  // flow and leaving this one alone is why Donate still opened the login modal
+  // after the rest of the work was done, and the fallback branch over there
+  // made it look like a plausible wiring rather than a miss.
+  //
+  // ⚠️ `openSiteDonation` IS NOW THE ONLY OPTION, AND THAT IS WHY THIS COMMENT
+  // SURVIVES. It used to say "never `openShowBoost`", which was a live trap:
+  // that flow's Gate 1 was a bare `api.requestLogin()`, because
+  // `MultiLegBoostForm` signed its kind-1 BEFORE paying and needed a signer by
+  // construction. Both were deleted on 2026-08-23, so the wrong call no longer
+  // exists to be made — but the reasoning is why Donate must stay ungated:
+  // donating is a payment, a payment needs no Nostr identity, the wallet gate
+  // belongs behind the Boost press inside the modal, and the note is decided in
+  // the form. `test-boost-modal-render.mjs` still pins this call.
+  return <BoostButton onOpen={() => api.openSiteDonation()} />
 }
 
 // ── External-episode boost host (other podcasts, via /feeds) ─────────────
@@ -556,81 +483,6 @@ function ExternalBoostHost() {
     </ModalErrorBoundary></div>,
     document.body,
   )
-}
-
-// ── Meetup-flow modal host ───────────────────────────────────────────────
-// One signal, one host. The four entry points on the meetups page —
-// "My meetups", "Search Nostr", "Paste naddr", "+ Create new" — set the
-// same module-level state with a discriminator, and this host renders
-// whichever modal is open. Only one is ever open at a time.
-const meetupModalListeners = new Set()
-let meetupModalState = null   // { kind: 'my'|'search'|'paste'|'create' } or null
-function setMeetupModalState(v) {
-  meetupModalState = v || null
-  for (const fn of meetupModalListeners) {
-    try { fn(meetupModalState) } catch {}
-  }
-}
-
-function MeetupModalHost() {
-  const user = useSharedUser()
-  const [state, setLocalState] = useState(meetupModalState)
-  useEffect(() => {
-    const fn = (v) => setLocalState(v)
-    meetupModalListeners.add(fn)
-    return () => { meetupModalListeners.delete(fn) }
-  }, [])
-  if (!state) return null
-
-  const close = () => setMeetupModalState(null)
-  const openShowBoostWithMessage = (msg) => api.openShowBoost({ prefillMessage: msg })
-
-  // Pass the stub-inclusive user so the modals render their real content
-  // (event list / composer form) during the brief background-restore
-  // window instead of flashing a sign-in gate. A stub carries the pubkey
-  // these flows need; the actual sign is gated downstream (openShowBoost
-  // for boosts, ensureSignerOk for the create publish).
-  let body = null
-  if (state.kind === 'my') {
-    body = (
-      <MyMeetupsModal
-        user={user}
-        onClose={close}
-        onBoostMeetup={openShowBoostWithMessage}
-        onRequestSignIn={() => api.requestLogin()}
-      />
-    )
-  } else if (state.kind === 'search') {
-    body = (
-      <SearchMeetupsModal
-        onClose={close}
-        onBoostMeetup={openShowBoostWithMessage}
-      />
-    )
-  } else if (state.kind === 'paste') {
-    body = (
-      <BoostExistingMeetupModal
-        user={user}
-        onClose={close}
-        onRequestSignIn={() => api.requestLogin()}
-        onOpenShowBoostWithMessage={openShowBoostWithMessage}
-      />
-    )
-  } else if (state.kind === 'create') {
-    body = (
-      <CreateMeetupModal
-        user={user}
-        onClose={close}
-        onRequestSignIn={() => api.requestLogin()}
-        onOpenShowBoostWithMessage={openShowBoostWithMessage}
-        ensureSignerOk={ensureSignerVerified}
-      />
-    )
-  }
-
-  if (!body) return null
-  return createPortal(
-    <div className="lb-w">{body}</div>, document.body)
 }
 
 // ── Bug-report modal host ────────────────────────────────────────────────
@@ -681,26 +533,6 @@ function IdentityHost() {
   )
 }
 
-// ── Embedded "find a meetup to feature" flow ─────────────────────────────
-// Renders a flow's body (My Meetups / Search) with no modal chrome so it can
-// live inside the /feeds "Find" modal's accordion drawers instead of opening a
-// second modal. Boosting closes the host modal (onBoosted) then opens the
-// show-boost modal — the flows build the {naddr}-prefilled message themselves.
-function EmbeddedFindFlow({ kind, onBoosted }) {
-  const user = useSharedUser()
-  const boost = (msg) => { onBoosted?.(); api.openShowBoost({ prefillMessage: msg }) }
-  if (kind === 'search') {
-    return <SearchMeetupsModal embedded onBoostMeetup={boost} />
-  }
-  return (
-    <MyMeetupsModal
-      embedded
-      user={user}
-      onBoostMeetup={boost}
-      onRequestSignIn={() => api.requestLogin()}
-    />
-  )
-}
 
 let mounted = false
 
@@ -745,11 +577,8 @@ const api = {
       return el
     }
     createRoot(makeHost('lb-login-prompt-host')).render(<LoginPromptHost />)
-    createRoot(makeHost('lb-episode-boost-host')).render(<EpisodeBoostHost />)
     createRoot(makeHost('lb-external-boost-host')).render(<ExternalBoostHost />)
-    createRoot(makeHost('lb-show-boost-host')).render(<ShowBoostHost />)
     createRoot(makeHost('lb-wallet-connect-host')).render(<WalletConnectHost />)
-    createRoot(makeHost('lb-meetup-modal-host')).render(<MeetupModalHost />)
     createRoot(makeHost('lb-bug-report-host')).render(<BugReportHost />)
     createRoot(makeHost('lb-toast-host')).render(<ToastHost />)
     createRoot(makeHost('lb-boost-progress-host')).render(<BoostProgressBanner />)
@@ -885,138 +714,11 @@ const api = {
   },
 
   /**
-   * Open the show-boost modal. Mirrors openEpisodeBoost's gate chain
-   * because the show boost uses the same multi-leg payment flow:
-   * needs login (allowlisted leg metadata is donor-signed), needs the
-   * real signer (not a stub), needs the signer to match the saved
-   * pubkey, and needs a wallet connected (NWC or WebLN).
-   *
-   * No auto-engage — a user without a wallet is routed through the
-   * connect modal, which surfaces both the WebLN extension button
-   * and the NWC paste field. Auto-engage was removed because Alby's
-   * per-domain permission can silently re-grant on a shared browser,
-   * leaking one user's wallet to another's first boost click.
-   */
-  async openShowBoost(opts = {}) {
-    const prefillMessage = typeof opts?.prefillMessage === 'string' ? opts.prefillMessage : ''
-
-    // Gate 1: signed in?
-    if (!currentUser || currentUser === undefined) {
-      setPendingAction(() => api.openShowBoost({ prefillMessage }))
-      api.requestLogin()
-      return
-    }
-
-    // Gate 1.5: real user (not a stub)?
-    if (isStubUser(currentUser)) {
-      setPendingAction(() => api.openShowBoost({ prefillMessage }))
-      ensureRealRestore()
-      return
-    }
-
-    // Gate 1.75: signer-account match.
-    if (!await ensureSignerVerified()) return
-
-    // Gate 2: wallet connected? Try the at-rest restore (NWC blob or
-    // per-pubkey WebLN flag); if neither lands, route through the
-    // connect modal where the user picks a wallet explicitly.
-    if (!wallet.isReady()) {
-      wallet.ensureReady(currentUser)
-        .then((ok) => {
-          if (ok) {
-            api.openShowBoost({ prefillMessage })
-          } else {
-            handleWalletGateFailure(() => api.openShowBoost({ prefillMessage }))
-          }
-        })
-        .catch(() => {
-          handleWalletGateFailure(() => api.openShowBoost({ prefillMessage }))
-        })
-      return
-    }
-
-    setShowBoostState({ prefillMessage })
-  },
-
-  /**
-   * Open the episode boost modal for a given RSS item. Walks the
-   * gating chain — if the user isn't logged in we save the call and
-   * open the login modal first; if they are logged in but have no
-   * NWC connected we open the wallet-connect modal first. Either
-   * gate completing fires the saved action and the boost modal
-   * eventually opens.
-   *
-   * @param {object}  args
-   * @param {object}  args.episode  - { number, title, guid }
-   * @param {object}  args.splits   - { recipients, totalWeight, source }
-   */
-  async openEpisodeBoost({ episode, splits }) {
-    if (!episode || !splits || !Array.isArray(splits.recipients)) {
-      console.warn('[LBLogin] openEpisodeBoost: missing episode/splits payload')
-      return
-    }
-    const args = { episode, splits }
-
-    // Gate 1: signed in?
-    if (!currentUser || currentUser === undefined) {
-      setPendingAction(() => api.openEpisodeBoost(args))
-      api.requestLogin()
-      return
-    }
-
-    // Gate 1.5: signed in but only as a stub — wait for real restore
-    // to land before reaching the NWC gate, since unlocking the NWC
-    // blob needs the real signer. ensureRealRestore covers the case
-    // where the ambient page-load restore quietly failed.
-    if (isStubUser(currentUser)) {
-      setPendingAction(() => api.openEpisodeBoost(args))
-      ensureRealRestore()
-      return
-    }
-
-    // Gate 1.75: signer-account match. Boostagram payloads embed the
-    // sender's pubkey from currentUser; if the extension's active
-    // account changed under us, we'd publish a payload claiming
-    // currentUser.pubkey while the signature came from a different
-    // key. Force re-auth before that can happen. No-op after first ok.
-    if (!await ensureSignerVerified()) return
-
-    // Gate 2: wallet connected?
-    if (!wallet.isReady()) {
-      // Try to restore from at-rest state (NWC encrypted blob, or
-      // per-pubkey WebLN flag + still-installed extension). If that
-      // succeeds, fall straight through. Otherwise open the connect
-      // modal — auto-engage was removed, see wallet.ensureReady.
-      wallet.ensureReady(currentUser)
-        .then((ok) => {
-          if (ok) {
-            // Re-call openEpisodeBoost — Gate 2 will pass now.
-            api.openEpisodeBoost(args)
-          } else {
-            handleWalletGateFailure(() => api.openEpisodeBoost(args))
-          }
-        })
-        .catch(() => {
-          handleWalletGateFailure(() => api.openEpisodeBoost(args))
-        })
-      return
-    }
-
-    // Both gates pass — open the form. Apply LB's per-host substitutions
-    // before the modal sees the recipient list.
-    const normalizedRecipients = applyRecipientOverrides(splits.recipients)
-    setEpisodeBoostState({
-      episode,
-      splits: { ...splits, recipients: normalizedRecipients },
-    })
-  },
-
-  /**
    * Open the EXTERNAL-episode boost modal (another podcast's episode, from
    * /feeds). Renders ExternalBoostModal and applies NO recipient
    * overrides.
    *
-   * ⚠️ ITS GATE CHAIN IS NO LONGER openEpisodeBoost's. Both the login gate
+   * ⚠️ ITS GATE CHAIN IS NOT THE ONE THE LB MODALS HAD. Both the login gate
    * (Phase 1) and the wallet gate (D13) are gone from in front of the modal:
    * a boost is a payment, a payment needs no Nostr identity, and asking for a
    * wallet before the reader has seen the amount is the wrong order. What
@@ -1101,13 +803,15 @@ const api = {
    * copies of a money path, and the copy that is exercised less is the one
    * that rots.
    *
-   * ⚠️ IT REPLACES `openShowBoost`, WHICH IS THE LB PATH AND STAYS AS IT IS.
-   * That one signs its kind-1 BEFORE paying and batches the approval with the
-   * receipts, so its content is frozen before any outcome is known. That is
-   * safe there only because a single leg at 100% cannot partial — but it also
-   * cannot offer the bot route, so it is login-gated by construction, which is
-   * the whole thing this change is undoing. `MultiLegBoostForm` is deliberately
-   * untouched; see the note in CLAUDE.md under the dead-code list.
+   * ⚠️ IT REPLACED `openShowBoost`, WHICH IS NOW DELETED (2026-08-23). That
+   * one signed its kind-1 BEFORE paying and batched the approval with the
+   * receipts, so its content was frozen before any outcome was known — safe
+   * only because a single leg at 100% cannot partial, and login-gated by
+   * construction, which is the whole thing this replacement undid. It went
+   * with `BoostModal`, `MultiLegBoostForm`, `EpisodeBoostModal` and the LB
+   * meetup flows once nothing on this fork had called any of them for months.
+   * `git show 75f88ef` has all of it if the presign-then-publish design is
+   * ever wanted again.
    *
    * ⚠️ THE SPLIT IS BUILT HERE AND NEVER FETCHED. A podcast boost resolves its
    * value block from the show's own RSS through `/api/value`; this one is
@@ -1174,52 +878,6 @@ const api = {
     }
     api.openWalletConnect()
     return false
-  },
-
-  /**
-   * Open one of the meetup-flow modals on the /meetups page. All four
-   * entry points share a single gate chain: login → real-user → signer
-   * verified. The actual boost handoff inside each modal calls back
-   * into api.openShowBoost which applies the wallet gate, so there's
-   * no need to pre-engage the wallet here.
-   *
-   * Same pending-action pattern as openShowBoost: a click while the
-   * user is logged out (or restoring) saves the call, opens the login
-   * modal, and replays after login lands.
-   *
-   * @param {'my'|'search'|'paste'|'create'} kind
-   */
-  async openMeetupModal(kind) {
-    if (!['my', 'search', 'paste', 'create'].includes(kind)) return
-    // Open IMMEDIATELY — logged in or not, stub or real. None of these four
-    // flows sign on open, so there's no reason to block on login or a full
-    // session restore (which used to make even the inert ones feel broken):
-    //   - search/paste are read-only/inert inputs, fully usable logged out;
-    //   - 'my' and create render an in-modal sign-in prompt when there's no
-    //     identity yet, instead of bouncing the user to the login modal.
-    // The actual sign is gated at the point of ACTION, which carries its own
-    // gates: boosts route through openShowBoost (login prompt with the boost
-    // message preserved + ensureSignerVerified), and the create publish runs
-    // ensureSignerOk (see MeetupModalHost). If we already have a stub user
-    // (returning visitor mid-restore), warm the real restore in the
-    // BACKGROUND so the signer is ready by the time they act — without making
-    // them wait for it just to see the modal.
-    if (currentUser && isStubUser(currentUser)) ensureRealRestore()
-    setMeetupModalState({ kind })
-  },
-
-  /**
-   * Mount a "find a meetup to feature" flow (kind 'my' | 'search') into a
-   * container element, without modal chrome — for the /feeds "Find" modal's
-   * accordion drawers, which host these inline instead of opening a second
-   * modal. `onBoosted` fires when the user picks a meetup (so the host can
-   * close its modal); the show-boost modal then opens. Returns an unmount fn.
-   */
-  mountFindFlow(kind, container, { onBoosted } = {}) {
-    if (!container || (kind !== 'my' && kind !== 'search')) return () => {}
-    const root = createRoot(container)
-    root.render(<EmbeddedFindFlow kind={kind} onBoosted={onBoosted} />)
-    return () => { try { root.unmount() } catch {} }
   },
 
   /**

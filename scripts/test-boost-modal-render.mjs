@@ -34,7 +34,7 @@
  * Run: node scripts/test-boost-modal-render.mjs
  */
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 
 // Every component that renders while a leg is in flight. A crash in any of
 // these takes the widget root down mid-payment.
@@ -194,11 +194,18 @@ console.log('\nThe themed classes emit real CSS:')
    * it, since neither Tailwind nor the bundler will.
    */
   const ALPHA_ON_VAR = /(?:bg|text|border|ring|divide|from|to|via)-\[var\(--[a-z-]+\)\]\/\d/
-  const styled = [
-    'ExternalBoostModal', 'WalletConnectModal', 'LoginModal', 'LoginScreen', 'BoostModal',
-    'MultiLegBoostForm', 'BugReportModal', 'ConfirmLeaveOverlay', 'ModalErrorBoundary',
-    'IdentityDropdown', 'BoostProgressView', 'BoostExpectations', 'ToastHost', 'LoginButton',
-  ]
+  /* ⚠️ EVERY COMPONENT, READ OFF THE DIRECTORY, NOT A LIST. This was fourteen
+   * hardcoded names until 2026-08-23, and a hardcoded list has exactly one
+   * failure mode: a new component is added, nobody remembers this file, and it
+   * is silently uncovered by both of the scans below — which are the whole
+   * defence against two failures that are invisible in the build and in the
+   * markup. It also went stale in the other direction the moment the LB modals
+   * were deleted, taking the test down with it. A component carrying no
+   * Tailwind classes simply yields no matches, so the glob costs nothing. */
+  const styled = readdirSync(new URL('../login-widget/src/components/', import.meta.url))
+    .filter((f) => f.endsWith('.jsx'))
+    .map((f) => f.replace(/\.jsx$/, ''))
+    .sort()
   const offenders = []
   for (const name of styled) {
     const text = readFileSync(new URL(`../login-widget/src/components/${name}.jsx`, import.meta.url), 'utf8')
