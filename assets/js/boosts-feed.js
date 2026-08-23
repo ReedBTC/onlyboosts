@@ -30,8 +30,8 @@
  * need only id + pubkey. The object handed to buildActionBar below is a
  * projection, not a verified event; don't pass it anywhere that assumes one.
  */
-import { nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v116'
-import { buildActionBar, configureBoostActions } from '/assets/js/boost-actions.js?v=ob-v116'
+import { nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v117'
+import { buildActionBar, configureBoostActions } from '/assets/js/boost-actions.js?v=ob-v117'
 // ⚠️ wireNpubCopy WAS IMPORTED HERE and is not any more. The avatar and the name
 // were its only two callers on this feed, and both are now links to
 // /booster/<npub>. Unlike the Episodes drawer — where the per-boost ⋮ menu
@@ -39,20 +39,21 @@ import { buildActionBar, configureBoostActions } from '/assets/js/boost-actions.
 // from this feed means opening their page, which leads with the button.
 // Its own module rather than a third export from show-link.js; see the note at
 // the head of booster-link.js and the ob-v53 entry in CLAUDE.md.
-import { boosterPageHref, markBoosterLink } from '/assets/js/booster-link.js?v=ob-v116'
-import { parseSegments, renderSegmentsInto, setCachedProfile } from '/assets/js/boosts-thread.js?v=ob-v116'
-import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v116'
-import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v116'
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v116'
-import { boosterLabel } from '/assets/js/ob-data.js?v=ob-v116'
-import { followsBoostReader, globalBoostReader } from '/assets/js/ob-live.js?v=ob-v116'
+import { boosterPageHref, markBoosterLink } from '/assets/js/booster-link.js?v=ob-v117'
+import { parseSegments, renderSegmentsInto, setCachedProfile } from '/assets/js/boosts-thread.js?v=ob-v117'
+import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v117'
+import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v117'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v117'
+import { boosterLabel } from '/assets/js/ob-data.js?v=ob-v117'
+import { followsBoostReader, globalBoostReader } from '/assets/js/ob-live.js?v=ob-v117'
 import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls,
   RANGE_OPTIONS,
-} from '/assets/js/feed-controls.js?v=ob-v116'
-import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v116'
-import { showPageHref, episodePageHref } from '/assets/js/show-link.js?v=ob-v116'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v116'
+} from '/assets/js/feed-controls.js?v=ob-v117'
+import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v117'
+import { searchMembers, getMemberBoosts, SEARCH_HITS } from '/assets/js/ob-live.js?v=ob-v117'
+import { showPageHref, episodePageHref } from '/assets/js/show-link.js?v=ob-v117'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v117'
 
 const PAGE_SIZE = 30
 
@@ -484,41 +485,31 @@ export async function renderBoosts({ panel, list, scope = 'global' }) {
     // rows landed), so drop it; it rebuilds on the next keystroke.
     search?.refresh()
     const picked = search?.selection || null
+    /* ⚠️ A PICKED MEMBER'S BOOSTS COME FROM `pickedRows`, NOT FROM FILTERING
+       WHAT IS LOADED. The filter is what used to be here, and it fails for the
+       same reason the old in-memory search did: the member was chosen out of
+       the whole index, so they will usually have no boosts at all in the window
+       the browser is holding — the list emptied itself at the moment the search
+       succeeded. `pickedRows` is that member's own corpus, fetched on the pick;
+       the range still applies to it, so "no boosts in this range" stays a real
+       answer rather than an artefact of what had been scrolled past. */
     const scoped = picked
-      ? scopedRows.filter((b) => b.booster.pk === picked.key)
+      ? (cutoff ? pickedRows.filter((b) => b.ts >= cutoff) : pickedRows)
       : scopedRows
     return sortKey === 'recent' ? scoped : [...scoped].sort(SORTERS[sortKey])
   }
 
-  /** Distinct boosters in the current window, most boosts first. */
-  function boosterEntries() {
-    const by = new Map()
-    for (const b of scopedRows) {
-      const pk = b.booster?.pk
-      if (!pk) continue
-      let e = by.get(pk)
-      if (!e) {
-        e = { pk, label: boosterLabel(b.booster), npub: boosterNpub(b.booster), pic: b.booster.pic, n: 0, sats: 0 }
-        by.set(pk, e)
-      }
-      // Names and avatars are embedded per record and a given row can be
-      // missing either, so fill from whichever row has one.
-      if (!e.pic && b.booster.pic) e.pic = b.booster.pic
-      e.n++
-      e.sats += b.sats || 0
-    }
-    return [...by.values()]
-      .sort((a, b) => b.n - a.n || b.sats - a.sats)
-      .map((e) => ({
-        key: e.pk,
-        label: e.label,
-        sub: `${e.npub ? e.npub.slice(0, 12) + '…' : ''}${e.npub ? ' · ' : ''}${e.n.toLocaleString()} boost${e.n === 1 ? '' : 's'}`,
-        // Matchable, not shown: a pasted npub or hex pubkey finds its booster
-        // even though the row displays a truncated one.
-        extra: `${e.npub} ${e.pk}`,
-        img: e.pic,
-      }))
-  }
+  /* ⚠️ `boosterEntries()` IS GONE AND MUST NOT COME BACK. It indexed
+     `scopedRows` — the boosts in memory — so a member was findable only if they
+     turned up in what the reader had already scrolled past. Measured against
+     the whole corpus on 2026-08-23: the first page reaches 34 of 2,011 members
+     (2%), 500 boosts reaches 164 (8%), and paging in every one of the 23,259
+     boosts still only reaches 684 (34%). A third of members have never appeared
+     in this feed at all, so no amount of loading closes it. The question "where
+     is this person" is asked of the index now; see searchMembers in ob-live.js.
+
+     One member's own boosts, fetched when they are picked. Empty until then. */
+  let pickedRows = []
 
   function oldestTs() { return rows.length ? rows[rows.length - 1].ts : Infinity }
 
@@ -661,13 +652,42 @@ export async function renderBoosts({ panel, list, scope = 'global' }) {
 
   // Boosters, not boosts: see buildView. The index covers the loaded window,
   // so on All it grows as older pages land.
+  /* ⚠️ A QUERY, NOT AN IN-MEMORY INDEX — see the note over `pickedRows`. The
+     suggestions come from the whole index and the pick then fetches that
+     member's own boosts, because a member chosen out of 2,011 will usually have
+     none in the window this feed is holding.
+     `searchRemote` is the backend the four ranked feeds already use; it is
+     debounced, abortable and sequence-guarded in feed-search.js. */
   search = mountFeedSearch(panel, {
-    placeholder: 'Search boosters by name or npub…',
-    label: 'Search boosters',
-    noun: 'booster',
+    placeholder: 'Search members by name or npub…',
+    label: 'Search members',
+    noun: 'member',
     glyph: '👤',
-    onPick: () => paint({ reset: true }),
-    getEntries: boosterEntries,
+    searchRemote: async (q, { signal } = {}) => {
+      const found = await searchMembers({ q, limit: SEARCH_HITS, signal })
+      return found.map((m) => ({
+        key: m.pk,
+        label: m.name || (m.npub ? m.npub.slice(0, 12) + '…' : m.pk.slice(0, 12) + '…'),
+        sub: `${m.boosts.toLocaleString('en-US')} boost${m.boosts === 1 ? '' : 's'}`,
+        img: m.pic,
+      }))
+    },
+    onPick: async (entry) => {
+      pickedRows = []
+      if (!entry) { paint({ reset: true }); return }
+      /* Painting twice is deliberate: the first call empties the list under the
+         reader immediately so the pick visibly took, and the fetch fills it.
+         A failure leaves `pickedRows` empty, which paints the feed's own
+         "nothing in this window" line rather than a stack trace — the member
+         exists, we just could not read their boosts this second. */
+      paint({ reset: true })
+      try {
+        pickedRows = await getMemberBoosts({ pk: entry.key })
+      } catch (err) {
+        console.warn('[boosts] member corpus failed', entry.key, err)
+      }
+      paint({ reset: true })
+    },
   })
 
   list.replaceChildren(cards, moreWrap)

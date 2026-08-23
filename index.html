@@ -50,17 +50,17 @@
 
   <!-- Shared note / card styles (.note-card, .embed-note) — the boosts
        feeds render through the same kind-1 card as boosts-thread.js. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v116" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v117" />
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v116" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v117" />
   <!-- The episode card and its drawer, extracted from the inline block below
        when /episode/<guid> pages needed the same cards. See the file header. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v116" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v117" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. Must stay last
        among the stylesheets so the inline block below still wins. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v116" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v117" />
 
   <style>
     :root {
@@ -235,6 +235,14 @@
       font-size: 0.95rem;
       letter-spacing: 0.01em;
     }
+    /* ⚠️ A SEAM UNDER THE TAB ROW, BROKEN UNDER THE SELECTED TAB. Without it the
+       two rows float on one flat ground and read as five loose controls; with a
+       plain rule all the way across, the line cuts between the selected tab and
+       the feed under it and breaks the column the fill is there to draw. So the
+       hairline is on the TAB, not on the row, and the selected one paints it in
+       its own fill — where the column continues, the seam disappears. */
+    .feed-tab { border-bottom: 1px solid var(--border); }
+    .feed-tab[aria-selected="true"] { border-bottom-color: var(--tab); }
     .feed-tab:hover { background: rgba(0,0,0,0.03); }
     .feed-tab:focus-visible { outline: 2px solid var(--tab); outline-offset: -2px; }
     .feed-tab[aria-selected="true"] {
@@ -297,6 +305,11 @@
       font-weight: 700;
       background: var(--cream-d);
       color: var(--muted);
+      /* An edge on three sides, so an unselected block is a block rather than a
+         patch of slightly darker ground. No top border: it meets the tab row's
+         own seam there. */
+      border: 1px solid var(--border);
+      border-top: 0;
       padding: 0.34rem 0.4rem 0.38rem;
       cursor: pointer;
       transition: background 0.15s, color 0.15s;
@@ -305,7 +318,11 @@
     .feed-sub:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
     /* The selected block continues the tab's fill downward, so the tab and the
        feed under it read as one column rather than as two separate controls. */
-    .feed-sub[aria-selected="true"] { background: var(--accent); color: var(--white); }
+    .feed-sub[aria-selected="true"] {
+      background: var(--accent);
+      color: var(--white);
+      border-color: var(--accent);
+    }
     .feed-sub[aria-selected="true"]:hover { color: var(--white); }
 
     .feed-bar {
@@ -731,8 +748,8 @@
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
     }
   </style>
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v116" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v116" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v117" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v117" />
 </head>
 <body data-active-feed="episodes-global">
 
@@ -1496,17 +1513,17 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v116"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v117"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v116" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v117" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v116" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v117" defer></script>
 
 <!-- Feed hydration — lazily loads the active feed on first view. -->
-<script type="module" src="/assets/js/feeds.js?v=ob-v116"></script>
-<script src="/assets/js/nav.js?v=ob-v116" defer></script>
+<script type="module" src="/assets/js/feeds.js?v=ob-v117"></script>
+<script src="/assets/js/nav.js?v=ob-v117" defer></script>
 
 </body>
 </html>
