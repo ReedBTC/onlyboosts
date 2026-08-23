@@ -14,13 +14,25 @@
  * A repeated name is authentic to it rather than a bug to collapse — Piez holds
  * five of the top ten and that is the actual story of the board.
  */
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v122'
-import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v122'
-import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v122'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v123'
+import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v123'
+import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v123'
+/* ⚠️ THE SAME WALL /show AND /episode RENDER, not a copy of it. It moved out of
+ * functions/_shared/detail-page.js into a two-sided module for exactly this;
+ * that file re-exports every name, so both Functions were untouched. A reader
+ * who screenshots the wall here and on a show page must not be able to tell
+ * them apart. */
+import { renderSupporters, initShowMore } from '/assets/js/supporter-wall.js?v=ob-v123'
 
 const esc = htmlEscape
 const HOURS_API = '/api/v1/members/hours'
+const MEMBERS_API = '/api/v1/members'
 const ROWS = 10
+/* ⚠️ THE WALL IS CAPPED AT 100 AND SEARCH IS THE ROUTE TO EVERYONE ELSE.
+ * Reed's call. On /show the wall holds one show's boosters — a median of one —
+ * where site-wide it would hold 2,011, so an uncapped "Show N more" paints
+ * nineteen hundred faces on one press. */
+const WALL_CAP = 100
 
 /* en-US in UTC, matching every other date on the site. A board row names the
  * Monday its week started, so the reader can see the hall of fame is old. */
@@ -89,6 +101,31 @@ async function board(range, signal) {
   return resp.json()
 }
 
+/* The wall's rows, in the shape renderSupporters reads. That function is the
+ * server's, so its field names are D1 column names rather than the API's — the
+ * adapter is here rather than in the endpoint, because the endpoint's shape is
+ * the one every other caller already consumes. */
+function wallRows(members) {
+  return members.map((m) => ({
+    booster_pubkey: m.pk,
+    booster_npub: m.npub,
+    display_name: m.name,
+    name: null,
+    picture: m.pic,
+    sats: m.sats,
+    boosts: m.boosts,
+  }))
+}
+
+async function wall(signal) {
+  const resp = await fetch(`${MEMBERS_API}?limit=${WALL_CAP}`, {
+    headers: { Accept: 'application/json' }, signal,
+  })
+  if (!resp.ok) throw new Error(`members: HTTP ${resp.status}`)
+  const data = await resp.json()
+  return Array.isArray(data?.members) ? data.members : []
+}
+
 /**
  * Fill the Members tab's boards. Idempotent by a marker, because the tab can be
  * activated many times and this is one fetch pair.
@@ -121,6 +158,33 @@ export async function renderMembersBoards(root) {
         empty: 'Nothing recorded yet.',
       })
     root.dataset.hpwState = 'done'
+    /* The wall goes below the boards, in its own container, and is fetched
+       alongside them. It fails independently: a wall that cannot load leaves
+       the boards standing, and vice versa. */
+    const wallRoot = document.querySelector('[data-members-wall]')
+    if (wallRoot) {
+      try {
+        const rows = wallRows(await wall())
+        wallRoot.innerHTML = rows.length
+          ? renderSupporters(rows, {
+              // ⚠️ "Members" HERE AND "Nostr Community" ON THE DETAIL PAGES.
+              // One component, two words, deliberately: the protocol is not the
+              // greeting, and a reader who has drilled into a show has chosen to
+              // go deeper than one who just landed. See supporter-wall.js.
+              heading: 'Members',
+              id: 'members-wall',
+              sectionClass: 'members-wall-section',
+              sub: `Everyone who has boosted a show, ranked by sats sent, all time. Top ${WALL_CAP}.`,
+              empty: '',
+            })
+          : ''
+        // The wall ships its overflow hidden behind a "Show N more" button; the
+        // handler is delegated, so one call covers every repaint.
+        initShowMore()
+      } catch (err) {
+        console.warn('[members] wall failed', err)
+      }
+    }
   } catch (err) {
     console.warn('[hpw] boards failed', err)
     root.innerHTML = '<p class="hpw-empty">The boards are unavailable right now.</p>'

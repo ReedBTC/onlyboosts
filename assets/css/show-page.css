@@ -451,114 +451,11 @@
    card into the grid below, but it can let the row break where it must.
 */
 
-.sup-podium,
-.sup-grid {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.sup-podium {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 1.6rem 1.3rem;
-  margin-bottom: 1.9rem;
-}
-
-.sup-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(5.75rem, 1fr));
-  gap: 1.4rem 0.75rem;
-}
-
-.sup-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 0.4rem;
-  min-width: 0;
-}
-.sup-card[hidden] { display: none; }
-
-/* An exact fraction of the row, not a fixed width: five per line here, three
-   in the responsive block below. A pixel width would put the break at the mercy
-   of viewport arithmetic — a 430px phone fits four 84px cards and a 375px one
-   fits three, so the same rule would give different counts on two phones. */
-.sup-card--podium { width: calc((100% - 4 * 1.3rem) / 5); }
-
-/* The community card's avatar and name are wrapped in ONE anchor to that
-   booster's page. The wrapper restates the card's own column layout rather than
-   using display:contents, so nothing about the existing `.sup-avatar` /
-   `.sup-name` rules had to change and the semantics of a focusable link are not
-   at the mercy of how a browser treats a box that is not generated. The sats
-   line stays outside it — a figure, not a way in — and inherits the card's gap,
-   which is the same value, so the spacing is unchanged.
-
-   The avatar itself was a copy-npub <button> before this and is now a <span>
-   inside the link; `cursor: pointer` below is what it always had and is now the
-   anchor's doing. */
-.sup-link {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.4rem;
-  min-width: 0;
-  max-width: 100%;
-  text-decoration: none;
-  color: inherit;
-}
-.sup-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; border-radius: 8px; }
-.sup-link:hover .sup-name { color: var(--brand-d); }
-
-.sup-avatar {
-  width: 68px;
-  height: 68px;
-  padding: 0;
-  border: 2px solid var(--border);
-  border-radius: 50%;
-  background: var(--cream-d);
-  overflow: hidden;
-  cursor: pointer;
-  flex: none;
-  display: block;
-  transition: border-color 0.15s, transform 0.15s;
-}
-.sup-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.sup-avatar.is-blank { background: var(--cream-d); }
-.sup-avatar:hover { border-color: var(--brand); transform: translateY(-2px); }
-.sup-avatar:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
-
-/* The podium's only marks: bigger, and ringed in brand. */
-.sup-card--podium .sup-avatar {
-  width: 96px;
-  height: 96px;
-  border-width: 3px;
-  border-color: var(--brand);
-  box-shadow: 0 0 0 2px rgba(0, 175, 240, 0.22);
-}
-
-.sup-avatar--sm { width: 38px; height: 38px; border-width: 1px; }
-
-.sup-name {
-  font-size: 0.82rem;
-  font-weight: 600;
-  line-height: 1.25;
-  color: var(--ink);
-  word-break: break-word;
-  max-width: 100%;
-}
-.sup-card--podium .sup-name { font-size: 0.88rem; }
-
-/* Centered under the name, per card. Tabular so a column of them lines up. */
-.sup-sats {
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: var(--brand-d);
-  font-variant-numeric: tabular-nums;
-}
-.sup-card--podium .sup-sats { font-size: 0.78rem; }
+/* ── The community wall ──
+ * ⚠️ MOVED TO assets/css/supporter-wall.css AND LINKED SEPARATELY. The
+ * homepage's Members tab renders the same wall, so the rules had to be reachable
+ * from a page that does not load this file. Do not re-add them here: two copies
+ * of one component's look is the drift the move exists to prevent. */
 
 /* The "Show N more boosters" toggle under the wall. */
 .show-more { margin-top: 1rem; }
@@ -1407,18 +1304,7 @@ a.boost-who:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px
     font-size: clamp(0.55rem, 2.2vw, 0.63rem);
   }
   .show-stats-cap { font-size: 0.72rem; }
-  /* Three across on a phone, five on desktop. Cards four and five wrap to a
-     centered second line rather than disappearing — PODIUM is decided by the
-     server, and no supporter is dropped for being on a small screen. */
-  .sup-podium { gap: 1.1rem 0.7rem; margin-bottom: 1.5rem; }
-  .sup-card--podium { width: calc((100% - 2 * 0.7rem) / 3); }
-  .sup-card--podium .sup-avatar { width: 74px; height: 74px; }
-  .sup-card--podium .sup-name { font-size: 0.82rem; }
-
-  .sup-grid { grid-template-columns: repeat(auto-fill, minmax(4.75rem, 1fr)); gap: 1.15rem 0.6rem; }
-  .sup-avatar { width: 56px; height: 56px; }
-  .sup-name { font-size: 0.76rem; }
-  .sup-sats { font-size: 0.68rem; }
+  /* The wall's phone rules moved to supporter-wall.css with the rest of it. */
   .boost-when { margin-left: 0; }
   /* "Other Shows/Albums This Community Boosts" is a long label; keep the hint
      on the same line as the last word of it rather than letting the two

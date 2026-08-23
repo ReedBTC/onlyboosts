@@ -16,9 +16,9 @@
  * page to be complete and legible; it adds the interactive half and every
  * function degrades to what the server rendered.
  */
-import { copyNpub, copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v122'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v122'
-import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v122'
+import { copyNpub, copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v123'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v123'
+import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v123'
 
 // ── copy-npub ────────────────────────────────────────────────────────
 /* Delegated rather than per-element: the community wall can hold 500 cards, and
@@ -33,22 +33,13 @@ export function initCopyNpub() {
   })
 }
 
-// ── "Show N more" ────────────────────────────────────────────────────
-/* Scoped to the button's own <section> rather than to a named grid, which is
- * what lets one handler serve all of them — the overflow items and the button
- * that reveals them are always in the same section, and the two podroll grids
- * are otherwise identical, so a selector naming one would fire on both. */
-export function initShowMore() {
-  document.addEventListener('click', (e) => {
-    const btn = e.target.closest?.('[data-show-more]')
-    if (!btn) return
-    for (const li of btn.closest('section')?.querySelectorAll('[data-overflow]') || []) {
-      li.hidden = false
-      li.removeAttribute('data-overflow')
-    }
-    btn.remove()
-  })
-}
+/* ── "Show N more" ──
+ * ⚠️ MOVED TO assets/js/supporter-wall.js AND RE-EXPORTED. The wall emits the
+ * button, and the homepage renders the wall without loading this module — which
+ * is 156KB of thread machinery it has no other use for. The handler is generic
+ * and scoped to the button's own <section>, so the same one still serves the two
+ * podroll grids on /show. The three detail pages import it from here unchanged. */
+export { initShowMore } from "./supporter-wall.js?v=ob-v123";
 
 // ── share ────────────────────────────────────────────────────────────
 /* The canonical URL, not location.href: the hash spy below rewrites the hash as

@@ -209,13 +209,47 @@ console.log('\nWhat it refuses, and what it aggregates:')
   const { body } = await call('?q=p')
   check('one character is below the minimum and returns nothing', () => assert.equal(body.count, 0))
 }
+console.log('\n⚠️ No query is the LISTING, not a miss:')
 {
   const { body } = await call('')
-  check('no query at all is not an error', () => assert.equal(body.count, 0))
+  check('an empty query returns the top members', () => {
+    assert.equal(body.listing, true)
+    assert.ok(body.count > 0, 'the listing came back empty')
+  })
+  /* ⚠️ AT A LIMIT THAT REACHES THEM. The profileless fixture member has the
+     lowest sats, so the default limit of 8 excludes them and the assertion
+     would be testing the limit rather than the LEFT JOIN. */
+  const wide = await call('?limit=50')
+  check('the listing includes a member with no profile', () => {
+    // The wall is a list of MEMBERS, and 61 of the 2,011 have no kind-0. A
+    // listing built from `profiles` would silently be a different set from the
+    // one /booster/<npub> serves pages for.
+    assert.ok(wide.body.members.some((m) => m.pk === '5'.repeat(64)),
+      'a member with no profile row is missing from the listing')
+  })
+  check('the listing is ordered by sats', () => {
+    const sats = body.members.map((m) => m.sats)
+    assert.ok(sats.length >= 3)
+    assert.deepEqual(sats, [...sats].sort((a, b) => b - a))
+  })
+  const capped = await call('?limit=2')
+  check('the listing honours limit', () => assert.equal(capped.body.members.length, 2))
 }
 {
   const { body } = await call('?q=zzzznobodyhasthisname')
-  check('a genuine miss is an empty list, not a 500', () => assert.equal(body.count, 0))
+  check('⚠️ a search that MISSES does not fall through to the listing', () => {
+    // The listing branch is guarded by its own bind rather than by `like = ''`.
+    // Without that guard a query matching nothing returns every member, which
+    // reads as a broken search rather than as an empty one.
+    assert.equal(body.listing, false)
+    assert.equal(body.count, 0)
+  })
+}
+{
+  const { body } = await call('?q=p')
+  check('a one-character query is still refused, not treated as a listing', () => {
+    assert.equal(body.count, 0)
+  })
 }
 {
   const { body } = await call('?q=piez')

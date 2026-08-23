@@ -44,7 +44,19 @@ export async function onRequestGet({ request, env }) {
   const raw = (u.searchParams.get("q") || "").trim().slice(0, MAX_Q);
   const limit = clampLimit(u.searchParams.get("limit"), 8, 50);
 
-  if (raw.length < MIN_CHARS) {
+  /* ⚠️ NO QUERY IS A LIST, NOT AN ERROR. `?limit=100` with no `q` is the top
+   * members by sats — what the wall on the Members tab renders — and it is the
+   * same endpoint deliberately: one definition of what a member is, one place
+   * the qualifying rule lives, one shape of row for the caller. A `top=1` flag
+   * or a second path would be two answers to "who is a member" that could
+   * disagree.
+   *
+   * A ONE-CHARACTER query is still refused: it matches 1,150 of the 1,950
+   * named profiles, which is not a search result — it is the whole list at the
+   * cost of aggregating every one of them. An EMPTY query asks for the list on
+   * purpose, so it is served. */
+  const listing = raw.length === 0;
+  if (!listing && raw.length < MIN_CHARS) {
     return json(request, { q: raw, count: 0, members: [] });
   }
 
@@ -56,13 +68,13 @@ export async function onRequestGet({ request, env }) {
    * falls back to a prefix LIKE over `booster_npub`, which is not indexed — a
    * scan of the boosts table, measured at ~2ms against the live corpus. Worth
    * knowing before that column grows a lot; not worth an index today. */
-  const hex = toHexPubkey(raw) || "";
-  const partialNpub = !hex && /^npub1[02-9ac-hj-np-z]+$/i.test(raw)
+  const hex = listing ? "" : (toHexPubkey(raw) || "");
+  const partialNpub = !listing && !hex && /^npub1[02-9ac-hj-np-z]+$/i.test(raw)
     ? likeEscape(raw.toLowerCase()) + "%"
     : "";
   // A string that is plainly an identifier is not also a name. Searching both
   // would let a half-typed npub match somebody whose display name contains it.
-  const like = (hex || partialNpub) ? "" : "%" + likeEscape(raw) + "%";
+  const like = (listing || hex || partialNpub) ? "" : "%" + likeEscape(raw) + "%";
 
   /* ⚠️ CANDIDATES FIRST, AGGREGATE SECOND. The obvious shape puts the three
    * tests in one WHERE over the join, and the ORs defeat index seeking: the
@@ -84,6 +96,10 @@ export async function onRequestGet({ request, env }) {
       UNION
       SELECT booster_pubkey FROM boosts
        WHERE ?3 <> '' AND booster_npub LIKE ?3 ESCAPE '\\'
+      UNION
+      -- The listing: every member. Guarded by ?5 so a SEARCH never falls into
+      -- it, which would return the whole membership for a query that missed.
+      SELECT booster_pubkey FROM boosts WHERE ?5 = 1
     )
     SELECT b.booster_pubkey AS pk,
            MAX(b.booster_npub) AS npub,
@@ -101,9 +117,10 @@ export async function onRequestGet({ request, env }) {
 
   try {
     const { results } = await env.DB.prepare(sql)
-      .bind(like, hex, partialNpub, limit).all();
+      .bind(like, hex, partialNpub, limit, listing ? 1 : 0).all();
     return json(request, {
       q: raw,
+      listing,
       count: results.length,
       members: results.map((r) => ({
         pk: r.pk,

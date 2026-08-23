@@ -50,17 +50,18 @@
 
   <!-- Shared note / card styles (.note-card, .embed-note) — the boosts
        feeds render through the same kind-1 card as boosts-thread.js. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v122" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v123" />
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v122" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v123" />
   <!-- The episode card and its drawer, extracted from the inline block below
        when /episode/<guid> pages needed the same cards. See the file header. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v122" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v123" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v123" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. Must stay last
        among the stylesheets so the inline block below still wins. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v122" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v123" />
 
   <style>
     :root {
@@ -507,6 +508,28 @@
     .hpw-unit { font-weight: 400; font-size: 0.72rem; color: var(--muted); }
     .hpw-eps { font-size: 0.7rem; color: var(--muted); width: 3.6rem; text-align: right; flex: none; }
 
+    /* The wall's own section chrome. `.show-section` and friends live in
+       show-page.css, which this page does not link — the wall's `.sup-*` rules
+       come from supporter-wall.css and the section around them is here. */
+    .members-wall-section { margin: 0 0 2.25rem; }
+    .members-wall-section h2 {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 1.6rem; font-weight: 700; color: var(--ink);
+      margin: 0; letter-spacing: 0.01em;
+    }
+    .members-wall-section .show-section-head { margin-bottom: 1.1rem; }
+    .members-wall-section .show-section-sub {
+      margin: 0.2rem 0 0; font-size: 0.88rem; color: var(--muted);
+    }
+    .members-wall-section .show-more {
+      margin-top: 1rem;
+      font: inherit; font-size: 0.82rem; font-weight: 700;
+      color: var(--brand-dd); background: none;
+      border: 1px solid var(--border); border-radius: 999px;
+      padding: 0.35rem 0.9rem; cursor: pointer;
+    }
+    .members-wall-section .show-more:hover { border-color: var(--brand); color: var(--brand-ddd); }
+
     .feed-panel { display: none; }
     .feed-panel.is-active { display: block; }
 
@@ -847,8 +870,8 @@
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
     }
   </style>
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v122" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v122" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v123" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v123" />
 </head>
 <body data-active-feed="episodes-global">
 
@@ -1077,6 +1100,11 @@
           publish boosts on other people's behalf are left out.
         </p>
       </div>
+
+      <!-- The wall. Filled by members-board.js through the SAME renderSupporters
+           /show and /episode use; the section markup, the podium and the
+           "Show N more" toggle all come from that module. -->
+      <div class="members-wall" data-members-wall></div>
     </div>
 
 
@@ -1643,17 +1671,17 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v122"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v123"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v122" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v123" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v122" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v123" defer></script>
 
 <!-- Feed hydration — lazily loads the active feed on first view. -->
-<script type="module" src="/assets/js/feeds.js?v=ob-v122"></script>
-<script src="/assets/js/nav.js?v=ob-v122" defer></script>
+<script type="module" src="/assets/js/feeds.js?v=ob-v123"></script>
+<script src="/assets/js/nav.js?v=ob-v123" defer></script>
 
 </body>
 </html>
