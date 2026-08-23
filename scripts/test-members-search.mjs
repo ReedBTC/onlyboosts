@@ -64,6 +64,11 @@ const FIXED = [
    * contains an npub, so searching both columns changes nothing and the
    * assertion passes with the split deleted. */
   { pk: '9'.repeat(64), npub: 'npub1iii', name: 'npub1ccc superfan', sats: 330, n: 1 },
+  /* ⚠️ A PUBLISHER KEY. chadf-boostbot's real pubkey, so the fixture exercises
+     the actual constant rather than a stand-in. It has the most sats of anyone
+     here, so it would top the listing if it were not excluded. */
+  { pk: 'f3bd42a91af5f3f1c40ca45ad2269464ab79996b32da78e8ed2ab91111b08e65',
+    npub: 'npub1bot', name: 'chadf_boostbot', sats: 9000, n: 40, spread: 30 },
   { pk: '4'.repeat(64), npub: 'npub1ddd', name: 'Bitcoin Audible', sats: 300, n: 1 },
   { pk: '6'.repeat(64), npub: 'npub1fff', name: 'Ünïcödé',          sats: 250, n: 1, sameCase: true },
   { pk: '5'.repeat(64), npub: 'npub1eee', name: null,              sats: 200, n: 1 }, // no profile
@@ -326,6 +331,29 @@ console.log('\n⚠️ Three orderings, three different top members:')
   check('an unknown sort falls back to sats rather than erroring', () => {
     assert.equal(body.sort, 'sats')
   })
+}
+
+console.log('\n⚠️ Publisher keys: out of the LISTING, still in the SEARCH:')
+{
+  const BOT = 'f3bd42a91af5f3f1c40ca45ad2269464ab79996b32da78e8ed2ab91111b08e65'
+  for (const sort of ['sats', 'boosts', 'shows']) {
+    const { body } = await call(`?sort=${sort}&limit=50`)
+    check(`the bot does not rank on sort=${sort}`, () => {
+      assert.ok(!body.members.some((m) => m.pk === BOT),
+        `chadf_boostbot ranked #${body.members.findIndex((m) => m.pk === BOT) + 1} by ${sort}`)
+    })
+  }
+  {
+    const { body } = await call('?q=chadf')
+    check('⚠️ but searching for it by name still finds it', () => {
+      assert.ok(body.members.some((m) => m.pk === BOT),
+        'a real account became unreachable, not just unranked')
+    })
+  }
+  {
+    const { body } = await call('?q=' + BOT)
+    check('and so does its pubkey', () => assert.equal(body.count, 1))
+  }
 }
 
 console.log(failed

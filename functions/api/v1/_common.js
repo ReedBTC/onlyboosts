@@ -209,3 +209,23 @@ export function boostRecord(r) {
     },
   };
 }
+
+/* ⚠️ A BOARD OF PEOPLE MUST NOT RANK A BOT, AND THESE FOUR ARE PUBLISHERS.
+ * Each is a single key that signs boosts made by many different people:
+ * chadf-boostbot alone carries 1,012 boosts from roughly 34 donors. The site's
+ * standing rule is that the booster is the bot and never the donor — right for
+ * attribution, and a category error on a leaderboard of listeners, where it
+ * would sum thirty-four people's weeks into one row.
+ *
+ * ⚠️ IT IS A PUBKEY LIST AND NOT A `client_id` FILTER, deliberately. D1 does not
+ * carry `client_src`, and `client_id = 'onlyboosts'` covers BOTH the bot-signed
+ * path and every donor who boosted from this site — filtering on it would drop
+ * real people. `localbitcoiners` is the same shape: its top three pubkeys are
+ * three humans, not the show account. See "Who published a boost" in CLAUDE.md.
+ * Verified against the live corpus: each of these is exactly one pubkey. */
+export const PUBLISHERS = [
+  "f3bd42a91af5f3f1c40ca45ad2269464ab79996b32da78e8ed2ab91111b08e65", // chadf-boostbot
+  "d35ae076512c29b01a5b33aa764ed4db44a9d0bbd96009705f48101f6cfe76a2", // lnaddress-music
+  "c330881e28768381dd8bdfd274341dca0c5882c29b8642ea4bc82f7563264592", // Local Bitcoiners show account
+  "3a87a19c801d57111b0905569225d2b20b39d154fc93bef5a8f2860c409b84d9", // OnlyBoosts' own bot
+];

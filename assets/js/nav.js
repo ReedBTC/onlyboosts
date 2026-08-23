@@ -71,7 +71,7 @@
         return
       }
       var s = document.createElement('script')
-      s.src = '/assets/widgets/login-widget.js?v=ob-v124'
+      s.src = '/assets/widgets/login-widget.js?v=ob-v125'
       s.async = true
       s.onload = function () { Promise.resolve().then(resolve) }
       s.onerror = function () { window.__lbWidgetLoad = null; reject(new Error('widget load failed')) }

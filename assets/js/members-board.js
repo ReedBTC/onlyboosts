@@ -14,15 +14,15 @@
  * A repeated name is authentic to it rather than a bug to collapse — Piez holds
  * five of the top ten and that is the actual story of the board.
  */
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v124'
-import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v124'
-import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v124'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v125'
+import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v125'
+import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v125'
 /* ⚠️ THE SAME WALL /show AND /episode RENDER, not a copy of it. It moved out of
  * functions/_shared/detail-page.js into a two-sided module for exactly this;
  * that file re-exports every name, so both Functions were untouched. A reader
  * who screenshots the wall here and on a show page must not be able to tell
  * them apart. */
-import { renderSupporters, initShowMore } from '/assets/js/supporter-wall.js?v=ob-v124'
+import { renderSupporters, initShowMore } from '/assets/js/supporter-wall.js?v=ob-v125'
 
 const esc = htmlEscape
 const HOURS_API = '/api/v1/members/hours'

@@ -31,7 +31,7 @@
  * and a reader who never scrolls to #boosts pays none of it. The notes are
  * readable and complete throughout.
  */
-import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v124'
+import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v125'
 
 /* The projection buildActionBar needs.
  *
@@ -90,7 +90,7 @@ let actionsPromise = null
 function loadActions() {
   if (!actionsPromise) {
     actionsPromise = (async () => {
-      const actions = await import('/assets/js/boost-actions.js?v=ob-v124')
+      const actions = await import('/assets/js/boost-actions.js?v=ob-v125')
       // The signer. Without it the bar still renders and each button reports
       // that it needs a sign-in, which is the same behaviour the feeds have.
       await ensureLoginWidget()

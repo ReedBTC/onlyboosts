@@ -19,7 +19,7 @@
 //
 // It is also the lookup Chad asked for and the reason idea #2.3 is open: there
 // has been no way to reach someone's page except by catching them boosting.
-import { json, preflight, clampLimit, toHexPubkey } from "./_common.js";
+import { json, preflight, clampLimit, toHexPubkey, PUBLISHERS } from "./_common.js";
 
 export async function onRequestOptions({ request }) { return preflight(request); }
 
@@ -117,9 +117,19 @@ export async function onRequestGet({ request, env }) {
       SELECT booster_pubkey FROM boosts
        WHERE ?3 <> '' AND booster_npub LIKE ?3 ESCAPE '\\'
       UNION
-      -- The listing: every member. Guarded by ?5 so a SEARCH never falls into
-      -- it, which would return the whole membership for a query that missed.
-      SELECT booster_pubkey FROM boosts WHERE ?5 = 1
+      /* The listing: every member. Guarded by ?5 so a SEARCH never falls into
+         it, which would return the whole membership for a query that missed.
+
+         ⚠️ THE LISTING EXCLUDES PUBLISHER KEYS AND THE SEARCH DOES NOT, which is
+         the one asymmetry in this file and it is deliberate. A key that signs
+         boosts for dozens of donors is not a top MEMBER — chadf_boostbot led
+         both the boosts and the shows orderings on the live index, on other
+         people's listening, which is the same category error the 40 HPW boards
+         exclude it for. But it is a real account somebody may want to look up,
+         so typing its name still finds it. Ranked lists are a claim; a search
+         result is not. */
+      SELECT booster_pubkey FROM boosts
+       WHERE ?5 = 1 AND booster_pubkey NOT IN (${PUBLISHERS.map(() => "?").join(",")})
     )
     SELECT b.booster_pubkey AS pk,
            MAX(b.booster_npub) AS npub,
@@ -141,7 +151,7 @@ export async function onRequestGet({ request, env }) {
 
   try {
     const { results } = await env.DB.prepare(sql)
-      .bind(like, hex, partialNpub, limit, listing ? 1 : 0).all();
+      .bind(like, hex, partialNpub, limit, listing ? 1 : 0, ...PUBLISHERS).all();
     return json(request, {
       q: raw,
       listing,
