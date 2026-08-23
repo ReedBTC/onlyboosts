@@ -470,7 +470,15 @@
 // session-only because the at-rest scheme encrypts the NWC URI to the user's
 // own signer. The widget bundle changed, so a returning visitor needs the new
 // URL.
-const VERSION = 'ob-v113';
+// ob-v114: the show card is two-sided. assets/js/show-card.js emits it as an
+// HTML string and assets/js/show-card-actions.js attaches its verbs, so the
+// same definition can render at the edge and in the browser — which is what
+// lets the homepage open on Shows without going back to painting a shell.
+// shows-feed.js is now the feed around that card rather than the card itself.
+// REQUIRED: shows-feed.js gains static imports of two modules that have never
+// existed, so a returning visitor holding the old copy against a fresh graph is
+// the ob-v53 link-time failure exactly.
+const VERSION = 'ob-v114';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;
@@ -502,27 +510,27 @@ const PRECACHE_URLS = [
   '/assets/onlyboosts_pfp.png',
   '/assets/onlyboosts_banner.png',
   '/assets/avatar-fallback.svg',
-  '/assets/css/theme.css?v=ob-v113',
-  '/assets/css/page.css?v=ob-v113',
-  '/assets/css/nav.css?v=ob-v113',
-  '/assets/css/footer.css?v=ob-v113',
-  '/assets/css/boosts-thread.css?v=ob-v113',
-  '/assets/css/boost-actions.css?v=ob-v113',
+  '/assets/css/theme.css?v=ob-v114',
+  '/assets/css/page.css?v=ob-v114',
+  '/assets/css/nav.css?v=ob-v114',
+  '/assets/css/footer.css?v=ob-v114',
+  '/assets/css/boosts-thread.css?v=ob-v114',
+  '/assets/css/boost-actions.css?v=ob-v114',
   // The episode card and its drawer. Precached alongside the others because the
   // homepage's feeds are painted in it and it used to be inline in index.html,
   // which IS precached — leaving it out would trade an inline block for a
   // network round trip on the one page this list exists to make fast.
-  '/assets/css/feed-cards.css?v=ob-v113',
-  '/assets/js/boosts-thread.js?v=ob-v113',
+  '/assets/css/feed-cards.css?v=ob-v114',
+  '/assets/js/boosts-thread.js?v=ob-v114',
   // A static import of boosts-thread.js, so precaching that without this one
   // leaves a returning visitor fetching half the graph from the network.
-  '/assets/js/primal-profiles.js?v=ob-v113',
-  '/assets/js/calendar-events.js?v=ob-v113',
-  '/assets/js/boost-actions.js?v=ob-v113',
-  '/assets/js/nav.js?v=ob-v113',
-  '/assets/js/nav-widget-boot.js?v=ob-v113',
-  '/assets/js/widget-loader.js?v=ob-v113',
-  '/assets/js/sw-register.js?v=ob-v113',
+  '/assets/js/primal-profiles.js?v=ob-v114',
+  '/assets/js/calendar-events.js?v=ob-v114',
+  '/assets/js/boost-actions.js?v=ob-v114',
+  '/assets/js/nav.js?v=ob-v114',
+  '/assets/js/nav-widget-boot.js?v=ob-v114',
+  '/assets/js/widget-loader.js?v=ob-v114',
+  '/assets/js/sw-register.js?v=ob-v114',
 ];
 
 self.addEventListener('install', (event) => {
