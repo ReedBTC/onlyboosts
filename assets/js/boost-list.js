@@ -30,15 +30,16 @@
  */
 import {
   htmlEscape, isSafeUrl, truncate, renderMessage,
-} from './nostr-text.js?v=ob-v112';
-import { episodePageHref, showPageHref } from './show-link.js?v=ob-v112';
+} from './nostr-text.js?v=ob-v113';
+import { episodePageHref, showPageHref } from './show-link.js?v=ob-v113';
 /* ⚠️ THE REAL MODULE, NOT A FOURTH COPY OF THE RULE. booster-link.js has been
  * dependency-free since it was written, so esbuild inlines it here exactly as it
  * does nostr-text.js, and the boost rows link a booster by the same test every
  * feed surface uses rather than by a transcription of it. This is the collapse
  * that functions/_shared/detail-page.js#boosterPageUrl said was available; that
  * name is now an alias for this function rather than a second copy of it. */
-import { boosterPageHref } from './booster-link.js?v=ob-v112';
+import { boosterPageHref } from './booster-link.js?v=ob-v113';
+import { httpsUrl } from './cover-art.js?v=ob-v113';
 
 // ── The formatters the row needs ─────────────────────────────────────────────
 //
@@ -370,7 +371,9 @@ function stateScript(state) {
 function boostRow(r, names, { itemAbbr, noun, showTarget, linkBooster = true, showShow = false }) {
   const realName = displayName(r);
   const name = realName || shortId(r.booster_npub, r.booster_pubkey);
-  const pic = isSafeUrl(r.pr_pic) ? r.pr_pic : null;
+  // https-promoted before the guard; see httpsUrl in cover-art.js.
+  const picUrl = httpsUrl(r.pr_pic);
+  const pic = isSafeUrl(picUrl) ? picUrl : null;
   const href = linkBooster ? boosterPageHref(r.booster_npub, r.booster_pubkey) : null;
   const missing = [realName ? null : "name", pic ? null : "pic"].filter(Boolean).join(" ");
   // ⚠️ NO "the episode" FALLBACK ANY MORE. The old compact row printed

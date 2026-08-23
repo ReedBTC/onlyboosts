@@ -22,7 +22,7 @@ export default function ConfirmLeaveOverlay({ paid = 0, total = 0, onStay, onLea
         <div className="flex gap-2">
           <button
             onClick={onStay}
-            className="flex-1 py-2.5 rounded-lg bg-[var(--brand,#00aff0)] hover:bg-[var(--brand-d,#068ace)] text-sm font-medium text-white transition-colors"
+            className="flex-1 py-2.5 rounded-lg bg-[var(--brand-dd,#0a6fa8)] hover:bg-[var(--brand-ddd,#095e90)] text-sm font-medium text-white transition-colors"
           >
             Keep waiting
           </button>

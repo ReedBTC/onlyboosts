@@ -53,29 +53,29 @@
  */
 import {
   getShowPage, searchShows, getShowEpisodes, SEARCH_HITS, SEARCH_MIN_CHARS,
-} from '/assets/js/ob-live.js?v=ob-v112'
+} from '/assets/js/ob-live.js?v=ob-v113'
 import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls,
-} from '/assets/js/feed-controls.js?v=ob-v112'
+} from '/assets/js/feed-controls.js?v=ob-v113'
 // Its own module, not two more exports of feed-controls.js — see the ⚠️ note
 // at the top of that file for the four-hour window that shape opens.
-import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v112'
+import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v113'
 import {
   LANG_ALL, languageOptions, langControl, langNote, langNoMatchText, langLabelFor,
-} from '/assets/js/feed-lang.js?v=ob-v112'
-import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v112'
-import { competitionRanks, rankLabel } from '/assets/js/rank.js?v=ob-v112'
-import { showPageHref, episodePageHref } from '/assets/js/show-link.js?v=ob-v112'
+} from '/assets/js/feed-lang.js?v=ob-v113'
+import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v113'
+import { competitionRanks, rankLabel } from '/assets/js/rank.js?v=ob-v113'
+import { showPageHref, episodePageHref } from '/assets/js/show-link.js?v=ob-v113'
 // Show-level boosting. Same four pieces the episode feed uses, and deliberately
 // the same ones: fromApiValue / applyExternalOverrides are where the split
 // logic lives, and sharing them is what keeps every surface paying the value
 // block a feed actually published.
-import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v112'
-import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v112'
-import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v112'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v112'
-import { boostButton, withBoostBusy } from '/assets/js/boost-button.js?v=ob-v112'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v112'
+import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v113'
+import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v113'
+import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v113'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v113'
+import { boostButton, withBoostBusy } from '/assets/js/boost-button.js?v=ob-v113'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v113'
 
 /* ── The hash's language, on an already-hydrated feed ──
  * The twin of the map in feeds-podcasts.js, and there for the same reason: a

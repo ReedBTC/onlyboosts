@@ -42,11 +42,11 @@
  * what functions/_shared/detail-page.js has always done, so the site now has one
  * date format rather than one for the feeds and another for the detail pages.
  */
-import { showPageHref, episodePageHref } from './show-link.js?v=ob-v112'
-import { episodeBoostLink } from './episode-link.js?v=ob-v112'
-import { boosterPageHref, boosterLinkAttrs } from './booster-link.js?v=ob-v112'
-import { coverChain } from './cover-art.js?v=ob-v112'
-import { htmlEscape, isSafeUrl, renderMessage } from './nostr-text.js?v=ob-v112'
+import { showPageHref, episodePageHref } from './show-link.js?v=ob-v113'
+import { episodeBoostLink } from './episode-link.js?v=ob-v113'
+import { boosterPageHref, boosterLinkAttrs } from './booster-link.js?v=ob-v113'
+import { coverChain, httpsUrl } from './cover-art.js?v=ob-v113'
+import { htmlEscape, isSafeUrl, renderMessage } from './nostr-text.js?v=ob-v113'
 
 const esc = htmlEscape
 
@@ -492,7 +492,10 @@ export const MAX_FACES = 10
 function avatarHtml(profile, npub, { size = 26, interactive = false, label = '', pk = null, hook = false } = {}) {
   const style = `--pcast-av:${size}px`
   const chip = initials(profile, npub)
-  const pic = profile?.picture
+  // Promoted before the guard, for the same reason artwork is: the page is
+  // https, so an http avatar is mixed content the browser upgrades and then
+  // blocks if it fails. See httpsUrl in cover-art.js.
+  const pic = httpsUrl(profile?.picture)
   const hasPic = !!(pic && isSafeUrl(pic))
   // `hook` marks a face that is NOT inside an element already carrying one — the
   // stack on the drawer bar, where the row-level hook lives on the row. Without

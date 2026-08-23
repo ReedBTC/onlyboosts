@@ -168,7 +168,7 @@ export default function IdentityDropdown({
                 type="button"
                 role="menuitem"
                 onClick={() => { onClose(); onConnectWallet() }}
-                className="w-full px-3 py-2 rounded-lg bg-[var(--brand,#00aff0)] hover:bg-[var(--brand-d,#068ace)] text-xs font-medium text-white transition-colors"
+                className="w-full px-3 py-2 rounded-lg bg-[var(--brand-dd,#0a6fa8)] hover:bg-[var(--brand-ddd,#095e90)] text-xs font-medium text-white transition-colors"
               >
                 Reconnect to save it
               </button>
@@ -189,7 +189,7 @@ export default function IdentityDropdown({
               type="button"
               role="menuitem"
               onClick={() => { onClose(); onConnectWallet() }}
-              className="w-full px-3 py-2 rounded-lg bg-[var(--brand,#00aff0)] hover:bg-[var(--brand-d,#068ace)] text-xs font-medium text-white transition-colors"
+              className="w-full px-3 py-2 rounded-lg bg-[var(--brand-dd,#0a6fa8)] hover:bg-[var(--brand-ddd,#095e90)] text-xs font-medium text-white transition-colors"
             >
               Connect Lightning Wallet
             </button>

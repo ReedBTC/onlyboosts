@@ -259,7 +259,7 @@ export default function BugReportModal({ user, onClose }) {
                 <button
                   onClick={handleSubmit}
                   disabled={submitting}
-                  className="px-4 py-1.5 rounded-lg bg-[var(--brand,#00aff0)] hover:bg-[var(--brand-d,#068ace)] disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium text-white transition-colors order-2 sm:order-3"
+                  className="px-4 py-1.5 rounded-lg bg-[var(--brand-dd,#0a6fa8)] hover:bg-[var(--brand-ddd,#095e90)] disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium text-white transition-colors order-2 sm:order-3"
                 >
                   {submitting ? 'Sending…' : 'Send report'}
                 </button>

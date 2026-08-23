@@ -760,8 +760,20 @@ second by refusing the `/\d` shape in source. Nothing else about either failure
 is visible: the class names look right, the build is silent, and the page is
 simply unstyled in one place.
 
+**⚠️ A FILLED BRAND BUTTON IS `--brand-dd`, NEVER `--brand`, AND THE RAMP HAS A
+FOURTH STEP FOR ITS HOVER.** White on `--brand` measures **2.50:1** and on
+`--brand-d` **3.79:1**, so both fail AA — and the pair failed in the wrong
+direction too, since the old buttons went from one illegible fill to a slightly
+less illegible one on hover. That is why the wallet menu's log-in button was
+reported as "almost invisible until you hover over it" and why the boost
+presets were reported twice. All fifteen filled buttons in the widget are now
+`--brand-dd` (5.45:1) with `--brand-ddd` (6.96:1) on hover, so contrast only
+ever increases. `--brand-ddd` exists for exactly this and has no other caller.
+
 **Two surfaces stay dark on purpose**: `IdentityWidget`'s pill and
-`BoostButton`, which sit on the navy nav bar rather than on a modal.
+`BoostButton`, which sit on the navy nav bar rather than on a modal. Neither
+carries the white-on-brand pairing, which is why the sweep above left them
+alone.
 
 **Known and deliberately not changed:** `boosts-thread.css` and
 `boost-actions.css` still tint hover states with `rgba(247,147,26,…)`, LB's
@@ -3229,6 +3241,18 @@ the chain on error.
 ```
 episode art  →  show art (img)  →  show art2  →  glyph / placeholder
 ```
+
+**⚠️ `coverChain()` PROMOTES `http://` TO `https://` BEFORE IT FILTERS.** Every
+page here is https, so an http image is mixed content: Chrome auto-upgrades it
+and **blocks it outright if https fails**, never falling back to the insecure
+copy. The http URL was therefore already unreachable as written, and promoting
+it only stops the console filling with warnings and stops the chain holding two
+entries for one picture. Measured over 200 boosts on 2026-08-22: 7
+`episode.img`, 5 `podcast.img`, 1 `booster.pic`. A host with no https at all is
+not made worse — an upgraded URL that fails advances to the next source exactly
+as a dead https URL always has, which is what makes this safe to do to a third
+party's URL. `httpsUrl` is exported for the two avatar render sites
+(`boost-list.js`, `episode-card.js`), which do not go through the chain.
 
 `coverChain()` filters to http(s) and **dedupes** — `art2` is meant to be null
 when it equals `img`, but the shards are third-party data and a repeat would cost

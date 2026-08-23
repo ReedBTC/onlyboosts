@@ -691,7 +691,7 @@ export default function LoginScreen({ onLogin, embedded = false }) {
       <button
         onClick={loginWithExtension}
         disabled={loading}
-        className="w-full py-3 px-4 rounded-lg bg-[var(--brand,#00aff0)] hover:bg-[var(--brand-d,#068ace)] disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium transition-colors"
+        className="w-full py-3 px-4 rounded-lg bg-[var(--brand-dd,#0a6fa8)] hover:bg-[var(--brand-ddd,#095e90)] disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium transition-colors"
       >
         {loading ? 'Connecting...' : 'Login with Extension'}
       </button>
@@ -721,13 +721,13 @@ export default function LoginScreen({ onLogin, embedded = false }) {
           <div className="flex rounded-md overflow-hidden border border-[var(--modal-line,#b9d4e6)] text-xs">
             <button
               onClick={() => switchNcTab('qr')}
-              className={`px-3 py-1.5 transition-colors ${ncTab === 'qr' ? 'bg-[var(--brand,#00aff0)] text-white font-semibold' : 'bg-[var(--modal-field,#ffffff)] text-[var(--muted,#5a7488)] hover:text-[var(--ink,#0f2733)]'}`}
+              className={`px-3 py-1.5 transition-colors ${ncTab === 'qr' ? 'bg-[var(--brand-dd,#0a6fa8)] text-white font-semibold' : 'bg-[var(--modal-field,#ffffff)] text-[var(--muted,#5a7488)] hover:text-[var(--ink,#0f2733)]'}`}
             >
               Scan QR
             </button>
             <button
               onClick={() => switchNcTab('paste')}
-              className={`px-3 py-1.5 transition-colors border-l border-[var(--modal-line,#b9d4e6)] ${ncTab === 'paste' ? 'bg-[var(--brand,#00aff0)] text-white font-semibold' : 'bg-[var(--modal-field,#ffffff)] text-[var(--muted,#5a7488)] hover:text-[var(--ink,#0f2733)]'}`}
+              className={`px-3 py-1.5 transition-colors border-l border-[var(--modal-line,#b9d4e6)] ${ncTab === 'paste' ? 'bg-[var(--brand-dd,#0a6fa8)] text-white font-semibold' : 'bg-[var(--modal-field,#ffffff)] text-[var(--muted,#5a7488)] hover:text-[var(--ink,#0f2733)]'}`}
             >
               Paste string
             </button>
@@ -746,7 +746,7 @@ export default function LoginScreen({ onLogin, embedded = false }) {
           {qrUri ? (
             <a
               href={qrUri}
-              className="w-full py-3 px-4 rounded-lg bg-[var(--brand,#00aff0)] hover:bg-[var(--brand-d,#068ace)] text-white font-medium transition-colors flex items-center justify-center gap-2"
+              className="w-full py-3 px-4 rounded-lg bg-[var(--brand-dd,#0a6fa8)] hover:bg-[var(--brand-ddd,#095e90)] text-white font-medium transition-colors flex items-center justify-center gap-2"
               style={{ textDecoration: 'none' }}
               aria-label="Open in signer app"
             >
@@ -756,7 +756,7 @@ export default function LoginScreen({ onLogin, embedded = false }) {
             <button
               type="button"
               disabled
-              className="w-full py-3 px-4 rounded-lg bg-[var(--brand,#00aff0)] opacity-40 cursor-not-allowed text-white font-medium flex items-center justify-center gap-2"
+              className="w-full py-3 px-4 rounded-lg bg-[var(--brand-dd,#0a6fa8)] opacity-40 cursor-not-allowed text-white font-medium flex items-center justify-center gap-2"
             >
               <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
             </button>

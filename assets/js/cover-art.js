@@ -28,17 +28,45 @@ function isSafeUrl(url) {
 }
 
 /**
+ * An `http://` image URL, promoted to https.
+ *
+ * ⚠️ IT IS NOT A CHOICE WE ARE MAKING; IT IS THE ONE THE BROWSER ALREADY MADE.
+ * Every page here is https, so an http image is mixed content and Chrome
+ * auto-upgrades it and then **blocks it outright if https fails** — it never
+ * falls back to the insecure copy. So the http URL was already unreachable as
+ * written; all this does is stop the console filling with upgrade warnings and
+ * stop the chain holding two entries for one picture.
+ *
+ * Measured over 200 boosts, 2026-08-22: 7 `episode.img`, 5 `podcast.img` and 1
+ * `booster.pic` are http. `folkhour.com`, the commonest, serves the identical
+ * PNG over https with a 200.
+ *
+ * ⚠️ A HOST WITH NO HTTPS AT ALL IS THEREFORE NOT MADE WORSE, and the chain is
+ * why: an upgraded URL that fails advances to the next source exactly as a dead
+ * https URL always has. That is the whole reason this is safe to do to a third
+ * party's URL without asking them.
+ */
+export function httpsUrl(u) {
+  return typeof u === 'string' && u.startsWith('http://')
+    ? 'https://' + u.slice(7)
+    : u
+}
+
+/**
  * Ordered, deduped, http(s)-only. Every URL in a chain reaches an `img.src`, so
  * they go through the same guard any single one would — a chain is not a reason
  * to relax it.
  *
  * Deduping matters: `art2` is meant to be null when it equals `img`, but the
  * shards are third-party data and a repeat would otherwise cost a second
- * request for the URL that just failed.
+ * request for the URL that just failed. **The https promotion happens before
+ * the dedupe**, so a feed publishing the same picture as http and https is one
+ * entry rather than two attempts at the same bytes.
  */
 export function coverChain(...urls) {
   const out = []
-  for (const u of urls.flat()) {
+  for (const raw of urls.flat()) {
+    const u = httpsUrl(raw)
     if (!isSafeUrl(u) && !(typeof u === 'string' && u.startsWith('/'))) continue
     if (!out.includes(u)) out.push(u)
   }

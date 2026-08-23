@@ -40,6 +40,15 @@ html, body { overflow-x: hidden; max-width: 100vw; }
   --brand:    #00aff0;
   --brand-d:  #068ace;
   --brand-dd: #0a6fa8;
+  /* ⚠️ THE HOVER STEP FOR A FILLED BRAND BUTTON, AND IT EXISTS BECAUSE THE
+     RAMP RAN OUT. White on --brand is 2.50:1 and on --brand-d is 3.79:1, so
+     both fail AA and the pair failed in the wrong direction too: the old
+     buttons DARKENED on hover from one illegible fill to another slightly
+     less illegible one, which is why the log-in button in the wallet menu was
+     reported as "almost invisible until you hover over it". --brand-dd is the
+     fill at 5.45:1 and this is one step below it at 6.96:1, so a hover still
+     reads as a hover and contrast only ever increases. */
+  --brand-ddd: #095e90;
 
   /* ── Legacy token aliases ─────────────────────────────────────
      The shared stylesheets were written against localbitcoiners'

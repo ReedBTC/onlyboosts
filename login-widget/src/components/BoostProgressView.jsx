@@ -251,7 +251,7 @@ export default function BoostProgressView({
                   {(status === 'failed' || status === 'uncertain') && onRetryLeg && !unpayable && (
                     <button
                       onClick={() => onRetryLeg(i)}
-                      className="text-[11px] font-medium px-2 py-0.5 rounded-lg bg-[var(--brand,#00aff0)] hover:bg-[var(--brand-d,#068ace)] text-white transition-colors"
+                      className="text-[11px] font-medium px-2 py-0.5 rounded-lg bg-[var(--brand-dd,#0a6fa8)] hover:bg-[var(--brand-ddd,#095e90)] text-white transition-colors"
                     >
                       {status === 'uncertain' ? 'Check' : 'Retry'}
                     </button>
@@ -284,7 +284,7 @@ export default function BoostProgressView({
       {done && (
         <button
           onClick={onDone}
-          className="shrink-0 w-full py-3 rounded-lg bg-[var(--brand,#00aff0)] hover:bg-[var(--brand-d,#068ace)] text-sm font-medium text-white transition-colors"
+          className="shrink-0 w-full py-3 rounded-lg bg-[var(--brand-dd,#0a6fa8)] hover:bg-[var(--brand-ddd,#095e90)] text-sm font-medium text-white transition-colors"
         >
           Done
         </button>
