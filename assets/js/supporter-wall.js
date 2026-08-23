@@ -21,9 +21,9 @@
  * The markup is unchanged from the day it moved, byte for byte — verified by
  * rendering the original against fixtures, moving, and diffing the output.
  */
-import { num, shortId, displayName } from './boost-list.js?v=ob-v123'
-import { boosterPageHref as boosterPageUrl } from './booster-link.js?v=ob-v123'
-import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v123'
+import { num, shortId, displayName } from './boost-list.js?v=ob-v124'
+import { boosterPageHref as boosterPageUrl } from './booster-link.js?v=ob-v124'
+import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v124'
 
 /* Compact sat figures — 1435000 → "1.4M". Lives here rather than in
  * detail-page.js because the wall is its heaviest caller and this module may
@@ -81,6 +81,7 @@ export const PODIUM = 5;
  * Defaults keep the detail pages calling this exactly as they did. */
 export function renderSupporters(rows, {
   sub, empty, heading = "Nostr Community", id = "community", sectionClass = "show-section",
+  metric = "sats",
 } = {}) {
   if (!rows.length) {
     return `<section class="${htmlEscape(sectionClass)}" id="${htmlEscape(id)}">
@@ -100,11 +101,11 @@ export function renderSupporters(rows, {
     </div>
 
     <ol class="sup-podium">
-      ${podium.map((r) => supporterCard(r, true)).join("\n      ")}
+      ${podium.map((r) => supporterCard(r, true, false, metric)).join("\n      ")}
     </ol>
 
     ${rest.length ? `<ol class="sup-grid" data-supporter-grid>
-      ${rest.map((r, i) => supporterCard(r, false, i >= SUPPORTERS_VISIBLE - PODIUM)).join("\n      ")}
+      ${rest.map((r, i) => supporterCard(r, false, i >= SUPPORTERS_VISIBLE - PODIUM, metric)).join("\n      ")}
     </ol>` : ""}
 
     ${hidden > 0 ? `<button type="button" class="btn btn-quiet show-more" data-show-more="supporter">
@@ -129,7 +130,21 @@ export function renderSupporters(rows, {
 // sats stay outside it, being a figure rather than a way in. `.sup-link`
 // restates the card's own column layout so the wrapper costs nothing visually —
 // see show-page.css.
-function supporterCard(r, isPodium, hidden = false) {
+/* ⚠️ THE METRIC IS A PARAMETER AND `sats` IS THE DEFAULT, so /show and /episode
+ * call this exactly as they did and their markup is byte-identical. The Members
+ * tab ranks the same wall three ways — sats, boosts, shows — and the figure
+ * under each face has to be the one the list was ordered by, or the wall shows
+ * a descending column of sats under an order it did not compute. */
+const METRICS = {
+  sats:   { value: (r) => r.sats,   label: 'sats',
+            title: (r) => `${num(r.sats)} sats across ${num(r.boosts)} boosts` },
+  boosts: { value: (r) => r.boosts, label: (v) => (v === 1 ? 'boost' : 'boosts'),
+            title: (r) => `${num(r.boosts)} boosts, ${num(r.sats)} sats` },
+  shows:  { value: (r) => r.shows,  label: (v) => (v === 1 ? 'show' : 'shows'),
+            title: (r) => `${num(r.shows)} shows boosted, ${num(r.sats)} sats` },
+};
+
+function supporterCard(r, isPodium, hidden = false, metric = 'sats') {
   const name = displayName(r);
   const label = name || shortId(r.booster_npub, r.booster_pubkey);
   const pic = isSafeUrl(r.picture) ? r.picture : null;
@@ -143,6 +158,7 @@ function supporterCard(r, isPodium, hidden = false) {
   // hydrateProfiles reaches `.sup-name` and `.sup-avatar` by class from this
   // <li>, so wrapping them in the anchor below leaves it working untouched.
   const missing = [name ? null : "name", pic ? null : "pic"].filter(Boolean).join(" ");
+  const m = METRICS[metric] || METRICS.sats;
 
   const inner = `<span class="sup-avatar${pic ? "" : " is-blank"}">
             ${pic ? `<img src="${htmlEscape(pic)}" alt="" loading="lazy" />` : ""}
@@ -161,7 +177,7 @@ function supporterCard(r, isPodium, hidden = false) {
   return `<li class="sup-card${isPodium ? " sup-card--podium" : ""}"${hidden ? " hidden data-overflow" : ""}${
         missing ? ` data-pk="${htmlEscape(r.booster_pubkey)}" data-missing="${missing}"` : ""}>
         ${body}
-        <span class="sup-sats" title="${htmlEscape(num(r.sats))} sats across ${htmlEscape(num(r.boosts))} boosts">${htmlEscape(compact(r.sats))} sats</span>
+        <span class="sup-sats" title="${htmlEscape(m.title(r))}">${htmlEscape(compact(m.value(r)))} ${htmlEscape(typeof m.label === "function" ? m.label(m.value(r)) : m.label)}</span>
       </li>`;
 }
 

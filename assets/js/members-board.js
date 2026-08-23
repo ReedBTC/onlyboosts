@@ -14,15 +14,15 @@
  * A repeated name is authentic to it rather than a bug to collapse — Piez holds
  * five of the top ten and that is the actual story of the board.
  */
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v123'
-import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v123'
-import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v123'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v124'
+import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v124'
+import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v124'
 /* ⚠️ THE SAME WALL /show AND /episode RENDER, not a copy of it. It moved out of
  * functions/_shared/detail-page.js into a two-sided module for exactly this;
  * that file re-exports every name, so both Functions were untouched. A reader
  * who screenshots the wall here and on a show page must not be able to tell
  * them apart. */
-import { renderSupporters, initShowMore } from '/assets/js/supporter-wall.js?v=ob-v123'
+import { renderSupporters, initShowMore } from '/assets/js/supporter-wall.js?v=ob-v124'
 
 const esc = htmlEscape
 const HOURS_API = '/api/v1/members/hours'
@@ -33,6 +33,18 @@ const ROWS = 10
  * where site-wide it would hold 2,011, so an uncapped "Show N more" paints
  * nineteen hundred faces on one press. */
 const WALL_CAP = 100
+
+/* ⚠️ THREE VIEWS, BECAUSE THEY ARE THREE DIFFERENT PEOPLE. Sats ranks by
+ * generosity and rewards one large boost; boosts rewards turning up; shows
+ * rewards spreading it around. On the live corpus the leaders barely overlap,
+ * so a single ordering would present one of them as "the" top member and hide
+ * the other two stories. Reed's call. */
+const WALL_VIEWS = [
+  ['sats', 'Most sats'],
+  ['boosts', 'Most boosts'],
+  ['shows', 'Most shows'],
+]
+let wallView = 'sats'
 
 /* en-US in UTC, matching every other date on the site. A board row names the
  * Monday its week started, so the reader can see the hall of fame is old. */
@@ -78,7 +90,9 @@ function rowHtml(m, i, goal) {
     `<span class="hpw-pos">${i + 1}</span>` +
     face +
     `<span class="hpw-who">${who}${week}</span>` +
-    `<span class="hpw-hours">${esc(hours(m.seconds))}<span class="hpw-unit"> h</span></span>` +
+    // ⚠️ "hpw", NOT "h". Every row on both boards is one member's ONE week, so
+    // the figure is hours per week and the unit is the name of the thing.
+    `<span class="hpw-hours">${esc(hours(m.seconds))}<span class="hpw-unit"> hpw</span></span>` +
     `<span class="hpw-eps">${esc(String(m.episodes))} ep${m.episodes === 1 ? '' : 's'}</span>` +
     `</li>`
 }
@@ -114,16 +128,55 @@ function wallRows(members) {
     picture: m.pic,
     sats: m.sats,
     boosts: m.boosts,
+    shows: m.shows,
   }))
 }
 
-async function wall(signal) {
-  const resp = await fetch(`${MEMBERS_API}?limit=${WALL_CAP}`, {
+/* The view switcher, built here rather than shipped in index.html because the
+ * wall it acts on is client-rendered and there is nothing to switch until it
+ * lands. Same shape as the feeds' sort control, deliberately. */
+function viewsHtml(active) {
+  return `<div class="mw-views" role="group" aria-label="Rank members by">` +
+    WALL_VIEWS.map(([key, label]) =>
+      `<button type="button" class="mw-view" data-view="${esc(key)}"` +
+      ` aria-pressed="${key === active ? 'true' : 'false'}">${esc(label)}</button>`).join('') +
+    `</div>`
+}
+
+async function wall(sort, signal) {
+  const resp = await fetch(`${MEMBERS_API}?limit=${WALL_CAP}&sort=${encodeURIComponent(sort)}`, {
     headers: { Accept: 'application/json' }, signal,
   })
   if (!resp.ok) throw new Error(`members: HTTP ${resp.status}`)
   const data = await resp.json()
   return Array.isArray(data?.members) ? data.members : []
+}
+
+/* The rules dialog. Wired once, alongside the boards, because it is the only
+ * thing on this tab that is in the document before anything is fetched — a
+ * reader can open it while the boards are still loading, or after they failed.
+ *
+ * ⚠️ ESCAPE AND THE SCRIM BOTH CLOSE IT, and focus goes back to the button that
+ * opened it. Not a focus trap: this is five paragraphs and a close button, and
+ * a trap that has to be escaped from is worse than a dialog you can tab past. */
+function wireRules() {
+  const modal = document.querySelector('[data-hpw-modal]')
+  const open = document.querySelector('[data-hpw-rules]')
+  if (!modal || !open || modal.dataset.wired) return
+  modal.dataset.wired = '1'
+  const show = () => {
+    modal.hidden = false
+    modal.querySelector('.hpw-modal-x')?.focus()
+    document.addEventListener('keydown', onKey)
+  }
+  const hide = () => {
+    modal.hidden = true
+    document.removeEventListener('keydown', onKey)
+    open.focus()
+  }
+  function onKey(e) { if (e.key === 'Escape') hide() }
+  open.addEventListener('click', show)
+  for (const el of modal.querySelectorAll('[data-hpw-close]')) el.addEventListener('click', hide)
 }
 
 /**
@@ -139,6 +192,8 @@ export async function renderMembersBoards(root) {
   if (!root || root.dataset.hpwState === 'done' || root.dataset.hpwState === 'loading') return
   root.dataset.hpwState = 'loading'
   root.innerHTML = '<p class="hpw-empty">Loading the boards…</p>'
+  // Before the fetch, so the rules open even if the boards never arrive.
+  wireRules()
   try {
     const [week, all] = await Promise.all([board('week'), board('all')])
     const goal = week.goal_hours || all.goal_hours || 40
@@ -163,10 +218,29 @@ export async function renderMembersBoards(root) {
        the boards standing, and vice versa. */
     const wallRoot = document.querySelector('[data-members-wall]')
     if (wallRoot) {
+      await paintWall(wallRoot)
+      /* Delegated, so it survives every repaint — the wall's markup is replaced
+         wholesale each time the view changes. */
+      wallRoot.addEventListener('click', (e) => {
+        const btn = e.target.closest?.('[data-view]')
+        if (!btn || btn.dataset.view === wallView) return
+        wallView = btn.dataset.view
+        paintWall(wallRoot)
+      })
+    }
+  } catch (err) {
+    console.warn('[hpw] boards failed', err)
+    root.innerHTML = '<p class="hpw-empty">The boards are unavailable right now.</p>'
+    // Not 'done': approaching the tab again retries.
+    root.dataset.hpwState = ''
+  }
+}
+
+async function paintWall(wallRoot) {
       try {
-        const rows = wallRows(await wall())
+        const rows = wallRows(await wall(wallView))
         wallRoot.innerHTML = rows.length
-          ? renderSupporters(rows, {
+          ? viewsHtml(wallView) + renderSupporters(rows, {
               // ⚠️ "Members" HERE AND "Nostr Community" ON THE DETAIL PAGES.
               // One component, two words, deliberately: the protocol is not the
               // greeting, and a reader who has drilled into a show has chosen to
@@ -174,7 +248,8 @@ export async function renderMembersBoards(root) {
               heading: 'Members',
               id: 'members-wall',
               sectionClass: 'members-wall-section',
-              sub: `Everyone who has boosted a show, ranked by sats sent, all time. Top ${WALL_CAP}.`,
+              metric: wallView,
+              sub: `Everyone who has boosted a show, all time. Top ${WALL_CAP}.`,
               empty: '',
             })
           : ''
@@ -184,11 +259,4 @@ export async function renderMembersBoards(root) {
       } catch (err) {
         console.warn('[members] wall failed', err)
       }
-    }
-  } catch (err) {
-    console.warn('[hpw] boards failed', err)
-    root.innerHTML = '<p class="hpw-empty">The boards are unavailable right now.</p>'
-    // Not 'done': approaching the tab again retries.
-    root.dataset.hpwState = ''
-  }
 }

@@ -50,18 +50,18 @@
 
   <!-- Shared note / card styles (.note-card, .embed-note) — the boosts
        feeds render through the same kind-1 card as boosts-thread.js. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v123" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v124" />
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v123" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v124" />
   <!-- The episode card and its drawer, extracted from the inline block below
        when /episode/<guid> pages needed the same cards. See the file header. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v123" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v123" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v124" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v124" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. Must stay last
        among the stylesheets so the inline block below still wins. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v123" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v124" />
 
   <style>
     :root {
@@ -448,7 +448,6 @@
       margin: 0; letter-spacing: 0.01em;
     }
     .hpw-sub { margin: 0.2rem 0 1rem; font-size: 0.88rem; color: var(--muted); }
-    .hpw-caveat { margin: 0.85rem 0 0; font-size: 0.78rem; color: var(--muted); }
 
     /* Two boards side by side where there is room, stacked where there is not.
        This Week is first in the source and so is first on a phone — it is the
@@ -529,6 +528,58 @@
       padding: 0.35rem 0.9rem; cursor: pointer;
     }
     .members-wall-section .show-more:hover { border-color: var(--brand); color: var(--brand-ddd); }
+
+    /* The rules link, and the dialog behind it. */
+    .hpw-rules-line { margin: 0.85rem 0 0; }
+    .hpw-rules {
+      font: inherit; font-size: 0.8rem; font-weight: 700;
+      color: var(--brand-dd); background: none; border: 0; padding: 0;
+      cursor: pointer; text-decoration: underline;
+      text-underline-offset: 3px; text-decoration-color: rgba(10,111,168,0.4);
+    }
+    .hpw-rules:hover { color: var(--brand-ddd); text-decoration-color: currentColor; }
+    .hpw-rules:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; border-radius: 4px; }
+
+    .hpw-modal { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+    .hpw-modal[hidden] { display: none; }
+    .hpw-modal-scrim { position: absolute; inset: 0; background: var(--scrim); }
+    .hpw-modal-box {
+      position: relative; z-index: 1;
+      background: var(--modal-bg); color: var(--ink);
+      border: 1px solid var(--modal-line); border-radius: 14px;
+      box-shadow: 0 18px 50px rgba(11,58,82,0.28);
+      padding: 1.1rem 1.3rem 1.3rem;
+      width: min(34rem, 100%); max-height: min(80vh, 40rem); overflow-y: auto;
+    }
+    .hpw-modal-head { display: flex; align-items: flex-start; gap: 1rem; margin-bottom: 0.7rem; }
+    .hpw-modal-head h3 {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 1.15rem; font-weight: 700; margin: 0; flex: 1;
+    }
+    .hpw-modal-x {
+      font: inherit; font-size: 1.4rem; line-height: 1;
+      background: none; border: 0; color: var(--muted); cursor: pointer; padding: 0 0.2rem;
+    }
+    .hpw-modal-x:hover { color: var(--ink); }
+    .hpw-rules-list { margin: 0; }
+    .hpw-rules-list dt {
+      font-weight: 700; font-size: 0.88rem; color: var(--ink); margin-top: 0.85rem;
+    }
+    .hpw-rules-list dt:first-child { margin-top: 0; }
+    .hpw-rules-list dd { margin: 0.2rem 0 0; font-size: 0.84rem; color: var(--muted); }
+
+    /* The wall's three views. Same pill shape as the feeds' controls. */
+    .mw-views { display: flex; gap: 0.35rem; margin: 0 0 1rem; flex-wrap: wrap; }
+    .mw-view {
+      font: inherit; font-size: 0.76rem; font-weight: 700;
+      color: var(--muted); background: var(--white);
+      border: 1px solid var(--border); border-radius: 999px;
+      padding: 0.26rem 0.7rem; cursor: pointer;
+      transition: background 0.12s, color 0.12s, border-color 0.12s;
+    }
+    .mw-view:hover { border-color: var(--brand); color: var(--brand-dd); }
+    .mw-view[aria-pressed="true"] { background: var(--brand-dd); border-color: var(--brand-dd); color: var(--white); }
+    .mw-view:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 
     .feed-panel { display: none; }
     .feed-panel.is-active { display: block; }
@@ -870,8 +921,8 @@
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
     }
   </style>
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v123" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v123" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v124" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v124" />
 </head>
 <body data-active-feed="episodes-global">
 
@@ -1087,18 +1138,66 @@
         Send a boost from an app that tags what you are listening to, and you
         show up here — no sign-up, nothing to join.
       </p>
+      <!-- ⚠️ ONE LINE OF EXPLANATION, NOT TWO. The sub-line and the caveat under
+           the boards said the same thing twice at two sizes; the mechanics moved
+           behind Rules, where a reader who wants them can have all of them and a
+           reader who does not is not charged two paragraphs for the boards. -->
       <div class="hpw" data-hpw>
-        <h2 class="hpw-heading">40 HPW</h2>
+        <h2 class="hpw-heading">#40HPW</h2>
         <p class="hpw-sub">
-          Boost an episode and we assume you heard all of it. Forty hours a
-          week is the question, not the entry fee.
+          40HPW Challenge! Share boosts for 40 hours of podcasts in a week.
         </p>
         <div class="hpw-boards" data-hpw-boards></div>
-        <p class="hpw-caveat">
-          Counts one listen per episode per week, over boosts that name an
-          episode we know the length of — about 14% do not. Accounts that
-          publish boosts on other people's behalf are left out.
+        <p class="hpw-rules-line">
+          <button type="button" class="hpw-rules" data-hpw-rules aria-haspopup="dialog">Rules</button>
         </p>
+      </div>
+
+      <!-- The rules, as a dialog rather than as a third paragraph. Ships closed
+           and in the document, so it needs no fetch and reads with the boards
+           whether or not the fetch behind them succeeded. -->
+      <div class="hpw-modal" data-hpw-modal hidden>
+        <div class="hpw-modal-scrim" data-hpw-close></div>
+        <div class="hpw-modal-box" role="dialog" aria-modal="true" aria-labelledby="hpw-rules-title">
+          <div class="hpw-modal-head">
+            <h3 id="hpw-rules-title">How #40HPW works</h3>
+            <button type="button" class="hpw-modal-x" data-hpw-close aria-label="Close">×</button>
+          </div>
+          <dl class="hpw-rules-list">
+            <dt>A boost counts as a listen</dt>
+            <dd>
+              Boost an episode and the board assumes you heard all of it, then
+              adds up the episode's length. It is an assumption, not a
+              measurement, and it is the whole premise.
+            </dd>
+
+            <dt>One listen per episode per week</dt>
+            <dd>
+              Boosting the same episode five times is one listen. Deduplicating
+              removes about 9% of qualifying boosts, and one episode has been
+              boosted fifteen times by the same person in a week.
+            </dd>
+
+            <dt>Weeks run Monday to Monday, UTC</dt>
+            <dd>
+              This Week resets Monday at 00:00 UTC. The Hall of Fame is one row
+              per person per week, so the same name can hold several places.
+            </dd>
+
+            <dt>Some boosts cannot count</dt>
+            <dd>
+              About 14% contribute nothing: roughly 8% are sent to a show rather
+              than an episode, and Podcast Index has no length for another few
+              percent of episodes.
+            </dd>
+
+            <dt>Accounts that post for other people are left out</dt>
+            <dd>
+              A few keys publish boosts on behalf of many donors. Ranking one of
+              those would add up dozens of people's weeks into a single row.
+            </dd>
+          </dl>
+        </div>
       </div>
 
       <!-- The wall. Filled by members-board.js through the SAME renderSupporters
@@ -1671,17 +1770,17 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v123"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v124"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v123" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v124" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v123" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v124" defer></script>
 
 <!-- Feed hydration — lazily loads the active feed on first view. -->
-<script type="module" src="/assets/js/feeds.js?v=ob-v123"></script>
-<script src="/assets/js/nav.js?v=ob-v123" defer></script>
+<script type="module" src="/assets/js/feeds.js?v=ob-v124"></script>
+<script src="/assets/js/nav.js?v=ob-v124" defer></script>
 
 </body>
 </html>

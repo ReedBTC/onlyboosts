@@ -29,6 +29,24 @@ export async function onRequestOptions({ request }) { return preflight(request);
 const MIN_CHARS = 2;
 const MAX_Q = 128;
 
+/* ⚠️ THREE WAYS TO BE A TOP MEMBER, AND THEY ARE DIFFERENT PEOPLE. Sats alone
+ * ranks by generosity, which rewards one large boost; boosts rewards how often
+ * somebody shows up; shows rewards how widely they spread it. Measured on the
+ * live corpus, the top of each list barely overlaps — AdminPacman leads by sats
+ * on 24 boosts, where the boost leader has 447. One ordering would present one
+ * of those as "the" top member and quietly hide the other two stories.
+ *
+ * Every row carries ALL THREE figures whichever is asked for, so the caller can
+ * label the one it ranked by without a second request. */
+const SORTS = {
+  sats:   "sats",
+  boosts: "boosts",
+  // COUNT(DISTINCT podcast_guid) ignores NULLs, which is what we want: ~2% of
+  // boosts name no show, and those cannot count toward a breadth figure.
+  shows:  "shows",
+};
+const DEFAULT_SORT = "sats";
+
 /* ⚠️ LIKE'S OWN WILDCARDS HAVE TO BE ESCAPED OR THE READER CAN TYPE THEM. A
  * bare `%` matches everything and `_` matches any character, so a pasted string
  * containing either quietly returns the wrong people rather than nothing. The
@@ -42,7 +60,9 @@ function likeEscape(s) {
 export async function onRequestGet({ request, env }) {
   const u = new URL(request.url);
   const raw = (u.searchParams.get("q") || "").trim().slice(0, MAX_Q);
-  const limit = clampLimit(u.searchParams.get("limit"), 8, 50);
+  const limit = clampLimit(u.searchParams.get("limit"), 8, 200);
+  const askedSort = u.searchParams.get("sort");
+  const sort = Object.hasOwn(SORTS, askedSort) ? askedSort : DEFAULT_SORT;
 
   /* ⚠️ NO QUERY IS A LIST, NOT AN ERROR. `?limit=100` with no `q` is the top
    * members by sats — what the wall on the Members tab renders — and it is the
@@ -103,8 +123,9 @@ export async function onRequestGet({ request, env }) {
     )
     SELECT b.booster_pubkey AS pk,
            MAX(b.booster_npub) AS npub,
-           COUNT(*)            AS boosts,
-           COALESCE(SUM(b.sats), 0) AS sats,
+           COUNT(*)                          AS boosts,
+           COALESCE(SUM(b.sats), 0)          AS sats,
+           COUNT(DISTINCT b.podcast_guid)    AS shows,
            MAX(p.name)         AS name,
            MAX(p.display_name) AS dname,
            MAX(p.picture)      AS pic
@@ -112,7 +133,10 @@ export async function onRequestGet({ request, env }) {
       JOIN boosts b ON b.booster_pubkey = h.pk
       LEFT JOIN profiles p ON p.pubkey = h.pk
      GROUP BY b.booster_pubkey
-     ORDER BY sats DESC, boosts DESC, pk
+     /* The two trailing keys are a tiebreak, never a ranking: sats settles a
+        tie on boosts or shows, and the pubkey settles a tie on sats so paging
+        is a total order. */
+     ORDER BY ${SORTS[sort]} DESC, sats DESC, pk
      LIMIT ?4`;
 
   try {
@@ -121,6 +145,7 @@ export async function onRequestGet({ request, env }) {
     return json(request, {
       q: raw,
       listing,
+      sort,
       count: results.length,
       members: results.map((r) => ({
         pk: r.pk,
@@ -131,6 +156,7 @@ export async function onRequestGet({ request, env }) {
         pic: r.pic || null,
         boosts: r.boosts,
         sats: r.sats,
+        shows: r.shows,
       })),
     });
   } catch (err) {

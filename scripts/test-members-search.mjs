@@ -43,7 +43,12 @@ db.exec(readFileSync(join(ROOT, 'bots/global-boost-scan/d1/schema.sql'), 'utf8')
  * rows are the cases a capture is unlikely to contain: LIKE metacharacters in a
  * display name, and a member with no profile row at all. */
 const FIXED = [
-  { pk: '1'.repeat(64), npub: 'npub1aaa', name: 'Piez',            sats: 900, n: 3 },
+  /* `spread` is how many distinct shows the member's boosts land on. Piez tops
+     sats; Broad tops shows on far fewer sats; Often tops boosts on fewer still.
+     Without three different winners the sort parameter is untestable. */
+  { pk: '1'.repeat(64), npub: 'npub1aaa', name: 'Piez',            sats: 900, n: 3, spread: 2 },
+  { pk: 'a'.repeat(64), npub: 'npub1jjj', name: 'Broad',           sats: 150, n: 8, spread: 8 },
+  { pk: 'b'.repeat(64), npub: 'npub1kkk', name: 'Often',           sats: 120, n: 20, spread: 1 },
   { pk: '2'.repeat(64), npub: 'npub1bbb', name: '100% Bitcoin',    sats: 500, n: 2 },
   { pk: '3'.repeat(64), npub: 'npub1ccc', name: 'under_score',     sats: 400, n: 2 },
   /* ⚠️ THE DECOYS ARE THE WHOLE POINT OF THE ESCAPING TESTS. Without a member
@@ -64,15 +69,17 @@ const FIXED = [
   { pk: '5'.repeat(64), npub: 'npub1eee', name: null,              sats: 200, n: 1 }, // no profile
 ]
 let ev = 0
-const addBoost = (pk, npub, sats) =>
-  db.prepare('INSERT INTO boosts(event_id,booster_pubkey,booster_npub,created_at,sats) VALUES(?,?,?,?,?)')
+const addBoost = (pk, npub, sats, show = null) =>
+  db.prepare('INSERT INTO boosts(event_id,booster_pubkey,booster_npub,created_at,sats,podcast_guid) VALUES(?,?,?,?,?,?)')
     /* ⚠️ PAD THE COUNTER, NOT THE WHOLE STRING. `\`e${n}\`.padEnd(64,'0')`
        makes e1 and e10 the same 64 characters, so the eleventh insert hits the
        primary key. Event ids are opaque here; only their uniqueness matters. */
-    .run('e' + String(ev++).padStart(63, '0'), pk, npub, 1_700_000_000 + ev, sats)
+    .run('e' + String(ev++).padStart(63, '0'), pk, npub, 1_700_000_000 + ev, sats, show)
 
 for (const m of FIXED) {
-  for (let i = 0; i < m.n; i++) addBoost(m.pk, m.npub, Math.round(m.sats / m.n))
+  // Each member's boosts land on `spread` distinct shows, cycling — so sats,
+  // boosts and shows genuinely order the fixture differently.
+  for (let i = 0; i < m.n; i++) addBoost(m.pk, m.npub, Math.round(m.sats / m.n), 'show' + (i % (m.spread || 1)))
   if (m.name !== null) {
     /* `name` is normally the lowercase handle and `display_name` the pretty
        form, which is what the collector stores. `sameCase` pins both columns to
@@ -282,6 +289,42 @@ console.log('\nOrdering:')
   })
   check('most sats first', () => {
     assert.deepEqual(sats, [...sats].sort((a, b) => b - a))
+  })
+}
+
+console.log('\n⚠️ Three orderings, three different top members:')
+{
+  const tops = {}
+  for (const sort of ['sats', 'boosts', 'shows']) {
+    const { body } = await call(`?sort=${sort}&limit=50`)
+    check(`sort=${sort} is echoed back`, () => assert.equal(body.sort, sort))
+    check(`sort=${sort} is ordered by ${sort}`, () => {
+      const v = body.members.map((m) => m[sort])
+      assert.ok(v.length >= 3, 'not enough rows to have an order')
+      assert.deepEqual(v, [...v].sort((a, b) => b - a))
+    })
+    tops[sort] = body.members[0].name
+  }
+  check('the three leaders are three different people', () => {
+    assert.equal(tops.sats, 'Piez')
+    assert.equal(tops.boosts, 'Often')
+    assert.equal(tops.shows, 'Broad')
+  })
+}
+{
+  const { body } = await call('?limit=3')
+  check('every row carries all three figures, whichever was ranked', () => {
+    for (const m of body.members) {
+      for (const k of ['sats', 'boosts', 'shows']) {
+        assert.equal(typeof m[k], 'number', `${m.name} has no ${k}`)
+      }
+    }
+  })
+}
+{
+  const { body } = await call('?sort=nonsense&limit=3')
+  check('an unknown sort falls back to sats rather than erroring', () => {
+    assert.equal(body.sort, 'sats')
   })
 }
 
