@@ -161,6 +161,42 @@ a rollup a card is an **aggregate**, so the scope is a claim about what was
 counted rather than about which cards survived. This is deliberately one line and
 no box; don't grow it back into the scope paragraph it replaced.
 
+### The Landing Feed
+
+**The front door opens on Shows / All time / Most boosters.** Reed's call,
+2026-08-23, shipping the last piece of the tabs work (Phase D, idea #18). The
+show-level leaderboard is the view that answers "what is this site" to somebody
+who has never seen it; the episode feed is one press away on the sub-row above
+it. It opened on Episodes · Global from the day the feed bar existed.
+
+**⚠️ IT IS THREE DECLARATIONS AND THEY MOVE TOGETHER.** Any one of them alone is
+a page that contradicts itself, and `test-server-render.mjs` pins all three:
+
+| | |
+|---|---|
+| `DEFAULT_TYPE` in the `index.html` controller | what the controller resolves to when the hash names nothing |
+| `is-active` on `#panel-shows`, and the `<!--OB:SSR-SHOWS-->` markers inside it | what a reader with no JavaScript and a crawler on its first pass actually see, since the controller only hides and shows panels once it runs |
+| `FEED` in `functions/index.js` | which query was rendered into that panel, and the `sort` / `range` the client's controls open on |
+
+**⚠️ `TAB_DEFAULT.podcasts` IS DELIBERATELY STILL `'episodes'`.** Where a cold
+load lands and what the **Podcasts tab** opens on when pressed are two questions,
+and only one of them was asked. That constant is also pinned to the nav's own
+Podcasts href (`/#episodes-global`), so changing it is the nav's decision as much
+as the page's. A change that makes those two constants agree has almost
+certainly merged them.
+
+**⚠️ THE OPENING SORT IS `boosters` ON BOTH ROLLUPS, and only one of them moved.**
+`shows-feed.js` opened on `boosts` (raw volume) and is now `boosters` — distinct
+people, because one listener boosting a show forty times is one vote, not forty.
+`feeds-podcasts.js` was **already** there: its key for that ranking is spelled
+`count`, which is the episodes endpoint's own name for it, and setting it to
+`boosters` would be an unknown sort key silently falling back to Latest boost.
+The two endpoints disagree about the word and agree about the ranking.
+
+**The Function renders ONE feed and it is the one on screen** — see the ⚠️ under
+the rendering rule for why, and for why `feeds-podcasts.js#adoptServerCards` is
+kept with no producer.
+
 ## The medium split
 
 `<podcast:medium>` is what separates a podcast from a music release: a `music`
@@ -260,7 +296,7 @@ Twelve test scripts, all plain `node scripts/<name>.mjs` with no runner:
 |---|---|
 | `test-episode-card.mjs` | the card's HTML against fixtures |
 | `test-boost-row.mjs` | the boost row's two-sided contract: a D1 row through `boostRecord` and back through `rowsFromRecords` must render **character for character** as the edge rendered it, or a reader who re-sorts watches half the list change shape |
-| `test-server-render.mjs` | the assembled homepage against a captured production response: the injection, the state element, a 256KB first-view budget, **and the ranking invariants**. Takes the capture as an argument |
+| `test-server-render.mjs` | the assembled homepage against a captured production response: the injection, **the three declarations that name the landing feed**, the state element, a 256KB first-view budget, and the ranking invariants. Takes the capture as an argument, and is written against the **show** card since Phase D |
 | `test-feed-hash.mjs` | the inline feed-bar controller: hash parsing, and the boot sequence |
 | `test-feed-lang.mjs` | `feed-lang.js`: menu ordering, the withholding rule, and the copy |
 | `test-sign-boost.mjs` | the signing oracle's validator and its KV rate limiter, fed by the **shipped** note builder |
@@ -278,6 +314,14 @@ measurement. It asserted `cards are numbered 1..N with no gaps` — the *ordinal
 scheme's invariant — until competition ranking shipped on 2026-08-18, and it
 would have been merged red had it not been run. **Run all twelve before a merge**,
 and treat this one as the guard on the ranking scheme rather than only on weight.
+
+**⚠️ AND ITS `curl` CHANGED WITH THE LANDING FEED.** It captures
+`/api/v1/podcasts?not_medium=music&sort=boosters&range=all&limit=25` now, not the
+episodes query. The whole file was rewritten by Phase D, which is the honest
+measure of how big that change was: the landing feed is not a constant this test
+could have been parameterised by, since the two cards share no renderer, no state
+element and no drawer. `git show 4c22017:scripts/test-server-render.mjs` is the
+episode version if the front door ever moves back.
 
 **⚠️ `test-feed-hash.mjs` EXTRACTS THE CONTROLLER OUT OF `index.html` and runs
 it**, because it is an inline `<script>` and cannot be imported. That is the
@@ -503,7 +547,7 @@ See "Range And Sort On `#boosts`" under the detail pages.
 |---|---|
 | `stats` | the `Nostr Stats:` line. Off on `/booster/<npub>`, where every card aggregates one person's boosts and the booster count is 1 by construction. |
 | `layout` | `feed` or `compact`. Compact is the detail-page drawers and means three things that move together: no inline `<audio>`, no ⋮ subscribe menu, and the boost pill in a right-hand rail of its own, vertically centred. |
-| `drawer` | `inline` or `lazy`. **Where the drawer's boost notes come from.** Inline (the default, and both detail pages) renders them into the `<details>` body with the card. Lazy (`HOME_CARD_PARTS`, the homepage only) ships the body holding only its footer, and `episode-card-actions.js#fillLazyDrawer` fetches `/api/v1/episodes/<guid>?names=1` on the first open and renders the rows through the exported `boostRowsHtml`, the same function, so a fetched row is byte-identical to an inline one (verified against production data). |
+| `drawer` | `inline` or `lazy`. **Where the drawer's boost notes come from.** Inline (the default, and both detail pages) renders them into the `<details>` body with the card. Lazy (`HOME_CARD_PARTS`, the homepage only, and since Phase D declared by `feeds-podcasts.js` itself rather than by a Function) ships the body holding only its footer, and `episode-card-actions.js#fillLazyDrawer` fetches `/api/v1/episodes/<guid>?names=1` on the first open and renders the rows through the exported `boostRowsHtml`, the same function, so a fetched row is byte-identical to an inline one (verified against production data). |
 
 **⚠️ Lazy is not the homepage being exempted from the rendering rule; it is the
 rule's beneficiaries being named.** Server-rendered notes exist for the crawler,
@@ -542,7 +586,7 @@ The five surfaces the card serves, all one definition:
 
 | Surface | Rendered by |
 |---|---|
-| Homepage Episodes / Songs | `functions/index.js` for the opening page, `feeds-podcasts.js` after |
+| Homepage Episodes / Songs | `feeds-podcasts.js` — **client-rendered since Phase D**, the front door having moved to Shows |
 | `/episode/<guid>` `#community-episodes` | `functions/episode/[guid].js` |
 | `/booster/<npub>` `#episodes` | `functions/booster/[npub].js` |
 | every re-sort, range change and search pick | `feeds-podcasts.js` / `episode-section.js` |
@@ -550,12 +594,22 @@ The five surfaces the card serves, all one definition:
 `functions/_shared/episode-cards.js` is the server-side helper all three
 Functions call (`itemsFromBoosts`, `renderCardPage`, `CARDS_PER_PAGE`).
 
-**The homepage's front door is server-rendered too.** `functions/index.js`
-fetches `index.html` through `env.ASSETS` and splices thirty ranked cards into one
-marked slot (`<!--OB:SSR-EPISODES-->`); `feeds-podcasts.js` finds them and
-**adopts** them rather than refetching. It is a **fast path, not a dependency** —
-a failed asset fetch, a D1 error or a missing marker all serve the file untouched
-and the feed hydrates as before.
+**The homepage's front door is server-rendered too, and since Phase D it is the
+SHOW card that renders there.** `functions/index.js` fetches `index.html` through
+`env.ASSETS` and splices one ranked page into one marked slot
+(`<!--OB:SSR-SHOWS-->`, inside the Shows panel); `shows-feed.js` finds those
+cards and **adopts** them rather than refetching. It is a **fast path, not a
+dependency** — a failed asset fetch, a D1 error or a missing marker all serve the
+file untouched and the feed hydrates as before. See **The Landing Feed** below.
+
+**⚠️ ONE FEED IS SERVER-RENDERED AND IT IS THE ONE ON SCREEN.** Rendering
+Episodes as well would put a second ranked list in the document inside a hidden
+panel: bytes every reader downloads, a feed nobody is looking at, and a crawler
+shown two rankings on one URL. So `feeds-podcasts.js#adoptServerCards` has no
+producer today. **It is kept rather than deleted**, marked as such at its own
+definition: it is the client half of the landing-feed decision, it collapses to
+`adoptedCount = 0` when it finds nothing, and it is what makes moving the front
+door a change to the Function alone.
 
 Three things that fell out of the split:
 
@@ -612,7 +666,27 @@ Measured against production when the episode card closed the last exception:
 | Elements in the card block | 9,774 | **1,449** |
 | Feed-bar controller after the first card | 1,160,125 bytes | **~172KB** |
 
-The last row is the one that was the bug: with the controller 1.16MB after the
+**And re-measured on 2026-08-23 when Phase D moved the front door to Shows**,
+against a fresh capture of `/api/v1/podcasts?not_medium=music&sort=boosters`:
+
+| | Episodes, lazy drawers | **Shows** |
+|---|---|---|
+| Cards on the opening page | 30 | **25** (`SHOW_CARDS_PER_PAGE`) |
+| Document, raw | 226.5KB | **152.8KB** |
+| Document, brotli | 33.0KB | **35.5KB** |
+| First view, brotli (document + module graph) | 100.6KB | **103.7KB** |
+| Feed-bar controller after the first card | ~172KB | **46.3KB** |
+
+**⚠️ THE SAVING HERE IS A ROUND TRIP, NOT BYTES, and the numbers say so.** The
+episode page removed a 431KB JSON fetch; the show page's own JSON is 3.2KB
+brotli, so server-rendering it is +1.3KB on the first view against one fewer
+request. The case for it is the rendering rule and the crawler, not weight — a
+ranked list of shows with their boost figures is a FACT, and the front door is
+the site's most-linked URL. The last row is the incidental win: the show card
+carries no boost rows at all, so the controller sits 46KB behind the first card
+rather than 172KB.
+
+The last row of the table above it is the one that was the bug: with the controller 1.16MB after the
 first card, the browser painted the whole Episodes · Global feed before any
 script could read which feed the hash named, and every `#shows` / `#albums` /
 `#members` load flashed Episodes first. **That flash was fixed here, at the
@@ -4379,7 +4453,7 @@ would. Never remove an entry** — those links are in the wild.
 | `feed-controls.js` / `feed-search.js` | the range/sort chrome and the per-feed typeahead |
 | `feed-lang.js` | the language menu on the four ranked feeds, and the copy it rewrites |
 | `boosts-thread.js` / `boost-actions.js` | the content tokenizer and reply / like / repost / zap |
-| `functions/index.js` | the homepage's opening feed, rendered at the edge |
+| `functions/index.js` | the homepage's opening feed — **Shows**, rendered at the edge |
 | `functions/{show,episode,booster}/…` | the three edge-rendered detail pages |
 | `functions/api/v1/*` | the D1 query API |
 | `functions/api/v1/members.js` | member search and the top-members listing, over all 2,011 |
@@ -4395,35 +4469,6 @@ would. Never remove an entry** — those links are in the wild.
 | `bots/global-boost-scan/` | the network-wide collector |
 
 **Still to build:**
-
-0. **⚠️ PHASE D: THE HOMEPAGE STILL OPENS ON EPISODES · GLOBAL.** The last
-   unbuilt piece of the tabs work (branch `homepage`, idea #18), and the reason
-   the show card was made two-sided in the first place: the front door should
-   land on **Shows / all time / most boosters**, which is the view that answers
-   "what is this site" to somebody who has never seen it. Three knobs, and they
-   are separate decisions:
-
-   | | Today | Phase D |
-   |---|---|---|
-   | `DEFAULT_TYPE` in the `index.html` controller | `'episodes'` | `'shows'` |
-   | `shows-feed.js` opening sort | `'boosts'` | `'boosters'` |
-   | `feeds-podcasts.js` opening sort | `'count'` | `'boosters'` |
-
-   **⚠️ IT IS NOT A ONE-LINE CHANGE, because `functions/index.js` SERVER-RENDERS
-   THE OPENING FEED.** That Function splices thirty ranked **episode** cards into
-   `<!--OB:SSR-EPISODES-->` and `feeds-podcasts.js` adopts them. Landing on Shows
-   means either the edge renders show cards into a slot of their own — the
-   two-sided `show-card.js` and `functions/_shared/show-cards.js` exist for
-   exactly this — or the front door gives up its server-rendered first paint,
-   which would undo the measurements under **The Cost, Stated**. The first is the
-   intent. `shows-feed.js` also has no `adoptServerCards` path yet.
-
-   **⚠️ AND `test-server-render.mjs` IS WRITTEN AGAINST THE EPISODE CARD**, from
-   its capture `curl` down to its assertions. Phase D rewrites that test, which
-   is the honest measure of how big it is.
-
-   **Reed has never been asked to confirm the landing feed itself** — it changes
-   what every first-time visitor sees, so ask before building.
 
 1. **The two Stats pages.** `/stats` (Boost Stats) and `/boosters` (Community) are
    coming-soon placeholders and are the whole Stats column of the Explore menu, so

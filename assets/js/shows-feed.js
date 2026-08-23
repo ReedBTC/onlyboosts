@@ -53,18 +53,18 @@
  */
 import {
   getShowPage, searchShows, getShowEpisodes, SEARCH_HITS, SEARCH_MIN_CHARS,
-} from '/assets/js/ob-live.js?v=ob-v132'
+} from '/assets/js/ob-live.js?v=ob-v133'
 import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls,
-} from '/assets/js/feed-controls.js?v=ob-v132'
+} from '/assets/js/feed-controls.js?v=ob-v133'
 // Its own module, not two more exports of feed-controls.js — see the ⚠️ note
 // at the top of that file for the four-hour window that shape opens.
-import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v132'
+import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v133'
 import {
   LANG_ALL, languageOptions, langControl, langNote, langNoMatchText, langLabelFor,
-} from '/assets/js/feed-lang.js?v=ob-v132'
-import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v132'
-import { competitionRanks, rankLabel } from '/assets/js/rank.js?v=ob-v132'
+} from '/assets/js/feed-lang.js?v=ob-v133'
+import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v133'
+import { competitionRanks, rankLabel } from '/assets/js/rank.js?v=ob-v133'
 /* ⚠️ THE CARD ITSELF IS NOT IN THIS FILE ANY MORE. show-card.js emits it as an
  * HTML string and show-card-actions.js attaches its verbs, which is what lets
  * functions/index.js render the opening page of this feed at the edge — a
@@ -81,9 +81,9 @@ import {
   COPY, copyFor, toCard, showCardHtml, showRankValue,
   SORT_OPTIONS, RANKED_SORTS, SHOW_CARDS_PER_PAGE,
   num, fmtSats, plural,
-} from '/assets/js/show-card.js?v=ob-v132'
-import { wireShowCards } from '/assets/js/show-card-actions.js?v=ob-v132'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v132'
+} from '/assets/js/show-card.js?v=ob-v133'
+import { wireShowCards } from '/assets/js/show-card-actions.js?v=ob-v133'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v133'
 
 /* ── The hash's language, on an already-hydrated feed ──
  * The twin of the map in feeds-podcasts.js, and there for the same reason: a
@@ -188,10 +188,13 @@ export async function renderShows({ panel, list, medium = 'other', lang = null }
   // All time is the opening view: the all-time leaderboard is the question a
   // show-level feed is for. The windowed ranges narrow it.
   let rangeKey = 'all'
-  // Raw boost volume, matching the episode rollup's default — the ranking the
-  // feed is *for*. 'boosters' ranks by distinct people instead, which differs
-  // wherever someone boosts the same show repeatedly (most of them).
-  let sortKey = 'boosts'
+  /* Distinct people, matching the episode rollup's default: one listener
+   * boosting a show forty times is one vote, not forty. It was 'boosts' (raw
+   * volume) until Phase D put the front door on this feed, and the two differ
+   * wherever someone boosts the same show repeatedly, which is most of them.
+   * ⚠️ Must match FEED.sort in functions/index.js, or the reader watches the
+   * server's list get replaced by a different one. */
+  let sortKey = 'boosters'
   // No language filter, which is NOT the same as English: 341 shows on this
   // side of the medium split and 253 on the music side declare no <language>
   // at all, so All is the only key that holds every card. See feed-lang.js.
@@ -211,6 +214,18 @@ export async function renderShows({ panel, list, medium = 'other', lang = null }
   const langOptionsP = languageOptions({ medium: wantMusic ? 'music' : null })
 
   let shows = []          // the pages pulled so far, in the server's order
+  /* ⚠️ CARDS ON SCREEN THAT `shows` DOES NOT DESCRIBE.
+   *
+   * The server-rendered opening page is HTML with no card objects behind it,
+   * and building them would mean shipping the same rows twice — once as markup
+   * and once as JSON — which is the cost the server render exists to remove. So
+   * `shows` holds only what THIS module fetched, the count is what every rank
+   * is offset by, and the last painted card's rank and figure are the seed that
+   * carries a tie across the one gap in the run. Every path that replaces those
+   * cards clears all three. The twin of the same block in feeds-podcasts.js. */
+  let adoptedCount = 0
+  let adoptedLastRank = null
+  let adoptedLastValue = null
   let nextOffset = 0
   let loading = false
   let view = []           // what's painted: `shows`, or the one searched show
@@ -228,7 +243,10 @@ export async function renderShows({ panel, list, medium = 'other', lang = null }
    * and `data-since` carries it. Read at OPEN time rather than baked into the
    * card, so a range change moves every drawer with it — see wireDrawer in
    * show-card-actions.js. The edge emits the same pair. */
-  const cards = h('div', { class: 'pcast-list', 'data-show-list': '' })
+  // `let`, because adoption REUSES the container the server painted rather than
+  // copying its markup into this one. Copying would mean serialising and
+  // re-parsing the whole opening page to end up with the same nodes.
+  let cards = h('div', { class: 'pcast-list', 'data-show-list': '' })
   const moreWrap = h('div', { class: 'pcast-more-wrap' })
 
   const cutoff = () => rangeCutoff(rangeKey)
@@ -286,8 +304,9 @@ export async function renderShows({ panel, list, medium = 'other', lang = null }
     moreWrap.appendChild(h('div', { class: 'pcast-more-group' }, [
       btn,
       // No total to count against: the endpoint pages rather than reporting how
-      // many shows the whole range holds, so this says what is on screen.
-      h('div', { class: 'pcast-more-count', text: copy.countLine(shown) }),
+      // many shows the whole range holds, so this says what is on screen — the
+      // server's adopted cards included, since a reader counts what they can see.
+      h('div', { class: 'pcast-more-count', text: copy.countLine(adoptedCount + shown) }),
     ]))
   }
 
@@ -308,32 +327,58 @@ export async function renderShows({ panel, list, medium = 'other', lang = null }
    * a full repaint every label already matches, so it is a no-op. */
   function syncRankLabels() {
     if (picked) return
-    const els = cards.querySelectorAll('.pcast-card')
+    // The CARD elements, not the rank nodes: an unranked sort renders no rank
+    // node at all and indexing those would slide by one. The server's adopted
+    // block sits ahead of `view` in the DOM, hence the offset.
+    const els = cards.querySelectorAll('[data-show-card]')
     view.forEach((s, i) => {
-      const node = els[i]?.querySelector('.pcast-rank')
+      const node = els[adoptedCount + i]?.querySelector('.pcast-rank')
       if (!node) return
       const label = RANKED_SORTS.has(sortKey) ? rankLabel(s._rank, s._tied) : null
       if (label != null && node.textContent !== label) node.textContent = label
     })
+    // The seam itself: the server painted its last card without knowing what
+    // followed it, and that card is not in `view` to be re-labelled above.
+    if (adoptedCount && view.length && adoptedLastRank != null
+        && showRankValue(sortKey)(view[0]) === adoptedLastValue) {
+      const seam = els[adoptedCount - 1]?.querySelector('.pcast-rank')
+      const label = rankLabel(adoptedLastRank, true)
+      if (seam && seam.textContent !== label) seam.textContent = label
+    }
   }
 
   function rebuild({ keepShown = false } = {}) {
     /* ⚠️ COMPETITION RANKS, NOT POSITIONS: ties share the better place and the
      * next distinct value skips the group, so two shows with the same boost
-     * count are not separated by the sats tiebreak the endpoint pages by. This
-     * feed is never server-adopted, so `shows` is always a prefix from offset 0
-     * and needs no seed. See assets/js/rank.js. */
+     * count are not separated by the sats tiebreak the endpoint pages by. See
+     * assets/js/rank.js. */
     if (!picked) {
-      const ranks = competitionRanks(shows, showRankValue(sortKey))
+      /* The seed carries the adopted block's last card across the one gap in
+       * the run: `shows` is a contiguous prefix of the ranked view starting at
+       * `adoptedCount`, not at 0, whenever the server painted the opening page.
+       * Without it the first fetched row would restart the numbering and every
+       * card below a straddling tie would be off by the size of that tie. */
+      const ranks = competitionRanks(shows, showRankValue(sortKey), {
+        startIndex: adoptedCount,
+        prevValue: adoptedLastValue,
+        prevRank: adoptedLastRank,
+      })
       shows.forEach((s, i) => { s._rank = ranks[i].rank; s._tied = ranks[i].tied })
     }
     search?.refresh()
     view = picked ? (pickedItem ? [pickedItem] : []) : shows
     const from = keepShown ? shown : 0
     shown = from
-    if (!keepShown) cards.replaceChildren()
+    /* ⚠️ THE ADOPTED CARDS ARE NEVER CLEARED HERE. They are the container's own
+     * contents and there is nothing to rebuild them from, so every path that
+     * genuinely replaces the list — a requery, a search pick — drops adoption
+     * explicitly BEFORE calling this. What reaches here with a count still set
+     * is the opening paint and an append, neither of which may wipe them. */
+    if (!keepShown && !adoptedCount) cards.replaceChildren()
     moreWrap.replaceChildren()
-    if (!view.length) {
+    // Same reasoning one line on: with the server's cards on screen, an empty
+    // `shows` means nothing has been FETCHED yet, not that the feed is empty.
+    if (!view.length && !adoptedCount) {
       const empty = rangeKey === 'all' ? copy.emptyAll : copy.emptyWindow
       cards.appendChild(pickLoading
         ? h('div', { class: 'feed-placeholder' }, [
@@ -364,9 +409,14 @@ export async function renderShows({ panel, list, medium = 'other', lang = null }
    */
   async function resolvePick() {
     const mine = ++pickSeq
+    // A pick paints one card in place of the list, so the server's cards are
+    // gone the moment one resolves — and their count must stop offsetting ranks.
+    // The boundary seed goes with the count: it describes a card that is no
+    // longer on screen, and left behind it would tie the first fetched row to it.
+    dropAdoption()
     // Dropping the filter comes through here too, and it has to repaint:
     // bumping pickSeq has already retired any resolve still in flight.
-    if (!picked) { pickedItem = null; pickLoading = false; rebuild(); return }
+    if (!picked) { pickedItem = null; pickLoading = false; await refetchUnfiltered(); return }
     pickLoading = true
     pickedItem = null
     rebuild()
@@ -386,6 +436,41 @@ export async function renderShows({ panel, list, medium = 'other', lang = null }
     } finally {
       if (mine === pickSeq) { pickLoading = false; rebuild() }
     }
+  }
+
+  /* The server's opening page stops describing what is on screen.
+   *
+   * Called by every path that replaces the list wholesale rather than appending
+   * to it. The count and the seed go together: the seed describes a card that
+   * is no longer painted, and left behind it would tie the first fetched row to
+   * a figure nothing on the page carries.
+   */
+  function dropAdoption() {
+    adoptedCount = 0
+    adoptedLastRank = null
+    adoptedLastValue = null
+  }
+
+  /* Clearing a search has to reveal the full list again.
+   *
+   * On a feed that fetched its own first page `shows` still holds it and this
+   * is a repaint. On the ADOPTED feed it does not — those cards were the
+   * server's and a pick replaced them — so the page has to be fetched once,
+   * which is the one request adoption defers rather than avoids. It is paid by
+   * the reader who searched and then cleared, which is the right person to
+   * charge for it.
+   */
+  async function refetchUnfiltered() {
+    if (shows.length) { rebuild(); return }
+    try {
+      const page = await loadShowPage({ medium, sort: sortKey, range: rangeKey, lang: langKey, offset: 0 })
+      shows = page.items
+      nextOffset = page.nextOffset
+    } catch (e) {
+      console.warn('[shows] reload failed', e)
+      showToast(copy.rangeFail[0], true)
+    }
+    rebuild()
   }
 
   /* A range or sort change is a new QUERY, so it refetches from offset 0.
@@ -409,6 +494,11 @@ export async function renderShows({ panel, list, medium = 'other', lang = null }
       if (mine !== seq) return
       shows = page.items
       nextOffset = page.nextOffset
+      // The answer arrived, so the server's opening page is about to be
+      // replaced wholesale and stops offsetting anything, boundary seed
+      // included. Done here rather than at the press, because a failed requery
+      // leaves the old view on screen and those cards are still what it is.
+      dropAdoption()
       rebuild()
       // The unfiltered list is still fetched under a live search filter, since
       // clearing the box has to reveal the new range rather than fetch again.
@@ -422,16 +512,80 @@ export async function renderShows({ panel, list, medium = 'other', lang = null }
     }
   }
 
-  let first
-  try {
-    first = await loadShowPage({ medium, sort: sortKey, range: rangeKey, lang: langKey, offset: 0 })
-  } catch (e) {
-    console.error('[shows] index fetch failed', e)
-    renderPlaceholder(list, ...copy.loadFail)
-    return
+  /* The opening page, already rendered.
+   *
+   * functions/index.js server-renders Shows · All into the static shell, so on
+   * that one feed the cards are on the page before this module is even fetched.
+   * Adopting them rather than fetching the same rows again is the whole point
+   * of having rendered them: it saves a request and a full repaint, and it
+   * means the first thing the reader sees is the last thing they see.
+   *
+   * The state element is the contract, and it is deliberately tiny — the sort
+   * and range the server used (so the controls open on the right values), how
+   * many cards it painted, where the next page starts, and the last card's rank
+   * and figure. It is REMOVED on adoption so a later re-render takes the
+   * fetching path.
+   *
+   * ⚠️ THE MEDIUM IS CHECKED because one module serves two feeds. A shell
+   * rendered for Shows must never be adopted by Albums, which is a different
+   * half of the same partition and would paint podcasts under an Albums
+   * heading. There is no scope to check: both of these feeds are Global only.
+   *
+   * ⚠️ THE SERVER'S CARDS ARE UNFILTERED, AND THE SERVER CANNOT KNOW OTHERWISE.
+   * functions/index.js renders the opening page with no language, and a hash is
+   * never sent to the server, so it could not honour one if it wanted to. A
+   * `#shows?lang=de` load therefore has to FETCH rather than adopt — adopting
+   * would paint thirty English shows under a German filter, with a note beneath
+   * them saying otherwise.
+   */
+  function adoptServerCards() {
+    const stateEl = list.querySelector('[data-feed-state]')
+    if (!stateEl) return null
+    let state = null
+    try { state = JSON.parse(stateEl.textContent || '{}') } catch { return null }
+    const painted = list.querySelector('.pcast-list')
+    if (!state || !painted || !painted.querySelector('[data-show-card]')) return null
+    if (state.medium !== medium) return null
+    if (langKey !== LANG_ALL) return null
+    stateEl.remove()
+    return { state, painted }
   }
-  shows = first.items
-  nextOffset = first.nextOffset
+
+  const adopted = adoptServerCards()
+
+  if (adopted) {
+    sortKey = adopted.state.sort || sortKey
+    rangeKey = adopted.state.range || rangeKey
+    adoptedCount = Number(adopted.state.count) || 0
+    nextOffset = adopted.state.nextOffset ?? null
+    /* The last server-painted card's rank and figure. The adopted cards are
+     * markup with no data behind them, so without these the first fetched page
+     * cannot tell whether its opening row continues the tie the last painted
+     * one was part of. See the boundary note in _shared/show-cards.js. */
+    adoptedLastRank = Number.isFinite(adopted.state.lastRank) ? adopted.state.lastRank : null
+    adoptedLastValue = adopted.state.lastValue ?? null
+    // The container the server painted IS the one this module appends to, so a
+    // "load more" adds to the list already on screen instead of starting a
+    // second one beside it — and no node is rebuilt.
+    cards = adopted.painted
+    list.appendChild(moreWrap)
+  } else {
+    // The first page decides whether there is a feed at all, so it is the one
+    // fetch that can render a placeholder instead of cards.
+    let first
+    try {
+      first = await loadShowPage({ medium, sort: sortKey, range: rangeKey, lang: langKey, offset: 0 })
+    } catch (e) {
+      console.error('[shows] index fetch failed', e)
+      renderPlaceholder(list, ...copy.loadFail)
+      return
+    }
+    shows = first.items
+    nextOffset = first.nextOffset
+
+    list.className = ''
+    list.replaceChildren(cards, moreWrap)
+  }
 
   // The same line the Episodes and Songs feeds carry. There is no Follows scope
   // here yet, so it has one form; when Shows · Follows lands it gains the second
@@ -567,7 +721,10 @@ export async function renderShows({ panel, list, medium = 'other', lang = null }
       : copy.searchNoneRange),
   })
 
-  list.className = ''
-  list.replaceChildren(cards, moreWrap)
+  // The server's cards are complete markup and still need their verbs: the
+  // boost pill, the drawer, and the relative time over each "last boost" date.
+  // wireShowCards is idempotent by a marker attribute, so the paint below can
+  // run over them again for nothing.
+  if (adopted) wireShowCards(cards)
   rebuild()
 }

@@ -1,30 +1,43 @@
 #!/usr/bin/env node
 /**
- * Render the server-side surfaces against REAL API responses and assert on them.
+ * Render the homepage's server-side opening feed against a REAL API response
+ * and assert on it.
  *
- * The companion to test-episode-card.mjs, one level up: that one checks the card
- * against fixtures, this one checks that the three Pages Functions assemble a
- * page out of it correctly — the injection into index.html, the state element
- * the client adopts through, and the size of what a reader actually downloads.
+ * The companion to test-show-card.mjs, one level up: that one checks the card
+ * against fixtures, this one checks that functions/index.js assembles a page
+ * out of it correctly — the injection into index.html, the state element the
+ * client adopts through, and the size of what a reader actually downloads.
+ *
+ * ⚠️ IT IS WRITTEN AGAINST THE SHOW CARD SINCE PHASE D (2026-08-23). The front
+ * door landed on Episodes until then and this file was written against the
+ * episode card, capture `curl` and all. Both halves moved together, which is
+ * the honest measure of how big that change was: the landing feed is not a
+ * constant anything here can be parameterised by, because the two cards do not
+ * share a renderer, a state element or a drawer. `git show 4c22017` has the
+ * episode version if the front door ever moves back.
  *
  * ⚠️ IT NEEDS A CAPTURE, NOT A DATABASE. D1 is not reachable from here and
  * wrangler is unauthenticated, so the input is a saved response from production:
  *
- *   curl -s 'https://onlyboosts.social/api/v1/episodes?not_medium=music\
- * &include=boosts&limit=30&sort=count&range=all' > <file>
+ *   curl -s 'https://onlyboosts.social/api/v1/podcasts?not_medium=music\
+ * &sort=boosters&range=all&limit=25' > <file>
  *
- * Run: node scripts/test-server-render.mjs <captured-episodes.json>
+ * ⚠️ TAKE A FRESH ONE. It is the size measurement as well as the fixture, and a
+ * stale capture measures a page nobody is being served.
+ *
+ * Run: node scripts/test-server-render.mjs <captured-podcasts.json>
  */
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { gzipSync, brotliCompressSync, constants } from 'node:zlib'
-import { itemsFromBoosts, renderCardPage, CARDS_PER_PAGE } from '../functions/_shared/episode-cards.js'
-import { episodeApiToBoosts } from '../assets/js/ob-data.js'
-import { COPY, HOME_CARD_PARTS } from '../assets/js/episode-card.js'
+import {
+  cardsFromPodcasts, renderShowCardPage, SHOW_CARDS_PER_PAGE,
+} from '../functions/_shared/show-cards.js'
+import { COPY, showRankValue } from '../assets/js/show-card.js'
 
 const capture = process.argv[2]
 if (!capture) {
-  console.error('usage: node scripts/test-server-render.mjs <captured-episodes.json>')
+  console.error('usage: node scripts/test-server-render.mjs <captured-podcasts.json>')
   process.exit(2)
 }
 
@@ -35,28 +48,23 @@ function check(name, fn) {
 }
 
 const api = JSON.parse(readFileSync(capture, 'utf8'))
-const records = api.episodes || []
-const { boosts, totals } = episodeApiToBoosts(records)
-// The same reordering functions/index.js#fromRecords does: built items put back
-// into the records' order, never re-sorted over the capped inline rows.
-const built = itemsFromBoosts(boosts, { sort: 'count' })
-const byGuid = new Map(built.items.map((it) => [it.guid, it]))
-const items = records.map((r) => byGuid.get(r.guid)).filter(Boolean)
-const profiles = built.profiles
-for (const it of items) it.totals = totals.get(it.guid) || null
+const records = api.podcasts || []
+// ⚠️ NO RE-SORT. The endpoint answers in rank order and functions/index.js maps
+// straight over it — see the order note in that file. Re-ordering here would
+// test a page the Function does not produce.
+const cards = cardsFromPodcasts(records)
 
-// The same call functions/index.js makes, variant included: HOME_CARD_PARTS is
-// the homepage's card, whose drawers fill on open rather than shipping their
-// rows. That is what the weight numbers below are about.
-const block = `<div class="pcast-list">${renderCardPage(items, {
-  copy: COPY.other, profiles, sort: 'count', range: 'all', limit: CARDS_PER_PAGE,
-  parts: HOME_CARD_PARTS,
-  state: { scope: 'global', medium: 'other', sort: 'count', range: 'all', nextOffset: api.next_offset },
-})}</div>`
+// The same call functions/index.js makes.
+const SORT = 'boosters'
+const block = renderShowCardPage(cards, {
+  copy: COPY.other, sort: SORT, range: 'all', limit: SHOW_CARDS_PER_PAGE,
+  state: { scope: 'global', medium: 'other', sort: SORT, range: 'all', nextOffset: api.next_offset },
+})
+const painted = Math.min(SHOW_CARDS_PER_PAGE, cards.length)
 
 // ── The injection, run against the real index.html ──────────────────────────
-const OPEN = '<!--OB:SSR-EPISODES-->'
-const CLOSE = '<!--/OB:SSR-EPISODES-->'
+const OPEN = '<!--OB:SSR-SHOWS-->'
+const CLOSE = '<!--/OB:SSR-SHOWS-->'
 const shell = readFileSync(new URL('../index.html', import.meta.url), 'utf8')
 
 console.log('\nThe homepage injection:')
@@ -72,112 +80,155 @@ const page = shell.slice(0, shell.indexOf(OPEN)) + block +
              shell.slice(shell.indexOf(CLOSE) + CLOSE.length)
 
 check('the placeholder between them is replaced, not appended to', () => {
-  assert.doesNotMatch(page, /Global episodes feed coming online/)
+  assert.doesNotMatch(page, /Shows feed coming online/)
 })
 
-check('the cards land inside the Episodes · Global panel', () => {
-  const panel = page.slice(page.indexOf('id="panel-episodes-global"'))
-  const nextPanel = panel.indexOf('id="panel-members-global"')
-  const mine = panel.slice(0, nextPanel)
-  assert.match(mine, /<div class="pcast-list">/)
-  assert.match(mine, /data-episode-card/)
+check('the cards land inside the Shows panel', () => {
+  const panel = page.slice(page.indexOf('id="panel-shows"'))
+  const mine = panel.slice(0, panel.indexOf('id="panel-albums"'))
+  assert.match(mine, /<div class="pcast-list" data-show-list>/)
+  assert.match(mine, /data-show-card/)
+})
+
+/* ⚠️ THE LANDING FEED IS THREE DECISIONS THAT MOVE TOGETHER, and two of them
+ * are in this file rather than in the Function. `is-active` on the panel is
+ * what a reader with no JavaScript and a crawler on its first pass actually
+ * see; DEFAULT_TYPE is what the controller resolves to; and FEED.sort in the
+ * Function is what was rendered into it. Any one of them alone is a page that
+ * contradicts itself. */
+console.log('\nThe landing feed:')
+
+check('the Shows panel is the one that ships active', () => {
+  const m = shell.match(/<section class="feed-panel([^"]*)" id="panel-shows"[^>]*>/)
+  assert.ok(m, 'the Shows panel is missing or its attribute order changed')
+  assert.match(m[1], /\bis-active\b/, 'the Shows panel does not ship active')
+  assert.doesNotMatch(m[0], /\shidden\b/, 'the Shows panel ships hidden')
+})
+
+check('no other panel ships active, so the markup names one opening feed', () => {
+  const actives = [...shell.matchAll(/<section class="feed-panel[^"]*\bis-active\b[^"]*" id="(panel-[^"]+)"/g)]
+  assert.deepEqual(actives.map((m) => m[1]), ['panel-shows'])
+})
+
+check('the controller lands on the same feed', () => {
+  assert.match(shell, /const DEFAULT_TYPE = 'shows';/)
+})
+
+check('the sub-row ships with the landing feed selected', () => {
+  // syncTabs rewrites this during parse, so it only shows through to a reader
+  // with no JavaScript and to a crawler's first pass — the two who must not be
+  // shown a selected sub-feed that is not the panel below it.
+  const row = shell.slice(shell.indexOf('<div class="feed-sub-group" data-tab="podcasts">'))
+  const group = row.slice(0, row.indexOf('</div>'))
+  const on = [...group.matchAll(/data-value="([^"]+)"\s+aria-selected="true"/g)].map((m) => m[1])
+  assert.deepEqual(on, ['shows'])
+})
+
+check('the Episodes panel carries no injection marker of its own', () => {
+  // One feed is server-rendered and it is the one on screen. A second block
+  // inside a hidden panel is bytes nobody reads and two rankings on one URL.
+  assert.doesNotMatch(shell, /OB:SSR-EPISODES/)
 })
 
 check('nothing else in the shell was disturbed', () => {
   // The eight panels, the feed bar and the generated nav/footer all survive: the
   // Function does one string splice and must never reformat the file.
-  for (const id of ['panel-episodes-follows', 'panel-members-global', 'panel-shows', 'panel-albums']) {
+  for (const id of ['panel-episodes-global', 'panel-episodes-follows', 'panel-members-global', 'panel-albums']) {
     assert.ok(page.includes(id), `${id} missing`)
   }
   assert.ok(page.includes('NAV:START') || page.includes('id="top-nav"'), 'nav missing')
 })
 
 // ── The handover ────────────────────────────────────────────────────────────
-console.log('\nThe state element feeds-podcasts.js adopts through:')
+console.log('\nThe state element shows-feed.js adopts through:')
 
 check('it is present, is application/json, and is not executable', () => {
   assert.match(block, /<script type="application\/json" data-feed-state>/)
 })
 
-check('it carries the scope and medium the client checks', () => {
-  const m = block.match(/data-feed-state>([^<]*)</)
-  const state = JSON.parse(m[1])
+check('it carries the medium the client checks, and the opening controls', () => {
+  const state = readState()
   assert.equal(state.scope, 'global')
   assert.equal(state.medium, 'other')
-  assert.equal(state.sort, 'count')
+  assert.equal(state.sort, SORT)
   assert.equal(state.range, 'all')
-  assert.equal(state.count, Math.min(CARDS_PER_PAGE, items.length))
+  assert.equal(state.count, painted)
   assert.equal(state.nextOffset, api.next_offset)
 })
 
-check('it carries state and not content', () => {
-  const m = block.match(/data-feed-state>([^<]*)</)
-  // The whole point: the rows are the markup, not a second copy of themselves.
-  assert.ok(m[1].length < 260, `state element is ${m[1].length} bytes — is it carrying rows?`)
+check('it carries the boundary seed the next page needs to number itself', () => {
+  const state = readState()
+  const last = cards[painted - 1]
+  assert.equal(state.lastValue, showRankValue(SORT)(last),
+    'the seed value is not the last painted card’s figure')
+  assert.equal(typeof state.lastRank, 'number')
 })
 
-check('it declares the homepage variant, so a client repaint matches the edge', () => {
-  const m = block.match(/data-feed-state>([^<]*)</)
-  const state = JSON.parse(m[1])
-  assert.deepEqual(state.card, HOME_CARD_PARTS)
-  assert.equal(state.card.drawer, 'lazy')
+check('it carries state and not content', () => {
+  const raw = block.match(/data-feed-state>([^<]*)</)[1]
+  // The whole point: the rows are the markup, not a second copy of themselves.
+  assert.ok(raw.length < 260, `state element is ${raw.length} bytes — is it carrying rows?`)
+})
+
+check('no data-since on the All range', () => {
+  // The drawer reads it at open time to scope its episode rows to the card's own
+  // window. All is the opening range and has no cutoff, so the attribute is
+  // absent rather than present and empty.
+  assert.doesNotMatch(block, /data-since=/)
 })
 
 // ── The drawers ─────────────────────────────────────────────────────────────
 console.log('\nThe drawers, filled on open:')
 
-check('no boost row is in the document; every drawer is a lazy <details>', () => {
-  // The measurement this exists for: with the rows inline the drawer bodies
-  // were 82% of the document and the feed-bar controller sat 1.16MB after the
-  // first card, which is the flash of Episodes on every #shows load.
-  assert.equal((block.match(/data-boost-note/g) || []).length, 0)
+check('every drawer is a lazy <details>; no episode row is in the document', () => {
+  // The show card's drawer is ALWAYS lazy: its rows come from
+  // /api/v1/podcasts/<guid> scoped to the card's range, so they are never in
+  // hand when the card is built — at the edge or in the browser.
+  const withEpisodes = cards.slice(0, painted).filter((s) => s.episodes).length
   const drawers = (block.match(/<details class="pcast-card-details">/g) || []).length
-  const lazy = (block.match(/<div class="pcast-details" data-lazy-boosts>/g) || []).length
-  assert.equal(drawers, Math.min(CARDS_PER_PAGE, items.length))
+  const lazy = (block.match(/<div class="pcast-details" data-lazy-episodes>/g) || []).length
+  assert.equal(drawers, withEpisodes)
   assert.equal(lazy, drawers)
+  assert.equal((block.match(/class="ob-ep-row"/g) || []).length, 0)
 })
 
-check('the drawer bar still carries the booster faces and the sats', () => {
-  const faces = (block.match(/<span class="pcast-avatars">/g) || []).length
-  assert.equal(faces, Math.min(CARDS_PER_PAGE, items.length))
-  assert.match(block, /class="pcast-sats"/)
+check('the boost pill ships hidden, because boosting is a verb', () => {
+  assert.match(block, /class="ob-boost-pill" hidden data-boost-show/)
+})
+
+check('the last-boost date is a date, not a relative time', () => {
+  // relTime() reads Date.now(), which at the edge is the moment the response was
+  // CACHED — the same bytes go to everyone arriving inside the 300s window. The
+  // timestamp is the fact; show-card-actions.js rewrites the reading of it.
+  assert.doesNotMatch(block, /ago<\/div>/)
+  assert.match(block, /data-latest-ts="\d+">last boost [A-Z][a-z]{2} \d{1,2}, \d{4}</)
 })
 
 // ── Ranking ─────────────────────────────────────────────────────────────────
 console.log('\nRanking:')
 
-check('the server ranking survives buildEpisodes’ recency sort', () => {
-  // buildEpisodes ends with a sort by latest boost, which would throw the
-  // endpoint's ordering away; fromRecords restores the records' order. The
-  // check is that the painted order is descending by the aggregate booster
-  // count, which is what the endpoint ranked on.
-  const counts = items.slice(0, CARDS_PER_PAGE).map((it) => it.totals?.boosters ?? it.distinctBoosters.length)
-  for (let i = 1; i < counts.length; i++) {
-    assert.ok(counts[i] <= counts[i - 1], `card ${i + 1} outranks card ${i} (${counts[i]} > ${counts[i - 1]})`)
+check('the server ranking survives into the painted order', () => {
+  const values = cards.slice(0, painted).map(showRankValue(SORT))
+  for (let i = 1; i < values.length; i++) {
+    assert.ok(values[i] <= values[i - 1], `card ${i + 1} outranks card ${i} (${values[i]} > ${values[i - 1]})`)
   }
 })
 
-/* ⚠️ THIS ASSERTED `1..N WITH NO GAPS` UNTIL 2026-08-18, AND THAT WAS THE OLD
- * SCHEME. Ranks are standard competition ranks now (assets/js/rank.js): tied
- * cards share the better place and the next distinct value skips the whole
- * group, so `1 2 3 4 5 T6 T6 8` is CORRECT and a gapless run would mean the
- * tiebreak was deciding standings again. The invariants below are what actually
- * hold, and the live capture exercises them — the homepage's opening sort is
- * Most boosters, whose counts are quantised enough that the first page ties
- * heavily.
- */
+/* ⚠️ COMPETITION RANKS, NOT POSITIONS. Ties share the better place and the next
+ * distinct value skips the whole group, so `1 2 3 T4 T4 6` is CORRECT and a
+ * gapless run would mean the sats-then-guid tiebreak — which exists so that
+ * paging is a total order — was deciding standings again. */
 check('cards carry competition ranks: ties share a place, the next value skips', () => {
-  const labels = [...block.matchAll(/<div class="pcast-rank" aria-hidden="true">(T?\d+)</g)].map((m) => m[1])
-  assert.equal(labels.length, Math.min(CARDS_PER_PAGE, items.length), 'every card carries a rank')
+  const labels = rankLabels()
+  const values = cards.slice(0, labels.length).map(showRankValue(SORT))
+  assert.equal(labels.length, painted, 'every card carries a rank')
   const ranks = labels.map((l) => Number(l.replace(/^T/, '')))
-  const values = items.slice(0, labels.length).map((it) => it.totals?.boosters ?? it.distinctBoosters.length)
 
   assert.equal(ranks[0], 1, 'the first card is rank 1')
   for (let i = 0; i < ranks.length; i++) {
     // The definition, checked directly against the page's own figures.
     const ahead = values.filter((v) => v > values[i]).length
     assert.equal(ranks[i], ahead + 1, `card ${i + 1} is #${ranks[i]} with ${ahead} ahead of it`)
-    // Equal figures share a place; different figures cannot.
     if (i > 0) {
       const same = values[i] === values[i - 1]
       assert.equal(ranks[i] === ranks[i - 1], same, `card ${i + 1} vs ${i}: rank/figure disagree`)
@@ -186,14 +237,14 @@ check('cards carry competition ranks: ties share a place, the next value skips',
 })
 
 check('the T marks a shared place, and only a shared place', () => {
-  const labels = [...block.matchAll(/<div class="pcast-rank" aria-hidden="true">(T?\d+)</g)].map((m) => m[1])
-  const values = items.slice(0, labels.length).map((it) => it.totals?.boosters ?? it.distinctBoosters.length)
+  const labels = rankLabels()
+  const values = cards.slice(0, labels.length).map(showRankValue(SORT))
   labels.forEach((label, i) => {
     const shared = values.filter((v) => v === values[i]).length > 1
-    // ⚠️ The LAST card is exempt in one direction only: it cannot see whether
-    // its run continues into row 31, so it may under-report a tie it shares
-    // forward. It must never over-report one. The client re-syncs that row once
-    // it has fetched what follows — see syncRankLabels in feeds-podcasts.js.
+    /* ⚠️ The LAST card is exempt in one direction only: it cannot see whether
+     * its run continues into the next page, so it may under-report a tie it
+     * shares forward. It must never over-report one. That is what the boundary
+     * seed in the state element repairs — see syncRankLabels in shows-feed.js. */
     const lastRow = i === labels.length - 1
     if (label.startsWith('T')) {
       assert.ok(shared, `card ${i + 1} is marked T but its figure ${values[i]} is unique on the page`)
@@ -203,13 +254,12 @@ check('the T marks a shared place, and only a shared place', () => {
   })
 })
 
-check('the figures come from the aggregates, not the inlined rows', () => {
-  // The endpoint caps inline notes at 50 per episode. The top card in the live
-  // capture is at the cap, so its printed count must exceed the rows it shipped.
-  const top = items[0]
-  const inlined = top.boosts.length
-  const printed = top.totals?.boosts
-  assert.ok(printed >= inlined, `printed ${printed} < inlined ${inlined}`)
+check('a chronological sort paints no numeral at all', () => {
+  // A rank under "Recently boosted" reads as a score when it is only order.
+  const chrono = renderShowCardPage(cards, { copy: COPY.other, sort: 'latest', range: 'all' })
+  assert.equal((chrono.match(/class="pcast-rank"/g) || []).length, 0)
+  const state = JSON.parse(chrono.match(/data-feed-state>([^<]*)</)[1])
+  assert.equal(state.lastRank, undefined, 'an unranked page carries a boundary seed')
 })
 
 // ── Weight ─────────────────────────────────────────────────────────────────
@@ -231,7 +281,6 @@ const shellRaw = Buffer.byteLength(shell)
 const shellBr = br(shell)
 const apiBuf = readFileSync(capture)
 const apiBr = br(apiBuf)
-const notes = items.reduce((n, it) => n + it.boosts.length, 0)
 
 // The modules the homepage must have before a client-rendered feed can paint.
 // Read from disk so the number moves when the graph does.
@@ -240,7 +289,7 @@ const graphBr = moduleGraphBytes('assets/js/feeds.js')
 const beforeTotal = shellBr + apiBr + graphBr
 const afterTotal = brNew + graphBr
 
-console.log(`  cards           ${items.length} episodes, ${notes} boost notes behind them (fetched on open, none in the document)`)
+console.log(`  cards           ${painted} shows`)
 console.log(`  document        ${kb(shellRaw)} → ${kb(raw)} raw, ${kb(shellBr)} → ${kb(brNew)} br  (gz ${kb(gzipSync(shell).length)} → ${kb(gz)})`)
 console.log(`  the JSON fetch  ${kb(apiBr)} br, now not made at all`)
 console.log(`  module graph    ${kb(graphBr)} br, unchanged either way`)
@@ -257,11 +306,13 @@ console.log(`  delta           ${afterTotal > beforeTotal ? '+' : ''}${kb(afterT
  * pass, which is worse than not having one.
  *
  * So: 256KB brotli for the WHOLE first view — document plus the module graph it
- * needs before anything can paint. That is roughly 20% of headroom over where
- * this lands today, it is a number a reader on a slow connection can be reasoned
- * about, and blowing it means a real conversation rather than a nudge. The
- * comparison against the old two-round-trip page is still PRINTED above, because
- * it is the interesting number even though it is the wrong thing to gate on.
+ * needs before anything can paint. It is a number a reader on a slow connection
+ * can be reasoned about, and blowing it means a real conversation rather than a
+ * nudge. ⚠️ IT WAS NOT LOWERED WHEN THE FRONT DOOR MOVED TO THE SHOW CARD, which
+ * lands far under it: a budget re-cut to whatever today's page happens to weigh
+ * is a tripwire against nothing. The comparison against the old two-round-trip
+ * page is still PRINTED above, because it is the interesting number even though
+ * it is the wrong thing to gate on.
  */
 const BUDGET_BR = 256 * 1024
 
@@ -273,20 +324,27 @@ check(`the first view fits the ${kb(BUDGET_BR)} brotli budget`, () => {
 check('the raw document stays small enough that the hash is read before the paint', () => {
   // The parse cost is the one that does not compress away. With every boost
   // note inline the document was 1.19MB raw and the feed-bar controller sat
-  // 1.16MB after the first card, so the browser painted the whole Episodes
-  // feed before any script could read which feed the hash named. The lazy
-  // drawer took it to ~220KB. 400KB is headroom over that, not a target; the
-  // number to notice if the page size or the card grows.
+  // 1.16MB after the first card, so the browser painted the whole opening feed
+  // before any script could read which feed the hash named. 400KB is headroom,
+  // not a target; the number to notice if the page or the card grows.
   assert.ok(raw < 409_600, `${kb(raw)} raw`)
 })
 
 check('the feed-bar controller is close behind the first card', () => {
-  const first = page.indexOf('data-episode-card')
+  const first = page.indexOf('data-show-card')
   const ctrl = page.indexOf('FEED BAR CONTROLLER')
   assert.ok(first > 0 && ctrl > first, 'controller or first card missing')
   console.log(`  controller      ${kb(ctrl - first)} after the first card`)
   assert.ok(ctrl - first < 307_200, `${kb(ctrl - first)} between the first card and the controller`)
 })
+
+function readState() {
+  return JSON.parse(block.match(/data-feed-state>([^<]*)</)[1])
+}
+
+function rankLabels() {
+  return [...block.matchAll(/<div class="pcast-rank" aria-hidden="true">(T?\d+)</g)].map((m) => m[1])
+}
 
 function br(buf) {
   return brotliCompressSync(Buffer.from(buf), {

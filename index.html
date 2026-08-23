@@ -50,18 +50,18 @@
 
   <!-- Shared note / card styles (.note-card, .embed-note) — the boosts
        feeds render through the same kind-1 card as boosts-thread.js. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v132" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v133" />
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v132" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v133" />
   <!-- The episode card and its drawer, extracted from the inline block below
        when /episode/<guid> pages needed the same cards. See the file header. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v132" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v132" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v133" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v133" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. Must stay last
        among the stylesheets so the inline block below still wins. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v132" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v133" />
 
   <style>
     :root {
@@ -1123,8 +1123,8 @@
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
     }
   </style>
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v132" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v132" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v133" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v133" />
 </head>
 <body data-active-feed="episodes-global">
 
@@ -1278,9 +1278,15 @@
        a phone, where the tabs are chips with space between them. -->
   <div class="feed-subs-wrap">
     <div class="feed-subs" data-feed-subs>
+      <!-- ⚠️ Shows ships selected because the front door lands on it — see
+           DEFAULT_TYPE in the controller. syncTabs rewrites both attributes
+           during parse, so this only shows through to a reader with no
+           JavaScript and to a crawler's first pass; those are exactly the two
+           who must not be shown a selected sub-feed that is not the panel
+           below. -->
       <div class="feed-sub-group" data-tab="podcasts">
-        <button type="button" class="feed-sub" data-value="shows"    aria-selected="false">Shows</button>
-        <button type="button" class="feed-sub" data-value="episodes" aria-selected="true">Episodes</button>
+        <button type="button" class="feed-sub" data-value="shows"    aria-selected="true">Shows</button>
+        <button type="button" class="feed-sub" data-value="episodes" aria-selected="false">Episodes</button>
       </div>
       <div class="feed-sub-group" data-tab="music">
         <button type="button" class="feed-sub" data-value="albums" aria-selected="false">Albums</button>
@@ -1520,28 +1526,21 @@
          page, which is the surface that gets shared and the one where the
          numbers read as a claim about somebody's audience. -->
 
-    <section class="feed-panel is-active" id="panel-episodes-global" role="region" aria-label="Episodes, global" data-feed="episodes-global" data-scope="global">
+    <!-- ⚠️ NO INJECTION MARKER HERE SINCE PHASE D. This panel carried the
+         server-rendered opening feed while the front door landed on Episodes;
+         it lands on Shows now, so the markers moved to that panel and this one
+         fetches its first page the way Songs and both Follows feeds always
+         have. Only the feed a reader is actually looking at is rendered at the
+         edge — a second thirty-card list inside a hidden panel is bytes nobody
+         reads and two rankings on one URL for a crawler. -->
+    <section class="feed-panel" id="panel-episodes-global" role="region" aria-label="Episodes, global" data-feed="episodes-global" data-scope="global" hidden>
       <p class="feed-note" data-feed-note hidden></p>
       <div class="feed-search" data-feed-search hidden></div>
-      <!-- ⚠️ THE MARKER BELOW IS AN INJECTION POINT, not a comment. functions/index.js
-           fetches this file through env.ASSETS, replaces that exact string with
-           thirty server-rendered episode cards, and serves the result — so the
-           front door ships real content rather than a shell a crawler has to run
-           JavaScript to read. feeds-podcasts.js finds those cards and ADOPTS
-           them instead of fetching the same 431KB of rows again.
-
-           Do not reword it, and do not remove the placeholder under it: the
-           Function degrades to serving this file untouched whenever D1 is
-           unreachable, in which case the placeholder is what a reader sees for
-           the moment before the feed hydrates. Everything still works with the
-           markers unreplaced; it is a fast path, not a dependency. -->
       <div class="feed-list" data-feed-list>
-        <!--OB:SSR-EPISODES-->
         <div class="feed-placeholder">
           <strong>Global episodes feed coming online</strong>
           The layout is ready — boosted episodes load here once the snapshot loader lands.
         </div>
-        <!--/OB:SSR-EPISODES-->
       </div>
     </section>
 
@@ -1605,14 +1604,33 @@
     <!-- Shows: the show-level rollup, where the Episodes feeds are
          episode-level. Global only — podcasts/index.json is computed over
          everyone, so it can't serve a Follows audience (shows-feed.js). -->
-    <section class="feed-panel" id="panel-shows" role="region" aria-label="Shows" data-feed="shows" data-scope="global" hidden>
+    <!-- ⚠️ THE PANEL THE FRONT DOOR OPENS ON. DEFAULT_TYPE in the controller
+         below says so, and this is the half of that decision a reader with no
+         JavaScript and a crawler on its first pass actually see: the controller
+         hides and shows panels, but until it runs, `is-active` here is what is
+         on screen. The two move together. -->
+    <section class="feed-panel is-active" id="panel-shows" role="region" aria-label="Shows" data-feed="shows" data-scope="global">
       <p class="feed-note" data-feed-note hidden></p>
       <div class="feed-search" data-feed-search hidden></div>
+      <!-- ⚠️ THE MARKER BELOW IS AN INJECTION POINT, not a comment. functions/index.js
+           fetches this file through env.ASSETS, replaces that exact string with
+           the server-rendered opening page of show cards, and serves the result
+           — so the front door ships real content rather than a shell a crawler
+           has to run JavaScript to read. shows-feed.js finds those cards and
+           ADOPTS them instead of fetching the same rows again.
+
+           Do not reword it, and do not remove the placeholder under it: the
+           Function degrades to serving this file untouched whenever D1 is
+           unreachable, in which case the placeholder is what a reader sees for
+           the moment before the feed hydrates. Everything still works with the
+           markers unreplaced; it is a fast path, not a dependency. -->
       <div class="feed-list" data-feed-list>
+        <!--OB:SSR-SHOWS-->
         <div class="feed-placeholder">
           <strong>Shows feed coming online</strong>
           The layout is ready — boosted shows load here once the rollup lands.
         </div>
+        <!--/OB:SSR-SHOWS-->
       </div>
     </section>
 
@@ -1830,7 +1848,19 @@
     const lang = langByFeed[feed] || '';
     return '#' + (HASH_OF[feed] || feed) + (lang ? '?lang=' + encodeURIComponent(lang) : '');
   }
-  const DEFAULT_TYPE = 'episodes';
+  /* ⚠️ THE FRONT DOOR LANDS ON SHOWS (Phase D, 2026-08-23, Reed's call). The
+     show-level leaderboard is the view that answers "what is this site" to
+     somebody who has never seen it; the episode feed is one press away on the
+     sub-row above it. Three things move with this line and none of them is
+     optional: `is-active` on the Shows panel in the markup above, the injection
+     markers inside it, and FEED in functions/index.js, which server-renders
+     that panel's opening page.
+
+     ⚠️ TAB_DEFAULT.podcasts IS DELIBERATELY STILL 'episodes'. This is where a
+     COLD LOAD lands; that is what the Podcasts TAB opens on when it is pressed
+     with no remembered sub-feed, and it is pinned to the nav's own Podcasts
+     href. They are two different questions and only one of them was asked. */
+  const DEFAULT_TYPE = 'shows';
   const DEFAULT_SCOPE = 'global';
   const bar = document.querySelector('.feed-bar');
   if (!bar) return;
@@ -2119,17 +2149,17 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v132"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v133"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v132" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v133" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v132" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v133" defer></script>
 
 <!-- Feed hydration — lazily loads the active feed on first view. -->
-<script type="module" src="/assets/js/feeds.js?v=ob-v132"></script>
-<script src="/assets/js/nav.js?v=ob-v132" defer></script>
+<script type="module" src="/assets/js/feeds.js?v=ob-v133"></script>
+<script src="/assets/js/nav.js?v=ob-v133" defer></script>
 
 </body>
 </html>

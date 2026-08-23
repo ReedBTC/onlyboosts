@@ -285,8 +285,12 @@ eq('signed out, follows coerces to global and KEEPS the language',
 r = boot('#episodes-follows?lang=de', { signedIn: true })
 eq('signed in, follows survives with its language',
   [r.body.dataset.activeFeed, r.body.dataset.feedLang], ['episodes-follows', 'de'])
+// ⚠️ THE FALLBACK IS DEFAULT_TYPE, WHICH IS SHOWS SINCE PHASE D. Shows has no
+// whose-axis, so the rewritten hash is the bare feed key rather than a scoped
+// one — and Shows is not in LANG_FEEDS' company here either: the language is
+// dropped because the hash was never understood, not because the feed refused it.
 r = boot('#nonsense?lang=de')
-eq('an unknown hash falls back and drops the language', r.location.hash, '#episodes-global')
+eq('an unknown hash falls back and drops the language', r.location.hash, '#shows')
 
 /* ── Tabs ──────────────────────────────────────────────────────────────
  * ⚠️ THE TAB IS DERIVED FROM THE FEED KEY AND IS NOT IN THE HASH. Every URL in
@@ -302,8 +306,13 @@ for (const [hash, tab, sub] of [
   ['#songs-global', 'music', 'songs'],
   ['#members', 'members', 'members'],
   ['#podcasts-global', 'podcasts', 'episodes'],   // retired hash, still resolves
-  ['', 'podcasts', 'episodes'],                   // no hash at all
-  ['#nonsense', 'podcasts', 'episodes'],          // unknown falls back
+  // ⚠️ THE FRONT DOOR LANDS ON SHOWS (Phase D). Both of these read DEFAULT_TYPE,
+  // which is the landing feed — NOT TAB_DEFAULT.podcasts, which is still
+  // 'episodes' and is what pressing the Podcasts tab opens. Two questions, two
+  // constants; a change that makes these two rows agree with the row above has
+  // almost certainly merged them.
+  ['', 'podcasts', 'shows'],                      // no hash at all
+  ['#nonsense', 'podcasts', 'shows'],             // unknown falls back
 ]) {
   const b = boot(hash)
   eq(`${hash || '(no hash)'} → ${tab} / ${sub}`,

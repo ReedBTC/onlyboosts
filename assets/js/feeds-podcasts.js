@@ -45,31 +45,31 @@
  * Entry point: renderPodcasts({ panel, list }) — lazy-imported by feeds.js
  * the first time the feed is opened.
  */
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v132'
-import { toEpisodeShape, normalizeBoosts, episodeApiToBoosts } from '/assets/js/ob-data.js?v=ob-v132'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v133'
+import { toEpisodeShape, normalizeBoosts, episodeApiToBoosts } from '/assets/js/ob-data.js?v=ob-v133'
 import {
   getEpisodePage, searchEpisodes, SEARCH_HITS, SEARCH_MIN_CHARS,
-} from '/assets/js/ob-live.js?v=ob-v132'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v132'
+} from '/assets/js/ob-live.js?v=ob-v133'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v133'
 import {
   rangeDays, rangeControl, sortControl, mountFeedControls,
-} from '/assets/js/feed-controls.js?v=ob-v132'
+} from '/assets/js/feed-controls.js?v=ob-v133'
 // Its own module, not two more exports of feed-controls.js — see the ⚠️ note
 // at the top of that file for the four-hour window that shape opens.
-import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v132'
+import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v133'
 import {
   LANG_ALL, languageOptions, langControl, langNote, langNoMatchText, langLabelFor,
-} from '/assets/js/feed-lang.js?v=ob-v132'
-import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v132'
+} from '/assets/js/feed-lang.js?v=ob-v133'
+import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v133'
 // The card, and the card's verbs. One definition each, shared with the edge.
 import {
   COPY, HOME_CARD_PARTS, buildEpisodes, renderEpisodeCards, RANKED_SORTS, SORT_OPTIONS,
   episodeRankValue,
-} from '/assets/js/episode-card.js?v=ob-v132'
-import { competitionRanks, rankLabel } from '/assets/js/rank.js?v=ob-v132'
+} from '/assets/js/episode-card.js?v=ob-v133'
+import { competitionRanks, rankLabel } from '/assets/js/rank.js?v=ob-v133'
 import {
   wireEpisodeCards, hydrateCardProfiles, prewarmBoosting,
-} from '/assets/js/episode-card-actions.js?v=ob-v132'
+} from '/assets/js/episode-card-actions.js?v=ob-v133'
 
 const INITIAL_CARDS = 30       // episodes rendered per "load more" batch
 
@@ -325,12 +325,13 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
   let adoptedLastValue = null
   /* Which parts of the card this surface shows. HOME_CARD_PARTS is the whole
    * card with the drawer filled on open (see `drawer` under CARD_PARTS), and it
-   * is the same object functions/index.js declares into the state element for
-   * the page it rendered. When that page is adopted the declaration is read
+   * is the same object a Function would declare into the state element for a
+   * page it had rendered. When such a page is adopted the declaration is read
    * back off it below, so a later "Load more" or re-sort paints the variant the
    * edge did rather than one this module chose for itself; when nothing was
-   * adopted (Songs, Follows, a language in the hash) the same constant is the
-   * declaration, and the two cannot differ because they are one import. */
+   * adopted — which since Phase D is EVERY episodes and songs feed, the front
+   * door having moved to Shows — this constant is the declaration, and the two
+   * cannot differ because they are one import. */
   let parts = HOME_CARD_PARTS
   // The search filter lives here rather than being read back off the module,
   // because resolving a pick is a FETCH: `picked` is the chosen suggestion,
@@ -357,11 +358,20 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
 
   /* The opening page, already rendered.
    *
-   * functions/index.js server-renders Episodes · Global into the static shell,
-   * so on that one feed the cards are on the page before this module is even
-   * fetched. Adopting them rather than fetching the same rows again is the whole
-   * point of having rendered them: it saves a 431KB request and a full repaint,
-   * and it means the first thing the reader sees is the last thing they see.
+   * ⚠️ NOTHING PRODUCES ONE FOR THIS FEED TODAY, AND THAT IS NOT ROT. Phase D
+   * moved the front door to Shows on 2026-08-23, so functions/index.js renders
+   * show cards into the Shows panel and the marker pair went with it — one feed
+   * is server-rendered and it is the one on screen. This path is the CLIENT half
+   * of the landing-feed decision: it costs one querySelector that finds nothing,
+   * every branch below it collapses to `adoptedCount = 0`, and it is what makes
+   * moving the front door back (or server-rendering a second panel) a change to
+   * the Function alone. shows-feed.js#adoptServerCards is the copy that is live.
+   *
+   * When a Function DOES render into this panel, the cards are on the page
+   * before this module is even fetched. Adopting them rather than fetching the
+   * same rows again is the whole point of having rendered them: it saves a 431KB
+   * request and a full repaint, and it means the first thing the reader sees is
+   * the last thing they see.
    *
    * The state element is the contract, and it is deliberately tiny — the sort
    * and range the server used (so the controls open on the right values), how

@@ -75,7 +75,17 @@ function showRecord(r) {
   };
 }
 
-function readParams(u) {
+/** Shared query params, or an {error} to return verbatim.
+ *
+ * ⚠️ EXPORTED, because functions/index.js server-renders the homepage's opening
+ * feed and has to ask this endpoint's question without making an HTTP request
+ * to it. It builds a URL, reads it through here, and runs globalPodcasts below
+ * — so the front door's list is produced by the same parameter parsing, the
+ * same SQL and the same record shape as the one the browser fetches on the next
+ * page. The twin of the same pair in episodes.js, and there for the same
+ * reason.
+ */
+export function readParams(u) {
   const rawSort = u.searchParams.get("sort");
   const mapped = SORT_ALIASES[rawSort] || rawSort;
   const sortKey = SORTS[mapped] ? mapped : DEFAULT_SORT;
@@ -131,6 +141,24 @@ export async function onRequestGet({ request, env }) {
   const p = readParams(u);
   if (p.error) return json(request, { error: p.error }, { status: 400 });
 
+  const { podcasts, nextOffset } = await globalPodcasts(env, p);
+
+  return json(request, {
+    count: podcasts.length,
+    sort: p.sortKey,
+    range: p.range,
+    ...(p.lang ? { lang: p.lang } : {}),
+    ...(p.q ? { q: p.q } : {}),
+    next_offset: nextOffset,
+    podcasts,
+    // A windowed page is a live aggregate and a plain one is a precomputed read,
+    // so they cache differently. Both are identical for every visitor.
+  }, { cache: p.cutoff ? 120 : 300 });
+}
+
+/** One page of the ranked show list, as records. See readParams above for why
+ *  this is separate from the handler that serves it over HTTP. */
+export async function globalPodcasts(env, p) {
   const s = SORTS[p.sortKey];
   const args = [];
   let base;
@@ -234,15 +262,8 @@ export async function onRequestGet({ request, env }) {
     return rec;
   });
 
-  return json(request, {
-    count: podcasts.length,
-    sort: p.sortKey,
-    range: p.range,
-    ...(p.lang ? { lang: p.lang } : {}),
-    ...(p.q ? { q: p.q } : {}),
-    next_offset: podcasts.length === p.limit ? p.offset + p.limit : null,
+  return {
     podcasts,
-    // A windowed page is a live aggregate and a plain one is a precomputed read,
-    // so they cache differently. Both are identical for every visitor.
-  }, { cache: p.cutoff ? 120 : 300 });
+    nextOffset: podcasts.length === p.limit ? p.offset + p.limit : null,
+  };
 }

@@ -33,7 +33,7 @@
  * feed-bar controller in index.html, plus a load of whichever feed is active
  * when this module first runs).
  */
-import { STATIC_RELAYS, fetchProfilesFromPrimal } from '/assets/js/boosts-thread.js?v=ob-v132'
+import { STATIC_RELAYS, fetchProfilesFromPrimal } from '/assets/js/boosts-thread.js?v=ob-v133'
 import {
   parseCalendarEvent,
   renderCalendarCard,
@@ -44,13 +44,13 @@ import {
   clearPendingPromote,
   KIND_DATE_EVENT,
   KIND_TIME_EVENT,
-} from '/assets/js/calendar-events.js?v=ob-v132'
-import { SimplePool, verifyEvent, nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v132'
+} from '/assets/js/calendar-events.js?v=ob-v133'
+import { SimplePool, verifyEvent, nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v133'
 // Supporter-set resolution lives in one shared module; re-exported below so
 // home-feeds.js keeps importing resolveSupporters from feeds.js unchanged.
-import { resolveSupporters } from '/assets/js/supporter-set.js?v=ob-v132'
+import { resolveSupporters } from '/assets/js/supporter-set.js?v=ob-v133'
 // Identity, for keeping the Follows feeds in sync with who's signed in.
-import { getSessionPubkey, clearFollowCache } from '/assets/js/follow-set.js?v=ob-v132'
+import { getSessionPubkey, clearFollowCache } from '/assets/js/follow-set.js?v=ob-v133'
 
 // Hourly events snapshot (Cloudflare Pages Function proxying the file
 // bots/community-feeds pushes to the VPS). It carries the same raw signed
@@ -1041,11 +1041,14 @@ async function hydrate(panelId, mod, scope, medium, lang) {
   const list = panel.querySelector('[data-feed-list]')
   if (!list) return
   /* ⚠️ NO SKELETONS OVER A SERVER-RENDERED FEED, and this guard is load-bearing.
-   * showSkeletons() clears the list, and since ob-v61 the Episodes · Global panel
-   * arrives from functions/index.js with thirty finished cards in it — wiping
-   * them would destroy the page the reader is already looking at and force
-   * feeds-podcasts.js to fetch and repaint exactly what was thrown away, which is
-   * the whole cost the server render exists to remove.
+   * showSkeletons() clears the list, and the panel the front door opens on
+   * arrives from functions/index.js with a full page of finished cards in it —
+   * wiping them would destroy the page the reader is already looking at and
+   * force the renderer to fetch and repaint exactly what was thrown away, which
+   * is the whole cost the server render exists to remove. That panel was
+   * Episodes · Global from ob-v61 and is Shows from Phase D; this guard did not
+   * have to change, because it asks whether a panel was server-rendered rather
+   * than which panel it is.
    *
    * The state element is the marker because it is the same one the renderer
    * adopts through, so the two cannot disagree about whether a panel was
@@ -1067,9 +1070,9 @@ async function hydrate(panelId, mod, scope, medium, lang) {
 }
 
 // ── Lazy per-feed dispatch ───────────────────────────────────────────
-const BOOSTS = '/assets/js/boosts-feed.js?v=ob-v132'
-const PODCASTS = '/assets/js/feeds-podcasts.js?v=ob-v132'
-const SHOWS = '/assets/js/shows-feed.js?v=ob-v132'
+const BOOSTS = '/assets/js/boosts-feed.js?v=ob-v133'
+const PODCASTS = '/assets/js/feeds-podcasts.js?v=ob-v133'
+const SHOWS = '/assets/js/shows-feed.js?v=ob-v133'
 // Each module's entry point, by module. Named rather than sniffed out of the
 // path, so adding a feed is one line here instead of another branch.
 const RENDERERS = {
@@ -1117,7 +1120,7 @@ function loadMemberBoards() {
   const root = document.querySelector('[data-hpw-boards]')
   if (!root) return
   boardsWired = true
-  import('/assets/js/members-board.js?v=ob-v132')
+  import('/assets/js/members-board.js?v=ob-v133')
     .then((m) => m.renderMembersBoards(root))
     .catch((err) => {
       console.warn('[feeds] member boards failed to load', err)
