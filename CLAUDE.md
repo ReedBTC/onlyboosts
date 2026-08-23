@@ -2453,11 +2453,16 @@ language, so returning to a feed restores both the view and the address.
 the panel rather than the sticky bar: range and sort are read while scrolling a
 long list, a search is a thing you do at the top.
 
-| Feed | Searches | Filters to |
+| Feed | Searches | A pick does |
 |---|---|---|
-| Episodes / Songs | episode title, plus the show behind it | that one episode |
-| Shows / Albums | show title, plus the guid | that one show |
-| Boosts (Members) | **`/api/v1/members`, over all 2,011** — name, npub or hex | that member's boosts, **fetched** |
+| Episodes / Songs | episode title, plus the show behind it | filters to that one episode |
+| Shows / Albums | show title, plus the guid | filters to that one show |
+
+**⚠️ THE MEMBERS LOOKUP IS NO LONGER IN THIS TABLE AND IS NOT A FILTER.** It
+left the Boosts panel on 2026-08-23, leads the Members tab, and **navigates** to
+`/booster/<npub>`. It is the same `mountFeedSearch`, so everything below about
+debouncing, aborting and sequence-guarding still applies to it; nothing below
+about rank retention or `noMatchText` does. See **The member lookup**.
 
 **Typing suggests, picking filters.** Five hits, and nothing in the list moves
 until one is chosen. That's what a ranked feed needs: the question is "where does
@@ -2475,8 +2480,10 @@ and isn't — the Shows sub-line reads "506 boosts · 12k sats", which made ever
 show a weak hit for "boost".
 
 **Two backends, and which one a feed gets is not a preference.** `getEntries`
-scores a corpus the feed already holds in memory — right for Boosts, whose window
-*is* its corpus. Scoring is a ladder (exact / prefix / word-start / substring /
+scores a corpus the caller already holds in memory. **It has no caller on the
+feeds any more** — the Boosts panel was its one user and its search is gone —
+but it is what `#boosts`'s message filter and any future in-memory picker want,
+so it stays. Scoring is a ladder (exact / prefix / word-start / substring /
 label before `extra`), not a fuzzy distance, because these queries are the
 opening words of a name the user already knows. `searchRemote` is for a feed that
 **pages a ranked list off the server**, where the loaded pages are a prefix of the
@@ -4388,6 +4395,35 @@ would. Never remove an entry** — those links are in the wild.
 | `bots/global-boost-scan/` | the network-wide collector |
 
 **Still to build:**
+
+0. **⚠️ PHASE D: THE HOMEPAGE STILL OPENS ON EPISODES · GLOBAL.** The last
+   unbuilt piece of the tabs work (branch `homepage`, idea #18), and the reason
+   the show card was made two-sided in the first place: the front door should
+   land on **Shows / all time / most boosters**, which is the view that answers
+   "what is this site" to somebody who has never seen it. Three knobs, and they
+   are separate decisions:
+
+   | | Today | Phase D |
+   |---|---|---|
+   | `DEFAULT_TYPE` in the `index.html` controller | `'episodes'` | `'shows'` |
+   | `shows-feed.js` opening sort | `'boosts'` | `'boosters'` |
+   | `feeds-podcasts.js` opening sort | `'count'` | `'boosters'` |
+
+   **⚠️ IT IS NOT A ONE-LINE CHANGE, because `functions/index.js` SERVER-RENDERS
+   THE OPENING FEED.** That Function splices thirty ranked **episode** cards into
+   `<!--OB:SSR-EPISODES-->` and `feeds-podcasts.js` adopts them. Landing on Shows
+   means either the edge renders show cards into a slot of their own — the
+   two-sided `show-card.js` and `functions/_shared/show-cards.js` exist for
+   exactly this — or the front door gives up its server-rendered first paint,
+   which would undo the measurements under **The Cost, Stated**. The first is the
+   intent. `shows-feed.js` also has no `adoptServerCards` path yet.
+
+   **⚠️ AND `test-server-render.mjs` IS WRITTEN AGAINST THE EPISODE CARD**, from
+   its capture `curl` down to its assertions. Phase D rewrites that test, which
+   is the honest measure of how big it is.
+
+   **Reed has never been asked to confirm the landing feed itself** — it changes
+   what every first-time visitor sees, so ask before building.
 
 1. **The two Stats pages.** `/stats` (Boost Stats) and `/boosters` (Community) are
    coming-soon placeholders and are the whole Stats column of the Explore menu, so
