@@ -16,9 +16,9 @@
  * page to be complete and legible; it adds the interactive half and every
  * function degrades to what the server rendered.
  */
-import { copyNpub, copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v109'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v109'
-import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v109'
+import { copyNpub, copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v110'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v110'
+import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v110'
 
 // ── copy-npub ────────────────────────────────────────────────────────
 /* Delegated rather than per-element: the community wall can hold 500 cards, and

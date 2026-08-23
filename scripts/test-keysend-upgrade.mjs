@@ -387,14 +387,30 @@ try {
    * later adds the one line that reopens the double-pay door. */
   const boost = readFileSync(join(ROOT, 'login-widget/src/lib/externalBoost.js'), 'utf8')
 
-  await ok('⚠️ there is exactly one call site for the LNURL leg', () => {
-    // The failure this refuses is a fallback: catching a failed keysend and
-    // paying the leg over LNURL instead. A keysend that returned no preimage
-    // may still be in flight, so that "recovery" is a recipient paid twice —
-    // the same bug as 2026-08-19, arriving through a new door. Anything that
-    // needs a second call site has to argue with this comment first.
+  await ok('⚠️ the invoice fallback fires on FAILED and on nothing else', () => {
+    // The whole safety argument in one line. FAILED can only have come from
+    // `isCleanDecline`, which is this file's definition of "the payment never
+    // left the wallet" — the same test that already puts a re-paying Retry in
+    // front of the donor. UNCERTAIN reaching this branch would be the
+    // 2026-08-19 double payment: an attempt was made, nothing observable came
+    // back, and it gets paid a second time.
+    assert.match(boost, /if \(upgraded && result\.status === STATUS\.FAILED\)/)
+    const branch = boost.slice(boost.indexOf('if (upgraded && result.status'))
+    const body = branch.slice(0, branch.indexOf('\n        }') + 10)
+    assert.doesNotMatch(body, /UNCERTAIN/, 'no uncertain leg is re-paid here')
+    assert.match(body, /result = await payLnaddressLeg\(/)
+  })
+  await ok('⚠️ the fallback is the ONLY second call site for the LNURL leg', () => {
+    // Two calls: the ordinary route, and the clean-decline fallback. A third
+    // is a path nobody has argued for, and every unargued path on this file is
+    // a way to pay a recipient twice.
     const calls = boost.match(/payLnaddressLeg\(/g) || []
-    assert.equal(calls.length, 2, 'one definition, one call — no fallback path')
+    assert.equal(calls.length, 3, 'one definition, two calls')
+  })
+  await ok('a genuine node recipient has no invoice to fall back to', () => {
+    // `upgraded` gates the fallback, so a leg the value block declared as
+    // type:'node' cannot reach it — there is no lightning address to pay.
+    assert.match(boost, /if \(upgraded && /)
   })
   await ok('the LNURL leg is reached only when no upgrade was resolved', () => {
     assert.match(boost, /leg\.recipient\.type === 'lnaddress' && !upgraded/)

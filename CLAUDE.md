@@ -1416,12 +1416,30 @@ already keysend, 34 more upgrade, 25 are at `fountain.fm` and are deliberately
 excluded, 4 publish no usable document. **Tier-one coverage goes from 48 legs to
 82.**
 
-**⚠️ THE DECISION IS MADE BEFORE THE PAYMENT AND IS NEVER REVISITED AFTER IT.**
-Once a wallet has been handed a keysend there is no observation proving it did
-not go out, so falling back to LNURL on a failure is the 2026-08-19 double-pay
-bug arriving through a new door. `test-keysend-upgrade.mjs` asserts there is
-**exactly one call site** for `payLnaddressLeg` for that reason. Everything that
-could disqualify a leg is therefore asked up front:
+**⚠️ AN INVOICE IS MORE RELIABLE AND A KEYSEND IS MORE INFORMATIVE, WHICH IS
+THE WHOLE TRADE.** An invoice carries route hints and reaches a node behind
+unannounced channels; a keysend to a bare pubkey has none. Measured 2026-08-22,
+`podcastindex@getalby.com` names a node with **no public channel record at
+all**, which is exactly the shape that fails.
+
+**So an upgraded leg the wallet CLEANLY DECLINES is re-paid as an invoice on the
+same leg**, automatically, and the donor never sees it. `FAILED` is the only
+status that reaches that branch, and it can only have come from
+`isCleanDecline` — this codebase's standing definition of *the payment never
+left the wallet*, and already the test that puts a **Retry which re-pays** in
+front of a donor. So the fallback is exactly as safe as a button that already
+ships; the one thing new about it is that nobody had to press it. The descriptor
+runs on the fallback path, so such a leg still reaches tier two.
+
+**⚠️ AND `UNCERTAIN` MUST NEVER REACH THAT BRANCH.** An attempt was made and
+nothing observable came back, so re-paying it on another rail is the 2026-08-19
+double payment. There is no re-pay out of UNCERTAIN anywhere on this site and
+this is not the exception. `test-keysend-upgrade.mjs` pins the branch's
+condition literally, and pins `payLnaddressLeg` at **exactly two call sites** —
+the ordinary route and this one. A third is a path nobody has argued for.
+
+Everything else that could disqualify a leg is asked up front, before anything
+is attempted:
 
 - **⚠️ THE WALLET IS ASKED FIRST, AND THAT GATE IS WHAT KEEPS THE UPGRADE FROM
   COSTING A PAYMENT.** An lnaddress leg pays over BOLT11, which every rail
@@ -1489,10 +1507,20 @@ has one because it *writes*, under our key, to a third party.
 
 **⚠️ THE LEG'S IDENTITY DOES NOT CHANGE, ONLY ITS DESTINATION.** `leg.recipient`
 stays exactly as the value block published it — the lightning address is what
-the donor sees, what a retry is issued against, and what the boostagram credits.
-`leg.keysendUpgrade` and a `→keysend` marker in the console line are the only
-trace, and they exist because whether the upgrade fired is the first thing
-anyone debugging a podcaster's missing row needs to know.
+the donor sees, what a retry is issued against, what the boostagram credits, and
+what the fallback pays. `leg.keysendUpgrade` / `leg.keysendFellBack` and a
+`→keysend` or `→keysend→invoice` marker in the console line are the only trace,
+and they exist because which rail a leg took is the first thing anyone debugging
+a podcaster's missing row needs to know.
+
+**⚠️ THE RSS `type` AND THE WELL-KNOWN ARE NOT IN CONFLICT, which is the frame
+this decision turned on** (Reed's question, 2026-08-22). A publisher writing
+`type="lnaddress"` and the provider publishing a keysend document *for that same
+address* are not two claims to arbitrate between; the provider is naming a
+second door to the same account, complete with the `customKey` / `customValue`
+that routes to it. So the question was never whose declaration wins — it was
+which door is more reliable, and the fallback is what stops us having to answer
+that in advance for every recipient.
 
 **Still unverified: a real upgraded leg reaching a real Helipad.** The wallet
 gate, the exclusion and the parser are all covered by the test; the end-to-end

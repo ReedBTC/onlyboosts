@@ -15,7 +15,9 @@
  * boostagram rides in the HTLC and reaches Helipad's first tier rather than
  * its third. See `keysendLookup.js` for what the upgrade is worth and for the
  * two rules that keep it from ever costing a payment: the wallet is asked
- * before the address, and `fountain.fm` is excluded despite qualifying.
+ * before the address, and `fountain.fm` is excluded despite qualifying. A
+ * third rule lives in the leg loop below: a keysend the wallet cleanly
+ * declines is re-paid as an invoice on the same leg.
  *
  * The probe adds one bounded round trip per distinct address, inside the leg
  * and therefore inside the wait. Prefetching it on mount beside the modal's
@@ -290,13 +292,15 @@ async function fetchBoostDescriptor(leg, ctx) {
 /**
  * Can this lnaddress leg be paid as a keysend instead, and to what?
  *
- * ⚠️ THE DECISION IS MADE BEFORE THE PAYMENT AND IS NEVER REVISITED AFTER IT.
- * Once a wallet has been handed a keysend there is no observation that proves
- * it did not go out, so falling back to LNURL on a failure would be the
- * double-pay bug arriving through a new door. That is why the two questions
- * below are both asked up front and why the pubkey is validated strictly in
- * `keysendLookup.js`: everything that could disqualify this leg has to be
- * known while the leg is still unpaid.
+ * ⚠️ THE DECISION IS MADE BEFORE THE PAYMENT, AND AFTERWARDS IT IS REVISITED
+ * IN EXACTLY ONE CASE: a CLEAN DECLINE, which is this file's definition of the
+ * payment never having left the wallet. Anything else — above all an
+ * `UNCERTAIN` leg — is never re-paid on any rail, because there is no
+ * observation proving a keysend did not go out. See the fallback in the leg
+ * loop for the whole argument. So the questions below are still asked up
+ * front, and the pubkey is still validated strictly in `keysendLookup.js`:
+ * the fallback is a safety net for a routing failure, not a licence to be
+ * careless about what gets attempted.
  *
  * ⚠️ AND THE ORDER OF THE TWO IS DELIBERATE. The wallet is asked FIRST because
  * its answer is cached for the session and disqualifies every leg at once,
@@ -554,9 +558,42 @@ export async function payExternalBoost({
           ? await resolveKeysendUpgrade(leg, timer)
           : null
         if (upgraded) leg.keysendUpgrade = true
-        const result = (leg.recipient.type === 'lnaddress' && !upgraded)
+        let result = (leg.recipient.type === 'lnaddress' && !upgraded)
           ? await payLnaddressLeg(leg, ctx, update, timer)
           : await payKeysendLeg(leg, ctx, update, timer, upgraded)
+
+        // ⚠️ AN UPGRADED LEG THAT WAS CLEANLY DECLINED GOES BACK TO THE
+        // INVOICE, AND THE `FAILED` TEST IS THE WHOLE SAFETY ARGUMENT.
+        //
+        // An invoice carries route hints and reaches a node behind
+        // unannounced channels; a keysend to a bare pubkey has none and can be
+        // refused where the invoice would have paid. Measured 2026-08-22, one
+        // address in the top-30 corpus (`podcastindex@getalby.com`) names a
+        // node with no public channel record at all, which is exactly that
+        // shape. Without this the upgrade trades that leg's payment for
+        // metadata, which is the wrong way round.
+        //
+        // ⚠️ `FAILED` HERE CAN ONLY HAVE COME FROM `isCleanDecline`, which is
+        // this file's standing definition of "the payment never left the
+        // wallet" — and the site already bets on it: a clean decline is what
+        // puts a **Retry that re-pays** in front of the donor. So paying the
+        // invoice here is exactly as safe as the button that already ships.
+        // The one thing that is new is that nobody had to press it.
+        //
+        // ⚠️ AND `UNCERTAIN` MUST NEVER REACH THIS BRANCH. That status means an
+        // attempt was made and nothing observable came back, so re-paying it is
+        // the 2026-08-19 double payment. There is no re-pay out of UNCERTAIN
+        // anywhere on this site and this is not the exception.
+        if (upgraded && result.status === STATUS.FAILED) {
+          console.info(
+            `[lb-boost] leg ${leg.index + 1}/${legs.length} keysend declined ` +
+            `(${result.error || 'no reason given'}) → paying the invoice instead`,
+          )
+          leg.keysendFellBack = true
+          // The descriptor runs on this path, so the leg still reaches
+          // Helipad's second tier rather than dropping to the bare message.
+          result = await payLnaddressLeg(leg, ctx, update, timer)
+        }
         update(result)
       } catch (e) {
         // Pre-payment failures (LNURL resolve, below-min, invoice fetch) are
@@ -593,7 +630,7 @@ export async function payExternalBoost({
         // upgraded leg is indistinguishable from an LNURL one in the log, and
         // whether the upgrade fired is the first thing anyone debugging a
         // podcaster's missing Helipad row needs to know.
-        `${leg.keysendUpgrade ? '→keysend' : ''} ` +
+        `${leg.keysendUpgrade ? (leg.keysendFellBack ? '→keysend→invoice' : '→keysend') : ''} ` +
         `${leg.recipient.address} ${leg.sats} sats → ${leg.status} in ${totalMs}ms` +
         (phases ? ` (${phases})` : ''),
       )
