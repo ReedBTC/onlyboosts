@@ -50,17 +50,17 @@
 
   <!-- Shared note / card styles (.note-card, .embed-note) — the boosts
        feeds render through the same kind-1 card as boosts-thread.js. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v114" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v115" />
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v114" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v115" />
   <!-- The episode card and its drawer, extracted from the inline block below
        when /episode/<guid> pages needed the same cards. See the file header. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v114" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v115" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. Must stay last
        among the stylesheets so the inline block below still wins. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v114" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v115" />
 
   <style>
     :root {
@@ -177,6 +177,106 @@
       background: var(--cream);
       border-bottom: 1px solid var(--border);
     }
+    /* ══ THE TABS ══
+       Lifted from Local Bitcoiners' feeds.html (`git show lb/main:feeds.html`):
+       a full-bleed equal-column grid, an icon over each label, a 3px top rule,
+       and the selected tab FILLED with its own accent rather than underlined.
+       That pattern is why this exists at all — the old what-dropdown hid four
+       of five feeds behind a control you had to know to open, and a visitor who
+       did not know what the site was could not find them.
+
+       ⚠️ THE ACTIVE TAB READS `--accent`, NOT A COLOUR OF ITS OWN, so it tracks
+       the sub-feed inside it: Podcasts is #1b7bc1 on Shows and #2f6bb5 on
+       Episodes, off the body[data-active-feed] mapping that already exists.
+       An INACTIVE tab has no active feed to read, so it carries its family's
+       representative shade as `--tab`. Nothing here adds a token. */
+    .feed-tabs {
+      max-width: 720px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+    }
+    .feed-tab {
+      --tab: var(--muted);
+      appearance: none;
+      background: transparent;
+      border: 0;
+      border-top: 3px solid transparent;
+      font: inherit;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.3rem;
+      padding: 0.7rem 0.6rem 0.6rem;
+      color: var(--muted);
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    /* Inactive: the family's shade. Active: whatever feed is on screen. */
+    .feed-tab--podcasts { --tab: var(--sh-accent); }
+    .feed-tab--music    { --tab: var(--alb-accent); }
+    .feed-tab--members  { --tab: var(--bg-accent); }
+    body[data-active-tab="podcasts"] .feed-tab--podcasts,
+    body[data-active-tab="music"]    .feed-tab--music,
+    body[data-active-tab="members"]  .feed-tab--members { --tab: var(--accent); }
+    .feed-tab-icon { width: 21px; height: 21px; color: var(--tab); transition: color 0.15s; }
+    .feed-tab-icon svg { width: 100%; height: 100%; display: block; }
+    .feed-tab-label {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-weight: 700;
+      font-size: 0.95rem;
+      letter-spacing: 0.01em;
+    }
+    .feed-tab:hover { background: rgba(0,0,0,0.03); }
+    .feed-tab:focus-visible { outline: 2px solid var(--tab); outline-offset: -2px; }
+    .feed-tab[aria-selected="true"] {
+      background: var(--tab);
+      border-top-color: var(--tab);
+      color: var(--white);
+    }
+    .feed-tab[aria-selected="true"] .feed-tab-icon { color: #fff; }
+
+    /* ══ THE SUB-CATEGORY ROW ══
+       Which feed inside the tab. Tinted with the active feed's own wash so the
+       tabs and this read as one block rather than two stacked bars.
+
+       ⚠️ WHICH BUTTONS ARE ON SCREEN IS CSS OFF body[data-active-tab], NOT JS —
+       the same call .feed-bar-controls makes one rule up, and for the same
+       reason: an imperative swap is the version that can leave a tab you come
+       back to showing another tab's sub-feeds, or none. */
+    .feed-subs {
+      max-width: 720px;
+      margin: 0 auto;
+      display: flex;
+      gap: 1.15rem;
+      padding: 0.3rem 1.25rem 0.28rem;
+    }
+    .feed-subs-wrap { background: var(--tint); border-bottom: 1px solid var(--border); }
+    /* Members holds one feed today, and a one-option picker is worse than none —
+       the same call the scope menu makes while signed out. */
+    body[data-active-tab="members"] .feed-subs-wrap { display: none; }
+    .feed-subs > [data-tab] { display: none; }
+    body[data-active-tab="podcasts"] .feed-subs > [data-tab="podcasts"],
+    body[data-active-tab="music"]    .feed-subs > [data-tab="music"],
+    body[data-active-tab="members"]  .feed-subs > [data-tab="members"] { display: inline-flex; }
+    .feed-sub {
+      appearance: none;
+      background: none;
+      border: 0;
+      border-bottom: 2px solid transparent;
+      font: inherit;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--muted);
+      padding: 0.1rem 0 0.18rem;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .feed-sub:hover { color: var(--accent-d); }
+    .feed-sub:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .feed-sub[aria-selected="true"] { color: var(--accent-d); border-bottom-color: var(--accent); }
+
     .feed-bar {
       max-width: 720px;
       margin: 0 auto;
@@ -228,10 +328,8 @@
     .feed-menu-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
     .feed-menu-cur { font-weight: 700; color: var(--accent-d); }
     .feed-menu-caret { color: var(--muted); font-size: 0.85em; }
-    .feed-menu--type .feed-menu-cur {
-      font-family: 'Playfair Display', Georgia, serif;
-      font-size: 1.2rem; line-height: 1.25;
-    }
+    /* `.feed-menu--type` is gone with the what-dropdown it styled — the tabs
+       replaced it. Scope is the only menu left. */
     .feed-menu--scope .feed-menu-cur { font-size: 0.82rem; }
     .feed-menu-list {
       position: absolute; top: calc(100% + 4px); left: 0; z-index: 6;
@@ -560,7 +658,33 @@
     @media (max-width: 640px) {
       .feed-bar-wrap { top: 56px; } /* nav shrinks on mobile */
       .feed-bar { padding: 0.5rem 1rem; gap: 0.4rem; }
-      .feed-menu--type .feed-menu-cur { font-size: 1.05rem; }
+
+      /* ══ THE TABS ON A PHONE ══
+         The tall two-line tab becomes a chip: icon and label on one row, the
+         accent as an outline rather than a fill. Three chips across 375px with
+         ~15px of padding each, which fits with room to spare.
+
+         ⚠️ THE LABELS STAY, AND THAT IS THE ONE PLACE THIS DEPARTS FROM LB.
+         `git show lb/main:feeds.html` hides them here and goes icon-only,
+         because four tabs and four words do not fit. Three do — and this whole
+         reorganization exists because a visitor could not tell what the site
+         was showing them, so opening it with three unlabelled glyphs would
+         undo the reason for the work. Measured: the widest label ("Podcasts")
+         is ~58px against ~113px of chip. */
+      .feed-tabs { gap: 0.4rem; padding: 0.5rem 1rem 0.15rem; }
+      .feed-tab {
+        flex-direction: row;
+        gap: 0.32rem;
+        border-top: 0;
+        border: 1px solid var(--tab);
+        border-radius: 999px;
+        padding: 0.4rem 0;
+        color: var(--tab);
+      }
+      .feed-tab-icon { width: 16px; height: 16px; }
+      .feed-tab-label { font-size: 0.82rem; }
+      .feed-tab:hover { background: transparent; }
+      .feed-subs { padding: 0.28rem 1rem 0.26rem; gap: 1rem; }
       /* All four controls rarely fit one line here, so the range + sort group
          wraps onto its own. Kept right-aligned: left-aligned it would sit at
          the screen edge and the sort menu's right-anchored popover (min-width
@@ -571,8 +695,8 @@
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
     }
   </style>
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v114" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v114" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v115" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v115" />
 </head>
 <body data-active-feed="episodes-global">
 
@@ -679,21 +803,52 @@
      bar is above the fold on every visit, so it shouldn't wait on script to
      exist. -->
 <div class="feed-bar-wrap">
-  <div class="feed-bar">
 
-    <div class="feed-menu feed-menu--type" data-feed-menu="type">
-      <button type="button" class="feed-menu-btn" aria-haspopup="true" aria-expanded="false" aria-label="Choose feed">
-        <span class="feed-menu-cur" data-feed-menu-cur>Episodes</span>
-        <span class="feed-menu-caret" aria-hidden="true">▾</span>
-      </button>
-      <div class="feed-menu-list" role="menu" aria-label="Feed" hidden>
-        <button type="button" class="feed-menu-item" role="menuitemradio" aria-checked="true" data-value="episodes">Episodes</button>
-        <button type="button" class="feed-menu-item" role="menuitemradio" aria-checked="false" data-value="shows">Shows</button>
-        <button type="button" class="feed-menu-item" role="menuitemradio" aria-checked="false" data-value="songs">Songs</button>
-        <button type="button" class="feed-menu-item" role="menuitemradio" aria-checked="false" data-value="albums">Albums</button>
-        <button type="button" class="feed-menu-item" role="menuitemradio" aria-checked="false" data-value="boosts">Boosts</button>
-      </div>
+  <!-- The three tabs. Podcasts and Music are the two sides of
+       <podcast:medium>; Members is the people half of the site. -->
+  <div class="feed-tabs" role="tablist" aria-label="Feeds">
+    <button type="button" class="feed-tab feed-tab--podcasts" role="tab" data-tab="podcasts" aria-selected="true">
+      <span class="feed-tab-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="2" width="6" height="12" rx="3"/>
+          <path d="M5 10a7 7 0 0 0 14 0"/>
+          <line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/>
+        </svg>
+      </span>
+      <span class="feed-tab-label">Podcasts</span>
+    </button>
+    <button type="button" class="feed-tab feed-tab--music" role="tab" data-tab="music" aria-selected="false">
+      <span class="feed-tab-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.6"/>
+        </svg>
+      </span>
+      <span class="feed-tab-label">Music</span>
+    </button>
+    <button type="button" class="feed-tab feed-tab--members" role="tab" data-tab="members" aria-selected="false">
+      <span class="feed-tab-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+          <path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+      </span>
+      <span class="feed-tab-label">Members</span>
+    </button>
+  </div>
+
+  <!-- Which feed inside the tab. Every button ships; CSS shows the active
+       tab's. `data-tab` is what that rule keys on, `data-value` is the type. -->
+  <div class="feed-subs-wrap">
+    <div class="feed-subs" data-feed-subs>
+      <button type="button" class="feed-sub" data-tab="podcasts" data-value="shows"    aria-selected="false">Shows</button>
+      <button type="button" class="feed-sub" data-tab="podcasts" data-value="episodes" aria-selected="true">Episodes</button>
+      <button type="button" class="feed-sub" data-tab="music"    data-value="albums"   aria-selected="false">Albums</button>
+      <button type="button" class="feed-sub" data-tab="music"    data-value="songs"    aria-selected="false">Songs</button>
+      <button type="button" class="feed-sub" data-tab="members"  data-value="boosts"   aria-selected="false">Boosts</button>
     </div>
+  </div>
+
+  <div class="feed-bar">
 
     <div class="feed-menu feed-menu--scope" data-feed-menu="scope" hidden>
       <button type="button" class="feed-menu-btn" aria-haspopup="true" aria-expanded="false" aria-label="Choose whose boosts">
@@ -910,9 +1065,11 @@
 <!-- FOOTER:END -->
 
 <!-- ══════════════════════════════ FEED BAR CONTROLLER ══════════════════════════════
-     Owns the two menus, which panel is on screen, and the hash. The feed key
-     is `<type>-<scope>` (Shows excepted). ALIASES below keeps the retired
-     `#podcasts-*` hashes working and upgrades them in place. -->
+     Owns the tabs, the sub-category row, the scope menu, which panel is on
+     screen, and the hash. The feed key is `<type>-<scope>` (Shows excepted)
+     and the TAB IS DERIVED FROM IT — see TAB_OF — so no URL in the wild had to
+     change when the tabs landed. ALIASES below keeps the retired `#podcasts-*`
+     hashes working and upgrades them in place. -->
 <script>
 (function () {
   'use strict';
@@ -934,6 +1091,31 @@
   // asymmetry is about which data source each reads, not about medium; see the
   // scope note at the top of shows-feed.js.
   const SCOPELESS = { shows: true, albums: true };
+  /* ── The tab a feed belongs to ──
+     ⚠️ A TAB IS DERIVED FROM THE FEED KEY, NEVER STORED IN THE HASH. That is
+     the whole reason `#shows`, `#songs-global`, `#boosts-global` and the two
+     retired `#podcasts-*` aliases keep resolving with no entry added anywhere:
+     the URL still names a FEED, and which tab is on screen is a fact computed
+     from it. A `#podcasts/shows` scheme would have been a second address space
+     for the same eight views and would have put every link in the wild through
+     an alias table.
+
+     Podcasts and Music are the two sides of <podcast:medium> — the partition
+     the API already answers on. Members is the people half; today it holds the
+     boost firehose alone, which takes no medium and so could not have gone
+     under either of the other two without becoming two things it isn't. */
+  const TAB_OF = {
+    shows: 'podcasts', episodes: 'podcasts',
+    albums: 'music',   songs:    'music',
+    boosts: 'members',
+  };
+  // What a tab opens on when it is pressed and has no remembered sub-feed.
+  const TAB_DEFAULT = { podcasts: 'episodes', music: 'albums', members: 'boosts' };
+  /* Which sub-feed each tab was last on, so leaving Podcasts on Shows and
+     coming back returns you to Shows rather than to the default. The twin of
+     langByFeed below, and there for the same reason: a reader's place in a tab
+     is theirs, not the tab's. */
+  const typeByTab = Object.create(null);
   // Retired hashes, kept working permanently. The episodes feed was called
   // "podcasts" until Shows arrived and made the name ambiguous — both are
   // podcasts; one is episode-level. An old link resolves to the new feed and
@@ -1009,6 +1191,10 @@
   const panels = Array.from(document.querySelectorAll('.feed-panel[data-feed]'));
   const menus = {};
   bar.querySelectorAll('[data-feed-menu]').forEach((el) => { menus[el.dataset.feedMenu] = el; });
+  // Outside `.feed-bar`: the tabs and the sub-row are siblings of it inside
+  // .feed-bar-wrap, so they are queried off the document rather than the bar.
+  const tabs = Array.from(document.querySelectorAll('.feed-tab[data-tab]'));
+  const subs = Array.from(document.querySelectorAll('.feed-sub[data-value]'));
 
   let type = DEFAULT_TYPE;
   let scope = DEFAULT_SCOPE;
@@ -1030,9 +1216,12 @@
     catch (e) { return false; }
   }
 
+  /* The scope menu is the only dropdown left; the what-axis became the tabs.
+     Still written as a loop over `menus` because wireMenu and this pair up, and
+     a second axis would be one entry rather than a rewrite. */
   function syncMenus() {
     Object.entries(menus).forEach(([axis, root]) => {
-      const value = axis === 'type' ? type : scope;
+      const value = scope;
       let label = '';
       root.querySelectorAll('.feed-menu-item').forEach((item) => {
         const on = item.dataset.value === value;
@@ -1047,6 +1236,21 @@
     // A one-option dropdown is worse than none: hide the scope menu while
     // signed out, and on the feeds that have no whose-axis.
     if (menus.scope) menus.scope.hidden = !!SCOPELESS[type] || !isSignedIn();
+  }
+
+  /* The tabs and the sub-row carry `aria-selected`, which is also what the CSS
+     fills and underlines them off. WHICH sub-buttons are on screen is not set
+     here — that is a rule off body[data-active-tab], the same call
+     .feed-bar-controls makes. */
+  function syncTabs() {
+    const tab = TAB_OF[type] || TAB_DEFAULT.podcasts;
+    tabs.forEach(function (el) {
+      el.setAttribute('aria-selected', el.dataset.tab === tab ? 'true' : 'false');
+    });
+    subs.forEach(function (el) {
+      el.setAttribute('aria-selected', el.dataset.value === type ? 'true' : 'false');
+    });
+    return tab;
   }
 
   function setFeed(nextType, nextScope, opts) {
@@ -1076,6 +1280,13 @@
       if (want !== (opts.lang || '')) updateHash = true;
     }
     document.body.setAttribute('data-active-feed', feed);
+    /* ⚠️ THE TAB IS AN ATTRIBUTE FOR THE SAME REASON THE LANGUAGE IS: this
+       script runs during parse and the CSS that shows one tab's sub-buttons
+       keys on it, so a cold load has to have it before first paint. Set here,
+       beside data-active-feed, so the two can never disagree about which feed
+       is on screen. */
+    document.body.setAttribute('data-active-tab', TAB_OF[type] || TAB_DEFAULT.podcasts);
+    typeByTab[TAB_OF[type] || TAB_DEFAULT.podcasts] = type;
     /* ⚠️ THE LANGUAGE RIDES THE ATTRIBUTE AS WELL AS THE EVENT, and the
        attribute is the one that matters on a cold load. This inline script runs
        during parse; feeds.js is a module and therefore deferred, so it attaches
@@ -1091,6 +1302,7 @@
       panel.hidden = !isActive;
     });
     syncMenus();
+    syncTabs();
     if (updateHash && hashFor(feed) !== location.hash) {
       history.replaceState(null, '', hashFor(feed));
     }
@@ -1193,8 +1405,21 @@
   }
 
   const wired = [];
-  if (menus.type) wired.push(wireMenu(menus.type, (v) => setFeed(v, scope)));
   if (menus.scope) wired.push(wireMenu(menus.scope, (v) => setFeed(type, v)));
+
+  /* Pressing a tab opens the sub-feed you were last on inside it, falling back
+     to that tab's default. Pressing a sub-feed picks it directly. Neither
+     touches the SCOPE state, so Boosts · Follows → Podcasts → Episodes returns
+     you to Follows — the rule SCOPELESS already encodes for Shows and Albums. */
+  tabs.forEach(function (el) {
+    el.addEventListener('click', function () {
+      const tab = el.dataset.tab;
+      setFeed(typeByTab[tab] || TAB_DEFAULT[tab] || DEFAULT_TYPE, scope);
+    });
+  });
+  subs.forEach(function (el) {
+    el.addEventListener('click', function () { setFeed(el.dataset.value, scope); });
+  });
 
   window.addEventListener('hashchange', () => { fromHash(false); });
 
@@ -1222,17 +1447,17 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v114"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v115"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v114" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v115" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v114" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v115" defer></script>
 
 <!-- Feed hydration — lazily loads the active feed on first view. -->
-<script type="module" src="/assets/js/feeds.js?v=ob-v114"></script>
-<script src="/assets/js/nav.js?v=ob-v114" defer></script>
+<script type="module" src="/assets/js/feeds.js?v=ob-v115"></script>
+<script src="/assets/js/nav.js?v=ob-v115" defer></script>
 
 </body>
 </html>

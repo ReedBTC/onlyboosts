@@ -73,12 +73,27 @@ class El {
 function boot(hash, { signedIn = false } = {}) {
   const body = new El('body')
   const bar = new El('div')
+  const mk = (attrs) => { const e = new El('button'); Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, v)); return e }
+  const tabEls = ['podcasts', 'music', 'members'].map((t) => mk({ 'data-tab': t }))
+  const subEls = [
+    ['podcasts', 'shows'], ['podcasts', 'episodes'],
+    ['music', 'albums'], ['music', 'songs'],
+    ['members', 'boosts'],
+  ].map(([t, v]) => mk({ 'data-tab': t, 'data-value': v }))
   const listeners = {}
   const events = []
   const doc = {
     body,
     querySelector: (s) => (s === '.feed-bar' ? bar : null),
-    querySelectorAll: () => [],
+    /* The tabs and the sub-row live OUTSIDE .feed-bar, so the controller queries
+       them off the document. Returning real elements here is what makes the
+       aria-selected assertions below test the shipped syncTabs() rather than a
+       no-op over an empty list. */
+    querySelectorAll: (sel) => {
+      if (sel === '.feed-tab[data-tab]') return tabEls
+      if (sel === '.feed-sub[data-value]') return subEls
+      return []
+    },
     addEventListener: (t, fn) => { (listeners[t] ||= []).push(fn) },
     removeEventListener: () => {},
     dispatchEvent: (e) => { events.push(e); (listeners[e.type] || []).forEach((f) => f(e)) },
@@ -94,7 +109,16 @@ function boot(hash, { signedIn = false } = {}) {
   class CE { constructor(type, init) { this.type = type; this.detail = init && init.detail } }
   new Function('document', 'window', 'location', 'history', 'localStorage', 'CustomEvent', 'console', SRC)(
     doc, { addEventListener: () => {} }, location, history, storage, CE, console)
-  return { body, location, events }
+  const selected = (els) => els.filter((e) => e.getAttribute('aria-selected') === 'true')
+  return {
+    body,
+    location,
+    events,
+    tab: () => (selected(tabEls)[0] || {}).dataset?.tab ?? null,
+    sub: () => (selected(subEls)[0] || {}).dataset?.value ?? null,
+    tabsSelected: () => selected(tabEls).length,
+    subsSelected: () => selected(subEls).length,
+  }
 }
 
 // ── Harness ──────────────────────────────────────────────────────────
@@ -187,6 +211,43 @@ eq('signed in, follows survives with its language',
   [r.body.dataset.activeFeed, r.body.dataset.feedLang], ['episodes-follows', 'de'])
 r = boot('#nonsense?lang=de')
 eq('an unknown hash falls back and drops the language', r.location.hash, '#episodes-global')
+
+/* ── Tabs ──────────────────────────────────────────────────────────────
+ * ⚠️ THE TAB IS DERIVED FROM THE FEED KEY AND IS NOT IN THE HASH. Every URL in
+ * the wild names a feed; which tab is on screen is computed from it. These
+ * assertions are what stop somebody "simplifying" that into a tab stored in the
+ * hash, which would quietly need an alias for all eight keys and the two
+ * retired ones. */
+console.log('\nThe tab a hash lands on:')
+for (const [hash, tab, sub] of [
+  ['#shows', 'podcasts', 'shows'],
+  ['#episodes-global', 'podcasts', 'episodes'],
+  ['#albums', 'music', 'albums'],
+  ['#songs-global', 'music', 'songs'],
+  ['#boosts-global', 'members', 'boosts'],
+  ['#podcasts-global', 'podcasts', 'episodes'],   // retired hash, still resolves
+  ['', 'podcasts', 'episodes'],                   // no hash at all
+  ['#nonsense', 'podcasts', 'episodes'],          // unknown falls back
+]) {
+  const b = boot(hash)
+  eq(`${hash || '(no hash)'} → ${tab} / ${sub}`,
+    [b.body.getAttribute('data-active-tab'), b.tab(), b.sub()], [tab, tab, sub])
+}
+
+console.log('\nExactly one tab and one sub-feed are ever marked selected:')
+{
+  const b = boot('#albums')
+  eq('one tab, one sub', [b.tabsSelected(), b.subsSelected()], [1, 1])
+}
+
+console.log('\nThe tab attribute can never disagree with the feed:')
+for (const hash of ['#shows', '#episodes-follows', '#songs-follows', '#boosts-follows', '#albums']) {
+  const b = boot(hash, { signedIn: true })
+  const feed = b.body.getAttribute('data-active-feed')
+  const type = feed.replace(/-(global|follows)$/, '')
+  const want = { shows: 'podcasts', episodes: 'podcasts', albums: 'music', songs: 'music', boosts: 'members' }[type]
+  eq(`${hash} → feed ${feed}, tab ${want}`, b.body.getAttribute('data-active-tab'), want)
+}
 
 console.log(`\n${pass} assertions passed${fail ? `, ${fail} FAILED` : ''}.`)
 process.exit(fail ? 1 : 0)
