@@ -248,6 +248,21 @@ console.log('\n⚠️ The Members feed is addressed as #members, not #members-gl
   eq('  nor songs', bare('songs-follows'), '#songs-follows')
   eq('the map has exactly one entry', Object.keys(HASH_OF), ['members-global'])
   eq('and the derived inverse matches it', KEY_OF.members, 'members-global')
+
+  /* ⚠️ AND THE RETIRED HASHES STILL RESOLVE. `#boosts-global` and
+     `#boosts-follows` were the shipped addresses of this feed on production
+     until the rename, so they are in the wild and ALIASES may never lose them.
+     Without the entries they fall through to DEFAULT_TYPE — measured landing on
+     Shows, with the hash rewritten to `#shows`, which is a dead link reporting
+     itself as a working one. An aliased hash always forces the rewrite, so an
+     old link upgrades itself the way a 301 would; the global one upgrades twice
+     over, through the alias and then through HASH_OF's elision. */
+  let old = boot('#boosts-global', { signedIn: true })
+  eq('⚠️ #boosts-global still lands on the members feed', old.body.dataset.activeFeed, 'members-global')
+  eq('  and the hash upgrades to #members', old.location.hash, '#members')
+  old = boot('#boosts-follows', { signedIn: true })
+  eq('⚠️ #boosts-follows too', old.body.dataset.activeFeed, 'members-follows')
+  eq('  and upgrades to #members-follows', old.location.hash, '#members-follows')
 }
 
 // ── 2. The boot sequence, which is where both bugs lived ─────────────

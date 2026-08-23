@@ -1769,6 +1769,15 @@
   const ALIASES = {
     'podcasts-global':  'episodes-global',
     'podcasts-follows': 'episodes-follows',
+    /* ⚠️ THE BOOSTS FEED WAS RENAMED TO MEMBERS ON 2026-08-23 AND THESE TWO ARE
+       IN THE WILD — they were the shipped hashes on production up to that day.
+       Without them a retired link falls through to DEFAULT_TYPE, which is
+       Shows, and the reader is shown the show leaderboard with the address bar
+       quietly rewritten to match: a dead link that reports itself as a working
+       one. Measured before they were added. The global one resolves on to the
+       bare `#members` through HASH_OF, so an old link upgrades all the way. */
+    'boosts-global':    'members-global',
+    'boosts-follows':   'members-follows',
   };
   /* ── The language in the hash ──
      `#shows?lang=de` — the feed key, then a query string. The key stays intact

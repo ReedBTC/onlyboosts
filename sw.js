@@ -520,6 +520,28 @@
 // SEARCH. chadf_boostbot topped both the boosts and shows orderings on other
 // people's listening. PUBLISHERS moved to _common.js so one list serves the
 // wall and the 40 HPW boards.
+// ob-v126: the four publisher keys get a Boost Bots section of their own, so
+// the exclusion above is shown rather than merely applied, and the Members
+// intro's (i) links out to /about#membership. about.html gains both anchors.
+// ob-v127: the member lookup leaves the Boosts panel, leads the tab, and
+// NAVIGATES to /booster/<npub> instead of filtering the feed; the member wall
+// gains the feeds' own range and sort controls rather than a shape of its own.
+// ob-v128: the feed bar is MOVED into the Members tab, under the three sections
+// above the boost list, and moved back on every other tab. index.html only.
+// ob-v129: all four Members sections take the detail pages' shell and lid, and
+// an empty range keeps its controls instead of replacing them with a dead end.
+// ob-v130: the Boosts lid rejoins its own feed as one two-element shell, and
+// the note feed gains 1Y — not a new query, but the treatment All already had.
+// ob-v131: the members feed is addressed as #members (#boosts-global and
+// #boosts-follows are ALIASES now and must stay so — they were the shipped
+// hashes until this version), and the all-time board is High Scores.
+// ob-v132: /booster's stat tiles carry rank chips, over the member wall's own
+// population, and the episodes tile comes off because nothing ranks by it.
+// ob-v133: PHASE D — the front door opens on Shows / All / Most boosters.
+// functions/index.js server-renders show cards into <!--OB:SSR-SHOWS-->
+// inside the Shows panel and shows-feed.js adopts them; the Episodes panel
+// ships its placeholder again, one feed being rendered at the edge and it
+// being the one on screen.
 const VERSION = 'ob-v133';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
