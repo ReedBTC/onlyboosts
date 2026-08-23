@@ -63,9 +63,60 @@ restating a control the page already has.
 | Shows | `#shows` | per-show rollup, Global only |
 | Albums | `#albums` | the same rollup, music feeds only, Global only |
 
-The inline feed-bar controller in `index.html` owns the menus, which panel is on
-screen, and the hash, and dispatches `lb:feed-activate`; `assets/js/feeds.js`
-listens and lazily hydrates.
+The inline feed-bar controller in `index.html` owns the tabs, the sub-category
+row, the scope menu, which panel is on screen, and the hash, and dispatches
+`lb:feed-activate`; `assets/js/feeds.js` listens and lazily hydrates.
+
+### The Three Tabs
+
+**Podcasts · Music · Members**, on Local Bitcoiners' `feeds.html` pattern
+(`git show lb/main:feeds.html`): a full-bleed equal-column grid, an icon over
+each label, a 3px top rule, and the selected tab **filled with its accent**
+rather than underlined. The what-dropdown they replaced hid four of five feeds
+behind a control you had to know to open, which is idea #18's whole complaint.
+
+| Tab | Sub-feeds | Why |
+|---|---|---|
+| **Podcasts** | Shows · Episodes | the not-music side of `<podcast:medium>` |
+| **Music** | Albums · Songs | the music side |
+| **Members** | *(none shown)* | the boost firehose, which takes no medium and could not go under either without becoming two things it isn't |
+
+**⚠️ THE TAB IS DERIVED FROM THE FEED KEY AND IS NOT IN THE HASH.** `TAB_OF` in
+the controller computes it, which is why nothing in the wild changed: `#shows`,
+`#episodes-global`, `#songs-follows`, `#albums`, `#boosts-global` and the two
+retired `#podcasts-*` aliases all resolve exactly as before. A `#podcasts/shows`
+scheme would have been a second address space for the same eight views.
+
+**⚠️ The active tab reads `--accent`, so it tracks the sub-feed inside it** —
+Podcasts is `#1b7bc1` on Shows and `#2f6bb5` on Episodes, straight off the
+`body[data-active-feed]` mapping. An inactive tab has no active feed to read and
+carries its family's shade. No token was added.
+
+**⚠️ Which sub-buttons are on screen is CSS off `body[data-active-tab]`, not
+JS** — the same call `.feed-bar-controls` makes, for the same reason. Each
+`.feed-sub-group` is pinned to its own grid column, and that explicit
+`grid-column` is what makes hiding the others safe: with auto placement plus
+`display:none`, whichever group survived would fall into column 1.
+
+**⚠️ `.feed-subs` and `.feed-tabs` must share a content box.** Both are
+three-column grids; if one takes a horizontal padding or a gap the other does
+not, every block narrows and the pair slides out from under its tab a few pixels
+at a time. `test-feed-hash.mjs` compares them per breakpoint.
+
+**⚠️ The seam under the tab row runs all the way across, including under the
+selected tab**, in `--accent-d`. Broken there, the tab and the block below it
+share a fill, touch, and merge into one slab.
+
+**On a phone the tabs become chips and KEEP THEIR LABELS.** LB goes icon-only
+because four tabs and four words do not fit; three do, and a reorganization that
+exists because visitors cannot tell what the site shows them must not open with
+three unlabelled glyphs.
+
+**⚠️ The page track is `--feed-track: 60rem`, which is `.show-main`'s width.**
+Four elements read it — the tabs, the sub-row, the control bar and the panels —
+so the column no longer narrows by 240px when a reader clicks a card through to
+its detail page. The masthead's logo and subtitle keep their own smaller
+measures; those are typographic, not the track.
 
 **A hash may carry a language: `#shows?lang=de`.** The feed key stays intact as
 the part before the `?`, so `FEEDS` and `ALIASES` look up exactly as they did and
@@ -196,7 +247,7 @@ node scripts/stamp-assets.js --check   # verify; non-zero exit if anything is st
 **Order matters.** `sync-partials` injects markup into the page files; anything
 it injects has to be stamped afterwards.
 
-Nine test scripts, all plain `node scripts/<name>.mjs` with no runner:
+Twelve test scripts, all plain `node scripts/<name>.mjs` with no runner:
 
 | | |
 |---|---|
@@ -208,6 +259,9 @@ Nine test scripts, all plain `node scripts/<name>.mjs` with no runner:
 | `test-sign-boost.mjs` | the signing oracle's validator and its KV rate limiter, fed by the **shipped** note builder |
 | `test-boost-modal-render.mjs` | the widget's four silent-failure classes: use-before-declare, themed classes that emit no CSS, portals with no container, and the missing preflight. See the ⚠️ below |
 | `test-boostbox.mjs` | the BoostBox descriptor path: the comment's whole-or-nothing rule, the record allowlist, and every way `/api/boostbox` is allowed to fail. **Stubs `fetch`**, so it never writes a record to a third party's service |
+| `test-show-card.mjs` | the show card's two-sided contract. Its own reason for existing is the crossing: `renderShowCard` was a DOM builder and could afford `Date.now()` and an unpinned locale, which a two-sided module cannot — see the note under the card |
+| `test-members-search.mjs` | `/api/v1/members`, running the **shipped handler** against a database built from the real `schema.sql` through an `env.DB` shim over `node:sqlite`. LIKE escaping, the identifier/name split, the listing, and the publisher asymmetry |
+| `test-members-hours.mjs` | the 40 HPW boards, same shim, with a fixture built to known answers. Dedupe, week boundaries, the publisher exclusion, and the row-multiplying join |
 | `test-keysend-upgrade.mjs` | the keysend upgrade: the `fountain.fm` exclusion's exact-or-parent rule, the routing pair's whole-or-nothing rule, the strict node-pubkey check, every way `/api/keysend` answers "no endpoint", and the wallet gate. **Stubs `fetch`**, so it probes nobody's well-known |
 
 **⚠️ `test-server-render.mjs` IS THE ONE THAT NEEDS AN ARGUMENT, SO IT IS THE ONE
@@ -215,7 +269,7 @@ THAT GOES UNRUN.** Its header carries the `curl` that produces the capture; take
 a fresh one rather than reusing an old file, since it is also the size
 measurement. It asserted `cards are numbered 1..N with no gaps` — the *ordinal*
 scheme's invariant — until competition ranking shipped on 2026-08-18, and it
-would have been merged red had it not been run. **Run all nine before a merge**,
+would have been merged red had it not been run. **Run all twelve before a merge**,
 and treat this one as the guard on the ranking scheme rather than only on weight.
 
 **⚠️ `test-feed-hash.mjs` EXTRACTS THE CONTROLLER OUT OF `index.html` and runs
@@ -405,7 +459,32 @@ The episode card is the worked example, split along the facts/verbs line:
 | `assets/js/episode-card.js` | the FACTS, as an HTML **string**: artwork and its fallback chain, title, show, air date, rank, the `Nostr Stats:` line, and every boost note inside the drawer. No DOM, no `fetch`, no `Intl` defaults. |
 | `assets/js/episode-card-actions.js` | the VERBS: the ⋮ subscribe menu, the boost pill, the drawer's hide control, the per-boost ⋮ menu, and the reply / like / repost / zap bars. |
 
-**The boost row is the second worked example**, and the same split:
+**The show card is the second, and it exists because of the tabs.**
+`assets/js/show-card.js` is the facts as a string and
+`assets/js/show-card-actions.js` the verbs; `functions/_shared/show-cards.js` is
+the server half, mirroring `episode-cards.js`. `shows-feed.js` is the feed
+around that card rather than the card itself.
+
+**⚠️ THREE FORMATTERS WERE SAFE IN A DOM BUILDER AND ARE NOT SAFE HERE**, and
+none of them looks like anything when it breaks. `relTime()` read `Date.now()`
+— at the edge that clock is the moment the response was *cached*, and the same
+bytes go to everyone arriving inside the 300s window, so a server-rendered
+"3m ago" is wrong for almost every reader of it and different again from what
+the browser rebuilds. The timestamp is the fact and the relative time is a
+reading of it, so the card renders `last boost Nov 14, 2023` with
+`data-latest-ts` and the actions module rewrites it. `shortDate()` called
+`toLocaleDateString(undefined, …)` and `plural()` called `n.toLocaleString()`
+unpinned. All three are `en-US` in UTC now. `test-show-card.mjs` scans the
+source for all three, because the test process is already en-US in UTC and a
+render check passes regardless.
+
+**The show card's drawer is a `<details>` and is always lazy.** Its rows come
+from `/api/v1/podcasts/<guid>` scoped to the card's own range, so they are never
+in hand when the card is built — at the edge or in the browser. There is no
+inline counterpart to choose between, which is why this card has no `parts`
+table the way the episode card does.
+
+**The boost row is the third worked example**, and the same split:
 `assets/js/boost-list.js` is the facts (`renderBoosts`, `boostRows`, the three
 comparators, the range filter) and `assets/js/boost-section.js` is the verbs.
 See "Range And Sort On `#boosts`" under the detail pages.
@@ -2353,7 +2432,7 @@ long list, a search is a thing you do at the top.
 |---|---|---|
 | Episodes / Songs | episode title, plus the show behind it | that one episode |
 | Shows / Albums | show title, plus the guid | that one show |
-| Boosts | booster display name, npub or hex pubkey | that booster's boosts |
+| Boosts (Members) | **`/api/v1/members`, over all 2,011** — name, npub or hex | that member's boosts, **fetched** |
 
 **Typing suggests, picking filters.** Five hits, and nothing in the list moves
 until one is chosen. That's what a ranked feed needs: the question is "where does
@@ -2447,6 +2526,122 @@ Two data facts that shaped the UI:
 **Both ranges fetch the drawer**, with the window passed as `?since=<unix>` so
 the rows come back scoped and recounted. A drawer showing all-time figures under
 a card showing the week's would contradict the card it opened from.
+
+### The Members Tab
+
+Three sections above the boost firehose, all client-rendered by
+`assets/js/members-board.js` and hydrated on the tab's first activation.
+
+**⚠️ THE BLOCK SITS ABOVE THE PANELS, NOT INSIDE ONE.** Members holds two boosts
+PANELS — Global and Follows — so a section inside one would either be duplicated
+or vanish when the reader switches scope. Shown by CSS off
+`body[data-active-tab]`.
+
+**⚠️ AND IT HYDRATES FROM BOTH ENTRY POINTS.** The cold load does not go through
+`lb:feed-activate` — the controller dispatches that during parse, before
+`feeds.js` exists, which is why `feeds.js` re-reads `body[data-active-feed]` at
+the end. Hooked to the listener alone, the boards rendered when a reader
+*clicked* to Members and were an empty gap on every reload and every shared
+link. `test-feed-hash.mjs` asserts both call sites exist.
+
+#### `#40HPW`
+
+Boost an episode and the board assumes you heard all of it, then adds up the
+durations. **It is an assumption, not a measurement**, and the Rules dialog says
+so. Two boards: **This Week** leads (it resets Monday and has a live race in
+it), **Hall of Fame** follows.
+
+**⚠️ NOBODY CLEARS FORTY HOURS.** Over all 9,977 booster-weeks since 2024-10,
+exactly two did — the same person, both in autumn 2025. Eighteen weeks ever
+passed 30; a typical winning week in mid-2026 is 14 to 20 hours. Eight of the
+all-time top ten are from 2025, which is why This Week exists beside the hall of
+fame rather than instead of it. The name is the provocation, not a threshold,
+and gold marks the two rows above forty. **If gold ever marks a third of a
+board the fix is the goal, not the styling.**
+
+`GET /api/v1/members/hours?range=week|all`. Four rules, each from a measurement:
+
+- **Dedupe (booster, episode) inside the week.** Five boosts on one episode is
+  one listen; deduping removes 8.9% of qualifying rows and one pair carried
+  fifteen. Without it the board measures generosity, which the sats totals
+  already measure.
+- **Weeks start Monday 00:00 UTC.** `345600` is the first Monday after the
+  epoch; without the shift `ts / 604800` buckets Thursday to Wednesday, which
+  still produces weeks and is wrong by three days on every row.
+- **~14% of boosts contribute nothing** — 8% name no episode, 2.5% of episodes
+  have no duration. Stated in the Rules rather than hidden.
+- **Publisher keys are excluded.** See below.
+
+**⚠️ THE NPUB COMES FROM A CORRELATED SUBQUERY, NEVER A SECOND JOIN ON
+`boosts`.** That join reads correctly and multiplies every row by the member's
+whole boost count, so `COUNT(*)` stops being episodes and `SUM(duration)` stops
+being hours — both inflated by the same factor and both still a plausible board.
+
+**Units are `hpw`, not `h`:** every row is one member's one week.
+
+**The Rules are a dialog, in the document rather than fetched**, so they open
+while the boards are loading or after they failed. It replaced a sub-line and a
+caveat that said the same thing at two sizes.
+
+#### The member wall
+
+`GET /api/v1/members` with no `q` is the top-members listing, capped at 100 with
+search as the route to everyone else. **It is the same `renderSupporters` the
+detail pages use** — that function and every `.sup-*` rule moved into
+`assets/js/supporter-wall.js` and `assets/css/supporter-wall.css`, which
+`functions/_shared/detail-page.js` re-exports and all four pages link.
+
+**⚠️ THE HEADING IS A PARAMETER AND THE TWO CALLERS PASS DIFFERENT WORDS.**
+"Members" on the homepage, "Nostr Community" on the detail pages. Not an
+inconsistency to tidy up: the protocol is not the greeting, and someone who has
+drilled into one show's page has chosen to go deeper than someone who just
+landed.
+
+**⚠️ THREE ORDERINGS, BECAUSE THEY ARE THREE DIFFERENT PEOPLE.** `sort=sats`
+ranks by generosity and rewards one large boost; `boosts` rewards turning up;
+`shows` (`COUNT(DISTINCT podcast_guid)`) rewards spreading it around. Live, the
+leaders are AdminPacman (2.1M sats on 24 boosts), Piez (940 boosts) and Quantum
+Panhandler (129 shows). **The figure under each face is the one the list was
+ordered by** — a `metric` parameter on `supporterCard`, defaulting to `sats` so
+the detail pages are byte-identical.
+
+**⚠️ THE LISTING EXCLUDES PUBLISHER KEYS AND THE SEARCH DOES NOT.** `PUBLISHERS`
+in `functions/api/v1/_common.js` is the four keys that sign boosts for many
+donors. `chadf_boostbot` topped both the boosts and shows orderings on other
+people's listening before this landed. A ranked list is a claim about who the
+top members are; a search result is not, and it is a real account somebody may
+want to look up. **One list in one place**, because the boards had the exclusion
+from day one and the wall never did, which is how the gap opened.
+
+#### The member search
+
+**⚠️ IT ASKS THE INDEX, AND THE THING IT REPLACED COULD NOT.**
+`boosts-feed.js#boosterEntries` indexed `scopedRows` — the boosts in memory — so
+a member was findable only if they turned up in what the reader had scrolled
+past. Measured: the first page reaches 34 of 2,011 members (2%), 500 boosts
+reaches 164 (8%), and paging in all 23,259 still only reaches 684 (34%). A third
+of members have never appeared in the note feed, so loading more could never
+close it.
+
+**⚠️ AND THE PICK FETCHES RATHER THAN FILTERING**, which is the same bug one
+level down: a member chosen out of the whole index will usually have no boosts
+in the loaded window, so filtering emptied the list at the moment the search
+succeeded. `/api/v1/boosts?booster=` is a parameter that endpoint has always
+taken.
+
+Three more rules in `functions/api/v1/members.js`:
+
+- **A member is someone who has boosted, never someone with a profile.** 61 of
+  the 2,011 have no kind-0 on any relay the collector tried; deriving the set
+  from `profiles` reports their live pages as not existing.
+- **⚠️ CANDIDATES FIRST, AGGREGATE SECOND.** The obvious single-`WHERE` shape
+  defeats index seeking — the plan comes back `SCAN b USING INDEX
+  idx_boosts_booster`, reading all 23,259 boosts per keystroke, measured 20ms
+  against 3-6ms for the CTE.
+- **⚠️ LIKE's WILDCARDS ARE ESCAPED**, the LIKE counterpart of `ftsMatch`: a
+  bare `%` typed into the box otherwise returns everyone, ordered by sats.
+  SQLite's LIKE folds ASCII only, so a query differing from a name by the case
+  of a non-ASCII letter will not match; nothing cheap fixes that.
 
 ### The episode feed adapter
 
@@ -2660,7 +2855,9 @@ Three more things a change would break:
 
 | | |
 |---|---|
-| `functions/_shared/detail-page.js` | escaping, `compact`, `isoDate`, `fmtDuration`, the bech32 decoder behind the `@Name` chips, `renderSupporters`, `renderBioText`. **Re-exports `renderBoosts` and five formatters from `assets/js/boost-list.js`** and `boosterPageUrl` from `booster-link.js`; those are aliases, not definitions |
+| `functions/_shared/detail-page.js` | escaping, `isoDate`, `fmtDuration`, the bech32 decoder behind the `@Name` chips, `renderBioText`. **Re-exports `renderBoosts` and five formatters from `assets/js/boost-list.js`, and `renderSupporters` / `SUPPORTERS_VISIBLE` / `PODIUM` / `compact` / `initShowMore` from `assets/js/supporter-wall.js`**, plus `boosterPageUrl` from `booster-link.js`; those are aliases, not definitions |
+| `assets/js/supporter-wall.js` | **two-sided**: the community wall, its podium rule, its counts and its "Show N more" handler. Moved here so the homepage can render the same wall without loading detail-page.js, which is 156KB of thread machinery it has no other use for |
+| `assets/css/supporter-wall.css` | every `.sup-*` rule, desktop and phone. **⚠️ The phone rules moved with it and that is load-bearing**: `.sup-card--podium` is an exact fraction of its row (/5 desktop, /3 under 640px) because `PODIUM` is a server-side constant and CSS cannot move a card into the grid below |
 | `assets/js/boost-list.js` | **two-sided**: the boost row and the `#boosts` section, plus the comparators and the range filter both sides run |
 | `assets/js/boost-section.js` | the `#boosts` range and sort, shared by all three |
 | `functions/_shared/episode-cards.js` | `itemsFromBoosts`, `renderCardPage`, `CARDS_PER_PAGE` — the server half of the episode card |
@@ -3202,7 +3399,10 @@ other drawer on the page.
 
 ### The community wall
 
-`renderSupporters`, on `/show` and `/episode`. Follows localbitcoiners'
+`renderSupporters` in **`assets/js/supporter-wall.js`** (it moved out of
+`functions/_shared/detail-page.js` so the homepage's Members tab could render the
+same wall; that file re-exports it). On `/show`, `/episode` and `/#members`.
+Follows localbitcoiners'
 `supporters.html`, which is its visual ancestor. The card has **no chrome** — no
 border, no background, no panel — just a circular avatar, the name, and the sats
 centered beneath. The avatars are the pattern, and a grid of bordered boxes
@@ -3781,13 +3981,18 @@ would. Never remove an entry** — those links are in the wild.
 | `episode-section.js` | the card rollup on `/episode` and `/booster` |
 | `rank.js` | **the** definition of a rank, competition-style, shared by the edge and the browser |
 | `boost-list.js` + `boost-section.js` | **the** boost row and the `#boosts` range and sort, facts and verbs, shared by the edge and the browser |
-| `shows-feed.js` | the show-level rollup behind Shows and Albums |
+| `show-card.js` + `show-card-actions.js` | **the** show card, facts and verbs, shared by the edge and the browser |
+| `shows-feed.js` | the feed around that card, behind Shows and Albums |
+| `supporter-wall.js` + `supporter-wall.css` | **the** community wall, shared by the three detail pages and the Members tab |
+| `members-board.js` | the Members tab: the #40HPW boards, the wall and its three orderings, the Rules dialog |
 | `feed-controls.js` / `feed-search.js` | the range/sort chrome and the per-feed typeahead |
 | `feed-lang.js` | the language menu on the four ranked feeds, and the copy it rewrites |
 | `boosts-thread.js` / `boost-actions.js` | the content tokenizer and reply / like / repost / zap |
 | `functions/index.js` | the homepage's opening feed, rendered at the edge |
 | `functions/{show,episode,booster}/…` | the three edge-rendered detail pages |
 | `functions/api/v1/*` | the D1 query API |
+| `functions/api/v1/members.js` | member search and the top-members listing, over all 2,011 |
+| `functions/api/v1/members/hours.js` | the #40HPW boards |
 | `functions/api/sign-boost.js` | the signing oracle for the boost bot, with `functions/_shared/nostr-sign.js` |
 | `login-widget/src/lib/siteSign.js` | its client half: a wallet-only boost gets a note without a key |
 | `functions/api/keysend.js` + `keysendLookup.js` | the keysend upgrade: an lnaddress leg reaches Helipad's first tier |
@@ -3816,7 +4021,11 @@ would. Never remove an entry** — those links are in the wild.
    directly relevant. **`/boosters` is now much closer than it was**, since
    `/booster/<npub>` exists and `functions/api/v1/boosters/[npub].js` is the query
    it would page. **The path stayed `/boosters` when the label became Community**:
-   the URL is in the wild and the rename was a label change.
+   the URL is in the wild and the rename was a label change. **⚠️ And the
+   homepage's Members tab now answers most of what `/boosters` promised** — the
+   member search, the top-members wall and the #40HPW boards all live there, so
+   the open question is whether `/boosters` becomes a 301 to `/#members` rather
+   than a page of its own.
 
 2. **Shows · Follows.** The scope menu is hidden on Shows because the show-level
    rollup is computed over everyone. See the scope note at the top of
