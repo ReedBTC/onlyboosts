@@ -20,30 +20,30 @@
  * A repeated name is authentic to it rather than a bug to collapse — Piez holds
  * five of the top ten and that is the actual story of the board.
  */
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v140'
-import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v140'
-import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v140'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v141'
+import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v141'
+import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v141'
 /* ⚠️ THE SAME WALL /show AND /episode RENDER, not a copy of it. It moved out of
  * functions/_shared/detail-page.js into a two-sided module for exactly this;
  * that file re-exports every name, so both Functions were untouched. A reader
  * who screenshots the wall here and on a show page must not be able to tell
  * them apart. */
-import { renderSupporters, initShowMore, compact } from '/assets/js/supporter-wall.js?v=ob-v140'
+import { renderSupporters, initShowMore, compact } from '/assets/js/supporter-wall.js?v=ob-v141'
 /* ⚠️ EXACT BOOST COUNTS HERE, COMPACT SATS. On the wall a row is one of a
  * hundred and `1k` is plenty; here there are four rows and the count is the
  * disclosure itself — "1,021 boosts from dozens of listeners" is the claim the
  * section exists to make, and `1k` rounds the evidence away. */
-import { num } from '/assets/js/boost-list.js?v=ob-v140'
-import { rangeControl, sortControl } from '/assets/js/feed-controls.js?v=ob-v140'
-import { mountFeedSearch } from '/assets/js/feed-search.js?v=ob-v140'
-import { searchMembers, SEARCH_HITS } from '/assets/js/ob-live.js?v=ob-v140'
+import { num } from '/assets/js/boost-list.js?v=ob-v141'
+import { rangeControl, sortControl } from '/assets/js/feed-controls.js?v=ob-v141'
+import { mountFeedSearch } from '/assets/js/feed-search.js?v=ob-v141'
+import { searchMembers, SEARCH_HITS } from '/assets/js/ob-live.js?v=ob-v141'
 /* ⚠️ THE SAME WEEK RULE THE ENDPOINT CUTS ON, not a second copy of it. That
  * module is two-sided for exactly this: the picker steps and enumerates weeks
  * without a round trip per press, and a Pacific week containing a DST
  * transition is 167 or 169 hours, so a client that stepped by a flat 604800
  * would drift an hour past every March and every November while still
  * producing Mondays. */
-import { prevWeek, nextWeek, weekSeries, weekDateString, weekStartFromDate } from '/assets/js/pacific-week.js?v=ob-v140'
+import { prevWeek, nextWeek, weekSeries, weekDateString, weekStartFromDate } from '/assets/js/pacific-week.js?v=ob-v141'
 
 const esc = htmlEscape
 const HOURS_API = '/api/v1/members/hours'
@@ -246,6 +246,20 @@ function boardHtml({ title, titleHtml, sub, members, goal, empty, board }) {
  * Both arrows render even when disabled. A control that vanishes at the end of
  * a range moves the two beside it, so the header reflows as the reader walks
  * back through the weeks.
+ *
+ * ⚠️ THE THREE PIECES ARE ONE BORDERED GROUP, AND THE FIRST VERSION WAS NOT.
+ * Reed's call, 2026-08-24, on seeing it: the arrows were transparent until
+ * hover and the label wore the title's type, so the control was invisible at
+ * rest and a touch device never saw the hover state that would have revealed
+ * it. The segmented stepper is in `index.html` — everything here builds is the
+ * same markup it always was, which is the point of the chrome living in CSS.
+ *
+ * ⚠️ THE CARET SPAN IS DELIBERATELY EMPTY. It held `▾` (U+25BE) inside a
+ * Playfair element, and Playfair carries no such glyph — so it was already
+ * falling through to whatever face the platform substituted, at whatever size
+ * that face draws it. It is two borders and a rotation now, sized in CSS, the
+ * same call `.drawer-hint`'s chevron makes. Putting a character back in here
+ * stacks a glyph on top of the drawn one.
  */
 function pickerHtml(ws, live, first) {
   const atNewest = !live || ws >= live
@@ -269,7 +283,7 @@ function pickerHtml(ws, live, first) {
   const label = esc(weekTitle(ws, live))
   const pick = weeks.length
     ? `<button type="button" class="hpw-pick" data-hpw-pick aria-haspopup="listbox" aria-expanded="false"` +
-      ` title="Pick a week">${label}<span class="hpw-pick-caret" aria-hidden="true">▾</span></button>`
+      ` title="Pick a week">${label}<span class="hpw-pick-caret" aria-hidden="true"></span></button>`
     : `<span class="hpw-pick hpw-pick--static">${label}</span>`
   return `<span class="hpw-nav" data-hpw-nav>` +
     arrow('prev', '‹', 'Previous week', atOldest) +

@@ -3152,6 +3152,34 @@ this tab already carries a lookup, a range, a sort and a dialog; a fourth contro
 strip above the boards would be permanent chrome for something most readers press
 twice. The arrows flank the word they change.
 
+**⚠️ AND THE THREE PIECES ARE ONE BORDERED GROUP, WHICH THE FIRST VERSION WAS
+NOT.** *Reed's call, 2026-08-24, on seeing it shipped:* the arrows were
+transparent circles until hover and the label wore the title's own type, so
+nothing on screen had an edge and **a touch device never sees the hover state
+that would reveal one** — the control was invisible at rest. A segmented stepper
+is the shape a calendar app and a dashboard both use to walk a date range, so
+the two ends explain themselves, and the hairline dividers are what say the
+middle is a third control rather than a label between two buttons. Four options
+were rendered against it and rejected: solid arrows alone (fixes stepping, leaves
+the menu undiscovered), the site's own Sort pill (a real consistency argument,
+but it leaves the arrows the only unstyled things in a styled row and costs the
+board its Playfair heading), a labelled band under the heading (~2.4rem on every
+board, doubled on desktop where two boards sit side by side), and an
+accent-tinted version of the stepper (the loudest thing in the board, competing
+with the gold row that marks a 40-hour week).
+
+**⚠️ THE CARET IS DRAWN, NOT TYPED, AND THAT IS WHY IT COULD BE MADE BIGGER AT
+ALL.** It was `▾` (U+25BE) inside a Playfair element, and **Playfair carries no
+such glyph** — so it was already falling through to whatever face each platform
+substituted, at whatever size that face draws it. Its apparent size was not ours
+to set anywhere, which is exactly why it read as small. It is two borders and a
+rotation now, the same call `.drawer-hint`'s chevron and the `(i)` badge both
+make, at 0.5rem/2px against the drawer chevron's 0.46rem because this one sits
+beside 1.02rem Playfair rather than a 0.68rem label. **The span in
+`members-board.js` is deliberately empty**; putting a character back in it stacks
+a glyph on the drawn one. `.hpw-pick` is `align-items: center` for the same
+reason — a drawn box has no baseline and rides low under `baseline`.
+
 **⚠️ THE HIGH SCORES ROWS ARE THE REAL WAY IN.** Each row's week is a button
 (`data-hpw-goweek`) that opens that week on the board above. A menu of 99 dated
 rows can only be scrolled; the board beside it already names the weeks worth
