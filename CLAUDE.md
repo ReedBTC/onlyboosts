@@ -3174,11 +3174,20 @@ such glyph** — so it was already falling through to whatever face each platfor
 substituted, at whatever size that face draws it. Its apparent size was not ours
 to set anywhere, which is exactly why it read as small. It is two borders and a
 rotation now, the same call `.drawer-hint`'s chevron and the `(i)` badge both
-make, at 0.5rem/2px against the drawer chevron's 0.46rem because this one sits
-beside 1.02rem Playfair rather than a 0.68rem label. **The span in
-`members-board.js` is deliberately empty**; putting a character back in it stacks
-a glyph on the drawn one. `.hpw-pick` is `align-items: center` for the same
-reason — a drawn box has no baseline and rides low under `baseline`.
+make. **The span in `members-board.js` is deliberately empty**; putting a
+character back in it stacks a glyph on the drawn one. `.hpw-pick` is
+`align-items: center` for the same reason — a drawn box has no baseline and
+rides low under `baseline`.
+
+**⚠️ 0.4rem AT 1.5px, AND THE SIZE WAS ARRIVED AT BY MEASUREMENT.** It shipped
+at 0.5rem/2px and Reed called it the same day: *"it went from whispering to you
+to shouting at you."* The arithmetic agrees. The old `▾` draws about 7px of
+visible triangle; a 0.5rem box rotated 45° is 8 × √2 ≈ **11.3px** across, so the
+mark had roughly doubled. 0.4rem is ≈ **9px**, the midpoint of the two. **That
+midpoint is the whole argument for drawing it rather than typing it** — a
+substituted glyph has no midpoint to ask for. The stroke came down with it: 2px
+on a 6.4px box is a quarter of the shape and reads as a heavy outline, where a
+flat 1px goes to sub-pixel mush on a non-retina screen.
 
 **⚠️ THE HIGH SCORES ROWS ARE THE REAL WAY IN.** Each row's week is a button
 (`data-hpw-goweek`) that opens that week on the board above. A menu of 99 dated

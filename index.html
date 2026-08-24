@@ -50,18 +50,18 @@
 
   <!-- Shared note / card styles (.note-card, .embed-note) — the boosts
        feeds render through the same kind-1 card as boosts-thread.js. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v141" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v142" />
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v141" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v142" />
   <!-- The episode card and its drawer, extracted from the inline block below
        when /episode/<guid> pages needed the same cards. See the file header. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v141" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v141" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v142" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v142" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. Must stay last
        among the stylesheets so the inline block below still wins. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v141" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v142" />
 
   <style>
     :root {
@@ -573,7 +573,7 @@
        than a glyph now (see below), and a box has no baseline to sit on — under
        `baseline` it aligns on its own bottom edge and rides low. */
     .hpw-pick {
-      display: inline-flex; align-items: center; gap: 0.4rem; max-width: 100%;
+      display: inline-flex; align-items: center; gap: 0.35rem; max-width: 100%;
       font-family: 'Playfair Display', Georgia, serif;
       font-size: 1.02rem; font-weight: 700; color: var(--ink);
       background: none; border: 0; border-radius: 0;
@@ -596,16 +596,26 @@
        small. Two borders and a rotation is the same call `.drawer-hint`'s
        chevron and the `(i)` badge both make, and for the same reason.
 
-       0.5rem square at 2px is a step up from the drawer chevron's 0.46rem: this
-       one sits beside 1.02rem Playfair rather than a 0.68rem label, and it is
-       the whole of what says the week name opens something. `translateY` is
-       optical centering — the visible shape is a corner, so its mass sits below
-       the box's own centre. */
+       ⚠️ 0.4rem AT 1.5px, AND BOTH NUMBERS WERE ARRIVED AT BY MEASUREMENT
+       RATHER THAN BY EYE. It shipped at 0.5rem/2px for a few minutes and Reed
+       called it — "it went from whispering to you to shouting at you" — which
+       the arithmetic agrees with: the old `▾` glyph draws about 7px of visible
+       triangle, where a 0.5rem box rotated 45° is 8 × √2 ≈ 11.3px across, so
+       the mark had roughly doubled. 0.4rem is 6.4 × √2 ≈ 9px, which is the
+       midpoint of those two, and it is the whole reason for drawing this rather
+       than typing it: a glyph has no midpoint to ask for.
+
+       The stroke drops with it. 2px on a 6.4px box is a quarter of the shape
+       and reads as a heavy outline; 1.5px holds the corner crisp without
+       sub-pixel mush, which a flat 1px gets on a non-retina screen.
+
+       `translateY` is optical centering — the visible shape is a corner, so its
+       mass sits below the box's own centre. */
     .hpw-pick-caret {
-      flex: none; width: 0.5rem; height: 0.5rem;
-      border-right: 2px solid var(--accent-d);
-      border-bottom: 2px solid var(--accent-d);
-      transform: translateY(-2px) rotate(45deg);
+      flex: none; width: 0.4rem; height: 0.4rem;
+      border-right: 1.5px solid var(--accent-d);
+      border-bottom: 1.5px solid var(--accent-d);
+      transform: translateY(-1.5px) rotate(45deg);
       transition: border-color 0.12s;
     }
     .hpw-pick:hover .hpw-pick-caret { border-color: var(--accent-dd); }
@@ -941,7 +951,7 @@
          target, and the three segments have to hold one line at 375px. The
          title between them does NOT grow with them. */
       .hpw-arrow { width: 2.5rem; height: 2.5rem; font-size: 1.3rem; }
-      .hpw-pick-caret { width: 0.55rem; height: 0.55rem; }
+      .hpw-pick-caret { width: 0.45rem; height: 0.45rem; }
       /* The menu is centred on the pick, which on a narrow screen puts its
          edges past the board's padding. Cap it to the viewport instead. */
       .hpw-weeks { min-width: 11rem; max-width: min(86vw, 20rem); }
@@ -1303,8 +1313,8 @@
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
     }
   </style>
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v141" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v141" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v142" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v142" />
 </head>
 <body data-active-feed="episodes-global">
 
@@ -2357,17 +2367,17 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v141"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v142"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v141" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v142" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v141" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v142" defer></script>
 
 <!-- Feed hydration — lazily loads the active feed on first view. -->
-<script type="module" src="/assets/js/feeds.js?v=ob-v141"></script>
-<script src="/assets/js/nav.js?v=ob-v141" defer></script>
+<script type="module" src="/assets/js/feeds.js?v=ob-v142"></script>
+<script src="/assets/js/nav.js?v=ob-v142" defer></script>
 
 </body>
 </html>
