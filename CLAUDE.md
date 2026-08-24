@@ -1779,9 +1779,20 @@ in the exact case the fallback was built for. `WALLET_CLEAN_FAILURE_RE` in
 safety**: `FAILURE_REASON_TIMEOUT` is excluded because an HTLC in flight when
 the clock expired can still settle, and `FAILURE_REASON_ERROR` says nothing
 about settlement. **Only add a code whose meaning is that no HTLC survived.**
-The same gap is still in `payAllLegs.js`, which reads the shared classifier
-directly; it is unpatched because nothing on this fork calls that path and its
-error runs the safe way.
+**⚠️ AND THE FIX WAS IN THE WRONG FILE FOR TWO DAYS.** `WALLET_CLEAN_FAILURE_RE`
+was a local constant in `externalBoost.js`, with a note saying the same gap in
+`payAllLegs.js` was left alone because nothing calls that path and its error runs
+the safe way. That was true of `payAllLegs` and **missed the third reader**:
+`payInvoiceVerified` in `index.jsx` is the live **zap** path, and there a
+`FAILURE_REASON_NO_ROUTE` fell through to `confirmInvoiceSettled` — which can
+only answer `settled` or `unknown`, so the result was always `uncertain`, and
+`boost-actions.js` **withholds the manual-invoice fallback** on uncertain. A user
+whose wallet provably never sent anything was left with no way to pay. The codes
+now live in `utils.js#isCleanPaymentDecline`, which all three read; the
+keysend-capability layer stays in `externalBoost.js`, being the one thing only
+that path can see. `assets/js/boost-actions.js` carries a **hand-copy** for its
+raw-WebLN branch, since the site cannot import from `login-widget/src`, and
+`test-keysend-upgrade.mjs` pins both against drift.
 
 **⚠️ AND `UNCERTAIN` MUST NEVER REACH THAT BRANCH.** An attempt was made and
 nothing observable came back, so re-paying it on another rail is the 2026-08-19
@@ -4403,8 +4414,45 @@ is `INSERT OR IGNORE`** and will not update a column on a row D1 already has, so
 a re-derivation reaches the query layer only through
 `d1_sync.py --remote-clients`, which emits UPDATEs. Nothing else re-pushes them.
 
-**Still open: the UI.** Nothing renders attribution yet; `/stats` is where a
-"boosts by app" breakdown belongs, and `/api/v1/clients` is what it reads.
+**The boost note cards render it**, as a `via <App>` chip in the meta row
+beside the sats. Two renderers print it — `boost-list.js#boostRow` (the
+`#boosts` section on all three detail pages) and `boosts-feed.js` (the Members
+feed) — and the shared part is the label table, `assets/js/client-label.js`.
+
+**⚠️ THAT TABLE IS TWO-SIDED AND THAT IS WHY IT MOVED.** It was declared inside
+`functions/api/v1/clients.js`, which a card renderer running at the edge *and*
+in the browser cannot import from; that endpoint now imports it instead. The
+Boosts feed also had a **third** copy, keyed on the RAW `client` tag with
+domain-shaped keys and a suffix-stripping fallback — deleted, because the tag is
+on 1.3% of the corpus where `client_id` covers 99.8%.
+
+**⚠️ THE CHIP NAMES THE PUBLISHER, NEVER `client_via`.** *Reed's call,
+2026-08-24.* A relayed boost carries the listener's own app there (Castamatic
+294, StableKraft 260, PodcastGuru 159 …) and showing it would answer a more
+interesting question — but the note was published by the bot and **the booster
+credited on that same card is the bot**, so "via Castamatic" beside a bot's name
+and face is two claims in one row. The origin app is still in the record and
+still nested on `/api/v1/clients`.
+
+**⚠️ AN UNATTRIBUTABLE BOOST GETS NO CHIP.** `hasClientLabel` is the gate. A
+chip reading "via Unattributed" would state our own coverage gap in the position
+a reader expects an app's name. `unattributed` is a real row on
+`/api/v1/clients` and is deliberately not a card label.
+
+**⚠️ ALL THREE PAGE QUERIES HAD TO SELECT `b.client_id`, and forgetting one is
+the two-sided bug.** Those queries are hand-written rather than `BOOST_SELECT`,
+so the edge would have rendered no chip while a re-sort — which refetches
+through `/api/v1` and `rowsFromRecords` — added one to every row.
+`test-boost-row.mjs`'s round-trip check is what catches it, and was confirmed to
+go red when `client_id` is dropped from the adapter.
+
+**The episode-card drawer rows deliberately do NOT carry it.** They are a
+different component (`.pcast-boost-*`, not `.ob-boost-*`) with a denser row, and
+adding it would mean putting `client_id` on `?include=boosts`, which every
+homepage card downloads. Not a rule, just untouched scope.
+
+**Still open: `/stats`.** A "boosts by app" breakdown is what
+`/api/v1/clients` was built for and still has no surface.
 
 ### OnlyBoosts Publishes On Behalf Of Its Own Donors
 
@@ -4717,8 +4765,9 @@ would. Never remove an entry** — those links are in the wild.
    in-flight tracking those two read. That tracking can no longer become
    non-empty, so the dropdown's in-flight UI and the navigation guard are dead
    with it. Removing them means editing two live components rather than deleting
-   files, which is why it was left. `payAllLegs.js`'s stale keysend classifier
-   (see the ⚠️ under The Keysend Upgrade) is the same finding from the other end.
+   files, which is why it was left. `payAllLegs.js`'s keysend classifier gap was **fixed on 2026-08-24 by fixing
+   it somewhere else**: the NIP-47 codes moved into the shared classifier, so
+   that path gets them whether or not it ever gains a caller.
 
 6. **Typography.** The brand wordmark is a bold sans; the site is still on LB's
    Playfair Display / Source Serif 4. It reads fine, but the serif is inherited,

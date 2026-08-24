@@ -19,8 +19,8 @@ import {
   getCachedProfile,
   setCachedProfile,
   registerEvent,
-} from '/assets/js/boosts-thread.js?v=ob-v137'
-import { nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v137'
+} from '/assets/js/boosts-thread.js?v=ob-v138'
+import { nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v138'
 
 // ── Module state ─────────────────────────────────────────────────────
 const state = {
@@ -947,8 +947,21 @@ async function performZap({
       // the extension never sent the payment — manual invoice is safe.
       // Anything else is ambiguous: confirm settlement via LUD-21 when
       // we can, and refuse to re-surface the invoice when we can't.
+      //
+      // ⚠️ THE SECOND ALTERNATIVE IS THE NIP-47 CODES, AND IT IS NOT
+      // DECORATION HERE EITHER. This is a hand-copy of the widget's
+      // `utils.js#isCleanPaymentDecline`, kept because the site cannot import
+      // from `login-widget/src`; it drifted the moment those codes were added
+      // there. An extension backed by a hub that speaks NIP-47 surfaces
+      // `FAILURE_REASON_NO_ROUTE` verbatim, and the prose patterns look for
+      // `no route` with a space — so a provably-clean refusal read as
+      // ambiguous and cost the user the manual invoice. The list is
+      // deliberately the same three and no more: TIMEOUT and ERROR say nothing
+      // about whether an HTLC survived. **The two copies must move together.**
       const msg = String(e?.message || e || '')
-      const cleanDecline = /rejected|denied|declined|insufficient|not enough|no funds|balance too low|expired|no route|unable to find route|route not found/i.test(msg)
+      const cleanDecline =
+        /rejected|denied|declined|insufficient|not enough|no funds|balance too low|expired|no route|unable to find route|route not found/i.test(msg) ||
+        /FAILURE_REASON_(NO_ROUTE|INSUFFICIENT_BALANCE|INCORRECT_PAYMENT_DETAILS)/i.test(msg)
       if (!cleanDecline) {
         const settled = await confirmZapSettled(verify)
         if (settled === 'settled') return { paid: true, method: 'webln', invoice }

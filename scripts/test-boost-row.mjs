@@ -49,6 +49,10 @@ const dbRows = [
     p_title: 'A Podcast & "Friends"', p_image: null, p_feed: null,
     e_title: 'The One About <Value>', e_image: null, e_pub: 1_700_000_000,
     e_num: 42, e_url: null,
+    // ⚠️ `client` AND `client_id` ARE DIFFERENT FACTS and both are on this row.
+    // The first is the raw NIP-89 tag as signed (1.3% of the corpus); the
+    // second is the collector's derivation, and it is the one the chip prints.
+    client_id: 'fountain', client_via: null,
     pr_name: 'alice', pr_dname: 'Alice <script>', pr_pic: 'https://example.com/a.png',
   },
   {
@@ -59,6 +63,9 @@ const dbRows = [
     podcast_guid: null, item_guid: null, item_url: null, client: null, message: null,
     p_title: null, p_image: null, p_feed: null,
     e_title: null, e_image: null, e_pub: null, e_num: null, e_url: null,
+    // Unattributable: none of the collector's three signals fired. ~0.2% of the
+    // corpus, and the row must render with no chip rather than guessing.
+    client_id: null, client_via: null,
     pr_name: null, pr_dname: null, pr_pic: null,
   },
   {
@@ -70,6 +77,10 @@ const dbRows = [
     client: null, message: 'nice',
     p_title: 'Another Show', p_image: null, p_feed: null,
     e_title: 'A Track', e_image: null, e_pub: null, e_num: null, e_url: null,
+    // A relayed boost: published by the bot, originated in Castamatic. The chip
+    // names the PUBLISHER (Reed's call, 2026-08-24), so `client_via` must not
+    // reach it.
+    client_id: 'chadf-boostbot', client_via: 'castamatic',
     pr_name: 'bob', pr_dname: null, pr_pic: 'javascript:alert(1)',
   },
 ]
@@ -153,6 +164,45 @@ check('the episode chip carries the title alone, never an episode number', () =>
     assert.match(html, /ob-boost-ep/, `${surface} still renders the chip`)
     assert.doesNotMatch(html, /Ep\. ?42|Track ?42|\b42 ?·/, `${surface} printed the episode number`)
   }
+})
+
+// ── The "via <app>" chip ────────────────────────────────────────────────────
+
+check('the chip names the app that PUBLISHED the note', () => {
+  const html = boostRows([dbRows[0]], names, SURFACES.show)
+  assert.match(html, /<span class="ob-boost-via">via Fountain<\/span>/)
+  // Beside the sats, inside the meta row — not a line of its own under it.
+  assert.match(html, /ob-boost-sats[\s\S]{0,200}ob-boost-via/)
+})
+
+check('⚠️ a relayed boost names the publisher, never the origin app', () => {
+  // Reed's call, 2026-08-24. The bot published this note and the booster
+  // credited on the same card IS the bot, so "via Castamatic" beside a bot's
+  // name and face would be two different claims in one row. The origin app is
+  // still in the record and still nested under the bot on /api/v1/clients.
+  const html = boostRows([dbRows[2]], names, SURFACES.show)
+  assert.match(html, /via ChadF Boost Bot/)
+  assert.doesNotMatch(html, /Castamatic/i, 'client_via reached the card')
+})
+
+check('an unattributable boost gets no chip rather than a guess', () => {
+  const html = boostRows([dbRows[1]], names, SURFACES.show)
+  assert.doesNotMatch(html, /ob-boost-via/)
+  assert.doesNotMatch(html, /Unattributed/i)
+  // And the row still renders — the chip is additive, never a gate.
+  assert.match(html, /data-boost-note/)
+})
+
+check('an unknown slug renders as itself, so a new app is a missing label', () => {
+  const row = { ...dbRows[0], client_id: 'some-new-app' }
+  assert.match(boostRows([row], names, SURFACES.show), /via some-new-app/)
+})
+
+check('the slug is escaped, being a value out of the database', () => {
+  const row = { ...dbRows[0], client_id: '<img src=x onerror=alert(1)>' }
+  const html = boostRows([row], names, SURFACES.show)
+  assert.doesNotMatch(html, /<img src=x/)
+  assert.match(html, /&lt;img src=x/)
 })
 
 check('/booster does not link a row back to the page it is on', () => {

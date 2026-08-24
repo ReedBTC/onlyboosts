@@ -31,7 +31,7 @@
 // absolute `/assets/js/…` specifier cannot be bundled, so it is the one form a
 // two-sided module may not use. See the header of episode-card.js, and
 // scripts/stamp-assets.js, which stamps both shapes.
-import { coverChain } from './cover-art.js?v=ob-v137'
+import { coverChain } from './cover-art.js?v=ob-v138'
 
 /* ⚠️ THE FETCHING HALF OF THIS MODULE IS GONE, and this is what it was.
  *
@@ -99,6 +99,13 @@ export function normalizeBoosts(d) {
       src: str(b?.src),
       msg: str(b?.msg),
       client: str(b?.client),
+      // ⚠️ `client` IS THE RAW NIP-89 TAG AND `clientId` IS THE DERIVATION, and
+      // they are different facts. The tag is on 1.3% of the corpus, exactly as
+      // the publisher signed it; `client_app.id` is the collector's own answer
+      // from three signals and is what the "via" chip on a boost card prints.
+      // `client_app.via` — the app a relayed boost originated in — is left out
+      // deliberately; see the note over hasClientLabel in client-label.js.
+      clientId: str(b?.client_app?.id),
       booster: {
         pk: pk.toLowerCase(),
         npub: str(b?.booster?.npub),

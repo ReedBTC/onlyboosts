@@ -30,16 +30,17 @@
  */
 import {
   htmlEscape, isSafeUrl, truncate, renderMessage,
-} from './nostr-text.js?v=ob-v137';
-import { episodePageHref, showPageHref } from './show-link.js?v=ob-v137';
+} from './nostr-text.js?v=ob-v138';
+import { episodePageHref, showPageHref } from './show-link.js?v=ob-v138';
 /* ⚠️ THE REAL MODULE, NOT A FOURTH COPY OF THE RULE. booster-link.js has been
  * dependency-free since it was written, so esbuild inlines it here exactly as it
  * does nostr-text.js, and the boost rows link a booster by the same test every
  * feed surface uses rather than by a transcription of it. This is the collapse
  * that functions/_shared/detail-page.js#boosterPageUrl said was available; that
  * name is now an alias for this function rather than a second copy of it. */
-import { boosterPageHref } from './booster-link.js?v=ob-v137';
-import { httpsUrl } from './cover-art.js?v=ob-v137';
+import { boosterPageHref } from './booster-link.js?v=ob-v138';
+import { httpsUrl } from './cover-art.js?v=ob-v138';
+import { clientLabel, hasClientLabel } from './client-label.js?v=ob-v138';
 
 // ── The formatters the row needs ─────────────────────────────────────────────
 //
@@ -123,6 +124,10 @@ export function rowsFromRecords(records) {
     podcast_guid: b.podcast?.guid ?? null,
     e_title: b.episode?.title ?? null,
     e_num: b.episode?.num ?? null,
+    // Which app PUBLISHED this note, for the "via" chip. `client_app.via` — the
+    // app a relayed boost originated in — is deliberately not carried: see the
+    // note over hasClientLabel in client-label.js.
+    client_id: b.client_app?.id ?? null,
     // Not selected by any of the three PAGE queries — none of them prints an
     // air date on a boost row — but it is what the `episode` sort orders on, and
     // sorting only ever happens over a corpus fetched from the API. See
@@ -449,10 +454,31 @@ function boostRow(r, names, { noun, showTarget, linkBooster = true, showShow = f
         : `<span class="ob-boost-show">${htmlEscape(truncate(r.p_title, 60))}</span>`)
     : null;
 
+  /* WHICH APP PUBLISHED THIS NOTE. It rides the meta row beside the sats
+   * because that row is already the "what this boost was" line, and the client
+   * is a fact about the boost rather than about the episode or the show.
+   *
+   * ⚠️ IT IS A DERIVED CLASSIFICATION, NOT A FIELD ANYONE SIGNED. The NIP-89
+   * `client` tag is on 1.3% of the corpus; the collector infers the rest from
+   * the NIP-73 i-tag's host and from known publisher pubkeys, and leaves
+   * `client_id` null when nothing fired. So the chip is absent on ~0.2% of rows
+   * rather than guessing, and absent is the correct rendering of "we do not
+   * know" — see hasClientLabel.
+   *
+   * ⚠️ NOT A LINK. There is no per-client page to point at; /api/v1/clients has
+   * no surface yet and /stats is still a placeholder. A chip that looked
+   * clickable and was not would be worse than a plain one, and this is the row
+   * where two links already compete for the reader.
+   */
+  const via = hasClientLabel(r.client_id)
+    ? `<span class="ob-boost-via">via ${htmlEscape(clientLabel(r.client_id))}</span>`
+    : null;
+
   const meta = [
     Number(r.sats) > 0
       ? `<span class="ob-boost-sats">${htmlEscape(num(r.sats))}<span class="ob-bolt" aria-hidden="true">⚡</span></span>`
       : null,
+    via,
     showTarget ? epEl : null,
     showTarget ? showEl : null,
   ].filter(Boolean).join("\n            ");

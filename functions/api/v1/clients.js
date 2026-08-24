@@ -21,28 +21,18 @@ import { json, preflight } from "./_common.js";
 
 export async function onRequestOptions({ request }) { return preflight(request); }
 
-// Labels live here rather than in the client so one rename lands everywhere. A
-// slug with no entry renders as itself, so a new app is a missing label rather
-// than a missing row.
-const DISPLAY = {
-  "fountain": "Fountain",
-  "chadf-boostbot": "ChadF Boost Bot",
-  "boostmebitch": "BoostMeBitch",
-  "localbitcoiners": "Local Bitcoiners",
-  "bowlafterbowl": "Bowl After Bowl",
-  "onlyboosts": "OnlyBoosts",
-  "pv4v": "PV4V",
-  "lnaddress-music": "lnaddress music",
-  "castamatic": "Castamatic",
-  "stablekraft": "StableKraft",
-  "podcastguru": "PodcastGuru",
-  "curiocaster": "CurioCaster",
-  "ln-beats": "LN Beats",
-  "podverse": "Podverse",
-  "podcast-index": "Podcast Index",
-  "boostcli": "BoostCLI",
-};
-const label = (slug) => DISPLAY[slug] || slug;
+/* ⚠️ THE LABELS MOVED TO assets/js/client-label.js ON 2026-08-24, and the
+ * direction of the move is the point. They were declared here, on the reasoning
+ * that one rename should land everywhere — but the only consumer was a surface
+ * that does not exist yet (`/stats`), and when the boost cards started printing
+ * client names they could not reach a table inside a Pages Function. A card
+ * renderer that runs at the edge AND in the browser can only import from
+ * `assets/js`, so that is where the table has to live for both to read it.
+ *
+ * A slug with no entry renders as itself, so a new app is a missing label
+ * rather than a missing row.
+ */
+import { clientLabel as label } from "../../../assets/js/client-label.js";
 
 const RANGE_DAYS = { "1w": 7, "1m": 30, "1y": 365, all: null };
 
