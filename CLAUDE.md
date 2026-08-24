@@ -1074,8 +1074,10 @@ Two separate things are both called "boost":
   nav's Donate button. **It runs the BOOST flow, not a flow of its own**:
   `openSiteDonation` → `openExternalBoost` → `ExternalBoostModal` with a
   synthetic one-leg bundle. See *A Donation Is The Boost Flow With One Leg*.
-  `boostagram.js` + `BoostModal.jsx` + `MultiLegBoostForm` are the retired LB
-  path and now have **no caller on this fork**.
+  `BoostModal.jsx` and `MultiLegBoostForm` were the retired LB path and were
+  **deleted on 2026-08-23**; see *What The Strip Removed*. `boostagram.js`
+  survives and is live — `index.jsx` imports `bolt11PaymentHash`,
+  `confirmInvoiceSettled` and `RECIPIENT_LUD16` from it.
 
 All LB payment and identity values were replaced on fork and the shipped
 `assets/widgets/login-widget.js` was rebuilt — verified zero occurrences of LB's
@@ -1347,12 +1349,15 @@ boost** rather than shown disabled: signing with the donor's own npub would undo
 the anonymity they chose one field up. A signed-out booster is served by the
 site-signed path instead; see below.
 
-**The LB path is different and is deliberately not being changed.**
-`MultiLegBoostForm` signs its kind-1 *before* paying, batched into one signer
-approval with the receipts, and `boostQueue.js` publishes it if any leg paid.
-Its content is frozen before any outcome is known. It is unaffected here because
-the only surface using it on this fork is the site tip, which is one leg at 100%
-and cannot partial.
+**⚠️ THE LB PATH THAT USED TO SIT BESIDE THIS IS GONE, AND THE CONTRAST IS
+STILL WORTH KNOWING.** `MultiLegBoostForm` signed its kind-1 *before* paying,
+batched into one signer approval with the receipts, so its content was frozen
+before any outcome was known — safe there only because the one surface using it
+was the site tip, a single leg at 100% that cannot partial. It was deleted on
+2026-08-23 along with the rest of the LB strip, so **there is now exactly one
+publishing design on this fork** and the rule above is unconditional: the
+figures are recomputed from live leg state at the moment of publishing.
+`git show 75f88ef` has the presign-then-publish version if it is ever wanted.
 
 ### The Login Is Not A Gate On The Wallet
 
@@ -1405,12 +1410,12 @@ signed-out case something to say. See *The Boost Modal Declares What Happens To
 The Note*.
 
 **⚠️ THE SITE TIP USED TO BE THE EXCEPTION AND IS NOT ANY MORE.**
-`openShowBoost` → `BoostModal` → `MultiLegBoostForm` signs a kind-1 before
-paying, so it needs a signer by construction — which meant the nav's Donate
+`openShowBoost` → `BoostModal` → `MultiLegBoostForm` signed a kind-1 before
+paying, so it needed a signer by construction — which meant the nav's Donate
 button demanded a Nostr account long after the episode boosts stopped doing so.
-It now opens `openSiteDonation` instead. `openShowBoost` is still exported and
-still works; nothing on this fork calls it. `_ensureWalletForPay` (the merch
-checkout) keeps its gate.
+It opens `openSiteDonation` instead, and the whole `openShowBoost` chain was
+**deleted on 2026-08-23**, so the wrong call is no longer available to make.
+`_ensureWalletForPay` (the merch checkout) keeps its gate.
 
 ### The Boost Modal Declares What Happens To The Note
 
@@ -1616,7 +1621,9 @@ then mounts `BoostApp` over `#lb-boost-slot` and owns every press after. Wiring
 the boot script alone left Donate opening the login modal while every file
 anyone would grep said otherwise. `test-boost-modal-render.mjs` walks `BoostApp`
 and asserts it calls `openSiteDonation` and never `openShowBoost`, whose Gate 1
-is a bare `api.requestLogin()`.
+was a bare `api.requestLogin()`. **That assertion is kept although
+`openShowBoost` no longer exists**: it is cheap, and it is what would catch a
+future re-introduction of a login-gated flow behind the Donate button.
 
 **⚠️ A DONATION NOTE IS NOT A BOOST NOTE, AND DROPPING THE NIP-73 TAGS IS NOT
 ENOUGH TO MAKE THAT TRUE.** `classify.py` sets `is_boost` from **either** a `t`
@@ -4527,8 +4534,10 @@ complete and unqualified and this site has none.
 
 The Supporter → Community rename was a **surface rename only**. `supporterCard`,
 `renderSupporters`, `SUPPORTERS_VISIBLE`, `data-supporter-grid`, the `.sup-*`
-classes and `assets/js/supporter-set.js` all keep their names, the same seam as
-Podcasts → Episodes below.
+classes and `assets/js/supporter-wall.js` all keep their names, the same seam as
+Podcasts → Episodes below. (`assets/js/supporter-set.js` was named here too until
+2026-08-23; it was LB's supporter-TIER resolver, a different thing that happened
+to share the word, and it was deleted with the rest of the strip.)
 
 ## Naming note
 
