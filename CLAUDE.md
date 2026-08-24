@@ -3168,34 +3168,26 @@ board, doubled on desktop where two boards sit side by side), and an
 accent-tinted version of the stepper (the loudest thing in the board, competing
 with the gold row that marks a 40-hour week).
 
-**⚠️ THE LABEL CARRIES A `Week:` TAG, AND THE WORD IS A STRONGER AFFORDANCE
-THAN THE CHROME AROUND IT.** *Reed's call, 2026-08-24.* "This week" does not say
-pickable; "Week: This week" does, and it is the shape the feeds' Sort pill
-(`.pcast-sort-tag`) has been teaching since it shipped.
+**⚠️ THE LABEL IS `This Week` / `Last Week` / `Week of Aug 10, 2026`, AND A
+`Week:` TAG IN FRONT OF IT WAS BUILT AND REVERTED THE SAME DAY.** *Reed,
+2026-08-24: "I don't like the font and alignment clashes between `Week:` and
+the week printed."* The reasoning behind the tag was sound and is worth keeping
+— a word says "pickable" better than any border does — but **the type is what
+sank it, and that is the part to understand before anyone proposes it again.**
 
-**⚠️ THE VALUE DROPPED "WEEK OF" IN THE SAME CHANGE, AND IT HAD TO.** The third
-form read `Week of Aug 10, 2026`, so tagging it gives `Week: Week of Aug 10,
-2026`. The tag now supplies the noun for all three states and `weekTitle`
-returns `This week` / `Last week` / `Aug 10, 2026`. **Tagging only the dated
-form was the alternative and is worse**: the control changes shape as the reader
-steps through it.
+`.pcast-sort-tag` gets away with `Sort: Most boosts` because both halves are
+**one family at one size**, differing only in colour and weight. This label is
+1.02rem Playfair bold, so a tag beside it necessarily varies **family and size
+and weight at once**, and three axes of difference across two words reads as a
+collision rather than as an axis and its value. `align-self: baseline` (needed
+because the button is `align-items: center` for the drawn caret) was not enough
+to settle it. **A future tag has to solve the type first, not the wording.**
 
-Two things fell out of that. **The widest label got NARROWER despite gaining a
-word** — 20 characters of Playfair bold became 12, plus five at 0.74rem in
-Source Serif — so the phone budget improved rather than tightened. And **the
-menu improved for free**, its rows taking `weekTitle` untagged: ninety-nine rows
-each opening with the same two words is a column of prefixes with the
-distinguishing part pushed right.
-
-**⚠️ THE TAG IS SOURCE SERIF AT REGULAR WEIGHT, NEVER THE LABEL'S PLAYFAIR
-BOLD.** Two words in one heavy display face read as two halves of a title rather
-than as an axis and its value, and being visibly the quieter half is the tag's
-whole job. It takes `align-self: baseline`, because the button is
-`align-items: center` for the drawn caret's sake and that would otherwise centre
-a small word against a large one and leave it floating. It also **rides the
-no-menu form**: it names what the value is rather than what pressing does, so it
-stays true with nothing to press, and the header holding one shape matters more
-than saving a word.
+The tag also forced the value to give up "Week of", since `Week: Week of Aug 10,
+2026` is unsayable, so the revert restores the prefix with it. **The relative
+form for the first two is the calendar-app idiom and is the point**: a reader
+one press back is looking at "Last Week", not at a date they would have to
+decode.
 
 **⚠️ THE CARET IS DRAWN, NOT TYPED, AND THAT IS WHY IT COULD BE MADE BIGGER AT
 ALL.** It was `▾` (U+25BE) inside a Playfair element, and **Playfair carries no
@@ -3278,9 +3270,6 @@ under this week's heading; and **the menu's items must undo the title's font** �
 `.pcast-sort-item` is declared `font: inherit` and it is inheriting from an `<h3>`
 in Playfair bold, the same shorthand trap `.show-stat dd` documents, arriving
 through the ancestor rather than through a later rule.
-
-**⚠️ THE MODIFIER LIST IS NOW EMPTY.** The tag was the last thing held back from
-the picker; what remains below is a different decision.
 
 **Not in the hash, deliberately, and it is the obvious next step.** A week is the
 one thing on this tab somebody would hand to somebody else, which is the same

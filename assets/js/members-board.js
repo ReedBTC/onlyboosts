@@ -20,30 +20,30 @@
  * A repeated name is authentic to it rather than a bug to collapse — Piez holds
  * five of the top ten and that is the actual story of the board.
  */
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v143'
-import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v143'
-import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v143'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v144'
+import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v144'
+import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v144'
 /* ⚠️ THE SAME WALL /show AND /episode RENDER, not a copy of it. It moved out of
  * functions/_shared/detail-page.js into a two-sided module for exactly this;
  * that file re-exports every name, so both Functions were untouched. A reader
  * who screenshots the wall here and on a show page must not be able to tell
  * them apart. */
-import { renderSupporters, initShowMore, compact } from '/assets/js/supporter-wall.js?v=ob-v143'
+import { renderSupporters, initShowMore, compact } from '/assets/js/supporter-wall.js?v=ob-v144'
 /* ⚠️ EXACT BOOST COUNTS HERE, COMPACT SATS. On the wall a row is one of a
  * hundred and `1k` is plenty; here there are four rows and the count is the
  * disclosure itself — "1,021 boosts from dozens of listeners" is the claim the
  * section exists to make, and `1k` rounds the evidence away. */
-import { num } from '/assets/js/boost-list.js?v=ob-v143'
-import { rangeControl, sortControl } from '/assets/js/feed-controls.js?v=ob-v143'
-import { mountFeedSearch } from '/assets/js/feed-search.js?v=ob-v143'
-import { searchMembers, SEARCH_HITS } from '/assets/js/ob-live.js?v=ob-v143'
+import { num } from '/assets/js/boost-list.js?v=ob-v144'
+import { rangeControl, sortControl } from '/assets/js/feed-controls.js?v=ob-v144'
+import { mountFeedSearch } from '/assets/js/feed-search.js?v=ob-v144'
+import { searchMembers, SEARCH_HITS } from '/assets/js/ob-live.js?v=ob-v144'
 /* ⚠️ THE SAME WEEK RULE THE ENDPOINT CUTS ON, not a second copy of it. That
  * module is two-sided for exactly this: the picker steps and enumerates weeks
  * without a round trip per press, and a Pacific week containing a DST
  * transition is 167 or 169 hours, so a client that stepped by a flat 604800
  * would drift an hour past every March and every November while still
  * producing Mondays. */
-import { prevWeek, nextWeek, weekSeries, weekDateString, weekStartFromDate } from '/assets/js/pacific-week.js?v=ob-v143'
+import { prevWeek, nextWeek, weekSeries, weekDateString, weekStartFromDate } from '/assets/js/pacific-week.js?v=ob-v144'
 
 const esc = htmlEscape
 const HOURS_API = '/api/v1/members/hours'
@@ -116,25 +116,26 @@ function weekLabel(unixSec) {
  * the relative form is the one they would say out loud. Everything older takes
  * the date, because "three weeks ago" stops being something anybody counts.
  *
- * ⚠️ AND IT NO LONGER SAYS "WEEK OF", BECAUSE THE TAG BESIDE IT DOES. Reed's
- * call, 2026-08-24: the strongest signal that a week is selectable is not
- * chrome, it is the word, so the button carries a `Week:` tag the way the
- * feeds' Sort pill carries `Sort:`. That tag is what makes the old third form
- * unsayable — "Week: Week of Aug 10, 2026" — so the value drops the prefix and
- * the tag supplies it for all three. The alternative was tagging only the dated
- * form, which changes the control's shape as the reader steps through it.
+ * ⚠️ A `Week:` TAG WAS BUILT IN FRONT OF THIS AND WAS REVERTED THE SAME DAY.
+ * Reed's call, 2026-08-24: "I don't like the font and alignment clashes between
+ * `Week:` and the week printed." The reasoning for it was sound — a word says
+ * "pickable" better than any border does — and the EXECUTION is what could not
+ * work here. The feeds' Sort pill gets away with `Sort: Most boosts` because
+ * both halves are ONE family at ONE size, varying only in colour and weight;
+ * this label is 1.02rem Playfair bold, so a tag beside it varied family AND
+ * size AND weight at once, and three axes of difference across two words reads
+ * as a collision rather than as an axis and its value. `align-self: baseline`
+ * was not enough to settle it.
  *
- * ⚠️ IT ALSO IMPROVED THE MENU FOR FREE, which takes `weekTitle` with no tag:
- * ninety-nine rows each opening with the same two words is a column of
- * prefixes with the distinguishing part pushed right.
- *
- * The lower-case `week` in the first two is the same decision one level down —
- * it is the second half of a phrase now, not a heading on its own. */
+ * The tag also forced the value to give up "Week of", since "Week: Week of Aug
+ * 10, 2026" is unsayable — so reverting it restores the prefix too, which is
+ * what these three strings said before and what Reed asked to have back.
+ * ⚠️ ANY FUTURE TAG HAS TO SOLVE THE TYPE FIRST, NOT THE WORDING. */
 function weekTitle(ws, live) {
-  if (!ws || !live) return 'This week'
-  if (ws === live) return 'This week'
-  if (ws === prevWeek(live)) return 'Last week'
-  return weekLabel(ws)
+  if (!ws || !live) return 'This Week'
+  if (ws === live) return 'This Week'
+  if (ws === prevWeek(live)) return 'Last Week'
+  return `Week of ${weekLabel(ws)}`
 }
 
 /* The span a past week covers, for the sub-line under the title.
@@ -294,15 +295,10 @@ function pickerHtml(ws, live, first) {
       `</div>`
     : ''
   const label = esc(weekTitle(ws, live))
-  /* ⚠️ THE TAG RIDES BOTH FORMS, INCLUDING THE ONE WITH NO MENU. It names what
-     the value IS rather than what pressing it does, so it stays true when there
-     is nothing to press — and the header holding one shape matters more than
-     saving a word on a path almost nobody reaches. */
-  const tag = `<span class="hpw-pick-tag">Week:</span>`
   const pick = weeks.length
     ? `<button type="button" class="hpw-pick" data-hpw-pick aria-haspopup="listbox" aria-expanded="false"` +
-      ` title="Pick a week">${tag}${label}<span class="hpw-pick-caret" aria-hidden="true"></span></button>`
-    : `<span class="hpw-pick hpw-pick--static">${tag}${label}</span>`
+      ` title="Pick a week">${label}<span class="hpw-pick-caret" aria-hidden="true"></span></button>`
+    : `<span class="hpw-pick hpw-pick--static">${label}</span>`
   return `<span class="hpw-nav" data-hpw-nav>` +
     arrow('prev', '‹', 'Previous week', atOldest) +
     `<span class="hpw-pick-wrap">${pick}${menu}</span>` +
