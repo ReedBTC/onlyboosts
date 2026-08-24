@@ -270,10 +270,15 @@ def effective_guid(alias="b"):
 
 
 # ── the exclusion list ────────────────────────────────────────────────────────
-# Everything that reaches a reader is filtered on `boosts.excluded = 0`. Use this
-# rather than writing the flag by hand, so the one predicate is greppable.
+# Everything that reaches a reader is filtered here. Use this rather than writing
+# the flags by hand, so the one predicate is greppable. Two gates, two mechanisms:
+# `excluded` is the takedown list (recomputed wholesale from excludes.json by
+# apply_excludes on every connect — which is exactly why duplicates cannot ride
+# it), and `dup_of` marks a republisher's second note for a payment another app
+# already published; see dedupe.py.
 def not_excluded(alias="b"):
-    return f"{alias + '.' if alias else ''}excluded = 0"
+    p = f"{alias}." if alias else ""
+    return f"({p}excluded = 0 AND {p}dup_of IS NULL)"
 
 
 def _excluded_expr(alias="b"):
@@ -398,6 +403,11 @@ def _migrate(conn):
         conn.execute("ALTER TABLE boosts ADD COLUMN canonical_guid TEXT")
     if "excluded" not in cols:
         conn.execute("ALTER TABLE boosts ADD COLUMN excluded INTEGER NOT NULL DEFAULT 0")
+    if "dup_of" not in cols:
+        # The kept partner's event_id when this row is a duplicate note for a
+        # payment already indexed under another note (dedupe.py). NULL = live.
+        conn.execute("ALTER TABLE boosts ADD COLUMN dup_of TEXT")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_boosts_dup ON boosts(dup_of)")
     for col in ("client_id", "client_via", "client_src"):
         if col not in cols:
             conn.execute(f"ALTER TABLE boosts ADD COLUMN {col} TEXT")

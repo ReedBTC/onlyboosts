@@ -39,6 +39,7 @@ import db                                                       # noqa: E402
 import enrich                                                   # noqa: E402
 import excludes                                                 # noqa: E402
 import clients                                                  # noqa: E402
+import dedupe                                                   # noqa: E402
 import fountain                                                 # noqa: E402
 import export as export_mod                                     # noqa: E402
 import podroll                                                  # noqa: E402
@@ -815,6 +816,23 @@ def cmd_reclassify_clients(args):
             print(f"    {clients.display_name(k):22} {v:6}")
 
 
+def cmd_dedupe(args):
+    """Mark republisher notes that duplicate another app's note for the same
+    payment — see dedupe.py for the rule and the measurements behind it.
+
+    Default scope is a trailing window: the bot lags its partner by a minute or
+    three, but relay/scan order can deliver either side first, so unmarked notes
+    are re-evaluated every cycle until the window ages them out. `--all` is the
+    historical pass. Marking is reversible (clear `dup_of`, drop the row's
+    `d1_boosts_synced` marker, and the next delta re-inserts it into D1)."""
+    conn = db.connect(DB_PATH)
+    try:
+        dedupe.run(conn, days=None if args.all else args.days,
+                   dry_run=args.dry_run)
+    finally:
+        conn.close()
+
+
 def cmd_excludes(args):
     """Validate excludes.json and report what each entry currently hides.
 
@@ -943,6 +961,14 @@ def main():
     pu.add_argument("--delete", action="store_true",
                     help="prune remote files no longer exported (within onlyboosts/ only)")
     pu.set_defaults(func=cmd_push)
+
+    dd = sub.add_parser("dedupe",
+                        help="mark republisher notes duplicating another app's note (dedupe.py)")
+    dd.add_argument("--days", type=int, default=7,
+                    help="trailing window of bot notes to evaluate (default 7)")
+    dd.add_argument("--all", action="store_true", help="full history")
+    dd.add_argument("--dry-run", action="store_true")
+    dd.set_defaults(func=cmd_dedupe)
 
     xc = sub.add_parser("excludes",
                         help="validate excludes.json and report what each entry hides")
