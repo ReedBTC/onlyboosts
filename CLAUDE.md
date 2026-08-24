@@ -3068,8 +3068,12 @@ so. If the reset ever moves east of Greenwich, that formatter moves with it.
   from Podcast Index never erases a derived value (`db.upsert_episode`). 183 of
   194 duration-less boosted episodes filled on flip-on; the residue is live
   streams and `.m3u8` playlists, which stay unscored honestly. **The Rules
-  dialog still claims ~14% with the no-duration slice at "a few percent"; both
-  halves of that copy now want the site-side edit.**
+  dialog was brought into line on 2026-08-24** and now prints all three slices
+  rather than "a few percent", plus one sentence saying lengths are filled in as
+  they are found — which is the reader-facing half of the self-healing note
+  below. **⚠️ THAT COPY IS A MEASUREMENT AND MOVES ON ITS OWN**, so it is
+  re-checked whenever these figures are; a Rules dialog that overstates what
+  cannot count is the one part of this board a reader has no way to verify.
 
 **⚠️ THE EPISODE COUNT ON A ROW IS EPISODES THAT CONTRIBUTED HOURS, NOT EPISODES
 BOOSTED, AND IT READS LIKE A BUG.** Reed checked the board against a member's own
@@ -3271,11 +3275,18 @@ under this week's heading; and **the menu's items must undo the title's font** �
 in Playfair bold, the same shorthand trap `.show-stat dd` documents, arriving
 through the ancestor rather than through a later rule.
 
-**Not in the hash, deliberately, and it is the obvious next step.** A week is the
-one thing on this tab somebody would hand to somebody else, which is the same
-reasoning that put language in the hash and left range and sort out. It wants a
-`#members?week=2026-08-10` entry in the `index.html` controller's grammar, which
-is that controller's decision as much as this board's.
+**⚠️ NOT IN THE HASH, AND THAT IS A DECISION RATHER THAN A GAP.** *Reed's call,
+2026-08-24: "let's skip the shareable URL, they can take a screenshot if they
+want to share it."* The case for `#members?week=2026-08-10` was the
+language-in-the-hash argument — a week is a body of work somebody would hand to
+somebody else — and what it ran into is that **a board is a picture rather than
+a document**: the thing a reader wants to send is ten names and their hours, not
+a URL that re-renders with different numbers once a duration lands. A screenshot
+carries the moment, which is what a leaderboard actually trades in.
+
+So this is **closed rather than deferred**, and reopening it wants a better idea
+than a hash: an OG image for the week, or a card the board itself can produce.
+Do not re-propose the plain URL parameter.
 
 #### The member wall
 
