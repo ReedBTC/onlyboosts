@@ -16,6 +16,7 @@ there rather than restating the argument:
 | The D1 consolidation (complete) | `docs/data-architecture.md` |
 | `/about` copy, factual source of record | `docs/about-and-faq-source.md` |
 | The `/api/v1` surface | `docs/api-tier2-d1-spec.md` |
+| The duplicate filter (rule, tiers, measurements) | `bots/global-boost-scan/dedupe.py` docstring |
 
 Deleted reasoning is recoverable: `git log -S <symbol> -- CLAUDE.md` finds the
 paragraph that used to explain any name in here.
@@ -2238,6 +2239,55 @@ is the check to run after an edit.
 **The removal path is deliberately not documented on the site.** `/about` says
 nothing about how to be excluded, and `docs/about-and-faq-source.md` is
 intentionally silent on it too. Reed's call; don't add it as a "missing piece".
+
+## The duplicate filter
+
+`bots/global-boost-scan/dedupe.py`, live since 2026-08-24, and **its docstring
+is the design record** — the rule, the evidence tiers, and the measurements
+behind every threshold. What belongs here is only what a change elsewhere
+would break.
+
+One payment can produce two notes: the donor's app publishes one, and a
+node-watching relay bot (`chadf-boostbot`) publishes another for the same
+boost. Before BMB/OB/LB spoke NIP-73 the bot's note was the only record; now
+it double-counts the boost, the sats and — different signing keys — the
+booster. The filter marks the relay copy `dup_of = <kept event_id>` and keeps
+the app's own note, which may be donor-signed, so the real member keeps the
+credit. 62 historical rows were marked on flip-on (42 BMB, 14 StableKraft, 6
+Bowl After Bowl, 25,265 sats); the pass runs every incremental cycle over a
+7-day trailing window.
+
+- **⚠️ `dup_of` IS ITS OWN COLUMN AND MUST NEVER FOLD INTO `excluded`.**
+  `apply_excludes` recomputes that flag wholesale from excludes.json on every
+  connect and would silently unmark every duplicate. `db.not_excluded()` gates
+  on both, which is how one edit reached every published surface — keep using
+  it rather than writing either flag by hand.
+- **⚠️ SATS + GUID + TIME WINDOW ALONE OVER-FILTERS, MEASURED.** 651 pairs of
+  same-amount, same-episode boosts minutes apart are distinct real payments
+  (live-show boost storms). What prevents eating them: only
+  `RELAY_PUBLISHERS`-signed notes are ever droppable, pairing is strictly
+  one-to-one, and one evidence tier must corroborate — a ≥3-distinctive-word
+  common run of the donor's own prose, or app agreement where the note's prose
+  (if any) is fully contained in the partner's. **A pair with no evidence is
+  let through, and contradicted prose blocks even a same-app match** — Reed's
+  call, 2026-08-24: a duplicate slipping through beats a real boost filtered
+  out. Don't tighten toward recall.
+- **A new republisher bot is out of scope until registered**: its pubkey in
+  `clients.py#PUBLISHER_PUBKEYS` (the member wall already forces this) and its
+  slug in `RELAY_PUBLISHERS` — relay bots only; the first-party publisher keys
+  (BMB's site account, our bot, LB's show account) are never the droppable
+  side, their note being the payment's own record. A bot whose notes carry no
+  message and no discoverable app identity slips through until a fingerprint
+  joins `APP_DOMAINS`; that is the accepted cost of never guessing.
+- **Reversal is two deletes, and D1 heals itself**: clear the row's `dup_of`
+  and its `d1_boosts_synced` marker, and the next delta re-inserts it; marking
+  rides the same `d1_reproject` queue an exclusion uses, which recounts the
+  touched show, episode and profile rows remotely.
+- `onlyboosts_globalscan.py dedupe [--days N | --all] [--dry-run]`; the last
+  full-history report is `data/dedupe-report.txt` (gitignored).
+- **The site needed no change** — it reads D1 and the shards, both corrected
+  at the source. `/about` does not yet disclose the filter;
+  `docs/about-and-faq-source.md` is where that copy starts if it ever should.
 
 ## Data feed
 
@@ -4567,6 +4617,12 @@ that shape:
   **Flag it rather than shipping it quietly.**
 - **A stale D1 sync**, which is the same failure with no code change behind it.
   The delta sync in every incremental cycle is what keeps the answer fresh.
+- **The duplicate filter marking an LB note.** `localbitcoiners` is in
+  `RELAY_PUBLISHERS` as a safety net (zero matches at flip-on, and LB's own
+  index check should keep it that way). If it ever fires, the dropped note is
+  on relays but unindexed, so **LB's audit files the issue** — that is the
+  expected surfacing of an LB-side dedupe race, not a bug here, and the answer
+  is to read the pair in `dedupe.py`'s report before un-marking anything.
 
 LB runs a daily audit (`bots/boost-publisher/coverage_audit.py` in that repo)
 comparing node payments against relays against this index, and files a GitHub
