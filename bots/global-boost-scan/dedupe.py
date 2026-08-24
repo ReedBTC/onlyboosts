@@ -1,51 +1,67 @@
 """Duplicate boost notes: one payment, two Nostr notes, two rows in the index.
 
-`chadf-boostbot` watches Chad's LND node and publishes a NIP-73 note for every
-boost the node receives — regardless of whether the app the donor used already
-published one. That was the right behaviour when no app did; now BoostMeBitch,
-StableKraft, Bowl After Bowl's site (and this site) publish their own notes, so
-a boost made through one of them lands in this index twice: once under the
-app's note, once under the bot's, doubling the boost count, the sats and
-(because the two notes are signed by different keys) the booster count.
-Confirmed with Chad on the 4 notes at /episode/133f2ef1-…#boosts, which are two
-payments (2026-08-24).
+A relay bot watches a Lightning node and publishes a NIP-73 note for every
+boost the node receives — regardless of whether the donor's app already
+published one. `chadf-boostbot` is today's case (confirmed with Chad on the 4
+notes at /episode/133f2ef1-…#boosts, which are two payments, 2026-08-24), but
+the shape is general: any node-watching republisher duplicates every boost
+made through an app that publishes its own notes, doubling the boost count,
+the sats and (different signing keys) the booster count.
 
-THE RULE. A REPUBLISHERS note is a duplicate of exactly one partner note when:
+SCOPE. Only notes signed by a key in RELAY_PUBLISHERS are ever droppable.
+A future bot is out of scope until its pubkey is registered in clients.py's
+PUBLISHER_PUBKEYS — which the member wall already forces — and given a role
+here. First-party publishers (BoostMeBitch's site key, our own bot, LB's show
+account) are never the droppable side: their note IS the payment's note.
 
-  • same sats, same item_guid, same effective show guid (canonical-aware);
-  • the partner is not itself a republisher's note, not excluded, not already
-    claimed as somebody's partner (pairing is one-to-one, which is what lets
-    two same-amount boosts in one live-show hour keep both their notes); and
-  • ONE of two tiers of corroboration holds:
+THE RULE. A relay note is a duplicate of exactly one partner when the hard key
+holds — same sats, same item_guid, same effective show guid, pairing strictly
+one-to-one (two same-amount boosts in one live-show hour keep both notes) —
+AND one tier of corroborating evidence holds. The tiers are EVIDENCE SOURCES,
+not conventions the bots are trusted to follow: a bot whose note format we
+have never seen simply produces no evidence, and a pair with no evidence is
+LET THROUGH (Reed's call, 2026-08-24: a duplicate slipping through is far
+better than a real boost filtered out).
 
-      msg-match      the donor's own message — the bot note stripped of its
-                     boilerplate (the "⚡ N sats" line, the "📱 via App" line,
-                     bare URLs and nostr: tokens) — appears verbatim inside the
-                     partner's message, within ±MSG_WINDOW. Where both sides
-                     name an app, they must agree.
+  1. strong message   The two notes share a run of the donor's own words:
+                      the longest common contiguous word sequence, counting
+                      only DISTINCTIVE words — not the episode/show title,
+                      the artist, app names/domains, boost-template
+                      vocabulary, or bare numbers, all of which both
+                      templates restate from the same facts. ≥3 distinctive
+                      words within ±MSG_WINDOW. Format-free by construction:
+                      nothing here knows any bot's layout.
 
-      no-msg + app   the bot note carries no donor message, so the only
-                     corroboration is agreement of app identity: the bot's own
-                     `📱 via <App>` line (client_via) names the app whose note
-                     the partner is — by the partner's client_id, or by the
-                     app's domain in the partner's message text for apps the
-                     classifier leaves null (StableKraft). Tight window.
+  2. weak message     The relay note's whole donor prose is 1–2 distinctive
+     + app agreement  words (a name, a "Toast") and ALL of it appears in the
+                      partner, AND both sides' publishing app is determinable
+                      and equal. ±APP_WINDOW.
 
-  Measured on the full corpus 2026-08-24: 62 of 1,027 bot notes pair (42
-  BoostMeBitch, 14 StableKraft, 6 Bowl After Bowl), max observed gap 162s, and
-  every long-gap / cross-app candidate the looser drafts of this rule matched
-  turned out to be two different payments. The windows are generous multiples
-  of the observed lag, not guesses.
+  3. no message       The relay note carries no donor prose at all, so app
+     + app agreement  identity is the only evidence: both determinable and
+                      equal. ±APP_WINDOW.
 
-WHAT IS DELIBERATELY NOT MATCHED. Same person, same amount, same episode,
-minutes apart, from ONE app — that is two real payments with one note each
-(live-show boost storms, Chad's test runs: 651 such pairs live in the corpus).
-Amount+guid+time alone would eat them, which is why the corroboration tiers
-exist and why the scope is the republisher's notes only, never the app's own.
+  Contradiction beats agreement: a relay note whose donor prose does NOT
+  appear in the candidate is two different payments, and no app-identity
+  match may override that (measured: the one same-app near-miss in the
+  corpus, "DELTA OG!!!!" vs a different track's auto-boost, is exactly this).
 
-WHICH COPY IS KEPT: always the app's. It is the note the donor's own app chose
-to publish, it may be donor-signed (the real member gets the credit), and the
-bot note is the relay of it.
+  App identity is best-effort, in order: the classifier's answer (client_via
+  names the app a relay note restates, client_id the publisher itself); the
+  note's own "📱 via <App>" line where one exists; the app's domain in the
+  note text (APP_DOMAINS) for apps the classifier leaves null. A bot that
+  publishes none of these contributes no tier-2/3 evidence — by design.
+
+  Measured on the full corpus 2026-08-24 (1,027 chadf-boostbot notes): 62
+  duplicates — 42 BoostMeBitch, 14 StableKraft, 6 Bowl After Bowl — 25,265
+  over-counted sats, max true-pair gap 162s. Distinctive-overlap separation
+  between true pairs and same-key coincidences was total at ≥3 words; the
+  651 same-amount/same-episode/minutes-apart pairs among NON-relay notes are
+  distinct real payments and are untouchable by scope.
+
+WHICH COPY IS KEPT: always the partner. It is the note the donor's own app
+chose to publish, it may be donor-signed (the real member keeps the credit),
+and the relay note is the restatement.
 
 MECHANISM. A duplicate gets `dup_of = <kept event_id>` — its own column, NOT
 `excluded`, because apply_excludes() recomputes that flag wholesale from
@@ -56,9 +72,9 @@ removed through the same `d1_reproject` queue an exclusion uses, and the
 `d1_boosts_synced` marker is cleared so an UNMARKED row re-inserts on the next
 delta — the whole thing is reversible by clearing the column.
 
-Runs per-cycle over a trailing window (the bot lags its partner by ~1-3
-minutes, but relay/scan order can deliver either side first, so unmarked bot
-notes are re-evaluated every tick until the window ages them out).
+Runs per-cycle over a trailing window (the relay bot lags its partner by ~1-3
+minutes, but relay/scan order can deliver either side first, so unmarked
+relay notes are re-evaluated every tick until the window ages them out).
 """
 import re
 import time
@@ -66,14 +82,15 @@ import time
 import db
 
 # Publishers whose notes RESTATE a node payment other apps also publish notes
-# for. Scope is deliberately this and not all of PUBLISHER_PUBKEYS: the LB show
-# account and our own bot publish ONLY when no other note exists (LB checks this
-# very index first), so their notes are never the second copy.
-REPUBLISHERS = {"chadf-boostbot"}
+# for — the only droppable side. localbitcoiners checks this very index before
+# publishing and so should never pair (its presence here is a safety net for a
+# race, and a place to watch: a MATCH on an LB note means its dedupe failed).
+# The other PUBLISHER_PUBKEYS entries are first-party and never belong here.
+RELAY_PUBLISHERS = {"chadf-boostbot", "localbitcoiners"}
 
-MSG_WINDOW = 30 * 60      # donor-message corroboration: generous
-EMPTY_WINDOW = 10 * 60    # app-identity corroboration only: tight
-MIN_MSG = 4               # a donor message shorter than this is no evidence
+MSG_WINDOW = 30 * 60      # strong message corroboration: generous
+APP_WINDOW = 10 * 60      # app-identity corroboration: tight
+STRONG_OVERLAP = 3        # distinctive words in a common run = strong evidence
 
 # The partner side of an app-identity match, for apps whose own notes the
 # classifier leaves unclassified (no client tag, no publisher key): the app's
@@ -85,50 +102,120 @@ APP_DOMAINS = {
     "bowlafterbowl": "bowlafterbowl.com",
 }
 
-_SATS_LINE = re.compile(r"^\s*⚡\s*[\d,.]+\s*sats?\s*$", re.I)
-_VIA_LINE = re.compile(r"^\s*\N{MOBILE PHONE}\s*via\s+", re.I)
+# Words both sides' templates restate about ANY boost; sharing them proves
+# nothing. Lowercase, matched against normalized words.
+TEMPLATE_VOCAB = set("""boost boosts boosted boostagram sats sat via user users
+episode ep show podcast live stream to the a an and of for on by from with
+this is at in zap zapped sent""".split())
+
 _TOKEN = re.compile(r"(?:nostr:\S+|https?://\S+)")
+_WORD = re.compile(r"[^\W_]+", re.UNICODE)
+_VIA_LINE = re.compile("\N{MOBILE PHONE}\\s*via\\s+(.+?)\\s*(?:\\n|$)")
 
 
-def donor_message(text):
-    """The donor's own words out of a republisher note: every line minus the
-    sats line, the via line, and any URL / nostr: tokens (the bot appends npub
-    mentions inline on the donor's line)."""
-    keep = []
-    for ln in (text or "").splitlines():
-        if _SATS_LINE.match(ln) or _VIA_LINE.match(ln):
-            continue
-        ln = _TOKEN.sub("", ln).strip()
-        if ln:
-            keep.append(ln)
-    return " ".join(keep)
+def _words(text):
+    return [w.lower() for w in _WORD.findall(_TOKEN.sub(" ", text or ""))]
 
 
-def _norm(s):
-    return re.sub(r"\s+", " ", (s or "")).strip().lower()
+def _known_facts(conn, row):
+    """Words both notes can derive from the boost itself: episode title, show
+    title, artist/author, and every app's name. Sharing these is not evidence."""
+    known = set(TEMPLATE_VOCAB)
+    for slug, domain in APP_DOMAINS.items():
+        known.add(slug)
+        known.update(domain.split("."))
+    known.update({"fountain", "castamatic", "podcastguru", "curiocaster",
+                  "podverse", "onlyboosts", "localbitcoiners", "fm", "com",
+                  "app", "social"})
+    if row["item_guid"]:
+        for t in conn.execute("SELECT title FROM episodes WHERE item_guid=?",
+                              (row["item_guid"],)):
+            known.update(_words(t[0]))
+    eg = row["canonical_guid"] or row["podcast_guid"]
+    if eg:
+        for t in conn.execute(
+                "SELECT title, author FROM shows WHERE podcast_guid=?", (eg,)):
+            known.update(_words(t[0]))
+            known.update(_words(t[1]))
+    return known
 
 
-def partner_app(row):
-    """Which app published this (non-republisher) note, best effort: the
-    classifier's answer, else the domain fingerprint. None = undeterminable."""
-    if row["client_id"]:
+def _distinctive(ws, known):
+    return [w for w in ws if w not in known and not w.isdigit() and len(w) > 1]
+
+
+def _overlap_run(a_words, b_words, known):
+    """Distinctive-word count of the longest common contiguous word run."""
+    best = 0
+    prev = [0] * (len(b_words) + 1)
+    for i, aw in enumerate(a_words, 1):
+        cur = [0] * (len(b_words) + 1)
+        for j, bw in enumerate(b_words, 1):
+            if aw == bw:
+                cur[j] = prev[j - 1] + 1
+                run = a_words[i - cur[j]:i]
+                best = max(best, len(_distinctive(run, known)))
+        prev = cur
+    return best
+
+
+def note_app(row):
+    """Which app this note claims to have come through, best effort: the
+    classifier's answer (client_via names the app a relay note restates,
+    client_id the publisher itself), else the note's own via-line, else a
+    domain fingerprint. None = no claim, which contributes no evidence."""
+    if row["client_via"]:
+        return row["client_via"]
+    if row["client_id"] and row["client_id"] not in RELAY_PUBLISHERS:
         return row["client_id"]
     msg = row["message"] or ""
+    m = _VIA_LINE.search(msg)
+    if m:
+        import clients
+        return clients.slugify(m.group(1))
     for slug, domain in APP_DOMAINS.items():
         if domain in msg:
             return slug
     return None
 
 
-def find_duplicates(conn, since=None):
-    """Pair unmarked republisher notes against partner notes. Read-only.
+def _match(conn, b, cands, claimed):
+    """The evidence tiers, against one relay note. Returns (partner, tier, gap)
+    or None. `cands` already satisfy the hard key within MSG_WINDOW."""
+    known = _known_facts(conn, b)
+    bw = _words(b["message"])
+    b_prose = set(_distinctive(bw, known))
+    b_app = note_app(b)
+    best = None
+    for o in cands:
+        if o["event_id"] in claimed:
+            continue
+        gap = abs(o["created_at"] - b["created_at"])
+        ow = _words(o["message"])
+        run = _overlap_run(bw, ow, known)
+        apps_agree = b_app is not None and note_app(o) == b_app
+        if run >= STRONG_OVERLAP:
+            tier = "msg"
+        elif b_prose and b_prose <= set(ow) and apps_agree and gap <= APP_WINDOW:
+            tier = "msg+app"
+        elif not b_prose and apps_agree and gap <= APP_WINDOW:
+            tier = "app"
+        else:
+            continue          # no evidence, or contradicted prose: let it through
+        if best is None or gap < best[2]:
+            best = (o, tier, gap)
+    return best
 
-    Returns [(bot_row, partner_row, tier, gap_seconds)], partner-claims
+
+def find_duplicates(conn, since=None):
+    """Pair unmarked relay-publisher notes against partner notes. Read-only.
+
+    Returns [(relay_row, partner_row, tier, gap_seconds)], partner-claims
     one-to-one against both prior runs (dup_of already set) and this one.
     """
-    ph = ",".join("?" * len(REPUBLISHERS))
+    ph = ",".join("?" * len(RELAY_PUBLISHERS))
     since_sql = "AND created_at >= ?" if since else ""
-    args = list(REPUBLISHERS) + ([since] if since else [])
+    args = list(RELAY_PUBLISHERS) + ([since] if since else [])
     bots = conn.execute(
         f"""SELECT * FROM boosts
             WHERE client_id IN ({ph}) AND excluded = 0 AND dup_of IS NULL
@@ -143,44 +230,21 @@ def find_duplicates(conn, since=None):
     egb = db.effective_guid("b")
     pairs = []
     for b in bots:
-        dm = _norm(donor_message(b["message"]))
-        has_msg = len(dm) >= MIN_MSG
-        window = MSG_WINDOW if has_msg else EMPTY_WINDOW
         cands = conn.execute(
             f"""SELECT * FROM boosts b
                 WHERE b.sats = ? AND b.created_at BETWEEN ? AND ?
                   AND COALESCE(b.item_guid,'') = ? AND COALESCE({egb},'') = ?
                   AND (b.client_id IS NULL OR b.client_id NOT IN ({ph}))
                   AND b.excluded = 0 AND b.dup_of IS NULL AND b.event_id != ?""",
-            [b["sats"], b["created_at"] - window, b["created_at"] + window,
+            [b["sats"], b["created_at"] - MSG_WINDOW, b["created_at"] + MSG_WINDOW,
              b["item_guid"] or "",
              b["canonical_guid"] or b["podcast_guid"] or ""]
-            + list(REPUBLISHERS) + [b["event_id"]]).fetchall()
-        best = best_tier = best_gap = None
-        for o in cands:
-            if o["event_id"] in claimed:
-                continue
-            gap = abs(o["created_at"] - b["created_at"])
-            pa = partner_app(o)
-            if has_msg:
-                # Where both sides name an app they must agree; either side
-                # unknown is allowed — the message match is the evidence.
-                if b["client_via"] and pa and pa != b["client_via"]:
-                    continue
-                if dm not in _norm(o["message"]):
-                    continue
-                tier = "msg-match"
-            else:
-                # No donor message: app identity is the ONLY corroboration, so
-                # both sides must be known and equal.
-                if not b["client_via"] or pa != b["client_via"]:
-                    continue
-                tier = "app-match"
-            if best is None or gap < best_gap:
-                best, best_tier, best_gap = o, tier, gap
-        if best is not None:
-            claimed.add(best["event_id"])
-            pairs.append((b, best, best_tier, best_gap))
+            + list(RELAY_PUBLISHERS) + [b["event_id"]]).fetchall()
+        hit = _match(conn, b, cands, claimed)
+        if hit is not None:
+            o, tier, gap = hit
+            claimed.add(o["event_id"])
+            pairs.append((b, o, tier, gap))
     return pairs
 
 
