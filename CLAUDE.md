@@ -367,7 +367,7 @@ node scripts/stamp-assets.js --check   # verify; non-zero exit if anything is st
 **Order matters.** `sync-partials` injects markup into the page files; anything
 it injects has to be stamped afterwards.
 
-Twelve test scripts, all plain `node scripts/<name>.mjs` with no runner:
+Thirteen test scripts, all plain `node scripts/<name>.mjs` with no runner:
 
 | | |
 |---|---|
@@ -382,6 +382,7 @@ Twelve test scripts, all plain `node scripts/<name>.mjs` with no runner:
 | `test-show-card.mjs` | the show card's two-sided contract. Its own reason for existing is the crossing: `renderShowCard` was a DOM builder and could afford `Date.now()` and an unpinned locale, which a two-sided module cannot — see the note under the card |
 | `test-members-search.mjs` | `/api/v1/members`, running the **shipped handler** against a database built from the real `schema.sql` through an `env.DB` shim over `node:sqlite`. LIKE escaping, the identifier/name split, the listing, the publisher asymmetry, and `publishers=1` as its exact complement. **Two publisher keys are in the fixture deliberately**: with one, a single-row answer says nothing about whether the mode asks for the list or found the loudest key |
 | `test-members-hours.mjs` | the 40 HPW boards, same shim, with a fixture built to known answers. Dedupe, week boundaries, the publisher exclusion, and the row-multiplying join |
+| `test-community-medium.mjs` | the two community rollups and the medium partition they were split on, against a `node:sqlite` build of the real `schema.sql`. **Two halves reached two ways**: `fetchCommunityBoosts` is exported and called directly, where `/show`'s query is inline in the page Function and is **extracted from the source and executed**, the `test-feed-hash.mjs` technique. A copy of the SQL written into the test would pass forever while the shipped one rotted. Confirmed to go red on three mutations: the filter removed, its polarity inverted, and the `COALESCE` dropped |
 | `test-keysend-upgrade.mjs` | the keysend upgrade: the `fountain.fm` exclusion's exact-or-parent rule, the routing pair's whole-or-nothing rule, the strict node-pubkey check, every way `/api/keysend` answers "no endpoint", and the wallet gate. **Stubs `fetch`**, so it probes nobody's well-known |
 
 **⚠️ `test-server-render.mjs` IS THE ONE THAT NEEDS AN ARGUMENT, SO IT IS THE ONE
