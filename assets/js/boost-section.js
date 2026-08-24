@@ -36,10 +36,10 @@
 import {
   boostRows, rowsFromRecords, sortBoostRows,
   filterBoostRows, filterBoostShow, searchBoostRows,
-} from '/assets/js/boost-list.js?v=ob-v113'
-import { rangeControl, sortControl, rangeDays, rangeCutoff } from '/assets/js/feed-controls.js?v=ob-v113'
-import { wireBoostNotes } from '/assets/js/boost-note-actions.js?v=ob-v113'
-import { hydrateProfiles } from '/assets/js/detail-page.js?v=ob-v113'
+} from '/assets/js/boost-list.js?v=ob-v136'
+import { rangeControl, sortControl, rangeDays, rangeCutoff } from '/assets/js/feed-controls.js?v=ob-v136'
+import { wireBoostNotes } from '/assets/js/boost-note-actions.js?v=ob-v136'
+import { hydrateProfiles } from '/assets/js/detail-page.js?v=ob-v136'
 
 /* The sort menu, taken from boosts-feed.js#SORT_OPTIONS so the wording matches
  * the feed the reader was sent here from.
@@ -183,7 +183,7 @@ export function initBoostSection({
       rangeControl(rangeKey, (key) => { if (key !== rangeKey) { rangeKey = key; onControlChange() } }, {
         label: 'Filter by when the boost was sent',
         titleFor: rangeTitle,
-        // All four, where /#boosts-global offers three. That feed omits 1Y
+        // All four, where /#members offers three. That feed omits 1Y
         // because it WALKS month archives to cover a window — ~13,900 rows and
         // ~70 sequential requests at the network's ~38 boosts a day. This section
         // holds its whole corpus in one bounded response, so filtering it to a

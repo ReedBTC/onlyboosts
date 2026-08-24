@@ -29,7 +29,7 @@ paragraph that used to explain any name in here.
 | `/episode/<item-guid>` | one episode, edge-rendered |
 | `/booster/<npub>` | one person, edge-rendered |
 | `/about` | the project's own explanation of what the data is and isn't |
-| `/stats`, `/boosters` | coming-soon placeholders: nav + header + soon-card, `noindex`, out of the sitemap |
+| `/stats` | a coming-soon placeholder: nav + header + soon-card, `noindex`, out of the sitemap. `/boosters` was the second one and was **deleted** on 2026-08-23 — see the Stats row of the site map |
 | `/404.html` | see the ⚠️ under LB conventions |
 
 `/shows` and `/podcasts` are both 301s to `/#shows` now; the Shows feed replaced
@@ -43,11 +43,27 @@ order. They are the site map, so **they're regrouped together or not at all**:
 
 | Group | Items |
 |---|---|
-| **Feeds** | Episodes `/#episodes-global` · Shows `/#shows` · Songs `/#songs-global` · Albums `/#albums` · Boosts `/#boosts-global` |
-| **Stats** | Boost Stats `/stats` · Community `/boosters` — both coming soon |
+| **Feeds** | Podcasts `/#episodes-global` · Music `/#albums` · Members `/#members` |
+| **Stats** | Boost Stats `/stats` — coming soon |
+
+**⚠️ `/boosters` (Community) WAS THE SECOND STATS ENTRY AND THE PAGE IS DELETED,
+NOT REDIRECTED.** *Reed's call, 2026-08-23.* The Members tab now answers what it
+promised — the member lookup, the top-members wall, the #40HPW boards — so the
+placeholder pointed a reader at a promise for content that exists one tab over.
+It was `noindex`, out of the sitemap, and linked from nowhere but this menu and
+the footer, so there is nothing to redirect: no inbound links, no bookmarks, no
+search presence. **`/api/v1/boosters/<npub>` and `/booster/<npub>` are different
+paths entirely and are live** — do not confuse the plural page with either.
 | **More** (footer: *Connect*) | About · Source · Report a bug |
 
-Feeds has one entry per feed, matching the homepage's what-menu exactly.
+**⚠️ FEEDS IS ONE ENTRY PER TAB, NOT PER FEED, AND EACH LANDS ON THAT TAB'S
+DEFAULT SUB-FEED.** *Reed's call, 2026-08-23.* It listed all five sub-feeds,
+which was right while the homepage hid them behind a dropdown and wrong the
+moment the tabs put them on screen: the nav then restated a control the page
+carries, in a different order, using different words for the same things.
+**Those three hrefs and `TAB_DEFAULT` in the `index.html` controller move
+together** — Podcasts opens Episodes, Music opens Albums, Members opens Boosts.
+
 **The Global/Follows axis is deliberately not in the nav**: it's the second
 dropdown on the page, and listing both scopes would double the group into a grid
 restating a control the page already has.
@@ -58,14 +74,65 @@ restating a control the page already has.
 | Episodes · Follows | `#episodes-follows` | same, filtered to your kind-3 contacts |
 | Songs · Global | `#songs-global` | the same rollup, music feeds only |
 | Songs · Follows | `#songs-follows` | same, filtered to your kind-3 contacts |
-| Boosts · Global | `#boosts-global` | the kind-1 boost notes themselves |
-| Boosts · Follows | `#boosts-follows` | same, filtered to your kind-3 contacts |
+| Members · Global | `#members` | the kind-1 boost notes themselves |
+| Members · Follows | `#members-follows` | same, filtered to your kind-3 contacts |
 | Shows | `#shows` | per-show rollup, Global only |
 | Albums | `#albums` | the same rollup, music feeds only, Global only |
 
-The inline feed-bar controller in `index.html` owns the menus, which panel is on
-screen, and the hash, and dispatches `lb:feed-activate`; `assets/js/feeds.js`
-listens and lazily hydrates.
+The inline feed-bar controller in `index.html` owns the tabs, the sub-category
+row, the scope menu, which panel is on screen, and the hash, and dispatches
+`lb:feed-activate`; `assets/js/feeds.js` listens and lazily hydrates.
+
+### The Three Tabs
+
+**Podcasts · Music · Members**, on Local Bitcoiners' `feeds.html` pattern
+(`git show lb/main:feeds.html`): a full-bleed equal-column grid, an icon over
+each label, a 3px top rule, and the selected tab **filled with its accent**
+rather than underlined. The what-dropdown they replaced hid four of five feeds
+behind a control you had to know to open, which is idea #18's whole complaint.
+
+| Tab | Sub-feeds | Why |
+|---|---|---|
+| **Podcasts** | Shows · Episodes | the not-music side of `<podcast:medium>` |
+| **Music** | Albums · Songs | the music side |
+| **Members** | *(none shown)* | the boost firehose, which takes no medium and could not go under either without becoming two things it isn't |
+
+**⚠️ THE TAB IS DERIVED FROM THE FEED KEY AND IS NOT IN THE HASH.** `TAB_OF` in
+the controller computes it, which is why nothing in the wild changed: `#shows`,
+`#episodes-global`, `#songs-follows`, `#albums`, `#members` and the two
+retired `#podcasts-*` aliases all resolve exactly as before. A `#podcasts/shows`
+scheme would have been a second address space for the same eight views.
+
+**⚠️ The active tab reads `--accent`, so it tracks the sub-feed inside it** —
+Podcasts is `#1b7bc1` on Shows and `#2f6bb5` on Episodes, straight off the
+`body[data-active-feed]` mapping. An inactive tab has no active feed to read and
+carries its family's shade. No token was added.
+
+**⚠️ Which sub-buttons are on screen is CSS off `body[data-active-tab]`, not
+JS** — the same call `.feed-bar-controls` makes, for the same reason. Each
+`.feed-sub-group` is pinned to its own grid column, and that explicit
+`grid-column` is what makes hiding the others safe: with auto placement plus
+`display:none`, whichever group survived would fall into column 1.
+
+**⚠️ `.feed-subs` and `.feed-tabs` must share a content box.** Both are
+three-column grids; if one takes a horizontal padding or a gap the other does
+not, every block narrows and the pair slides out from under its tab a few pixels
+at a time. `test-feed-hash.mjs` compares them per breakpoint.
+
+**⚠️ The seam under the tab row runs all the way across, including under the
+selected tab**, in `--accent-d`. Broken there, the tab and the block below it
+share a fill, touch, and merge into one slab.
+
+**On a phone the tabs become chips and KEEP THEIR LABELS.** LB goes icon-only
+because four tabs and four words do not fit; three do, and a reorganization that
+exists because visitors cannot tell what the site shows them must not open with
+three unlabelled glyphs.
+
+**⚠️ The page track is `--feed-track: 60rem`, which is `.show-main`'s width.**
+Four elements read it — the tabs, the sub-row, the control bar and the panels —
+so the column no longer narrows by 240px when a reader clicks a card through to
+its detail page. The masthead's logo and subtitle keep their own smaller
+measures; those are typographic, not the track.
 
 **A hash may carry a language: `#shows?lang=de`.** The feed key stays intact as
 the part before the `?`, so `FEEDS` and `ALIASES` look up exactly as they did and
@@ -102,6 +169,42 @@ Global, "Ranks based on only boosts from the accounts you follow" on Follows. On
 a rollup a card is an **aggregate**, so the scope is a claim about what was
 counted rather than about which cards survived. This is deliberately one line and
 no box; don't grow it back into the scope paragraph it replaced.
+
+### The Landing Feed
+
+**The front door opens on Shows / All time / Most boosters.** Reed's call,
+2026-08-23, shipping the last piece of the tabs work (Phase D, idea #18). The
+show-level leaderboard is the view that answers "what is this site" to somebody
+who has never seen it; the episode feed is one press away on the sub-row above
+it. It opened on Episodes · Global from the day the feed bar existed.
+
+**⚠️ IT IS THREE DECLARATIONS AND THEY MOVE TOGETHER.** Any one of them alone is
+a page that contradicts itself, and `test-server-render.mjs` pins all three:
+
+| | |
+|---|---|
+| `DEFAULT_TYPE` in the `index.html` controller | what the controller resolves to when the hash names nothing |
+| `is-active` on `#panel-shows`, and the `<!--OB:SSR-SHOWS-->` markers inside it | what a reader with no JavaScript and a crawler on its first pass actually see, since the controller only hides and shows panels once it runs |
+| `FEED` in `functions/index.js` | which query was rendered into that panel, and the `sort` / `range` the client's controls open on |
+
+**⚠️ `TAB_DEFAULT.podcasts` IS DELIBERATELY STILL `'episodes'`.** Where a cold
+load lands and what the **Podcasts tab** opens on when pressed are two questions,
+and only one of them was asked. That constant is also pinned to the nav's own
+Podcasts href (`/#episodes-global`), so changing it is the nav's decision as much
+as the page's. A change that makes those two constants agree has almost
+certainly merged them.
+
+**⚠️ THE OPENING SORT IS `boosters` ON BOTH ROLLUPS, and only one of them moved.**
+`shows-feed.js` opened on `boosts` (raw volume) and is now `boosters` — distinct
+people, because one listener boosting a show forty times is one vote, not forty.
+`feeds-podcasts.js` was **already** there: its key for that ranking is spelled
+`count`, which is the episodes endpoint's own name for it, and setting it to
+`boosters` would be an unknown sort key silently falling back to Latest boost.
+The two endpoints disagree about the word and agree about the ranking.
+
+**The Function renders ONE feed and it is the one on screen** — see the ⚠️ under
+the rendering rule for why, and for why `feeds-podcasts.js#adoptServerCards` is
+kept with no producer.
 
 ## The medium split
 
@@ -161,6 +264,50 @@ Design and code are also expected to be pulled from:
 - `ChadFarrow/boostmebitch` (BMB) — Podcast Index proxy, wallet rails,
   signed-out boosts via a server-side identity, live-stream zaps
 
+### What The Strip Removed
+
+The fork left LB's own products in the tree, unreachable but shipped. They were
+deleted on 2026-08-23, before the `homepage` branch merged. **~6,600 lines of
+source, and what a homepage visitor downloads went down by 202KB raw:**
+
+| | |
+|---|---|
+| `assets/js/feeds.js` | 50.4KB → **12.4KB**. The whole Events path: `loadEvents`, the NIP-52 calendar machinery, the streaming relay subscription, the month browser. Unreachable since the Events tab went on fork — `LOADERS` never mapped it — and two endpoints it read, `/api/community-events` and `/api/meetups`, do not exist on this fork at all. |
+| `assets/js/boosts-thread.js` | 29.6KB → **18.4KB**. `ROOT_NEVENT`, `EXCLUDED_NOTE_IDS`, `fetchBoostThread` and the six helpers only it called. |
+| `assets/js/calendar-events.js` | **deleted** (24.4KB, and it was precached). |
+| `assets/js/supporter-set.js` | **deleted** (7.1KB). Its only importer was `feeds.js`. |
+| `assets/widgets/login-widget.js` | 1,051KB → **929KB**. 22 source files: `BoostModal`, `EpisodeBoostModal`, `MultiLegBoostForm`, `BoostProgressView`, `BoostExpectations`, and the entire LB meetup product (`CreateMeetupModal`, `MyMeetupsModal`, `SearchMeetupsModal`, `EventComposer`, `eventForm`, `eventPublish`, `eventTypes`, `eventAnnouncement`, `primalSearch`, …), plus `openShowBoost`, `openEpisodeBoost`, `openMeetupModal` and `mountFindFlow` out of `index.jsx`. |
+
+**⚠️ THE CALENDAR CARD HAD ALREADY BEEN UNREACHABLE, AND THE NOTE HERE SAID
+OTHERWISE FOR MONTHS.** This file used to claim `calendar-events.js` was
+"retained because `boosts-thread.js` imports it to render calendar-event quotes
+inside boost notes — that circular import is what makes the cleanup fiddly."
+Both halves were wrong. There was no circular import: the module had two
+ordinary importers. And the rich card could never appear, because the only
+writer of the cache it read was `fetchBoostThread`, which has had no caller
+since the fork — so every quoted calendar event fell through to the naddr chip,
+every time. **The chip's own reading of the two NIP-52 kinds is what survives**,
+inlined as two integers in `boosts-thread.js`, so a quoted event still links out
+as "📅 Linked event on Nostr →" rather than as an article. Nothing a reader
+could see changed.
+
+**⚠️ THE BUILD DOES NOT CATCH A DELETION THAT GOES TOO FAR, AND THIS ONE DID.**
+Cutting `index.jsx` by banner-comment ranges swallowed `BoostApp` — the nav's
+Donate button — and `let mounted = false`, which `api.mount()` guards on. Vite
+built both away without a word: an undeclared module-level identifier is a
+runtime `ReferenceError`, not a build error, and there is no linter here.
+`scripts/test-boost-modal-render.mjs` is what failed, because it walks for
+`function BoostApp()` by name. **A widget deletion is verified by that test and
+by a declared-versus-referenced diff against the previous revision, never by a
+green build.**
+
+**Two checks are worth reusing for any future strip**, and neither is a test in
+the repo: a module-graph walk that resolves every import *and* every named
+import against the target's exports (the `ob-v53` failure class), and a
+reachability walk over `login-widget/src` from `index.jsx` that lists orphaned
+files. The second one must count bare side-effect imports (`import './x.js'`)
+or it reports `styles.css` and `navigationGuard.js` as dead.
+
 ## Stack
 
 Vanilla HTML + ES modules, no build step for the site itself. Cloudflare Pages +
@@ -196,18 +343,21 @@ node scripts/stamp-assets.js --check   # verify; non-zero exit if anything is st
 **Order matters.** `sync-partials` injects markup into the page files; anything
 it injects has to be stamped afterwards.
 
-Nine test scripts, all plain `node scripts/<name>.mjs` with no runner:
+Twelve test scripts, all plain `node scripts/<name>.mjs` with no runner:
 
 | | |
 |---|---|
 | `test-episode-card.mjs` | the card's HTML against fixtures |
 | `test-boost-row.mjs` | the boost row's two-sided contract: a D1 row through `boostRecord` and back through `rowsFromRecords` must render **character for character** as the edge rendered it, or a reader who re-sorts watches half the list change shape |
-| `test-server-render.mjs` | the assembled homepage against a captured production response: the injection, the state element, a 256KB first-view budget, **and the ranking invariants**. Takes the capture as an argument |
+| `test-server-render.mjs` | the assembled homepage against a captured production response: the injection, **the three declarations that name the landing feed**, the state element, a 256KB first-view budget, and the ranking invariants. Takes the capture as an argument, and is written against the **show** card since Phase D |
 | `test-feed-hash.mjs` | the inline feed-bar controller: hash parsing, and the boot sequence |
 | `test-feed-lang.mjs` | `feed-lang.js`: menu ordering, the withholding rule, and the copy |
 | `test-sign-boost.mjs` | the signing oracle's validator and its KV rate limiter, fed by the **shipped** note builder |
 | `test-boost-modal-render.mjs` | the widget's four silent-failure classes: use-before-declare, themed classes that emit no CSS, portals with no container, and the missing preflight. See the ⚠️ below |
 | `test-boostbox.mjs` | the BoostBox descriptor path: the comment's whole-or-nothing rule, the record allowlist, and every way `/api/boostbox` is allowed to fail. **Stubs `fetch`**, so it never writes a record to a third party's service |
+| `test-show-card.mjs` | the show card's two-sided contract. Its own reason for existing is the crossing: `renderShowCard` was a DOM builder and could afford `Date.now()` and an unpinned locale, which a two-sided module cannot — see the note under the card |
+| `test-members-search.mjs` | `/api/v1/members`, running the **shipped handler** against a database built from the real `schema.sql` through an `env.DB` shim over `node:sqlite`. LIKE escaping, the identifier/name split, the listing, the publisher asymmetry, and `publishers=1` as its exact complement. **Two publisher keys are in the fixture deliberately**: with one, a single-row answer says nothing about whether the mode asks for the list or found the loudest key |
+| `test-members-hours.mjs` | the 40 HPW boards, same shim, with a fixture built to known answers. Dedupe, week boundaries, the publisher exclusion, and the row-multiplying join |
 | `test-keysend-upgrade.mjs` | the keysend upgrade: the `fountain.fm` exclusion's exact-or-parent rule, the routing pair's whole-or-nothing rule, the strict node-pubkey check, every way `/api/keysend` answers "no endpoint", and the wallet gate. **Stubs `fetch`**, so it probes nobody's well-known |
 
 **⚠️ `test-server-render.mjs` IS THE ONE THAT NEEDS AN ARGUMENT, SO IT IS THE ONE
@@ -215,8 +365,16 @@ THAT GOES UNRUN.** Its header carries the `curl` that produces the capture; take
 a fresh one rather than reusing an old file, since it is also the size
 measurement. It asserted `cards are numbered 1..N with no gaps` — the *ordinal*
 scheme's invariant — until competition ranking shipped on 2026-08-18, and it
-would have been merged red had it not been run. **Run all nine before a merge**,
+would have been merged red had it not been run. **Run all twelve before a merge**,
 and treat this one as the guard on the ranking scheme rather than only on weight.
+
+**⚠️ AND ITS `curl` CHANGED WITH THE LANDING FEED.** It captures
+`/api/v1/podcasts?not_medium=music&sort=boosters&range=all&limit=25` now, not the
+episodes query. The whole file was rewritten by Phase D, which is the honest
+measure of how big that change was: the landing feed is not a constant this test
+could have been parameterised by, since the two cards share no renderer, no state
+element and no drawer. `git show 4c22017:scripts/test-server-render.mjs` is the
+episode version if the front door ever moves back.
 
 **⚠️ `test-feed-hash.mjs` EXTRACTS THE CONTROLLER OUT OF `index.html` and runs
 it**, because it is an inline `<script>` and cannot be imported. That is the
@@ -405,7 +563,32 @@ The episode card is the worked example, split along the facts/verbs line:
 | `assets/js/episode-card.js` | the FACTS, as an HTML **string**: artwork and its fallback chain, title, show, air date, rank, the `Nostr Stats:` line, and every boost note inside the drawer. No DOM, no `fetch`, no `Intl` defaults. |
 | `assets/js/episode-card-actions.js` | the VERBS: the ⋮ subscribe menu, the boost pill, the drawer's hide control, the per-boost ⋮ menu, and the reply / like / repost / zap bars. |
 
-**The boost row is the second worked example**, and the same split:
+**The show card is the second, and it exists because of the tabs.**
+`assets/js/show-card.js` is the facts as a string and
+`assets/js/show-card-actions.js` the verbs; `functions/_shared/show-cards.js` is
+the server half, mirroring `episode-cards.js`. `shows-feed.js` is the feed
+around that card rather than the card itself.
+
+**⚠️ THREE FORMATTERS WERE SAFE IN A DOM BUILDER AND ARE NOT SAFE HERE**, and
+none of them looks like anything when it breaks. `relTime()` read `Date.now()`
+— at the edge that clock is the moment the response was *cached*, and the same
+bytes go to everyone arriving inside the 300s window, so a server-rendered
+"3m ago" is wrong for almost every reader of it and different again from what
+the browser rebuilds. The timestamp is the fact and the relative time is a
+reading of it, so the card renders `last boost Nov 14, 2023` with
+`data-latest-ts` and the actions module rewrites it. `shortDate()` called
+`toLocaleDateString(undefined, …)` and `plural()` called `n.toLocaleString()`
+unpinned. All three are `en-US` in UTC now. `test-show-card.mjs` scans the
+source for all three, because the test process is already en-US in UTC and a
+render check passes regardless.
+
+**The show card's drawer is a `<details>` and is always lazy.** Its rows come
+from `/api/v1/podcasts/<guid>` scoped to the card's own range, so they are never
+in hand when the card is built — at the edge or in the browser. There is no
+inline counterpart to choose between, which is why this card has no `parts`
+table the way the episode card does.
+
+**The boost row is the third worked example**, and the same split:
 `assets/js/boost-list.js` is the facts (`renderBoosts`, `boostRows`, the three
 comparators, the range filter) and `assets/js/boost-section.js` is the verbs.
 See "Range And Sort On `#boosts`" under the detail pages.
@@ -417,7 +600,7 @@ See "Range And Sort On `#boosts`" under the detail pages.
 |---|---|
 | `stats` | the `Nostr Stats:` line. Off on `/booster/<npub>`, where every card aggregates one person's boosts and the booster count is 1 by construction. |
 | `layout` | `feed` or `compact`. Compact is the detail-page drawers and means three things that move together: no inline `<audio>`, no ⋮ subscribe menu, and the boost pill in a right-hand rail of its own, vertically centred. |
-| `drawer` | `inline` or `lazy`. **Where the drawer's boost notes come from.** Inline (the default, and both detail pages) renders them into the `<details>` body with the card. Lazy (`HOME_CARD_PARTS`, the homepage only) ships the body holding only its footer, and `episode-card-actions.js#fillLazyDrawer` fetches `/api/v1/episodes/<guid>?names=1` on the first open and renders the rows through the exported `boostRowsHtml`, the same function, so a fetched row is byte-identical to an inline one (verified against production data). |
+| `drawer` | `inline` or `lazy`. **Where the drawer's boost notes come from.** Inline (the default, and both detail pages) renders them into the `<details>` body with the card. Lazy (`HOME_CARD_PARTS`, the homepage only, and since Phase D declared by `feeds-podcasts.js` itself rather than by a Function) ships the body holding only its footer, and `episode-card-actions.js#fillLazyDrawer` fetches `/api/v1/episodes/<guid>?names=1` on the first open and renders the rows through the exported `boostRowsHtml`, the same function, so a fetched row is byte-identical to an inline one (verified against production data). |
 
 **⚠️ Lazy is not the homepage being exempted from the rendering rule; it is the
 rule's beneficiaries being named.** Server-rendered notes exist for the crawler,
@@ -456,7 +639,7 @@ The five surfaces the card serves, all one definition:
 
 | Surface | Rendered by |
 |---|---|
-| Homepage Episodes / Songs | `functions/index.js` for the opening page, `feeds-podcasts.js` after |
+| Homepage Episodes / Songs | `feeds-podcasts.js` — **client-rendered since Phase D**, the front door having moved to Shows |
 | `/episode/<guid>` `#community-episodes` | `functions/episode/[guid].js` |
 | `/booster/<npub>` `#episodes` | `functions/booster/[npub].js` |
 | every re-sort, range change and search pick | `feeds-podcasts.js` / `episode-section.js` |
@@ -464,12 +647,22 @@ The five surfaces the card serves, all one definition:
 `functions/_shared/episode-cards.js` is the server-side helper all three
 Functions call (`itemsFromBoosts`, `renderCardPage`, `CARDS_PER_PAGE`).
 
-**The homepage's front door is server-rendered too.** `functions/index.js`
-fetches `index.html` through `env.ASSETS` and splices thirty ranked cards into one
-marked slot (`<!--OB:SSR-EPISODES-->`); `feeds-podcasts.js` finds them and
-**adopts** them rather than refetching. It is a **fast path, not a dependency** —
-a failed asset fetch, a D1 error or a missing marker all serve the file untouched
-and the feed hydrates as before.
+**The homepage's front door is server-rendered too, and since Phase D it is the
+SHOW card that renders there.** `functions/index.js` fetches `index.html` through
+`env.ASSETS` and splices one ranked page into one marked slot
+(`<!--OB:SSR-SHOWS-->`, inside the Shows panel); `shows-feed.js` finds those
+cards and **adopts** them rather than refetching. It is a **fast path, not a
+dependency** — a failed asset fetch, a D1 error or a missing marker all serve the
+file untouched and the feed hydrates as before. See **The Landing Feed** below.
+
+**⚠️ ONE FEED IS SERVER-RENDERED AND IT IS THE ONE ON SCREEN.** Rendering
+Episodes as well would put a second ranked list in the document inside a hidden
+panel: bytes every reader downloads, a feed nobody is looking at, and a crawler
+shown two rankings on one URL. So `feeds-podcasts.js#adoptServerCards` has no
+producer today. **It is kept rather than deleted**, marked as such at its own
+definition: it is the client half of the landing-feed decision, it collapses to
+`adoptedCount = 0` when it finds nothing, and it is what makes moving the front
+door a change to the Function alone.
 
 Three things that fell out of the split:
 
@@ -526,10 +719,30 @@ Measured against production when the episode card closed the last exception:
 | Elements in the card block | 9,774 | **1,449** |
 | Feed-bar controller after the first card | 1,160,125 bytes | **~172KB** |
 
-The last row is the one that was the bug: with the controller 1.16MB after the
+**And re-measured on 2026-08-23 when Phase D moved the front door to Shows**,
+against a fresh capture of `/api/v1/podcasts?not_medium=music&sort=boosters`:
+
+| | Episodes, lazy drawers | **Shows** |
+|---|---|---|
+| Cards on the opening page | 30 | **25** (`SHOW_CARDS_PER_PAGE`) |
+| Document, raw | 226.5KB | **152.8KB** |
+| Document, brotli | 33.0KB | **35.5KB** |
+| First view, brotli (document + module graph) | 100.6KB | **103.7KB** |
+| Feed-bar controller after the first card | ~172KB | **46.3KB** |
+
+**⚠️ THE SAVING HERE IS A ROUND TRIP, NOT BYTES, and the numbers say so.** The
+episode page removed a 431KB JSON fetch; the show page's own JSON is 3.2KB
+brotli, so server-rendering it is +1.3KB on the first view against one fewer
+request. The case for it is the rendering rule and the crawler, not weight — a
+ranked list of shows with their boost figures is a FACT, and the front door is
+the site's most-linked URL. The last row is the incidental win: the show card
+carries no boost rows at all, so the controller sits 46KB behind the first card
+rather than 172KB.
+
+The last row of the table above it is the one that was the bug: with the controller 1.16MB after the
 first card, the browser painted the whole Episodes · Global feed before any
 script could read which feed the hash named, and every `#shows` / `#albums` /
-`#boosts-global` load flashed Episodes first. **That flash was fixed here, at the
+`#members` load flashed Episodes first. **That flash was fixed here, at the
 cause, and two patches for it were rejected on 2026-08-17 for that reason**:
 skeletons painted over the server's cards, and a boot script in `<head>`
 carrying its own copy of the feed-key list. Don't re-propose either.
@@ -792,6 +1005,26 @@ Those stylesheets were written against LB's token names (`--cream`, `--navy`,
 kept as **aliases repointed at the OnlyBoosts palette**. Trust the values, not
 the words — `--orange` is brand cyan. New code should prefer `--brand` / `--ink`
 / `--surface`.
+
+**⚠️ THE FEED RAMP HAS A FOURTH STEP, `--*-accent-dd`, AND IT IS FOR TEXT.**
+Same idea as `--brand-dd`: white on `--bg-accent` measures **2.50:1** and the
+same colour as ink on cream is **2.29:1**, so anything small wearing the cyan end
+of the ramp is illegible. The phone's tab chips read the accent both ways — as a
+fill under white when selected, as the label and border when not — which is
+where Reed saw it (2026-08-23). **Each value is the LEAST darkening that reaches
+6:1 on white**, solved per family rather than scaled by a constant, so the four
+already past it keep their exact colour and only the cyan end moves; a uniform
+multiplier big enough to fix cyan takes Albums to 10.8:1 and flattens the ramp
+that says which feed you are on. `--accent-dd` is mapped beside `--accent` on
+every `body[data-active-feed]` row, and `--tab-dd` rides beside `--tab` on the
+tabs because CSS cannot build one custom property's name out of another's.
+
+**⚠️ THE DESKTOP TAB AND THE SUB-ROW STILL USE `--accent` AND STILL MEASURE
+2.50:1 ON MEMBERS.** Only the phone chips were changed, which is what was asked
+for and where the type is smallest. It is the same bug at a larger size; fixing
+it means the selected tab and the block below it stop sharing a fill, which is
+the thing the seam note under **The Three Tabs** exists to protect. A decision,
+not an oversight.
 
 Brand colors are sampled from the supplied art: `--brand: #00aff0` and
 `--brand-d: #068ace`. The eight feed accents sit on one cyan→indigo→violet ramp,
@@ -2048,8 +2281,8 @@ renderer on first view.
 
 | Feed | Module | Source |
 |---|---|---|
-| `boosts-global` | `boosts-feed.js` | `GET /api/v1/boosts`, cursor-paged |
-| `boosts-follows` | `boosts-feed.js` | `POST /api/v1/boosts/follows`, cursor-paged |
+| `members-global` | `boosts-feed.js` | `GET /api/v1/boosts`, cursor-paged |
+| `members-follows` | `boosts-feed.js` | `POST /api/v1/boosts/follows`, cursor-paged |
 | `episodes-global` | `feeds-podcasts.js` | `GET /api/v1/episodes?not_medium=music&include=boosts` |
 | `episodes-follows` | `feeds-podcasts.js` | the same endpoint as `POST`, body `{follows:[…]}` |
 | `songs-global` | `feeds-podcasts.js` | same, `medium=music` |
@@ -2089,15 +2322,33 @@ The note feed's shorter menu is not an omission — a card there is one boost, s
 explicitly: `episode.date` is null on ~12% of records, and a `0` fallback would
 float them to the top.
 
-**The ranked feeds offer 1W/1M/1Y/All; the Boosts note feed offers 1W/1M/All.**
+**Every feed offers 1W/1M/1Y/All.**
 On the ranked feeds the range is a **query parameter** — `RANGE_DAYS` in
 `functions/api/v1/episodes.js` and `…/podcasts.js` — so a wider window is a
 different `WHERE` clause and costs nothing. **Those two tables and
 `RANGE_OPTIONS` move together, or a range button answers 400.** The note feed
 **walks** its window instead (`ensureCoverage`), and at ~38 boosts a day a year
 is ~13,900 rows: ~70 sequential requests before the first card paints.
-`WALKED_RANGE_OPTIONS` is the subset it passes. Giving it a year means giving it
-a `since`-scoped query, not a fourth button.
+**⚠️ THE BOOSTS NOTE FEED GOT ITS 1Y ON 2026-08-23, AND NOT BY GAINING A
+QUERY.** *Reed's call, on seeing it missing beside the members wall's four
+buttons.* `/api/v1/boosts` does take `since`, but `globalBoostReader` still does
+not pass it — a `since`-bounded page returns no cursor, so the client could not
+page back **out** when the reader widens the range again. What 1Y got instead is
+**the treatment All already had**: it is not pre-walked, a non-chronological sort
+ranks only what has been loaded, and the count line says so in those words. The
+honesty was already built; 1Y was the one bounded window big enough to need it.
+
+**⚠️ `needsCoverage()` IS A FACT AND `shouldPreWalk()` IS A POLICY, and they are
+separate on purpose.** The first says the loaded corpus does not yet reach the
+window's cutoff; the second says we will sit and page until it does. Folding
+`1y` into the fact takes the **load-older button** away from it too, because
+that button is gated on the same condition — and a 1Y view that neither walks
+nor offers to load more is a window the reader can never fill. `UNWALKED` is
+the policy's whole content.
+
+**⚠️ AND THE COUNT LINE KEYS ON COVERAGE, NOT ON THE RANGE.** `rangeKey !== 'all'`
+was right while every bounded window was pre-walked, and would have made a
+half-loaded 1Y claim completeness.
 
 **Sorting is over the selected window, so a bounded window is paged in completely
 before it's painted**; otherwise "largest boost" would rank whichever pages
@@ -2349,11 +2600,16 @@ language, so returning to a feed restores both the view and the address.
 the panel rather than the sticky bar: range and sort are read while scrolling a
 long list, a search is a thing you do at the top.
 
-| Feed | Searches | Filters to |
+| Feed | Searches | A pick does |
 |---|---|---|
-| Episodes / Songs | episode title, plus the show behind it | that one episode |
-| Shows / Albums | show title, plus the guid | that one show |
-| Boosts | booster display name, npub or hex pubkey | that booster's boosts |
+| Episodes / Songs | episode title, plus the show behind it | filters to that one episode |
+| Shows / Albums | show title, plus the guid | filters to that one show |
+
+**⚠️ THE MEMBERS LOOKUP IS NO LONGER IN THIS TABLE AND IS NOT A FILTER.** It
+left the Boosts panel on 2026-08-23, leads the Members tab, and **navigates** to
+`/booster/<npub>`. It is the same `mountFeedSearch`, so everything below about
+debouncing, aborting and sequence-guarding still applies to it; nothing below
+about rank retention or `noMatchText` does. See **The member lookup**.
 
 **Typing suggests, picking filters.** Five hits, and nothing in the list moves
 until one is chosen. That's what a ranked feed needs: the question is "where does
@@ -2371,8 +2627,10 @@ and isn't — the Shows sub-line reads "506 boosts · 12k sats", which made ever
 show a weak hit for "boost".
 
 **Two backends, and which one a feed gets is not a preference.** `getEntries`
-scores a corpus the feed already holds in memory — right for Boosts, whose window
-*is* its corpus. Scoring is a ladder (exact / prefix / word-start / substring /
+scores a corpus the caller already holds in memory. **It has no caller on the
+feeds any more** — the Boosts panel was its one user and its search is gone —
+but it is what `#boosts`'s message filter and any future in-memory picker want,
+so it stays. Scoring is a ladder (exact / prefix / word-start / substring /
 label before `extra`), not a fuzzy distance, because these queries are the
 opening words of a name the user already knows. `searchRemote` is for a feed that
 **pages a ranked list off the server**, where the loaded pages are a prefix of the
@@ -2447,6 +2705,485 @@ Two data facts that shaped the UI:
 **Both ranges fetch the drawer**, with the window passed as `?since=<unix>` so
 the rows come back scoped and recounted. A drawer showing all-time figures under
 a card showing the week's would contradict the card it opened from.
+
+### The Members Tab
+
+Three sections above the boost firehose, all client-rendered by
+`assets/js/members-board.js` and hydrated on the tab's first activation.
+
+**⚠️ THE TAB IS FOUR SECTIONS AND THEY SHARE ONE IDIOM.** #40HPW, Members,
+Boost Bots, Boosts. *Reed's call, 2026-08-23:* they read as four loose blocks
+stacked in a column where `/show` and `/episode` read as a page made of definite
+parts. `.mb-section` restates what those pages get their definition from — a
+2.75rem top margin, a Playfair `h2` at the same `clamp(1.2rem, 3vw, 1.6rem)`,
+and a `.mb-section-sub` at the same muted 0.88rem.
+
+**⚠️ AND EACH SECTION'S CONTENT LIVES IN A SHELL**, which is where those pages
+actually get their edges from. *Reed's call, 2026-08-23: "the boosts live in
+their own little shell… can you do that for the members page?"* A hairline above
+each heading shipped first as a guess at the same effect and **came back out** —
+with the content boxed, a rule above the heading is a second boundary for one
+break.
+
+**⚠️ `.mb-shell` AND `.mb-lid` RESTATE `.bs-shell` AND `.bs-controls`, THEY DO
+NOT IMPORT THEM.** This page does not link `show-page.css` (30KB of detail-page
+chrome for four rules), so the values are copied: 1px `--border`, **12px**
+radius, `--cream` fill, and a lid one step darker on `--cream-d` with a bottom
+border and no top one. **They must stay in step** — a shell here at 10px where
+`/booster` is 12px reads as a different component to anyone who visits both.
+`.bots-list` and `.hpw-board` were exactly that near-miss and were corrected.
+
+| Section | Shell |
+|---|---|
+| #40HPW | each board is one, no lid (no controls) |
+| Members | heading outside, range + sort as the lid |
+| Boost Bots | the `<ul>` is the shell, no lid |
+| Boosts | **two elements** — see below |
+
+**⚠️ THE BOOSTS SHELL IS TWO ELEMENTS AND THE SEAM IS THE WHOLE RISK.** The bar
+is the lid and the cards are the body, but the cards live in `.feed-panel`s
+outside the section — that panel system serves seven other feeds and moving them
+in would fork it. So the lid closes its own bottom (`.mb-shell--lid-only`) and
+the active panel opens its own top, both scoped to
+`body[data-active-tab="members"]`. **Any vertical margin on either half opens a
+gap the border makes visible.**
+
+**⚠️ AND IT OPENED ONE ON THE FIRST TRY: `.mb-section`'s OWN `margin-bottom`.**
+That rule gives every section on the tab 2.75rem of space beneath it, which is
+right for three of them and wrong for the one whose box *continues into the
+element after it* — the result was 2.75rem of nothing between a lid and its
+body with the border drawing both edges of the hole. `.members-boosts` zeroes
+it. The warning above was written before this shipped and did not save it;
+**check the containing section's margin, not only the two halves.**
+
+**⚠️ AND NO `overflow: hidden` ON A SHELL WHOSE LID HOLDS A DROPDOWN.**
+`.bs-shell` carries it and gets away with it because its lid sits on top of a
+tall list, so the sort menu opens downward *into* the shell. The Boosts lid has
+nothing under it inside its own shell, so the menu was clipped the instant it
+opened — reported as "the dropdowns get hidden in the gap", the two faults
+compounding into one symptom. `.mb-lid` takes the top corners itself, which is
+all the clip was doing. `.bots-list` keeps its clip: no dropdown, and its rows
+carry their own fill to the rounded edge.
+
+**⚠️ NO `max-width` OR `margin` IN THE SCOPED `.feed-bar` RULE.** Both are
+no-ops (the shell already sits inside `.feed-panels-inner`, which reads the
+track), and `test-feed-hash.mjs` scans declarations for `.feed-bar` to assert
+four elements read `var(--feed-track)` — so a scoped `max-width: none` reads to
+it as the track declaration going away. It failed exactly that way once.
+Restyle the fill and the padding there; leave the box model to the base rule.
+
+**⚠️ THE WALL'S HEADING IS renderSupporters' AND IS MOVED, NOT REWRITTEN.** The
+word is a parameter — "Members" here, "Nostr Community" on the detail pages — so
+it is rendered inside that section and lifted into
+`[data-members-wall-head]` above the shell, the same `appendChild` move the
+controls make. Writing it a second time in `index.html` would be two copies that
+could disagree.
+
+**⚠️ AND IT HAS TWO SHAPES.** A populated wall wraps the heading in
+`.show-section-head`; the empty branch emits a **bare `<h2>`**. Selecting only
+the first left an empty range untitled.
+
+**⚠️ THE EMPTY RANGE GOES THROUGH `renderSupporters` TOO, and that is not
+tidiness.** A hand-written "nothing here" paragraph replaced the whole body,
+taking the shell and its lid with it — so a reader who narrowed to 1W and found
+nobody **lost the range control that would have widened it again**. The dead end
+was the bug, not the empty list.
+
+**⚠️ `shows` IS THE WALL'S DEFAULT ORDERING, NOT `sats`.** *Reed's call,
+2026-08-23.* Sats ranks by generosity, which one large boost can win; breadth is
+what rewards listening across the network, which is what a wall of *members* is
+a claim about. The other two are one press away.
+
+**⚠️ THE BOARD TITLES ARE CENTRED AND THEIR SUB-LINES ARE NOT.** *Reed's call,
+2026-08-23.* "This Week" and "High Scores" name the board the way a scoreboard's
+own header does; the line under it is a caption, and a centred caption over a
+left-aligned list of rows reads as a second heading rather than as a note. The
+`<small>` is inside the `<h3>`, so it opts out of the alignment explicitly.
+
+**Rules sits in the #40HPW sub-line**, not under the boards. *Reed's call,
+2026-08-23.* Below them it was a footnote to two tall boxes and read as
+belonging to the second one; on the line stating the challenge it is where the
+question it answers gets asked.
+
+**⚠️ NO SECTION STYLES ITS OWN HEADING ANY MORE.** `.hpw-heading`, `.hpw-sub`,
+`.bots-title` and `.bots-sub` are gone, and `members-board.js` emits the shared
+`.mb-section-head` markup. `.bots-title` set its type with a `font:` shorthand
+at (0,1,0) against `.mb-section > h2` at (0,1,1) — the exact specificity trap
+`.show-stat dd` documents in `show-page.css`, and it would have won on
+line-height while losing on family.
+
+**⚠️ THE FEED BAR IS MOVED INTO THIS TAB, AND MOVED BACK.** `placeFeedBar` in
+the controller relocates `.feed-bar` — the scope menu plus every feed's mounted
+range/sort group — into `[data-feed-bar-slot]` inside the Boosts section, and
+returns it to `.feed-bar-wrap` on every other tab. *Reed's call, 2026-08-23:*
+every other tab puts its feed directly under the bar, so sticky-at-the-top is
+right; Members puts three sections above the boost list, which left the controls
+a screen and a half from the list they act on, and the list itself unnamed.
+
+- **It is a MOVE, never a duplicate.** `appendChild` relocates the live element
+  with its listeners, its open-menu state and all eight `[data-controls-for]`
+  groups intact, so the declarative `body[data-active-feed]` rule that decides
+  which group is on screen is untouched. A second bar would be two sets of
+  controls over one feed, which is the failure that rule exists to prevent.
+- **⚠️ THE MOVE BACK IS THE HALF THAT BREAKS.** `.members-block` is
+  `display:none` off this tab, so a bar left in the slot vanishes from every
+  other feed: no scope menu, no range, no sort, and nothing saying why.
+- It stops being sticky for free — `.feed-bar-wrap` carries the `position`, and
+  the slot is an ordinary section.
+- `test-feed-hash.mjs` pins both directions, and **its window stub now keeps its
+  listeners** so `hashchange` can be fired. It was `{ addEventListener(){} }`,
+  which silently dropped that handler and made every test in the file a
+  cold-load test; anything that happens when a reader moves between tabs was
+  untestable before this.
+
+**⚠️ THE WALL CARRIES NO SUB-LINE.** *Reed's call, 2026-08-23.* It read
+"Everyone who has boosted a show, all time. Top 100." — a definition the intro
+at the top of the tab has already given, a window the range control beside it
+already names, and a cap nobody asked about. `.show-section-sub:empty` is what
+keeps the `<p>` `renderSupporters` always emits from costing a blank line.
+
+**⚠️ THE BLOCK SITS ABOVE THE PANELS, NOT INSIDE ONE.** Members holds two boosts
+PANELS — Global and Follows — so a section inside one would either be duplicated
+or vanish when the reader switches scope. Shown by CSS off
+`body[data-active-tab]`.
+
+**⚠️ AND IT HYDRATES FROM BOTH ENTRY POINTS.** The cold load does not go through
+`lb:feed-activate` — the controller dispatches that during parse, before
+`feeds.js` exists, which is why `feeds.js` re-reads `body[data-active-feed]` at
+the end. Hooked to the listener alone, the boards rendered when a reader
+*clicked* to Members and were an empty gap on every reload and every shared
+link. `test-feed-hash.mjs` asserts both call sites exist.
+
+#### `#40HPW`
+
+Boost an episode and the board assumes you heard all of it, then adds up the
+durations. **It is an assumption, not a measurement**, and the Rules dialog says
+so. Two boards: **This Week** leads (it resets Monday and has a live race in
+it), **High Scores** follows.
+
+**⚠️ NOBODY CLEARS FORTY HOURS.** Over all 9,977 booster-weeks since 2024-10,
+exactly two did — the same person, both in autumn 2025. Eighteen weeks ever
+passed 30; a typical winning week in mid-2026 is 14 to 20 hours. Eight of the
+all-time top ten are from 2025, which is why This Week exists beside the high-score
+table rather than instead of it. The name is the provocation, not a threshold,
+and gold marks the two rows above forty. **If gold ever marks a third of a
+board the fix is the goal, not the styling.**
+
+`GET /api/v1/members/hours?range=week|all`. Four rules, each from a measurement:
+
+- **Dedupe (booster, episode) inside the week.** Five boosts on one episode is
+  one listen; deduping removes 8.9% of qualifying rows and one pair carried
+  fifteen. Without it the board measures generosity, which the sats totals
+  already measure.
+- **Weeks start Monday 00:00 US Pacific.** `345600` is the first Monday after
+  the epoch; without the shift `ts / 604800` buckets Thursday to Wednesday,
+  which still produces weeks and is wrong by three days on every row.
+
+**⚠️ IT WAS UTC UNTIL 2026-08-23, AND UTC IS THE WRONG MIDNIGHT FOR THIS
+BOARD.** *Reed's call.* Monday 00:00 UTC is Sunday 5pm on the US west coast and
+Sunday 8pm on the east; he watched This Week reset on a Sunday evening, which is
+the middle of the weekend for most of the people racing on it. **Pacific is the
+choice because it is the last US zone into Monday**: at Monday 00:00 Pacific
+every part of the country is already on Monday, so nobody's board resets while
+their Sunday is still running.
+
+**⚠️ THE DST RULE IS IMPLEMENTED TWICE AND THE TWO MUST AGREE.** The weekly
+board needs one cutoff computed before the query (`pacificWeekStart`, exported);
+the all-time board needs a per-row bucket computed inside it, over ten thousand
+booster-weeks (`pacificOffsetSql`). They cannot share code, so
+`test-members-hours.mjs` runs the real SQL fragment against its own sqlite and
+compares it to the JS at both transitions.
+
+**⚠️ AND IT IS ARITHMETIC RATHER THAN `Intl`, DELIBERATELY.** The obvious
+version asks `Intl.DateTimeFormat` for `America/Los_Angeles` — exact, and no
+rule of our own to maintain — but it puts a runtime ICU dependency on the
+request path, and there is no ICU at all on the SQL side, so the two halves
+would derive from different sources and could drift with a tzdata update on one.
+The US rule has been fixed since 2007 and the corpus begins in 2024. **The test
+is where ICU belongs**: Node has full tzdata, so `test-members-hours.mjs` holds
+the hand-rolled rule against the real thing on every week for four years. That
+check is what would catch the US changing its dates.
+
+**⚠️ `strftime('%s', …)` RETURNS TEXT, AND SQLITE COMPARES TEXT AS GREATER THAN
+ANY INTEGER.** Without the `CAST` in `pacificOffsetSql` every comparison is
+false, every row takes the PST branch, and the all-time board is quietly an hour
+out for eight months of every year — which looks like nothing at all. Verified
+to fail the test when removed.
+
+**⚠️ `week_start` IS A REAL INSTANT AND THE CLIENT STILL FORMATS IT IN UTC**,
+which is correct only because Pacific is BEHIND UTC: Monday 00:00 Pacific is
+Monday 07:00 or 08:00 UTC, still Monday. `weekLabel` in `members-board.js` says
+so. If the reset ever moves east of Greenwich, that formatter moves with it.
+- **~14% of boosts contribute nothing** — 8% name no episode, 2.5% of episodes
+  have no duration. Stated in the Rules rather than hidden.
+- **Publisher keys are excluded.** See below.
+
+**⚠️ THE NPUB COMES FROM A CORRELATED SUBQUERY, NEVER A SECOND JOIN ON
+`boosts`.** That join reads correctly and multiplies every row by the member's
+whole boost count, so `COUNT(*)` stops being episodes and `SUM(duration)` stops
+being hours — both inflated by the same factor and both still a plausible board.
+
+**Units are `hpw`, not `h`:** every row is one member's one week.
+
+**The all-time board is "High Scores", not "Hall of Fame"** (*Reed's call,
+2026-08-23*). It is the arcade idiom the whole board is built on, and a hall of
+fame is a place you are inducted into where a high-score table is one you get
+onto by playing — which is the invitation This Week is making.
+
+**⚠️ THE RULES DIALOG LINKS OUT TO THE BOOST BOTS SECTION, AND CLOSES ITSELF
+FIRST.** A bare `<a href="#boost-bots">` scrolls the document *behind the
+scrim*, so the reader arrives at the right section with the rules still over it.
+`data-hpw-goto` is the hook; `wireRules` hides the dialog, then scrolls and
+moves focus. The id is set by `members-board.js` (`BOTS_ID`), the section being
+client-rendered, so nothing in `index.html` can carry it.
+
+**The Rules are a dialog, in the document rather than fetched**, so they open
+while the boards are loading or after they failed. It replaced a sub-line and a
+caveat that said the same thing at two sizes.
+
+#### The member wall
+
+`GET /api/v1/members` with no `q` is the top-members listing, capped at 100 with
+search as the route to everyone else. **It is the same `renderSupporters` the
+detail pages use** — that function and every `.sup-*` rule moved into
+`assets/js/supporter-wall.js` and `assets/css/supporter-wall.css`, which
+`functions/_shared/detail-page.js` re-exports and all four pages link.
+
+**⚠️ THE HEADING IS A PARAMETER AND THE TWO CALLERS PASS DIFFERENT WORDS.**
+"Members" on the homepage, "Nostr Community" on the detail pages. Not an
+inconsistency to tidy up: the protocol is not the greeting, and someone who has
+drilled into one show's page has chosen to go deeper than someone who just
+landed.
+
+**⚠️ THE WALL CARRIES A RANGE AND A SORT, AND THEY ARE THE FEEDS' OWN
+CONTROLS.** *Reed's call, 2026-08-23.* `rangeControl` + `sortControl` from
+`feed-controls.js` in a `.pcast-controls` row, not a shape of their own: this is
+the same kind of choice a feed's Sort pill makes, and a second shape for one
+idea makes the site look like two sites. Order matches the feeds — filters, then
+ordering.
+
+**⚠️ `range` MEANS WHEN THE BOOST WAS SENT**, the reading `/api/v1/podcasts` and
+every `#boosts` section give it, never the air-date reading `/api/v1/episodes`
+gives the same word. A member is in the 1W wall because they boosted this week.
+
+All four ranges, where the Boosts note feed offers three: that feed **walks**
+month archives to cover a window, so a year is ~70 sequential requests before
+the first card. This is one indexed query whatever the window.
+
+**⚠️ THE WINDOW IS ON THE JOIN, NOT ONLY ON THE CANDIDATE SCAN.** Narrowing
+candidates alone picks the right people and then sums their **whole history**,
+so the 1W wall would rank this week's boosters by their all-time sats — a
+plausible-looking board answering neither question. It also drops a member with
+no in-window boost for free: the join yields no rows, so the `GROUP BY` yields
+none either.
+
+**⚠️ THE RANGE SCOPES A LISTING AND NEVER A SEARCH**, the same asymmetry the
+publisher exclusion has and for the same reason. A ranked listing is a claim
+about a window; a search answers "where is this person", and a member who last
+boosted in March is still the person being looked for. Windowing it would report
+a real member as not existing.
+
+**⚠️ THE CONTROLS ARE BUILT ONCE AND MOVED, NEVER REBUILT.** The wall's markup
+is replaced wholesale on every change, so a control rendered inside it would be
+destroyed by the repaint it just triggered, losing its open menu, its listeners
+and the reader's focus. `appendChild` moves a live node into each fresh
+`.show-section-head`. `wallSeq` guards the reply, since 1W then 1M puts two
+requests in flight and the slower must not paint over the newer.
+
+**The sub-line names the window** rather than a fixed "all time": a caption
+contradicting the control above it is worse than no caption.
+
+**⚠️ THREE ORDERINGS, BECAUSE THEY ARE THREE DIFFERENT PEOPLE.** `sort=sats`
+ranks by generosity and rewards one large boost; `boosts` rewards turning up;
+`shows` (`COUNT(DISTINCT podcast_guid)`) rewards spreading it around. Live, the
+leaders are AdminPacman (2.1M sats on 24 boosts), Piez (940 boosts) and Quantum
+Panhandler (129 shows). **The figure under each face is the one the list was
+ordered by** — a `metric` parameter on `supporterCard`, defaulting to `sats` so
+the detail pages are byte-identical.
+
+**⚠️ THE LISTING EXCLUDES PUBLISHER KEYS AND THE SEARCH DOES NOT.** `PUBLISHERS`
+in `functions/api/v1/_common.js` is the five keys that sign boosts for many
+donors.
+
+**⚠️ BOOSTMEBITCH IS IN BOTH LISTS AND THAT IS NOT A CONTRADICTION.** The app
+publishes under the donor's **own** key when they are signed in — 13 distinct
+pubkeys behind the `boostmebitch` slug — and its site account
+(`3820f4ff…f408`, 35 boosts / 114,753 sats / 13 shows) publishes for everyone
+else, exactly the arrangement this site has. So `boostmebitch` is an application
+a listener can become a member through **and** that pubkey is a publisher key
+that must not rank. Added 2026-08-23 on Reed's instruction. Do not "resolve" the
+apparent duplication by removing either one.
+
+**⚠️ THE COLLECTOR'S HALF IS SEPARATE AND WAS NOT TOUCHED HERE.**
+`PUBLISHER_PUBKEYS` in `bots/global-boost-scan/clients.py` lives on the other
+machine and governs `client_via` nesting on `/api/v1/clients`, not the wall.
+The two lists are mirrors and have now drifted by one entry. `chadf_boostbot` topped both the boosts and shows orderings on other
+people's listening before this landed. A ranked list is a claim about who the
+top members are; a search result is not, and it is a real account somebody may
+want to look up. **One list in one place**, because the boards had the exclusion
+from day one and the wall never did, which is how the gap opened.
+
+#### The member lookup
+
+**⚠️ IT LEADS THE TAB AND IT NAVIGATES; IT DOES NOT FILTER THE BOOST LIST.**
+*Reed's call, 2026-08-23.* The question is "where is this person" and the answer
+is `/booster/<npub>` — their whole history, their shows, their totals — not a
+narrowed slice of one feed. It sat inside the Boosts panel while it was a
+filter, which is also how a reader had to reach the feed to find the control
+that finds people.
+
+It is the shared `mountFeedSearch`, so the debounce, the abort, the sequence
+guard and the keyboard handling are the four ranked feeds' own. The suggestion
+rows stay `role="option"` **buttons rather than anchors**, because that is what
+a combobox listbox is; the navigation lives in `onPick`.
+
+**Two retired attempts are buried in `boosts-feed.js` so neither comes back**:
+`boosterEntries()` indexed the boosts in memory (34 of 2,011 members on the
+first page, 684 after paging in all 23,259), and `pickedRows` fixed that by
+fetching the picked member's own corpus — at which point the feed was rendering
+a different subject than its own controls described. `getMemberBoosts` in
+`ob-live.js` now has no caller.
+
+**⚠️ `resetFeedSearch(panel)` IS STILL CALLED THOUGH NOTHING MOUNTS THERE.** A
+reader holding a cached module from before the move may have mounted a box into
+that host; clearing it is one call, and the alternative is a live search box
+over a feed that no longer reads it.
+
+#### The member search endpoint
+
+**⚠️ IT ASKS THE INDEX, AND THE THING IT REPLACED COULD NOT.**
+`boosts-feed.js#boosterEntries` indexed `scopedRows` — the boosts in memory — so
+a member was findable only if they turned up in what the reader had scrolled
+past. Measured: the first page reaches 34 of 2,011 members (2%), 500 boosts
+reaches 164 (8%), and paging in all 23,259 still only reaches 684 (34%). A third
+of members have never appeared in the note feed, so loading more could never
+close it.
+
+**⚠️ AND THE PICK FETCHES RATHER THAN FILTERING**, which is the same bug one
+level down: a member chosen out of the whole index will usually have no boosts
+in the loaded window, so filtering emptied the list at the moment the search
+succeeded. `/api/v1/boosts?booster=` is a parameter that endpoint has always
+taken.
+
+Three more rules in `functions/api/v1/members.js`:
+
+- **A member is someone who has boosted, never someone with a profile.** 61 of
+  the 2,011 have no kind-0 on any relay the collector tried; deriving the set
+  from `profiles` reports their live pages as not existing.
+- **⚠️ CANDIDATES FIRST, AGGREGATE SECOND.** The obvious single-`WHERE` shape
+  defeats index seeking — the plan comes back `SCAN b USING INDEX
+  idx_boosts_booster`, reading all 23,259 boosts per keystroke, measured 20ms
+  against 3-6ms for the CTE.
+- **⚠️ LIKE's WILDCARDS ARE ESCAPED**, the LIKE counterpart of `ftsMatch`: a
+  bare `%` typed into the box otherwise returns everyone, ordered by sats.
+  SQLite's LIKE folds ASCII only, so a query differing from a name by the case
+  of a non-ASCII letter will not match; nothing cheap fixes that.
+
+#### The Boost Bots section, and what the tab discloses
+
+`/api/v1/members?publishers=1` is the **exact complement of the listing**: the
+wall drops the four `PUBLISHERS` keys, and this asks for those four and nothing
+else. Same endpoint, same row shape, one place the aggregate is computed; a
+second path would be two answers to "who is a member" that could disagree. It
+wins over an empty `q`, so it is never also the listing, and a `q` alongside it
+does not union in the search — `test-members-search.mjs` pins both.
+
+**⚠️ THE PUBLISHER LIST IS BOUND ONCE AND ITS PLACEHOLDERS ARE NUMBERED.** The
+statement references it twice (`NOT IN` for the listing, `IN` for the bots), and
+SQLite numbers a bare `?` from the highest index used *so far*, which would make
+the second run's numbering depend on where the first happens to sit in the SQL.
+`PUB_FIRST` / `PUB_HOLES` / `PUB_FLAG` in `members.js` are the whole of it.
+
+**The heading is "Shoutout to the Boost Bots"** (*Reed's call, 2026-08-23*),
+not a bare "Boost Bots". These four accounts are the only reason a listener with
+no Nostr account is represented here at all, and the section's job is to credit
+them; the flatter label read as a category of thing being disclosed rather than
+as thanks. **The Rules dialog's link still says "Boost Bots"** — it is a
+reference inside a sentence ("They are named under Boost Bots below"), and the
+longer name does not fit that grammar. The section id stays `boost-bots`, and
+`/about#bots` is untouched.
+
+**⚠️ THE SECTION IS THE EXCLUSION, SHOWN — it is not a disclosure notice.**
+*Reed's call, 2026-08-23: "either way we need to be transparent about anything
+we are NOT including on this page."* These four accounts are the only reason a
+listener who wants no Nostr account is represented here at all, so the section
+carries their totals and links to their pages the way any member's row does.
+
+Four rules a change would break:
+
+- **Rows, not faces.** The wall is a grid of avatars because it is a community;
+  these are four accounts each needing a sentence saying what it does. Rendering
+  them as more faces puts them back in the list they were taken out of.
+- **⚠️ A KEY WITH NO `BOT_ROLES` ENTRY STILL RENDERS.** The server owns the list
+  and `members-board.js` owns the prose, so a fifth publisher appears with its
+  figures and no description. A row missing a sentence beats a bot the section
+  quietly fails to disclose.
+- **Exact boost counts, compact sats.** `num(m.boosts)` and `compact(m.sats)`.
+  On the wall a row is one of a hundred and `1k` is plenty; here the count *is*
+  the claim, and `1k` for 1,021 rounds the evidence away.
+- **⚠️ TWO SENTENCES, AND THE LINK CARRIES THE REST.** *Reed's call,
+  2026-08-23.* The first version ran four and turned a short section into a
+  paragraph with a list under it. What has to be said here is what these
+  accounts are and that they are deliberately not ranked; why the rule exists,
+  and what it costs, is `/about#bots`.
+- **⚠️ A FAILED FETCH LEAVES NOTHING BEHIND.** An error line here would read as
+  "something is being hidden from you", which is the opposite of the point. The
+  claim is additive, so its absence costs a reader nothing they were promised.
+  It is started after the wall and never awaited.
+
+**How the four were determined: by hand, and nothing detects them.**
+`PUBLISHERS` in `functions/api/v1/_common.js` mirrors `PUBLISHER_PUBKEYS` in the
+collector's `clients.py`. Naming an account a bot is a claim, and the cost of
+getting it wrong is a real person left off a leaderboard.
+
+#### The Members intro, and the (i)
+
+The intro is **one sentence** and the mechanics live behind a badge: *"Become a
+member by boosting one podcast or musician and sharing the boost with your Nostr
+identity."* Reed's wording, 2026-08-23.
+
+**⚠️ THE (i) IS A REAL LINK TO `/about#membership`, NOT A TOOLTIP, AND IT
+OPENS IN A NEW TAB** (Reed's call, 2026-08-23) — a reader consulting a
+definition has not finished with the tab they are standing on. What it has
+to answer is "which app do I use", and the answer is three named applications
+with a caveat on each; that is a section, not a hover. It is also the one thing
+on this tab a crawler should follow. The badge is a CSS circle rather than the
+`ⓘ` character, whose glyph is missing or differently sized in several of the
+fallback faces — the same call `.drawer-hint`'s chevron makes.
+
+**⚠️ `/about#membership` AND `/about#bots` ARE IN THE WILD, so treat them as
+frozen** the way the detail pages' section ids are. Two surfaces point at them:
+this badge and the Boost Bots section's "How this works".
+
+**`/#members` IS THE TAB'S ADDRESS** since the feed was renamed on 2026-08-23.
+It was `/#boosts-global`, and for one day this note said there was no `#members`
+hash and that adding one would be a second address space. That was true of an
+*alias*; it is not true of a rename, which is what shipped. See **The Three
+Tabs** for the mechanism.
+
+**⚠️ `#membership` LEADS WITH NOSTR AND EXPLAINS IT, which is the one place on
+this site that should.** *Reed's call, 2026-08-23:* the front door says
+"Members" and never says Nostr; a reader who has clicked through to the about
+page has dug deeper, and here the answer to "how is a boost public at all" **is**
+the protocol. So the section states the definition — *a member is anyone who has
+shared a boost publicly using their Nostr account* — and then explains that an
+ordinary boost is a private transaction, that a boost note is an announcement of
+one rather than the payment itself, and that the membership belongs to a keypair
+the reader holds rather than to a profile here. See
+[[nostr-vocabulary-by-depth]]; this is the depth.
+
+**It also says boosting without any of this is not worse**, only unrecorded.
+The sats and the message arrive identically; what is missing is the public
+record, which is the whole of what membership means here.
+
+**⚠️ TWO LISTS OF APPS EXIST ON `/about` AND THEY ANSWER DIFFERENT QUESTIONS.**
+`#pipeline`'s *Applications Publishing Boost Notes* is the technical inventory
+and holds **four**, Local Bitcoiners among them. `#membership` holds **three** —
+Fountain, BoostMeBitch and OnlyBoosts — being the apps that publish a note signed
+by a key the *listener* controls. LB is deliberately off that list: it is one
+show's own website widget, not a route a listener can take to boosting podcasts
+generally. **Reed's call.** Each section cross-references the other so the two
+counts cannot read as a contradiction.
 
 ### The episode feed adapter
 
@@ -2564,7 +3301,8 @@ where the widest figure is five.
 
 ### The Rank Line In The Stat Tiles
 
-On `/show` and `/episode` each stat tile carries a third line, `#4` or `T#118`:
+On `/show`, `/episode` **and `/booster`** each stat tile carries a third line,
+`#4` or `T#118`:
 the subject's **all-time, all-language, Global** rank by that tile's own sort
 (sats, boosts, boosters) on the feed its card lives on (Shows or Albums,
 Episodes or Songs, chosen by the same medium partition the API uses). One
@@ -2618,7 +3356,51 @@ chip line go with it and the page renders exactly as `/booster` already does.
 Three more things a change would break:
 
 - **It fails quietly**, the podroll discipline: null resolves to tiles with no
-  third line, which is what `/booster` renders.
+  third line, which is what every page rendered before this and what any page
+  still renders when the query fails.
+
+**⚠️ `/booster` JOINED ON 2026-08-23, AND ITS THIRD KEY IS DIFFERENT.** *Reed's
+call.* A show or an episode's third figure is how many **people** boosted it
+(`boosters`); a booster's is how many **shows** they boosted (`shows`). Both are
+the breadth axis of the list the subject is ranked on, but they are different
+columns and different words, so `BOOSTER_RANK_KEYS` sits beside `RANK_KEYS`
+rather than one array serving both.
+
+**⚠️ THE EPISODES TILE CAME OFF, AND DROPPING IT IS WHAT LET THE OTHERS RANK.**
+The members wall orders by sats, boosts and shows and by nothing else, so an
+episodes tile could never carry a chip — and a fourth tile with a visibly empty
+corner reads as a rank that failed to load rather than as a figure with no list
+behind it. The figure is not lost: the `#shows` rollup's own rows still print
+it, and the `#episodes` heading below opens with the count.
+
+**⚠️ THE POPULATION IS THE WALL'S, PUBLISHER EXCLUSION AND ALL.** `RANK_PUBLISHERS`
+in `feed-rank.js` restates `PUBLISHERS` from `functions/api/v1/_common.js`,
+which it may not import without dragging the API surface in — **the two copies
+must stay in step**. Ranking over a population that included those five keys
+would be a rank on a list nobody can scroll: every member below `chadf-boostbot`
+would read one place worse here than on the wall itself.
+
+**⚠️ AND A PUBLISHER'S OWN PAGE GETS NO CHIPS, WHICH FALLS OUT FOR FREE.** The
+subject is not in the CTE, so `at` is 0 and the shared `ranksFrom` guard returns
+null — the same guard that catches a medium mismatch. That is the honest answer:
+those keys are deliberately not on the wall, so they hold no place on it, and
+printing one would contradict the Boost Bots section that says they were left
+out.
+
+**It rides the SECOND `Promise.all`, not the first**, because it needs `totals`
+and the first batch is what produces them. So `/booster` pays
+`first + max(second)` rather than one `max()`. Cost is one scan of `boosts`
+(~23k rows) grouped to ~2k, against ~1.3k for a show — heavier than its
+siblings, still behind the 300s edge cache, and it never throws.
+
+**⚠️ `test-members-search.mjs`'s `env.DB` SHIM HAD NO `.first()` AND D1 DOES.**
+`feedRanks` uses it, so every rank call threw inside that function's own
+try/catch and came back null — which is its *documented failure mode*, so
+"a publisher gets no rank" passed for entirely the wrong reason. A shim that
+models less than the thing it stands in for turns a hard failure into a quiet
+one. The rank block there brute-forces every rank against "strictly ahead, plus
+one" over the same population, and was confirmed to go red with the exclusion
+removed.
 - **The caption defines the `T` only when a `T` is on screen.** Explaining a
   notation the reader cannot see is worse than saying nothing.
 - **The chips are not links and the caption is.** Three links to one feed under
@@ -2660,7 +3442,9 @@ Three more things a change would break:
 
 | | |
 |---|---|
-| `functions/_shared/detail-page.js` | escaping, `compact`, `isoDate`, `fmtDuration`, the bech32 decoder behind the `@Name` chips, `renderSupporters`, `renderBioText`. **Re-exports `renderBoosts` and five formatters from `assets/js/boost-list.js`** and `boosterPageUrl` from `booster-link.js`; those are aliases, not definitions |
+| `functions/_shared/detail-page.js` | escaping, `isoDate`, `fmtDuration`, the bech32 decoder behind the `@Name` chips, `renderBioText`. **Re-exports `renderBoosts` and five formatters from `assets/js/boost-list.js`, and `renderSupporters` / `SUPPORTERS_VISIBLE` / `PODIUM` / `compact` / `initShowMore` from `assets/js/supporter-wall.js`**, plus `boosterPageUrl` from `booster-link.js`; those are aliases, not definitions |
+| `assets/js/supporter-wall.js` | **two-sided**: the community wall, its podium rule, its counts and its "Show N more" handler. Moved here so the homepage can render the same wall without loading detail-page.js, which is 156KB of thread machinery it has no other use for |
+| `assets/css/supporter-wall.css` | every `.sup-*` rule, desktop and phone. **⚠️ The phone rules moved with it and that is load-bearing**: `.sup-card--podium` is an exact fraction of its row (/5 desktop, /3 under 640px) because `PODIUM` is a server-side constant and CSS cannot move a card into the grid below |
 | `assets/js/boost-list.js` | **two-sided**: the boost row and the `#boosts` section, plus the comparators and the range filter both sides run |
 | `assets/js/boost-section.js` | the `#boosts` range and sort, shared by all three |
 | `functions/_shared/episode-cards.js` | `itemsFromBoosts`, `renderCardPage`, `CARDS_PER_PAGE` — the server half of the episode card |
@@ -2975,7 +3759,7 @@ as a paragraph.
 
 The `#boosts` section on all three pages carries a range and a sort, built by
 `assets/js/boost-section.js`. **The range means when the boost was SENT**,
-matching `/#boosts-global` and `/api/v1/podcasts`. It does not mean when the
+matching `/#members` and `/api/v1/podcasts`. It does not mean when the
 episode aired; that axis belongs to the Episodes feeds and to
 `/api/v1/episodes`. Two readings of that parameter name exist on this site
 deliberately and there must not be a third.
@@ -3000,9 +3784,11 @@ the sort would be a no-op that looked like a ranking — the same call `/booster
 episode rollup makes in leaving "Most boosters" out of its menu. **No sort here
 paints a rank numeral**: a row is one boost, so there is no aggregate to rank.
 
-**Ranges are 1W/1M/1Y/All, one more than `/#boosts-global` offers.** That feed
-omits 1Y because it *walks* month archives to cover a window; these sections hold
-a bounded corpus in memory, so a year costs nothing.
+**Ranges are 1W/1M/1Y/All, the same four `/#members` offers** since
+2026-08-23. These sections hold a bounded corpus in memory, so every window is
+complete and the count line can always claim so; that feed pages, so its 1Y is
+covered progressively and its count line says which. Same buttons, different
+guarantees, and only the note feed has to disclose one.
 
 Six things a change would break:
 
@@ -3202,7 +3988,10 @@ other drawer on the page.
 
 ### The community wall
 
-`renderSupporters`, on `/show` and `/episode`. Follows localbitcoiners'
+`renderSupporters` in **`assets/js/supporter-wall.js`** (it moved out of
+`functions/_shared/detail-page.js` so the homepage's Members tab could render the
+same wall; that file re-exports it). On `/show`, `/episode` and `/#members`.
+Follows localbitcoiners'
 `supporters.html`, which is its visual ancestor. The card has **no chrome** — no
 border, no background, no panel — just a circular avatar, the name, and the sats
 centered beneath. The avatars are the pattern, and a grid of bordered boxes
@@ -3781,13 +4570,18 @@ would. Never remove an entry** — those links are in the wild.
 | `episode-section.js` | the card rollup on `/episode` and `/booster` |
 | `rank.js` | **the** definition of a rank, competition-style, shared by the edge and the browser |
 | `boost-list.js` + `boost-section.js` | **the** boost row and the `#boosts` range and sort, facts and verbs, shared by the edge and the browser |
-| `shows-feed.js` | the show-level rollup behind Shows and Albums |
+| `show-card.js` + `show-card-actions.js` | **the** show card, facts and verbs, shared by the edge and the browser |
+| `shows-feed.js` | the feed around that card, behind Shows and Albums |
+| `supporter-wall.js` + `supporter-wall.css` | **the** community wall, shared by the three detail pages and the Members tab |
+| `members-board.js` | the Members tab: the #40HPW boards, the wall and its three orderings, the Rules dialog |
 | `feed-controls.js` / `feed-search.js` | the range/sort chrome and the per-feed typeahead |
 | `feed-lang.js` | the language menu on the four ranked feeds, and the copy it rewrites |
 | `boosts-thread.js` / `boost-actions.js` | the content tokenizer and reply / like / repost / zap |
-| `functions/index.js` | the homepage's opening feed, rendered at the edge |
+| `functions/index.js` | the homepage's opening feed — **Shows**, rendered at the edge |
 | `functions/{show,episode,booster}/…` | the three edge-rendered detail pages |
 | `functions/api/v1/*` | the D1 query API |
+| `functions/api/v1/members.js` | member search and the top-members listing, over all 2,011 |
+| `functions/api/v1/members/hours.js` | the #40HPW boards |
 | `functions/api/sign-boost.js` | the signing oracle for the boost bot, with `functions/_shared/nostr-sign.js` |
 | `login-widget/src/lib/siteSign.js` | its client half: a wallet-only boost gets a note without a key |
 | `functions/api/keysend.js` + `keysendLookup.js` | the keysend upgrade: an lnaddress leg reaches Helipad's first tier |
@@ -3800,10 +4594,10 @@ would. Never remove an entry** — those links are in the wild.
 
 **Still to build:**
 
-1. **The two Stats pages.** `/stats` (Boost Stats) and `/boosters` (Community) are
-   coming-soon placeholders and are the whole Stats column of the Explore menu, so
-   both are visible and both promise something. **`/stats` has a rich ancestor
-   upstream** and it's the thing to pull from rather than starting over:
+1. **`/stats` (Boost Stats).** A coming-soon placeholder, and now the whole
+   Stats column of the Explore menu, so it is visible and it promises something.
+   **It has a rich ancestor upstream** and that's the thing to pull from rather
+   than starting over:
 
    ```
    git show lb/main:stats.html            # 38KB, the charts + view switcher
@@ -3813,10 +4607,12 @@ would. Never remove an entry** — those links are in the wild.
 
    It was built against LB's own sats log, so the data layer is wrong for us, but
    the chart code, the broken-axis outlier handling and the view switcher are
-   directly relevant. **`/boosters` is now much closer than it was**, since
-   `/booster/<npub>` exists and `functions/api/v1/boosters/[npub].js` is the query
-   it would page. **The path stayed `/boosters` when the label became Community**:
-   the URL is in the wild and the rename was a label change.
+   directly relevant. `/api/v1/clients` is already built and renders nowhere,
+   which makes "boosts by app" the obvious first view.
+
+   **⚠️ `/boosters` IS NO LONGER THE SECOND HALF OF THIS ITEM.** It was deleted
+   on 2026-08-23 rather than built or redirected: the Members tab answers what
+   it promised. See the Stats row of the site map.
 
 2. **Shows · Follows.** The scope menu is hidden on Shows because the show-level
    rollup is computed over everyone. See the scope note at the top of
@@ -3831,25 +4627,18 @@ would. Never remove an entry** — those links are in the wild.
    `relay.mynostr.app`'s strfry write-policy plugin still has to whitelist that
    literal string. **VPS-side — reports are silently rejected until it's made.**
 
-5. **Dead LB code still in the tree.** `feeds.js` keeps `loadEvents` and the
-   NIP-52 calendar machinery, unreachable since the Events tab went away
-   (`LOADERS` doesn't map it). `boosts-thread.js` still has LB's `ROOT_NEVENT` and
-   `EXCLUDED_NOTE_IDS`, and `fetchBoostThread` has no caller. `calendar-events.js`
-   is only retained because `boosts-thread.js` imports it to render calendar-event
-   quotes inside boost notes — that circular import is what makes the cleanup
-   fiddly. All of it ships to every visitor.
+5. **Dead LB code — mostly gone, one layer left.** The bulk of it was deleted
+   on 2026-08-23 (`git show 75f88ef` and the commit after it); what that
+   removed and what it did not is under **What The Strip Removed** below.
 
-   **⚠️ `EpisodeBoostModal.jsx` is dead too, and knowing that is worth real
-   time.** `openEpisodeBoost` has no caller anywhere in `assets/js` or
-   `functions` — it is LB's own-podcast boost flow. The live map is: **every
-   podcast boost on this site goes through `openExternalBoost` →
-   `ExternalBoostModal`**, from all six surfaces in the boost-button table
-   above, **and the nav's Donate button now joins them through
-   `openSiteDonation`**. `openShowBoost` → `BoostModal` → `MultiLegBoostForm`
-   has no caller left on this fork at all. A change to "the boost modal"
-   is one file, not three, and `MultiLegBoostForm`'s presign-then-publish design
-   is deliberately untouched because nothing on this fork exercises it
-   multi-leg.
+   **What is left is `boostQueue.js` and `payAllLegs.js`.** `submitBoost`'s only
+   caller was `MultiLegBoostForm`, so both are now dead — but `boostQueue.js` is
+   still *imported*, by `navigationGuard.js` and `IdentityDropdown.jsx`, for the
+   in-flight tracking those two read. That tracking can no longer become
+   non-empty, so the dropdown's in-flight UI and the navigation guard are dead
+   with it. Removing them means editing two live components rather than deleting
+   files, which is why it was left. `payAllLegs.js`'s stale keysend classifier
+   (see the ⚠️ under The Keysend Upgrade) is the same finding from the other end.
 
 6. **Typography.** The brand wordmark is a bold sans; the site is still on LB's
    Playfair Display / Source Serif 4. It reads fine, but the serif is inherited,

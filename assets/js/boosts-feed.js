@@ -30,8 +30,8 @@
  * need only id + pubkey. The object handed to buildActionBar below is a
  * projection, not a verified event; don't pass it anywhere that assumes one.
  */
-import { nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v113'
-import { buildActionBar, configureBoostActions } from '/assets/js/boost-actions.js?v=ob-v113'
+import { nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v136'
+import { buildActionBar, configureBoostActions } from '/assets/js/boost-actions.js?v=ob-v136'
 // ⚠️ wireNpubCopy WAS IMPORTED HERE and is not any more. The avatar and the name
 // were its only two callers on this feed, and both are now links to
 // /booster/<npub>. Unlike the Episodes drawer — where the per-boost ⋮ menu
@@ -39,20 +39,21 @@ import { buildActionBar, configureBoostActions } from '/assets/js/boost-actions.
 // from this feed means opening their page, which leads with the button.
 // Its own module rather than a third export from show-link.js; see the note at
 // the head of booster-link.js and the ob-v53 entry in CLAUDE.md.
-import { boosterPageHref, markBoosterLink } from '/assets/js/booster-link.js?v=ob-v113'
-import { parseSegments, renderSegmentsInto, setCachedProfile } from '/assets/js/boosts-thread.js?v=ob-v113'
-import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v113'
-import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v113'
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v113'
-import { boosterLabel } from '/assets/js/ob-data.js?v=ob-v113'
-import { followsBoostReader, globalBoostReader } from '/assets/js/ob-live.js?v=ob-v113'
+import { boosterPageHref, markBoosterLink } from '/assets/js/booster-link.js?v=ob-v136'
+import { parseSegments, renderSegmentsInto, setCachedProfile } from '/assets/js/boosts-thread.js?v=ob-v136'
+import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v136'
+import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v136'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v136'
+import { boosterLabel } from '/assets/js/ob-data.js?v=ob-v136'
+import { followsBoostReader, globalBoostReader } from '/assets/js/ob-live.js?v=ob-v136'
+import { resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v136'
 import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls,
   RANGE_OPTIONS,
-} from '/assets/js/feed-controls.js?v=ob-v113'
-import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v113'
-import { showPageHref, episodePageHref } from '/assets/js/show-link.js?v=ob-v113'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v113'
+} from '/assets/js/feed-controls.js?v=ob-v136'
+
+import { showPageHref, episodePageHref } from '/assets/js/show-link.js?v=ob-v136'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v136'
 
 const PAGE_SIZE = 30
 
@@ -66,26 +67,34 @@ function rangeTitle(key) {
   return days ? `Boosts sent in the last ${days} days` : 'All boosts'
 }
 
-// 1W / 1M / All, and deliberately no 1Y where the ranked feeds have one.
+// ⚠️ ALL FOUR RANGES NOW, AND 1Y IS NOT WALKED. Reed's call, 2026-08-23, on
+// seeing it missing beside the members wall's four buttons.
 //
-// This feed WALKS its window in rather than querying it: ensureCoverage below
+// This feed WALKS a bounded window in rather than querying it: `ensureCoverage`
 // has to hold every boost in the range before it can sort them, or "largest
-// boost" ranks whichever pages happened to land. The network publishes ~38
-// boosts a day, so 1W is ~280 rows and 1M ~1,140, both a handful of 200-row
-// requests; a year is ~13,900 rows, which is ~70 sequential requests and
-// several megabytes before the first card paints. Widening this feed to a year
-// means giving it a `since`-scoped query the way /api/v1/episodes and
-// /api/v1/podcasts have, so the window is answered rather than walked. That is
-// a different feature, not a fourth button.
+// boost" ranks whichever pages happened to land. At ~38 boosts a day 1W is ~280
+// rows and 1M ~1,140, both a handful of 200-row requests. A year is ~13,900,
+// which is ~70 sequential requests and several megabytes before the first card
+// paints, and that is why 1Y was left out rather than merely slow.
 //
-// Derived here rather than exported from feed-controls.js on purpose. Assets
-// ship max-age=14400 and each module URL expires on its own clock, so a new
-// named export there is unresolvable for up to four hours in any browser
-// holding the older copy — and an unresolved named import is a LINK-TIME error
-// that takes the whole module down. Filtering a table that module already
-// exported degrades instead: an older RANGE_OPTIONS has no '1y' row, so this is
-// a no-op and the feed still renders. See feed-note.js for the full note.
-const WALKED_RANGES = RANGE_OPTIONS.filter(([key]) => key !== '1y')
+// ⚠️ WHAT UNBLOCKED IT WAS NOT A NEW QUERY. `/api/v1/boosts` does take `since`,
+// but `globalBoostReader` deliberately does not pass it — a `since`-bounded page
+// returns no cursor, so the client could not page back OUT when the reader
+// widens their range again. That note still stands.
+//
+// What 1Y gets instead is the treatment **All already has**: it is not
+// pre-walked, a non-chronological sort ranks only what has been loaded, and the
+// count line says so in those words. The honesty was already built; 1Y was the
+// one bounded window big enough to need it. See UNWALKED below.
+/* Named for what it is rather than for what it filtered: it was
+   `WALKED_RANGES`, a subset with '1y' removed, and both halves of that name are
+   now wrong. */
+const BOOST_RANGES = RANGE_OPTIONS
+
+/* The windows that are NOT paged in before they are painted. `all` has no
+   cutoff to page to; `1y` has one and is deliberately left unwalked, because
+   reaching it costs ~70 sequential requests before the first card. */
+const UNWALKED = new Set(['all', '1y'])
 
 // Deliberately shorter than the Episodes rollup's menu: an episode card
 // aggregates many boosts and can be ranked by boosters / boosts / sats, but a
@@ -394,8 +403,11 @@ async function createFollowsSource(authors) {
  */
 export async function renderBoosts({ panel, list, scope = 'global' }) {
   if (!list) return
-  // A re-render (account switch) may end on a placeholder, so clear any box a
-  // previous run left behind before deciding whether this one gets one.
+  /* ⚠️ STILL CALLED THOUGH NOTHING MOUNTS HERE ANY MORE, and deliberately: a
+     reader who loaded this page before the lookup moved may still be holding a
+     cached module that mounted a box into this panel's host. Clearing it is one
+     call and the alternative is a dead search box over a feed that no longer
+     reads it. */
   resetFeedSearch(panel)
 
   // Resolve the audience first — a signed-out Follows tab should say so
@@ -464,60 +476,27 @@ export async function renderBoosts({ panel, list, scope = 'global' }) {
   // Guards an in-flight coverage fetch against a newer selection landing
   // while it's still running.
   let seq = 0
-  let search = null
-  // The window's rows before the search narrows them — what the booster index
-  // is built over, so a suggestion is always someone this window can show.
-  let scopedRows = rows
 
   // The rows in the selected window, in the selected order. 'recent' over
   // 'all' is the source's own order, so the default view is the source's own
   // array — paging appends to it and nothing has to be copied or re-sorted.
   //
-  // A search here narrows to one BOOSTER rather than one card: this feed's
-  // subject is the person, and a single note is not something anyone knows the
-  // name of. There's no rank to retain — a card is one boost, so the feed has
-  // no ranked sort and never paints a rank badge.
+  /* ⚠️ THIS FEED HAS NO SEARCH, AND THAT IS NOT AN OMISSION. It carried a
+     member filter until 2026-08-23; the lookup now leads the Members tab and
+     NAVIGATES to /booster/<npub> instead. Reed's call, and the argument is that
+     a filter was answering the wrong question — "where is this person" is
+     answered by their page, not by a narrowed slice of one feed.
+
+     Two attempts are buried here, so neither comes back: `boosterEntries()`
+     indexed the boosts in memory, which reached 34 of 2,011 members on the
+     first page and only 684 after paging in all 23,259; `pickedRows` fixed that
+     by fetching the member's own corpus, at which point the feed was rendering
+     a different subject than the one its controls described. See
+     mountMemberLookup in members-board.js. */
   function buildView() {
     const cutoff = rangeCutoff(rangeKey)
-    scopedRows = cutoff ? rows.filter((b) => b.ts >= cutoff) : rows
-    // The corpus behind the index just changed (new window, or a page of older
-    // rows landed), so drop it; it rebuilds on the next keystroke.
-    search?.refresh()
-    const picked = search?.selection || null
-    const scoped = picked
-      ? scopedRows.filter((b) => b.booster.pk === picked.key)
-      : scopedRows
+    const scoped = cutoff ? rows.filter((b) => b.ts >= cutoff) : rows
     return sortKey === 'recent' ? scoped : [...scoped].sort(SORTERS[sortKey])
-  }
-
-  /** Distinct boosters in the current window, most boosts first. */
-  function boosterEntries() {
-    const by = new Map()
-    for (const b of scopedRows) {
-      const pk = b.booster?.pk
-      if (!pk) continue
-      let e = by.get(pk)
-      if (!e) {
-        e = { pk, label: boosterLabel(b.booster), npub: boosterNpub(b.booster), pic: b.booster.pic, n: 0, sats: 0 }
-        by.set(pk, e)
-      }
-      // Names and avatars are embedded per record and a given row can be
-      // missing either, so fill from whichever row has one.
-      if (!e.pic && b.booster.pic) e.pic = b.booster.pic
-      e.n++
-      e.sats += b.sats || 0
-    }
-    return [...by.values()]
-      .sort((a, b) => b.n - a.n || b.sats - a.sats)
-      .map((e) => ({
-        key: e.pk,
-        label: e.label,
-        sub: `${e.npub ? e.npub.slice(0, 12) + '…' : ''}${e.npub ? ' · ' : ''}${e.n.toLocaleString()} boost${e.n === 1 ? '' : 's'}`,
-        // Matchable, not shown: a pasted npub or hex pubkey finds its booster
-        // even though the row displays a truncated one.
-        extra: `${e.npub} ${e.pk}`,
-        img: e.pic,
-      }))
   }
 
   function oldestTs() { return rows.length ? rows[rows.length - 1].ts : Infinity }
@@ -530,6 +509,15 @@ export async function renderBoosts({ panel, list, scope = 'global' }) {
     const cutoff = rangeCutoff(rangeKey)
     return !!cutoff && source.hasMore && oldestTs() > cutoff
   }
+
+  /* ⚠️ ONE FACT, ONE POLICY, AND THEY ARE SEPARATE ON PURPOSE.
+     `needsCoverage()` is the FACT that the loaded corpus does not yet reach the
+     window's cutoff; `shouldPreWalk()` is the POLICY that we will sit and page
+     until it does. Folding 1Y into the fact would have taken the load-older
+     button away from it too, because that button is gated on the same
+     condition — and a 1Y view that neither walks nor offers to load more is a
+     window the reader can never actually fill. */
+  function shouldPreWalk() { return needsCoverage() && !UNWALKED.has(rangeKey) }
 
   // Cheap by construction, and now identically so on both scopes: a page is
   // ob-live.js's 200 rows. The network publishes ~38 boosts a day, so 1W is
@@ -548,7 +536,7 @@ export async function renderBoosts({ panel, list, scope = 'global' }) {
   // it returns no cursor, and the client can't mint the opaque cursor it would
   // then need to keep paging *past* the window when the range widens again.
   async function ensureCoverage() {
-    while (needsCoverage()) {
+    while (shouldPreWalk()) {
       let got = 0
       try {
         got = await source.loadMore()
@@ -564,16 +552,10 @@ export async function renderBoosts({ panel, list, scope = 'global' }) {
     if (reset) { shown = 0; cards.replaceChildren() }
     view = buildView()
     if (!view.length) {
-      const picked = search?.selection || null
-      cards.replaceChildren(picked
-        ? h('div', { class: 'feed-placeholder' }, [
-            h('strong', { text: 'Nothing in this window' }),
-            ` ${picked.label} sent no boosts in this time range — widen the range, or clear the search.`,
-          ])
-        : h('div', { class: 'feed-placeholder' }, [
-            h('strong', { text: 'No boosts in this window' }),
-            ' Nothing was boosted in this time range — try a wider one.',
-          ]))
+      cards.replaceChildren(h('div', { class: 'feed-placeholder' }, [
+        h('strong', { text: 'No boosts in this window' }),
+        ' Nothing was boosted in this time range — try a wider one.',
+      ]))
       moreWrap.replaceChildren()
       return
     }
@@ -591,10 +573,13 @@ export async function renderBoosts({ panel, list, scope = 'global' }) {
   function updateMoreButton() {
     moreWrap.replaceChildren()
     const remaining = view.length - shown
-    // Paging further back only means anything on All: a bounded window is
-    // already covered in full, so once it's all on screen there is nothing
-    // left to fetch *for that window*.
-    const canLoadOlder = rangeKey === 'all' && source.hasMore
+    /* Paging further back means something on All, and on any window the corpus
+       does not yet reach back to — which is 1Y until it has been filled. A
+       pre-walked window is already covered in full, so once it is all on screen
+       there is nothing left to fetch *for that window*, and the button goes.
+       ⚠️ The 1Y button therefore disappears by itself when the year is covered,
+       rather than sitting there loading rows the range filter discards. */
+    const canLoadOlder = source.hasMore && (rangeKey === 'all' || needsCoverage())
     if (remaining <= 0 && !canLoadOlder) return
 
     const btn = h('button', { class: 'pcast-showmore', type: 'button' },
@@ -616,9 +601,13 @@ export async function renderBoosts({ panel, list, scope = 'global' }) {
       else updateMoreButton()
     })
 
-    // On All, a non-chronological order can only rank what's been loaded, so
-    // say what that is rather than implying it's the whole archive.
-    const note = rangeKey !== 'all'
+    /* ⚠️ THE CLAIM THE COUNT LINE MAKES DEPENDS ON COVERAGE, NOT ON THE RANGE.
+       A window that is fully in hand can say "of N in this window"; one that is
+       not can only describe what has been loaded, whatever button produced it.
+       Keying this on `rangeKey !== 'all'` was right while every bounded window
+       was pre-walked, and would have made a half-loaded 1Y claim completeness. */
+    const covered = rangeKey !== 'all' && !needsCoverage()
+    const note = covered
       ? `Showing ${shown} of ${view.length} in this window`
       : (sortKey === 'recent'
           ? `Showing ${shown} of ${view.length} loaded`
@@ -646,29 +635,24 @@ export async function renderBoosts({ panel, list, scope = 'global' }) {
     paint({ reset: true })
   }
 
-  mountFeedControls(panel?.dataset.feed || `boosts-${scope}`, [
+  /* ⚠️ THE FALLBACK KEY IS `members-${scope}` AND IT MUST TRACK THE FEED MAP.
+     The panel's own `data-feed` is the real answer; this only fires if the
+     renderer is handed a panel without one. It said `boosts-${scope}` after the
+     type was renamed on 2026-08-23, which tags the controls group with a key no
+     `body[data-active-feed]` rule matches — so the group mounts and is never
+     shown, and the feed loses its range and sort with nothing thrown. */
+  mountFeedControls(panel?.dataset.feed || `members-${scope}`, [
     rangeControl(rangeKey, (key) => {
       if (key !== rangeKey) apply(() => { rangeKey = key })
     }, {
       label: 'Filter by when the boost was sent',
       titleFor: rangeTitle,
-      options: WALKED_RANGES,
+      options: BOOST_RANGES,
     }),
     sortControl(SORT_OPTIONS, sortKey, (key) => {
       if (key !== sortKey) apply(() => { sortKey = key })
     }, { title: 'Sort boosts' }),
   ])
-
-  // Boosters, not boosts: see buildView. The index covers the loaded window,
-  // so on All it grows as older pages land.
-  search = mountFeedSearch(panel, {
-    placeholder: 'Search boosters by name or npub…',
-    label: 'Search boosters',
-    noun: 'booster',
-    glyph: '👤',
-    onPick: () => paint({ reset: true }),
-    getEntries: boosterEntries,
-  })
 
   list.replaceChildren(cards, moreWrap)
 

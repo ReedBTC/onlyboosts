@@ -54,7 +54,82 @@
 // prints tiles without a rank line, which is exactly what /booster renders.
 
 // The three sorts, which are also the three stat tiles' keys.
+//
+// ⚠️ THE THIRD KEY DIFFERS BY SUBJECT AND THE TILES SAY WHY. A show or an
+// episode's third figure is how many PEOPLE boosted it; a booster's is how many
+// SHOWS they boosted. Both are the breadth axis of the list the subject is
+// ranked on — `boosters` on Shows/Episodes, `shows` on the members wall — but
+// they are different columns and different words, so one shared array would
+// have quietly ranked a person by a column that does not exist for them.
 const RANK_KEYS = ["sats", "boosts", "boosters"];
+const BOOSTER_RANK_KEYS = ["sats", "boosts", "shows"];
+
+/* ⚠️ RESTATED FROM functions/api/v1/_common.js, WHICH THIS FILE MAY NOT IMPORT
+ * WITHOUT DRAGGING THE WHOLE API SURFACE IN. The members wall drops these five
+ * keys from its listing, so a booster rank computed over a population that
+ * INCLUDED them would be a rank on a list the reader cannot scroll: every
+ * member below chadf-boostbot would be one place worse here than on the wall.
+ * **The two copies must stay in step.** */
+const RANK_PUBLISHERS = [
+  "f3bd42a91af5f3f1c40ca45ad2269464ab79996b32da78e8ed2ab91111b08e65",
+  "d35ae076512c29b01a5b33aa764ed4db44a9d0bbd96009705f48101f6cfe76a2",
+  "c330881e28768381dd8bdfd274341dca0c5882c29b8642ea4bc82f7563264592",
+  "3a87a19c801d57111b0905569225d2b20b39d154fc93bef5a8f2860c409b84d9",
+  "3820f4ff8587747530c7feafe47c1e592e3ce0fd2929b4f907e40714bd26f408",
+];
+
+/**
+ * A booster's three all-time ranks on the members wall.
+ *
+ * ⚠️ THE POPULATION IS THE WALL'S, PUBLISHER EXCLUSION AND ALL. Rank means the
+ * place the subject holds on a list a reader can go and scroll, and that list is
+ * `/api/v1/members` with no `q` — every member, publishers dropped, ordered by
+ * one of these three columns. The aggregates are restated here rather than
+ * imported for the same reason the pubkey list is.
+ *
+ * ⚠️ A PUBLISHER'S OWN PAGE GETS NO CHIPS, AND IT FALLS OUT FOR FREE. The
+ * subject is not in the CTE, so `at` is 0 and the shared guard below returns
+ * null — the same guard that catches a medium mismatch. That is the honest
+ * answer: those five keys are deliberately not on the wall, so they hold no
+ * place on it, and printing one would contradict the section that says so.
+ *
+ * COST: one scan of `boosts` (~23k rows) grouped to ~2k, against ~1.3k for a
+ * show. Heavier than its siblings and still inside the page's existing
+ * Promise.all behind a 300s edge cache; and it never throws, so the worst case
+ * is the page rendering exactly as it did before this existed.
+ */
+function boosterRankQuery(row) {
+  const val = {
+    sats: Number(row.sats) || 0,
+    boosts: Number(row.boosts) || 0,
+    shows: Number(row.shows) || 0,
+  };
+  const holes = RANK_PUBLISHERS.map(() => "?").join(",");
+  const args = [...RANK_PUBLISHERS];
+  const parts = BOOSTER_RANK_KEYS.map((k) => {
+    args.push(val[k], val[k]);
+    return `COUNT(CASE WHEN m.${k} > ? THEN 1 END) AS a_${k},
+            COUNT(CASE WHEN m.${k} = ? THEN 1 END) AS t_${k}`;
+  }).join(",\n           ");
+
+  /* The CTE restates `/api/v1/members`'s aggregate exactly: SUM(sats),
+     COUNT(*), COUNT(DISTINCT podcast_guid) — the last ignoring NULLs, so a
+     boost naming no show is still a boost and is not a show. Same three
+     definitions the subject's own totals are computed with one file over, which
+     is what makes comparing them meaningful. */
+  const sql = `
+    WITH m AS (
+      SELECT booster_pubkey AS pk,
+             COALESCE(SUM(sats), 0)        AS sats,
+             COUNT(*)                      AS boosts,
+             COUNT(DISTINCT podcast_guid)  AS shows
+        FROM boosts
+       WHERE booster_pubkey NOT IN (${holes})
+       GROUP BY booster_pubkey
+    )
+    SELECT ${parts} FROM m`;
+  return { sql, args };
+}
 
 /**
  * The three all-time global ranks for a show or an episode.
@@ -70,6 +145,15 @@ const RANK_KEYS = ["sats", "boosts", "boosters"];
  */
 export async function feedRanks(db, kind, row) {
   try {
+    /* ⚠️ THE BOOSTER BRANCH SHARES THE TAIL DELIBERATELY. The ahead/at → rank
+       conversion, the `at < 1` guard and the catch below are the parts that are
+       easy to get subtly wrong; only the query and the key list differ. */
+    if (kind === "booster") {
+      if (!row || !row.pk) return null;
+      const { sql, args } = boosterRankQuery(row);
+      const r = await db.prepare(sql).bind(...args).first();
+      return ranksFrom(r, BOOSTER_RANK_KEYS);
+    }
     const isEpisode = kind === "episode";
     const id = isEpisode ? row.item_guid : row.podcast_guid;
     if (!id) return null;
@@ -111,23 +195,31 @@ export async function feedRanks(db, kind, row) {
       : `COALESCE(${mediumCol},'podcast') <> 'music'`;
 
     const r = await db.prepare(`SELECT ${parts} ${from} WHERE ${where}`).bind(...args).first();
-    if (!r) return null;
-
-    const out = {};
-    for (const k of RANK_KEYS) {
-      const ahead = Number(r[`a_${k}`]);
-      const at = Number(r[`t_${k}`]);
-      // `at` counts the subject, so 0 means the subject was not in the set the
-      // WHERE admits — a medium mismatch between this query and the row we were
-      // handed. Print nothing rather than a rank on a list it is not on.
-      if (!Number.isFinite(ahead) || !Number.isFinite(at) || at < 1) return null;
-      out[k] = { rank: ahead + 1, tied: at > 1 };
-    }
-    return out;
+    return ranksFrom(r, RANK_KEYS);
   } catch (err) {
     console.warn("[feed-rank] rank query failed", err);
     return null;
   }
+}
+
+/* The two counts per stat → `{rank, tied}`, shared by every kind.
+ *
+ * ⚠️ `at` COUNTS THE SUBJECT, so 0 means the subject was not in the set the
+ * query admits and the whole result is withheld. Three ways that happens, and
+ * all three want silence rather than a number: a medium mismatch between this
+ * query and the row we were handed, a booster whose key is one of the five the
+ * wall excludes, and a subject with no rows at all. Printing a rank on a list
+ * the subject is not on is worse than printing none. */
+function ranksFrom(r, keys) {
+  if (!r) return null;
+  const out = {};
+  for (const k of keys) {
+    const ahead = Number(r[`a_${k}`]);
+    const at = Number(r[`t_${k}`]);
+    if (!Number.isFinite(ahead) || !Number.isFinite(at) || at < 1) return null;
+    out[k] = { rank: ahead + 1, tied: at > 1 };
+  }
+  return out;
 }
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));

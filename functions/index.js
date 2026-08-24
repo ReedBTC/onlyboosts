@@ -1,18 +1,33 @@
 // GET / — the homepage, with its opening feed rendered at the edge.
 //
 // ⚠️ THE PAGE IS STILL index.html. This Function does not build a homepage; it
-// fetches the static file through env.ASSETS, drops thirty ranked episode cards
+// fetches the static file through env.ASSETS, drops the opening feed's cards
 // into one marked slot inside it, and serves the result. Everything else about
-// that file — the feed bar, the eight panels, the inline controller, the nav and
+// that file — the tabs, the eight panels, the inline controller, the nav and
 // footer that scripts/sync-partials.js writes into it — is untouched and is
 // edited there as it always was.
 //
+// ⚠️ THE OPENING FEED IS SHOWS, NOT EPISODES, SINCE PHASE D (2026-08-23). The
+// front door lands on the show-level leaderboard — all time, ranked by distinct
+// boosters — because that is the view that answers "what is this site" to
+// somebody who has never seen it. Reed's call. What moved with it is this
+// Function: the marker pair is inside the Shows panel now, the cards come from
+// /api/v1/podcasts, and shows-feed.js adopts them the way feeds-podcasts.js
+// adopted the episode page before it.
+//
+// ⚠️ ONE FEED IS RENDERED, AND IT IS THE ONE ON SCREEN. Rendering Episodes as
+// well would put a second thirty-card list in the document inside a hidden
+// panel — bytes every reader downloads, a feed no reader is looking at, and a
+// crawler shown two rankings on one URL. So the Episodes panel ships its
+// placeholder again and feeds-podcasts.js fetches its first page, exactly as
+// Songs and both Follows feeds always have.
+//
 // WHY IT EXISTS. The front door was a shell: every panel shipped a placeholder
-// and the Episodes · Global feed painted itself after JavaScript loaded and a
-// 431KB request came back. Under the rendering rule in CLAUDE.md that is the
-// wrong side of the line — a ranked list of episodes with their boosts is as
-// much a FACT as a show page's hero — and it cost the site its most-linked URL
-// in search, since Googlebot runs JavaScript on a delayed second pass and not
+// and the opening feed painted itself after JavaScript loaded and a large JSON
+// request came back. Under the rendering rule in CLAUDE.md that is the wrong
+// side of the line — a ranked list of shows with their boost figures is as much
+// a FACT as a show page's hero — and it cost the site its most-linked URL in
+// search, since Googlebot runs JavaScript on a delayed second pass and not
 // dependably per page. It also cost a round trip and a repaint for every reader.
 //
 // ⚠️ IT IS A FAST PATH, NOT A DEPENDENCY. Every failure — the asset fetch, the
@@ -20,37 +35,37 @@
 // feed hydrates the way it did before this existed. There is no error state and
 // no placeholder, because the page already has one.
 //
-// WHAT IT COSTS. One D1 read of the same query /api/v1/episodes answers, and the
+// WHAT IT COSTS. One D1 read of the same query /api/v1/podcasts answers, and the
 // response is edge-cached for 300s like the detail pages, so it is one query per
-// colo per five minutes rather than one per visitor. The bytes are not new: the
-// cards are the same rows the browser used to fetch as JSON, and it no longer
-// does — measured at 431KB raw / 155KB gzipped for this page of thirty.
-import { readParams, globalEpisodes } from "./api/v1/episodes.js";
-import { itemsFromBoosts, renderCardPage, CARDS_PER_PAGE } from "./_shared/episode-cards.js";
-import { COPY, HOME_CARD_PARTS } from "../assets/js/episode-card.js";
-import { episodeApiToBoosts } from "../assets/js/ob-data.js";
+// colo per five minutes rather than one per visitor. On the All range that query
+// reads the precomputed aggregate columns rather than grouping the boosts table,
+// which is the cheapest page this site renders.
+import { readParams, globalPodcasts } from "./api/v1/podcasts.js";
+import { cardsFromPodcasts, renderShowCardPage, SHOW_CARDS_PER_PAGE } from "./_shared/show-cards.js";
+import { COPY } from "../assets/js/show-card.js";
 
 // The slot in index.html. A marker PAIR, not a single point: the block it wraps
 // is the placeholder the page shows when this does nothing, and that has to go
 // when the cards arrive.
-const OPEN = "<!--OB:SSR-EPISODES-->";
-const CLOSE = "<!--/OB:SSR-EPISODES-->";
+const OPEN = "<!--OB:SSR-SHOWS-->";
+const CLOSE = "<!--/OB:SSR-SHOWS-->";
 
-/* The opening feed, and it must match feeds-podcasts.js's opening state exactly.
+/* The opening feed, and it must match shows-feed.js's opening state exactly.
  *
- * `count` (Most boosters) because distinct people is the higher-signal ranking:
- * one listener boosting an episode forty times is one vote, not forty. It
- * opened on `boosts` (raw volume) until 2026-08-18. `all` because that is the
- * useful opening window on a corpus this size, and
- * not_medium=music because Episodes and Songs are a PARTITION — music goes to
- * Songs, and everything else, including video and the feeds Podcast Index cannot
- * identify, comes here. A mismatch would not break anything; it would just make
- * the reader watch the list they were given get replaced by a different one.
+ * `boosters` (Most boosters) because distinct people is the higher-signal
+ * ranking: one listener boosting a show forty times is one vote, not forty. It
+ * opened on `boosts` (raw volume) until Phase D. `all` because a show-level
+ * leaderboard is an all-time question and the windowed ranges narrow it. And
+ * not_medium=music because Shows and Albums are a PARTITION — music goes to
+ * Albums, and everything else, including video and the feeds Podcast Index
+ * cannot identify, comes here. A mismatch would not break anything; it would
+ * just make the reader watch the list they were given get replaced by a
+ * different one.
  */
 const FEED = {
   scope: "global",
   medium: "other",
-  sort: "count",
+  sort: "boosters",
   range: "all",
 };
 
@@ -108,76 +123,40 @@ export async function onRequestGet(context) {
 
 /* The cards, built by the same chain the browser runs.
  *
- * ⚠️ THE ORDER COMES FROM THE SERVER AND MUST SURVIVE buildEpisodes, which ends
- * with a sort by recency — the same trap loadEpisodePage documents in
- * feeds-podcasts.js, and it takes the same cure: the built items are put back
- * into the records' order by guid. It used to re-sort by the feed's comparator
- * instead, which agreed with SQL only while the comparator's inputs did — and
- * they do not: the inline rows are capped at 50 an episode, so
- * `distinctBoosters.length` and `boosts.length` both undercount past the cap,
- * and a `count` ranking re-derived from them could reorder the top of the page
- * against the ranking D1 answered. The server's order is the answer.
- *
- * The figures are stamped from the aggregates for the same reason.
+ * ⚠️ THE ORDER IS THE SERVER'S AND IS NEVER RE-DERIVED. `/api/v1/podcasts`
+ * answers already ordered by the active sort, with a tiebreak that makes paging
+ * a total order; `cardsFromPodcasts` is a map and preserves it. That matters
+ * twice over — competitionRanks assumes the rows it is handed are already
+ * ordered by the value it ranks, and re-sorting here by the same key would drop
+ * the tiebreak and could reorder a run of tied shows against the ranking D1
+ * actually answered. The episode page had to restore this order by hand after
+ * buildEpisodes' recency sort; the show card has no such step to undo.
  */
 async function openingPage(env) {
-  const u = new URL("https://ob.invalid/api/v1/episodes");
+  const u = new URL("https://ob.invalid/api/v1/podcasts");
   u.searchParams.set("not_medium", "music");
-  u.searchParams.set("include", "boosts");
   u.searchParams.set("sort", FEED.sort);
   u.searchParams.set("range", FEED.range);
-  u.searchParams.set("limit", String(CARDS_PER_PAGE));
+  u.searchParams.set("limit", String(SHOW_CARDS_PER_PAGE));
   const p = readParams(u);
   if (p.error) throw new Error(p.error);
 
-  const { episodes, nextOffset } = await globalEpisodes(env, p);
-  if (!episodes.length) throw new Error("no episodes");
+  const { podcasts, nextOffset } = await globalPodcasts(env, p);
+  if (!podcasts.length) throw new Error("no shows");
 
-  const { items, profiles, totals } = fromRecords(episodes);
-  if (!items.length) throw new Error("nothing built");
+  const cards = cardsFromPodcasts(podcasts);
+  if (!cards.length) throw new Error("nothing built");
 
-  return `<div class="pcast-list">${renderCardPage(items, {
+  return renderShowCardPage(cards, {
     copy: COPY.other,
-    profiles,
     sort: FEED.sort,
     range: FEED.range,
-    limit: CARDS_PER_PAGE,
-    // ⚠️ THE HOMEPAGE'S VARIANT: the whole card, with the drawer's boost notes
-    // fetched on open rather than rendered into the document. With them inline
-    // the drawer bodies were 82% of the document (995KB of 1.21MB, 744 rows
-    // inside closed <details>), and the feed-bar controller at the foot of
-    // <body> sat 1.16MB after the first card, so every #shows / #albums /
-    // #boosts-global load flashed the Episodes feed before the hash was read.
-    // The variant rides the state element (`card`), so feeds-podcasts.js
-    // paints every later page the same way. See `drawer` under CARD_PARTS.
-    parts: HOME_CARD_PARTS,
+    limit: SHOW_CARDS_PER_PAGE,
     // The state the client adopts through. `scope` and `medium` are checked
     // against the panel being hydrated, so a shell rendered for one feed can
     // never be adopted by another.
     state: { ...FEED, nextOffset },
-  })}</div>`;
-}
-
-/* API records → items, with the aggregates put back on.
- *
- * episodeApiToBoosts is imported through ob-data.js rather than reimplemented:
- * it is the function that turns the endpoint's grouped shape back into flat
- * boost records with their podcast and episode blocks, which is what lets one
- * model reach every consumer. This is the same three lines feeds-podcasts.js
- * runs.
- */
-function fromRecords(records) {
-  const { boosts, totals } = episodeApiToBoosts(records);
-  const built = itemsFromBoosts(boosts, { sort: FEED.sort });
-  const byGuid = new Map(built.items.map((it) => [it.guid, it]));
-  const items = [];
-  for (const r of records) {
-    const it = byGuid.get(r.guid);
-    if (!it) continue;
-    it.totals = totals.get(r.guid) || null;
-    items.push(it);
-  }
-  return { items, profiles: built.profiles, totals };
+  });
 }
 
 function injectFeed(html, block) {

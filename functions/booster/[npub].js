@@ -38,6 +38,7 @@ import {
   renderBoosts,
 } from "../_shared/detail-page.js";
 import { itemsFromBoosts, renderCardPage, CARDS_PER_PAGE } from "../_shared/episode-cards.js";
+import { feedRanks, renderStatTiles } from "../_shared/feed-rank.js";
 import { fetchBoosterCorpus } from "../api/v1/boosters/[npub].js";
 import { COPY as CARD_COPY } from "../../assets/js/episode-card.js";
 
@@ -214,11 +215,23 @@ export async function onRequestGet({ env, params }) {
   // wants names for its text chips; the bio wants names AND pictures for its
   // face chips, and merging them would make every /show and /episode render
   // carry a `picture` column it has no use for.
-  const [names, bioProfiles] = await Promise.all([
+  const [names, bioProfiles, ranks] = await Promise.all([
     lookupMentionNames(env, boostRows.map((r) => r.message)),
     // Skipped entirely when the bio has no mention in it, which is the common
     // case — mentionedPubkeys returns empty and the helper never queries.
     lookupMentionProfiles(env, [prof?.about || ""]),
+    /* ⚠️ THE SECOND BATCH, NOT THE FIRST, because it needs `totals` — which the
+       first batch is what produces. So this page pays `first + max(second)`
+       rather than one `max()`, which is the cost of a rank that has to be
+       compared against figures the page has just computed. It never throws
+       (see _shared/feed-rank.js), so the worst case is the tiles rendering
+       exactly as they did before this existed. */
+    feedRanks(env.DB, "booster", {
+      pk: hex,
+      sats: totals.sats,
+      boosts: totals.boosts,
+      shows: totals.shows,
+    }),
   ]);
 
   const html = renderBoosterPage({
@@ -230,6 +243,7 @@ export async function onRequestGet({ env, params }) {
     boosts: boostRows,
     names,
     bioProfiles,
+    ranks,
     corpus,
   });
 
@@ -273,7 +287,7 @@ function toHexPubkey(s) {
 
 // ── the page ─────────────────────────────────────────────────────────────────
 
-function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioProfiles, corpus }) {
+function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioProfiles, ranks, corpus }) {
   const realName = prof?.display_name || prof?.name || null;
   const label = realName || shortId(npub, hex);
   const pageUrl = `${SITE_ORIGIN}/booster/${encodeURIComponent(npub || hex)}`;
@@ -291,7 +305,8 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
   const satsTotal = Number(totals.sats || 0);
   const boostTotal = Number(totals.boosts || 0);
   const showTotal = Number(totals.shows || 0);
-  const epTotal = Number(totals.eps || 0);
+  /* `totals.eps` is still SELECTed and still used by the #shows rollup's own
+     per-row meta line; it just no longer has a tile of its own. */
 
   const ogTitle = `${label} — Boosts on Nostr | OnlyBoosts`;
 
@@ -319,11 +334,19 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
     },
   };
 
+  /* ⚠️ THREE TILES, NOT FOUR: THE EPISODES ONE CAME OFF ON 2026-08-23 (Reed's
+     call), and dropping it is what let the other three carry a rank. The
+     members wall ranks by sats, boosts and shows and by nothing else, so an
+     episodes tile could never have a chip beside it — a fourth tile with a
+     visibly empty corner reads as a rank that failed to load rather than as a
+     figure with no list behind it. The figure is not lost: the #episodes
+     rollup below opens with "N sats across M episodes".
+
+     `key` is what pairs a tile with its rank; see _shared/feed-rank.js. */
   const stats = [
-    { label: "sats", value: compact(satsTotal), exact: num(satsTotal) },
-    { label: boostTotal === 1 ? "boost" : "boosts", value: num(boostTotal), exact: num(boostTotal) },
-    { label: showTotal === 1 ? "show" : "shows", value: num(showTotal), exact: num(showTotal) },
-    { label: epTotal === 1 ? "episode" : "episodes", value: num(epTotal), exact: num(epTotal) },
+    { key: "sats", label: "sats", value: compact(satsTotal), exact: num(satsTotal) },
+    { key: "boosts", label: boostTotal === 1 ? "boost" : "boosts", value: num(boostTotal), exact: num(boostTotal) },
+    { key: "shows", label: showTotal === 1 ? "show" : "shows", value: num(showTotal), exact: num(showTotal) },
   ];
 
   return `<!DOCTYPE html>
@@ -397,22 +420,23 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v113" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v113" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v113" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v113" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v136" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v136" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v136" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v136" />
   <!-- The hero, the drawers and the boost list are the show page's, so this
        page links its stylesheet and adds only the deltas. -->
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v113" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v136" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v136" />
   <!-- The episode card, for the #episodes rollup: the same chrome
        feeds-podcasts.js paints on the homepage. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v113" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v136" />
   <!-- The boost thread inside a card's drawer, and its reply / like / repost /
        zap bar, both reached through that same card. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v113" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v113" />
-  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v113" />
-  <link rel="stylesheet" href="/assets/css/booster-page.css?v=ob-v113" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v136" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v136" />
+  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v136" />
+  <link rel="stylesheet" href="/assets/css/booster-page.css?v=ob-v136" />
 </head>
 <body data-booster-pk="${htmlEscape(hex)}"${npub ? ` data-booster-npub="${htmlEscape(npub)}"` : ""}>
 
@@ -444,28 +468,39 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
           </div>
           <a class="nav-explore-home" href="/"><span aria-hidden="true">🏠</span> Home</a>
           <div class="nav-explore-groups">
-            <!-- Feeds: one entry per feed, matching the homepage's what-menu
-                 exactly (Episodes / Shows / Songs / Albums / Boosts). The
-                 Global vs Follows axis is deliberately absent — it's the
+            <!-- ⚠️ FEEDS IS ONE ENTRY PER TAB, NOT PER FEED. Reed's call,
+                 2026-08-23. It listed all five sub-feeds, which was right while
+                 the homepage hid them behind a dropdown and wrong the moment
+                 the tabs put them on screen: the nav then restated a control
+                 the page carries, in a different order, using different words
+                 for the same things. Each entry lands on that tab's DEFAULT
+                 sub-feed — TAB_DEFAULT in the index.html controller — so
+                 Podcasts opens Episodes, Music opens Albums and Members opens
+                 Boosts. **Those three hrefs and TAB_DEFAULT move together.**
+
+                 The Global vs Follows axis stays deliberately absent: it is the
                  second dropdown on the page itself, and listing both scopes
-                 here made the nav a grid restating a control the page already
-                 has. Songs and Albums are the music half of Episodes and
-                 Shows, split on <podcast:medium>; they sit next to the feeds
-                 they mirror rather than in a group of their own. -->
+                 here made the nav a grid restating a control the page has. -->
             <div class="nav-explore-group">
               <h4>Feeds</h4>
-              <a href="/#episodes-global"><span aria-hidden="true">🎙</span> Episodes</a>
-              <a href="/#shows"><span aria-hidden="true">📻</span> Shows</a>
-              <a href="/#songs-global"><span aria-hidden="true">🎵</span> Songs</a>
-              <a href="/#albums"><span aria-hidden="true">💿</span> Albums</a>
-              <a href="/#boosts-global"><span aria-hidden="true">⚡</span> Boosts</a>
+              <a href="/#episodes-global"><span aria-hidden="true">🎙</span> Podcasts</a>
+              <a href="/#albums"><span aria-hidden="true">🎵</span> Music</a>
+              <a href="/#members"><span aria-hidden="true">👥</span> Members</a>
             </div>
-            <!-- Stats: the aggregate views over the same data. Both are
-                 coming-soon pages for now (noindex, out of the sitemap). -->
+            <!-- Stats: the aggregate view over the same data. A coming-soon
+                 page for now (noindex, out of the sitemap).
+
+                 ⚠️ /boosters (Community) WAS THE SECOND ENTRY AND THE PAGE IS
+                 DELETED, not redirected. Reed's call, 2026-08-23: the Members
+                 tab now answers what it promised — the member lookup, the
+                 top-members wall and the #40HPW boards — so leaving a
+                 placeholder here pointed a reader at a promise for content that
+                 exists one tab over. It was never linked from anywhere but this
+                 menu and the footer, was noindex and out of the sitemap, so it
+                 has no inbound links to preserve and gets no redirect. -->
             <div class="nav-explore-group">
               <h4>Stats</h4>
               <a href="/stats"><span aria-hidden="true">📊</span> Boost Stats</a>
-              <a href="/boosters"><span aria-hidden="true">🧑‍🤝‍🧑</span> Community</a>
             </div>
             <div class="nav-explore-group">
               <h4>More</h4>
@@ -507,11 +542,11 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
        history.back() when the previous document was one of ours. /boosters is
        deliberately NOT the target: it is still a coming-soon placeholder, so a
        reader with nowhere to go back to would land on a page that says nothing. -->
-  <a class="show-back" href="/#boosts-global" data-show-back>
+  <a class="show-back" href="/#members" data-show-back>
     <span class="show-back-arrow" aria-hidden="true">←</span><span data-back-label>All Boosts</span>
   </a>
 
-  ${renderHeader({ hex, npub, prof, label, realName, pic, banner, stats, totals, bioProfiles })}
+  ${renderHeader({ hex, npub, prof, label, realName, pic, banner, stats, ranks, totals, bioProfiles })}
 
   ${renderShows(shows, realName)}
 
@@ -567,13 +602,14 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
          footer is the nav's site map repeated, so they're regrouped together
          or not at all. -->
     <div class="footer-col">
+      <!-- ⚠️ ONE ENTRY PER TAB, and it mirrors the nav's Explore menu exactly.
+           The two are the site map and are regrouped together or not at all;
+           each lands on that tab's default sub-feed. See partials/nav.html. -->
       <h3>Feeds</h3>
       <ul>
-        <li><a href="/#episodes-global">🎙 Episodes</a></li>
-        <li><a href="/#shows">📻 Shows</a></li>
-        <li><a href="/#songs-global">🎵 Songs</a></li>
-        <li><a href="/#albums">💿 Albums</a></li>
-        <li><a href="/#boosts-global">⚡ Boosts</a></li>
+        <li><a href="/#episodes-global">🎙 Podcasts</a></li>
+        <li><a href="/#albums">🎵 Music</a></li>
+        <li><a href="/#members">👥 Members</a></li>
       </ul>
     </div>
 
@@ -581,7 +617,6 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
       <h3>Stats</h3>
       <ul>
         <li><a href="/stats">📊 Boost Stats</a></li>
-        <li><a href="/boosters">🧑‍🤝‍🧑 Community</a></li>
       </ul>
     </div>
 
@@ -607,12 +642,12 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav.js?v=ob-v113" defer></script>
-<script src="/assets/js/booster-page.js?v=ob-v113" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v136" defer></script>
+<script src="/assets/js/booster-page.js?v=ob-v136" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v113"></script>
-<script src="/assets/js/sw-register.js?v=ob-v113" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v136"></script>
+<script src="/assets/js/sw-register.js?v=ob-v136" defer></script>
 </body>
 </html>`;
 }
@@ -628,7 +663,7 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
 // the 1,948 stored profiles: about 53.9%, lud16 64.7%, website 18.8%,
 // banner 42.5%, lud06 4.4%. A header built as a form with empty rows would be
 // mostly empty rows; every one of these prints or is absent.
-function renderHeader({ hex, npub, prof, label, realName, pic, banner, stats, totals, bioProfiles }) {
+function renderHeader({ hex, npub, prof, label, realName, pic, banner, stats, ranks, totals, bioProfiles }) {
   const nip05 = String(prof?.nip05 || "").trim();
   const about = String(prof?.about || "").trim();
   const website = isSafeUrl(prof?.website) ? prof.website : null;
@@ -705,9 +740,14 @@ function renderHeader({ hex, npub, prof, label, realName, pic, banner, stats, to
     <h2 class="show-stats-title">
       <a href="/about#keysend">Nostr Boost</a> Stats
     </h2>
-    <dl class="show-stats">
-      ${stats.map((s) => `<div class="show-stat"><dt>${htmlEscape(s.label)}</dt><dd title="${htmlEscape(s.exact)}">${htmlEscape(s.value)}</dd></div>`).join("\n      ")}
-    </dl>
+    ${renderStatTiles(stats, ranks, {
+      rankFeed: "Members",
+      /* The wall, not this page's back link. `/#members` is where those three
+         orderings live and where a reader can go and find the row; the back
+         link above points at the same place, which is a coincidence of this
+         page rather than something to rely on. */
+      backHref: "/#members",
+    })}
   </header>`;
 }
 
@@ -1035,10 +1075,10 @@ function notFound(raw) {
   <meta name="robots" content="noindex" />
   <title>Booster not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v113" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v113" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v113" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v113" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v136" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v136" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v136" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v136" />
 </head>
 <body>
 <section class="page-header">
@@ -1052,11 +1092,11 @@ function notFound(raw) {
       <p>This page exists for people who have published a boost to Nostr. An
          npub that has never boosted, or one this index has not seen, has
          nothing to show here.</p>
-      <p><a href="/#boosts-global">Browse all boosts →</a></p>
+      <p><a href="/#members">Browse all boosts →</a></p>
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v113" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v136" defer></script>
 </body>
 </html>`;
   return new Response(html, {

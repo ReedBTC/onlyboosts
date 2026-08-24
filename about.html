@@ -48,12 +48,12 @@
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v113" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v113" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v136" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v136" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v113" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v113" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v136" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v136" />
 </head>
 <body>
 
@@ -85,28 +85,39 @@
           </div>
           <a class="nav-explore-home" href="/"><span aria-hidden="true">🏠</span> Home</a>
           <div class="nav-explore-groups">
-            <!-- Feeds: one entry per feed, matching the homepage's what-menu
-                 exactly (Episodes / Shows / Songs / Albums / Boosts). The
-                 Global vs Follows axis is deliberately absent — it's the
+            <!-- ⚠️ FEEDS IS ONE ENTRY PER TAB, NOT PER FEED. Reed's call,
+                 2026-08-23. It listed all five sub-feeds, which was right while
+                 the homepage hid them behind a dropdown and wrong the moment
+                 the tabs put them on screen: the nav then restated a control
+                 the page carries, in a different order, using different words
+                 for the same things. Each entry lands on that tab's DEFAULT
+                 sub-feed — TAB_DEFAULT in the index.html controller — so
+                 Podcasts opens Episodes, Music opens Albums and Members opens
+                 Boosts. **Those three hrefs and TAB_DEFAULT move together.**
+
+                 The Global vs Follows axis stays deliberately absent: it is the
                  second dropdown on the page itself, and listing both scopes
-                 here made the nav a grid restating a control the page already
-                 has. Songs and Albums are the music half of Episodes and
-                 Shows, split on <podcast:medium>; they sit next to the feeds
-                 they mirror rather than in a group of their own. -->
+                 here made the nav a grid restating a control the page has. -->
             <div class="nav-explore-group">
               <h4>Feeds</h4>
-              <a href="/#episodes-global"><span aria-hidden="true">🎙</span> Episodes</a>
-              <a href="/#shows"><span aria-hidden="true">📻</span> Shows</a>
-              <a href="/#songs-global"><span aria-hidden="true">🎵</span> Songs</a>
-              <a href="/#albums"><span aria-hidden="true">💿</span> Albums</a>
-              <a href="/#boosts-global"><span aria-hidden="true">⚡</span> Boosts</a>
+              <a href="/#episodes-global"><span aria-hidden="true">🎙</span> Podcasts</a>
+              <a href="/#albums"><span aria-hidden="true">🎵</span> Music</a>
+              <a href="/#members"><span aria-hidden="true">👥</span> Members</a>
             </div>
-            <!-- Stats: the aggregate views over the same data. Both are
-                 coming-soon pages for now (noindex, out of the sitemap). -->
+            <!-- Stats: the aggregate view over the same data. A coming-soon
+                 page for now (noindex, out of the sitemap).
+
+                 ⚠️ /boosters (Community) WAS THE SECOND ENTRY AND THE PAGE IS
+                 DELETED, not redirected. Reed's call, 2026-08-23: the Members
+                 tab now answers what it promised — the member lookup, the
+                 top-members wall and the #40HPW boards — so leaving a
+                 placeholder here pointed a reader at a promise for content that
+                 exists one tab over. It was never linked from anywhere but this
+                 menu and the footer, was noindex and out of the sitemap, so it
+                 has no inbound links to preserve and gets no redirect. -->
             <div class="nav-explore-group">
               <h4>Stats</h4>
               <a href="/stats"><span aria-hidden="true">📊</span> Boost Stats</a>
-              <a href="/boosters"><span aria-hidden="true">🧑‍🤝‍🧑</span> Community</a>
             </div>
             <div class="nav-explore-group">
               <h4>More</h4>
@@ -152,6 +163,8 @@
       <h2 class="toc-title" id="toc-title">Contents</h2>
       <ol class="toc-list">
         <li><a href="#overview">Overview</a></li>
+        <li><a href="#membership">Becoming a Member</a></li>
+        <li><a href="#bots">Accounts That Publish for Other People</a></li>
         <li><a href="#stats">Indexer Stats</a></li>
         <li><a href="#nostr">Nostr Fundamentals</a></li>
         <li><a href="#nip73">NIP-73 and External Content IDs</a></li>
@@ -171,6 +184,53 @@
         <p class="lede">OnlyBoosts is an index of podcast boosts that have been published to Nostr. Boost notes are collected from relays across the network, cross-referenced against the Podcast Index for show and episode metadata, and served as an open feed.</p>
         <p>Boosting requires no Nostr at all. A listener sends sats to a show through the Podcasting 2.0 value block, the payment is split among the recipients the podcaster has named in the RSS feed, and a boostagram message frequently travels with it. That process predates this site by years and it remains the mechanism behind the large majority of boosts sent today.</p>
         <p>What this site indexes is considerably narrower. A small number of podcast applications now publish a public note to Nostr when a boost is sent, announcing that the boost occurred. Those notes, and only those notes, are what OnlyBoosts collects. The result is a cross-application view of boost activity assembled entirely from what the applications themselves have chosen to broadcast.</p>
+      </section>
+
+      <!-- The (i) beside the Members tab's intro line points at #membership,
+           and the Boost Bots section below that wall points at #bots. Both are
+           in the wild the moment the homepage ships; treat the ids as frozen
+           the way the detail pages' section ids are. -->
+      <section id="membership">
+        <h2>Becoming a Member</h2>
+        <p class="lede">A member is anyone who has shared a boost publicly using their Nostr account.</p>
+        <p>There is no account to create on this site, no form to complete and nothing to join. The membership is assembled out of boosts that were already public, and the reason they are public is Nostr.</p>
+
+        <h3>What Nostr Does Here</h3>
+        <p>An ordinary boost is a private transaction. Sats move from a listener&rsquo;s wallet to the recipients a podcast names in its RSS feed, the message travels attached to that payment, and the only parties who ever see it are the sender&rsquo;s application and the receiving nodes. Nothing announces it. That is <a href="#keysend">how the majority of boosting still works</a>, and it is invisible to this site by design rather than by accident.</p>
+        <p>Nostr is an open protocol for publishing signed messages to a network of independent servers. It has no accounts in the usual sense; an identity is a cryptographic keypair, and the public half of it is what everything you publish is signed as coming from. <a href="#nostr">Nostr Fundamentals</a> sets that out at length.</p>
+        <p>When a podcast application publishes a boost note to Nostr, it takes the facts of a payment that already happened and puts them on a public, permanent record: the show, the episode, the amount, the message, and the identity that sent it. That note is not the payment and does not carry it. It is an announcement, signed by a key, that anyone can read and anyone can verify.</p>
+        <p>This site reads those announcements. Nothing else. Every figure on OnlyBoosts was published to Nostr by somebody who chose to publish it, which is what makes an open index of boosting possible at all: there is no company to ask for the data and no permission to be granted, because the data was already broadcast in public.</p>
+        <p>Your membership, therefore, is your own. It is attached to a keypair you hold rather than to a profile on this site, it works the same way on every other application reading the same protocol, and nothing here can revoke it.</p>
+
+        <h3>Applications That Publish Under Your Own Identity</h3>
+        <p>What varies is whether the application publishes anything, and which key it signs with. Three are known to publish under a key belonging to the listener.</p>
+        <ul>
+          <li><strong><a href="https://fountain.fm" target="_blank" rel="noopener noreferrer">Fountain</a></strong> publishes a boost note automatically and accounts for the bulk of what this index holds. The signing key is one Fountain manages on your behalf rather than an identity you brought with you, so a name here will not always match the one you use elsewhere on Nostr.</li>
+          <li><strong><a href="https://boostmebitch.com" target="_blank" rel="noopener noreferrer">BoostMeBitch</a></strong> publishes a note signed by the Nostr identity you connect to it.</li>
+          <li><strong><a href="/">OnlyBoosts</a></strong> publishes a note for a boost sent from this site, signed by the identity you signed in with, when you choose to share it. A boost sent from here and not shared is not counted, on exactly the terms applied to every other source.</li>
+        </ul>
+        <p>That is a short list and it is the single largest constraint on this data. It is not, however, a closed one. NIP-73 is an open specification and this site operates no registry: an application that begins publishing boost notes in the format set out under <a href="#pipeline">How the Index Is Built</a> appears here on the next scan, with no registration, no key and no permission required from anyone. The coverage of this index improves as adoption does, which is the premise the project rests on.</p>
+        <p>A fourth source, <a href="https://localbitcoiners.com" target="_blank" rel="noopener noreferrer">Local Bitcoiners</a>, publishes boost notes from its own website widget and is not listed above for one reason: it covers a single show rather than a catalogue, so it is not a route a listener can take to boosting podcasts generally. Its boosts are indexed on the same terms as any other.</p>
+        <p>Boosting without any of this remains entirely possible, and nothing about it is worse. A listener who never publishes a note has still paid the show; the sats and the message arrive exactly the same way. What they do not get is a public record, which is the whole of what membership here means. <a href="#bots">Accounts That Publish for Other People</a> covers the third case, where somebody else publishes the note instead.</p>
+      </section>
+
+      <section id="bots">
+        <h2>Accounts That Publish for Other People</h2>
+        <p>A second route into this index exists, and it produces a different result. It is the explanation for any boost here carrying a name that is not a person&rsquo;s.</p>
+        <p>Because most podcast applications publish nothing to Nostr, a small number of automated accounts have stepped into the gap. They observe boosts sent by listeners who published nothing themselves and publish a note for each one, so the boost is recorded rather than lost. Five such keys are known to this index.</p>
+        <ul>
+          <li><strong>ChadF Boost Bot</strong> is much the largest, carrying over a thousand boosts sent from Castamatic, StableKraft, PodcastGuru, CurioCaster, LN Beats, Podverse and ten further applications, each named in the note it publishes.</li>
+          <li><strong><a href="https://boostmebitch.com" target="_blank" rel="noopener noreferrer">BoostMeBitch</a></strong> keeps a site account for the same purpose, publishing a note for a listener who boosted from that site without connecting an identity. It therefore appears in both lists on this page: the application publishes under your own key when you have one, and under its own when you do not.</li>
+          <li><strong>lnaddress music</strong> publishes boosts sent to music feeds through a Lightning address.</li>
+          <li><strong>Local Bitcoiners</strong> publishes a note for a boost to that show where the donor produced none themselves, which is the case for roughly a quarter of them.</li>
+          <li><strong>OnlyBoosts</strong> signs a note for a boost sent from this site by someone with no Nostr identity, so a listener who wants no account still counts toward the show&rsquo;s totals.</li>
+        </ul>
+        <p>The list is maintained by hand and nothing detects these accounts automatically. Identifying an account as one of them is a claim, and the cost of getting it wrong is a real person left off a leaderboard.</p>
+
+        <h3>Why the Boost Is Credited to the Key</h3>
+        <p>These notes frequently name the person who sent the boost, either in the message or in a sender field. That name is not treated as an identity here and cannot be, because nothing verifies that the person named authorised a note signed by a key they do not hold. The booster credited is therefore the key that signed the note, and the name travels as ordinary text. The same rule is applied to this site&rsquo;s own bot.</p>
+        <p>The consequence is worth stating plainly, because it runs in both directions. Every one of these boosts is indexed: it counts toward the sats and boost totals, appears on the show and episode pages, and ranks in the feeds exactly as any other boost does. Nothing about it is second class. What these keys are excluded from is the two surfaces that rank <em>people</em>, being the member wall and the #40HPW boards. A single key carrying a thousand boosts from dozens of different listeners would lead both, on other people&rsquo;s listening, and that is a claim about who the top members are that the data cannot support. They remain findable by search, since a search result is not a ranking, and each has an ordinary booster page.</p>
+        <p>They are listed on the <a href="/#members">Members</a> tab with their totals rather than quietly removed. The role they fill is a real one: they are the only reason a listener who wants no Nostr account is represented on this site at all.</p>
       </section>
 
       <section id="stats">
@@ -285,6 +345,7 @@
           <li><strong><a href="https://localbitcoiners.com" target="_blank" rel="noopener noreferrer">Local Bitcoiners</a></strong> publishes a note carrying an <code>amount</code> tag from its website boost widget.</li>
           <li><strong><a href="/">OnlyBoosts</a></strong> publishes a note for a boost sent from this site, when the booster is signed in and elects to share it.</li>
         </ul>
+        <p>Those four are applications a listener boosts from directly. A further five keys publish boost notes on behalf of listeners who published nothing themselves, and <a href="#bots">Accounts That Publish for Other People</a> covers them and how they are counted.</p>
         <p>This site indexes its own output on the same terms as every other source; it receives no precedence in the feeds or the totals, and a boost sent from here that is not shared to Nostr is not counted, exactly as for an application that publishes nothing.</p>
         <p>That is a short list and it is the single largest constraint on this data. Nothing about the index is specific to those four applications, however. NIP-73 is an open standard, so any application that begins publishing boost notes in the same format will appear here automatically, without registration or coordination. The coverage of this index improves as adoption grows; that is the premise the site is built on.</p>
       </section>
@@ -473,13 +534,14 @@
          footer is the nav's site map repeated, so they're regrouped together
          or not at all. -->
     <div class="footer-col">
+      <!-- ⚠️ ONE ENTRY PER TAB, and it mirrors the nav's Explore menu exactly.
+           The two are the site map and are regrouped together or not at all;
+           each lands on that tab's default sub-feed. See partials/nav.html. -->
       <h3>Feeds</h3>
       <ul>
-        <li><a href="/#episodes-global">🎙 Episodes</a></li>
-        <li><a href="/#shows">📻 Shows</a></li>
-        <li><a href="/#songs-global">🎵 Songs</a></li>
-        <li><a href="/#albums">💿 Albums</a></li>
-        <li><a href="/#boosts-global">⚡ Boosts</a></li>
+        <li><a href="/#episodes-global">🎙 Podcasts</a></li>
+        <li><a href="/#albums">🎵 Music</a></li>
+        <li><a href="/#members">👥 Members</a></li>
       </ul>
     </div>
 
@@ -487,7 +549,6 @@
       <h3>Stats</h3>
       <ul>
         <li><a href="/stats">📊 Boost Stats</a></li>
-        <li><a href="/boosters">🧑‍🤝‍🧑 Community</a></li>
       </ul>
     </div>
 
@@ -558,15 +619,15 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v113"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v136"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v113" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v136" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v113" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v136" defer></script>
 
-<script src="/assets/js/nav.js?v=ob-v113" defer></script>
+<script src="/assets/js/nav.js?v=ob-v136" defer></script>
 
 </body>
 </html>

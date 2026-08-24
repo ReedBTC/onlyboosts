@@ -413,21 +413,22 @@ function renderEpisodePage({ ep, supporters, boosts, boosterCount, latestTs, nam
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v113" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v113" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v113" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v113" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v136" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v136" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v136" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v136" />
   <!-- The hero, the community wall and the boost list are the show page's, so
        this page links its stylesheet and adds only the deltas. -->
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v113" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v136" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v136" />
   <!-- The episode card, for the community-episodes section: the same chrome
        feeds-podcasts.js paints on the homepage. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v113" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v136" />
   <!-- The boost thread inside a card's drawer, and its reply / like / repost /
        zap bar. Only this page's community section needs them; /show does not. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v113" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v113" />
-  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v113" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v136" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v136" />
+  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v136" />
 </head>
 <body data-episode-guid="${htmlEscape(ep.item_guid)}"${ep.podcast_guid ? ` data-show-guid="${htmlEscape(ep.podcast_guid)}"` : ""}>
 
@@ -459,28 +460,39 @@ function renderEpisodePage({ ep, supporters, boosts, boosterCount, latestTs, nam
           </div>
           <a class="nav-explore-home" href="/"><span aria-hidden="true">🏠</span> Home</a>
           <div class="nav-explore-groups">
-            <!-- Feeds: one entry per feed, matching the homepage's what-menu
-                 exactly (Episodes / Shows / Songs / Albums / Boosts). The
-                 Global vs Follows axis is deliberately absent — it's the
+            <!-- ⚠️ FEEDS IS ONE ENTRY PER TAB, NOT PER FEED. Reed's call,
+                 2026-08-23. It listed all five sub-feeds, which was right while
+                 the homepage hid them behind a dropdown and wrong the moment
+                 the tabs put them on screen: the nav then restated a control
+                 the page carries, in a different order, using different words
+                 for the same things. Each entry lands on that tab's DEFAULT
+                 sub-feed — TAB_DEFAULT in the index.html controller — so
+                 Podcasts opens Episodes, Music opens Albums and Members opens
+                 Boosts. **Those three hrefs and TAB_DEFAULT move together.**
+
+                 The Global vs Follows axis stays deliberately absent: it is the
                  second dropdown on the page itself, and listing both scopes
-                 here made the nav a grid restating a control the page already
-                 has. Songs and Albums are the music half of Episodes and
-                 Shows, split on <podcast:medium>; they sit next to the feeds
-                 they mirror rather than in a group of their own. -->
+                 here made the nav a grid restating a control the page has. -->
             <div class="nav-explore-group">
               <h4>Feeds</h4>
-              <a href="/#episodes-global"><span aria-hidden="true">🎙</span> Episodes</a>
-              <a href="/#shows"><span aria-hidden="true">📻</span> Shows</a>
-              <a href="/#songs-global"><span aria-hidden="true">🎵</span> Songs</a>
-              <a href="/#albums"><span aria-hidden="true">💿</span> Albums</a>
-              <a href="/#boosts-global"><span aria-hidden="true">⚡</span> Boosts</a>
+              <a href="/#episodes-global"><span aria-hidden="true">🎙</span> Podcasts</a>
+              <a href="/#albums"><span aria-hidden="true">🎵</span> Music</a>
+              <a href="/#members"><span aria-hidden="true">👥</span> Members</a>
             </div>
-            <!-- Stats: the aggregate views over the same data. Both are
-                 coming-soon pages for now (noindex, out of the sitemap). -->
+            <!-- Stats: the aggregate view over the same data. A coming-soon
+                 page for now (noindex, out of the sitemap).
+
+                 ⚠️ /boosters (Community) WAS THE SECOND ENTRY AND THE PAGE IS
+                 DELETED, not redirected. Reed's call, 2026-08-23: the Members
+                 tab now answers what it promised — the member lookup, the
+                 top-members wall and the #40HPW boards — so leaving a
+                 placeholder here pointed a reader at a promise for content that
+                 exists one tab over. It was never linked from anywhere but this
+                 menu and the footer, was noindex and out of the sitemap, so it
+                 has no inbound links to preserve and gets no redirect. -->
             <div class="nav-explore-group">
               <h4>Stats</h4>
               <a href="/stats"><span aria-hidden="true">📊</span> Boost Stats</a>
-              <a href="/boosters"><span aria-hidden="true">🧑‍🤝‍🧑</span> Community</a>
             </div>
             <div class="nav-explore-group">
               <h4>More</h4>
@@ -571,13 +583,14 @@ function renderEpisodePage({ ep, supporters, boosts, boosterCount, latestTs, nam
          footer is the nav's site map repeated, so they're regrouped together
          or not at all. -->
     <div class="footer-col">
+      <!-- ⚠️ ONE ENTRY PER TAB, and it mirrors the nav's Explore menu exactly.
+           The two are the site map and are regrouped together or not at all;
+           each lands on that tab's default sub-feed. See partials/nav.html. -->
       <h3>Feeds</h3>
       <ul>
-        <li><a href="/#episodes-global">🎙 Episodes</a></li>
-        <li><a href="/#shows">📻 Shows</a></li>
-        <li><a href="/#songs-global">🎵 Songs</a></li>
-        <li><a href="/#albums">💿 Albums</a></li>
-        <li><a href="/#boosts-global">⚡ Boosts</a></li>
+        <li><a href="/#episodes-global">🎙 Podcasts</a></li>
+        <li><a href="/#albums">🎵 Music</a></li>
+        <li><a href="/#members">👥 Members</a></li>
       </ul>
     </div>
 
@@ -585,7 +598,6 @@ function renderEpisodePage({ ep, supporters, boosts, boosterCount, latestTs, nam
       <h3>Stats</h3>
       <ul>
         <li><a href="/stats">📊 Boost Stats</a></li>
-        <li><a href="/boosters">🧑‍🤝‍🧑 Community</a></li>
       </ul>
     </div>
 
@@ -613,12 +625,12 @@ function renderEpisodePage({ ep, supporters, boosts, boosterCount, latestTs, nam
 
 <script type="application/json" id="episode-boost-payload">${jsonForScript(boostPayload)}</script>
 
-<script src="/assets/js/nav.js?v=ob-v113" defer></script>
-<script src="/assets/js/episode-page.js?v=ob-v113" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v136" defer></script>
+<script src="/assets/js/episode-page.js?v=ob-v136" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v113"></script>
-<script src="/assets/js/sw-register.js?v=ob-v113" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v136"></script>
+<script src="/assets/js/sw-register.js?v=ob-v136" defer></script>
 </body>
 </html>`;
 }
@@ -991,10 +1003,10 @@ function notFound(guid) {
   <meta name="robots" content="noindex" />
   <title>Episode not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v113" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v113" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v113" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v113" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v136" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v136" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v136" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v136" />
 </head>
 <body>
 <section class="page-header">
@@ -1012,7 +1024,7 @@ function notFound(guid) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v113" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v136" defer></script>
 </body>
 </html>`;
   return new Response(html, {

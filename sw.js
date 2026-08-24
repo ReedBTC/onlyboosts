@@ -470,7 +470,93 @@
 // session-only because the at-rest scheme encrypts the NWC URI to the user's
 // own signer. The widget bundle changed, so a returning visitor needs the new
 // URL.
-const VERSION = 'ob-v113';
+// ob-v114: the show card is two-sided. assets/js/show-card.js emits it as an
+// HTML string and assets/js/show-card-actions.js attaches its verbs, so the
+// same definition can render at the edge and in the browser — which is what
+// lets the homepage open on Shows without going back to painting a shell.
+// shows-feed.js is now the feed around that card rather than the card itself.
+// REQUIRED: shows-feed.js gains static imports of two modules that have never
+// existed, so a returning visitor holding the old copy against a fresh graph is
+// the ob-v53 link-time failure exactly.
+// ob-v115: the what-dropdown became three tabs — Podcasts, Music, Members —
+// on Local Bitcoiners' feeds.html pattern, with the sub-feed on a row under
+// them. index.html's markup and inline CSS changed; no module did. Bumped so
+// the build is identifiable from sw.js, which is how a deploy gets verified
+// here, and because /index.html is precached under the versioned cache name.
+// ob-v116: the sub-feeds are blocks aligned under the tab they belong to, and
+// the sticky chrome is one ground again. The sub-row carried `--tint`, which
+// put the feed's own wash between two bands of `--cream` and made the header
+// read as four alternating stripes. index.html only.
+// ob-v117: the Boosts feed's search asks the index instead of the rows in
+// memory. New endpoint /api/v1/members, two readers in ob-live.js, and
+// boosts-feed.js fetches a picked member's own boosts rather than filtering
+// what is loaded. REQUIRED: ob-live.js gains exports boosts-feed.js imports
+// statically, which is the ob-v53 link-time failure exactly.
+// ob-v118: the seam between the tabs and the sub-feeds runs all the way
+// across, including under the selected tab, where the two share a fill and had
+// merged into one slab. `--accent-d` inside the accent column so it reads as a
+// fold; the sub-blocks touch each other and the tab above, like the tabs do.
+// ob-v119: the homepage track is 60rem, the width /show, /episode and
+// /booster already use. It was 720px, so the column changed width the moment a
+// reader clicked through to a detail page. index.html only.
+// ob-v120: /api/v1/members/hours — the 40 HPW boards, this week and the best
+// weeks ever recorded. Backend only; nothing renders it yet.
+// ob-v121: the 40 HPW boards render on the Members tab. New module
+// assets/js/members-board.js, lazily imported by feeds.js when either boosts
+// feed activates. index.html gains the block and its styles.
+// ob-v122: the 40 HPW boards actually render. They were hooked to
+// lb:feed-activate only, which the cold load does not go through, so the
+// section was an empty gap on every reload and every shared link. The copy
+// spans the track now instead of taking a prose measure.
+// ob-v123: the member wall lands on the Members tab, and it is the SAME wall
+// /show and /episode render — renderSupporters and its CSS both moved into
+// two-sided files rather than being copied. /api/v1/members with no q is the
+// top-members listing. REQUIRED: three page modules now import initShowMore
+// through a module that did not exist, which is the ob-v53 link-time failure.
+// ob-v124: #40HPW gains its challenge subtitle and a Rules dialog, replacing
+// two paragraphs that said the same thing twice; the boards read hpw; and the
+// member wall ranks three ways — sats, boosts, shows.
+// ob-v125: publisher keys are out of the member LISTING and still in the
+// SEARCH. chadf_boostbot topped both the boosts and shows orderings on other
+// people's listening. PUBLISHERS moved to _common.js so one list serves the
+// wall and the 40 HPW boards.
+// ob-v126: the four publisher keys get a Boost Bots section of their own, so
+// the exclusion above is shown rather than merely applied, and the Members
+// intro's (i) links out to /about#membership. about.html gains both anchors.
+// ob-v127: the member lookup leaves the Boosts panel, leads the tab, and
+// NAVIGATES to /booster/<npub> instead of filtering the feed; the member wall
+// gains the feeds' own range and sort controls rather than a shape of its own.
+// ob-v128: the feed bar is MOVED into the Members tab, under the three sections
+// above the boost list, and moved back on every other tab. index.html only.
+// ob-v129: all four Members sections take the detail pages' shell and lid, and
+// an empty range keeps its controls instead of replacing them with a dead end.
+// ob-v130: the Boosts lid rejoins its own feed as one two-element shell, and
+// the note feed gains 1Y — not a new query, but the treatment All already had.
+// ob-v131: the members feed is addressed as #members (#boosts-global and
+// #boosts-follows are ALIASES now and must stay so — they were the shipped
+// hashes until this version), and the all-time board is High Scores.
+// ob-v132: /booster's stat tiles carry rank chips, over the member wall's own
+// population, and the episodes tile comes off because nothing ranks by it.
+// ob-v136: the phone's tab chips read the accent's new fourth step. White on
+// --bg-accent was 2.50:1 and the same colour as ink on cream was 2.29:1, so the
+// Members chip was illegible either way and Shows was marginal; every -dd is
+// >= 6:1 now. Also: the #40HPW board titles are centred, and the Boost Bots
+// section is "Shoutout to the Boost Bots".
+// ob-v135: #40HPW weeks reset at midnight US Pacific instead of 00:00 UTC.
+// Monday 00:00 UTC is Sunday evening across the Americas; Pacific is the last
+// US zone into Monday. The Rules dialog and the This Week sub-line say so.
+// ob-v134: the LB strip finishes. feeds.js loses the whole Events path
+// (50.4KB → 12.4KB), boosts-thread.js loses the megathread fetch (29.6KB →
+// 18.4KB), calendar-events.js and supporter-set.js are deleted, and the widget
+// bundle drops 22 dead source files (1,051KB → 929KB). /boosters is deleted
+// too. REQUIRED: calendar-events.js leaves PRECACHE_URLS, so a returning
+// visitor holding the old list would keep trying to precache a 404.
+// ob-v133: PHASE D — the front door opens on Shows / All / Most boosters.
+// functions/index.js server-renders show cards into <!--OB:SSR-SHOWS-->
+// inside the Shows panel and shows-feed.js adopts them; the Episodes panel
+// ships its placeholder again, one feed being rendered at the edge and it
+// being the one on screen.
+const VERSION = 'ob-v136';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;
@@ -502,27 +588,26 @@ const PRECACHE_URLS = [
   '/assets/onlyboosts_pfp.png',
   '/assets/onlyboosts_banner.png',
   '/assets/avatar-fallback.svg',
-  '/assets/css/theme.css?v=ob-v113',
-  '/assets/css/page.css?v=ob-v113',
-  '/assets/css/nav.css?v=ob-v113',
-  '/assets/css/footer.css?v=ob-v113',
-  '/assets/css/boosts-thread.css?v=ob-v113',
-  '/assets/css/boost-actions.css?v=ob-v113',
+  '/assets/css/theme.css?v=ob-v136',
+  '/assets/css/page.css?v=ob-v136',
+  '/assets/css/nav.css?v=ob-v136',
+  '/assets/css/footer.css?v=ob-v136',
+  '/assets/css/boosts-thread.css?v=ob-v136',
+  '/assets/css/boost-actions.css?v=ob-v136',
   // The episode card and its drawer. Precached alongside the others because the
   // homepage's feeds are painted in it and it used to be inline in index.html,
   // which IS precached — leaving it out would trade an inline block for a
   // network round trip on the one page this list exists to make fast.
-  '/assets/css/feed-cards.css?v=ob-v113',
-  '/assets/js/boosts-thread.js?v=ob-v113',
+  '/assets/css/feed-cards.css?v=ob-v136',
+  '/assets/js/boosts-thread.js?v=ob-v136',
   // A static import of boosts-thread.js, so precaching that without this one
   // leaves a returning visitor fetching half the graph from the network.
-  '/assets/js/primal-profiles.js?v=ob-v113',
-  '/assets/js/calendar-events.js?v=ob-v113',
-  '/assets/js/boost-actions.js?v=ob-v113',
-  '/assets/js/nav.js?v=ob-v113',
-  '/assets/js/nav-widget-boot.js?v=ob-v113',
-  '/assets/js/widget-loader.js?v=ob-v113',
-  '/assets/js/sw-register.js?v=ob-v113',
+  '/assets/js/primal-profiles.js?v=ob-v136',
+  '/assets/js/boost-actions.js?v=ob-v136',
+  '/assets/js/nav.js?v=ob-v136',
+  '/assets/js/nav-widget-boot.js?v=ob-v136',
+  '/assets/js/widget-loader.js?v=ob-v136',
+  '/assets/js/sw-register.js?v=ob-v136',
 ];
 
 self.addEventListener('install', (event) => {

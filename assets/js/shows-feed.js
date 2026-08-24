@@ -53,29 +53,37 @@
  */
 import {
   getShowPage, searchShows, getShowEpisodes, SEARCH_HITS, SEARCH_MIN_CHARS,
-} from '/assets/js/ob-live.js?v=ob-v113'
+} from '/assets/js/ob-live.js?v=ob-v136'
 import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls,
-} from '/assets/js/feed-controls.js?v=ob-v113'
+} from '/assets/js/feed-controls.js?v=ob-v136'
 // Its own module, not two more exports of feed-controls.js — see the ⚠️ note
 // at the top of that file for the four-hour window that shape opens.
-import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v113'
+import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v136'
 import {
   LANG_ALL, languageOptions, langControl, langNote, langNoMatchText, langLabelFor,
-} from '/assets/js/feed-lang.js?v=ob-v113'
-import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v113'
-import { competitionRanks, rankLabel } from '/assets/js/rank.js?v=ob-v113'
-import { showPageHref, episodePageHref } from '/assets/js/show-link.js?v=ob-v113'
-// Show-level boosting. Same four pieces the episode feed uses, and deliberately
-// the same ones: fromApiValue / applyExternalOverrides are where the split
-// logic lives, and sharing them is what keeps every surface paying the value
-// block a feed actually published.
-import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v113'
-import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v113'
-import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v113'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v113'
-import { boostButton, withBoostBusy } from '/assets/js/boost-button.js?v=ob-v113'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v113'
+} from '/assets/js/feed-lang.js?v=ob-v136'
+import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v136'
+import { competitionRanks, rankLabel } from '/assets/js/rank.js?v=ob-v136'
+/* ⚠️ THE CARD ITSELF IS NOT IN THIS FILE ANY MORE. show-card.js emits it as an
+ * HTML string and show-card-actions.js attaches its verbs, which is what lets
+ * functions/index.js render the opening page of this feed at the edge — a
+ * Function can splice a string into index.html and cannot run a DOM builder.
+ * The copy table, the sort options, the rank value and the episode rows moved
+ * with it, so both sides read one definition. See CLAUDE.md, "One Module,
+ * Imported From Both Sides".
+ *
+ * Nothing is re-exported: feeds.js reaches this module for `renderShows` and
+ * nothing else, so there is no importer of COPY or SORT_OPTIONS to keep whole.
+ * feeds-podcasts.js does re-export episode-card.js's copy table, because it has
+ * one. */
+import {
+  COPY, copyFor, toCard, showCardHtml, showRankValue,
+  SORT_OPTIONS, RANKED_SORTS, SHOW_CARDS_PER_PAGE,
+  num, fmtSats, plural,
+} from '/assets/js/show-card.js?v=ob-v136'
+import { wireShowCards } from '/assets/js/show-card-actions.js?v=ob-v136'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v136'
 
 /* ── The hash's language, on an already-hydrated feed ──
  * The twin of the map in feeds-podcasts.js, and there for the same reason: a
@@ -91,8 +99,9 @@ document.addEventListener('lb:set-feed-lang', (e) => {
   if (apply) apply(detail.lang || LANG_ALL)
 })
 
-const PAGE_SIZE = 25       // show cards per "load more" batch
-const DRAWER_EPISODES = 50 // episodes listed per expanded show
+// One number, declared in show-card.js and read by the edge too. See the note
+// over SHOW_CARDS_PER_PAGE there.
+const PAGE_SIZE = SHOW_CARDS_PER_PAGE
 
 function h(tag, attrs = {}, kids = []) {
   const el = document.createElement(tag)
@@ -110,159 +119,12 @@ function h(tag, attrs = {}, kids = []) {
   return el
 }
 
-function isSafeUrl(url) {
-  if (typeof url !== 'string') return false
-  try {
-    const u = new URL(url)
-    return u.protocol === 'http:' || u.protocol === 'https:'
-  } catch { return false }
-}
-
-// The shards stringify their numerics ("9", "55987", "None"), and the index
-// is not contractually typed either — coerce rather than trusting typeof.
-function num(v) {
-  const n = typeof v === 'number' ? v : parseInt(v, 10)
-  return Number.isFinite(n) ? n : 0
-}
-
-function fmtSats(n) {
-  if (!Number.isFinite(n) || n <= 0) return '0'
-  if (n >= 1000000) return `${(n / 1000000).toFixed(n % 1000000 ? 1 : 0)}M`
-  if (n >= 1000) return `${(n / 1000).toFixed(n % 1000 ? 1 : 0)}k`
-  return String(n)
-}
-
-function relTime(ts) {
-  if (!Number.isFinite(ts) || ts <= 0) return ''
-  const sec = Math.floor(Date.now() / 1000) - ts
-  if (sec < 3600) return `${Math.max(1, Math.floor(sec / 60))}m ago`
-  if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`
-  if (sec < 2592000) return `${Math.floor(sec / 86400)}d ago`
-  return new Date(ts * 1000).toLocaleDateString()
-}
-
-function shortDate(ts) {
-  if (!Number.isFinite(ts) || ts <= 0) return ''
-  return new Date(ts * 1000).toLocaleDateString(undefined, {
-    month: 'short', day: 'numeric', year: 'numeric',
-  })
-}
-
-function plural(n, one, many) {
-  return `${n.toLocaleString()} ${n === 1 ? one : many}`
-}
-
 function renderPlaceholder(list, title, body) {
   list.className = ''
   list.replaceChildren(h('div', { class: 'feed-placeholder' }, [
     h('strong', { text: title }), document.createTextNode(body || ''),
   ]))
 }
-
-// ── Copy ──────────────────────────────────────────────────────────────
-// Everything that differs between Shows and Albums. Nothing structural does.
-const COPY = {
-  other: {
-    glyph: '🎙',
-    unidentified: 'Unidentified show',
-    noun: 'show',
-    drawer: 'Episodes with Nostr Boosts',
-    noItems: 'No episodes recorded for this show yet.',
-    truncated: (n, total) => `Showing the ${n} most recent of ${total} episodes.`,
-    untitledItem: 'Untitled episode',
-    rangeLabel: 'Filter by when the show was boosted',
-    rangeTitle: (days) => (days ? `Shows boosted in the last ${days} days` : 'All time'),
-    sortTitle: 'Sort shows',
-    // The line above the search box. See mountFeedNote in feed-controls.js.
-    noteGlobal: 'Ranks based on every boost in the index',
-    moreLabel: (n) => `Load ${n} more show${n === 1 ? '' : 's'}`,
-    // No total to count against: the endpoint pages rather than reporting how
-    // many shows the range holds, so this states what is on screen and nothing
-    // it cannot support.
-    countLine: (shown) => `Showing ${shown}`,
-    searchPlaceholder: 'Search shows…',
-    searchLabel: 'Search shows',
-    searchNoun: 'show',
-    loadFail: ['Couldn’t load shows', ' The podcast index is unavailable right now — please try again later.'],
-    rangeFail: ['Couldn’t load shows', ' The boosts feed is unavailable right now — please try again later.'],
-    loading: ['Loading this window…', ' Rolling the boosts in this range up by show.'],
-    emptyAll: ['No shows in this window', ' When someone boosts a podcast episode on Nostr, its show will appear here.'],
-    emptyWindow: ['No shows in this window', ' Nothing was boosted in this time range — try a wider one.'],
-    outOfRange: (label) => ` ${label} wasn’t boosted in this time range — widen the range, or clear the search.`,
-    // A miss means two different things and the single old line read as both.
-    // On All the search has seen the whole index, so it is a COVERAGE boundary
-    // rather than a filter to widen: a show nobody has boosted on Nostr is not
-    // in the index and will not be until somebody does.
-    searchNoneAll: 'No show matches. The index holds only shows someone has boosted on Nostr.',
-    searchNoneRange: 'No show matches in this time range. Try All.',
-  },
-  music: {
-    glyph: '💿',
-    unidentified: 'Unidentified release',
-    noun: 'album',
-    drawer: 'Tracks with Nostr Boosts',
-    noItems: 'No tracks recorded for this release yet.',
-    truncated: (n, total) => `Showing the ${n} most recent of ${total} tracks.`,
-    untitledItem: 'Untitled track',
-    rangeLabel: 'Filter by when the album was boosted',
-    rangeTitle: (days) => (days ? `Albums boosted in the last ${days} days` : 'All time'),
-    sortTitle: 'Sort albums',
-    noteGlobal: 'Ranks based on every boost in the index',
-    moreLabel: (n) => `Load ${n} more album${n === 1 ? '' : 's'}`,
-    // No total to count against: the endpoint pages rather than reporting how
-    // many shows the range holds, so this states what is on screen and nothing
-    // it cannot support.
-    countLine: (shown) => `Showing ${shown}`,
-    searchPlaceholder: 'Search albums…',
-    searchLabel: 'Search albums',
-    searchNoun: 'album',
-    loadFail: ['Couldn’t load albums', ' The podcast index is unavailable right now — please try again later.'],
-    rangeFail: ['Couldn’t load albums', ' The boosts feed is unavailable right now — please try again later.'],
-    loading: ['Loading this window…', ' Rolling the boosts in this range up by album.'],
-    emptyAll: ['No albums in this window', ' When someone boosts a track from a music feed on Nostr, its album will appear here.'],
-    emptyWindow: ['No albums in this window', ' Nothing was boosted in this time range — try a wider one.'],
-    outOfRange: (label) => ` ${label} wasn’t boosted in this time range — widen the range, or clear the search.`,
-    searchNoneAll: 'No album matches. The index holds only releases someone has boosted on Nostr.',
-    searchNoneRange: 'No album matches in this time range. Try All.',
-  },
-}
-
-// ── Range + sort ──────────────────────────────────────────────────────
-// The range filters on boost time: a show is in the 1W view if it was boosted
-// in the last 7 days, and its numbers are that week's numbers. (The Episodes
-// feeds' identical buttons mean episode air date, which is a different axis —
-// each feed writes its own tooltips for exactly that reason.)
-
-// ── On the absence of an episode count ────────────────────────────────
-// There used to be a fifth axis here, 'Most episodes', and a matching figure
-// on every card. Both are gone, and the data behind them is still loaded (the
-// drawer needs it) but never displayed as a number.
-//
-// The reason: sats, boosts and boosters are measures of boost activity and
-// have no meaning outside it, so "as published to Nostr" is the only available
-// reading of them. An episode count is different in kind — it is a property of
-// the podcast, with a true value out in the world — so printing one next to a
-// show's name reads as a claim about the show. Ours is not that claim. It
-// counts episodes carrying at least one boost we indexed, which excludes
-// keysend boosts entirely and any boost published before NIP-73 tagging was
-// in use.
-//
-// Measured against the shows' own RSS: we held 70 for Rabbit Hole Recap
-// against 415 real episodes, and 64 for LINUX Unplugged against 676. It also
-// runs the other way — 22 against 21 for Local Bitcoiners — because episodes
-// are keyed off item_guid from boosts and a feed can drop or re-guid an item.
-// So the number was not even reliably a subset, and no label short enough to
-// fit a card could have fixed it.
-const SORT_OPTIONS = [
-  ['boosts', 'Most boosts'],
-  ['sats', 'Most sats'],
-  ['boosters', 'Most boosters'],
-  ['latest', 'Recently boosted'],
-]
-
-// Sorts where a position means something, so the card gets a rank number.
-// 'latest' is chronology, not standing.
-const RANKED_SORTS = new Set(['boosts', 'sats', 'boosters'])
 
 /* ⚠️ THE COMPARATORS ARE GONE, AND THAT WAS A CORRECTNESS FIX RATHER THAN A
  * SPEEDUP — the same move the Episodes feeds made, and this was the last
@@ -305,307 +167,6 @@ async function loadShowPage({ medium, sort, range, lang, offset, signal }) {
   return { items: records.map(toCard), nextOffset }
 }
 
-function toCard(p) {
-  return {
-    guid: p.guid,
-    title: typeof p.title === 'string' ? p.title : '',
-    img: typeof p.img === 'string' ? p.img : '',
-    // The feed's OTHER artwork URL, published only when it differs from `img`.
-    // A handful of shows have a dead primary and a live second — see
-    // cover-art.js.
-    art2: typeof p.art2 === 'string' ? p.art2 : '',
-    feed: typeof p.feed === 'string' ? p.feed : '',
-    // <itunes:author>: the artist on a music feed, the host or publisher on a
-    // podcast. Matched by the search box server-side, never displayed here —
-    // the credit line belongs on the show's own page, next to its name.
-    author: typeof p.author === 'string' ? p.author : '',
-    boosts: num(p.boosts),
-    sats: num(p.sats),
-    boosters: num(p.boosters),
-    episodes: num(p.episodes),
-    latest: num(p.latest),
-    // Present only on a search hit: the position in the FULL ordering, which a
-    // filtered page cannot be numbered by. See the rank note in repaint().
-    rank: Number.isFinite(p.rank) ? p.rank : null,
-  }
-}
-
-// ── Episode drawer ────────────────────────────────────────────────────
-// Newest episode first: the list reads as the show's recent catalogue, with
-// each row carrying what it took. The episode-level ranking question is what
-// the Episodes feeds are for.
-//
-// The row's TITLE links to that episode's page here, the same rule and the same
-// module every other episode surface uses — see show-link.js#episodePageHref and
-// the link section in CLAUDE.md. It used to point at `e.url`, the audio itself,
-// which was the only destination this row had before the pages existed; that URL
-// is now the fallback for an episode with no title to qualify it, and it is the
-// only branch that still opens a new tab.
-//
-// Both sources feeding this carry a guid: the All path maps it off the per-show
-// shard, and the windowed rollup keys its own episode map on it.
-function renderEpisodes(into, eps, copy, { truncatedFrom = 0 } = {}) {
-  if (!eps.length) {
-    into.replaceChildren(h('div', { class: 'ob-show-note', text: copy.noItems }))
-    return
-  }
-  const list = h('ul', { class: 'ob-ep-list' })
-  for (const e of eps) {
-    const title = e.title || copy.untitledItem
-    const epHref = episodePageHref(e.guid, e.title)
-    const meta = [shortDate(e.date), e.boosts ? plural(e.boosts, 'boost', 'boosts') : null]
-      .filter(Boolean).join(' · ')
-    list.appendChild(h('li', { class: 'ob-ep' }, [
-      h('div', { class: 'ob-ep-main' }, [
-        epHref
-          ? h('a', {
-              class: 'ob-ep-title', href: epHref,
-              title: `Nostr boosts to ${title}`, text: title,
-            })
-          : isSafeUrl(e.url)
-            ? h('a', {
-                class: 'ob-ep-title', href: e.url,
-                target: '_blank', rel: 'noopener noreferrer', text: title,
-              })
-            : h('span', { class: 'ob-ep-title', text: title }),
-        meta ? h('span', { class: 'ob-ep-meta', text: meta }) : null,
-      ]),
-      e.sats ? h('span', { class: 'ob-ep-sats' }, [fmtSats(e.sats), h('span', { class: 'pcast-bolt', 'aria-hidden': 'true', text: ' ⚡' })]) : null,
-    ]))
-  }
-  into.replaceChildren(list)
-  if (truncatedFrom > eps.length) {
-    into.appendChild(h('div', { class: 'ob-show-note', text: copy.truncated(eps.length, truncatedFrom) }))
-  }
-}
-
-function sortEpisodes(eps) {
-  return [...eps].sort((a, b) => num(b.date) - num(a.date))
-}
-
-// ── Boost wiring ──────────────────────────────────────────────────────
-//
-// MONEY PATH. A show-level boost: it resolves the FEED-level value block (no
-// `guid` parameter) and pays exactly the split that feed published. The episode
-// feed's equivalent is feeds-podcasts.js#onBoostClick, which this deliberately
-// mirrors rather than imports — that module is the episode renderer, and
-// pulling it in here would drag the whole feed with it. The two share
-// fromApiValue / applyExternalOverrides, which is where the split logic lives.
-//
-// applyExternalOverrides is a documented passthrough and must stay one. No leg
-// of a third party's value block is ever rewritten, renamed, merged or dropped;
-// see the money-paths section of CLAUDE.md.
-const VALUE_API = '/api/value'
-
-// Hold the loading state until the widget actually shows something: its gate
-// chain (session restore, wallet unlock) can run for seconds on a cold bundle,
-// and a button that reverts before then reads as a click that did nothing.
-function waitForModal(timeoutMs = 40000) {
-  return new Promise((resolve) => {
-    const t0 = Date.now()
-    const tick = () => {
-      if (document.querySelector('[role="dialog"]')) return resolve('modal')
-      if (Date.now() - t0 > timeoutMs) return resolve('timeout')
-      setTimeout(tick, 200)
-    }
-    tick()
-  })
-}
-
-async function onShowBoost(s, btn, copy) {
-  // The rollup carries no Podcast Index numeric id, so the show is identified
-  // by guid and/or feed URL and /api/value resolves the id server-side.
-  if (!s.guid && !s.feed) { showToast(`Can’t identify this ${copy.noun}’s feed`, true); return }
-
-  await withBoostBusy(btn, async () => {
-  try {
-    const qs = new URLSearchParams()
-    if (s.guid) qs.set('podcastGuid', s.guid)
-    if (s.feed) qs.set('feedUrl', s.feed)
-
-    let data = null
-    try {
-      const resp = await fetch(`${VALUE_API}?${qs}`, { headers: { Accept: 'application/json' } })
-      // A server/config failure and "this show has no value block" are
-      // different outcomes and must not be conflated — otherwise an outage
-      // reads as every show being un-boostable.
-      if (!resp.ok) { showToast('Couldn’t load boost splits — please try again in a moment.', true); return }
-      data = await resp.json()
-    } catch { showToast('Couldn’t load boost splits — please try again in a moment.', true); return }
-    if (data && data.error) { showToast('Boost splits are unavailable right now.', true); return }
-
-    const parsed = fromApiValue(data)
-    if (!parsed) { showToast(`This ${copy.noun} has no value block to boost.`, true); return }
-
-    const recipients = applyExternalOverrides(parsed.recipients)
-    const totalWeight = recipients.reduce((a, r) => a + (r.splitWeight || 0), 0)
-    if (!recipients.length || totalWeight <= 0) { showToast(`This ${copy.noun} has no payable recipients.`, true); return }
-
-    await ensureLoginWidget()
-    if (!window.LBLogin?.openExternalBoost) { showToast('Boost is unavailable right now.', true); return }
-    window.LBLogin.openExternalBoost({
-      episode: {
-        showTitle: s.title || '',
-        // No episode: this is the show itself. The note template drops the
-        // link line and the `r` tag when there's no item to point at.
-        episodeTitle: '',
-        podcastGuid: s.guid || '',
-        itemGuid: '',
-        bmbUrl: episodeBoostLink({ itemGuid: '', podcastGuid: s.guid || null, feedId: null }) || '',
-      },
-      recipientsBundle: { recipients, totalWeight },
-    })
-    await waitForModal()
-  } catch (e) {
-    console.warn('[shows] boost failed', e)
-    showToast('Couldn’t start the boost — try again.', true)
-  }
-  })
-}
-
-// ── Card ──────────────────────────────────────────────────────────────
-// Built out of the episode card's chrome (.pcast-card and friends) rather than
-// a parallel set of its own, so the two feeds read as one system. Only the
-// stat row and the episode list are new.
-// `since` is the active range's cutoff (null on All). It reaches the card only
-// to scope the drawer's episode list to the same window the card's own figures
-// were computed over.
-function renderShowCard(s, rank, copy, since = null) {
-  // 462 of the 1,384 shows in the index (33%) have no title and no art: the
-  // collector holds a boost tagged with their guid but Podcast Index doesn't
-  // know the feed, so there is nothing to enrich from. They're the long tail —
-  // median 1 boost, 3.8% of all sats, and the first one doesn't appear until
-  // #28 on any sort — so they never crowd the first page. Kept rather than
-  // filtered (they're real boosts to real shows) but labelled for what they
-  // are, with the guid shown, so an unnamed card reads as incomplete data
-  // rather than a broken site.
-  const named = !!s.title
-  // Primary artwork, then the feed's second-chance URL, then the glyph. A dead
-  // host or a hotlink block falls back to the same glyph a show with no art
-  // gets, rather than leaving an empty box — `art2` just gives it one more real
-  // URL to try first. See cover-art.js.
-  const art = h('img', { alt: '', referrerpolicy: 'no-referrer', loading: 'lazy' })
-  const media = h('div', { class: 'pcast-card-media' }, art)
-  const hasArt = wireCoverFallback(art, coverChain(s.img, s.art2), () => {
-    media.classList.add('pcast-card-media--none')
-    media.replaceChildren(document.createTextNode(copy.glyph))
-  })
-  if (!hasArt) {
-    media.classList.add('pcast-card-media--none')
-    media.replaceChildren(document.createTextNode(copy.glyph))
-  }
-
-  // "Nostr Stats:" carries the qualifier that used to sit in a paragraph above
-  // the whole feed. Two words on the line the figures are already on, rather
-  // than three lines of caveat before the first card. It says what the numbers
-  // are counted from, which is the only reading of them that is true.
-  const stats = h('div', { class: 'pcast-meta ob-show-stats' }, [
-    h('span', { class: 'ob-stats-label', text: 'Nostr Stats:' }),
-    h('span', { class: 'pcast-sats' }, [fmtSats(s.sats), h('span', { class: 'pcast-bolt', 'aria-hidden': 'true', text: ' ⚡' })]),
-    h('span', { class: 'pcast-dot', 'aria-hidden': 'true', text: '·' }),
-    h('span', { text: plural(s.boosts, 'boost', 'boosts') }),
-    h('span', { class: 'pcast-dot', 'aria-hidden': 'true', text: '·' }),
-    h('span', { text: plural(s.boosters, 'booster', 'boosters') }),
-    // No episode count. See the note above SORT_OPTIONS: sats, boosts and
-    // boosters are measures of boost activity, but an episode count reads as a
-    // fact about the show, and ours isn't one.
-    //
-    // The boost button rides the end of this line rather than sitting in a
-    // button row of its own. It's the same pill the community drawer on a
-    // /show page uses, right-aligned by .ob-boost-pill's own margin-left,
-    // which is what keeps it off the figures on a narrow card. Withheld from
-    // unidentified shows for the same reason they get no landing page: Podcast
-    // Index doesn't know the feed, so there is no block to resolve and the
-    // button could only ever fail.
-    named && (s.guid || s.feed)
-      ? boostButton({
-          label: s.title || copy.noun,
-          onClick: (btn) => onShowBoost(s, btn, copy),
-        })
-      : null,
-  ])
-
-  const head = h('div', { class: 'pcast-card-head' }, [
-    rank ? h('div', { class: 'pcast-rank', text: String(rank) }) : null,
-    media,
-    h('div', { class: 'pcast-card-body' }, [
-      // Named shows link to their landing page (/show/<guid>); unnamed ones
-      // don't, because there is no page — the qualifying rule for a landing
-      // page is exactly "has a title". See docs/show-pages-spec.md.
-      h('h3', {
-        class: 'pcast-title' + (named ? '' : ' ob-show-unnamed'),
-      }, named && showPageHref(s.guid)
-        ? [h('a', { class: 'ob-show-link', href: showPageHref(s.guid), text: s.title })]
-        : (named ? s.title : copy.unidentified)),
-      // The guid stands in for a name we don't have. It's the only handle on
-      // the show, and it's what you'd search the collector for.
-      named ? null : h('div', { class: 'ob-show-guid', text: s.guid }),
-      stats,
-      s.latest ? h('div', { class: 'ob-show-latest', text: `last boost ${relTime(s.latest)}` }) : null,
-    ]),
-  ])
-
-  // No drawer when there's nothing to put in it. A show can legitimately have
-  // boosts and no episodes: the all-time index reports 0 for shows whose boosts
-  // never carried an episode guid, and the windowed rollup counts distinct
-  // guids, so the same holds there. Offering a drawer would spend a shard fetch
-  // to say "no episodes".
-  if (!s.episodes) return h('article', { class: 'pcast-card' }, [head])
-
-  const details = h('div', { class: 'pcast-details', hidden: 'hidden' })
-  const caret = h('span', { class: 'pcast-drawer-caret', 'aria-hidden': 'true', text: '▾' })
-  const drawer = h('button', {
-    class: 'pcast-drawer', type: 'button', 'aria-expanded': 'false',
-  // Named, not counted — see the note above SORT_OPTIONS. The drawer bar is
-  // full-width, so it has room to say exactly what the rows are rather than
-  // leaving "Episodes" to imply the show's catalogue.
-  }, [caret, h('span', { text: copy.drawer })])
-
-  const card = h('article', { class: 'pcast-card' }, [head, drawer, details])
-  let loaded = false
-
-  drawer.addEventListener('click', async () => {
-    const open = drawer.getAttribute('aria-expanded') === 'true'
-    drawer.setAttribute('aria-expanded', open ? 'false' : 'true')
-    details.hidden = open
-    card.classList.toggle('is-open', !open)
-    if (open || loaded) return
-    loaded = true
-
-    /* Both ranges fetch now, and both fetch the same thing.
-     *
-     * ⚠️ THIS RETIRES THE PER-SHOW SHARD, which was the largest request the
-     * site could make: 3.5KB at the median and 15KB at p90, but **1.95MB** for
-     * the most-boosted show, because a shard carries every boost it ever had
-     * plus full shownotes. The endpoint returns the episode rows and nothing
-     * else.
-     *
-     * The windowed ranges used to build this list in memory for free, since the
-     * browser was holding every boost in the window anyway. It no longer is —
-     * that aggregation is the thing that moved — so the window is passed to the
-     * server instead and the rows come back scoped and recounted. A drawer
-     * showing all-time figures under a card showing the week's would contradict
-     * the card it opened from.
-     */
-    details.replaceChildren(h('div', { class: 'ob-show-note', text: 'Loading episodes…' }))
-    try {
-      const rows = await getShowEpisodes({ guid: s.guid, since })
-      const eps = rows.map((e) => ({
-        guid: e.guid, title: e.title || '', img: e.img || '',
-        date: num(e.date), num: num(e.num), url: e.url || '',
-        boosts: num(e.boosts), sats: num(e.sats),
-      }))
-      renderEpisodes(details, sortEpisodes(eps).slice(0, DRAWER_EPISODES), copy, { truncatedFrom: eps.length })
-    } catch (e) {
-      console.warn('[shows] episode load failed', s.guid, e)
-      loaded = false   // collapsing and reopening retries
-      details.replaceChildren(h('div', { class: 'ob-show-note', text: 'Couldn’t load this show’s episodes.' }))
-    }
-  })
-
-  return card
-}
-
 // ── entry point ───────────────────────────────────────────────────────
 /**
  * @param {Element} [opts.panel]  the feed's panel, for its feed key
@@ -616,7 +177,7 @@ function renderShowCard(s, rank, copy, since = null) {
  */
 export async function renderShows({ panel, list, medium = 'other', lang = null }) {
   if (!list) return
-  const copy = COPY[medium] || COPY.other
+  const copy = copyFor(medium)
   const wantMusic = medium === 'music'
   // Neither of these re-renders today (Global only, so no account switch
   // reaches them), but the reset is what makes that a fact about the feed
@@ -627,10 +188,13 @@ export async function renderShows({ panel, list, medium = 'other', lang = null }
   // All time is the opening view: the all-time leaderboard is the question a
   // show-level feed is for. The windowed ranges narrow it.
   let rangeKey = 'all'
-  // Raw boost volume, matching the episode rollup's default — the ranking the
-  // feed is *for*. 'boosters' ranks by distinct people instead, which differs
-  // wherever someone boosts the same show repeatedly (most of them).
-  let sortKey = 'boosts'
+  /* Distinct people, matching the episode rollup's default: one listener
+   * boosting a show forty times is one vote, not forty. It was 'boosts' (raw
+   * volume) until Phase D put the front door on this feed, and the two differ
+   * wherever someone boosts the same show repeatedly, which is most of them.
+   * ⚠️ Must match FEED.sort in functions/index.js, or the reader watches the
+   * server's list get replaced by a different one. */
+  let sortKey = 'boosters'
   // No language filter, which is NOT the same as English: 341 shows on this
   // side of the medium split and 253 on the music side declare no <language>
   // at all, so All is the only key that holds every card. See feed-lang.js.
@@ -650,6 +214,18 @@ export async function renderShows({ panel, list, medium = 'other', lang = null }
   const langOptionsP = languageOptions({ medium: wantMusic ? 'music' : null })
 
   let shows = []          // the pages pulled so far, in the server's order
+  /* ⚠️ CARDS ON SCREEN THAT `shows` DOES NOT DESCRIBE.
+   *
+   * The server-rendered opening page is HTML with no card objects behind it,
+   * and building them would mean shipping the same rows twice — once as markup
+   * and once as JSON — which is the cost the server render exists to remove. So
+   * `shows` holds only what THIS module fetched, the count is what every rank
+   * is offset by, and the last painted card's rank and figure are the seed that
+   * carries a tie across the one gap in the run. Every path that replaces those
+   * cards clears all three. The twin of the same block in feeds-podcasts.js. */
+  let adoptedCount = 0
+  let adoptedLastRank = null
+  let adoptedLastValue = null
   let nextOffset = 0
   let loading = false
   let view = []           // what's painted: `shows`, or the one searched show
@@ -663,18 +239,36 @@ export async function renderShows({ panel, list, medium = 'other', lang = null }
   let pickLoading = false
   let pickSeq = 0
 
-  const cards = h('div', { class: 'pcast-list' })
+  /* `data-show-list` is what a card's drawer walks up to for the active window,
+   * and `data-since` carries it. Read at OPEN time rather than baked into the
+   * card, so a range change moves every drawer with it — see wireDrawer in
+   * show-card-actions.js. The edge emits the same pair. */
+  // `let`, because adoption REUSES the container the server painted rather than
+  // copying its markup into this one. Copying would mean serialising and
+  // re-parsing the whole opening page to end up with the same nodes.
+  let cards = h('div', { class: 'pcast-list', 'data-show-list': '' })
   const moreWrap = h('div', { class: 'pcast-more-wrap' })
 
   const cutoff = () => rangeCutoff(rangeKey)
 
   function paintMore() {
     const slice = view.slice(shown, shown + PAGE_SIZE)
-    slice.forEach((s) => {
-      cards.appendChild(renderShowCard(
-        s, RANKED_SORTS.has(sortKey) ? rankLabel(s._rank, s._tied) : null, copy, cutoff(),
-      ))
-    })
+    /* ⚠️ ONE insertAdjacentHTML FOR THE WHOLE SLICE, then one wiring pass. The
+     * cards are a string now, so appending them one at a time would reparse the
+     * container per card; and the verbs must be attached AFTER the markup is in
+     * the document, because wireShowCards queries for it. wireShowCards is
+     * idempotent by a marker attribute, so running it over a container that
+     * already holds wired cards costs a querySelectorAll and nothing else. */
+    if (slice.length) {
+      const since = cutoff()
+      if (since) cards.setAttribute('data-since', String(since))
+      else cards.removeAttribute('data-since')
+      cards.insertAdjacentHTML('beforeend', slice.map((s) => showCardHtml(s, {
+        rank: RANKED_SORTS.has(sortKey) ? rankLabel(s._rank, s._tied) : null,
+        copy,
+      })).join(''))
+      wireShowCards(cards)
+    }
     shown += slice.length
     moreWrap.replaceChildren()
 
@@ -710,8 +304,9 @@ export async function renderShows({ panel, list, medium = 'other', lang = null }
     moreWrap.appendChild(h('div', { class: 'pcast-more-group' }, [
       btn,
       // No total to count against: the endpoint pages rather than reporting how
-      // many shows the whole range holds, so this says what is on screen.
-      h('div', { class: 'pcast-more-count', text: copy.countLine(shown) }),
+      // many shows the whole range holds, so this says what is on screen — the
+      // server's adopted cards included, since a reader counts what they can see.
+      h('div', { class: 'pcast-more-count', text: copy.countLine(adoptedCount + shown) }),
     ]))
   }
 
@@ -732,32 +327,58 @@ export async function renderShows({ panel, list, medium = 'other', lang = null }
    * a full repaint every label already matches, so it is a no-op. */
   function syncRankLabels() {
     if (picked) return
-    const els = cards.querySelectorAll('.pcast-card')
+    // The CARD elements, not the rank nodes: an unranked sort renders no rank
+    // node at all and indexing those would slide by one. The server's adopted
+    // block sits ahead of `view` in the DOM, hence the offset.
+    const els = cards.querySelectorAll('[data-show-card]')
     view.forEach((s, i) => {
-      const node = els[i]?.querySelector('.pcast-rank')
+      const node = els[adoptedCount + i]?.querySelector('.pcast-rank')
       if (!node) return
       const label = RANKED_SORTS.has(sortKey) ? rankLabel(s._rank, s._tied) : null
       if (label != null && node.textContent !== label) node.textContent = label
     })
+    // The seam itself: the server painted its last card without knowing what
+    // followed it, and that card is not in `view` to be re-labelled above.
+    if (adoptedCount && view.length && adoptedLastRank != null
+        && showRankValue(sortKey)(view[0]) === adoptedLastValue) {
+      const seam = els[adoptedCount - 1]?.querySelector('.pcast-rank')
+      const label = rankLabel(adoptedLastRank, true)
+      if (seam && seam.textContent !== label) seam.textContent = label
+    }
   }
 
   function rebuild({ keepShown = false } = {}) {
     /* ⚠️ COMPETITION RANKS, NOT POSITIONS: ties share the better place and the
      * next distinct value skips the group, so two shows with the same boost
-     * count are not separated by the sats tiebreak the endpoint pages by. This
-     * feed is never server-adopted, so `shows` is always a prefix from offset 0
-     * and needs no seed. See assets/js/rank.js. */
+     * count are not separated by the sats tiebreak the endpoint pages by. See
+     * assets/js/rank.js. */
     if (!picked) {
-      const ranks = competitionRanks(shows, (s) => Number(s[sortKey]) || 0)
+      /* The seed carries the adopted block's last card across the one gap in
+       * the run: `shows` is a contiguous prefix of the ranked view starting at
+       * `adoptedCount`, not at 0, whenever the server painted the opening page.
+       * Without it the first fetched row would restart the numbering and every
+       * card below a straddling tie would be off by the size of that tie. */
+      const ranks = competitionRanks(shows, showRankValue(sortKey), {
+        startIndex: adoptedCount,
+        prevValue: adoptedLastValue,
+        prevRank: adoptedLastRank,
+      })
       shows.forEach((s, i) => { s._rank = ranks[i].rank; s._tied = ranks[i].tied })
     }
     search?.refresh()
     view = picked ? (pickedItem ? [pickedItem] : []) : shows
     const from = keepShown ? shown : 0
     shown = from
-    if (!keepShown) cards.replaceChildren()
+    /* ⚠️ THE ADOPTED CARDS ARE NEVER CLEARED HERE. They are the container's own
+     * contents and there is nothing to rebuild them from, so every path that
+     * genuinely replaces the list — a requery, a search pick — drops adoption
+     * explicitly BEFORE calling this. What reaches here with a count still set
+     * is the opening paint and an append, neither of which may wipe them. */
+    if (!keepShown && !adoptedCount) cards.replaceChildren()
     moreWrap.replaceChildren()
-    if (!view.length) {
+    // Same reasoning one line on: with the server's cards on screen, an empty
+    // `shows` means nothing has been FETCHED yet, not that the feed is empty.
+    if (!view.length && !adoptedCount) {
       const empty = rangeKey === 'all' ? copy.emptyAll : copy.emptyWindow
       cards.appendChild(pickLoading
         ? h('div', { class: 'feed-placeholder' }, [
@@ -788,9 +409,14 @@ export async function renderShows({ panel, list, medium = 'other', lang = null }
    */
   async function resolvePick() {
     const mine = ++pickSeq
+    // A pick paints one card in place of the list, so the server's cards are
+    // gone the moment one resolves — and their count must stop offsetting ranks.
+    // The boundary seed goes with the count: it describes a card that is no
+    // longer on screen, and left behind it would tie the first fetched row to it.
+    dropAdoption()
     // Dropping the filter comes through here too, and it has to repaint:
     // bumping pickSeq has already retired any resolve still in flight.
-    if (!picked) { pickedItem = null; pickLoading = false; rebuild(); return }
+    if (!picked) { pickedItem = null; pickLoading = false; await refetchUnfiltered(); return }
     pickLoading = true
     pickedItem = null
     rebuild()
@@ -810,6 +436,41 @@ export async function renderShows({ panel, list, medium = 'other', lang = null }
     } finally {
       if (mine === pickSeq) { pickLoading = false; rebuild() }
     }
+  }
+
+  /* The server's opening page stops describing what is on screen.
+   *
+   * Called by every path that replaces the list wholesale rather than appending
+   * to it. The count and the seed go together: the seed describes a card that
+   * is no longer painted, and left behind it would tie the first fetched row to
+   * a figure nothing on the page carries.
+   */
+  function dropAdoption() {
+    adoptedCount = 0
+    adoptedLastRank = null
+    adoptedLastValue = null
+  }
+
+  /* Clearing a search has to reveal the full list again.
+   *
+   * On a feed that fetched its own first page `shows` still holds it and this
+   * is a repaint. On the ADOPTED feed it does not — those cards were the
+   * server's and a pick replaced them — so the page has to be fetched once,
+   * which is the one request adoption defers rather than avoids. It is paid by
+   * the reader who searched and then cleared, which is the right person to
+   * charge for it.
+   */
+  async function refetchUnfiltered() {
+    if (shows.length) { rebuild(); return }
+    try {
+      const page = await loadShowPage({ medium, sort: sortKey, range: rangeKey, lang: langKey, offset: 0 })
+      shows = page.items
+      nextOffset = page.nextOffset
+    } catch (e) {
+      console.warn('[shows] reload failed', e)
+      showToast(copy.rangeFail[0], true)
+    }
+    rebuild()
   }
 
   /* A range or sort change is a new QUERY, so it refetches from offset 0.
@@ -833,6 +494,11 @@ export async function renderShows({ panel, list, medium = 'other', lang = null }
       if (mine !== seq) return
       shows = page.items
       nextOffset = page.nextOffset
+      // The answer arrived, so the server's opening page is about to be
+      // replaced wholesale and stops offsetting anything, boundary seed
+      // included. Done here rather than at the press, because a failed requery
+      // leaves the old view on screen and those cards are still what it is.
+      dropAdoption()
       rebuild()
       // The unfiltered list is still fetched under a live search filter, since
       // clearing the box has to reveal the new range rather than fetch again.
@@ -846,16 +512,80 @@ export async function renderShows({ panel, list, medium = 'other', lang = null }
     }
   }
 
-  let first
-  try {
-    first = await loadShowPage({ medium, sort: sortKey, range: rangeKey, lang: langKey, offset: 0 })
-  } catch (e) {
-    console.error('[shows] index fetch failed', e)
-    renderPlaceholder(list, ...copy.loadFail)
-    return
+  /* The opening page, already rendered.
+   *
+   * functions/index.js server-renders Shows · All into the static shell, so on
+   * that one feed the cards are on the page before this module is even fetched.
+   * Adopting them rather than fetching the same rows again is the whole point
+   * of having rendered them: it saves a request and a full repaint, and it
+   * means the first thing the reader sees is the last thing they see.
+   *
+   * The state element is the contract, and it is deliberately tiny — the sort
+   * and range the server used (so the controls open on the right values), how
+   * many cards it painted, where the next page starts, and the last card's rank
+   * and figure. It is REMOVED on adoption so a later re-render takes the
+   * fetching path.
+   *
+   * ⚠️ THE MEDIUM IS CHECKED because one module serves two feeds. A shell
+   * rendered for Shows must never be adopted by Albums, which is a different
+   * half of the same partition and would paint podcasts under an Albums
+   * heading. There is no scope to check: both of these feeds are Global only.
+   *
+   * ⚠️ THE SERVER'S CARDS ARE UNFILTERED, AND THE SERVER CANNOT KNOW OTHERWISE.
+   * functions/index.js renders the opening page with no language, and a hash is
+   * never sent to the server, so it could not honour one if it wanted to. A
+   * `#shows?lang=de` load therefore has to FETCH rather than adopt — adopting
+   * would paint thirty English shows under a German filter, with a note beneath
+   * them saying otherwise.
+   */
+  function adoptServerCards() {
+    const stateEl = list.querySelector('[data-feed-state]')
+    if (!stateEl) return null
+    let state = null
+    try { state = JSON.parse(stateEl.textContent || '{}') } catch { return null }
+    const painted = list.querySelector('.pcast-list')
+    if (!state || !painted || !painted.querySelector('[data-show-card]')) return null
+    if (state.medium !== medium) return null
+    if (langKey !== LANG_ALL) return null
+    stateEl.remove()
+    return { state, painted }
   }
-  shows = first.items
-  nextOffset = first.nextOffset
+
+  const adopted = adoptServerCards()
+
+  if (adopted) {
+    sortKey = adopted.state.sort || sortKey
+    rangeKey = adopted.state.range || rangeKey
+    adoptedCount = Number(adopted.state.count) || 0
+    nextOffset = adopted.state.nextOffset ?? null
+    /* The last server-painted card's rank and figure. The adopted cards are
+     * markup with no data behind them, so without these the first fetched page
+     * cannot tell whether its opening row continues the tie the last painted
+     * one was part of. See the boundary note in _shared/show-cards.js. */
+    adoptedLastRank = Number.isFinite(adopted.state.lastRank) ? adopted.state.lastRank : null
+    adoptedLastValue = adopted.state.lastValue ?? null
+    // The container the server painted IS the one this module appends to, so a
+    // "load more" adds to the list already on screen instead of starting a
+    // second one beside it — and no node is rebuilt.
+    cards = adopted.painted
+    list.appendChild(moreWrap)
+  } else {
+    // The first page decides whether there is a feed at all, so it is the one
+    // fetch that can render a placeholder instead of cards.
+    let first
+    try {
+      first = await loadShowPage({ medium, sort: sortKey, range: rangeKey, lang: langKey, offset: 0 })
+    } catch (e) {
+      console.error('[shows] index fetch failed', e)
+      renderPlaceholder(list, ...copy.loadFail)
+      return
+    }
+    shows = first.items
+    nextOffset = first.nextOffset
+
+    list.className = ''
+    list.replaceChildren(cards, moreWrap)
+  }
 
   // The same line the Episodes and Songs feeds carry. There is no Follows scope
   // here yet, so it has one form; when Shows · Follows lands it gains the second
@@ -991,7 +721,10 @@ export async function renderShows({ panel, list, medium = 'other', lang = null }
       : copy.searchNoneRange),
   })
 
-  list.className = ''
-  list.replaceChildren(cards, moreWrap)
+  // The server's cards are complete markup and still need their verbs: the
+  // boost pill, the drawer, and the relative time over each "last boost" date.
+  // wireShowCards is idempotent by a marker attribute, so the paint below can
+  // run over them again for nothing.
+  if (adopted) wireShowCards(cards)
   rebuild()
 }

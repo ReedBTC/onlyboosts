@@ -132,6 +132,83 @@ starts publishing boost notes the same way, they show up here automatically, and
 the picture of value-for-value across podcasting gets richer and more accurate.
 **The data will get better as adoption grows.**
 
+### Becoming a member (the reader-facing half of the same fact)
+
+The Members tab calls this "becoming a member", and it is worth keeping the two
+framings separate because they answer different questions.
+
+- **"Who publishes boost notes"** is the technical inventory above, and it has
+  four entries. Local Bitcoiners is one of them.
+- **"How do I become a member"** is narrower: which apps will publish a boost
+  note *signed by a key the listener controls*, so the boost carries their name
+  rather than somebody else's. Three do: **Fountain**, **BoostMeBitch** and
+  **OnlyBoosts** when signed in. Local Bitcoiners is deliberately not on that
+  list, being one show's own website widget rather than an app a listener can
+  use across podcasting.
+
+Both lists are open. Any app publishing in the NIP-73 format appears with no
+registration and no coordination.
+
+**And the /about section leads with Nostr, deliberately.** Reed, 2026-08-23:
+this is one of the places where a reader has dug deep enough to be told what is
+under the hood. The definition it opens on is his — *a member is anyone who has
+shared a boost publicly using their Nostr account* — followed by why an ordinary
+boost is private, what a boost note actually is (an announcement of a payment,
+not the payment), and that the membership belongs to a keypair the reader holds
+rather than to a profile on this site. It also says plainly that boosting
+without publishing anything is not worse, only unrecorded.
+
+A caveat that belongs with Fountain specifically: the key it signs with is one
+Fountain manages on the listener's behalf, not an identity they brought with
+them. So a Fountain booster's name here may not match the one they use
+elsewhere on Nostr. This is already stated under limitations; it belongs beside
+the membership claim too.
+
+---
+
+## Accounts that publish on behalf of other people
+
+Distinct from the apps above, and the source of every "why is a bot at the top
+of this list" question.
+
+Most podcast apps publish nothing to Nostr at all. A handful of automated
+accounts fill that gap: they watch for boosts sent from apps with no Nostr
+support and publish a note for each one, so the boost is recorded rather than
+lost. **Five such keys are known to this index**, and the list is maintained by
+hand (`PUBLISHER_PUBKEYS` in the collector's `clients.py`, mirrored as
+`PUBLISHERS` in `functions/api/v1/_common.js`). Nothing detects them
+automatically and nothing should: calling an account a bot is a claim, and the
+cost of getting it wrong is leaving a real person off a leaderboard.
+
+| Key | Boosts | Sats | What it does |
+|---|---|---|---|
+| ChadF Boost Bot | 1,021 | 628,608 | Republishes boosts sent from Castamatic (294), StableKraft (260), PodcastGuru (159), BoostMeBitch (56), CurioCaster (56), LN Beats (21), Podverse (3) and ten more apps that speak no NIP-73 |
+| BoostMeBitch (site account) | 35 | 114,753 | Publishes for a boostmebitch.com listener who connected no identity. ⚠️ **The app is ALSO in the members list above** — it signs under the donor's own key when they have one, under this account when they do not. Added 2026-08-23 on Reed's instruction |
+| lnaddress music | 31 | 0 | Boosts sent to music feeds through a Lightning address |
+| Local Bitcoiners (show account) | ~8 over 14 days | — | Publishes for a donor to that show who produced no note themselves |
+| OnlyBoosts (boost bot) | part of 23 | — | Signs a note for a boost sent from this site by someone with no Nostr identity |
+
+Figures measured 2026-08-23 off `/api/v1/clients`.
+
+**The booster credited is the key that signed, never the person named.** These
+notes often carry a sender name, in the message body or a `From` field. Nothing
+verifies that the person named authorised a note signed by a key they do not
+hold, so the name is treated as text and never as an identity. Same call for
+all four, including our own.
+
+**What that costs and what it does not.** Every one of these boosts is indexed
+and counted: sats totals, boost counts, show pages, episode pages, every feed
+and every ranking those feeds produce. What the four keys are excluded from is
+the two surfaces that rank **people** — the member wall and the #40HPW boards.
+One key carrying a thousand boosts from dozens of listeners would top both on
+other people's listening, which is a claim about who the top members are that
+the data cannot support. They remain findable by search, because a search
+result is not a claim, and each has an ordinary `/booster/<npub>` page.
+
+**They are listed on the Members tab with their totals**, rather than silently
+removed. The role they fill is real: they are the only reason a listener
+without a Nostr account is represented here at all.
+
 ---
 
 ## What this data IS

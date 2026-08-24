@@ -19,7 +19,7 @@
  * per-user and change as boosts arrive, so a page-lifetime cache would serve a
  * stale feed. The endpoints set their own short Cache-Control.
  */
-import { normalizeBoosts } from '/assets/js/ob-data.js?v=ob-v113'
+import { normalizeBoosts } from '/assets/js/ob-data.js?v=ob-v136'
 
 const BASE = '/api/v1/'
 
@@ -494,6 +494,56 @@ export async function getShowEpisodes({ guid, since = null, signal } = {}) {
   if (!resp.ok) throw new Error(`podcast detail: HTTP ${resp.status}`)
   const data = await resp.json()
   return Array.isArray(data?.episodes) ? data.episodes : []
+}
+
+/* ── Members ─────────────────────────────────────────────────────────
+ *
+ * ⚠️ THE MEMBER SEARCH IS A QUERY, NOT AN INDEX OVER WHAT IS LOADED, and that
+ * is the whole reason it exists. The Boosts feed used to score the boosts the
+ * browser happened to be holding, so a member was findable only if they turned
+ * up in what the reader had already scrolled past. Measured against the whole
+ * corpus on 2026-08-23: the first page reaches 34 of 2,011 members (2%), 500
+ * boosts reaches 164 (8%), and paging in all 23,259 boosts still only reaches
+ * 684 (34%) — a third of members have never appeared in the note feed at all,
+ * so loading more could never close it.
+ */
+const MEMBERS_API = '/api/v1/members'
+
+/**
+ * @param {string} opts.q  a name, an npub (whole or a prefix), or a hex pubkey.
+ * @returns {Promise<Array<{pk, npub, name, pic, boosts, sats}>>} most sats
+ *   first. Never throws for a miss; an empty list is a real answer.
+ */
+export async function searchMembers({ q, limit = SEARCH_HITS, signal } = {}) {
+  const text = typeof q === 'string' ? q.trim() : ''
+  if (text.length < SEARCH_MIN_CHARS) return []
+  const qs = new URLSearchParams({ q: text, limit: String(limit) })
+  const resp = await fetch(`${MEMBERS_API}?${qs}`, {
+    headers: { Accept: 'application/json' }, signal,
+  })
+  if (!resp.ok) throw new Error(`members: HTTP ${resp.status}`)
+  const data = await resp.json()
+  return Array.isArray(data?.members) ? data.members : []
+}
+
+/**
+ * One member's boosts, newest first.
+ *
+ * ⚠️ THE PICK HAS TO FETCH, NOT FILTER. Filtering the loaded rows is what the
+ * search box did before, and it fails in the same way for the same reason: the
+ * member the reader just picked out of the whole index will usually have no
+ * boosts in the window the browser is holding, so the list would empty itself
+ * the moment the search succeeded. `booster=` is a parameter /api/v1/boosts has
+ * always taken and it rides `idx_boosts_booster`.
+ */
+export async function getMemberBoosts({ pk, limit = 200, signal } = {}) {
+  const qs = new URLSearchParams({ booster: pk, limit: String(limit) })
+  const resp = await fetch(`/api/v1/boosts?${qs}`, {
+    headers: { Accept: 'application/json' }, signal,
+  })
+  if (!resp.ok) throw new Error(`member boosts: HTTP ${resp.status}`)
+  const data = await resp.json()
+  return normalizeBoosts(data)
 }
 
 /* ── The languages present in the index ──────────────────────────────

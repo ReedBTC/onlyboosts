@@ -50,17 +50,18 @@
 
   <!-- Shared note / card styles (.note-card, .embed-note) — the boosts
        feeds render through the same kind-1 card as boosts-thread.js. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v113" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v136" />
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v113" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v136" />
   <!-- The episode card and its drawer, extracted from the inline block below
        when /episode/<guid> pages needed the same cards. See the file header. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v113" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v136" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v136" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. Must stay last
        among the stylesheets so the inline block below still wins. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v113" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v136" />
 
   <style>
     :root {
@@ -86,21 +87,49 @@
       --snf-accent:  #6d489b;  --snf-accent-d:  #583a7e;  --snf-tint:  #f0eaf7;
       --alb-accent:  #7f4694;  --alb-accent-d:  #663878;  --alb-tint:  #f4e9f5;
 
+      /* ⚠️ A FOURTH STEP, FOR TEXT THAT HAS TO SURVIVE THE CYAN END OF THE
+         RAMP. `--brand-dd` in theme.css exists for exactly this reason and this
+         is the same idea applied to the feed accents: white on `--bg-accent`
+         measures 2.50:1, which fails AA at every size, and the same colour as
+         INK on cream is 2.29:1. The phone's tab chips use the accent both ways
+         — as a fill under white text when selected, and as the label colour
+         when not — so both readings were illegible on Members and marginal on
+         Shows. Reported by Reed, 2026-08-23: "the white letters blend into the
+         background too much".
+
+         ⚠️ SOLVED FOR A TARGET RATIO, NOT SCALED BY A CONSTANT, WHICH IS WHY
+         HALF THIS TABLE IS UNCHANGED. A uniform multiplier big enough to fix
+         cyan takes Albums to 10.8:1 and turns the violet half of the ramp
+         nearly black — the ramp is the system that says which feed you are on,
+         and flattening it to fix one end would cost more than it bought. Each
+         value here is the least darkening that reaches 6:1 on white, so the
+         four already past it keep their exact colour and only the cyan end
+         moves. Measured: every one is >= 6.0:1 on white and >= 5.4:1 on cream. */
+      --bg-accent-dd:  #006990;
+      --bf-accent-dd:  #04689a;
+      --sh-accent-dd:  #1767a2;
+      --eg-accent-dd:  #2c64a8;
+      --ef-accent-dd:  #4a4f9e;
+      --sng-accent-dd: #5c4aa0;
+      --snf-accent-dd: #6d489b;
+      --alb-accent-dd: #7f4694;
+
       /* Defaults (Episodes · Global is the landing feed). */
-      --accent:   var(--eg-accent);
-      --accent-d: var(--eg-accent-d);
+      --accent:    var(--eg-accent);
+      --accent-d:  var(--eg-accent-d);
+      --accent-dd: var(--eg-accent-dd);
       --tint:     var(--eg-tint);
     }
 
     /* Active-feed → accent mapping. Set on <body data-active-feed>. */
-    body[data-active-feed="boosts-global"]    { --accent: var(--bg-accent); --accent-d: var(--bg-accent-d); --tint: var(--bg-tint); }
-    body[data-active-feed="boosts-follows"]   { --accent: var(--bf-accent); --accent-d: var(--bf-accent-d); --tint: var(--bf-tint); }
-    body[data-active-feed="shows"]            { --accent: var(--sh-accent); --accent-d: var(--sh-accent-d); --tint: var(--sh-tint); }
-    body[data-active-feed="episodes-global"]  { --accent: var(--eg-accent); --accent-d: var(--eg-accent-d); --tint: var(--eg-tint); }
-    body[data-active-feed="episodes-follows"] { --accent: var(--ef-accent); --accent-d: var(--ef-accent-d); --tint: var(--ef-tint); }
-    body[data-active-feed="songs-global"]     { --accent: var(--sng-accent); --accent-d: var(--sng-accent-d); --tint: var(--sng-tint); }
-    body[data-active-feed="songs-follows"]    { --accent: var(--snf-accent); --accent-d: var(--snf-accent-d); --tint: var(--snf-tint); }
-    body[data-active-feed="albums"]           { --accent: var(--alb-accent); --accent-d: var(--alb-accent-d); --tint: var(--alb-tint); }
+    body[data-active-feed="members-global"]    { --accent: var(--bg-accent); --accent-d: var(--bg-accent-d); --accent-dd: var(--bg-accent-dd); --tint: var(--bg-tint); }
+    body[data-active-feed="members-follows"]   { --accent: var(--bf-accent); --accent-d: var(--bf-accent-d); --accent-dd: var(--bf-accent-dd); --tint: var(--bf-tint); }
+    body[data-active-feed="shows"]            { --accent: var(--sh-accent); --accent-d: var(--sh-accent-d); --accent-dd: var(--sh-accent-dd); --tint: var(--sh-tint); }
+    body[data-active-feed="episodes-global"]  { --accent: var(--eg-accent); --accent-d: var(--eg-accent-d); --accent-dd: var(--eg-accent-dd); --tint: var(--eg-tint); }
+    body[data-active-feed="episodes-follows"] { --accent: var(--ef-accent); --accent-d: var(--ef-accent-d); --accent-dd: var(--ef-accent-dd); --tint: var(--ef-tint); }
+    body[data-active-feed="songs-global"]     { --accent: var(--sng-accent); --accent-d: var(--sng-accent-d); --accent-dd: var(--sng-accent-dd); --tint: var(--sng-tint); }
+    body[data-active-feed="songs-follows"]    { --accent: var(--snf-accent); --accent-d: var(--snf-accent-d); --accent-dd: var(--snf-accent-dd); --tint: var(--snf-tint); }
+    body[data-active-feed="albums"]           { --accent: var(--alb-accent); --accent-d: var(--alb-accent-d); --accent-dd: var(--alb-accent-dd); --tint: var(--alb-tint); }
 
     /* ── Masthead ────────────────────────────────────────────────────
        Wordmark banner sits above the sticky feed bar. It scrolls away;
@@ -170,6 +199,19 @@
 
        Width matches .feed-panels-inner rather than the old ribbon's wider
        track, so the menus line up with the left edge of the cards below. */
+    /* ⚠️ ONE TRACK WIDTH FOR THE WHOLE PAGE, AND IT MATCHES THE DETAIL PAGES.
+       `.show-main` is 60rem with 1.25rem of padding, so the homepage was 240px
+       narrower than /show, /episode and /booster and the whole column jumped
+       width when a reader clicked through to one. The four elements below —
+       the tabs, the sub-row, the control bar and the panels — are the page
+       track and move together or not at all; `--feed-track` is what makes that
+       true by construction rather than by four numbers agreeing.
+
+       The masthead's logo and subtitle keep their own smaller measures. Those
+       are typographic — a 960px line of subtitle is a bad measure however wide
+       the page is. */
+    :root { --feed-track: 60rem; }
+
     .feed-bar-wrap {
       position: sticky;
       top: 64px; /* height of #top-nav */
@@ -177,8 +219,165 @@
       background: var(--cream);
       border-bottom: 1px solid var(--border);
     }
+    /* ══ THE TABS ══
+       Lifted from Local Bitcoiners' feeds.html (`git show lb/main:feeds.html`):
+       a full-bleed equal-column grid, an icon over each label, a 3px top rule,
+       and the selected tab FILLED with its own accent rather than underlined.
+       That pattern is why this exists at all — the old what-dropdown hid four
+       of five feeds behind a control you had to know to open, and a visitor who
+       did not know what the site was could not find them.
+
+       ⚠️ THE ACTIVE TAB READS `--accent`, NOT A COLOUR OF ITS OWN, so it tracks
+       the sub-feed inside it: Podcasts is #1b7bc1 on Shows and #2f6bb5 on
+       Episodes, off the body[data-active-feed] mapping that already exists.
+       An INACTIVE tab has no active feed to read, so it carries its family's
+       representative shade as `--tab`. Nothing here adds a token. */
+    .feed-tabs {
+      max-width: var(--feed-track);
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+    }
+    /* ⚠️ THE WHOLE STICKY CHROME IS ONE GROUND AND ONLY THE PANEL IS TINTED.
+       The sub-row carried `--tint` at first, which put the feed's own wash
+       between two bands of `--cream` and made the header read as four
+       alternating stripes — cream, violet, cream, violet on Albums. LB's
+       feeds.html is two-tone for this reason: `.feed-tabs-wrap` is cream and
+       `.feed-panels` is the tint. Keep any new band in the chrome on `--cream`
+       and let the accent arrive through the tabs and the blocks themselves. */
+    .feed-tab {
+      --tab: var(--muted);
+      appearance: none;
+      background: transparent;
+      border: 0;
+      border-top: 3px solid transparent;
+      font: inherit;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.3rem;
+      padding: 0.7rem 0.6rem 0.6rem;
+      color: var(--muted);
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    /* Inactive: the family's shade. Active: whatever feed is on screen. */
+    /* `--tab-dd` rides alongside `--tab` rather than being derived from it,
+       because CSS cannot turn one custom property into another's name. The
+       phone chips are its only consumer; see the block at the foot of this
+       stylesheet. */
+    .feed-tab--podcasts { --tab: var(--sh-accent);  --tab-dd: var(--sh-accent-dd); }
+    .feed-tab--music    { --tab: var(--alb-accent); --tab-dd: var(--alb-accent-dd); }
+    .feed-tab--members  { --tab: var(--bg-accent);  --tab-dd: var(--bg-accent-dd); }
+    body[data-active-tab="podcasts"] .feed-tab--podcasts,
+    body[data-active-tab="music"]    .feed-tab--music,
+    body[data-active-tab="members"]  .feed-tab--members { --tab: var(--accent); --tab-dd: var(--accent-dd); }
+    .feed-tab-icon { width: 21px; height: 21px; color: var(--tab); transition: color 0.15s; }
+    .feed-tab-icon svg { width: 100%; height: 100%; display: block; }
+    .feed-tab-label {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-weight: 700;
+      font-size: 0.95rem;
+      letter-spacing: 0.01em;
+    }
+    /* ⚠️ THE SEAM RUNS ALL THE WAY ACROSS, INCLUDING UNDER THE SELECTED TAB.
+       It shipped broken there first, on the theory that an unbroken line would
+       cut the accent column in half — but the selected tab and the selected
+       block below it are the SAME fill and they touch, so with no seam they
+       merge into one tall slab and the two tiers stop being distinguishable at
+       all. That is the thing being fixed (Reed: "add a line or outline or
+       something so they are differentiated").
+
+       Inside the accent column the line is `--accent-d`, one step darker than
+       the fill, so it reads as a FOLD between two related surfaces rather than
+       as a cut between two unrelated ones. On the cream ground it is the
+       ordinary `--border`. */
+    .feed-tab { border-bottom: 1px solid var(--border); }
+    .feed-tab[aria-selected="true"] { border-bottom-color: var(--accent-d); }
+    .feed-tab:hover { background: rgba(0,0,0,0.03); }
+    .feed-tab:focus-visible { outline: 2px solid var(--tab); outline-offset: -2px; }
+    .feed-tab[aria-selected="true"] {
+      background: var(--tab);
+      border-top-color: var(--tab);
+      color: var(--white);
+    }
+    .feed-tab[aria-selected="true"] .feed-tab-icon { color: #fff; }
+
+    /* ══ THE SUB-CATEGORY ROW ══
+       Which feed inside the tab, as blocks rather than as text.
+
+       ⚠️ IT IS THE SAME THREE-COLUMN GRID AS `.feed-tabs`, AND EACH GROUP IS
+       PINNED TO ITS OWN COLUMN. That is what puts Shows and Episodes exactly
+       under Podcasts and makes the pair add up to one tab's width, whatever the
+       gap or padding is at that breakpoint. Placing the buttons in a flat
+       six-column grid instead only lines up while both rows share a gap — and
+       they do not on a phone, where the tabs are separated chips.
+
+       The explicit grid-column is what makes hiding the other groups safe: with
+       `display:none` and auto placement, whichever group survived would fall
+       into column 1 and sit under Podcasts however the reader got there.
+
+       ⚠️ WHICH GROUP IS ON SCREEN IS CSS OFF body[data-active-tab], NOT JS —
+       the same call .feed-bar-controls makes below, and for the same reason: an
+       imperative swap is the version that leaves a tab you come back to showing
+       another tab's sub-feeds, or none. */
+    .feed-subs-wrap { border-bottom: 1px solid var(--border); }
+    .feed-subs {
+      max-width: var(--feed-track);
+      margin: 0 auto;
+      /* ⚠️ NO HORIZONTAL PADDING, because `.feed-tabs` has none. The two grids
+         have to share a content box or their columns do not line up, and a
+         1.25rem inset here narrows every sub-block and shifts the pair left of
+         the tab it belongs to. Whatever padding one row takes, the other takes
+         — see the 640px block. */
+      padding: 0 0 0.4rem;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+    }
+    /* ⚠️ NO GAP: the blocks touch each other and the tab above them, because the
+       big tabs touch and a gap here made the two tiers read as different kinds
+       of control. Only one sub-feed can be active at a time, so the boundary
+       between the pair is carried by the fill — one is `--accent`, the other
+       `--cream-d` — and needs no rule of its own. */
+    .feed-sub-group { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 0; }
+    .feed-sub-group[data-tab="podcasts"] { grid-column: 1; }
+    .feed-sub-group[data-tab="music"]    { grid-column: 2; }
+    .feed-sub-group[data-tab="members"]  { grid-column: 3; }
+    .feed-subs > .feed-sub-group { display: none; }
+    body[data-active-tab="podcasts"] .feed-subs > [data-tab="podcasts"],
+    body[data-active-tab="music"]    .feed-subs > [data-tab="music"],
+    body[data-active-tab="members"]  .feed-subs > [data-tab="members"] {
+      display: grid;
+    }
+    /* Members holds one feed today, and a one-option picker is worse than none —
+       the same call the scope menu makes while signed out. */
+    body[data-active-tab="members"] .feed-subs-wrap { display: none; }
+    .feed-sub {
+      appearance: none;
+      border: 0;
+      border-radius: 0;
+      font: inherit;
+      font-size: 0.82rem;
+      font-weight: 700;
+      background: var(--cream-d);
+      color: var(--muted);
+      /* No border and no radius, matching the tabs. The blocks are adjacent, so
+         per-block borders would double along the seam between them and rounded
+         corners would scallop a run that is meant to read as one bar. */
+      padding: 0.34rem 0.4rem 0.38rem;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .feed-sub:hover { color: var(--accent-d); }
+    .feed-sub:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+    /* The selected block continues the tab's fill downward, so the tab and the
+       feed under it read as one column rather than as two separate controls. */
+    .feed-sub[aria-selected="true"] { background: var(--accent); color: var(--white); }
+    .feed-sub[aria-selected="true"]:hover { color: var(--white); }
+
     .feed-bar {
-      max-width: 720px;
+      max-width: var(--feed-track);
       margin: 0 auto;
       padding: 0.55rem 1.25rem;
       display: flex;
@@ -204,8 +403,8 @@
     body[data-active-feed="episodes-follows"] .feed-bar-controls > [data-controls-for="episodes-follows"],
     body[data-active-feed="songs-global"]     .feed-bar-controls > [data-controls-for="songs-global"],
     body[data-active-feed="songs-follows"]    .feed-bar-controls > [data-controls-for="songs-follows"],
-    body[data-active-feed="boosts-global"]    .feed-bar-controls > [data-controls-for="boosts-global"],
-    body[data-active-feed="boosts-follows"]   .feed-bar-controls > [data-controls-for="boosts-follows"],
+    body[data-active-feed="members-global"]    .feed-bar-controls > [data-controls-for="members-global"],
+    body[data-active-feed="members-follows"]   .feed-bar-controls > [data-controls-for="members-follows"],
     body[data-active-feed="shows"]            .feed-bar-controls > [data-controls-for="shows"],
     body[data-active-feed="albums"]           .feed-bar-controls > [data-controls-for="albums"] {
       display: flex;
@@ -228,10 +427,8 @@
     .feed-menu-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
     .feed-menu-cur { font-weight: 700; color: var(--accent-d); }
     .feed-menu-caret { color: var(--muted); font-size: 0.85em; }
-    .feed-menu--type .feed-menu-cur {
-      font-family: 'Playfair Display', Georgia, serif;
-      font-size: 1.2rem; line-height: 1.25;
-    }
+    /* `.feed-menu--type` is gone with the what-dropdown it styled — the tabs
+       replaced it. Scope is the only menu left. */
     .feed-menu--scope .feed-menu-cur { font-size: 0.82rem; }
     .feed-menu-list {
       position: absolute; top: calc(100% + 4px); left: 0; z-index: 6;
@@ -258,10 +455,373 @@
       min-height: 60vh;
     }
     .feed-panels-inner {
-      max-width: 720px;
+      max-width: var(--feed-track);
       margin: 0 auto;
       padding: 2rem 1.25rem 3rem;
     }
+    /* ══ The Members tab's sections ══ */
+    .members-block { display: none; }
+    body[data-active-tab="members"] .members-block { display: block; }
+    /* ⚠️ NO max-width ON ANY OF THIS COPY. A comfortable measure for prose is
+       narrower than the feed, and on a page where the boards and the cards
+       below both span the track, a short column of text reads as a mistake
+       rather than as typography. Reed's call on ob-v121. */
+    .members-intro {
+      margin: 0 0 1.5rem;
+      font-size: 0.95rem;
+      color: var(--muted);
+    }
+    .members-intro strong { color: var(--ink); font-weight: 700; }
+
+    /* The (i) badge. Sits on the same baseline run as the sentence it belongs
+       to, so it is separated by a margin rather than by a space character:
+       a text space here can break the line and leave the badge alone at the
+       start of the next one. */
+    .members-info {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 1.05rem; height: 1.05rem; margin-left: 0.4rem;
+      vertical-align: 0.05em;
+      border: 1px solid var(--brand); border-radius: 50%;
+      color: var(--brand-dd); background: transparent;
+      font-family: var(--font-body, Georgia, serif);
+      font-size: 0.7rem; font-weight: 700; font-style: italic;
+      line-height: 1; text-decoration: none;
+    }
+    .members-info:hover { background: var(--brand-dd); border-color: var(--brand-dd); color: #fff; }
+    .members-info:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+        
+    /* Two boards side by side where there is room, stacked where there is not.
+       This Week is first in the source and so is first on a phone — it is the
+       board with a live race in it. */
+    .hpw-boards { display: grid; gap: 1.1rem; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); }
+    /* Same radius and fill as `.mb-shell`; a board IS a shell, it just holds a
+       list rather than a lid. */
+    .hpw-board {
+      background: var(--cream);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 0.9rem 1rem 1rem;
+    }
+    /* ⚠️ THE TITLE IS CENTRED AND ITS SUB-LINE IS NOT. Reed's call,
+       2026-08-23. "This Week" and "High Scores" name the board the way a
+       scoreboard's own header does; the line under it is a caption, and a
+       centred caption over a left-aligned list of rows reads as a second
+       heading rather than as a note. `small` is inside the `h3`, so it has to
+       opt out of the alignment explicitly. */
+    .hpw-title {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 1.02rem; font-weight: 700; color: var(--ink); margin: 0 0 0.6rem;
+      text-align: center;
+    }
+    .hpw-title small {
+      display: block; margin-top: 0.15rem; text-align: left;
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-size: 0.72rem; font-weight: 400; color: var(--muted);
+    }
+    .hpw-list { list-style: none; margin: 0; padding: 0; }
+    .hpw-empty { font-size: 0.82rem; color: var(--muted); margin: 0; }
+    .hpw-row {
+      display: flex; align-items: center; gap: 0.55rem;
+      padding: 0.32rem 0.4rem;
+      border-top: 1px solid var(--border);
+      font-variant-numeric: tabular-nums;
+      border-radius: 6px;
+    }
+    .hpw-row:first-child { border-top: 0; }
+    /* ⚠️ GOLD IS THE ONLY DECORATION ON THIS BOARD, and it marks the two rows in
+       the whole history that cleared forty hours. If it ever marks a third of
+       the list it has stopped meaning anything — the fix would be the goal, not
+       the styling. The tint is a wash rather than a fill so the row still reads
+       as a row. */
+    .hpw-row--gold {
+      background: linear-gradient(90deg, rgba(198,150,32,0.16), rgba(198,150,32,0.02));
+      box-shadow: inset 3px 0 0 #c69620;
+    }
+    .hpw-pos { width: 1.4rem; text-align: right; font-size: 0.78rem; color: var(--muted); flex: none; }
+    .hpw-face {
+      width: 26px; height: 26px; border-radius: 50%; flex: none;
+      object-fit: cover; background: var(--cream-d);
+    }
+    .hpw-face--none {
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.7rem; font-weight: 700; color: var(--muted);
+    }
+    .hpw-who { min-width: 0; flex: 1; display: flex; flex-direction: column; line-height: 1.2; }
+    .hpw-name {
+      font-weight: 700; font-size: 0.86rem; color: var(--ink); text-decoration: none;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    a.hpw-name:hover { color: var(--accent-d); text-decoration: underline; }
+    .hpw-week { font-size: 0.68rem; color: var(--muted); }
+    .hpw-hours { font-weight: 700; font-size: 0.92rem; color: var(--accent-d); flex: none; }
+    .hpw-unit { font-weight: 400; font-size: 0.72rem; color: var(--muted); }
+    .hpw-eps { font-size: 0.7rem; color: var(--muted); width: 3.6rem; text-align: right; flex: none; }
+
+    /* The wall's own section chrome. `.show-section` and friends live in
+       show-page.css, which this page does not link — the wall's `.sup-*` rules
+       come from supporter-wall.css and the section around them is here. */
+    /* ══ THE MEMBERS TAB'S SECTIONS ══
+       ⚠️ ONE IDIOM FOR ALL FOUR, LIFTED FROM THE DETAIL PAGES. Reed's call,
+       2026-08-23: the boards, the wall, the bots and the boost list read as
+       four loose blocks stacked in a column, where /show and /episode read as
+       a page made of definite parts. Those pages get that from three things
+       and this restates all three — a generous top margin, a Playfair h2 at
+       the same clamp, and a sub-line in the same muted 0.88rem.
+
+       ⚠️ THE HAIRLINE IS THE ONE ADDITION. The detail pages separate sections
+       by space alone, which works there because each is a bordered drawer or
+       a shell; here the wall is deliberately chrome-less avatars, so space
+       alone left it floating between two boxes. A rule above each heading is
+       the lightest thing that draws the boundary without putting a box round
+       a component whose whole design is not having one.
+
+       :first-child carries no rule — a line above the first section would
+       fence it off from the intro that introduces it. */
+    .mb-section { margin: 0 0 2.75rem; }
+    /* ⚠️ THE HAIRLINE ABOVE EACH HEADING CAME BACK OUT. It was a guess at what
+       makes the detail pages read as definite; Reed named the real answer on
+       2026-08-23 — the boost list on /booster and /episode lives in a SHELL,
+       and that is what those pages get their edges from. With every section's
+       content inside one, a rule above the heading as well is a second boundary
+       for one break. Spacing plus the shell, exactly as /show does it. */
+    .mb-section > h2,
+    .mb-section .show-section-head > h2 {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: clamp(1.2rem, 3vw, 1.6rem); font-weight: 700; color: var(--ink);
+      margin: 0; letter-spacing: 0.01em;
+    }
+    .mb-section .show-section-head,
+    [data-members-wall-head],
+    .mb-section-head { margin-bottom: 1.1rem; }
+    /* The lifted heading arrives in either of renderSupporters' two shapes — a
+       `.show-section-head` wrapper on a populated wall, a bare <h2> on the
+       empty one — so the type is set on the host's h2 whichever landed. */
+    [data-members-wall-head] h2 {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: clamp(1.2rem, 3vw, 1.6rem); font-weight: 700; color: var(--ink);
+      margin: 0; letter-spacing: 0.01em;
+    }
+    [data-members-wall-head]:empty { display: none; }
+    .mb-section .show-section-sub,
+    .mb-section-sub {
+      margin: 0.35rem 0 0; font-size: 0.88rem; color: var(--muted);
+    }
+    /* ⚠️ AN EMPTY SUB-LINE MUST TAKE NO SPACE. renderSupporters emits the <p>
+       unconditionally, and the wall now passes no sub — without this the wall's
+       heading carries a blank line under it. */
+    .mb-section .show-section-sub:empty { display: none; }
+
+    /* ══ THE SHELL ══
+       ⚠️ `.bs-shell` AND `.bs-controls` FROM show-page.css, RESTATED RATHER
+       THAN IMPORTED. Reed's call, 2026-08-23: "the boosts live in their own
+       little shell… can you do that for the members page?" This page does not
+       link show-page.css — 30KB of detail-page chrome for four rules — so the
+       values are copied and this comment is the pointer. **They must stay in
+       step**; a shell here that is 10px where /booster is 12px reads as a
+       different component to anyone who visits both.
+
+       The band is a LID: it carries the shell's fill one step darker and a
+       bottom border, and no top border of its own, because the shell's own
+       border is already the line above it. */
+    /* ⚠️ NO `overflow: hidden` ON A SHELL WHOSE LID HOLDS A DROPDOWN. `.bs-shell`
+       carries it and gets away with it because its lid sits on top of a tall
+       list, so the sort menu opens downward INTO the shell. The Boosts lid has
+       nothing under it inside its own shell, so the menu was clipped the
+       instant it opened — reported as "the dropdowns get hidden in the gap".
+       The lid takes the top corners itself instead, which is what the clip was
+       doing. */
+    .mb-shell {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--cream);
+    }
+    .mb-lid {
+      display: flex; align-items: center; justify-content: flex-end;
+      flex-wrap: wrap; gap: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+      border-radius: 12px 12px 0 0;
+      background: var(--cream-d);
+    }
+    .mb-lid[hidden] { display: none; }
+    /* The body's own padding, since `.bs-shell` puts none on the shell itself
+       and lets each list bring its own. */
+    .mb-body { padding: 1.1rem 1rem; }
+
+    /* ⚠️ THE TWO HALVES OF THE BOOSTS SHELL, AND THE SEAM IS THE WHOLE RISK.
+       The lid closes its own bottom and the panel below opens its own top, so
+       the pair draws one box across two elements. Both are scoped to the
+       Members tab: everywhere else the bar is back in its sticky wrapper and
+       the panel is an ordinary panel.
+
+       ⚠️ THE SECTION'S OWN BOTTOM MARGIN IS THE GAP, and it shipped that way.
+       `.mb-section` carries `margin-bottom: 2.75rem` for the space between
+       sections; on the one section whose box CONTINUES into the element after
+       it, that margin is 2.75rem of nothing between a lid and its body, with
+       the border drawing both edges of the hole. Reported the day it shipped.
+       Anything that puts vertical space between these two halves reopens it. */
+    .members-boosts { margin-bottom: 0; }
+    .mb-shell--lid-only { border-bottom: 0; border-radius: 12px 12px 0 0; }
+    /* ⚠️ NO `max-width` AND NO `margin` HERE, DELIBERATELY. Both would be
+       no-ops — the shell is already inside `.feed-panels-inner`, which reads
+       the track, so the bar cannot exceed it and has nothing to centre within.
+       And `test-feed-hash.mjs` asserts that four elements read
+       `var(--feed-track)` by scanning declarations for `.feed-bar`, so a scoped
+       `max-width: none` reads to it as the track declaration going away. It
+       failed exactly that way once. Restyle the fill and the padding here;
+       leave the box model to the base rule. */
+    body[data-active-tab="members"] .mb-shell--lid-only > .feed-bar {
+      background: var(--cream-d);
+      border-bottom: 1px solid var(--border);
+      padding: 0.5rem 0.75rem;
+    }
+    /* The panel finishes the box. `margin-top: 0` is load-bearing: any gap here
+       is a visible break in a border that is meant to be continuous. */
+    body[data-active-tab="members"] .feed-panel.is-active {
+      margin-top: 0;
+      border: 1px solid var(--border);
+      border-top: 0;
+      border-radius: 0 0 12px 12px;
+      background: var(--cream);
+      padding: 1.1rem 1rem;
+    }
+
+    .members-wall-section { margin: 0; }
+    .members-wall-section .show-more {
+      margin-top: 1rem;
+      font: inherit; font-size: 0.82rem; font-weight: 700;
+      color: var(--brand-dd); background: none;
+      border: 1px solid var(--border); border-radius: 999px;
+      padding: 0.35rem 0.9rem; cursor: pointer;
+    }
+    .members-wall-section .show-more:hover { border-color: var(--brand); color: var(--brand-ddd); }
+
+    /* ── Boost Bots ────────────────────────────────────────────────────────
+       ⚠️ NOT THE WALL'S IDIOM, DELIBERATELY. The wall is a grid of faces
+       because it is a community; these are four accounts, each of which needs
+       a sentence saying what it does, so they are rows. Rendering them as more
+       faces would put them back in the list they were taken out of. */
+    /* ⚠️ NO HEADING OR SPACING RULES HERE. `.mb-section` owns both for all
+       four sections on this tab; a `font:` shorthand on `.bots-title` at
+       (0,1,0) against `.mb-section > h2` at (0,1,1) is the exact specificity
+       trap `.show-stat dd` documents in show-page.css. The section renders its
+       head through the shared `.mb-section-head` markup instead. */
+    .bots:empty { display: none; }
+    .bots-more { color: var(--brand-dd); text-decoration: underline; text-decoration-color: var(--brand-tint, var(--brand)); white-space: nowrap; }
+    .bots-more:hover { color: var(--brand-ddd); text-decoration-color: currentColor; }
+    /* ⚠️ THE LIST IS THE SHELL. Same border, same 12px, same `--cream` as
+       `.mb-shell` above and as `.bs-shell` on the detail pages — it was 10px
+       on `--surface`, which is close enough to read as a near-miss rather than
+       as the same component. It carries no lid, having no controls. */
+    .bots-list {
+      list-style: none; margin: 0; padding: 0;
+      border: 1px solid var(--border); border-radius: 12px;
+      /* Keeps its clip, unlike `.mb-shell`: no dropdown lives in here, and the
+         rows carry their own fill right up to the rounded edge. */
+      background: var(--cream); overflow: hidden;
+    }
+    .bots-row {
+      display: flex; align-items: center; gap: 0.75rem;
+      padding: 0.7rem 0.9rem; border-top: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .bots-row:first-child { border-top: 0; }
+    .bots-link { display: flex; flex: none; }
+    .bots-face {
+      width: 34px; height: 34px; border-radius: 50%; flex: none;
+      object-fit: cover; background: var(--cream-d);
+    }
+    .bots-face--none {
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.8rem; font-weight: 700; color: var(--muted);
+    }
+    .bots-who { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 0.1rem; }
+    .bots-name {
+      font-weight: 700; font-size: 0.9rem; color: var(--ink);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    a.bots-name:hover { color: var(--accent-d); text-decoration: underline; }
+    .bots-role { font-size: 0.76rem; color: var(--muted); line-height: 1.35; }
+    /* The figures are a fixed column so the four rows line up; on a phone they
+       drop under the name rather than squeezing the role text to nothing. */
+    .bots-figs { display: flex; gap: 1rem; flex: none; text-align: right; }
+    .bots-fig { font-weight: 700; font-size: 0.85rem; color: var(--accent-d); white-space: nowrap; }
+    .bots-fig small { font-weight: 400; font-size: 0.7rem; color: var(--muted); }
+
+    @media (max-width: 560px) {
+      .bots-row { align-items: flex-start; }
+      .bots-figs { flex-basis: 100%; order: 3; margin-left: 2.9rem; text-align: left; }
+      .bots-row { flex-wrap: wrap; }
+    }
+
+    /* The rules link, and the dialog behind it. */
+    /* Inline in the sub-line's sentence, so it takes the surrounding type and
+       sits on its baseline; it is a button because it opens a dialog, and
+       everything here is what stops it looking like one. */
+    .hpw-rules {
+      font: inherit; color: var(--brand-dd); background: none;
+      border: 0; padding: 0; margin-left: 0.15rem; cursor: pointer;
+      text-decoration: underline; text-decoration-color: var(--brand-tint, var(--brand));
+      text-underline-offset: 2px;
+    }
+    .hpw-rules:hover { color: var(--brand-ddd); text-decoration-color: currentColor; }
+    .hpw-rules:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; border-radius: 4px; }
+
+    .hpw-modal { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+    .hpw-modal[hidden] { display: none; }
+    .hpw-modal-scrim { position: absolute; inset: 0; background: var(--scrim); }
+    .hpw-modal-box {
+      position: relative; z-index: 1;
+      background: var(--modal-bg); color: var(--ink);
+      border: 1px solid var(--modal-line); border-radius: 14px;
+      box-shadow: 0 18px 50px rgba(11,58,82,0.28);
+      padding: 1.1rem 1.3rem 1.3rem;
+      width: min(34rem, 100%); max-height: min(80vh, 40rem); overflow-y: auto;
+    }
+    .hpw-modal-head { display: flex; align-items: flex-start; gap: 1rem; margin-bottom: 0.7rem; }
+    .hpw-modal-head h3 {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 1.15rem; font-weight: 700; margin: 0; flex: 1;
+    }
+    .hpw-modal-x {
+      font: inherit; font-size: 1.4rem; line-height: 1;
+      background: none; border: 0; color: var(--muted); cursor: pointer; padding: 0 0.2rem;
+    }
+    .hpw-modal-x:hover { color: var(--ink); }
+    .hpw-rules-list { margin: 0; }
+    .hpw-rules-list dt {
+      font-weight: 700; font-size: 0.88rem; color: var(--ink); margin-top: 0.85rem;
+    }
+    .hpw-rules-list dt:first-child { margin-top: 0; }
+    .hpw-rules-list dd { margin: 0.2rem 0 0; font-size: 0.84rem; color: var(--muted); }
+
+    /* ⚠️ THE WALL'S CONTROLS ARE THE FEEDS' OWN, so there is no pill styling
+       here: `.pcast-range` and `.pcast-sort` come from feed-cards.css, which
+       this page already links. The three-button `.mw-views` group they replaced
+       was a second shape for the same idea. The only rule needed is where the
+       row sits — beside the heading, the way a feed's bar sits beside its
+       tabs. */
+    .mw-controls[hidden] { display: none; }
+    .members-wall-section .show-section-head {
+      display: flex; align-items: flex-end; justify-content: space-between;
+      gap: 0.75rem 1rem; flex-wrap: wrap;
+    }
+    /* The heading and its sub-line stay one block; the controls take the far
+       end and drop to their own line before the sub-line has to wrap. */
+    .members-wall-section .show-section-head > :not(.mw-controls) { min-width: 0; }
+    .members-wall-section .mw-controls { margin-left: auto; }
+    .members-wall-section .mw-controls .pcast-controls { margin: 0; }
+    @media (max-width: 640px) {
+      .members-wall-section .mw-controls { margin-left: 0; flex-basis: 100%; }
+    }
+
+    /* ⚠️ THE LOOKUP LEADS THE TAB, so it is not `hidden` the way a feed's
+       search host is — mountFeedSearch reveals it, and this only gives it the
+       room a leading control needs. */
+    .members-find { margin: 0 0 1.75rem; }
+    .members-find [data-feed-search] { margin: 0; }
+
     .feed-panel { display: none; }
     .feed-panel.is-active { display: block; }
 
@@ -560,7 +1120,48 @@
     @media (max-width: 640px) {
       .feed-bar-wrap { top: 56px; } /* nav shrinks on mobile */
       .feed-bar { padding: 0.5rem 1rem; gap: 0.4rem; }
-      .feed-menu--type .feed-menu-cur { font-size: 1.05rem; }
+
+      /* ══ THE TABS ON A PHONE ══
+         The tall two-line tab becomes a chip: icon and label on one row, the
+         accent as an outline rather than a fill. Three chips across 375px with
+         ~15px of padding each, which fits with room to spare.
+
+         ⚠️ THE LABELS STAY, AND THAT IS THE ONE PLACE THIS DEPARTS FROM LB.
+         `git show lb/main:feeds.html` hides them here and goes icon-only,
+         because four tabs and four words do not fit. Three do — and this whole
+         reorganization exists because a visitor could not tell what the site
+         was showing them, so opening it with three unlabelled glyphs would
+         undo the reason for the work. Measured: the widest label ("Podcasts")
+         is ~58px against ~113px of chip. */
+      .feed-tabs { gap: 0.4rem; padding: 0.5rem 1rem 0.15rem; }
+      /* ⚠️ `--tab-dd`, NOT `--tab`, IN ALL THREE PLACES. A chip is small type
+         on a small surface and it reads the accent twice over — as its label
+         and border when idle, and as its fill under white when selected. On the
+         cyan families that was 2.29:1 and 2.50:1. The desktop tab is the same
+         two readings at a larger size and is deliberately NOT changed here;
+         see the note on the -dd tokens above. */
+      .feed-tab {
+        flex-direction: row;
+        gap: 0.32rem;
+        border-top: 0;
+        border: 1px solid var(--tab-dd);
+        border-radius: 999px;
+        padding: 0.4rem 0;
+        color: var(--tab-dd);
+      }
+      .feed-tab[aria-selected="true"] {
+        background: var(--tab-dd);
+        border-color: var(--tab-dd);
+      }
+      .feed-tab-icon { width: 16px; height: 16px; }
+      .feed-tab-label { font-size: 0.82rem; }
+      .feed-tab:hover { background: transparent; }
+      /* Same padding and gap as the chips above, so each group still splits
+         exactly the width of its own tab. */
+      .feed-tabs { gap: 0.4rem; }
+      .feed-subs { padding: 0 1rem 0.4rem; gap: 0.4rem; }
+      .feed-sub-group { gap: 0; }
+      .feed-sub { font-size: 0.76rem; padding: 0.3rem 0.2rem 0.34rem; }
       /* All four controls rarely fit one line here, so the range + sort group
          wraps onto its own. Kept right-aligned: left-aligned it would sit at
          the screen edge and the sort menu's right-anchored popover (min-width
@@ -571,8 +1172,8 @@
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
     }
   </style>
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v113" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v113" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v136" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v136" />
 </head>
 <body data-active-feed="episodes-global">
 
@@ -604,28 +1205,39 @@
           </div>
           <a class="nav-explore-home" href="/"><span aria-hidden="true">🏠</span> Home</a>
           <div class="nav-explore-groups">
-            <!-- Feeds: one entry per feed, matching the homepage's what-menu
-                 exactly (Episodes / Shows / Songs / Albums / Boosts). The
-                 Global vs Follows axis is deliberately absent — it's the
+            <!-- ⚠️ FEEDS IS ONE ENTRY PER TAB, NOT PER FEED. Reed's call,
+                 2026-08-23. It listed all five sub-feeds, which was right while
+                 the homepage hid them behind a dropdown and wrong the moment
+                 the tabs put them on screen: the nav then restated a control
+                 the page carries, in a different order, using different words
+                 for the same things. Each entry lands on that tab's DEFAULT
+                 sub-feed — TAB_DEFAULT in the index.html controller — so
+                 Podcasts opens Episodes, Music opens Albums and Members opens
+                 Boosts. **Those three hrefs and TAB_DEFAULT move together.**
+
+                 The Global vs Follows axis stays deliberately absent: it is the
                  second dropdown on the page itself, and listing both scopes
-                 here made the nav a grid restating a control the page already
-                 has. Songs and Albums are the music half of Episodes and
-                 Shows, split on <podcast:medium>; they sit next to the feeds
-                 they mirror rather than in a group of their own. -->
+                 here made the nav a grid restating a control the page has. -->
             <div class="nav-explore-group">
               <h4>Feeds</h4>
-              <a href="/#episodes-global"><span aria-hidden="true">🎙</span> Episodes</a>
-              <a href="/#shows"><span aria-hidden="true">📻</span> Shows</a>
-              <a href="/#songs-global"><span aria-hidden="true">🎵</span> Songs</a>
-              <a href="/#albums"><span aria-hidden="true">💿</span> Albums</a>
-              <a href="/#boosts-global"><span aria-hidden="true">⚡</span> Boosts</a>
+              <a href="/#episodes-global"><span aria-hidden="true">🎙</span> Podcasts</a>
+              <a href="/#albums"><span aria-hidden="true">🎵</span> Music</a>
+              <a href="/#members"><span aria-hidden="true">👥</span> Members</a>
             </div>
-            <!-- Stats: the aggregate views over the same data. Both are
-                 coming-soon pages for now (noindex, out of the sitemap). -->
+            <!-- Stats: the aggregate view over the same data. A coming-soon
+                 page for now (noindex, out of the sitemap).
+
+                 ⚠️ /boosters (Community) WAS THE SECOND ENTRY AND THE PAGE IS
+                 DELETED, not redirected. Reed's call, 2026-08-23: the Members
+                 tab now answers what it promised — the member lookup, the
+                 top-members wall and the #40HPW boards — so leaving a
+                 placeholder here pointed a reader at a promise for content that
+                 exists one tab over. It was never linked from anywhere but this
+                 menu and the footer, was noindex and out of the sitemap, so it
+                 has no inbound links to preserve and gets no redirect. -->
             <div class="nav-explore-group">
               <h4>Stats</h4>
               <a href="/stats"><span aria-hidden="true">📊</span> Boost Stats</a>
-              <a href="/boosters"><span aria-hidden="true">🧑‍🤝‍🧑</span> Community</a>
             </div>
             <div class="nav-explore-group">
               <h4>More</h4>
@@ -679,21 +1291,71 @@
      bar is above the fold on every visit, so it shouldn't wait on script to
      exist. -->
 <div class="feed-bar-wrap">
-  <div class="feed-bar">
 
-    <div class="feed-menu feed-menu--type" data-feed-menu="type">
-      <button type="button" class="feed-menu-btn" aria-haspopup="true" aria-expanded="false" aria-label="Choose feed">
-        <span class="feed-menu-cur" data-feed-menu-cur>Episodes</span>
-        <span class="feed-menu-caret" aria-hidden="true">▾</span>
-      </button>
-      <div class="feed-menu-list" role="menu" aria-label="Feed" hidden>
-        <button type="button" class="feed-menu-item" role="menuitemradio" aria-checked="true" data-value="episodes">Episodes</button>
-        <button type="button" class="feed-menu-item" role="menuitemradio" aria-checked="false" data-value="shows">Shows</button>
-        <button type="button" class="feed-menu-item" role="menuitemradio" aria-checked="false" data-value="songs">Songs</button>
-        <button type="button" class="feed-menu-item" role="menuitemradio" aria-checked="false" data-value="albums">Albums</button>
-        <button type="button" class="feed-menu-item" role="menuitemradio" aria-checked="false" data-value="boosts">Boosts</button>
+  <!-- The three tabs. Podcasts and Music are the two sides of
+       <podcast:medium>; Members is the people half of the site. -->
+  <div class="feed-tabs" role="tablist" aria-label="Feeds">
+    <button type="button" class="feed-tab feed-tab--podcasts" role="tab" data-tab="podcasts" aria-selected="true">
+      <span class="feed-tab-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="2" width="6" height="12" rx="3"/>
+          <path d="M5 10a7 7 0 0 0 14 0"/>
+          <line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/>
+        </svg>
+      </span>
+      <span class="feed-tab-label">Podcasts</span>
+    </button>
+    <button type="button" class="feed-tab feed-tab--music" role="tab" data-tab="music" aria-selected="false">
+      <span class="feed-tab-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.6"/>
+        </svg>
+      </span>
+      <span class="feed-tab-label">Music</span>
+    </button>
+    <button type="button" class="feed-tab feed-tab--members" role="tab" data-tab="members" aria-selected="false">
+      <span class="feed-tab-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+          <path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+      </span>
+      <span class="feed-tab-label">Members</span>
+    </button>
+  </div>
+
+  <!-- Which feed inside the tab. Every button ships; CSS shows the active
+       tab's. `data-tab` is what that rule keys on, `data-value` is the type. -->
+  <!-- Which feed inside the tab. Every group ships; CSS shows the active tab's.
+       ⚠️ THE GROUP IS WHAT ALIGNS THE BLOCKS UNDER THEIR TAB. `.feed-subs` is
+       the same three-column grid as `.feed-tabs` and each group is pinned to
+       its own column, so the pair inside it splits exactly the width of the tab
+       above — at any gap, any padding, any breakpoint. A flat six-column grid
+       gets this right only while the two rows share a gap, which they do not on
+       a phone, where the tabs are chips with space between them. -->
+  <div class="feed-subs-wrap">
+    <div class="feed-subs" data-feed-subs>
+      <!-- ⚠️ Shows ships selected because the front door lands on it — see
+           DEFAULT_TYPE in the controller. syncTabs rewrites both attributes
+           during parse, so this only shows through to a reader with no
+           JavaScript and to a crawler's first pass; those are exactly the two
+           who must not be shown a selected sub-feed that is not the panel
+           below. -->
+      <div class="feed-sub-group" data-tab="podcasts">
+        <button type="button" class="feed-sub" data-value="shows"    aria-selected="true">Shows</button>
+        <button type="button" class="feed-sub" data-value="episodes" aria-selected="false">Episodes</button>
+      </div>
+      <div class="feed-sub-group" data-tab="music">
+        <button type="button" class="feed-sub" data-value="albums" aria-selected="false">Albums</button>
+        <button type="button" class="feed-sub" data-value="songs"  aria-selected="false">Songs</button>
+      </div>
+      <div class="feed-sub-group" data-tab="members">
+        <button type="button" class="feed-sub" data-value="members" aria-selected="false">Boosts</button>
       </div>
     </div>
+  </div>
+
+  <div class="feed-bar">
 
     <div class="feed-menu feed-menu--scope" data-feed-menu="scope" hidden>
       <button type="button" class="feed-menu-btn" aria-haspopup="true" aria-expanded="false" aria-label="Choose whose boosts">
@@ -729,6 +1391,192 @@
 <main class="feed-panels">
   <div class="feed-panels-inner">
 
+    <!-- ══ THE MEMBERS TAB'S OWN SECTIONS ══
+         Above the panels rather than inside one, because the Members tab holds
+         two boosts PANELS (Global and Follows) and these sections belong to the
+         tab, not to either of them. CSS shows the block only on that tab, the
+         same call .feed-bar-controls and .feed-subs make.
+
+         A member is anyone who has boosted at least one show. The intro says
+         that plainly and puts the mechanics on a second line a reader can skip:
+         the front door is not where somebody learns what a protocol is. -->
+    <div class="members-block" data-members-block>
+      <!-- ⚠️ THE (i) IS A REAL LINK TO /about#membership, NOT A TOOLTIP. What
+           it has to answer is "which app do I use", and the answer is three
+           named applications with a caveat on each; that is a section, not a
+           hover. It is also the one thing on this tab a crawler should follow.
+
+           The badge is a CSS circle rather than the ⓘ character, whose glyph is
+           missing or differently sized in several of the faces this site
+           falls back to; the same call .drawer-hint's chevron makes. -->
+      <p class="members-intro">
+        <strong>Become a member by boosting one podcast or musician and sharing
+        the boost with your Nostr identity.</strong><a class="members-info"
+          href="/about#membership" target="_blank" rel="noopener"
+          aria-label="How membership works (opens in a new tab)"
+          title="How membership works"><span aria-hidden="true">i</span></a>
+      </p>
+
+      <!-- ⚠️ THE LOOKUP LEADS THE TAB AND IT NAVIGATES; IT NO LONGER FILTERS
+           THE BOOST LIST. Reed's call, 2026-08-23: the question is "where is
+           this person", and the answer is their page. It sat inside the Boosts
+           panel while it was a filter, which is also why it could only be found
+           by a reader who had already scrolled to the feed. It is the same
+           `[data-feed-search]` host and the same mountFeedSearch the four
+           ranked feeds use. -->
+      <div class="members-find">
+        <div data-feed-search hidden></div>
+      </div>
+      <!-- ⚠️ ONE LINE OF EXPLANATION, NOT TWO. The sub-line and the caveat under
+           the boards said the same thing twice at two sizes; the mechanics moved
+           behind Rules, where a reader who wants them can have all of them and a
+           reader who does not is not charged two paragraphs for the boards. -->
+      <section class="mb-section hpw" data-hpw>
+        <div class="mb-section-head">
+          <h2>#40HPW</h2>
+          <!-- ⚠️ RULES SITS IN THE SUB-LINE, NOT UNDER THE BOARDS. Reed's call,
+               2026-08-23. Below them it was a footnote to two tall boxes and
+               read as belonging to the second one; on the line that states the
+               challenge it is where the question it answers is asked. -->
+          <p class="mb-section-sub">
+            40HPW Challenge! Share boosts for 40 hours of podcasts in a week.
+            <button type="button" class="hpw-rules" data-hpw-rules aria-haspopup="dialog">Rules</button>
+          </p>
+        </div>
+        <div class="hpw-boards" data-hpw-boards></div>
+      </section>
+
+      <!-- The rules, as a dialog rather than as a third paragraph. Ships closed
+           and in the document, so it needs no fetch and reads with the boards
+           whether or not the fetch behind them succeeded. -->
+      <div class="hpw-modal" data-hpw-modal hidden>
+        <div class="hpw-modal-scrim" data-hpw-close></div>
+        <div class="hpw-modal-box" role="dialog" aria-modal="true" aria-labelledby="hpw-rules-title">
+          <div class="hpw-modal-head">
+            <h3 id="hpw-rules-title">How #40HPW works</h3>
+            <button type="button" class="hpw-modal-x" data-hpw-close aria-label="Close">×</button>
+          </div>
+          <dl class="hpw-rules-list">
+            <dt>A boost counts as a listen</dt>
+            <dd>
+              Boost an episode and the board assumes you heard all of it, then
+              adds up the episode's length. It is an assumption, not a
+              measurement, and it is the whole premise.
+            </dd>
+
+            <dt>One listen per episode per week</dt>
+            <dd>
+              Boosting the same episode five times is one listen. Deduplicating
+              removes about 9% of qualifying boosts, and one episode has been
+              boosted fifteen times by the same person in a week.
+            </dd>
+
+            <dt>Weeks run Monday to Monday, Pacific time</dt>
+            <dd>
+              This Week resets at midnight Pacific on Monday, adjusted for
+              daylight saving. Pacific is the last US time zone to reach
+              Monday, so the board never resets while part of the country is
+              still on Sunday; a UTC reset landed on Sunday evening across the
+              Americas. High Scores is one row per person per week, so the same
+              name can hold several places.
+            </dd>
+
+            <dt>Some boosts cannot count</dt>
+            <dd>
+              About 14% contribute nothing: roughly 8% are sent to a show rather
+              than an episode, and Podcast Index has no length for another few
+              percent of episodes.
+            </dd>
+
+            <dt>Accounts that post for other people are left out</dt>
+            <dd>
+              A few keys publish boosts on behalf of many donors. Ranking one of
+              those would add up dozens of people&rsquo;s weeks into a single row.
+              They are named under
+              <!-- ⚠️ NOT A PLAIN <a href="#boost-bots">. The dialog sits over
+                   the page, so following an in-page anchor scrolls the document
+                   BEHIND the scrim and leaves the reader looking at the rules
+                   they just left. wireRules closes it first, then jumps. -->
+              <button type="button" class="hpw-rules" data-hpw-goto="boost-bots">Boost Bots</button>
+              below.
+            </dd>
+          </dl>
+        </div>
+      </div>
+
+      <!-- The wall. Filled by members-board.js through the SAME renderSupporters
+           /show and /episode use; the section markup, the podium and the
+           "Show N more" toggle all come from that module.
+
+           ⚠️ TWO CONTAINERS, BECAUSE THE CONTROLS OUTLIVE THE WALL. The body is
+           replaced wholesale on every range or sort change; a control rebuilt
+           with it would lose its open menu and its listeners mid-gesture. The
+           controls element is built once and MOVED into each fresh section
+           head, which preserves both. -->
+      <!-- ⚠️ THE HEADING IS OUTSIDE THE SHELL AND THE CONTROLS ARE ITS LID,
+           which is exactly how /booster#boosts is built: an <h2> over a
+           bordered box whose first row is the band. That is also why the
+           controls stopped going into `.show-section-head` — a lid is part of
+           the box, not part of the heading above it. -->
+      <!-- ⚠️ THE HEADING IS OUTSIDE THE SHELL AND THE CONTROLS ARE ITS LID,
+           which is how /booster#boosts is built: an <h2> over a bordered box
+           whose first row is the band.
+
+           ⚠️ THE HEADING IS STILL renderSupporters'. It is a parameter — this
+           tab says "Members" where the detail pages say "Nostr Community" —
+           so it is rendered inside that section and then MOVED up here, rather
+           than written twice in two places that could disagree. Same move the
+           controls make, and safe for the same reason. -->
+      <section class="mb-section members-wall" data-members-wall>
+        <div data-members-wall-head></div>
+        <div class="mb-shell">
+          <div class="mw-controls mb-lid" data-members-controls hidden></div>
+          <div class="mb-body" data-members-wall-body></div>
+        </div>
+      </section>
+
+      <!-- ⚠️ THE BOTS SECTION IS THE WALL'S EXCLUSION, SHOWN. Four publisher
+           keys are dropped from every ranked listing above; this names them
+           rather than leaving them silently missing, and gives them their
+           totals. Filled by members-board.js from /api/v1/members?publishers=1,
+           and empty until it lands — a section that cannot load must not leave
+           an error where a disclosure was promised. -->
+      <section class="mb-section bots" data-members-bots></section>
+
+      <!-- ⚠️ THE BOOST LIST'S OWN HEADING AND ITS CONTROLS, and both are here
+           because the list is here. The scope menu and the range/sort sat in
+           the sticky bar at the top of the page, which is right on every other
+           tab and wrong on this one: the Members tab puts three sections above
+           the boost list, so the controls were a screen and a half from the
+           thing they act on and the list itself had no name at all. Reed's
+           call, 2026-08-23.
+
+           ⚠️ THE BAR IS MOVED, NOT DUPLICATED. `.feed-bar` is one element; the
+           controller relocates it into this slot on the Members tab and back
+           into `.feed-bar-wrap` on every other. A second bar would be a second
+           set of controls over one feed, which is the class of bug the
+           declarative body[data-active-feed] rule exists to avoid. See
+           `placeFeedBar` in the controller. -->
+      <section class="mb-section members-boosts">
+        <div class="mb-section-head">
+          <h2>Boosts</h2>
+          <p class="mb-section-sub">
+            Every boost note as it was published, newest first.
+          </p>
+        </div>
+        <!-- ⚠️ THE SHELL IS TWO ELEMENTS HERE AND THE SEAM IS THE WHOLE
+             RISK. The bar is the lid and the cards are the body, but the cards
+             live in `.feed-panel`s outside this section — the panel system is
+             shared with seven other feeds and moving them into here would fork
+             it. So the lid closes its own bottom and the panel opens its own
+             top, with no margin between them, and `body[data-active-tab]`
+             scopes both. Any vertical margin added to either half opens a gap
+             the border makes visible. -->
+        <div class="mb-shell mb-shell--lid-only" data-feed-bar-slot></div>
+      </section>
+    </div>
+
+
     <!-- No caveat paragraph here. One above every feed was
          tried and removed: it is the first thing on the page, it is three
          lines on a phone, and it pushes the feed itself below the fold to say
@@ -739,32 +1587,25 @@
          page, which is the surface that gets shared and the one where the
          numbers read as a claim about somebody's audience. -->
 
-    <section class="feed-panel is-active" id="panel-episodes-global" role="region" aria-label="Episodes, global" data-feed="episodes-global" data-scope="global">
+    <!-- ⚠️ NO INJECTION MARKER HERE SINCE PHASE D. This panel carried the
+         server-rendered opening feed while the front door landed on Episodes;
+         it lands on Shows now, so the markers moved to that panel and this one
+         fetches its first page the way Songs and both Follows feeds always
+         have. Only the feed a reader is actually looking at is rendered at the
+         edge — a second thirty-card list inside a hidden panel is bytes nobody
+         reads and two rankings on one URL for a crawler. -->
+    <section class="feed-panel" id="panel-episodes-global" role="region" aria-label="Episodes, global" data-feed="episodes-global" data-scope="global" hidden>
       <p class="feed-note" data-feed-note hidden></p>
       <div class="feed-search" data-feed-search hidden></div>
-      <!-- ⚠️ THE MARKER BELOW IS AN INJECTION POINT, not a comment. functions/index.js
-           fetches this file through env.ASSETS, replaces that exact string with
-           thirty server-rendered episode cards, and serves the result — so the
-           front door ships real content rather than a shell a crawler has to run
-           JavaScript to read. feeds-podcasts.js finds those cards and ADOPTS
-           them instead of fetching the same 431KB of rows again.
-
-           Do not reword it, and do not remove the placeholder under it: the
-           Function degrades to serving this file untouched whenever D1 is
-           unreachable, in which case the placeholder is what a reader sees for
-           the moment before the feed hydrates. Everything still works with the
-           markers unreplaced; it is a fast path, not a dependency. -->
       <div class="feed-list" data-feed-list>
-        <!--OB:SSR-EPISODES-->
         <div class="feed-placeholder">
           <strong>Global episodes feed coming online</strong>
           The layout is ready — boosted episodes load here once the snapshot loader lands.
         </div>
-        <!--/OB:SSR-EPISODES-->
       </div>
     </section>
 
-    <section class="feed-panel" id="panel-boosts-global" role="region" aria-label="Boosts, global" data-feed="boosts-global" data-scope="global" hidden>
+    <section class="feed-panel" id="panel-members-global" role="region" aria-label="Boosts, global" data-feed="members-global" data-scope="global" hidden>
       <div class="feed-search" data-feed-search hidden></div>
       <div class="feed-list" data-feed-list>
         <div class="feed-placeholder">
@@ -785,7 +1626,7 @@
       </div>
     </section>
 
-    <section class="feed-panel" id="panel-boosts-follows" role="region" aria-label="Boosts from your follows" data-feed="boosts-follows" data-scope="follows" hidden>
+    <section class="feed-panel" id="panel-members-follows" role="region" aria-label="Boosts from your follows" data-feed="members-follows" data-scope="follows" hidden>
       <div class="feed-search" data-feed-search hidden></div>
       <div class="feed-list" data-feed-list>
         <div class="feed-placeholder">
@@ -824,14 +1665,33 @@
     <!-- Shows: the show-level rollup, where the Episodes feeds are
          episode-level. Global only — podcasts/index.json is computed over
          everyone, so it can't serve a Follows audience (shows-feed.js). -->
-    <section class="feed-panel" id="panel-shows" role="region" aria-label="Shows" data-feed="shows" data-scope="global" hidden>
+    <!-- ⚠️ THE PANEL THE FRONT DOOR OPENS ON. DEFAULT_TYPE in the controller
+         below says so, and this is the half of that decision a reader with no
+         JavaScript and a crawler on its first pass actually see: the controller
+         hides and shows panels, but until it runs, `is-active` here is what is
+         on screen. The two move together. -->
+    <section class="feed-panel is-active" id="panel-shows" role="region" aria-label="Shows" data-feed="shows" data-scope="global">
       <p class="feed-note" data-feed-note hidden></p>
       <div class="feed-search" data-feed-search hidden></div>
+      <!-- ⚠️ THE MARKER BELOW IS AN INJECTION POINT, not a comment. functions/index.js
+           fetches this file through env.ASSETS, replaces that exact string with
+           the server-rendered opening page of show cards, and serves the result
+           — so the front door ships real content rather than a shell a crawler
+           has to run JavaScript to read. shows-feed.js finds those cards and
+           ADOPTS them instead of fetching the same rows again.
+
+           Do not reword it, and do not remove the placeholder under it: the
+           Function degrades to serving this file untouched whenever D1 is
+           unreachable, in which case the placeholder is what a reader sees for
+           the moment before the feed hydrates. Everything still works with the
+           markers unreplaced; it is a fast path, not a dependency. -->
       <div class="feed-list" data-feed-list>
+        <!--OB:SSR-SHOWS-->
         <div class="feed-placeholder">
           <strong>Shows feed coming online</strong>
           The layout is ready — boosted shows load here once the rollup lands.
         </div>
+        <!--/OB:SSR-SHOWS-->
       </div>
     </section>
 
@@ -869,13 +1729,14 @@
          footer is the nav's site map repeated, so they're regrouped together
          or not at all. -->
     <div class="footer-col">
+      <!-- ⚠️ ONE ENTRY PER TAB, and it mirrors the nav's Explore menu exactly.
+           The two are the site map and are regrouped together or not at all;
+           each lands on that tab's default sub-feed. See partials/nav.html. -->
       <h3>Feeds</h3>
       <ul>
-        <li><a href="/#episodes-global">🎙 Episodes</a></li>
-        <li><a href="/#shows">📻 Shows</a></li>
-        <li><a href="/#songs-global">🎵 Songs</a></li>
-        <li><a href="/#albums">💿 Albums</a></li>
-        <li><a href="/#boosts-global">⚡ Boosts</a></li>
+        <li><a href="/#episodes-global">🎙 Podcasts</a></li>
+        <li><a href="/#albums">🎵 Music</a></li>
+        <li><a href="/#members">👥 Members</a></li>
       </ul>
     </div>
 
@@ -883,7 +1744,6 @@
       <h3>Stats</h3>
       <ul>
         <li><a href="/stats">📊 Boost Stats</a></li>
-        <li><a href="/boosters">🧑‍🤝‍🧑 Community</a></li>
       </ul>
     </div>
 
@@ -910,9 +1770,11 @@
 <!-- FOOTER:END -->
 
 <!-- ══════════════════════════════ FEED BAR CONTROLLER ══════════════════════════════
-     Owns the two menus, which panel is on screen, and the hash. The feed key
-     is `<type>-<scope>` (Shows excepted). ALIASES below keeps the retired
-     `#podcasts-*` hashes working and upgrades them in place. -->
+     Owns the tabs, the sub-category row, the scope menu, which panel is on
+     screen, and the hash. The feed key is `<type>-<scope>` (Shows excepted)
+     and the TAB IS DERIVED FROM IT — see TAB_OF — so no URL in the wild had to
+     change when the tabs landed. ALIASES below keeps the retired `#podcasts-*`
+     hashes working and upgrades them in place. -->
 <script>
 (function () {
   'use strict';
@@ -924,8 +1786,8 @@
     'episodes-follows': { type: 'episodes', scope: 'follows' },
     'songs-global':     { type: 'songs',    scope: 'global' },
     'songs-follows':    { type: 'songs',    scope: 'follows' },
-    'boosts-global':    { type: 'boosts',   scope: 'global' },
-    'boosts-follows':   { type: 'boosts',   scope: 'follows' },
+    'members-global':   { type: 'members',  scope: 'global' },
+    'members-follows':  { type: 'members',  scope: 'follows' },
     'shows':            { type: 'shows',    scope: 'global' },
     'albums':           { type: 'albums',   scope: 'global' },
   };
@@ -934,6 +1796,31 @@
   // asymmetry is about which data source each reads, not about medium; see the
   // scope note at the top of shows-feed.js.
   const SCOPELESS = { shows: true, albums: true };
+  /* ── The tab a feed belongs to ──
+     ⚠️ A TAB IS DERIVED FROM THE FEED KEY, NEVER STORED IN THE HASH. That is
+     the whole reason `#shows`, `#songs-global`, `#members` and the two
+     retired `#podcasts-*` aliases keep resolving with no entry added anywhere:
+     the URL still names a FEED, and which tab is on screen is a fact computed
+     from it. A `#podcasts/shows` scheme would have been a second address space
+     for the same eight views and would have put every link in the wild through
+     an alias table.
+
+     Podcasts and Music are the two sides of <podcast:medium> — the partition
+     the API already answers on. Members is the people half; today it holds the
+     boost firehose alone, which takes no medium and so could not have gone
+     under either of the other two without becoming two things it isn't. */
+  const TAB_OF = {
+    shows: 'podcasts', episodes: 'podcasts',
+    albums: 'music',   songs:    'music',
+    members: 'members',
+  };
+  // What a tab opens on when it is pressed and has no remembered sub-feed.
+  const TAB_DEFAULT = { podcasts: 'episodes', music: 'albums', members: 'members' };
+  /* Which sub-feed each tab was last on, so leaving Podcasts on Shows and
+     coming back returns you to Shows rather than to the default. The twin of
+     langByFeed below, and there for the same reason: a reader's place in a tab
+     is theirs, not the tab's. */
+  const typeByTab = Object.create(null);
   // Retired hashes, kept working permanently. The episodes feed was called
   // "podcasts" until Shows arrived and made the name ambiguous — both are
   // podcasts; one is episode-level. An old link resolves to the new feed and
@@ -942,6 +1829,15 @@
   const ALIASES = {
     'podcasts-global':  'episodes-global',
     'podcasts-follows': 'episodes-follows',
+    /* ⚠️ THE BOOSTS FEED WAS RENAMED TO MEMBERS ON 2026-08-23 AND THESE TWO ARE
+       IN THE WILD — they were the shipped hashes on production up to that day.
+       Without them a retired link falls through to DEFAULT_TYPE, which is
+       Shows, and the reader is shown the show leaderboard with the address bar
+       quietly rewritten to match: a dead link that reports itself as a working
+       one. Measured before they were added. The global one resolves on to the
+       bare `#members` through HASH_OF, so an old link upgrades all the way. */
+    'boosts-global':    'members-global',
+    'boosts-follows':   'members-follows',
   };
   /* ── The language in the hash ──
      `#shows?lang=de` — the feed key, then a query string. The key stays intact
@@ -956,7 +1852,7 @@
      list. Adding them is a two-line change here when a reason turns up.
 
      Feeds with no language axis are listed out rather than in: the Boosts feeds
-     take no `lang` at the API, so `#boosts-global?lang=de` drops the parameter
+     take no `lang` at the API, so `#members?lang=de` drops the parameter
      and rewrites, the same coercion a signed-out `#episodes-follows` gets. */
   const LANG_FEEDS = {
     'episodes-global': 1, 'episodes-follows': 1,
@@ -998,17 +1894,52 @@
     return { key: raw.slice(0, q), lang: normLang(params && params.get('lang')) };
   }
 
+  /* ⚠️ THE HASH A FEED IS WRITTEN AS, where it should not simply be the key.
+     One entry: `members-global` is `#members`. Reed's call, 2026-08-23 — the
+     tab is called Members, the sections above the list are about members, and
+     `#members` named the smallest part of the page.
+
+     ⚠️ THIS IS NOT `ALIASES`, and the difference matters. An alias is a RETIRED
+     hash that gets upgraded in place, so `fromHash` force-rewrites the URL when
+     it resolves one. `#members` is the CANONICAL address, so it must not
+     rewrite itself to anything. The inverse is derived rather than written out,
+     because two hand-maintained maps that must stay inverse are one edit away
+     from disagreeing.
+
+     ⚠️ ONLY THE GLOBAL SCOPE ELIDES. `#members-follows` keeps its suffix, the
+     shape every other scoped feed has. A bare `#members` meaning "whichever
+     scope you were last on" would be an address that does not name a view. */
+  const HASH_OF = { 'members-global': 'members' };
+  const KEY_OF = Object.create(null);
+  Object.keys(HASH_OF).forEach(function (k) { KEY_OF[HASH_OF[k]] = k; });
+
   function hashFor(feed) {
     const lang = langByFeed[feed] || '';
-    return '#' + feed + (lang ? '?lang=' + encodeURIComponent(lang) : '');
+    return '#' + (HASH_OF[feed] || feed) + (lang ? '?lang=' + encodeURIComponent(lang) : '');
   }
-  const DEFAULT_TYPE = 'episodes';
+  /* ⚠️ THE FRONT DOOR LANDS ON SHOWS (Phase D, 2026-08-23, Reed's call). The
+     show-level leaderboard is the view that answers "what is this site" to
+     somebody who has never seen it; the episode feed is one press away on the
+     sub-row above it. Three things move with this line and none of them is
+     optional: `is-active` on the Shows panel in the markup above, the injection
+     markers inside it, and FEED in functions/index.js, which server-renders
+     that panel's opening page.
+
+     ⚠️ TAB_DEFAULT.podcasts IS DELIBERATELY STILL 'episodes'. This is where a
+     COLD LOAD lands; that is what the Podcasts TAB opens on when it is pressed
+     with no remembered sub-feed, and it is pinned to the nav's own Podcasts
+     href. They are two different questions and only one of them was asked. */
+  const DEFAULT_TYPE = 'shows';
   const DEFAULT_SCOPE = 'global';
   const bar = document.querySelector('.feed-bar');
   if (!bar) return;
   const panels = Array.from(document.querySelectorAll('.feed-panel[data-feed]'));
   const menus = {};
   bar.querySelectorAll('[data-feed-menu]').forEach((el) => { menus[el.dataset.feedMenu] = el; });
+  // Outside `.feed-bar`: the tabs and the sub-row are siblings of it inside
+  // .feed-bar-wrap, so they are queried off the document rather than the bar.
+  const tabs = Array.from(document.querySelectorAll('.feed-tab[data-tab]'));
+  const subs = Array.from(document.querySelectorAll('.feed-sub[data-value]'));
 
   let type = DEFAULT_TYPE;
   let scope = DEFAULT_SCOPE;
@@ -1030,9 +1961,12 @@
     catch (e) { return false; }
   }
 
+  /* The scope menu is the only dropdown left; the what-axis became the tabs.
+     Still written as a loop over `menus` because wireMenu and this pair up, and
+     a second axis would be one entry rather than a rewrite. */
   function syncMenus() {
     Object.entries(menus).forEach(([axis, root]) => {
-      const value = axis === 'type' ? type : scope;
+      const value = scope;
       let label = '';
       root.querySelectorAll('.feed-menu-item').forEach((item) => {
         const on = item.dataset.value === value;
@@ -1047,6 +1981,45 @@
     // A one-option dropdown is worse than none: hide the scope menu while
     // signed out, and on the feeds that have no whose-axis.
     if (menus.scope) menus.scope.hidden = !!SCOPELESS[type] || !isSignedIn();
+  }
+
+  /* The tabs and the sub-row carry `aria-selected`, which is also what the CSS
+     fills and underlines them off. WHICH sub-buttons are on screen is not set
+     here — that is a rule off body[data-active-tab], the same call
+     .feed-bar-controls makes. */
+  function syncTabs() {
+    const tab = TAB_OF[type] || TAB_DEFAULT.podcasts;
+    tabs.forEach(function (el) {
+      el.setAttribute('aria-selected', el.dataset.tab === tab ? 'true' : 'false');
+    });
+    subs.forEach(function (el) {
+      el.setAttribute('aria-selected', el.dataset.value === type ? 'true' : 'false');
+    });
+    placeFeedBar(tab);
+    return tab;
+  }
+
+  /* ⚠️ THE FEED BAR IS MOVED, NEVER DUPLICATED, AND THE MOVE IS WHY THIS IS
+     SAFE. `.feed-bar` holds the scope menu and every feed's mounted range/sort
+     group; `appendChild` relocates the live element with its listeners, its
+     open-menu state and all eight `[data-controls-for]` groups intact, so the
+     declarative body[data-active-feed] rule that decides which group is on
+     screen is untouched. A second bar rendered into the Members tab would be a
+     second set of controls over one feed, which is exactly the failure that
+     rule exists to prevent.
+
+     WHY ONLY THIS TAB. Every other tab puts its feed directly under the bar, so
+     sticky-at-the-top is right. Members puts three sections above the boost
+     list, which left the scope menu and the range/sort a screen and a half from
+     the list they act on. Reed's call, 2026-08-23.
+
+     The bar stops being sticky for free: `.feed-bar-wrap` is what carries
+     `position: sticky`, and the slot is an ordinary section. */
+  var barHome = bar.parentNode;
+  function placeFeedBar(tab) {
+    var slot = document.querySelector('[data-feed-bar-slot]');
+    var want = (tab === 'members' && slot) ? slot : barHome;
+    if (bar.parentNode !== want) want.appendChild(bar);
   }
 
   function setFeed(nextType, nextScope, opts) {
@@ -1076,6 +2049,13 @@
       if (want !== (opts.lang || '')) updateHash = true;
     }
     document.body.setAttribute('data-active-feed', feed);
+    /* ⚠️ THE TAB IS AN ATTRIBUTE FOR THE SAME REASON THE LANGUAGE IS: this
+       script runs during parse and the CSS that shows one tab's sub-buttons
+       keys on it, so a cold load has to have it before first paint. Set here,
+       beside data-active-feed, so the two can never disagree about which feed
+       is on screen. */
+    document.body.setAttribute('data-active-tab', TAB_OF[type] || TAB_DEFAULT.podcasts);
+    typeByTab[TAB_OF[type] || TAB_DEFAULT.podcasts] = type;
     /* ⚠️ THE LANGUAGE RIDES THE ATTRIBUTE AS WELL AS THE EVENT, and the
        attribute is the one that matters on a cold load. This inline script runs
        during parse; feeds.js is a module and therefore deferred, so it attaches
@@ -1091,6 +2071,7 @@
       panel.hidden = !isActive;
     });
     syncMenus();
+    syncTabs();
     if (updateHash && hashFor(feed) !== location.hash) {
       history.replaceState(null, '', hashFor(feed));
     }
@@ -1107,7 +2088,9 @@
   function fromHash(updateHash) {
     const parsed = parseHash();
     const raw = parsed.key;
-    const key = ALIASES[raw] || raw;
+    /* KEY_OF first: `#members` is canonical, so it resolves without the
+       force-rewrite an alias triggers below. */
+    const key = KEY_OF[raw] || ALIASES[raw] || raw;
     const cfg = FEEDS[key];
     // An unknown hash falls back to the default *and* rewrites, so the URL
     // never keeps naming something that isn't on screen.
@@ -1193,8 +2176,21 @@
   }
 
   const wired = [];
-  if (menus.type) wired.push(wireMenu(menus.type, (v) => setFeed(v, scope)));
   if (menus.scope) wired.push(wireMenu(menus.scope, (v) => setFeed(type, v)));
+
+  /* Pressing a tab opens the sub-feed you were last on inside it, falling back
+     to that tab's default. Pressing a sub-feed picks it directly. Neither
+     touches the SCOPE state, so Boosts · Follows → Podcasts → Episodes returns
+     you to Follows — the rule SCOPELESS already encodes for Shows and Albums. */
+  tabs.forEach(function (el) {
+    el.addEventListener('click', function () {
+      const tab = el.dataset.tab;
+      setFeed(typeByTab[tab] || TAB_DEFAULT[tab] || DEFAULT_TYPE, scope);
+    });
+  });
+  subs.forEach(function (el) {
+    el.addEventListener('click', function () { setFeed(el.dataset.value, scope); });
+  });
 
   window.addEventListener('hashchange', () => { fromHash(false); });
 
@@ -1213,7 +2209,7 @@
     if (!e || e.key === null || e.key === 'lb_nostr_session') onSessionChange();
   });
 
-  // Deep-link support: /#boosts-global lands on Boosts · Global.
+  // Deep-link support: /#members lands on Members · Global.
   fromHash(false);
 })();
 </script>
@@ -1222,17 +2218,17 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v113"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v136"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v113" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v136" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v113" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v136" defer></script>
 
 <!-- Feed hydration — lazily loads the active feed on first view. -->
-<script type="module" src="/assets/js/feeds.js?v=ob-v113"></script>
-<script src="/assets/js/nav.js?v=ob-v113" defer></script>
+<script type="module" src="/assets/js/feeds.js?v=ob-v136"></script>
+<script src="/assets/js/nav.js?v=ob-v136" defer></script>
 
 </body>
 </html>

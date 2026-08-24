@@ -79,17 +79,6 @@ export function jsonForScript(v) {
   return JSON.stringify(v).replace(/</g, "\\u003c");
 }
 
-// Compact sats for the stat tiles: 45,045,439 reads worse than 45.0M at a
-// glance, and the exact figure is in the title attribute.
-export function compact(n) {
-  const v = Number(n || 0);
-  if (v >= 1e9) return (v / 1e9).toFixed(v >= 1e10 ? 0 : 1).replace(/\.0$/, "") + "B";
-  if (v >= 1e6) return (v / 1e6).toFixed(v >= 1e7 ? 0 : 1).replace(/\.0$/, "") + "M";
-  if (v >= 1e4) return Math.round(v / 1e3) + "k";
-  if (v >= 1e3) return (v / 1e3).toFixed(1).replace(/\.0$/, "") + "k";
-  return String(v);
-}
-
 export function isoDate(ts) {
   if (!ts) return "";
   const d = new Date(Number(ts) * 1000);
@@ -158,122 +147,13 @@ export async function lookupMentionProfiles(env, texts) {
   return out;
 }
 
-// ── The Nostr Community wall ─────────────────────────────────────────────────
-//
-// LB's supporters.html is the visual ancestor (circular avatars, name beneath,
-// click-to-copy npub), but its TIER system is deliberately not carried over: LB
-// bucketed by absolute lifetime sats (100k / 69k / 21k), which works across one
-// show's whole audience and collapses per show. The median show here has one
-// booster and only 209 of 1,384 have five or more, so absolute thresholds would
-// file nearly everyone in the bottom tier. Relative standing replaces it: a
-// podium for the top five, then a ranked grid.
-//
-// "Nostr Community" rather than "Supporters", and the distinction is the point.
-// "Supporters" is a claim about who supports the show, and the wall cannot make
-// it: a show with two hundred keysend supporters and three Nostr boosters would
-// read as having three supporters. "Community" names the group this page can
-// actually see, and the qualifier says which group that is. The count noun
-// elsewhere stays "booster", because a person is a booster and only the set of
-// them is a community. See the site-wide vocabulary note in CLAUDE.md.
-//
-// NO COUNT BADGE on the heading. It read as a size claim about the subject's
-// community where it is a count of who published a boost to Nostr, and the
-// sub-line under it already names the set precisely.
+/* ── The Nostr Community wall ──
+ * ⚠️ MOVED TO assets/js/supporter-wall.js AND RE-EXPORTED, NOT COPIED. The
+ * homepage's Members tab renders the same wall in the browser, and a component
+ * a reader can screenshot from two pages has to be one definition. These are
+ * aliases; the markup, the podium rule and the counts all live there.
+ * Same arrangement renderBoosts has, three imports up. */
+export {
+  renderSupporters, SUPPORTERS_VISIBLE, PODIUM, compact,
+} from "../../assets/js/supporter-wall.js";
 
-// How many boosters paint above the fold. The rest render behind a toggle
-// rather than being dropped — a community wall that hides people is worse than
-// a long page.
-//
-// PODIUM is the top row of larger cards. Five rather than three: the wall sits
-// in a 60rem column, which fits five 9rem cards across with room to spare, so
-// three left the row looking sparse against the grid beneath it. VISIBLE counts
-// the podium, so the grid under it holds SUPPORTERS_VISIBLE - PODIUM.
-export const SUPPORTERS_VISIBLE = 21;
-export const PODIUM = 5;
-
-// The class name, the data attribute and every `.sup-*` selector keep the
-// "supporter" spelling on purpose. The rename to "community" was a SURFACE
-// rename — the same seam as Podcasts → Episodes. See CLAUDE.md.
-export function renderSupporters(rows, { sub, empty }) {
-  if (!rows.length) {
-    return `<section class="show-section" id="community">
-      <h2>Nostr Community</h2>
-      <p class="show-empty">${htmlEscape(empty)}</p>
-    </section>`;
-  }
-
-  const podium = rows.slice(0, PODIUM);
-  const rest = rows.slice(PODIUM);
-  const hidden = Math.max(0, rest.length - (SUPPORTERS_VISIBLE - PODIUM));
-
-  return `<section class="show-section" id="community">
-    <div class="show-section-head">
-      <h2>Nostr Community</h2>
-      <p class="show-section-sub">${sub}</p>
-    </div>
-
-    <ol class="sup-podium">
-      ${podium.map((r) => supporterCard(r, true)).join("\n      ")}
-    </ol>
-
-    ${rest.length ? `<ol class="sup-grid" data-supporter-grid>
-      ${rest.map((r, i) => supporterCard(r, false, i >= SUPPORTERS_VISIBLE - PODIUM)).join("\n      ")}
-    </ol>` : ""}
-
-    ${hidden > 0 ? `<button type="button" class="btn btn-quiet show-more" data-show-more="supporter">
-      Show ${num(hidden)} more booster${hidden === 1 ? "" : "s"}
-    </button>` : ""}
-  </section>`;
-}
-
-// No rank number. The wall is ordered by sats, so position already says
-// standing, and a numeral on every avatar turned a community into a scoreboard.
-// The podium's larger avatars are what mark the top of the order now.
-//
-// ⚠️ THE AVATAR WAS A COPY-NPUB BUTTON AND IS NOW A LINK TO THAT BOOSTER'S PAGE.
-// The gesture is not lost, it MOVED: /booster/<npub> leads with a "Copy npub"
-// button, on a page that also says whose npub it is. That trade is the whole
-// point of the page existing — a face on a wall that copies a string is a dead
-// end, where a face that opens the person's history is the same navigation the
-// show name and the episode title already do.
-//
-// ONE anchor wrapping the avatar AND the name, not two. Two links to one
-// destination inside one card is announced twice and tabbed through twice; the
-// sats stay outside it, being a figure rather than a way in. `.sup-link`
-// restates the card's own column layout so the wrapper costs nothing visually —
-// see show-page.css.
-function supporterCard(r, isPodium, hidden = false) {
-  const name = displayName(r);
-  const label = name || shortId(r.booster_npub, r.booster_pubkey);
-  const pic = isSafeUrl(r.picture) ? r.picture : null;
-  const href = boosterPageUrl(r.booster_npub, r.booster_pubkey);
-
-  // What the index couldn't supply is declared for the client to fill from
-  // Primal (detail-page.js#hydrateProfiles). Nothing here waits on that: the
-  // card is complete and readable as rendered, and a visitor with no JavaScript
-  // keeps the shortened npub and the blank circle.
-  //
-  // hydrateProfiles reaches `.sup-name` and `.sup-avatar` by class from this
-  // <li>, so wrapping them in the anchor below leaves it working untouched.
-  const missing = [name ? null : "name", pic ? null : "pic"].filter(Boolean).join(" ");
-
-  const inner = `<span class="sup-avatar${pic ? "" : " is-blank"}">
-            ${pic ? `<img src="${htmlEscape(pic)}" alt="" loading="lazy" />` : ""}
-          </span>
-          <span class="sup-name" title="${htmlEscape(label)}">${htmlEscape(label)}</span>`;
-
-  // A booster with neither an npub nor a pubkey cannot happen — the pubkey is
-  // the row's own key — but the card renders unlinked rather than emitting a
-  // dead href if one ever does.
-  const body = href
-    ? `<a class="sup-link" href="${htmlEscape(href)}" title="Boosts by ${htmlEscape(label)}">
-          ${inner}
-        </a>`
-    : `<span class="sup-link">${inner}</span>`;
-
-  return `<li class="sup-card${isPodium ? " sup-card--podium" : ""}"${hidden ? " hidden data-overflow" : ""}${
-        missing ? ` data-pk="${htmlEscape(r.booster_pubkey)}" data-missing="${missing}"` : ""}>
-        ${body}
-        <span class="sup-sats" title="${htmlEscape(num(r.sats))} sats across ${htmlEscape(num(r.boosts))} boosts">${htmlEscape(compact(r.sats))} sats</span>
-      </li>`;
-}
