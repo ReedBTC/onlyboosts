@@ -21,9 +21,9 @@
  * The markup is unchanged from the day it moved, byte for byte — verified by
  * rendering the original against fixtures, moving, and diffing the output.
  */
-import { num, shortId, displayName } from './boost-list.js?v=ob-v142'
-import { boosterPageHref as boosterPageUrl } from './booster-link.js?v=ob-v142'
-import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v142'
+import { num, shortId, displayName } from './boost-list.js?v=ob-v143'
+import { boosterPageHref as boosterPageUrl } from './booster-link.js?v=ob-v143'
+import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v143'
 
 /* Compact sat figures — 1435000 → "1.4M". Lives here rather than in
  * detail-page.js because the wall is its heaviest caller and this module may

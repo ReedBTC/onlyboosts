@@ -50,18 +50,18 @@
 
   <!-- Shared note / card styles (.note-card, .embed-note) — the boosts
        feeds render through the same kind-1 card as boosts-thread.js. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v142" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v143" />
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v142" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v143" />
   <!-- The episode card and its drawer, extracted from the inline block below
        when /episode/<guid> pages needed the same cards. See the file header. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v142" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v142" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v143" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v143" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. Must stay last
        among the stylesheets so the inline block below still wins. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v142" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v143" />
 
   <style>
     :root {
@@ -580,7 +580,25 @@
       padding: 0.3rem 0.75rem; cursor: pointer; white-space: nowrap;
       overflow: hidden; text-overflow: ellipsis;
     }
+    /* ⚠️ THE TAG IS THE STRONGEST AFFORDANCE ON THIS CONTROL, and it is a word
+       rather than chrome. Reed's call, 2026-08-24. "This week" does not say
+       pickable; "Week: This week" does, and it is the same shape the feeds'
+       Sort pill has been teaching since the day it shipped (`.pcast-sort-tag`).
+
+       ⚠️ IT IS SOURCE SERIF AT REGULAR WEIGHT, NOT THE LABEL'S PLAYFAIR BOLD.
+       Two words in the same heavy display face read as two halves of one title
+       rather than as an axis and its value, and the whole job of the tag is to
+       be visibly the quieter half. `align-self: baseline` because the button is
+       `align-items: center` for the drawn caret's sake, which would otherwise
+       centre a smaller word against a larger one and leave it floating. */
+    .hpw-pick-tag {
+      align-self: baseline;
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-size: 0.8rem; font-weight: 400; color: var(--muted);
+      margin-right: 0.05rem;
+    }
     .hpw-pick:hover { color: var(--accent-dd); background: var(--tint); }
+    .hpw-pick:hover .hpw-pick-tag { color: var(--accent-d); }
     .hpw-pick:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
     /* The no-menu form: `first_week` is allowed to fail quietly, and without it
        there is nothing to enumerate. The arrows still step. */
@@ -952,6 +970,12 @@
          title between them does NOT grow with them. */
       .hpw-arrow { width: 2.5rem; height: 2.5rem; font-size: 1.3rem; }
       .hpw-pick-caret { width: 0.45rem; height: 0.45rem; }
+      /* The tag is the first thing to give up room at 375px, being the half a
+         reader stops needing after the first press. It does not come off: a
+         control that drops its own label once you have used it is one you
+         cannot re-learn on a later visit. */
+      .hpw-pick-tag { font-size: 0.74rem; }
+      .hpw-pick { padding-left: 0.6rem; padding-right: 0.6rem; }
       /* The menu is centred on the pick, which on a narrow screen puts its
          edges past the board's padding. Cap it to the viewport instead. */
       .hpw-weeks { min-width: 11rem; max-width: min(86vw, 20rem); }
@@ -1313,8 +1337,8 @@
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
     }
   </style>
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v142" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v142" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v143" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v143" />
 </head>
 <body data-active-feed="episodes-global">
 
@@ -2367,17 +2391,17 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v142"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v143"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v142" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v143" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v142" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v143" defer></script>
 
 <!-- Feed hydration — lazily loads the active feed on first view. -->
-<script type="module" src="/assets/js/feeds.js?v=ob-v142"></script>
-<script src="/assets/js/nav.js?v=ob-v142" defer></script>
+<script type="module" src="/assets/js/feeds.js?v=ob-v143"></script>
+<script src="/assets/js/nav.js?v=ob-v143" defer></script>
 
 </body>
 </html>
