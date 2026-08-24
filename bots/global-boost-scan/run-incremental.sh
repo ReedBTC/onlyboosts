@@ -21,6 +21,7 @@ echo "=== $(date -u +%FT%TZ) OnlyBoosts incremental cycle ==="
 "$PY" "$BOT" excludes             # validate the exclusion list + report what it hides
 "$PY" "$BOT" incremental          # new boosts since last run → SQLite
 "$PY" "$BOT" resolve-guids        # canonicalize phantom guids (feed ids / item guids / slugs)
+"$PY" "$BOT" dedupe               # mark relay-bot notes duplicating another app's note (7d window)
 "$PY" "$BOT" enrich               # fill metadata/profiles for anything new
 "$PY" "$BOT" export --per-show    # rebuild the JSON shards
 "$PY" "$BOT" push                 # rsync changed shards to the VPS (no --delete: nothing is removed on a tail run)
