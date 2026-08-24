@@ -17,7 +17,7 @@ import { readFileSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
-import { onRequestGet } from '../functions/api/v1/members/hours.js'
+import { onRequestGet, pacificWeekStart } from '../functions/api/v1/members/hours.js'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -32,8 +32,13 @@ db.exec(readFileSync(join(ROOT, 'bots/global-boost-scan/d1/schema.sql'), 'utf8')
 
 const WEEK = 604800, MONDAY_EPOCH = 345600
 const HOUR = 3600
-// The Monday of the week `ts` falls in.
-const mondayOf = (ts) => Math.floor((ts - MONDAY_EPOCH) / WEEK) * WEEK + MONDAY_EPOCH
+/* ⚠️ THE FIXTURE ASKS THE SHIPPED FUNCTION WHERE MONDAY IS, rather than
+ * computing it. Weeks start at midnight US PACIFIC (Reed's call, 2026-08-23),
+ * so a fixture that floored to Monday 00:00 UTC would place "last Sunday" up to
+ * eight hours on the wrong side of the boundary for part of every week — and it
+ * would pass, because the endpoint and the fixture would then be wrong together
+ * in the same direction. `pacificWeekStart` is exported for exactly this. */
+const mondayOf = (ts) => pacificWeekStart(ts)
 const thisMonday = mondayOf(Math.floor(Date.now() / 1000))
 
 let ev = 0
@@ -147,9 +152,48 @@ check('a member who boosted in one week gets one row', () => {
 check('each row carries the Monday its week started', () => {
   for (const m of all.members) {
     assert.ok(m.week_start, `${m.name} has no week_start`)
-    assert.equal((m.week_start - MONDAY_EPOCH) % WEEK, 0,
-      `${m.name}'s week starts at ${new Date(m.week_start * 1000).toUTCString()}, not a Monday`)
-    assert.equal(new Date(m.week_start * 1000).getUTCDay(), 1, 'not a Monday')
+    // ⚠️ NOT `% WEEK`, WHICH IS WHAT THIS WAS WHILE WEEKS WERE UTC. A Pacific
+    // Monday midnight is 07:00 or 08:00 UTC and the two differ by an hour, so
+    // week starts are no longer congruent modulo a week. What must hold is that
+    // it IS the Monday of its own week, which is the same claim stated in terms
+    // of the rule rather than of the arithmetic.
+    assert.equal(m.week_start, pacificWeekStart(m.week_start),
+      `${m.name}'s week_start is not the start of its own week`)
+    assert.equal(new Date(m.week_start * 1000).getUTCDay(), 1,
+      `${m.name}'s week starts ${new Date(m.week_start * 1000).toUTCString()}, not a Monday`)
+  }
+})
+
+/* ⚠️ THE RULE IS IMPLEMENTED TWICE — once in JS for the weekly cutoff, once as
+ * a SQL expression for the all-time buckets — and nothing else makes them agree.
+ * These probes run the real `pacificOffsetSql` against this file's own sqlite
+ * and compare it to the shipped `pacificWeekStart`, at both 2025/2026
+ * transitions and either side of each. Verified to go red when the CAST is
+ * dropped from the SQL (TEXT compares greater than any INTEGER, so every row
+ * silently takes the PST branch for eight months of the year). */
+check('⚠️ the SQL half and the JS half agree, DST transitions included', () => {
+  const src = readFileSync(join(ROOT, 'functions/api/v1/members/hours.js'), 'utf8')
+  const m = /function pacificOffsetSql\(ts\) \{[\s\S]*?\n\}/.exec(src)
+  assert.ok(m, 'pacificOffsetSql not found — was it renamed?')
+  const PST = -8 * 3600, PDT = -7 * 3600
+  const body = m[0].replace(/^function pacificOffsetSql\(ts\) \{/, '').replace(/\}$/, '')
+  const offSql = (t) => new Function('ts', 'PST', 'PDT', body)(t, PST, PDT)
+
+  for (const iso of [
+    '2025-03-09T09:59:00Z', '2025-03-09T10:01:00Z',   // spring forward
+    '2025-11-02T08:59:00Z', '2025-11-02T09:01:00Z',   // fall back
+    '2026-03-08T09:59:00Z', '2026-03-08T10:01:00Z',
+    '2026-11-01T08:59:00Z', '2026-11-01T09:01:00Z',
+    '2026-01-15T12:00:00Z', '2026-07-15T12:00:00Z',   // deep winter, deep summer
+  ]) {
+    const ts = Math.floor(Date.parse(iso) / 1000)
+    const wk = db.prepare(
+      `SELECT (${ts} + ${offSql(String(ts))} - ${MONDAY_EPOCH}) / ${WEEK} AS wk`).get().wk
+    const local = `(${wk} * ${WEEK} + ${MONDAY_EPOCH} - ${PST})`
+    const ws = db.prepare(
+      `SELECT (${wk} * ${WEEK} + ${MONDAY_EPOCH}) - ${offSql(local)} AS ws`).get().ws
+    assert.equal(ws, pacificWeekStart(ts), `${iso}: SQL says ${ws}, JS says ${pacificWeekStart(ts)}`)
+    assert.equal(new Date(ws * 1000).getUTCDay(), 1, `${iso}: not a Monday`)
   }
 })
 check('⚠️ weeks are split, not merged: Cara and Alice are separate rows', () => {
@@ -161,15 +205,55 @@ check('the bot is excluded here too', () => {
 })
 
 console.log('\nWeek boundaries:')
-check('⚠️ a week starts MONDAY 00:00 UTC, not on the epoch\'s Thursday', () => {
-  // ts/604800 without the 345600 shift buckets Thursday-to-Wednesday, which
-  // still yields weeks and is wrong by three days on every row.
-  assert.equal(new Date(thisMonday * 1000).getUTCDay(), 1)
-  assert.equal(new Date(thisMonday * 1000).getUTCHours(), 0)
+/* ⚠️ THE ARITHMETIC RULE, CHECKED AGAINST REAL TZDATA. The endpoint deliberately
+ * does NOT use Intl — it would put an ICU dependency on the request path and
+ * there is no ICU on the SQL side, so the two halves would come from different
+ * sources. The test is where ICU belongs: Node has full tzdata, so this is the
+ * one place the hand-rolled rule can be held against the real thing. It is what
+ * would catch the US changing its DST dates. */
+const PT = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/Los_Angeles', hour12: false, weekday: 'short',
+  year: 'numeric', month: '2-digit', day: '2-digit',
+  hour: '2-digit', minute: '2-digit', second: '2-digit',
 })
+const inPT = (ts) => {
+  const p = Object.fromEntries(PT.formatToParts(new Date(ts * 1000))
+    .filter((x) => x.type !== 'literal').map((x) => [x.type, x.value]))
+  // hour12:false reports midnight as '24' in some ICU builds.
+  return { dow: p.weekday, hms: `${String(Number(p.hour) % 24).padStart(2, '0')}:${p.minute}:${p.second}` }
+}
+
+check('⚠️ a week starts MONDAY 00:00 PACIFIC, not Monday 00:00 UTC', () => {
+  // It was UTC until 2026-08-23, which put the reset at Sunday 5pm on the US
+  // west coast — Reed watched This Week reset on a Sunday evening. Pacific is
+  // the last US zone into Monday, so nobody's board resets on their Sunday.
+  const { dow, hms } = inPT(thisMonday)
+  assert.equal(dow, 'Mon', `week starts ${dow} Pacific`)
+  assert.equal(hms, '00:00:00', `week starts ${hms} Pacific`)
+  // And it is NOT the old boundary, which is what a silent revert would be.
+  assert.notEqual(new Date(thisMonday * 1000).getUTCHours(), 0,
+    'the week starts at 00:00 UTC — the Pacific offset was lost')
+})
+
+check('every week over the next four years starts Monday 00:00 Pacific', () => {
+  // Hourly would be 35,000 sqlite-free probes and takes a moment; six-hourly
+  // still crosses every transition in the window.
+  for (let ts = Date.UTC(2025, 0, 1) / 1000; ts < Date.UTC(2029, 0, 1) / 1000; ts += 6 * HOUR) {
+    const ws = mondayOf(ts)
+    const { dow, hms } = inPT(ws)
+    if (dow !== 'Mon' || hms !== '00:00:00') {
+      assert.fail(`${new Date(ts * 1000).toISOString()} -> week start ${dow} ${hms} PT`)
+    }
+    assert.ok(ws <= ts && ts < ws + WEEK + HOUR, `${ts} falls outside the week it names`)
+  }
+})
+
 check('a boost one second before Monday is the previous week', () => {
   const a = mondayOf(thisMonday - 1), b = mondayOf(thisMonday)
-  assert.equal(b - a, WEEK)
+  // ⚠️ NOT `=== WEEK`. A Pacific week containing a DST transition is 167 or 169
+  // hours of real time, so an exact-week assertion here is wrong twice a year.
+  assert.ok(b > a, 'the second before Monday is not an earlier week')
+  assert.ok(Math.abs(b - a - WEEK) <= HOUR, `weeks are ${b - a}s apart`)
 })
 
 console.log('\nLimits:')

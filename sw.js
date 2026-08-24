@@ -537,6 +537,9 @@
 // hashes until this version), and the all-time board is High Scores.
 // ob-v132: /booster's stat tiles carry rank chips, over the member wall's own
 // population, and the episodes tile comes off because nothing ranks by it.
+// ob-v135: #40HPW weeks reset at midnight US Pacific instead of 00:00 UTC.
+// Monday 00:00 UTC is Sunday evening across the Americas; Pacific is the last
+// US zone into Monday. The Rules dialog and the This Week sub-line say so.
 // ob-v134: the LB strip finishes. feeds.js loses the whole Events path
 // (50.4KB → 12.4KB), boosts-thread.js loses the megathread fetch (29.6KB →
 // 18.4KB), calendar-events.js and supporter-set.js are deleted, and the widget
@@ -548,7 +551,7 @@
 // inside the Shows panel and shows-feed.js adopts them; the Episodes panel
 // ships its placeholder again, one feed being rendered at the edge and it
 // being the one on screen.
-const VERSION = 'ob-v134';
+const VERSION = 'ob-v135';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;
@@ -580,26 +583,26 @@ const PRECACHE_URLS = [
   '/assets/onlyboosts_pfp.png',
   '/assets/onlyboosts_banner.png',
   '/assets/avatar-fallback.svg',
-  '/assets/css/theme.css?v=ob-v134',
-  '/assets/css/page.css?v=ob-v134',
-  '/assets/css/nav.css?v=ob-v134',
-  '/assets/css/footer.css?v=ob-v134',
-  '/assets/css/boosts-thread.css?v=ob-v134',
-  '/assets/css/boost-actions.css?v=ob-v134',
+  '/assets/css/theme.css?v=ob-v135',
+  '/assets/css/page.css?v=ob-v135',
+  '/assets/css/nav.css?v=ob-v135',
+  '/assets/css/footer.css?v=ob-v135',
+  '/assets/css/boosts-thread.css?v=ob-v135',
+  '/assets/css/boost-actions.css?v=ob-v135',
   // The episode card and its drawer. Precached alongside the others because the
   // homepage's feeds are painted in it and it used to be inline in index.html,
   // which IS precached — leaving it out would trade an inline block for a
   // network round trip on the one page this list exists to make fast.
-  '/assets/css/feed-cards.css?v=ob-v134',
-  '/assets/js/boosts-thread.js?v=ob-v134',
+  '/assets/css/feed-cards.css?v=ob-v135',
+  '/assets/js/boosts-thread.js?v=ob-v135',
   // A static import of boosts-thread.js, so precaching that without this one
   // leaves a returning visitor fetching half the graph from the network.
-  '/assets/js/primal-profiles.js?v=ob-v134',
-  '/assets/js/boost-actions.js?v=ob-v134',
-  '/assets/js/nav.js?v=ob-v134',
-  '/assets/js/nav-widget-boot.js?v=ob-v134',
-  '/assets/js/widget-loader.js?v=ob-v134',
-  '/assets/js/sw-register.js?v=ob-v134',
+  '/assets/js/primal-profiles.js?v=ob-v135',
+  '/assets/js/boost-actions.js?v=ob-v135',
+  '/assets/js/nav.js?v=ob-v135',
+  '/assets/js/nav-widget-boot.js?v=ob-v135',
+  '/assets/js/widget-loader.js?v=ob-v135',
+  '/assets/js/sw-register.js?v=ob-v135',
 ];
 
 self.addEventListener('install', (event) => {

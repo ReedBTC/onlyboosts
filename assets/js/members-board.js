@@ -14,23 +14,23 @@
  * A repeated name is authentic to it rather than a bug to collapse — Piez holds
  * five of the top ten and that is the actual story of the board.
  */
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v134'
-import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v134'
-import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v134'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v135'
+import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v135'
+import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v135'
 /* ⚠️ THE SAME WALL /show AND /episode RENDER, not a copy of it. It moved out of
  * functions/_shared/detail-page.js into a two-sided module for exactly this;
  * that file re-exports every name, so both Functions were untouched. A reader
  * who screenshots the wall here and on a show page must not be able to tell
  * them apart. */
-import { renderSupporters, initShowMore, compact } from '/assets/js/supporter-wall.js?v=ob-v134'
+import { renderSupporters, initShowMore, compact } from '/assets/js/supporter-wall.js?v=ob-v135'
 /* ⚠️ EXACT BOOST COUNTS HERE, COMPACT SATS. On the wall a row is one of a
  * hundred and `1k` is plenty; here there are four rows and the count is the
  * disclosure itself — "1,021 boosts from dozens of listeners" is the claim the
  * section exists to make, and `1k` rounds the evidence away. */
-import { num } from '/assets/js/boost-list.js?v=ob-v134'
-import { rangeControl, sortControl } from '/assets/js/feed-controls.js?v=ob-v134'
-import { mountFeedSearch } from '/assets/js/feed-search.js?v=ob-v134'
-import { searchMembers, SEARCH_HITS } from '/assets/js/ob-live.js?v=ob-v134'
+import { num } from '/assets/js/boost-list.js?v=ob-v135'
+import { rangeControl, sortControl } from '/assets/js/feed-controls.js?v=ob-v135'
+import { mountFeedSearch } from '/assets/js/feed-search.js?v=ob-v135'
+import { searchMembers, SEARCH_HITS } from '/assets/js/ob-live.js?v=ob-v135'
 
 const esc = htmlEscape
 const HOURS_API = '/api/v1/members/hours'
@@ -80,7 +80,14 @@ const WALL_RANGES = [
 let wallRange = 'all'
 
 /* en-US in UTC, matching every other date on the site. A board row names the
- * Monday its week started, so the reader can see the hall of fame is old. */
+ * Monday its week started, so the reader can see the hall of fame is old.
+ *
+ * ⚠️ UTC IS STILL RIGHT HERE EVEN THOUGH THE WEEKS ARE PACIFIC, and the reason
+ * is one-directional. `week_start` is the real instant of a Monday 00:00
+ * Pacific, which is Monday 07:00 or 08:00 UTC — Pacific is behind UTC, so that
+ * instant is always still Monday in UTC and this prints the right day. It would
+ * not survive a zone AHEAD of UTC; if the reset ever moves east, this formatter
+ * has to move with it. */
 function weekLabel(unixSec) {
   if (!unixSec) return ''
   const d = new Date(Number(unixSec) * 1000)
@@ -384,7 +391,7 @@ export async function renderMembersBoards(root) {
     root.innerHTML =
       boardHtml({
         title: 'This Week',
-        sub: `Resets Monday. Week of ${weekLabel(week.week_start)}.`,
+        sub: `Resets midnight Monday, Pacific. Week of ${weekLabel(week.week_start)}.`,
         members: week.members || [],
         goal,
         empty: 'No boosts with a known episode length yet this week.',

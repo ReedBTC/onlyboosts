@@ -2849,9 +2849,45 @@ board the fix is the goal, not the styling.**
   one listen; deduping removes 8.9% of qualifying rows and one pair carried
   fifteen. Without it the board measures generosity, which the sats totals
   already measure.
-- **Weeks start Monday 00:00 UTC.** `345600` is the first Monday after the
-  epoch; without the shift `ts / 604800` buckets Thursday to Wednesday, which
-  still produces weeks and is wrong by three days on every row.
+- **Weeks start Monday 00:00 US Pacific.** `345600` is the first Monday after
+  the epoch; without the shift `ts / 604800` buckets Thursday to Wednesday,
+  which still produces weeks and is wrong by three days on every row.
+
+**⚠️ IT WAS UTC UNTIL 2026-08-23, AND UTC IS THE WRONG MIDNIGHT FOR THIS
+BOARD.** *Reed's call.* Monday 00:00 UTC is Sunday 5pm on the US west coast and
+Sunday 8pm on the east; he watched This Week reset on a Sunday evening, which is
+the middle of the weekend for most of the people racing on it. **Pacific is the
+choice because it is the last US zone into Monday**: at Monday 00:00 Pacific
+every part of the country is already on Monday, so nobody's board resets while
+their Sunday is still running.
+
+**⚠️ THE DST RULE IS IMPLEMENTED TWICE AND THE TWO MUST AGREE.** The weekly
+board needs one cutoff computed before the query (`pacificWeekStart`, exported);
+the all-time board needs a per-row bucket computed inside it, over ten thousand
+booster-weeks (`pacificOffsetSql`). They cannot share code, so
+`test-members-hours.mjs` runs the real SQL fragment against its own sqlite and
+compares it to the JS at both transitions.
+
+**⚠️ AND IT IS ARITHMETIC RATHER THAN `Intl`, DELIBERATELY.** The obvious
+version asks `Intl.DateTimeFormat` for `America/Los_Angeles` — exact, and no
+rule of our own to maintain — but it puts a runtime ICU dependency on the
+request path, and there is no ICU at all on the SQL side, so the two halves
+would derive from different sources and could drift with a tzdata update on one.
+The US rule has been fixed since 2007 and the corpus begins in 2024. **The test
+is where ICU belongs**: Node has full tzdata, so `test-members-hours.mjs` holds
+the hand-rolled rule against the real thing on every week for four years. That
+check is what would catch the US changing its dates.
+
+**⚠️ `strftime('%s', …)` RETURNS TEXT, AND SQLITE COMPARES TEXT AS GREATER THAN
+ANY INTEGER.** Without the `CAST` in `pacificOffsetSql` every comparison is
+false, every row takes the PST branch, and the all-time board is quietly an hour
+out for eight months of every year — which looks like nothing at all. Verified
+to fail the test when removed.
+
+**⚠️ `week_start` IS A REAL INSTANT AND THE CLIENT STILL FORMATS IT IN UTC**,
+which is correct only because Pacific is BEHIND UTC: Monday 00:00 Pacific is
+Monday 07:00 or 08:00 UTC, still Monday. `weekLabel` in `members-board.js` says
+so. If the reset ever moves east of Greenwich, that formatter moves with it.
 - **~14% of boosts contribute nothing** — 8% name no episode, 2.5% of episodes
   have no duration. Stated in the Rules rather than hidden.
 - **Publisher keys are excluded.** See below.
