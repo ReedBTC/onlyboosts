@@ -149,6 +149,9 @@ def resolve_episode(item_guid, feed_id, key, secret):
             "image":          ep.get("image") or ep.get("feedImage"),
             "published":      ep.get("datePublished"),
             "duration":       ep.get("duration"),
+            # PI's `duration: 0` is faithful reporting of a feed that declares
+            # none — db.upsert_episode refuses to let it erase a derived one.
+            "duration_src":   "pi" if ep.get("duration") else None,
             "episode_number": ep.get("episode"),
             "podcast_guid":   ep.get("podcastGuid") or None,
             "feed_id":        ep.get("feedId"),
@@ -274,20 +277,35 @@ def parse_feed_episodes(xml):
         if not guid:
             continue
         live = kind.lower() == "liveitem"
+        live_attrs = (dict((k.split(":")[-1].lower(), v)
+                           for k, v in re.findall(r'([\w:]+)\s*=\s*"([^"]*)"', attrs))
+                      if live else {})
         # A live item carries no <pubDate>; its `start` attribute is the airing.
         published = _parse_pubdate(_tag(block, "pubDate"))
         if published is None and live:
-            start = dict((k.split(":")[-1].lower(), v)
-                         for k, v in re.findall(r'([\w:]+)\s*=\s*"([^"]*)"', attrs)).get("start")
-            published = _parse_iso8601(start)
+            published = _parse_iso8601(live_attrs.get("start"))
         # A live item's enclosure is the stream; some feeds spell the attribute
         # `uri` (podcast:alternateEnclosure's spelling) rather than `url`.
+        # Duration ladder: the publisher's <itunes:duration> wins; failing that,
+        # an ENDED liveItem's scheduled window (end - start) stands in. Gated on
+        # status="ended" — crediting listening hours for a stream that has not
+        # happened yet is worse than counting nothing — and it is the SCHEDULED
+        # window, the publisher's own claim, same standard as the rest of the
+        # pipeline. A pending/live item gets no duration at all.
+        duration = _parse_duration(_tag(block, "duration"))
+        duration_src = "rss" if duration else None
+        if not duration and live and (live_attrs.get("status") or "").lower() == "ended":
+            l_start = _parse_iso8601(live_attrs.get("start"))
+            l_end = _parse_iso8601(live_attrs.get("end"))
+            if l_start and l_end and l_end > l_start:
+                duration, duration_src = l_end - l_start, "live"
         out[guid] = {
             "item_guid":      guid,
             "title":          _tag(block, "title"),
             "image":          _attr(block, "image", "href") or _tag(block, "image"),
             "published":      published,
-            "duration":       _parse_duration(_tag(block, "duration")),
+            "duration":       duration,
+            "duration_src":   duration_src,
             "episode_number": _parse_int(_tag(block, "episode")),
             "enclosure_url":  _attr(block, "enclosure", "url", "uri"),
             "enclosure_type": _attr(block, "enclosure", "type"),

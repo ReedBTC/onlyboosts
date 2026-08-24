@@ -23,6 +23,7 @@ echo "=== $(date -u +%FT%TZ) OnlyBoosts incremental cycle ==="
 "$PY" "$BOT" resolve-guids        # canonicalize phantom guids (feed ids / item guids / slugs)
 "$PY" "$BOT" dedupe               # mark relay-bot notes duplicating another app's note (7d window)
 "$PY" "$BOT" enrich               # fill metadata/profiles for anything new
+"$PY" "$BOT" durations            # derive durations for boosted episodes with none (#40HPW evenness; capped per tick)
 "$PY" "$BOT" export --per-show    # rebuild the JSON shards
 "$PY" "$BOT" push                 # rsync changed shards to the VPS (no --delete: nothing is removed on a tail run)
 "$PY" d1_sync.py --remote-delta   # push new boosts to the D1 query layer (/api/v1); no-op if none / no CF creds

@@ -141,6 +141,8 @@ CREATE TABLE IF NOT EXISTS episodes (
     enclosure_url   TEXT,
     enclosure_type  TEXT,
     description     TEXT,          -- full shownotes (plain text, NOT length-capped)
+    duration_src    TEXT,          -- where `duration` came from: pi | rss | live | probe
+    duration_checked_at INTEGER,   -- when a duration DERIVATION was last attempted (see episodes_needing_duration)
     checked_at      INTEGER,       -- when we last LOOKED (the refresh gate)
     updated_at      INTEGER        -- when the row last CHANGED (the D1 drift gate)
 );
@@ -424,6 +426,16 @@ def _migrate(conn):
     # rows share one updated_at day (the initial backfill), so the seed does not
     # spread them either; the per-tick cap in guids_needing_episode is what does.
     ep_cols = {r[1] for r in conn.execute("PRAGMA table_info(episodes)")}
+    # Duration provenance + attempt stamp (the #40HPW evenness work, 2026-08-24).
+    # Existing rows migrate with duration_src NULL; rows holding a non-zero
+    # duration are all Podcast Index's, so they are seeded 'pi' to make the
+    # provenance column true from day one rather than only going forward.
+    if "duration_src" not in ep_cols:
+        conn.execute("ALTER TABLE episodes ADD COLUMN duration_src TEXT")
+        conn.execute("UPDATE episodes SET duration_src='pi' "
+                     "WHERE duration IS NOT NULL AND duration > 0")
+    if "duration_checked_at" not in ep_cols:
+        conn.execute("ALTER TABLE episodes ADD COLUMN duration_checked_at INTEGER")
     if "checked_at" not in ep_cols:
         conn.execute("ALTER TABLE episodes ADD COLUMN checked_at INTEGER")
         conn.execute("UPDATE episodes SET checked_at = updated_at "
@@ -576,24 +588,38 @@ def upsert_episode(conn, ep):
     """
     now = int(time.time())
     before = conn.execute(
-        f"SELECT updated_at, {', '.join(EPISODE_CONTENT_COLS)} "
+        f"SELECT updated_at, duration_src, {', '.join(EPISODE_CONTENT_COLS)} "
         f"FROM episodes WHERE item_guid=?",
         (ep["item_guid"],)).fetchone()
+    # ⚠️ A ZERO NEVER ERASES A REAL DURATION. Podcast Index reports duration: 0
+    # faithfully for feeds that publish no <itunes:duration> at all (Homegrown
+    # Hits: 0 of 149 items), so a duration derived anywhere else — the RSS
+    # fallback, a liveItem's ended window, the enclosure probe — would be wiped
+    # by the very next refresh if this upsert stayed unconditional. A non-zero
+    # incoming duration still always wins: that is a fresh read of the
+    # publisher's own claim, which outranks anything we derived.
+    ep = dict(ep)
+    ep.setdefault("duration_src", "pi" if ep.get("duration") else None)
+    if not ep.get("duration") and before and (before["duration"] or 0) > 0:
+        ep["duration"] = before["duration"]
+        ep["duration_src"] = before["duration_src"]
     changed = before is None or any(before[c] != ep.get(c) for c in EPISODE_CONTENT_COLS)
     conn.execute(
         """INSERT INTO episodes (item_guid, title, image, published, duration,
                                  episode_number, podcast_guid, feed_id,
                                  enclosure_url, enclosure_type, description,
-                                 checked_at, updated_at)
+                                 duration_src, checked_at, updated_at)
            VALUES (:item_guid, :title, :image, :published, :duration,
                    :episode_number, :podcast_guid, :feed_id,
-                   :enclosure_url, :enclosure_type, :description, :now, :updated_at)
+                   :enclosure_url, :enclosure_type, :description,
+                   :duration_src, :now, :updated_at)
            ON CONFLICT(item_guid) DO UPDATE SET
              title=excluded.title, image=excluded.image, published=excluded.published,
              duration=excluded.duration, episode_number=excluded.episode_number,
              podcast_guid=excluded.podcast_guid, feed_id=excluded.feed_id,
              enclosure_url=excluded.enclosure_url, enclosure_type=excluded.enclosure_type,
-             description=excluded.description, updated_at=excluded.updated_at""",
+             description=excluded.description, duration_src=excluded.duration_src,
+             updated_at=excluded.updated_at""",
         {**ep, "now": now,
          "updated_at": now if changed else (before["updated_at"] if before else now)})
     # Unconditional: we looked, whether or not the look changed anything.
@@ -612,6 +638,75 @@ def mark_episode_checked(conn, item_guid):
     conn.execute("UPDATE episodes SET checked_at=? WHERE item_guid=?",
                  (int(time.time()), item_guid))
     conn.commit()
+
+
+# ── derived durations (the #40HPW evenness work) ─────────────────────────────
+# `/api/v1/members/hours` sums episodes.duration, which turns it from a display
+# field into a score — and whole feeds publish no <itunes:duration> at all, so
+# their listeners could never score. The `durations` command derives one where
+# the publisher declares none: the feed's own <itunes:duration> first, then an
+# ended <podcast:liveItem>'s scheduled window, then a bounded probe of the
+# enclosure's MPEG headers (duration_probe.py). These write through
+# set_episode_duration, never upsert_episode, so a derivation can only ever
+# FILL a hole — a publisher-declared duration always outranks it.
+
+#: Retry cooldown for a duration derivation that produced nothing. A feed that
+#: publishes no duration and an enclosure we cannot read are stable facts;
+#: weekly is often enough to catch a host coming back up.
+DURATION_RETRY = 7 * 24 * 60 * 60
+
+
+def set_episode_duration(conn, item_guid, seconds, src):
+    """Write a DERIVED duration onto an episode that has none.
+
+    Refuses to touch a row already holding a non-zero duration: the publisher's
+    own claim (pi/rss) outranks every derivation, and one derivation does not
+    overwrite another. Bumps `updated_at` so the D1 metadata-drift pass carries
+    it, and stamps `duration_checked_at` so the row leaves the due queue.
+    """
+    if not seconds or seconds <= 0:
+        return False
+    now = int(time.time())
+    cur = conn.execute(
+        """UPDATE episodes
+           SET duration=?, duration_src=?, duration_checked_at=?, updated_at=?
+           WHERE item_guid=? AND (duration IS NULL OR duration <= 0)""",
+        (int(seconds), src, now, now, item_guid))
+    conn.commit()
+    return cur.rowcount > 0
+
+
+def mark_duration_checked(conn, item_guid):
+    """Record a duration derivation that produced nothing, so the row is not
+    retried until DURATION_RETRY lapses. The row itself is untouched."""
+    conn.execute("UPDATE episodes SET duration_checked_at=? WHERE item_guid=?",
+                 (int(time.time()), item_guid))
+    conn.commit()
+
+
+def episodes_needing_duration(conn, limit=0, retry_age=DURATION_RETRY):
+    """Boosted episodes with no usable duration, due a derivation attempt.
+
+    Only episodes carrying at least one live boost — the board is the reason
+    this exists, and a boost is what puts an episode on it. Rows whose last
+    attempt is inside `retry_age` are skipped; limit=0 means no cap.
+    """
+    cutoff = int(time.time()) - retry_age
+    sql = f"""SELECT e.item_guid, e.title, e.enclosure_url, e.enclosure_type,
+                     e.podcast_guid, s.feed_url
+              FROM episodes e
+              LEFT JOIN shows s ON s.podcast_guid = e.podcast_guid
+              WHERE (e.duration IS NULL OR e.duration <= 0)
+                AND (e.duration_checked_at IS NULL OR e.duration_checked_at < ?)
+                AND EXISTS (SELECT 1 FROM boosts b
+                            WHERE b.item_guid = e.item_guid AND {not_excluded('b')})
+              ORDER BY (SELECT COUNT(*) FROM boosts b2
+                        WHERE b2.item_guid = e.item_guid) DESC"""
+    params = [cutoff]
+    if limit:
+        sql += " LIMIT ?"
+        params.append(limit)
+    return conn.execute(sql, params).fetchall()
 
 
 def upsert_profile(conn, pubkey, prof):

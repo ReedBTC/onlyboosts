@@ -42,6 +42,7 @@ import clients                                                  # noqa: E402
 import dedupe                                                   # noqa: E402
 import fountain                                                 # noqa: E402
 import export as export_mod                                     # noqa: E402
+import duration_probe                                           # noqa: E402
 import podroll                                                  # noqa: E402
 import resolve_guids                                            # noqa: E402
 from classify import classify_boost, decode_note_or_nevent, _QUOTE_RE  # noqa: E402
@@ -344,6 +345,97 @@ def cmd_resolve_guids(args):
     _print_stats(conn)
 
 
+def cmd_durations(args):
+    """Derive durations for boosted episodes that have none — the #40HPW
+    evenness pass. Ladder per episode, each rung only when the one above
+    returned nothing usable:
+
+      1. the feed's own <itunes:duration>            (src 'rss')
+      2. an ENDED <podcast:liveItem>'s window        (src 'live')
+      3. the enclosure's MPEG headers, one 64KB read (src 'probe')
+
+    Writes go through db.set_episode_duration, which refuses to touch a row
+    already holding a publisher-declared duration; misses stamp
+    duration_checked_at and retry after db.DURATION_RETRY. Politeness follows
+    podroll.py's lesson: never two consecutive requests to one host without a
+    pause, and a network failure is a cooldown, never a negative answer.
+    """
+    conn = db.connect(DB_PATH, check_same_thread=False)
+    rows = db.episodes_needing_duration(conn, limit=(0 if args.all else args.limit))
+    if not rows:
+        print("durations: nothing due")
+        return
+    print(f"durations: {len(rows)} boosted episode(s) with no usable duration due")
+    from urllib.parse import urlsplit
+    session = requests.Session()
+    host_last = {}
+
+    def polite(url):
+        host = urlsplit(url).netloc.lower()
+        wait = 0.7 - (time.time() - host_last.get(host, 0))
+        if wait > 0:
+            time.sleep(wait)
+        host_last[host] = time.time()
+
+    # Rungs 1+2: one fetch per distinct feed, however many episodes it owes.
+    by_feed = {}
+    for r in rows:
+        if r["feed_url"]:
+            by_feed.setdefault(r["feed_url"], []).append(r)
+    declared = {}       # item_guid -> (seconds, src)
+    rss_enclosures = {} # enclosure recovered from RSS for rows whose DB has none
+    for i, (fu, wanted) in enumerate(by_feed.items(), 1):
+        polite(fu)
+        xml = enrich.fetch_feed(fu, session)
+        if xml is None:
+            print(f"  rss [{i}/{len(by_feed)}] unreachable ({len(wanted)} ep): {fu}")
+            continue
+        eps = enrich.parse_feed_episodes(xml)
+        hits = 0
+        for w in wanted:
+            info = eps.get(w["item_guid"])
+            if info and info.get("duration"):
+                declared[w["item_guid"]] = (info["duration"],
+                                            info.get("duration_src") or "rss")
+                hits += 1
+            elif info and info.get("enclosure_url") and not w["enclosure_url"]:
+                rss_enclosures[w["item_guid"]] = info["enclosure_url"]
+        print(f"  rss [{i}/{len(by_feed)}] {hits}/{len(wanted)} declared: {fu}")
+
+    # Rung 3: probe the enclosure.
+    probed, net_fail = {}, 0
+    for r in rows:
+        ig = r["item_guid"]
+        if ig in declared:
+            continue
+        url = r["enclosure_url"] or rss_enclosures.get(ig)
+        if not url:
+            continue
+        polite(url)
+        secs, how = duration_probe.probe_enclosure_duration(url, session)
+        name = (r["title"] or ig)[:60]
+        if secs:
+            probed[ig] = (secs, "probe")
+            print(f"  probe [{how}] {secs}s ({secs / 3600:.2f}h): {name}")
+        else:
+            net_fail += how == "fetch"
+            print(f"  probe [{how}]: {name}  [{url[:70]}]")
+
+    results = {**declared, **probed}
+    if args.dry_run:
+        print(f"[dry-run] would fill {len(results)} of {len(rows)} "
+              f"({len(declared)} declared, {len(probed)} probed); no writes")
+        return
+    filled = sum(bool(db.set_episode_duration(conn, ig, secs, s))
+                 for ig, (secs, s) in results.items())
+    for r in rows:
+        if r["item_guid"] not in results:
+            db.mark_duration_checked(conn, r["item_guid"])
+    print(f"durations: {filled} filled ({len(declared)} declared in feed, "
+          f"{len(probed)} probed), {len(rows) - len(results)} unresolved "
+          f"({net_fail} network), retry in {db.DURATION_RETRY // 86400}d")
+
+
 def cmd_fountain_shows(args):
     """Identify shows through Fountain when Podcast Index couldn't.
 
@@ -471,6 +563,20 @@ def _enrich_episodes(conn, key, secret, eps=None):
         info = enrich.resolve_episode(ig, feed_id, key, secret)
         if info:
             changed += bool(db.upsert_episode(conn, info))
+            # Rung 1 of the duration ladder: PI answered but with no usable
+            # duration — `duration: 0` is PI faithfully reporting a feed that
+            # declares none in the fields IT reads, yet the feed itself still
+            # gets a say (<itunes:duration>, or an ended liveItem's window).
+            # First-fetch only, the same batched one-fetch-per-feed path the
+            # full fallback rides; the refresh path stays out of RSS for the
+            # documented traffic reasons, and stored rows are the `durations`
+            # command's job.
+            if not known and not info.get("duration"):
+                show = db.show_feed_for_guid(conn, pg) if pg else None
+                if show and show["feed_url"]:
+                    rss_pending.setdefault(show["feed_url"], []).append(
+                        {"item_guid": ig, "podcast_guid": pg, "feed_id": feed_id,
+                         "show_image": show["image"], "duration_only": True})
         elif known:
             # A refresh that found nothing. The stored row stands; record the look.
             db.mark_episode_checked(conn, ig)
@@ -495,10 +601,29 @@ def _enrich_episodes(conn, key, secret, eps=None):
         print(f"  raw-RSS fallback: {chasing} episode(s) PI missed, across "
               f"{len(rss_pending)} feed(s)")
         found = enrich.resolve_episodes_from_feeds(rss_pending, log=print)
-        for info in found.values():
-            changed += bool(db.upsert_episode(conn, info))
+        dur_only = {w["item_guid"] for wanted in rss_pending.values()
+                    for w in wanted if w.get("duration_only")}
+        for ig2, info in found.items():
+            if ig2 in dur_only:
+                # The PI row just stored is the better record; the feed was
+                # consulted for its duration alone. A full upsert here would
+                # replace a good row with a thinner one.
+                if info.get("duration"):
+                    changed += bool(db.set_episode_duration(
+                        conn, ig2, info["duration"],
+                        info.get("duration_src") or "rss"))
+                else:
+                    db.mark_duration_checked(conn, ig2)
+            else:
+                changed += bool(db.upsert_episode(conn, info))
+        for ig2 in dur_only - set(found):
+            # The feed had no such item (or was unreachable): the duration chase
+            # is what failed, not the enrichment — cool it down, don't
+            # negative-cache the episode.
+            db.mark_duration_checked(conn, ig2)
         still_missing = [w["item_guid"] for wanted in rss_pending.values()
-                         for w in wanted if w["item_guid"] not in found]
+                         for w in wanted if w["item_guid"] not in found
+                         and not w.get("duration_only")]
         db.mark_enrich_failed(conn, "episode", still_missing)
         print(f"  raw-RSS fallback: recovered {len(found)}, "
               f"{len(still_missing)} still unresolved")
@@ -925,6 +1050,16 @@ def main():
                      help=f"cap for this run (default {db.EPISODE_BATCH}, "
                           f"the per-tick batch)")
     re_.set_defaults(func=cmd_reenrich_episodes)
+
+    du = sub.add_parser("durations",
+                        help="derive durations for boosted episodes that have none "
+                             "(feed <itunes:duration> → ended liveItem window → enclosure probe)")
+    du.add_argument("--limit", type=int, default=40,
+                    help="max episodes per run (timer-tick budget; default 40)")
+    du.add_argument("--all", action="store_true", help="no cap (backfill)")
+    du.add_argument("--dry-run", action="store_true",
+                    help="report what would be written, write nothing")
+    du.set_defaults(func=cmd_durations)
 
     fs = sub.add_parser("fountain-shows",
                         help="identify unresolved shows via their Fountain episode page")
