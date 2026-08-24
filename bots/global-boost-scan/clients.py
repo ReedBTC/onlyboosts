@@ -98,11 +98,22 @@ from urllib.parse import urlparse
 # about who paid, and must not gain one: nothing here can verify a donor
 # authorised a note signed by a key they do not hold. Same treatment the 994
 # `chadf-boostbot` rows and the LB show account already get.
+# ⚠️ THE FIFTH IS BOOSTMEBITCH'S SITE ACCOUNT, the same arrangement OnlyBoosts
+# has one entry up: the app publishes under the donor's own key when they are
+# signed in (13 distinct pubkeys behind the `boostmebitch` slug, all via the
+# `["client","BoostMeBitch"]` tag) and this key publishes for everyone else.
+# Same slug as the donor-signed path, for the same reason as ours; `client_src`
+# tells the two apart. Its notes carry the client tag too, so today this entry
+# changes only `client_src` (client-tag → publisher-pubkey) on 35 rows — what it
+# is FOR is the site's PUBLISHERS list in `functions/api/v1/_common.js`, which
+# keeps single keys that sign many people's boosts off the member boards, and
+# which this map must not fall behind. Registered 2026-08-24.
 PUBLISHER_PUBKEYS = {
     "f3bd42a91af5f3f1c40ca45ad2269464ab79996b32da78e8ed2ab91111b08e65": "chadf-boostbot",
     "d35ae076512c29b01a5b33aa764ed4db44a9d0bbd96009705f48101f6cfe76a2": "lnaddress-music",
     "c330881e28768381dd8bdfd274341dca0c5882c29b8642ea4bc82f7563264592": "localbitcoiners",
     "3a87a19c801d57111b0905569225d2b20b39d154fc93bef5a8f2860c409b84d9": "onlyboosts",
+    "3820f4ff8587747530c7feafe47c1e592e3ce0fd2929b4f907e40714bd26f408": "boostmebitch",
 }
 
 # Fountain links its own episode/show pages from the URL slot of each NIP-73
