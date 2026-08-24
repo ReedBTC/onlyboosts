@@ -2992,27 +2992,24 @@ durations. **It is an assumption, not a measurement**, and the Rules dialog says
 so. Two boards: **This Week** leads (it resets Monday and has a live race in
 it), **High Scores** follows.
 
-**⚠️ NOBODY CLEARS FORTY HOURS.** Over all 9,977 booster-weeks, **exactly one
-does** — Piez, 51.8h, the week of 2025-09-22. **⚠️ IT WAS TWO UNTIL 2026-08-23**,
-and the second one is a worked example of why the boundary moved: Piez's 41.6h
-week was 41.6h only because the Monday-00:00-UTC line ran through a Sunday
-evening, and re-cut at midnight Pacific it is 39.8h. Seventeen weeks ever
-passed 30, down from eighteen for the same reason. **Re-measure these three
-figures after any change to the week rule, and after any change to duration
-coverage; they are the whole argument for the name.**
-
-**⚠️ DURATION COVERAGE IS THE SECOND THING THAT MOVES THEM, AND IT MOVES WITHOUT
-ANYBODY HERE TOUCHING A LINE.** New as of 2026-08-24: the collector is being
-worked on to fill in missing durations (see the ⚠️ under the four rules below),
-and every episode that gains one adds hours to some past week. **So these
-figures only ever go up from here, silently, as the collector improves.** If a
-second week ever clears 40 the gold row stops being unique and the board's whole
-framing wants revisiting.
-
-A typical winning week in mid-2026 is 14 to 20 hours. Eight of the all-time top
+**⚠️ FORTY HOURS IS ALL BUT UNCLEARED.** Over all 10,042 booster-weeks,
+**exactly two pass it**, both Piez: 54.7h the week of 2025-09-22 and 40.2h the
+week of 2026-03-02. Nineteen weeks ever passed 30. **Re-measured 2026-08-24,
+when the collector's derived durations landed** — the 2026-08-23 Pacific re-cut
+had these at one (51.8h) and seventeen, and filling the duration-less feeds is
+what moved them: duration coverage adds hours to PAST weeks with no line of
+board code touched, which is why it is the second thing (after the week rule)
+that silently moves these figures. Before that, Piez's 41.6h UTC week re-cut to
+39.8h at midnight Pacific, the worked example for why the boundary moved.
+**Re-measure these figures after any change to the week rule OR to duration
+coverage; they are the whole argument for the name and they move with both.**
+The gold row is no longer unique — the second 40h week arrived with the derived
+durations — so the framing question this file used to park on "if a second week
+ever clears 40" is now live, and it is Reed's to call. A typical winning week in
+mid-2026 is 14 to 20 hours. Six of the all-time top
 ten are from 2025, which is why This Week exists beside the high-score
 table rather than instead of it. The name is the provocation, not a threshold,
-and gold marks the one row above forty. **If gold ever marks a third of a
+and gold marks the rows above forty. **If gold ever marks a third of a
 board the fix is the goal, not the styling.**
 
 `GET /api/v1/members/hours?range=week|all`. Four rules, each from a measurement:
@@ -3060,8 +3057,19 @@ to fail the test when removed.
 which is correct only because Pacific is BEHIND UTC: Monday 00:00 Pacific is
 Monday 07:00 or 08:00 UTC, still Monday. `weekLabel` in `members-board.js` says
 so. If the reset ever moves east of Greenwich, that formatter moves with it.
-- **~14% of boosts contribute nothing** — 8% name no episode, 2.5% of episodes
-  have no duration. Stated in the Rules rather than hidden.
+- **~12.5% of boosts contribute nothing** — 7.6% name no episode, 4.5% name one
+  the index cannot resolve, 0.4% resolve to an episode with no duration. Stated
+  in the Rules rather than hidden. It was ~14% with the last slice at ~2.5%
+  until 2026-08-24, when the collector started DERIVING durations: the feed's
+  own `<itunes:duration>`, else an ENDED `<podcast:liveItem>`'s scheduled
+  window, else a 64KB probe of the enclosure's MPEG headers —
+  `bots/global-boost-scan/duration_probe.py`, whose docstring is the design
+  record. `episodes.duration_src` says which rung answered, and a `duration: 0`
+  from Podcast Index never erases a derived value (`db.upsert_episode`). 183 of
+  194 duration-less boosted episodes filled on flip-on; the residue is live
+  streams and `.m3u8` playlists, which stay unscored honestly. **The Rules
+  dialog still claims ~14% with the no-duration slice at "a few percent"; both
+  halves of that copy now want the site-side edit.**
 
 **⚠️ THE EPISODE COUNT ON A ROW IS EPISODES THAT CONTRIBUTED HOURS, NOT EPISODES
 BOOSTED, AND IT READS LIKE A BUG.** Reed checked the board against a member's own
@@ -3072,35 +3080,33 @@ days earlier and its `duration` is `0`, so `e.duration > 0` dropped it, and the
 are summed over exactly the episodes counted, so a boost count there would claim
 four episodes produced those hours. The figure now carries a `title` saying what
 it counts. **Anyone comparing the board to a booster page will ask this again**,
-so don't "fix" it by widening the count.
+so don't "fix" it by widening the count. (That exact row has since healed — the
+probe filled the missing duration the same day and it reads 4 eps / 10.54h —
+but the semantics stand: an episode still at zero drops out of both figures
+together.)
 
-**⚠️ AND THE WEEKLY BOARD IS HIT FAR HARDER THAN THE 2.5% SUGGESTS, BECAUSE IT IS
-MADE OF RECENT BOOSTS.** Measured 2026-08-24 against production: over 600
-episodes spread across the whole index by boost rank, **2.2%** have no usable
-duration (3.8% boost-weighted) — the documented figure holds. But over the **200
-most recent boosts**, **8.5%** landed on an episode with no duration, and every
-one of those episodes had aired **one to five days earlier**. This Week is
-therefore the board that undercounts most, and it **self-heals**: both boards
-recompute from live data on every request, so a row gains an episode once
-enrichment fills the duration in. A reader who saw the lower number is not shown
-a correction.
+**⚠️ AND THE WEEKLY BOARD IS HIT HARDER THAN THE CORPUS FIGURE SUGGESTS, BECAUSE
+IT IS MADE OF RECENT BOOSTS.** Measured 2026-08-24, before the derivation pass:
+over the **200 most recent boosts**, **8.5%** landed on an episode with no
+duration against ~2% corpus-wide, and every one of those episodes had aired one
+to five days earlier. This Week is therefore the board that undercounts most,
+and it **self-heals**: both boards recompute from live data on every request, so
+a row gains an episode the moment the collector fills the duration in — a reader
+who saw the lower number is just never shown a correction. The derivation pass
+runs every incremental tick, so the window between a new duration-less episode
+appearing and its duration landing is now minutes to one tick, not the old
+enrichment lag.
 
-**Two distinct causes, and only one is a lag.** Three of the eight were **live
-episodes** (`Salty Sessions with Salty Crayon (LIVE)`, `151st Edition - LIVE`,
-`PC2.0 268 Live August 21st 2026`) — a `<podcast:liveItem>` has no duration by
-construction, so **boosting during a live show can never count toward #40HPW**,
-which is a permanent exclusion of exactly the high-engagement behaviour the board
-exists to celebrate. The rest are enriched rows where Podcast Index reported
-`0`, or rows not yet enriched at all (no title, no show). **Both are collector
-side**; nothing in `hours.js` can repair either, and a client- or edge-side
-guess at a duration is the masking fix CLAUDE.md already forbids for episode
-fields.
-
-**The total in the Rules dialog was re-checked and is right**: 14.0% of the
-recent 200 contributed nothing, against the ~14% it claims. Only the split moves
-with the window (5.5% show-level / 8.5% no-duration recently, against 8% / few%
-corpus-wide), which is why the dialog states the corpus figures and was left
-alone.
+**Two distinct causes, and neither is permanent any more.** Live episodes — a
+`<podcast:liveItem>` has no duration **while pending or live** by construction,
+so a boost sent during the stream counts nothing that evening; since 2026-08-24
+the collector fills the SCHEDULED window (`end − start`, src `live`) once the
+feed marks the item `status="ended"`, so those hours arrive when the stream
+ends. Only an endless stream (Icecast, `.m3u8`) stays unscored for good. The
+rest were enrichment lag or PI faithfully reporting `0`, which the refresh gate
+plus the probe now close. **All of it is collector side**; nothing in `hours.js`
+can repair any of it, and a client- or edge-side guess at a duration is the
+masking fix CLAUDE.md already forbids for episode fields.
 - **Publisher keys are excluded.** See below.
 
 **⚠️ THE NPUB COMES FROM A CORRELATED SUBQUERY, NEVER A SECOND JOIN ON
