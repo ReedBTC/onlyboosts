@@ -1006,6 +1006,26 @@ kept as **aliases repointed at the OnlyBoosts palette**. Trust the values, not
 the words — `--orange` is brand cyan. New code should prefer `--brand` / `--ink`
 / `--surface`.
 
+**⚠️ THE FEED RAMP HAS A FOURTH STEP, `--*-accent-dd`, AND IT IS FOR TEXT.**
+Same idea as `--brand-dd`: white on `--bg-accent` measures **2.50:1** and the
+same colour as ink on cream is **2.29:1**, so anything small wearing the cyan end
+of the ramp is illegible. The phone's tab chips read the accent both ways — as a
+fill under white when selected, as the label and border when not — which is
+where Reed saw it (2026-08-23). **Each value is the LEAST darkening that reaches
+6:1 on white**, solved per family rather than scaled by a constant, so the four
+already past it keep their exact colour and only the cyan end moves; a uniform
+multiplier big enough to fix cyan takes Albums to 10.8:1 and flattens the ramp
+that says which feed you are on. `--accent-dd` is mapped beside `--accent` on
+every `body[data-active-feed]` row, and `--tab-dd` rides beside `--tab` on the
+tabs because CSS cannot build one custom property's name out of another's.
+
+**⚠️ THE DESKTOP TAB AND THE SUB-ROW STILL USE `--accent` AND STILL MEASURE
+2.50:1 ON MEMBERS.** Only the phone chips were changed, which is what was asked
+for and where the type is smallest. It is the same bug at a larger size; fixing
+it means the selected tab and the block below it stop sharing a fill, which is
+the thing the seam note under **The Three Tabs** exists to protect. A decision,
+not an oversight.
+
 Brand colors are sampled from the supplied art: `--brand: #00aff0` and
 `--brand-d: #068ace`. The eight feed accents sit on one cyan→indigo→violet ramp,
 so switching feed shifts the page wash along a single system. The violet tail is
@@ -2774,6 +2794,12 @@ was the bug, not the empty list.
 what rewards listening across the network, which is what a wall of *members* is
 a claim about. The other two are one press away.
 
+**⚠️ THE BOARD TITLES ARE CENTRED AND THEIR SUB-LINES ARE NOT.** *Reed's call,
+2026-08-23.* "This Week" and "High Scores" name the board the way a scoreboard's
+own header does; the line under it is a caption, and a centred caption over a
+left-aligned list of rows reads as a second heading rather than as a note. The
+`<small>` is inside the `<h3>`, so it opts out of the alignment explicitly.
+
 **Rules sits in the #40HPW sub-line**, not under the boards. *Reed's call,
 2026-08-23.* Below them it was a footnote to two tall boxes and read as
 belonging to the second one; on the line stating the challenge it is where the
@@ -3067,6 +3093,15 @@ statement references it twice (`NOT IN` for the listing, `IN` for the bots), and
 SQLite numbers a bare `?` from the highest index used *so far*, which would make
 the second run's numbering depend on where the first happens to sit in the SQL.
 `PUB_FIRST` / `PUB_HOLES` / `PUB_FLAG` in `members.js` are the whole of it.
+
+**The heading is "Shoutout to the Boost Bots"** (*Reed's call, 2026-08-23*),
+not a bare "Boost Bots". These four accounts are the only reason a listener with
+no Nostr account is represented here at all, and the section's job is to credit
+them; the flatter label read as a category of thing being disclosed rather than
+as thanks. **The Rules dialog's link still says "Boost Bots"** — it is a
+reference inside a sentence ("They are named under Boost Bots below"), and the
+longer name does not fit that grammar. The section id stays `boost-bots`, and
+`/about#bots` is untouched.
 
 **⚠️ THE SECTION IS THE EXCLUSION, SHOWN — it is not a disclosure notice.**
 *Reed's call, 2026-08-23: "either way we need to be transparent about anything

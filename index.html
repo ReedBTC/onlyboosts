@@ -50,18 +50,18 @@
 
   <!-- Shared note / card styles (.note-card, .embed-note) — the boosts
        feeds render through the same kind-1 card as boosts-thread.js. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v135" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v136" />
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v135" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v136" />
   <!-- The episode card and its drawer, extracted from the inline block below
        when /episode/<guid> pages needed the same cards. See the file header. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v135" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v135" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v136" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v136" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. Must stay last
        among the stylesheets so the inline block below still wins. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v135" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v136" />
 
   <style>
     :root {
@@ -87,21 +87,49 @@
       --snf-accent:  #6d489b;  --snf-accent-d:  #583a7e;  --snf-tint:  #f0eaf7;
       --alb-accent:  #7f4694;  --alb-accent-d:  #663878;  --alb-tint:  #f4e9f5;
 
+      /* ⚠️ A FOURTH STEP, FOR TEXT THAT HAS TO SURVIVE THE CYAN END OF THE
+         RAMP. `--brand-dd` in theme.css exists for exactly this reason and this
+         is the same idea applied to the feed accents: white on `--bg-accent`
+         measures 2.50:1, which fails AA at every size, and the same colour as
+         INK on cream is 2.29:1. The phone's tab chips use the accent both ways
+         — as a fill under white text when selected, and as the label colour
+         when not — so both readings were illegible on Members and marginal on
+         Shows. Reported by Reed, 2026-08-23: "the white letters blend into the
+         background too much".
+
+         ⚠️ SOLVED FOR A TARGET RATIO, NOT SCALED BY A CONSTANT, WHICH IS WHY
+         HALF THIS TABLE IS UNCHANGED. A uniform multiplier big enough to fix
+         cyan takes Albums to 10.8:1 and turns the violet half of the ramp
+         nearly black — the ramp is the system that says which feed you are on,
+         and flattening it to fix one end would cost more than it bought. Each
+         value here is the least darkening that reaches 6:1 on white, so the
+         four already past it keep their exact colour and only the cyan end
+         moves. Measured: every one is >= 6.0:1 on white and >= 5.4:1 on cream. */
+      --bg-accent-dd:  #006990;
+      --bf-accent-dd:  #04689a;
+      --sh-accent-dd:  #1767a2;
+      --eg-accent-dd:  #2c64a8;
+      --ef-accent-dd:  #4a4f9e;
+      --sng-accent-dd: #5c4aa0;
+      --snf-accent-dd: #6d489b;
+      --alb-accent-dd: #7f4694;
+
       /* Defaults (Episodes · Global is the landing feed). */
-      --accent:   var(--eg-accent);
-      --accent-d: var(--eg-accent-d);
+      --accent:    var(--eg-accent);
+      --accent-d:  var(--eg-accent-d);
+      --accent-dd: var(--eg-accent-dd);
       --tint:     var(--eg-tint);
     }
 
     /* Active-feed → accent mapping. Set on <body data-active-feed>. */
-    body[data-active-feed="members-global"]    { --accent: var(--bg-accent); --accent-d: var(--bg-accent-d); --tint: var(--bg-tint); }
-    body[data-active-feed="members-follows"]   { --accent: var(--bf-accent); --accent-d: var(--bf-accent-d); --tint: var(--bf-tint); }
-    body[data-active-feed="shows"]            { --accent: var(--sh-accent); --accent-d: var(--sh-accent-d); --tint: var(--sh-tint); }
-    body[data-active-feed="episodes-global"]  { --accent: var(--eg-accent); --accent-d: var(--eg-accent-d); --tint: var(--eg-tint); }
-    body[data-active-feed="episodes-follows"] { --accent: var(--ef-accent); --accent-d: var(--ef-accent-d); --tint: var(--ef-tint); }
-    body[data-active-feed="songs-global"]     { --accent: var(--sng-accent); --accent-d: var(--sng-accent-d); --tint: var(--sng-tint); }
-    body[data-active-feed="songs-follows"]    { --accent: var(--snf-accent); --accent-d: var(--snf-accent-d); --tint: var(--snf-tint); }
-    body[data-active-feed="albums"]           { --accent: var(--alb-accent); --accent-d: var(--alb-accent-d); --tint: var(--alb-tint); }
+    body[data-active-feed="members-global"]    { --accent: var(--bg-accent); --accent-d: var(--bg-accent-d); --accent-dd: var(--bg-accent-dd); --tint: var(--bg-tint); }
+    body[data-active-feed="members-follows"]   { --accent: var(--bf-accent); --accent-d: var(--bf-accent-d); --accent-dd: var(--bf-accent-dd); --tint: var(--bf-tint); }
+    body[data-active-feed="shows"]            { --accent: var(--sh-accent); --accent-d: var(--sh-accent-d); --accent-dd: var(--sh-accent-dd); --tint: var(--sh-tint); }
+    body[data-active-feed="episodes-global"]  { --accent: var(--eg-accent); --accent-d: var(--eg-accent-d); --accent-dd: var(--eg-accent-dd); --tint: var(--eg-tint); }
+    body[data-active-feed="episodes-follows"] { --accent: var(--ef-accent); --accent-d: var(--ef-accent-d); --accent-dd: var(--ef-accent-dd); --tint: var(--ef-tint); }
+    body[data-active-feed="songs-global"]     { --accent: var(--sng-accent); --accent-d: var(--sng-accent-d); --accent-dd: var(--sng-accent-dd); --tint: var(--sng-tint); }
+    body[data-active-feed="songs-follows"]    { --accent: var(--snf-accent); --accent-d: var(--snf-accent-d); --accent-dd: var(--snf-accent-dd); --tint: var(--snf-tint); }
+    body[data-active-feed="albums"]           { --accent: var(--alb-accent); --accent-d: var(--alb-accent-d); --accent-dd: var(--alb-accent-dd); --tint: var(--alb-tint); }
 
     /* ── Masthead ────────────────────────────────────────────────────
        Wordmark banner sits above the sticky feed bar. It scrolls away;
@@ -235,12 +263,16 @@
       transition: background 0.15s, color 0.15s, border-color 0.15s;
     }
     /* Inactive: the family's shade. Active: whatever feed is on screen. */
-    .feed-tab--podcasts { --tab: var(--sh-accent); }
-    .feed-tab--music    { --tab: var(--alb-accent); }
-    .feed-tab--members  { --tab: var(--bg-accent); }
+    /* `--tab-dd` rides alongside `--tab` rather than being derived from it,
+       because CSS cannot turn one custom property into another's name. The
+       phone chips are its only consumer; see the block at the foot of this
+       stylesheet. */
+    .feed-tab--podcasts { --tab: var(--sh-accent);  --tab-dd: var(--sh-accent-dd); }
+    .feed-tab--music    { --tab: var(--alb-accent); --tab-dd: var(--alb-accent-dd); }
+    .feed-tab--members  { --tab: var(--bg-accent);  --tab-dd: var(--bg-accent-dd); }
     body[data-active-tab="podcasts"] .feed-tab--podcasts,
     body[data-active-tab="music"]    .feed-tab--music,
-    body[data-active-tab="members"]  .feed-tab--members { --tab: var(--accent); }
+    body[data-active-tab="members"]  .feed-tab--members { --tab: var(--accent); --tab-dd: var(--accent-dd); }
     .feed-tab-icon { width: 21px; height: 21px; color: var(--tab); transition: color 0.15s; }
     .feed-tab-icon svg { width: 100%; height: 100%; display: block; }
     .feed-tab-label {
@@ -471,12 +503,19 @@
       border-radius: 12px;
       padding: 0.9rem 1rem 1rem;
     }
+    /* ⚠️ THE TITLE IS CENTRED AND ITS SUB-LINE IS NOT. Reed's call,
+       2026-08-23. "This Week" and "High Scores" name the board the way a
+       scoreboard's own header does; the line under it is a caption, and a
+       centred caption over a left-aligned list of rows reads as a second
+       heading rather than as a note. `small` is inside the `h3`, so it has to
+       opt out of the alignment explicitly. */
     .hpw-title {
       font-family: 'Playfair Display', Georgia, serif;
       font-size: 1.02rem; font-weight: 700; color: var(--ink); margin: 0 0 0.6rem;
+      text-align: center;
     }
     .hpw-title small {
-      display: block; margin-top: 0.15rem;
+      display: block; margin-top: 0.15rem; text-align: left;
       font-family: 'Source Serif 4', Georgia, serif;
       font-size: 0.72rem; font-weight: 400; color: var(--muted);
     }
@@ -1095,14 +1134,24 @@
          undo the reason for the work. Measured: the widest label ("Podcasts")
          is ~58px against ~113px of chip. */
       .feed-tabs { gap: 0.4rem; padding: 0.5rem 1rem 0.15rem; }
+      /* ⚠️ `--tab-dd`, NOT `--tab`, IN ALL THREE PLACES. A chip is small type
+         on a small surface and it reads the accent twice over — as its label
+         and border when idle, and as its fill under white when selected. On the
+         cyan families that was 2.29:1 and 2.50:1. The desktop tab is the same
+         two readings at a larger size and is deliberately NOT changed here;
+         see the note on the -dd tokens above. */
       .feed-tab {
         flex-direction: row;
         gap: 0.32rem;
         border-top: 0;
-        border: 1px solid var(--tab);
+        border: 1px solid var(--tab-dd);
         border-radius: 999px;
         padding: 0.4rem 0;
-        color: var(--tab);
+        color: var(--tab-dd);
+      }
+      .feed-tab[aria-selected="true"] {
+        background: var(--tab-dd);
+        border-color: var(--tab-dd);
       }
       .feed-tab-icon { width: 16px; height: 16px; }
       .feed-tab-label { font-size: 0.82rem; }
@@ -1123,8 +1172,8 @@
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
     }
   </style>
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v135" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v135" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v136" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v136" />
 </head>
 <body data-active-feed="episodes-global">
 
@@ -2169,17 +2218,17 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v135"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v136"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v135" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v136" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v135" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v136" defer></script>
 
 <!-- Feed hydration — lazily loads the active feed on first view. -->
-<script type="module" src="/assets/js/feeds.js?v=ob-v135"></script>
-<script src="/assets/js/nav.js?v=ob-v135" defer></script>
+<script type="module" src="/assets/js/feeds.js?v=ob-v136"></script>
+<script src="/assets/js/nav.js?v=ob-v136" defer></script>
 
 </body>
 </html>
