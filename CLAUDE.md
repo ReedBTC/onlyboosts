@@ -3062,7 +3062,8 @@ so. If the reset ever moves east of Greenwich, that formatter moves with it.
   in the Rules rather than hidden. It was ~14% with the last slice at ~2.5%
   until 2026-08-24, when the collector started DERIVING durations: the feed's
   own `<itunes:duration>`, else an ENDED `<podcast:liveItem>`'s scheduled
-  window, else a 64KB probe of the enclosure's MPEG headers —
+  window, else a 64KB probe of the enclosure itself (MPEG frame headers, or
+  the MP4 `moov/mvhd` atom for video/m4a enclosures) —
   `bots/global-boost-scan/duration_probe.py`, whose docstring is the design
   record. `episodes.duration_src` says which rung answered, and a `duration: 0`
   from Podcast Index never erases a derived value (`db.upsert_episode`). 183 of
