@@ -5,90 +5,52 @@
 // not a measurement of listening and does not pretend to be; it is the most
 // interesting thing this index can say about a person's week.
 //
-//   range=week  this week's board, Monday 00:00 Pacific to now. Resets weekly.
-//   range=all   the best weeks ever recorded, one row per booster-week.
+//   range=week            this week's board, Monday 00:00 Pacific to now.
+//   range=week&week=DATE  the board for the week containing that calendar day.
+//   range=all             the best weeks ever recorded, one row per booster-week.
 //
-// ⚠️ NOBODY CLEARS 40 HOURS, AND THE NAME IS THE PROVOCATION RATHER THAN A
-// THRESHOLD. Measured over all 9,977 booster-weeks since 2024-10: exactly ONE
-// clears 40 (Piez, 51.8h, week of 2025-09-22) and seventeen have ever passed 30.
-// ⚠️ It was two and eighteen until the week boundary moved to midnight Pacific
-// on 2026-08-23: the second 40h week was 41.6h only because the UTC line ran
-// through a Sunday evening, and re-cut it is 39.8h. These figures move with the
-// boundary, so re-measure them if the rule changes again.
+// ⚠️ `week=` MADE THE WEEKLY QUERY A BOUNDED WINDOW, WHICH IT HAD NEVER BEEN.
+// Until the picker shipped on 2026-08-24 the live week needed only a floor —
+// nothing has a timestamp in the future — so there was no upper bound to get
+// wrong. A past week needs both, and a missing ceiling is the failure that
+// looks like nothing: every week would return the whole board since that
+// Monday, ranked plausibly, with the requested Monday printed above it.
+//
+// ⚠️ ALMOST NOBODY CLEARS 40 HOURS, AND THE NAME IS THE PROVOCATION RATHER
+// THAN A THRESHOLD. Re-measured against production 2026-08-24: TWO booster-weeks
+// clear 40 (Piez, 54.7h week of 2025-09-22, and Piez again, 40.2h week of
+// 2026-03-02) and nineteen have ever passed 30. Six of the top ten are from 2025.
+// ⚠️ THESE FIGURES ONLY EVER GO UP, AND NOT BECAUSE OF ANYTHING IN THIS FILE.
+// They were 51.8h / one / seventeen the day before, and the second 40h week
+// arrived with the collector's DERIVED durations: every duration-less episode
+// that gains one adds hours to some PAST week, with no line of board code
+// touched. Re-measure after any change to the week rule AND after any change to
+// duration coverage. If a third week ever clears 40 the board's framing wants
+// revisiting rather than the number.
 // A typical winning week in mid-2026 is 14 to 20 hours. That is why
 // `range=all` exists beside `range=week` — an all-time board alone is one
 // nobody currently reading can get onto.
 import { json, preflight, clampLimit, PUBLISHERS } from "../_common.js";
+/* ⚠️ THE WEEK RULE IS A TWO-SIDED MODULE NOW, imported here by relative path
+ * (esbuild inlines it off the filesystem) and by the browser as
+ * `/assets/js/pacific-week.js?v=<VERSION>`. It lived in this file until the
+ * week picker shipped on 2026-08-24 and needed to step and enumerate weeks in
+ * the client; the alternative was a second copy of the DST rule over there,
+ * which is exactly the drift `pacificOffsetSql` below is already tested
+ * against. `pacificWeekStart` is re-exported because the test imports it from
+ * here and because this endpoint is still where the rule is USED. */
+import {
+  WEEK, MONDAY_EPOCH, PST, PDT, pacificWeekStart, weekStartFromDate, nextWeek,
+} from "../../../../assets/js/pacific-week.js";
+
+export { pacificWeekStart };
 
 export async function onRequestOptions({ request }) { return preflight(request); }
 
-/* ⚠️ WEEKS START MONDAY 00:00 US PACIFIC, AND 345600 IS WHY THE ARITHMETIC
- * WORKS. Unix epoch 0 is a Thursday, so `ts / 604800` would bucket weeks
- * Thursday to Wednesday. 345600 is 1970-01-05, the first Monday after the
- * epoch; shifting by it puts every bucket boundary on a Monday midnight.
- * Integer division in SQLite floors for positive operands, which every boost
- * timestamp is.
- *
- * ⚠️ IT WAS UTC UNTIL 2026-08-23, AND UTC IS THE WRONG MIDNIGHT FOR THIS
- * BOARD. Monday 00:00 UTC is Sunday 5pm on the US west coast and Sunday 8pm on
- * the east — Reed watched This Week reset on a Sunday evening, which is the
- * middle of the weekend for most of the people racing on it. Pacific is the
- * choice because it is the last US zone into Monday: at Monday 00:00 Pacific
- * every part of the United States is already on Monday, so nobody's board
- * resets while their Sunday is still running. Reed's call. */
-const WEEK = 604800;
-const MONDAY_EPOCH = 345600;
-const PST = -8 * 3600;
-const PDT = -7 * 3600;
-
-/* ⚠️ THE DST RULE IS IMPLEMENTED TWICE, ONCE HERE AND ONCE IN SQL BELOW, AND
- * THE TWO MUST AGREE. They cannot share code: the weekly board needs one cutoff
- * computed before the query runs, and the all-time board needs a per-row bucket
- * computed inside it, over ten thousand booster-weeks. `test-members-hours.mjs`
- * pins them against each other at both transitions.
- *
- * ⚠️ AND IT IS ARITHMETIC RATHER THAN `Intl`, DELIBERATELY. The obvious version
- * asks `Intl.DateTimeFormat` for `America/Los_Angeles`, which is exact and
- * needs no rule of our own — but it puts a runtime ICU dependency on the
- * critical path of an endpoint, and there is no ICU at all on the SQL side, so
- * the two halves would be derived from different sources and could drift with a
- * tzdata update on one of them. The US rule has been fixed since 2007 (Energy
- * Policy Act of 2005) and the corpus begins in 2024, so the tail of history
- * this would get wrong does not exist.
- *
- * Second Sunday in March at 02:00 PST (10:00 UTC) through first Sunday in
- * November at 02:00 PDT (09:00 UTC). */
-function nthSundayUTC(year, month, firstDom) {
-  const d = Date.UTC(year, month - 1, firstDom);
-  const dow = new Date(d).getUTCDay();          // 0 = Sunday
-  return (d + ((7 - dow) % 7) * 86400000) / 1000;
-}
-
-function pacificOffset(tsSec) {
-  const year = new Date(tsSec * 1000).getUTCFullYear();
-  const dstStart = nthSundayUTC(year, 3, 8) + 10 * 3600;
-  const dstEnd = nthSundayUTC(year, 11, 1) + 9 * 3600;
-  return (tsSec >= dstStart && tsSec < dstEnd) ? PDT : PST;
-}
-
-/* The UTC instant of the Monday 00:00 Pacific that `tsSec` falls inside.
- *
- * ⚠️ TWO OFFSETS, NOT ONE, AND THE SECOND IS THE ONE THAT IS EASY TO MISS. The
- * first shifts `now` onto the Pacific wall clock so the Monday boundary can be
- * floored; the second is the offset in force at THAT MONDAY, which is not
- * always the offset in force now — the transition falls on a Sunday, the last
- * day of a Monday-anchored week, so during the changeover week the two differ
- * by an hour and reusing the first would move the board's cutoff.
- *
- * The `+ 8h` inside the second call resolves a wall-clock reading back to an
- * instant well away from any transition: transitions happen on a Sunday
- * morning UTC, roughly a day earlier, so either candidate offset lands the
- * probe on the same side of the rule. */
-export function pacificWeekStart(tsSec) {
-  const local = tsSec + pacificOffset(tsSec);
-  const localMonday = Math.floor((local - MONDAY_EPOCH) / WEEK) * WEEK + MONDAY_EPOCH;
-  return localMonday - pacificOffset(localMonday - PST);
-}
+/* The JS half of the week rule (`pacificWeekStart`, the DST offsets, and the
+ * `345600` Monday epoch) is in `assets/js/pacific-week.js`, imported above. Its
+ * SQL twin is immediately below, and `scripts/test-members-hours.mjs` is what
+ * holds the two against each other at every transition. */
 
 /* The same rule as a SQL expression, for the all-time board's per-row buckets.
  *
@@ -141,7 +103,7 @@ export async function onRequestGet({ request, env }) {
       FROM boosts b
      WHERE b.item_guid IS NOT NULL
        AND b.booster_pubkey NOT IN (${holes})
-       ${range === "week" ? "AND b.created_at >= ?" : ""}`;
+       ${range === "week" ? "AND b.created_at >= ? AND b.created_at < ?" : ""}`;
 
   const group = range === "all" ? "d.pk, d.wk" : "d.pk";
   const sql = `
@@ -179,22 +141,58 @@ export async function onRequestGet({ request, env }) {
      ORDER BY secs DESC, episodes ASC, d.pk
      LIMIT ?`;
 
-  const weekStart = pacificWeekStart(Math.floor(Date.now() / 1000));
+  const liveWeek = pacificWeekStart(Math.floor(Date.now() / 1000));
+  /* ⚠️ AN UNPARSEABLE OR FUTURE `week=` RESOLVES TO THE LIVE WEEK RATHER THAN
+     400ing, AND THE ENVELOPE IS WHAT KEEPS THAT HONEST. These weeks travel in
+     links, so the caller is often a reader rather than code, and a board that
+     answers with the current week while SAYING it is the current week is a
+     better failure than an error page. The client renders `week_start` off the
+     response and never off what it asked for, so the two cannot disagree.
+
+     There is deliberately NO floor. A week before the index begins returns an
+     empty board, which is the true answer; `first_week` below is what lets the
+     picker stop offering them rather than a clamp pretending they are this
+     week. */
+  const asked = weekStartFromDate(u.searchParams.get("week"));
+  const weekStart = (asked === null || asked > liveWeek) ? liveWeek : asked;
+  const isCurrent = weekStart === liveWeek;
+  /* The exclusive ceiling, stepped by the week rule rather than by `+ WEEK`: a
+     Pacific week containing a DST transition is 167 or 169 hours of real time,
+     so a flat 604800 leaks or drops an hour of boosts twice a year. */
+  const weekEnd = nextWeek(weekStart);
+
   /* Bound in the order they appear in the compiled statement: the CTE's
-     publisher list and its cutoff come before the outer LIMIT. `week_start` is
-     no longer bound at all — it is a literal in the `all` branch and rides the
-     response envelope in the `week` one, so there is no pair of identical
-     values whose order happened not to matter. */
+     publisher list and its window come before the outer LIMIT. */
   const args = range === "all"
     ? [...PUBLISHERS, limit]
-    : [...PUBLISHERS, weekStart, limit];
+    : [...PUBLISHERS, weekStart, weekEnd, limit];
+
+  /* The oldest boost in the index, so the picker knows where to stop stepping
+     back. One seek to the end of idx_boosts_created, run alongside the board
+     rather than before it, and ALLOWED TO FAIL QUIETLY: it bounds a control,
+     where the board is the thing the reader came for. A null answer costs the
+     picker its menu and its disabled arrow, not the board. */
+  const firstWeekQuery = range === "week"
+    ? env.DB.prepare("SELECT MIN(created_at) AS t FROM boosts").first()
+        .then((r) => (r && r.t ? pacificWeekStart(r.t) : null))
+        .catch(() => null)
+    : Promise.resolve(null);
 
   try {
-    const { results } = await env.DB.prepare(sql).bind(...args).all();
+    const [{ results }, firstWeek] = await Promise.all([
+      env.DB.prepare(sql).bind(...args).all(),
+      firstWeekQuery,
+    ]);
     return json(request, {
       range,
       goal_hours: GOAL_HOURS,
       week_start: range === "week" ? weekStart : null,
+      // The exclusive end, and the live week, so a client can label a board
+      // "This Week" without having to re-derive the boundary it is standing on.
+      week_end: range === "week" ? weekEnd : null,
+      is_current: range === "week" ? isCurrent : null,
+      current_week: range === "week" ? liveWeek : null,
+      first_week: firstWeek,
       count: results.length,
       members: results.map((r) => ({
         pk: r.pk,
@@ -208,7 +206,11 @@ export async function onRequestGet({ request, env }) {
         // Null on the weekly board, where the envelope carries the one week.
         week_start: r.week_start ?? null,
       })),
-    }, { cache: range === "all" ? 300 : 60 });
+      /* ⚠️ A PAST WEEK IS NOT THE LIVE ONE AND MUST NOT SHARE ITS 60s CACHE.
+         The live board changes as boosts land, which is what the short life
+         buys; a closed week only moves when the collector fills in a missing
+         episode duration, so it takes the all-time board's 300s. */
+    }, { cache: range === "week" && isCurrent ? 60 : 300 });
   } catch (err) {
     console.error("[hours] query failed", err);
     return json(request, { error: "query failed" }, { status: 500, cache: 0 });

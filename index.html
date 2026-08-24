@@ -50,18 +50,18 @@
 
   <!-- Shared note / card styles (.note-card, .embed-note) — the boosts
        feeds render through the same kind-1 card as boosts-thread.js. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v139" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v140" />
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v139" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v140" />
   <!-- The episode card and its drawer, extracted from the inline block below
        when /episode/<guid> pages needed the same cards. See the file header. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v139" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v139" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v140" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v140" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. Must stay last
        among the stylesheets so the inline block below still wins. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v139" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v140" />
 
   <style>
     :root {
@@ -519,6 +519,67 @@
       font-family: 'Source Serif 4', Georgia, serif;
       font-size: 0.72rem; font-weight: 400; color: var(--muted);
     }
+    /* ══ THE WEEK PICKER ══
+       ⚠️ IT IS THE BOARD'S TITLE, NOT A CONTROL ROW. Reed's call, 2026-08-24.
+       A scoreboard is navigated by its own header, and this tab already carries
+       a lookup, a range, a sort and a rules dialog — a fourth control strip
+       above the boards would be chrome for a thing most readers press twice. */
+    .hpw-nav {
+      display: inline-flex; align-items: center; justify-content: center;
+      gap: 0.15rem; max-width: 100%;
+    }
+    /* ⚠️ BOTH ARROWS RENDER WHEN DISABLED, AND THE SIZE IS A TOUCH TARGET.
+       A control that vanishes at the end of the range moves the two beside it,
+       so the header shifts under the reader's thumb as they walk back through
+       the weeks. 2.1rem here and 2.6rem on a phone, where this is pressed with
+       a finger rather than clicked. */
+    .hpw-arrow {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 2.1rem; height: 2.1rem; flex: none;
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-size: 1.15rem; line-height: 1;
+      color: var(--muted); background: none;
+      border: 1px solid transparent; border-radius: 50%;
+      cursor: pointer; padding: 0;
+      transition: background 0.12s, color 0.12s, border-color 0.12s;
+    }
+    .hpw-arrow:hover:not(:disabled) { color: var(--accent-d); background: var(--tint); border-color: var(--accent); }
+    .hpw-arrow:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+    .hpw-arrow:disabled { opacity: 0.28; cursor: default; }
+    .hpw-pick-wrap { position: relative; min-width: 0; }
+    /* Wears the title's own type, because it IS the title. The caret and the
+       hover are the whole of what says it opens. */
+    .hpw-pick {
+      display: inline-flex; align-items: baseline; gap: 0.25rem; max-width: 100%;
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 1.02rem; font-weight: 700; color: var(--ink);
+      background: none; border: 0; border-radius: 6px;
+      padding: 0.12rem 0.3rem; cursor: pointer; white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis;
+    }
+    .hpw-pick:hover { color: var(--accent-d); background: var(--tint); }
+    .hpw-pick:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+    /* The no-menu form: `first_week` is allowed to fail quietly, and without it
+       there is nothing to enumerate. The arrows still step. */
+    .hpw-pick--static { cursor: default; }
+    .hpw-pick--static:hover { color: var(--ink); background: none; }
+    .hpw-pick-caret { font-size: 0.7em; color: var(--muted); font-weight: 400; }
+    /* ⚠️ THE MENU IS `.pcast-sort-menu` AND MUST UNDO THE TITLE'S FONT. Its
+       items are declared `font: inherit`, and they are inheriting from an <h3>
+       in Playfair bold — the same shorthand trap `.show-stat dd` documents,
+       arriving here through the ancestor rather than through a later rule.
+       Its LENGTH IS DATA (99 weeks today, one more every Monday), so it scrolls
+       for exactly the reason the language menu does. */
+    .hpw-weeks {
+      left: 50%; right: auto; transform: translateX(-50%);
+      min-width: 12rem; text-align: left;
+      max-height: min(60vh, 21rem); overflow-y: auto; overscroll-behavior: contain;
+    }
+    .hpw-weeks .pcast-sort-item {
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-weight: 600; font-size: 0.82rem;
+      font-variant-numeric: tabular-nums;
+    }
     .hpw-list { list-style: none; margin: 0; padding: 0; }
     .hpw-empty { font-size: 0.82rem; color: var(--muted); margin: 0; }
     .hpw-row {
@@ -554,6 +615,20 @@
     }
     a.hpw-name:hover { color: var(--accent-d); text-decoration: underline; }
     .hpw-week { font-size: 0.68rem; color: var(--muted); }
+    /* ⚠️ ON HIGH SCORES THE WEEK IS A BUTTON AND IT IS THE PICKER'S WAY IN. A
+       menu of ninety-nine dates can only be scrolled; this board already names
+       the weeks worth seeing. `align-self` because `.hpw-who` is a column flex
+       container, in which a button would otherwise stretch the row's width. */
+    .hpw-week-jump {
+      align-self: flex-start; max-width: 100%;
+      font: inherit; font-size: 0.68rem; color: var(--muted);
+      background: none; border: 0; padding: 0; margin: 0;
+      text-align: left; cursor: pointer;
+      text-decoration: underline; text-decoration-style: dotted;
+      text-decoration-color: var(--border); text-underline-offset: 2px;
+    }
+    .hpw-week-jump:hover { color: var(--accent-d); text-decoration-color: currentColor; }
+    .hpw-week-jump:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 3px; }
     .hpw-hours { font-weight: 700; font-size: 0.92rem; color: var(--accent-d); flex: none; }
     .hpw-unit { font-weight: 400; font-size: 0.72rem; color: var(--muted); }
     .hpw-eps { font-size: 0.7rem; color: var(--muted); width: 3.6rem; text-align: right; flex: none; }
@@ -814,6 +889,15 @@
     .members-wall-section .mw-controls .pcast-controls { margin: 0; }
     @media (max-width: 640px) {
       .members-wall-section .mw-controls { margin-left: 0; flex-basis: 100%; }
+      /* ⚠️ THE ARROWS GROW ON A PHONE RATHER THAN SHRINKING WITH EVERYTHING
+         ELSE. They are pressed with a thumb here, where on desktop they are
+         clicked, and 34px is the smallest this header can carry and still be
+         hit reliably. The title between them does NOT grow with them. */
+      .hpw-arrow { width: 2.6rem; height: 2.6rem; font-size: 1.3rem; }
+      .hpw-nav { gap: 0.05rem; }
+      /* The menu is centred on the pick, which on a narrow screen puts its
+         edges past the board's padding. Cap it to the viewport instead. */
+      .hpw-weeks { min-width: 11rem; max-width: min(86vw, 20rem); }
     }
 
     /* ⚠️ THE LOOKUP LEADS THE TAB, so it is not `hidden` the way a feed's
@@ -1172,8 +1256,8 @@
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
     }
   </style>
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v139" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v139" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v140" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v140" />
 </head>
 <body data-active-feed="episodes-global">
 
@@ -2226,17 +2310,17 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v139"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v140"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v139" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v140" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v139" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v140" defer></script>
 
 <!-- Feed hydration — lazily loads the active feed on first view. -->
-<script type="module" src="/assets/js/feeds.js?v=ob-v139"></script>
-<script src="/assets/js/nav.js?v=ob-v139" defer></script>
+<script type="module" src="/assets/js/feeds.js?v=ob-v140"></script>
+<script src="/assets/js/nav.js?v=ob-v140" defer></script>
 
 </body>
 </html>
