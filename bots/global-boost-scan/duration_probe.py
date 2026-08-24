@@ -15,11 +15,13 @@ file), fall back to `(file_size - audio_start) * 8 / bitrate` with the bitrate
 READ FROM THE HEADER, never guessed — the two problem feeds measured are
 192kbps and 128kbps, so a guessed constant is off by 50%.
 
-Deliberately NOT handled, and recorded as an honest miss instead: non-MPEG
-enclosures (m4a/aac need the moov box, usually at the tail; ogg/opus need the
-last page's granule), `.m3u8` live playlists, and endless live streams (no
-Content-Length, no sync-verified second frame → clean failure). Of the misses
-measured 2026-08-24, 179 of 194 are mp3.
+MP4-family enclosures (mp4/m4a/aac-in-mp4) are handled too: the top-level box
+chain is walked with ranged reads until `moov` turns up (head for faststart
+files, tail otherwise) and `mvhd`'s duration/timescale is the answer. Still
+deliberately NOT handled, and recorded as an honest miss instead: ogg/opus
+(needs the last page's granule), `.m3u8` live playlists, and endless live
+streams (icy-* headers, no sync-verified second frame → clean failure). Of the
+misses measured 2026-08-24, 179 of 194 were mp3 and 1 was mp4.
 
 Read-only against third parties, bounded to PROBE_MAX_FETCHES ranged reads of
 PROBE_BYTES each. The caller owes podroll.py's politeness rule: serial per
@@ -181,10 +183,74 @@ def _fetch_range(url, start, session=None):
         return None, None
 
 
+def _be32(b, i):
+    return struct.unpack(">I", b[i:i + 4])[0]
+
+
+def _be64(b, i):
+    return struct.unpack(">Q", b[i:i + 8])[0]
+
+
+def _parse_mvhd_in(buf, moov_off, moov_end):
+    """Walk moov's children in `buf` for mvhd; seconds or None. mvhd is
+    ordinarily moov's first child, so holding only moov's head is enough."""
+    p = moov_off + 8
+    while p + 8 <= min(len(buf), moov_end):
+        size, typ, hdr = _be32(buf, p), buf[p + 4:p + 8], 8
+        if size == 1:
+            if p + 16 > len(buf):
+                return None
+            size, hdr = _be64(buf, p + 8), 16
+        if typ == b"mvhd" and p + hdr + 24 <= len(buf):
+            version = buf[p + hdr]
+            if version == 1 and p + hdr + 32 <= len(buf):
+                timescale = _be32(buf, p + hdr + 20)
+                duration = _be64(buf, p + hdr + 24)
+            else:
+                timescale = _be32(buf, p + hdr + 12)
+                duration = _be32(buf, p + hdr + 16)
+            return duration // timescale if timescale else None
+        if size < hdr:
+            return None
+        p += size
+    return None
+
+
+def _probe_mp4_duration(url, buf, total, session):
+    """Duration of an ISO-BMFF (mp4/m4a) file, or None.
+
+    Walks the top-level box chain from the head window; a box past the window
+    (mdat, almost always) is skipped with a fresh ranged read at its computed
+    end, so a tail-moov file costs one extra request. May raise _LiveStream."""
+    base, pos, refetches = 0, 0, 0
+    for _ in range(16):
+        if pos + 16 > base + len(buf):
+            if refetches >= PROBE_MAX_FETCHES:
+                return None
+            nxt, t2 = _fetch_range(url, pos, session)
+            if nxt is None or len(nxt) < 16:
+                return None
+            base, buf, refetches = pos, nxt, refetches + 1
+            total = total if total is not None else t2
+        i = pos - base
+        size, typ, hdr = _be32(buf, i), buf[i + 4:i + 8], 8
+        if size == 1:
+            size, hdr = _be64(buf, i + 8), 16
+        if typ == b"moov":
+            end = i + size if size else len(buf)
+            return _parse_mvhd_in(buf, i, end)
+        if size < hdr:                       # 0 = "to EOF", and it is not moov
+            return None
+        pos += size
+        if total and pos >= total:
+            return None
+    return None
+
+
 def probe_enclosure_duration(url, session=None):
     """(seconds, method) on success; (None, reason) otherwise.
 
-    method: 'xing' | 'vbri' | 'cbr'. reason: 'fetch' (network — retryable,
+    method: 'xing' | 'vbri' | 'cbr' | 'mp4'. reason: 'fetch' (network — retryable,
     do not negative-cache as a property of the file) or 'unparseable'."""
     if not url or not url.lower().startswith(("http://", "https://")):
         return None, "unparseable"
@@ -194,6 +260,15 @@ def probe_enclosure_duration(url, session=None):
         return None, "unparseable"
     if buf is None or len(buf) < 128:
         return None, "fetch"
+
+    if buf[4:8] == b"ftyp":
+        try:
+            secs = _probe_mp4_duration(url, buf, total, session)
+        except _LiveStream:
+            return None, "unparseable"
+        if secs and MIN_SANE_SECONDS <= secs <= MAX_SANE_SECONDS:
+            return int(secs), "mp4"
+        return None, "unparseable"
 
     # Skip ID3v2 tag(s) — they chain, and embedded art can push audio past one
     # window, in which case re-fetch a window at the computed audio offset.
