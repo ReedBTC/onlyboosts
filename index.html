@@ -20,7 +20,7 @@
     object-src 'none';
   " />
 
-  <title>OnlyBoosts — Podcasting 2.0 Boosts on Nostr</title>
+  <title>OnlyBoosts — Podcasting 2.0 Nostr Boosts</title>
   <meta name="description" content="An index of the Podcasting 2.0 boosts published to Nostr. Read the boostagrams as they are sent, globally or filtered to who you follow, and boost back with Lightning." />
   <link rel="canonical" href="https://onlyboosts.social/" />
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
@@ -37,7 +37,7 @@
   <!-- Open Graph -->
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://onlyboosts.social/" />
-  <meta property="og:title" content="OnlyBoosts — Podcasting 2.0 Boosts on Nostr" />
+  <meta property="og:title" content="OnlyBoosts — Podcasting 2.0 Nostr Boosts" />
   <meta property="og:description" content="An index of the Podcasting 2.0 boosts published to Nostr. Read the boostagrams as they are sent, globally or filtered to who you follow, and boost back with Lightning." />
   <meta property="og:site_name" content="OnlyBoosts" />
   <meta property="og:image" content="https://onlyboosts.social/assets/onlyboosts_banner.png" />
@@ -50,18 +50,18 @@
 
   <!-- Shared note / card styles (.note-card, .embed-note) — the boosts
        feeds render through the same kind-1 card as boosts-thread.js. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v136" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v137" />
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v136" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v137" />
   <!-- The episode card and its drawer, extracted from the inline block below
        when /episode/<guid> pages needed the same cards. See the file header. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v136" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v136" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v137" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v137" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. Must stay last
        among the stylesheets so the inline block below still wins. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v136" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v137" />
 
   <style>
     :root {
@@ -153,7 +153,7 @@
       color: var(--muted);
       line-height: 1.5;
     }
-    /* "Podcasting 2.0 Boosts on Nostr" links to the About page — the
+    /* "Podcasting 2.0 Nostr Boosts" links to the About page — the
        phrase most first-time visitors won't recognise is the thing that
        explains itself. It is also the site's subtitle of record, matching
        the <title> and og:title; change them together.
@@ -1172,8 +1172,8 @@
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
     }
   </style>
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v136" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v136" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v137" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v137" />
 </head>
 <body data-active-feed="episodes-global">
 
@@ -1274,8 +1274,16 @@
 
 <!-- ══════════════════════════════ MASTHEAD ══════════════════════════════ -->
 <div class="masthead">
-  <img src="/assets/onlyboosts_banner.png" alt="OnlyBoosts" width="1800" height="600" />
-  <p><a href="/about">Podcasting&nbsp;2.0 Boosts on Nostr</a>: Feeds, Rankings and Discoverability</p>
+  <!-- ⚠️ THE TRANSPARENT COPY, AND ITS OPAQUE TWIN IS STILL SHIPPED. The
+       wordmark is brand cyan on nothing, so it sits on whatever the page's
+       background is — which is what makes a dark theme a palette change rather
+       than a second banner. `onlyboosts_banner.png` beside it is the same art
+       flattened onto white and is the og:image on every page: a preview crawler
+       composites a transparent PNG onto a background it chooses and never tells
+       us, so a share card is the one surface where the flattened copy is the
+       safe one. Change the art and BOTH files move. -->
+  <img src="/assets/onlyboosts_banner_clear.png" alt="OnlyBoosts" width="1800" height="600" />
+  <p><a href="/about">Podcasting&nbsp;2.0 Nostr Boosts</a>: Feeds, Rankings and Discoverability</p>
 </div>
 
 <!-- ══════════════════════════════ FEED BAR ══════════════════════════════
@@ -1583,7 +1591,7 @@
          something a browsing visitor has not yet asked. The qualifier moved
          into the cards instead, where it costs two words — every rollup card
          labels its figures "Nostr Stats" and every boost drawer is titled
-         "Nostr Interactions". The full sentence still lives on each /show
+         "Nostr Boosts". The full sentence still lives on each /show
          page, which is the surface that gets shared and the one where the
          numbers read as a claim about somebody's audience. -->
 
@@ -2218,17 +2226,17 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v136"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v137"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v136" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v137" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v136" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v137" defer></script>
 
 <!-- Feed hydration — lazily loads the active feed on first view. -->
-<script type="module" src="/assets/js/feeds.js?v=ob-v136"></script>
-<script src="/assets/js/nav.js?v=ob-v136" defer></script>
+<script type="module" src="/assets/js/feeds.js?v=ob-v137"></script>
+<script src="/assets/js/nav.js?v=ob-v137" defer></script>
 
 </body>
 </html>

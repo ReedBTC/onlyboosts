@@ -31,7 +31,7 @@
 // absolute `/assets/js/…` specifier cannot be bundled, so it is the one form a
 // two-sided module may not use. See the header of episode-card.js, and
 // scripts/stamp-assets.js, which stamps both shapes.
-import { coverChain } from './cover-art.js?v=ob-v136'
+import { coverChain } from './cover-art.js?v=ob-v137'
 
 /* ⚠️ THE FETCHING HALF OF THIS MODULE IS GONE, and this is what it was.
  *

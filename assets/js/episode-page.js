@@ -9,7 +9,8 @@
  *   - the hero's Boost button, which pays THIS EPISODE's value block
  *   - the chapters drawer under the player, which the server cannot render
  *     because nothing in D1 holds a <podcast:chapters> URL
- *   - the verbs on "Other Episodes/Songs This Community Boosts"
+ *   - the verbs on "Other Episodes This Community Boosts" ("Other Songs" on a
+ *     music feed; the heading and the corpus are split on medium)
  *
  * ⚠️ THAT LAST SECTION USED TO BE THE REASON THIS FILE WAS NOT SMALL, and it is
  * now four lines at the foot of it. Its rows are the full Episodes-feed card,
@@ -21,20 +22,20 @@
  * That module is shared with the structurally identical section on
  * /booster/<npub>.
  */
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v136'
-import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v136'
-import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v136'
-import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v136'
-import { initEpisodeSection } from '/assets/js/episode-section.js?v=ob-v136'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v137'
+import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v137'
+import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v137'
+import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v137'
+import { initEpisodeSection } from '/assets/js/episode-section.js?v=ob-v137'
 import {
   initCopyNpub, initShowMore, initShare, initBackLink,
   initHashRouting, initHashSpy, initArt2, hydrateProfiles,
-} from '/assets/js/detail-page.js?v=ob-v136'
+} from '/assets/js/detail-page.js?v=ob-v137'
 // The reaction bar and ⋮ on the server-rendered boost notes at the foot of
 // this page. The community cards above them carry their own, through the feed
 // renderer they are built by.
-import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v136'
-import { initBoostSection, BOOST_SORTS } from '/assets/js/boost-section.js?v=ob-v136'
+import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v137'
+import { initBoostSection, BOOST_SORTS } from '/assets/js/boost-section.js?v=ob-v137'
 
 const VALUE_API = '/api/value'
 

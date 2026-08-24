@@ -30,16 +30,16 @@
  */
 import {
   htmlEscape, isSafeUrl, truncate, renderMessage,
-} from './nostr-text.js?v=ob-v136';
-import { episodePageHref, showPageHref } from './show-link.js?v=ob-v136';
+} from './nostr-text.js?v=ob-v137';
+import { episodePageHref, showPageHref } from './show-link.js?v=ob-v137';
 /* ⚠️ THE REAL MODULE, NOT A FOURTH COPY OF THE RULE. booster-link.js has been
  * dependency-free since it was written, so esbuild inlines it here exactly as it
  * does nostr-text.js, and the boost rows link a booster by the same test every
  * feed surface uses rather than by a transcription of it. This is the collapse
  * that functions/_shared/detail-page.js#boosterPageUrl said was available; that
  * name is now an alias for this function rather than a second copy of it. */
-import { boosterPageHref } from './booster-link.js?v=ob-v136';
-import { httpsUrl } from './cover-art.js?v=ob-v136';
+import { boosterPageHref } from './booster-link.js?v=ob-v137';
+import { httpsUrl } from './cover-art.js?v=ob-v137';
 
 // ── The formatters the row needs ─────────────────────────────────────────────
 //
@@ -277,7 +277,7 @@ export const CONTROLS_MIN = 3;
  *   the Function so a repaint cannot show fewer rows than the edge did.
  */
 export function renderBoosts(rows, names, {
-  heading, sub, itemAbbr, noun, showTarget = true, linkBooster = true, showShow = false,
+  heading, sub, noun, showTarget = true, linkBooster = true, showShow = false,
   total = null, state = null,
 }) {
   if (!rows.length) return "";
@@ -317,7 +317,7 @@ export function renderBoosts(rows, names, {
     <div class="bs-shell">
       ${all >= CONTROLS_MIN ? `<div class="cs-controls bs-controls" data-bs-controls hidden></div>` : ""}
       <ul class="boost-list ob-boost-list" data-bs-list>
-        ${boostRows(rows, names, { itemAbbr, noun, showTarget, linkBooster, showShow })}
+        ${boostRows(rows, names, { noun, showTarget, linkBooster, showShow })}
       </ul>
       <div class="bs-more" data-bs-more></div>
     </div>
@@ -332,7 +332,7 @@ export function renderBoosts(rows, names, {
        * the failure would be a re-sorted /episode growing an episode chip naming
        * the page it is on. It is written from the arguments this call already
        * received, so a caller cannot set one and forget the other. */
-      row: { itemAbbr, noun, showTarget, linkBooster, showShow },
+      row: { noun, showTarget, linkBooster, showShow },
       ...(state || {}),
     })}
   </section>`;
@@ -368,7 +368,7 @@ function stateScript(state) {
     JSON.stringify(state).replace(/</g, "\\u003c")}</script>`;
 }
 
-function boostRow(r, names, { itemAbbr, noun, showTarget, linkBooster = true, showShow = false }) {
+function boostRow(r, names, { noun, showTarget, linkBooster = true, showShow = false }) {
   const realName = displayName(r);
   const name = realName || shortId(r.booster_npub, r.booster_pubkey);
   // https-promoted before the guard; see httpsUrl in cover-art.js.
@@ -384,9 +384,15 @@ function boostRow(r, names, { itemAbbr, noun, showTarget, linkBooster = true, sh
   // (`if (b.episode.title)`), and these two surfaces are now one component, so
   // this does the same. `noun` is consequently unused here and kept in the
   // signature for the callers that still pass it.
-  const target = r.e_title
-    ? (r.e_num ? `${itemAbbr} ${htmlEscape(r.e_num)} · ${htmlEscape(truncate(r.e_title, 70))}` : htmlEscape(truncate(r.e_title, 70)))
-    : null;
+  // ⚠️ NO EPISODE NUMBER EITHER, and it is the same objection one step further
+  // on. The chip used to read "Ep. 42 · Title", from `episodes.episode_number`.
+  // Most publishers already put the number in the title they wrote, so the chip
+  // printed it twice — "Ep. 42 · Episode 42: The Thing" — and the half we added
+  // was the redundant one. The title is the publisher's own name for the
+  // episode and is left to speak for itself. Reed's call, 2026-08-24; the
+  // column is still selected and still published on /api/v1, it is simply not
+  // rendered anywhere.
+  const target = r.e_title ? htmlEscape(truncate(r.e_title, 70)) : null;
 
   // ⚠️ TWO LINKS TO ONE DESTINATION, unlike the community card, and it is
   // unavoidable here: the avatar sits at the card's top-left and the name beside

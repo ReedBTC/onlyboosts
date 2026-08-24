@@ -3,7 +3,7 @@
  * EXTRACTED FROM index.html's inline <style>, where it lived until /episode/
  * pages needed the same cards. It is not homepage-specific: the card is built
  * by assets/js/feeds-podcasts.js, which now renders on two surfaces — the
- * Episodes and Songs feeds, and the "Other Episodes/Songs This Community
+ * Episodes and Songs feeds, and the "Other Episodes This Community
  * Boosts" section of an episode page. One definition rather than a restatement,
  * because this is 370 lines rather than the one control show-page.css carries.
  *
@@ -22,7 +22,7 @@
  */
 
 /* ── Shared feed furniture ────────────────────────────────────────── */
-/* "Nostr Stats:" / "Nostr Interactions" — the two-word qualifier that
+/* "Nostr Stats:" / "Nostr Boosts:" — the two-word qualifier that
    replaced the scope-note paragraph at the head of these panels. Quiet
    enough to read as a label rather than a figure. */
 .ob-stats-label { color: var(--muted); font-weight: 600; }

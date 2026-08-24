@@ -34,13 +34,13 @@
  * the same comparators, from episode-card.js, so the two cases share code
  * without sharing the mistake.
  */
-import { competitionRanks, rankLabel } from '/assets/js/rank.js?v=ob-v136'
+import { competitionRanks, rankLabel } from '/assets/js/rank.js?v=ob-v137'
 import { renderEpisodeCards, sortEpisodeItems, filterEpisodeItems, buildEpisodes, COPY, episodeRankValue }
-  from '/assets/js/episode-card.js?v=ob-v136'
+  from '/assets/js/episode-card.js?v=ob-v137'
 import { wireEpisodeCards, hydrateCardProfiles, prewarmBoosting }
-  from '/assets/js/episode-card-actions.js?v=ob-v136'
-import { normalizeBoosts, toEpisodeShape } from '/assets/js/ob-data.js?v=ob-v136'
-import { rangeControl, sortControl, rangeDays, rangeCutoff } from '/assets/js/feed-controls.js?v=ob-v136'
+  from '/assets/js/episode-card-actions.js?v=ob-v137'
+import { normalizeBoosts, toEpisodeShape } from '/assets/js/ob-data.js?v=ob-v137'
+import { rangeControl, sortControl, rangeDays, rangeCutoff } from '/assets/js/feed-controls.js?v=ob-v137'
 
 const CARDS_PER_PAGE = 30   // matches CARDS_PER_PAGE in functions/_shared/episode-cards.js
 
@@ -130,9 +130,10 @@ export function initEpisodeSection({
         // The range filters on when the episode AIRED, not on when it was
         // boosted — the same axis the Episodes feed uses, and the reason the
         // tooltips are written per surface rather than inside feed-controls.js.
-        // The wording is neutral because neither list is split on medium: a
-        // music community also boosting podcasts is the interesting half of the
-        // finding, so one list carries both and "aired or released" covers them.
+        // The wording stays neutral although both lists ARE split on medium
+        // since 2026-08-24: this same control serves /booster's rollup, which
+        // deliberately is not split (splitting a person would file them under
+        // two half-histories), so "aired or released" has to cover both.
         label: 'Filter by air or release date',
         titleFor: (key, label) => (rangeDays(key)
           ? `Aired or released in the last ${rangeDays(key)} days`

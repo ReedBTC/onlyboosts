@@ -556,7 +556,15 @@
 // inside the Shows panel and shows-feed.js adopts them; the Episodes panel
 // ships its placeholder again, one feed being rendered at the edge and it
 // being the one on screen.
-const VERSION = 'ob-v136';
+// ob-v137: the episode number is dropped from every surface that rendered it
+// (the /show drawer rows, the boost rows' episode chip, the /episode hero
+// line); the two community rollups split on medium, so a podcast page says
+// "Other Shows" and an album page "Other Albums"; the Episodes/Songs boost
+// drawer is titled "Nostr Boosts" rather than "Nostr Interactions"; and the
+// masthead moves to a transparent banner. REQUIRED: the drawer label and the
+// card are one two-sided module, so a browser holding the old episode-card.js
+// against a freshly-rendered page would paint two different labels in one list.
+const VERSION = 'ob-v137';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;
@@ -586,28 +594,32 @@ const PRECACHE_URLS = [
   '/manifest.webmanifest',
   '/assets/onlyboosts_favicon.png',
   '/assets/onlyboosts_pfp.png',
-  '/assets/onlyboosts_banner.png',
+  // The masthead's banner. The TRANSPARENT one, which is the copy the page
+  // actually renders; the opaque `onlyboosts_banner.png` beside it is the
+  // og:image fallback, fetched by preview crawlers and never by a browser, so
+  // precaching it spent 93KB on every install for nothing.
+  '/assets/onlyboosts_banner_clear.png',
   '/assets/avatar-fallback.svg',
-  '/assets/css/theme.css?v=ob-v136',
-  '/assets/css/page.css?v=ob-v136',
-  '/assets/css/nav.css?v=ob-v136',
-  '/assets/css/footer.css?v=ob-v136',
-  '/assets/css/boosts-thread.css?v=ob-v136',
-  '/assets/css/boost-actions.css?v=ob-v136',
+  '/assets/css/theme.css?v=ob-v137',
+  '/assets/css/page.css?v=ob-v137',
+  '/assets/css/nav.css?v=ob-v137',
+  '/assets/css/footer.css?v=ob-v137',
+  '/assets/css/boosts-thread.css?v=ob-v137',
+  '/assets/css/boost-actions.css?v=ob-v137',
   // The episode card and its drawer. Precached alongside the others because the
   // homepage's feeds are painted in it and it used to be inline in index.html,
   // which IS precached — leaving it out would trade an inline block for a
   // network round trip on the one page this list exists to make fast.
-  '/assets/css/feed-cards.css?v=ob-v136',
-  '/assets/js/boosts-thread.js?v=ob-v136',
+  '/assets/css/feed-cards.css?v=ob-v137',
+  '/assets/js/boosts-thread.js?v=ob-v137',
   // A static import of boosts-thread.js, so precaching that without this one
   // leaves a returning visitor fetching half the graph from the network.
-  '/assets/js/primal-profiles.js?v=ob-v136',
-  '/assets/js/boost-actions.js?v=ob-v136',
-  '/assets/js/nav.js?v=ob-v136',
-  '/assets/js/nav-widget-boot.js?v=ob-v136',
-  '/assets/js/widget-loader.js?v=ob-v136',
-  '/assets/js/sw-register.js?v=ob-v136',
+  '/assets/js/primal-profiles.js?v=ob-v137',
+  '/assets/js/boost-actions.js?v=ob-v137',
+  '/assets/js/nav.js?v=ob-v137',
+  '/assets/js/nav-widget-boot.js?v=ob-v137',
+  '/assets/js/widget-loader.js?v=ob-v137',
+  '/assets/js/sw-register.js?v=ob-v137',
 ];
 
 self.addEventListener('install', (event) => {

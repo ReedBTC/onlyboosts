@@ -65,7 +65,8 @@ const GUID_MAX = 200;
 
 const BOOSTS_SHOWN = 24;
 
-// How many rows the "Other Shows/Albums This Community Boosts" drawer carries.
+// How many rows the "Other Shows This Community Boosts" drawer carries ("Other
+// Albums" on a music feed; both the heading and the query are split on medium).
 // Measured over the live corpus, the number of distinct other shows a show's
 // booster set has boosted runs to a median of 45, a p90 of 191 and a maximum of
 // 608 — so this cap only bites on the head of the distribution, and only in the
@@ -104,6 +105,12 @@ export async function onRequestGet({ request, env, params }) {
   // of 1,285 qualified after its 2026-07-26 pass, up from 922 of 1,384), which
   // is why nothing here is counted or capped — the rule does the work.
   if (!show || !show.title) return notFound(guid);
+
+  // The subject's own side of the medium partition, read once here because two
+  // things below need it: the community rollup's WHERE clause, and copyFor()
+  // further down. `music` one way, everything else the other — see the note
+  // over the community query.
+  const isMusic = show.medium === "music";
 
   const [eps, sups, boosts, community, podroll, podrolledBy, description, ranks] = await Promise.all([
     env.DB.prepare(
@@ -175,6 +182,23 @@ export async function onRequestGet({ request, env, params }) {
     // only boosts sent BY a member are counted, so a row's boosts, sats and
     // members are this audience's, never the show's global totals.
     //
+    // ⚠️ SPLIT ON MEDIUM SINCE 2026-08-24, and it did not used to be. This
+    // rollup was the one place on the site that deliberately crossed the
+    // partition, on the argument that a music audience also boosting podcasts
+    // is the interesting half of the finding. Reed reversed it: the homepage
+    // separates the two and these pages now do the same, so the heading can
+    // name one kind of thing and be true. The cost was measured over 24 live
+    // pages before the change — a podcast page's rollup was 12% albums and an
+    // ALBUM page's was 39% podcasts, so the album side is where the loss is.
+    // If the crossover is ever wanted back it wants a section of its own with
+    // its own heading, never this list widened again under a narrower name.
+    //
+    // The filter is the same PARTITION every other surface applies: `music`
+    // one way, EVERYTHING else the other — podcasts, the two video feeds, and
+    // every show whose medium the collector could not determine. COALESCE is
+    // what makes an untagged show land with the podcasts, matching
+    // `not_medium=music` on /api/v1/podcasts.
+    //
     // idx_boosts_podcast covers the CTE, idx_boosts_booster the scan. The join
     // to `podcasts` is also the filter: a show with no title has no /show page
     // to link to (see the qualifying rule above), and an unlinkable card in a
@@ -194,6 +218,7 @@ export async function onRequestGet({ request, env, params }) {
        WHERE b.podcast_guid IS NOT NULL
          AND b.podcast_guid <> ?
          AND p.title IS NOT NULL AND p.title <> ''
+         AND COALESCE(p.medium, 'podcast') ${isMusic ? "=" : "<>"} 'music'
        GROUP BY b.podcast_guid
        ORDER BY cs_members DESC, cs_boosts DESC, cs_sats DESC, b.podcast_guid
        LIMIT ?`
@@ -304,9 +329,11 @@ const COPY = {
     glyph: "🎙",
     boostBtn: "Boost this Show",
     itemsPlural: "Episodes",
-    itemAbbr: "Ep.",
     untitledItem: "Untitled episode",
     drawer: "Episodes with Nostr Boosts",
+    // The community rollup's heading. Split on medium since 2026-08-24; see the
+    // note over the query for what that cost and why it was paid.
+    communityHeading: "Other Shows This Community Boosts",
     // The way out of the drawer to a real catalogue. The drawer holds only
     // episodes carrying an indexed boost, which is a fraction of any show's
     // output — see "No Episode Counts, Anywhere" in the spec for how small a
@@ -338,9 +365,9 @@ const COPY = {
     glyph: "💿",
     boostBtn: "Boost this Album",
     itemsPlural: "Tracks",
-    itemAbbr: "Track",
     untitledItem: "Untitled track",
     drawer: "Tracks with Nostr Boosts",
+    communityHeading: "Other Albums This Community Boosts",
     allItems: "See All Tracks",
     noItems: "No tracks with Nostr boosts yet.",
     ldType: "MusicAlbum",
@@ -494,19 +521,19 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v136" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v136" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v136" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v136" />
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v136" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v136" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v137" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v137" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v137" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v137" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v137" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v137" />
   <!-- The boost note card and its reaction bar. Added when the boost list at
        the foot of this page became the same .note-card the homepage Boosts
        feed paints; this page linked neither before, which is why show-page.css
        restates .nostr-mention. That restatement is now redundant rather than
        load-bearing, and is left in place rather than removed in the same pass. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v136" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v136" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v137" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v137" />
 </head>
 <body data-show-guid="${htmlEscape(show.podcast_guid)}">
 
@@ -619,7 +646,7 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
 
   ${renderEpisodes(episodes, show, copy)}
 
-  ${renderCommunityShows(community)}
+  ${renderCommunityShows(community, copy)}
 
   ${renderSupporters(supporters, {
     sub: `Everyone who has boosted ${htmlEscape(show.title)} on Nostr, ranked by sats sent, all time.`,
@@ -639,7 +666,6 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
     // moment the reader sorted by size.
     heading: copy.boostsHeading,
     sub: `Every boost sent to this ${copy.noun}, as published to Nostr.`,
-    itemAbbr: copy.itemAbbr,
     noun: copy.noun,
     // The show's own aggregate, so the load-more control is correct before the
     // client has fetched anything. The list itself is still the newest 24: the
@@ -711,12 +737,12 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
 
 <script type="application/json" id="show-boost-payload">${jsonForScript(boostPayload)}</script>
 
-<script src="/assets/js/nav.js?v=ob-v136" defer></script>
-<script src="/assets/js/show-page.js?v=ob-v136" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v137" defer></script>
+<script src="/assets/js/show-page.js?v=ob-v137" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v136"></script>
-<script src="/assets/js/sw-register.js?v=ob-v136" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v137"></script>
+<script src="/assets/js/sw-register.js?v=ob-v137" defer></script>
 </body>
 </html>`;
 }
@@ -911,11 +937,14 @@ function renderHeader(show, art, title, copy, art2, description, ranks) {
 
 // ── Other shows this community boosts ────────────────────────────────────────
 //
-// Deliberately NOT split on medium, which every other rollup on this site is.
-// A music community also boosting podcasts is the interesting half of the
-// finding, and filing an album page's crossover under a heading that says
-// "Shows" would either hide it or misname it — hence the "Shows/Albums" wording
-// and no COPY entry, since the label is the same on both mediums.
+// ⚠️ SPLIT ON MEDIUM SINCE 2026-08-24, and it was the one rollup on this site
+// that was deliberately not. The heading read "Other Shows/Albums This Community
+// Boosts" on both mediums and the list carried both, on the argument that a
+// music audience also boosting podcasts is the interesting half of the finding.
+// Reed reversed it: the homepage separates the two and these pages now do too,
+// so a podcast page says "Shows" and an album page says "Albums" and each is
+// true of the list under it. The heading and the query's WHERE clause are ONE
+// decision — change either alone and the section names something it isn't.
 //
 // Every row's three figures are in the DOM from first paint, packed into one
 // attribute. Sorting is therefore a re-order and a renumber, never a fetch and
@@ -975,7 +1004,7 @@ function communityRow(r, rank) {
   </li>`;
 }
 
-function renderCommunityShows(rows) {
+function renderCommunityShows(rows, copy) {
   if (!rows.length) return "";
 
   // The bolt symbol sheet that used to sit here went with the icon button: the
@@ -986,7 +1015,7 @@ function renderCommunityShows(rows) {
       <!-- The hint is aria-hidden: <details> announces its own expanded state,
            so a screen reader reading "Hide" as well is noise. It is empty here
            and filled from CSS off [open] — see .drawer-hint in show-page.css. -->
-      <summary>Other Shows/Albums This Community Boosts<span class="drawer-hint" aria-hidden="true"></span></summary>
+      <summary>${htmlEscape(copy.communityHeading)}<span class="drawer-hint" aria-hidden="true"></span></summary>
       <!-- Ships hidden and stays hidden without JavaScript: a sort control that
            cannot sort is worse than none. Same rule as the feed-search slot on
            the homepage panels. -->
@@ -1015,10 +1044,12 @@ function renderCommunityShows(rows) {
 // merged into one grid: "I recommend them" and "they recommend me" are opposite
 // claims, and a tile carrying only art and a title cannot tell them apart.
 //
-// NOT split on medium, which is the same call renderCommunityShows makes and for
-// the same reason: a music feed recommending podcasts is the interesting half of
-// the finding, so the heading says "Shows/Albums" on both and there is no COPY
-// entry. Only the page's own noun comes off the table.
+// NOT split on medium, and since 2026-08-24 it is the ONLY section here that
+// isn't — renderCommunityShows above now is. The two are not the same case: a
+// podroll is the publisher's own list, written by them, and filtering it would
+// misreport what they wrote. A rollup of boosts is ours to scope. So the
+// heading stays medium-neutral here and there is no COPY entry; only the page's
+// own noun comes off the table.
 //
 // A tile ships with no boost button, deliberately. Every other list of other
 // shows on this site carries one, but a podroll target is barely half likely to
@@ -1103,8 +1134,8 @@ function podrollTile(c, hidden) {
 // it is looking for exactly this word.
 //
 // Neither heading is split on medium. "Show Authors" reads flat on an album page
-// on purpose, the same call renderCommunityShows makes: a music feed
-// recommending podcasts is the interesting half of the finding.
+// on purpose: see the note over PODROLL for why a publisher's own list is not
+// the same case as the boost rollup above it, which IS split.
 const PODROLL_COPY = {
   forward: {
     id: "podroll",
@@ -1230,7 +1261,7 @@ function episodeRow(e, copy, fallbackArt) {
             ? `<img class="ep-art" src="${htmlEscape(art)}" alt="" width="44" height="44" loading="lazy" referrerpolicy="no-referrer" />`
             : `<span class="ep-art ep-art--blank" aria-hidden="true">${copy.glyph}</span>`}
           <div class="ep-main">
-            <p class="ep-title">${e.episode_number ? `<span class="ep-num">${copy.itemAbbr} ${htmlEscape(e.episode_number)}</span> ` : ""}${
+            <p class="ep-title">${
               epUrl
                 ? `<a class="ep-title-link" href="${htmlEscape(epUrl)}" title="Nostr boosts to ${htmlEscape(e.title)}">${htmlEscape(e.title)}</a>`
                 : htmlEscape(e.title || copy.untitledItem)
@@ -1253,10 +1284,10 @@ function notFound(guid) {
   <meta name="robots" content="noindex" />
   <title>Show not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v136" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v136" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v136" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v136" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v137" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v137" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v137" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v137" />
 </head>
 <body>
 <section class="page-header">
@@ -1275,7 +1306,7 @@ function notFound(guid) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v136" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v137" defer></script>
 </body>
 </html>`;
   return new Response(html, {

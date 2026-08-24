@@ -144,7 +144,7 @@ check('a boost message renders mentions and links', () => {
 
 check('the drawer is a <details>, so it opens with no JavaScript', () => {
   assert.match(html, /<details class="pcast-card-details"><summary class="pcast-drawer">/)
-  assert.match(html, /Nostr Interactions:/)
+  assert.match(html, /Nostr Boosts:/)
 })
 
 check('"See all boosts" points at the episode page and is not hidden', () => {
@@ -302,7 +302,7 @@ check('the default drawer is inline, and the homepage declares lazy off the same
 check('a lazy drawer ships no rows, keeps the <details>, the faces and the footer', () => {
   assert.equal((home.match(/data-boost-note/g) || []).length, 0)
   assert.match(home, /<details class="pcast-card-details"><summary class="pcast-drawer">/)
-  assert.match(home, /Nostr Interactions:/)
+  assert.match(home, /Nostr Boosts:/)
   assert.match(home, /pcast-avatars/)
   assert.match(home, /<div class="pcast-details" data-lazy-boosts>/)
   assert.match(home, /<a class="pcast-seeall" href="\/episode\/item-guid-1"/)

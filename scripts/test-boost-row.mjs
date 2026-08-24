@@ -78,9 +78,9 @@ const names = new Map([[HEX_A, 'Alice']])
 
 // The three call sites, exactly as the Functions pass them.
 const SURFACES = {
-  show: { itemAbbr: 'Ep.', noun: 'episode', showTarget: true, linkBooster: true, showShow: false },
-  episode: { itemAbbr: 'Ep.', noun: 'episode', showTarget: false, linkBooster: true, showShow: false },
-  booster: { itemAbbr: 'Ep.', noun: 'episode', showTarget: true, linkBooster: false, showShow: true },
+  show: { noun: 'episode', showTarget: true, linkBooster: true, showShow: false },
+  episode: { noun: 'episode', showTarget: false, linkBooster: true, showShow: false },
+  booster: { noun: 'episode', showTarget: true, linkBooster: false, showShow: true },
 }
 
 // ── The two-sided contract ──────────────────────────────────────────────────
@@ -125,7 +125,7 @@ check('an unresolved mention carries the hook the Primal backfill reads', () => 
 
 check('the episode links to its page, and does not when it has no title', () => {
   assert.match(boostRows([dbRows[0]], names, SURFACES.show),
-    /<a class="ob-boost-ep" href="\/episode\/item-guid-1">Ep\. 42 · The One About &lt;Value&gt;<\/a>/)
+    /<a class="ob-boost-ep" href="\/episode\/item-guid-1">The One About &lt;Value&gt;<\/a>/)
   // No episode at all → no chip, not a chip reading "the episode".
   assert.doesNotMatch(boostRows([dbRows[1]], names, SURFACES.show), /ob-boost-ep/)
 })
@@ -138,6 +138,21 @@ check('the show is named on /booster and nowhere else', () => {
 
 check('the episode chip is suppressed on /episode, where it would repeat the h1', () => {
   assert.doesNotMatch(boostRows([dbRows[0]], names, SURFACES.episode), /ob-boost-ep/)
+})
+
+check('the episode chip carries the title alone, never an episode number', () => {
+  // ⚠️ THE GUARD ON A DELIBERATE REMOVAL, the same job the inline-image
+  // assertion in test-episode-card.mjs does. The chip read "Ep. 42 · Title"
+  // until 2026-08-24 and was dropped everywhere on Reed's call: publishers
+  // already put the number in the title, so the site printed it twice and the
+  // duplicate half was ours. `e_num` is 42 on this fixture and is still carried
+  // through the record shape, so re-adding the prefix is a one-line change that
+  // looks like an improvement — which is exactly why this asserts it stayed out.
+  for (const surface of ['show', 'booster']) {
+    const html = boostRows([dbRows[0]], names, SURFACES[surface])
+    assert.match(html, /ob-boost-ep/, `${surface} still renders the chip`)
+    assert.doesNotMatch(html, /Ep\. ?42|Track ?42|\b42 ?·/, `${surface} printed the episode number`)
+  }
 })
 
 check('/booster does not link a row back to the page it is on', () => {
@@ -321,7 +336,7 @@ check('every sort key in the menu has a comparator', () => {
 
 check('the section ships the slots boost-section.js contracts on', () => {
   const html = renderBoosts(dbRows, names, {
-    heading: 'Show Boosts', sub: 'Every boost.', itemAbbr: 'Ep.', noun: 'episode',
+    heading: 'Show Boosts', sub: 'Every boost.', noun: 'episode',
     total: 1404, state: { page: 24 },
   })
   assert.match(html, /id="boosts" data-boost-section/)
@@ -343,12 +358,12 @@ check('the section ships the slots boost-section.js contracts on', () => {
 
 check('the row variant travels in the state, so a repaint cannot diverge', () => {
   const html = renderBoosts(dbRows, names, {
-    heading: 'Episode Boosts', sub: 'Every boost.', itemAbbr: 'Ep.', noun: 'episode',
+    heading: 'Episode Boosts', sub: 'Every boost.', noun: 'episode',
     showTarget: false, state: { page: 500 },
   })
   const state = JSON.parse(html.match(/data-boost-state>(.*?)<\/script>/s)[1])
   assert.deepEqual(state.row, {
-    itemAbbr: 'Ep.', noun: 'episode', showTarget: false, linkBooster: true, showShow: false,
+    noun: 'episode', showTarget: false, linkBooster: true, showShow: false,
   })
   // And the variant in the state is the one the rows were actually rendered with.
   assert.equal(html.includes(boostRows(dbRows, names, state.row)), true)
@@ -356,12 +371,12 @@ check('the row variant travels in the state, so a repaint cannot diverge', () =>
 
 check('the control band is withheld below CONTROLS_MIN', () => {
   const one = renderBoosts(dbRows.slice(0, 1), names, {
-    heading: 'Episode Boosts', sub: 'Every boost.', itemAbbr: 'Ep.', noun: 'episode',
+    heading: 'Episode Boosts', sub: 'Every boost.', noun: 'episode',
   })
   assert.doesNotMatch(one, /data-bs-controls/, 'a one-row list has nothing to range over')
   assert.match(one, /data-bs-list/, 'the list itself is a fact and ships regardless')
   const three = renderBoosts(dbRows, names, {
-    heading: 'Episode Boosts', sub: 'Every boost.', itemAbbr: 'Ep.', noun: 'episode',
+    heading: 'Episode Boosts', sub: 'Every boost.', noun: 'episode',
   })
   assert.equal(dbRows.length, CONTROLS_MIN)
   assert.match(three, /data-bs-controls/)
@@ -369,7 +384,7 @@ check('the control band is withheld below CONTROLS_MIN', () => {
 
 check('a stale total that undercounts cannot print "showing 24 of 19"', () => {
   const html = renderBoosts(dbRows, names, {
-    heading: 'Show Boosts', sub: 'Every boost.', itemAbbr: 'Ep.', noun: 'episode', total: 1,
+    heading: 'Show Boosts', sub: 'Every boost.', noun: 'episode', total: 1,
   })
   const state = JSON.parse(html.match(/data-boost-state>(.*?)<\/script>/s)[1])
   assert.equal(state.total, 3)
@@ -377,13 +392,13 @@ check('a stale total that undercounts cannot print "showing 24 of 19"', () => {
 
 check('a section with no rows renders nothing at all', () => {
   assert.equal(renderBoosts([], names, {
-    heading: 'Show Boosts', sub: 'Every boost.', itemAbbr: 'Ep.', noun: 'episode',
+    heading: 'Show Boosts', sub: 'Every boost.', noun: 'episode',
   }), '')
 })
 
 check('a </script> inside the state cannot close the element early', () => {
   const html = renderBoosts(dbRows, names, {
-    heading: 'Show Boosts', sub: 'x', itemAbbr: '</script><img src=x>', noun: 'episode',
+    heading: 'Show Boosts', sub: 'x', noun: '</script><img src=x>',
   })
   const body = html.match(/data-boost-state>(.*?)<\/script>/s)[1]
   assert.doesNotMatch(body, /<\/script>/)

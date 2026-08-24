@@ -898,7 +898,6 @@ a.boost-who:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px
   border-radius: 3px;
 }
 
-.ep-num { color: var(--brand-d); }
 
 .ep-meta {
   margin: 0.2rem 0 0;
@@ -1306,7 +1305,7 @@ a.boost-who:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px
   .show-stats-cap { font-size: 0.72rem; }
   /* The wall's phone rules moved to supporter-wall.css with the rest of it. */
   .boost-when { margin-left: 0; }
-  /* "Other Shows/Albums This Community Boosts" is a long label; keep the hint
+  /* "Other Shows This Community Boosts" is a long label; keep the hint
      on the same line as the last word of it rather than letting the two
      compete for a narrow row. */
   .ep-drawer > summary { padding: 0.7rem 0.8rem; gap: 0.5rem; }

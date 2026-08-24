@@ -239,10 +239,34 @@ the data source, not the medium: `feeds-podcasts.js` never reads the show-level
 rollup, so its follows path works unchanged. See the scope note in
 `shows-feed.js`.
 
-**The rollups that are deliberately NOT split on medium** are the three
-community sections and the booster page: what an audience listens to *across*
-podcasts and music is the interesting half of the finding. So those headings read
-"Shows/Albums" and "Episodes/Songs" and carry no `COPY` entry at all.
+**⚠️ THE TWO COMMUNITY ROLLUPS WERE THE EXCEPTION AND ARE NOT ANY MORE.**
+*Reed's call, 2026-08-24.* `#community-shows` on `/show` and
+`#community-episodes` on `/episode` crossed the partition deliberately, on the
+argument that what an audience listens to *across* podcasts and music is the
+interesting half of the finding; both headings read "Shows/Albums" and
+"Episodes/Songs" and neither carried a `COPY` entry. The homepage separates the
+two, so these pages now do the same: a podcast page reads **Other Shows This
+Community Boosts** and an album page **Other Albums This Community Boosts**,
+with **Other Episodes** / **Other Songs** one level down.
+
+**The heading and the query's WHERE clause are ONE decision** — a `communityHeading`
+entry in each page's `COPY` table, and a `COALESCE(medium,'podcast')` filter in
+the show page's community CTE and in `fetchCommunityBoosts`. Change either alone
+and the section names something it isn't.
+
+**The cost was measured over 24 live pages before the change, and it is
+asymmetric**: a podcast page's rollup was **12% albums**, an album page's was
+**39% podcasts**. So the album side is where the crossover lived and where it was
+lost. If it is ever wanted back it wants a **section of its own with its own
+heading**, never this list widened again under a narrower name.
+
+**Two rollups are still deliberately unsplit, for different reasons.** The
+**podroll** is the publisher's own list, written by them, so filtering it would
+misreport what they wrote. The **booster page** would file one person under two
+half-histories, so its headings still read "Shows and Albums" and "Episodes and
+Songs" and it carries no `COPY` table at all. `episode-section.js`'s range
+tooltip stays medium-neutral ("aired or released") because it serves the
+booster page's rollup too.
 
 ## Where this code came from
 
@@ -587,6 +611,23 @@ from `/api/v1/podcasts/<guid>` scoped to the card's own range, so they are never
 in hand when the card is built — at the edge or in the browser. There is no
 inline counterpart to choose between, which is why this card has no `parts`
 table the way the episode card does.
+
+**⚠️ NO SURFACE PRINTS AN EPISODE NUMBER, ANYWHERE.** *Reed's call, 2026-08-24.*
+Three did: the boost row's episode chip (`Ep. 42 · Title`), the `/show` episode
+drawer's `.ep-num` span, and the `/episode` hero's facts line. **Most publishers
+already put the number in the title they wrote**, so the site printed it twice —
+"Ep. 42 · Episode 42: The Thing" — and the duplicate half was the one we added.
+The title is the publisher's own name for the episode and is left to speak for
+itself.
+
+The `itemAbbr` copy key existed only to render it and is **gone from all three
+`COPY` tables, from `renderBoosts`' signature and from the boost row's state
+element**, so a repaint cannot reintroduce it on one surface. What is NOT gone is
+the data: `episodes.episode_number` is still stored, still selected by
+`BOOST_SELECT`, still `e_num` on the row shape and still `num` on `/api/v1`.
+**`test-boost-row.mjs` asserts the chip renders the title alone** against a
+fixture whose `e_num` is 42, because re-adding the prefix is a one-line change
+that looks like an improvement. `.ep-num` is deleted from `show-page.css`.
 
 **The boost row is the third worked example**, and the same split:
 `assets/js/boost-list.js` is the facts (`renderBoosts`, `boostRows`, the three
@@ -1052,16 +1093,37 @@ site npub costs NIP-05, `.well-known/nostr.json`, and the `client` tag on every
 event ever published. Both names resolve from the one `.well-known/nostr.json`:
 `onlyboosts@` and `boostbot@`.
 
+**⚠️ THE BANNER IS TWO FILES AND THEY ARE NOT INTERCHANGEABLE.**
+`assets/onlyboosts_banner_clear.png` is the artwork on transparency and is what
+the masthead renders; `assets/onlyboosts_banner.png` is the same artwork
+flattened onto white and is the `og:image` on every page plus `OG_FALLBACK` on
+the three detail pages and `BANNER_PATH` in `/api/og/booster`. **Change the art
+and both files move.**
+
+The split is about who composites. The wordmark is brand cyan and nothing else
+(measured: 15% of the image is ink, all of it cyan), so on transparency it sits
+on whatever the page's background is — which is what makes a dark theme a
+palette change rather than a second banner. A **preview crawler** composites a
+transparent PNG onto a background it picks and never discloses, so a share card
+is the one surface where the flattened copy is the safe one. Only the clear file
+is in `PRECACHE_URLS`: the opaque one is fetched by crawlers and never by a
+browser, so precaching it spent 93KB on every install for nothing.
+
 The domain appears in `robots.txt`, `manifest.webmanifest`,
 `functions/sitemap.xml.js`, the CORS allowlist in
 `functions/api/data/[[path]].js`, page canonical/OG tags, and the `client` tags
 on published events — change them together. The npub is also served for NIP-05
 from `.well-known/nostr.json`.
 
-The site subtitle is **"Podcasting 2.0 Boosts on Nostr"**, appearing in four
-places that change together: the masthead line under the banner on `index.html`
-(where it links to `/about`), the homepage `<title>` and `og:title`, and
-`manifest.webmanifest`. Show pages use `<title> — Boosts on Nostr | OnlyBoosts`.
+The site subtitle is **"Podcasting 2.0 Nostr Boosts"**, appearing in four places
+that change together: the masthead line under the banner on `index.html` (where
+it links to `/about`), the homepage `<title>` and `og:title`, and
+`manifest.webmanifest`. It read "Podcasting 2.0 Boosts on Nostr" until
+2026-08-24; *Nostr boost* is the term the project settled on in public, so the
+subtitle now uses it as the compound noun the vocabulary table already treats it
+as. **Show pages still use `<title> — Boosts on Nostr | OnlyBoosts`** and were
+deliberately left alone: there the phrase follows a show's name and reads as a
+description of the page rather than as the site's own label.
 
 ## ⚠️ Money paths
 
@@ -4506,7 +4568,10 @@ where it is the subject.
 paragraph near them:**
 
 - `Nostr Stats:` on every rollup card (`.ob-stats-label`);
-- `Nostr Interactions:` on the Episodes/Songs boost drawer;
+- `Nostr Boosts:` on the Episodes/Songs boost drawer. It read
+  `Nostr Interactions:` until 2026-08-24; *Nostr boost* is the term the project
+  settled on in public and the drawer holds boosts, so the vaguer word was
+  naming the same thing twice over;
 - `Nostr Boost Stats` over the detail pages' stat tiles, with *Nostr Boost*
   linking to `/about#keysend`.
 
