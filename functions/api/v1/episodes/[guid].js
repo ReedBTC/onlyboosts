@@ -1,6 +1,8 @@
 // GET /api/v1/episodes/:guid — one episode: aggregate + its show + its boosts.
 // GET /api/v1/episodes/:guid?community=1 — additionally, the boost corpus behind
-//     "Other Episodes/Songs This Community Boosts" on /episode/<guid>.
+//     "Other Episodes This Community Boosts" (or "Other Songs", on a music feed)
+//     on /episode/<guid>. That corpus is scoped to the subject's own side of the
+//     medium partition; see fetchCommunityBoosts.
 //
 // The episode-level counterpart of /api/v1/podcasts/:guid. Two things about it
 // are worth knowing before touching either:
@@ -97,7 +99,7 @@ export async function onRequestGet({ request, env, params }) {
   };
 
   if (u.searchParams.get("community")) {
-    body.community = await fetchCommunityBoosts(env, guid, ep.podcast_guid);
+    body.community = await fetchCommunityBoosts(env, guid, ep.podcast_guid, ep.p_medium);
   }
 
   /* ?names=1 — display names for any npub MENTIONED inside these boost messages.
@@ -161,6 +163,20 @@ export async function onRequestGet({ request, env, params }) {
  * A subject episode with no show of its own falls back to excluding just itself,
  * which is all the data supports.
  *
+ * ⚠️ SPLIT ON MEDIUM SINCE 2026-08-24, and it was not before. The corpus carried
+ * both sides of the partition and the section's heading read "Other
+ * Episodes/Songs This Community Boosts" on every page. Reed's call: the homepage
+ * separates podcasts from music and these pages now do the same, so an episode
+ * page says "Episodes" and a track page says "Songs" and each is true of the
+ * list beneath it. `medium` is the SUBJECT's medium, read off its show; the
+ * caller must pass it, and a caller that forgets gets the podcast half rather
+ * than everything, which is the safe direction of that mistake.
+ *
+ * The cost was measured over 24 live pages before the change: a podcast page's
+ * rollup was 12% music and an album page's was 39% podcasts. The crossover it
+ * drops is a real finding; if it is ever wanted back it wants a section of its
+ * own with its own heading, never this list widened again under a narrower name.
+ *
  * idx_boosts_item covers the CTE, idx_boosts_booster the scan.
  *
  * ⚠️ EXPORTED, AND functions/episode/[guid].js CALLS IT DIRECTLY. That page
@@ -170,18 +186,27 @@ export async function onRequestGet({ request, env, params }) {
  * ranking over a corpus assembled differently from the one the client later
  * fetches to re-sort with.
  */
-export async function fetchCommunityBoosts(env, guid, showGuid) {
+export async function fetchCommunityBoosts(env, guid, showGuid, medium) {
   const excludeShow = showGuid ? " AND (b.podcast_guid IS NULL OR b.podcast_guid <> ?)" : "";
   const binds = showGuid
     ? [guid, guid, showGuid, COMMUNITY_ROWS + 1]
     : [guid, guid, COMMUNITY_ROWS + 1];
+  // The medium partition, applied here rather than in the browser so the cap
+  // above is spent on rows the section can actually show. `p` is LEFT JOINed by
+  // BOOST_SELECT, so a boost naming no show at all has a null medium and
+  // COALESCE files it with the podcasts — which is the partition rule, not an
+  // accident of the join: filing an unidentified feed under Songs would be a
+  // claim we cannot support.
+  const mediumWhere = medium === "music"
+    ? " AND COALESCE(p.medium, 'podcast') = 'music'"
+    : " AND COALESCE(p.medium, 'podcast') <> 'music'";
   const { results } = await env.DB.prepare(
     `WITH community AS (
        SELECT DISTINCT booster_pubkey FROM boosts WHERE item_guid = ?
      )
      ${BOOST_SELECT}
      JOIN community c ON c.booster_pubkey = b.booster_pubkey
-     WHERE b.item_guid IS NOT NULL AND b.item_guid <> ?${excludeShow}
+     WHERE b.item_guid IS NOT NULL AND b.item_guid <> ?${excludeShow}${mediumWhere}
      ORDER BY b.created_at DESC, b.event_id DESC
      LIMIT ?`
   ).bind(...binds).all();

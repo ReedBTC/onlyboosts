@@ -239,10 +239,34 @@ the data source, not the medium: `feeds-podcasts.js` never reads the show-level
 rollup, so its follows path works unchanged. See the scope note in
 `shows-feed.js`.
 
-**The rollups that are deliberately NOT split on medium** are the three
-community sections and the booster page: what an audience listens to *across*
-podcasts and music is the interesting half of the finding. So those headings read
-"Shows/Albums" and "Episodes/Songs" and carry no `COPY` entry at all.
+**⚠️ THE TWO COMMUNITY ROLLUPS WERE THE EXCEPTION AND ARE NOT ANY MORE.**
+*Reed's call, 2026-08-24.* `#community-shows` on `/show` and
+`#community-episodes` on `/episode` crossed the partition deliberately, on the
+argument that what an audience listens to *across* podcasts and music is the
+interesting half of the finding; both headings read "Shows/Albums" and
+"Episodes/Songs" and neither carried a `COPY` entry. The homepage separates the
+two, so these pages now do the same: a podcast page reads **Other Shows This
+Community Boosts** and an album page **Other Albums This Community Boosts**,
+with **Other Episodes** / **Other Songs** one level down.
+
+**The heading and the query's WHERE clause are ONE decision** — a `communityHeading`
+entry in each page's `COPY` table, and a `COALESCE(medium,'podcast')` filter in
+the show page's community CTE and in `fetchCommunityBoosts`. Change either alone
+and the section names something it isn't.
+
+**The cost was measured over 24 live pages before the change, and it is
+asymmetric**: a podcast page's rollup was **12% albums**, an album page's was
+**39% podcasts**. So the album side is where the crossover lived and where it was
+lost. If it is ever wanted back it wants a **section of its own with its own
+heading**, never this list widened again under a narrower name.
+
+**Two rollups are still deliberately unsplit, for different reasons.** The
+**podroll** is the publisher's own list, written by them, so filtering it would
+misreport what they wrote. The **booster page** would file one person under two
+half-histories, so its headings still read "Shows and Albums" and "Episodes and
+Songs" and it carries no `COPY` table at all. `episode-section.js`'s range
+tooltip stays medium-neutral ("aired or released") because it serves the
+booster page's rollup too.
 
 ## Where this code came from
 
@@ -343,7 +367,7 @@ node scripts/stamp-assets.js --check   # verify; non-zero exit if anything is st
 **Order matters.** `sync-partials` injects markup into the page files; anything
 it injects has to be stamped afterwards.
 
-Twelve test scripts, all plain `node scripts/<name>.mjs` with no runner:
+Thirteen test scripts, all plain `node scripts/<name>.mjs` with no runner:
 
 | | |
 |---|---|
@@ -358,6 +382,7 @@ Twelve test scripts, all plain `node scripts/<name>.mjs` with no runner:
 | `test-show-card.mjs` | the show card's two-sided contract. Its own reason for existing is the crossing: `renderShowCard` was a DOM builder and could afford `Date.now()` and an unpinned locale, which a two-sided module cannot — see the note under the card |
 | `test-members-search.mjs` | `/api/v1/members`, running the **shipped handler** against a database built from the real `schema.sql` through an `env.DB` shim over `node:sqlite`. LIKE escaping, the identifier/name split, the listing, the publisher asymmetry, and `publishers=1` as its exact complement. **Two publisher keys are in the fixture deliberately**: with one, a single-row answer says nothing about whether the mode asks for the list or found the loudest key |
 | `test-members-hours.mjs` | the 40 HPW boards, same shim, with a fixture built to known answers. Dedupe, week boundaries, the publisher exclusion, and the row-multiplying join |
+| `test-community-medium.mjs` | the two community rollups and the medium partition they were split on, against a `node:sqlite` build of the real `schema.sql`. **Two halves reached two ways**: `fetchCommunityBoosts` is exported and called directly, where `/show`'s query is inline in the page Function and is **extracted from the source and executed**, the `test-feed-hash.mjs` technique. A copy of the SQL written into the test would pass forever while the shipped one rotted. Confirmed to go red on three mutations: the filter removed, its polarity inverted, and the `COALESCE` dropped |
 | `test-keysend-upgrade.mjs` | the keysend upgrade: the `fountain.fm` exclusion's exact-or-parent rule, the routing pair's whole-or-nothing rule, the strict node-pubkey check, every way `/api/keysend` answers "no endpoint", and the wallet gate. **Stubs `fetch`**, so it probes nobody's well-known |
 
 **⚠️ `test-server-render.mjs` IS THE ONE THAT NEEDS AN ARGUMENT, SO IT IS THE ONE
@@ -587,6 +612,23 @@ from `/api/v1/podcasts/<guid>` scoped to the card's own range, so they are never
 in hand when the card is built — at the edge or in the browser. There is no
 inline counterpart to choose between, which is why this card has no `parts`
 table the way the episode card does.
+
+**⚠️ NO SURFACE PRINTS AN EPISODE NUMBER, ANYWHERE.** *Reed's call, 2026-08-24.*
+Three did: the boost row's episode chip (`Ep. 42 · Title`), the `/show` episode
+drawer's `.ep-num` span, and the `/episode` hero's facts line. **Most publishers
+already put the number in the title they wrote**, so the site printed it twice —
+"Ep. 42 · Episode 42: The Thing" — and the duplicate half was the one we added.
+The title is the publisher's own name for the episode and is left to speak for
+itself.
+
+The `itemAbbr` copy key existed only to render it and is **gone from all three
+`COPY` tables, from `renderBoosts`' signature and from the boost row's state
+element**, so a repaint cannot reintroduce it on one surface. What is NOT gone is
+the data: `episodes.episode_number` is still stored, still selected by
+`BOOST_SELECT`, still `e_num` on the row shape and still `num` on `/api/v1`.
+**`test-boost-row.mjs` asserts the chip renders the title alone** against a
+fixture whose `e_num` is 42, because re-adding the prefix is a one-line change
+that looks like an improvement. `.ep-num` is deleted from `show-page.css`.
 
 **The boost row is the third worked example**, and the same split:
 `assets/js/boost-list.js` is the facts (`renderBoosts`, `boostRows`, the three
@@ -1052,16 +1094,37 @@ site npub costs NIP-05, `.well-known/nostr.json`, and the `client` tag on every
 event ever published. Both names resolve from the one `.well-known/nostr.json`:
 `onlyboosts@` and `boostbot@`.
 
+**⚠️ THE BANNER IS TWO FILES AND THEY ARE NOT INTERCHANGEABLE.**
+`assets/onlyboosts_banner_clear.png` is the artwork on transparency and is what
+the masthead renders; `assets/onlyboosts_banner.png` is the same artwork
+flattened onto white and is the `og:image` on every page plus `OG_FALLBACK` on
+the three detail pages and `BANNER_PATH` in `/api/og/booster`. **Change the art
+and both files move.**
+
+The split is about who composites. The wordmark is brand cyan and nothing else
+(measured: 15% of the image is ink, all of it cyan), so on transparency it sits
+on whatever the page's background is — which is what makes a dark theme a
+palette change rather than a second banner. A **preview crawler** composites a
+transparent PNG onto a background it picks and never discloses, so a share card
+is the one surface where the flattened copy is the safe one. Only the clear file
+is in `PRECACHE_URLS`: the opaque one is fetched by crawlers and never by a
+browser, so precaching it spent 93KB on every install for nothing.
+
 The domain appears in `robots.txt`, `manifest.webmanifest`,
 `functions/sitemap.xml.js`, the CORS allowlist in
 `functions/api/data/[[path]].js`, page canonical/OG tags, and the `client` tags
 on published events — change them together. The npub is also served for NIP-05
 from `.well-known/nostr.json`.
 
-The site subtitle is **"Podcasting 2.0 Boosts on Nostr"**, appearing in four
-places that change together: the masthead line under the banner on `index.html`
-(where it links to `/about`), the homepage `<title>` and `og:title`, and
-`manifest.webmanifest`. Show pages use `<title> — Boosts on Nostr | OnlyBoosts`.
+The site subtitle is **"Podcasting 2.0 Nostr Boosts"**, appearing in four places
+that change together: the masthead line under the banner on `index.html` (where
+it links to `/about`), the homepage `<title>` and `og:title`, and
+`manifest.webmanifest`. It read "Podcasting 2.0 Boosts on Nostr" until
+2026-08-24; *Nostr boost* is the term the project settled on in public, so the
+subtitle now uses it as the compound noun the vocabulary table already treats it
+as. **Show pages still use `<title> — Boosts on Nostr | OnlyBoosts`** and were
+deliberately left alone: there the phrase follows a show's name and reads as a
+description of the page rather than as the site's own label.
 
 ## ⚠️ Money paths
 
@@ -1717,9 +1780,20 @@ in the exact case the fallback was built for. `WALLET_CLEAN_FAILURE_RE` in
 safety**: `FAILURE_REASON_TIMEOUT` is excluded because an HTLC in flight when
 the clock expired can still settle, and `FAILURE_REASON_ERROR` says nothing
 about settlement. **Only add a code whose meaning is that no HTLC survived.**
-The same gap is still in `payAllLegs.js`, which reads the shared classifier
-directly; it is unpatched because nothing on this fork calls that path and its
-error runs the safe way.
+**⚠️ AND THE FIX WAS IN THE WRONG FILE FOR TWO DAYS.** `WALLET_CLEAN_FAILURE_RE`
+was a local constant in `externalBoost.js`, with a note saying the same gap in
+`payAllLegs.js` was left alone because nothing calls that path and its error runs
+the safe way. That was true of `payAllLegs` and **missed the third reader**:
+`payInvoiceVerified` in `index.jsx` is the live **zap** path, and there a
+`FAILURE_REASON_NO_ROUTE` fell through to `confirmInvoiceSettled` — which can
+only answer `settled` or `unknown`, so the result was always `uncertain`, and
+`boost-actions.js` **withholds the manual-invoice fallback** on uncertain. A user
+whose wallet provably never sent anything was left with no way to pay. The codes
+now live in `utils.js#isCleanPaymentDecline`, which all three read; the
+keysend-capability layer stays in `externalBoost.js`, being the one thing only
+that path can see. `assets/js/boost-actions.js` carries a **hand-copy** for its
+raw-WebLN branch, since the site cannot import from `login-widget/src`, and
+`test-keysend-upgrade.mjs` pins both against drift.
 
 **⚠️ AND `UNCERTAIN` MUST NEVER REACH THAT BRANCH.** An attempt was made and
 nothing observable came back, so re-paying it on another rail is the 2026-08-19
@@ -2929,6 +3003,45 @@ Monday 07:00 or 08:00 UTC, still Monday. `weekLabel` in `members-board.js` says
 so. If the reset ever moves east of Greenwich, that formatter moves with it.
 - **~14% of boosts contribute nothing** — 8% name no episode, 2.5% of episodes
   have no duration. Stated in the Rules rather than hidden.
+
+**⚠️ THE EPISODE COUNT ON A ROW IS EPISODES THAT CONTRIBUTED HOURS, NOT EPISODES
+BOOSTED, AND IT READS LIKE A BUG.** Reed checked the board against a member's own
+activity on 2026-08-24: four boosts that week, all four to distinct episodes with
+guids, and the row said **3 eps**. Nothing was wrong — one of the four aired five
+days earlier and its `duration` is `0`, so `e.duration > 0` dropped it, and the
+6.49h printed beside it is exactly the other three. It cannot print 4: the hours
+are summed over exactly the episodes counted, so a boost count there would claim
+four episodes produced those hours. The figure now carries a `title` saying what
+it counts. **Anyone comparing the board to a booster page will ask this again**,
+so don't "fix" it by widening the count.
+
+**⚠️ AND THE WEEKLY BOARD IS HIT FAR HARDER THAN THE 2.5% SUGGESTS, BECAUSE IT IS
+MADE OF RECENT BOOSTS.** Measured 2026-08-24 against production: over 600
+episodes spread across the whole index by boost rank, **2.2%** have no usable
+duration (3.8% boost-weighted) — the documented figure holds. But over the **200
+most recent boosts**, **8.5%** landed on an episode with no duration, and every
+one of those episodes had aired **one to five days earlier**. This Week is
+therefore the board that undercounts most, and it **self-heals**: both boards
+recompute from live data on every request, so a row gains an episode once
+enrichment fills the duration in. A reader who saw the lower number is not shown
+a correction.
+
+**Two distinct causes, and only one is a lag.** Three of the eight were **live
+episodes** (`Salty Sessions with Salty Crayon (LIVE)`, `151st Edition - LIVE`,
+`PC2.0 268 Live August 21st 2026`) — a `<podcast:liveItem>` has no duration by
+construction, so **boosting during a live show can never count toward #40HPW**,
+which is a permanent exclusion of exactly the high-engagement behaviour the board
+exists to celebrate. The rest are enriched rows where Podcast Index reported
+`0`, or rows not yet enriched at all (no title, no show). **Both are collector
+side**; nothing in `hours.js` can repair either, and a client- or edge-side
+guess at a duration is the masking fix CLAUDE.md already forbids for episode
+fields.
+
+**The total in the Rules dialog was re-checked and is right**: 14.0% of the
+recent 200 contributed nothing, against the ~14% it claims. Only the split moves
+with the window (5.5% show-level / 8.5% no-duration recently, against 8% / few%
+corpus-wide), which is why the dialog states the corpus figures and was left
+alone.
 - **Publisher keys are excluded.** See below.
 
 **⚠️ THE NPUB COMES FROM A CORRELATED SUBQUERY, NEVER A SECOND JOIN ON
@@ -4341,8 +4454,45 @@ is `INSERT OR IGNORE`** and will not update a column on a row D1 already has, so
 a re-derivation reaches the query layer only through
 `d1_sync.py --remote-clients`, which emits UPDATEs. Nothing else re-pushes them.
 
-**Still open: the UI.** Nothing renders attribution yet; `/stats` is where a
-"boosts by app" breakdown belongs, and `/api/v1/clients` is what it reads.
+**The boost note cards render it**, as a `via <App>` chip in the meta row
+beside the sats. Two renderers print it — `boost-list.js#boostRow` (the
+`#boosts` section on all three detail pages) and `boosts-feed.js` (the Members
+feed) — and the shared part is the label table, `assets/js/client-label.js`.
+
+**⚠️ THAT TABLE IS TWO-SIDED AND THAT IS WHY IT MOVED.** It was declared inside
+`functions/api/v1/clients.js`, which a card renderer running at the edge *and*
+in the browser cannot import from; that endpoint now imports it instead. The
+Boosts feed also had a **third** copy, keyed on the RAW `client` tag with
+domain-shaped keys and a suffix-stripping fallback — deleted, because the tag is
+on 1.3% of the corpus where `client_id` covers 99.8%.
+
+**⚠️ THE CHIP NAMES THE PUBLISHER, NEVER `client_via`.** *Reed's call,
+2026-08-24.* A relayed boost carries the listener's own app there (Castamatic
+294, StableKraft 260, PodcastGuru 159 …) and showing it would answer a more
+interesting question — but the note was published by the bot and **the booster
+credited on that same card is the bot**, so "via Castamatic" beside a bot's name
+and face is two claims in one row. The origin app is still in the record and
+still nested on `/api/v1/clients`.
+
+**⚠️ AN UNATTRIBUTABLE BOOST GETS NO CHIP.** `hasClientLabel` is the gate. A
+chip reading "via Unattributed" would state our own coverage gap in the position
+a reader expects an app's name. `unattributed` is a real row on
+`/api/v1/clients` and is deliberately not a card label.
+
+**⚠️ ALL THREE PAGE QUERIES HAD TO SELECT `b.client_id`, and forgetting one is
+the two-sided bug.** Those queries are hand-written rather than `BOOST_SELECT`,
+so the edge would have rendered no chip while a re-sort — which refetches
+through `/api/v1` and `rowsFromRecords` — added one to every row.
+`test-boost-row.mjs`'s round-trip check is what catches it, and was confirmed to
+go red when `client_id` is dropped from the adapter.
+
+**The episode-card drawer rows deliberately do NOT carry it.** They are a
+different component (`.pcast-boost-*`, not `.ob-boost-*`) with a denser row, and
+adding it would mean putting `client_id` on `?include=boosts`, which every
+homepage card downloads. Not a rule, just untouched scope.
+
+**Still open: `/stats`.** A "boosts by app" breakdown is what
+`/api/v1/clients` was built for and still has no surface.
 
 ### OnlyBoosts Publishes On Behalf Of Its Own Donors
 
@@ -4506,7 +4656,10 @@ where it is the subject.
 paragraph near them:**
 
 - `Nostr Stats:` on every rollup card (`.ob-stats-label`);
-- `Nostr Interactions:` on the Episodes/Songs boost drawer;
+- `Nostr Boosts:` on the Episodes/Songs boost drawer. It read
+  `Nostr Interactions:` until 2026-08-24; *Nostr boost* is the term the project
+  settled on in public and the drawer holds boosts, so the vaguer word was
+  naming the same thing twice over;
 - `Nostr Boost Stats` over the detail pages' stat tiles, with *Nostr Boost*
   linking to `/about#keysend`.
 
@@ -4652,8 +4805,9 @@ would. Never remove an entry** — those links are in the wild.
    in-flight tracking those two read. That tracking can no longer become
    non-empty, so the dropdown's in-flight UI and the navigation guard are dead
    with it. Removing them means editing two live components rather than deleting
-   files, which is why it was left. `payAllLegs.js`'s stale keysend classifier
-   (see the ⚠️ under The Keysend Upgrade) is the same finding from the other end.
+   files, which is why it was left. `payAllLegs.js`'s keysend classifier gap was **fixed on 2026-08-24 by fixing
+   it somewhere else**: the NIP-47 codes moved into the shared classifier, so
+   that path gets them whether or not it ever gains a caller.
 
 6. **Typography.** The brand wordmark is a bold sans; the site is still on LB's
    Playfair Display / Source Serif 4. It reads fine, but the serif is inherited,

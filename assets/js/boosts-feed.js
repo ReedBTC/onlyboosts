@@ -30,8 +30,8 @@
  * need only id + pubkey. The object handed to buildActionBar below is a
  * projection, not a verified event; don't pass it anywhere that assumes one.
  */
-import { nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v136'
-import { buildActionBar, configureBoostActions } from '/assets/js/boost-actions.js?v=ob-v136'
+import { nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v139'
+import { buildActionBar, configureBoostActions } from '/assets/js/boost-actions.js?v=ob-v139'
 // ⚠️ wireNpubCopy WAS IMPORTED HERE and is not any more. The avatar and the name
 // were its only two callers on this feed, and both are now links to
 // /booster/<npub>. Unlike the Episodes drawer — where the per-boost ⋮ menu
@@ -39,21 +39,22 @@ import { buildActionBar, configureBoostActions } from '/assets/js/boost-actions.
 // from this feed means opening their page, which leads with the button.
 // Its own module rather than a third export from show-link.js; see the note at
 // the head of booster-link.js and the ob-v53 entry in CLAUDE.md.
-import { boosterPageHref, markBoosterLink } from '/assets/js/booster-link.js?v=ob-v136'
-import { parseSegments, renderSegmentsInto, setCachedProfile } from '/assets/js/boosts-thread.js?v=ob-v136'
-import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v136'
-import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v136'
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v136'
-import { boosterLabel } from '/assets/js/ob-data.js?v=ob-v136'
-import { followsBoostReader, globalBoostReader } from '/assets/js/ob-live.js?v=ob-v136'
-import { resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v136'
+import { boosterPageHref, markBoosterLink } from '/assets/js/booster-link.js?v=ob-v139'
+import { parseSegments, renderSegmentsInto, setCachedProfile } from '/assets/js/boosts-thread.js?v=ob-v139'
+import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v139'
+import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v139'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v139'
+import { boosterLabel } from '/assets/js/ob-data.js?v=ob-v139'
+import { clientLabel, hasClientLabel } from '/assets/js/client-label.js?v=ob-v139'
+import { followsBoostReader, globalBoostReader } from '/assets/js/ob-live.js?v=ob-v139'
+import { resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v139'
 import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls,
   RANGE_OPTIONS,
-} from '/assets/js/feed-controls.js?v=ob-v136'
+} from '/assets/js/feed-controls.js?v=ob-v139'
 
-import { showPageHref, episodePageHref } from '/assets/js/show-link.js?v=ob-v136'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v136'
+import { showPageHref, episodePageHref } from '/assets/js/show-link.js?v=ob-v139'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v139'
 
 const PAGE_SIZE = 30
 
@@ -157,35 +158,20 @@ function relTime(ts) {
   return new Date(ts * 1000).toLocaleDateString()
 }
 
-// The `client` tag as published by the boosting app, tidied for display.
-// Apps write it inconsistently — a bare name ("BoostMeBitch"), a domain
-// ("localbitcoiners.com"), sometimes with a version suffix — so known values
-// get a canonical label and anything else is shown as-is minus a domain
-// suffix. Unknown clients are still worth surfacing: seeing an unfamiliar app
-// name is more useful than hiding it.
-const CLIENT_LABELS = {
-  'boostmebitch': 'Boost Me Bitch',
-  'localbitcoiners.com': 'Local Bitcoiners',
-  'onlyboosts.social': 'OnlyBoosts',
-  'fountain': 'Fountain',
-  'fountain.fm': 'Fountain',
-  'castamatic': 'Castamatic',
-  'podverse': 'Podverse',
-  'truefans': 'TrueFans',
-  'curiocaster': 'CurioCaster',
-  'podcastguru': 'Podcast Guru',
-}
-function clientLabel(raw) {
-  if (!raw) return null
-  const key = String(raw).trim().toLowerCase()
-  if (!key) return null
-  if (CLIENT_LABELS[key]) return CLIENT_LABELS[key]
-  const bare = key.replace(/^www\./, '').replace(/\.(com|fm|social|app|net|io|org)$/, '')
-  if (CLIENT_LABELS[bare]) return CLIENT_LABELS[bare]
-  // Fall back to the raw value with its original casing, trimmed of a version
-  // suffix like "SomeApp/1.2.3".
-  return String(raw).trim().split('/')[0].slice(0, 32)
-}
+/* ⚠️ THE LOCAL LABEL MAP AND ITS RESOLVER WERE DELETED ON 2026-08-24, and what
+ * replaced them is a different FIELD as much as a different table. They read
+ * `b.client` — the raw NIP-89 tag, exactly as the publisher signed it — which
+ * is on ~1.3% of the corpus and absent from Fountain, the app behind ~94% of
+ * it. So this card carried a "via" line that was correct and almost never
+ * present, and the map needed domain-shaped keys ('fountain.fm',
+ * 'localbitcoiners.com') plus a suffix-stripping fallback to cope with whatever
+ * string an app happened to write.
+ *
+ * `client_app.id` is the collector's own derivation from three signals and
+ * covers 99.8% of rows, as an opaque slug that needs no normalising. So the
+ * table is now a plain slug lookup shared with the detail pages
+ * (client-label.js), and a rename lands on both surfaces at once.
+ */
 
 function fmtSats(n) {
   if (!Number.isFinite(n) || n <= 0) return ''
@@ -270,6 +256,15 @@ function renderBoostCard(b) {
       fmtSats(b.sats), h('span', { class: 'ob-bolt', 'aria-hidden': 'true', text: '⚡' }),
     ]))
   }
+  // Which app published the note, beside the sats — the same chip, in the same
+  // position, that boost-list.js renders on the three detail pages. The two
+  // renderers are separate by design (this one builds DOM, that one a string),
+  // so the SHARED part is the label table: both read client-label.js, and a
+  // rename lands on both. Absent when the collector could not attribute the
+  // boost, which is ~0.2% of rows; see hasClientLabel.
+  if (hasClientLabel(b.clientId)) {
+    bits.push(h('span', { class: 'ob-boost-via', text: `via ${clientLabel(b.clientId)}` }))
+  }
   // The episode title goes to that episode's landing page — the same rule the
   // Episodes cards apply, through the same module. It used to point at
   // `episode.url`, the audio itself, which was the only destination this card
@@ -304,18 +299,6 @@ function renderBoostCard(b) {
       : h('span', { class: 'ob-boost-show', text: b.podcast.title }))
   }
   if (bits.length) card.appendChild(h('div', { class: 'ob-boost-meta' }, bits))
-
-  // Where the boost was sent from. Only ~3.5% of records carry a client tag
-  // (Fountain, the largest source, doesn't emit one), so the line is omitted
-  // rather than rendered as "Unknown" on the other 96% — a column of
-  // "Unknown" would be noise, not information.
-  const via = clientLabel(b.client)
-  if (via) {
-    card.appendChild(h('div', { class: 'ob-boost-via' }, [
-      h('span', { class: 'ob-via-label', text: 'via ' }),
-      h('span', { class: 'ob-via-name', text: via }),
-    ]))
-  }
 
   if (b.msg) {
     const body = h('div', { class: 'note-body' })

@@ -196,7 +196,7 @@
 
 /* ── The community drawer's stacked summary ───────────────────────────── */
 
-/* "Other Episodes/Songs This Community Boosts" carries a line saying what the
+/* "Other Episodes This Community Boosts" carries a line saying what the
    list actually is, and it belongs against the NAME of the list rather than in
    the toolbar below it, where it would crowd the range buttons off a phone.
    .ep-drawer > summary is a centered flex row, so the pair is one column inside
@@ -215,7 +215,7 @@
   color: var(--muted);
 }
 
-/* ── Other Episodes/Songs This Community Boosts ───────────────────────── */
+/* ── Other Episodes This Community Boosts ───────────────────────── */
 
 /* The one client-rendered section on either detail page, and the same OBJECT as
    the show page's community drawer: an .ep-drawer whose <summary> is the

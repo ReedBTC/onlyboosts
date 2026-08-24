@@ -15,23 +15,23 @@
  * A repeated name is authentic to it rather than a bug to collapse — Piez holds
  * five of the top ten and that is the actual story of the board.
  */
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v136'
-import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v136'
-import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v136'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v139'
+import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v139'
+import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v139'
 /* ⚠️ THE SAME WALL /show AND /episode RENDER, not a copy of it. It moved out of
  * functions/_shared/detail-page.js into a two-sided module for exactly this;
  * that file re-exports every name, so both Functions were untouched. A reader
  * who screenshots the wall here and on a show page must not be able to tell
  * them apart. */
-import { renderSupporters, initShowMore, compact } from '/assets/js/supporter-wall.js?v=ob-v136'
+import { renderSupporters, initShowMore, compact } from '/assets/js/supporter-wall.js?v=ob-v139'
 /* ⚠️ EXACT BOOST COUNTS HERE, COMPACT SATS. On the wall a row is one of a
  * hundred and `1k` is plenty; here there are four rows and the count is the
  * disclosure itself — "1,021 boosts from dozens of listeners" is the claim the
  * section exists to make, and `1k` rounds the evidence away. */
-import { num } from '/assets/js/boost-list.js?v=ob-v136'
-import { rangeControl, sortControl } from '/assets/js/feed-controls.js?v=ob-v136'
-import { mountFeedSearch } from '/assets/js/feed-search.js?v=ob-v136'
-import { searchMembers, SEARCH_HITS } from '/assets/js/ob-live.js?v=ob-v136'
+import { num } from '/assets/js/boost-list.js?v=ob-v139'
+import { rangeControl, sortControl } from '/assets/js/feed-controls.js?v=ob-v139'
+import { mountFeedSearch } from '/assets/js/feed-search.js?v=ob-v139'
+import { searchMembers, SEARCH_HITS } from '/assets/js/ob-live.js?v=ob-v139'
 
 const esc = htmlEscape
 const HOURS_API = '/api/v1/members/hours'
@@ -134,7 +134,25 @@ function rowHtml(m, i, goal) {
     // ⚠️ "hpw", NOT "h". Every row on both boards is one member's ONE week, so
     // the figure is hours per week and the unit is the name of the thing.
     `<span class="hpw-hours">${esc(hours(m.seconds))}<span class="hpw-unit"> hpw</span></span>` +
-    `<span class="hpw-eps">${esc(String(m.episodes))} ep${m.episodes === 1 ? '' : 's'}</span>` +
+    /* ⚠️ THIS COUNTS EPISODES THAT CONTRIBUTED HOURS, NOT EPISODES BOOSTED, and
+     * the two differ often enough that the figure needs to say so. Reed read
+     * the board against a member's own activity on 2026-08-24, saw four boosts
+     * against "3 eps", and reported it as a bug — which is the right reaction to
+     * a number that looks like a boost count and is not one.
+     *
+     * It cannot be the boost count: the hours beside it are the sum over
+     * exactly these episodes, so printing 4 there would claim four episodes
+     * produced 6.49 hours. What was missing was any way to connect the figure
+     * to the rule. The tooltip does that; the Rules dialog carries the why.
+     *
+     * ⚠️ AND THE WEEKLY BOARD FEELS THIS HARDER THAN THE CORPUS RATE SUGGESTS.
+     * Measured 2026-08-24: 2.2% of episodes across the index have no usable
+     * duration, but 8.5% of the last 200 BOOSTS landed on one, because This
+     * Week is made entirely of boosts on episodes that aired days ago — the
+     * least likely to have been enriched. It self-heals as enrichment catches
+     * up, which is why a row can gain an episode after the fact. */
+    `<span class="hpw-eps" title="${esc(String(m.episodes))} episode${m.episodes === 1 ? '' : 's'} with a known length. Boosts to a show, or to an episode Podcast Index has no length for, add no hours and are not counted here.">` +
+      `${esc(String(m.episodes))} ep${m.episodes === 1 ? '' : 's'}</span>` +
     `</li>`
 }
 

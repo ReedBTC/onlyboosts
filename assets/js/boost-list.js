@@ -30,16 +30,17 @@
  */
 import {
   htmlEscape, isSafeUrl, truncate, renderMessage,
-} from './nostr-text.js?v=ob-v136';
-import { episodePageHref, showPageHref } from './show-link.js?v=ob-v136';
+} from './nostr-text.js?v=ob-v139';
+import { episodePageHref, showPageHref } from './show-link.js?v=ob-v139';
 /* ⚠️ THE REAL MODULE, NOT A FOURTH COPY OF THE RULE. booster-link.js has been
  * dependency-free since it was written, so esbuild inlines it here exactly as it
  * does nostr-text.js, and the boost rows link a booster by the same test every
  * feed surface uses rather than by a transcription of it. This is the collapse
  * that functions/_shared/detail-page.js#boosterPageUrl said was available; that
  * name is now an alias for this function rather than a second copy of it. */
-import { boosterPageHref } from './booster-link.js?v=ob-v136';
-import { httpsUrl } from './cover-art.js?v=ob-v136';
+import { boosterPageHref } from './booster-link.js?v=ob-v139';
+import { httpsUrl } from './cover-art.js?v=ob-v139';
+import { clientLabel, hasClientLabel } from './client-label.js?v=ob-v139';
 
 // ── The formatters the row needs ─────────────────────────────────────────────
 //
@@ -123,6 +124,10 @@ export function rowsFromRecords(records) {
     podcast_guid: b.podcast?.guid ?? null,
     e_title: b.episode?.title ?? null,
     e_num: b.episode?.num ?? null,
+    // Which app PUBLISHED this note, for the "via" chip. `client_app.via` — the
+    // app a relayed boost originated in — is deliberately not carried: see the
+    // note over hasClientLabel in client-label.js.
+    client_id: b.client_app?.id ?? null,
     // Not selected by any of the three PAGE queries — none of them prints an
     // air date on a boost row — but it is what the `episode` sort orders on, and
     // sorting only ever happens over a corpus fetched from the API. See
@@ -277,7 +282,7 @@ export const CONTROLS_MIN = 3;
  *   the Function so a repaint cannot show fewer rows than the edge did.
  */
 export function renderBoosts(rows, names, {
-  heading, sub, itemAbbr, noun, showTarget = true, linkBooster = true, showShow = false,
+  heading, sub, noun, showTarget = true, linkBooster = true, showShow = false,
   total = null, state = null,
 }) {
   if (!rows.length) return "";
@@ -317,7 +322,7 @@ export function renderBoosts(rows, names, {
     <div class="bs-shell">
       ${all >= CONTROLS_MIN ? `<div class="cs-controls bs-controls" data-bs-controls hidden></div>` : ""}
       <ul class="boost-list ob-boost-list" data-bs-list>
-        ${boostRows(rows, names, { itemAbbr, noun, showTarget, linkBooster, showShow })}
+        ${boostRows(rows, names, { noun, showTarget, linkBooster, showShow })}
       </ul>
       <div class="bs-more" data-bs-more></div>
     </div>
@@ -332,7 +337,7 @@ export function renderBoosts(rows, names, {
        * the failure would be a re-sorted /episode growing an episode chip naming
        * the page it is on. It is written from the arguments this call already
        * received, so a caller cannot set one and forget the other. */
-      row: { itemAbbr, noun, showTarget, linkBooster, showShow },
+      row: { noun, showTarget, linkBooster, showShow },
       ...(state || {}),
     })}
   </section>`;
@@ -368,7 +373,7 @@ function stateScript(state) {
     JSON.stringify(state).replace(/</g, "\\u003c")}</script>`;
 }
 
-function boostRow(r, names, { itemAbbr, noun, showTarget, linkBooster = true, showShow = false }) {
+function boostRow(r, names, { noun, showTarget, linkBooster = true, showShow = false }) {
   const realName = displayName(r);
   const name = realName || shortId(r.booster_npub, r.booster_pubkey);
   // https-promoted before the guard; see httpsUrl in cover-art.js.
@@ -384,9 +389,15 @@ function boostRow(r, names, { itemAbbr, noun, showTarget, linkBooster = true, sh
   // (`if (b.episode.title)`), and these two surfaces are now one component, so
   // this does the same. `noun` is consequently unused here and kept in the
   // signature for the callers that still pass it.
-  const target = r.e_title
-    ? (r.e_num ? `${itemAbbr} ${htmlEscape(r.e_num)} · ${htmlEscape(truncate(r.e_title, 70))}` : htmlEscape(truncate(r.e_title, 70)))
-    : null;
+  // ⚠️ NO EPISODE NUMBER EITHER, and it is the same objection one step further
+  // on. The chip used to read "Ep. 42 · Title", from `episodes.episode_number`.
+  // Most publishers already put the number in the title they wrote, so the chip
+  // printed it twice — "Ep. 42 · Episode 42: The Thing" — and the half we added
+  // was the redundant one. The title is the publisher's own name for the
+  // episode and is left to speak for itself. Reed's call, 2026-08-24; the
+  // column is still selected and still published on /api/v1, it is simply not
+  // rendered anywhere.
+  const target = r.e_title ? htmlEscape(truncate(r.e_title, 70)) : null;
 
   // ⚠️ TWO LINKS TO ONE DESTINATION, unlike the community card, and it is
   // unavoidable here: the avatar sits at the card's top-left and the name beside
@@ -443,10 +454,31 @@ function boostRow(r, names, { itemAbbr, noun, showTarget, linkBooster = true, sh
         : `<span class="ob-boost-show">${htmlEscape(truncate(r.p_title, 60))}</span>`)
     : null;
 
+  /* WHICH APP PUBLISHED THIS NOTE. It rides the meta row beside the sats
+   * because that row is already the "what this boost was" line, and the client
+   * is a fact about the boost rather than about the episode or the show.
+   *
+   * ⚠️ IT IS A DERIVED CLASSIFICATION, NOT A FIELD ANYONE SIGNED. The NIP-89
+   * `client` tag is on 1.3% of the corpus; the collector infers the rest from
+   * the NIP-73 i-tag's host and from known publisher pubkeys, and leaves
+   * `client_id` null when nothing fired. So the chip is absent on ~0.2% of rows
+   * rather than guessing, and absent is the correct rendering of "we do not
+   * know" — see hasClientLabel.
+   *
+   * ⚠️ NOT A LINK. There is no per-client page to point at; /api/v1/clients has
+   * no surface yet and /stats is still a placeholder. A chip that looked
+   * clickable and was not would be worse than a plain one, and this is the row
+   * where two links already compete for the reader.
+   */
+  const via = hasClientLabel(r.client_id)
+    ? `<span class="ob-boost-via">via ${htmlEscape(clientLabel(r.client_id))}</span>`
+    : null;
+
   const meta = [
     Number(r.sats) > 0
       ? `<span class="ob-boost-sats">${htmlEscape(num(r.sats))}<span class="ob-bolt" aria-hidden="true">⚡</span></span>`
       : null,
+    via,
     showTarget ? epEl : null,
     showTarget ? showEl : null,
   ].filter(Boolean).join("\n            ");

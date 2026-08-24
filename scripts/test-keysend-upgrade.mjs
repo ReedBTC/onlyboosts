@@ -40,6 +40,10 @@ import { onRequestGet, parseAddress } from '../functions/api/keysend.js'
  * lazy import lands after the stub and calls addEventListener on a bare
  * object. Node runs static imports first, which is the whole fix. */
 import { _isCleanDeclineForTests as isCleanDecline } from '../login-widget/src/lib/externalBoost.js'
+// The SHARED classifier, tested directly since 2026-08-24: the NIP-47 failure
+// codes moved here out of externalBoost.js, so this is the reader that
+// `payInvoiceVerified` (the live zap path) and `payAllLegs` actually see.
+import { isCleanPaymentDecline } from '../login-widget/src/lib/utils.js'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -466,6 +470,35 @@ try {
     assert.equal(isCleanDecline('FAILURE_REASON_NONE'), false)
     assert.equal(isCleanDecline('some unrelated wallet noise'), false)
   })
+  await ok('⚠️ the SHARED classifier carries the codes, not just this path', () => {
+    // The whole point of moving them. externalBoost.js held these privately
+    // from 2026-08-22 to 2026-08-24, with a note saying the other two readers
+    // were dead or safe — but `payInvoiceVerified` in index.jsx is the live zap
+    // path, and there a missed clean decline WITHHELD the manual-invoice
+    // fallback from a user whose wallet provably never sent anything.
+    assert.equal(isCleanPaymentDecline('Nip47WalletError: FAILURE_REASON_NO_ROUTE'), true)
+    assert.equal(isCleanPaymentDecline('FAILURE_REASON_INSUFFICIENT_BALANCE'), true)
+    assert.equal(isCleanPaymentDecline('FAILURE_REASON_INCORRECT_PAYMENT_DETAILS'), true)
+    // And the exclusions travel with them, or the move widened the guard.
+    assert.equal(isCleanPaymentDecline('FAILURE_REASON_TIMEOUT'), false)
+    assert.equal(isCleanPaymentDecline('FAILURE_REASON_ERROR'), false)
+    // The keysend-capability layer is NOT shared: no other caller upgrades a
+    // leg to keysend, so no other caller can see that error.
+    assert.equal(isCleanPaymentDecline('method not found'), false)
+    assert.equal(isCleanDecline('method not found'), true)
+  })
+
+  await ok('the site-side zap copy has not drifted from the shared one', () => {
+    // assets/js/boost-actions.js cannot import from login-widget/src, so its
+    // raw-WebLN branch hand-copies the test. Same three codes or the same bug
+    // comes back on the one path that does not go through the widget facade.
+    const src = readFileSync(new URL('../assets/js/boost-actions.js', import.meta.url), 'utf8')
+    assert.match(src, /FAILURE_REASON_\(NO_ROUTE\|INSUFFICIENT_BALANCE\|INCORRECT_PAYMENT_DETAILS\)/,
+      'the zap fallback lost its copy of the NIP-47 codes')
+    assert.doesNotMatch(src, /FAILURE_REASON_\([^)]*TIMEOUT/,
+      'TIMEOUT must never be a clean decline: an expired attempt can still settle')
+  })
+
   await ok('the classifier still recognises what it always did', () => {
     assert.equal(isCleanDecline('Payment rejected by user'), true)
     assert.equal(isCleanDecline('no route'), true)

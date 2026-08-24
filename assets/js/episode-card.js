@@ -42,11 +42,11 @@
  * what functions/_shared/detail-page.js has always done, so the site now has one
  * date format rather than one for the feeds and another for the detail pages.
  */
-import { showPageHref, episodePageHref } from './show-link.js?v=ob-v136'
-import { episodeBoostLink } from './episode-link.js?v=ob-v136'
-import { boosterPageHref, boosterLinkAttrs } from './booster-link.js?v=ob-v136'
-import { coverChain, httpsUrl } from './cover-art.js?v=ob-v136'
-import { htmlEscape, isSafeUrl, renderMessage } from './nostr-text.js?v=ob-v136'
+import { showPageHref, episodePageHref } from './show-link.js?v=ob-v139'
+import { episodeBoostLink } from './episode-link.js?v=ob-v139'
+import { boosterPageHref, boosterLinkAttrs } from './booster-link.js?v=ob-v139'
+import { coverChain, httpsUrl } from './cover-art.js?v=ob-v139'
+import { htmlEscape, isSafeUrl, renderMessage } from './nostr-text.js?v=ob-v139'
 
 const esc = htmlEscape
 
@@ -623,7 +623,7 @@ export function episodeCardHtml(item, {
     : ''
 
   /* The counts sit in the card body, under the Fountain link. The drawer is
-   * named for what it opens ("Nostr Interactions") rather than doubling as a
+   * named for what it opens ("Nostr Boosts") rather than doubling as a
    * stat line, and these figures need the "Nostr Stats:" qualifier, which is the
    * per-card replacement for the scope-note paragraph that used to sit above the
    * whole feed. The sats stay on the drawer bar beside the booster faces.
@@ -724,7 +724,7 @@ export function episodeCardHtml(item, {
   const drawer = `<details class="pcast-card-details">` +
     `<summary class="pcast-drawer">` +
       `<span class="pcast-drawer-caret" aria-hidden="true">▾</span>` +
-      `<span class="pcast-drawer-label">Nostr Interactions:</span>` +
+      `<span class="pcast-drawer-label">Nostr Boosts:</span>` +
       drawerMeta +
     `</summary>` +
     // A lazy body is the footer alone, and `data-lazy-boosts` is the hook the

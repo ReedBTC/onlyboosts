@@ -24,6 +24,35 @@ export function isSafeUrl(url) {
   }
 }
 
+/**
+ * ⚠️ THE WALLET'S OWN NIP-47 FAILURE CODES, WHICH THE PROSE PATTERNS BELOW MISS
+ * ON A TECHNICALITY: THEY LOOK FOR `no route` AND NIP-47 SAYS `NO_ROUTE`.
+ *
+ * Observed on a real boost, 2026-08-22: an upgraded keysend leg to
+ * `podcastindex@getalby.com` came back `Nip47WalletError:
+ * FAILURE_REASON_NO_ROUTE` — the node that address names has no public channel
+ * record. One underscore, and a provably-clean refusal read as ambiguous.
+ *
+ * ⚠️ IT LIVES HERE RATHER THAN IN ONE CALLER, AND THAT IS THE FIX. It was a
+ * local constant in `externalBoost.js` from 2026-08-22 to 2026-08-24, on the
+ * reasoning that the other two readers of this classifier were dead or safe.
+ * Half of that was wrong: `payAllLegs.js` is genuinely unreachable, but
+ * `payInvoiceVerified` in index.jsx is the live zap path, and there the miss
+ * cost a user the manual-invoice fallback after a payment that provably never
+ * happened. A shared classifier with one caller's knowledge bolted onto that
+ * caller is the drift this comment block already warned about.
+ *
+ * ⚠️ WHAT IS DELIBERATELY NOT IN THIS LIST IS THE WHOLE OF ITS SAFETY.
+ * `FAILURE_REASON_TIMEOUT` means the attempt ran out of time, and an HTLC in
+ * flight when the clock expired can still settle; `FAILURE_REASON_ERROR` is a
+ * catch-all and says nothing about settlement. Both stay ambiguous, and so does
+ * anything not named here. **Only add a code whose meaning is that no HTLC
+ * survived** — every caller of this function treats a true answer as licence to
+ * offer the money path again.
+ */
+const WALLET_CLEAN_FAILURE_RE =
+  /FAILURE_REASON_(NO_ROUTE|INSUFFICIENT_BALANCE|INCORRECT_PAYMENT_DETAILS)/i
+
 // True when a wallet error message means the payment definitively never
 // left the wallet — the user hit Reject in their extension, no balance,
 // expired invoice, no route. Safe to report as failed/unsettled without a
@@ -36,7 +65,9 @@ export function isSafeUrl(url) {
 // it for requests that may already be in flight, which is exactly the
 // ambiguous case the verify path exists for.
 export function isCleanPaymentDecline(msg) {
-  return /rejected|denied|declined|insufficient|not enough|no funds|balance too low|expired|no route|unable to find route|route not found/i.test(String(msg || ''))
+  const s = String(msg || '')
+  return /rejected|denied|declined|insufficient|not enough|no funds|balance too low|expired|no route|unable to find route|route not found/i.test(s) ||
+    WALLET_CLEAN_FAILURE_RE.test(s)
 }
 
 // Strip NWC connection strings (and any bare `secret=...` query

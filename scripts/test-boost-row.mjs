@@ -49,6 +49,10 @@ const dbRows = [
     p_title: 'A Podcast & "Friends"', p_image: null, p_feed: null,
     e_title: 'The One About <Value>', e_image: null, e_pub: 1_700_000_000,
     e_num: 42, e_url: null,
+    // ⚠️ `client` AND `client_id` ARE DIFFERENT FACTS and both are on this row.
+    // The first is the raw NIP-89 tag as signed (1.3% of the corpus); the
+    // second is the collector's derivation, and it is the one the chip prints.
+    client_id: 'fountain', client_via: null,
     pr_name: 'alice', pr_dname: 'Alice <script>', pr_pic: 'https://example.com/a.png',
   },
   {
@@ -59,6 +63,9 @@ const dbRows = [
     podcast_guid: null, item_guid: null, item_url: null, client: null, message: null,
     p_title: null, p_image: null, p_feed: null,
     e_title: null, e_image: null, e_pub: null, e_num: null, e_url: null,
+    // Unattributable: none of the collector's three signals fired. ~0.2% of the
+    // corpus, and the row must render with no chip rather than guessing.
+    client_id: null, client_via: null,
     pr_name: null, pr_dname: null, pr_pic: null,
   },
   {
@@ -70,6 +77,10 @@ const dbRows = [
     client: null, message: 'nice',
     p_title: 'Another Show', p_image: null, p_feed: null,
     e_title: 'A Track', e_image: null, e_pub: null, e_num: null, e_url: null,
+    // A relayed boost: published by the bot, originated in Castamatic. The chip
+    // names the PUBLISHER (Reed's call, 2026-08-24), so `client_via` must not
+    // reach it.
+    client_id: 'chadf-boostbot', client_via: 'castamatic',
     pr_name: 'bob', pr_dname: null, pr_pic: 'javascript:alert(1)',
   },
 ]
@@ -78,9 +89,9 @@ const names = new Map([[HEX_A, 'Alice']])
 
 // The three call sites, exactly as the Functions pass them.
 const SURFACES = {
-  show: { itemAbbr: 'Ep.', noun: 'episode', showTarget: true, linkBooster: true, showShow: false },
-  episode: { itemAbbr: 'Ep.', noun: 'episode', showTarget: false, linkBooster: true, showShow: false },
-  booster: { itemAbbr: 'Ep.', noun: 'episode', showTarget: true, linkBooster: false, showShow: true },
+  show: { noun: 'episode', showTarget: true, linkBooster: true, showShow: false },
+  episode: { noun: 'episode', showTarget: false, linkBooster: true, showShow: false },
+  booster: { noun: 'episode', showTarget: true, linkBooster: false, showShow: true },
 }
 
 // ── The two-sided contract ──────────────────────────────────────────────────
@@ -125,7 +136,7 @@ check('an unresolved mention carries the hook the Primal backfill reads', () => 
 
 check('the episode links to its page, and does not when it has no title', () => {
   assert.match(boostRows([dbRows[0]], names, SURFACES.show),
-    /<a class="ob-boost-ep" href="\/episode\/item-guid-1">Ep\. 42 · The One About &lt;Value&gt;<\/a>/)
+    /<a class="ob-boost-ep" href="\/episode\/item-guid-1">The One About &lt;Value&gt;<\/a>/)
   // No episode at all → no chip, not a chip reading "the episode".
   assert.doesNotMatch(boostRows([dbRows[1]], names, SURFACES.show), /ob-boost-ep/)
 })
@@ -138,6 +149,60 @@ check('the show is named on /booster and nowhere else', () => {
 
 check('the episode chip is suppressed on /episode, where it would repeat the h1', () => {
   assert.doesNotMatch(boostRows([dbRows[0]], names, SURFACES.episode), /ob-boost-ep/)
+})
+
+check('the episode chip carries the title alone, never an episode number', () => {
+  // ⚠️ THE GUARD ON A DELIBERATE REMOVAL, the same job the inline-image
+  // assertion in test-episode-card.mjs does. The chip read "Ep. 42 · Title"
+  // until 2026-08-24 and was dropped everywhere on Reed's call: publishers
+  // already put the number in the title, so the site printed it twice and the
+  // duplicate half was ours. `e_num` is 42 on this fixture and is still carried
+  // through the record shape, so re-adding the prefix is a one-line change that
+  // looks like an improvement — which is exactly why this asserts it stayed out.
+  for (const surface of ['show', 'booster']) {
+    const html = boostRows([dbRows[0]], names, SURFACES[surface])
+    assert.match(html, /ob-boost-ep/, `${surface} still renders the chip`)
+    assert.doesNotMatch(html, /Ep\. ?42|Track ?42|\b42 ?·/, `${surface} printed the episode number`)
+  }
+})
+
+// ── The "via <app>" chip ────────────────────────────────────────────────────
+
+check('the chip names the app that PUBLISHED the note', () => {
+  const html = boostRows([dbRows[0]], names, SURFACES.show)
+  assert.match(html, /<span class="ob-boost-via">via Fountain<\/span>/)
+  // Beside the sats, inside the meta row — not a line of its own under it.
+  assert.match(html, /ob-boost-sats[\s\S]{0,200}ob-boost-via/)
+})
+
+check('⚠️ a relayed boost names the publisher, never the origin app', () => {
+  // Reed's call, 2026-08-24. The bot published this note and the booster
+  // credited on the same card IS the bot, so "via Castamatic" beside a bot's
+  // name and face would be two different claims in one row. The origin app is
+  // still in the record and still nested under the bot on /api/v1/clients.
+  const html = boostRows([dbRows[2]], names, SURFACES.show)
+  assert.match(html, /via ChadF Boost Bot/)
+  assert.doesNotMatch(html, /Castamatic/i, 'client_via reached the card')
+})
+
+check('an unattributable boost gets no chip rather than a guess', () => {
+  const html = boostRows([dbRows[1]], names, SURFACES.show)
+  assert.doesNotMatch(html, /ob-boost-via/)
+  assert.doesNotMatch(html, /Unattributed/i)
+  // And the row still renders — the chip is additive, never a gate.
+  assert.match(html, /data-boost-note/)
+})
+
+check('an unknown slug renders as itself, so a new app is a missing label', () => {
+  const row = { ...dbRows[0], client_id: 'some-new-app' }
+  assert.match(boostRows([row], names, SURFACES.show), /via some-new-app/)
+})
+
+check('the slug is escaped, being a value out of the database', () => {
+  const row = { ...dbRows[0], client_id: '<img src=x onerror=alert(1)>' }
+  const html = boostRows([row], names, SURFACES.show)
+  assert.doesNotMatch(html, /<img src=x/)
+  assert.match(html, /&lt;img src=x/)
 })
 
 check('/booster does not link a row back to the page it is on', () => {
@@ -321,7 +386,7 @@ check('every sort key in the menu has a comparator', () => {
 
 check('the section ships the slots boost-section.js contracts on', () => {
   const html = renderBoosts(dbRows, names, {
-    heading: 'Show Boosts', sub: 'Every boost.', itemAbbr: 'Ep.', noun: 'episode',
+    heading: 'Show Boosts', sub: 'Every boost.', noun: 'episode',
     total: 1404, state: { page: 24 },
   })
   assert.match(html, /id="boosts" data-boost-section/)
@@ -343,12 +408,12 @@ check('the section ships the slots boost-section.js contracts on', () => {
 
 check('the row variant travels in the state, so a repaint cannot diverge', () => {
   const html = renderBoosts(dbRows, names, {
-    heading: 'Episode Boosts', sub: 'Every boost.', itemAbbr: 'Ep.', noun: 'episode',
+    heading: 'Episode Boosts', sub: 'Every boost.', noun: 'episode',
     showTarget: false, state: { page: 500 },
   })
   const state = JSON.parse(html.match(/data-boost-state>(.*?)<\/script>/s)[1])
   assert.deepEqual(state.row, {
-    itemAbbr: 'Ep.', noun: 'episode', showTarget: false, linkBooster: true, showShow: false,
+    noun: 'episode', showTarget: false, linkBooster: true, showShow: false,
   })
   // And the variant in the state is the one the rows were actually rendered with.
   assert.equal(html.includes(boostRows(dbRows, names, state.row)), true)
@@ -356,12 +421,12 @@ check('the row variant travels in the state, so a repaint cannot diverge', () =>
 
 check('the control band is withheld below CONTROLS_MIN', () => {
   const one = renderBoosts(dbRows.slice(0, 1), names, {
-    heading: 'Episode Boosts', sub: 'Every boost.', itemAbbr: 'Ep.', noun: 'episode',
+    heading: 'Episode Boosts', sub: 'Every boost.', noun: 'episode',
   })
   assert.doesNotMatch(one, /data-bs-controls/, 'a one-row list has nothing to range over')
   assert.match(one, /data-bs-list/, 'the list itself is a fact and ships regardless')
   const three = renderBoosts(dbRows, names, {
-    heading: 'Episode Boosts', sub: 'Every boost.', itemAbbr: 'Ep.', noun: 'episode',
+    heading: 'Episode Boosts', sub: 'Every boost.', noun: 'episode',
   })
   assert.equal(dbRows.length, CONTROLS_MIN)
   assert.match(three, /data-bs-controls/)
@@ -369,7 +434,7 @@ check('the control band is withheld below CONTROLS_MIN', () => {
 
 check('a stale total that undercounts cannot print "showing 24 of 19"', () => {
   const html = renderBoosts(dbRows, names, {
-    heading: 'Show Boosts', sub: 'Every boost.', itemAbbr: 'Ep.', noun: 'episode', total: 1,
+    heading: 'Show Boosts', sub: 'Every boost.', noun: 'episode', total: 1,
   })
   const state = JSON.parse(html.match(/data-boost-state>(.*?)<\/script>/s)[1])
   assert.equal(state.total, 3)
@@ -377,13 +442,13 @@ check('a stale total that undercounts cannot print "showing 24 of 19"', () => {
 
 check('a section with no rows renders nothing at all', () => {
   assert.equal(renderBoosts([], names, {
-    heading: 'Show Boosts', sub: 'Every boost.', itemAbbr: 'Ep.', noun: 'episode',
+    heading: 'Show Boosts', sub: 'Every boost.', noun: 'episode',
   }), '')
 })
 
 check('a </script> inside the state cannot close the element early', () => {
   const html = renderBoosts(dbRows, names, {
-    heading: 'Show Boosts', sub: 'x', itemAbbr: '</script><img src=x>', noun: 'episode',
+    heading: 'Show Boosts', sub: 'x', noun: '</script><img src=x>',
   })
   const body = html.match(/data-boost-state>(.*?)<\/script>/s)[1]
   assert.doesNotMatch(body, /<\/script>/)
