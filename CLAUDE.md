@@ -2868,12 +2868,18 @@ durations. **It is an assumption, not a measurement**, and the Rules dialog says
 so. Two boards: **This Week** leads (it resets Monday and has a live race in
 it), **High Scores** follows.
 
-**⚠️ NOBODY CLEARS FORTY HOURS.** Over all 9,977 booster-weeks since 2024-10,
-exactly two did — the same person, both in autumn 2025. Eighteen weeks ever
-passed 30; a typical winning week in mid-2026 is 14 to 20 hours. Eight of the
+**⚠️ NOBODY CLEARS FORTY HOURS.** Over all 9,977 booster-weeks, **exactly one
+does** — Piez, 51.8h, the week of 2025-09-22. **⚠️ IT WAS TWO UNTIL 2026-08-23**,
+and the second one is a worked example of why the boundary moved: Piez's 41.6h
+week was 41.6h only because the Monday-00:00-UTC line ran through a Sunday
+evening, and re-cut at midnight Pacific it is 39.8h. Seventeen weeks ever
+passed 30, down from eighteen for the same reason. **Re-measure these three
+figures after any change to the week rule; they are the whole argument for the
+name and they move with the boundary.** A typical winning week in mid-2026 is 14
+to 20 hours. Eight of the
 all-time top ten are from 2025, which is why This Week exists beside the high-score
 table rather than instead of it. The name is the provocation, not a threshold,
-and gold marks the two rows above forty. **If gold ever marks a third of a
+and gold marks the one row above forty. **If gold ever marks a third of a
 board the fix is the goal, not the styling.**
 
 `GET /api/v1/members/hours?range=week|all`. Four rules, each from a measurement:

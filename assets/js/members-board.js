@@ -4,9 +4,10 @@
  * up the durations. It is not a measurement of listening and the page says so.
  *
  * ⚠️ TWO BOARDS, AND THE SECOND ONE IS NOT A NICE-TO-HAVE. Nobody clears forty
- * hours: measured over all 9,977 booster-weeks since 2024-10, exactly two did,
- * both the same person, both in autumn 2025. Eight of the all-time top ten are
- * from 2025. So an all-time board on its own is a hall of fame nobody currently
+ * hours: measured over all 9,977 booster-weeks since 2024-10, exactly ONE does
+ * (Piez, 51.8h, autumn 2025). It was two until the week boundary moved to
+ * midnight Pacific on 2026-08-23 and the other one re-split across the new
+ * line. Eight of the all-time top ten are from 2025. So an all-time board on its own is a hall of fame nobody currently
  * reading can get onto, which is the opposite of a leaderboard — This Week is
  * the one with a live race in it, and it leads.
  *

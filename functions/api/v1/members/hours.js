@@ -9,9 +9,13 @@
 //   range=all   the best weeks ever recorded, one row per booster-week.
 //
 // ⚠️ NOBODY CLEARS 40 HOURS, AND THE NAME IS THE PROVOCATION RATHER THAN A
-// THRESHOLD. Measured over all 9,977 booster-weeks since 2024-10: exactly two
-// cleared 40, both the same person, both in autumn 2025. Eighteen weeks ever
-// passed 30. A typical winning week in mid-2026 is 14 to 20 hours. That is why
+// THRESHOLD. Measured over all 9,977 booster-weeks since 2024-10: exactly ONE
+// clears 40 (Piez, 51.8h, week of 2025-09-22) and seventeen have ever passed 30.
+// ⚠️ It was two and eighteen until the week boundary moved to midnight Pacific
+// on 2026-08-23: the second 40h week was 41.6h only because the UTC line ran
+// through a Sunday evening, and re-cut it is 39.8h. These figures move with the
+// boundary, so re-measure them if the rule changes again.
+// A typical winning week in mid-2026 is 14 to 20 hours. That is why
 // `range=all` exists beside `range=week` — an all-time board alone is one
 // nobody currently reading can get onto.
 import { json, preflight, clampLimit, PUBLISHERS } from "../_common.js";
