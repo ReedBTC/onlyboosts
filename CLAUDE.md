@@ -2948,10 +2948,19 @@ and the second one is a worked example of why the boundary moved: Piez's 41.6h
 week was 41.6h only because the Monday-00:00-UTC line ran through a Sunday
 evening, and re-cut at midnight Pacific it is 39.8h. Seventeen weeks ever
 passed 30, down from eighteen for the same reason. **Re-measure these three
-figures after any change to the week rule; they are the whole argument for the
-name and they move with the boundary.** A typical winning week in mid-2026 is 14
-to 20 hours. Eight of the
-all-time top ten are from 2025, which is why This Week exists beside the high-score
+figures after any change to the week rule, and after any change to duration
+coverage; they are the whole argument for the name.**
+
+**⚠️ DURATION COVERAGE IS THE SECOND THING THAT MOVES THEM, AND IT MOVES WITHOUT
+ANYBODY HERE TOUCHING A LINE.** New as of 2026-08-24: the collector is being
+worked on to fill in missing durations (see the ⚠️ under the four rules below),
+and every episode that gains one adds hours to some past week. **So these
+figures only ever go up from here, silently, as the collector improves.** If a
+second week ever clears 40 the gold row stops being unique and the board's whole
+framing wants revisiting.
+
+A typical winning week in mid-2026 is 14 to 20 hours. Eight of the all-time top
+ten are from 2025, which is why This Week exists beside the high-score
 table rather than instead of it. The name is the provocation, not a threshold,
 and gold marks the one row above forty. **If gold ever marks a third of a
 board the fix is the goal, not the styling.**
