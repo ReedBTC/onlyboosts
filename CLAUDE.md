@@ -3002,6 +3002,45 @@ Monday 07:00 or 08:00 UTC, still Monday. `weekLabel` in `members-board.js` says
 so. If the reset ever moves east of Greenwich, that formatter moves with it.
 - **~14% of boosts contribute nothing** — 8% name no episode, 2.5% of episodes
   have no duration. Stated in the Rules rather than hidden.
+
+**⚠️ THE EPISODE COUNT ON A ROW IS EPISODES THAT CONTRIBUTED HOURS, NOT EPISODES
+BOOSTED, AND IT READS LIKE A BUG.** Reed checked the board against a member's own
+activity on 2026-08-24: four boosts that week, all four to distinct episodes with
+guids, and the row said **3 eps**. Nothing was wrong — one of the four aired five
+days earlier and its `duration` is `0`, so `e.duration > 0` dropped it, and the
+6.49h printed beside it is exactly the other three. It cannot print 4: the hours
+are summed over exactly the episodes counted, so a boost count there would claim
+four episodes produced those hours. The figure now carries a `title` saying what
+it counts. **Anyone comparing the board to a booster page will ask this again**,
+so don't "fix" it by widening the count.
+
+**⚠️ AND THE WEEKLY BOARD IS HIT FAR HARDER THAN THE 2.5% SUGGESTS, BECAUSE IT IS
+MADE OF RECENT BOOSTS.** Measured 2026-08-24 against production: over 600
+episodes spread across the whole index by boost rank, **2.2%** have no usable
+duration (3.8% boost-weighted) — the documented figure holds. But over the **200
+most recent boosts**, **8.5%** landed on an episode with no duration, and every
+one of those episodes had aired **one to five days earlier**. This Week is
+therefore the board that undercounts most, and it **self-heals**: both boards
+recompute from live data on every request, so a row gains an episode once
+enrichment fills the duration in. A reader who saw the lower number is not shown
+a correction.
+
+**Two distinct causes, and only one is a lag.** Three of the eight were **live
+episodes** (`Salty Sessions with Salty Crayon (LIVE)`, `151st Edition - LIVE`,
+`PC2.0 268 Live August 21st 2026`) — a `<podcast:liveItem>` has no duration by
+construction, so **boosting during a live show can never count toward #40HPW**,
+which is a permanent exclusion of exactly the high-engagement behaviour the board
+exists to celebrate. The rest are enriched rows where Podcast Index reported
+`0`, or rows not yet enriched at all (no title, no show). **Both are collector
+side**; nothing in `hours.js` can repair either, and a client- or edge-side
+guess at a duration is the masking fix CLAUDE.md already forbids for episode
+fields.
+
+**The total in the Rules dialog was re-checked and is right**: 14.0% of the
+recent 200 contributed nothing, against the ~14% it claims. Only the split moves
+with the window (5.5% show-level / 8.5% no-duration recently, against 8% / few%
+corpus-wide), which is why the dialog states the corpus figures and was left
+alone.
 - **Publisher keys are excluded.** See below.
 
 **⚠️ THE NPUB COMES FROM A CORRELATED SUBQUERY, NEVER A SECOND JOIN ON

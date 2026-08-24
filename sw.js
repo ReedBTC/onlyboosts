@@ -556,6 +556,11 @@
 // inside the Shows panel and shows-feed.js adopts them; the Episodes panel
 // ships its placeholder again, one feed being rendered at the edge and it
 // being the one on screen.
+// ob-v139: the #40HPW row's episode figure says what it counts. It is episodes
+// that CONTRIBUTED HOURS, not episodes boosted, and the two differ whenever a
+// boosted episode has no duration — 2.2% of the index but 8.5% of recent
+// boosts, since This Week is made of episodes that aired days ago. No query
+// change; the board was already correct.
 // ob-v138: boost note cards name the app that published them ("100⚡ via
 // Fountain"), from the collector's client_id rather than the raw NIP-89 tag —
 // so the Boosts feed's own "via" line, which needed a tag 1.3% of boosts carry,
@@ -572,7 +577,7 @@
 // masthead moves to a transparent banner. REQUIRED: the drawer label and the
 // card are one two-sided module, so a browser holding the old episode-card.js
 // against a freshly-rendered page would paint two different labels in one list.
-const VERSION = 'ob-v138';
+const VERSION = 'ob-v139';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;
@@ -608,26 +613,26 @@ const PRECACHE_URLS = [
   // precaching it spent 93KB on every install for nothing.
   '/assets/onlyboosts_banner_clear.png',
   '/assets/avatar-fallback.svg',
-  '/assets/css/theme.css?v=ob-v138',
-  '/assets/css/page.css?v=ob-v138',
-  '/assets/css/nav.css?v=ob-v138',
-  '/assets/css/footer.css?v=ob-v138',
-  '/assets/css/boosts-thread.css?v=ob-v138',
-  '/assets/css/boost-actions.css?v=ob-v138',
+  '/assets/css/theme.css?v=ob-v139',
+  '/assets/css/page.css?v=ob-v139',
+  '/assets/css/nav.css?v=ob-v139',
+  '/assets/css/footer.css?v=ob-v139',
+  '/assets/css/boosts-thread.css?v=ob-v139',
+  '/assets/css/boost-actions.css?v=ob-v139',
   // The episode card and its drawer. Precached alongside the others because the
   // homepage's feeds are painted in it and it used to be inline in index.html,
   // which IS precached — leaving it out would trade an inline block for a
   // network round trip on the one page this list exists to make fast.
-  '/assets/css/feed-cards.css?v=ob-v138',
-  '/assets/js/boosts-thread.js?v=ob-v138',
+  '/assets/css/feed-cards.css?v=ob-v139',
+  '/assets/js/boosts-thread.js?v=ob-v139',
   // A static import of boosts-thread.js, so precaching that without this one
   // leaves a returning visitor fetching half the graph from the network.
-  '/assets/js/primal-profiles.js?v=ob-v138',
-  '/assets/js/boost-actions.js?v=ob-v138',
-  '/assets/js/nav.js?v=ob-v138',
-  '/assets/js/nav-widget-boot.js?v=ob-v138',
-  '/assets/js/widget-loader.js?v=ob-v138',
-  '/assets/js/sw-register.js?v=ob-v138',
+  '/assets/js/primal-profiles.js?v=ob-v139',
+  '/assets/js/boost-actions.js?v=ob-v139',
+  '/assets/js/nav.js?v=ob-v139',
+  '/assets/js/nav-widget-boot.js?v=ob-v139',
+  '/assets/js/widget-loader.js?v=ob-v139',
+  '/assets/js/sw-register.js?v=ob-v139',
 ];
 
 self.addEventListener('install', (event) => {
