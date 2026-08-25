@@ -391,8 +391,11 @@ THAT GOES UNRUN.** Its header carries the `curl` that produces the capture; take
 a fresh one rather than reusing an old file, since it is also the size
 measurement. It asserted `cards are numbered 1..N with no gaps` — the *ordinal*
 scheme's invariant — until competition ranking shipped on 2026-08-18, and it
-would have been merged red had it not been run. **Run all twelve before a merge**,
-and treat this one as the guard on the ranking scheme rather than only on weight.
+would have been merged red had it not been run. **Run all thirteen before a
+merge**, and treat this one as the guard on the ranking scheme rather than only
+on weight. *(It read "all twelve" until 2026-08-24, contradicting the table
+directly above it — the count moved when a test was added and this sentence did
+not. If the table grows again, this line grows with it.)*
 
 **⚠️ AND ITS `curl` CHANGED WITH THE LANDING FEED.** It captures
 `/api/v1/podcasts?not_medium=music&sort=boosters&range=all&limit=25` now, not the
@@ -2990,7 +2993,9 @@ link. `test-feed-hash.mjs` asserts both call sites exist.
 Boost an episode and the board assumes you heard all of it, then adds up the
 durations. **It is an assumption, not a measurement**, and the Rules dialog says
 so. Two boards: **This Week** leads (it resets Monday and has a live race in
-it), **High Scores** follows.
+it), **High Scores** follows. **⚠️ "This Week" NAMES THE BOARD'S DEFAULT, NOT ITS
+ONLY STATE** — since 2026-08-24 its title is a week picker and it renders any of
+the 99 weeks in the index. See **The week picker on This Week** below.
 
 **⚠️ FORTY HOURS IS ALL BUT UNCLEARED.** Over all 10,042 booster-weeks,
 **exactly two pass it**, both Piez: 54.7h the week of 2025-09-22 and 40.2h the
