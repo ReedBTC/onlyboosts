@@ -382,7 +382,7 @@ Thirteen test scripts, all plain `node scripts/<name>.mjs` with no runner:
 | `test-boostbox.mjs` | the BoostBox descriptor path: the comment's whole-or-nothing rule, the record allowlist, and every way `/api/boostbox` is allowed to fail. **Stubs `fetch`**, so it never writes a record to a third party's service |
 | `test-show-card.mjs` | the show card's two-sided contract. Its own reason for existing is the crossing: `renderShowCard` was a DOM builder and could afford `Date.now()` and an unpinned locale, which a two-sided module cannot — see the note under the card |
 | `test-members-search.mjs` | `/api/v1/members`, running the **shipped handler** against a database built from the real `schema.sql` through an `env.DB` shim over `node:sqlite`. LIKE escaping, the identifier/name split, the listing, the publisher asymmetry, and `publishers=1` as its exact complement. **Two publisher keys are in the fixture deliberately**: with one, a single-row answer says nothing about whether the mode asks for the list or found the loudest key |
-| `test-members-hours.mjs` | the 40 HPW boards, same shim, with a fixture built to known answers. Dedupe, week boundaries, the publisher exclusion, and the row-multiplying join |
+| `test-members-hours.mjs` | the 40 HPW boards, same shim, with a fixture built to known answers. Dedupe, week boundaries, the publisher exclusion, the row-multiplying join, and **the week picker**: the bounded window's ceiling, the noon-UTC date rule, DST-safe stepping, and the resolve-rather-than-400 envelope. Confirmed red on three mutations — the ceiling removed, dates resolved at midnight, and stepping by a flat 604800. **Its `env.DB` shim models `.first()`**, which `feed-rank.js` taught `test-members-search.mjs` the hard way |
 | `test-community-medium.mjs` | the two community rollups and the medium partition they were split on, against a `node:sqlite` build of the real `schema.sql`. **Two halves reached two ways**: `fetchCommunityBoosts` is exported and called directly, where `/show`'s query is inline in the page Function and is **extracted from the source and executed**, the `test-feed-hash.mjs` technique. A copy of the SQL written into the test would pass forever while the shipped one rotted. Confirmed to go red on three mutations: the filter removed, its polarity inverted, and the `COALESCE` dropped |
 | `test-keysend-upgrade.mjs` | the keysend upgrade: the `fountain.fm` exclusion's exact-or-parent rule, the routing pair's whole-or-nothing rule, the strict node-pubkey check, every way `/api/keysend` answers "no endpoint", and the wallet gate. **Stubs `fetch`**, so it probes nobody's well-known |
 
@@ -3069,8 +3069,12 @@ so. If the reset ever moves east of Greenwich, that formatter moves with it.
   from Podcast Index never erases a derived value (`db.upsert_episode`). 183 of
   194 duration-less boosted episodes filled on flip-on; the residue is live
   streams and `.m3u8` playlists, which stay unscored honestly. **The Rules
-  dialog still claims ~14% with the no-duration slice at "a few percent"; both
-  halves of that copy now want the site-side edit.**
+  dialog was brought into line on 2026-08-24** and now prints all three slices
+  rather than "a few percent", plus one sentence saying lengths are filled in as
+  they are found — which is the reader-facing half of the self-healing note
+  below. **⚠️ THAT COPY IS A MEASUREMENT AND MOVES ON ITS OWN**, so it is
+  re-checked whenever these figures are; a Rules dialog that overstates what
+  cannot count is the one part of this board a reader has no way to verify.
 
 **⚠️ THE EPISODE COUNT ON A ROW IS EPISODES THAT CONTRIBUTED HOURS, NOT EPISODES
 BOOSTED, AND IT READS LIKE A BUG.** Reed checked the board against a member's own
@@ -3132,6 +3136,158 @@ client-rendered, so nothing in `index.html` can carry it.
 **The Rules are a dialog, in the document rather than fetched**, so they open
 while the boards are loading or after they failed. It replaced a sub-line and a
 caveat that said the same thing at two sizes.
+
+#### The week picker on This Week
+
+*Reed's ask, 2026-08-24.* This Week showed the live week and nothing else, so a
+reader who missed a week could not see it, and the High Scores rows named weeks
+there was no way to open. `GET /api/v1/members/hours?range=week&week=YYYY-MM-DD`
+answers any of them.
+
+**⚠️ ARROWS ARE THE PRIMARY CONTROL AND THE MENU IS THE JUMP, AND A CALENDAR WAS
+REJECTED.** A month grid's unit is a **day** where this board's unit is a week,
+so every pick snaps somewhere the reader did not tap; it navigates by month when
+the overwhelmingly common request is "last week"; and on a phone it is a second
+overlay on a tab that already has the Rules dialog, at seven columns of 44px
+against 335px of content. `‹ This Week ▾ ›` is one press for the common case,
+identical under a mouse and a thumb.
+
+**⚠️ THE TITLE IS THE PICKER.** A scoreboard is navigated by its own header, and
+this tab already carries a lookup, a range, a sort and a dialog; a fourth control
+strip above the boards would be permanent chrome for something most readers press
+twice. The arrows flank the word they change.
+
+**⚠️ AND THE THREE PIECES ARE ONE BORDERED GROUP, WHICH THE FIRST VERSION WAS
+NOT.** *Reed's call, 2026-08-24, on seeing it shipped:* the arrows were
+transparent circles until hover and the label wore the title's own type, so
+nothing on screen had an edge and **a touch device never sees the hover state
+that would reveal one** — the control was invisible at rest. A segmented stepper
+is the shape a calendar app and a dashboard both use to walk a date range, so
+the two ends explain themselves, and the hairline dividers are what say the
+middle is a third control rather than a label between two buttons. Four options
+were rendered against it and rejected: solid arrows alone (fixes stepping, leaves
+the menu undiscovered), the site's own Sort pill (a real consistency argument,
+but it leaves the arrows the only unstyled things in a styled row and costs the
+board its Playfair heading), a labelled band under the heading (~2.4rem on every
+board, doubled on desktop where two boards sit side by side), and an
+accent-tinted version of the stepper (the loudest thing in the board, competing
+with the gold row that marks a 40-hour week).
+
+**⚠️ THE LABEL IS `This Week` / `Last Week` / `Week of Aug 10, 2026`, AND A
+`Week:` TAG IN FRONT OF IT WAS BUILT AND REVERTED THE SAME DAY.** *Reed,
+2026-08-24: "I don't like the font and alignment clashes between `Week:` and
+the week printed."* The reasoning behind the tag was sound and is worth keeping
+— a word says "pickable" better than any border does — but **the type is what
+sank it, and that is the part to understand before anyone proposes it again.**
+
+`.pcast-sort-tag` gets away with `Sort: Most boosts` because both halves are
+**one family at one size**, differing only in colour and weight. This label is
+1.02rem Playfair bold, so a tag beside it necessarily varies **family and size
+and weight at once**, and three axes of difference across two words reads as a
+collision rather than as an axis and its value. `align-self: baseline` (needed
+because the button is `align-items: center` for the drawn caret) was not enough
+to settle it. **A future tag has to solve the type first, not the wording.**
+
+The tag also forced the value to give up "Week of", since `Week: Week of Aug 10,
+2026` is unsayable, so the revert restores the prefix with it. **The relative
+form for the first two is the calendar-app idiom and is the point**: a reader
+one press back is looking at "Last Week", not at a date they would have to
+decode.
+
+**⚠️ THE CARET IS DRAWN, NOT TYPED, AND THAT IS WHY IT COULD BE MADE BIGGER AT
+ALL.** It was `▾` (U+25BE) inside a Playfair element, and **Playfair carries no
+such glyph** — so it was already falling through to whatever face each platform
+substituted, at whatever size that face draws it. Its apparent size was not ours
+to set anywhere, which is exactly why it read as small. It is two borders and a
+rotation now, the same call `.drawer-hint`'s chevron and the `(i)` badge both
+make. **The span in `members-board.js` is deliberately empty**; putting a
+character back in it stacks a glyph on the drawn one. `.hpw-pick` is
+`align-items: center` for the same reason — a drawn box has no baseline and
+rides low under `baseline`.
+
+**⚠️ 0.4rem AT 1.5px, AND THE SIZE WAS ARRIVED AT BY MEASUREMENT.** It shipped
+at 0.5rem/2px and Reed called it the same day: *"it went from whispering to you
+to shouting at you."* The arithmetic agrees. The old `▾` draws about 7px of
+visible triangle; a 0.5rem box rotated 45° is 8 × √2 ≈ **11.3px** across, so the
+mark had roughly doubled. 0.4rem is ≈ **9px**, the midpoint of the two. **That
+midpoint is the whole argument for drawing it rather than typing it** — a
+substituted glyph has no midpoint to ask for. The stroke came down with it: 2px
+on a 6.4px box is a quarter of the shape and reads as a heavy outline, where a
+flat 1px goes to sub-pixel mush on a non-retina screen.
+
+**⚠️ THE HIGH SCORES ROWS ARE THE REAL WAY IN.** Each row's week is a button
+(`data-hpw-goweek`) that opens that week on the board above. A menu of 99 dated
+rows can only be scrolled; the board beside it already names the weeks worth
+seeing, so the menu is the escape hatch for a week nobody has heard of rather
+than the way in. **The jump scrolls the weekly board into view** (`block:
+'nearest'`, a no-op on desktop), because on a phone the two boards are stacked
+and pressing a date in the lower one would otherwise change a board off screen.
+
+**⚠️ THE WEEK RULE IS A TWO-SIDED MODULE NOW: `assets/js/pacific-week.js`.** It
+was private to `hours.js` until the picker needed to step and enumerate weeks in
+the browser; the alternative was a second copy of the DST rule in the client.
+The endpoint imports it by relative path and re-exports `pacificWeekStart`, so
+`test-members-hours.mjs` is unchanged in how it reaches the rule. **The SQL twin
+`pacificOffsetSql` is still separate and still what the test holds it against** —
+there is no ICU on the SQL side, so that half cannot be shared.
+
+**⚠️ STEPPING IS `pacificWeekStart` OF A DAY WELL INSIDE THE TARGET WEEK, NEVER
+`± 604800`.** A Pacific week containing a DST transition is 167 or 169 hours of
+real time, so a flat week drifts an hour every March and November while still
+producing Mondays. The probes are asymmetric because the anchor is the *start*
+of a week: `prevWeek` goes back 3 days, `nextWeek` forward 10.
+
+**⚠️ A `YYYY-MM-DD` IS RESOLVED AT NOON UTC, AND MIDNIGHT IS THE TRAP.**
+`Date.UTC(y,m,d)` is 4pm or 5pm **Pacific on the day before**, so a Monday handed
+in naively resolves to the *previous* week, every time, with the board looking
+entirely correct. Dates are the wire form because they are readable and
+shareable; noon is what makes them safe. `test-members-hours.mjs` walks every
+week from 2024 to 2029 asserting the round trip, and goes red on midnight.
+
+**⚠️ THE WEEKLY QUERY GAINED A CEILING IT HAD NEVER HAD.** The live week needs
+only a floor, nothing having a timestamp in the future. A missing upper bound on
+a past week is the failure that looks like nothing: every week would return the
+whole board since that Monday, ranked plausibly, under the requested Monday's
+heading. Confirmed red on that mutation.
+
+**⚠️ A BAD OR FUTURE `week=` RESOLVES TO THE LIVE WEEK RATHER THAN 400ing, AND
+THE ENVELOPE IS WHAT KEEPS THAT HONEST.** These weeks travel in links, so the
+caller is often a reader rather than code. The response carries `week_start`,
+`week_end`, `is_current`, `current_week` and `first_week`, and **the client
+renders the week the server resolved, never the one it asked for.** There is
+deliberately **no floor**: a week before the index returns an empty board, which
+is the true answer, and `first_week` is what lets the picker stop offering them.
+
+**`first_week` is one seek to the end of `idx_boosts_created` and is allowed to
+fail quietly.** It bounds a control where the board is what the reader came for,
+so a null answer costs the picker its menu and its disabled arrow, nothing else;
+the arrows still step.
+
+**⚠️ A PAST WEEK DOES NOT SHARE THE LIVE ONE'S 60s CACHE.** The live board moves
+as boosts land; a closed week moves only when the collector fills in a missing
+duration, so it takes the all-time board's 300s.
+
+Three smaller rules: **both arrows render when disabled**, because a control that
+vanishes at the end of a range moves the two beside it and the header reflows
+under the reader's thumb; **the title repaints before the fetch and does not keep
+the old rows**, since a failed fetch would otherwise leave last week's board
+under this week's heading; and **the menu's items must undo the title's font** —
+`.pcast-sort-item` is declared `font: inherit` and it is inheriting from an `<h3>`
+in Playfair bold, the same shorthand trap `.show-stat dd` documents, arriving
+through the ancestor rather than through a later rule.
+
+**⚠️ NOT IN THE HASH, AND THAT IS A DECISION RATHER THAN A GAP.** *Reed's call,
+2026-08-24: "let's skip the shareable URL, they can take a screenshot if they
+want to share it."* The case for `#members?week=2026-08-10` was the
+language-in-the-hash argument — a week is a body of work somebody would hand to
+somebody else — and what it ran into is that **a board is a picture rather than
+a document**: the thing a reader wants to send is ten names and their hours, not
+a URL that re-renders with different numbers once a duration lands. A screenshot
+carries the moment, which is what a leaderboard actually trades in.
+
+So this is **closed rather than deferred**, and reopening it wants a better idea
+than a hash: an OG image for the week, or a card the board itself can produce.
+Do not re-propose the plain URL parameter.
 
 #### The member wall
 
@@ -4813,7 +4969,7 @@ would. Never remove an entry** — those links are in the wild.
 | `show-card.js` + `show-card-actions.js` | **the** show card, facts and verbs, shared by the edge and the browser |
 | `shows-feed.js` | the feed around that card, behind Shows and Albums |
 | `supporter-wall.js` + `supporter-wall.css` | **the** community wall, shared by the three detail pages and the Members tab |
-| `members-board.js` | the Members tab: the #40HPW boards, the wall and its three orderings, the Rules dialog |
+| `members-board.js` | the Members tab: the #40HPW boards and their week picker, the wall and its three orderings, the Rules dialog |
 | `feed-controls.js` / `feed-search.js` | the range/sort chrome and the per-feed typeahead |
 | `feed-lang.js` | the language menu on the four ranked feeds, and the copy it rewrites |
 | `boosts-thread.js` / `boost-actions.js` | the content tokenizer and reply / like / repost / zap |
@@ -4821,7 +4977,8 @@ would. Never remove an entry** — those links are in the wild.
 | `functions/{show,episode,booster}/…` | the three edge-rendered detail pages |
 | `functions/api/v1/*` | the D1 query API |
 | `functions/api/v1/members.js` | member search and the top-members listing, over all 2,011 |
-| `functions/api/v1/members/hours.js` | the #40HPW boards |
+| `functions/api/v1/members/hours.js` | the #40HPW boards, and any past week by `week=YYYY-MM-DD` |
+| `assets/js/pacific-week.js` | **the** week rule, Mondays in US Pacific with the DST arithmetic, shared by the edge and the browser |
 | `functions/api/sign-boost.js` | the signing oracle for the boost bot, with `functions/_shared/nostr-sign.js` |
 | `login-widget/src/lib/siteSign.js` | its client half: a wallet-only boost gets a note without a key |
 | `functions/api/keysend.js` + `keysendLookup.js` | the keysend upgrade: an lnaddress leg reaches Helipad's first tier |

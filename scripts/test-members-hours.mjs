@@ -18,6 +18,9 @@ import { DatabaseSync } from 'node:sqlite'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { onRequestGet, pacificWeekStart } from '../functions/api/v1/members/hours.js'
+import {
+  prevWeek, nextWeek, weekSeries, weekDateString, weekStartFromDate,
+} from '../assets/js/pacific-week.js'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -86,7 +89,18 @@ boost(DAVE, 'ep2', mid - 3 * WEEK)
 // The bot racked up four hours this week and must not appear.
 for (const g of ['ep1', 'ep2', 'ep3', 'ep4']) boost(BOT, g, mid)
 
-const env = { DB: { prepare: (sql) => ({ bind: (...a) => ({ all: async () => ({ results: db.prepare(sql).all(...a) }) }) }) } }
+/* ⚠️ THE SHIM MODELS `.first()` AS WELL AS `.all()`, AND `.first()` OFF AN
+ * UNBOUND STATEMENT. D1 offers both, `first_week` is fetched with the second
+ * shape, and a shim that models less than the thing it stands in for turns a
+ * hard failure into a quiet one — `test-members-search.mjs` learned that when a
+ * missing `.first()` made every rank call take its documented null path and
+ * pass for entirely the wrong reason. */
+const stmt = (sql, args = null) => ({
+  bind: (...a) => stmt(sql, a),
+  all: async () => ({ results: db.prepare(sql).all(...(args || [])) }),
+  first: async () => db.prepare(sql).get(...(args || [])) ?? null,
+})
+const env = { DB: { prepare: (sql) => stmt(sql) } }
 const call = async (qs) => (await (await onRequestGet({
   request: new Request('https://ob.invalid/api/v1/members/hours' + qs), env,
 })).json())
@@ -254,6 +268,112 @@ check('a boost one second before Monday is the previous week', () => {
   // hours of real time, so an exact-week assertion here is wrong twice a year.
   assert.ok(b > a, 'the second before Monday is not an earlier week')
   assert.ok(Math.abs(b - a - WEEK) <= HOUR, `weeks are ${b - a}s apart`)
+})
+
+console.log('\nThe week picker:')
+/* ⚠️ WHAT IS BEING TESTED HERE IS THE CEILING, AND IT NEVER EXISTED BEFORE.
+ * The weekly query had only a floor until 2026-08-24, because nothing has a
+ * timestamp in the future and the live week needs no upper bound. A past week
+ * needs both, and a missing ceiling is the failure that looks like nothing:
+ * every week would return the whole board since that Monday, ranked
+ * plausibly, under the requested Monday's heading. Alice is the probe — she
+ * boosted THIS week, so she must be absent from last week's board. */
+const lastMonday = prevWeek(thisMonday)
+const lastWk = await call(`?range=week&week=${weekDateString(lastMonday)}`)
+const lw = byName(lastWk)
+
+check('⚠️ a past week excludes boosts made AFTER it', () => {
+  assert.ok(!('Alice' in lw),
+    `Alice boosted this week and appears on last week's board: ${JSON.stringify(Object.keys(lw))}`)
+})
+check('a past week includes the boosts made inside it', () => {
+  assert.ok(lw.Cara, `Cara boosted last week and is missing: ${JSON.stringify(Object.keys(lw))}`)
+  assert.equal(hours(lw.Cara), 2)
+})
+check('a past week excludes boosts made BEFORE it', () => {
+  // Dave's other row is three weeks back.
+  assert.ok(!('Dave' in lw), 'a boost from three weeks ago counted as last week')
+})
+check('the envelope resolves the week and says it is not the live one', () => {
+  assert.equal(lastWk.week_start, lastMonday)
+  assert.equal(lastWk.week_end, thisMonday, 'the exclusive ceiling is not the next Monday')
+  assert.equal(lastWk.is_current, false)
+  assert.equal(lastWk.current_week, thisMonday)
+})
+check('the live board still says it is the live one', () => {
+  assert.equal(wk.is_current, true)
+  assert.equal(wk.current_week, thisMonday)
+  assert.equal(wk.week_end, nextWeek(thisMonday))
+})
+check('first_week is the week of the oldest boost, for the ◀ floor', () => {
+  const oldest = db.prepare('SELECT MIN(created_at) AS t FROM boosts').get().t
+  assert.equal(wk.first_week, pacificWeekStart(oldest))
+})
+
+/* ⚠️ A BAD OR FUTURE `week=` RESOLVES TO THE LIVE WEEK RATHER THAN 400ing, and
+ * the envelope is what keeps that honest — the client renders `week_start` off
+ * the response and never off what it asked for. These weeks travel in links, so
+ * the caller is often a reader rather than code. */
+for (const [name, qs] of [
+  ['a future week', `?range=week&week=${weekDateString(nextWeek(nextWeek(thisMonday)))}`],
+  ['a malformed week', '?range=week&week=next-tuesday'],
+  ['an impossible date', '?range=week&week=2026-02-30'],
+]) {
+  const r = await call(qs)
+  check(`${name} resolves to the live week and says so`, () => {
+    assert.equal(r.week_start, thisMonday, `${name} resolved to ${r.week_start}`)
+    assert.equal(r.is_current, true)
+  })
+}
+
+check('a week before the index is empty, not an error', () => {
+  // Not a clamp: an empty board is the true answer, and `first_week` is what
+  // lets the picker stop offering these rather than a floor pretending they
+  // are this week.
+  return call('?range=week&week=2019-01-07').then((r) => {
+    assert.equal(r.week_start, weekStartFromDate('2019-01-07'))
+    assert.equal(r.count, 0)
+  })
+})
+
+console.log('\nThe week rule, as the client walks it:')
+/* ⚠️ THE PICKER STEPS AND ENUMERATES WEEKS IN THE BROWSER, so the rule moved
+ * into a two-sided module and these guard the half the endpoint does not use.
+ * Held against real tzdata, which is the whole reason this file exists. */
+check('⚠️ a YYYY-MM-DD Monday is ITS OWN week, not the one before', () => {
+  /* The trap: `Date.UTC(y,m,d)` is midnight UTC, which is 4pm or 5pm PACIFIC on
+     the day BEFORE — so a Monday handed in naively resolves to the previous
+     week, every time, while the board looks entirely correct. */
+  for (let w = pacificWeekStart(Date.UTC(2024, 0, 15) / 1000);
+       w < Date.UTC(2029, 0, 1) / 1000; w = nextWeek(w)) {
+    assert.equal(weekStartFromDate(weekDateString(w)), w,
+      `${weekDateString(w)} resolved to a different week`)
+  }
+})
+
+check('⚠️ stepping is not ± 604800, and DST is why', () => {
+  // A Pacific week containing a transition is 167 or 169 hours of real time, so
+  // a flat week drifts an hour each March and November while still producing
+  // Mondays — which is why every step goes through pacificWeekStart.
+  let flat = 0
+  for (let w = pacificWeekStart(Date.UTC(2024, 0, 15) / 1000);
+       w < Date.UTC(2029, 0, 1) / 1000; w = nextWeek(w)) {
+    assert.equal(prevWeek(nextWeek(w)), w, `stepping off ${weekDateString(w)} does not return`)
+    const { dow, hms } = inPT(w)
+    assert.equal(dow, 'Mon', `${weekDateString(w)} is a ${dow} Pacific`)
+    assert.equal(hms, '00:00:00')
+    if (nextWeek(w) - w !== WEEK) flat++
+  }
+  assert.ok(flat >= 8, `no DST week found in five years (${flat}); the rule is not being exercised`)
+})
+
+check('weekSeries runs newest first and stops at the first week', () => {
+  const series = weekSeries(lastMonday - 5 * WEEK, thisMonday)
+  assert.equal(series[0], thisMonday, 'the series does not open on the newest week')
+  assert.deepEqual(series, [...series].sort((a, b) => b - a), 'the series is not newest-first')
+  assert.equal(new Set(series).size, series.length, 'the series repeats a week')
+  assert.ok(series.at(-1) <= lastMonday - 5 * WEEK + WEEK,
+    'the series stops short of the week it was given')
 })
 
 console.log('\nLimits:')
