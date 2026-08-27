@@ -53,19 +53,19 @@
  */
 import {
   getShowPage, searchShows, getShowEpisodes, SEARCH_HITS, SEARCH_MIN_CHARS,
-} from '/assets/js/ob-live.js?v=ob-v146'
+} from '/assets/js/ob-live.js?v=ob-v147'
 import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls,
   RANGE_OPTIONS,
-} from '/assets/js/feed-controls.js?v=ob-v146'
+} from '/assets/js/feed-controls.js?v=ob-v147'
 // Its own module, not two more exports of feed-controls.js — see the ⚠️ note
 // at the top of that file for the four-hour window that shape opens.
-import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v146'
+import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v147'
 import {
   LANG_ALL, languageOptions, langControl, langNote, langNoMatchText, langLabelFor,
-} from '/assets/js/feed-lang.js?v=ob-v146'
-import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v146'
-import { competitionRanks, rankLabel } from '/assets/js/rank.js?v=ob-v146'
+} from '/assets/js/feed-lang.js?v=ob-v147'
+import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v147'
+import { competitionRanks, rankLabel, markSliceTies } from '/assets/js/rank.js?v=ob-v147'
 /* ⚠️ THE CARD ITSELF IS NOT IN THIS FILE ANY MORE. show-card.js emits it as an
  * HTML string and show-card-actions.js attaches its verbs, which is what lets
  * functions/index.js render the opening page of this feed at the edge — a
@@ -82,9 +82,9 @@ import {
   COPY, copyFor, toCard, showCardHtml, showRankValue,
   SORT_OPTIONS, RANKED_SORTS, SHOW_CARDS_PER_PAGE,
   num, fmtSats, plural,
-} from '/assets/js/show-card.js?v=ob-v146'
-import { wireShowCards } from '/assets/js/show-card-actions.js?v=ob-v146'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v146'
+} from '/assets/js/show-card.js?v=ob-v147'
+import { wireShowCards } from '/assets/js/show-card-actions.js?v=ob-v147'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v147'
 
 /* ── The hash's language, on an already-hydrated feed ──
  * The twin of the map in feeds-podcasts.js, and there for the same reason: a
@@ -172,12 +172,17 @@ function renderPlaceholder(list, title, body) {
  * and in exchange the All drawer stops fetching the per-show shard, which ran to
  * 1.95MB on the most-boosted show.
  */
-async function loadShowPage({ medium, sort, range, lang, offset, signal }) {
+async function loadShowPage({ medium, sort, range, lang, offset, q = null, signal }) {
   const { records, nextOffset } = await getShowPage({
     medium: medium === 'music' ? 'music' : null,
-    sort, range, lang, offset, signal,
+    sort, range, lang, offset, q, signal,
   })
-  return { items: records.map(toCard), nextOffset }
+  const items = records.map(toCard)
+  // A `q=` page's records carry the server's rank — each row's standing in the
+  // FULL ordering — and the painter reads `_rank`. An unfiltered page carries
+  // none and is numbered by position in rebuild() instead.
+  for (const it of items) if (Number.isFinite(it.rank)) it._rank = it.rank
+  return { items, nextOffset }
 }
 
 // ── entry point ───────────────────────────────────────────────────────
@@ -276,6 +281,13 @@ export async function renderShows({ panel, list, medium = 'other', lang = null, 
   let pickedItem = null
   let pickLoading = false
   let pickSeq = 0
+  /* The submitted whole-query filter (Reed's ask, 2026-08-27): Enter in the
+   * search box turns the feed into the full result list. While set, every page
+   * this feed loads carries `q=` and `shows` holds RESULTS — a filtered slice
+   * of the ranked view, each row wearing the server's own rank — so the
+   * positional numbering and the tie-sync are both skipped. Cleared by a pick,
+   * by the box's ×, and by anything that resets the corpus. */
+  let query = ''
 
   /* `data-show-list` is what a card's drawer walks up to for the active window,
    * and `data-since` carries it. Read at OPEN time rather than baked into the
@@ -326,7 +338,7 @@ export async function renderShows({ panel, list, medium = 'other', lang = null, 
         btn.disabled = true
         btn.textContent = 'Loading…'
         try {
-          const next = await loadShowPage({ medium, sort: sortKey, range: rangeKey, lang: langKey, offset: nextOffset })
+          const next = await loadShowPage({ medium, sort: sortKey, range: rangeKey, lang: langKey, q: query || null, offset: nextOffset })
           shows = shows.concat(next.items)
           nextOffset = next.nextOffset
           rebuild({ keepShown: true })
@@ -364,7 +376,8 @@ export async function renderShows({ panel, list, medium = 'other', lang = null, 
    * those rows arrive this writes the corrected label back. Idempotent, and on
    * a full repaint every label already matches, so it is a no-op. */
   function syncRankLabels() {
-    if (picked) return
+    // Query results wear server ranks, which a later page cannot change.
+    if (picked || query) return
     // The CARD elements, not the rank nodes: an unranked sort renders no rank
     // node at all and indexing those would slide by one. The server's adopted
     // block sits ahead of `view` in the DOM, hence the offset.
@@ -390,7 +403,13 @@ export async function renderShows({ panel, list, medium = 'other', lang = null, 
      * next distinct value skips the group, so two shows with the same boost
      * count are not separated by the sats tiebreak the endpoint pages by. See
      * assets/js/rank.js. */
-    if (!picked) {
+    /* Query results are never renumbered: each row already wears the rank the
+     * server computed over the whole ordering, and numbering the filtered list
+     * by position would tell a searched show it is #1 of 1. Same rule the
+     * single-pick path has always had. What IS stamped is the tie flag, from
+     * ranks repeated inside the slice. */
+    if (query && !picked) markSliceTies(shows)
+    if (!picked && !query) {
       /* The seed carries the adopted block's last card across the one gap in
        * the run: `shows` is a contiguous prefix of the ranked view starting at
        * `adoptedCount`, not at 0, whenever the server painted the opening page.
@@ -428,9 +447,16 @@ export async function renderShows({ panel, list, medium = 'other', lang = null, 
               h('strong', { text: 'Not in this range' }),
               copy.outOfRange(picked.label),
             ])
-          : h('div', { class: 'feed-placeholder' }, [
-              h('strong', { text: empty[0] }), empty[1],
-            ]))
+          : query
+            // The menu's own no-hit line, so the two cannot drift into two
+            // versions of what a miss means here.
+            ? h('div', { class: 'feed-placeholder' }, [
+                h('strong', { text: `No matches for “${query}”` }),
+                noMatch(),
+              ])
+            : h('div', { class: 'feed-placeholder' }, [
+                h('strong', { text: empty[0] }), empty[1],
+              ]))
       return
     }
     paintMore()
@@ -501,7 +527,7 @@ export async function renderShows({ panel, list, medium = 'other', lang = null, 
   async function refetchUnfiltered() {
     if (shows.length) { rebuild(); return }
     try {
-      const page = await loadShowPage({ medium, sort: sortKey, range: rangeKey, lang: langKey, offset: 0 })
+      const page = await loadShowPage({ medium, sort: sortKey, range: rangeKey, lang: langKey, q: query || null, offset: 0 })
       shows = page.items
       nextOffset = page.nextOffset
     } catch (e) {
@@ -528,7 +554,7 @@ export async function renderShows({ panel, list, medium = 'other', lang = null, 
     const mine = ++seq
     loading = true
     try {
-      const page = await loadShowPage({ medium, sort: sortKey, range: rangeKey, lang: langKey, offset: 0 })
+      const page = await loadShowPage({ medium, sort: sortKey, range: rangeKey, lang: langKey, q: query || null, offset: 0 })
       if (mine !== seq) return
       shows = page.items
       nextOffset = page.nextOffset
@@ -751,12 +777,44 @@ export async function renderShows({ panel, list, medium = 'other', lang = null, 
     mountLangControl()
   })
 
+  // One definition of what a miss means, read by the menu's no-hit line and by
+  // the feed placeholder a submitted query paints.
+  function noMatch() {
+    return langKey !== LANG_ALL ? langNoMatchText(langKey, langLabel, copy.noun)
+      : rangeKey === 'all' ? copy.searchNoneAll
+      : copy.searchNoneRange
+  }
+
   search = mountFeedSearch(panel, {
     placeholder: copy.searchPlaceholder,
     label: copy.searchLabel,
     noun: copy.searchNoun,
     minChars: SEARCH_MIN_CHARS,
-    onPick: (entry) => { picked = entry; resolvePick() },
+    onPick: (entry) => {
+      /* Leaving query mode by any route resets the corpus: `shows` holds the
+       * RESULTS while a query is active, and refetchUnfiltered's "still in
+       * hand" shortcut would otherwise repaint them as the feed. */
+      if (query) { query = ''; shows = []; nextOffset = 0 }
+      picked = entry
+      resolvePick()
+    },
+    /* Enter (or the menu's footer row): the feed becomes the full result list.
+     * A query is a filter over the same ranked view the feed pages, so it runs
+     * the ordinary pipeline with `q=` attached — the server applies the active
+     * medium, range, sort and language, pages as usual, and stamps each row's
+     * rank over the WHOLE ordering, which is what rank retention means here. */
+    onSubmit: (q) => {
+      // No same-query no-op guard: a requery can be dropped or fail, and Enter
+      // again is the reader's retry. The worst repeat costs one coalesced fetch.
+      query = q
+      // Retire any pick resolve still in flight, the way resolvePick itself
+      // would, so a late reply cannot repaint over the results.
+      pickSeq++
+      picked = null
+      pickedItem = null
+      pickLoading = false
+      requery()
+    },
     /* ⚠️ SEARCHES THE WHOLE INDEX, not the pages loaded. The in-memory index
      * this replaces read the full range, which was true only while the browser
      * downloaded every show; now the feed pages a ranked list and those pages
@@ -768,9 +826,11 @@ export async function renderShows({ panel, list, medium = 'other', lang = null, 
      * `podcasts_fts`, which indexes it beside the title, and the guid as an
      * equality, since FTS5 does not index it and a pasted one is all hyphens.
      */
-    searchRemote: async (query, { signal }) => {
+    // `qText`, not `query` — that name is the renderer's own submitted-filter
+    // state now, and shadowing it here invites reading one as the other.
+    searchRemote: async (qText, { signal }) => {
       const records = await searchShows({
-        q: query, medium: wantMusic ? 'music' : null,
+        q: qText, medium: wantMusic ? 'music' : null,
         // ⚠️ THE LANGUAGE HAS TO TRAVEL WITH THE SEARCH, like the medium: a
         // suggestion the feed would then filter away to nothing is the
         // documented failure that keeps /api/v1/search off these feeds.
@@ -786,16 +846,14 @@ export async function renderShows({ panel, list, medium = 'other', lang = null, 
           ? `${plural(num(r.boosts), 'boost', 'boosts')} · ${fmtSats(num(r.sats))} sats`
           : r.guid,
         img: r.img,
-        query,
+        query: qText,
       }))
     },
     // The language is tested FIRST because it is the narrowest of the two
     // filters and the only one whose fix is a single press. It also outranks
     // the All case, where the line would otherwise call a coverage boundary on
     // a show that is in the index and merely in another language.
-    noMatchText: () => (langKey !== LANG_ALL ? langNoMatchText(langKey, langLabel, copy.noun)
-      : rangeKey === 'all' ? copy.searchNoneAll
-      : copy.searchNoneRange),
+    noMatchText: noMatch,
   })
 
   // The server's cards are complete markup and still need their verbs: the

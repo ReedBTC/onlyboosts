@@ -45,32 +45,32 @@
  * Entry point: renderPodcasts({ panel, list }) — lazy-imported by feeds.js
  * the first time the feed is opened.
  */
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v146'
-import { toEpisodeShape, normalizeBoosts, episodeApiToBoosts } from '/assets/js/ob-data.js?v=ob-v146'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v147'
+import { toEpisodeShape, normalizeBoosts, episodeApiToBoosts } from '/assets/js/ob-data.js?v=ob-v147'
 import {
   getEpisodePage, searchEpisodes, SEARCH_HITS, SEARCH_MIN_CHARS,
-} from '/assets/js/ob-live.js?v=ob-v146'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v146'
+} from '/assets/js/ob-live.js?v=ob-v147'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v147'
 import {
   rangeDays, rangeControl, sortControl, mountFeedControls,
   RANGE_OPTIONS,
-} from '/assets/js/feed-controls.js?v=ob-v146'
+} from '/assets/js/feed-controls.js?v=ob-v147'
 // Its own module, not two more exports of feed-controls.js — see the ⚠️ note
 // at the top of that file for the four-hour window that shape opens.
-import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v146'
+import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v147'
 import {
   LANG_ALL, languageOptions, langControl, langNote, langNoMatchText, langLabelFor,
-} from '/assets/js/feed-lang.js?v=ob-v146'
-import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v146'
+} from '/assets/js/feed-lang.js?v=ob-v147'
+import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v147'
 // The card, and the card's verbs. One definition each, shared with the edge.
 import {
   COPY, HOME_CARD_PARTS, buildEpisodes, renderEpisodeCards, RANKED_SORTS, SORT_OPTIONS,
   episodeRankValue,
-} from '/assets/js/episode-card.js?v=ob-v146'
-import { competitionRanks, rankLabel } from '/assets/js/rank.js?v=ob-v146'
+} from '/assets/js/episode-card.js?v=ob-v147'
+import { competitionRanks, rankLabel, markSliceTies } from '/assets/js/rank.js?v=ob-v147'
 import {
   wireEpisodeCards, hydrateCardProfiles, prewarmBoosting,
-} from '/assets/js/episode-card-actions.js?v=ob-v146'
+} from '/assets/js/episode-card-actions.js?v=ob-v147'
 
 const INITIAL_CARDS = 30       // episodes rendered per "load more" batch
 
@@ -380,6 +380,13 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
   let pickedItem = null
   let pickLoading = false
   let pickSeq = 0
+  /* The submitted whole-query filter (Reed's ask, 2026-08-27): Enter in the
+   * search box turns the feed into the full result list. While set, every page
+   * this feed loads carries `q=` and `items` holds RESULTS — a filtered slice
+   * of the ranked view, each row wearing the server's own rank — so renumber()
+   * and the tie-sync are both skipped. Cleared by a pick, by the box's ×, and
+   * by anything that resets the corpus. */
+  let query = ''
   // Every identity the feed has seen, merged across pages: the card reads names
   // and faces out of it for the booster rows, the drawer-bar stack and the
   // @mention chips inside a boost message.
@@ -550,10 +557,17 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
               h('strong', { text: 'Not in this range' }),
               `${picked.label} ${copy.outOfRange}`,
             ])
-          : h('div', { class: 'feed-placeholder' }, [
-              h('strong', { text: copy.emptyWindow[0] }),
-              copy.emptyWindow[1],
-            ]))
+          : query
+            // The menu's own no-hit line, so the two cannot drift into two
+            // versions of what a miss means here.
+            ? h('div', { class: 'feed-placeholder' }, [
+                h('strong', { text: `No matches for “${query}”` }),
+                noMatch(),
+              ])
+            : h('div', { class: 'feed-placeholder' }, [
+                h('strong', { text: copy.emptyWindow[0] }),
+                copy.emptyWindow[1],
+              ]))
       return
     }
     cards.innerHTML = cardsHtml(view)
@@ -592,7 +606,7 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
         btn.textContent = 'Loading…'
         try {
           const next = await loadEpisodePage({
-            medium, sort: sortKey, range: rangeKey, lang: langKey, offset: nextOffset, follows,
+            medium, sort: sortKey, range: rangeKey, lang: langKey, q: query || null, offset: nextOffset, follows,
           })
           mergeProfiles(next.profiles)
           // Concat BEFORE numbering: a competition rank reads the row ahead of
@@ -639,6 +653,12 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
    * seed carries the adopted block's last card across the one gap in it. */
   function renumber() {
     if (picked) return
+    /* Query results are never renumbered: each row already wears the rank the
+     * server computed over the whole ordering, and numbering the filtered list
+     * by position would tell a searched episode it is #1 of 1. Same rule the
+     * single-pick path has always had. What IS stamped is the tie flag, from
+     * ranks repeated inside the slice. */
+    if (query) { markSliceTies(items); return }
     const ranks = competitionRanks(items, episodeRankValue(sortKey), {
       startIndex: adoptedCount,
       prevValue: adoptedLastValue,
@@ -658,7 +678,8 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
    * sort renders no rank node at all and indexing those would slide by one. The
    * server's adopted block sits ahead of `items` in the DOM, hence the offset. */
   function syncRankLabels() {
-    if (picked) return
+    // Query results wear server ranks, which a later page cannot change.
+    if (picked || query) return
     const els = cards.querySelectorAll('[data-episode-card]')
     items.forEach((it, i) => {
       const node = els[adoptedCount + i]?.querySelector('.pcast-rank')
@@ -740,7 +761,7 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
   async function refetchUnfiltered() {
     if (items.length) { rebuild(); return }
     try {
-      const page = await loadEpisodePage({ medium, sort: sortKey, range: rangeKey, lang: langKey, offset: 0, follows })
+      const page = await loadEpisodePage({ medium, sort: sortKey, range: rangeKey, lang: langKey, q: query || null, offset: 0, follows })
       mergeProfiles(page.profiles)
       items = page.items
       nextOffset = page.nextOffset
@@ -763,7 +784,7 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
     if (loading) return
     loading = true
     try {
-      const page = await loadEpisodePage({ medium, sort: sortKey, range: rangeKey, lang: langKey, offset: 0, follows })
+      const page = await loadEpisodePage({ medium, sort: sortKey, range: rangeKey, lang: langKey, q: query || null, offset: 0, follows })
       mergeProfiles(page.profiles)
       items = page.items
       nextOffset = page.nextOffset
@@ -915,7 +936,32 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
     label: copy.searchLabel,
     noun: copy.searchNoun,
     minChars: SEARCH_MIN_CHARS,
-    onPick: (entry) => { picked = entry; resolvePick() },
+    onPick: (entry) => {
+      /* Leaving query mode by any route resets the corpus: `items` holds the
+       * RESULTS while a query is active, and refetchUnfiltered's "still in
+       * hand" shortcut would otherwise repaint them as the feed. */
+      if (query) { query = ''; items = []; nextOffset = 0 }
+      picked = entry
+      resolvePick()
+    },
+    /* Enter (or the menu's footer row): the feed becomes the full result list.
+     * A query is a filter over the same ranked view the feed pages, so it runs
+     * the ordinary pipeline with `q=` attached — the server applies the active
+     * medium, range, sort, language AND scope, pages as usual, and stamps each
+     * row's rank over the whole ordering, which is what rank retention means
+     * here. */
+    onSubmit: (q) => {
+      // No same-query no-op guard: this requery is refused outright while one
+      // is loading, and Enter again is the reader's retry.
+      query = q
+      // Retire any pick resolve still in flight, the way resolvePick itself
+      // would, so a late reply cannot repaint over the results.
+      pickSeq++
+      picked = null
+      pickedItem = null
+      pickLoading = false
+      requery()
+    },
     /* ⚠️ SEARCHES THE WHOLE INDEX, not the loaded pages, and that is the half of
      * the server-side ranking move that was missing.
      *
@@ -931,12 +977,14 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
      * this: title alone returned 2 hits for "UNGOVERNABLE" against the show's
      * own 135 episodes, all 2 belonging to other shows.
      */
-    searchRemote: async (query, { signal }) => {
+    // `qText`, not `query` — that name is the renderer's own submitted-filter
+    // state now, and shadowing it here invites reading one as the other.
+    searchRemote: async (qText, { signal }) => {
       const records = await searchEpisodes({
         // Same 'music'|null the data layer takes everywhere else. Passing this
         // feed's own 'other' would happen to work, since anything that isn't
         // 'music' becomes not_medium=music, but only by accident.
-        q: query, medium: medium === 'music' ? 'music' : null,
+        q: qText, medium: medium === 'music' ? 'music' : null,
         // ⚠️ THE LANGUAGE HAS TO TRAVEL WITH THE SEARCH, for the same reason the
         // medium and the scope do: a suggestion the feed would then filter away
         // to nothing is the documented failure that keeps /api/v1/search off
@@ -955,7 +1003,7 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
         img: r.img,
         // The query that produced this hit, carried so the pick can re-issue it
         // and land on the same row with its notes attached.
-        query,
+        query: qText,
       }))
     },
     // What a miss MEANS depends on where the reader is standing: on All/Global
@@ -966,11 +1014,17 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
     // and the only one whose fix is a single press — under Follows + German,
     // "switch to Global" sends the reader past the filter that is actually
     // hiding their show. See langNoMatchText.
-    noMatchText: () => (langKey !== LANG_ALL ? langNoMatchText(langKey, langLabel, langNoun)
+    noMatchText: noMatch,
+  })
+
+  // One definition of what a miss means, read by the menu's no-hit line and by
+  // the feed placeholder a submitted query paints.
+  function noMatch() {
+    return langKey !== LANG_ALL ? langNoMatchText(langKey, langLabel, langNoun)
       : follows ? copy.searchNoneFollows
       : rangeKey === 'all' ? copy.searchNoneAll
-      : copy.searchNoneRange),
-  })
+      : copy.searchNoneRange
+  }
 
   if (adopted) {
     // Nothing to paint — the cards are already on the page. They still need

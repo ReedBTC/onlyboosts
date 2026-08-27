@@ -2757,20 +2757,47 @@ view and the address.
 the panel rather than the sticky bar: range and sort are read while scrolling a
 long list, a search is a thing you do at the top.
 
-| Feed | Searches | A pick does |
-|---|---|---|
-| Episodes / Songs | episode title, plus the show behind it | filters to that one episode |
-| Shows / Albums | show title, plus the guid | filters to that one show |
+| Feed | Searches | A pick does | Enter does |
+|---|---|---|---|
+| Episodes / Songs | episode title, plus the show behind it | filters to that one episode | the feed becomes the full result list |
+| Shows / Albums | show title, plus the guid | filters to that one show | the same |
 
 **⚠️ THE MEMBERS LOOKUP IS NO LONGER IN THIS TABLE AND IS NOT A FILTER.** It
 left the Boosts panel on 2026-08-23, leads the Members tab, and **navigates** to
 `/booster/<npub>`. It is the same `mountFeedSearch`, so everything below about
 debouncing, aborting and sequence-guarding still applies to it; nothing below
-about rank retention or `noMatchText` does. See **The member lookup**.
+about rank retention or `noMatchText` does — **and it has no Enter-submit**,
+deliberately (Reed's call, 2026-08-27: "leave npubs alone"), so there Enter
+still takes the top suggestion. See **The member lookup**.
 
-**Typing suggests, picking filters.** Five hits, and nothing in the list moves
-until one is chosen. That's what a ranked feed needs: the question is "where does
-my show stand", and the answer is one card carrying its rank.
+**Typing suggests, picking filters, Enter submits.** Five hits, and nothing in
+the list moves until one is chosen — a pick answers "where does my show stand"
+with one card carrying its rank. **Enter (2026-08-27, Reed's ask) answers the
+other question**: the feed becomes the full scrollable result list for what was
+typed, because five truncated hits is not an answer to "what's here about
+bitcoin". Three things hold it together:
+
+- **Results mode is the feed's own pipeline with `q=` attached** — the four
+  ranked feeds' state gains a `query` beside `langKey`, every page load carries
+  it, and the endpoints apply the active medium, range, sort, language and
+  scope and page as usual (verified against production: `offset`/`next_offset`
+  work on the `q=` path), so "Load more", the range buttons, the sort menu and
+  the language pill all keep working *inside* the results.
+- **⚠️ Query results are never renumbered.** Each row wears the server's
+  `RANK()` over the whole ordering; `renumber()`/`competitionRanks` and the
+  tie-sync are skipped. The tie flag comes from `rank.js#markSliceTies` —
+  a rank repeated inside the slice is provably a tie, and a partner the query
+  filtered out stays undisclosed, the same safe direction the open-ended feeds
+  err in.
+- **⚠️ `onSubmit` is what flips the box's Enter behaviour**, in feed-search.js:
+  with it, suggestions are NOT auto-highlighted (Enter means "search what I
+  typed" until the reader arrows into the menu, the submitting-combobox
+  convention) and the menu grows a "See all results for …" footer row so a
+  mouse-only reader can find it. Without it — the member lookup — nothing
+  changed. Clearing arrives as `onPick(null)` either way, and **the renderer
+  must reset its corpus when the query drops**, because `shows`/`items` hold
+  RESULTS while one is active and `refetchUnfiltered`'s still-in-hand shortcut
+  would repaint them as the feed.
 
 **⚠️ Rank retention is the renderer's half of the contract, and it is an
 ordering**: sort the range's full corpus, stamp each row with its position,

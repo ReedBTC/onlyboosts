@@ -19,6 +19,25 @@
  * stand", and the answer is one card carrying its own rank badge, not a
  * shortlist whose positions would have to be renumbered.
  *
+ * ── Enter submits the whole query (Reed's ask, 2026-08-27) ───────────
+ *
+ * Where the caller supplies `onSubmit`, the box has a second outcome: Enter
+ * with no suggestion highlighted hands the QUERY to the feed, which becomes
+ * the full scrollable result list rather than a five-row menu. Two changes
+ * ride the flag, and both are what a submitting combobox does everywhere
+ * else (a video site's search, a search engine's):
+ *
+ *   - suggestions are NOT auto-highlighted. Enter used to pick the top hit
+ *     because the first row was pre-selected; with a submit action that same
+ *     keystroke must mean "search for what I typed", so a suggestion is only
+ *     picked once the reader has arrowed to it or clicked it.
+ *   - the menu grows a footer row naming the submit ("See all results for
+ *     …"), because a mouse-only reader would otherwise never learn Enter
+ *     does anything.
+ *
+ * Without `onSubmit` nothing changes — the member lookup keeps the old
+ * behaviour, where Enter takes the top suggestion, deliberately.
+ *
  * ── Rank retention is the caller's half of the contract ──────────────
  *
  * The module yields a key; the renderer decides what to do with it. Every
@@ -192,6 +211,11 @@ export function resetFeedSearch(panel) {
  *   A function rather than a string because what a miss MEANS depends on the
  *   feed's live range and scope.
  * @param {Function} opts.onPick         called with the picked entry, or null
+ * @param {Function} [opts.onSubmit]     called with the trimmed query when the
+ *   reader submits it whole (Enter with nothing highlighted, or the menu's
+ *   footer row). Supplying it turns off suggestion auto-highlight — see the
+ *   header. Clearing still arrives as onPick(null), one channel for "the box
+ *   is empty again" whichever mode filled it.
  * @returns {{refresh: Function, clear: Function, selection: object|null}|null}
  */
 export function mountFeedSearch(panel, opts) {
@@ -202,16 +226,23 @@ export function mountFeedSearch(panel, opts) {
   const menuId = `feed-search-menu-${uid}`
 
   const remote = typeof opts.searchRemote === 'function'
+  const submits = typeof opts.onSubmit === 'function'
   const minChars = Math.max(1, opts.minChars || 1)
 
   let entries = null      // lazily built by getEntries(), dropped on refresh()
   let selection = null    // the picked entry once something is picked
+  let submitted = false   // a whole-query submit is the active filter
   let hits = []           // what the menu is currently showing
   let active = -1         // keyboard cursor into hits
   let state = 'ready'     // ready | short | loading | error — remote path only
   let timer = null        // debounce handle
   let inflight = null     // AbortController for the request in flight
   let seq = 0             // monotonic request id; a late reply below it is stale
+
+  // With a submit action, nothing is pre-selected: Enter means "search for
+  // what I typed" until the reader arrows into the menu. Without one, the top
+  // hit is highlighted so Enter takes it — the original contract.
+  const autoActive = (n) => (submits ? -1 : (n ? 0 : -1))
 
   const input = h('input', {
     class: 'feed-search-input',
@@ -316,7 +347,7 @@ export function mountFeedSearch(panel, opts) {
     // The reader may have emptied the box or picked something while this was
     // out; either way the menu it would open no longer describes anything.
     if (!input.value || selection) return
-    active = hits.length ? 0 : -1
+    active = autoActive(hits.length)
     renderMenu()
     open()
     setActive(active)
@@ -370,6 +401,26 @@ export function mountFeedSearch(panel, opts) {
       item.addEventListener('click', () => pick(e))
       menu.appendChild(item)
     })
+    appendSubmitRow()
+  }
+
+  /* The footer row that makes the submit discoverable by mouse. It is not one
+   * of `hits`, so the arrow keys never land on it — Enter with nothing
+   * highlighted IS this row's action, and it says so. */
+  function appendSubmitRow() {
+    if (!submits) return
+    const q = input.value.trim()
+    if (q.length < minChars) return
+    const row = h('button', {
+      class: 'feed-search-item feed-search-all', type: 'button',
+    }, [
+      h('span', { class: 'feed-search-text' }, [
+        h('span', { class: 'feed-search-label', text: `See all results for “${q}”` }),
+      ]),
+    ])
+    row.addEventListener('mousedown', (ev) => ev.preventDefault())
+    row.addEventListener('click', () => submitQuery(q))
+    menu.appendChild(row)
   }
 
   function open() {
@@ -413,6 +464,7 @@ export function mountFeedSearch(panel, opts) {
   function pick(e) {
     cancelRemote()
     selection = { ...e }
+    submitted = false
     input.value = e.label
     clearBtn.hidden = false
     field.classList.add('is-filtered')
@@ -420,12 +472,29 @@ export function mountFeedSearch(panel, opts) {
     opts.onPick?.(selection)
   }
 
-  // Dropping the filter. `silent` is for the caller's own clear(), where the
-  // renderer is already repainting and doesn't need telling twice.
-  function clear({ silent = false, focus = false } = {}) {
-    const had = !!selection
+  /* The whole-query submit. The input keeps what was typed — it IS the filter
+   * now — and `hits` is dropped so a refocus cannot reopen a menu describing
+   * the suggestions the reader just declined. */
+  function submitQuery(q) {
     cancelRemote()
     selection = null
+    submitted = true
+    hits = []
+    state = 'ready'
+    clearBtn.hidden = false
+    field.classList.add('is-filtered')
+    close()
+    opts.onSubmit?.(q)
+  }
+
+  // Dropping the filter — a pick or a submitted query alike. `silent` is for
+  // the caller's own clear(), where the renderer is already repainting and
+  // doesn't need telling twice.
+  function clear({ silent = false, focus = false } = {}) {
+    const had = !!selection || submitted
+    cancelRemote()
+    selection = null
+    submitted = false
     input.value = ''
     clearBtn.hidden = true
     field.classList.remove('is-filtered')
@@ -445,12 +514,22 @@ export function mountFeedSearch(panel, opts) {
       field.classList.remove('is-filtered')
       opts.onPick?.(null)
     }
+    /* A submitted query survives editing — retyping should not refetch the
+     * unfiltered feed under the reader's cursor — but EMPTYING the box drops
+     * it: at that point nothing on screen names the filter and the × has just
+     * vanished with the text, so leaving it active would strand the reader in
+     * results mode with no visible way out. */
+    if (submitted && !input.value) {
+      submitted = false
+      field.classList.remove('is-filtered')
+      opts.onPick?.(null)
+    }
     clearBtn.hidden = !input.value
 
     if (!remote) {
       hits = searchLocal(input.value)
       if (!input.value) { close(); return }
-      active = hits.length ? 0 : -1
+      active = autoActive(hits.length)
       renderMenu()
       open()
       setActive(active)
@@ -470,7 +549,7 @@ export function mountFeedSearch(panel, opts) {
       state = 'loading'
       timer = setTimeout(() => { timer = null; runRemote(q) }, REMOTE_DEBOUNCE_MS)
     }
-    active = hits.length ? 0 : -1
+    active = autoActive(hits.length)
     renderMenu()
     open()
     setActive(active)
@@ -489,6 +568,15 @@ export function mountFeedSearch(panel, opts) {
       return
     }
     if (e.key === 'Enter') {
+      if (submits) {
+        // A suggestion the reader has arrowed to wins; otherwise the typed
+        // query is the ask, whether or not the menu happens to be open.
+        if (!menu.hidden && hits.length && active >= 0) { e.preventDefault(); pick(hits[active]); return }
+        e.preventDefault()
+        const q = input.value.trim()
+        if (q.length >= minChars) submitQuery(q)
+        return
+      }
       if (menu.hidden || !hits.length) return
       e.preventDefault()
       pick(hits[active >= 0 ? active : 0])
@@ -496,7 +584,7 @@ export function mountFeedSearch(panel, opts) {
     }
     if (e.key === 'Escape') {
       if (!menu.hidden) { close(); return }
-      if (selection || input.value) { e.preventDefault(); clear({ focus: true }) }
+      if (selection || submitted || input.value) { e.preventDefault(); clear({ focus: true }) }
     }
   })
 

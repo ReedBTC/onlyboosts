@@ -76,6 +76,24 @@ export function competitionRanks(list, valueOf, seed = null) {
 }
 
 /**
+ * Mark ties inside a SERVER-RANKED result slice, in place.
+ *
+ * For rows that arrive already carrying `_rank` — a `q=` search result, where
+ * each row's rank was computed over the whole ordering and the rows on hand
+ * are a filtered slice of it. A rank repeated inside the slice is provably a
+ * tie; a partner the filter removed stays invisible, which is the same safe
+ * direction competitionRanks' own `tied` errs in — the rank is right and the
+ * row merely does not yet disclose its tie.
+ */
+export function markSliceTies(rows) {
+  const seen = new Map()
+  for (const r of rows) {
+    if (Number.isFinite(r._rank)) seen.set(r._rank, (seen.get(r._rank) || 0) + 1)
+  }
+  for (const r of rows) r._tied = (seen.get(r._rank) || 0) > 1
+}
+
+/**
  * The numeral as a reader sees it: `4`, or `T4` where the place is shared.
  *
  * ⚠️ NO `#` HERE. The feed card prints a bare position beside the card, where
