@@ -140,6 +140,8 @@ function boot(hash, { signedIn = false } = {}) {
     sub: () => (selected(subEls)[0] || {}).dataset?.value ?? null,
     barParent: () => (bar.parentNode === barSlot ? 'slot' : bar.parentNode === barWrap ? 'wrap' : 'nowhere'),
     fire: (type) => (winListeners[type] || []).forEach((f) => f({ type })),
+    // A renderer's report, arriving as a document event the way the real ones do.
+    dispatch: (type, detail) => doc.dispatchEvent(new CE(type, { detail })),
     tabsSelected: () => selected(tabEls).length,
     subsSelected: () => selected(subEls).length,
   }
@@ -156,6 +158,8 @@ const eq = (name, got, want) => {
 // ── 1. Parsing, against the real functions ───────────────────────────
 const loc = { hash: '' }
 const langByFeed = Object.create(null)
+const rangeByFeed = Object.create(null)
+const sortByFeed = Object.create(null)
 /* ⚠️ THE HASH↔KEY MAPS ARE EXTRACTED, NOT STUBBED. `hashFor` reads HASH_OF and
    `fromHash` reads KEY_OF, so a copy here would let the shipped table say
    `#members` while this file still believed `#members-global` and every
@@ -179,21 +183,26 @@ const HASH_MAPS = [
 ].join('\n')
 
 const { normLang, parseHash, hashFor, HASH_OF, KEY_OF } = new Function(
-  'location', 'langByFeed',
+  'location', 'langByFeed', 'rangeByFeed', 'sortByFeed',
   `${HASH_MAPS}
-   ${[grab('normLang'), grab('parseHash'), grab('hashFor')].join('\n')}
+   ${[grab('normLang'), grab('normRange'), grab('normSort'), grab('parseHash'), grab('hashFor')].join('\n')}
    return { normLang, parseHash, hashFor, HASH_OF, KEY_OF }`,
-)(loc, langByFeed)
+)(loc, langByFeed, rangeByFeed, sortByFeed)
 const at = (h) => { loc.hash = h; return parseHash() }
+// The full parse shape, defaults empty — the deep-equals below stay legible.
+const P = (key, lang = '', range = '', sort = '') => ({ key, lang, range, sort })
 
 console.log('\nParsing the shared URL:')
-eq('#shows?lang=de', at('#shows?lang=de'), { key: 'shows', lang: 'de' })
-eq('a bare hash is unchanged', at('#shows'), { key: 'shows', lang: '' })
-eq('no hash at all', at(''), { key: '', lang: '' })
+eq('#shows?lang=de', at('#shows?lang=de'), P('shows', 'de'))
+eq('a bare hash is unchanged', at('#shows'), P('shows'))
+eq('no hash at all', at(''), P(''))
 eq('a retired hash still yields its key', at('#podcasts-global?lang=de').key, 'podcasts-global')
-eq('an unknown param is ignored, not choked on', at('#shows?sort=sats').lang, '')
-eq('lang alongside one', at('#shows?sort=sats&lang=de').lang, 'de')
-eq('a bare ?', at('#shows?'), { key: 'shows', lang: '' })
+eq('an unknown param is ignored, not choked on', at('#shows?foo=bar'), P('shows'))
+eq('lang alongside one', at('#shows?foo=bar&lang=de').lang, 'de')
+eq('a bare ?', at('#shows?'), P('shows'))
+eq('the whole view', at('#shows?lang=de&range=1m&sort=sats'), P('shows', 'de', '1m', 'sats'))
+eq('range alone', at('#albums?range=1w'), P('albums', '', '1w'))
+eq('sort alone', at('#episodes-global?sort=count'), P('episodes-global', '', '', 'count'))
 
 console.log('\nNormalizing what a human might type or paste:')
 eq('uppercase', at('#shows?lang=DE').lang, 'de')
@@ -209,24 +218,48 @@ eq('a digit is not a subtag', at('#shows?lang=1').lang, '')
 eq('empty', at('#shows?lang=').lang, '')
 eq('a subtag we hold nothing for still parses', at('#shows?lang=ko').lang, 'ko')
 
+console.log('\nNormalizing the range and the sort:')
+// ⚠️ 'all' is every ranked feed's default, so it folds to no parameter — the
+// same move lang=all makes: the bare hash IS the default view's address.
+eq('range=all is the default, not a filter', at('#shows?range=all').range, '')
+eq('range is case-folded', at('#shows?range=1M').range, '1m')
+eq('an unknown range is dropped', at('#shows?range=2y').range, '')
+eq('a garbage range is dropped', at('#shows?range=7days').range, '')
+// A sort is validated by SHAPE only: the keys are the renderers' own and
+// differ per feed, so the renderer coerces an unknown one and reports back.
+eq('a sort passes through by shape', at('#shows?sort=boosters').sort, 'boosters')
+eq('and is case-folded', at('#shows?sort=SATS').sort, 'sats')
+eq('a non-word sort is dropped', at('#shows?sort=sats;drop').sort, '')
+eq('a one-letter sort is dropped', at('#shows?sort=x').sort, '')
+
 console.log('\nWriting the hash back:')
 eq('no filter writes the hash it always wrote', hashFor('shows'), '#shows')
 langByFeed['shows'] = 'de'
 eq('a filter appends it', hashFor('shows'), '#shows?lang=de')
+rangeByFeed['shows'] = '1m'
+sortByFeed['shows'] = 'sats'
+eq('the whole view rides together', hashFor('shows'), '#shows?lang=de&range=1m&sort=sats')
+langByFeed['shows'] = ''
+eq('each param is independent', hashFor('shows'), '#shows?range=1m&sort=sats')
+rangeByFeed['shows'] = ''
+sortByFeed['shows'] = ''
 eq('another feed is unaffected', hashFor('albums'), '#albums')
 /* ⚠️ THE ROUND TRIP RESOLVES THROUGH KEY_OF, the way fromHash does. Comparing
    `back.key` to the feed directly would fail for any feed whose hash is not its
    key, and "fix" it by dropping that feed from the list — which is how a
    mapping stops being tested. */
 const keyOf = (raw) => KEY_OF[raw] || raw
-for (const [feed, lang] of [
-  ['shows', 'de'], ['albums', 'en'], ['songs-follows', 'unknown'],
-  ['episodes-global', 'nb'], ['members-global', ''], ['members-follows', ''],
+for (const [feed, lang, range, sort] of [
+  ['shows', 'de', '1m', 'sats'], ['albums', 'en', '', ''], ['songs-follows', 'unknown', '1y', ''],
+  ['episodes-global', 'nb', '', 'count'], ['members-global', '', '', ''], ['members-follows', '', '', ''],
 ]) {
   langByFeed[feed] = lang
+  rangeByFeed[feed] = range
+  sortByFeed[feed] = sort
   const h = hashFor(feed)
   const back = at(h)
-  eq(`${h} survives a round trip`, [keyOf(back.key), back.lang], [feed, lang])
+  eq(`${h} survives a round trip`,
+    [keyOf(back.key), back.lang, back.range, back.sort], [feed, lang, range, sort])
 }
 
 console.log('\n⚠️ The Members feed is addressed as #members, not #members-global:')
@@ -275,28 +308,55 @@ r = boot('#episodes-global?lang=de')
 eq('episodes too', [r.body.dataset.activeFeed, r.body.dataset.feedLang], ['episodes-global', 'de'])
 r = boot('#shows')
 eq('no language means an empty attribute, not "all"', r.body.dataset.feedLang, '')
+r = boot('#shows?range=1m&sort=sats')
+eq('the range and sort ride the attributes too',
+  [r.body.dataset.feedRange, r.body.dataset.feedSort], ['1m', 'sats'])
+eq('and the hash is left as shared', r.location.hash, '#shows?range=1m&sort=sats')
+r = boot('#shows')
+eq('a bare hash means empty view attributes',
+  [r.body.dataset.feedRange, r.body.dataset.feedSort], ['', ''])
 
 console.log('\nThe event detail agrees with the attribute:')
 r = boot('#albums?lang=en')
 const act = r.events.filter((e) => e.type === 'lb:feed-activate').pop()
 eq('lb:feed-activate fires', !!act, true)
-eq('and carries the same language', act.detail, { feed: 'albums', lang: 'en' })
+eq('and carries the same language', act.detail, { feed: 'albums', lang: 'en', range: '', sort: '' })
 eq('the attribute matches it', r.body.dataset.feedLang, 'en')
+r = boot('#albums?range=1w&sort=boosts')
+const act2 = r.events.filter((e) => e.type === 'lb:feed-activate').pop()
+eq('and carries the view', act2.detail, { feed: 'albums', lang: 'all', range: '1w', sort: 'boosts' })
 
 console.log('\nCoercion, with the hash rewritten to match what is on screen:')
 r = boot('#members?lang=de')
 eq('a feed with no language axis drops it', r.body.dataset.feedLang, '')
 eq('and the URL stops claiming it', r.location.hash, '#members')
+// ⚠️ The Members feeds have range and sort CONTROLS but their view is
+// deliberately not shareable (Reed scoped this to the four ranked feeds), so
+// the parameters are stripped the way an inapplicable language is.
+r = boot('#members?range=1w&sort=largest')
+eq('a members view drops its range and sort',
+  [r.body.dataset.feedRange, r.body.dataset.feedSort], ['', ''])
+eq('and the URL stops claiming them', r.location.hash, '#members')
 r = boot('#shows?lang=all')
 eq('?lang=all is no filter', r.body.dataset.feedLang, '')
+// Like ?lang=all above, the URL itself is left alone: it resolves to the same
+// view either way, and the rewrite machinery only fires when a feed had to
+// DROP something it was asked for.
+r = boot('#shows?range=all')
+eq('?range=all opens the default view', r.body.dataset.feedRange, '')
 r = boot('#podcasts-global?lang=de')
 eq('a retired hash upgrades AND keeps the language', r.location.hash, '#episodes-global?lang=de')
 eq('and hydrates filtered', [r.body.dataset.activeFeed, r.body.dataset.feedLang], ['episodes-global', 'de'])
+r = boot('#podcasts-global?range=1y&sort=count')
+eq('a retired hash keeps the view too', r.location.hash, '#episodes-global?range=1y&sort=count')
 // ⚠️ Bug 2: setFeed coerces the scope here, so the language must be filed under
 // the key it RESOLVED to, not the one the hash named.
 r = boot('#episodes-follows?lang=de', { signedIn: false })
 eq('signed out, follows coerces to global and KEEPS the language',
   [r.body.dataset.activeFeed, r.body.dataset.feedLang], ['episodes-global', 'de'])
+r = boot('#episodes-follows?range=1m', { signedIn: false })
+eq('and keeps the view, filed under the resolved key',
+  [r.body.dataset.activeFeed, r.body.dataset.feedRange], ['episodes-global', '1m'])
 r = boot('#episodes-follows?lang=de', { signedIn: true })
 eq('signed in, follows survives with its language',
   [r.body.dataset.activeFeed, r.body.dataset.feedLang], ['episodes-follows', 'de'])
@@ -306,6 +366,43 @@ eq('signed in, follows survives with its language',
 // dropped because the hash was never understood, not because the feed refused it.
 r = boot('#nonsense?lang=de')
 eq('an unknown hash falls back and drops the language', r.location.hash, '#shows')
+r = boot('#nonsense?range=1m&sort=sats')
+eq('and drops the view with it', r.location.hash, '#shows')
+
+/* ── The live tab, both directions ─────────────────────────────────────
+ * The renderers report control presses through lb:feed-view and the controller
+ * writes the hash; a URL pasted into an open tab travels the other way, as one
+ * lb:set-feed-view event so the pair costs one requery. Both are boot-sequence
+ * behaviour, so they are driven here rather than unit-tested in a copy. */
+console.log('\nA control press writes the hash, and a pasted URL commands the feed:')
+{
+  const b = boot('#shows')
+  b.dispatch('lb:feed-view', { feed: 'shows', range: '1m', sort: 'sats' })
+  eq('a reported view lands in the hash', b.location.hash, '#shows?range=1m&sort=sats')
+  b.dispatch('lb:feed-view', { feed: 'shows', range: '', sort: '' })
+  eq('reporting the default strips it back out', b.location.hash, '#shows')
+  // A report from a feed that is not on screen is remembered, not written.
+  b.dispatch('lb:feed-view', { feed: 'albums', range: '1w', sort: '' })
+  eq('an inactive feed\'s report leaves the hash alone', b.location.hash, '#shows')
+  // The members feeds have the controls but not the shareable view.
+  b.dispatch('lb:feed-view', { feed: 'members-global', range: '1w', sort: 'largest' })
+  eq('a members report is refused outright', b.location.hash, '#shows')
+}
+{
+  const b = boot('#shows')
+  b.location.hash = '#shows?range=1m&sort=sats'
+  b.fire('hashchange')
+  const set = b.events.filter((e) => e.type === 'lb:set-feed-view').pop()
+  eq('a pasted URL dispatches lb:set-feed-view', !!set, true)
+  eq('with the whole view', set.detail, { feed: 'shows', range: '1m', sort: 'sats' })
+  eq('and the attributes move with it',
+    [b.body.dataset.feedRange, b.body.dataset.feedSort], ['1m', 'sats'])
+  // Pasting the bare hash asks for the default view, not "leave it alone".
+  b.location.hash = '#shows'
+  b.fire('hashchange')
+  const back = b.events.filter((e) => e.type === 'lb:set-feed-view').pop()
+  eq('a bare hash commands the default view', back.detail, { feed: 'shows', range: '', sort: '' })
+}
 
 /* ── Tabs ──────────────────────────────────────────────────────────────
  * ⚠️ THE TAB IS DERIVED FROM THE FEED KEY AND IS NOT IN THE HASH. Every URL in

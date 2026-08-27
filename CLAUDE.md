@@ -135,11 +135,12 @@ so the column no longer narrows by 240px when a reader clicks a card through to
 its detail page. The masthead's logo and subtitle keep their own smaller
 measures; those are typographic, not the track.
 
-**A hash may carry a language: `#shows?lang=de`.** The feed key stays intact as
-the part before the `?`, so `FEEDS` and `ALIASES` look up exactly as they did and
-a retired hash still upgrades. `LANG_FEEDS` lists the six that have the axis; the
-two Boosts feeds drop the parameter and rewrite, the same coercion a signed-out
-`#episodes-follows` gets. See **The Language Filter** for the whole mechanism.
+**A hash may carry a view: `#shows?lang=de&range=1m&sort=sats`.** The feed key
+stays intact as the part before the `?`, so `FEEDS` and `ALIASES` look up exactly
+as they did and a retired hash still upgrades. `PARAM_FEEDS` (né `LANG_FEEDS`)
+lists the six that have the axes; the two Boosts feeds drop the parameters and
+rewrite, the same coercion a signed-out `#episodes-follows` gets. See **The View
+In The Hash** for the whole mechanism.
 
 `SCOPELESS` in that controller is the set of types with no whose-axis (`shows`,
 `albums`) — their key is the bare type, and picking one leaves the scope *state*
@@ -2685,48 +2686,70 @@ pattern the three detail pages share.
 **The Boosts feeds have no language axis**: `/api/v1/boosts` and
 `/api/v1/boosts/follows` take no `lang`. That is backend work, not a decision.
 
-### The Language In The Hash
+### The View In The Hash
 
-`#shows?lang=de` is a shareable view: the top German shows, the top German
-episodes. **Language is in the hash and range and sort are not**, which is a
-decision rather than an oversight. A language names a body of work somebody would
-hand to somebody else; a range and a sort are how one reader is currently looking
-at a list. The shape leaves room for them if a reason turns up.
+`#shows?lang=de&range=1m&sort=sats` is a shareable view: the top German shows,
+this month's shows by sats. Language shipped alone on 2026-08-17, on the argument
+that a language names a body of work where a range and a sort are how one reader
+is looking at a list; **range and sort joined on 2026-08-27, Reed's ask**, and
+the shape had been left with room for them, so it was the promised extension
+rather than a redesign. They ride the six `PARAM_FEEDS` feeds — Shows, Albums,
+Episodes and Songs on both scopes — and deliberately not the Members feeds,
+which have the controls but no shareable view.
 
-Five pieces, and the awkward ones are all about a feed that is *already on
+**⚠️ A default value is elided, and the elision is the renderer's.** The bare
+hash is the default view's address (`#shows`, never
+`#shows?range=all&sort=boosters`), and the defaults are the renderers' to own —
+**the episodes endpoint spells its boosters ranking `count` where the shows
+endpoint says `boosters`**, so the controller validates a sort by *shape* only
+(`normSort`) and passes it through; the renderer coerces an unknown key to its
+default and reports back, which takes it out of the address bar. `normRange`
+holds the real list (`1w|1m|1y`, mirroring `RANGE_OPTIONS`), and `range=all`
+folds to no parameter the way `lang=all` does.
+
+The pieces, and the awkward ones are all about a feed that is *already on
 screen*:
 
 - **`normLang` in the controller.** `?lang=en-US` normalizes to `en` the way the
   collector normalizes on write. **⚠️ `?lang=all` normalizes to NO FILTER**,
   because the API validates by shape and would take `all` as a well-formed subtag
   matching zero rows.
-- **The opening language rides `lb:feed-activate`** into `feeds.js` and on into
+- **The opening view rides `lb:feed-activate`** into `feeds.js` and on into
   the renderer, so it reaches the **first** query. Applying it after one would
-  paint the unfiltered feed and then correct itself.
-- **⚠️ A LANGUAGE IN THE HASH REFUSES THE SERVER'S CARDS.** `functions/index.js`
-  renders the opening Episodes · Global page unfiltered, and a hash never reaches
-  the server, so `adoptServerCards()` returns null whenever `langKey` is set.
-  Adopting would paint thirty English episodes under a German filter with a note
-  beneath them saying otherwise.
-- **⚠️ `lb:set-feed-lang` exists because a hydrated feed cannot be re-loaded.**
-  `feeds.js` runs each loader once, so a URL pasted into an open tab would move
-  the hash and leave the cards alone. Each renderer module keeps a `LANG_APPLY`
-  map and **one** listener, so a re-render replaces its entry rather than
-  stacking a second listener that requeries twice.
-- **`lb:feed-lang` reports back**, and the controller writes the hash from it. So
-  a shareable URL is a side effect of using the control, not something the reader
-  assembles.
+  paint the default feed and then correct itself. The cold load re-reads it off
+  three body attributes (`data-feed-lang`, `data-feed-range`, `data-feed-sort`),
+  the controller having dispatched during parse.
+- **⚠️ A VIEW IN THE HASH REFUSES THE SERVER'S CARDS.** `functions/index.js`
+  renders the opening page unfiltered at its own default range and sort, and a
+  hash never reaches the server, so `adoptServerCards()` returns null whenever
+  `langKey` is set or a URL-supplied range or sort differs from the state
+  element's. Adopting would paint the all-time boosters board under a URL and
+  controls claiming this month by sats. An explicit `?sort=boosters` that
+  matches the server's view is adopted as before.
+- **⚠️ `lb:set-feed-lang` and `lb:set-feed-view` exist because a hydrated feed
+  cannot be re-loaded.** `feeds.js` runs each loader once, so a URL pasted into
+  an open tab would move the hash and leave the cards alone. Each renderer
+  module keeps a `LANG_APPLY` and a `VIEW_APPLY` map with **one** listener each,
+  so a re-render replaces its entry rather than stacking a second listener that
+  requeries twice. Range and sort travel as **one** event so a pasted URL costs
+  one requery, and an externally-set view **rebuilds the range/sort controls**
+  (the mountLangControl move), each control owning its own pressed/label state.
+- **`lb:feed-lang` and `lb:feed-view` report back**, and the controller writes
+  the hash from them. So a shareable URL is a side effect of using the controls,
+  not something the reader assembles.
 
 **Coercion happens twice, and both are the `#episodes-follows` precedent.** A
-feed with no language axis drops the parameter; and when the menu lands, a
-language it has no row for is dropped, reported, and taken out of the address
-bar. The report is what keeps the URL from naming a view that is not on screen.
+feed without the axes drops the parameters; and a value the feed cannot show — a
+language with no menu row, a sort key the renderer's table refuses — is dropped,
+reported, and taken out of the address bar. The report is what keeps the URL
+from naming a view that is not on screen.
 
-**Language does not carry across a feed switch.** Each renderer hydrates once and
-owns its own control, so carrying one would need a command channel into an
-already-mounted control; the two menus also differ, so a carried value could name
-something the destination cannot show. `langByFeed` remembers each feed's
-language, so returning to a feed restores both the view and the address.
+**The view does not carry across a feed switch.** Each renderer hydrates once and
+owns its own controls, so carrying one would need a command channel into an
+already-mounted control; the menus also differ, so a carried value could name
+something the destination cannot show. `langByFeed`, `rangeByFeed` and
+`sortByFeed` remember each feed's view, so returning to a feed restores both the
+view and the address.
 
 ### Search
 

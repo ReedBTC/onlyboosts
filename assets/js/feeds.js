@@ -39,7 +39,7 @@
  * when this module first runs).
  */
 // Identity, for keeping the Follows feeds in sync with who's signed in.
-import { getSessionPubkey, clearFollowCache } from '/assets/js/follow-set.js?v=ob-v145'
+import { getSessionPubkey, clearFollowCache } from '/assets/js/follow-set.js?v=ob-v146'
 
 // ── DOM state helpers ────────────────────────────────────────────────
 
@@ -69,7 +69,7 @@ function renderPlaceholder(list, title, body) {
 // Every renderer reads the collector's published feed through ob-data.js
 // (Follows also through ob-live.js). Lazy-imported on first view so a visitor
 // who only opens one feed doesn't pay for the others' modules.
-async function hydrate(panelId, mod, scope, medium, lang) {
+async function hydrate(panelId, mod, scope, medium, view) {
   const panel = document.getElementById(panelId)
   if (!panel) return
   const list = panel.querySelector('[data-feed-list]')
@@ -94,9 +94,9 @@ async function hydrate(panelId, mod, scope, medium, lang) {
     if (typeof fn !== 'function') throw new Error(`no renderer export for ${mod}`)
     // Every renderer takes the panel: it carries the feed key their range/sort
     // controls are tagged with in the sticky bar. `medium` is undefined for
-    // the Boosts feeds, which don't split, and so is `lang` — they have no
-    // language axis, and the inline controller never puts one in their hash.
-    await fn({ panel, list, scope, medium, lang })
+    // the Boosts feeds, which don't split, and so is `view` — their hash
+    // carries no parameters, and the inline controller strips any it is handed.
+    await fn({ panel, list, scope, medium, lang: view?.lang, range: view?.range, sort: view?.sort })
   } catch (e) {
     console.error('[feeds] load failed', mod, scope, medium, e)
     renderPlaceholder(list, 'Couldn\u2019t load this feed', 'Something went wrong reaching the boosts data \u2014 please try again later.')
@@ -104,9 +104,9 @@ async function hydrate(panelId, mod, scope, medium, lang) {
 }
 
 // ── Lazy per-feed dispatch ───────────────────────────────────────────
-const BOOSTS = '/assets/js/boosts-feed.js?v=ob-v145'
-const PODCASTS = '/assets/js/feeds-podcasts.js?v=ob-v145'
-const SHOWS = '/assets/js/shows-feed.js?v=ob-v145'
+const BOOSTS = '/assets/js/boosts-feed.js?v=ob-v146'
+const PODCASTS = '/assets/js/feeds-podcasts.js?v=ob-v146'
+const SHOWS = '/assets/js/shows-feed.js?v=ob-v146'
 // Each module's entry point, by module. Named rather than sniffed out of the
 // path, so adding a feed is one line here instead of another branch.
 const RENDERERS = {
@@ -114,29 +114,37 @@ const RENDERERS = {
   [PODCASTS]: 'renderPodcasts',
   [SHOWS]: 'renderShows',
 }
-// `lang` is the feed's OPENING language, off the hash (`#shows?lang=de`) and
-// carried in the lb:feed-activate detail. It has to reach the renderer's first
-// query rather than being applied afterwards, or a shared link paints the
-// unfiltered feed and then corrects itself. The Boosts loaders take none: those
-// endpoints have no language axis.
+// `view` is the feed's OPENING state — {lang, range, sort}, off the hash
+// (`#shows?lang=de&range=1m&sort=sats`) and carried in the lb:feed-activate
+// detail. It has to reach the renderer's first query rather than being applied
+// afterwards, or a shared link paints the default feed and then corrects
+// itself. The Boosts loaders take none: their hash carries no parameters.
 const LOADERS = {
   'members-global':   () => hydrate('panel-members-global', BOOSTS, 'global'),
   'members-follows':  () => hydrate('panel-members-follows', BOOSTS, 'follows'),
-  'episodes-global':  (lang) => hydrate('panel-episodes-global', PODCASTS, 'global', 'other', lang),
-  'episodes-follows': (lang) => hydrate('panel-episodes-follows', PODCASTS, 'follows', 'other', lang),
-  'songs-global':     (lang) => hydrate('panel-songs-global', PODCASTS, 'global', 'music', lang),
-  'songs-follows':    (lang) => hydrate('panel-songs-follows', PODCASTS, 'follows', 'music', lang),
+  'episodes-global':  (view) => hydrate('panel-episodes-global', PODCASTS, 'global', 'other', view),
+  'episodes-follows': (view) => hydrate('panel-episodes-follows', PODCASTS, 'follows', 'other', view),
+  'songs-global':     (view) => hydrate('panel-songs-global', PODCASTS, 'global', 'music', view),
+  'songs-follows':    (view) => hydrate('panel-songs-follows', PODCASTS, 'follows', 'music', view),
   // Both Global only — see the scope note at the top of shows-feed.js.
-  'shows':            (lang) => hydrate('panel-shows', SHOWS, 'global', 'other', lang),
-  'albums':           (lang) => hydrate('panel-albums', SHOWS, 'global', 'music', lang),
+  'shows':            (view) => hydrate('panel-shows', SHOWS, 'global', 'other', view),
+  'albums':           (view) => hydrate('panel-albums', SHOWS, 'global', 'music', view),
 }
 const loaded = new Set()
 
-function loadFeed(feed, lang) {
+function loadFeed(feed, view) {
   const loader = LOADERS[feed]
   if (!loader || loaded.has(feed)) return
   loaded.add(feed)
-  loader(lang)
+  loader(view)
+}
+
+// The three body attributes the controller writes for exactly this reader —
+// the cold load and the account-switch re-render, both of which run after the
+// activate event has already fired.
+function viewFromBody() {
+  const ds = document.body.dataset
+  return { lang: ds.feedLang || '', range: ds.feedRange || '', sort: ds.feedSort || '' }
 }
 
 /* The Members tab's own sections, which belong to the TAB rather than to either
@@ -154,7 +162,7 @@ function loadMemberBoards() {
   const root = document.querySelector('[data-hpw-boards]')
   if (!root) return
   boardsWired = true
-  import('/assets/js/members-board.js?v=ob-v145')
+  import('/assets/js/members-board.js?v=ob-v146')
     .then((m) => m.renderMembersBoards(root))
     .catch((err) => {
       console.warn('[feeds] member boards failed to load', err)
@@ -164,9 +172,10 @@ function loadMemberBoards() {
 
 document.addEventListener('lb:feed-activate', (e) => {
   const feed = e?.detail?.feed
-  // Only read on the FIRST activation of a feed; afterwards the mounted control
-  // owns the language and the controller talks to it through lb:set-feed-lang.
-  if (feed) loadFeed(feed, e?.detail?.lang)
+  // Only read on the FIRST activation of a feed; afterwards the mounted
+  // controls own the view and the controller talks to them through
+  // lb:set-feed-lang and lb:set-feed-view.
+  if (feed) loadFeed(feed, { lang: e?.detail?.lang, range: e?.detail?.range, sort: e?.detail?.sort })
   if (feed && MEMBER_TABS.has(feed)) loadMemberBoards()
 })
 
@@ -193,10 +202,10 @@ function onSessionChange() {
   if (!pubkey) clearFollowCache()
   for (const feed of FOLLOWS_FEEDS) loaded.delete(feed)
   const active = document.body.dataset.activeFeed
-  // The language comes off the same attribute for the same reason as the cold
+  // The view comes off the same attributes for the same reason as the cold
   // load below: an account switch re-hydrates the feed from scratch, and it must
-  // come back filtered the way the reader left it.
-  if (FOLLOWS_FEEDS.includes(active)) loadFeed(active, document.body.dataset.feedLang || '')
+  // come back showing the view the reader left it on.
+  if (FOLLOWS_FEEDS.includes(active)) loadFeed(active, viewFromBody())
 }
 
 // Same-tab: the login widget announces every identity change (index.jsx).
@@ -212,13 +221,13 @@ window.addEventListener('storage', (e) => {
  * feed-bar controller has already set body[data-active-feed] and may have
  * dispatched its activation event before this listener attached).
  *
- * ⚠️ READ THE LANGUAGE FROM THE ATTRIBUTE, NOT FROM THE EVENT. This is the cold
- * load, which is the path every shared `#shows?lang=de` link takes, and the
- * lb:feed-activate that carried the language fired before this module existed.
- * Taking only the feed here is what made a shared link paint the unfiltered
- * feed while the URL claimed otherwise. */
+ * ⚠️ READ THE VIEW FROM THE ATTRIBUTES, NOT FROM THE EVENT. This is the cold
+ * load, which is the path every shared `#shows?lang=de&range=1m` link takes,
+ * and the lb:feed-activate that carried the view fired before this module
+ * existed. Taking only the feed here is what made a shared link paint the
+ * unfiltered feed while the URL claimed otherwise. */
 const bootFeed = document.body.dataset.activeFeed || 'episodes-global'
-loadFeed(bootFeed, document.body.dataset.feedLang || '')
+loadFeed(bootFeed, viewFromBody())
 /* ⚠️ AND THE MEMBERS BOARDS TOO, ON THIS PATH AS WELL AS ON THE EVENT. The cold
  * load does not go through the lb:feed-activate listener — the controller fired
  * that during parse, before this module existed, which is the whole reason the

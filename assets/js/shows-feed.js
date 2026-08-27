@@ -53,18 +53,19 @@
  */
 import {
   getShowPage, searchShows, getShowEpisodes, SEARCH_HITS, SEARCH_MIN_CHARS,
-} from '/assets/js/ob-live.js?v=ob-v145'
+} from '/assets/js/ob-live.js?v=ob-v146'
 import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls,
-} from '/assets/js/feed-controls.js?v=ob-v145'
+  RANGE_OPTIONS,
+} from '/assets/js/feed-controls.js?v=ob-v146'
 // Its own module, not two more exports of feed-controls.js — see the ⚠️ note
 // at the top of that file for the four-hour window that shape opens.
-import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v145'
+import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v146'
 import {
   LANG_ALL, languageOptions, langControl, langNote, langNoMatchText, langLabelFor,
-} from '/assets/js/feed-lang.js?v=ob-v145'
-import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v145'
-import { competitionRanks, rankLabel } from '/assets/js/rank.js?v=ob-v145'
+} from '/assets/js/feed-lang.js?v=ob-v146'
+import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v146'
+import { competitionRanks, rankLabel } from '/assets/js/rank.js?v=ob-v146'
 /* ⚠️ THE CARD ITSELF IS NOT IN THIS FILE ANY MORE. show-card.js emits it as an
  * HTML string and show-card-actions.js attaches its verbs, which is what lets
  * functions/index.js render the opening page of this feed at the edge — a
@@ -81,9 +82,9 @@ import {
   COPY, copyFor, toCard, showCardHtml, showRankValue,
   SORT_OPTIONS, RANKED_SORTS, SHOW_CARDS_PER_PAGE,
   num, fmtSats, plural,
-} from '/assets/js/show-card.js?v=ob-v145'
-import { wireShowCards } from '/assets/js/show-card-actions.js?v=ob-v145'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v145'
+} from '/assets/js/show-card.js?v=ob-v146'
+import { wireShowCards } from '/assets/js/show-card-actions.js?v=ob-v146'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v146'
 
 /* ── The hash's language, on an already-hydrated feed ──
  * The twin of the map in feeds-podcasts.js, and there for the same reason: a
@@ -97,6 +98,18 @@ document.addEventListener('lb:set-feed-lang', (e) => {
   const detail = e && e.detail
   const apply = detail && detail.feed && LANG_APPLY.get(detail.feed)
   if (apply) apply(detail.lang || LANG_ALL)
+})
+
+/* The hash's range and sort, on an already-hydrated feed — the same way in the
+ * language has, as one event because a pasted URL states a whole view and its
+ * two halves belong in one requery. '' in the detail means the feed's own
+ * default, which this module resolves; the controller cannot, the defaults
+ * being the renderers' to own. */
+const VIEW_APPLY = new Map()
+document.addEventListener('lb:set-feed-view', (e) => {
+  const detail = e && e.detail
+  const apply = detail && detail.feed && VIEW_APPLY.get(detail.feed)
+  if (apply) apply(detail)
 })
 
 // One number, declared in show-card.js and read by the edge too. See the note
@@ -174,8 +187,11 @@ async function loadShowPage({ medium, sort, range, lang, offset, signal }) {
  * @param {string}  opts.medium   'other' (Shows) | 'music' (Albums)
  * @param {string}  [opts.lang]   the feed's OPENING language, off the hash
  *                                (`#shows?lang=de`). Must reach the first query.
+ * @param {string}  [opts.range]  the OPENING range, off the hash. '' or absent
+ *                                means the default (all time).
+ * @param {string}  [opts.sort]   the OPENING sort, off the hash. Same rule.
  */
-export async function renderShows({ panel, list, medium = 'other', lang = null }) {
+export async function renderShows({ panel, list, medium = 'other', lang = null, range = null, sort = null }) {
   if (!list) return
   const copy = copyFor(medium)
   const wantMusic = medium === 'music'
@@ -185,20 +201,42 @@ export async function renderShows({ panel, list, medium = 'other', lang = null }
   resetFeedSearch(panel)
   resetFeedNote(panel)
 
+  /* Distinct people is the default sort, matching the episode rollup's: one
+   * listener boosting a show forty times is one vote, not forty. It was
+   * 'boosts' (raw volume) until Phase D put the front door on this feed.
+   * ⚠️ Must match FEED.sort in functions/index.js, or the reader watches the
+   * server's list get replaced by a different one. It is also what the hash
+   * elides: a default view's address is the bare feed key. */
+  const DEFAULT_SORT = 'boosters'
+  /* The hash's range and sort are the opening state, like the language, and a
+   * key the tables don't hold — a typo, or the other renderer's spelling
+   * ('count' is the episodes endpoint's word for boosters) — coerces to the
+   * default and is reported below, which takes it back out of the address bar. */
+  const urlRange = (typeof range === 'string' && RANGE_OPTIONS.some((o) => o[0] === range)) ? range : ''
+  const urlSort = (typeof sort === 'string' && SORT_OPTIONS.some((o) => o[0] === sort)) ? sort : ''
   // All time is the opening view: the all-time leaderboard is the question a
   // show-level feed is for. The windowed ranges narrow it.
-  let rangeKey = 'all'
-  /* Distinct people, matching the episode rollup's default: one listener
-   * boosting a show forty times is one vote, not forty. It was 'boosts' (raw
-   * volume) until Phase D put the front door on this feed, and the two differ
-   * wherever someone boosts the same show repeatedly, which is most of them.
-   * ⚠️ Must match FEED.sort in functions/index.js, or the reader watches the
-   * server's list get replaced by a different one. */
-  let sortKey = 'boosters'
+  let rangeKey = urlRange || 'all'
+  let sortKey = urlSort || DEFAULT_SORT
   // No language filter, which is NOT the same as English: 341 shows on this
   // side of the medium split and 253 on the music side declare no <language>
   // at all, so All is the only key that holds every card. See feed-lang.js.
   const feedKey = panel?.dataset.feed || (medium === 'music' ? 'albums' : 'shows')
+  /* What the reader is looking at, reported so the controller can write the
+   * hash from it — the shareable URL is a side effect of using the controls.
+   * '' is the default, which keeps the bare hash bare. */
+  function reportView() {
+    document.dispatchEvent(new CustomEvent('lb:feed-view', {
+      detail: {
+        feed: feedKey,
+        range: rangeKey === 'all' ? '' : rangeKey,
+        sort: sortKey === DEFAULT_SORT ? '' : sortKey,
+      },
+    }))
+  }
+  // A URL-supplied key the tables refused: say so now, so the hash stops
+  // claiming a view that is not going to be rendered.
+  if ((range && range !== urlRange) || (sort && sort !== urlSort)) reportView()
   // The hash's language is the opening state. langLabelFor names it from the
   // subtag so the feed note reads correctly on the first paint, before the menu
   // request has landed.
@@ -547,6 +585,13 @@ export async function renderShows({ panel, list, medium = 'other', lang = null }
     if (!state || !painted || !painted.querySelector('[data-show-card]')) return null
     if (state.medium !== medium) return null
     if (langKey !== LANG_ALL) return null
+    /* Same argument one axis over: the server rendered its own opening range
+     * and sort, and the state element declares which. A hash naming a different
+     * view has to fetch — adopting would paint the all-time boosters board
+     * under a URL and controls claiming this month by sats. An explicit
+     * `?sort=boosters` that matches the server's is adopted as before. */
+    if (urlRange && state.range !== urlRange) return null
+    if (urlSort && state.sort !== urlSort) return null
     stateEl.remove()
     return { state, painted }
   }
@@ -594,20 +639,34 @@ export async function renderShows({ panel, list, medium = 'other', lang = null }
   // and the language control's cannot drift into two versions of one sentence.
   mountFeedNote(panel, langNote(copy.noteGlobal, langKey, langLabel, copy.noun))
 
-  const controls = mountFeedControls(panel?.dataset.feed || (wantMusic ? 'albums' : 'shows'), [
-    rangeControl(rangeKey, (key) => {
-      if (key === rangeKey) return
-      rangeKey = key
-      requery()
-    }, {
-      label: copy.rangeLabel, titleFor: (key) => copy.rangeTitle(rangeDays(key)),
-    }),
-    sortControl(SORT_OPTIONS, sortKey, (key) => {
-      if (key === sortKey) return
-      sortKey = key
-      requery()
-    }, { title: copy.sortTitle }),
-  ])
+  function applyRange(key) {
+    if (key === rangeKey) return
+    rangeKey = key
+    reportView()
+    requery()
+  }
+  function applySort(key) {
+    if (key === sortKey) return
+    sortKey = key
+    reportView()
+    requery()
+  }
+  /* Rebuilt rather than mutated when the view is set from outside, the same
+   * call mountLangControl makes and for the same reason: each control owns its
+   * own pressed/label state, and an externally-set view has to move both.
+   * mountFeedControls replaces the feed's previous group wholesale, so the
+   * language pill is re-inserted after every mount. */
+  let controls = null
+  function mountViewControls() {
+    controls = mountFeedControls(feedKey, [
+      rangeControl(rangeKey, applyRange, {
+        label: copy.rangeLabel, titleFor: (key) => copy.rangeTitle(rangeDays(key)),
+      }),
+      sortControl(SORT_OPTIONS, sortKey, applySort, { title: copy.sortTitle }),
+    ])
+    mountLangControl()
+  }
+  mountViewControls()
 
   /* A language change is a QUERY, exactly like the range and the sort, because
    * the ranking is computed over the filtered corpus server-side. Filtering the
@@ -660,6 +719,24 @@ export async function renderShows({ panel, list, medium = 'other', lang = null }
     if (want === langKey) return
     applyLang(want, langLabelFor(want))
     mountLangControl()
+  })
+
+  /* The hash's range and sort, on a feed already on screen — same door as the
+   * language's, one event for the pair so a pasted URL costs one requery. */
+  VIEW_APPLY.set(feedKey, (detail) => {
+    // Coerce rather than trust: the controller validates a sort by shape only,
+    // so the other renderer's spelling (or a typo) can arrive here.
+    const wantRange = (detail.range && RANGE_OPTIONS.some((o) => o[0] === detail.range))
+      ? detail.range : 'all'
+    const wantSort = (detail.sort && SORT_OPTIONS.some((o) => o[0] === detail.sort))
+      ? detail.sort : DEFAULT_SORT
+    if (wantRange === rangeKey && wantSort === sortKey) return
+    rangeKey = wantRange
+    sortKey = wantSort
+    mountViewControls()
+    // Reported back, which is what strips a coerced key out of the address bar.
+    reportView()
+    requery()
   })
 
   langOptionsP.then((opts) => {

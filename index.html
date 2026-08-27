@@ -50,18 +50,18 @@
 
   <!-- Shared note / card styles (.note-card, .embed-note) — the boosts
        feeds render through the same kind-1 card as boosts-thread.js. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v145" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v146" />
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v145" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v146" />
   <!-- The episode card and its drawer, extracted from the inline block below
        when /episode/<guid> pages needed the same cards. See the file header. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v145" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v145" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v146" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v146" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. Must stay last
        among the stylesheets so the inline block below still wins. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v145" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v146" />
 
   <style>
     :root {
@@ -1322,8 +1322,8 @@
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
     }
   </style>
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v145" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v145" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v146" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v146" />
 </head>
 <body data-active-feed="episodes-global">
 
@@ -2008,22 +2008,23 @@
     'boosts-global':    'members-global',
     'boosts-follows':   'members-follows',
   };
-  /* ── The language in the hash ──
-     `#shows?lang=de` — the feed key, then a query string. The key stays intact
-     as the part before the `?`, so FEEDS and ALIASES look up exactly as before
-     and a retired hash still upgrades; and there is room for range and sort
-     later without a second redesign of the shape.
+  /* ── The view in the hash ──
+     `#shows?lang=de&range=1m&sort=sats` — the feed key, then a query string.
+     The key stays intact as the part before the `?`, so FEEDS and ALIASES look
+     up exactly as before and a retired hash still upgrades.
 
-     ⚠️ LANGUAGE IS IN THE HASH AND RANGE AND SORT ARE NOT, which is a
-     deliberate asymmetry rather than an oversight. A language names a body of
-     work somebody would want to hand to somebody else ("the top German
-     podcasts"); a range and a sort are how one reader is currently looking at a
-     list. Adding them is a two-line change here when a reason turns up.
+     Language shipped first, alone, on the argument that a language names a body
+     of work where a range and a sort are how one reader is looking at a list.
+     Range and sort joined on 2026-08-27 (Reed's ask): the ranked views are the
+     site's own leaderboards, and "the top shows this month by sats" is exactly
+     the kind of view somebody hands to somebody else. The shape was left with
+     room for them, so this was the promised extension rather than a redesign.
 
-     Feeds with no language axis are listed out rather than in: the Boosts feeds
-     take no `lang` at the API, so `#members?lang=de` drops the parameter
-     and rewrites, the same coercion a signed-out `#episodes-follows` gets. */
-  const LANG_FEEDS = {
+     Feeds without the axes are listed out rather than in: the Members feeds
+     take no `lang` at the API and their range/sort are deliberately not
+     shareable, so `#members?lang=de&range=1w` drops the parameters and
+     rewrites, the same coercion a signed-out `#episodes-follows` gets. */
+  const PARAM_FEEDS = {
     'episodes-global': 1, 'episodes-follows': 1,
     'songs-global': 1, 'songs-follows': 1,
     'shows': 1, 'albums': 1,
@@ -2038,6 +2039,11 @@
   // (German is 38 shows on the podcast side and 2 on music), so a carried value
   // could name something the destination cannot show.
   const langByFeed = Object.create(null);
+  /* Range and sort, remembered the same way and written into the hash from the
+     same maps. '' means the feed's own default, which is what keeps a default
+     view's address bare: `#shows`, not `#shows?range=all&sort=boosters`. */
+  const rangeByFeed = Object.create(null);
+  const sortByFeed = Object.create(null);
 
   /* ⚠️ 'all' NORMALIZES TO NO FILTER, and that guard is load-bearing. The API
      validates `lang` by SHAPE, so 'all' is a well-formed three-letter subtag
@@ -2054,13 +2060,38 @@
     return primary;
   }
 
+  /* The range keys mirror RANGE_OPTIONS in feed-controls.js and RANGE_DAYS in
+     the two endpoints (this inline script cannot import the module). 'all' is
+     every ranked feed's default, so it normalizes to no parameter — the same
+     move `lang=all` makes, and for the same reason: the bare hash is the
+     default view's address. */
+  function normRange(value) {
+    const raw = String(value || '').trim().toLowerCase();
+    return (raw === '1w' || raw === '1m' || raw === '1y') ? raw : '';
+  }
+  /* ⚠️ A SORT IS VALIDATED BY SHAPE ONLY, because the valid keys are the
+     renderers' own and differ per feed — the episodes endpoint spells its
+     boosters ranking 'count' where the shows endpoint says 'boosters'. An
+     unknown key is passed through; the renderer coerces it to its default and
+     reports back through lb:feed-view, which rewrites the hash — the same
+     round trip an unshowable language takes through the menu check. */
+  function normSort(value) {
+    const raw = String(value || '').trim().toLowerCase();
+    return /^[a-z]{2,16}$/.test(raw) ? raw : '';
+  }
+
   function parseHash() {
     const raw = (location.hash || '').replace(/^#/, '');
     const q = raw.indexOf('?');
-    if (q < 0) return { key: raw, lang: '' };
+    if (q < 0) return { key: raw, lang: '', range: '', sort: '' };
     var params;
     try { params = new URLSearchParams(raw.slice(q + 1)); } catch (e) { params = null; }
-    return { key: raw.slice(0, q), lang: normLang(params && params.get('lang')) };
+    return {
+      key: raw.slice(0, q),
+      lang: normLang(params && params.get('lang')),
+      range: normRange(params && params.get('range')),
+      sort: normSort(params && params.get('sort')),
+    };
   }
 
   /* ⚠️ THE HASH A FEED IS WRITTEN AS, where it should not simply be the key.
@@ -2083,8 +2114,11 @@
   Object.keys(HASH_OF).forEach(function (k) { KEY_OF[HASH_OF[k]] = k; });
 
   function hashFor(feed) {
-    const lang = langByFeed[feed] || '';
-    return '#' + (HASH_OF[feed] || feed) + (lang ? '?lang=' + encodeURIComponent(lang) : '');
+    const parts = [];
+    if (langByFeed[feed]) parts.push('lang=' + encodeURIComponent(langByFeed[feed]));
+    if (rangeByFeed[feed]) parts.push('range=' + encodeURIComponent(rangeByFeed[feed]));
+    if (sortByFeed[feed]) parts.push('sort=' + encodeURIComponent(sortByFeed[feed]));
+    return '#' + (HASH_OF[feed] || feed) + (parts.length ? '?' + parts.join('&') : '');
   }
   /* ⚠️ THE FRONT DOOR LANDS ON SHOWS (Phase D, 2026-08-23, Reed's call). The
      show-level leaderboard is the view that answers "what is this site" to
@@ -2211,11 +2245,28 @@
        is what a menu pick does, so each feed keeps its own across a switch. */
     let langChanged = false;
     if (opts && opts.lang !== undefined) {
-      const want = LANG_FEEDS[feed] ? (opts.lang || '') : '';
+      const want = PARAM_FEEDS[feed] ? (opts.lang || '') : '';
       langChanged = (langByFeed[feed] || '') !== want;
       langByFeed[feed] = want;
       // A language this feed had to drop must not survive in the address bar.
       if (want !== (opts.lang || '')) updateHash = true;
+    }
+    /* Range and sort take the same filing rule the language does, resolved-key
+       and all, and the same drop on a feed without the axes. One flag for the
+       pair: they travel to the renderer together (lb:set-feed-view below), so
+       telling them apart here would be a distinction with no reader. */
+    let viewChanged = false;
+    if (opts && opts.range !== undefined) {
+      const want = PARAM_FEEDS[feed] ? (opts.range || '') : '';
+      if ((rangeByFeed[feed] || '') !== want) viewChanged = true;
+      rangeByFeed[feed] = want;
+      if (want !== (opts.range || '')) updateHash = true;
+    }
+    if (opts && opts.sort !== undefined) {
+      const want = PARAM_FEEDS[feed] ? (opts.sort || '') : '';
+      if ((sortByFeed[feed] || '') !== want) viewChanged = true;
+      sortByFeed[feed] = want;
+      if (want !== (opts.sort || '')) updateHash = true;
     }
     document.body.setAttribute('data-active-feed', feed);
     /* ⚠️ THE TAB IS AN ATTRIBUTE FOR THE SAME REASON THE LANGUAGE IS: this
@@ -2234,6 +2285,10 @@
        exactly the path a shared link takes. Shipped that way once: every
        `#shows?lang=de` cold load painted the unfiltered feed. */
     document.body.setAttribute('data-feed-lang', langByFeed[feed] || '');
+    // Range and sort ride the same cold-load channel, for the same reason:
+    // feeds.js attaches its listener after this has already dispatched.
+    document.body.setAttribute('data-feed-range', rangeByFeed[feed] || '');
+    document.body.setAttribute('data-feed-sort', sortByFeed[feed] || '');
     panels.forEach((panel) => {
       const isActive = panel.dataset.feed === feed;
       panel.classList.toggle('is-active', isActive);
@@ -2249,9 +2304,17 @@
     // has to make its first query with it, not adopt an unfiltered view and
     // correct itself afterwards.
     document.dispatchEvent(new CustomEvent('lb:feed-activate', {
-      detail: { feed: feed, lang: langByFeed[feed] || 'all' },
+      detail: {
+        feed: feed,
+        lang: langByFeed[feed] || 'all',
+        // '' means the feed's own default; the renderer resolves it, since the
+        // defaults are the renderers' to own (the episodes and shows endpoints
+        // do not even spell their boosters sort the same way).
+        range: rangeByFeed[feed] || '',
+        sort: sortByFeed[feed] || '',
+      },
     }));
-    return { feed: feed, langChanged: langChanged };
+    return { feed: feed, langChanged: langChanged, viewChanged: viewChanged };
   }
 
   function fromHash(updateHash) {
@@ -2263,13 +2326,13 @@
     const cfg = FEEDS[key];
     // An unknown hash falls back to the default *and* rewrites, so the URL
     // never keeps naming something that isn't on screen.
-    if (!cfg) { setFeed(DEFAULT_TYPE, DEFAULT_SCOPE, { updateHash: true, lang: '' }); return; }
+    if (!cfg) { setFeed(DEFAULT_TYPE, DEFAULT_SCOPE, { updateHash: true, lang: '', range: '', sort: '' }); return; }
     // An aliased hash always rewrites, whatever the caller asked for — that's
     // what upgrades an old link's URL to the current name. setFeed forces the
-    // rewrite itself when it has to drop a language the feed cannot apply.
+    // rewrite itself when it has to drop a parameter the feed cannot apply.
     const res = setFeed(cfg.type, cfg.scope, {
       updateHash: key !== raw ? true : updateHash,
-      lang: parsed.lang,
+      lang: parsed.lang, range: parsed.range, sort: parsed.sort,
     });
     /* ⚠️ A HASH CHANGE ON AN ALREADY-HYDRATED FEED NEEDS A SECOND SIGNAL. The
        activate event above is a no-op once feeds.js has loaded a feed, so a URL
@@ -2284,6 +2347,19 @@
         detail: { feed: res.feed, lang: langByFeed[res.feed] || 'all' },
       }));
     }
+    /* Range and sort take the same second signal, as one event: a pasted URL
+       states a whole view, so its two halves are applied in one requery rather
+       than two racing ones. '' means the renderer's own default — a URL that
+       names neither is asking for the default view, not "leave it alone". */
+    if (res.viewChanged) {
+      document.dispatchEvent(new CustomEvent('lb:set-feed-view', {
+        detail: {
+          feed: res.feed,
+          range: rangeByFeed[res.feed] || '',
+          sort: sortByFeed[res.feed] || '',
+        },
+      }));
+    }
   }
 
   /* The renderers own the control, so they report what the reader picked and
@@ -2292,13 +2368,28 @@
      the view and the address. */
   document.addEventListener('lb:feed-lang', function (e) {
     const d = e && e.detail;
-    if (!d || !d.feed || !LANG_FEEDS[d.feed]) return;
+    if (!d || !d.feed || !PARAM_FEEDS[d.feed]) return;
     const lang = normLang(d.lang);
     if ((langByFeed[d.feed] || '') === lang) return;
     langByFeed[d.feed] = lang;
     if (d.feed !== feedKey(type, scope)) return;
     // replaceState, not push: changing a filter is not a navigation, and a
     // history entry per press would bury the page the reader arrived from.
+    if (hashFor(d.feed) !== location.hash) history.replaceState(null, '', hashFor(d.feed));
+  });
+
+  /* The renderers report range and sort the same way, in one event because a
+     control press resolves both to a whole view. '' means the feed's default,
+     which is what keeps `#shows` bare until something is actually changed. */
+  document.addEventListener('lb:feed-view', function (e) {
+    const d = e && e.detail;
+    if (!d || !d.feed || !PARAM_FEEDS[d.feed]) return;
+    const range = normRange(d.range);
+    const sort = normSort(d.sort);
+    if ((rangeByFeed[d.feed] || '') === range && (sortByFeed[d.feed] || '') === sort) return;
+    rangeByFeed[d.feed] = range;
+    sortByFeed[d.feed] = sort;
+    if (d.feed !== feedKey(type, scope)) return;
     if (hashFor(d.feed) !== location.hash) history.replaceState(null, '', hashFor(d.feed));
   });
 
@@ -2387,17 +2478,17 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v145"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v146"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v145" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v146" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v145" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v146" defer></script>
 
 <!-- Feed hydration — lazily loads the active feed on first view. -->
-<script type="module" src="/assets/js/feeds.js?v=ob-v145"></script>
-<script src="/assets/js/nav.js?v=ob-v145" defer></script>
+<script type="module" src="/assets/js/feeds.js?v=ob-v146"></script>
+<script src="/assets/js/nav.js?v=ob-v146" defer></script>
 
 </body>
 </html>
