@@ -502,3 +502,16 @@
   transform: translateX(-50%) translateY(0);
 }
 .lb-toast.is-error { background: #6b2418; }
+
+/* ── Dark mode ─────────────────────────────────────────────────────
+   The zap modal was drawn navy-on-white; its panel (var(--white)) goes
+   dark with the tokens, so the modal-scoped --navy remap flips every
+   internal navy role — headings, labels, the ghost buttons and their
+   hover fills — in one place, the pairings staying legible because
+   --navy and --white move in opposite directions inside it. The toast
+   keeps its navy fill in both themes, so its text stays light by
+   literal rather than by the flipped --cream. */
+:root[data-theme="dark"] .zap-modal { --navy: #d7e5f1; }
+:root[data-theme="dark"] .zap-modal .zap-status.is-error { color: #f08a63; }
+:root[data-theme="dark"] .reply-composer .rc-cancel { color: var(--text); }
+:root[data-theme="dark"] .lb-toast { color: #eef6fb; }

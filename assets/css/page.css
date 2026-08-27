@@ -367,3 +367,13 @@
      figures come down a step to stop the longer ones wrapping. */
   .stat-num { font-size: 1.15rem; }
 }
+
+/* ── Dark mode ─────────────────────────────────────────────────────
+   The tokens flip in theme.css; what needs fixing here is the handful
+   of roles that cannot follow a token both ways. --brand-dd is the AA
+   fill under white in both themes (see theme.css), so where it was
+   this page's darkest TEXT step it reads the lightened --brand-d
+   instead; the warn callout's literals were picked for a light panel. */
+:root[data-theme="dark"] .soon-card h2,
+:root[data-theme="dark"] .prose h3 { color: var(--brand-d); }
+:root[data-theme="dark"] .callout--warn strong { color: #eda679; }

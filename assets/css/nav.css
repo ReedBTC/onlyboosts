@@ -193,6 +193,36 @@
   0% { background-position: 100% 0; }
   100% { background-position: -100% 0; }
 }
+/* ── Dark-mode toggle ── */
+/* Same chrome family as the Explore trigger: white-alpha border on the
+   navy bar. Shows the theme you would switch TO — moon in light, sun in
+   dark; the pair of spans swaps on the <html> data-theme attribute so the
+   icon is right even before nav.js runs. */
+.nav-theme-toggle {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 0.95rem;
+  line-height: 1;
+  transition: background 0.15s, border-color 0.15s;
+}
+.nav-theme-toggle:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.34);
+}
+.nav-theme-toggle:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+.nav-theme-toggle .ntt-sun { display: none; }
+[data-theme="dark"] .nav-theme-toggle .ntt-moon { display: none; }
+[data-theme="dark"] .nav-theme-toggle .ntt-sun { display: inline; }
+
 .lb-boost-placeholder {
   background: var(--orange);
   color: #ffffff;

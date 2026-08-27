@@ -461,3 +461,15 @@ a.ob-boost-show:hover { color: var(--accent-d); text-decoration: underline; }
   font-size: 0.8rem;
   white-space: nowrap;
 }
+
+/* ── Dark mode ─────────────────────────────────────────────────────
+   The note card was drawn with --navy as its strong text (author
+   names, event titles) and --navy-l as its link blue, and --navy
+   deliberately does not flip in theme.css (the nav and footer are
+   built on it). Remapping the two inside the card containers flips
+   every usage at once; nothing in this file uses either as a fill. */
+:root[data-theme="dark"] .note-card,
+:root[data-theme="dark"] .embed-note {
+  --navy:   #dce8f2;
+  --navy-l: #7fc5ec;
+}

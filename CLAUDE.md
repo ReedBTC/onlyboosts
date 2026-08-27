@@ -864,7 +864,57 @@ stylesheets** so a page's own inline `<style>` still wins.
 the `body[data-active-feed]` mapping. `assets/css/page.css` is the counterpart
 for the plain content pages (`.page-header`, `.soon-card`).
 
-### The Widget Wears The Site's Palette
+### Dark Mode
+
+**`data-theme="dark"` on `<html>`, set before first paint by the boot script in
+`partials/nav.html` and toggled by the moon/sun button beside it; the choice is
+per-browser in `localStorage` under `ob-theme`.** Absence of the attribute — and
+any stored value other than `dark` — is the light theme, which is exactly what
+every visitor saw before the toggle existed. `nav.js` owns the click, the
+storage write, the button's label, and cross-tab sync via the `storage` event;
+the boot script only replays the stored choice. Riding the nav partial is what
+puts both on every page, the edge-rendered ones included, from one source —
+which is also why **neither may contain a backtick or `${`** (sync-partials
+exits nonzero if one appears; it bit once, in a comment).
+
+The theme itself is `:root[data-theme="dark"]` blocks: the palette flip in
+`theme.css`, the eight accent families' flip in `index.html`'s inline block
+(each `-d`/`-dd` step re-derived per family against the dark background, the
+same per-family discipline the light `-dd` row used against white), and a short
+dark section at the foot of each stylesheet that needed one. Every shipped value
+was contrast-measured; text ≥ 4.5:1 on its surface, links and accents ≥ 6:1.
+
+**⚠️ THREE TOKENS DELIBERATELY DO NOT FLIP, and each has a scoped repair:**
+
+- **`--navy`.** The nav, footer, `.page-header` band and `.tagblock` are dark
+  in both themes. They read `--cream`/`--cream-d`/`--white` as light TEXT, so
+  `theme.css` re-supplies those inside `#top-nav`, `#site-footer` and
+  `.page-header`; `boosts-thread.css` and `boost-actions.css` instead remap
+  `--navy`/`--navy-l` *inside* the components that used them as text on light
+  surfaces (`.note-card`, `.embed-note`, `.zap-modal`).
+- **`--brand-dd` / `--brand-ddd`.** They are the AA fills under white on every
+  filled widget button, read live by the bundle, so lightening them breaks the
+  checkout. Where they were doing the *other* job — darkest text step on a
+  light page — each stylesheet carries a dark-scoped override reading the
+  lightened `--brand-d` instead. **A new `--brand-dd` text usage needs its own
+  override**; a new filled button needs nothing.
+- **`--warn` / `--danger`** are lightened, never re-hued: amber is UNCERTAIN
+  and red is FAILED, and the double-pay guard rests on telling them apart in
+  either theme.
+
+**`--brand-d` inverts its role in dark**: it is the brand TEXT step (lightened),
+so the two filled controls that hover onto it (`.ob-boost-pill`, `.show-main
+.btn-boost`) carry scoped rules hovering to `--brand-dd` instead — contrast
+still only ever increases.
+
+Two structural notes. **The widget needed no change**: it reads the tokens live
+off `:root`, so the dark `--modal-*`/state values reach the modals by
+themselves, and its `var()` fallbacks stay mirrors of the *light* values — a
+fallback only fires when a token is undefined (a stale `theme.css`), never in
+dark mode. Which is also why **the dark block must stay below the base `:root`
+block in `theme.css`**: `test-boost-modal-render.mjs` parses the first `:root`
+block it finds. And the masthead needed no second banner — the clear PNG's
+wordmark is cyan on transparency, which is what that file's split was for.
 
 **The login/boost widget is a fork of LB's and wore LB's dark palette until
 2026-08-21** — `bg-neutral-900`, `border-neutral-700`, `text-orange-500` on every

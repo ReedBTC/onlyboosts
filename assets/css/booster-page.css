@@ -332,3 +332,7 @@ a.bs-mention { text-decoration: none; }
   .bs-ident { padding: 3.4rem 1rem 1.15rem; }
   .bs-chip { font-size: 0.78rem; }
 }
+
+/* ── Dark mode: --brand-dd stays the AA fill under white (theme.css),
+   so its text role here reads the lightened --brand-d instead. ── */
+:root[data-theme="dark"] .bs-bio a:hover { color: var(--brand-d); }

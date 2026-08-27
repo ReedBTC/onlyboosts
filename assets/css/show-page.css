@@ -1322,3 +1322,13 @@ a.boost-who:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px
   .pr-title { font-size: 0.86rem; }
 }
 
+
+/* ── Dark mode ─────────────────────────────────────────────────────
+   The tokens flip in theme.css. Two roles cannot follow them both
+   ways: --brand-d is the dark theme's brand TEXT step (lightened), so
+   the one filled button that used it as a hover fill under white
+   hovers to --brand-dd, the ramp's AA fill in both themes; and
+   --brand-dd's own text roles read --brand-d instead. */
+:root[data-theme="dark"] .show-main .btn-boost:hover { background: var(--brand-dd); }
+:root[data-theme="dark"] .show-desc-body a:hover { color: var(--brand-d); }
+:root[data-theme="dark"] .ep-drawer > summary:hover { color: var(--brand-d); }

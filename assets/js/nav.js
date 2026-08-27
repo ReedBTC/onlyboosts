@@ -54,6 +54,47 @@
     }
   }, true)
 
+  // ── Dark-mode toggle ─────────────────────────────────────────────────
+  // The boot script in the nav partial replays the stored choice before
+  // first paint; this owns everything after — the click, the storage
+  // write, the button's label, and cross-tab sync. Absence of the
+  // attribute (and any stored value other than 'dark') is the light theme.
+  function themeIsDark() {
+    return document.documentElement.getAttribute('data-theme') === 'dark'
+  }
+  function labelThemeToggles() {
+    var dark = themeIsDark()
+    var label = dark ? 'Switch to light mode' : 'Switch to dark mode'
+    var btns = document.querySelectorAll('.nav-theme-toggle')
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].setAttribute('aria-label', label)
+      btns[i].setAttribute('title', label)
+    }
+  }
+  function applyTheme(dark) {
+    if (dark) document.documentElement.setAttribute('data-theme', 'dark')
+    else document.documentElement.removeAttribute('data-theme')
+    labelThemeToggles()
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target && e.target.closest && e.target.closest('.nav-theme-toggle')
+    if (!b) return
+    var dark = !themeIsDark()
+    applyTheme(dark)
+    // 'light' is stored explicitly rather than removed, so a pressed
+    // choice stays distinguishable from never having pressed at all.
+    try { localStorage.setItem('ob-theme', dark ? 'dark' : 'light') } catch (err) {}
+  })
+  // Another tab flipping the theme flips this one too — same pattern the
+  // feed controller uses for lb_nostr_session.
+  window.addEventListener('storage', function (e) {
+    if (e.key !== 'ob-theme') return
+    applyTheme(e.newValue === 'dark')
+  })
+  // The markup ships the light-mode label; correct it when the boot
+  // script already set dark before this module ran.
+  labelThemeToggles()
+
   // ── "Report a bug" trigger (More ▾ dropdown item, sitewide) ──────────
   // Lazy-loads the login-widget bundle on demand and opens the bug-report
   // modal (which gates login itself). The bundle has an internal
@@ -71,7 +112,7 @@
         return
       }
       var s = document.createElement('script')
-      s.src = '/assets/widgets/login-widget.js?v=ob-v147'
+      s.src = '/assets/widgets/login-widget.js?v=ob-v148'
       s.async = true
       s.onload = function () { Promise.resolve().then(resolve) }
       s.onerror = function () { window.__lbWidgetLoad = null; reject(new Error('widget load failed')) }

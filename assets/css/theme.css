@@ -128,6 +128,93 @@ html, body { overflow-x: hidden; max-width: 100vw; }
   --scrim:      rgba(11, 58, 82, 0.55);
 }
 
+/* ══════════════════════════════ DARK MODE ══════════════════════════════
+   Applied when the <html> element carries data-theme="dark", which the
+   boot script in partials/nav.html sets before first paint from the
+   visitor's stored choice (localStorage key `ob-theme`). Absence of the
+   attribute is the light theme — exactly what every visitor saw before
+   the toggle existed.
+
+   ⚠️ THIS BLOCK MUST STAY BELOW THE BASE `:root` BLOCK.
+   scripts/test-boost-modal-render.mjs reads the widget's var() fallbacks
+   against the FIRST `:root` block in this file; the fallbacks mirror the
+   light values, which is correct — a fallback only fires when the token
+   is undefined (a stale theme.css), never in dark mode, where every
+   token below is defined.
+
+   Every value here was contrast-checked against the surfaces it sits on
+   (scripts in the working notes; text ≥ 4.5:1 on the page and card
+   backgrounds, links and accents ≥ 6:1). Three deliberate exceptions to
+   "just flip the token":
+
+   - `--navy` DOES NOT FLIP. The nav, the footer, the .page-header band
+     and the .tagblock code sample are dark surfaces in the light theme
+     already, and they stay exactly as they are; the scoped block below
+     re-supplies their light text tokens, which is cheaper and safer than
+     re-styling four components.
+   - `--brand-dd` / `--brand-ddd` DO NOT FLIP. They are the AA fills
+     under white text on every filled button in the login widget, which
+     reads them live. Where they were doing the OTHER job — darkest text
+     step on a light page — each stylesheet carries its own dark-scoped
+     override pointing at `--brand-d` instead.
+   - `--warn` and `--danger` are lightened, never re-hued: amber is
+     UNCERTAIN and red is FAILED, and the double-pay guard rests on a
+     donor telling them apart at a glance in either theme. */
+:root[data-theme="dark"] {
+  --cream:   #0e1720;   /* page background      */
+  --cream-d: #0a1119;   /* sunken background    */
+  --green:   #5fc3f0;   /* link, hover          */
+  --green-d: #3fb2e6;   /* link                 */
+  --text:    #d9e4ee;
+  --muted:   #8da4b6;
+  --border:  #263c4f;
+  --white:   #15222e;   /* card surface — the alias keeps its role, not its word */
+  --bg:      #0a1119;
+
+  --ink:     #d9e4ee;
+  --surface: #15222e;
+
+  /* --brand-d is the dark theme's brand TEXT step (links, hovers, focus
+     rings on the detail pages). It lightens rather than darkens because
+     emphasis on a dark ground goes toward white; the two filled-button
+     hovers that used it as a fill under white carry their own scoped
+     rules below. */
+  --brand-d: #3cc0f5;
+
+  --modal-bg:    #101b26;
+  --modal-line:  #2e4759;
+  --modal-field: #0b141c;
+  --modal-inset: #192939;
+
+  --brand-tint: rgba(0, 175, 240, 0.16);
+  --brand-ring: rgba(0, 175, 240, 0.40);
+  --ok:         #45b585;
+  --warn:       #d98a43;
+  --danger:     #e57f76;
+  --scrim:      rgba(2, 10, 16, 0.7);
+}
+:root[data-theme="dark"] body { color-scheme: dark; }
+
+/* The chrome that is dark in BOTH themes — the navy bars and bands — reads
+   --cream / --cream-d / --white as its light TEXT, not as a background, so
+   it keeps the light theme's supply. Without this the nav's own wordmark
+   goes dark-on-navy the moment the page does. */
+:root[data-theme="dark"] #top-nav,
+:root[data-theme="dark"] #site-footer,
+:root[data-theme="dark"] .page-header {
+  --cream:   #eef6fb;
+  --cream-d: #e2eef7;
+  --white:   #ffffff;
+}
+
+/* A filled cyan control hovers DARKER in dark mode too: the lightened
+   --brand-d above would put white text on a light fill. --brand-dd is the
+   ramp's AA step under white in both themes. */
+:root[data-theme="dark"] .ob-boost-pill:hover:not(:disabled) {
+  background: var(--brand-dd);
+  border-color: var(--brand-dd);
+}
+
 html { scroll-behavior: smooth; }
 
 body {

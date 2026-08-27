@@ -50,18 +50,18 @@
 
   <!-- Shared note / card styles (.note-card, .embed-note) — the boosts
        feeds render through the same kind-1 card as boosts-thread.js. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v147" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v148" />
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v147" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v148" />
   <!-- The episode card and its drawer, extracted from the inline block below
        when /episode/<guid> pages needed the same cards. See the file header. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v147" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v147" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v148" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v148" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. Must stay last
        among the stylesheets so the inline block below still wins. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v147" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v148" />
 
   <style>
     :root {
@@ -130,6 +130,60 @@
     body[data-active-feed="songs-global"]     { --accent: var(--sng-accent); --accent-d: var(--sng-accent-d); --accent-dd: var(--sng-accent-dd); --tint: var(--sng-tint); }
     body[data-active-feed="songs-follows"]    { --accent: var(--snf-accent); --accent-d: var(--snf-accent-d); --accent-dd: var(--snf-accent-dd); --tint: var(--snf-tint); }
     body[data-active-feed="albums"]           { --accent: var(--alb-accent); --accent-d: var(--alb-accent-d); --accent-dd: var(--alb-accent-dd); --tint: var(--alb-tint); }
+
+    /* ── Dark mode: the accent families ─────────────────────────────
+       theme.css owns the page palette; this block owns the eight feed
+       families, which only exist on this page. The remap keeps every
+       `--accent` (they are FILLS, mid-tone in both themes) and moves
+       the other three roles:
+
+       - `--*-accent-d` / `--*-accent-dd` are the family's TEXT and
+         hover steps, so on a dark ground they lighten instead of
+         darken — each value is the least lightening that reaches
+         4.5:1 (-d) or 6:1 (-dd) on the dark page background, computed
+         per family, the same per-family discipline the light -dd row
+         used against white. The two cyan families' -d steps are
+         nudged past the computed minimum because the seam under the
+         selected tab is drawn in --accent-d and must stay visible
+         against the --accent fill beside it.
+       - `--*-tint` is the family's wash: 18% of the accent mixed into
+         the dark background.
+
+       The mobile tab chips need no rule of their own: the selected
+       chip is `--tab-dd` under `var(--white)`, and those flip in
+       opposite directions (light fill, dark text ≥ 6:1 by the same
+       computation). The DESKTOP tab keeps its unchanged accent fill,
+       so its selected label pins to #fff below, scoped above the
+       chip breakpoint so the chips are left alone. */
+    :root[data-theme="dark"] body {
+      --bg-accent-d:   #3ec3f4;  --bg-accent-dd:  #00aff0;  --bg-tint:   #0b3245;
+      --bf-accent-d:   #2f9fd8;  --bf-accent-dd:  #309ed6;  --bf-tint:   #0d2c3f;
+      --sh-accent-d:   #2d86c6;  --sh-accent-dd:  #549cd1;  --sh-tint:   #10293d;
+      --eg-accent-d:   #5083c1;  --eg-accent-dd:  #6f99cc;  --eg-tint:   #14263b;
+      --ef-accent-d:   #777bb6;  --ef-accent-dd:  #8f92c3;  --ef-tint:   #192137;
+      --sng-accent-d:  #8577b8;  --sng-accent-dd: #9a8fc4;  --sng-tint:  #1c2037;
+      --snf-accent-d:  #9074b3;  --snf-accent-dd: #a38cc0;  --snf-tint:  #1f2036;
+      --alb-accent-d:  #9b6fac;  --alb-accent-dd: #ad89bb;  --alb-tint:  #221f35;
+    }
+    :root[data-theme="dark"] .feed-sub[aria-selected="true"],
+    :root[data-theme="dark"] .feed-sub[aria-selected="true"]:hover { color: #fff; }
+    @media (min-width: 641px) {
+      :root[data-theme="dark"] .feed-tab[aria-selected="true"] { color: #fff; }
+    }
+    :root[data-theme="dark"] .feed-tab:hover { background: rgba(255, 255, 255, 0.04); }
+    /* The scope toggle's thumb was `--white`, which is a card surface now —
+       invisible against the dark track. */
+    :root[data-theme="dark"] .feed-toggle-thumb { background: #d9e4ee; }
+    /* --brand-dd stays the AA fill under white (see theme.css); where this
+       page used it as its darkest TEXT step, dark mode reads the lightened
+       --brand-d instead, with a lighter step again for the -ddd hovers. */
+    :root[data-theme="dark"] .members-info,
+    :root[data-theme="dark"] .members-wall-section .show-more,
+    :root[data-theme="dark"] .bots-more,
+    :root[data-theme="dark"] .hpw-rules { color: var(--brand-d); }
+    :root[data-theme="dark"] .members-wall-section .show-more:hover,
+    :root[data-theme="dark"] .bots-more:hover,
+    :root[data-theme="dark"] .hpw-rules:hover { color: #8fd6f8; }
 
     /* ── Masthead ────────────────────────────────────────────────────
        Wordmark banner sits above the sticky feed bar. It scrolls away;
@@ -1327,8 +1381,8 @@
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
     }
   </style>
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v147" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v147" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v148" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v148" />
 </head>
 <body data-active-feed="episodes-global">
 
@@ -1338,6 +1392,23 @@
      page files; edit THIS file, then run scripts/sync-partials.js to
      push it into every page (between the NAV:START / NAV:END markers).
      Styles live in /assets/css/nav.css; behavior in /assets/js/nav.js. -->
+<!-- Theme boot. Runs before the nav (the first visible element) is parsed,
+     so a returning dark-mode visitor never sees a light flash. The choice is
+     per-browser (localStorage key ob-theme); absence means light, which is what
+     every visitor saw before the toggle existed. The toggle itself is wired
+     in nav.js; this only replays the stored choice.
+     ⚠️ No backticks or dollar-brace in this file — sync-partials.js injects
+     it into the edge Functions inside a template literal and exits nonzero
+     if either appears. -->
+<script>
+(function () {
+  try {
+    if (localStorage.getItem('ob-theme') === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+  } catch (e) { /* storage blocked — the light default stands */ }
+})();
+</script>
 <header id="top-nav">
   <div class="nav-inner">
     <a class="nav-logo" href="/" aria-label="OnlyBoosts home">
@@ -1404,6 +1475,13 @@
         </div>
       </details>
     </nav>
+    <!-- Dark-mode toggle. Shows the theme you would SWITCH TO (moon in
+         light, sun in dark); nav.js owns the click, the storage write and
+         the aria-label, and keeps other open tabs in step via the storage event. -->
+    <button type="button" class="nav-theme-toggle" aria-label="Switch to dark mode" title="Switch to dark mode">
+      <span class="ntt-moon" aria-hidden="true">🌙</span>
+      <span class="ntt-sun" aria-hidden="true">☀️</span>
+    </button>
     <div id="lb-boost-slot" aria-label="Donate">
       <button
         type="button"
@@ -2483,17 +2561,17 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v147"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v148"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v147" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v148" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v147" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v148" defer></script>
 
 <!-- Feed hydration — lazily loads the active feed on first view. -->
-<script type="module" src="/assets/js/feeds.js?v=ob-v147"></script>
-<script src="/assets/js/nav.js?v=ob-v147" defer></script>
+<script type="module" src="/assets/js/feeds.js?v=ob-v148"></script>
+<script src="/assets/js/nav.js?v=ob-v148" defer></script>
 
 </body>
 </html>

@@ -424,22 +424,22 @@ function renderEpisodePage({ ep, supporters, boosts, boosterCount, latestTs, nam
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v147" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v147" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v147" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v147" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v148" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v148" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v148" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v148" />
   <!-- The hero, the community wall and the boost list are the show page's, so
        this page links its stylesheet and adds only the deltas. -->
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v147" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v147" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v148" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v148" />
   <!-- The episode card, for the community-episodes section: the same chrome
        feeds-podcasts.js paints on the homepage. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v147" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v148" />
   <!-- The boost thread inside a card's drawer, and its reply / like / repost /
        zap bar. Only this page's community section needs them; /show does not. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v147" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v147" />
-  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v147" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v148" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v148" />
+  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v148" />
 </head>
 <body data-episode-guid="${htmlEscape(ep.item_guid)}"${ep.podcast_guid ? ` data-show-guid="${htmlEscape(ep.podcast_guid)}"` : ""}>
 
@@ -449,6 +449,23 @@ function renderEpisodePage({ ep, supporters, boosts, boosterCount, latestTs, nam
      page files; edit THIS file, then run scripts/sync-partials.js to
      push it into every page (between the NAV:START / NAV:END markers).
      Styles live in /assets/css/nav.css; behavior in /assets/js/nav.js. -->
+<!-- Theme boot. Runs before the nav (the first visible element) is parsed,
+     so a returning dark-mode visitor never sees a light flash. The choice is
+     per-browser (localStorage key ob-theme); absence means light, which is what
+     every visitor saw before the toggle existed. The toggle itself is wired
+     in nav.js; this only replays the stored choice.
+     ⚠️ No backticks or dollar-brace in this file — sync-partials.js injects
+     it into the edge Functions inside a template literal and exits nonzero
+     if either appears. -->
+<script>
+(function () {
+  try {
+    if (localStorage.getItem('ob-theme') === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+  } catch (e) { /* storage blocked — the light default stands */ }
+})();
+</script>
 <header id="top-nav">
   <div class="nav-inner">
     <a class="nav-logo" href="/" aria-label="OnlyBoosts home">
@@ -515,6 +532,13 @@ function renderEpisodePage({ ep, supporters, boosts, boosterCount, latestTs, nam
         </div>
       </details>
     </nav>
+    <!-- Dark-mode toggle. Shows the theme you would SWITCH TO (moon in
+         light, sun in dark); nav.js owns the click, the storage write and
+         the aria-label, and keeps other open tabs in step via the storage event. -->
+    <button type="button" class="nav-theme-toggle" aria-label="Switch to dark mode" title="Switch to dark mode">
+      <span class="ntt-moon" aria-hidden="true">🌙</span>
+      <span class="ntt-sun" aria-hidden="true">☀️</span>
+    </button>
     <div id="lb-boost-slot" aria-label="Donate">
       <button
         type="button"
@@ -635,12 +659,12 @@ function renderEpisodePage({ ep, supporters, boosts, boosterCount, latestTs, nam
 
 <script type="application/json" id="episode-boost-payload">${jsonForScript(boostPayload)}</script>
 
-<script src="/assets/js/nav.js?v=ob-v147" defer></script>
-<script src="/assets/js/episode-page.js?v=ob-v147" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v148" defer></script>
+<script src="/assets/js/episode-page.js?v=ob-v148" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v147"></script>
-<script src="/assets/js/sw-register.js?v=ob-v147" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v148"></script>
+<script src="/assets/js/sw-register.js?v=ob-v148" defer></script>
 </body>
 </html>`;
 }
@@ -1024,10 +1048,10 @@ function notFound(guid) {
   <meta name="robots" content="noindex" />
   <title>Episode not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v147" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v147" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v147" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v147" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v148" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v148" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v148" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v148" />
 </head>
 <body>
 <section class="page-header">
@@ -1045,7 +1069,7 @@ function notFound(guid) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v147" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v148" defer></script>
 </body>
 </html>`;
   return new Response(html, {

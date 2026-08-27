@@ -562,3 +562,10 @@ a.pcast-show-link:hover { text-decoration: underline; }
 }
 .pcast-toast.is-visible { opacity: 1; transform: translate(-50%, 0); }
 .pcast-toast.is-error { background: #9b2c2c; }
+
+/* ── Dark mode ─────────────────────────────────────────────────────
+   The toast inverts with the page: its fill is var(--text), which is
+   light in dark mode, so the hardcoded white text flips to ink. The
+   error toast keeps its dark red fill and therefore keeps white. */
+:root[data-theme="dark"] .pcast-toast { color: #10202c; }
+:root[data-theme="dark"] .pcast-toast.is-error { color: #fff; }
