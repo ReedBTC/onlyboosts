@@ -369,7 +369,7 @@ node scripts/stamp-assets.js --check   # verify; non-zero exit if anything is st
 **Order matters.** `sync-partials` injects markup into the page files; anything
 it injects has to be stamped afterwards.
 
-Thirteen test scripts, all plain `node scripts/<name>.mjs` with no runner:
+Fourteen test scripts, all plain `node scripts/<name>.mjs` with no runner:
 
 | | |
 |---|---|
@@ -386,13 +386,14 @@ Thirteen test scripts, all plain `node scripts/<name>.mjs` with no runner:
 | `test-members-hours.mjs` | the 40 HPW boards, same shim, with a fixture built to known answers. Dedupe, week boundaries, the publisher exclusion, the row-multiplying join, and **the week picker**: the bounded window's ceiling, the noon-UTC date rule, DST-safe stepping, and the resolve-rather-than-400 envelope. Confirmed red on three mutations — the ceiling removed, dates resolved at midnight, and stepping by a flat 604800. **Its `env.DB` shim models `.first()`**, which `feed-rank.js` taught `test-members-search.mjs` the hard way |
 | `test-community-medium.mjs` | the two community rollups and the medium partition they were split on, against a `node:sqlite` build of the real `schema.sql`. **Two halves reached two ways**: `fetchCommunityBoosts` is exported and called directly, where `/show`'s query is inline in the page Function and is **extracted from the source and executed**, the `test-feed-hash.mjs` technique. A copy of the SQL written into the test would pass forever while the shipped one rotted. Confirmed to go red on three mutations: the filter removed, its polarity inverted, and the `COALESCE` dropped |
 | `test-keysend-upgrade.mjs` | the keysend upgrade: the `fountain.fm` exclusion's exact-or-parent rule, the routing pair's whole-or-nothing rule, the strict node-pubkey check, every way `/api/keysend` answers "no endpoint", and the wallet gate. **Stubs `fetch`**, so it probes nobody's well-known |
+| `test-feed-search.mjs` | the search box's two outcomes, driving the **shipped** `mountFeedSearch` against a stub DOM: Enter submits the whole query where a feed supplies `onSubmit`, arrow + Enter still picks, emptying the box or Escape clears through `onPick(null)`, the footer row renders — and **the member lookup, with no `onSubmit`, keeps its old Enter**. Confirmed red on two mutations: auto-highlight restored, and the empty-box clear removed |
 
 **⚠️ `test-server-render.mjs` IS THE ONE THAT NEEDS AN ARGUMENT, SO IT IS THE ONE
 THAT GOES UNRUN.** Its header carries the `curl` that produces the capture; take
 a fresh one rather than reusing an old file, since it is also the size
 measurement. It asserted `cards are numbered 1..N with no gaps` — the *ordinal*
 scheme's invariant — until competition ranking shipped on 2026-08-18, and it
-would have been merged red had it not been run. **Run all thirteen before a
+would have been merged red had it not been run. **Run all fourteen before a
 merge**, and treat this one as the guard on the ranking scheme rather than only
 on weight. *(It read "all twelve" until 2026-08-24, contradicting the table
 directly above it — the count moved when a test was added and this sentence did
