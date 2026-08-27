@@ -3041,6 +3041,12 @@ link. `test-feed-hash.mjs` asserts both call sites exist.
 
 #### `#40HPW`
 
+**The section's visible heading is "Nostr Gang #40HPW Challenge"** (Reed's
+rename, 2026-08-27); `#40HPW` stays the feature's name in this file, in ids and
+data attributes, and in the Rules dialog's title. The sub-line under the heading
+dropped its "40HPW Challenge!" opener with the rename, the heading now carrying
+that word itself.
+
 Boost an episode and the board assumes you heard all of it, then adds up the
 durations. **It is an assumption, not a measurement**, and the Rules dialog says
 so. Two boards: **This Week** leads (it resets Monday and has a live race in
