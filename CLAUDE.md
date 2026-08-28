@@ -104,10 +104,11 @@ the controller computes it, which is why nothing in the wild changed: `#shows`,
 retired `#podcasts-*` aliases all resolve exactly as before. A `#podcasts/shows`
 scheme would have been a second address space for the same eight views.
 
-**⚠️ The active tab reads `--accent`, so it tracks the sub-feed inside it** —
-Podcasts is `#1b7bc1` on Shows and `#2f6bb5` on Episodes, straight off the
-`body[data-active-feed]` mapping. An inactive tab has no active feed to read and
-carries its family's shade. No token was added.
+**⚠️ The active tab reads `--accent`, straight off the `body[data-active-feed]`
+mapping**; an inactive tab has no active feed to read and carries its family's
+shade. Since the ramp retired (see the Theming section) every family resolves to
+the one brand cyan, so the tracking no longer shows — the mapping is kept, and
+no token was added.
 
 **⚠️ Which sub-buttons are on screen is CSS off `body[data-active-tab]`, not
 JS** — the same call `.feed-bar-controls` makes, for the same reason. Each
@@ -878,9 +879,9 @@ which is also why **neither may contain a backtick or `${`** (sync-partials
 exits nonzero if one appears; it bit once, in a comment).
 
 The theme itself is `:root[data-theme="dark"]` blocks: the palette flip in
-`theme.css`, the eight accent families' flip in `index.html`'s inline block
-(each `-d`/`-dd` step re-derived per family against the dark background, the
-same per-family discipline the light `-dd` row used against white), and a short
+`theme.css`, the feed accent's flip in `index.html`'s inline block (one family
+since the ramp retired — its `-d`/`-dd` steps lighten against the dark
+background, the same derivation the light `-dd` used against white), and a short
 dark section at the foot of each stylesheet that needed one. Every shipped value
 was contrast-measured; text ≥ 4.5:1 on its surface, links and accents ≥ 6:1.
 
@@ -1104,32 +1105,37 @@ kept as **aliases repointed at the OnlyBoosts palette**. Trust the values, not
 the words — `--orange` is brand cyan. New code should prefer `--brand` / `--ink`
 / `--surface`.
 
-**⚠️ THE FEED RAMP HAS A FOURTH STEP, `--*-accent-dd`, AND IT IS FOR TEXT.**
+**⚠️ THE FEED ACCENT HAS A FOURTH STEP, `--*-accent-dd`, AND IT IS FOR TEXT.**
 Same idea as `--brand-dd`: white on `--bg-accent` measures **2.50:1** and the
-same colour as ink on cream is **2.29:1**, so anything small wearing the cyan end
-of the ramp is illegible. The phone's tab chips read the accent both ways — as a
-fill under white when selected, as the label and border when not — which is
-where Reed saw it (2026-08-23). **Each value is the LEAST darkening that reaches
-6:1 on white**, solved per family rather than scaled by a constant, so the four
-already past it keep their exact colour and only the cyan end moves; a uniform
-multiplier big enough to fix cyan takes Albums to 10.8:1 and flattens the ramp
-that says which feed you are on. `--accent-dd` is mapped beside `--accent` on
-every `body[data-active-feed]` row, and `--tab-dd` rides beside `--tab` on the
-tabs because CSS cannot build one custom property's name out of another's.
+same colour as ink on cream is **2.29:1**, so anything small wearing the accent
+is illegible. The phone's tab chips read it both ways — as a fill under white
+when selected, as the label and border when not — which is where Reed saw it
+(2026-08-23). The value is the least darkening of the cyan that reaches 6:1 on
+white. `--accent-dd` is mapped beside `--accent` on every `body[data-active-feed]`
+row, and `--tab-dd` rides beside `--tab` on the tabs because CSS cannot build
+one custom property's name out of another's.
 
 **⚠️ THE DESKTOP TAB AND THE SUB-ROW STILL USE `--accent` AND STILL MEASURE
-2.50:1 ON MEMBERS.** Only the phone chips were changed, which is what was asked
-for and where the type is smallest. It is the same bug at a larger size; fixing
-it means the selected tab and the block below it stop sharing a fill, which is
-the thing the seam note under **The Three Tabs** exists to protect. A decision,
-not an oversight.
+2.50:1.** Only the phone chips were changed, which is what was asked for and
+where the type is smallest. It is the same bug at a larger size; fixing it means
+the selected tab and the block below it stop sharing a fill, which is the thing
+the seam note under **The Three Tabs** exists to protect. A decision, not an
+oversight.
 
 Brand colors are sampled from the supplied art: `--brand: #00aff0` and
-`--brand-d: #068ace`. The eight feed accents sit on one cyan→indigo→violet ramp,
-so switching feed shifts the page wash along a single system. The violet tail is
-the music half of the medium split, so the color family says which side you're
-on rather than the position in the menu. `--accent` / `--accent-d` / `--tint` are
-the only names the shared chrome sees.
+`--brand-d: #068ace`. **⚠️ THE PER-FEED ACCENT RAMP IS RETIRED.** *Reed's call,
+2026-08-27, on seeing the feeds beside dark mode:* the eight feeds sat on one
+cyan→indigo→violet ramp, the violet tail marking the music half of the medium
+split, so switching feed shifted the page wash. Every feed now wears the one
+brand-cyan family — the one Members · Global always wore, and the same accent
+the detail pages supply — in both themes. **The retirement is values-only**: the
+eight family names survive in `index.html` as aliases of `--bg-*`, the
+`body[data-active-feed]` mapping is untouched, and the dark remap touches
+`--bg-*` alone (a dark line for any other family would silently override the
+aliasing — the inline comment says so). A revival is repointing the aliases; the
+ramp's light and dark values and the reasoning that picked them are in git
+before 2026-08-27. `--accent` / `--accent-d` / `--tint` remain the only names
+the shared chrome sees.
 
 ## Site identity
 

@@ -66,53 +66,38 @@
   <style>
     :root {
       /* ── Per-feed theme palette ──────────────────────────────────
-         Each feed owns an accent, read by the panel wash, the feed-bar
-         menus and the range/sort controls. The eight sit on one
-         cyan→indigo→violet ramp, so switching feed shifts the page along
-         a single system rather than to an unrelated color. The active
-         feed's trio is mirrored into --accent / --accent-d / --tint by
-         the [data-active-feed] rules below, so the shared chrome can
-         just read --accent.
+         ⚠️ THE RAMP IS RETIRED: EVERY FEED WEARS THE ONE BRAND FAMILY.
+         Reed's call, 2026-08-27, on seeing the feeds beside dark mode:
+         the per-feed washes (a cyan→indigo→violet ramp whose violet
+         tail marked the music half of <podcast:medium>) are gone, and
+         switching feed no longer shifts the page's colour. The chrome
+         is unchanged by design — every rule still reads --accent /
+         --accent-d / --accent-dd / --tint through the
+         [data-active-feed] mapping below, and the eight family names
+         still exist as aliases of the one brand family, so this is a
+         values-only change: repointing the aliases is all a revival
+         would take. `git show <pre-2026-08-27>:index.html` has the
+         ramp's values and the reasoning that picked them.
 
-         The ramp's violet tail is the music half of <podcast:medium>:
-         Songs and Albums are the same two rollups as Episodes and Shows,
-         so the color family is what says which side you're on rather
-         than the position in the menu. */
+         The brand family is the one Members · Global always wore, and
+         the same accent the detail pages supply (`.show-main` reads
+         --brand), so the homepage and the pages behind it now agree.
+
+         The fourth step (-dd) is text-grade: white on the accent is
+         2.50:1, so anything small — the phone's tab chips read it as
+         label and fill — uses this instead. #006990 is the least
+         darkening of the cyan that reaches 6:1 on white (the same
+         derivation --brand-dd documents in theme.css). */
       --bg-accent:   #00aff0;  --bg-accent-d:   #0090cc;  --bg-tint:   #e2f6fd;
-      --bf-accent:   #068ace;  --bf-accent-d:   #0570ab;  --bf-tint:   #e0f0fa;
-      --sh-accent:   #1b7bc1;  --sh-accent-d:   #15629b;  --sh-tint:   #e4f1fb;
-      --eg-accent:   #2f6bb5;  --eg-accent-d:   #255696;  --eg-tint:   #e7eefa;
-      --ef-accent:   #4a4f9e;  --ef-accent-d:   #3b3f80;  --ef-tint:   #eaebf7;
-      --sng-accent:  #5c4aa0;  --sng-accent-d:  #4a3b83;  --sng-tint:  #edebf8;
-      --snf-accent:  #6d489b;  --snf-accent-d:  #583a7e;  --snf-tint:  #f0eaf7;
-      --alb-accent:  #7f4694;  --alb-accent-d:  #663878;  --alb-tint:  #f4e9f5;
+      --bg-accent-dd: #006990;
 
-      /* ⚠️ A FOURTH STEP, FOR TEXT THAT HAS TO SURVIVE THE CYAN END OF THE
-         RAMP. `--brand-dd` in theme.css exists for exactly this reason and this
-         is the same idea applied to the feed accents: white on `--bg-accent`
-         measures 2.50:1, which fails AA at every size, and the same colour as
-         INK on cream is 2.29:1. The phone's tab chips use the accent both ways
-         — as a fill under white text when selected, and as the label colour
-         when not — so both readings were illegible on Members and marginal on
-         Shows. Reported by Reed, 2026-08-23: "the white letters blend into the
-         background too much".
-
-         ⚠️ SOLVED FOR A TARGET RATIO, NOT SCALED BY A CONSTANT, WHICH IS WHY
-         HALF THIS TABLE IS UNCHANGED. A uniform multiplier big enough to fix
-         cyan takes Albums to 10.8:1 and turns the violet half of the ramp
-         nearly black — the ramp is the system that says which feed you are on,
-         and flattening it to fix one end would cost more than it bought. Each
-         value here is the least darkening that reaches 6:1 on white, so the
-         four already past it keep their exact colour and only the cyan end
-         moves. Measured: every one is >= 6.0:1 on white and >= 5.4:1 on cream. */
-      --bg-accent-dd:  #006990;
-      --bf-accent-dd:  #04689a;
-      --sh-accent-dd:  #1767a2;
-      --eg-accent-dd:  #2c64a8;
-      --ef-accent-dd:  #4a4f9e;
-      --sng-accent-dd: #5c4aa0;
-      --snf-accent-dd: #6d489b;
-      --alb-accent-dd: #7f4694;
+      --bf-accent:  var(--bg-accent); --bf-accent-d:  var(--bg-accent-d); --bf-accent-dd:  var(--bg-accent-dd); --bf-tint:  var(--bg-tint);
+      --sh-accent:  var(--bg-accent); --sh-accent-d:  var(--bg-accent-d); --sh-accent-dd:  var(--bg-accent-dd); --sh-tint:  var(--bg-tint);
+      --eg-accent:  var(--bg-accent); --eg-accent-d:  var(--bg-accent-d); --eg-accent-dd:  var(--bg-accent-dd); --eg-tint:  var(--bg-tint);
+      --ef-accent:  var(--bg-accent); --ef-accent-d:  var(--bg-accent-d); --ef-accent-dd:  var(--bg-accent-dd); --ef-tint:  var(--bg-tint);
+      --sng-accent: var(--bg-accent); --sng-accent-d: var(--bg-accent-d); --sng-accent-dd: var(--bg-accent-dd); --sng-tint: var(--bg-tint);
+      --snf-accent: var(--bg-accent); --snf-accent-d: var(--bg-accent-d); --snf-accent-dd: var(--bg-accent-dd); --snf-tint: var(--bg-tint);
+      --alb-accent: var(--bg-accent); --alb-accent-d: var(--bg-accent-d); --alb-accent-dd: var(--bg-accent-dd); --alb-tint: var(--bg-tint);
 
       /* Defaults (Episodes · Global is the landing feed). */
       --accent:    var(--eg-accent);
@@ -131,23 +116,25 @@
     body[data-active-feed="songs-follows"]    { --accent: var(--snf-accent); --accent-d: var(--snf-accent-d); --accent-dd: var(--snf-accent-dd); --tint: var(--snf-tint); }
     body[data-active-feed="albums"]           { --accent: var(--alb-accent); --accent-d: var(--alb-accent-d); --accent-dd: var(--alb-accent-dd); --tint: var(--alb-tint); }
 
-    /* ── Dark mode: the accent families ─────────────────────────────
-       theme.css owns the page palette; this block owns the eight feed
-       families, which only exist on this page. The remap keeps every
-       `--accent` (they are FILLS, mid-tone in both themes) and moves
-       the other three roles:
+    /* ── Dark mode: the accent family ───────────────────────────────
+       theme.css owns the page palette; this block owns the feed accent,
+       which only exists on this page. Only the brand family needs a
+       remap — the other seven names are aliases of it (see the palette
+       note above), so they follow: var() substitution happens per
+       element at computed-value time, and an alias declared on :root
+       picks up the value this rule sets on body. ⚠️ A dark line for any
+       other family would silently break that aliasing; if the ramp
+       ever comes back, its per-family dark values are in git beside
+       the light ones.
 
-       - `--*-accent-d` / `--*-accent-dd` are the family's TEXT and
-         hover steps, so on a dark ground they lighten instead of
-         darken — each value is the least lightening that reaches
-         4.5:1 (-d) or 6:1 (-dd) on the dark page background, computed
-         per family, the same per-family discipline the light -dd row
-         used against white. The two cyan families' -d steps are
-         nudged past the computed minimum because the seam under the
-         selected tab is drawn in --accent-d and must stay visible
-         against the --accent fill beside it.
-       - `--*-tint` is the family's wash: 18% of the accent mixed into
-         the dark background.
+       The remap keeps `--accent` (it is a FILL, mid-tone in both
+       themes) and moves the other three roles: -d and -dd are TEXT and
+       hover steps, so on a dark ground they lighten instead of darken
+       (-d is nudged past the 4.5:1 minimum because the seam under the
+       selected tab is drawn in --accent-d and must stay visible against
+       the --accent fill beside it; -dd is the accent itself, which
+       already clears 6:1 on the dark background), and the tint is 18%
+       of the accent mixed into the dark background.
 
        The mobile tab chips need no rule of their own: the selected
        chip is `--tab-dd` under `var(--white)`, and those flip in
@@ -156,14 +143,7 @@
        so its selected label pins to #fff below, scoped above the
        chip breakpoint so the chips are left alone. */
     :root[data-theme="dark"] body {
-      --bg-accent-d:   #3ec3f4;  --bg-accent-dd:  #00aff0;  --bg-tint:   #0b3245;
-      --bf-accent-d:   #2f9fd8;  --bf-accent-dd:  #309ed6;  --bf-tint:   #0d2c3f;
-      --sh-accent-d:   #2d86c6;  --sh-accent-dd:  #549cd1;  --sh-tint:   #10293d;
-      --eg-accent-d:   #5083c1;  --eg-accent-dd:  #6f99cc;  --eg-tint:   #14263b;
-      --ef-accent-d:   #777bb6;  --ef-accent-dd:  #8f92c3;  --ef-tint:   #192137;
-      --sng-accent-d:  #8577b8;  --sng-accent-dd: #9a8fc4;  --sng-tint:  #1c2037;
-      --snf-accent-d:  #9074b3;  --snf-accent-dd: #a38cc0;  --snf-tint:  #1f2036;
-      --alb-accent-d:  #9b6fac;  --alb-accent-dd: #ad89bb;  --alb-tint:  #221f35;
+      --bg-accent-d: #3ec3f4;  --bg-accent-dd: #00aff0;  --bg-tint: #0b3245;
     }
     :root[data-theme="dark"] .feed-sub[aria-selected="true"],
     :root[data-theme="dark"] .feed-sub[aria-selected="true"]:hover { color: #fff; }
@@ -281,11 +261,13 @@
        of five feeds behind a control you had to know to open, and a visitor who
        did not know what the site was could not find them.
 
-       ⚠️ THE ACTIVE TAB READS `--accent`, NOT A COLOUR OF ITS OWN, so it tracks
-       the sub-feed inside it: Podcasts is #1b7bc1 on Shows and #2f6bb5 on
-       Episodes, off the body[data-active-feed] mapping that already exists.
-       An INACTIVE tab has no active feed to read, so it carries its family's
-       representative shade as `--tab`. Nothing here adds a token. */
+       ⚠️ THE ACTIVE TAB READS `--accent`, NOT A COLOUR OF ITS OWN, off the
+       body[data-active-feed] mapping that already exists; an INACTIVE tab
+       has no active feed to read, so it carries its family's `--tab`.
+       Since the ramp retired (2026-08-27) every family resolves to the one
+       brand cyan, so the distinction no longer shows — the plumbing is kept
+       because it is what a revived ramp would need, and nothing here adds a
+       token. */
     .feed-tabs {
       max-width: var(--feed-track);
       margin: 0 auto;
@@ -316,7 +298,8 @@
       color: var(--muted);
       transition: background 0.15s, color 0.15s, border-color 0.15s;
     }
-    /* Inactive: the family's shade. Active: whatever feed is on screen. */
+    /* Inactive: the family's shade (all brand cyan since the ramp retired).
+       Active: whatever feed is on screen. */
     /* `--tab-dd` rides alongside `--tab` rather than being derived from it,
        because CSS cannot turn one custom property into another's name. The
        phone chips are its only consumer; see the block at the foot of this
