@@ -292,11 +292,15 @@
     height: auto;
     padding: 0.6rem 1rem;
   }
-  /* Drop the wordmark on mobile (the logo carries the brand) and let the
-     freed space hold a labeled "Explore" trigger. */
+  /* Drop the wordmark on mobile (the logo carries the brand). */
   .nav-site-name { display: none; }
   nav { margin-right: auto; }   /* push Boost + identity to the right edge */
   .nav-explore .caret { display: none; }
+  /* The word goes too (Reed's call, 2026-08-27): a bare hamburger is the
+     established affordance, and the freed width is what keeps Log in on
+     the same line as everything else instead of wrapping under it. The
+     summary keeps its aria-label, so nothing is lost to a screen reader. */
+  .nav-explore-text { display: none; }
   #lb-boost-slot { flex-shrink: 0; }
   /* Swap the compass for a hamburger so it clearly reads as a menu, not a
      link. It morphs to ✕ while the full-screen overlay is open. The 🧭 emoji
