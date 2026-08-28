@@ -924,6 +924,18 @@ so the two filled controls that hover onto it (`.ob-boost-pill`, `.show-main
 .btn-boost`) carry scoped rules hovering to `--brand-dd` instead — contrast
 still only ever increases.
 
+**⚠️ A DARK OVERRIDE OF AN ALIASED TOKEN GOES ON THE ELEMENT THE ALIAS IS
+DECLARED ON, AND THIS SHIPPED WRONG ONCE.** A custom property substitutes its
+`var()` at computed-value time on the element that *declares* it, then inherits
+as the resolved value. The accent families are aliases on `:root`
+(`--eg-tint: var(--bg-tint)`), and the dark remap sat on `body` — so every
+alias had already baked in the light value before body's override existed, and
+dark mode rendered the feed panels on the light-mode cyan with the light
+`--accent-d` (a blue picked for white, ~2.5:1 on a dark card) on every eyebrow
+and link. Nothing errors; the page is simply the wrong colors. The remap lives
+on `:root[data-theme="dark"]` now, and the inline comment beside it says why.
+Reed's screenshots are what caught it — "still a lot of different shades".
+
 Two structural notes. **The widget needed no change**: it reads the tokens live
 off `:root`, so the dark `--modal-*`/state values reach the modals by
 themselves, and its `var()` fallbacks stay mirrors of the *light* values — a

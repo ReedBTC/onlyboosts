@@ -142,12 +142,30 @@
        computation). The DESKTOP tab keeps its unchanged accent fill,
        so its selected label pins to #fff below, scoped above the
        chip breakpoint so the chips are left alone. */
-    :root[data-theme="dark"] body {
-      /* The tint is barely off the ground on purpose — the panels wear it
-         page-wide, and a saturated cyan wash there is exactly the "region
-         in its own colour" the dark grammar retires. */
-      --bg-accent-d: #3ec3f4;  --bg-accent-dd: #00aff0;  --bg-tint: #151d24;
+    /* ⚠️ THIS REMAP MUST BE ON `:root`, THE ELEMENT THE ALIASES ARE
+       DECLARED ON, AND IT SHIPPED ON `body` ONCE. A custom property
+       substitutes its var() at computed-value time ON THE ELEMENT THAT
+       DECLARES IT and then inherits as the resolved value — so with the
+       dark values on body, `--eg-tint: var(--bg-tint)` on :root had
+       already baked in the LIGHT tint before body's remap existed, and
+       every dark feed panel rendered on the light-mode cyan. Same rule
+       for any future alias: override a token on the element that
+       declares the alias, or the alias never sees it.
+
+       The tint is an alpha wash, not a shade: it hovers and marks
+       selected menu rows on several different surfaces, and it is the
+       same rgba the detail pages' `.show-main` supplies, so the two
+       agree. The panel FIELD it also used to paint is scoped to the
+       ground below — a page-wide wash is exactly the "region in its own
+       colour" the dark grammar retires. */
+    :root[data-theme="dark"] {
+      --bg-accent-d: #3ec3f4;  --bg-accent-dd: #00aff0;  --bg-tint: rgba(0, 175, 240, 0.10);
     }
+    /* One ground: the panel field and the masthead join the page in dark.
+       (In light they are the LB two-tone — chrome on cream, panels on the
+       tint — which is untouched.) */
+    :root[data-theme="dark"] .feed-panels { background: var(--cream); }
+    :root[data-theme="dark"] .masthead { background: var(--cream); }
     :root[data-theme="dark"] .feed-sub[aria-selected="true"],
     :root[data-theme="dark"] .feed-sub[aria-selected="true"]:hover { color: #fff; }
     @media (min-width: 641px) {
