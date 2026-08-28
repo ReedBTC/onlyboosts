@@ -50,18 +50,18 @@
 
   <!-- Shared note / card styles (.note-card, .embed-note) — the boosts
        feeds render through the same kind-1 card as boosts-thread.js. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v148" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v149" />
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v148" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v149" />
   <!-- The episode card and its drawer, extracted from the inline block below
        when /episode/<guid> pages needed the same cards. See the file header. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v148" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v148" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v149" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v149" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. Must stay last
        among the stylesheets so the inline block below still wins. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v148" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v149" />
 
   <style>
     :root {
@@ -143,7 +143,10 @@
        so its selected label pins to #fff below, scoped above the
        chip breakpoint so the chips are left alone. */
     :root[data-theme="dark"] body {
-      --bg-accent-d: #3ec3f4;  --bg-accent-dd: #00aff0;  --bg-tint: #0b3245;
+      /* The tint is barely off the ground on purpose — the panels wear it
+         page-wide, and a saturated cyan wash there is exactly the "region
+         in its own colour" the dark grammar retires. */
+      --bg-accent-d: #3ec3f4;  --bg-accent-dd: #00aff0;  --bg-tint: #151d24;
     }
     :root[data-theme="dark"] .feed-sub[aria-selected="true"],
     :root[data-theme="dark"] .feed-sub[aria-selected="true"]:hover { color: #fff; }
@@ -153,7 +156,7 @@
     :root[data-theme="dark"] .feed-tab:hover { background: rgba(255, 255, 255, 0.04); }
     /* The scope toggle's thumb was `--white`, which is a card surface now —
        invisible against the dark track. */
-    :root[data-theme="dark"] .feed-toggle-thumb { background: #d9e4ee; }
+    :root[data-theme="dark"] .feed-toggle-thumb { background: #e4e8ec; }
     /* --brand-dd stays the AA fill under white (see theme.css); where this
        page used it as its darkest TEXT step, dark mode reads the lightened
        --brand-d instead, with a lighter step again for the -ddd hovers. */
@@ -1364,8 +1367,8 @@
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
     }
   </style>
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v148" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v148" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v149" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v149" />
 </head>
 <body data-active-feed="episodes-global">
 
@@ -2544,17 +2547,17 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v148"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v149"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v148" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v149" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v148" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v149" defer></script>
 
 <!-- Feed hydration — lazily loads the active feed on first view. -->
-<script type="module" src="/assets/js/feeds.js?v=ob-v148"></script>
-<script src="/assets/js/nav.js?v=ob-v148" defer></script>
+<script type="module" src="/assets/js/feeds.js?v=ob-v149"></script>
+<script src="/assets/js/nav.js?v=ob-v149" defer></script>
 
 </body>
 </html>

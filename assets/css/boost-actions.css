@@ -514,4 +514,10 @@
 :root[data-theme="dark"] .zap-modal { --navy: #d7e5f1; }
 :root[data-theme="dark"] .zap-modal .zap-status.is-error { color: #f08a63; }
 :root[data-theme="dark"] .reply-composer .rc-cancel { color: var(--text); }
-:root[data-theme="dark"] .lb-toast { color: #eef6fb; }
+/* --navy is the ground in dark, so the toast's navy fill vanished into
+   the page; it becomes a raised bordered surface instead. */
+:root[data-theme="dark"] .lb-toast {
+  color: #eef6fb;
+  background: #1c2127;
+  border: 1px solid #2e343b;
+}

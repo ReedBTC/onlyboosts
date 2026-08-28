@@ -885,14 +885,30 @@ background, the same derivation the light `-dd` used against white), and a short
 dark section at the foot of each stylesheet that needed one. Every shipped value
 was contrast-measured; text ≥ 4.5:1 on its surface, links and accents ≥ 6:1.
 
-**⚠️ THREE TOKENS DELIBERATELY DO NOT FLIP, and each has a scoped repair:**
+**⚠️ THE DARK GRAMMAR IS ONE GROUND, HAIRLINES, AND ONE ACCENT.** *Reed's call,
+2026-08-27, against a Primal dark-mode screenshot* ("ours feels blocky and
+choppy"). The first cut flipped each light surface to its own blue-tinted dark
+shade and kept the navy chrome, which read as bands and boxes. What replaced it:
+a near-neutral black ground; the nav, footer and `.page-header` band sit ON
+that ground behind a 1px `--border` hairline instead of on their own navy; the
+card (`--white`/`--surface`) and sunken (`--cream-d`) surfaces are within a few
+percent of the ground, with borders doing the separating; and cyan appears only
+as text, accents and fills, never as a wash a region wears (`--bg-tint` is
+barely off the ground for the same reason). **Don't re-introduce a surface with
+its own colour into dark mode** — that is the specific thing this pass removed.
 
-- **`--navy`.** The nav, footer, `.page-header` band and `.tagblock` are dark
-  in both themes. They read `--cream`/`--cream-d`/`--white` as light TEXT, so
-  `theme.css` re-supplies those inside `#top-nav`, `#site-footer` and
-  `.page-header`; `boosts-thread.css` and `boost-actions.css` instead remap
-  `--navy`/`--navy-l` *inside* the components that used them as text on light
-  surfaces (`.note-card`, `.embed-note`, `.zap-modal`).
+**⚠️ TWO TOKENS DELIBERATELY DO NOT FLIP, AND `--navy` FLIPS TO THE GROUND:**
+
+- **`--navy` becomes the page ground in dark**, which is what merges the nav
+  and footer into the page. Three consequences carry scoped repairs: those
+  components read `--cream`/`--cream-d`/`--white` as light TEXT, so `theme.css`
+  re-supplies those inside `#top-nav`, `#site-footer` and `.page-header`; the
+  `.tagblock` and `.lb-toast` fills vanished into the ground and became
+  bordered surfaces (dark sections of `page.css` / `boost-actions.css`); and
+  `boosts-thread.css` / `boost-actions.css` remap `--navy`/`--navy-l` *inside*
+  the components that used them as text on light surfaces (`.note-card`,
+  `.embed-note`, `.zap-modal`). **A new `--navy` fill needs a dark-scoped
+  border or fill of its own**; a new navy-as-text usage needs a remap.
 - **`--brand-dd` / `--brand-ddd`.** They are the AA fills under white on every
   filled widget button, read live by the bundle, so lightening them breaks the
   checkout. Where they were doing the *other* job — darkest text step on a

@@ -377,3 +377,10 @@
 :root[data-theme="dark"] .soon-card h2,
 :root[data-theme="dark"] .prose h3 { color: var(--brand-d); }
 :root[data-theme="dark"] .callout--warn strong { color: #eda679; }
+/* --navy is the ground in dark, so the code block's navy fill vanished
+   into the page; it becomes a bordered sunken block instead. Its light
+   syntax colours were picked for a dark fill and stay. */
+:root[data-theme="dark"] .tagblock {
+  background: var(--cream-d);
+  border: 1px solid var(--border);
+}
