@@ -1604,6 +1604,15 @@ section's content in a shell.
   render, not a snapshot at the moment of sharing**. `.hpw-*` CSS moved to
   `assets/css/hpw-board.css` (37 selectors, audited) so both surfaces dress
   the same rows.
+  **⚠️ ROW HEIGHT ON THE CARD IS A CARD-SIZE DECISION.** Ten rows share
+  ~432px, High Scores rows are the tall ones (the week under the name), and
+  the list clips inside its shell — so anything that grows a row (a chip, a
+  second line, a bigger face) **silently drops the tenth member from the
+  card while the tab still shows them**. Measured 2026-08-29: 36.8px a High
+  Scores row, 35.4px a week row, 43.2px the ceiling. The bot measures
+  `rowsClippedByList` on every render and refuses to publish a card with a
+  clipped row, which is the guard; re-measure after touching the card's
+  stylesheet or the row's markup.
 - **The member wall** (`GET /api/v1/members`, top 100) is the same
   `renderSupporters` the detail pages use; the heading is a parameter
   ("Members" here, "Nostr Community" there) and is moved into the head slot,
