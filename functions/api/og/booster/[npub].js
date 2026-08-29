@@ -74,6 +74,15 @@ export async function onRequestGet({ request, env, params }) {
   return out;
 }
 
+/* ⚠️ PAGES ROUTES BY METHOD, AND A HEAD FALLS THROUGH TO THE STATIC LOOKUP
+   WHEN ONLY onRequestGet IS EXPORTED — answering 404 for a URL whose GET is
+   fine. Found by the collector's bot on 2026-08-29. Most OG scrapers GET, but
+   link checkers and some CDNs HEAD first. Same answer, no body. */
+export async function onRequestHead(ctx) {
+  const resp = await onRequestGet(ctx);
+  return new Response(null, { status: resp.status, headers: resp.headers });
+}
+
 // One bounded fetch. Returns a Response ready to send, or null for "use the
 // banner" — every failure mode lands on null rather than throwing, because a
 // share card is not worth a 5xx.

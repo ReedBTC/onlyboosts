@@ -23,7 +23,8 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import * as board from '../assets/js/hpw-board.js'
 import { onRequestGet as pageGet, CARD_W, CARD_H } from '../functions/hpw/[[path]].js'
-import { onRequestGet as ogGet, isPng, UPSTREAM_BASE } from '../functions/api/og/hpw/[name].js'
+import { onRequestGet as ogGet, onRequestHead as ogHead, isPng, UPSTREAM_BASE } from '../functions/api/og/hpw/[name].js'
+import { onRequestHead as boosterHead } from '../functions/api/og/booster/[npub].js'
 import { pacificWeekStart, weekDateString, prevWeek, nextWeek } from '../assets/js/pacific-week.js'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -229,6 +230,15 @@ await check('over 900KB is the banner, by Content-Length and by the stream', asy
   assert.equal((await og('high-scores.png')).headers.get('x-ob-image'), 'fallback')
   upstream = () => new Response(big, { status: 200, headers: { 'content-type': 'image/png' } })
   assert.equal((await og('high-scores.png')).headers.get('x-ob-image'), 'fallback')
+})
+await check('⚠️ HEAD is routed and answers the GET\'s status and headers with no body', async () => {
+  upstream = () => new Response(PNG, { status: 200, headers: { 'content-type': 'image/png' } })
+  const r = await ogHead({ request: new Request('https://ob.invalid/api/og/hpw/high-scores.png', { method: 'HEAD' }), env: { ASSETS: assets }, params: { name: 'high-scores.png' } })
+  assert.equal(r.status, 200); assert.equal(r.headers.get('x-ob-image'), 'card')
+  assert.equal(r.headers.get('content-type'), 'image/png'); assert.equal(r.body, null)
+  assert.equal((await ogHead({ request: new Request('https://ob.invalid/api/og/hpw/x.png', { method: 'HEAD' }), env: {}, params: { name: 'x.png' } })).status, 404)
+  // and the booster route, which had the same gap
+  assert.equal(typeof boosterHead, 'function')
 })
 await check('a 404 upstream, and a thrown fetch, are the banner', async () => {
   upstream = () => new Response('nope', { status: 404 })
