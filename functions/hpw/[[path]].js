@@ -288,29 +288,42 @@ export function renderCard(view) {
   <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v151" />
   <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v151" />
   <style>
-    html { font-size: 19px; background: var(--white); }
+    /* ⚠️ THE VERTICAL BUDGET, MEASURED. The collector's bot measured the first
+       version against the preview on 2026-08-29: 402px between the list's top
+       and the footer, against 10 rows at 45.6px (High Scores, whose rows carry
+       a second line for the week) and 43.1px (a week) — so rows 9 and 10
+       painted through the footer. At 18px base, 30px faces and the row
+       paddings below, a High Scores row is ~39px and a week row ~36px, with
+       the overheads (frame padding 38, head 62, shell 24, title ~46, foot 24)
+       leaving ~436px for the rows. The list also clips inside its shell, so a
+       future overrun stays a cut-off tenth row rather than an overlap. Change
+       any of these numbers and re-measure; the bot re-renders on request. */
+    html { font-size: 18px; background: var(--white); }
     html, body { margin: 0; padding: 0; }
     body {
       width: ${CARD_W}px; height: ${CARD_H}px; overflow: hidden;
       background: var(--white); color: var(--ink);
       --accent: var(--brand); --accent-d: var(--brand-d); --accent-dd: var(--brand-dd); --tint: rgba(0, 175, 240, 0.1);
     }
-    .card { box-sizing: border-box; width: 100%; height: 100%; padding: 28px 40px 22px; display: flex; flex-direction: column; }
-    .card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .card { box-sizing: border-box; width: 100%; height: 100%; padding: 22px 40px 16px; display: flex; flex-direction: column; }
+    .card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex: none; }
     .card-logo { height: 54px; width: auto; display: block; }
     .card-kicker {
       font-family: 'Playfair Display', Georgia, serif; font-weight: 700; font-size: 1.15rem;
       color: var(--ink); letter-spacing: 0.01em; text-align: right;
     }
     .card-kicker small { display: block; font-family: 'Source Serif 4', Georgia, serif; font-weight: 400; font-size: 0.74rem; color: var(--muted); margin-top: 2px; }
-    .card .hpw-board { flex: 1; min-height: 0; padding: 0.7rem 1.1rem 0.6rem; }
-    .card .hpw-title { margin-bottom: 0.4rem; }
-    .card .hpw-row { padding: 0.24rem 0.5rem; }
-    .card .hpw-face { width: 34px; height: 34px; }
-    .card .hpw-face--none { font-size: 0.8rem; }
-    .card .hpw-name { font-size: 0.92rem; }
-    .card .hpw-hours { font-size: 1rem; }
-    .card-foot { margin-top: 12px; display: flex; justify-content: space-between; font-size: 0.74rem; color: var(--muted); }
+    .card .hpw-board { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0.6rem 1.1rem 0.5rem; }
+    .card .hpw-title { margin-bottom: 0.3rem; flex: none; }
+    .card .hpw-list { flex: 1; min-height: 0; overflow: hidden; }
+    .card .hpw-row { padding: 0.15rem 0.5rem; gap: 0.5rem; }
+    .card .hpw-face { width: 30px; height: 30px; }
+    .card .hpw-face--none { font-size: 0.74rem; }
+    .card .hpw-who { line-height: 1.15; }
+    .card .hpw-name { font-size: 0.9rem; }
+    .card .hpw-week, .card .hpw-week-jump { font-size: 0.62rem; }
+    .card .hpw-hours { font-size: 0.98rem; }
+    .card-foot { margin-top: 8px; flex: none; display: flex; justify-content: space-between; font-size: 0.74rem; color: var(--muted); }
     .card-foot b { color: var(--brand-dd); font-weight: 700; }
     /* A screenshot has no hover, focus or pointer. */
     .card a { text-decoration: none; color: inherit; pointer-events: none; }
