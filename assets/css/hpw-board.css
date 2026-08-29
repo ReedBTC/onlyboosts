@@ -236,12 +236,20 @@ a.hpw-name:hover { color: var(--accent-d); text-decoration: underline; }
 }
 
 /* ── The share control ──
-   A footer row on each board, right-aligned: the pill is the feeds' own
-   `.pcast-sort-btn` and the menu their `.pcast-sort-menu` (feed-cards.css),
-   so it is the same kind of control as Sort rather than a new shape. Below
-   the rows, not beside the title, because the weekly title is the picker and
-   the two would meet on a narrow board. */
-.hpw-share { display: flex; justify-content: flex-end; margin-top: 0.6rem; }
-.hpw-share-btn { font-size: 0.74rem; padding: 0.25rem 0.65rem; }
+   An icon button in the board's top-right corner (Reed's call, 2026-08-29;
+   the first version was a "Share" pill under the rows). The button is the
+   feeds' own `.pcast-sort-btn` made round and the menu their
+   `.pcast-sort-menu` (feed-cards.css), so it is the same kind of control as
+   Sort rather than a new shape. The weekly title is the centred picker, and
+   at the board's 19rem minimum the two clear each other by a few px; a wider
+   button here would not. */
+.hpw-board { position: relative; }
+.hpw-share { position: absolute; top: 0.55rem; right: 0.6rem; margin: 0; }
+.hpw-share-btn {
+  width: 1.9rem; height: 1.9rem; padding: 0; justify-content: center;
+  border-radius: 50%; color: var(--muted);
+}
+.hpw-share-btn:hover, .hpw-share-btn[aria-expanded="true"] { color: var(--accent-d); }
+.hpw-share-btn svg { display: block; }
 .hpw-share-menu { min-width: 11rem; }
 .hpw-composer { margin-top: 0.6rem; }

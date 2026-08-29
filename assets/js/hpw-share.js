@@ -28,10 +28,16 @@
  * That is the V1 decision (2026-08-29); a frozen copy per share would need the
  * collector to keep versioned files, which it does not yet.
  */
-import { copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v152'
+import { copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v153'
 
 const SITE = 'https://onlyboosts.social'
-const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v152'
+const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v153'
+/* The box-with-arrow share glyph (the iOS / most-websites one), inline so it
+ * scales with the button and takes currentColor in either theme. Reed's call,
+ * 2026-08-29: the icon rather than the word. */
+const SHARE_ICON =
+  '<svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+  '<path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v13"/></svg>'
 
 /* `page` and `image` are the site's ABSOLUTE addresses, the ones a note or a
  * clipboard carries — a shared link must never point at a preview deployment.
@@ -59,8 +65,8 @@ export function mountShare(boardEl, { key, title }) {
   host.className = 'hpw-share'
   host.innerHTML =
     `<span class="pcast-sort hpw-share-wrap">` +
-      `<button type="button" class="pcast-sort-btn hpw-share-btn" aria-haspopup="menu" aria-expanded="false">` +
-        `<span aria-hidden="true">↗</span> Share</button>` +
+      `<button type="button" class="pcast-sort-btn hpw-share-btn" aria-haspopup="menu" aria-expanded="false" aria-label="Share" title="Share">` +
+        SHARE_ICON + `</button>` +
       `<div class="pcast-sort-menu hpw-share-menu" role="menu" hidden>` +
         `<button type="button" class="pcast-sort-item" role="menuitem" data-share="nostr">Post to Nostr</button>` +
         `<button type="button" class="pcast-sort-item" role="menuitem" data-share="link">Copy link</button>` +
