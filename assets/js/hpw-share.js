@@ -28,13 +28,23 @@
  * That is the V1 decision (2026-08-29); a frozen copy per share would need the
  * collector to keep versioned files, which it does not yet.
  */
-import { copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v151'
+import { copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v152'
 
 const SITE = 'https://onlyboosts.social'
-const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v151'
+const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v152'
 
+/* `page` and `image` are the site's ABSOLUTE addresses, the ones a note or a
+ * clipboard carries — a shared link must never point at a preview deployment.
+ * `imageHere` is the same image on the origin this page is on, and is what
+ * the control FETCHES: fetching the absolute one from a branch preview is a
+ * cross-origin request to a route that has not merged yet, which is how
+ * "Share image" failed on 2026-08-29. */
 export function shareUrls(key) {
-  return { page: `${SITE}/hpw/${key}`, image: `${SITE}/api/og/hpw/${key}.png` }
+  return {
+    page: `${SITE}/hpw/${key}`,
+    image: `${SITE}/api/og/hpw/${key}.png`,
+    imageHere: `/api/og/hpw/${key}.png`,
+  }
 }
 
 /* `key` is `YYYY-MM-DD` or `high-scores`; `title` is the board's own name
@@ -86,7 +96,7 @@ export function mountShare(boardEl, { key, title }) {
 }
 
 async function fetchCard(urls) {
-  const resp = await fetch(urls.image, { headers: { Accept: 'image/png' } })
+  const resp = await fetch(urls.imageHere, { headers: { Accept: 'image/png' } })
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
   /* The banner is the proxy's "not rendered yet"; the header is what says so.
      A browser that strips it (an old cached answer) is caught by the type. */
@@ -99,7 +109,7 @@ async function fetchCard(urls) {
 async function shareImage(urls, key, title, canShareFiles) {
   let blob
   try { blob = await fetchCard(urls) }
-  catch (err) { console.warn('[hpw-share] image fetch failed', err); showToast('The image could not be fetched', true); return }
+  catch (err) { console.warn('[hpw-share] image fetch failed', err); showToast(`The image could not be fetched (${err?.message || 'network error'})`, true); return }
   if (!blob) { showToast('This board\'s image is not ready yet — try again in a few minutes', true); return }
   const file = new File([blob], `onlyboosts-40hpw-${key}.png`, { type: 'image/png' })
   if (canShareFiles) {
