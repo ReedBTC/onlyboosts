@@ -68,6 +68,11 @@ await check('the week is a jump button on the tab and a link when weekHref is gi
   assert.match(board.rowHtml(m, 0, 40, { weekHref: (d) => `/hpw/${d}` }), /<a class="hpw-week hpw-week-jump" href="\/hpw\/2025-08-18"/)
   assert.match(board.boardHtml({ title: 't', sub: 's', members: [m], goal: 40, empty: 'e', weekHref: (d) => `/x/${d}` }), /href="\/x\/2025-08-18"/)
 })
+await check('⚠️ an empty board is .hpw-empty with NO .hpw-list (the collector\'s clip guard returns early on that)', () => {
+  const html = board.boardHtml({ title: 't', sub: 's', members: [], goal: 40, empty: 'Nothing recorded yet.' })
+  assert.match(html, /<p class="hpw-empty">Nothing recorded yet\.<\/p>/)
+  assert.doesNotMatch(html, /hpw-list/)
+})
 await check('dates are en-US in UTC', () => {
   assert.equal(board.weekLabel(1755504000), 'Aug 18, 2025')
   assert.equal(board.weekSpan(1755504000), 'Aug 18 to Aug 24, 2025')
