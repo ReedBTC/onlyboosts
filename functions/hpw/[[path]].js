@@ -13,7 +13,7 @@
 //                        or to the live week, so one week has one URL.
 //   /hpw/high-scores     the all-time board, with each row's week linking to
 //                        that week's page.
-//   /hpw/<key>/card      THE SHARE CARD. The same board in a fixed 1200x630
+//   /hpw/<key>/card      THE SHARE CARD. The same board in a fixed 720x900
 //                        frame with no nav, no footer and no theme toggle,
 //                        which the collector's bot (bots/hpw-cards/) loads in
 //                        headless Chromium and screenshots at 2x. It sets
@@ -43,8 +43,16 @@ const HIGH = "high-scores";
 const ROWS = 10;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 // The card's frame. The bot screenshots exactly this viewport at 2x.
-export const CARD_W = 1200;
-export const CARD_H = 630;
+// ⚠️ PORTRAIT, 4:5, since 2026-08-29. It shipped as a 1200x630 landscape,
+// the link-preview shape, and the first thing Reed said on downloading one
+// was "oh man, it's wide screen": the card is shared from phones into Nostr
+// clients and chat apps, which show an image at its own shape, and a phone
+// is tall. 720x900 at 2x is 1440x1800, the standard portrait social size, and
+// well under the 900KB cap. The page's twitter:card takes the square
+// thumbnail rather than the large card for the same reason — a wide crop out
+// of the middle of a tall board would show four rows and no title.
+export const CARD_W = 720;
+export const CARD_H = 900;
 
 export async function onRequestGet({ request, env, params }) {
   let segs = params.path;
@@ -234,7 +242,7 @@ export function renderPage(view) {
     body,
     canonical: pageUrl,
     og: { title: d.ogTitle, description: d.lead, image, url: pageUrl },
-    scripts: `<script src="/assets/js/hpw-page.js?v=ob-v154" type="module"></script>`,
+    scripts: `<script src="/assets/js/hpw-page.js?v=ob-v155" type="module"></script>`,
     extraCss: `
     /* The tab supplies the accent family off body[data-active-feed]; this page
        has no active feed and supplies the brand, as .show-main does. */
@@ -251,7 +259,7 @@ export function renderPage(view) {
 /* The frame the bot screenshots. Everything about it is fixed: the size, the
    light palette (no theme boot script, so `data-theme` is never set), the
    type scale. It links the same two stylesheets the tab's board is dressed by
-   and overrides only what a 1200x630 image needs — a larger base size so the
+   and overrides only what a portrait 720x900 image needs — a larger base size so the
    rows fill the frame, faces to match, and no hover chrome anywhere. */
 export function renderCard(view) {
   const d = describe(view);
@@ -285,45 +293,44 @@ export function renderCard(view) {
   <title>${htmlEscape(d.ogTitle)} (card)</title>
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
-  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v154" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v154" />
+  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v155" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v155" />
   <style>
-    /* ⚠️ THE VERTICAL BUDGET, MEASURED. The collector's bot measured the first
-       version against the preview on 2026-08-29: 402px between the list's top
-       and the footer, against 10 rows at 45.6px (High Scores, whose rows carry
-       a second line for the week) and 43.1px (a week) — so rows 9 and 10
-       painted through the footer. At 18px base, 30px faces and the row
-       paddings below, a High Scores row is ~39px and a week row ~36px, with
-       the overheads (frame padding 38, head 62, shell 24, title ~46, foot 24)
-       leaving ~436px for the rows. The list also clips inside its shell, so a
-       future overrun stays a cut-off tenth row rather than an overlap. Change
-       any of these numbers and re-measure; the bot re-renders on request. */
-    html { font-size: 18px; background: var(--white); }
+    /* ⚠️ THE VERTICAL BUDGET. The landscape card overflowed its frame once
+       (rows nine and ten painted through the footer; the collector's bot
+       measured it, 2026-08-29) and the list has clipped inside its shell
+       since, so an overrun is a cut-off tenth row rather than an overlap —
+       and a SILENT one, which is why the bot refuses to publish a card with
+       a clipped row. Portrait budget at 21px base: frame padding 50, head
+       ~130, shell ~26, title ~55, foot ~26 leaves ~610px for the rows; a
+       High Scores row (two lines) is ~50px, a week row ~50px with the 40px
+       face, so ten rows take ~500. Change a number and re-measure. */
+    html { font-size: 21px; background: var(--white); }
     html, body { margin: 0; padding: 0; }
     body {
       width: ${CARD_W}px; height: ${CARD_H}px; overflow: hidden;
       background: var(--white); color: var(--ink);
       --accent: var(--brand); --accent-d: var(--brand-d); --accent-dd: var(--brand-dd); --tint: rgba(0, 175, 240, 0.1);
     }
-    .card { box-sizing: border-box; width: 100%; height: 100%; padding: 22px 40px 16px; display: flex; flex-direction: column; }
-    .card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex: none; }
-    .card-logo { height: 54px; width: auto; display: block; }
+    .card { box-sizing: border-box; width: 100%; height: 100%; padding: 28px 32px 22px; display: flex; flex-direction: column; }
+    .card-head { display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: 12px; flex: none; }
+    .card-logo { height: 64px; width: auto; display: block; margin-bottom: 6px; }
     .card-kicker {
-      font-family: 'Playfair Display', Georgia, serif; font-weight: 700; font-size: 1.15rem;
-      color: var(--ink); letter-spacing: 0.01em; text-align: right;
+      font-family: 'Playfair Display', Georgia, serif; font-weight: 700; font-size: 1.2rem;
+      color: var(--ink); letter-spacing: 0.01em;
     }
     .card-kicker small { display: block; font-family: 'Source Serif 4', Georgia, serif; font-weight: 400; font-size: 0.74rem; color: var(--muted); margin-top: 2px; }
-    .card .hpw-board { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0.6rem 1.1rem 0.5rem; }
-    .card .hpw-title { margin-bottom: 0.3rem; flex: none; }
+    .card .hpw-board { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0.7rem 1.1rem 0.6rem; }
+    .card .hpw-title { margin-bottom: 0.4rem; flex: none; font-size: 1.1rem; }
     .card .hpw-list { flex: 1; min-height: 0; overflow: hidden; }
-    .card .hpw-row { padding: 0.15rem 0.5rem; gap: 0.5rem; }
-    .card .hpw-face { width: 30px; height: 30px; }
-    .card .hpw-face--none { font-size: 0.74rem; }
-    .card .hpw-who { line-height: 1.15; }
-    .card .hpw-name { font-size: 0.9rem; }
+    .card .hpw-row { padding: 0.22rem 0.5rem; gap: 0.55rem; }
+    .card .hpw-face { width: 40px; height: 40px; }
+    .card .hpw-face--none { font-size: 0.85rem; }
+    .card .hpw-who { line-height: 1.2; }
+    .card .hpw-name { font-size: 0.95rem; }
     .card .hpw-week, .card .hpw-week-jump { font-size: 0.62rem; }
-    .card .hpw-hours { font-size: 0.98rem; }
-    .card-foot { margin-top: 8px; flex: none; display: flex; justify-content: space-between; font-size: 0.74rem; color: var(--muted); }
+    .card .hpw-hours { font-size: 1.05rem; }
+    .card-foot { margin-top: 10px; flex: none; display: flex; justify-content: space-between; gap: 1rem; font-size: 0.68rem; color: var(--muted); }
     .card-foot b { color: var(--brand-dd); font-weight: 700; }
     /* A screenshot has no hover, focus or pointer. */
     .card a { text-decoration: none; color: inherit; pointer-events: none; }
@@ -332,7 +339,7 @@ export function renderCard(view) {
 <body>
 <div class="card">
   <header class="card-head">
-    <img class="card-logo" src="/assets/onlyboosts_banner_clear.png" alt="OnlyBoosts" width="162" height="54" />
+    <img class="card-logo" src="/assets/onlyboosts_banner_clear.png" alt="OnlyBoosts" width="192" height="64" />
     <div class="card-kicker">${htmlEscape(COPY.challenge)}<small>${htmlEscape(COPY.intro)}</small></div>
   </header>
   ${board}
@@ -407,12 +414,14 @@ ${og ? `
   <meta property="og:title" content="${htmlEscape(og.title)}" />
   <meta property="og:description" content="${htmlEscape(og.description)}" />
   <meta property="og:site_name" content="OnlyBoosts" />
-  <!-- The card IS large-card-shaped — a 1200x630 frame, screenshotted at 2x —
-       so this is the one detail page whose artwork takes summary_large_image
-       rather than the summary thumbnail the square artwork elsewhere gets. -->
+  <!-- The card is PORTRAIT (720x900 at 2x), so it takes the square summary
+       thumbnail, as the square artwork on the other detail pages does: a
+       large card crops a wide band out of the middle of a tall board, where
+       the square loses a little top and bottom. Nostr clients and chat apps
+       show the image at its own shape and are unaffected. -->
   <meta property="og:image" content="${htmlEscape(og.image)}" />
   <meta property="og:image:alt" content="${htmlEscape(og.title)}" />
-  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:card" content="summary" />
   <meta name="twitter:title" content="${htmlEscape(og.title)}" />
   <meta name="twitter:description" content="${htmlEscape(og.description)}" />
   <meta name="twitter:image" content="${htmlEscape(og.image)}" />
@@ -420,16 +429,16 @@ ${og ? `
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v154" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v154" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v155" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v155" />
   <!-- feed-cards.css for the share pill and its menu; boost-actions.css for
        the composer behind Post to Nostr. Both are the same chrome the tab
        already has. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v154" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v154" />
-  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v154" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v154" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v154" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v155" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v155" />
+  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v155" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v155" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v155" />
   ${extraCss ? `<style>${extraCss}\n  </style>` : ""}
 </head>
 <body>
@@ -623,10 +632,10 @@ ${body}
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav.js?v=ob-v154" defer></script>
+<script src="/assets/js/nav.js?v=ob-v155" defer></script>
 ${scripts}
-<script src="/assets/js/nav-widget-boot.js?v=ob-v154"></script>
-<script src="/assets/js/sw-register.js?v=ob-v154" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v155"></script>
+<script src="/assets/js/sw-register.js?v=ob-v155" defer></script>
 </body>
 </html>`;
 }

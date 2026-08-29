@@ -40,7 +40,7 @@ CLAUDE.md` finds the paragraph that used to explain any name in here.
 | `/about` | the project's own explanation of what the data is and isn't |
 | `/stats` | a coming-soon placeholder: nav + header + soon-card, `noindex`, out of the sitemap. `/boosters` was the second one and was **deleted** on 2026-08-23 — see the Stats row of the site map |
 | `/404.html` | see the ⚠️ under LB conventions |
-| `/hpw/<YYYY-MM-DD>`, `/hpw/high-scores` | one 40 HPW board as a page, edge-rendered, the address a shared week has. `/hpw/<key>/card` is the 1200x630 frame the collector screenshots for `/api/og/hpw/<key>.png`. See **The Share Cards** under the Members tab |
+| `/hpw/<YYYY-MM-DD>`, `/hpw/high-scores` | one 40 HPW board as a page, edge-rendered, the address a shared week has. `/hpw/<key>/card` is the 720x900 portrait frame the collector screenshots for `/api/og/hpw/<key>.png`. See **The Share Cards** under the Members tab |
 
 `/shows` and `/podcasts` are both 301s to `/#shows` now; the Shows feed replaced
 the standalone page. `feeds.html` and `boosts.html` were folded into `/` and
@@ -1592,7 +1592,7 @@ section's content in a shell.
   MACHINE, NOT RENDERED AT THE EDGE** (Reed's call, over satori + resvg-wasm:
   +1.1MB on a 109KB Functions bundle and blank emoji in names). The bot
   (`bots/hpw-cards/`) loads `/hpw/<key>/card`, waits for
-  `html[data-card-ready="1"]`, captures 1200x630 at 2x, and writes the PNG
+  `html[data-card-ready="1"]`, captures 720x900 (portrait) at 2x, and writes the PNG
   **inside the shards tree** so the routine `push` ships it;
   `/api/og/hpw/<key>.png` proxies it on the booster OG route's shape
   (`_shared/og-image.js`): name allowlist, **PNG signature checked because

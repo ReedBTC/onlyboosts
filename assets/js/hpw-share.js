@@ -34,10 +34,10 @@
  * That is the V1 decision (2026-08-29); a frozen copy per share would need the
  * collector to keep versioned files, which it does not yet.
  */
-import { copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v154'
+import { copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v155'
 
 const SITE = 'https://onlyboosts.social'
-const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v154'
+const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v155'
 /* The box-with-arrow share glyph (the iOS / most-websites one), inline so it
  * scales with the button and takes currentColor in either theme. Reed's call,
  * 2026-08-29: the icon rather than the word. */
@@ -192,7 +192,7 @@ export function buildShareTags(urls, title) {
     ['t', '40hpw'],
     ['r', urls.page],
     // NIP-92: what the image URL in the content is, so a client can lay it
-    // out before fetching it. The screenshot is 1200x630 at 2x.
+    // out before fetching it. The screenshot is 720x900 (portrait) at 2x.
     ['imeta', `url ${urls.image}`, 'm image/png', `alt Nostr Gang #40HPW leaderboard, ${title}`],
     ['client', 'onlyboosts.social'],
   ]

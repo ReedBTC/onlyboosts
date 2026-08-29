@@ -136,10 +136,10 @@ await check('last week renders the same row the tab would, gold and all', async 
   assert.match(pageHtml, /hpw-row--gold/)
   assert.match(pageHtml, /Alice 🐱 &lt;x&gt;/)
 })
-await check('the page carries canonical, og:image on the proxy, and a large card', async () => {
+await check('the page carries canonical, og:image on the proxy, and the square card (the image is portrait)', async () => {
   assert.match(pageHtml, new RegExp(`<link rel="canonical" href="https://onlyboosts.social/hpw/${lastKey}" />`))
   assert.match(pageHtml, new RegExp(`<meta property="og:image" content="https://onlyboosts.social/api/og/hpw/${lastKey}.png" />`))
-  assert.match(pageHtml, /twitter:card" content="summary_large_image"/)
+  assert.match(pageHtml, /twitter:card" content="summary"/)
   assert.match(pageHtml, /og:description" content="Boost an episode on Nostr and the board assumes you listened to all of it\. Alice 🐱 &lt;x&gt; leads for the week of/)
   assert.match(pageHtml, /NAV:START[\s\S]*NAV:END/)
   assert.doesNotMatch(pageHtml, /X-Robots-Tag/)
@@ -163,7 +163,8 @@ await check('high-scores links each row to its week and takes 300s', async () =>
   assert.match(html, new RegExp(`<a class="hpw-week hpw-week-jump" href="/hpw/${lastKey}"`))
   assert.equal(r.headers.get('cache-control'), 'public, max-age=300')
 })
-await check('the card: fixed frame, no nav, noindex, the ready signal, the same row', async () => {
+await check('the card: a portrait frame, no nav, noindex, the ready signal, the same row', async () => {
+  assert.ok(CARD_H > CARD_W, 'portrait')
   const r = await get(`/hpw/${lastKey}/card`)
   assert.equal(r.status, 200)
   assert.equal(r.headers.get('x-robots-tag'), 'noindex')

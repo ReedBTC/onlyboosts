@@ -735,7 +735,7 @@ looks at it, so it belongs on the batch path.
 |---|---|
 | The bot screenshots | `https://onlyboosts.social/hpw/<YYYY-MM-DD>/card` and `/hpw/high-scores/card` |
 | Ready signal | `html[data-card-ready="1"]`, set once fonts and faces settle (and after 8s regardless) |
-| Capture | 1200x630 viewport at device scale 2; under 900KB or re-captured at 1x |
+| Capture | 720x900 viewport (portrait, 4:5; it shipped landscape and Reed asked for phone-shaped on the first download) at device scale 2; under 900KB or re-captured at 1x |
 | Where it lands | inside the shards tree, so the routine `push` ships it and a `--delete` mirror keeps it: `onlyboosts/hpw/<key>.png` plus `hpw/index.json` |
 | Change detection | the bot hashes the `members` array of the hours endpoint and re-renders only on a change; Chromium PNGs are not byte-stable, and an unchanged file is what lets rsync skip it |
 | The site's URL | `/api/og/hpw/<key>.png`, proxied with the PNG signature checked |
