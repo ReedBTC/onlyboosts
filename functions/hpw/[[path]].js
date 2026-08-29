@@ -296,15 +296,24 @@ export function renderCard(view) {
   <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v155" />
   <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v155" />
   <style>
-    /* ⚠️ THE VERTICAL BUDGET. The landscape card overflowed its frame once
+    /* ⚠️ THE VERTICAL BUDGET IS MEASURED, NOT DERIVED, AND THE LINE IS THE
+       LIST BOX, NOT THE FOOTER. The landscape card overflowed its frame once
        (rows nine and ten painted through the footer; the collector's bot
        measured it, 2026-08-29) and the list has clipped inside its shell
        since, so an overrun is a cut-off tenth row rather than an overlap —
-       and a SILENT one, which is why the bot refuses to publish a card with
-       a clipped row. Portrait budget at 21px base: frame padding 50, head
-       ~130, shell ~26, title ~55, foot ~26 leaves ~610px for the rows; a
-       High Scores row (two lines) is ~50px, a week row ~50px with the 40px
-       face, so ten rows take ~500. Change a number and re-measure. */
+       a SILENT one, which is why the bot refuses to publish a card with a
+       clipped row. A budget I derived from the base size and the footer's
+       position read ~7px a row high; the bot measured the portrait card
+       against the live preview instead:
+
+         list box 269.5 → 807.3 (537.8px of room), footer top 830.9
+         rows 49.2–50.2px, ten rows, clipped 0
+         ceiling 53.8px a row: 53px fits, 54px loses row ten
+
+       So a row has about 3.6px of growth in hand. Anything that grows one (a
+       chip, a second line, a bigger face) spends that and then loses the
+       tenth member from the card while the tab still shows them. Change a
+       number here and have the bot re-measure before believing it. */
     html { font-size: 21px; background: var(--white); }
     html, body { margin: 0; padding: 0; }
     body {
