@@ -11,8 +11,8 @@
  * that's sitting in localStorage. Reading it directly means the Follows tabs
  * can resolve on a cold load without paying for the bundle.
  */
-import { SimplePool, verifyEvent } from '/assets/widgets/nostr-tools.js?v=ob-v150'
-import { STATIC_RELAYS } from '/assets/js/boosts-thread.js?v=ob-v150'
+import { SimplePool, verifyEvent } from '/assets/widgets/nostr-tools.js?v=ob-v151'
+import { STATIC_RELAYS } from '/assets/js/boosts-thread.js?v=ob-v151'
 
 // Written by the login widget (login-widget/src/lib/sessionPersistence.js).
 // If that key ever changes there, this breaks silently — the Follows tabs

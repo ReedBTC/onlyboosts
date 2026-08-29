@@ -710,3 +710,51 @@ by a key the *listener* controls. LB is deliberately off that list: it is one
 show's own website widget, not a route a listener can take to boosting podcasts
 generally. **Reed's call.** Each section cross-references the other so the two
 counts cannot read as a contradiction.
+
+### The Share Cards
+
+Shipped 2026-08-29, after several members asked for a way to share the boards
+on Nostr. Reed wanted two things at once: a share that works as a Nostr note,
+and an image a reader can capture and carry anywhere else; and he wanted it to
+"look like a screenshot, not a replication of the screen with glitches in it".
+
+**Three designs were weighed.** A browser-drawn `<canvas>` (cheap, but faces
+hit CORS taint and a Nostr post then needs a Blossom upload, which a signed-out
+reader cannot sign). Rasterizing at the edge with satori and resvg-wasm (a
+permanent PNG URL, but it measured at ~1.1MB gzip against a 109KB Functions
+bundle, satori draws blanks for the emoji that Nostr display names carry, and
+it would have used the Workers Paid plan to be *allowed* to carry all that).
+And the one taken: **a real Chromium screenshot on the collector machine**,
+which already runs a pipeline that computes things off-request and publishes
+them as static files. The card changes when a boost lands, not when someone
+looks at it, so it belongs on the batch path.
+
+**The contract between the two machines**, which must not drift:
+
+| | |
+|---|---|
+| The bot screenshots | `https://onlyboosts.social/hpw/<YYYY-MM-DD>/card` and `/hpw/high-scores/card` |
+| Ready signal | `html[data-card-ready="1"]`, set once fonts and faces settle (and after 8s regardless) |
+| Capture | 1200x630 viewport at device scale 2; under 900KB or re-captured at 1x |
+| Where it lands | inside the shards tree, so the routine `push` ships it and a `--delete` mirror keeps it: `onlyboosts/hpw/<key>.png` plus `hpw/index.json` |
+| Change detection | the bot hashes the `members` array of the hours endpoint and re-renders only on a change; Chromium PNGs are not byte-stable, and an unchanged file is what lets rsync skip it |
+| The site's URL | `/api/og/hpw/<key>.png`, proxied with the PNG signature checked |
+
+**What the site carries** is small: the page Function, the proxy, the share
+control, and the move of the board's rows into a two-sided module so the page
+and the tab paint the same row. The page wears the plain content-page chrome
+(`page.css`) with the board in its 640px column, which is the width a board
+has on the tab. The card is the same board in a fixed frame with a larger
+base size, no nav, no theme boot script, and no hover chrome; it is
+`noindex`, the page being the thing to index.
+
+**Two decisions the control makes that are easy to reverse by accident.** It
+refuses to share the banner: the proxy answers the site banner while a week's
+card has not been rendered yet, and the header `X-OB-Image: fallback` is how
+the control knows. And a signed-out "Post to Nostr" opens the login and
+stops; it does not queue the post to fire on login, for the reason the money
+paths give: a second path into a publish is a second way to publish twice.
+
+**Known limitation.** The image a note links is the latest render of that
+week, so a note posted mid-week shows the board as it stands when it is read.
+A frozen copy per share would need the collector to keep versioned files.

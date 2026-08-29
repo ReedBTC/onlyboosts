@@ -82,6 +82,28 @@ export async function onRequestGet({ request, env }) {
   const u = new URL(request.url);
   const range = u.searchParams.get("range") === "all" ? "all" : "week";
   const limit = clampLimit(u.searchParams.get("limit"), 10, 50);
+  const week = u.searchParams.get("week");
+  try {
+    const { body, cache } = await hoursBoard(env, { range, week, limit });
+    return json(request, body, { cache });
+  } catch (err) {
+    console.error("[hours] query failed", err);
+    return json(request, { error: "query failed" }, { status: 500, cache: 0 });
+  }
+}
+
+/* The board itself, apart from the HTTP around it. Exported so the
+ * edge-rendered `/hpw/<week>` pages (functions/hpw/[[path]].js) can render the
+ * same envelope the tab fetches, from the same query, rather than fetching
+ * this endpoint over the network from inside another Function or carrying a
+ * second copy of the SQL. `range` is "week" | "all"; `week` is the raw
+ * `week=` string or null; `limit` is already clamped. Resolves to
+ * `{ body, cache }` — the JSON envelope and the max-age it should carry — and
+ * REJECTS on a query failure, which the handler above turns into a 500.
+ *
+ * `scripts/test-members-hours.mjs` runs the handler, so everything in here is
+ * still under it. */
+export async function hoursBoard(env, { range = "week", week = null, limit = 10 } = {}) {
 
   const holes = PUBLISHERS.map(() => "?").join(",");
 
@@ -153,7 +175,7 @@ export async function onRequestGet({ request, env }) {
      empty board, which is the true answer; `first_week` below is what lets the
      picker stop offering them rather than a clamp pretending they are this
      week. */
-  const asked = weekStartFromDate(u.searchParams.get("week"));
+  const asked = weekStartFromDate(week);
   const weekStart = (asked === null || asked > liveWeek) ? liveWeek : asked;
   const isCurrent = weekStart === liveWeek;
   /* The exclusive ceiling, stepped by the week rule rather than by `+ WEEK`: a
@@ -178,12 +200,13 @@ export async function onRequestGet({ request, env }) {
         .catch(() => null)
     : Promise.resolve(null);
 
-  try {
-    const [{ results }, firstWeek] = await Promise.all([
-      env.DB.prepare(sql).bind(...args).all(),
-      firstWeekQuery,
-    ]);
-    return json(request, {
+  const [{ results }, firstWeek] = await Promise.all([
+    env.DB.prepare(sql).bind(...args).all(),
+    firstWeekQuery,
+  ]);
+  return {
+    cache: range === "week" && isCurrent ? 60 : 300,
+    body: {
       range,
       goal_hours: GOAL_HOURS,
       week_start: range === "week" ? weekStart : null,
@@ -206,13 +229,10 @@ export async function onRequestGet({ request, env }) {
         // Null on the weekly board, where the envelope carries the one week.
         week_start: r.week_start ?? null,
       })),
-      /* ⚠️ A PAST WEEK IS NOT THE LIVE ONE AND MUST NOT SHARE ITS 60s CACHE.
-         The live board changes as boosts land, which is what the short life
-         buys; a closed week only moves when the collector fills in a missing
-         episode duration, so it takes the all-time board's 300s. */
-    }, { cache: range === "week" && isCurrent ? 60 : 300 });
-  } catch (err) {
-    console.error("[hours] query failed", err);
-    return json(request, { error: "query failed" }, { status: 500, cache: 0 });
-  }
+    },
+  };
 }
+/* ⚠️ A PAST WEEK IS NOT THE LIVE ONE AND MUST NOT SHARE ITS 60s CACHE (the
+   `cache` above). The live board changes as boosts land, which is what the
+   short life buys; a closed week only moves when the collector fills in a
+   missing episode duration, so it takes the all-time board's 300s. */

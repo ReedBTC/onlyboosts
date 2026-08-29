@@ -20,30 +20,34 @@
  * A repeated name is authentic to it rather than a bug to collapse — Piez holds
  * five of the top ten and that is the actual story of the board.
  */
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v150'
-import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v150'
-import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v150'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v151'
+import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v151'
+import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v151'
 /* ⚠️ THE SAME WALL /show AND /episode RENDER, not a copy of it. It moved out of
  * functions/_shared/detail-page.js into a two-sided module for exactly this;
  * that file re-exports every name, so both Functions were untouched. A reader
  * who screenshots the wall here and on a show page must not be able to tell
  * them apart. */
-import { renderSupporters, initShowMore, compact } from '/assets/js/supporter-wall.js?v=ob-v150'
+import { renderSupporters, initShowMore, compact } from '/assets/js/supporter-wall.js?v=ob-v151'
 /* ⚠️ EXACT BOOST COUNTS HERE, COMPACT SATS. On the wall a row is one of a
  * hundred and `1k` is plenty; here there are four rows and the count is the
  * disclosure itself — "1,021 boosts from dozens of listeners" is the claim the
  * section exists to make, and `1k` rounds the evidence away. */
-import { num } from '/assets/js/boost-list.js?v=ob-v150'
-import { rangeControl, sortControl } from '/assets/js/feed-controls.js?v=ob-v150'
-import { mountFeedSearch } from '/assets/js/feed-search.js?v=ob-v150'
-import { searchMembers, SEARCH_HITS } from '/assets/js/ob-live.js?v=ob-v150'
+import { num } from '/assets/js/boost-list.js?v=ob-v151'
+import { rangeControl, sortControl } from '/assets/js/feed-controls.js?v=ob-v151'
+import { mountFeedSearch } from '/assets/js/feed-search.js?v=ob-v151'
+import { searchMembers, SEARCH_HITS } from '/assets/js/ob-live.js?v=ob-v151'
 /* ⚠️ THE SAME WEEK RULE THE ENDPOINT CUTS ON, not a second copy of it. That
  * module is two-sided for exactly this: the picker steps and enumerates weeks
  * without a round trip per press, and a Pacific week containing a DST
  * transition is 167 or 169 hours, so a client that stepped by a flat 604800
  * would drift an hour past every March and every November while still
  * producing Mondays. */
-import { prevWeek, nextWeek, weekSeries, weekDateString, weekStartFromDate } from '/assets/js/pacific-week.js?v=ob-v150'
+import { prevWeek, nextWeek, weekSeries, weekDateString, weekStartFromDate } from '/assets/js/pacific-week.js?v=ob-v151'
+import { weekTitle, weekLabel, boardHtml, initials, COPY } from '/assets/js/hpw-board.js?v=ob-v151'
+/* The share control: Post to Nostr, Copy link, Share image. A verb, mounted
+ * onto each board after it is painted; the same module /hpw/<week> uses. */
+import { mountShare } from '/assets/js/hpw-share.js?v=ob-v151'
 
 const esc = htmlEscape
 const HOURS_API = '/api/v1/members/hours'
@@ -92,150 +96,12 @@ const WALL_RANGES = [
 ]
 let wallRange = 'all'
 
-/* en-US in UTC, matching every other date on the site. A board row names the
- * Monday its week started, so the reader can see the hall of fame is old.
- *
- * ⚠️ UTC IS STILL RIGHT HERE EVEN THOUGH THE WEEKS ARE PACIFIC, and the reason
- * is one-directional. `week_start` is the real instant of a Monday 00:00
- * Pacific, which is Monday 07:00 or 08:00 UTC — Pacific is behind UTC, so that
- * instant is always still Monday in UTC and this prints the right day. It would
- * not survive a zone AHEAD of UTC; if the reset ever moves east, this formatter
- * has to move with it. */
-function weekLabel(unixSec) {
-  if (!unixSec) return ''
-  const d = new Date(Number(unixSec) * 1000)
-  if (Number.isNaN(d.getTime())) return ''
-  return d.toLocaleDateString('en-US', {
-    month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC',
-  })
-}
-
-/* ⚠️ THE PICKER'S LABEL NAMES A POSITION FIRST AND A DATE SECOND, which is the
- * calendar-app idiom: a reader one press back is looking at "Last week", not at
- * "Aug 17, 2026". The date is the answer to a question they did not ask, and
- * the relative form is the one they would say out loud. Everything older takes
- * the date, because "three weeks ago" stops being something anybody counts.
- *
- * ⚠️ A `Week:` TAG WAS BUILT IN FRONT OF THIS AND WAS REVERTED THE SAME DAY.
- * Reed's call, 2026-08-24: "I don't like the font and alignment clashes between
- * `Week:` and the week printed." The reasoning for it was sound — a word says
- * "pickable" better than any border does — and the EXECUTION is what could not
- * work here. The feeds' Sort pill gets away with `Sort: Most boosts` because
- * both halves are ONE family at ONE size, varying only in colour and weight;
- * this label is 1.02rem Playfair bold, so a tag beside it varied family AND
- * size AND weight at once, and three axes of difference across two words reads
- * as a collision rather than as an axis and its value. `align-self: baseline`
- * was not enough to settle it.
- *
- * The tag also forced the value to give up "Week of", since "Week: Week of Aug
- * 10, 2026" is unsayable — so reverting it restores the prefix too, which is
- * what these three strings said before and what Reed asked to have back.
- * ⚠️ ANY FUTURE TAG HAS TO SOLVE THE TYPE FIRST, NOT THE WORDING. */
-function weekTitle(ws, live) {
-  if (!ws || !live) return 'This Week'
-  if (ws === live) return 'This Week'
-  if (ws === prevWeek(live)) return 'Last Week'
-  return `Week of ${weekLabel(ws)}`
-}
-
-/* The span a past week covers, for the sub-line under the title.
- *
- * `+ 6 days` is safe where `+ WEEK` would not be: week_start is Monday 07:00 or
- * 08:00 UTC, so six days on is Sunday 07:00 or 08:00 UTC — still Sunday
- * whichever offset is in force, where a flat week lands on the following Monday
- * and a DST week lands an hour either side of it. */
-function weekSpan(ws) {
-  const end = Number(ws) + 6 * 86400
-  const opts = { month: 'short', day: 'numeric', timeZone: 'UTC' }
-  const a = new Date(Number(ws) * 1000).toLocaleDateString('en-US', opts)
-  const b = new Date(end * 1000).toLocaleDateString('en-US', opts)
-  const year = new Date(end * 1000).toLocaleDateString('en-US', { year: 'numeric', timeZone: 'UTC' })
-  return `${a} to ${b}, ${year}`
-}
-
-/* One decimal, always. `26h` and `25.9h` in the same column read as different
- * kinds of number, and the gap between second and third place is often less
- * than an hour. */
-function hours(seconds) {
-  return (Number(seconds) / 3600).toFixed(1)
-}
-
-function initials(name, pk) {
-  const src = (name || '').trim()
-  if (src) return src.slice(0, 1).toUpperCase()
-  return (pk || '?').slice(0, 2).toUpperCase()
-}
-
-function rowHtml(m, i, goal) {
-  const h = Number(m.seconds) / 3600
-  const cleared = h >= goal
-  const href = boosterPageHref(m.npub, m.pk)
-  const name = m.name || (m.npub ? m.npub.slice(0, 12) + '…' : (m.pk || '').slice(0, 12) + '…')
-  const pic = httpsUrl(m.pic)
-  const face = pic
-    ? `<img class="hpw-face" src="${esc(pic)}" alt="" loading="lazy" referrerpolicy="no-referrer" />`
-    : `<span class="hpw-face hpw-face--none" aria-hidden="true">${esc(initials(m.name, m.pk))}</span>`
-  /* ⚠️ ON HIGH SCORES THE WEEK IS A BUTTON, AND IT IS THE PICKER'S REAL
-   * DISCOVERY PATH. A menu of ninety-nine dated rows can only be scrolled; this
-   * board already names the weeks worth looking at, so seeing Piez at 54.7h and
-   * pressing the date beside it opens that whole week on the board above. The
-   * menu is the escape hatch for a week nobody has heard of, not the way in.
-   *
-   * It sits OUTSIDE the name's anchor, in the row's second column: a button
-   * nested inside a link is neither, which is the same call `.cs-boosts-btn`
-   * makes on the booster page's rollup rows. */
-  const week = m.week_start
-    ? `<button type="button" class="hpw-week hpw-week-jump" data-hpw-goweek="${esc(weekDateString(m.week_start))}"` +
-      ` title="Show the whole board for this week">${esc(weekLabel(m.week_start))}</button>`
-    : ''
-  // The name links to that member's page — the same unconditional rule
-  // booster-link.js applies everywhere, since a member is on this board only
-  // because they boosted.
-  const who = href
-    ? `<a class="hpw-name" href="${esc(href)}">${esc(name)}</a>`
-    : `<span class="hpw-name">${esc(name)}</span>`
-  return `<li class="hpw-row${cleared ? ' hpw-row--gold' : ''}">` +
-    `<span class="hpw-pos">${i + 1}</span>` +
-    face +
-    `<span class="hpw-who">${who}${week}</span>` +
-    // ⚠️ "hpw", NOT "h". Every row on both boards is one member's ONE week, so
-    // the figure is hours per week and the unit is the name of the thing.
-    `<span class="hpw-hours">${esc(hours(m.seconds))}<span class="hpw-unit"> hpw</span></span>` +
-    /* ⚠️ THIS COUNTS EPISODES THAT CONTRIBUTED HOURS, NOT EPISODES BOOSTED, and
-     * the two differ often enough that the figure needs to say so. Reed read
-     * the board against a member's own activity on 2026-08-24, saw four boosts
-     * against "3 eps", and reported it as a bug — which is the right reaction to
-     * a number that looks like a boost count and is not one.
-     *
-     * It cannot be the boost count: the hours beside it are the sum over
-     * exactly these episodes, so printing 4 there would claim four episodes
-     * produced 6.49 hours. What was missing was any way to connect the figure
-     * to the rule. The tooltip does that; the Rules dialog carries the why.
-     *
-     * ⚠️ AND THE WEEKLY BOARD FEELS THIS HARDER THAN THE CORPUS RATE SUGGESTS.
-     * Measured 2026-08-24: 2.2% of episodes across the index have no usable
-     * duration, but 8.5% of the last 200 BOOSTS landed on one, because This
-     * Week is made entirely of boosts on episodes that aired days ago — the
-     * least likely to have been enriched. It self-heals as enrichment catches
-     * up, which is why a row can gain an episode after the fact. */
-    `<span class="hpw-eps" title="${esc(String(m.episodes))} episode${m.episodes === 1 ? '' : 's'} with a known length. Boosts to a show, or to an episode Podcast Index has no length for, add no hours and are not counted here.">` +
-      `${esc(String(m.episodes))} ep${m.episodes === 1 ? '' : 's'}</span>` +
-    `</li>`
-}
-
-/* `title` is escaped text; `titleHtml` is markup and overrides it. Only the
- * weekly board passes the second, and only because its title IS the picker —
- * see pickerHtml. Keeping the escaped path as the default is what stops the
- * next caller reaching for innerHTML by habit. */
-function boardHtml({ title, titleHtml, sub, members, goal, empty, board }) {
-  const body = members.length
-    ? `<ol class="hpw-list">${members.map((m, i) => rowHtml(m, i, goal)).join('')}</ol>`
-    : `<p class="hpw-empty">${esc(empty)}</p>`
-  return `<section class="hpw-board"${board ? ` data-hpw-board="${esc(board)}"` : ''}>` +
-    `<h3 class="hpw-title">${titleHtml || esc(title)}<small>${esc(sub)}</small></h3>` +
-    body +
-    `</section>`
-}
+/* ⚠️ THE ROWS ARE A TWO-SIDED MODULE NOW. `weekLabel`, `weekTitle`, `weekSpan`,
+ * `hours`, `initials`, `rowHtml` and `boardHtml` lived here until the share
+ * cards shipped (2026-08-29) and moved to `hpw-board.js`, where the edge can
+ * import them too: `/hpw/<week>` and the card page the collector screenshots
+ * paint the same rows this tab does, from the same function. The picker, the
+ * jump buttons and the Rules dialog are verbs and stay here. */
 
 /* ⚠️ THE TITLE IS THE PICKER, RATHER THAN A CONTROL ROW ABOVE OR BELOW IT.
  * Reed's call, 2026-08-24. The board's header is what a scoreboard navigates by,
@@ -338,9 +204,7 @@ function weeklyBoardHtml(ws, members, isCurrent, empty) {
   return boardHtml({
     board: 'week',
     titleHtml: pickerHtml(ws, liveWeek, firstWeek),
-    sub: isCurrent
-      ? `Resets midnight Monday, Pacific. Week of ${weekLabel(ws)}.`
-      : `${weekSpan(ws)}. Weeks run Monday to Sunday, Pacific.`,
+    sub: COPY.weekSub(ws, isCurrent),
     members,
     goal: goalHours,
     empty,
@@ -362,6 +226,12 @@ async function showWeek(root, ws, { scroll = false } = {}) {
     const host = root.querySelector('[data-hpw-board="week"]')
     if (host) host.outerHTML = html
   }
+  /* After the rows land, never on the loading paint: the address it shares is
+     the week the SERVER resolved, and the loading board has no rows to share. */
+  const share = () => {
+    const el = root.querySelector('[data-hpw-board="week"]')
+    if (el && shownWeek) mountShare(el, { key: weekDateString(shownWeek), title: `Week of ${weekLabel(shownWeek)}` })
+  }
   paint(weeklyBoardHtml(ws, [], isCurrent, 'Loading the board…'))
   if (scroll) root.querySelector('[data-hpw-board="week"]')?.scrollIntoView({ block: 'nearest' })
   try {
@@ -377,10 +247,9 @@ async function showWeek(root, ws, { scroll = false } = {}) {
     if (data.first_week) firstWeek = data.first_week
     paint(weeklyBoardHtml(
       shownWeek, data.members || [], data.is_current !== false,
-      data.is_current !== false
-        ? 'No boosts with a known episode length yet this week.'
-        : 'Nobody boosted an episode with a known length that week.',
+      data.is_current !== false ? COPY.emptyLive : COPY.emptyPast,
     ))
+    share()
   } catch (err) {
     if (mine !== weekSeq) return
     console.warn('[hpw] week failed', err)
@@ -689,24 +558,25 @@ export async function renderMembersBoards(root) {
     shownWeek = week.week_start || liveWeek
     root.innerHTML =
       weeklyBoardHtml(
-        shownWeek, week.members || [], week.is_current !== false,
-        'No boosts with a known episode length yet this week.',
+        shownWeek, week.members || [], week.is_current !== false, COPY.emptyLive,
       ) +
       boardHtml({
-        // "High Scores" rather than "Hall of Fame", Reed's call 2026-08-23. It
-        // is the arcade idiom the whole board is built on, and a hall of fame
-        // is a place you are inducted into where a high-score table is one you
-        // get onto by playing — which is the invitation This Week is making.
-        title: 'High Scores',
-        sub: `The best weeks ever recorded. Gold clears ${goal} hours.`,
+        board: 'all',
+        // The words are hpw-board.js's COPY, shared with /hpw/high-scores.
+        title: COPY.highScoresTitle,
+        sub: COPY.highScoresSub(goal),
         members: all.members || [],
         goal,
-        empty: 'Nothing recorded yet.',
+        empty: COPY.emptyAll,
       })
     /* After the first paint, and once: the arrows and the menu live inside
        markup this line just wrote, and the listener is delegated so it survives
        every repaint after it. */
     wirePicker(root)
+    const weekEl = root.querySelector('[data-hpw-board="week"]')
+    if (weekEl && shownWeek) mountShare(weekEl, { key: weekDateString(shownWeek), title: `Week of ${weekLabel(shownWeek)}` })
+    const allEl = root.querySelector('[data-hpw-board="all"]')
+    if (allEl) mountShare(allEl, { key: 'high-scores', title: COPY.highScoresTitle })
     root.dataset.hpwState = 'done'
     /* The wall goes below the boards, in its own container, and is fetched
        alongside them. It fails independently: a wall that cannot load leaves

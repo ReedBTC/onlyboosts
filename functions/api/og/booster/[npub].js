@@ -30,11 +30,12 @@
 
 import { toHexPubkey } from "../../v1/_common.js";
 import { isSafeUrl } from "../../../../assets/js/nostr-text.js";
+// The bounded read, the byte cap and the banner fallback are shared with
+// /api/og/hpw/<week>.png since 2026-08-29; the behaviour here is unchanged.
+import { readBounded, bannerResponse, MAX_IMAGE_BYTES } from "../../../_shared/og-image.js";
 
 const FETCH_TIMEOUT_MS = 6_000;
-const MAX_IMAGE_BYTES = 900 * 1024;
 const NPUB_MAX = 128;
-const BANNER_PATH = "/assets/onlyboosts_banner.png";
 
 // SVG is excluded on purpose: served from this origin it would be a document,
 // not a picture, and no preview fetcher accepts it as an image anyway.
@@ -44,7 +45,6 @@ const RASTER_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gi
 // is edge-cached itself. A fallback is cached briefly, so a transient upstream
 // failure does not pin the banner onto someone's share card for a day.
 const TTL_IMAGE = 86_400;
-const TTL_FALLBACK = 300;
 
 export async function onRequestGet({ request, env, params }) {
   let raw = params.npub;
@@ -68,7 +68,7 @@ export async function onRequestGet({ request, env, params }) {
   }
 
   let out = pic ? await fetchAvatar(pic) : null;
-  if (!out) out = await banner(request, env);
+  if (!out) out = await bannerResponse(request, env);
 
   try { await cache.put(cacheKey, out.clone()); } catch { /* cache is best-effort */ }
   return out;
@@ -118,57 +118,4 @@ async function fetchAvatar(url) {
   } finally {
     clearTimeout(timer);
   }
-}
-
-async function banner(request, env) {
-  const url = new URL(BANNER_PATH, request.url);
-  try {
-    const resp = await env.ASSETS.fetch(new Request(url.toString()));
-    if (resp.ok) {
-      const bytes = await resp.arrayBuffer();
-      return new Response(bytes, {
-        status: 200,
-        headers: {
-          "Content-Type": "image/png",
-          "Content-Length": String(bytes.byteLength),
-          "Cache-Control": `public, max-age=${TTL_FALLBACK}`,
-          "X-Content-Type-Options": "nosniff",
-          "X-OB-Image": "fallback",
-        },
-      });
-    }
-  } catch { /* fall through to the redirect */ }
-  // The asset fetch itself failed; hand the fetcher the static URL directly.
-  return new Response(null, {
-    status: 302,
-    headers: { Location: url.toString(), "Cache-Control": `public, max-age=${TTL_FALLBACK}` },
-  });
-}
-
-// Stream the body, bailing once cumulative bytes exceed the cap. arrayBuffer()
-// would buffer the whole thing before we could check size.
-async function readBounded(resp, ctrl) {
-  const reader = resp.body?.getReader?.();
-  if (!reader) {
-    const buf = await resp.arrayBuffer();
-    return buf.byteLength > MAX_IMAGE_BYTES ? null : buf;
-  }
-  const chunks = [];
-  let total = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (!value) continue;
-    total += value.byteLength;
-    if (total > MAX_IMAGE_BYTES) {
-      try { ctrl.abort(); } catch {}
-      try { reader.cancel(); } catch {}
-      return null;
-    }
-    chunks.push(value);
-  }
-  const out = new Uint8Array(total);
-  let off = 0;
-  for (const c of chunks) { out.set(c, off); off += c.byteLength; }
-  return out.buffer;
 }

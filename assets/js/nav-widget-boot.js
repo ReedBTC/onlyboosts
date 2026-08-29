@@ -40,7 +40,7 @@
       }
       const s = document.createElement('script');
       // Absolute — this file is shared by pages at more than one path.
-      s.src = '/assets/widgets/login-widget.js?v=ob-v150';
+      s.src = '/assets/widgets/login-widget.js?v=ob-v151';
       s.async = true;
       s.onload = () => { Promise.resolve().then(resolve); };
       s.onerror = () => {
@@ -51,6 +51,10 @@
     });
     return window.__lbWidgetLoad;
   }
+  // Exposed for the modules that need the widget on a gesture of their own
+  // (the 40 HPW share control's "Post to Nostr"), so there is one loader and
+  // one in-flight promise rather than a second copy of this function.
+  window.__lbEnsureWidget = ensureWidgetLoaded;
 
   const boostPh = document.querySelector('[data-lb-boost-trigger="show"]');
   if (boostPh) {

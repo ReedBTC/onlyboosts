@@ -40,6 +40,7 @@ CLAUDE.md` finds the paragraph that used to explain any name in here.
 | `/about` | the project's own explanation of what the data is and isn't |
 | `/stats` | a coming-soon placeholder: nav + header + soon-card, `noindex`, out of the sitemap. `/boosters` was the second one and was **deleted** on 2026-08-23 — see the Stats row of the site map |
 | `/404.html` | see the ⚠️ under LB conventions |
+| `/hpw/<YYYY-MM-DD>`, `/hpw/high-scores` | one 40 HPW board as a page, edge-rendered, the address a shared week has. `/hpw/<key>/card` is the 1200x630 frame the collector screenshots for `/api/og/hpw/<key>.png`. See **The Share Cards** under the Members tab |
 
 `/shows` and `/podcasts` are both 301s to `/#shows` now; the Shows feed replaced
 the standalone page. `feeds.html` and `boosts.html` were folded into `/` and
@@ -345,7 +346,7 @@ node scripts/stamp-assets.js --check   # verify; non-zero exit if anything is st
 **Order matters.** `sync-partials` injects markup into the page files; anything
 it injects has to be stamped afterwards.
 
-Fourteen test scripts, all plain `node scripts/<name>.mjs` with no runner:
+Fifteen test scripts, all plain `node scripts/<name>.mjs` with no runner:
 
 | | |
 |---|---|
@@ -363,14 +364,15 @@ Fourteen test scripts, all plain `node scripts/<name>.mjs` with no runner:
 | `test-community-medium.mjs` | the two community rollups and the medium partition they were split on, against a `node:sqlite` build of the real `schema.sql`. **Two halves reached two ways**: `fetchCommunityBoosts` is exported and called directly, where `/show`'s query is inline in the page Function and is **extracted from the source and executed**, the `test-feed-hash.mjs` technique. A copy of the SQL written into the test would pass forever while the shipped one rotted. Confirmed to go red on three mutations: the filter removed, its polarity inverted, and the `COALESCE` dropped |
 | `test-keysend-upgrade.mjs` | the keysend upgrade: the `fountain.fm` exclusion's exact-or-parent rule, the routing pair's whole-or-nothing rule, the strict node-pubkey check, every way `/api/keysend` answers "no endpoint", and the wallet gate. **Stubs `fetch`**, so it probes nobody's well-known |
 | `test-feed-search.mjs` | the search box's two outcomes, driving the **shipped** `mountFeedSearch` against a stub DOM: Enter submits the whole query where a feed supplies `onSubmit`, arrow + Enter still picks, emptying the box or Escape clears through `onPick(null)`, the footer row renders — and **the member lookup, with no `onSubmit`, keeps its old Enter**. Confirmed red on two mutations: auto-highlight restored, and the empty-box clear removed |
+| `test-hpw-cards.mjs` | the 40 HPW share cards, three halves: `hpw-board.js`'s two-sided rules (a **source** scan for absolute imports, `Date.now()` and unpinned locales, plus the row's escaping and `isSafeUrl` on the face); the **shipped** `/hpw` Function over a `node:sqlite` build of the real schema (every redirect, the 404s, the page's canonical and `og:image`, the card's frame and ready signal, and that the page carries `rowHtml` byte for byte); and `/api/og/hpw/<name>.png` with **`fetch` stubbed** (the allowlist, the upstream's 200-for-missing answered with the banner, the PNG signature, the 900KB cap). Nothing in it touches the VPS |
 
 **⚠️ `test-server-render.mjs` IS THE ONE THAT NEEDS AN ARGUMENT, SO IT IS THE
 ONE THAT GOES UNRUN.** Its header carries the `curl` that produces the capture
 (`/api/v1/podcasts?not_medium=music&sort=boosters&range=all&limit=25` since
 Phase D); take a fresh one, since it is also the size measurement. **Run all
-fourteen before a merge**, and treat this one as the guard on the ranking
+fifteen before a merge**, and treat this one as the guard on the ranking
 scheme rather than only on weight — it would have been merged red once had it
-not been run. *(If the table grows again, the "fourteen" above grows with
+not been run. *(If the table grows again, the "fifteen" above grows with
 it.)* `git show 4c22017:scripts/test-server-render.mjs` is the episode-card
 version if the front door ever moves back.
 
@@ -1580,6 +1582,28 @@ section's content in a shell.
   has no `▾`). **Not in the hash: closed, not deferred** (Reed,
   2026-08-24 — "they can take a screenshot"); don't re-propose the plain URL
   parameter.
+- **The Share Cards** (2026-08-29; design record in `docs/members-tab.md`):
+  the week is still not in the hash — **`/hpw/<YYYY-MM-DD>` and
+  `/hpw/high-scores` are the address a shared board has**, edge-rendered by
+  `functions/hpw/[[path]].js` from `hoursBoard()` (lifted out of the hours
+  endpoint) and the **two-sided `assets/js/hpw-board.js`** (`rowHtml`,
+  `boardHtml`, `COPY`), which the tab imports too; the move was verified by
+  diff. **⚠️ THE IMAGE IS A CHROMIUM SCREENSHOT TAKEN ON THE COLLECTOR
+  MACHINE, NOT RENDERED AT THE EDGE** (Reed's call, over satori + resvg-wasm:
+  +1.1MB on a 109KB Functions bundle and blank emoji in names). The bot
+  (`bots/hpw-cards/`) loads `/hpw/<key>/card`, waits for
+  `html[data-card-ready="1"]`, captures 1200x630 at 2x, and writes the PNG
+  **inside the shards tree** so the routine `push` ships it;
+  `/api/og/hpw/<key>.png` proxies it on the booster OG route's shape
+  (`_shared/og-image.js`): name allowlist, **PNG signature checked because
+  the upstream answers 200 text for a missing file**, 900KB cap, banner
+  fallback. The share control (`hpw-share.js`: Post to Nostr / Copy link /
+  Share image) is a verb mounted onto each board by the tab and by
+  `hpw-page.js`; it refuses to share the banner (`X-OB-Image: fallback`),
+  never signs on anyone's behalf, and the image it links is **the latest
+  render, not a snapshot at the moment of sharing**. `.hpw-*` CSS moved to
+  `assets/css/hpw-board.css` (37 selectors, audited) so both surfaces dress
+  the same rows.
 - **The member wall** (`GET /api/v1/members`, top 100) is the same
   `renderSupporters` the detail pages use; the heading is a parameter
   ("Members" here, "Nostr Community" there) and is moved into the head slot,

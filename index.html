@@ -50,18 +50,20 @@
 
   <!-- Shared note / card styles (.note-card, .embed-note) — the boosts
        feeds render through the same kind-1 card as boosts-thread.js. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v150" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v151" />
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v150" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v151" />
   <!-- The episode card and its drawer, extracted from the inline block below
        when /episode/<guid> pages needed the same cards. See the file header. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v150" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v150" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v151" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v151" />
+  <!-- The 40 HPW boards on the Members tab; shared with the /hpw/<week> pages. -->
+  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v151" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. Must stay last
        among the stylesheets so the inline block below still wins. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v150" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v151" />
 
   <style>
     :root {
@@ -549,211 +551,8 @@
     .members-info:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 
         
-    /* Two boards side by side where there is room, stacked where there is not.
-       This Week is first in the source and so is first on a phone — it is the
-       board with a live race in it. */
-    .hpw-boards { display: grid; gap: 1.1rem; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); }
-    /* Same radius and fill as `.mb-shell`; a board IS a shell, it just holds a
-       list rather than a lid. */
-    .hpw-board {
-      background: var(--cream);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 0.9rem 1rem 1rem;
-    }
-    /* ⚠️ THE TITLE IS CENTRED AND ITS SUB-LINE IS NOT. Reed's call,
-       2026-08-23. "This Week" and "High Scores" name the board the way a
-       scoreboard's own header does; the line under it is a caption, and a
-       centred caption over a left-aligned list of rows reads as a second
-       heading rather than as a note. `small` is inside the `h3`, so it has to
-       opt out of the alignment explicitly. */
-    .hpw-title {
-      font-family: 'Playfair Display', Georgia, serif;
-      font-size: 1.02rem; font-weight: 700; color: var(--ink); margin: 0 0 0.6rem;
-      text-align: center;
-    }
-    .hpw-title small {
-      display: block; margin-top: 0.15rem; text-align: left;
-      font-family: 'Source Serif 4', Georgia, serif;
-      font-size: 0.72rem; font-weight: 400; color: var(--muted);
-    }
-    /* ══ THE WEEK PICKER ══
-       ⚠️ IT IS THE BOARD'S TITLE, NOT A CONTROL ROW. Reed's call, 2026-08-24.
-       A scoreboard is navigated by its own header, and this tab already carries
-       a lookup, a range, a sort and a rules dialog — a fourth control strip
-       above the boards would be chrome for a thing most readers press twice. */
-    /* ⚠️ ONE BORDERED GROUP, NOT THREE LOOSE PIECES. Reed's call, 2026-08-24,
-       after seeing the first version: the arrows were transparent until hover
-       and the label wore the title's own type, so nothing on screen had an edge
-       and a phone never sees a hover state at all. The control was invisible at
-       rest. A segmented stepper is the shape a calendar app and a dashboard both
-       use to walk a date range, so the two ends explain themselves; the
-       hairlines are what say the middle is a third control rather than a label
-       between two buttons. It still sits where the title sat and still carries
-       the title's type, which is what keeps it a header rather than a toolbar. */
-    .hpw-nav {
-      display: inline-flex; align-items: center; justify-content: center;
-      gap: 0; max-width: 100%;
-      background: var(--white);
-      border: 1px solid var(--border);
-      border-radius: 999px;
-    }
-    /* ⚠️ BOTH ARROWS RENDER WHEN DISABLED, AND THE SIZE IS A TOUCH TARGET.
-       A control that vanishes at the end of the range moves the two beside it,
-       so the header shifts under the reader's thumb as they walk back through
-       the weeks. 2rem here and 2.5rem on a phone, where this is pressed with a
-       finger rather than clicked; the group's own border is part of the target
-       either way, which is what lets these be smaller than the loose circles
-       they replaced. */
-    .hpw-arrow {
-      display: inline-flex; align-items: center; justify-content: center;
-      width: 2rem; height: 2rem; flex: none;
-      font-family: 'Source Serif 4', Georgia, serif;
-      font-size: 1.15rem; line-height: 1;
-      color: var(--accent-d); background: none;
-      border: 0; border-radius: 999px;
-      cursor: pointer; padding: 0;
-      transition: background 0.12s, color 0.12s;
-    }
-    .hpw-arrow:hover:not(:disabled) { color: var(--accent-dd); background: var(--tint); }
-    .hpw-arrow:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
-    .hpw-arrow:disabled { opacity: 0.28; cursor: default; }
-    /* The dividers, and the only thing that makes this a SEGMENTED control
-       rather than a pill with two glyphs in it. */
-    .hpw-pick-wrap {
-      position: relative; min-width: 0;
-      border-left: 1px solid var(--border); border-right: 1px solid var(--border);
-    }
-    /* Wears the title's own type, because it IS the title. The group's border
-       says the three pieces are a control; the caret says this middle one opens
-       something rather than pressing. */
-    /* ⚠️ `align-items: center`, NOT `baseline`. The caret is a drawn box rather
-       than a glyph now (see below), and a box has no baseline to sit on — under
-       `baseline` it aligns on its own bottom edge and rides low. */
-    .hpw-pick {
-      display: inline-flex; align-items: center; gap: 0.35rem; max-width: 100%;
-      font-family: 'Playfair Display', Georgia, serif;
-      font-size: 1.02rem; font-weight: 700; color: var(--ink);
-      background: none; border: 0; border-radius: 0;
-      padding: 0.3rem 0.75rem; cursor: pointer; white-space: nowrap;
-      overflow: hidden; text-overflow: ellipsis;
-    }
-    /* ⚠️ A `Week:` TAG SHIPPED IN FRONT OF THE LABEL AND WAS REVERTED THE SAME
-       DAY (2026-08-24). Reed: "I don't like the font and alignment clashes
-       between `Week:` and the week printed." The idea was right and the type
-       was not. `.pcast-sort-tag` gets away with `Sort: Most boosts` because
-       both halves are ONE family at ONE size, differing only in colour and
-       weight; this label is 1.02rem Playfair bold, so any tag beside it varies
-       family AND size AND weight at once, and three axes of difference across
-       two words reads as a collision rather than as an axis and its value.
-       ⚠️ A future tag has to solve the TYPE first, not the wording. */
-    .hpw-pick:hover { color: var(--accent-dd); background: var(--tint); }
-    .hpw-pick:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
-    /* The no-menu form: `first_week` is allowed to fail quietly, and without it
-       there is nothing to enumerate. The arrows still step. */
-    .hpw-pick--static { cursor: default; }
-    .hpw-pick--static:hover { color: var(--ink); background: none; }
-    /* Nothing to open, so nothing to point at: the group keeps its dividers and
-       loses only the caret. */
-    /* ⚠️ THE CARET IS DRAWN, NOT TYPED, WHICH IS WHY IT CAN BE SIZED AT ALL.
-       It was `▾` (U+25BE) inside a Playfair element, and Playfair has no such
-       glyph — so it was already falling through to whatever face the platform
-       happened to substitute, at whatever size that face draws it. Its apparent
-       size was not ours to set, on any platform, which is exactly why it read as
-       small. Two borders and a rotation is the same call `.drawer-hint`'s
-       chevron and the `(i)` badge both make, and for the same reason.
-
-       ⚠️ 0.4rem AT 1.5px, AND BOTH NUMBERS WERE ARRIVED AT BY MEASUREMENT
-       RATHER THAN BY EYE. It shipped at 0.5rem/2px for a few minutes and Reed
-       called it — "it went from whispering to you to shouting at you" — which
-       the arithmetic agrees with: the old `▾` glyph draws about 7px of visible
-       triangle, where a 0.5rem box rotated 45° is 8 × √2 ≈ 11.3px across, so
-       the mark had roughly doubled. 0.4rem is 6.4 × √2 ≈ 9px, which is the
-       midpoint of those two, and it is the whole reason for drawing this rather
-       than typing it: a glyph has no midpoint to ask for.
-
-       The stroke drops with it. 2px on a 6.4px box is a quarter of the shape
-       and reads as a heavy outline; 1.5px holds the corner crisp without
-       sub-pixel mush, which a flat 1px gets on a non-retina screen.
-
-       `translateY` is optical centering — the visible shape is a corner, so its
-       mass sits below the box's own centre. */
-    .hpw-pick-caret {
-      flex: none; width: 0.4rem; height: 0.4rem;
-      border-right: 1.5px solid var(--accent-d);
-      border-bottom: 1.5px solid var(--accent-d);
-      transform: translateY(-1.5px) rotate(45deg);
-      transition: border-color 0.12s;
-    }
-    .hpw-pick:hover .hpw-pick-caret { border-color: var(--accent-dd); }
-    /* ⚠️ THE MENU IS `.pcast-sort-menu` AND MUST UNDO THE TITLE'S FONT. Its
-       items are declared `font: inherit`, and they are inheriting from an <h3>
-       in Playfair bold — the same shorthand trap `.show-stat dd` documents,
-       arriving here through the ancestor rather than through a later rule.
-       Its LENGTH IS DATA (99 weeks today, one more every Monday), so it scrolls
-       for exactly the reason the language menu does. */
-    .hpw-weeks {
-      left: 50%; right: auto; transform: translateX(-50%);
-      min-width: 12rem; text-align: left;
-      max-height: min(60vh, 21rem); overflow-y: auto; overscroll-behavior: contain;
-    }
-    .hpw-weeks .pcast-sort-item {
-      font-family: 'Source Serif 4', Georgia, serif;
-      font-weight: 600; font-size: 0.82rem;
-      font-variant-numeric: tabular-nums;
-    }
-    .hpw-list { list-style: none; margin: 0; padding: 0; }
-    .hpw-empty { font-size: 0.82rem; color: var(--muted); margin: 0; }
-    .hpw-row {
-      display: flex; align-items: center; gap: 0.55rem;
-      padding: 0.32rem 0.4rem;
-      border-top: 1px solid var(--border);
-      font-variant-numeric: tabular-nums;
-      border-radius: 6px;
-    }
-    .hpw-row:first-child { border-top: 0; }
-    /* ⚠️ GOLD IS THE ONLY DECORATION ON THIS BOARD, and it marks the two rows in
-       the whole history that cleared forty hours. If it ever marks a third of
-       the list it has stopped meaning anything — the fix would be the goal, not
-       the styling. The tint is a wash rather than a fill so the row still reads
-       as a row. */
-    .hpw-row--gold {
-      background: linear-gradient(90deg, rgba(198,150,32,0.16), rgba(198,150,32,0.02));
-      box-shadow: inset 3px 0 0 #c69620;
-    }
-    .hpw-pos { width: 1.4rem; text-align: right; font-size: 0.78rem; color: var(--muted); flex: none; }
-    .hpw-face {
-      width: 26px; height: 26px; border-radius: 50%; flex: none;
-      object-fit: cover; background: var(--cream-d);
-    }
-    .hpw-face--none {
-      display: flex; align-items: center; justify-content: center;
-      font-size: 0.7rem; font-weight: 700; color: var(--muted);
-    }
-    .hpw-who { min-width: 0; flex: 1; display: flex; flex-direction: column; line-height: 1.2; }
-    .hpw-name {
-      font-weight: 700; font-size: 0.86rem; color: var(--ink); text-decoration: none;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-    a.hpw-name:hover { color: var(--accent-d); text-decoration: underline; }
-    .hpw-week { font-size: 0.68rem; color: var(--muted); }
-    /* ⚠️ ON HIGH SCORES THE WEEK IS A BUTTON AND IT IS THE PICKER'S WAY IN. A
-       menu of ninety-nine dates can only be scrolled; this board already names
-       the weeks worth seeing. `align-self` because `.hpw-who` is a column flex
-       container, in which a button would otherwise stretch the row's width. */
-    .hpw-week-jump {
-      align-self: flex-start; max-width: 100%;
-      font: inherit; font-size: 0.68rem; color: var(--muted);
-      background: none; border: 0; padding: 0; margin: 0;
-      text-align: left; cursor: pointer;
-      text-decoration: underline; text-decoration-style: dotted;
-      text-decoration-color: var(--border); text-underline-offset: 2px;
-    }
-    .hpw-week-jump:hover { color: var(--accent-d); text-decoration-color: currentColor; }
-    .hpw-week-jump:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 3px; }
-    .hpw-hours { font-weight: 700; font-size: 0.92rem; color: var(--accent-d); flex: none; }
-    .hpw-unit { font-weight: 400; font-size: 0.72rem; color: var(--muted); }
-    .hpw-eps { font-size: 0.7rem; color: var(--muted); width: 3.6rem; text-align: right; flex: none; }
+    /* The boards' own rules are in /assets/css/hpw-board.css, linked in <head>;
+       they are shared with the edge-rendered /hpw/<week> pages. */
 
     /* The wall's own section chrome. `.show-section` and friends live in
        show-page.css, which this page does not link — the wall's `.sup-*` rules
@@ -1011,17 +810,6 @@
     .members-wall-section .mw-controls .pcast-controls { margin: 0; }
     @media (max-width: 640px) {
       .members-wall-section .mw-controls { margin-left: 0; flex-basis: 100%; }
-      /* ⚠️ THE ARROWS GROW ON A PHONE RATHER THAN SHRINKING WITH EVERYTHING
-         ELSE. They are pressed with a thumb here, where on desktop they are
-         clicked. 2.5rem inside the group rather than the 2.6rem they took when
-         they were loose circles: the group's own border is now part of the
-         target, and the three segments have to hold one line at 375px. The
-         title between them does NOT grow with them. */
-      .hpw-arrow { width: 2.5rem; height: 2.5rem; font-size: 1.3rem; }
-      .hpw-pick-caret { width: 0.45rem; height: 0.45rem; }
-      /* The menu is centred on the pick, which on a narrow screen puts its
-         edges past the board's padding. Cap it to the viewport instead. */
-      .hpw-weeks { min-width: 11rem; max-width: min(86vw, 20rem); }
     }
 
     /* ⚠️ THE LOOKUP LEADS THE TAB, so it is not `hidden` the way a feed's
@@ -1385,8 +1173,8 @@
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
     }
   </style>
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v150" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v150" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v151" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v151" />
 </head>
 <body data-active-feed="episodes-global">
 
@@ -2565,17 +2353,17 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v150"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v151"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v150" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v151" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v150" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v151" defer></script>
 
 <!-- Feed hydration — lazily loads the active feed on first view. -->
-<script type="module" src="/assets/js/feeds.js?v=ob-v150"></script>
-<script src="/assets/js/nav.js?v=ob-v150" defer></script>
+<script type="module" src="/assets/js/feeds.js?v=ob-v151"></script>
+<script src="/assets/js/nav.js?v=ob-v151" defer></script>
 
 </body>
 </html>
