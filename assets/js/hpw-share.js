@@ -9,10 +9,16 @@
  *
  *   Copy link      the page URL, https://onlyboosts.social/hpw/<key>, which
  *                  previews with the card wherever a link unfurls.
- *   Share image    the card itself, /api/og/hpw/<key>.png — the collector's
- *                  Chromium screenshot, proxied by this origin. On a phone the
- *                  Web Share sheet takes it as a FILE, so it lands in any app
- *                  as a picture rather than a link; on a desktop it downloads.
+ *   Download image the card itself, /api/og/hpw/<key>.png — the collector's
+ *                  Chromium screenshot, proxied by this origin — saved as a
+ *                  file. ⚠️ IT IS A DOWNLOAD, NOT THE WEB SHARE SHEET. The
+ *                  first version handed the file to navigator.share wherever
+ *                  the browser allowed it, and desktop Chrome allows it, so
+ *                  pressing "Share image" opened the operating system's share
+ *                  dialog (Reed, 2026-08-29: "I have no idea what that opened
+ *                  up"). A download is the same on every device and says what
+ *                  it does; a reader shares the saved picture from wherever
+ *                  they keep pictures.
  *                  ⚠️ THE PROXY ANSWERS THE SITE BANNER WHEN THE CARD IS NOT
  *                  RENDERED YET (X-OB-Image: fallback), and sharing the banner
  *                  as "the board" would be wrong, so that answer is refused
@@ -28,10 +34,10 @@
  * That is the V1 decision (2026-08-29); a frozen copy per share would need the
  * collector to keep versioned files, which it does not yet.
  */
-import { copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v153'
+import { copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v154'
 
 const SITE = 'https://onlyboosts.social'
-const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v153'
+const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v154'
 /* The box-with-arrow share glyph (the iOS / most-websites one), inline so it
  * scales with the button and takes currentColor in either theme. Reed's call,
  * 2026-08-29: the icon rather than the word. */
@@ -58,9 +64,6 @@ export function shareUrls(key) {
 export function mountShare(boardEl, { key, title }) {
   if (!boardEl || boardEl.querySelector('.hpw-share')) return
   const urls = shareUrls(key)
-  const canShareFiles = typeof navigator.canShare === 'function'
-    && navigator.canShare({ files: [new File([''], 'x.png', { type: 'image/png' })] })
-
   const host = document.createElement('div')
   host.className = 'hpw-share'
   host.innerHTML =
@@ -70,7 +73,7 @@ export function mountShare(boardEl, { key, title }) {
       `<div class="pcast-sort-menu hpw-share-menu" role="menu" hidden>` +
         `<button type="button" class="pcast-sort-item" role="menuitem" data-share="nostr">Post to Nostr</button>` +
         `<button type="button" class="pcast-sort-item" role="menuitem" data-share="link">Copy link</button>` +
-        `<button type="button" class="pcast-sort-item" role="menuitem" data-share="image">${canShareFiles ? 'Share image' : 'Download image'}</button>` +
+        `<button type="button" class="pcast-sort-item" role="menuitem" data-share="image">Download image</button>` +
       `</div>` +
     `</span>`
   boardEl.appendChild(host)
@@ -94,7 +97,7 @@ export function mountShare(boardEl, { key, title }) {
       const ok = await copyText(urls.page)
       showToast(ok ? 'Link copied' : 'Copy failed — clipboard blocked', !ok)
     } else if (item.dataset.share === 'image') {
-      await shareImage(urls, key, title, canShareFiles)
+      await downloadImage(urls, key)
     } else if (item.dataset.share === 'nostr') {
       await openComposer(boardEl, urls, title)
     }
@@ -112,24 +115,14 @@ async function fetchCard(urls) {
   return blob
 }
 
-async function shareImage(urls, key, title, canShareFiles) {
+async function downloadImage(urls, key) {
   let blob
   try { blob = await fetchCard(urls) }
   catch (err) { console.warn('[hpw-share] image fetch failed', err); showToast(`The image could not be fetched (${err?.message || 'network error'})`, true); return }
   if (!blob) { showToast('This board\'s image is not ready yet — try again in a few minutes', true); return }
-  const file = new File([blob], `onlyboosts-40hpw-${key}.png`, { type: 'image/png' })
-  if (canShareFiles) {
-    try {
-      await navigator.share({ files: [file], title: `Nostr Gang #40HPW: ${title}`, text: urls.page })
-      return
-    } catch (err) {
-      if (err?.name === 'AbortError') return   // the reader closed the sheet
-      console.warn('[hpw-share] share sheet failed, downloading instead', err)
-    }
-  }
   const a = document.createElement('a')
   a.href = URL.createObjectURL(blob)
-  a.download = file.name
+  a.download = `onlyboosts-40hpw-${key}.png`
   document.body.appendChild(a)
   a.click()
   a.remove()

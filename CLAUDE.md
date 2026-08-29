@@ -1598,7 +1598,7 @@ section's content in a shell.
   (`_shared/og-image.js`): name allowlist, **PNG signature checked because
   the upstream answers 200 text for a missing file**, 900KB cap, banner
   fallback. The share control (`hpw-share.js`: Post to Nostr / Copy link /
-  Share image) is a verb mounted onto each board by the tab and by
+  Download image) is a verb mounted onto each board by the tab and by
   `hpw-page.js`; it refuses to share the banner (`X-OB-Image: fallback`),
   never signs on anyone's behalf, and the image it links is **the latest
   render, not a snapshot at the moment of sharing**. `.hpw-*` CSS moved to
