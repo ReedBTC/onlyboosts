@@ -98,6 +98,16 @@ export async function onRequestGet({ request, env, params }) {
   return page(html, data.cache, { noindex: card || !(body.members || []).length });
 }
 
+/* ⚠️ PAGES ROUTES BY METHOD, AND A HEAD FALLS THROUGH TO THE STATIC 404 WHEN
+   ONLY onRequestGet IS EXPORTED. The two OG image routes learned this from the
+   collector's bot on 2026-08-29 and this page repeated it on 2026-08-30: a
+   `curl -I` on /hpw/high-scores answered 404 while GET answered 200. Same
+   status and headers, no body. */
+export async function onRequestHead(ctx) {
+  const resp = await onRequestGet(ctx);
+  return new Response(null, { status: resp.status, headers: resp.headers });
+}
+
 // ── the responses ────────────────────────────────────────────────────────────
 
 function page(html, maxAge, { noindex = false } = {}) {
