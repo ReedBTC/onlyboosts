@@ -1,104 +1,14 @@
-# Theming: Design Record
+# The Login/Boost Widget's Styling
 
-Moved out of CLAUDE.md on 2026-08-28 to keep that file within its size
-budget. CLAUDE.md's "Theming" section holds the operating rules; this file holds the full record behind them: the dark-mode passes, the widget's CSS failure classes, and the measurements.
-Headings are unchanged from CLAUDE.md, so `git log -S <text> -- CLAUDE.md`
-still finds each section's earlier history there.
+*Split out of `CLAUDE.md` on 2026-08-29, when that file passed its size budget.
+This is the authority for the subject; `CLAUDE.md` keeps the rules a change would
+break and points here for the arguments and the measurements. Nothing was rewritten
+on the way across — `git log -S <symbol> -- CLAUDE.md` still finds any paragraph
+that used to live there.*
 
 ---
 
-## Theming
-
-The shared stylesheets (`nav.css`, `footer.css`, `boosts-thread.css`,
-`boost-actions.css`) read their colors as CSS custom properties off `:root` and
-don't define them — every page has to supply the tokens. That supply is
-`assets/css/theme.css`: the palette, the `@font-face` rules, and the base
-`body`/`a`/`img` styles. **Link it from every page, last among the shared
-stylesheets** so a page's own inline `<style>` still wins.
-
-`index.html` keeps one theme block of its own — the eight per-feed accents and
-the `body[data-active-feed]` mapping. `assets/css/page.css` is the counterpart
-for the plain content pages (`.page-header`, `.soon-card`).
-
-### Dark Mode
-
-**`data-theme="dark"` on `<html>`, set before first paint by the boot script in
-`partials/nav.html` and toggled by the moon/sun button beside it; the choice is
-per-browser in `localStorage` under `ob-theme`.** Absence of the attribute — and
-any stored value other than `dark` — is the light theme, which is exactly what
-every visitor saw before the toggle existed. `nav.js` owns the click, the
-storage write, the button's label, and cross-tab sync via the `storage` event;
-the boot script only replays the stored choice. Riding the nav partial is what
-puts both on every page, the edge-rendered ones included, from one source —
-which is also why **neither may contain a backtick or `${`** (sync-partials
-exits nonzero if one appears; it bit once, in a comment).
-
-The theme itself is `:root[data-theme="dark"]` blocks: the palette flip in
-`theme.css`, the feed accent's flip in `index.html`'s inline block (one family
-since the ramp retired — its `-d`/`-dd` steps lighten against the dark
-background, the same derivation the light `-dd` used against white), and a short
-dark section at the foot of each stylesheet that needed one. Every shipped value
-was contrast-measured; text ≥ 4.5:1 on its surface, links and accents ≥ 6:1.
-
-**⚠️ THE DARK GRAMMAR IS ONE GROUND, HAIRLINES, AND ONE ACCENT.** *Reed's call,
-2026-08-27, against a Primal dark-mode screenshot* ("ours feels blocky and
-choppy"). The first cut flipped each light surface to its own blue-tinted dark
-shade and kept the navy chrome, which read as bands and boxes. What replaced it:
-a near-neutral black ground; the nav, footer and `.page-header` band sit ON
-that ground behind a 1px `--border` hairline instead of on their own navy; the
-card (`--white`/`--surface`) and sunken (`--cream-d`) surfaces are within a few
-percent of the ground, with borders doing the separating; and cyan appears only
-as text, accents and fills, never as a wash a region wears (`--bg-tint` is
-barely off the ground for the same reason). **Don't re-introduce a surface with
-its own colour into dark mode** — that is the specific thing this pass removed.
-
-**⚠️ TWO TOKENS DELIBERATELY DO NOT FLIP, AND `--navy` FLIPS TO THE GROUND:**
-
-- **`--navy` becomes the page ground in dark**, which is what merges the nav
-  and footer into the page. Three consequences carry scoped repairs: those
-  components read `--cream`/`--cream-d`/`--white` as light TEXT, so `theme.css`
-  re-supplies those inside `#top-nav`, `#site-footer` and `.page-header`; the
-  `.tagblock` and `.lb-toast` fills vanished into the ground and became
-  bordered surfaces (dark sections of `page.css` / `boost-actions.css`); and
-  `boosts-thread.css` / `boost-actions.css` remap `--navy`/`--navy-l` *inside*
-  the components that used them as text on light surfaces (`.note-card`,
-  `.embed-note`, `.zap-modal`). **A new `--navy` fill needs a dark-scoped
-  border or fill of its own**; a new navy-as-text usage needs a remap.
-- **`--brand-dd` / `--brand-ddd`.** They are the AA fills under white on every
-  filled widget button, read live by the bundle, so lightening them breaks the
-  checkout. Where they were doing the *other* job — darkest text step on a
-  light page — each stylesheet carries a dark-scoped override reading the
-  lightened `--brand-d` instead. **A new `--brand-dd` text usage needs its own
-  override**; a new filled button needs nothing.
-- **`--warn` / `--danger`** are lightened, never re-hued: amber is UNCERTAIN
-  and red is FAILED, and the double-pay guard rests on telling them apart in
-  either theme.
-
-**`--brand-d` inverts its role in dark**: it is the brand TEXT step (lightened),
-so the two filled controls that hover onto it (`.ob-boost-pill`, `.show-main
-.btn-boost`) carry scoped rules hovering to `--brand-dd` instead — contrast
-still only ever increases.
-
-**⚠️ A DARK OVERRIDE OF AN ALIASED TOKEN GOES ON THE ELEMENT THE ALIAS IS
-DECLARED ON, AND THIS SHIPPED WRONG ONCE.** A custom property substitutes its
-`var()` at computed-value time on the element that *declares* it, then inherits
-as the resolved value. The accent families are aliases on `:root`
-(`--eg-tint: var(--bg-tint)`), and the dark remap sat on `body` — so every
-alias had already baked in the light value before body's override existed, and
-dark mode rendered the feed panels on the light-mode cyan with the light
-`--accent-d` (a blue picked for white, ~2.5:1 on a dark card) on every eyebrow
-and link. Nothing errors; the page is simply the wrong colors. The remap lives
-on `:root[data-theme="dark"]` now, and the inline comment beside it says why.
-Reed's screenshots are what caught it — "still a lot of different shades".
-
-Two structural notes. **The widget needed no change**: it reads the tokens live
-off `:root`, so the dark `--modal-*`/state values reach the modals by
-themselves, and its `var()` fallbacks stay mirrors of the *light* values — a
-fallback only fires when a token is undefined (a stale `theme.css`), never in
-dark mode. Which is also why **the dark block must stay below the base `:root`
-block in `theme.css`**: `test-boost-modal-render.mjs` parses the first `:root`
-block it finds. And the masthead needed no second banner — the clear PNG's
-wordmark is cyan on transparency, which is what that file's split was for.
+## The Widget Wears The Site's Palette
 
 **The login/boost widget is a fork of LB's and wore LB's dark palette until
 2026-08-21** — `bg-neutral-900`, `border-neutral-700`, `text-orange-500` on every
@@ -275,47 +185,3 @@ alone.
 `boost-actions.css` still tint hover states with `rgba(247,147,26,…)`, LB's
 bitcoin orange. Those are the site's own reaction bars, not the widget, and they
 were out of scope for the widget restyle.
-
-`assets/css/feed-cards.css` holds the **episode card and everything that hangs
-off it** — the range/sort controls, the card, the boost drawer, the inline boost
-thread, the copy toast, `.ob-stats-label` and `.feed-placeholder`. Every rule in
-it reads `--accent` / `--accent-d` / `--tint`, so a page that links it has to
-supply them.
-
-Those stylesheets were written against LB's token names (`--cream`, `--navy`,
-`--orange`, `--green-d` …). Rather than rename ~300 usages, the old names are
-kept as **aliases repointed at the OnlyBoosts palette**. Trust the values, not
-the words — `--orange` is brand cyan. New code should prefer `--brand` / `--ink`
-/ `--surface`.
-
-**⚠️ THE FEED ACCENT HAS A FOURTH STEP, `--*-accent-dd`, AND IT IS FOR TEXT.**
-Same idea as `--brand-dd`: white on `--bg-accent` measures **2.50:1** and the
-same colour as ink on cream is **2.29:1**, so anything small wearing the accent
-is illegible. The phone's tab chips read it both ways — as a fill under white
-when selected, as the label and border when not — which is where Reed saw it
-(2026-08-23). The value is the least darkening of the cyan that reaches 6:1 on
-white. `--accent-dd` is mapped beside `--accent` on every `body[data-active-feed]`
-row, and `--tab-dd` rides beside `--tab` on the tabs because CSS cannot build
-one custom property's name out of another's.
-
-**⚠️ THE DESKTOP TAB AND THE SUB-ROW STILL USE `--accent` AND STILL MEASURE
-2.50:1.** Only the phone chips were changed, which is what was asked for and
-where the type is smallest. It is the same bug at a larger size; fixing it means
-the selected tab and the block below it stop sharing a fill, which is the thing
-the seam note under **The Three Tabs** exists to protect. A decision, not an
-oversight.
-
-Brand colors are sampled from the supplied art: `--brand: #00aff0` and
-`--brand-d: #068ace`. **⚠️ THE PER-FEED ACCENT RAMP IS RETIRED.** *Reed's call,
-2026-08-27, on seeing the feeds beside dark mode:* the eight feeds sat on one
-cyan→indigo→violet ramp, the violet tail marking the music half of the medium
-split, so switching feed shifted the page wash. Every feed now wears the one
-brand-cyan family — the one Members · Global always wore, and the same accent
-the detail pages supply — in both themes. **The retirement is values-only**: the
-eight family names survive in `index.html` as aliases of `--bg-*`, the
-`body[data-active-feed]` mapping is untouched, and the dark remap touches
-`--bg-*` alone (a dark line for any other family would silently override the
-aliasing — the inline comment says so). A revival is repointing the aliases; the
-ramp's light and dark values and the reasoning that picked them are in git
-before 2026-08-27. `--accent` / `--accent-d` / `--tint` remain the only names
-the shared chrome sees.

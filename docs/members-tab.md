@@ -1,9 +1,10 @@
-# The Members Tab: Design Record
+# The Members Tab
 
-Moved out of CLAUDE.md on 2026-08-28 to keep that file within its size
-budget. CLAUDE.md's "The Members Tab" section (under Feed loaders) holds the operating rules; this file holds the full record behind the tab: the shells, the #40HPW boards and their week picker, the member wall and lookup, the Boost Bots section, and every rejected alternative.
-Headings are unchanged from CLAUDE.md, so `git log -S <text> -- CLAUDE.md`
-still finds each section's earlier history there.
+*Split out of `CLAUDE.md` on 2026-08-29, when that file passed its size budget.
+This is the authority for the subject; `CLAUDE.md` keeps the rules a change would
+break and points here for the arguments and the measurements. Nothing was rewritten
+on the way across — `git log -S <symbol> -- CLAUDE.md` still finds any paragraph
+that used to live there.*
 
 ---
 

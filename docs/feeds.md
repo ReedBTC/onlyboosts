@@ -1,11 +1,74 @@
-# The Ranked Feeds: Design Record
+# The Feeds: Range, Sort, Rank, Language, Search
 
-Moved out of CLAUDE.md on 2026-08-28 to keep that file within its size
-budget. CLAUDE.md's "Feed loaders" section holds the operating rules; this file holds the full record behind five of its subsections (ranking, the language filter, the phone bar, the view in the hash, and search): the measurements and the rejected alternatives.
-Headings are unchanged from CLAUDE.md, so `git log -S <text> -- CLAUDE.md`
-still finds each section's earlier history there.
+*Split out of `CLAUDE.md` on 2026-08-29, when that file passed its size budget.
+This is the authority for the subject; `CLAUDE.md` keeps the rules a change would
+break and points here for the arguments and the measurements. Nothing was rewritten
+on the way across — `git log -S <symbol> -- CLAUDE.md` still finds any paragraph
+that used to live there.*
 
 ---
+
+### Range and sort
+
+Every feed carries a range and a sort dropdown, built by
+`assets/js/feed-controls.js`. The chrome is shared; **what the range means is
+not**, which is why each renderer passes its own tooltips:
+
+| | Range filters on | Sorts |
+|---|---|---|
+| Episodes / Songs | when the episode **aired** (`ep.published`) | latest boost / latest episode / most boosters / most boosts / most sats |
+| Boosts | when the boost was **sent** (`b.ts`) | latest boost / latest episode / largest boost |
+| Shows / Albums | when the show was **boosted** (`b.ts`) | most boosts / sats / boosters / episodes / recently boosted |
+
+**⚠️ `range` MEANS BOOST TIME on `/api/v1/podcasts` and AIR DATE on
+`/api/v1/episodes`.** A show is in the 1W view because someone boosted it this
+week; an episode is in the 1W view because it AIRED this week, however long ago
+it was boosted. Both sides are deliberate and the parameter name is shared; do
+not "unify" them. Filtering the note and show feeds by air date instead would
+drop most of what they hold, since most boosts land on back catalogue.
+
+The note feed's shorter menu is not an omission — a card there is one boost, so
+"most boosters" has nothing to count. Its `episode` sort has to sink undated rows
+explicitly: `episode.date` is null on ~12% of records, and a `0` fallback would
+float them to the top.
+
+**Every feed offers 1W/1M/1Y/All.**
+On the ranked feeds the range is a **query parameter** — `RANGE_DAYS` in
+`functions/api/v1/episodes.js` and `…/podcasts.js` — so a wider window is a
+different `WHERE` clause and costs nothing. **Those two tables and
+`RANGE_OPTIONS` move together, or a range button answers 400.** The note feed
+**walks** its window instead (`ensureCoverage`), and at ~38 boosts a day a year
+is ~13,900 rows: ~70 sequential requests before the first card paints.
+**⚠️ THE BOOSTS NOTE FEED GOT ITS 1Y ON 2026-08-23, AND NOT BY GAINING A
+QUERY.** *Reed's call, on seeing it missing beside the members wall's four
+buttons.* `/api/v1/boosts` does take `since`, but `globalBoostReader` still does
+not pass it — a `since`-bounded page returns no cursor, so the client could not
+page back **out** when the reader widens the range again. What 1Y got instead is
+**the treatment All already had**: it is not pre-walked, a non-chronological sort
+ranks only what has been loaded, and the count line says so in those words. The
+honesty was already built; 1Y was the one bounded window big enough to need it.
+
+**⚠️ `needsCoverage()` IS A FACT AND `shouldPreWalk()` IS A POLICY, and they are
+separate on purpose.** The first says the loaded corpus does not yet reach the
+window's cutoff; the second says we will sit and page until it does. Folding
+`1y` into the fact takes the **load-older button** away from it too, because
+that button is gated on the same condition — and a 1Y view that neither walks
+nor offers to load more is a window the reader can never fill. `UNWALKED` is
+the policy's whole content.
+
+**⚠️ AND THE COUNT LINE KEYS ON COVERAGE, NOT ON THE RANGE.** `rangeKey !== 'all'`
+was right while every bounded window was pre-walked, and would have made a
+half-loaded 1Y claim completeness.
+
+**Sorting is over the selected window, so a bounded window is paged in completely
+before it's painted**; otherwise "largest boost" would rank whichever pages
+happened to be loaded. A bounded window that's fully covered therefore has **no**
+load-older button. On All the button stays, and a non-chronological order can
+only rank what's loaded, so the count line says so. Loading older rows re-sorts
+in place under those sorts; under `recent` it appends.
+
+**Neither Boosts scope pages backwards hunting for matches any more.** The D1
+query answers in one indexed hit, so an empty first page genuinely means empty.
 
 ### Ranking, And The One Definition Of It
 
@@ -378,3 +441,107 @@ miss *means* depends on where the reader is standing. On All/Global the truth is
 a **coverage boundary**: a show nobody has boosted on Nostr is not in the index
 and will not be until someone does. There is no wider view to send them to.
 Three strings per medium: `searchNoneAll`, `searchNoneRange`, `searchNoneFollows`.
+
+### The Shows feed
+
+`assets/js/shows-feed.js`. The card is the SHOW where the Episodes card is one
+EPISODE — same boosts, rolled up a level. `GET /api/v1/podcasts` answers all
+three ranges off D1: on All it reads the precomputed aggregate columns, on 1W/1M
+it GROUPs the boosts inside the window. The card cannot tell which one answered.
+
+Two data facts that shaped the UI:
+
+- **462 of 1,384 shows (33%) have no title and no art.** The collector holds
+  boosts tagged with their guid but Podcast Index doesn't know the feed. They're
+  long tail — median 1 boost, 3.8% of all sats — and the first one doesn't appear
+  until #28 on *any* sort. They're kept rather than filtered (real boosts to real
+  shows) and labelled "Unidentified show" with the guid, so an unnamed card reads
+  as incomplete data rather than a bug.
+- **Detail shards ran 3.5KB at the median, 15KB at p90, and 1.95MB for the single
+  most-boosted show.** That fetch is retired; the drawer calls
+  `GET /api/v1/podcasts/<guid>?boosts=0`, which returns the episode rows only.
+
+**Both ranges fetch the drawer**, with the window passed as `?since=<unix>` so
+the rows come back scoped and recounted. A drawer showing all-time figures under
+a card showing the week's would contradict the card it opened from.
+### The episode feed adapter
+
+`feeds-podcasts.js` predates this data feed: it groups a flat boost list by
+`item_guid` and looks metadata up in side tables, where the feed embeds that
+metadata in every boost. `ob-data.js#toEpisodeShape` adapts the data to the
+consumer rather than the reverse — rewriting the UI around the new shape would
+have cost the boost drawer, the range filter and the five-way sort menu.
+
+Two fields the feed doesn't carry:
+
+- **`feed_id` / `itunes_id`** drive the "listen on" links and the `/api/value`
+  split lookup. `/api/value` also accepts `feedUrl` or `podcastGuid` and resolves
+  the id server-side, so boosting works; the pod.link / PI links are omitted for
+  shows we can't identify.
+- **`description` / `enclosure_type`** only exist in the per-show shard, too
+  expensive to fetch per card. Cards degrade to no blurb and let the browser
+  sniff the audio type.
+
+`toEpisodeShape` also returns a `profiles` map built from the embedded booster
+identities, which `renderPodcasts` seeds before first paint.
+
+### Snapshot → card
+
+The feed carries each boost's identity and content but **not the signed event**.
+Every surface builds a minimal `{id, pubkey, kind, content, created_at, tags}`
+object purely to hand to `buildActionBar` — a projection, not a verified event.
+Don't pass it anywhere that assumes a real one.
+
+**⚠️ THE MISSING `sig` HAS BITTEN ONCE.** `handleRepost` embedded the original
+note only when `ev.sig` was present, and no surface here has it, so every repost
+published from this site was a bare kind-6 with empty content — valid NIP-18 and
+still unrenderable, since 98% of boost notes live on `relay.fountain.fm` alone.
+Fixed in `b6c0bd4` by fetching the original through NDK. The projection is built
+in three places (`episode-card-actions.js`, `boost-note-actions.js`,
+`boosts-feed.js`) and each says so; **when a new action is added, decide
+explicitly whether it needs the real signed event or only the projection.**
+
+`boosts-feed.js` builds its own card rather than calling
+`boosts-thread.js#renderNoteCard`, because that function caches cards by event id
+and appends the action bar itself — appending the boost-meta row afterwards would
+double up on a cached repaint.
+
+### Every Episode Link Points at `/episode/<item-guid>`
+
+Seven surfaces name an episode and all seven resolve here: the Episodes/Songs
+cards (artwork, title, "See all boosts"), `/episode`'s community cards, the
+Shows/Albums episode drawer rows, the Boosts cards' meta row, the three detail
+pages' boost rows, `/show`'s episode drawer rows, and the URL written into a
+published boost note.
+
+**The qualifying rule is the TITLE**, not the guid: 6,682 of the 7,182 episodes
+carrying an indexed boost have one. Each surface falls back to what it linked
+before rather than emitting a URL that 404s, and the fallbacks differ because
+what each linked before differs.
+
+`show-link.js#episodePageHref` owns the rule for client surfaces, next to
+`showPageHref` so the two cannot drift.
+`functions/show/[guid].js#episodePageUrl` restates it for the server-rendered
+drawer rows, and `episode-link.js` restates it again for the note path. **Three
+copies of one test, and they must agree**; each is marked.
+
+**⚠️ Two surfaces still point at boostmebitch.com on purpose, and both are
+show-level**, in `functions/show/[guid].js` through one `bmbShowUrl()`: **"See
+All Episodes"** on the episode drawer's control band, and a **podroll tile** for a
+show we have no page for (44% of them). The drawer lists only episodes carrying
+an indexed boost, so a show's full catalogue is the one thing this site cannot
+offer. `episode-link.js` enumerates the set.
+
+**⚠️ THE NOTE'S LINK IS PERMANENT.** `episodeBoostLink` in `episode-link.js` is
+the single owner of the URL written into a published boost note; three surfaces
+import it. It resolved to BMB from the fork because OnlyBoosts had no per-episode
+page, and the flip was held back until the pages shipped rather than being taken
+as a side effect of them. **Notes already published keep pointing at BMB and
+always will**: an event cannot be recalled. The URL it emits is **absolute**,
+because the string is read wherever the event is rendered.
+
+It returns null (caller sends `''`, template omits both the content link line and
+the `r` tag) when there is no episode to point at, which is also what a
+**show-level** boost gets. `/show/<guid>` is **not** the episode target: a boost
+note is about one episode, so pointing it at the show would drop the part the
+reader wants.

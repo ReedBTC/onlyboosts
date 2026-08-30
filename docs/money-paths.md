@@ -1,55 +1,12 @@
-# Money Paths: Design Record
+# Money Paths
 
-Moved out of CLAUDE.md on 2026-08-28 to keep that file within its size
-budget. CLAUDE.md's "Money paths" section holds the operating rules; this file holds the full record behind them: the incidents, the measurements, and the rejected alternatives.
-Headings are unchanged from CLAUDE.md, so `git log -S <text> -- CLAUDE.md`
-still finds each section's earlier history there.
+*Split out of `CLAUDE.md` on 2026-08-29, when that file passed its size budget.
+This is the authority for the subject; `CLAUDE.md` keeps the rules a change would
+break and points here for the arguments and the measurements. Nothing was rewritten
+on the way across — `git log -S <symbol> -- CLAUDE.md` still finds any paragraph
+that used to live there.*
 
 ---
-
-## ⚠️ Money paths
-
-Two separate things are both called "boost":
-
-- **Boosting a podcast** — sats go to that show's own value split, parsed from
-  its RSS feed. `externalBoost.js` / `externalBoostagram.js` / `payAllLegs.js`.
-  This is the main event and it pays third parties.
-- **Donating to the site** — one leg at 100% to `RECIPIENT_LUD16`, behind the
-  nav's Donate button. **It runs the BOOST flow, not a flow of its own**:
-  `openSiteDonation` → `openExternalBoost` → `ExternalBoostModal` with a
-  synthetic one-leg bundle. See *A Donation Is The Boost Flow With One Leg*.
-  `BoostModal.jsx` and `MultiLegBoostForm` were the retired LB path and were
-  **deleted on 2026-08-23**; see *What The Strip Removed*. `boostagram.js`
-  survives and is live — `index.jsx` imports `bolt11PaymentHash`,
-  `confirmInvoiceSettled` and `RECIPIENT_LUD16` from it.
-
-All LB payment and identity values were replaced on fork and the shipped
-`assets/widgets/login-widget.js` was rebuilt — verified zero occurrences of LB's
-address, npub, feed GUID, or host addresses. **`login-widget/` is a build
-artifact: editing `login-widget/src/` changes nothing until you run
-`npm run build`.** Verify after any change to a money path:
-
-```sh
-grep -c "onlyboosts@getalby.com" assets/widgets/login-widget.js   # expect >= 1
-```
-
-`LNADDRESS_OVERRIDES` in `recipientOverrides.js` is deliberately empty. An entry
-there silently reroutes sats away from the address a show's RSS names, without
-telling donor or recipient. That was defensible on LB (Reed's own feed); here it
-would divert money from third-party shows. Only add one for a feed OnlyBoosts
-owns.
-
-**It has a twin: `EXTERNAL_OVERRIDES` in `assets/js/value-block.js`, and both
-must stay empty.** They are two separate maps on two sides of the fork's strip,
-which is how the LB entry survived: `recipientOverrides.js` was emptied, then
-`8bc4cf9` restored `value-block.js` wholesale with
-`boostbot@fountain.fm → aquafox30@primal.net` still in it. It shipped, and
-rewrote Fountain's 2% leg on a live external boost before being caught on
-2026-07-27. **No leg of a third party's value block is ever rewritten, renamed,
-merged or dropped** — `applyExternalOverrides` is a documented passthrough, and
-the external boost pays exactly what the show published. If OnlyBoosts ever takes
-a cut it gets its own leg under its own name. Grep both maps after any restore
-from `lb/main`.
 
 ### A Lightning Address With No CORS Headers Cannot Be Paid From A Browser
 

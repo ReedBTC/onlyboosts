@@ -1,43 +1,12 @@
-# The Detail Pages: Design Record
+# The Three Detail Pages
 
-Moved out of CLAUDE.md on 2026-08-28 to keep that file within its size
-budget. CLAUDE.md's "The three detail pages" section holds the operating rules, and `docs/show-pages-spec.md` remains the design of record for `/show`; this file holds the full record for everything else on the three pages: the rank chips, the `#boosts` controls, the show filter, the community rollups, the player card, and the hash routing.
-Headings are unchanged from CLAUDE.md, so `git log -S <text> -- CLAUDE.md`
-still finds each section's earlier history there.
+*Split out of `CLAUDE.md` on 2026-08-29, when that file passed its size budget.
+This is the authority for the subject; `CLAUDE.md` keeps the rules a change would
+break and points here for the arguments and the measurements. Nothing was rewritten
+on the way across — `git log -S <symbol> -- CLAUDE.md` still finds any paragraph
+that used to live there.*
 
 ---
-
-## The three detail pages
-
-`/show/<guid>`, `/episode/<item-guid>` and `/booster/<npub>` are **one page with
-three subjects**. The back link, the stat tiles, the drawers, the boost list, the
-community wall and the whole client chrome come out of two shared modules; what
-differs is the subject and which sections apply.
-
-| | `/show` | `/episode` | `/booster` |
-|---|---|---|---|
-| Hero | show art, "Boost this Show" | a **player card**: art, audio, chapters + show-notes drawers, eyebrow links the show | the person: avatar, banner, bio, lightning address |
-| Stats | show totals | that episode's | that person's |
-| Rollup | `#community-shows` | `#community-episodes` | `#shows` + `#episodes` |
-| Community wall | `#community` | `#community` | — |
-| Podroll | both directions | — show-level tag | — |
-| Boosts | `#boosts`, opens on 24 | `#boosts`, all of them | `#boosts`, opens on 24 |
-
-**Design of record for `/show` is `docs/show-pages-spec.md`.** What follows here
-is only what a change would break.
-
-**⚠️ The stat tiles are one row on a phone, whatever the count.** They are
-`repeat(auto-fit, minmax(7rem, 1fr))` at full width, which on a 375px phone needs
-360px for three columns against 335px of content — so `/show` and `/episode` broke
-2 + 1 and `/booster` broke 2 + 2, and the second line read as a separate row of
-figures rather than the rest of one. Under 640px the grid switches to
-`grid-auto-flow: column` over `grid-template-columns: none`, which is what makes
-it **count-agnostic**: three tiles become three equal columns and four become
-four, with no rule naming either number. The maximum today is four (sats, boosts,
-shows, episodes on `/booster`); a fifth wants looking at rather than squeezing in.
-The type scales with `clamp()` rather than stepping, and **the binding constraint
-is the LABEL, not the number** — "episodes" and "boosters" are eight characters,
-where the widest figure is five.
 
 ### The Rank Line In The Stat Tiles
 
