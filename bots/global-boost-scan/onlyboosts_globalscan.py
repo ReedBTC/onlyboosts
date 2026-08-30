@@ -44,6 +44,7 @@ import fountain                                                 # noqa: E402
 import export as export_mod                                     # noqa: E402
 import duration_probe                                           # noqa: E402
 import podroll                                                  # noqa: E402
+import publishers as publishers_mod                             # noqa: E402
 import resolve_guids                                            # noqa: E402
 from classify import classify_boost, decode_note_or_nevent, _QUOTE_RE  # noqa: E402
 from relays import CORE_RELAYS, PROFILE_RELAYS, RECEIPT_RELAYS, expand_via_outbox  # noqa: E402
@@ -787,6 +788,12 @@ def _store_podroll(conn, results):
         if r["items"] is not None:
             db.replace_podroll(conn, r["podcast_guid"], r["items"])
             edges += len(r["items"])
+            # The publisher link rides the same clean read (parse_publisher).
+            # set_show_publisher bumps updated_at only when the link moved, which
+            # is what carries it to D1 on the metadata-drift pass.
+            pub = r.get("publisher") or {}
+            db.set_show_publisher(conn, r["podcast_guid"],
+                                  pub.get("guid"), pub.get("url"))
         db.mark_podroll_checked(conn, r["podcast_guid"], r["status"])
     conn.commit()
     return counts, edges
@@ -808,6 +815,121 @@ def _print_podroll_stats(conn):
           f"{one(f'''SELECT COUNT(*) FROM (SELECT DISTINCT source_guid AS g FROM podroll
                      UNION SELECT target_guid FROM podroll WHERE target_guid IS NOT NULL) x
                      WHERE x.g IN ({boosted})'''):>6}")
+
+
+# ── publishers ────────────────────────────────────────────────────────────────
+def cmd_publishers(args):
+    """Fetch the publisher (artist) feeds album feeds declare — publishers.py
+    carries the design record. Extraction of the LINKS rides the podroll sweep;
+    this pass resolves the publisher feeds those links point at, and the albums
+    they list. Read-only outward; --dry-run fetches and writes nothing."""
+    conn = db.connect(DB_PATH, check_same_thread=False)
+    rows = db.publishers_needing_fetch(conn, max_age=args.max_age,
+                                       retry_age=args.retry_age)
+    if not rows:
+        print("publishers: every linked publisher checked within the freshness window")
+    else:
+        print(f"Publishers: fetching {len(rows)} feed(s)...")
+        t0 = time.time()
+        results = publishers_mod.probe_publishers(rows, log=lambda m: print(m, flush=True))
+        counts = Counter(r["status"] for r in results)
+        summary = ", ".join(f"{k}={v}" for k, v in sorted(counts.items()))
+        if args.dry_run:
+            print(f"  [dry-run] fetched in {time.time() - t0:.0f}s — {summary}; nothing written")
+            for r in results:
+                m = r["meta"] or {}
+                print(f"    {r['status']:<14} {(m.get('title') or '—')[:32]:<34} "
+                      f"{len(r['albums'] or []):>3} album(s)  {r['feed_url']}")
+            return
+        mismatch = 0
+        for r in results:
+            if r["meta"] is not None:
+                claimed = r["meta"].pop("publisher_guid", None)
+                if claimed and claimed != r["publisher_guid"]:
+                    mismatch += 1
+                db.upsert_publisher(conn, {**r["meta"],
+                                           "publisher_guid": r["publisher_guid"],
+                                           "feed_url": r["feed_url"]})
+                db.replace_publisher_albums(conn, r["publisher_guid"], r["albums"] or [])
+            db.mark_publisher_checked(conn, r["publisher_guid"], r["status"])
+        conn.commit()
+        print(f"  fetched in {time.time() - t0:.0f}s — {summary}")
+        if mismatch:
+            print(f"  [warn] {mismatch} feed(s) claim a different podcast:guid than the "
+                  f"one album feeds link them by (stored under the linked guid)")
+        # Podcast Index fallback for feeds we could not read. PI knows the
+        # Fountain/RSS Blue publisher feeds and NOT Wavlake's (measured; see
+        # publishers.py), so this fills failures, never replaces the fetch. The
+        # stored status keeps the fetch outcome so transients still retry.
+        failed = [r for r in results
+                  if r["meta"] is None and r["status"] != "not-publisher"]
+        key, secret = _pi_creds()
+        if failed and key and secret:
+            ok = 0
+            for r in failed:
+                info = enrich.resolve_show(r["publisher_guid"], key, secret)
+                if info and (info.get("medium") or "").lower() == "publisher":
+                    db.upsert_publisher(conn, {
+                        "publisher_guid": r["publisher_guid"],
+                        "feed_url": info.get("feed_url") or r["feed_url"],
+                        "title": info.get("title"), "image": info.get("image"),
+                        "artwork": info.get("artwork"), "description": None})
+                    ok += 1
+            conn.commit()
+            if ok:
+                print(f"  Podcast Index fallback titled {ok}/{len(failed)} unreadable feed(s)")
+
+    # Resolve listed albums we hold no shows row for, so a publisher's album
+    # list can render titled — discovered_via='publisher', the podroll-targets
+    # idea. Capped: a publisher lists its whole catalogue.
+    if args.resolve_albums:
+        todo = db.publisher_albums_needing_show(conn, limit=args.resolve_albums)
+        key, secret = _pi_creds()
+        if todo and not (key and secret):
+            print(f"[warn] no Podcast Index credentials — {len(todo)} album(s) left unresolved")
+        elif todo:
+            print(f"Resolving {len(todo)} listed album(s) via Podcast Index...")
+            # 4 workers: concurrent PI sweeps get rate-limited into silent
+            # failures that look exactly like "no such feed".
+            with ThreadPoolExecutor(max_workers=4) as ex:
+                found = list(ex.map(lambda g: (g, enrich.resolve_show(g, key, secret)), todo))
+            ok = 0
+            for guid, info in found:
+                if info:
+                    db.upsert_show(conn, info, discovered_via="publisher")
+                    ok += 1
+                else:
+                    db.mark_enrich_failed(conn, "show", guid)
+            print(f"  resolved {ok}/{len(todo)}")
+    _print_publisher_stats(conn)
+
+
+def _print_publisher_stats(conn):
+    from urllib.parse import urlparse
+    one = lambda q: conn.execute(q).fetchone()[0]                    # noqa: E731
+    print("\n── publishers ──")
+    print(f"  shows declaring a publisher: "
+          f"{one('SELECT COUNT(*) FROM shows WHERE publisher_guid IS NOT NULL'):>5}")
+    for med, n, tot in conn.execute(
+            """SELECT COALESCE(medium,'podcast') m,
+                      SUM(CASE WHEN publisher_guid IS NOT NULL THEN 1 ELSE 0 END),
+                      COUNT(*)
+               FROM shows WHERE feed_url IS NOT NULL AND podroll_checked_at IS NOT NULL
+               GROUP BY m ORDER BY 3 DESC""").fetchall():
+        print(f"    {med:<10} {n:>4} of {tot:>4} swept feeds")
+    print(f"  distinct publishers linked:  "
+          f"{one('SELECT COUNT(DISTINCT publisher_guid) FROM shows WHERE publisher_guid IS NOT NULL'):>5}")
+    print(f"  publisher feeds resolved:    "
+          f"{one('SELECT COUNT(*) FROM publishers WHERE title IS NOT NULL'):>5}")
+    print(f"  album edges listed:          "
+          f"{one('SELECT COUNT(*) FROM publisher_albums'):>5}")
+    print(f"  …to shows we index:          "
+          f"{one('SELECT COUNT(*) FROM publisher_albums WHERE album_guid IN (SELECT podcast_guid FROM shows)'):>5}")
+    print("  per-host linkage:")
+    hosts = Counter(urlparse(r[0]).netloc.lower() for r in conn.execute(
+        "SELECT publisher_feed_url FROM shows WHERE publisher_feed_url IS NOT NULL"))
+    for host, n in hosts.most_common(10):
+        print(f"    {host:<30} {n:>4}")
 
 
 # ── stats ─────────────────────────────────────────────────────────────────────
@@ -1078,6 +1200,22 @@ def main():
                     help="also crawl the podrolls OF podroll targets (walks the graph a "
                          "second hop; those shows have no page to show it on)")
     pr.set_defaults(func=cmd_podroll)
+
+    pb = sub.add_parser("publishers",
+                        help="fetch the publisher (artist) feeds album feeds declare "
+                             "(links themselves are extracted by the podroll pass)")
+    pb.add_argument("--max-age", type=int, default=6 * 24 * 3600,
+                    help="re-fetch a publisher feed only if last checked longer ago "
+                         "than this (seconds; default just under a week)")
+    pb.add_argument("--retry-age", type=int, default=None,
+                    help="shorter re-check window for feeds whose last read never "
+                         "completed; default is a sixth of --max-age")
+    pb.add_argument("--resolve-albums", type=int, default=300,
+                    help="cap on Podcast Index lookups for listed albums with no "
+                         "shows row yet (0 = skip)")
+    pb.add_argument("--dry-run", action="store_true",
+                    help="fetch and report; write nothing")
+    pb.set_defaults(func=cmd_publishers)
 
     x = sub.add_parser("export", help="write static JSON shards for the website")
     x.add_argument("--out", default=str(HERE / "data" / "shards"),

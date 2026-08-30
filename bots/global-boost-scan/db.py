@@ -104,6 +104,12 @@ CREATE TABLE IF NOT EXISTS shows (
                                  -- asks the boosts table directly, which self-corrects).
     podroll_checked_at INTEGER,  -- last time we fetched this feed looking for a podroll
     podroll_status TEXT,         -- outcome of that fetch: ok | none | truncated | http-<n> | err-<Type>
+    publisher_guid TEXT,         -- the publisher feed (artist tier) this feed's channel
+                                 -- declares itself part of, via <podcast:publisher> or a flat
+                                 -- medium="publisher" remoteItem. Extracted by
+                                 -- podroll.py#parse_publisher on the podroll sweep's clean
+                                 -- reads; see the publishers table for the other end.
+    publisher_feed_url TEXT,
     updated_at    INTEGER
 );
 
@@ -128,6 +134,39 @@ CREATE TABLE IF NOT EXISTS podroll (
     PRIMARY KEY (source_guid, position)
 );
 CREATE INDEX IF NOT EXISTS idx_podroll_target ON podroll(target_guid);
+
+-- <podcast:publisher> — the publisher feed (artist tier) each album feed
+-- declares itself part of. The LINK lives on shows.publisher_guid /
+-- shows.publisher_feed_url (extracted during the podroll sweep at zero extra
+-- fetches); these two tables are the other end — the publisher feeds
+-- themselves, fetched by publishers.py, which carries the design record.
+CREATE TABLE IF NOT EXISTS publishers (
+    publisher_guid  TEXT PRIMARY KEY, -- the guid album feeds link by (equal to the
+                                      -- feed's own podcast:guid on every clean case)
+    feed_url        TEXT,
+    title           TEXT,             -- the artist, in practice
+    image           TEXT,
+    artwork         TEXT,             -- enrich convention: <itunes:image> when it differs
+    description     TEXT,
+    checked_at      INTEGER,          -- when the publisher feed was last fetched
+    status          TEXT,             -- ok | not-publisher | http-<n> | err-<Type>
+    updated_at      INTEGER
+);
+
+-- The albums a publisher feed lists (its channel-level remoteItems), an ordered
+-- list replaced wholesale per publisher — the podroll shape one tier up, and the
+-- reverse edge exists even for albums nobody has boosted yet.
+CREATE TABLE IF NOT EXISTS publisher_albums (
+    publisher_guid  TEXT NOT NULL,
+    position        INTEGER NOT NULL, -- order in the publisher's own list
+    album_guid      TEXT,             -- remoteItem feedGuid (join key; nullable like podroll)
+    album_url       TEXT,             -- remoteItem feedUrl
+    album_title     TEXT,             -- remoteItem title attr, if any — publisher's own hint
+    album_medium    TEXT,             -- remoteItem medium attr ('music' on all observed)
+    updated_at      INTEGER,
+    PRIMARY KEY (publisher_guid, position)
+);
+CREATE INDEX IF NOT EXISTS idx_pub_albums_album ON publisher_albums(album_guid);
 
 CREATE TABLE IF NOT EXISTS episodes (
     item_guid       TEXT PRIMARY KEY,
@@ -451,6 +490,9 @@ def _migrate(conn):
                       ("podroll_status", "TEXT")):
         if col not in show_cols:
             conn.execute(f"ALTER TABLE shows ADD COLUMN {col} {decl}")
+    for col in ("publisher_guid", "publisher_feed_url"):
+        if col not in show_cols:
+            conn.execute(f"ALTER TABLE shows ADD COLUMN {col} TEXT")
     # A ledger, not a work queue — see apply_aliases. Rows created before
     # `deleted_at` existed migrate with it NULL, so they are re-sent exactly once
     # and then go quiet.
@@ -1089,6 +1131,154 @@ def podroll_rows(conn):
         ORDER BY p.source_guid, p.position""").fetchall()
 
 
+# ── publishers (the artist tier above albums; see publishers.py) ─────────────
+def set_show_publisher(conn, podcast_guid, pub_guid, pub_url):
+    """Record which publisher feed a show's channel declares (extracted by
+    podroll.py#parse_publisher on the podroll sweep — same clean-read-only gate
+    as replace_podroll, which the caller enforces).
+
+    Bumps updated_at ONLY when the link actually moved: that bump is what
+    carries the new value to D1 on the metadata-drift pass, and an
+    unconditional one would re-project every show on every daily sweep.
+    Clearing (both None) is a real answer — a link removed from the feed comes
+    off the show. Returns whether anything moved."""
+    row = conn.execute(
+        "SELECT publisher_guid, publisher_feed_url FROM shows WHERE podcast_guid=?",
+        (podcast_guid,)).fetchone()
+    if row is None or (row["publisher_guid"] == pub_guid
+                       and row["publisher_feed_url"] == pub_url):
+        return False
+    conn.execute(
+        "UPDATE shows SET publisher_guid=?, publisher_feed_url=?, updated_at=? "
+        "WHERE podcast_guid=?",
+        (pub_guid, pub_url, int(time.time()), podcast_guid))
+    return True
+
+
+def publishers_needing_fetch(conn, max_age, retry_age=None):
+    """Distinct publisher feeds due a fetch: declared by at least one show, and
+    never fetched or fetched too long ago. Same two-age transient rule as the
+    podroll sweep (PODROLL_TRANSIENT); 'not-publisher' is deliberately NOT
+    transient — a link resolving to a non-publisher feed is a real answer,
+    re-read on the ordinary schedule in case the publisher fixes it."""
+    if retry_age is None:
+        retry_age = max_age // 6
+    now = int(time.time())
+    transient = " OR ".join("p.status LIKE ?" for _ in PODROLL_TRANSIENT)
+    return conn.execute(
+        f"""SELECT s.publisher_guid, MAX(s.publisher_feed_url) AS feed_url,
+                   COUNT(*) AS declared_by
+            FROM shows s
+            LEFT JOIN publishers p ON p.publisher_guid = s.publisher_guid
+            WHERE s.publisher_guid IS NOT NULL AND s.publisher_feed_url IS NOT NULL
+              AND NOT {show_excluded('s.publisher_guid', 's.publisher_feed_url')}
+              AND (p.checked_at IS NULL
+                   OR p.checked_at < ?
+                   OR (({transient}) AND p.checked_at < ?))
+            GROUP BY s.publisher_guid
+            ORDER BY COALESCE(MAX(p.checked_at), 0), s.publisher_guid""",
+        (now - max_age, *[t + "%" for t in PODROLL_TRANSIENT], now - retry_age)).fetchall()
+
+
+def upsert_publisher(conn, pub):
+    """Cache a publisher feed's channel metadata (from the feed itself, or the
+    Podcast Index fallback). Wholesale overwrite like upsert_show — the feed is
+    the authority on its own channel."""
+    conn.execute(
+        """INSERT INTO publishers (publisher_guid, feed_url, title, image, artwork,
+                                   description, updated_at)
+           VALUES (:publisher_guid, :feed_url, :title, :image, :artwork,
+                   :description, :updated_at)
+           ON CONFLICT(publisher_guid) DO UPDATE SET
+             feed_url=excluded.feed_url, title=excluded.title,
+             image=excluded.image, artwork=excluded.artwork,
+             description=excluded.description, updated_at=excluded.updated_at""",
+        {"description": None, **pub, "updated_at": int(time.time())})
+
+
+def mark_publisher_checked(conn, publisher_guid, status):
+    conn.execute("INSERT OR IGNORE INTO publishers (publisher_guid) VALUES (?)",
+                 (publisher_guid,))
+    conn.execute("UPDATE publishers SET checked_at=?, status=? WHERE publisher_guid=?",
+                 (int(time.time()), status, publisher_guid))
+
+
+def replace_publisher_albums(conn, publisher_guid, items):
+    """Swap in a publisher's whole album list — ordered, replaced wholesale, the
+    replace_podroll rule: a dropped album has to actually disappear."""
+    now = int(time.time())
+    conn.execute("DELETE FROM publisher_albums WHERE publisher_guid=?",
+                 (publisher_guid,))
+    conn.executemany(
+        """INSERT INTO publisher_albums (publisher_guid, position, album_guid,
+                                         album_url, album_title, album_medium,
+                                         updated_at)
+           VALUES (?,?,?,?,?,?,?)""",
+        [(publisher_guid, i, it.get("album_guid"), it.get("album_url"),
+          it.get("album_title"), it.get("album_medium"), now)
+         for i, it in enumerate(items)])
+
+
+def publisher_albums_needing_show(conn, limit=0):
+    """Album guids a publisher lists that have no `shows` row yet — the cards
+    that would render bare. Same shape as podroll_targets_needing_show, with a
+    cap because a publisher lists its WHOLE catalogue."""
+    lim = f" LIMIT {int(limit)}" if limit else ""
+    rows = conn.execute(
+        f"""SELECT DISTINCT a.album_guid FROM publisher_albums a
+            LEFT JOIN shows s ON s.podcast_guid = a.album_guid
+            LEFT JOIN enrich_failed f ON f.kind='show' AND f.id = a.album_guid
+            WHERE a.album_guid IS NOT NULL AND s.podcast_guid IS NULL
+              AND NOT {show_excluded('a.album_guid', 'a.album_url')}
+              AND (f.id IS NULL OR f.last_try < ?){lim}""", (_cutoff(),)).fetchall()
+    return [r[0] for r in rows]
+
+
+#: The excluded-publisher test, shared by publisher_rows, publisher_album_rows
+#: and the publisher figures in stats(): a publisher survives only when its own
+#: ids are not listed AND at least one non-excluded show still declares it.
+def _publisher_ok(alias="p"):
+    return (f"(NOT {show_excluded(alias + '.publisher_guid', alias + '.feed_url')} "
+            f"AND EXISTS (SELECT 1 FROM shows s2 "
+            f"WHERE s2.publisher_guid = {alias}.publisher_guid "
+            f"AND NOT {show_excluded('s2.podcast_guid', 's2.feed_url')}))")
+
+
+def publisher_rows(conn):
+    """Every publishable publisher, with how many indexed shows declare it."""
+    return conn.execute(f"""
+        SELECT p.publisher_guid, p.feed_url, p.title, p.image, p.artwork,
+               p.description, p.status,
+               (SELECT COUNT(*) FROM shows s WHERE s.publisher_guid = p.publisher_guid
+                 AND NOT {show_excluded('s.podcast_guid', 's.feed_url')}) AS show_count
+        FROM publishers p
+        WHERE {_publisher_ok('p')}
+        ORDER BY p.publisher_guid""").fetchall()
+
+
+def publisher_album_rows(conn):
+    """Every publisher→album edge with the album's display metadata resolved —
+    the one join both projections would read; podroll_rows one tier up (same
+    boosted-CTE trick, same hint-loses-to-resolved-title rule downstream)."""
+    return conn.execute(f"""
+        WITH boosted AS (SELECT DISTINCT {effective_guid('')} AS g FROM boosts
+                         WHERE podcast_guid IS NOT NULL AND {not_excluded('')})
+        SELECT a.publisher_guid, a.position, a.album_guid, a.album_url,
+               a.album_title, a.album_medium,
+               s.title AS alb_title, s.image AS alb_img, s.artwork AS alb_art2,
+               s.medium AS alb_medium, s.author AS alb_author, s.feed_url AS alb_feed,
+               (b.g IS NOT NULL) AS alb_boosted
+        FROM publisher_albums a
+        JOIN publishers p ON p.publisher_guid = a.publisher_guid
+        LEFT JOIN shows s ON s.podcast_guid = a.album_guid
+        LEFT JOIN boosted b ON b.g = a.album_guid
+        WHERE {_publisher_ok('p')}
+          AND NOT EXISTS (SELECT 1 FROM excluded_ids x
+                WHERE (x.kind IN ('show','episode') AND x.id = a.album_guid)
+                   OR (x.kind='show_feed' AND x.id IN (s.feed_url, a.album_url)))
+        ORDER BY a.publisher_guid, a.position""").fetchall()
+
+
 def feed_id_for_guid(conn, podcast_guid):
     row = conn.execute("SELECT feed_id FROM shows WHERE podcast_guid=?",
                        (podcast_guid,)).fetchone()
@@ -1343,6 +1533,10 @@ def stats(conn):
         # two integers is the expensive way to agree with it.
         "podroll_edges":   one(f"SELECT COUNT(*) FROM {_PODROLL_FILTERED}"),
         "podroll_shows":   one(f"SELECT COUNT(DISTINCT p.source_guid) FROM {_PODROLL_FILTERED}"),
+        # Publisher tier, net of exclusions the same way (see _publisher_ok).
+        "publishers":      one(f"SELECT COUNT(*) FROM publishers p WHERE {_publisher_ok('p')}"),
+        "publisher_shows": one(f"SELECT COUNT(*) FROM shows s WHERE s.publisher_guid IS NOT NULL "
+                               f"AND NOT {show_excluded('s.podcast_guid', 's.feed_url')}"),
         "earliest":        one(f"SELECT MIN(created_at) FROM boosts WHERE {nx}"),
         "latest":          one(f"SELECT MAX(created_at) FROM boosts WHERE {nx}"),
     }

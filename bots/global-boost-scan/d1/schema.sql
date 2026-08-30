@@ -44,12 +44,18 @@ CREATE TABLE IF NOT EXISTS podcasts (
   -- same way `artwork` and the profiles fields were — see the note over `profiles`.
   language      TEXT,               -- RSS <language>, primary subtag only ('en','de'); NULL = feed declares
                                     -- none, which is NOT English (48% of music feeds vs 99% of podcasts)
+  -- ⚠️ ADDED OUT-OF-BAND with ALTER TABLE ... ADD COLUMN on the live remote,
+  -- like `language`. The publisher (artist) feed this show's RSS declares itself
+  -- part of (<podcast:publisher> / flat medium="publisher" remoteItem); joins
+  -- publishers.publisher_guid. NULL = the feed declares none.
+  publisher_guid TEXT,
   boost_count   INTEGER,
   total_sats    INTEGER,
   booster_count INTEGER,
   episode_count INTEGER,
   latest_ts     INTEGER
 );
+CREATE INDEX IF NOT EXISTS idx_podcasts_publisher ON podcasts(publisher_guid);
 CREATE INDEX IF NOT EXISTS idx_podcasts_latest ON podcasts(latest_ts DESC);
 CREATE INDEX IF NOT EXISTS idx_podcasts_sats   ON podcasts(total_sats DESC);
 CREATE INDEX IF NOT EXISTS idx_podcasts_boosts ON podcasts(boost_count DESC);
@@ -115,6 +121,41 @@ CREATE TABLE IF NOT EXISTS podroll (
   PRIMARY KEY (source_guid, position)
 );
 CREATE INDEX IF NOT EXISTS idx_podroll_target ON podroll(target_guid);
+
+-- <podcast:publisher> — the artist tier above albums. `publishers` is one row
+-- per publisher feed (title/art/description parsed from the feed itself by the
+-- collector's publishers pass); `publisher_albums` is that feed's channel-level
+-- album list, ordered, with display fields denormalized like podroll's and for
+-- the same reason: a join to `podcasts` only answers for the albums that have
+-- boosts, and most of a publisher's catalogue doesn't. Both are replaced
+-- wholesale by `d1_sync.py --remote-publishers`; the boost delta never touches
+-- them. show_count = indexed shows declaring this publisher (post-exclusion) —
+-- what a /api/v1/publishers listing would rank by. album_linked = that album
+-- has a /show page here (boosts AND a title); 0 = render the card but point it
+-- at the feed.
+CREATE TABLE IF NOT EXISTS publishers (
+  publisher_guid TEXT PRIMARY KEY,
+  feed_url       TEXT,
+  title          TEXT,               -- the artist, in practice
+  image          TEXT,
+  artwork        TEXT,               -- second-chance art URL, cover-art chain rules
+  description    TEXT,
+  show_count     INTEGER
+);
+CREATE TABLE IF NOT EXISTS publisher_albums (
+  publisher_guid TEXT NOT NULL,
+  position       INTEGER NOT NULL,   -- order in the publisher's own feed
+  album_guid     TEXT,               -- remoteItem feedGuid; joins podcasts.podcast_guid
+  album_url      TEXT,
+  album_title    TEXT,
+  album_image    TEXT,
+  album_artwork  TEXT,
+  album_medium   TEXT,
+  album_author   TEXT,
+  album_linked   INTEGER,
+  PRIMARY KEY (publisher_guid, position)
+);
+CREATE INDEX IF NOT EXISTS idx_pub_albums_album ON publisher_albums(album_guid);
 
 -- ⚠️ CREATE TABLE IF NOT EXISTS DOES NOT ADD A COLUMN to an existing remote
 -- table, so applying this file is NOT how the five fields below reach a D1 that

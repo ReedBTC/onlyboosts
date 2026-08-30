@@ -92,6 +92,67 @@ class Truncated(Exception):
     """The podroll block ran past the bytes we were willing to read."""
 
 
+# ── publisher linkage ─────────────────────────────────────────────────────────
+# An album feed names the publisher feed above it (in practice: the artist) in
+# one of two shapes, both channel-level, and both must be parsed:
+#
+#   1. nested (Fountain, RSS Blue):
+#        <podcast:publisher>
+#          <podcast:remoteItem medium="publisher" feedGuid="…" feedUrl="…"/>
+#        </podcast:publisher>
+#   2. flat (Wavlake): a bare channel-level
+#        <podcast:remoteItem medium="publisher" feedGuid="…" feedUrl="…">
+#        </podcast:remoteItem>
+#      — note it is NOT self-closing in the wild, which is why _ITEM_RE matches
+#      open tags only.
+#
+# Channel-level means the link is always inside the prefix fetch_feed_head
+# already holds, so extraction rides the podroll fetch at ZERO extra requests.
+# The scan is scoped to the channel head (everything before the first
+# <item>/<liveItem>) with podroll blocks cut out, so a podroll RECOMMENDING a
+# publisher feed can never read as ownership, and an item-level remoteItem (a
+# valueTimeSplit's, say) can never leak in. See publishers.py for the design
+# record and the pass that fetches the publisher feeds these links point at.
+
+_PUB_BLOCK_RE = re.compile(
+    r"<([a-zA-Z0-9]+:)?publisher[\s>].*?</([a-zA-Z0-9]+:)?publisher>", re.S | re.I)
+_HEAD_END_RE = re.compile(r"<([a-zA-Z0-9]+:)?(item|liveItem)[\s>]", re.I)
+
+
+def channel_head(xml):
+    """Everything before the first <item>/<liveItem> — where every channel-level
+    tag sits in practice. (An <itunes:…> tag is not cut: the tag NAME must be
+    item, not merely start with it.)"""
+    m = _HEAD_END_RE.search(xml)
+    return xml[:m.start()] if m else xml
+
+
+def parse_publisher(xml):
+    """The publisher feed this feed declares itself part of, or None.
+
+    Returns {"guid", "url", "title"} off the remoteItem's attributes; any single
+    field may be None but at least one of guid/url is set. The nested block's
+    remoteItem counts with or without its medium attribute (every one observed
+    carries medium="publisher", but inside <podcast:publisher> the position
+    already says what it is); a flat remoteItem counts only when it SAYS
+    medium="publisher" — any other channel-level remoteItem is a different
+    feature and must not be read as ownership.
+    """
+    head = channel_head(xml)
+    block = _PUB_BLOCK_RE.search(head)
+    scopes = ((block.group(0), False),) if block else ()
+    scopes += ((_BLOCK_RE.sub("", head), True),)
+    for scope, need_medium in scopes:
+        for _prefix, attrs in _ITEM_RE.findall(scope):
+            a = {k.split(":")[-1].lower(): v for k, v in _ATTR_RE.findall(attrs)}
+            if need_medium and (a.get("medium") or "").strip().lower() != "publisher":
+                continue
+            guid, url = _norm(a.get("feedguid")), _norm(a.get("feedurl"))
+            if guid or url:
+                return {"guid": guid, "url": url, "title": _norm(a.get("title"))}
+    return None
+
+
 def fetch_feed_head(url, session):
     """Stream a feed until the channel header is done. Returns (status, text).
 
@@ -119,7 +180,8 @@ def fetch_feed_head(url, session):
 def _probe_one(row, session):
     """One feed → a result dict. Never raises: a failure is a recorded status."""
     guid, url = row["podcast_guid"], row["feed_url"]
-    out = {"podcast_guid": guid, "feed_url": url, "status": None, "items": None}
+    out = {"podcast_guid": guid, "feed_url": url, "status": None, "items": None,
+           "publisher": None}
     for attempt in range(RETRY_429 + 1):
         try:
             status, text = fetch_feed_head(url, session)
@@ -130,6 +192,9 @@ def _probe_one(row, session):
                 out["status"] = f"http-{status}"
                 return out
             out["items"] = parse_podroll(text)
+            # Rides the same clean read; on a Truncated podroll the whole result
+            # is recorded as truncated and the link is not extracted either.
+            out["publisher"] = parse_publisher(text)
             out["status"] = "ok" if out["items"] else "none"
             return out
         except Truncated:

@@ -23,8 +23,10 @@ exec 9>data/pipeline.lock
 flock -w 900 9 || { echo "[skip] pipeline still busy after 15min — skipping this podroll run"; exit 0; }
 
 echo "=== $(date -u +%FT%TZ) OnlyBoosts podroll refresh ==="
-"$PY" "$BOT" podroll              # fetch feeds → parse podroll → resolve targets
+"$PY" "$BOT" podroll              # fetch feeds → parse podroll + publisher links → resolve targets
+"$PY" "$BOT" publishers           # fetch the publisher (artist) feeds those links declare
 "$PY" "$BOT" export --per-show    # podroll rides in the per-show shards + index counts
 "$PY" "$BOT" push                 # rsync changed shards to the VPS
 "$PY" d1_sync.py --remote-podroll # replace the podroll table in D1 (/api/v1 + /show pages)
+"$PY" d1_sync.py --remote-publishers # replace the publisher projection in D1
 echo "=== $(date -u +%FT%TZ) podroll cycle done ==="

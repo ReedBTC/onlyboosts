@@ -86,6 +86,34 @@ def build_podroll_sql(conn):
     return out
 
 
+def build_publishers_sql(conn):
+    """Replace the publisher projection (both tables) wholesale — the podroll
+    rule: it moves when a publisher edits their feed, never when a boost
+    arrives, so the collector's `publishers` pass is what pushes it. Album
+    display fields are denormalized onto the edge for podroll's reason: a join
+    to `podcasts` only answers for albums that have boosts, and most of a
+    publisher's catalogue doesn't. Our resolved title/medium win over the
+    remoteItem's own attributes — hints in someone else's feed go stale."""
+    out = ["DELETE FROM publishers;", "DELETE FROM publisher_albums;"]
+    for r in db.publisher_rows(conn):
+        out.append(
+            "INSERT INTO publishers (publisher_guid,feed_url,title,image,artwork,"
+            "description,show_count) VALUES ("
+            f"{q(r['publisher_guid'])},{q(r['feed_url'])},{q(r['title'])},"
+            f"{q(r['image'])},{q(r['artwork'])},{q(r['description'])},{q(r['show_count'])});")
+    for r in db.publisher_album_rows(conn):
+        title = r["alb_title"] or r["album_title"]
+        out.append(
+            "INSERT INTO publisher_albums (publisher_guid,position,album_guid,album_url,"
+            "album_title,album_image,album_artwork,album_medium,album_author,album_linked"
+            ") VALUES ("
+            f"{q(r['publisher_guid'])},{q(r['position'])},{q(r['album_guid'])},"
+            f"{q(r['alb_feed'] or r['album_url'])},{q(title)},{q(r['alb_img'])},"
+            f"{q(r['alb_art2'])},{q(r['alb_medium'] or r['album_medium'])},"
+            f"{q(r['alb_author'])},{q(1 if (r['alb_boosted'] and title) else 0)});")
+    return out
+
+
 def build_full_sql(conn):
     """Full-load statements: wipe the projection tables and repopulate."""
     out = []
@@ -115,7 +143,8 @@ def build_full_sql(conn):
                COUNT(DISTINCT b.booster_pubkey) AS booster_count,
                COUNT(DISTINCT b.item_guid) AS episode_count,
                MAX(b.created_at) AS latest_ts,
-               s.title, s.image, s.artwork, s.feed_url, s.medium, s.author, s.language
+               s.title, s.image, s.artwork, s.feed_url, s.medium, s.author, s.language,
+               s.publisher_guid
         FROM boosts b LEFT JOIN shows s ON s.podcast_guid={eg}
         WHERE {eg} IS NOT NULL AND {db.not_excluded('b')} GROUP BY {eg}""").fetchall():
         # `artwork` is the second-chance art URL (<itunes:image> when it differs
@@ -124,9 +153,9 @@ def build_full_sql(conn):
         # so it's projected here and in the --remote-delta path below.
         out.append(
             "INSERT INTO podcasts (podcast_guid,title,image,artwork,feed_url,medium,author,language,"
-            "boost_count,total_sats,booster_count,episode_count,latest_ts) VALUES ("
+            "publisher_guid,boost_count,total_sats,booster_count,episode_count,latest_ts) VALUES ("
             f"{q(a['guid'])},{q(a['title'])},{q(a['image'])},{q(a['artwork'])},{q(a['feed_url'])},"
-            f"{q(a['medium'])},{q(a['author'])},{q(a['language'])},"
+            f"{q(a['medium'])},{q(a['author'])},{q(a['language'])},{q(a['publisher_guid'])},"
             f"{q(a['boost_count'])},{q(a['total_sats'])},"
             f"{q(a['booster_count'])},{q(a['episode_count'])},{q(a['latest_ts'])});")
         if a["title"] or a["author"]:
@@ -168,6 +197,7 @@ def build_full_sql(conn):
         out.extend(_profile_upsert_sql(p, verb="INSERT"))
 
     out.extend(build_podroll_sql(conn))
+    out.extend(build_publishers_sql(conn))
 
     s = db.stats(conn)
     for k, v in {"generated_at": int(time.time()), "boosts": s["boosts"],
@@ -205,7 +235,8 @@ def _podcast_upsert_sql(conn, guid):
                   COUNT(DISTINCT b.booster_pubkey) AS booster_count,
                   COUNT(DISTINCT b.item_guid) AS episode_count,
                   MAX(b.created_at) AS latest_ts,
-                  s.title, s.image, s.artwork, s.feed_url, s.medium, s.author, s.language
+                  s.title, s.image, s.artwork, s.feed_url, s.medium, s.author, s.language,
+                  s.publisher_guid
            FROM boosts b LEFT JOIN shows s ON s.podcast_guid={eg}
            WHERE {eg}=? AND {db.not_excluded('b')} GROUP BY {eg}""", (guid,)).fetchone()
     if not a:
@@ -213,9 +244,9 @@ def _podcast_upsert_sql(conn, guid):
     # `artwork` (second-chance art URL) is projected here and in the full load;
     # the remote D1 column exists.
     out = ["INSERT OR REPLACE INTO podcasts (podcast_guid,title,image,artwork,feed_url,medium,author,language,"
-           "boost_count,total_sats,booster_count,episode_count,latest_ts) VALUES ("
+           "publisher_guid,boost_count,total_sats,booster_count,episode_count,latest_ts) VALUES ("
            f"{q(a['guid'])},{q(a['title'])},{q(a['image'])},{q(a['artwork'])},{q(a['feed_url'])},"
-           f"{q(a['medium'])},{q(a['author'])},{q(a['language'])},"
+           f"{q(a['medium'])},{q(a['author'])},{q(a['language'])},{q(a['publisher_guid'])},"
            f"{q(a['boost_count'])},{q(a['total_sats'])},"
            f"{q(a['booster_count'])},{q(a['episode_count'])},{q(a['latest_ts'])});",
            f"DELETE FROM podcasts_fts WHERE podcast_guid={q(guid)};"]
@@ -636,6 +667,28 @@ def cmd_remote_podroll(args):
     print(f"D1 podroll: replaced with {len(stmts) - 1} edge(s)")
 
 
+def cmd_remote_publishers(args):
+    """Push the publisher projection alone (full replace of both tables). Run
+    after the collector's `publishers` pass; the boost delta never touches
+    them. (podcasts.publisher_guid travels separately, on the metadata-drift
+    pass — set_show_publisher bumps shows.updated_at when the link moves.)"""
+    cf = _cf(load_config(CREDENTIALS))
+    if not cf:
+        print("[error] CF_ACCOUNT_ID / CF_D1_DATABASE_ID / CF_API_TOKEN missing from credentials.env")
+        return
+    conn = db.connect(DB_PATH)
+    stmts = build_publishers_sql(conn)
+    BATCH = 100
+    for i in range(0, len(stmts), BATCH):
+        ok, detail = _d1_exec(*cf, "\n".join(stmts[i:i + BATCH]))
+        if not ok:
+            # A missing-table error here means d1/schema.sql hasn't been applied to
+            # the remote yet: run --apply-schema first (it's CREATE ... IF NOT EXISTS).
+            print(f"[error] publishers batch {i // BATCH} failed: {detail}")
+            return
+    print(f"D1 publishers: replaced with {len(stmts) - 2} row(s) across both tables")
+
+
 def cmd_remote_clients(args):
     """Push client attribution onto boosts D1 ALREADY HAS, as UPDATEs.
 
@@ -745,6 +798,8 @@ def main():
                     help="replace the podroll projection (run after the weekly podroll pass)")
     ap.add_argument("--remote-clients", action="store_true",
                     help="push re-derived client attribution onto existing D1 boosts")
+    ap.add_argument("--remote-publishers", action="store_true",
+                    help="full-replace the publisher projection (run after the publishers pass)")
     ap.add_argument("--rebuild-fts", action="store_true",
                     help="drop + repopulate podcasts_fts/episodes_fts (needed after a column change)")
     ap.add_argument("--mark-all-synced", action="store_true", help="one-time: mark all current boosts as already in D1")
@@ -759,6 +814,8 @@ def main():
         cmd_remote_delta(args)
     elif args.remote_podroll:
         cmd_remote_podroll(args)
+    elif args.remote_publishers:
+        cmd_remote_publishers(args)
     elif args.remote_clients:
         cmd_remote_clients(args)
     elif args.rebuild_fts:
@@ -767,7 +824,7 @@ def main():
         cmd_mark_all_synced(args)
     else:
         ap.error("choose --emit-sql <file>, --apply-schema, --remote, --remote-delta, "
-                 "--remote-podroll, --rebuild-fts, or --mark-all-synced")
+                 "--remote-podroll, --remote-publishers, --rebuild-fts, or --mark-all-synced")
 
 
 if __name__ == "__main__":
