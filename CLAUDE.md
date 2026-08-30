@@ -1476,7 +1476,12 @@ What a change elsewhere would break:
   MACHINE, NOT RENDERED AT THE EDGE** (Reed's call over satori + resvg-wasm):
   the bot (`bots/hpw-cards/`) loads `/hpw/<key>/card`, waits for
   `html[data-card-ready="1"]`, captures 720x900 at 2x, and writes the PNG
-  **inside the shards tree** so the routine `push` ships it;
+  **inside the shards tree**, which is also what saves it from a `--delete`
+  mirror run. **⚠️ ITS STEP IN `run-incremental.sh` CARRIES A SECOND `push`,
+  AND THAT IS NOT REDUNDANT**: the card photographs the live site and the live
+  site reads D1, so the render has to follow `d1_sync --remote-delta` — which
+  sits BELOW the routine `push`, so by then the rsync has already run. Rendering
+  above the sync instead would photograph the previous cycle's board;
   `/api/og/hpw/<key>.png` proxies it on the booster OG route's shape
   (`_shared/og-image.js`): name allowlist, **PNG signature checked because the
   upstream answers 200 text for a missing file**, 900KB cap, banner fallback,
