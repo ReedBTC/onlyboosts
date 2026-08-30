@@ -44,11 +44,11 @@
  * while a week's card is not rendered yet (X-OB-Image: fallback); that is
  * refused with a note rather than uploaded as "the board".
  */
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v157'
-import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v157'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v158'
+import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v158'
 
 const SITE = 'https://onlyboosts.social'
-const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v157'
+const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v158'
 /* The box-with-arrow share glyph (the iOS / most-websites one), inline so it
  * scales with the button and takes currentColor in either theme. Reed's call,
  * 2026-08-29: the icon rather than the word. */
@@ -147,11 +147,8 @@ function buildModal() {
 
 function q(sel) { return modal.querySelector(sel) }
 
-const PLACEHOLDERS = {
-  live: 'Say something about this week\'s board…',
-  past: 'Say something about this week\'s results…',
-  all: 'Say something about the high scores…',
-}
+// One placeholder for every board. Reed's wording, 2026-08-30.
+const PLACEHOLDER = 'Share your message about the #40hpw chart'
 
 export function openShareModal({ key, title, isLive }) {
   if (!modal) modal = buildModal()
@@ -165,8 +162,8 @@ export function openShareModal({ key, title, isLive }) {
     seq: (session?.seq || 0) + 1,
   }
   q('[data-text]').value = ''
-  q('[data-text]').placeholder = key === 'high-scores' ? PLACEHOLDERS.all : isLive ? PLACEHOLDERS.live : PLACEHOLDERS.past
-  q('[data-hint]').textContent = `The image and a link (${session.link.replace(/^https:\/\//, '')}) are added when you publish.`
+  q('[data-text]').placeholder = PLACEHOLDER
+  q('[data-hint]').textContent = `The image and a link to ${session.link.replace(/^https:\/\//, '')} will be added to your message`
   q('[data-preview]').innerHTML = '<span class="hpw-share-preview-empty" aria-hidden="true"></span>'
   q('[data-download]').disabled = true
   modal.hidden = false
