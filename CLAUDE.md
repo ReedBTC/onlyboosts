@@ -1205,6 +1205,18 @@ Bowl After Bowl, 25,265 sats); the pass runs every incremental cycle over a
   let through, and contradicted prose blocks even a same-app match** — Reed's
   call, 2026-08-24: a duplicate slipping through beats a real boost filtered
   out. Don't tighten toward recall.
+- **⚠️ ONE-TO-ONE HAS ONE EXCEPTION, ON THE RELAY SIDE.** `chadf-boostbot`
+  signs one receipt and one note **per keysend leg**, so a multi-leg boost is
+  2–3 identical bot notes and the claim used to block the second from the
+  partner the first had matched — 7 duplicates reached D1 that way (found
+  2026-08-30). A relay note whose identical sibling (same publisher, same hard
+  key, prose equal once `nostr:`/URL tokens are stripped, ±`APP_WINDOW`) is
+  already marked is marked against the same partner, tier `sibling`. It only
+  ever attaches to a partner the tiers already matched, so it cannot reach a
+  non-relay note. **It is deliberately not a partnerless "identical siblings"
+  rule** — Reed's call, 2026-08-30: 233 real same-author identical-text pairs
+  within 300s exist, and #40HPW hours are `DISTINCT (booster, episode)` so a
+  second note never adds hours anyway. The 77 partnerless bot clusters stay.
 - **A new republisher bot is out of scope until registered**: its pubkey in
   `clients.py#PUBLISHER_PUBKEYS` (the member wall already forces this) and its
   slug in `RELAY_PUBLISHERS` — relay bots only; the first-party publisher keys

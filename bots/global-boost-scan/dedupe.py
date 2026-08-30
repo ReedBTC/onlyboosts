@@ -17,7 +17,25 @@ account) are never the droppable side: their note IS the payment's note.
 THE RULE. A relay note is a duplicate of exactly one partner when the hard key
 holds — same sats, same item_guid, same effective show guid, pairing strictly
 one-to-one (two same-amount boosts in one live-show hour keep both notes) —
-AND one tier of corroborating evidence holds. The tiers are EVIDENCE SOURCES,
+AND one tier of corroborating evidence holds.
+
+ONE-TO-ONE HAS ONE EXCEPTION, AND IT IS ON THE RELAY SIDE (2026-08-30).
+chadf-boostbot signs one kind-9735 receipt and one note PER KEYSEND LEG, so a
+multi-leg boost is two or three bot notes, identical except for the quoted
+`nevent` (113 clusters over the corpus: 110 of two, 3 of three; every app, not
+one). The pass marked the first bot note and the claim then blocked its
+sibling from the same partner — 7 relay notes (6 BMB, 1 StableKraft; 6,232
+sats) reached D1 that way, every one with a partner AND evidence. So after
+the tiers fail, a relay note whose SIBLING — same publisher, same hard key,
+identical prose once nostr:/URL tokens are stripped, within ±APP_WINDOW — is
+already marked `dup_of P` is marked `dup_of P` too. Measured: it marks exactly
+those 7 and can never touch a non-relay note, because it only ever attaches a
+relay note to a partner the tiers already matched. What it deliberately is
+NOT: a partnerless "identical siblings are one payment" rule. 233 same-author,
+same-key, identical-text pairs within 300s exist among REAL notes (150 with
+empty text — live-stream repeats), so identical text is not proof of one
+payment; the 77 partnerless bot clusters (~51k sats) stay, by Reed's call,
+and a second note never adds hours on #40HPW (DISTINCT booster+episode). The tiers are EVIDENCE SOURCES,
 not conventions the bots are trusted to follow: a bot whose note format we
 have never seen simply produces no evidence, and a pair with no evidence is
 LET THROUGH (Reed's call, 2026-08-24: a duplicate slipping through is far
@@ -226,6 +244,7 @@ def find_duplicates(conn, since=None):
 
     claimed = {r[0] for r in conn.execute(
         "SELECT dup_of FROM boosts WHERE dup_of IS NOT NULL")}
+    marked_by = {}            # relay event_id -> partner, for THIS run's pairs
 
     egb = db.effective_guid("b")
     pairs = []
@@ -241,11 +260,51 @@ def find_duplicates(conn, since=None):
              b["canonical_guid"] or b["podcast_guid"] or ""]
             + list(RELAY_PUBLISHERS) + [b["event_id"]]).fetchall()
         hit = _match(conn, b, cands, claimed)
+        if hit is None:
+            hit = _sibling_match(conn, b, marked_by)
         if hit is not None:
             o, tier, gap = hit
             claimed.add(o["event_id"])
+            marked_by[b["event_id"]] = o["event_id"]
             pairs.append((b, o, tier, gap))
     return pairs
+
+
+def _prose_key(msg):
+    """A note's text with every nostr:/URL token removed and whitespace
+    folded — what two per-leg sibling notes share to the character."""
+    return " ".join(_TOKEN.sub(" ", msg or "").split())
+
+
+def _sibling_match(conn, b, marked_by):
+    """The one-to-one exception (see the module docstring): a relay note whose
+    identical sibling by the same publisher is already marked — in a prior run
+    (dup_of) or earlier in this one (marked_by) — is a duplicate of that same
+    partner. Returns (partner_row, "sibling", gap_to_sibling) or None. Never
+    consults non-relay notes, so it cannot widen the partner side."""
+    egb = db.effective_guid("b")
+    sibs = conn.execute(
+        f"""SELECT event_id, message, created_at, dup_of FROM boosts b
+            WHERE b.client_id = ? AND b.sats = ? AND b.created_at BETWEEN ? AND ?
+              AND COALESCE(b.item_guid,'') = ? AND COALESCE({egb},'') = ?
+              AND b.excluded = 0 AND b.event_id != ?""",
+        [b["client_id"], b["sats"],
+         b["created_at"] - APP_WINDOW, b["created_at"] + APP_WINDOW,
+         b["item_guid"] or "", b["canonical_guid"] or b["podcast_guid"] or "",
+         b["event_id"]]).fetchall()
+    key = _prose_key(b["message"])
+    best = None
+    for s in sibs:
+        partner_id = s["dup_of"] or marked_by.get(s["event_id"])
+        if not partner_id or _prose_key(s["message"]) != key:
+            continue
+        gap = abs(s["created_at"] - b["created_at"])
+        if best is None or gap < best[1]:
+            best = (partner_id, gap)
+    if best is None:
+        return None
+    o = conn.execute("SELECT * FROM boosts WHERE event_id = ?", (best[0],)).fetchone()
+    return (o, "sibling", best[1]) if o is not None else None
 
 
 def apply(conn, pairs):
