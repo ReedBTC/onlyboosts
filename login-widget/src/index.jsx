@@ -24,6 +24,7 @@ import { bolt11PaymentHash, confirmInvoiceSettled, RECIPIENT_LUD16 } from './lib
 import { isCleanPaymentDecline } from './lib/utils.js'
 import { applyRecipientOverrides } from './lib/recipientOverrides.js'
 import { pushToast } from './lib/toast.js'
+import { uploadToBlossom } from './lib/blossom.js'
 // Side-effect import: installs a same-origin click interceptor that
 // briefly holds nav (≤2s) when a boost is in flight, so a user who
 // clicks Boost and immediately clicks a nav link doesn't reload the
@@ -889,6 +890,13 @@ const api = {
   openBugReport() {
     setBugReportState({})
   },
+
+  /** Upload a File to Blossom under the signed-in user's key (kind 24242
+   *  auth), resolving to its content-addressed URL. The same helper the
+   *  bug-report modal uses; exposed for the 40 HPW share modal, which
+   *  freezes the board's image at the moment of sharing. Rejects when there
+   *  is no signer. */
+  uploadToBlossom(file) { return uploadToBlossom(file) },
 
   /** Wallet status snapshot for consumers that want to render wallet
    *  state. Now includes a `kind` field ('nwc' | 'webln' | null). */

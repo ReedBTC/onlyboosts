@@ -1,43 +1,54 @@
-/* The 40 HPW share control: Post to Nostr, Copy link, Share image.
+/* The 40 HPW share control: one button, one modal, one kind-1 note.
  *
  * A VERB, attached after the board is painted, on the tab (members-board.js
  * mounts one per board) and on /hpw/<week> (hpw-page.js). The board's markup
- * is the two-sided hpw-board.js and carries no button; this appends a footer
- * row to it. Two surfaces, one control, one file.
+ * is the two-sided hpw-board.js and carries no button; this adds one to the
+ * board's corner. Two surfaces, one control, one file.
  *
- * What each action does with the two addresses a board has:
+ * ⚠️ THE IMAGE IS FROZEN AT THE MOMENT OF SHARING. Reed's call, 2026-08-30,
+ * over the first version, which put the proxy's URL (/api/og/hpw/<key>.png)
+ * in the note: that file is re-rendered every collector cycle the board
+ * moves, so "I'm in first so far!" posted with it stopped being backed by
+ * the picture an hour later. Now the modal fetches the card the reader is
+ * looking at and uploads THAT file to Blossom under the reader's own key;
+ * Blossom addresses a file by its SHA-256, so the URL in the note can never
+ * show anything but the file it was posted with. The proxy's URL keeps
+ * moving (it is the page's og:image, where live is right); the note's cannot.
  *
- *   Copy link      the page URL, https://onlyboosts.social/hpw/<key>, which
- *                  previews with the card wherever a link unfurls.
- *   Download image the card itself, /api/og/hpw/<key>.png — the collector's
- *                  Chromium screenshot, proxied by this origin — saved as a
- *                  file. ⚠️ IT IS A DOWNLOAD, NOT THE WEB SHARE SHEET. The
- *                  first version handed the file to navigator.share wherever
- *                  the browser allowed it, and desktop Chrome allows it, so
- *                  pressing "Share image" opened the operating system's share
- *                  dialog (Reed, 2026-08-29: "I have no idea what that opened
- *                  up"). A download is the same on every device and says what
- *                  it does; a reader shares the saved picture from wherever
- *                  they keep pictures.
- *                  ⚠️ THE PROXY ANSWERS THE SITE BANNER WHEN THE CARD IS NOT
- *                  RENDERED YET (X-OB-Image: fallback), and sharing the banner
- *                  as "the board" would be wrong, so that answer is refused
- *                  with a note rather than shared.
- *   Post to Nostr  a kind-1 through the signed-in account, prefilled with the
- *                  title, the page link and the image link, with `t`, `r`,
- *                  `imeta` (NIP-92) and `client` tags. The reader edits before
- *                  posting. Signed out, the widget is loaded and its login
- *                  opened; nothing is signed on anyone's behalf here.
+ * The note is exactly:
  *
- * ⚠️ THE IMAGE IS THE LATEST RENDER, NOT A SNAPSHOT AT THE MOMENT OF SHARING.
- * A note posted on Wednesday shows the board as it stands when it is read.
- * That is the V1 decision (2026-08-29); a frozen copy per share would need the
- * collector to keep versioned files, which it does not yet.
+ *     <what they typed>
+ *
+ *     <blossom url>
+ *
+ *     <link>
+ *
+ * where the link is /#members for the live week (the live race) and the
+ * week's own page for a past week or High Scores (Reed's call: a link to
+ * the live board under last week's picture lands on a different board).
+ * The image and the link are not in the textarea; they are shown as what
+ * will be added, and added at publish. The suggestion is a placeholder,
+ * never content.
+ *
+ * ⚠️ THE MODAL OPENS FOR EVERYONE. Signed out, Publish is a Log in button
+ * and Download image still works, so a reader with no Nostr account can
+ * take the picture to a text message or anywhere else. The upload needs a
+ * signer (a kind-24242 auth event), so it starts once a session exists;
+ * the site's bot key never signs one, for the reason it signs nothing
+ * beyond the templated boost note. Publish is blocked until the image is
+ * ready — a note without the picture is not what this control is for — and
+ * a failed upload offers Retry.
+ *
+ * The card is the collector's last render, so it is up to one cycle (five
+ * minutes) behind the board on screen. The proxy answers the site banner
+ * while a week's card is not rendered yet (X-OB-Image: fallback); that is
+ * refused with a note rather than uploaded as "the board".
  */
-import { copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v155'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v156'
+import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v156'
 
 const SITE = 'https://onlyboosts.social'
-const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v155'
+const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v156'
 /* The box-with-arrow share glyph (the iOS / most-websites one), inline so it
  * scales with the button and takes currentColor in either theme. Reed's call,
  * 2026-08-29: the icon rather than the word. */
@@ -45,91 +56,257 @@ const SHARE_ICON =
   '<svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
   '<path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v13"/></svg>'
 
-/* `page` and `image` are the site's ABSOLUTE addresses, the ones a note or a
- * clipboard carries — a shared link must never point at a preview deployment.
- * `imageHere` is the same image on the origin this page is on, and is what
- * the control FETCHES: fetching the absolute one from a branch preview is a
- * cross-origin request to a route that has not merged yet, which is how
- * "Share image" failed on 2026-08-29. */
-export function shareUrls(key) {
-  return {
-    page: `${SITE}/hpw/${key}`,
-    image: `${SITE}/api/og/hpw/${key}.png`,
-    imageHere: `/api/og/hpw/${key}.png`,
-  }
+// ── the pure parts, exported for scripts/test-hpw-cards.mjs ─────────────────
+
+export function shareLink(key, isLive) {
+  return isLive ? `${SITE}/#members` : `${SITE}/hpw/${key}`
 }
 
-/* `key` is `YYYY-MM-DD` or `high-scores`; `title` is the board's own name
- * ("Week of Aug 24, 2026", "High Scores"). Idempotent per board element. */
-export function mountShare(boardEl, { key, title }) {
+/* The image is fetched from THIS origin: the absolute URL from a branch
+ * preview is a cross-origin request to a route that has not merged. */
+export function imageHere(key) {
+  return `/api/og/hpw/${key}.png`
+}
+
+export function noteContent(message, imageUrl, link) {
+  const text = String(message || '').trim()
+  return [text, imageUrl, link].filter(Boolean).join('\n\n')
+}
+
+export function buildShareTags({ link, imageUrl, sha256, title }) {
+  const imeta = [`url ${imageUrl}`, 'm image/png']
+  if (sha256) imeta.push(`x ${sha256}`)
+  imeta.push(`alt Nostr Gang #40HPW leaderboard, ${title}`)
+  return [
+    ['t', '40hpw'],
+    ['r', link],
+    // NIP-92: what the image URL in the content is, so a client can lay it
+    // out before fetching it.
+    ['imeta', ...imeta],
+    ['client', 'onlyboosts.social'],
+  ]
+}
+
+// ── the button ──────────────────────────────────────────────────────────────
+
+/* `key` is `YYYY-MM-DD` or `high-scores`; `title` the board's own name
+ * ("Week of Aug 24, 2026", "High Scores"); `isLive` whether this is the
+ * week in progress. Idempotent per board element. */
+export function mountShare(boardEl, { key, title, isLive = false }) {
   if (!boardEl || boardEl.querySelector('.hpw-share')) return
-  const urls = shareUrls(key)
   const host = document.createElement('div')
   host.className = 'hpw-share'
   host.innerHTML =
-    `<span class="pcast-sort hpw-share-wrap">` +
-      `<button type="button" class="pcast-sort-btn hpw-share-btn" aria-haspopup="menu" aria-expanded="false" aria-label="Share" title="Share">` +
-        SHARE_ICON + `</button>` +
-      `<div class="pcast-sort-menu hpw-share-menu" role="menu" hidden>` +
-        `<button type="button" class="pcast-sort-item" role="menuitem" data-share="nostr">Post to Nostr</button>` +
-        `<button type="button" class="pcast-sort-item" role="menuitem" data-share="link">Copy link</button>` +
-        `<button type="button" class="pcast-sort-item" role="menuitem" data-share="image">Download image</button>` +
-      `</div>` +
-    `</span>`
+    `<button type="button" class="pcast-sort-btn hpw-share-btn" aria-label="Share on Nostr" title="Share on Nostr">${SHARE_ICON}</button>`
   boardEl.appendChild(host)
+  host.querySelector('button').addEventListener('click', () => openShareModal({ key, title, isLive }))
+}
 
-  const btn = host.querySelector('.hpw-share-btn')
-  const menu = host.querySelector('.hpw-share-menu')
-  const close = () => { menu.hidden = true; btn.setAttribute('aria-expanded', 'false') }
-  btn.addEventListener('click', () => {
-    const open = menu.hidden
-    menu.hidden = !open
-    btn.setAttribute('aria-expanded', String(open))
-  })
-  document.addEventListener('click', (e) => { if (!host.contains(e.target)) close() }, true)
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close() })
+// ── the modal ───────────────────────────────────────────────────────────────
 
-  menu.addEventListener('click', async (e) => {
-    const item = e.target.closest('[data-share]')
-    if (!item) return
-    close()
-    if (item.dataset.share === 'link') {
-      const ok = await copyText(urls.page)
-      showToast(ok ? 'Link copied' : 'Copy failed — clipboard blocked', !ok)
-    } else if (item.dataset.share === 'image') {
-      await downloadImage(urls, key)
-    } else if (item.dataset.share === 'nostr') {
-      await openComposer(boardEl, urls, title)
+let modal = null
+let session = null   // the open share, so a second press or a login lands on it
+
+function buildModal() {
+  const el = document.createElement('div')
+  el.className = 'hpw-modal hpw-share-modal'
+  el.hidden = true
+  el.innerHTML =
+    `<div class="hpw-modal-scrim" data-close></div>` +
+    `<div class="hpw-modal-box hpw-share-box" role="dialog" aria-modal="true" aria-labelledby="hpw-share-title">` +
+      `<div class="hpw-modal-head"><h3 id="hpw-share-title">Share on Nostr</h3>` +
+        `<button type="button" class="hpw-modal-x" data-close aria-label="Close">×</button></div>` +
+      `<div class="hpw-share-body">` +
+        `<div class="hpw-share-preview" data-preview><span class="hpw-share-preview-empty" aria-hidden="true"></span></div>` +
+        `<div class="hpw-share-main">` +
+          `<p class="hpw-share-status" data-status aria-live="polite"></p>` +
+          `<textarea class="hpw-share-text" data-text rows="4" placeholder=""></textarea>` +
+          `<p class="hpw-share-hint" data-hint></p>` +
+          `<div class="hpw-share-actions">` +
+            `<button type="button" class="hpw-share-dl" data-download disabled>Download image</button>` +
+            `<button type="button" class="hpw-share-publish" data-publish disabled>Publish note</button>` +
+            `<button type="button" class="hpw-share-publish" data-login hidden>Log in to publish</button>` +
+          `</div>` +
+        `</div>` +
+      `</div>` +
+    `</div>`
+  document.body.appendChild(el)
+  for (const c of el.querySelectorAll('[data-close]')) c.addEventListener('click', closeShareModal)
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !el.hidden) closeShareModal() })
+  el.querySelector('[data-download]').addEventListener('click', () => session && download(session))
+  el.querySelector('[data-publish]').addEventListener('click', () => session && publish(session))
+  el.querySelector('[data-login]').addEventListener('click', () => login())
+  /* A login completing while the modal is open (the widget dispatches this
+     on an identity change, and `storage` covers another tab) starts the
+     upload in place: the reader keeps what they typed. */
+  const onSession = () => { if (session && !modal.hidden) refresh(session) }
+  document.addEventListener('lb:session-change', onSession)
+  window.addEventListener('storage', (e) => { if (e.key === 'lb_nostr_session') onSession() })
+  return el
+}
+
+function q(sel) { return modal.querySelector(sel) }
+
+const PLACEHOLDERS = {
+  live: 'Say something about this week\'s board…',
+  past: 'Say something about this week\'s results…',
+  all: 'Say something about the high scores…',
+}
+
+export function openShareModal({ key, title, isLive }) {
+  if (!modal) modal = buildModal()
+  session = {
+    key, title, isLive,
+    link: shareLink(key, isLive),
+    blob: null,          // the card as fetched from this origin
+    sha256: null,
+    blossomUrl: null,    // set once the upload succeeds
+    uploading: false,
+    seq: (session?.seq || 0) + 1,
+  }
+  q('[data-text]').value = ''
+  q('[data-text]').placeholder = key === 'high-scores' ? PLACEHOLDERS.all : isLive ? PLACEHOLDERS.live : PLACEHOLDERS.past
+  q('[data-hint]').textContent = `The image and a link (${session.link.replace(/^https:\/\//, '')}) are added when you publish.`
+  q('[data-preview]').innerHTML = '<span class="hpw-share-preview-empty" aria-hidden="true"></span>'
+  q('[data-download]').disabled = true
+  modal.hidden = false
+  q('.hpw-modal-x').focus()
+  fetchImage(session)
+}
+
+export function closeShareModal() {
+  if (!modal) return
+  modal.hidden = true
+  session = null
+}
+
+function setStatus(text, kind = '') {
+  const el = q('[data-status]')
+  el.textContent = text
+  el.className = `hpw-share-status${kind ? ` is-${kind}` : ''}`
+}
+
+function setStatusRetry(text, onRetry) {
+  setStatus(text, 'error')
+  const b = document.createElement('button')
+  b.type = 'button'; b.className = 'hpw-share-retry'; b.textContent = 'Retry'
+  b.addEventListener('click', onRetry)
+  q('[data-status]').append(' ', b)
+}
+
+/* Step one: the card from this origin. Refused when the proxy answered the
+   banner, which is its "not rendered yet". */
+async function fetchImage(s) {
+  setStatus('Fetching the image…', 'busy')
+  try {
+    const resp = await fetch(imageHere(s.key), { headers: { Accept: 'image/png' } })
+    if (s !== session) return
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+    if (resp.headers.get('X-OB-Image') === 'fallback') {
+      setStatusRetry('This board\'s image is not ready yet; it is rendered a few minutes after the board changes.', () => fetchImage(s))
+      return
     }
-  })
+    const blob = await resp.blob()
+    if (s !== session) return
+    if (blob.type !== 'image/png') throw new Error('not a PNG')
+    s.blob = blob
+    s.sha256 = await sha256Hex(await blob.arrayBuffer())
+    const img = document.createElement('img')
+    img.alt = ''
+    img.src = URL.createObjectURL(blob)
+    q('[data-preview]').replaceChildren(img)
+    q('[data-download]').disabled = false
+    refresh(s)
+  } catch (err) {
+    if (s !== session) return
+    console.warn('[hpw-share] image fetch failed', err)
+    setStatusRetry(`The image could not be fetched (${err?.message || 'network error'}).`, () => fetchImage(s))
+  }
 }
 
-async function fetchCard(urls) {
-  const resp = await fetch(urls.imageHere, { headers: { Accept: 'image/png' } })
-  if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
-  /* The banner is the proxy's "not rendered yet"; the header is what says so.
-     A browser that strips it (an old cached answer) is caught by the type. */
-  if (resp.headers.get('X-OB-Image') === 'fallback') return null
-  const blob = await resp.blob()
-  if (blob.type !== 'image/png') return null
-  return blob
+/* Step two, whenever the session or the image changes: decide between the
+   Log in button, the upload, and Publish. */
+function refresh(s) {
+  if (s !== session || !s.blob) return
+  const signedIn = !!(getSessionPubkey() || window.LBLogin?.getUser?.())
+  q('[data-login]').hidden = signedIn
+  q('[data-publish]').hidden = !signedIn
+  if (!signedIn) {
+    q('[data-publish]').disabled = true
+    setStatus('Image ready. Log in to publish it on Nostr, or download it.', 'ok')
+    return
+  }
+  if (s.blossomUrl) {
+    q('[data-publish]').disabled = false
+    setStatus('Image ready.', 'ok')
+    return
+  }
+  if (!s.uploading) upload(s)
 }
 
-async function downloadImage(urls, key) {
-  let blob
-  try { blob = await fetchCard(urls) }
-  catch (err) { console.warn('[hpw-share] image fetch failed', err); showToast(`The image could not be fetched (${err?.message || 'network error'})`, true); return }
-  if (!blob) { showToast('This board\'s image is not ready yet — try again in a few minutes', true); return }
+async function upload(s) {
+  s.uploading = true
+  q('[data-publish]').disabled = true
+  setStatus('Uploading the image…', 'busy')
+  try {
+    await ensureWidget()
+    if (s !== session) return
+    if (typeof window.LBLogin?.uploadToBlossom !== 'function') throw new Error('the login widget is stale; reload the page')
+    const file = new File([s.blob], `onlyboosts-40hpw-${s.key}.png`, { type: 'image/png' })
+    const url = await window.LBLogin.uploadToBlossom(file)
+    if (s !== session) return
+    if (typeof url !== 'string' || !/^https:\/\//.test(url)) throw new Error('no URL came back')
+    s.blossomUrl = url
+    s.uploading = false
+    refresh(s)
+  } catch (err) {
+    s.uploading = false
+    if (s !== session) return
+    console.warn('[hpw-share] upload failed', err)
+    setStatusRetry(`The image could not be uploaded (${err?.message || 'unknown error'}).`, () => upload(s))
+  }
+}
+
+async function publish(s) {
+  if (!s.blossomUrl) return
+  if (!window.LBLogin?.getUser?.()) { login(); return }
+  const btn = q('[data-publish]')
+  btn.disabled = true
+  const was = btn.textContent
+  btn.textContent = 'Publishing…'
+  try {
+    const content = noteContent(q('[data-text]').value, s.blossomUrl, s.link)
+    const signed = await window.LBLogin.signAndPublish({
+      kind: 1, content,
+      tags: buildShareTags({ link: s.link, imageUrl: s.blossomUrl, sha256: s.sha256, title: s.title }),
+    })
+    if (!signed || signed.kind !== 1 || typeof signed.sig !== 'string') throw new Error('widget returned no signed event')
+    closeShareModal()
+    showToast('Posted to Nostr')
+  } catch (err) {
+    console.warn('[hpw-share] publish failed', err)
+    btn.disabled = false
+    btn.textContent = was
+    setStatus(`Publishing failed (${err?.message || 'unknown error'}); nothing was posted.`, 'error')
+  }
+}
+
+function download(s) {
+  if (!s.blob) return
   const a = document.createElement('a')
-  a.href = URL.createObjectURL(blob)
-  a.download = `onlyboosts-40hpw-${key}.png`
+  a.href = URL.createObjectURL(s.blob)
+  a.download = `onlyboosts-40hpw-${s.key}.png`
   document.body.appendChild(a)
   a.click()
   a.remove()
   setTimeout(() => URL.revokeObjectURL(a.href), 10_000)
 }
 
-// ── Post to Nostr ────────────────────────────────────────────────────
+async function login() {
+  try { await ensureWidget() }
+  catch (err) { console.warn('[hpw-share] widget failed', err); setStatus('The login widget could not be loaded.', 'error'); return }
+  window.LBLogin?.requestLogin?.()
+}
 
 /* The widget is 1MB and loads on the gesture that needs it, through the
  * nav's own loader so there is one in-flight promise. If that hook is
@@ -153,66 +330,8 @@ function ensureWidget() {
   })
 }
 
-async function openComposer(boardEl, urls, title) {
-  const existing = boardEl.querySelector('.reply-composer')
-  if (existing) { existing.remove(); return }
-  try { await ensureWidget() }
-  catch (err) { console.warn('[hpw-share] widget failed', err); showToast('The login widget could not be loaded', true); return }
-  if (!window.LBLogin?.getUser?.()) {
-    /* Signed out: open the login. The reader presses Share again afterwards;
-       a pending action that fires on login is a second path into a publish,
-       which is the shape the money paths forbid for the same reason. */
-    window.LBLogin?.requestLogin?.()
-    showToast('Log in to post, then press Share again')
-    return
-  }
-
-  const composer = document.createElement('div')
-  composer.className = 'reply-composer hpw-composer'
-  const ta = document.createElement('textarea')
-  ta.rows = 5
-  ta.value = `Nostr Gang #40HPW Challenge, ${title}\n\n${urls.page}\n${urls.image}`
-  composer.appendChild(ta)
-  const actions = document.createElement('div')
-  actions.className = 'rc-actions'
-  const cancel = document.createElement('button')
-  cancel.type = 'button'; cancel.className = 'rc-cancel'; cancel.textContent = 'Cancel'
-  cancel.addEventListener('click', () => composer.remove())
-  const send = document.createElement('button')
-  send.type = 'button'; send.className = 'rc-send'; send.textContent = 'Post to Nostr'
-  send.addEventListener('click', () => post(ta.value, urls, title, send, composer))
-  actions.append(cancel, send)
-  composer.appendChild(actions)
-  boardEl.appendChild(composer)
-  ta.focus()
-}
-
-export function buildShareTags(urls, title) {
-  return [
-    ['t', '40hpw'],
-    ['r', urls.page],
-    // NIP-92: what the image URL in the content is, so a client can lay it
-    // out before fetching it. The screenshot is 720x900 (portrait) at 2x.
-    ['imeta', `url ${urls.image}`, 'm image/png', `alt Nostr Gang #40HPW leaderboard, ${title}`],
-    ['client', 'onlyboosts.social'],
-  ]
-}
-
-async function post(content, urls, title, sendBtn, composer) {
-  const text = (content || '').trim()
-  if (!text) return
-  if (!window.LBLogin?.getUser?.()) { window.LBLogin?.requestLogin?.(); return }
-  sendBtn.disabled = true
-  sendBtn.textContent = 'Posting…'
-  try {
-    const signed = await window.LBLogin.signAndPublish({ kind: 1, content: text, tags: buildShareTags(urls, title) })
-    if (!signed || signed.kind !== 1 || typeof signed.sig !== 'string') throw new Error('widget returned no signed event')
-    composer.remove()
-    showToast('Posted to Nostr')
-  } catch (err) {
-    console.warn('[hpw-share] post failed', err)
-    sendBtn.disabled = false
-    sendBtn.textContent = 'Post to Nostr'
-    showToast('Posting failed — nothing was published', true)
-  }
+async function sha256Hex(buffer) {
+  if (!crypto?.subtle) return null
+  const d = await crypto.subtle.digest('SHA-256', buffer)
+  return Array.from(new Uint8Array(d)).map((b) => b.toString(16).padStart(2, '0')).join('')
 }

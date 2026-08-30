@@ -50,20 +50,20 @@
 
   <!-- Shared note / card styles (.note-card, .embed-note) — the boosts
        feeds render through the same kind-1 card as boosts-thread.js. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v155" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v156" />
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v155" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v156" />
   <!-- The episode card and its drawer, extracted from the inline block below
        when /episode/<guid> pages needed the same cards. See the file header. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v155" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v155" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v156" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v156" />
   <!-- The 40 HPW boards on the Members tab; shared with the /hpw/<week> pages. -->
-  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v155" />
+  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v156" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. Must stay last
        among the stylesheets so the inline block below still wins. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v155" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v156" />
 
   <style>
     :root {
@@ -764,27 +764,8 @@
     .hpw-rules:hover { color: var(--brand-ddd); text-decoration-color: currentColor; }
     .hpw-rules:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; border-radius: 4px; }
 
-    .hpw-modal { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 1rem; }
-    .hpw-modal[hidden] { display: none; }
-    .hpw-modal-scrim { position: absolute; inset: 0; background: var(--scrim); }
-    .hpw-modal-box {
-      position: relative; z-index: 1;
-      background: var(--modal-bg); color: var(--ink);
-      border: 1px solid var(--modal-line); border-radius: 14px;
-      box-shadow: 0 18px 50px rgba(11,58,82,0.28);
-      padding: 1.1rem 1.3rem 1.3rem;
-      width: min(34rem, 100%); max-height: min(80vh, 40rem); overflow-y: auto;
-    }
-    .hpw-modal-head { display: flex; align-items: flex-start; gap: 1rem; margin-bottom: 0.7rem; }
-    .hpw-modal-head h3 {
-      font-family: 'Playfair Display', Georgia, serif;
-      font-size: 1.15rem; font-weight: 700; margin: 0; flex: 1;
-    }
-    .hpw-modal-x {
-      font: inherit; font-size: 1.4rem; line-height: 1;
-      background: none; border: 0; color: var(--muted); cursor: pointer; padding: 0 0.2rem;
-    }
-    .hpw-modal-x:hover { color: var(--ink); }
+    /* .hpw-modal* (the Rules dialog and the share modal) live in
+       /assets/css/hpw-board.css, shared with the /hpw/<week> pages. */
     .hpw-rules-list { margin: 0; }
     .hpw-rules-list dt {
       font-weight: 700; font-size: 0.88rem; color: var(--ink); margin-top: 0.85rem;
@@ -1173,8 +1154,8 @@
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
     }
   </style>
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v155" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v155" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v156" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v156" />
 </head>
 <body data-active-feed="episodes-global">
 
@@ -2353,17 +2334,17 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v155"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v156"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v155" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v156" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v155" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v156" defer></script>
 
 <!-- Feed hydration — lazily loads the active feed on first view. -->
-<script type="module" src="/assets/js/feeds.js?v=ob-v155"></script>
-<script src="/assets/js/nav.js?v=ob-v155" defer></script>
+<script type="module" src="/assets/js/feeds.js?v=ob-v156"></script>
+<script src="/assets/js/nav.js?v=ob-v156" defer></script>
 
 </body>
 </html>

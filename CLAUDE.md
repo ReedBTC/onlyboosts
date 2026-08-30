@@ -1597,13 +1597,21 @@ section's content in a shell.
   `/api/og/hpw/<key>.png` proxies it on the booster OG route's shape
   (`_shared/og-image.js`): name allowlist, **PNG signature checked because
   the upstream answers 200 text for a missing file**, 900KB cap, banner
-  fallback. The share control (`hpw-share.js`: Post to Nostr / Copy link /
-  Download image) is a verb mounted onto each board by the tab and by
-  `hpw-page.js`; it refuses to share the banner (`X-OB-Image: fallback`),
-  never signs on anyone's behalf, and the image it links is **the latest
-  render, not a snapshot at the moment of sharing**. `.hpw-*` CSS moved to
-  `assets/css/hpw-board.css` (37 selectors, audited) so both surfaces dress
-  the same rows.
+  fallback. **The share control (`hpw-share.js`) is one icon button per
+  board opening one modal**, mounted by the tab and by `hpw-page.js`.
+  **⚠️ THE NOTE'S IMAGE IS FROZEN AT THE MOMENT OF SHARING** (Reed,
+  2026-08-30): the modal fetches the card from its own origin and uploads
+  that file to Blossom under the reader's key (`LBLogin.uploadToBlossom`,
+  the bug-report modal's helper, exposed for this), and the note carries
+  the content-addressed URL, never the proxy's, which is re-rendered every
+  cycle the board moves. The note is `<message>\n\n<blossom url>\n\n<link>`,
+  the link being `/#members` for the live week and the week's own page
+  otherwise; `t: 40hpw`, `r`, `imeta` (with `x`), `client`. The modal opens
+  signed out too (Publish becomes Log in; Download image still works);
+  Publish is **blocked until the upload succeeds** (Retry on failure), and
+  a banner answer (`X-OB-Image: fallback`) is refused. The site's bot key
+  signs none of it. The `.hpw-modal*` chrome moved to `hpw-board.css` with
+  the boards' rules so the page can open the same modal.
   **⚠️ ROW HEIGHT ON THE CARD IS A CARD-SIZE DECISION, AND THE BUDGET IS
   MEASURED, NOT DERIVED.** Ten rows share the LIST BOX (537.8px on the
   portrait card, ending 23.6px above the footer — not the room down to the

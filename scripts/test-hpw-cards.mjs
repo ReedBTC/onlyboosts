@@ -26,6 +26,8 @@ import { onRequestGet as pageGet, CARD_W, CARD_H } from '../functions/hpw/[[path
 import { onRequestGet as ogGet, onRequestHead as ogHead, isPng, UPSTREAM_BASE } from '../functions/api/og/hpw/[name].js'
 import { onRequestHead as boosterHead } from '../functions/api/og/booster/[npub].js'
 import { pacificWeekStart, weekDateString, prevWeek, nextWeek } from '../assets/js/pacific-week.js'
+import { writeFileSync, mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 let passed = 0, failed = 0
@@ -76,6 +78,46 @@ await check('⚠️ an empty board is .hpw-empty with NO .hpw-list (the collecto
 await check('dates are en-US in UTC', () => {
   assert.equal(board.weekLabel(1755504000), 'Aug 18, 2025')
   assert.equal(board.weekSpan(1755504000), 'Aug 18 to Aug 24, 2025')
+})
+
+// ── the share module's pure parts ───────────────────────────────────────────
+/* hpw-share.js is browser-only and imports two siblings ABSOLUTELY (it is not
+   two-sided), which node cannot resolve — so the shipped source is loaded with
+   those two imports rewritten to stubs, the test-feed-lang.mjs technique. The
+   module under test is still the shipped file. */
+console.log('\nhpw-share.js: the note, the link, the tags:')
+const shareSrc = readFileSync(join(ROOT, 'assets/js/hpw-share.js'), 'utf8')
+  .replace(/from '\/assets\/js\/copy-npub\.js\?v=[^']+'/, "from 'data:text/javascript,export const showToast = () => {}'")
+  .replace(/from '\/assets\/js\/follow-set\.js\?v=[^']+'/, "from 'data:text/javascript,export const getSessionPubkey = () => null'")
+const shareDir = mkdtempSync(join(tmpdir(), 'hpw-share-'))
+writeFileSync(join(shareDir, 'hpw-share.mjs'), shareSrc)
+const share = await import(join(shareDir, 'hpw-share.mjs'))
+await check('the live week links /#members; a past week and High Scores link their own page', () => {
+  assert.equal(share.shareLink('2026-08-24', true), 'https://onlyboosts.social/#members')
+  assert.equal(share.shareLink('2026-08-17', false), 'https://onlyboosts.social/hpw/2026-08-17')
+  assert.equal(share.shareLink('high-scores', false), 'https://onlyboosts.social/hpw/high-scores')
+})
+await check('the image is fetched from THIS origin, never the absolute site URL', () => {
+  assert.equal(share.imageHere('2026-08-24'), '/api/og/hpw/2026-08-24.png')
+})
+await check('⚠️ the note is message, blank line, image, blank line, link — and the image is a Blossom URL, never the proxy', () => {
+  const img = 'https://blossom.primal.net/abc.png'
+  assert.equal(share.noteContent('  hi there ', img, 'https://onlyboosts.social/#members'), 'hi there\n\nhttps://blossom.primal.net/abc.png\n\nhttps://onlyboosts.social/#members')
+  assert.equal(share.noteContent('', img, 'L'), `${img}\n\nL`, 'an empty message is allowed')
+  assert.ok(!shareSrc.includes('imageUrl: s.blob') && !/noteContent\([^)]*imageHere/.test(shareSrc), 'the proxy URL never reaches the note')
+})
+await check('the tags: t, r, imeta with the sha, client; no e, no p', () => {
+  const tags = share.buildShareTags({ link: 'L', imageUrl: 'U', sha256: 'ab', title: 'Week of Aug 24, 2026' })
+  assert.deepEqual(tags.map((t) => t[0]), ['t', 'r', 'imeta', 'client'])
+  assert.deepEqual(tags[0], ['t', '40hpw']); assert.deepEqual(tags[1], ['r', 'L'])
+  assert.deepEqual(tags[2], ['imeta', 'url U', 'm image/png', 'x ab', 'alt Nostr Gang #40HPW leaderboard, Week of Aug 24, 2026'])
+  assert.deepEqual(tags[3], ['client', 'onlyboosts.social'])
+  assert.deepEqual(share.buildShareTags({ link: 'L', imageUrl: 'U', sha256: null, title: 't' })[2], ['imeta', 'url U', 'm image/png', 'alt Nostr Gang #40HPW leaderboard, t'])
+})
+await check('⚠️ nothing here signs with a site key: the upload and the publish go through the widget', () => {
+  assert.ok(!/sign-boost|siteSign|SITE_SIGN/.test(shareSrc))
+  assert.match(shareSrc, /window\.LBLogin\.uploadToBlossom\(/)
+  assert.match(shareSrc, /window\.LBLogin\.signAndPublish\(/)
 })
 
 // ── the pages, over the real schema ──────────────────────────────────────────
@@ -148,8 +190,10 @@ await check('a past week takes the endpoint cache life; the live week the shorte
   assert.equal((await get(`/hpw/${lastKey}`)).headers.get('cache-control'), 'public, max-age=300')
   assert.equal((await get(`/hpw/${liveKey}`)).headers.get('cache-control'), 'public, max-age=60')
 })
-await check('the page arrows: ‹ links to the previous week, › is off on the live week', async () => {
+await check('the page arrows: ‹ links to the previous week, › is off on the live week; only the live week is data-hpw-live', async () => {
   const html = await (await get(`/hpw/${liveKey}`)).text()
+  assert.match(html, /data-hpw-live="1"/)
+  assert.doesNotMatch(pageHtml, /data-hpw-live/)
   assert.match(html, new RegExp(`<a class="hpw-arrow" href="/hpw/${lastKey}"`))
   assert.match(html, /<span class="hpw-arrow" aria-disabled="true" aria-label="Next week">/)
   // and on the first week ‹ is off
@@ -176,7 +220,7 @@ await check('the card: a portrait frame, no nav, noindex, the ready signal, the 
   assert.match(cardHtml, /setAttribute\('data-card-ready', '1'\)/)
   const expect = board.rowHtml({ pk: 'a'.repeat(64), npub: null, name: 'Alice 🐱 <x>', pic: 'https://x.example/a.png', seconds: 41 * 3600, episodes: 1, week_start: null }, 0, 40)
   assert.ok(cardHtml.includes(expect))
-  assert.match(cardHtml, new RegExp(`onlyboosts\\.social</b>/hpw/${lastKey}`))
+  assert.match(cardHtml, /<footer class="card-foot">onlyboosts\.social\/#members<\/footer>/)
 })
 await check('the card names the week, never "This Week"', async () => {
   const html = await (await get(`/hpw/${liveKey}/card`)).text()

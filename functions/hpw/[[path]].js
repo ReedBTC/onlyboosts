@@ -224,7 +224,7 @@ export function renderPage(view) {
     weekHref: view.kind === "all" ? (date) => `/hpw/${date}` : null,
   });
   const body = `
-<div class="hpw-page" data-hpw-page="${htmlEscape(d.key)}" data-hpw-image="${htmlEscape(image)}" data-hpw-url="${htmlEscape(pageUrl)}">
+<div class="hpw-page" data-hpw-page="${htmlEscape(d.key)}"${d.isCurrent ? ' data-hpw-live="1"' : ""} data-hpw-image="${htmlEscape(image)}" data-hpw-url="${htmlEscape(pageUrl)}">
   <div class="hpw-boards hpw-boards--page">${board}</div>
   <!-- The share control mounts here: Post to Nostr, Copy link, Share image.
        A verb, so hpw-page.js attaches it; empty in the document. -->
@@ -242,7 +242,7 @@ export function renderPage(view) {
     body,
     canonical: pageUrl,
     og: { title: d.ogTitle, description: d.lead, image, url: pageUrl },
-    scripts: `<script src="/assets/js/hpw-page.js?v=ob-v155" type="module"></script>`,
+    scripts: `<script src="/assets/js/hpw-page.js?v=ob-v156" type="module"></script>`,
     extraCss: `
     /* The tab supplies the accent family off body[data-active-feed]; this page
        has no active feed and supplies the brand, as .show-main does. */
@@ -293,8 +293,8 @@ export function renderCard(view) {
   <title>${htmlEscape(d.ogTitle)} (card)</title>
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
-  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v155" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v155" />
+  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v156" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v156" />
   <style>
     /* ⚠️ THE VERTICAL BUDGET IS MEASURED, NOT DERIVED, AND THE LINE IS THE
        LIST BOX, NOT THE FOOTER. The landscape card overflowed its frame once
@@ -339,8 +339,7 @@ export function renderCard(view) {
     .card .hpw-name { font-size: 0.95rem; }
     .card .hpw-week, .card .hpw-week-jump { font-size: 0.62rem; }
     .card .hpw-hours { font-size: 1.05rem; }
-    .card-foot { margin-top: 10px; flex: none; display: flex; justify-content: space-between; gap: 1rem; font-size: 0.68rem; color: var(--muted); }
-    .card-foot b { color: var(--brand-dd); font-weight: 700; }
+    .card-foot { margin-top: 10px; flex: none; text-align: left; font-size: 0.72rem; font-weight: 700; color: var(--brand-dd); }
     /* A screenshot has no hover, focus or pointer. */
     .card a { text-decoration: none; color: inherit; pointer-events: none; }
   </style>
@@ -352,10 +351,8 @@ export function renderCard(view) {
     <div class="card-kicker">${htmlEscape(COPY.challenge)}<small>${htmlEscape(COPY.intro)}</small></div>
   </header>
   ${board}
-  <footer class="card-foot">
-    <span>Boost an episode on Nostr and the board counts its whole length.</span>
-    <span><b>onlyboosts.social</b>/hpw/${htmlEscape(d.key)}</span>
-  </footer>
+  <!-- One line, left-aligned, and nothing else. Reed's call, 2026-08-30. -->
+  <footer class="card-foot">onlyboosts.social/#members</footer>
 </div>
 <script>
 /* The bot waits for html[data-card-ready="1"], never for a fixed sleep. Set
@@ -438,16 +435,16 @@ ${og ? `
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v155" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v155" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v156" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v156" />
   <!-- feed-cards.css for the share pill and its menu; boost-actions.css for
        the composer behind Post to Nostr. Both are the same chrome the tab
        already has. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v155" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v155" />
-  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v155" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v155" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v155" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v156" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v156" />
+  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v156" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v156" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v156" />
   ${extraCss ? `<style>${extraCss}\n  </style>` : ""}
 </head>
 <body>
@@ -641,10 +638,10 @@ ${body}
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav.js?v=ob-v155" defer></script>
+<script src="/assets/js/nav.js?v=ob-v156" defer></script>
 ${scripts}
-<script src="/assets/js/nav-widget-boot.js?v=ob-v155"></script>
-<script src="/assets/js/sw-register.js?v=ob-v155" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v156"></script>
+<script src="/assets/js/sw-register.js?v=ob-v156" defer></script>
 </body>
 </html>`;
 }

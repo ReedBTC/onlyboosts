@@ -20,34 +20,34 @@
  * A repeated name is authentic to it rather than a bug to collapse — Piez holds
  * five of the top ten and that is the actual story of the board.
  */
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v155'
-import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v155'
-import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v155'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v156'
+import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v156'
+import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v156'
 /* ⚠️ THE SAME WALL /show AND /episode RENDER, not a copy of it. It moved out of
  * functions/_shared/detail-page.js into a two-sided module for exactly this;
  * that file re-exports every name, so both Functions were untouched. A reader
  * who screenshots the wall here and on a show page must not be able to tell
  * them apart. */
-import { renderSupporters, initShowMore, compact } from '/assets/js/supporter-wall.js?v=ob-v155'
+import { renderSupporters, initShowMore, compact } from '/assets/js/supporter-wall.js?v=ob-v156'
 /* ⚠️ EXACT BOOST COUNTS HERE, COMPACT SATS. On the wall a row is one of a
  * hundred and `1k` is plenty; here there are four rows and the count is the
  * disclosure itself — "1,021 boosts from dozens of listeners" is the claim the
  * section exists to make, and `1k` rounds the evidence away. */
-import { num } from '/assets/js/boost-list.js?v=ob-v155'
-import { rangeControl, sortControl } from '/assets/js/feed-controls.js?v=ob-v155'
-import { mountFeedSearch } from '/assets/js/feed-search.js?v=ob-v155'
-import { searchMembers, SEARCH_HITS } from '/assets/js/ob-live.js?v=ob-v155'
+import { num } from '/assets/js/boost-list.js?v=ob-v156'
+import { rangeControl, sortControl } from '/assets/js/feed-controls.js?v=ob-v156'
+import { mountFeedSearch } from '/assets/js/feed-search.js?v=ob-v156'
+import { searchMembers, SEARCH_HITS } from '/assets/js/ob-live.js?v=ob-v156'
 /* ⚠️ THE SAME WEEK RULE THE ENDPOINT CUTS ON, not a second copy of it. That
  * module is two-sided for exactly this: the picker steps and enumerates weeks
  * without a round trip per press, and a Pacific week containing a DST
  * transition is 167 or 169 hours, so a client that stepped by a flat 604800
  * would drift an hour past every March and every November while still
  * producing Mondays. */
-import { prevWeek, nextWeek, weekSeries, weekDateString, weekStartFromDate } from '/assets/js/pacific-week.js?v=ob-v155'
-import { weekTitle, weekLabel, boardHtml, initials, COPY } from '/assets/js/hpw-board.js?v=ob-v155'
+import { prevWeek, nextWeek, weekSeries, weekDateString, weekStartFromDate } from '/assets/js/pacific-week.js?v=ob-v156'
+import { weekTitle, weekLabel, boardHtml, initials, COPY } from '/assets/js/hpw-board.js?v=ob-v156'
 /* The share control: Post to Nostr, Copy link, Share image. A verb, mounted
  * onto each board after it is painted; the same module /hpw/<week> uses. */
-import { mountShare } from '/assets/js/hpw-share.js?v=ob-v155'
+import { mountShare } from '/assets/js/hpw-share.js?v=ob-v156'
 
 const esc = htmlEscape
 const HOURS_API = '/api/v1/members/hours'
@@ -230,7 +230,7 @@ async function showWeek(root, ws, { scroll = false } = {}) {
      the week the SERVER resolved, and the loading board has no rows to share. */
   const share = () => {
     const el = root.querySelector('[data-hpw-board="week"]')
-    if (el && shownWeek) mountShare(el, { key: weekDateString(shownWeek), title: `Week of ${weekLabel(shownWeek)}` })
+    if (el && shownWeek) mountShare(el, { key: weekDateString(shownWeek), title: `Week of ${weekLabel(shownWeek)}`, isLive: !liveWeek || shownWeek >= liveWeek })
   }
   paint(weeklyBoardHtml(ws, [], isCurrent, 'Loading the board…'))
   if (scroll) root.querySelector('[data-hpw-board="week"]')?.scrollIntoView({ block: 'nearest' })
@@ -574,9 +574,9 @@ export async function renderMembersBoards(root) {
        every repaint after it. */
     wirePicker(root)
     const weekEl = root.querySelector('[data-hpw-board="week"]')
-    if (weekEl && shownWeek) mountShare(weekEl, { key: weekDateString(shownWeek), title: `Week of ${weekLabel(shownWeek)}` })
+    if (weekEl && shownWeek) mountShare(weekEl, { key: weekDateString(shownWeek), title: `Week of ${weekLabel(shownWeek)}`, isLive: !liveWeek || shownWeek >= liveWeek })
     const allEl = root.querySelector('[data-hpw-board="all"]')
-    if (allEl) mountShare(allEl, { key: 'high-scores', title: COPY.highScoresTitle })
+    if (allEl) mountShare(allEl, { key: 'high-scores', title: COPY.highScoresTitle, isLive: false })
     root.dataset.hpwState = 'done'
     /* The wall goes below the boards, in its own container, and is fetched
        alongside them. It fails independently: a wall that cannot load leaves

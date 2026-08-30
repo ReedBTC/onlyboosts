@@ -748,13 +748,35 @@ has on the tab. The card is the same board in a fixed frame with a larger
 base size, no nav, no theme boot script, and no hover chrome; it is
 `noindex`, the page being the thing to index.
 
-**Two decisions the control makes that are easy to reverse by accident.** It
-refuses to share the banner: the proxy answers the site banner while a week's
-card has not been rendered yet, and the header `X-OB-Image: fallback` is how
-the control knows. And a signed-out "Post to Nostr" opens the login and
-stops; it does not queue the post to fire on login, for the reason the money
-paths give: a second path into a publish is a second way to publish twice.
+**The share modal (2026-08-30).** The first version was a dropdown of three
+actions (Post to Nostr, Copy link, Share image), and the note it composed
+linked the proxy's URL for the image. Reed's objection was exact: that URL is
+re-rendered every cycle the board moves, so "I'm in first so far" posted with
+it stopped being backed by its own picture an hour later; and a share that is
+not better than a phone screenshot is not worth a pipeline. The answer is a
+freeze. The share button now opens one modal; it fetches the card the reader
+is looking at and uploads that file to Blossom under the reader's own key
+(`LBLogin.uploadToBlossom`, the helper the bug-report modal already used),
+and the note carries the content-addressed URL. Blossom addresses a file by
+its SHA-256, so that URL can never show anything but the file it was posted
+with. The proxy's URL keeps moving, which is right for the page's `og:image`.
 
-**Known limitation.** The image a note links is the latest render of that
-week, so a note posted mid-week shows the board as it stands when it is read.
-A frozen copy per share would need the collector to keep versioned files.
+The note is exactly `<message>`, `<blossom url>`, `<link>`, each on its own
+paragraph. The message is what the reader typed (the suggestion is a
+placeholder, never content); the image and the link are shown as what will be
+added and added at publish. The link is `/#members` for the live week and the
+week's own page for a past week or High Scores, so a reader does not land on
+a different board than the picture.
+
+Three rules the modal follows. It opens for everyone: signed out, Publish is
+a Log in button and Download image works, so a reader with no Nostr account
+can take the picture to a text message. Publish is blocked until the upload
+succeeds, with Retry; a note without the picture is not what the control is
+for. And a banner answer from the proxy (`X-OB-Image: fallback`, a week not
+rendered yet) is refused rather than uploaded as "the board". Copy link and
+the old download-only path are gone; Download lives inside the modal.
+
+What the freeze does not change: the card is the collector's last render, so
+it is up to one cycle (five minutes) behind the board on screen, which is the
+site's cadence everywhere. The card's footer is one line,
+`onlyboosts.social/#members`, left-aligned; everything else came out.
