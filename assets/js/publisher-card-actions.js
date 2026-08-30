@@ -1,0 +1,101 @@
+/* The verbs on an artist card — the other half of publisher-card.js.
+ *
+ * The show card's seam, one tier up, and deliberately its own module rather
+ * than a switch inside show-card-actions.js: an artist card and a show card
+ * are different objects with different hooks. Three verbs, no money path:
+ *
+ *   artwork fallback     the error path needs a listener the string cannot carry
+ *   the last-boost line  the absolute date is the fact; "3d ago" is a reading
+ *   the drawer's rows    the album list fetches on first open
+ *
+ * No boost pill — see the header of publisher-card.js for why that is a
+ * decision and not a gap.
+ */
+import { wireArt2 } from '/assets/js/detail-page.js?v=ob-v161'
+import { getPublisherAlbums } from '/assets/js/ob-live.js?v=ob-v161'
+import { COPY, albumRowsHtml } from '/assets/js/publisher-card.js?v=ob-v161'
+import { num } from '/assets/js/show-card.js?v=ob-v161'
+
+/**
+ * Wire every artist card under `root` that isn't wired already. Idempotent by
+ * the same marker attribute wireShowCards uses, and safe on a root with no
+ * cards, so every caller calls it unconditionally.
+ */
+export function wirePublisherCards(root) {
+  const cards = Array.from(root?.querySelectorAll?.('[data-publisher-card]:not([data-wired])') || [])
+  if (!cards.length) return
+  for (const card of cards) {
+    card.setAttribute('data-wired', '')
+    try { wireCard(card) } catch (err) {
+      // One malformed card must not cost the rest their verbs.
+      console.warn('[publisher-card] wiring failed', err)
+    }
+  }
+}
+
+function wireCard(card) {
+  wireArtwork(card)
+  wireLatest(card)
+  wireDrawer(card)
+}
+
+function wireArtwork(card) {
+  const img = card.querySelector('.pcast-card-media img')
+  if (!img) return
+  const media = img.closest('.pcast-card-media')
+  wireArt2(img, () => {
+    img.remove()
+    media?.classList.add('pcast-card-media--none')
+    media?.appendChild(document.createTextNode(COPY.glyph))
+  })
+}
+
+// Identical mechanics and thresholds to show-card-actions.js#wireLatest, and
+// identical on purpose: the two cards sit in adjacent feeds and must read the
+// same. Past a month the absolute date the string rendered is the better answer.
+function wireLatest(card) {
+  const el = card.querySelector('.ob-show-latest[data-latest-ts]')
+  if (!el) return
+  const ts = num(el.getAttribute('data-latest-ts'))
+  if (!ts) return
+  const rel = relTime(ts)
+  if (rel) el.textContent = `last boost ${rel}`
+}
+
+function relTime(ts) {
+  const sec = Math.floor(Date.now() / 1000) - ts
+  if (sec < 60) return 'just now'
+  if (sec < 3600) return `${Math.floor(sec / 60)}m ago`
+  if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`
+  if (sec < 2592000) return `${Math.floor(sec / 86400)}d ago`
+  return ''
+}
+
+/* Fill on first open. Unlike the show drawer there is no window to read: the
+ * album list is the artist's own catalogue, which no range narrows — the card's
+ * figures move with the range, the catalogue does not. A failure resets the
+ * marker so collapsing and reopening retries. */
+function wireDrawer(card) {
+  const details = card.querySelector('details.pcast-card-details')
+  const body = details?.querySelector('[data-lazy-albums]')
+  if (!details || !body) return
+
+  let loaded = false
+  details.addEventListener('toggle', async () => {
+    if (!details.open || loaded) return
+    loaded = true
+
+    const guid = card.getAttribute('data-guid')
+    const status = body.querySelector('[data-drawer-status]')
+
+    try {
+      const { albums } = await getPublisherAlbums({ guid })
+      status?.remove()
+      body.insertAdjacentHTML('afterbegin', albumRowsHtml(albums, COPY))
+    } catch (err) {
+      console.warn('[publisher-card] album load failed', guid, err)
+      loaded = false
+      if (status) status.textContent = COPY.drawerFail
+    }
+  })
+}

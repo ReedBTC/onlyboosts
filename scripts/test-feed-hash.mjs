@@ -88,7 +88,7 @@ function boot(hash, { signedIn = false } = {}) {
      the sub-feeds became blocks aligned under their tab, and the controller has
      never read it off a button. Mirroring the real shape here is what keeps
      this a test of the shipped selector. */
-  const subEls = ['shows', 'episodes', 'albums', 'songs', 'members'].map((v) => mk({ 'data-value': v }))
+  const subEls = ['shows', 'episodes', 'albums', 'songs', 'artists', 'members'].map((v) => mk({ 'data-value': v }))
   const listeners = {}
   const events = []
   const doc = {
@@ -252,6 +252,7 @@ const keyOf = (raw) => KEY_OF[raw] || raw
 for (const [feed, lang, range, sort] of [
   ['shows', 'de', '1m', 'sats'], ['albums', 'en', '', ''], ['songs-follows', 'unknown', '1y', ''],
   ['episodes-global', 'nb', '', 'count'], ['members-global', '', '', ''], ['members-follows', '', '', ''],
+  ['artists', '', '1w', 'sats'],
 ]) {
   langByFeed[feed] = lang
   rangeByFeed[feed] = range
@@ -416,6 +417,7 @@ for (const [hash, tab, sub] of [
   ['#episodes-global', 'podcasts', 'episodes'],
   ['#albums', 'music', 'albums'],
   ['#songs-global', 'music', 'songs'],
+  ['#artists', 'music', 'artists'],
   ['#members', 'members', 'members'],
   ['#podcasts-global', 'podcasts', 'episodes'],   // retired hash, still resolves
   // ⚠️ THE FRONT DOOR LANDS ON SHOWS (Phase D). Both of these read DEFAULT_TYPE,
@@ -438,11 +440,11 @@ console.log('\nExactly one tab and one sub-feed are ever marked selected:')
 }
 
 console.log('\nThe tab attribute can never disagree with the feed:')
-for (const hash of ['#shows', '#episodes-follows', '#songs-follows', '#members-follows', '#albums']) {
+for (const hash of ['#shows', '#episodes-follows', '#songs-follows', '#members-follows', '#albums', '#artists']) {
   const b = boot(hash, { signedIn: true })
   const feed = b.body.getAttribute('data-active-feed')
   const type = feed.replace(/-(global|follows)$/, '')
-  const want = { shows: 'podcasts', episodes: 'podcasts', albums: 'music', songs: 'music', members: 'members' }[type]
+  const want = { shows: 'podcasts', episodes: 'podcasts', albums: 'music', songs: 'music', artists: 'music', members: 'members' }[type]
   eq(`${hash} → feed ${feed}, tab ${want}`, b.body.getAttribute('data-active-tab'), want)
 }
 
@@ -574,6 +576,7 @@ console.log('\n⚠️ The feed bar is MOVED into the Members tab, and moved back
   eq('#episodes-global leaves it in the sticky wrap', boot('#episodes-global').barParent(), 'wrap')
   eq('#shows too', boot('#shows').barParent(), 'wrap')
   eq('#albums too', boot('#albums').barParent(), 'wrap')
+  eq('#artists too', boot('#artists').barParent(), 'wrap')
   eq('a signed-in #members-follows also lands in the slot',
      boot('#members-follows', { signedIn: true }).barParent(), 'slot')
   {
