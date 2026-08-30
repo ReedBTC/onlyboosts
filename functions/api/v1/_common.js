@@ -211,11 +211,25 @@ export function boostRecord(r) {
 }
 
 /* ⚠️ A BOARD OF PEOPLE MUST NOT RANK A BOT, AND THESE FOUR ARE PUBLISHERS.
- * Each is a single key that signs boosts made by many different people:
- * chadf-boostbot alone carries 1,012 boosts from roughly 34 donors. The site's
- * standing rule is that the booster is the bot and never the donor — right for
- * attribution, and a category error on a leaderboard of listeners, where it
- * would sum thirty-four people's weeks into one row.
+ * Each is a single key that signs boosts made by many different people. The
+ * site's standing rule is that the booster is the bot and never the donor —
+ * right for attribution, and a category error on a leaderboard of listeners,
+ * where it would sum many people's weeks into one row.
+ *
+ * ⚠️ chadf-boostbot (f3bd42a9…08e65) IS DELIBERATELY NOT HERE. Reed's call,
+ * 2026-08-30. It led this list from the day the boards shipped, on the claim
+ * that it "carries 1,012 boosts from roughly 34 donors" — a number read off a
+ * DIFFERENT account's display name ("ChadF and 33 others", f7922a0a…4788,
+ * Chad's own key); the bot's notes carry no sender at all. How it actually
+ * works: it watches Chad's node and publishes a note for every boost SENT from
+ * it, naming the sending app as `📱 via <App>`. One person's boosts, so the
+ * key is a member. It STAYS in the collector's PUBLISHER_PUBKEYS (attribution:
+ * the note is bot-published) and in dedupe.py's RELAY_PUBLISHERS (it also
+ * republishes the boosts he sends through BoostMeBitch, OnlyBoosts and
+ * StableKraft, which publish their own notes), so this list and the collector's
+ * differ by ONE ENTRY BY DESIGN. He appears as two members — this key for the
+ * Castamatic/PodcastGuru/StableKraft listening, his own key for the rest — and
+ * nothing here merges them.
  *
  * ⚠️ IT IS A PUBKEY LIST AND NOT A `client_id` FILTER, deliberately. D1 does not
  * carry `client_src`, and `client_id = 'onlyboosts'` covers BOTH the bot-signed
@@ -224,7 +238,6 @@ export function boostRecord(r) {
  * three humans, not the show account. See "Who published a boost" in CLAUDE.md.
  * Verified against the live corpus: each of these is exactly one pubkey. */
 export const PUBLISHERS = [
-  "f3bd42a91af5f3f1c40ca45ad2269464ab79996b32da78e8ed2ab91111b08e65", // chadf-boostbot
   "d35ae076512c29b01a5b33aa764ed4db44a9d0bbd96009705f48101f6cfe76a2", // lnaddress-music
   "c330881e28768381dd8bdfd274341dca0c5882c29b8642ea4bc82f7563264592", // Local Bitcoiners show account
   "3a87a19c801d57111b0905569225d2b20b39d154fc93bef5a8f2860c409b84d9", // OnlyBoosts' own bot

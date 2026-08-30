@@ -172,12 +172,12 @@ export async function onRequestGet({ request, env }) {
 
          ⚠️ THE LISTING EXCLUDES PUBLISHER KEYS AND THE SEARCH DOES NOT, which is
          the one asymmetry in this file and it is deliberate. A key that signs
-         boosts for dozens of donors is not a top MEMBER — chadf_boostbot led
-         both the boosts and the shows orderings on the live index, on other
-         people's listening, which is the same category error the 40 HPW boards
-         exclude it for. But it is a real account somebody may want to look up,
-         so typing its name still finds it. Ranked lists are a claim; a search
-         result is not. */
+         boosts for dozens of donors is not a top MEMBER, which is the same
+         category error the 40 HPW boards exclude it for. But it is a real
+         account somebody may want to look up, so typing its name still finds
+         it. Ranked lists are a claim; a search result is not. (chadf_boostbot
+         was the motivating case and turned out to be one person's own sends;
+         it came off PUBLISHERS on 2026-08-30 — see the note there.) */
       SELECT booster_pubkey FROM boosts
        WHERE ?5 = 1 AND created_at >= ${SINCE_HOLE}
          AND booster_pubkey NOT IN (${PUB_HOLES})

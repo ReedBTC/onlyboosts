@@ -65,11 +65,17 @@ const FIXED = [
    * contains an npub, so searching both columns changes nothing and the
    * assertion passes with the split deleted. */
   { pk: '9'.repeat(64), npub: 'npub1iii', name: 'npub1ccc superfan', sats: 330, n: 1 },
-  /* ⚠️ A PUBLISHER KEY. chadf-boostbot's real pubkey, so the fixture exercises
-     the actual constant rather than a stand-in. It has the most sats of anyone
-     here, so it would top the listing if it were not excluded. */
+  /* ⚠️ A PUBLISHER KEY. BoostMeBitch's site account's real pubkey, so the
+     fixture exercises the actual constant rather than a stand-in. It has the
+     most sats of anyone here, so it would top the listing if it were not
+     excluded. (It was chadf-boostbot's key until 2026-08-30 — see below.) */
+  { pk: '3820f4ff8587747530c7feafe47c1e592e3ce0fd2929b4f907e40714bd26f408',
+    npub: 'npub1bot', name: 'bmb_site', sats: 9000, n: 40, spread: 30 },
+  /* ⚠️ chadf-boostbot's REAL key, deliberately small, and it must RANK: Reed
+     established on 2026-08-30 that the bot publishes Chad's own sends, and it
+     came off PUBLISHERS. A regression that puts it back fails by name. */
   { pk: 'f3bd42a91af5f3f1c40ca45ad2269464ab79996b32da78e8ed2ab91111b08e65',
-    npub: 'npub1bot', name: 'chadf_boostbot', sats: 9000, n: 40, spread: 30 },
+    npub: 'npub1chad', name: 'chadf_boostbot', sats: 120, n: 1 },
   /* ⚠️ A SECOND PUBLISHER, and it earns its place: with one, `publishers=1`
      returning a single row proves nothing about whether the mode asks for the
      whole list or happens to have found the loudest key. lnaddress-music's real
@@ -363,16 +369,20 @@ console.log('\n⚠️ Three orderings, three different top members:')
 
 console.log('\n⚠️ Publisher keys: out of the LISTING, still in the SEARCH:')
 {
-  const BOT = 'f3bd42a91af5f3f1c40ca45ad2269464ab79996b32da78e8ed2ab91111b08e65'
+  const BOT = '3820f4ff8587747530c7feafe47c1e592e3ce0fd2929b4f907e40714bd26f408'
+  const CHAD = 'f3bd42a91af5f3f1c40ca45ad2269464ab79996b32da78e8ed2ab91111b08e65'
   for (const sort of ['sats', 'boosts', 'shows']) {
     const { body } = await call(`?sort=${sort}&limit=50`)
     check(`the bot does not rank on sort=${sort}`, () => {
       assert.ok(!body.members.some((m) => m.pk === BOT),
-        `chadf_boostbot ranked #${body.members.findIndex((m) => m.pk === BOT) + 1} by ${sort}`)
+        `bmb_site ranked #${body.members.findIndex((m) => m.pk === BOT) + 1} by ${sort}`)
+    })
+    check(`⚠️ chadf_boostbot DOES rank on sort=${sort} (2026-08-30)`, () => {
+      assert.ok(body.members.some((m) => m.pk === CHAD), 'chadf_boostbot is excluded again')
     })
   }
   {
-    const { body } = await call('?q=chadf')
+    const { body } = await call('?q=bmb_site')
     check('⚠️ but searching for it by name still finds it', () => {
       assert.ok(body.members.some((m) => m.pk === BOT),
         'a real account became unreachable, not just unranked')
@@ -386,14 +396,14 @@ console.log('\n⚠️ Publisher keys: out of the LISTING, still in the SEARCH:')
 
 console.log('\n⚠️ publishers=1 is the exact complement of the listing:')
 {
-  const BOT = 'f3bd42a91af5f3f1c40ca45ad2269464ab79996b32da78e8ed2ab91111b08e65'
+  const BOT = '3820f4ff8587747530c7feafe47c1e592e3ce0fd2929b4f907e40714bd26f408'
   const LNA = 'd35ae076512c29b01a5b33aa764ed4db44a9d0bbd96009705f48101f6cfe76a2'
   const { body } = await call('?publishers=1&sort=boosts&limit=50')
   check('the mode is echoed back', () => assert.equal(body.publishers, true))
   check('it is not also the listing', () => assert.equal(body.listing, false))
   check('it returns EVERY publisher present, not just the loudest', () => {
     const got = new Set(body.members.map((m) => m.pk))
-    assert.ok(got.has(BOT), 'chadf_boostbot missing')
+    assert.ok(got.has(BOT), 'bmb_site missing')
     assert.ok(got.has(LNA), 'lnaddress-music missing — the mode found one key, not the list')
   })
   check('and nobody else', () => {
@@ -481,9 +491,9 @@ console.log('\n⚠️ A booster\'s rank is over the WALL\'s population:')
   /* The three chips on /booster/<npub> are that person's place on the members
      wall by sats, boosts and shows. Ranking them over a population that
      included the publisher keys would be a rank on a list nobody can scroll:
-     every member below chadf-boostbot would read one place worse here than on
+     every member below a publisher would read one place worse here than on
      the wall itself. */
-  const BOT = 'f3bd42a91af5f3f1c40ca45ad2269464ab79996b32da78e8ed2ab91111b08e65'
+  const BOT = '3820f4ff8587747530c7feafe47c1e592e3ce0fd2929b4f907e40714bd26f408'
   const totals = (pk) => db.prepare(
     'SELECT COALESCE(SUM(sats),0) sats, COUNT(*) boosts, COUNT(DISTINCT podcast_guid) shows'
     + ' FROM boosts WHERE booster_pubkey = ?').get(pk)
@@ -514,13 +524,12 @@ console.log('\n⚠️ A booster\'s rank is over the WALL\'s population:')
        the next distinct value skips the group. */
     const rows = db.prepare(
       `SELECT booster_pubkey pk, COUNT(*) n FROM boosts
-        WHERE booster_pubkey NOT IN (${new Array(5).fill('?').join(',')})
+        WHERE booster_pubkey NOT IN (${new Array(4).fill('?').join(',')})
         GROUP BY booster_pubkey ORDER BY n DESC`).all(
       BOT,
       'd35ae076512c29b01a5b33aa764ed4db44a9d0bbd96009705f48101f6cfe76a2',
       'c330881e28768381dd8bdfd274341dca0c5882c29b8642ea4bc82f7563264592',
-      '3a87a19c801d57111b0905569225d2b20b39d154fc93bef5a8f2860c409b84d9',
-      '3820f4ff8587747530c7feafe47c1e592e3ce0fd2929b4f907e40714bd26f408')
+      '3a87a19c801d57111b0905569225d2b20b39d154fc93bef5a8f2860c409b84d9')
     const top = rows[0]
     const r = await rank(top.pk)
     check('the boosts leader is #1', () => assert.equal(r.boosts.rank, 1))

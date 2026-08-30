@@ -1468,10 +1468,14 @@ What a change elsewhere would break:
   episodes boosted, and it reads like a bug. Don't "fix" it by widening the count —
   the hours are summed over exactly the episodes counted.
 - **⚠️ PUBLISHER KEYS ARE EXCLUDED FROM THE LISTING AND THE BOARDS, NOT FROM THE
-  SEARCH.** `PUBLISHERS` in `functions/api/v1/_common.js` mirrors
-  `PUBLISHER_PUBKEYS` in the collector's `clients.py`; **the two have drifted by
-  one entry** (`boostmebitch`'s site account). `?publishers=1` is the exact
-  complement of the listing.
+  SEARCH.** `PUBLISHERS` in `functions/api/v1/_common.js` is the collector's
+  `PUBLISHER_PUBKEYS` **less `chadf-boostbot`, by design** (Reed's call,
+  2026-08-30): that bot publishes the boosts Chad sends from his own node, so
+  it is a publisher for attribution and a member for ranking. The old "34
+  donors" figure was read off a different account's display name. It stays in
+  `dedupe.py`'s `RELAY_PUBLISHERS`, where it matters more now. `?publishers=1`
+  is the exact complement of the listing. `RANK_PUBLISHERS` in
+  `functions/_shared/feed-rank.js` restates the list and moved with it.
 - **⚠️ `/about#membership` AND `/about#bots` ARE IN THE WILD** — treat them as
   frozen the way the detail pages' section ids are.
 - **The Share Cards** (2026-08-29/30; the design record is the section of that

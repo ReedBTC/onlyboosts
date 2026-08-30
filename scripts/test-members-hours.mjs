@@ -66,9 +66,14 @@ const ALICE = 'a'.repeat(64), BOB = 'b'.repeat(64), CARA = 'c'.repeat(64)
  * the merge is invisible. Verified by mutation: dropping `d.wk` from the GROUP
  * BY was caught by nothing until this member existed. */
 const DAVE = 'd'.repeat(64)
-const BOT = 'f3bd42a91af5f3f1c40ca45ad2269464ab79996b32da78e8ed2ab91111b08e65' // chadf-boostbot
+const BOT = '3820f4ff8587747530c7feafe47c1e592e3ce0fd2929b4f907e40714bd26f408' // BoostMeBitch's site account
+/* ⚠️ chadf-boostbot's REAL key, and it must RANK. It was the fixture's publisher
+ * until 2026-08-30, when Reed established the bot publishes Chad's own sends;
+ * a regression that puts it back on PUBLISHERS fails here by name. */
+const CHAD = 'f3bd42a91af5f3f1c40ca45ad2269464ab79996b32da78e8ed2ab91111b08e65'
 profile(ALICE, 'Alice'); profile(BOB, 'Bob'); profile(CARA, 'Cara'); profile(DAVE, 'Dave')
-profile(BOT, 'chadf_boostbot')
+profile(BOT, 'bmb_site'); profile(CHAD, 'chadf_boostbot')
+boost(CHAD, 'ep3', thisMonday + 2 * 86400 + 60, 'npub1chad')
 
 const mid = thisMonday + 2 * 86400          // Wednesday of this week
 // Alice: three distinct hours, plus FOUR repeat boosts on one of them.
@@ -129,7 +134,11 @@ check('a show-level boost names no episode and is skipped', () => {
   assert.equal(hours(w.Bob), 2)
 })
 check('⚠️ a publisher pubkey is not a member and does not rank', () => {
-  assert.ok(!('chadf_boostbot' in w), `bot ranked: ${JSON.stringify(Object.keys(w))}`)
+  assert.ok(!('bmb_site' in w), `bot ranked: ${JSON.stringify(Object.keys(w))}`)
+})
+check('⚠️ chadf_boostbot is one person\'s own sends and DOES rank (2026-08-30)', () => {
+  assert.ok('chadf_boostbot' in w, `absent: ${JSON.stringify(Object.keys(w))}`)
+  assert.equal(hours(w.chadf_boostbot), 1)
 })
 check('last week does not appear on this week\'s board', () => {
   assert.ok(!('Cara' in w), 'a boost from last Sunday counted as this week')
@@ -215,7 +224,8 @@ check('⚠️ weeks are split, not merged: Cara and Alice are separate rows', ()
   assert.ok(names.includes('Cara') && names.includes('Alice'))
 })
 check('the bot is excluded here too', () => {
-  assert.ok(!all.members.some((m) => m.name === 'chadf_boostbot'))
+  assert.ok(!all.members.some((m) => m.name === 'bmb_site'))
+  assert.ok(all.members.some((m) => m.name === 'chadf_boostbot'), 'chadf_boostbot missing from all-time')
 })
 
 console.log('\nWeek boundaries:')
