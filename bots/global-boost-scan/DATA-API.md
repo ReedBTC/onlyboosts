@@ -237,6 +237,75 @@ Same numbers as `index.json`'s `totals`, standalone, for a cheap header/summary 
 
 ---
 
+### `hpw/` — the #40HPW share cards (PNG, not JSON)
+
+The only binary the collector publishes. Real Chromium screenshots of the site's
+own `/hpw/**/card` pages, rendered on the collector box by `bots/hpw-cards/` at
+the end of an incremental cycle and shipped on the same rsync as the JSON.
+
+```
+hpw/index.json          the manifest — read this first, as everywhere else here
+hpw/high-scores.png     the all-time High Scores board
+hpw/<YYYY-MM-DD>.png    one week's board; the date is a Monday, US Pacific
+```
+
+```jsonc
+{
+  "generated": 1788025890,             // unix seconds, when the manifest was written
+  "high_scores": {
+    "sha256": "50f4cf57…",             // of the PNG bytes
+    "bytes": 284093,
+    "rendered_at": 1788025890,         // unix seconds
+    "source_hash": "cd29e474…"         // of the board DATA behind it — see below
+  },
+  "weeks": {
+    "2026-08-24": { /* the same four fields */ },
+    "2026-08-17": { … }                // newest first
+  }
+}
+```
+
+**⚠️ DISCOVER FILENAMES FROM `hpw/index.json`, NEVER BUILD THE PATH.** The same
+rule as everywhere else in this file, and it bites harder here: only the weeks
+that have been rendered exist, a week with no qualifying boosts may never get a
+card, and the upstream answers **200 with relay prose** for a miss rather than
+404. A hand-built `hpw/2026-01-05.png` therefore returns a 200 that is not an
+image.
+
+**⚠️ A CARD IS AT MOST 900KB, AND THAT IS A CONTRACT, NOT AN OBSERVATION.** The
+site's proxy refuses anything larger, so the renderer captures at
+`device_scale_factor: 2` and **re-captures the whole board at scale 1** if the
+first attempt exceeds it. A card is **720x900 CSS pixels** either way — portrait,
+4:5, so it arrives on a phone as a card rather than a letterbox strip — and only
+the pixel density changes, 1440x1800 at scale 2. Trust `bytes` in the manifest
+over a `HEAD`.
+
+**`source_hash` is of the DATA, not the picture, and that is the useful one.**
+Chromium's PNG output is not byte-stable, so `sha256` can move while the board
+is identical. `source_hash` is a hash of the `members` array from
+`/api/v1/members/hours` for that board — equal hashes mean the same board,
+whatever the bytes did. It is also what stops the renderer re-rendering, and
+therefore re-rsyncing, every five minutes.
+
+**A stale card is the designed failure.** Every write is a temp file plus a
+rename and a render that fails keeps the previous PNG, so a card can lag the
+board it names by a cycle or more; `rendered_at` and `source_hash` are how you
+tell. At a URL that is already shared, a stale board beats a broken image.
+
+**Weeks move after the fact.** Each cycle re-checks the live week, high-scores
+and the **12 most recent weeks**, because the collector fills in episode
+durations later and those hours land in *past* weeks. Older cards are rendered
+once and left alone.
+
+**⚠️ THE `/api/data/` PROXY CANNOT SERVE THESE.** That Function checks the
+content-type and then **parses the body as JSON** before returning it — a
+deliberate guard against the upstream's 200-for-a-miss behaviour, and one a PNG
+fails by construction. The cards need a route of their own that keeps the
+content-type check, drops the JSON parse, and enforces the 900KB ceiling.
+
+
+---
+
 ## Building the views
 
 | View | How |

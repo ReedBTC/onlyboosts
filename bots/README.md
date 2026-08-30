@@ -20,6 +20,12 @@ as the Local Bitcoiners bot suite (`~/localbitcoiners/bots/`):
 - **`bug-watcher/`** — polls the bug relay for `onlyboosts-alpha` reports and
   opens GitHub issues. Node, not Python. Needs `onlyboosts-alpha` whitelisted
   in relay.mynostr.app's strfry write-policy before reports get through.
+- **`hpw-cards/`** — renders the Nostr Gang #40HPW boards to share-card PNGs by
+  screenshotting the site's own card pages with Playwright's Chromium, and drops
+  them inside the collector's shards tree so they ship on the same rsync. The one
+  bot with a venv and the one that publishes something that isn't JSON; read-only
+  outward and it signs nothing. `README.md` in that directory covers the install,
+  which has a root step Chromium will not start without.
 - **`shared/`** — `nostr_utils` (relay list, npub helpers, outbox lookup) and
   `collector_common` (bounded relay queries, VPS push).
 

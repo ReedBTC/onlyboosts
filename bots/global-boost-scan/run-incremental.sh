@@ -27,4 +27,29 @@ echo "=== $(date -u +%FT%TZ) OnlyBoosts incremental cycle ==="
 "$PY" "$BOT" export --per-show    # rebuild the JSON shards
 "$PY" "$BOT" push                 # rsync changed shards to the VPS (no --delete: nothing is removed on a tail run)
 "$PY" d1_sync.py --remote-delta   # push new boosts to the D1 query layer (/api/v1); no-op if none / no CF creds
+
+# ── #40HPW share cards ───────────────────────────────────────────────────────
+# COMMENTED OUT UNTIL REED FLIPS IT. Uncomment all three lines to enable.
+#
+# ⚠️ IT RUNS AFTER THE D1 SYNC, WHICH IS WHY IT NEEDS A SECOND PUSH. The card is
+# a screenshot of the LIVE SITE, and the live site reads D1 — so a render before
+# `--remote-delta` photographs the previous cycle's board. But `push` is above
+# the sync, so by the time the PNGs exist the rsync has already run. The second
+# push is the cheap half of that trade: rsync -a transfers only what changed, so
+# on a cycle that rendered nothing it is one SSH handshake and a file list.
+#
+# The alternative is moving `push` below the sync and keeping one — fewer moving
+# parts, at the cost of delaying every shard by however long the D1 delta takes.
+# Not done here: reordering an established pipeline to add a picture is the
+# wrong way round, and this step is meant to be removable without a trace.
+#
+# Bounded at 90s inside the wrapper — a hung Chromium is a skipped render, never
+# a failed cycle — and `|| true` is the second belt, since `set -e` would
+# otherwise turn a missing card into a GitHub issue.
+#
+# The card page merged in 4ec28ae (2026-08-30) and the 99-week history is
+# already on the VPS, so enabling this only keeps it current. See
+# ../hpw-cards/README.md.
+../hpw-cards/run-hpwcards.sh --live || true   # #40HPW boards → shards/hpw/*.png
+"$PY" "$BOT" push                             # ship those PNGs on this cycle
 echo "=== $(date -u +%FT%TZ) cycle done ==="

@@ -63,6 +63,13 @@ bots/**/__pycache__/
 bots/**/*.pyc
 bots/.claude/
 
+# --- hpw-cards: the Playwright venv and its Chromium (~400MB), and the dry-run
+# render target. The venv is per-box and rebuildable from the README in four
+# lines; `preview/` is what a dry run writes instead of the shards tree, so it
+# is scratch by definition.
+bots/**/.venv/
+bots/hpw-cards/preview/
+
 # --- Node ---
 node_modules/
 
