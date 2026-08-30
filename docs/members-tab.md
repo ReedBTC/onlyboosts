@@ -529,8 +529,26 @@ ordered by** — a `metric` parameter on `supporterCard`, defaulting to `sats` s
 the detail pages are byte-identical.
 
 **⚠️ THE LISTING EXCLUDES PUBLISHER KEYS AND THE SEARCH DOES NOT.** `PUBLISHERS`
-in `functions/api/v1/_common.js` is the five keys that sign boosts for many
+in `functions/api/v1/_common.js` is the four keys that sign boosts for many
 donors.
+
+**⚠️ `chadf_boostbot` IS NOT ONE OF THEM, SINCE 2026-08-30, AND IT WAS THE
+MOTIVATING CASE.** *Reed's call.* It was excluded on the claim that it carried
+"1,012 boosts from roughly 34 donors"; that number was read off a different
+account's display name ("ChadF and 33 others", `f7922a0a…4788`, Chad's own key),
+and the bot's notes carry no sender at all. The bot watches Chad's node and
+publishes a note for every boost he **sends** from it, naming the app as
+`📱 via <App>`. One person's boosts, so the key is a member: it ranks on the
+boards and on the wall (where it takes the Boosts and Shows orderings), and it
+left the Boost Bots section and `/about#bots`. Two consequences to know. He is
+**two members**, this key for the Castamatic/PodcastGuru/StableKraft listening
+and his own key for what BoostMeBitch and OnlyBoosts publish under it, and
+nothing merges them. And the duplicate filter matters more, not less: the bot
+also republishes what he sends through apps that publish their own notes, and
+`RELAY_PUBLISHERS` in `dedupe.py` keeps it for exactly that. Six surviving
+pairs were found in D1 on 2026-08-30 and handed to the collector side, which
+confirmed seven and is closing them. `test-members-hours.mjs` and
+`test-members-search.mjs` both pin that the key ranks.
 
 **⚠️ BOOSTMEBITCH IS IN BOTH LISTS AND THAT IS NOT A CONTRADICTION.** The app
 publishes under the donor's **own** key when they are signed in — 13 distinct
@@ -544,11 +562,13 @@ apparent duplication by removing either one.
 **⚠️ THE COLLECTOR'S HALF IS SEPARATE AND WAS NOT TOUCHED HERE.**
 `PUBLISHER_PUBKEYS` in `bots/global-boost-scan/clients.py` lives on the other
 machine and governs `client_via` nesting on `/api/v1/clients`, not the wall.
-The two lists are mirrors and have now drifted by one entry. `chadf_boostbot` topped both the boosts and shows orderings on other
-people's listening before this landed. A ranked list is a claim about who the
+**The two lists differ by one entry by design**: `chadf_boostbot` is a
+publisher for attribution (the note is bot-published) and a member for
+ranking (the boosts are one person's). A ranked list is a claim about who the
 top members are; a search result is not, and it is a real account somebody may
-want to look up. **One list in one place**, because the boards had the exclusion
-from day one and the wall never did, which is how the gap opened.
+want to look up. **One list in one place** on the site side, because the boards
+had the exclusion from day one and the wall never did, which is how the gap
+opened.
 
 #### The member lookup
 
@@ -659,9 +679,10 @@ Four rules a change would break:
   It is started after the wall and never awaited.
 
 **How the four were determined: by hand, and nothing detects them.**
-`PUBLISHERS` in `functions/api/v1/_common.js` mirrors `PUBLISHER_PUBKEYS` in the
-collector's `clients.py`. Naming an account a bot is a claim, and the cost of
-getting it wrong is a real person left off a leaderboard.
+`PUBLISHERS` in `functions/api/v1/_common.js` is the collector's
+`PUBLISHER_PUBKEYS` less `chadf_boostbot`. Naming an account a bot is a claim,
+and the cost of getting it wrong is a real person left off a leaderboard; that
+is exactly what happened to `chadf_boostbot` for a week.
 
 #### The Members intro, and the (i)
 
