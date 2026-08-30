@@ -114,6 +114,10 @@ await check('the tags: t, r, imeta with the sha, client; no e, no p', () => {
   assert.deepEqual(tags[3], ['client', 'onlyboosts.social'])
   assert.deepEqual(share.buildShareTags({ link: 'L', imageUrl: 'U', sha256: null, title: 't' })[2], ['imeta', 'url U', 'm image/png', 'alt Nostr Gang #40HPW leaderboard, t'])
 })
+await check('⚠️ lb:session-change is listened for on window, where the widget dispatches it', () => {
+  assert.match(shareSrc, /window\.addEventListener\('lb:session-change'/)
+  assert.doesNotMatch(shareSrc, /document\.addEventListener\('lb:session-change'/)
+})
 await check('⚠️ nothing here signs with a site key: the upload and the publish go through the widget', () => {
   assert.ok(!/sign-boost|siteSign|SITE_SIGN/.test(shareSrc))
   assert.match(shareSrc, /window\.LBLogin\.uploadToBlossom\(/)

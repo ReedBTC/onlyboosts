@@ -50,20 +50,20 @@
 
   <!-- Shared note / card styles (.note-card, .embed-note) — the boosts
        feeds render through the same kind-1 card as boosts-thread.js. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v158" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v159" />
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v158" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v159" />
   <!-- The episode card and its drawer, extracted from the inline block below
        when /episode/<guid> pages needed the same cards. See the file header. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v158" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v158" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v159" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v159" />
   <!-- The 40 HPW boards on the Members tab; shared with the /hpw/<week> pages. -->
-  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v158" />
+  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v159" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. Must stay last
        among the stylesheets so the inline block below still wins. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v158" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v159" />
 
   <style>
     :root {
@@ -1154,8 +1154,8 @@
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
     }
   </style>
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v158" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v158" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v159" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v159" />
 </head>
 <body data-active-feed="episodes-global">
 
@@ -2334,17 +2334,17 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v158"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v159"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v158" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v159" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v158" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v159" defer></script>
 
 <!-- Feed hydration — lazily loads the active feed on first view. -->
-<script type="module" src="/assets/js/feeds.js?v=ob-v158"></script>
-<script src="/assets/js/nav.js?v=ob-v158" defer></script>
+<script type="module" src="/assets/js/feeds.js?v=ob-v159"></script>
+<script src="/assets/js/nav.js?v=ob-v159" defer></script>
 
 </body>
 </html>

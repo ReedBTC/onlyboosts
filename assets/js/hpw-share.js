@@ -44,11 +44,11 @@
  * while a week's card is not rendered yet (X-OB-Image: fallback); that is
  * refused with a note rather than uploaded as "the board".
  */
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v158'
-import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v158'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v159'
+import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v159'
 
 const SITE = 'https://onlyboosts.social'
-const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v158'
+const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v159'
 /* The box-with-arrow share glyph (the iOS / most-websites one), inline so it
  * scales with the button and takes currentColor in either theme. Reed's call,
  * 2026-08-29: the icon rather than the word. */
@@ -136,11 +136,14 @@ function buildModal() {
   el.querySelector('[data-download]').addEventListener('click', () => session && download(session))
   el.querySelector('[data-publish]').addEventListener('click', () => session && publish(session))
   el.querySelector('[data-login]').addEventListener('click', () => login())
-  /* A login completing while the modal is open (the widget dispatches this
-     on an identity change, and `storage` covers another tab) starts the
-     upload in place: the reader keeps what they typed. */
+  /* A login completing while the modal is open starts the upload in place:
+     the reader keeps what they typed. ⚠️ THE WIDGET DISPATCHES
+     `lb:session-change` ON `window`, and a listener on `document` never
+     hears it — the modal shipped that way once and sat on "Log in to
+     publish" after a successful login (Reed, 2026-08-30). `storage` covers a
+     login in another tab. */
   const onSession = () => { if (session && !modal.hidden) refresh(session) }
-  document.addEventListener('lb:session-change', onSession)
+  window.addEventListener('lb:session-change', onSession)
   window.addEventListener('storage', (e) => { if (e.key === 'lb_nostr_session') onSession() })
   return el
 }
@@ -307,6 +310,9 @@ function download(s) {
 async function login() {
   try { await ensureWidget() }
   catch (err) { console.warn('[hpw-share] widget failed', err); setStatus('The login widget could not be loaded.', 'error'); return }
+  /* Already signed in (a login the modal somehow missed): the press is the
+     refresh, never a dead button. */
+  if (window.LBLogin?.getUser?.()) { if (session) refresh(session); return }
   window.LBLogin?.requestLogin?.()
 }
 

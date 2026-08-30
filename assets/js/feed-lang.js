@@ -43,8 +43,8 @@
  * scrolls it (feed-cards.css). That is the real constraint; a floor would have
  * been a cap on the data to avoid solving it.
  */
-import { sortControl } from '/assets/js/feed-controls.js?v=ob-v158'
-import { getLanguages } from '/assets/js/ob-live.js?v=ob-v158'
+import { sortControl } from '/assets/js/feed-controls.js?v=ob-v159'
+import { getLanguages } from '/assets/js/ob-live.js?v=ob-v159'
 
 /** No filter. The opening state of every feed, and never sent to the API. */
 export const LANG_ALL = 'all'
