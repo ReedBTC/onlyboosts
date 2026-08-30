@@ -65,13 +65,13 @@ const RANK_KEYS = ["sats", "boosts", "boosters"];
 const BOOSTER_RANK_KEYS = ["sats", "boosts", "shows"];
 
 /* ⚠️ RESTATED FROM functions/api/v1/_common.js, WHICH THIS FILE MAY NOT IMPORT
- * WITHOUT DRAGGING THE WHOLE API SURFACE IN. The members wall drops these five
+ * WITHOUT DRAGGING THE WHOLE API SURFACE IN. The members wall drops these four
  * keys from its listing, so a booster rank computed over a population that
  * INCLUDED them would be a rank on a list the reader cannot scroll: every
- * member below chadf-boostbot would be one place worse here than on the wall.
- * **The two copies must stay in step.** */
+ * member below a publisher would be one place worse here than on the wall.
+ * **The two copies must stay in step.** (chadf-boostbot came off both on
+ * 2026-08-30; see the note on PUBLISHERS for why.) */
 const RANK_PUBLISHERS = [
-  "f3bd42a91af5f3f1c40ca45ad2269464ab79996b32da78e8ed2ab91111b08e65",
   "d35ae076512c29b01a5b33aa764ed4db44a9d0bbd96009705f48101f6cfe76a2",
   "c330881e28768381dd8bdfd274341dca0c5882c29b8642ea4bc82f7563264592",
   "3a87a19c801d57111b0905569225d2b20b39d154fc93bef5a8f2860c409b84d9",
@@ -90,7 +90,7 @@ const RANK_PUBLISHERS = [
  * ⚠️ A PUBLISHER'S OWN PAGE GETS NO CHIPS, AND IT FALLS OUT FOR FREE. The
  * subject is not in the CTE, so `at` is 0 and the shared guard below returns
  * null — the same guard that catches a medium mismatch. That is the honest
- * answer: those five keys are deliberately not on the wall, so they hold no
+ * answer: those four keys are deliberately not on the wall, so they hold no
  * place on it, and printing one would contradict the section that says so.
  *
  * COST: one scan of `boosts` (~23k rows) grouped to ~2k, against ~1.3k for a

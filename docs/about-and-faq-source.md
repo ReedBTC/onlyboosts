@@ -174,21 +174,32 @@ of this list" question.
 Most podcast apps publish nothing to Nostr at all. A handful of automated
 accounts fill that gap: they watch for boosts sent from apps with no Nostr
 support and publish a note for each one, so the boost is recorded rather than
-lost. **Five such keys are known to this index**, and the list is maintained by
-hand (`PUBLISHER_PUBKEYS` in the collector's `clients.py`, mirrored as
-`PUBLISHERS` in `functions/api/v1/_common.js`). Nothing detects them
+lost. **Four such keys are known to this index**, and the list is maintained by
+hand (`PUBLISHERS` in `functions/api/v1/_common.js`; the collector's
+`PUBLISHER_PUBKEYS` is the attribution list and carries one more key, see
+below). Nothing detects them
 automatically and nothing should: calling an account a bot is a claim, and the
 cost of getting it wrong is leaving a real person off a leaderboard.
 
 | Key | Boosts | Sats | What it does |
 |---|---|---|---|
-| ChadF Boost Bot | 1,021 | 628,608 | Republishes boosts sent from Castamatic (294), StableKraft (260), PodcastGuru (159), BoostMeBitch (56), CurioCaster (56), LN Beats (21), Podverse (3) and ten more apps that speak no NIP-73 |
 | BoostMeBitch (site account) | 35 | 114,753 | Publishes for a boostmebitch.com listener who connected no identity. ⚠️ **The app is ALSO in the members list above** — it signs under the donor's own key when they have one, under this account when they do not. Added 2026-08-23 on Reed's instruction |
 | lnaddress music | 31 | 0 | Boosts sent to music feeds through a Lightning address |
 | Local Bitcoiners (show account) | ~8 over 14 days | — | Publishes for a donor to that show who produced no note themselves |
 | OnlyBoosts (boost bot) | part of 23 | — | Signs a note for a boost sent from this site by someone with no Nostr identity |
 
 Figures measured 2026-08-23 off `/api/v1/clients`.
+
+**⚠️ ChadF Boost Bot is NOT one of these, since 2026-08-30, and it was listed
+first until then.** It is a node-watching bot, but the node is Chad's own and
+it publishes a note for every boost he SENDS from it, naming the sending app
+(Castamatic 294, StableKraft 260, PodcastGuru 159, and so on). Those are one
+person's boosts, so the key is a member and ranks like any other. The earlier
+claim that it "carried boosts from roughly 34 donors" was read off a different
+account's display name ("ChadF and 33 others", Chad's own key). It remains in
+the collector's `PUBLISHER_PUBKEYS` for attribution, where "the publisher is
+the client" still holds: the note is bot-published, and the app it names is
+`client_via`. Reed's call, after the collector-side duplicate investigation.
 
 **The booster credited is the key that signed, never the person named.** These
 notes often carry a sender name, in the message body or a `From` field. Nothing

@@ -20,34 +20,34 @@
  * A repeated name is authentic to it rather than a bug to collapse — Piez holds
  * five of the top ten and that is the actual story of the board.
  */
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v159'
-import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v159'
-import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v159'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v160'
+import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v160'
+import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v160'
 /* ⚠️ THE SAME WALL /show AND /episode RENDER, not a copy of it. It moved out of
  * functions/_shared/detail-page.js into a two-sided module for exactly this;
  * that file re-exports every name, so both Functions were untouched. A reader
  * who screenshots the wall here and on a show page must not be able to tell
  * them apart. */
-import { renderSupporters, initShowMore, compact } from '/assets/js/supporter-wall.js?v=ob-v159'
+import { renderSupporters, initShowMore, compact } from '/assets/js/supporter-wall.js?v=ob-v160'
 /* ⚠️ EXACT BOOST COUNTS HERE, COMPACT SATS. On the wall a row is one of a
  * hundred and `1k` is plenty; here there are four rows and the count is the
- * disclosure itself — "1,021 boosts from dozens of listeners" is the claim the
- * section exists to make, and `1k` rounds the evidence away. */
-import { num } from '/assets/js/boost-list.js?v=ob-v159'
-import { rangeControl, sortControl } from '/assets/js/feed-controls.js?v=ob-v159'
-import { mountFeedSearch } from '/assets/js/feed-search.js?v=ob-v159'
-import { searchMembers, SEARCH_HITS } from '/assets/js/ob-live.js?v=ob-v159'
+ * disclosure itself — "35 boosts for listeners with no identity" is the claim
+ * the section exists to make, and `1k` rounds the evidence away. */
+import { num } from '/assets/js/boost-list.js?v=ob-v160'
+import { rangeControl, sortControl } from '/assets/js/feed-controls.js?v=ob-v160'
+import { mountFeedSearch } from '/assets/js/feed-search.js?v=ob-v160'
+import { searchMembers, SEARCH_HITS } from '/assets/js/ob-live.js?v=ob-v160'
 /* ⚠️ THE SAME WEEK RULE THE ENDPOINT CUTS ON, not a second copy of it. That
  * module is two-sided for exactly this: the picker steps and enumerates weeks
  * without a round trip per press, and a Pacific week containing a DST
  * transition is 167 or 169 hours, so a client that stepped by a flat 604800
  * would drift an hour past every March and every November while still
  * producing Mondays. */
-import { prevWeek, nextWeek, weekSeries, weekDateString, weekStartFromDate } from '/assets/js/pacific-week.js?v=ob-v159'
-import { weekTitle, weekLabel, boardHtml, initials, COPY } from '/assets/js/hpw-board.js?v=ob-v159'
+import { prevWeek, nextWeek, weekSeries, weekDateString, weekStartFromDate } from '/assets/js/pacific-week.js?v=ob-v160'
+import { weekTitle, weekLabel, boardHtml, initials, COPY } from '/assets/js/hpw-board.js?v=ob-v160'
 /* The share control: Post to Nostr, Copy link, Share image. A verb, mounted
  * onto each board after it is painted; the same module /hpw/<week> uses. */
-import { mountShare } from '/assets/js/hpw-share.js?v=ob-v159'
+import { mountShare } from '/assets/js/hpw-share.js?v=ob-v160'
 
 const esc = htmlEscape
 const HOURS_API = '/api/v1/members/hours'
@@ -379,8 +379,8 @@ async function wall(sort, range, signal) {
 const BOTS_ID = 'boost-bots'
 
 /* ⚠️ THE BOTS SECTION IS THE WALL'S EXCLUSION, SHOWN. `/api/v1/members` drops
- * four publisher keys from every ranked listing because one of them stands in
- * for dozens of listeners; `?publishers=1` asks for exactly those four, so what
+ * four publisher keys from every ranked listing because each one stands in
+ * for many listeners; `?publishers=1` asks for exactly those four, so what
  * the wall removes is named directly under it rather than silently missing.
  * Reed's call, 2026-08-23: "either way we need to be transparent about anything
  * we are NOT including on this page".
@@ -400,8 +400,10 @@ const BOTS_ID = 'boost-bots'
  * figures and no description — which is a row missing a sentence, where the
  * alternative is a bot the section quietly fails to disclose. */
 const BOT_ROLES = {
-  f3bd42a91af5f3f1c40ca45ad2269464ab79996b32da78e8ed2ab91111b08e65:
-    'Republishes boosts sent from Castamatic, StableKraft, PodcastGuru, CurioCaster and a dozen more apps that publish nothing to Nostr.',
+  /* chadf_boostbot (f3bd42a9…) was the first entry until 2026-08-30. It is a
+     node-watching bot, but the node is Chad's own and it publishes the boosts
+     he SENDS, so it is one member's listening and now ranks like anyone's. The
+     server's PUBLISHERS carries the reasoning. */
   d35ae076512c29b01a5b33aa764ed4db44a9d0bbd96009705f48101f6cfe76a2:
     'Publishes boosts sent to music feeds through a Lightning address.',
   c330881e28768381dd8bdfd274341dca0c5882c29b8642ea4bc82f7563264592:
