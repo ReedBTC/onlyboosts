@@ -44,11 +44,11 @@
  * while a week's card is not rendered yet (X-OB-Image: fallback); that is
  * refused with a note rather than uploaded as "the board".
  */
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v156'
-import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v156'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v157'
+import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v157'
 
 const SITE = 'https://onlyboosts.social'
-const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v156'
+const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v157'
 /* The box-with-arrow share glyph (the iOS / most-websites one), inline so it
  * scales with the button and takes currentColor in either theme. Reed's call,
  * 2026-08-29: the icon rather than the word. */
@@ -211,9 +211,14 @@ async function fetchImage(s) {
     if (blob.type !== 'image/png') throw new Error('not a PNG')
     s.blob = blob
     s.sha256 = await sha256Hex(await blob.arrayBuffer())
+    /* ⚠️ A data: URL, NOT createObjectURL: every page's CSP allows
+       `img-src 'self' data: https:` and no `blob:`, so an object URL here was
+       a broken-image icon (Reed's screenshot, 2026-08-30). Widening a policy
+       every page shares for one preview is the wrong trade. */
     const img = document.createElement('img')
     img.alt = ''
-    img.src = URL.createObjectURL(blob)
+    img.src = await dataUrl(blob)
+    if (s !== session) return
     q('[data-preview]').replaceChildren(img)
     q('[data-download]').disabled = false
     refresh(s)
@@ -327,6 +332,15 @@ function ensureWidget() {
       if (window.LBLogin) { clearInterval(iv); resolve(); return }
       if (Date.now() - started > 15000) { clearInterval(iv); reject(new Error('login widget load timed out')) }
     }, 60)
+  })
+}
+
+function dataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader()
+    r.onload = () => resolve(r.result)
+    r.onerror = () => reject(r.error || new Error('read failed'))
+    r.readAsDataURL(blob)
   })
 }
 
