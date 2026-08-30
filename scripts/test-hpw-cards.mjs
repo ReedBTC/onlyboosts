@@ -22,7 +22,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import * as board from '../assets/js/hpw-board.js'
-import { onRequestGet as pageGet, CARD_W, CARD_H } from '../functions/hpw/[[path]].js'
+import { onRequestGet as pageGet, onRequestHead as pageHead, CARD_W, CARD_H } from '../functions/hpw/[[path]].js'
 import { onRequestGet as ogGet, onRequestHead as ogHead, isPng, UPSTREAM_BASE } from '../functions/api/og/hpw/[name].js'
 import { onRequestHead as boosterHead } from '../functions/api/og/booster/[npub].js'
 import { pacificWeekStart, weekDateString, prevWeek, nextWeek } from '../assets/js/pacific-week.js'
@@ -230,6 +230,11 @@ await check('the card names the week, never "This Week"', async () => {
   const html = await (await get(`/hpw/${liveKey}/card`)).text()
   assert.doesNotMatch(html, /This Week/)
   assert.match(html, /In progress\./)
+})
+await check('⚠️ HEAD on the page is routed: the GET\'s status and headers, no body', async () => {
+  const r = await pageHead({ request: new Request(`https://ob.invalid/hpw/${lastKey}`, { method: 'HEAD' }), env, params: { path: [lastKey] } })
+  assert.equal(r.status, 200); assert.equal(r.headers.get('cache-control'), 'public, max-age=300'); assert.equal(r.body, null)
+  assert.equal((await pageHead({ request: new Request('https://ob.invalid/hpw/nope', { method: 'HEAD' }), env, params: { path: ['nope'] } })).status, 404)
 })
 await check('a query failure is a 503 with no-store, not a blank 200', async () => {
   const err = console.error; console.error = () => {}   // the handler logs it, as it should
