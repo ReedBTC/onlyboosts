@@ -1613,17 +1613,19 @@ section's content in a shell.
   signs none of it. The `.hpw-modal*` chrome moved to `hpw-board.css` with
   the boards' rules so the page can open the same modal.
   **⚠️ ROW HEIGHT ON THE CARD IS A CARD-SIZE DECISION, AND THE BUDGET IS
-  MEASURED, NOT DERIVED.** Ten rows share the LIST BOX (537.8px on the
-  portrait card, ending 23.6px above the footer — not the room down to the
-  footer, and not a figure worked out from the base size, which read 7px a
-  row high once), and the list clips inside its shell — so anything that
-  grows a row (a chip, a second line, a bigger face) **silently drops the
-  tenth member from the card while the tab still shows them**. Measured by
-  the bot against the live preview, 2026-08-29: rows 49.2–50.2px, ceiling
-  53.8px (53 fits, 54 loses row ten), ~3.6px of growth in hand. The bot
-  measures `rowsClippedByList` on every render and refuses to publish a card
-  with a clipped row, which is the guard; have it re-measure after touching
-  the card's stylesheet or the row's markup rather than budgeting by hand.
+  MEASURED, NOT DERIVED.** Ten rows share the LIST BOX (560px on the
+  portrait card — not the room down to the footer, and not a figure worked
+  out from the base size, which read 7px a row high once), and the list
+  clips inside its shell — so anything that grows a row (a chip, a second
+  line, a bigger face) **silently drops the tenth member from the card while
+  the tab still shows them**. Measured by the bot against the live preview,
+  2026-08-30: rows 49.2–50.2px, ceiling 56.0px (56 fits, 57 loses row ten),
+  ~5.8px of growth in hand. **The ceiling is not a constant**: it is the
+  list box over ten, and any chrome change around the list moves it (the
+  one-line footer moved it 2.2px a row without a row being touched). The
+  bot measures `rowsClippedByList` on every render and refuses to publish a
+  card with a clipped row, which is the guard; have it re-measure after
+  touching the card page at all rather than budgeting by hand.
 - **The member wall** (`GET /api/v1/members`, top 100) is the same
   `renderSupporters` the detail pages use; the heading is a parameter
   ("Members" here, "Nostr Community" there) and is moved into the head slot,

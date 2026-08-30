@@ -306,14 +306,20 @@ export function renderCard(view) {
        position read ~7px a row high; the bot measured the portrait card
        against the live preview instead:
 
-         list box 269.5 → 807.3 (537.8px of room), footer top 830.9
+         list box 269.5 → 829.5 (560px of room), footer top 853
          rows 49.2–50.2px, ten rows, clipped 0
-         ceiling 53.8px a row: 53px fits, 54px loses row ten
+         ceiling 56.0px a row: 56px fits, 57px loses row ten
 
-       So a row has about 3.6px of growth in hand. Anything that grows one (a
+       So a row has about 5.8px of growth in hand. Anything that grows one (a
        chip, a second line, a bigger face) spends that and then loses the
-       tenth member from the card while the tab still shows them. Change a
-       number here and have the bot re-measure before believing it. */
+       tenth member from the card while the tab still shows them.
+
+       ⚠️ THE CEILING IS NOT A CONSTANT: it is (listBottom − listTop) / 10,
+       and ANY chrome change around the list moves it, not only a row
+       change — trimming the footer to one line moved it 2.2px a row without
+       a row being touched. Change a number anywhere in here and have the
+       bot re-measure (its clip_report returns the list box) before
+       believing a budget. */
     html { font-size: 21px; background: var(--white); }
     html, body { margin: 0; padding: 0; }
     body {
