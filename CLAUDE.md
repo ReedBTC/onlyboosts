@@ -627,7 +627,10 @@ What a change would break:
 ## Conventions carried over from LB — keep these
 
 - **CSP meta tag on every page.** All pages share one policy so tightening
-  happens in lockstep.
+  happens in lockstep. **`img-src` allows `data:` and `https:` and not
+  `blob:`**, so a preview of a fetched blob is a `data:` URL, never
+  `createObjectURL` (the share modal shipped a broken-image icon that way);
+  don't widen the shared policy for one preview.
 - **Shared nav/footer are generated.** Edit `partials/nav.html` /
   `partials/footer.html`, then run `node scripts/sync-partials.js`. Never edit
   the copies inside page files — they're between `NAV:START`/`NAV:END` markers
@@ -657,6 +660,11 @@ What a change would break:
 - **Pages Functions bound every upstream fetch**: wall-clock timeout, byte cap,
   *and* a streamed read (`resp.text()` buffers before you can check size). See
   `functions/api/data/[[path]].js` for the reference shape.
+- **⚠️ Every Function that exports `onRequestGet` also exports
+  `onRequestHead`** (the GET's status and headers, no body). Pages routes by
+  method, and a HEAD with no handler falls through to the static lookup and
+  answers 404 for a URL whose GET is fine; link checkers and some unfurlers
+  HEAD first. Bitten three times in two days on 2026-08-29/30.
 - **CORS origin allowlists are exact-match `Set` lookups**, never `startsWith` —
   a prefix check lets a lookalike origin get reflected into
   `Access-Control-Allow-Origin`.
