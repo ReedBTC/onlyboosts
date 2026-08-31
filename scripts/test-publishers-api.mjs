@@ -407,20 +407,38 @@ console.log('\nThe #boosts corpus (?corpus=1):')
   })
 }
 
-console.log('\n⚠️ The medium partition on a mixed-media artist:')
+console.log('\n⚠️ The artist tier counts MUSIC ONLY (Reed, 2026-08-31):')
 {
+  /* Mixed Media declares one music show (mm-m1: 1 boost, 20 sats) and one
+   * podcast (mm-p1: 1 boost, 30 sats). The tier must count and list only the
+   * music half, on every surface — the launch-day #shows section and the
+   * everything-they-declared figures were reversed with the tier. */
   const { body } = await detail(G.mixed)
-  check('every album row carries its medium', () => {
-    const byGuid = Object.fromEntries(body.albums.map((a) => [a.guid, a.medium]))
-    assert.deepEqual(byGuid, { 'mm-m1': 'music', 'mm-p1': 'podcast' })
+  check('⚠️ the detail lists only the declaring MUSIC shows', () => {
+    assert.deepEqual(body.albums.map((a) => a.guid), ['mm-m1'])
+    assert.equal(body.albums[0].medium, 'music')
+  })
+  const listing = await call('?sort=sats&limit=50')
+  check('⚠️ the listing’s figures exclude the podcast-side boosts', () => {
+    const mm = listing.body.publishers.find((p) => p.guid === G.mixed)
+    assert.ok(mm, 'Mixed Media still lists — it has a boosted music show')
+    assert.deepEqual([mm.boosts, mm.sats, mm.boosters], [1, 20, 1])
+  })
+  const { boosts: corpus } = await fetchPublisherCorpus(env, G.mixed)
+  check('⚠️ the #boosts corpus holds only the music boosts', () => {
+    assert.deepEqual(corpus.map((b) => b.podcast.guid), ['mm-m1'])
   })
   const src = readFileSync(join(ROOT, 'functions/artist/[guid].js'), 'utf8')
-  check('the page partitions on it — a Shows section exists beside Albums', () => {
-    assert.ok(src.includes('Shows with Nostr Boosts'))
-    assert.ok(src.includes('a.medium === "music"'))
+  check('⚠️ the page’s #shows section is gone and its queries filter to music', () => {
+    assert.ok(!src.includes('Shows with Nostr Boosts'),
+      'the launch-day #shows section is back — the tier is music-only')
+    assert.ok((src.match(/COALESCE\((?:pc?|p|pub_pc)\.?medium,'podcast'\) = 'music'/g) || []).length >= 5,
+      'every /artist query must carry the music filter')
   })
   const card = readFileSync(join(ROOT, 'assets/js/publisher-card.js'), 'utf8')
-  check('and the feed card’s drawer groups a mixed list', () => {
+  check('the feed card’s drawer keeps its defensive grouping', () => {
+    // Music-only server-side means the groups never render; the machinery
+    // stays so a data regression reads as labelled honesty, not a silent lie.
     assert.ok(card.includes("a.medium === 'music'"))
     assert.ok(card.includes('showsGroup'))
   })

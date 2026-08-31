@@ -20,13 +20,17 @@
 // through ~395 declaring shows over an indexed boost column — the same work the
 // windowed show path already does on every 1W press.
 //
-// ⚠️ NO MEDIUM PARAMETER, DELIBERATELY. The tier is ownership, not medium: 9 of
-// the 395 declaring shows are podcasts, and an artist's figures are the figures
-// of everything they declared. Filtering the join to music would silently
-// shrink those artists' numbers under a claim nobody made. The SURFACE lives
-// under the Music tab because the tag is a music-host feature today (zero
-// coverage on anchor/podhome/buzzsprout — measured), not because the query
-// narrows.
+// ⚠️ MUSIC ONLY, HARD-WIRED — no medium parameter because there is no choice
+// to offer. Reed's call, 2026-08-31, REVERSING the launch decision (which
+// counted everything a publisher declared, the tier being ownership): the
+// surface says ARTIST and sits under the Music tab, so an artist's figures
+// are their music's figures, full stop. The ~9 podcast-side declaring shows
+// still aggregate into Shows/Episodes like any show; they simply no longer
+// count toward the artist tier anywhere — this listing, the detail endpoint,
+// /artist, and the feed-rank chips all carry the same filter, or a chip would
+// claim a place on a list computed over a different corpus. The standing
+// partition reading applies: COALESCE(medium,'podcast'), so an unidentified
+// declaring feed is not music and does not count.
 import { json, preflight, clampLimit, toHexPubkey, readLang, langWhere } from "./_common.js";
 
 export async function onRequestOptions({ request }) { return preflight(request); }
@@ -192,7 +196,9 @@ export async function globalPublishers(env, p) {
   // resolves to a non-publisher feed for — a card with no name, no art and no
   // page is not a card. The collector's parse refuses to store a non-publisher
   // channel's metadata, which is the right refusal; this is its display half.
-  const where = ["pub.title IS NOT NULL"];
+  // Music only — see the header. Literal rather than bound, so the artist
+  // page's extracted-SQL tests keep their parameter shape.
+  const where = ["pub.title IS NOT NULL", "COALESCE(pc.medium,'podcast') = 'music'"];
   // The follows filter rides the same aggregate: this endpoint always GROUPs,
   // so the scope is one more WHERE clause rather than a second path.
   // `p.followsIn` is pre-validated hex, interpolated — see onRequestPost.

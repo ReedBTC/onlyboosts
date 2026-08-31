@@ -613,15 +613,19 @@ decision:
   mechanism: `/api/v1/publishers` gained the follows POST (one more WHERE on
   an endpoint that always aggregates), the numerals are withheld on Follows,
   and the drawer's follows path is
-  `POST /api/v1/podcasts?publisher=<guid>&since=<unix>` — the declaring shows
-  with the follow set's own figures, no medium filter (an artist's list
-  includes their podcasts), carried to the drawer through the same
+  `POST /api/v1/podcasts?publisher=<guid>&medium=music&since=<unix>` — the
+  declaring MUSIC shows with the follow set's own figures (music-only since
+  2026-08-31, matching the tier), carried to the drawer through the same
   `obFollows` container property the show cards use.
-- **The endpoint takes no medium.** The tier is ownership: 9 of the 395
-  declaring shows are podcasts, and an artist's figures are the figures of
-  everything they declared. The SURFACE sits under Music because the tag is a
-  music-host feature today (zero coverage on anchor/podhome/buzzsprout),
-  not because the query narrows.
+- **⚠️ Music only, hard-wired — no medium parameter because there is no
+  choice.** Reed's call, 2026-08-31, REVERSING launch (which counted
+  everything a publisher declared, the tier being ownership): the surface
+  says ARTIST and sits under Music, so an artist's figures are their music's
+  figures on every artist-tier surface — this listing, the follows POST, the
+  detail endpoint, `/artist` (its `#shows` section removed the same day) and
+  the feed-rank chips. The ~9 podcast-side declaring shows still aggregate
+  into Shows/Episodes as ordinary shows. The standing partition reading
+  applies, so an unidentified declaring feed is not music and does not count.
 - **Always a GROUP BY.** `publishers` carries no precomputed aggregates, so
   All aggregates like the windowed ranges do. 182 publishers over an indexed
   join; the windowed show path already does this work on every 1W press.

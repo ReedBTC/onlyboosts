@@ -252,11 +252,17 @@ Adding a third medium is a third entry in those tables, not a third renderer.
 the ARTIST.** `<podcast:publisher>` links an album feed to its artist's own
 publisher feed; the collector resolves it from raw RSS (PI carries no publisher
 field — `bots/global-boost-scan/publishers.py` is that design record) and the
-Artists feed (`#artists`, shipped 2026-08-30) ranks them. **The Artists ENDPOINT
-takes no medium** — the tier is ownership, and 9 of the 395 declaring shows are
-podcasts — while the SURFACE sits under the Music tab because the tag is a
-music-host feature (measured zero coverage outside the music hosts). **The
-Artists feed** in `docs/feeds.md` carries the seven decisions behind it.
+Artists feed (`#artists`, shipped 2026-08-30) ranks them. **⚠️ THE ARTIST TIER
+COUNTS MUSIC ONLY — hard-wired server-side since 2026-08-31.** *Reed's call,
+reversing the launch decision* (the endpoint took no medium on the argument
+that the tier is ownership, the ~9 podcast-side declaring shows counting too):
+the surface says ARTIST and sits under the Music tab, so an artist's figures
+are their music's figures on every surface — the listing, the detail endpoint,
+`/artist` (whose `#shows` section was removed the same day), and the
+feed-rank chips, all on the standing `COALESCE(medium,'podcast') = 'music'`
+partition reading. An artist's podcast-side shows still live on Shows/Episodes
+and their own `/show` pages; they are simply not part of the tier. **The
+Artists feed** in `docs/feeds.md` carries the rest of the decisions.
 
 **⚠️ The split is a partition, not a narrowing.** `music` goes to Songs and
 Albums; **everything else** goes to Episodes and Shows — podcasts, the two video
@@ -1409,7 +1415,7 @@ renderer on first view.
 | `shows-follows` | `shows-feed.js` | the same endpoint as `POST`, body `{follows:[…]}` |
 | `albums-global` | `shows-feed.js` | same, `medium=music` |
 | `albums-follows` | `shows-feed.js` | same, `medium=music`, as `POST` |
-| `artists-global` | `artists-feed.js` | `GET /api/v1/publishers` — the publisher tier, no medium |
+| `artists-global` | `artists-feed.js` | `GET /api/v1/publishers` — the publisher tier, music-only server-side |
 | `artists-follows` | `artists-feed.js` | the same endpoint as `POST` |
 
 **All four ranked feeds rank server-side.** They used to build a corpus in the
@@ -1642,9 +1648,9 @@ the publisher tier's landing page, structured as the album page one level up
 (Reed's spec): hero, Nostr Boost Stats tiles with the rank chip (`feedRanks`
 gained a `publisher` kind ranking on the Artists feed), **#albums** ("Albums
 with Nostr Boosts", the indexed declaring MUSIC shows by sats, the
-episode-drawer chrome) with **#shows** ("Shows with Nostr Boosts") beside
-it for the not-music declaring shows — the medium partition, because 9
-declaring shows are podcasts and a heading names only what is under it —
+episode-drawer chrome — **the page's one show list since 2026-08-31**, when
+the artist tier went music-only and the launch-day `#shows` section for the
+not-music declaring shows was REMOVED, a removal rather than a rename),
 **#community-artists** ("Other Artists This Community Boosts",
 the /show community rollup one tier up — NOT medium-split, because every row
 is a publisher and there is no partition to cross), the **#community** wall,

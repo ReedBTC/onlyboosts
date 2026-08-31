@@ -19,7 +19,7 @@
  * per-user and change as boosts arrive, so a page-lifetime cache would serve a
  * stale feed. The endpoints set their own short Cache-Control.
  */
-import { normalizeBoosts } from '/assets/js/ob-data.js?v=ob-v169'
+import { normalizeBoosts } from '/assets/js/ob-data.js?v=ob-v170'
 
 const BASE = '/api/v1/'
 
@@ -452,9 +452,9 @@ export async function getShowPage({
     sort, range, limit: String(limit), offset: String(offset),
   })
   if (medium === 'music') qs.set('medium', 'music')
-  /* One artist's declaring shows (the artist drawer's follows path) take NO
-   * medium filter: the publisher tier is ownership, and 9 declaring shows are
-   * podcasts — filtering them out would shrink the artist's own list. */
+  /* A publisher-scoped list never defaults to not_medium: the artist tier is
+   * music-only since 2026-08-31 and its callers pass medium:'music'
+   * explicitly; forcing the not-music half here would empty every drawer. */
   else if (!publisher) qs.set('not_medium', 'music')
   if (q) qs.set('q', q)
   if (lang && lang !== 'all') qs.set('lang', lang)
@@ -659,13 +659,14 @@ export async function searchPublishers({
   return records
 }
 
-/* The artist drawer's follows path: the artist's declaring shows, counted
- * over the follow set's boosts in the card's window. The show records carry
- * everything albumRowsHtml reads — guid/title/medium/boosts/sats — including
- * the medium the drawer partitions its groups on. */
+/* The artist drawer's follows path: the artist's declaring MUSIC shows,
+ * counted over the follow set's boosts in the card's window. medium:'music'
+ * matches the artist tier's own filter (2026-08-31, Reed's call — the tier
+ * counts music only), so the follows drawer and the global drawer describe
+ * the same corpus. The rows carry everything albumRowsHtml reads. */
 export async function getPublisherAlbumsFollows({ guid, follows, since = null, signal } = {}) {
   const { records } = await getShowPage({
-    follows, publisher: guid, since, sort: 'sats', range: 'all',
+    follows, publisher: guid, since, medium: 'music', sort: 'sats', range: 'all',
     limit: 200, offset: 0, signal,
   })
   return records

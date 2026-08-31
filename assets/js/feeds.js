@@ -39,7 +39,7 @@
  * when this module first runs).
  */
 // Identity, for keeping the Follows feeds in sync with who's signed in.
-import { getSessionPubkey, clearFollowCache } from '/assets/js/follow-set.js?v=ob-v169'
+import { getSessionPubkey, clearFollowCache } from '/assets/js/follow-set.js?v=ob-v170'
 
 // ── DOM state helpers ────────────────────────────────────────────────
 
@@ -104,10 +104,10 @@ async function hydrate(panelId, mod, scope, medium, view) {
 }
 
 // ── Lazy per-feed dispatch ───────────────────────────────────────────
-const BOOSTS = '/assets/js/boosts-feed.js?v=ob-v169'
-const PODCASTS = '/assets/js/feeds-podcasts.js?v=ob-v169'
-const SHOWS = '/assets/js/shows-feed.js?v=ob-v169'
-const ARTISTS = '/assets/js/artists-feed.js?v=ob-v169'
+const BOOSTS = '/assets/js/boosts-feed.js?v=ob-v170'
+const PODCASTS = '/assets/js/feeds-podcasts.js?v=ob-v170'
+const SHOWS = '/assets/js/shows-feed.js?v=ob-v170'
+const ARTISTS = '/assets/js/artists-feed.js?v=ob-v170'
 // Each module's entry point, by module. Named rather than sniffed out of the
 // path, so adding a feed is one line here instead of another branch.
 const RENDERERS = {
@@ -135,8 +135,8 @@ const LOADERS = {
   'albums-global':    (view) => hydrate('panel-albums', SHOWS, 'global', 'music', view),
   'albums-follows':   (view) => hydrate('panel-albums-follows', SHOWS, 'follows', 'music', view),
   /* The publisher tier above Albums — <podcast:publisher>, one card per
-   * artist. It takes no medium: the tier is ownership, not medium (see
-   * /api/v1/publishers). */
+   * artist. No medium argument because there is no choice: the tier is
+   * MUSIC-ONLY server-side since 2026-08-31 (see /api/v1/publishers). */
   'artists-global':   (view) => hydrate('panel-artists', ARTISTS, 'global', undefined, view),
   'artists-follows':  (view) => hydrate('panel-artists-follows', ARTISTS, 'follows', undefined, view),
 }
@@ -172,7 +172,7 @@ function loadMemberBoards() {
   const root = document.querySelector('[data-hpw-boards]')
   if (!root) return
   boardsWired = true
-  import('/assets/js/members-board.js?v=ob-v169')
+  import('/assets/js/members-board.js?v=ob-v170')
     .then((m) => m.renderMembersBoards(root))
     .catch((err) => {
       console.warn('[feeds] member boards failed to load', err)

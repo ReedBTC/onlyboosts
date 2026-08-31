@@ -45,32 +45,32 @@
  * Entry point: renderPodcasts({ panel, list }) — lazy-imported by feeds.js
  * the first time the feed is opened.
  */
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v169'
-import { toEpisodeShape, normalizeBoosts, episodeApiToBoosts } from '/assets/js/ob-data.js?v=ob-v169'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v170'
+import { toEpisodeShape, normalizeBoosts, episodeApiToBoosts } from '/assets/js/ob-data.js?v=ob-v170'
 import {
   getEpisodePage, searchEpisodes, SEARCH_HITS, SEARCH_MIN_CHARS,
-} from '/assets/js/ob-live.js?v=ob-v169'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v169'
+} from '/assets/js/ob-live.js?v=ob-v170'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v170'
 import {
   rangeDays, rangeControl, sortControl, mountFeedControls,
   RANGE_OPTIONS,
-} from '/assets/js/feed-controls.js?v=ob-v169'
+} from '/assets/js/feed-controls.js?v=ob-v170'
 // Its own module, not two more exports of feed-controls.js — see the ⚠️ note
 // at the top of that file for the four-hour window that shape opens.
-import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v169'
+import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v170'
 import {
   LANG_ALL, languageOptions, langControl, langNote, langNoMatchText, langLabelFor,
-} from '/assets/js/feed-lang.js?v=ob-v169'
-import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v169'
+} from '/assets/js/feed-lang.js?v=ob-v170'
+import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v170'
 // The card, and the card's verbs. One definition each, shared with the edge.
 import {
   COPY, HOME_CARD_PARTS, buildEpisodes, renderEpisodeCards, RANKED_SORTS, SORT_OPTIONS,
   episodeRankValue,
-} from '/assets/js/episode-card.js?v=ob-v169'
-import { competitionRanks, rankLabel, markSliceTies } from '/assets/js/rank.js?v=ob-v169'
+} from '/assets/js/episode-card.js?v=ob-v170'
+import { competitionRanks, rankLabel, markSliceTies } from '/assets/js/rank.js?v=ob-v170'
 import {
   wireEpisodeCards, hydrateCardProfiles, prewarmBoosting,
-} from '/assets/js/episode-card-actions.js?v=ob-v169'
+} from '/assets/js/episode-card-actions.js?v=ob-v170'
 
 const INITIAL_CARDS = 30       // episodes rendered per "load more" batch
 

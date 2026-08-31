@@ -64,6 +64,10 @@
 const RANK_KEYS = ["sats", "boosts", "boosters"];
 const BOOSTER_RANK_KEYS = ["sats", "boosts", "shows"];
 
+/* The publisher aggregates in this file carry the artist tier's MUSIC-ONLY
+ * filter (2026-08-31, Reed's call — see ../api/v1/publishers.js): a chip
+ * claims a place on the Artists list, and that list counts only the declaring
+ * music shows now, so the populations here must count the same corpus. */
 /* ⚠️ RESTATED FROM functions/api/v1/_common.js, WHICH THIS FILE MAY NOT IMPORT
  * WITHOUT DRAGGING THE WHOLE API SURFACE IN. The members wall drops these four
  * keys from its listing, so a booster rank computed over a population that
@@ -164,6 +168,7 @@ function publisherRankQuery(row) {
         JOIN podcasts pc   ON pc.podcast_guid    = b.podcast_guid
         JOIN publishers pub ON pub.publisher_guid = pc.publisher_guid
        WHERE pub.title IS NOT NULL
+         AND COALESCE(pc.medium,'podcast') = 'music'
        GROUP BY pc.publisher_guid
     )
     SELECT ${parts} FROM m`;
@@ -210,6 +215,7 @@ function chartQuery(kind, row) {
         JOIN podcasts pc    ON pc.podcast_guid    = b.podcast_guid
         JOIN publishers pub ON pub.publisher_guid = pc.publisher_guid
        WHERE pub.title IS NOT NULL
+         AND COALESCE(pc.medium,'podcast') = 'music'
        GROUP BY pc.publisher_guid`;
   } else {
     const isEpisode = kind === "episode";
