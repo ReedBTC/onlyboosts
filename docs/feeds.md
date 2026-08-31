@@ -505,7 +505,9 @@ decision:
   the inline navigation: the artist's **indexed** albums from
   `GET /api/v1/publishers/<guid>`, ranked by sats and windowed with the
   card's range (`?since`, the show drawer's contract), each row linking to
-  its `/show` page, with the foot linking the artist page.
+  its `/show` page, with the foot linking the artist page. A MIXED drawer —
+  an artist who also declares podcasts — renders the medium partition as two
+  labelled groups (Albums, then Shows); unmixed drawers carry no labels.
 - **⚠️ THE DRAWER IS INDEX-ONLY.** *Reed's call, 2026-08-30.* Nothing without
   at least one Nostr boost appears anywhere on this site — the podroll is the
   one standing exception, and it is not a ranked feed. The first cut listed

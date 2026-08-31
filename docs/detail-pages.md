@@ -744,6 +744,17 @@ Community Boosts**. Decisions, each deliberate:
 - **Index-only throughout**, the site rule: the albums section is
   `podcasts WHERE publisher_guid` by sats — never `publisher_albums`, the
   artist's own catalogue file, which stays collected and unrendered.
+- **⚠️ THE DECLARING SHOWS ARE PARTITIONED ON MEDIUM** (Reed caught V4V
+  Roundtable — a podcast — under the "Albums" heading on the preview,
+  2026-08-30): music renders under **#albums** ("Albums with Nostr Boosts"),
+  everything else — podcasts, video, unidentified — under **#shows** ("Shows
+  with Nostr Boosts"), each section only when non-empty, the hero sub-line
+  counting both halves. The feed card's drawer takes the same partition as
+  labelled groups inside one drawer (`albumRowsHtml`), unlabelled when
+  unmixed. The STAT TILES still aggregate both: the tier is ownership, and
+  the two sections together hold exactly the shows the figures cover. The
+  ENDPOINT stays unfiltered and now ships `medium` on every album row —
+  the split is the renderer's, the same seam as everywhere else.
 - **The wall and #boosts joined the same day** (Reed's follow-up to his own
   spec): the Nostr Community wall is `fetchSupporters` one tier up (boosters
   by sats to the artist's albums, `SUPPORTER_CAP`, total order), and #boosts
@@ -767,9 +778,10 @@ Community Boosts**. Decisions, each deliberate:
   in `functions/_shared/feed-rank.js`, the booster branch's shape with the
   listing endpoint's aggregate restated (title-less row excluded), top-100
   cutoff and all.
-- **Section ids `#albums`, `#community-artists`, `#community` and `#boosts`
-  are frozen**, like every other page's — the last two reused deliberately,
-  naming the same kind of section they name everywhere else. `#community-artists` follows the `#community-shows` /
+- **Section ids `#albums`, `#shows`, `#community-artists`, `#community` and
+  `#boosts` are frozen**, like every other page's — `#shows`, `#community`
+  and `#boosts` reused deliberately, naming the same kind of section they
+  name everywhere else. `#community-artists` follows the `#community-shows` /
   `#community-episodes` naming; `#albums` is this page's own.
 - **404s**: an unknown guid, the one title-less publisher row, and a publisher
   with no boosts all answer a real 404, `noindex`, pointing at `/#artists`.

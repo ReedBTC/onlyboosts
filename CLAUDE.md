@@ -1603,8 +1603,11 @@ where the widest figure is five.
 the publisher tier's landing page, structured as the album page one level up
 (Reed's spec): hero, Nostr Boost Stats tiles with the rank chip (`feedRanks`
 gained a `publisher` kind ranking on the Artists feed), **#albums** ("Albums
-with Nostr Boosts", the indexed declaring shows by sats, the episode-drawer
-chrome), **#community-artists** ("Other Artists This Community Boosts",
+with Nostr Boosts", the indexed declaring MUSIC shows by sats, the
+episode-drawer chrome) with **#shows** ("Shows with Nostr Boosts") beside
+it for the not-music declaring shows — the medium partition, because 9
+declaring shows are podcasts and a heading names only what is under it —
+**#community-artists** ("Other Artists This Community Boosts",
 the /show community rollup one tier up — NOT medium-split, because every row
 is a publisher and there is no partition to cross), the **#community** wall,
 and **#boosts** (opens on 24, whole corpus behind

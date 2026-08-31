@@ -35,17 +35,17 @@
  * guids — the majority). A pill that fails for most artists is worse than
  * none; boosting stays at the album and song level, one drawer-click away.
  */
-import { showPageHref, publisherPageHref } from './show-link.js?v=ob-v165'
-import { coverChain } from './cover-art.js?v=ob-v165'
-import { htmlEscape } from './nostr-text.js?v=ob-v165'
-import { num, fmtSats, plural, shortDate } from './show-card.js?v=ob-v165'
+import { showPageHref, publisherPageHref } from './show-link.js?v=ob-v166'
+import { coverChain } from './cover-art.js?v=ob-v166'
+import { htmlEscape } from './nostr-text.js?v=ob-v166'
+import { num, fmtSats, plural, shortDate } from './show-card.js?v=ob-v166'
 // Re-exported: artists-feed.js reads the formatting helpers through this
 // module the way shows-feed.js reads them through show-card.js. ⚠️ An import
 // is NOT a re-export — this line shipped missing once, and the unresolved
 // named import was a LINK-TIME error: renderArtists never executed and the
 // whole feed painted the load-failure placeholder (the ob-v53 class, caught
 // on the preview deploy).
-export { num, fmtSats, plural, shortDate } from './show-card.js?v=ob-v165'
+export { num, fmtSats, plural, shortDate } from './show-card.js?v=ob-v166'
 
 const esc = htmlEscape
 
@@ -61,6 +61,10 @@ export const COPY = {
   drawerLoading: 'Loading albums…',
   drawerFail: 'Couldn’t load this artist’s albums.',
   drawerFoot: 'See all boosts to this artist',
+  // The group labels inside a MIXED drawer — an artist who declares podcasts
+  // beside their albums. Unmixed drawers render neither.
+  albumsGroup: 'Albums',
+  showsGroup: 'Shows',
   rangeLabel: 'Filter by when the artist was boosted',
   rangeTitle: (days) => (days ? `Artists boosted in the last ${days} days` : 'All time'),
   sortTitle: 'Sort artists',
@@ -208,8 +212,24 @@ export function publisherCardHtml(p, { rank = null, copy = COPY } = {}) {
 export function albumRowsHtml(albums, copy = COPY) {
   if (!albums.length) return `<div class="ob-show-note">${esc(copy.noItems)}</div>`
 
+  /* ⚠️ THE MEDIUM PARTITION, in miniature. A declaring show can be a PODCAST
+   * (9 of 395 are — Reed caught V4V Roundtable under the "Albums" lid), and
+   * the standing rule is that a heading names only what is under it. Inside
+   * one drawer that means groups: albums first under the lid's own claim,
+   * then the not-music rows under their own label. Unmixed lists render with
+   * no labels at all, which is every artist but a handful. */
+  const music = albums.filter((a) => a.medium === 'music')
+  const other = albums.filter((a) => a.medium !== 'music')
+  if (music.length && other.length) {
+    return `<div class="ob-show-note">${esc(copy.albumsGroup)}</div>` + rowsHtml(music, copy) +
+      `<div class="ob-show-note">${esc(copy.showsGroup)}</div>` + rowsHtml(other, copy)
+  }
+  return rowsHtml(albums, copy)
+}
+
+function rowsHtml(albums, copy) {
   const rows = albums.map((a) => {
-    const title = a.title || copy.untitledItem
+    const title = a.title || (a.medium === 'music' ? copy.untitledItem : 'Unidentified show')
     const href = a.title && a.guid ? showPageHref(a.guid) : null
     const titleEl = href
       ? `<a class="ob-ep-title" href="${esc(href)}" title="Nostr boosts to ${esc(title)}">${esc(title)}</a>`

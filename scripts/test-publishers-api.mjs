@@ -40,6 +40,7 @@ const db = new DatabaseSync(':memory:')
 db.exec(readFileSync(join(ROOT, 'bots/global-boost-scan/d1/schema.sql'), 'utf8'))
 
 const G = {
+  mixed: '99999999-7777-4777-8777-000000000007',
   haleen: 'aaaaaaaa-1111-4111-8111-000000000001',
   zed: 'bbbbbbbb-2222-4222-8222-000000000002',
   bare: 'cccccccc-3333-4333-8333-000000000003',
@@ -63,6 +64,7 @@ addPub(G.bare, null, 1)
 addPub(G.pct, '100% Wave', 1)
 addPub(G.decoy, '100 Wave', 1)   // what an unescaped '100%' ALSO matches
 addPub(G.gone, 'Long Gone Artist', 1)
+addPub(G.mixed, 'Mixed Media', 2)
 
 /* ⚠️ THE AGGREGATE COLUMNS ARE REAL, matching the boosts inserted below. On
  * the live D1 d1_sync keeps them true, and the detail endpoint's all-time
@@ -83,6 +85,12 @@ addShow('al-c1', G.bare, null, 'Album C1', 1, 50, 1)
 addShow('al-d1', G.pct, null, 'Album D1', 1, 10, 1)
 addShow('al-e1', G.decoy, null, 'Album E1', 1, 10, 1)
 addShow('al-f1', G.gone, null, 'Album F1', 1, 999, 1)
+/* ⚠️ A PUBLISHER WHO DECLARES A PODCAST BESIDE AN ALBUM — the V4V Roundtable
+ * case Reed caught on the preview: the medium must ride every album row so
+ * the renderers can partition, or a podcast lands under an "Albums" heading. */
+addShow('mm-m1', G.mixed, null, 'Mixed Album', 1, 20, 1)
+addShow('mm-p1', G.mixed, null, 'Mixed Podcast', 1, 30, 1)
+db.prepare("UPDATE podcasts SET medium = 'podcast' WHERE podcast_guid = 'mm-p1'").run()
 
 let ev = 0
 const NOW = Math.floor(Date.now() / 1000)
@@ -111,6 +119,8 @@ addBoost('al-f1', '7', 999, 400)   // Long Gone: All only, outside 1w/1m/1y
  * lead and Haleen's boosters lead both survive. */
 addBoost('al-b1', '1', 111)
 addBoost('al-c1', '1', 5)
+addBoost('mm-m1', '8', 20)
+addBoost('mm-p1', '8', 30)
 
 /* Haleen's catalogue file. ⚠️ INDEX-ONLY (Reed's call, 2026-08-30): the detail
  * endpoint must NOT read this table — the drawer lists the declaring shows.
@@ -381,6 +391,25 @@ console.log('\nThe #boosts corpus (?corpus=1):')
     assert.equal(status, 200)
     assert.equal(body.corpus.count, 4)
     assert.ok(!('albums' in body))
+  })
+}
+
+console.log('\n⚠️ The medium partition on a mixed-media artist:')
+{
+  const { body } = await detail(G.mixed)
+  check('every album row carries its medium', () => {
+    const byGuid = Object.fromEntries(body.albums.map((a) => [a.guid, a.medium]))
+    assert.deepEqual(byGuid, { 'mm-m1': 'music', 'mm-p1': 'podcast' })
+  })
+  const src = readFileSync(join(ROOT, 'functions/artist/[guid].js'), 'utf8')
+  check('the page partitions on it — a Shows section exists beside Albums', () => {
+    assert.ok(src.includes('Shows with Nostr Boosts'))
+    assert.ok(src.includes('a.medium === "music"'))
+  })
+  const card = readFileSync(join(ROOT, 'assets/js/publisher-card.js'), 'utf8')
+  check('and the feed card’s drawer groups a mixed list', () => {
+    assert.ok(card.includes("a.medium === 'music'"))
+    assert.ok(card.includes('showsGroup'))
   })
 }
 

@@ -12,10 +12,19 @@
 //   /booster/<npub>   one person, and everything they have boosted
 //   /artist/<guid>    one ARTIST, and the albums / audience under them
 //
-// FOUR SECTIONS, the show page's set one tier up (Reed's spec plus his
-// follow-up the same day): "Albums with Nostr Boosts", "Other Artists This
-// Community Boosts", the Nostr Community wall, and #boosts — every boost to
-// the artist's albums, with the shared range/sort machinery.
+// THE SECTIONS, the show page's set one tier up (Reed's spec plus his two
+// follow-ups the same day): "Albums with Nostr Boosts" — and, where the
+// artist also declares podcasts, "Shows with Nostr Boosts" beside it — then
+// "Other Artists This Community Boosts", the Nostr Community wall, and
+// #boosts with the shared range/sort machinery.
+//
+// ⚠️ THE DECLARING SHOWS ARE PARTITIONED ON MEDIUM, the site's standing rule:
+// 9 of the 395 declaring shows are podcasts (Reed caught V4V Roundtable under
+// an "Albums" heading on the preview), and the heading and the split are ONE
+// decision — music to #albums, everything else (podcasts, video, unidentified)
+// to #shows, each section rendered only when it holds something. The STAT
+// TILES still aggregate both halves: the tier is ownership, and the two
+// sections together hold exactly the shows the figures were computed over.
 //
 // ⚠️ INDEX-ONLY, like the Artists feed's drawer (Reed's call, 2026-08-30): the
 // album list is `podcasts WHERE publisher_guid` — the shows whose boosts are
@@ -239,6 +248,11 @@ export async function onRequestHead(ctx) {
 
 function renderArtistPage({ pub, albums, totals, community, supporters, boosts, names, ranks }) {
   const title = pub.title;
+  /* The medium partition, the same COALESCE reading every other surface takes:
+   * music one way, EVERYTHING else — podcasts, video, and shows the collector
+   * cannot identify — the other. */
+  const albumRows = albums.filter((a) => a.medium === "music");
+  const showRows = albums.filter((a) => a.medium !== "music");
   const pageUrl = `${SITE_ORIGIN}/artist/${encodeURIComponent(pub.publisher_guid)}`;
   const art = isSafeUrl(pub.image) ? pub.image : null;
   const art2 = isSafeUrl(pub.artwork) && pub.artwork !== art ? pub.artwork : null;
@@ -246,7 +260,8 @@ function renderArtistPage({ pub, albums, totals, community, supporters, boosts, 
   const ogTitle = `${title} — Boosts on Nostr | OnlyBoosts`;
   // The one string that travels without the page around it — full scope
   // sentence, never trimmed. Same rule as every other detail page.
-  const albumCount = albums.length;
+  const albumCount = albumRows.length;
+  const showCount = showRows.length;
   const one = totals.boosters === 1;
   const ogDesc =
     `${num(totals.boosters)} Nostr booster${one ? " has" : "s have"} sent ` +
@@ -327,16 +342,16 @@ function renderArtistPage({ pub, albums, totals, community, supporters, boosts, 
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v165" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v165" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v165" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v165" />
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v165" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v165" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v166" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v166" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v166" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v166" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v166" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v166" />
   <!-- The boost note card and its reaction bar, for #boosts — the same
        .note-card every other detail page's list paints. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v165" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v165" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v166" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v166" />
 </head>
 <body data-artist-guid="${htmlEscape(pub.publisher_guid)}">
 
@@ -465,9 +480,11 @@ function renderArtistPage({ pub, albums, totals, community, supporters, boosts, 
     <span class="show-back-arrow" aria-hidden="true">←</span><span data-back-label>All Artists</span>
   </a>
 
-  ${renderHeader(pub, art, art2, title, albumCount, totals, stats, ranks)}
+  ${renderHeader(pub, art, art2, title, albumCount, showCount, totals, stats, ranks)}
 
-  ${renderAlbums(albums)}
+  ${renderAlbums(albumRows)}
+
+  ${renderShows(showRows)}
 
   ${renderCommunityArtists(community)}
 
@@ -549,12 +566,12 @@ function renderArtistPage({ pub, albums, totals, community, supporters, boosts, 
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav.js?v=ob-v165" defer></script>
-<script src="/assets/js/artist-page.js?v=ob-v165" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v166" defer></script>
+<script src="/assets/js/artist-page.js?v=ob-v166" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v165"></script>
-<script src="/assets/js/sw-register.js?v=ob-v165" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v166"></script>
+<script src="/assets/js/sw-register.js?v=ob-v166" defer></script>
 </body>
 </html>`;
 }
@@ -565,7 +582,7 @@ function renderArtistPage({ pub, albums, totals, community, supporters, boosts, 
 // INDEXED albums — every one has a boost, so the number is a claim about this
 // index and not about the artist's catalogue, which is the same honesty rule
 // that keeps episode counts off every surface.
-function renderHeader(pub, art, art2, title, albumCount, totals, stats, ranks) {
+function renderHeader(pub, art, art2, title, albumCount, showCount, totals, stats, ranks) {
   return `<header class="show-hero">
     <div class="show-hero-inner">
       <div class="show-art">${
@@ -578,7 +595,10 @@ function renderHeader(pub, art, art2, title, albumCount, totals, stats, ranks) {
         <h1>${htmlEscape(title)}</h1>
         <p class="show-sub">${
           [
-            `${num(albumCount)} album${albumCount === 1 ? "" : "s"} with Nostr Boosts`,
+            [
+              albumCount ? `${num(albumCount)} album${albumCount === 1 ? "" : "s"}` : null,
+              showCount ? `${num(showCount)} show${showCount === 1 ? "" : "s"}` : null,
+            ].filter(Boolean).join(" and ") + " with Nostr Boosts",
             totals.latest_ts ? `Last boosted ${htmlEscape(relTime(totals.latest_ts))}` : null,
           ].filter(Boolean).join(" · ")
         }</p>
@@ -623,11 +643,7 @@ function renderDescription(description) {
 // deliberately unrendered (index-only), so there is nothing off-site to point
 // at that this page's rule would allow.
 function renderAlbums(rows) {
-  if (!rows.length) {
-    return `<section class="show-section show-section--bare" id="albums">
-      <p class="show-empty">No album boosts recorded for this artist yet.</p>
-    </section>`;
-  }
+  if (!rows.length) return "";
 
   return `<section class="show-section show-section--bare" id="albums">
     <details class="ep-drawer" open data-artist-albums>
@@ -642,11 +658,30 @@ function renderAlbums(rows) {
   </section>`;
 }
 
+/* The not-music half of the partition, its own section with its own heading —
+ * never the albums list widened under a narrower name (the community-rollup
+ * lesson, one tier up). Same drawer, same row, same sort machinery; only the
+ * heading, the id and the glyph differ. */
+function renderShows(rows) {
+  if (!rows.length) return "";
+
+  return `<section class="show-section show-section--bare" id="shows">
+    <details class="ep-drawer" open data-artist-albums>
+      <summary>Shows with Nostr Boosts<span class="drawer-hint" aria-hidden="true"></span></summary>
+      <div class="cs-controls" data-al-controls hidden></div>
+      <ul class="ep-list" data-al-list>
+        ${rows.map((a) => albumRow(a)).join("\n        ")}
+      </ul>
+    </details>
+  </section>`;
+}
+
 function albumRow(a) {
   const art = isSafeUrl(a.image) ? a.image : null;
   const art2 = isSafeUrl(a.artwork) && a.artwork !== art ? a.artwork : null;
   const titled = Boolean(String(a.title || "").trim());
-  const title = titled ? truncate(a.title, 120) : "Untitled release";
+  const music = a.medium === "music";
+  const title = titled ? truncate(a.title, 120) : (music ? "Untitled release" : "Unidentified show");
   const boosts = Number(a.boost_count || 0);
   const sats = Number(a.total_sats || 0);
   const boosters = Number(a.booster_count || 0);
@@ -663,7 +698,7 @@ function albumRow(a) {
   return `<li class="ep-row" data-al="${pack}">
           ${art
             ? `<img class="ep-art" src="${htmlEscape(art)}"${art2 ? ` data-art2="${htmlEscape(art2)}"` : ""} alt="" width="44" height="44" loading="lazy" referrerpolicy="no-referrer" />`
-            : `<span class="ep-art ep-art--blank" aria-hidden="true">💿</span>`}
+            : `<span class="ep-art ep-art--blank" aria-hidden="true">${music ? "💿" : "🎙️"}</span>`}
           <div class="ep-main">
             <p class="ep-title">${
               titled
@@ -735,10 +770,10 @@ function notFound(guid) {
   <meta name="robots" content="noindex" />
   <title>Artist not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v165" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v165" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v165" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v165" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v166" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v166" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v166" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v166" />
 </head>
 <body>
 <section class="page-header">
@@ -756,7 +791,7 @@ function notFound(guid) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v165" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v166" defer></script>
 </body>
 </html>`;
   return new Response(html, {

@@ -10,14 +10,14 @@
  * here, so the page carries the shared boost-section machinery, the note
  * verbs, and the Primal backfill like its three siblings.
  */
-import { sortControl } from '/assets/js/feed-controls.js?v=ob-v165'
+import { sortControl } from '/assets/js/feed-controls.js?v=ob-v166'
 import {
   initCopyNpub, initShowMore, initShare, initBackLink,
   initHashRouting, initHashSpy, initArt2, hydrateProfiles,
-} from '/assets/js/detail-page.js?v=ob-v165'
-import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v165'
-import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v165'
-import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v165'
+} from '/assets/js/detail-page.js?v=ob-v166'
+import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v166'
+import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v166'
+import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v166'
 
 const GUID = document.body.dataset.artistGuid || ''
 
@@ -51,8 +51,13 @@ const AL_SORTS = [
 ]
 
 function initAlbumSort() {
-  const root = document.querySelector('[data-artist-albums]')
-  if (!root) return
+  // Two drawers can carry the attribute now — #albums and, on an artist who
+  // also declares podcasts, #shows. Each gets its own control over its own
+  // rows; the partition never re-merges.
+  document.querySelectorAll('[data-artist-albums]').forEach(initOneAlbumDrawer)
+}
+
+function initOneAlbumDrawer(root) {
   const list = root.querySelector('[data-al-list]')
   const slot = root.querySelector('[data-al-controls]')
   if (!list || !slot) return

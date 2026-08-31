@@ -46,7 +46,7 @@ export async function onRequestGet({ request, env, params }) {
   const windowed = Number.isFinite(since) && since > 0;
   const { results } = windowed
     ? await env.DB.prepare(
-        `SELECT b.podcast_guid AS guid, pc.title, pc.image, pc.artwork,
+        `SELECT b.podcast_guid AS guid, pc.title, pc.image, pc.artwork, pc.medium,
                 COUNT(*)                AS boost_count,
                 COALESCE(SUM(b.sats),0) AS total_sats
          FROM boosts b
@@ -56,7 +56,7 @@ export async function onRequestGet({ request, env, params }) {
          ORDER BY total_sats DESC LIMIT 200`
       ).bind(guid, since).all()
     : await env.DB.prepare(
-        `SELECT podcast_guid AS guid, title, image, artwork,
+        `SELECT podcast_guid AS guid, title, image, artwork, medium,
                 boost_count, total_sats
          FROM podcasts WHERE publisher_guid = ?
          ORDER BY total_sats DESC LIMIT 200`
@@ -77,6 +77,12 @@ export async function onRequestGet({ request, env, params }) {
       title: a.title,
       img: a.image,
       art2: a.artwork || null,
+      // The medium partition's input: a declaring show can be a PODCAST (9 of
+      // 395 are), and a drawer headed "Albums" listing one is the exact
+      // widened-list-under-a-narrower-name failure the medium split exists to
+      // prevent. Null means the collector could not identify the feed, which
+      // partitions to the not-music side as everywhere else.
+      medium: a.medium || null,
       boosts: a.boost_count,
       sats: a.total_sats,
     })),
