@@ -45,9 +45,9 @@
  * All three are now en-US in UTC, which is what episode-card.js and
  * functions/_shared/detail-page.js already do. The site has one date format.
  */
-import { showPageHref, episodePageHref } from './show-link.js?v=ob-v170'
-import { coverChain } from './cover-art.js?v=ob-v170'
-import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v170'
+import { showPageHref, episodePageHref } from './show-link.js?v=ob-v171'
+import { coverChain } from './cover-art.js?v=ob-v171'
+import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v171'
 
 const esc = htmlEscape
 
@@ -76,9 +76,8 @@ export const COPY = {
     rangeLabel: 'Filter by when the show was boosted',
     rangeTitle: (days) => (days ? `Shows boosted in the last ${days} days` : 'All time'),
     sortTitle: 'Sort shows',
-    // The line above the search box. See mountFeedNote in feed-controls.js.
-    noteGlobal: 'Ranks based on every boost in the index',
-    noteFollows: 'Ranks based on only boosts from the accounts you follow',
+    // The line above the search box is composed live from the view — see
+    // viewNote in feed-note.js; nothing static here to keep in step.
     noFollows: ['You’re not following anyone yet', 'Follow some npubs in any Nostr client and the shows they boost will show up here.'],
     moreLabel: (n) => `Load ${n} more show${n === 1 ? '' : 's'}`,
     // No total to count against: the endpoint pages rather than reporting how
@@ -115,8 +114,6 @@ export const COPY = {
     rangeLabel: 'Filter by when the album was boosted',
     rangeTitle: (days) => (days ? `Albums boosted in the last ${days} days` : 'All time'),
     sortTitle: 'Sort albums',
-    noteGlobal: 'Ranks based on every boost in the index',
-    noteFollows: 'Ranks based on only boosts from the accounts you follow',
     noFollows: ['You’re not following anyone yet', 'Follow some npubs in any Nostr client and the albums they boost will show up here.'],
     moreLabel: (n) => `Load ${n} more album${n === 1 ? '' : 's'}`,
     countLine: (shown) => `Showing ${shown}`,

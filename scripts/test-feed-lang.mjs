@@ -158,6 +158,34 @@ eq('follows and the music noun compose with it',
   langNote('Ranks based on only boosts from the accounts you follow', 'de', 'German', 'album'),
   'Ranks based on only boosts from the accounts you follow. German-language albums only.')
 
+console.log('\nviewNote (feed-note.js): the base composed from the view itself:')
+const { viewNote, CHART_INFO } = await import(pathToFileURL(join(ROOT, 'assets/js/feed-note.js')).href)
+eq('chart, all time, global: the formula alone',
+  viewNote({ sort: 'chart', days: 0, follows: false, noun: 'show' }),
+  "Chart rank sums each show's place in sats, boosts and boosters; the lowest total leads")
+eq('a window adds the corpus clause',
+  viewNote({ sort: 'sats', days: 30, follows: false, noun: 'show' }),
+  'Ranked by total sats boosted. Counting boosts from the last 30 days')
+eq('follows names its corpus even at all time',
+  viewNote({ sort: 'boosts', days: 0, follows: true, noun: 'album' }),
+  'Ranked by number of boosts. Counting only boosts from the accounts you follow')
+eq('follows plus a window is one clause, not two',
+  viewNote({ sort: 'chart', days: 7, follows: true, noun: 'episode' }),
+  "Chart rank sums each episode's place in sats, boosts and boosters; the lowest total leads. Counting only the last 7 days of boosts from the accounts you follow")
+eq('the two boosters spellings are one ranking',
+  viewNote({ sort: 'count', days: 0, follows: false }),
+  viewNote({ sort: 'boosters', days: 0, follows: false }))
+eq('chronology says ordered, not ranked',
+  viewNote({ sort: 'recent', days: 0, follows: false, noun: 'show' }),
+  'Ordered by most recent boost')
+eq('the music date sort says release',
+  viewNote({ sort: 'episode', days: 0, follows: false, noun: 'track' }),
+  'Ordered by latest release')
+eq('and it composes with langNote as any base does',
+  langNote(viewNote({ sort: 'sats', days: 0, follows: false }), 'de', 'German', 'show'),
+  'Ranked by total sats boosted. German-language shows only.')
+eq('the chart info link is the frozen about anchor', CHART_INFO.href, '/about#charts')
+
 console.log('\nThe no-match line:')
 eq('a language miss', langNoMatchText('de', 'German', 'show'),
   'No match among German-language shows. Try All languages.')

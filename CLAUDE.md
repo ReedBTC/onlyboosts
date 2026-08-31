@@ -183,13 +183,17 @@ filled by the renderer and stay hidden until one does, so a feed showing "sign
 in" or an error grows neither. They're inside the panel rather than the bar, so
 they scroll away with the cards they describe.
 
-**The note slot is on the four ranked feeds only** (`mountFeedNote` in
-`feed-controls.js`, text off each renderer's `COPY` table). It names the corpus
-the ranking was computed over: "Ranks based on every boost in the index" on
-Global, "Ranks based on only boosts from the accounts you follow" on Follows. On
-a rollup a card is an **aggregate**, so the scope is a claim about what was
-counted rather than about which cards survived. This is deliberately one line and
-no box; don't grow it back into the scope paragraph it replaced.
+**The note slot is on the four ranked feeds only** (`mountFeedNote` and
+`viewNote` in `feed-note.js`). Since 2026-08-31 the line is composed from the
+view itself rather than being a fixed corpus sentence: what orders the list
+("Ranked by total sats boosted"; the chart sort states its formula), plus a
+corpus clause only when the corpus deviates from all time/Global ("Counting
+only boosts from the accounts you follow"), plus `langNote`'s language
+sentence. On the chart sort it also carries an ⓘ linking to `/about#charts` —
+an anchor now in the wild, frozen like `/about#membership`. On a rollup a card
+is an **aggregate**, so the corpus clause is a claim about what was counted
+rather than about which cards survived. This is deliberately one line and no
+box; don't grow it back into the scope paragraph it replaced.
 
 ### The Landing Feed
 

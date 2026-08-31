@@ -30,8 +30,8 @@
  * need only id + pubkey. The object handed to buildActionBar below is a
  * projection, not a verified event; don't pass it anywhere that assumes one.
  */
-import { nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v170'
-import { buildActionBar, configureBoostActions } from '/assets/js/boost-actions.js?v=ob-v170'
+import { nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v171'
+import { buildActionBar, configureBoostActions } from '/assets/js/boost-actions.js?v=ob-v171'
 // ⚠️ wireNpubCopy WAS IMPORTED HERE and is not any more. The avatar and the name
 // were its only two callers on this feed, and both are now links to
 // /booster/<npub>. Unlike the Episodes drawer — where the per-boost ⋮ menu
@@ -39,22 +39,22 @@ import { buildActionBar, configureBoostActions } from '/assets/js/boost-actions.
 // from this feed means opening their page, which leads with the button.
 // Its own module rather than a third export from show-link.js; see the note at
 // the head of booster-link.js and the ob-v53 entry in CLAUDE.md.
-import { boosterPageHref, markBoosterLink } from '/assets/js/booster-link.js?v=ob-v170'
-import { parseSegments, renderSegmentsInto, setCachedProfile } from '/assets/js/boosts-thread.js?v=ob-v170'
-import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v170'
-import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v170'
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v170'
-import { boosterLabel } from '/assets/js/ob-data.js?v=ob-v170'
-import { clientLabel, hasClientLabel } from '/assets/js/client-label.js?v=ob-v170'
-import { followsBoostReader, globalBoostReader } from '/assets/js/ob-live.js?v=ob-v170'
-import { resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v170'
+import { boosterPageHref, markBoosterLink } from '/assets/js/booster-link.js?v=ob-v171'
+import { parseSegments, renderSegmentsInto, setCachedProfile } from '/assets/js/boosts-thread.js?v=ob-v171'
+import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v171'
+import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v171'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v171'
+import { boosterLabel } from '/assets/js/ob-data.js?v=ob-v171'
+import { clientLabel, hasClientLabel } from '/assets/js/client-label.js?v=ob-v171'
+import { followsBoostReader, globalBoostReader } from '/assets/js/ob-live.js?v=ob-v171'
+import { resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v171'
 import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls,
   RANGE_OPTIONS,
-} from '/assets/js/feed-controls.js?v=ob-v170'
+} from '/assets/js/feed-controls.js?v=ob-v171'
 
-import { showPageHref, episodePageHref } from '/assets/js/show-link.js?v=ob-v170'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v170'
+import { showPageHref, episodePageHref } from '/assets/js/show-link.js?v=ob-v171'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v171'
 
 const PAGE_SIZE = 30
 

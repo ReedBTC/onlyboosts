@@ -256,6 +256,14 @@ What a change would break:
   scores across corpora or weeks. A definitive published list is therefore a
   **snapshot taken at publication time**, not a live query.
 
+**The feed note explains the chart on screen** (2026-08-31, Reed's ask,
+replacing the fixed "Ranks based on every boost in the index" line): `viewNote`
+in `assets/js/feed-note.js` composes the line above the search box from the
+live view — what orders the list, plus a corpus clause only when the corpus
+deviates from all time/Global — and the chart sort appends an ⓘ (`CHART_INFO`)
+linking to `/about#charts`, where the formula is stated in full. That section
+anchor is now an address in the wild, frozen the way `/about#membership` is.
+
 `scripts/test-charts.mjs` owns the correctness: brute-forced expectations from
 an independent implementation of the rule, a micro-corpus that inverts if the
 tiebreak chain is reordered, and it was confirmed red on four mutations (the
@@ -317,9 +325,9 @@ already paged in. Two consequences the site's existing discipline demands:
   then filters to nothing is the documented reason `/api/v1/search` is not used
   by these feeds.
 - **The feed note gains a second sentence** rather than a rewritten first one:
-  "Ranks based on every boost in the index. German-language shows only." One rule
-  covers both scopes and both media. `-language` is not padding; "English shows"
-  reads as shows from England.
+  "Ranked by total sats boosted. German-language shows only." One rule covers
+  every base the composed note (`viewNote`, 2026-08-31) can produce.
+  `-language` is not padding; "English shows" reads as shows from England.
 - **`noMatchText` gains a fourth cause, tested FIRST.** It is the narrowest
   filter and the only one whose fix is one press; under Follows plus German,
   "switch to Global" points past the filter actually hiding the reader's show.
