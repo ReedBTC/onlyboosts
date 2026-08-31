@@ -45,32 +45,32 @@
  * Entry point: renderPodcasts({ panel, list }) — lazy-imported by feeds.js
  * the first time the feed is opened.
  */
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v166'
-import { toEpisodeShape, normalizeBoosts, episodeApiToBoosts } from '/assets/js/ob-data.js?v=ob-v166'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v170'
+import { toEpisodeShape, normalizeBoosts, episodeApiToBoosts } from '/assets/js/ob-data.js?v=ob-v170'
 import {
   getEpisodePage, searchEpisodes, SEARCH_HITS, SEARCH_MIN_CHARS,
-} from '/assets/js/ob-live.js?v=ob-v166'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v166'
+} from '/assets/js/ob-live.js?v=ob-v170'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v170'
 import {
   rangeDays, rangeControl, sortControl, mountFeedControls,
   RANGE_OPTIONS,
-} from '/assets/js/feed-controls.js?v=ob-v166'
+} from '/assets/js/feed-controls.js?v=ob-v170'
 // Its own module, not two more exports of feed-controls.js — see the ⚠️ note
 // at the top of that file for the four-hour window that shape opens.
-import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v166'
+import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v170'
 import {
   LANG_ALL, languageOptions, langControl, langNote, langNoMatchText, langLabelFor,
-} from '/assets/js/feed-lang.js?v=ob-v166'
-import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v166'
+} from '/assets/js/feed-lang.js?v=ob-v170'
+import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v170'
 // The card, and the card's verbs. One definition each, shared with the edge.
 import {
   COPY, HOME_CARD_PARTS, buildEpisodes, renderEpisodeCards, RANKED_SORTS, SORT_OPTIONS,
   episodeRankValue,
-} from '/assets/js/episode-card.js?v=ob-v166'
-import { competitionRanks, rankLabel, markSliceTies } from '/assets/js/rank.js?v=ob-v166'
+} from '/assets/js/episode-card.js?v=ob-v170'
+import { competitionRanks, rankLabel, markSliceTies } from '/assets/js/rank.js?v=ob-v170'
 import {
   wireEpisodeCards, hydrateCardProfiles, prewarmBoosting,
-} from '/assets/js/episode-card-actions.js?v=ob-v166'
+} from '/assets/js/episode-card-actions.js?v=ob-v170'
 
 const INITIAL_CARDS = 30       // episodes rendered per "load more" batch
 
@@ -223,6 +223,9 @@ async function loadEpisodePage({ medium, sort, range, lang, offset, follows, q =
     // its position from here. An unfiltered page carries no rank and is
     // numbered by position instead, in rebuild().
     if (Number.isFinite(r.rank)) it._rank = r.rank
+    // The chart sort ranks EVERY row server-side and its tie flag is
+    // corpus-true, so it rides here rather than being re-derived from a slice.
+    if (r.tied != null) it._tied = !!r.tied
     items.push(it)
   }
   // Booster identities ride along in every record, so the cards paint with real
@@ -282,16 +285,18 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
     follows = res.follows
   }
 
-  // Most boosters is the default sort on both feeds: distinct people is the
-  // higher-signal ranking, since one listener boosting an episode forty times
-  // is one vote rather than forty. ('boosts' ranks by raw volume instead; the
-  // two differ on the ~16% of episodes someone boosted more than once. It was
-  // the opening sort until 2026-08-18.) ⚠️ Must match FEED.sort in
-  // functions/index.js, or the reader watches the server's list get replaced.
-  // ⚠️ 'count' IS THIS ENDPOINT'S OWN NAME for the boosters ranking — the shows
-  // endpoint spells the same idea 'boosters'. The hash carries whichever the
-  // feed's renderer speaks, and each coerces the other's word to its default.
-  const DEFAULT_SORT = 'count'
+  // ⚠️ CHART RANK IS THE OPENING SORT — the OnlyBoosts Charts, Reed's call
+  // 2026-08-31, on every ranked feed at once. It was 'count' (Most boosters,
+  // distinct people over raw volume) from Phase D and 'boosts' before
+  // 2026-08-18; both survive in the menu, and the chart keeps breadth as a
+  // component and the first tiebreaker. The landing feed is Shows, so the
+  // FEED.sort pin lives in shows-feed.js now, not here.
+  // ⚠️ 'count' IS STILL THIS ENDPOINT'S OWN NAME for the boosters ranking —
+  // the shows endpoint spells the same idea 'boosters'. The hash carries
+  // whichever the feed's renderer speaks, and each coerces the other's word
+  // to its default. 'chart' is deliberately ONE spelling on all four ranked
+  // endpoints, so the composite never grows a sibling of that wart.
+  const DEFAULT_SORT = 'chart'
   /* The hash's range and sort are the opening state, like the language. A key
    * the tables don't hold coerces to the default and is reported back below,
    * which takes it out of the address bar. */
@@ -653,6 +658,11 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
    * seed carries the adopted block's last card across the one gap in it. */
   function renumber() {
     if (picked) return
+    /* Chart rows wear the server's rank and tie flag on every row — a tuple
+     * standing (score, then boosters, sats, boosts) the client cannot
+     * re-derive from any single figure. Nothing to renumber, and marking
+     * slice ties would overwrite a corpus-true flag with a slice-local one. */
+    if (sortKey === 'chart') return
     /* Query results are never renumbered: each row already wears the rank the
      * server computed over the whole ordering, and numbering the filtered list
      * by position would tell a searched episode it is #1 of 1. Same rule the
@@ -678,8 +688,9 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
    * sort renders no rank node at all and indexing those would slide by one. The
    * server's adopted block sits ahead of `items` in the DOM, hence the offset. */
   function syncRankLabels() {
-    // Query results wear server ranks, which a later page cannot change.
-    if (picked || query) return
+    // Query results wear server ranks, which a later page cannot change —
+    // and under the chart sort EVERY row does, tie flags included.
+    if (picked || query || sortKey === 'chart') return
     const els = cards.querySelectorAll('[data-episode-card]')
     items.forEach((it, i) => {
       const node = els[adoptedCount + i]?.querySelector('.pcast-rank')

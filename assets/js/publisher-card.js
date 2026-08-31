@@ -35,17 +35,17 @@
  * guids — the majority). A pill that fails for most artists is worse than
  * none; boosting stays at the album and song level, one drawer-click away.
  */
-import { showPageHref, publisherPageHref } from './show-link.js?v=ob-v166'
-import { coverChain } from './cover-art.js?v=ob-v166'
-import { htmlEscape } from './nostr-text.js?v=ob-v166'
-import { num, fmtSats, plural, shortDate } from './show-card.js?v=ob-v166'
+import { showPageHref, publisherPageHref } from './show-link.js?v=ob-v170'
+import { coverChain } from './cover-art.js?v=ob-v170'
+import { htmlEscape } from './nostr-text.js?v=ob-v170'
+import { num, fmtSats, plural, shortDate } from './show-card.js?v=ob-v170'
 // Re-exported: artists-feed.js reads the formatting helpers through this
 // module the way shows-feed.js reads them through show-card.js. ⚠️ An import
 // is NOT a re-export — this line shipped missing once, and the unresolved
 // named import was a LINK-TIME error: renderArtists never executed and the
 // whole feed painted the load-failure placeholder (the ob-v53 class, caught
 // on the preview deploy).
-export { num, fmtSats, plural, shortDate } from './show-card.js?v=ob-v166'
+export { num, fmtSats, plural, shortDate } from './show-card.js?v=ob-v170'
 
 const esc = htmlEscape
 
@@ -69,6 +69,8 @@ export const COPY = {
   rangeTitle: (days) => (days ? `Artists boosted in the last ${days} days` : 'All time'),
   sortTitle: 'Sort artists',
   noteGlobal: 'Ranks based on every boost in the index',
+  noteFollows: 'Ranks based on only boosts from the accounts you follow',
+  noFollows: ['You’re not following anyone yet', 'Follow some npubs in any Nostr client and the artists they boost will show up here.'],
   moreLabel: (n) => `Load ${n} more artist${n === 1 ? '' : 's'}`,
   countLine: (shown) => `Showing ${shown}`,
   searchPlaceholder: 'Search artists…',
@@ -89,12 +91,15 @@ export const COPY = {
 // The same keys as the shows endpoint, because /api/v1/publishers spells its
 // aggregates the same way — see SORTS there. 'latest' is chronology, no rank.
 export const SORT_OPTIONS = [
+  /* ⚠️ THE ONLYBOOSTS CHARTS — see show-card.js; the same composite, one tier
+   * up. Server-ranked on every row; never renumbered client-side. */
+  ['chart', 'Chart rank'],
   ['boosters', 'Most boosters'],
   ['boosts', 'Most boosts'],
   ['sats', 'Most sats'],
   ['latest', 'Recently boosted'],
 ]
-export const RANKED_SORTS = new Set(['boosts', 'sats', 'boosters'])
+export const RANKED_SORTS = new Set(['chart', 'boosts', 'sats', 'boosters'])
 
 export const PUBLISHER_CARDS_PER_PAGE = 25
 
@@ -118,6 +123,8 @@ export function toCard(p) {
     boosters: num(p.boosters),
     latest: num(p.latest),
     rank: Number.isFinite(p.rank) ? p.rank : null,
+    // The chart sort's corpus-true tie flag, riding beside its rank.
+    tied: p.tied === true,
   }
 }
 
@@ -212,12 +219,12 @@ export function publisherCardHtml(p, { rank = null, copy = COPY } = {}) {
 export function albumRowsHtml(albums, copy = COPY) {
   if (!albums.length) return `<div class="ob-show-note">${esc(copy.noItems)}</div>`
 
-  /* ⚠️ THE MEDIUM PARTITION, in miniature. A declaring show can be a PODCAST
-   * (9 of 395 are — Reed caught V4V Roundtable under the "Albums" lid), and
-   * the standing rule is that a heading names only what is under it. Inside
-   * one drawer that means groups: albums first under the lid's own claim,
-   * then the not-music rows under their own label. Unmixed lists render with
-   * no labels at all, which is every artist but a handful. */
+  /* The medium partition, in miniature — DEFENSIVE since 2026-08-31: the
+   * artist tier is music-only server-side now, so every list arriving here
+   * is unmixed and renders with no group labels. The grouping stays because
+   * it costs two filters and turns a future data regression (a podcast row
+   * reaching an "Albums" lid — the V4V Roundtable case Reed caught at
+   * launch) into labelled honesty instead of a silent lie. */
   const music = albums.filter((a) => a.medium === 'music')
   const other = albums.filter((a) => a.medium !== 'music')
   if (music.length && other.length) {

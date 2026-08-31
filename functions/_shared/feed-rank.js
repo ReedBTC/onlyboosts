@@ -64,6 +64,10 @@
 const RANK_KEYS = ["sats", "boosts", "boosters"];
 const BOOSTER_RANK_KEYS = ["sats", "boosts", "shows"];
 
+/* The publisher aggregates in this file carry the artist tier's MUSIC-ONLY
+ * filter (2026-08-31, Reed's call — see ../api/v1/publishers.js): a chip
+ * claims a place on the Artists list, and that list counts only the declaring
+ * music shows now, so the populations here must count the same corpus. */
 /* ⚠️ RESTATED FROM functions/api/v1/_common.js, WHICH THIS FILE MAY NOT IMPORT
  * WITHOUT DRAGGING THE WHOLE API SURFACE IN. The members wall drops these four
  * keys from its listing, so a booster rank computed over a population that
@@ -164,10 +168,118 @@ function publisherRankQuery(row) {
         JOIN podcasts pc   ON pc.podcast_guid    = b.podcast_guid
         JOIN publishers pub ON pub.publisher_guid = pc.publisher_guid
        WHERE pub.title IS NOT NULL
+         AND COALESCE(pc.medium,'podcast') = 'music'
        GROUP BY pc.publisher_guid
     )
     SELECT ${parts} FROM m`;
   return { sql, args };
+}
+
+/* ⚠️ THE ONLYBOOSTS CHARTS POSITION — rank in sats + rank in boosts + rank in
+ * the subject's breadth key (boosters for content, shows boosted for a
+ * member), summed, lowest total first; ties break breadth → sats → boosts and
+ * a remaining tie is shared (T#). Reed's spec, 2026-08-31; the design record
+ * is "The OnlyBoosts Charts" in docs/feeds.md.
+ *
+ * The population is the SAME list the three component chips are computed over
+ * — the medium partition for a show or an episode, the wall's publisher
+ * exclusion for a member, the title-less exclusion for a publisher — so the
+ * chart place and the component ranks always describe one corpus. All time,
+ * Global, all languages: the feedRanks doctrine at the top of this file. */
+function chartQuery(kind, row) {
+  let base = null;
+  let id = null;
+  const args = [];
+  if (kind === "booster") {
+    if (!row?.pk) return null;
+    id = row.pk;
+    const holes = RANK_PUBLISHERS.map(() => "?").join(",");
+    args.push(...RANK_PUBLISHERS);
+    base = `
+      SELECT booster_pubkey AS id,
+             COALESCE(SUM(sats), 0)       AS m_sats,
+             COUNT(*)                     AS m_boosts,
+             COUNT(DISTINCT podcast_guid) AS m_breadth
+        FROM boosts
+       WHERE booster_pubkey NOT IN (${holes})
+       GROUP BY booster_pubkey`;
+  } else if (kind === "publisher") {
+    if (!row?.guid) return null;
+    id = row.guid;
+    base = `
+      SELECT pc.publisher_guid                AS id,
+             COALESCE(SUM(b.sats), 0)         AS m_sats,
+             COUNT(*)                         AS m_boosts,
+             COUNT(DISTINCT b.booster_pubkey) AS m_breadth
+        FROM boosts b
+        JOIN podcasts pc    ON pc.podcast_guid    = b.podcast_guid
+        JOIN publishers pub ON pub.publisher_guid = pc.publisher_guid
+       WHERE pub.title IS NOT NULL
+         AND COALESCE(pc.medium,'podcast') = 'music'
+       GROUP BY pc.publisher_guid`;
+  } else {
+    const isEpisode = kind === "episode";
+    id = isEpisode ? row.item_guid : row.podcast_guid;
+    if (!id) return null;
+    const music = (isEpisode ? row.p_medium : row.medium) === "music";
+    // The medium partition, restated from the API: never `= 'podcast'`.
+    const op = music ? "=" : "<>";
+    base = isEpisode
+      ? `
+      SELECT e.item_guid                  AS id,
+             COALESCE(e.total_sats,0)     AS m_sats,
+             COALESCE(e.boost_count,0)    AS m_boosts,
+             COALESCE(e.booster_count,0)  AS m_breadth
+        FROM episodes e
+        LEFT JOIN podcasts pc ON pc.podcast_guid = e.podcast_guid
+       WHERE COALESCE(pc.medium,'podcast') ${op} 'music'`
+      : `
+      SELECT p.podcast_guid               AS id,
+             COALESCE(p.total_sats,0)     AS m_sats,
+             COALESCE(p.boost_count,0)    AS m_boosts,
+             COALESCE(p.booster_count,0)  AS m_breadth
+        FROM podcasts p
+       WHERE COALESCE(p.medium,'podcast') ${op} 'music'`;
+  }
+  const sql = `
+    WITH base AS (${base}),
+         scored AS (
+           SELECT base.*,
+                  RANK() OVER (ORDER BY m_sats DESC)    AS r_sats,
+                  RANK() OVER (ORDER BY m_boosts DESC)  AS r_boosts,
+                  RANK() OVER (ORDER BY m_breadth DESC) AS r_breadth
+           FROM base
+         ),
+         chart AS (
+           SELECT id,
+                  RANK() OVER (ORDER BY (r_sats + r_boosts + r_breadth),
+                               m_breadth DESC, m_sats DESC, m_boosts DESC) AS rank
+           FROM scored
+         ),
+         tied AS (
+           SELECT chart.*, COUNT(*) OVER (PARTITION BY rank) AS peers FROM chart
+         )
+    SELECT rank, peers FROM tied WHERE id = ?`;
+  args.push(id);
+  return { sql, args };
+}
+
+/* Resolves { rank, tied } or null; its own catch, so a chart failure costs the
+ * chart line and never the three component chips beside it. A subject outside
+ * the population (a publisher key on /booster, a medium mismatch) simply finds
+ * no row, which is the same honest silence ranksFrom keeps. */
+async function chartPlace(db, kind, row) {
+  try {
+    const q = chartQuery(kind, row);
+    if (!q) return null;
+    const r = await db.prepare(q.sql).bind(...q.args).first();
+    const rank = Number(r?.rank);
+    if (!Number.isFinite(rank) || rank < 1) return null;
+    return { rank, tied: Number(r.peers) > 1 };
+  } catch (err) {
+    console.warn("[feed-rank] chart query failed", err);
+    return null;
+  }
 }
 
 /**
@@ -191,13 +303,17 @@ export async function feedRanks(db, kind, row) {
       if (!row || !row.pk) return null;
       const { sql, args } = boosterRankQuery(row);
       const r = await db.prepare(sql).bind(...args).first();
-      return ranksFrom(r, BOOSTER_RANK_KEYS);
+      const out = ranksFrom(r, BOOSTER_RANK_KEYS);
+      if (out) out.chart = await chartPlace(db, kind, row);
+      return out;
     }
     if (kind === "publisher") {
       if (!row || !row.guid) return null;
       const { sql, args } = publisherRankQuery(row);
       const r = await db.prepare(sql).bind(...args).first();
-      return ranksFrom(r, RANK_KEYS);
+      const out = ranksFrom(r, RANK_KEYS);
+      if (out) out.chart = await chartPlace(db, kind, row);
+      return out;
     }
     const isEpisode = kind === "episode";
     const id = isEpisode ? row.item_guid : row.podcast_guid;
@@ -240,7 +356,9 @@ export async function feedRanks(db, kind, row) {
       : `COALESCE(${mediumCol},'podcast') <> 'music'`;
 
     const r = await db.prepare(`SELECT ${parts} ${from} WHERE ${where}`).bind(...args).first();
-    return ranksFrom(r, RANK_KEYS);
+    const out = ranksFrom(r, RANK_KEYS);
+    if (out) out.chart = await chartPlace(db, kind, row);
+    return out;
   } catch (err) {
     console.warn("[feed-rank] rank query failed", err);
     return null;
@@ -347,7 +465,21 @@ export function renderStatTiles(stats, ranks, copy) {
     ? `<p class="show-stats-cap">Rank on the all-time <a href="${esc(copy.backHref)}">${esc(copy.rankFeed)} feed</a>${anyTie ? "; T marks a tie" : ""}</p>`
     : "";
 
-  return `<dl class="show-stats">
+  /* ⚠️ THE CHARTS LINE — the subject's OnlyBoosts Charts position, above the
+   * tiles because it is the headline standing and the three tile ranks are
+   * its components (their sum is the score; lowest total wins). Top-100 gated
+   * by the same RANK_CUTOFF, for the same reason as the chips. The link opens
+   * the same list sorted by Chart rank; /booster overrides it via
+   * `copy.chartHref`, its chart living on the members wall rather than behind
+   * a sort key the Members hash would drop. `copy.chartBreadth` names the
+   * subject's breadth key in the tooltip ("boosters" unless overridden). */
+  const c = ranks && ranks.chart;
+  const chartTip = `Rank in sats + rank in boosts + rank in ${copy.chartBreadth || "boosters"}, summed — lowest total first, all time. Ties break by ${copy.chartBreadth || "boosters"}, then sats, then boosts; T marks a remaining tie.`;
+  const chartLine = c && c.rank <= RANK_CUTOFF
+    ? `<p class="show-stats-chart" title="${esc(chartTip)}"><a href="${esc(copy.chartHref || (copy.backHref + "?sort=chart"))}">${esc(chip(c))} on the OnlyBoosts Charts</a></p>`
+    : "";
+
+  return `${chartLine}${chartLine ? "\n    " : ""}<dl class="show-stats">
       ${tiles.join("\n      ")}
     </dl>${caption ? "\n    " + caption : ""}`;
 }

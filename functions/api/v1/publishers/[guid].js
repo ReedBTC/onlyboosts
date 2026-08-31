@@ -11,6 +11,11 @@
 // whose boosts built the card's figures — and `publisher_albums` (the
 // artist's own catalogue file, still collected) is deliberately NOT read here.
 //
+// ⚠️ MUSIC ONLY, like every artist-tier surface since 2026-08-31 (Reed's
+// call; the header of ../publishers.js is the design record): the album list,
+// the windowed recount and the #boosts corpus all filter to the declaring
+// MUSIC shows, so the drawer, the page and the card describe one corpus.
+//
 // `?since=<unix>` windows the list to the boosts inside it and recomputes each
 // album's figures over the window — the same contract, for the same reason, as
 // /api/v1/podcasts/<guid>?since: the card above the drawer shows the range's
@@ -52,6 +57,7 @@ export async function onRequestGet({ request, env, params }) {
          FROM boosts b
          JOIN podcasts pc ON pc.podcast_guid = b.podcast_guid
          WHERE pc.publisher_guid = ? AND b.created_at >= ?
+           AND COALESCE(pc.medium,'podcast') = 'music'
          GROUP BY b.podcast_guid
          ORDER BY total_sats DESC LIMIT 200`
       ).bind(guid, since).all()
@@ -59,6 +65,7 @@ export async function onRequestGet({ request, env, params }) {
         `SELECT podcast_guid AS guid, title, image, artwork, medium,
                 boost_count, total_sats
          FROM podcasts WHERE publisher_guid = ?
+           AND COALESCE(medium,'podcast') = 'music'
          ORDER BY total_sats DESC LIMIT 200`
       ).bind(guid).all();
 
@@ -77,11 +84,8 @@ export async function onRequestGet({ request, env, params }) {
       title: a.title,
       img: a.image,
       art2: a.artwork || null,
-      // The medium partition's input: a declaring show can be a PODCAST (9 of
-      // 395 are), and a drawer headed "Albums" listing one is the exact
-      // widened-list-under-a-narrower-name failure the medium split exists to
-      // prevent. Null means the collector could not identify the feed, which
-      // partitions to the not-music side as everywhere else.
+      // Always 'music' since 2026-08-31 (the tier counts music only); the
+      // field stays so the renderers' partition machinery keeps its shape.
       medium: a.medium || null,
       boosts: a.boost_count,
       sats: a.total_sats,
@@ -125,6 +129,7 @@ export async function fetchPublisherCorpus(env, guid) {
     `${BOOST_SELECT}
      JOIN podcasts pub_pc ON pub_pc.podcast_guid = b.podcast_guid
      WHERE pub_pc.publisher_guid = ?
+       AND COALESCE(pub_pc.medium,'podcast') = 'music'
      ORDER BY b.created_at DESC, b.event_id DESC LIMIT ?`
   ).bind(guid, CORPUS_CAP + 1).all();
 

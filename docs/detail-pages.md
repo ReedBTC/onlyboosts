@@ -467,11 +467,11 @@ as a paragraph.
 ### Range And Sort On `#boosts`
 
 The `#boosts` section on /show, /episode, /booster and /artist carries a range and a sort, built by
-`assets/js/boost-section.js`. **The range means when the boost was SENT**,
-matching `/#members` and `/api/v1/podcasts`. It does not mean when the
-episode aired; that axis belongs to the Episodes feeds and to
-`/api/v1/episodes`. Two readings of that parameter name exist on this site
-deliberately and there must not be a third.
+`assets/js/boost-section.js`. **The range means when the boost was SENT** —
+since 2026-08-31 the ONE reading of that parameter site-wide, `/#members`,
+`/api/v1/podcasts` and `/api/v1/episodes` alike (the episode feeds' air-date
+reading was retired that day; see Range and sort in `docs/feeds.md`). There
+must not be a second reading again.
 
 **`/show/<guid>#boosts` is the section that changed character.** It was the most
 recent 24 boosts; with an order over the show's whole corpus it is the show's

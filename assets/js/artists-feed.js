@@ -7,8 +7,9 @@
  * and changing either refetches, the shape every ranked feed has had since the
  * server-side move. Expanding a card lists the artist's own album catalogue.
  *
- * Global only, deliberately: the rollup is computed over everyone, the same
- * scope note Shows and Albums carry. And there is no adoption path — only the
+ * Both scopes since 2026-08-31, the same move Shows and Albums made: the
+ * Follows scope POSTs the contact list and /api/v1/publishers aggregates the
+ * follow set's boosts per request. There is no adoption path — only the
  * landing feed is server-rendered, and it is Shows — so this module is
  * shows-feed.js with the adoption machinery and the medium split removed. The
  * two stay parallel on purpose; a fix in one usually wants the other read.
@@ -18,23 +19,24 @@
  */
 import {
   getPublisherPage, searchPublishers, SEARCH_HITS, SEARCH_MIN_CHARS,
-} from '/assets/js/ob-live.js?v=ob-v166'
+} from '/assets/js/ob-live.js?v=ob-v170'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v170'
 import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls, RANGE_OPTIONS,
-} from '/assets/js/feed-controls.js?v=ob-v166'
-import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v166'
+} from '/assets/js/feed-controls.js?v=ob-v170'
+import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v170'
 import {
   LANG_ALL, languageOptions, langControl, langNote, langNoMatchText, langLabelFor,
-} from '/assets/js/feed-lang.js?v=ob-v166'
-import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v166'
-import { competitionRanks, rankLabel, markSliceTies } from '/assets/js/rank.js?v=ob-v166'
+} from '/assets/js/feed-lang.js?v=ob-v170'
+import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v170'
+import { competitionRanks, rankLabel, markSliceTies } from '/assets/js/rank.js?v=ob-v170'
 import {
   COPY, toCard, publisherCardHtml, publisherRankValue,
   SORT_OPTIONS, RANKED_SORTS, PUBLISHER_CARDS_PER_PAGE,
   num, fmtSats, plural,
-} from '/assets/js/publisher-card.js?v=ob-v166'
-import { wirePublisherCards } from '/assets/js/publisher-card-actions.js?v=ob-v166'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v166'
+} from '/assets/js/publisher-card.js?v=ob-v170'
+import { wirePublisherCards } from '/assets/js/publisher-card-actions.js?v=ob-v170'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v170'
 
 /* The hash's language / view on an already-hydrated feed — the same two doors
  * every ranked renderer keeps; see the twin maps in shows-feed.js. */
@@ -77,11 +79,15 @@ function renderPlaceholder(list, title, body) {
 }
 
 /** One page of ranked artists, adapted into the card's shape. */
-async function loadPublisherPage({ sort, range, lang, offset, q = null, signal }) {
-  const { records, nextOffset } = await getPublisherPage({ sort, range, lang, offset, q, signal })
+async function loadPublisherPage({ follows = null, sort, range, lang, offset, q = null, signal }) {
+  const { records, nextOffset } = await getPublisherPage({
+    follows, sort, range, lang, offset, q, signal })
   const items = records.map(toCard)
   // A `q=` page's rows carry the server's rank over the FULL ordering.
   for (const it of items) if (Number.isFinite(it.rank)) it._rank = it.rank
+  // The chart sort ranks EVERY row server-side; its corpus-true tie flag
+  // rides beside the rank (see toCard) rather than being re-derived here.
+  for (const it of items) if (it.tied) it._tied = true
   return { items, nextOffset }
 }
 
@@ -92,21 +98,42 @@ async function loadPublisherPage({ sort, range, lang, offset, q = null, signal }
  * @param {string}  [opts.range]  the OPENING range, off the hash
  * @param {string}  [opts.sort]   the OPENING sort, off the hash
  */
-export async function renderArtists({ panel, list, lang = null, range = null, sort = null } = {}) {
+export async function renderArtists({ panel, list, scope = 'global', lang = null, range = null, sort = null } = {}) {
   if (!list) return
   const copy = COPY
+  // Numerals are withheld on Follows — the shows-feed.js rule, same reason.
+  const showRanks = scope !== 'follows'
   resetFeedSearch(panel)
   resetFeedNote(panel)
 
-  /* Distinct people, matching the two show-level rollups: one listener boosting
-   * an artist forty times is one vote, not forty. Also the endpoint's own
-   * default, and what the hash elides. */
-  const DEFAULT_SORT = 'boosters'
+  // The follows resolution, mirrored from shows-feed.js / feeds-podcasts.js.
+  let follows = null
+  if (scope === 'follows') {
+    const res = await resolveFollows()
+    if (res.status === 'signed-out') {
+      renderPlaceholder(list, 'Sign in to see this feed', 'Follows feeds read your kind-3 contact list, so they need a signed-in npub.')
+      return
+    }
+    if (res.status === 'unavailable') {
+      renderPlaceholder(list, 'Couldn’t load your follow list', 'We couldn’t reach a relay holding your kind-3 contact list — please try again later.')
+      return
+    }
+    if (res.status === 'empty') {
+      renderPlaceholder(list, ...copy.noFollows)
+      return
+    }
+    follows = res.follows
+  }
+
+  /* ⚠️ CHART RANK, matching every ranked feed since 2026-08-31 (Reed's
+   * call) — also the endpoint's own default, and what the hash elides. It
+   * was 'boosters' from this feed's first day. */
+  const DEFAULT_SORT = 'chart'
   const urlRange = (typeof range === 'string' && RANGE_OPTIONS.some((o) => o[0] === range)) ? range : ''
   const urlSort = (typeof sort === 'string' && SORT_OPTIONS.some((o) => o[0] === sort)) ? sort : ''
   let rangeKey = urlRange || 'all'
   let sortKey = urlSort || DEFAULT_SORT
-  const feedKey = panel?.dataset.feed || 'artists'
+  const feedKey = panel?.dataset.feed || `artists-${scope}`
 
   function reportView() {
     document.dispatchEvent(new CustomEvent('lb:feed-view', {
@@ -147,6 +174,8 @@ export async function renderArtists({ panel, list, lang = null, range = null, so
    * window, and `data-since` carries it — read at OPEN time, so a range change
    * moves every drawer with it. The same pair the show cards use. */
   const cards = h('div', { class: 'pcast-list', 'data-artist-list': '' })
+  // The drawer's corpus rides the container — see show-card-actions.js.
+  if (follows) cards.obFollows = follows
   const moreWrap = h('div', { class: 'pcast-more-wrap' })
 
   const cutoff = () => rangeCutoff(rangeKey)
@@ -158,7 +187,7 @@ export async function renderArtists({ panel, list, lang = null, range = null, so
       if (since) cards.setAttribute('data-since', String(since))
       else cards.removeAttribute('data-since')
       cards.insertAdjacentHTML('beforeend', slice.map((p) => publisherCardHtml(p, {
-        rank: RANKED_SORTS.has(sortKey) ? rankLabel(p._rank, p._tied) : null,
+        rank: (showRanks && RANKED_SORTS.has(sortKey)) ? rankLabel(p._rank, p._tied) : null,
         copy,
       })).join(''))
       wirePublisherCards(cards)
@@ -179,7 +208,7 @@ export async function renderArtists({ panel, list, lang = null, range = null, so
         btn.disabled = true
         btn.textContent = 'Loading…'
         try {
-          const next = await loadPublisherPage({ sort: sortKey, range: rangeKey, lang: langKey, q: query || null, offset: nextOffset })
+          const next = await loadPublisherPage({ follows, sort: sortKey, range: rangeKey, lang: langKey, q: query || null, offset: nextOffset })
           artists = artists.concat(next.items)
           nextOffset = next.nextOffset
           rebuild({ keepShown: true })
@@ -201,8 +230,10 @@ export async function renderArtists({ panel, list, lang = null, range = null, so
   function rebuild({ keepShown = false } = {}) {
     /* Rank first, filter second — competition ranks on the unfiltered list,
      * server ranks kept verbatim on a query's rows. See shows-feed.js. */
-    if (query && !picked) markSliceTies(artists)
-    if (!picked && !query) {
+    /* Chart rows wear the server's rank and tie flag on every row — a tuple
+     * standing the client cannot re-derive — so neither branch below runs. */
+    if (sortKey !== 'chart' && query && !picked) markSliceTies(artists)
+    if (sortKey !== 'chart' && !picked && !query) {
       const ranks = competitionRanks(artists, publisherRankValue(sortKey))
       artists.forEach((p, i) => { p._rank = ranks[i].rank; p._tied = ranks[i].tied })
     }
@@ -247,12 +278,13 @@ export async function renderArtists({ panel, list, lang = null, range = null, so
     rebuild()
     try {
       const records = await searchPublishers({
+        follows,
         q: picked.query, sort: sortKey, range: rangeKey, lang: langKey, limit: SEARCH_HITS,
       })
       if (mine !== pickSeq) return
       const hit = records.find((r) => r.guid === picked.key)
       pickedItem = hit ? toCard(hit) : null
-      if (pickedItem) pickedItem._rank = pickedItem.rank
+      if (pickedItem) { pickedItem._rank = pickedItem.rank; if (pickedItem.tied) pickedItem._tied = true }
     } catch (e) {
       if (mine !== pickSeq) return
       console.warn('[artists] search pick failed', e)
@@ -265,7 +297,7 @@ export async function renderArtists({ panel, list, lang = null, range = null, so
   async function refetchUnfiltered() {
     if (artists.length) { rebuild(); return }
     try {
-      const page = await loadPublisherPage({ sort: sortKey, range: rangeKey, lang: langKey, q: query || null, offset: 0 })
+      const page = await loadPublisherPage({ follows, sort: sortKey, range: rangeKey, lang: langKey, q: query || null, offset: 0 })
       artists = page.items
       nextOffset = page.nextOffset
     } catch (e) {
@@ -281,7 +313,7 @@ export async function renderArtists({ panel, list, lang = null, range = null, so
     const mine = ++seq
     loading = true
     try {
-      const page = await loadPublisherPage({ sort: sortKey, range: rangeKey, lang: langKey, q: query || null, offset: 0 })
+      const page = await loadPublisherPage({ follows, sort: sortKey, range: rangeKey, lang: langKey, q: query || null, offset: 0 })
       if (mine !== seq) return
       artists = page.items
       nextOffset = page.nextOffset
@@ -300,7 +332,7 @@ export async function renderArtists({ panel, list, lang = null, range = null, so
   // always fetches and is the one that can render a placeholder.
   let first
   try {
-    first = await loadPublisherPage({ sort: sortKey, range: rangeKey, lang: langKey, offset: 0 })
+    first = await loadPublisherPage({ follows, sort: sortKey, range: rangeKey, lang: langKey, offset: 0 })
   } catch (e) {
     console.error('[artists] index fetch failed', e)
     renderPlaceholder(list, ...copy.loadFail)
@@ -312,7 +344,7 @@ export async function renderArtists({ panel, list, lang = null, range = null, so
   list.className = ''
   list.replaceChildren(cards, moreWrap)
 
-  mountFeedNote(panel, langNote(copy.noteGlobal, langKey, langLabel, copy.noun))
+  mountFeedNote(panel, langNote(follows ? copy.noteFollows : copy.noteGlobal, langKey, langLabel, copy.noun))
 
   function applyRange(key) {
     if (key === rangeKey) return
@@ -342,7 +374,7 @@ export async function renderArtists({ panel, list, lang = null, range = null, so
     if (key === langKey) return
     langKey = key
     langLabel = label || langLabelFor(key)
-    mountFeedNote(panel, langNote(copy.noteGlobal, langKey, langLabel, copy.noun))
+    mountFeedNote(panel, langNote(follows ? copy.noteFollows : copy.noteGlobal, langKey, langLabel, copy.noun))
     document.dispatchEvent(new CustomEvent('lb:feed-lang', {
       detail: { feed: feedKey, lang: langKey === LANG_ALL ? '' : langKey },
     }))
@@ -413,6 +445,7 @@ export async function renderArtists({ panel, list, lang = null, range = null, so
     },
     searchRemote: async (qText, { signal }) => {
       const records = await searchPublishers({
+        follows,
         q: qText, sort: sortKey, range: rangeKey, lang: langKey, signal,
       })
       return records.map((r) => ({

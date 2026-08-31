@@ -45,9 +45,9 @@
  * All three are now en-US in UTC, which is what episode-card.js and
  * functions/_shared/detail-page.js already do. The site has one date format.
  */
-import { showPageHref, episodePageHref } from './show-link.js?v=ob-v166'
-import { coverChain } from './cover-art.js?v=ob-v166'
-import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v166'
+import { showPageHref, episodePageHref } from './show-link.js?v=ob-v170'
+import { coverChain } from './cover-art.js?v=ob-v170'
+import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v170'
 
 const esc = htmlEscape
 
@@ -78,6 +78,8 @@ export const COPY = {
     sortTitle: 'Sort shows',
     // The line above the search box. See mountFeedNote in feed-controls.js.
     noteGlobal: 'Ranks based on every boost in the index',
+    noteFollows: 'Ranks based on only boosts from the accounts you follow',
+    noFollows: ['You’re not following anyone yet', 'Follow some npubs in any Nostr client and the shows they boost will show up here.'],
     moreLabel: (n) => `Load ${n} more show${n === 1 ? '' : 's'}`,
     // No total to count against: the endpoint pages rather than reporting how
     // many shows the range holds, so this states what is on screen and nothing
@@ -114,6 +116,8 @@ export const COPY = {
     rangeTitle: (days) => (days ? `Albums boosted in the last ${days} days` : 'All time'),
     sortTitle: 'Sort albums',
     noteGlobal: 'Ranks based on every boost in the index',
+    noteFollows: 'Ranks based on only boosts from the accounts you follow',
+    noFollows: ['You’re not following anyone yet', 'Follow some npubs in any Nostr client and the albums they boost will show up here.'],
     moreLabel: (n) => `Load ${n} more album${n === 1 ? '' : 's'}`,
     countLine: (shown) => `Showing ${shown}`,
     searchPlaceholder: 'Search albums…',
@@ -139,9 +143,9 @@ export function copyFor(medium) {
 
 // ── Range + sort ──────────────────────────────────────────────────────
 // The range filters on BOOST time: a show is in the 1W view if it was boosted in
-// the last 7 days, and its numbers are that week's numbers. The Episodes feeds'
-// identical buttons mean episode AIR DATE, which is a different axis; each feed
-// writes its own tooltips for exactly that reason. See CLAUDE.md.
+// the last 7 days, and its numbers are that week's numbers. Since 2026-08-31
+// that is the ONE reading site-wide — the Episodes feeds' identical buttons
+// retired their air-date axis the same day. See Range and sort in docs/feeds.md.
 //
 // On the absence of an episode count: there used to be a fifth axis here, 'Most
 // episodes', and a matching figure on every card. Both are gone. Sats, boosts
@@ -151,6 +155,14 @@ export function copyFor(medium) {
 // value out in the world — so printing one next to a show's name reads as a
 // claim about the show, and ours is not that claim.
 export const SORT_OPTIONS = [
+  /* ⚠️ THE ONLYBOOSTS CHARTS — rank in sats + rank in boosts + rank in
+   * boosters, summed, lowest total first; see "The OnlyBoosts Charts" in
+   * docs/feeds.md. Server-ranked on every row (rank + tie flag through
+   * toCard); the renderer never renumbers chart rows. First in the menu as
+   * the composite the single-axis sorts feed into, and the feeds OPEN on it
+   * since 2026-08-31 — the opening constant is pinned to functions/index.js
+   * (FEED.sort) and shows-feed.js (DEFAULT_SORT), which move together. */
+  ['chart', 'Chart rank'],
   ['boosters', 'Most boosters'],
   ['boosts', 'Most boosts'],
   ['sats', 'Most sats'],
@@ -159,7 +171,7 @@ export const SORT_OPTIONS = [
 
 // Sorts where a position means something, so the card gets a rank number.
 // 'latest' is chronology, not standing.
-export const RANKED_SORTS = new Set(['boosts', 'sats', 'boosters'])
+export const RANKED_SORTS = new Set(['chart', 'boosts', 'sats', 'boosters'])
 
 // Show cards per page, and per "Load more" batch. ⚠️ ONE NUMBER, READ BY BOTH
 // SIDES: functions/_shared/show-cards.js re-exports it and shows-feed.js
@@ -241,6 +253,8 @@ export function toCard(p) {
     episodes: num(p.episodes),
     latest: num(p.latest),
     rank: Number.isFinite(p.rank) ? p.rank : null,
+    // The chart sort's corpus-true tie flag, riding beside its rank.
+    tied: p.tied === true,
   }
 }
 

@@ -90,9 +90,9 @@ restating a control the page already has.
 | Songs · Follows | `#songs-follows` | same, filtered to your kind-3 contacts |
 | Members · Global | `#members` | the kind-1 boost notes themselves |
 | Members · Follows | `#members-follows` | same, filtered to your kind-3 contacts |
-| Shows | `#shows` | per-show rollup, Global only |
-| Albums | `#albums` | the same rollup, music feeds only, Global only |
-| Artists | `#artists` | the publisher tier above Albums, Global only |
+| Shows | `#shows` / `#shows-follows` | per-show rollup; Follows since 2026-08-31 |
+| Albums | `#albums` / `#albums-follows` | the same rollup, music feeds only |
+| Artists | `#artists` / `#artists-follows` | the publisher tier above Albums |
 
 The inline feed-bar controller in `index.html` owns the tabs, the sub-category
 row, the scope menu, which panel is on screen, and the hash, and dispatches
@@ -153,15 +153,19 @@ measures; those are typographic, not the track.
 **A hash may carry a view: `#shows?lang=de&range=1m&sort=sats`.** The feed key
 stays intact as the part before the `?`, so `FEEDS` and `ALIASES` look up exactly
 as they did and a retired hash still upgrades. `PARAM_FEEDS` (né `LANG_FEEDS`)
-lists the seven that have the axes; the two Boosts feeds drop the parameters and
+lists the ten that have the axes; the two Boosts feeds drop the parameters and
 rewrite, the same coercion a signed-out `#episodes-follows` gets. See **The View
 In The Hash** in `docs/feeds.md` for the whole mechanism.
 
-`SCOPELESS` in that controller is the set of types with no whose-axis (`shows`,
-`albums`, `artists`) — their key is the bare type, and picking one leaves the scope *state*
-alone, so Boosts · Follows → Shows → Episodes returns you to Follows. Adding
-Shows · Follows means dropping it from that set, renaming the key and keeping
-`#shows` as an alias.
+**⚠️ `SCOPELESS` IS EMPTY SINCE 2026-08-31 AND THE BARE HASHES DID NOT BECOME
+ALIASES.** Shows, Albums and Artists gained the whose-axis with the Charts
+branch, so every feed key is `<type>-<scope>` now — and `#shows`, `#albums`
+and `#artists` are the CANONICAL hashes of the global scope through `HASH_OF`,
+the `#members` arrangement, so no link in the wild rewrites. The set itself is
+kept empty rather than deleted: `feedKey` and the scope-menu rule read it, and
+a future scopeless feed is one entry rather than a re-derivation. One
+behaviour changed with it, deliberately: picking Shows while on a Follows feed
+now lands on Shows · Follows, since the scope state applies everywhere.
 
 **Follows only exists for a signed-in npub.** Signed out, the scope menu is
 `hidden` outright, and a `#episodes-follows` deep link is coerced to Global with
@@ -189,11 +193,15 @@ no box; don't grow it back into the scope paragraph it replaced.
 
 ### The Landing Feed
 
-**The front door opens on Shows / All time / Most boosters.** Reed's call,
-2026-08-23, shipping the last piece of the tabs work (Phase D, idea #18). The
-show-level leaderboard is the view that answers "what is this site" to somebody
-who has never seen it; the episode feed is one press away on the sub-row above
-it. It opened on Episodes · Global from the day the feed bar existed.
+**The front door opens on Shows / All time / Chart rank.** Two Reed calls:
+Shows on 2026-08-23 (Phase D, idea #18, shipping the last piece of the tabs
+work), and Chart rank on 2026-08-31, when the OnlyBoosts Charts became the
+opening sort on **every ranked feed at once** — Shows, Albums, Artists,
+Episodes and Songs, both scopes, plus the members wall. The show-level
+leaderboard is the view that answers "what is this site" to somebody who has
+never seen it; the episode feed is one press away on the sub-row above it. It
+opened on Episodes · Global from the day the feed bar existed, and on Most
+boosters from Phase D to the Charts flip.
 
 **⚠️ IT IS THREE DECLARATIONS AND THEY MOVE TOGETHER.** Any one of them alone is
 a page that contradicts itself, and `test-server-render.mjs` pins all three:
@@ -211,13 +219,19 @@ Podcasts href (`/#episodes-global`), so changing it is the nav's decision as muc
 as the page's. A change that makes those two constants agree has almost
 certainly merged them.
 
-**⚠️ THE OPENING SORT IS `boosters` ON BOTH ROLLUPS, and only one of them moved.**
-`shows-feed.js` opened on `boosts` (raw volume) and is now `boosters` — distinct
-people, because one listener boosting a show forty times is one vote, not forty.
-`feeds-podcasts.js` was **already** there: its key for that ranking is spelled
-`count`, which is the episodes endpoint's own name for it, and setting it to
-`boosters` would be an unknown sort key silently falling back to Latest boost.
-The two endpoints disagree about the word and agree about the ranking.
+**⚠️ THE OPENING SORT IS `chart` ON EVERY RANKED FEED — one key, one
+spelling.** *Reed's call, 2026-08-31.* The OnlyBoosts Charts is deliberately
+spelled `chart` on all four ranked endpoints, so the default is the first sort
+key the two rollups have ever agreed on. The history matters because the wart
+it stepped around is still live for the OPTION menus: the boosters ranking is
+spelled `count` on the episodes endpoint and `boosters` on the shows endpoint,
+and each renderer coerces the other's word to its default — that coercion now
+lands on `chart`. `shows-feed.js` opened on `boosts`, then `boosters` (Phase
+D: distinct people, because one listener boosting a show forty times is one
+vote, not forty), now `chart`; `feeds-podcasts.js` opened on `boosts`, then
+`count`, now `chart`. Breadth stays in the chart as both a component and the
+first tiebreaker, which is what made the flip a sharpening of the Phase-D
+argument rather than a reversal.
 
 **The Function renders ONE feed and it is the one on screen** — see the ⚠️ under
 the rendering rule for why, and for why `feeds-podcasts.js#adoptServerCards` is
@@ -238,11 +252,17 @@ Adding a third medium is a third entry in those tables, not a third renderer.
 the ARTIST.** `<podcast:publisher>` links an album feed to its artist's own
 publisher feed; the collector resolves it from raw RSS (PI carries no publisher
 field — `bots/global-boost-scan/publishers.py` is that design record) and the
-Artists feed (`#artists`, shipped 2026-08-30) ranks them. **The Artists ENDPOINT
-takes no medium** — the tier is ownership, and 9 of the 395 declaring shows are
-podcasts — while the SURFACE sits under the Music tab because the tag is a
-music-host feature (measured zero coverage outside the music hosts). **The
-Artists feed** in `docs/feeds.md` carries the seven decisions behind it.
+Artists feed (`#artists`, shipped 2026-08-30) ranks them. **⚠️ THE ARTIST TIER
+COUNTS MUSIC ONLY — hard-wired server-side since 2026-08-31.** *Reed's call,
+reversing the launch decision* (the endpoint took no medium on the argument
+that the tier is ownership, the ~9 podcast-side declaring shows counting too):
+the surface says ARTIST and sits under the Music tab, so an artist's figures
+are their music's figures on every surface — the listing, the detail endpoint,
+`/artist` (whose `#shows` section was removed the same day), and the
+feed-rank chips, all on the standing `COALESCE(medium,'podcast') = 'music'`
+partition reading. An artist's podcast-side shows still live on Shows/Episodes
+and their own `/show` pages; they are simply not part of the tier. **The
+Artists feed** in `docs/feeds.md` carries the rest of the decisions.
 
 **⚠️ The split is a partition, not a narrowing.** `music` goes to Songs and
 Albums; **everything else** goes to Episodes and Shows — podcasts, the two video
@@ -261,10 +281,12 @@ rewriting every month archive.
 `not_medium=music` and answer already split, so the browser never reconciles two
 datasets.
 
-Songs has the Global/Follows axis and Albums doesn't. That asymmetry is about
-the data source, not the medium: `feeds-podcasts.js` never reads the show-level
-rollup, so its follows path works unchanged. See the scope note in
-`shows-feed.js`.
+Every feed on both sides of the split has the Global/Follows axis since
+2026-08-31. The old asymmetry (Songs had it, Albums didn't) was about the data
+source: the show-level rollup read a published aggregate computed over
+everyone. Server-side ranking retired that, and `/api/v1/podcasts` and
+`/api/v1/publishers` now take the same follows POST `/api/v1/episodes` always
+had. See the scope note in `shows-feed.js`.
 
 **⚠️ THE TWO COMMUNITY ROLLUPS WERE THE EXCEPTION AND ARE NOT ANY MORE.**
 *Reed's call, 2026-08-24.* `#community-shows` on `/show` and
@@ -292,8 +314,9 @@ heading**, never this list widened again under a narrower name.
 misreport what they wrote. The **booster page** would file one person under two
 half-histories, so its headings still read "Shows and Albums" and "Episodes and
 Songs" and it carries no `COPY` table at all. `episode-section.js`'s range
-tooltip stays medium-neutral ("aired or released") because it serves the
-booster page's rollup too.
+tooltip reads "Boosted in the last N days" — one reading of `range`
+site-wide since 2026-08-31 — which also serves the booster page's unsplit
+rollup with no medium-neutral dance.
 
 ## Where this code came from
 
@@ -414,21 +437,25 @@ Sixteen test scripts, all plain `node scripts/<name>.mjs` with no runner:
 | `test-feed-search.mjs` | the search box's two outcomes, driving the **shipped** `mountFeedSearch` against a stub DOM: Enter submits the whole query where a feed supplies `onSubmit`, arrow + Enter still picks, emptying the box or Escape clears through `onPick(null)`, the footer row renders — and **the member lookup, with no `onSubmit`, keeps its old Enter**. Confirmed red on two mutations: auto-highlight restored, and the empty-box clear removed |
 | `test-hpw-cards.mjs` | the 40 HPW share cards, three halves: `hpw-board.js`'s two-sided rules (a **source** scan for absolute imports, `Date.now()` and unpinned locales, plus the row's escaping and `isSafeUrl` on the face); `hpw-share.js`'s pure parts (the note's shape, the link rule, the tags, the `window` listener); the **shipped** `/hpw` Function over a `node:sqlite` build of the real schema (every redirect, the 404s, the page's canonical and `og:image`, the card's frame and ready signal, and that the page carries `rowHtml` byte for byte); and `/api/og/hpw/<name>.png` with **`fetch` stubbed** (the allowlist, the upstream's 200-for-missing answered with the banner, the PNG signature, the 900KB cap, HEAD). Nothing in it touches the VPS |
 | `test-publishers-api.mjs` | the **shipped** `/api/v1/publishers` handlers — listing and per-artist detail — over a `node:sqlite` build of the real `schema.sql`, on the members-search pattern. Three sorts with three winners, the boost-time windows, the language filter recounting through the declaring shows (`lang=unknown` included), LIKE-wildcard decoys, rank retention on `q=`, the title-less publisher's exclusion, HEAD, the album list's publisher-order and its live-row-over-edge-hint preference |
+| `test-charts.mjs` | the OnlyBoosts Charts: `sort=chart` on the **shipped** handlers of all four ranked endpoints over a `node:sqlite` build of the real `schema.sql`. **Expectations are brute-forced from an independent JS implementation of the rule**, one boost list feeding both sides; a micro-corpus that inverts if the tiebreak chain is reordered; `q=` rank retention with pre-filter tie flags; the follows-POST chart on all three POSTing endpoints (podcasts and publishers gained theirs in phase 2, with `publisher=` and boost-time `since=` for the drawers' follows paths); `feedRanks`' chart place and the tiles' Charts line. Confirmed red on five mutations: the tuple tiebreak removed, the chain flipped in members.js and again in feed-rank.js, `peers` counted post-filter, and the podcasts POST's follows filter dropped |
 
 **⚠️ `test-server-render.mjs` IS THE ONE THAT NEEDS AN ARGUMENT, SO IT IS THE ONE
 THAT GOES UNRUN.** Its header carries the `curl` that produces the capture; take
 a fresh one rather than reusing an old file, since it is also the size
 measurement. It asserted `cards are numbered 1..N with no gaps` — the *ordinal*
 scheme's invariant — until competition ranking shipped on 2026-08-18, and it
-would have been merged red had it not been run. **Run all sixteen before a
+would have been merged red had it not been run. **Run all seventeen before a
 merge**, and treat this one as the guard on the ranking scheme rather than only
-on weight. *(It read "all twelve" until 2026-08-24 and "all fifteen" until 2026-08-30, contradicting the table
+on weight. *(It read "all twelve" until 2026-08-24, "all fifteen" until 2026-08-30 and "all sixteen" until 2026-08-31, contradicting the table
 directly above it — the count moved when a test was added and this sentence did
 not. If the table grows again, this line grows with it.)*
 
 **⚠️ AND ITS `curl` CHANGED WITH THE LANDING FEED.** It captures
-`/api/v1/podcasts?not_medium=music&sort=boosters&range=all&limit=25` now, not the
-episodes query. The whole file was rewritten by Phase D, which is the honest
+`/api/v1/podcasts?not_medium=music&sort=chart&range=all&limit=25` now (it read
+`sort=boosters` until the Charts became the opening sort on 2026-08-31 — and
+until a deploy serving `sort=chart` is live, production coerces the unknown
+key, so the capture is built through the shipped handler instead; the test's
+header carries the recipe), not the episodes query. The whole file was rewritten by Phase D, which is the honest
 measure of how big that change was: the landing feed is not a constant this test
 could have been parameterised by, since the two cards share no renderer, no state
 element and no drawer. `git show 4c22017:scripts/test-server-render.mjs` is the
@@ -1384,9 +1411,12 @@ renderer on first view.
 | `episodes-follows` | `feeds-podcasts.js` | the same endpoint as `POST`, body `{follows:[…]}` |
 | `songs-global` | `feeds-podcasts.js` | same, `medium=music` |
 | `songs-follows` | `feeds-podcasts.js` | same, `medium=music`, as `POST` |
-| `shows` | `shows-feed.js` | `GET /api/v1/podcasts?not_medium=music` |
-| `albums` | `shows-feed.js` | same, `medium=music` |
-| `artists` | `artists-feed.js` | `GET /api/v1/publishers` — the publisher tier, no medium |
+| `shows-global` | `shows-feed.js` | `GET /api/v1/podcasts?not_medium=music` |
+| `shows-follows` | `shows-feed.js` | the same endpoint as `POST`, body `{follows:[…]}` |
+| `albums-global` | `shows-feed.js` | same, `medium=music` |
+| `albums-follows` | `shows-feed.js` | same, `medium=music`, as `POST` |
+| `artists-global` | `artists-feed.js` | `GET /api/v1/publishers` — the publisher tier, music-only server-side |
+| `artists-follows` | `artists-feed.js` | the same endpoint as `POST` |
 
 **All four ranked feeds rank server-side.** They used to build a corpus in the
 browser and roll it up, which ranked over whatever shards the walk happened to
@@ -1399,23 +1429,26 @@ are queries now, and changing either refetches.**
 ### Range, sort, rank, language, search: `docs/feeds.md`
 
 **That file is the authority for everything the feed bar does.** Its sections:
-*Range and sort*, *Ranking, And The One Definition Of It*, *The Language Filter*,
-*The Bar On A Phone*, *The View In The Hash*, *Search*, *The Shows feed*.
+*Range and sort*, *Ranking, And The One Definition Of It*, *The OnlyBoosts
+Charts*, *The Language Filter*, *The Bar On A Phone*, *The View In The Hash*,
+*Search*, *The Shows feed*.
 
 What a change would break, restated here because each rule reaches outside that
 file:
 
-- **⚠️ `range` MEANS BOOST TIME on `/api/v1/podcasts` AND AIR DATE on
-  `/api/v1/episodes`.** A show is in the 1W view because someone boosted it this
-  week; an episode is in the 1W view because it **aired** this week, however long
-  ago it was boosted. Both are deliberate, the parameter name is shared, and
-  **there must not be a third reading.** `#boosts` and the members wall take the
-  boost-time reading.
+- **⚠️ `range` MEANS BOOST TIME, EVERYWHERE — one reading since 2026-08-31.**
+  *Reed's call*, retiring the air-date reading `/api/v1/episodes` inherited
+  from LB (it served a different purpose there, and here it made the music
+  windows structurally near-empty: 612 of 618 boosted tracks were older than
+  30 days). A row is in the 1W view because someone **boosted** it this week,
+  and a windowed card's figures — and its drawer's notes — are the window's
+  own, recomputed over the window's boosts. Air date survives as the "Latest
+  episode" SORT and as the date on the card; it is never a window again.
 - **`RANGE_DAYS` in `functions/api/v1/episodes.js` and `…/podcasts.js` and
   `RANGE_OPTIONS` move together**, or a range button answers 400.
 - **⚠️ THE HASH CARRIES THE WHOLE VIEW: `#shows?lang=de&range=1m&sort=sats`.**
   Language shipped alone on 2026-08-17; **range and sort joined on 2026-08-27,
-  Reed's ask**. They ride the six `PARAM_FEEDS` (né `LANG_FEEDS`) feeds and
+  Reed's ask**. They ride the ten `PARAM_FEEDS` (né `LANG_FEEDS`) feeds and
   deliberately not the Members feeds, which have the controls but no shareable
   view. **A default value is elided**, so the bare `#shows` is the default view's
   address — and because the two endpoints spell the boosters ranking differently
@@ -1428,6 +1461,17 @@ file:
   `rankLabel()` owns both forms of the tie marker — `T4` on a feed card, `T#4` in
   a detail-page tile. Dense ranking was measured and rejected; **no denominator,
   anywhere.**
+- **⚠️ THE ONLYBOOSTS CHARTS: `sort=chart`, ONE SPELLING ON ALL FOUR RANKED
+  ENDPOINTS, AND ITS TIEBREAK LIVES INSIDE THE WINDOW.** Rank in sats + rank in
+  boosts + rank in the breadth key (boosters; shows boosted for a member),
+  summed, lowest total first; ties break breadth → sats → boosts, the rest
+  share a `T#`. The standing is the tuple, so — alone among the sorts — the
+  tiebreak is part of the `RANK()` window, every row carries `rank`/`tied`
+  from the server, and the renderers never renumber chart rows. Computed at
+  query time deliberately (no collector precompute; Follows forces the
+  query-time path to exist). The members wall opens on it; the detail pages
+  draw its top-100 line above the stat tiles. **See *The OnlyBoosts Charts*
+  in `docs/feeds.md`** — the design record — and `test-charts.mjs`.
 - **⚠️ `competitionRanks` ASSUMES THE LIST IS ALREADY ORDERED BY THE VALUE IT
   RANKS**, and returns confident nonsense otherwise. Every caller satisfies it by
   construction; a new one has to check.
@@ -1465,7 +1509,7 @@ data attributes, and in the Rules dialog's title.
 
 **`docs/members-tab.md` is the authority**: the four-section idiom and its
 shells, the #40HPW rules and every measurement behind them, the week picker, the
-member wall's three orderings, the lookup, the member search endpoint, the Boost
+member wall's four orderings (Chart rank the default since 2026-08-31), the lookup, the member search endpoint, the Boost
 Bots section, and the intro copy. Nearly every paragraph in it is a Reed call.
 
 What a change elsewhere would break:
@@ -1604,9 +1648,9 @@ the publisher tier's landing page, structured as the album page one level up
 (Reed's spec): hero, Nostr Boost Stats tiles with the rank chip (`feedRanks`
 gained a `publisher` kind ranking on the Artists feed), **#albums** ("Albums
 with Nostr Boosts", the indexed declaring MUSIC shows by sats, the
-episode-drawer chrome) with **#shows** ("Shows with Nostr Boosts") beside
-it for the not-music declaring shows — the medium partition, because 9
-declaring shows are podcasts and a heading names only what is under it —
+episode-drawer chrome — **the page's one show list since 2026-08-31**, when
+the artist tier went music-only and the launch-day `#shows` section for the
+not-music declaring shows was REMOVED, a removal rather than a rename),
 **#community-artists** ("Other Artists This Community Boosts",
 the /show community rollup one tier up — NOT medium-split, because every row
 is a publisher and there is no partition to cross), the **#community** wall,
@@ -2141,7 +2185,7 @@ would. Never remove an entry** — those links are in the wild.
 | `artists-feed.js` | the feed around that card, behind Artists — the publisher tier |
 | `functions/api/v1/publishers.js` + `…/publishers/[guid].js` | the artist rollup and the per-artist album list, off the collector's publisher pass |
 | `supporter-wall.js` + `supporter-wall.css` | **the** community wall, shared by `/show`, `/episode`, `/artist` and the Members tab |
-| `members-board.js` | the Members tab: the #40HPW boards and their week picker, the wall and its three orderings, the Rules dialog |
+| `members-board.js` | the Members tab: the #40HPW boards and their week picker, the wall and its four orderings (Chart rank the default), the Rules dialog |
 | `feed-controls.js` / `feed-search.js` | the range/sort chrome and the per-feed typeahead |
 | `feed-lang.js` | the language menu on the four ranked feeds, and the copy it rewrites |
 | `boosts-thread.js` / `boost-actions.js` | the content tokenizer and reply / like / repost / zap |
@@ -2183,20 +2227,16 @@ would. Never remove an entry** — those links are in the wild.
    on 2026-08-23 rather than built or redirected: the Members tab answers what
    it promised. See the Stats row of the site map.
 
-2. **Shows · Follows.** The scope menu is hidden on Shows because the show-level
-   rollup is computed over everyone. See the scope note at the top of
-   `shows-feed.js`.
-
-3. **A crawlable show directory.** ~930 show pages are reachable only through the
+2. **A crawlable show directory.** ~930 show pages are reachable only through the
    sitemap and through links on other pages. See the note in
    `functions/sitemap.xml.js`.
 
-4. **Bug relay write-policy.** `BUG_TAG` is `onlyboosts-alpha` in both
+3. **Bug relay write-policy.** `BUG_TAG` is `onlyboosts-alpha` in both
    `login-widget/src/lib/bugReport.js` and `bots/bug-watcher/watcher.js`, but
    `relay.mynostr.app`'s strfry write-policy plugin still has to whitelist that
    literal string. **VPS-side — reports are silently rejected until it's made.**
 
-5. **Dead LB code — mostly gone, one layer left.** The bulk of it was deleted
+4. **Dead LB code — mostly gone, one layer left.** The bulk of it was deleted
    on 2026-08-23 (`git show 75f88ef` and the commit after it); what that
    removed and what it did not is under **What The Strip Removed** below.
 
@@ -2210,7 +2250,7 @@ would. Never remove an entry** — those links are in the wild.
    it somewhere else**: the NIP-47 codes moved into the shared classifier, so
    that path gets them whether or not it ever gains a caller.
 
-6. **Typography.** The brand wordmark is a bold sans; the site is still on LB's
+5. **Typography.** The brand wordmark is a bold sans; the site is still on LB's
    Playfair Display / Source Serif 4. It reads fine, but the serif is inherited,
    not chosen. Only those two families are self-hosted in `assets/fonts/`.
    **The widget now reads both as `--font-display` / `--font-body` tokens**, so

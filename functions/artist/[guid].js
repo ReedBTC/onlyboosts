@@ -12,19 +12,21 @@
 //   /booster/<npub>   one person, and everything they have boosted
 //   /artist/<guid>    one ARTIST, and the albums / audience under them
 //
-// THE SECTIONS, the show page's set one tier up (Reed's spec plus his two
-// follow-ups the same day): "Albums with Nostr Boosts" — and, where the
-// artist also declares podcasts, "Shows with Nostr Boosts" beside it — then
-// "Other Artists This Community Boosts", the Nostr Community wall, and
-// #boosts with the shared range/sort machinery.
+// THE SECTIONS, the show page's set one tier up (Reed's spec): "Albums with
+// Nostr Boosts", then "Other Artists This Community Boosts", the Nostr
+// Community wall, and #boosts with the shared range/sort machinery.
 //
-// ⚠️ THE DECLARING SHOWS ARE PARTITIONED ON MEDIUM, the site's standing rule:
-// 9 of the 395 declaring shows are podcasts (Reed caught V4V Roundtable under
-// an "Albums" heading on the preview), and the heading and the split are ONE
-// decision — music to #albums, everything else (podcasts, video, unidentified)
-// to #shows, each section rendered only when it holds something. The STAT
-// TILES still aggregate both halves: the tier is ownership, and the two
-// sections together hold exactly the shows the figures were computed over.
+// ⚠️ MUSIC ONLY, EVERYWHERE ON THIS PAGE — Reed's call, 2026-08-31, reversing
+// the launch arrangement (a #shows section for the not-music declaring shows
+// beside #albums, with the tiles aggregating both halves, the tier being
+// ownership). The surface says ARTIST and lives under Music, so every query
+// here filters the declaring shows to COALESCE(medium,'podcast') = 'music':
+// the tiles, the album list, the community rollup, the wall and the boost
+// list all describe one music corpus, matching /api/v1/publishers. An
+// artist's podcast-side shows still exist on Shows/Episodes and their own
+// /show pages; they are simply not part of the artist tier. The #shows
+// section is GONE (a removal, not a rename — the frozen-id rule guards
+// renames); its id lives on at /show, where it always also existed.
 //
 // ⚠️ INDEX-ONLY, like the Artists feed's drawer (Reed's call, 2026-08-30): the
 // album list is `podcasts WHERE publisher_guid` — the shows whose boosts are
@@ -92,12 +94,15 @@ export async function onRequestGet({ env, params }) {
        FROM publishers WHERE publisher_guid = ?`
     ).bind(guid).first(),
 
-    // The indexed albums, ranked by what they took — the same list, in the
-    // same order, as /api/v1/publishers/<guid> serves the feed card's drawer.
+    // The indexed MUSIC albums, ranked by what they took — the same list, in
+    // the same order, as /api/v1/publishers/<guid> serves the feed card's
+    // drawer. Filters literal, not bound: the extracted-SQL tests keep their
+    // parameter shape.
     env.DB.prepare(
       `SELECT podcast_guid, title, image, artwork, medium,
               boost_count, total_sats, booster_count, latest_ts
        FROM podcasts WHERE publisher_guid = ?
+         AND COALESCE(medium,'podcast') = 'music'
        ORDER BY total_sats DESC, podcast_guid LIMIT ?`
     ).bind(guid, ALBUMS_CAP).all(),
 
@@ -110,7 +115,8 @@ export async function onRequestGet({ env, params }) {
               MAX(b.created_at) AS latest_ts
        FROM boosts b
        JOIN podcasts pc ON pc.podcast_guid = b.podcast_guid
-       WHERE pc.publisher_guid = ?`
+       WHERE pc.publisher_guid = ?
+         AND COALESCE(pc.medium,'podcast') = 'music'`
     ).bind(guid).first(),
 
     // What else this artist's community boosts — the show page's community
@@ -135,6 +141,7 @@ export async function onRequestGet({ env, params }) {
          FROM boosts b
          JOIN podcasts pc ON pc.podcast_guid = b.podcast_guid
          WHERE pc.publisher_guid = ?
+           AND COALESCE(pc.medium,'podcast') = 'music'
        )
        SELECT pc.publisher_guid, pub.title, pub.image, pub.artwork,
               COUNT(*)                         AS cs_boosts,
@@ -146,6 +153,7 @@ export async function onRequestGet({ env, params }) {
        JOIN publishers pub ON pub.publisher_guid = pc.publisher_guid
        WHERE pc.publisher_guid <> ?
          AND pub.title IS NOT NULL
+         AND COALESCE(pc.medium,'podcast') = 'music'
        GROUP BY pc.publisher_guid
        ORDER BY cs_members DESC, cs_boosts DESC, cs_sats DESC, pc.publisher_guid
        LIMIT ?`
@@ -167,6 +175,7 @@ export async function onRequestGet({ env, params }) {
        JOIN podcasts pc ON pc.podcast_guid = b.podcast_guid
        LEFT JOIN profiles pr ON pr.pubkey = b.booster_pubkey
        WHERE pc.publisher_guid = ?
+         AND COALESCE(pc.medium,'podcast') = 'music'
        GROUP BY b.booster_pubkey
        ORDER BY sats DESC, boosts DESC, b.booster_pubkey
        LIMIT ?`
@@ -186,6 +195,7 @@ export async function onRequestGet({ env, params }) {
        LEFT JOIN episodes e ON e.item_guid = b.item_guid
        LEFT JOIN profiles pr ON pr.pubkey = b.booster_pubkey
        WHERE p.publisher_guid = ?
+         AND COALESCE(p.medium,'podcast') = 'music'
        ORDER BY b.created_at DESC, b.event_id DESC LIMIT ?`
     ).bind(guid, BOOSTS_SHOWN).all(),
   ]);
@@ -248,11 +258,9 @@ export async function onRequestHead(ctx) {
 
 function renderArtistPage({ pub, albums, totals, community, supporters, boosts, names, ranks }) {
   const title = pub.title;
-  /* The medium partition, the same COALESCE reading every other surface takes:
-   * music one way, EVERYTHING else — podcasts, video, and shows the collector
-   * cannot identify — the other. */
-  const albumRows = albums.filter((a) => a.medium === "music");
-  const showRows = albums.filter((a) => a.medium !== "music");
+  // Every row is music by the query's own filter; the variable keeps its name
+  // because everything downstream reads it.
+  const albumRows = albums;
   const pageUrl = `${SITE_ORIGIN}/artist/${encodeURIComponent(pub.publisher_guid)}`;
   const art = isSafeUrl(pub.image) ? pub.image : null;
   const art2 = isSafeUrl(pub.artwork) && pub.artwork !== art ? pub.artwork : null;
@@ -261,7 +269,6 @@ function renderArtistPage({ pub, albums, totals, community, supporters, boosts, 
   // The one string that travels without the page around it — full scope
   // sentence, never trimmed. Same rule as every other detail page.
   const albumCount = albumRows.length;
-  const showCount = showRows.length;
   const one = totals.boosters === 1;
   const ogDesc =
     `${num(totals.boosters)} Nostr booster${one ? " has" : "s have"} sent ` +
@@ -342,16 +349,16 @@ function renderArtistPage({ pub, albums, totals, community, supporters, boosts, 
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v166" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v166" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v166" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v166" />
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v166" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v166" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v170" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v170" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v170" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v170" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v170" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v170" />
   <!-- The boost note card and its reaction bar, for #boosts — the same
        .note-card every other detail page's list paints. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v166" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v166" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v170" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v170" />
 </head>
 <body data-artist-guid="${htmlEscape(pub.publisher_guid)}">
 
@@ -480,11 +487,9 @@ function renderArtistPage({ pub, albums, totals, community, supporters, boosts, 
     <span class="show-back-arrow" aria-hidden="true">←</span><span data-back-label>All Artists</span>
   </a>
 
-  ${renderHeader(pub, art, art2, title, albumCount, showCount, totals, stats, ranks)}
+  ${renderHeader(pub, art, art2, title, albumCount, totals, stats, ranks)}
 
   ${renderAlbums(albumRows)}
-
-  ${renderShows(showRows)}
 
   ${renderCommunityArtists(community)}
 
@@ -566,12 +571,12 @@ function renderArtistPage({ pub, albums, totals, community, supporters, boosts, 
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav.js?v=ob-v166" defer></script>
-<script src="/assets/js/artist-page.js?v=ob-v166" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v170" defer></script>
+<script src="/assets/js/artist-page.js?v=ob-v170" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v166"></script>
-<script src="/assets/js/sw-register.js?v=ob-v166" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v170"></script>
+<script src="/assets/js/sw-register.js?v=ob-v170" defer></script>
 </body>
 </html>`;
 }
@@ -582,7 +587,7 @@ function renderArtistPage({ pub, albums, totals, community, supporters, boosts, 
 // INDEXED albums — every one has a boost, so the number is a claim about this
 // index and not about the artist's catalogue, which is the same honesty rule
 // that keeps episode counts off every surface.
-function renderHeader(pub, art, art2, title, albumCount, showCount, totals, stats, ranks) {
+function renderHeader(pub, art, art2, title, albumCount, totals, stats, ranks) {
   return `<header class="show-hero">
     <div class="show-hero-inner">
       <div class="show-art">${
@@ -595,10 +600,7 @@ function renderHeader(pub, art, art2, title, albumCount, showCount, totals, stat
         <h1>${htmlEscape(title)}</h1>
         <p class="show-sub">${
           [
-            [
-              albumCount ? `${num(albumCount)} album${albumCount === 1 ? "" : "s"}` : null,
-              showCount ? `${num(showCount)} show${showCount === 1 ? "" : "s"}` : null,
-            ].filter(Boolean).join(" and ") + " with Nostr Boosts",
+            `${num(albumCount)} album${albumCount === 1 ? "" : "s"} with Nostr Boosts`,
             totals.latest_ts ? `Last boosted ${htmlEscape(relTime(totals.latest_ts))}` : null,
           ].filter(Boolean).join(" · ")
         }</p>
@@ -658,23 +660,9 @@ function renderAlbums(rows) {
   </section>`;
 }
 
-/* The not-music half of the partition, its own section with its own heading —
- * never the albums list widened under a narrower name (the community-rollup
- * lesson, one tier up). Same drawer, same row, same sort machinery; only the
- * heading, the id and the glyph differ. */
-function renderShows(rows) {
-  if (!rows.length) return "";
-
-  return `<section class="show-section show-section--bare" id="shows">
-    <details class="ep-drawer" open data-artist-albums>
-      <summary>Shows with Nostr Boosts<span class="drawer-hint" aria-hidden="true"></span></summary>
-      <div class="cs-controls" data-al-controls hidden></div>
-      <ul class="ep-list" data-al-list>
-        ${rows.map((a) => albumRow(a)).join("\n        ")}
-      </ul>
-    </details>
-  </section>`;
-}
+/* The #shows section (the not-music declaring shows) lived here from launch
+ * to 2026-08-31, when Reed made the artist tier music-only — see the header.
+ * A removal, not a rename; git has the section if the tier ever widens. */
 
 function albumRow(a) {
   const art = isSafeUrl(a.image) ? a.image : null;
@@ -770,10 +758,10 @@ function notFound(guid) {
   <meta name="robots" content="noindex" />
   <title>Artist not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v166" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v166" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v166" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v166" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v170" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v170" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v170" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v170" />
 </head>
 <body>
 <section class="page-header">
@@ -791,7 +779,7 @@ function notFound(guid) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v166" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v170" defer></script>
 </body>
 </html>`;
   return new Response(html, {

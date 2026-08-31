@@ -23,20 +23,20 @@
  * objects with different hooks, and merging them would put a switch inside the
  * seam.
  */
-import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v166'
-import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v166'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v166'
-import { withBoostBusy } from '/assets/js/boost-button.js?v=ob-v166'
-import { wireArt2 } from '/assets/js/detail-page.js?v=ob-v166'
-import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v166'
-import { getShowEpisodes } from '/assets/js/ob-live.js?v=ob-v166'
+import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v170'
+import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v170'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v170'
+import { withBoostBusy } from '/assets/js/boost-button.js?v=ob-v170'
+import { wireArt2 } from '/assets/js/detail-page.js?v=ob-v170'
+import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v170'
+import { getShowEpisodes, getShowEpisodesFollows } from '/assets/js/ob-live.js?v=ob-v170'
 // The row renderer, for a drawer that fills on open. THE SAME FUNCTION the card
 // module would have run inline, so a fetched row is byte-identical to one the
 // edge could have shipped. show-card.js is already in the graph on every surface
 // this module runs on, so a static import costs nothing.
 import {
   episodeRowsHtml, sortEpisodeRows, copyFor, num,
-} from '/assets/js/show-card.js?v=ob-v166'
+} from '/assets/js/show-card.js?v=ob-v170'
 
 const VALUE_API = '/api/value'   // Podcast Index value-block proxy (splits)
 const DRAWER_EPISODES = 50       // episodes listed per expanded show
@@ -151,10 +151,20 @@ function wireDrawer(card) {
     const guid = card.getAttribute('data-guid')
     const copy = copyFor(card.getAttribute('data-noun') === 'album' ? 'music' : 'other')
     const status = body.querySelector('[data-drawer-status]')
-    const since = num(card.closest('[data-show-list]')?.getAttribute('data-since')) || null
+    const listEl = card.closest('[data-show-list]')
+    const since = num(listEl?.getAttribute('data-since')) || null
+    /* ⚠️ THE FOLLOWS SET RIDES THE LIST CONTAINER AS A JS PROPERTY — the feed
+     * sets `obFollows` when its scope is Follows (shows-feed.js). An attribute
+     * cannot carry thousands of hex keys, and the drawer must count over
+     * exactly the corpus the card's own figures were counted over, or it
+     * contradicts the card it opened from. Global lists never set it, so this
+     * path is byte-identical to what always shipped. */
+    const follows = Array.isArray(listEl?.obFollows) && listEl.obFollows.length ? listEl.obFollows : null
 
     try {
-      const rows = await getShowEpisodes({ guid, since })
+      const rows = follows
+        ? await getShowEpisodesFollows({ guid, follows, since })
+        : await getShowEpisodes({ guid, since })
       const eps = rows.map((e) => ({
         guid: e.guid, title: e.title || '', img: e.img || '',
         date: num(e.date), num: num(e.num), url: e.url || '',

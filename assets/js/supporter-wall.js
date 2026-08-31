@@ -21,9 +21,9 @@
  * The markup is unchanged from the day it moved, byte for byte — verified by
  * rendering the original against fixtures, moving, and diffing the output.
  */
-import { num, shortId, displayName } from './boost-list.js?v=ob-v166'
-import { boosterPageHref as boosterPageUrl } from './booster-link.js?v=ob-v166'
-import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v166'
+import { num, shortId, displayName } from './boost-list.js?v=ob-v170'
+import { boosterPageHref as boosterPageUrl } from './booster-link.js?v=ob-v170'
+import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v170'
 
 /* Compact sat figures — 1435000 → "1.4M". Lives here rather than in
  * detail-page.js because the wall is its heaviest caller and this module may
@@ -142,6 +142,12 @@ const METRICS = {
             title: (r) => `${num(r.boosts)} boosts, ${num(r.sats)} sats` },
   shows:  { value: (r) => r.shows,  label: (v) => (v === 1 ? 'show' : 'shows'),
             title: (r) => `${num(r.shows)} shows boosted, ${num(r.sats)} sats` },
+  /* The Charts ordering (the Members tab's default view) shows sats — the
+   * headline figure — under each face; the chart POSITION stays off the wall,
+   * the no-numeral rule above, and the tooltip carries all three components
+   * of the score instead. */
+  chart:  { value: (r) => r.sats,   label: 'sats',
+            title: (r) => `${num(r.sats)} sats, ${num(r.boosts)} boosts, ${num(r.shows)} shows boosted` },
 };
 
 function supporterCard(r, isPodium, hidden = false, metric = 'sats') {

@@ -19,7 +19,7 @@
  * per-user and change as boosts arrive, so a page-lifetime cache would serve a
  * stale feed. The endpoints set their own short Cache-Control.
  */
-import { normalizeBoosts } from '/assets/js/ob-data.js?v=ob-v166'
+import { normalizeBoosts } from '/assets/js/ob-data.js?v=ob-v170'
 
 const BASE = '/api/v1/'
 
@@ -302,7 +302,7 @@ const EPISODE_PAGE = 60
  *   The Episodes half passes NOT_MUSIC instead of `medium: 'podcast'` — the
  *   split is a partition, so it has to keep video and undeclared feeds too.
  * @param {string}   [opts.sort]    recent|episode|count|boosts|sats
- * @param {string}   [opts.range]   1w|1m|1y|all, filtered on AIR DATE
+ * @param {string}   [opts.range]   1w|1m|1y|all, filtered on BOOST TIME (the one reading, everywhere, since 2026-08-31)
  * @param {string}   [opts.lang]    a 2-3 letter subtag, or 'unknown' for the
  *   shows that declare no `<language>` at all. Omitted or 'all' sends nothing.
  *   ⚠️ The language belongs to the SHOW, so this selects episodes whose FEED
@@ -320,6 +320,7 @@ const EPISODE_PAGE = 60
 export async function getEpisodePage({
   medium = null, sort = 'boosts', range = 'all', lang = null,
   offset = 0, limit = EPISODE_PAGE, follows = null, q = null,
+  podcast = null, since = null,
   withBoosts = true, signal,
 } = {}) {
   const qs = new URLSearchParams({
@@ -331,13 +332,20 @@ export async function getEpisodePage({
   // 'all' is the absence of a filter rather than a value the endpoint knows, so
   // an unfiltered feed sends the query string it always sent.
   if (lang && lang !== 'all') qs.set('lang', lang)
+  // One show's episodes (the show drawer's follows path) and an explicit
+  // boost-time cutoff (`since`, the drawer's data-since — applied only on the
+  // follows POST; see the endpoint's readParams).
+  if (podcast) qs.set('podcast', podcast)
+  if (since) qs.set('since', String(since))
   // Deliberately not `medium=podcast`. Both are the same 6,123 episodes today,
   // but a show that declares `video` (there are two in the index, neither with
   // an enriched boosted episode yet) would be dropped by one and kept by the
   // other, and the partition rule says everything that is not music belongs to
   // Episodes.
   if (medium === 'music') qs.set('medium', 'music')
-  else qs.set('not_medium', 'music')
+  // A single show's list is one show whichever side of the partition it is
+  // on; filtering it by medium could only ever empty it.
+  else if (!podcast) qs.set('not_medium', 'music')
 
   const init = { headers: { Accept: 'application/json' }, signal }
   if (follows && follows.length) {
@@ -405,11 +413,10 @@ export async function searchEpisodes({
 
 /* ── The show-level rollup, behind Shows and Albums ──────────────────────────
  *
- * ⚠️ `range` MEANS BOOST TIME HERE, where the episode reader above means AIR
- * DATE. A show is in the 1W view because someone boosted it this week and its
- * figures are that week's; an episode is in the 1W view because it AIRED this
- * week, however long ago it was boosted. The endpoints keep the same split, and
- * each feed writes its own tooltips for exactly this reason.
+ * `range` means BOOST TIME here as everywhere — one reading site-wide since
+ * 2026-08-31, when the episode reader above retired its LB-inherited air-date
+ * reading. A row is in the 1W view because someone boosted it this week, and
+ * its figures are that week's.
  *
  * What this replaces: the All range read the collector's published per-show
  * rollup whole (~440KB of every show, to paint thirty cards) and the windowed
@@ -438,19 +445,34 @@ const SHOW_PAGE = 60
  */
 export async function getShowPage({
   medium = null, sort = 'boosts', range = 'all', lang = null,
-  offset = 0, limit = SHOW_PAGE, q = null, signal,
+  offset = 0, limit = SHOW_PAGE, q = null, follows = null,
+  publisher = null, since = null, signal,
 } = {}) {
   const qs = new URLSearchParams({
     sort, range, limit: String(limit), offset: String(offset),
   })
   if (medium === 'music') qs.set('medium', 'music')
-  else qs.set('not_medium', 'music')
+  /* A publisher-scoped list never defaults to not_medium: the artist tier is
+   * music-only since 2026-08-31 and its callers pass medium:'music'
+   * explicitly; forcing the not-music half here would empty every drawer. */
+  else if (!publisher) qs.set('not_medium', 'music')
   if (q) qs.set('q', q)
   if (lang && lang !== 'all') qs.set('lang', lang)
+  if (publisher) qs.set('publisher', publisher)
+  // An explicit boost-time cutoff overriding the range bucket — the
+  // /api/v1/podcasts/<guid>?since= contract, now on the listing too.
+  if (since) qs.set('since', String(since))
 
-  const resp = await fetch(`${PODCASTS_API}?${qs}`, {
-    headers: { Accept: 'application/json' }, signal,
-  })
+  // Follows rides a POST, exactly as getEpisodePage's does: a contact list is
+  // too long for a query string and is caller state, not an identifier.
+  const init = { headers: { Accept: 'application/json' }, signal }
+  if (follows && follows.length) {
+    init.method = 'POST'
+    init.headers['Content-Type'] = 'application/json'
+    init.body = JSON.stringify({ follows })
+  }
+
+  const resp = await fetch(`${PODCASTS_API}?${qs}`, init)
   if (!resp.ok) throw new Error(`podcasts: HTTP ${resp.status}`)
   const data = await resp.json()
   return {
@@ -462,12 +484,26 @@ export async function getShowPage({
 /** The Shows/Albums typeahead. Same reasoning as searchEpisodes above. */
 export async function searchShows({
   q, medium = null, sort = 'boosts', range = 'all', lang = null,
-  limit = SEARCH_HITS, signal,
+  follows = null, limit = SEARCH_HITS, signal,
 } = {}) {
   const text = typeof q === 'string' ? q.trim() : ''
   if (text.length < SEARCH_MIN_CHARS) return []
   const { records } = await getShowPage({
-    medium, sort, range, lang, signal, q: text, limit, offset: 0,
+    medium, sort, range, lang, follows, signal, q: text, limit, offset: 0,
+  })
+  return records
+}
+
+/* The show drawer's follows path: one show's episodes, counted over only the
+ * follow set's boosts inside the same boost-time window the card's figures
+ * were (`since`, the container's data-since). The episode records already
+ * carry every field the drawer reads — guid/title/img/date/num/url/boosts/
+ * sats — so the rows pass straight through. Sats-ranked; the drawer re-sorts
+ * by recency itself, the same as the global path's rows. */
+export async function getShowEpisodesFollows({ guid, follows, since = null, signal } = {}) {
+  const { records } = await getEpisodePage({
+    follows, podcast: guid, since, sort: 'sats', range: 'all',
+    withBoosts: false, limit: 200, offset: 0, signal,
   })
   return records
 }
@@ -585,7 +621,7 @@ const PUBLISHERS_API = '/api/v1/publishers'
 /** One page of the ranked artist list. */
 export async function getPublisherPage({
   sort = 'boosters', range = 'all', lang = null,
-  offset = 0, limit = SHOW_PAGE, q = null, signal,
+  offset = 0, limit = SHOW_PAGE, q = null, follows = null, signal,
 } = {}) {
   const qs = new URLSearchParams({
     sort, range, limit: String(limit), offset: String(offset),
@@ -593,9 +629,15 @@ export async function getPublisherPage({
   if (q) qs.set('q', q)
   if (lang && lang !== 'all') qs.set('lang', lang)
 
-  const resp = await fetch(`${PUBLISHERS_API}?${qs}`, {
-    headers: { Accept: 'application/json' }, signal,
-  })
+  // Follows rides a POST — see getShowPage.
+  const init = { headers: { Accept: 'application/json' }, signal }
+  if (follows && follows.length) {
+    init.method = 'POST'
+    init.headers['Content-Type'] = 'application/json'
+    init.body = JSON.stringify({ follows })
+  }
+
+  const resp = await fetch(`${PUBLISHERS_API}?${qs}`, init)
   if (!resp.ok) throw new Error(`publishers: HTTP ${resp.status}`)
   const data = await resp.json()
   return {
@@ -607,12 +649,25 @@ export async function getPublisherPage({
 /** The Artists typeahead. Same reasoning as searchShows. */
 export async function searchPublishers({
   q, sort = 'boosters', range = 'all', lang = null,
-  limit = SEARCH_HITS, signal,
+  follows = null, limit = SEARCH_HITS, signal,
 } = {}) {
   const text = typeof q === 'string' ? q.trim() : ''
   if (text.length < SEARCH_MIN_CHARS) return []
   const { records } = await getPublisherPage({
-    sort, range, lang, signal, q: text, limit, offset: 0,
+    sort, range, lang, follows, signal, q: text, limit, offset: 0,
+  })
+  return records
+}
+
+/* The artist drawer's follows path: the artist's declaring MUSIC shows,
+ * counted over the follow set's boosts in the card's window. medium:'music'
+ * matches the artist tier's own filter (2026-08-31, Reed's call — the tier
+ * counts music only), so the follows drawer and the global drawer describe
+ * the same corpus. The rows carry everything albumRowsHtml reads. */
+export async function getPublisherAlbumsFollows({ guid, follows, since = null, signal } = {}) {
+  const { records } = await getShowPage({
+    follows, publisher: guid, since, medium: 'music', sort: 'sats', range: 'all',
+    limit: 200, offset: 0, signal,
   })
   return records
 }
