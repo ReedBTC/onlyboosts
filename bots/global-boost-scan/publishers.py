@@ -86,6 +86,17 @@ def parse_publisher_feed(xml):
         "artwork": artwork,
         "description": clean_html(_tag(head, "description")),
     }
+    # ⚠️ album_guid IS THE remoteItem's feedGuid, AND ON WAVLAKE THAT IS NOT
+    # THE ALBUM'S DECLARED podcast:guid. Measured 2026-08-31 on Ainsley
+    # Costello's publisher feed: every remoteItem names Wavlake's internal feed
+    # id (also the artwork filename), while the album feed itself declares a
+    # different podcast:guid — the one PI, boost notes and shows.podcast_guid
+    # all key on. So publisher_albums.album_guid does NOT join against shows
+    # for Wavlake albums; any future consumer of these downward edges must
+    # resolve through album_url instead (BMB walks this same chain by URL for
+    # exactly this reason). The upward edge (shows.publisher_guid) is
+    # unaffected: an album feed's publisher remoteItem names the publisher
+    # feed's own guid, which is consistent on every host observed.
     albums = []
     for _prefix, attrs in _ITEM_RE.findall(head):
         a = {k.split(":")[-1].lower(): v for k, v in _ATTR_RE.findall(attrs)}
