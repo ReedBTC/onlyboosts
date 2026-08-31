@@ -10,7 +10,7 @@
  * has a failure window measured in hours: a visitor holding a three-hour-old
  * feed-controls.js who fetches a fresh feeds-podcasts.js gets
  *
- *   SyntaxError: The requested module '/assets/js/feed-controls.js?v=ob-v172' does not
+ *   SyntaxError: The requested module '/assets/js/feed-controls.js?v=ob-v173' does not
  *   provide an export named 'mountFeedNote'
  *
  * and an unresolved named import is a LINK-TIME error: the module never
@@ -57,14 +57,23 @@ export function mountFeedNote(panel, text, opts = {}) {
   host.textContent = text
   const info = opts.info
   if (info && info.href) {
+    // Inline when the base starts with info.after (the chart head), trailing
+    // otherwise. textContent above already holds the full text; the split
+    // rebuilds it around the anchor.
+    const at = info.after && text.startsWith(info.after) ? info.after.length : text.length
+    host.textContent = text.slice(0, at)
     host.append(' ')
     const a = document.createElement('a')
     a.className = 'feed-note-info'
     a.href = info.href
+    // A reader mid-browse: the explainer opens beside the feed, not over it.
+    a.target = '_blank'
+    a.rel = 'noopener'
     if (info.title) a.title = info.title
     a.setAttribute('aria-label', info.label || info.title || 'More about this ranking')
     a.textContent = 'ⓘ'
     host.append(a)
+    if (at < text.length) host.append(text.slice(at))
   }
   host.hidden = false
   return host
@@ -78,6 +87,12 @@ export const CHART_INFO = {
   href: '/about#charts',
   title: 'How the OnlyBoosts Charts work',
   label: 'How the OnlyBoosts Charts work',
+  // The ⓘ sits INSIDE the sentence, right after this prefix, so the window
+  // and language clauses read past it: "Ranked by the OnlyBoosts Chart
+  // Position ⓘ. Counting boosts from the last 30 days." (Reed's spec,
+  // 2026-08-31.) mountFeedNote splits on it; a base not starting with it
+  // gets the link appended at the end, the original behaviour.
+  after: 'Ranked by the OnlyBoosts Chart Position',
 }
 
 /**
@@ -105,7 +120,10 @@ export function viewNote({ sort, days, follows, noun = 'show' }) {
   let head
   switch (sort) {
     case 'chart':
-      head = `Chart rank sums each ${noun}'s place in sats, boosts and boosters; the lowest total leads`
+      // The formula moved into the ⓘ (its tooltip and /about#charts): the
+      // note names the ranking, the link explains it. Must stay equal to
+      // CHART_INFO.after or the ⓘ falls to the end of the line.
+      head = CHART_INFO.after
       break
     case 'sats': head = 'Ranked by total sats boosted'; break
     case 'boosts': head = 'Ranked by number of boosts'; break

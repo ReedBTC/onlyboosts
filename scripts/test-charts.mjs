@@ -644,7 +644,7 @@ async function call(handler, url, init) {
   }
   const html = renderStatTiles(stats, ranks, { rankFeed: 'Shows', backHref: '/#shows' })
   check('the strip renders all four windows, each cell linked to its chart view', () => {
-    assert.ok(html.includes('OnlyBoosts Charts'))
+    assert.ok(html.includes('OnlyBoosts Chart Positions'))
     // &amp; — the renderer escapes attribute values, so the test expects HTML.
     assert.ok(html.includes('href="/#shows?sort=chart&amp;range=1w"'))
     assert.ok(html.includes('href="/#shows?sort=chart&amp;range=1m"'))
@@ -661,8 +661,8 @@ async function call(handler, url, init) {
     assert.ok(!deepHtml.includes('href="/#shows?sort=chart&amp;range=1m"'))
   })
   const quietHtml = renderStatTiles(stats, { ...ranks, chartWindows: { ...ranks.chartWindows, '1w': null } }, { rankFeed: 'Shows', backHref: '/#shows' })
-  check('⚠️ a window with no boosts is a dash with its own honest wording', () => {
-    assert.ok(quietHtml.includes('No boosts this week'))
+  check('⚠️ a window with no boosts is a dash too — one wording, outside the top 100', () => {
+    assert.ok(quietHtml.includes('Outside the top 100 this week'))
     assert.ok(!quietHtml.includes('href="/#shows?sort=chart&amp;range=1w"'))
   })
   const overrideHtml = renderStatTiles(stats, ranks, { rankFeed: 'Members', backHref: '/#members', chartHref: '/#members', chartBreadth: 'shows boosted' })

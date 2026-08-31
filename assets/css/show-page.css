@@ -317,7 +317,6 @@
 .show-chart-strip {
   display: flex;
   align-items: stretch;
-  max-width: 30rem;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--surface);

@@ -564,11 +564,14 @@ export function renderStatTiles(stats, ranks, copy) {
         const href = copy.chartHref || `${copy.backHref}?sort=chart${key === "all" ? "" : `&range=${key}`}`;
         return `<a class="show-chart-cell${all}" href="${esc(href)}" title="${esc(`${chip(c)} on the OnlyBoosts Charts ${phrase}`)}">${winEl}<span class="show-chart-rank">${esc(chip(c))}</span></a>`;
       }
-      const tip = c ? `Outside the top 100 ${phrase}` : `No boosts ${phrase}`;
-      return `<span class="show-chart-cell show-chart-cell--none${all}" title="${esc(tip)}">${winEl}<span class="show-chart-rank">—</span></span>`;
+      /* One wording for both nulls (no boosts in the window, or ranked past
+       * the gate): the chart's claim is the top 100, and "outside the top
+       * 100" is true either way — Reed's call, 2026-08-31, replacing a
+       * "No boosts" variant that answered a question the chart isn't asking. */
+      return `<span class="show-chart-cell show-chart-cell--none${all}" title="${esc(`Outside the top 100 ${phrase}`)}">${winEl}<span class="show-chart-rank">—</span></span>`;
     });
-    chartStrip = `<nav class="show-chart" aria-label="OnlyBoosts Charts rank by time window">
-      <a class="show-chart-label" href="/about#charts" title="${esc(labelTip)}">OnlyBoosts Charts</a>
+    chartStrip = `<nav class="show-chart" aria-label="OnlyBoosts Chart Positions by time window">
+      <a class="show-chart-label" href="/about#charts" title="${esc(labelTip)}">OnlyBoosts Chart Positions</a>
       <div class="show-chart-strip">${cells.join("")}</div>
     </nav>`;
   }

@@ -57,7 +57,7 @@ order. They are the site map, so **they're regrouped together or not at all**:
 
 | Group | Items |
 |---|---|
-| **Feeds** | Podcasts `/#episodes-global` · Music `/#albums` · Members `/#members` |
+| **Feeds** | Podcasts `/#episodes-global` · Music `/#artists` · Members `/#members` |
 | **Stats** | Boost Stats `/stats` — coming soon |
 
 **⚠️ `/boosters` (Community) WAS THE SECOND STATS ENTRY AND THE PAGE IS DELETED,
@@ -76,7 +76,7 @@ which was right while the homepage hid them behind a dropdown and wrong the
 moment the tabs put them on screen: the nav then restated a control the page
 carries, in a different order, using different words for the same things.
 **Those three hrefs and `TAB_DEFAULT` in the `index.html` controller move
-together** — Podcasts opens Episodes, Music opens Albums, Members opens Boosts.
+together** — Podcasts opens Episodes, Music opens Artists (Albums until 2026-08-31, Reed's call with the Chart Positions strip), Members opens Boosts.
 
 **The Global/Follows axis is deliberately not in the nav**: it's the second
 dropdown on the page, and listing both scopes would double the group into a grid

@@ -522,19 +522,19 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v172" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v172" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v172" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v172" />
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v172" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v172" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v173" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v173" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v173" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v173" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v173" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v173" />
   <!-- The boost note card and its reaction bar. Added when the boost list at
        the foot of this page became the same .note-card the homepage Boosts
        feed paints; this page linked neither before, which is why show-page.css
        restates .nostr-mention. That restatement is now redundant rather than
        load-bearing, and is left in place rather than removed in the same pass. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v172" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v172" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v173" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v173" />
 </head>
 <body data-show-guid="${htmlEscape(show.podcast_guid)}">
 
@@ -599,7 +599,7 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
             <div class="nav-explore-group">
               <h4>Feeds</h4>
               <a href="/#episodes-global"><span aria-hidden="true">🎙</span> Podcasts</a>
-              <a href="/#albums"><span aria-hidden="true">🎵</span> Music</a>
+              <a href="/#artists"><span aria-hidden="true">🎵</span> Music</a>
               <a href="/#members"><span aria-hidden="true">👥</span> Members</a>
             </div>
             <!-- Stats: the aggregate view over the same data. A coming-soon
@@ -726,7 +726,7 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
       <h3>Feeds</h3>
       <ul>
         <li><a href="/#episodes-global">🎙 Podcasts</a></li>
-        <li><a href="/#albums">🎵 Music</a></li>
+        <li><a href="/#artists">🎵 Music</a></li>
         <li><a href="/#members">👥 Members</a></li>
       </ul>
     </div>
@@ -762,12 +762,12 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
 
 <script type="application/json" id="show-boost-payload">${jsonForScript(boostPayload)}</script>
 
-<script src="/assets/js/nav.js?v=ob-v172" defer></script>
-<script src="/assets/js/show-page.js?v=ob-v172" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v173" defer></script>
+<script src="/assets/js/show-page.js?v=ob-v173" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v172"></script>
-<script src="/assets/js/sw-register.js?v=ob-v172" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v173"></script>
+<script src="/assets/js/sw-register.js?v=ob-v173" defer></script>
 </body>
 </html>`;
 }
@@ -1309,10 +1309,10 @@ function notFound(guid) {
   <meta name="robots" content="noindex" />
   <title>Show not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v172" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v172" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v172" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v172" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v173" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v173" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v173" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v173" />
 </head>
 <body>
 <section class="page-header">
@@ -1331,7 +1331,7 @@ function notFound(guid) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v172" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v173" defer></script>
 </body>
 </html>`;
   return new Response(html, {
