@@ -22,7 +22,7 @@
  * Resolves once window.LBLogin exists.
  */
 
-const SRC = '/assets/widgets/login-widget.js?v=ob-v163'
+const SRC = '/assets/widgets/login-widget.js?v=ob-v164'
 const LOAD_TIMEOUT_MS = 15000
 
 export function ensureLoginWidget() {

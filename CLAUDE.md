@@ -40,6 +40,7 @@ passed its size budget. Nothing was rewritten on the way across, so that same
 | `/show/<guid>` | one show, edge-rendered |
 | `/episode/<item-guid>` | one episode, edge-rendered |
 | `/booster/<npub>` | one person, edge-rendered |
+| `/artist/<guid>` | one artist (publisher), edge-rendered — see the detail pages section |
 | `/about` | the project's own explanation of what the data is and isn't |
 | `/stats` | a coming-soon placeholder: nav + header + soon-card, `noindex`, out of the sitemap. `/boosters` was the second one and was **deleted** on 2026-08-23 — see the Stats row of the site map |
 | `/404.html` | see the ⚠️ under LB conventions |
@@ -1566,10 +1567,10 @@ All three are in `docs/feeds.md`. What a change would break:
   both through `bmbShowUrl()`: "See All Episodes", and a podroll tile for a show we
   have no page for.
 
-## The three detail pages
+## The detail pages
 
-`/show/<guid>`, `/episode/<item-guid>` and `/booster/<npub>` are **one page with
-three subjects**. The back link, the stat tiles, the drawers, the boost list, the
+`/show/<guid>`, `/episode/<item-guid>`, `/booster/<npub>` and `/artist/<guid>`
+are **one page with four subjects** (the artist page joined 2026-08-30). The back link, the stat tiles, the drawers, the boost list, the
 community wall and the whole client chrome come out of two shared modules; what
 differs is the subject and which sections apply.
 
@@ -1597,6 +1598,20 @@ shows, episodes on `/booster`); a fifth wants looking at rather than squeezing i
 The type scales with `clamp()` rather than stepping, and **the binding constraint
 is the LABEL, not the number** — "episodes" and "boosters" are eight characters,
 where the widest figure is five.
+
+**`/artist/<guid>` is the fourth, shipped 2026-08-30 with the Artists feed** —
+the publisher tier's landing page, structured as the album page one level up
+(Reed's spec): hero, Nostr Boost Stats tiles with the rank chip (`feedRanks`
+gained a `publisher` kind ranking on the Artists feed), **#albums** ("Albums
+with Nostr Boosts", the indexed declaring shows by sats, the episode-drawer
+chrome), and **#community-artists** ("Other Artists This Community Boosts",
+the /show community rollup one tier up — NOT medium-split, because every row
+is a publisher and there is no partition to cross). No boost list, no wall,
+no boost button (PI cannot resolve most publisher feeds), index-only
+throughout. Section ids `#albums` and `#community-artists` are frozen. It is
+in `EDGE_PAGES`, the sitemap, and `show-link.js#publisherPageHref` is the one
+place that decides an artist title links — the feed card reads it too.
+`scripts/test-publishers-api.mjs` executes the page's extracted SQL.
 
 **`docs/detail-pages.md` carries the rest**: the rank line in the stat tiles,
 where the shared code lives, the section ids, the hash spy, the back link, the
@@ -2125,7 +2140,7 @@ would. Never remove an entry** — those links are in the wild.
 | `feed-lang.js` | the language menu on the four ranked feeds, and the copy it rewrites |
 | `boosts-thread.js` / `boost-actions.js` | the content tokenizer and reply / like / repost / zap |
 | `functions/index.js` | the homepage's opening feed — **Shows**, rendered at the edge |
-| `functions/{show,episode,booster}/…` | the three edge-rendered detail pages |
+| `functions/{show,episode,booster,artist}/…` | the four edge-rendered detail pages |
 | `functions/api/v1/*` | the D1 query API |
 | `functions/api/v1/members.js` | member search and the top-members listing, over all 2,011 |
 | `functions/api/v1/members/hours.js` | the #40HPW boards, and any past week by `week=YYYY-MM-DD` |

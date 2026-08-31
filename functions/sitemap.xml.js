@@ -136,6 +136,29 @@ export async function onRequest({ env }) {
     console.warn("[sitemap] episode enumeration failed", err);
   }
 
+  // The artist pages (functions/artist/[guid].js): one per titled publisher,
+  // ~182 today. The qualifying rule is the page's own — `title IS NOT NULL`
+  // drops the one bare row a stale link produced. Separate try for the same
+  // reason the episode one has its own: a failure must not cost the entries
+  // that already succeeded.
+  try {
+    const { results } = await env.DB.prepare(
+      `SELECT publisher_guid FROM publishers WHERE title IS NOT NULL LIMIT 5000`
+    ).all();
+
+    for (const r of results || []) {
+      if (!r.publisher_guid) continue;
+      urls.push({
+        loc: `${SITE_ORIGIN}/artist/${encodeURIComponent(r.publisher_guid)}`,
+        lastmod: today,
+        changefreq: "weekly",
+        priority: "0.6",
+      });
+    }
+  } catch (err) {
+    console.warn("[sitemap] publisher enumeration failed", err);
+  }
+
   return new Response(renderSitemap(urls), {
     status: 200,
     headers: {

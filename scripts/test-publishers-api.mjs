@@ -103,6 +103,15 @@ addBoost('al-d1', '5', 10)
 addBoost('al-e1', '6', 10)
 addBoost('al-f1', '7', 999, 400)   // Long Gone: All only, outside 1w/1m/1y
 
+/* Cross-boosts for the /artist page's community rollup. Booster '1' (one of
+ * Haleen's three) also boosts Zed's album and the BARE publisher's — so
+ * Haleen's community rollup must contain Zed (1 boost, 111 sats, 1 member)
+ * and must NOT contain the title-less publisher, which is exactly the filter
+ * under test. Kept small enough not to move any listing winner: Zed's sats
+ * lead and Haleen's boosters lead both survive. */
+addBoost('al-b1', '1', 111)
+addBoost('al-c1', '1', 5)
+
 /* Haleen's catalogue file. ⚠️ INDEX-ONLY (Reed's call, 2026-08-30): the detail
  * endpoint must NOT read this table — the drawer lists the declaring shows.
  * These rows exist so the assertion that they never leak is a real one. */
@@ -163,6 +172,11 @@ console.log('\nThe ranked listing:')
     assert.deepEqual(
       [h.boosts, h.sats, h.boosters, h.albums],
       [4, 1300, 3, 2])
+  })
+  check('and a member boosting elsewhere adds nothing here', () => {
+    const z = body.publishers.find((p) => p.guid === G.zed)
+    // Zed: 2 own-fixture boosts + booster 1's cross-boost.
+    assert.deepEqual([z.boosts, z.sats, z.boosters], [3, 5111, 2])
   })
 }
 {
@@ -283,6 +297,46 @@ console.log('\nThe per-artist detail (index-only, Reed 2026-08-30):')
 {
   const { status } = await detail('no-such-publisher')
   check('an unknown guid answers 404', () => assert.equal(status, 404))
+}
+
+console.log('\nThe /artist page’s own SQL, extracted from the shipped Function:')
+{
+  const src = readFileSync(join(ROOT, 'functions/artist/[guid].js'), 'utf8')
+  const grabSql = (start) => {
+    const i = src.indexOf(start)
+    assert.ok(i >= 0, `artist page no longer contains: ${start.slice(0, 40)}`)
+    const j = src.indexOf('`', i)
+    assert.ok(j > i, 'unterminated SQL template')
+    return src.slice(i, j)
+  }
+
+  const communitySql = grabSql('WITH community AS (')
+  const rows = db.prepare(communitySql).all(G.haleen, G.haleen, 40)
+  check('the community rollup finds the other artist, figures scoped', () => {
+    assert.equal(rows.length, 1)
+    assert.equal(rows[0].publisher_guid, G.zed)
+    assert.deepEqual(
+      [rows[0].cs_boosts, rows[0].cs_sats, rows[0].cs_members], [1, 111, 1])
+  })
+  check('⚠️ and never a title-less publisher, though its show was boosted by a member', () => {
+    assert.ok(!rows.some((r) => r.publisher_guid === G.bare))
+  })
+  check('the subject is never its own recommendation', () => {
+    assert.ok(!rows.some((r) => r.publisher_guid === G.haleen))
+  })
+
+  const totalsSql = grabSql('SELECT COUNT(*) AS boosts, COALESCE(SUM(b.sats), 0) AS sats,')
+  const t = db.prepare(totalsSql).get(G.haleen)
+  check('the stat tiles aggregate the declaring shows', () =>
+    assert.deepEqual([t.boosts, t.sats, t.boosters], [4, 1300, 3]))
+
+  const albumsSql = grabSql('SELECT podcast_guid, title, image, artwork, medium,')
+  const al = db.prepare(albumsSql).all(G.haleen, 400)
+  check('the albums section ranks the indexed albums by sats', () =>
+    assert.deepEqual(al.map((a) => a.podcast_guid), ['al-a2', 'al-a1']))
+
+  check('the page answers HEAD', () =>
+    assert.ok(src.includes('export async function onRequestHead')))
 }
 
 console.log(`\n${passed} passed${failed ? `, ${failed} FAILED` : ''}.`)

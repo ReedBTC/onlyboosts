@@ -64,6 +64,22 @@ export function showPageHref(guid) {
  * Callers should treat null as "fall back to whatever they linked before":
  * an unidentified episode is still a real card, it just has no page of ours.
  */
+/**
+ * The landing-page URL for an artist (publisher) guid, or null when there
+ * isn't one. The third rule in this module, beside the show and episode ones
+ * and here for the same reason: artist titles appear on the Artists feed's
+ * cards and on /artist's own community rollup, and copies of the rule would
+ * drift. The qualifying test matches /artist/<guid>'s own: the page 404s a
+ * publisher with no title (the one bare row a stale link produced), so callers
+ * check the title before asking, the same discipline the show rule has.
+ */
+export function publisherPageHref(guid) {
+  if (typeof guid !== 'string') return null
+  const g = guid.trim()
+  if (!g) return null
+  return `/artist/${encodeURIComponent(g)}`
+}
+
 export function episodePageHref(itemGuid, title) {
   if (typeof itemGuid !== 'string') return null
   const g = itemGuid.trim()

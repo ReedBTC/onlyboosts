@@ -729,3 +729,37 @@ OG tags either way; those are about the share card, not about crawling.
 The episode query is a `GROUP BY` over the whole boosts table where the show one
 is a single indexed scan, so it has its **own** `try` — a failure there must not
 cost the show entries that already succeeded.
+
+
+---
+
+### The Artist Page: `/artist/<guid>`
+
+The fourth detail page, shipped 2026-08-30 beside the Artists feed. The subject
+is the publisher tier (`<podcast:publisher>`, the artist in practice); the
+structure is the album page one level up, which was Reed's spec verbatim: hero,
+Nostr Boost Stats tiles, **Albums with Nostr Boosts**, **Other Artists This
+Community Boosts**. Decisions, each deliberate:
+
+- **Index-only throughout**, the site rule: the albums section is
+  `podcasts WHERE publisher_guid` by sats — never `publisher_albums`, the
+  artist's own catalogue file, which stays collected and unrendered.
+- **No boost list, no community wall, no boost button.** The albums are the
+  navigation; each album page carries all three. The button specifically:
+  `/api/value` resolves through Podcast Index, which cannot see most publisher
+  feeds (measured on Wavlake artist guids), and a button that fails for most
+  artists is worse than none.
+- **The community rollup is not medium-split** — and unlike `/show`'s history
+  this is not a reversal waiting to happen: every row is a publisher, one pool,
+  no partition to cross.
+- **The rank chip ranks on the Artists feed**: `feedRanks(db, "publisher", …)`
+  in `functions/_shared/feed-rank.js`, the booster branch's shape with the
+  listing endpoint's aggregate restated (title-less row excluded), top-100
+  cutoff and all.
+- **Section ids `#albums` and `#community-artists` are frozen**, like every
+  other page's. `#community-artists` follows the `#community-shows` /
+  `#community-episodes` naming; `#albums` is this page's own.
+- **404s**: an unknown guid, the one title-less publisher row, and a publisher
+  with no boosts all answer a real 404, `noindex`, pointing at `/#artists`.
+- Both drawers sort client-side off packed row attributes
+  (`assets/js/artist-page.js`), never a fetch — the show page's arrangement.

@@ -500,11 +500,12 @@ decision:
   LIKE escapes its wildcards (`likeEscape`, members.js's rule) and a pasted
   guid matches as an equality. The `q=` path still ranks with `RANK()` over
   the whole filtered ordering — rank retention holds.
-- **The card's title is not a link** — there is no `/publisher/<guid>` page
-  yet. The drawer is the navigation: the artist's **indexed** albums from
+- **The card's title links to `/artist/<guid>`** (the page shipped alongside,
+  2026-08-30; `show-link.js#publisherPageHref` owns the rule). The drawer is
+  the inline navigation: the artist's **indexed** albums from
   `GET /api/v1/publishers/<guid>`, ranked by sats and windowed with the
   card's range (`?since`, the show drawer's contract), each row linking to
-  its `/show` page.
+  its `/show` page, with the foot linking the artist page.
 - **⚠️ THE DRAWER IS INDEX-ONLY.** *Reed's call, 2026-08-30.* Nothing without
   at least one Nostr boost appears anywhere on this site — the podroll is the
   one standing exception, and it is not a ranked feed. The first cut listed

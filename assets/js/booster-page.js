@@ -19,17 +19,17 @@
  * `episode-section.js` attaches the controls and the verbs and nothing else.
  * That module is shared with the identical section on /episode/<guid>.
  */
-import { copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v163'
-import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v163'
-import { rangeControl, sortControl, rangeDays } from '/assets/js/feed-controls.js?v=ob-v163'
-import { initEpisodeSection } from '/assets/js/episode-section.js?v=ob-v163'
+import { copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v164'
+import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v164'
+import { rangeControl, sortControl, rangeDays } from '/assets/js/feed-controls.js?v=ob-v164'
+import { initEpisodeSection } from '/assets/js/episode-section.js?v=ob-v164'
 import {
   initCopyNpub, initShowMore, initShare, initBackLink,
   initHashRouting, initHashSpy, initArt2, wireArt2, hydrateProfiles,
-} from '/assets/js/detail-page.js?v=ob-v163'
-import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v163'
-import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v163'
-import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v163'
+} from '/assets/js/detail-page.js?v=ob-v164'
+import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v164'
+import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v164'
+import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v164'
 
 const PK = document.body.dataset.boosterPk || ''
 const NPUB = document.body.dataset.boosterNpub || PK

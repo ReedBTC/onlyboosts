@@ -15,10 +15,10 @@
  * the code says "publisher", the same product/module seam as Podcasts →
  * Episodes. See "The medium split" in CLAUDE.md and docs/feeds.md.
  *
- * ⚠️ THE TITLE IS NOT A LINK. There is no /publisher/<guid> page yet, and a
- * dead link is worse than a plain name. The drawer is the navigation: the
- * artist's INDEXED albums, each linking to its /show page. When a publisher
- * page ships, the href goes here and every surface gets it at once.
+ * The title links to /artist/<guid> — the publisher page shipped 2026-08-30,
+ * and this is the href-goes-here-once moment the earlier note promised. The
+ * drawer stays the inline navigation: the artist's INDEXED albums, each
+ * linking to its /show page.
  *
  * ⚠️ THE DRAWER IS INDEX-ONLY — Reed's call, 2026-08-30. Nothing without at
  * least one Nostr boost appears anywhere on this site (the podroll excepted,
@@ -35,17 +35,17 @@
  * guids — the majority). A pill that fails for most artists is worse than
  * none; boosting stays at the album and song level, one drawer-click away.
  */
-import { showPageHref } from './show-link.js?v=ob-v163'
-import { coverChain } from './cover-art.js?v=ob-v163'
-import { htmlEscape } from './nostr-text.js?v=ob-v163'
-import { num, fmtSats, plural, shortDate } from './show-card.js?v=ob-v163'
+import { showPageHref, publisherPageHref } from './show-link.js?v=ob-v164'
+import { coverChain } from './cover-art.js?v=ob-v164'
+import { htmlEscape } from './nostr-text.js?v=ob-v164'
+import { num, fmtSats, plural, shortDate } from './show-card.js?v=ob-v164'
 // Re-exported: artists-feed.js reads the formatting helpers through this
 // module the way shows-feed.js reads them through show-card.js. ⚠️ An import
 // is NOT a re-export — this line shipped missing once, and the unresolved
 // named import was a LINK-TIME error: renderArtists never executed and the
 // whole feed painted the load-failure placeholder (the ob-v53 class, caught
 // on the preview deploy).
-export { num, fmtSats, plural, shortDate } from './show-card.js?v=ob-v163'
+export { num, fmtSats, plural, shortDate } from './show-card.js?v=ob-v164'
 
 const esc = htmlEscape
 
@@ -60,6 +60,7 @@ export const COPY = {
   untitledItem: 'Untitled release',
   drawerLoading: 'Loading albums…',
   drawerFail: 'Couldn’t load this artist’s albums.',
+  drawerFoot: 'See all boosts to this artist',
   rangeLabel: 'Filter by when the artist was boosted',
   rangeTitle: (days) => (days ? `Artists boosted in the last ${days} days` : 'All time'),
   sortTitle: 'Sort artists',
@@ -136,8 +137,12 @@ export function publisherCardHtml(p, { rank = null, copy = COPY } = {}) {
   const mediaClass = 'pcast-card-media' + (chain.length ? '' : ' pcast-card-media--none')
   const media = `<div class="${mediaClass}">${mediaInner}</div>`
 
-  const titleEl =
-    `<h3 class="pcast-title${named ? '' : ' ob-show-unnamed'}">${esc(named ? p.title : copy.unidentified)}</h3>`
+  // Named artists link to their landing page — /artist/<guid>, the page's own
+  // qualifying rule being the title, same as the show card's arrangement.
+  const href = named ? publisherPageHref(p.guid) : null
+  const titleEl = href
+    ? `<h3 class="pcast-title"><a class="ob-show-link" href="${esc(href)}" title="Nostr boosts to ${esc(p.title)}">${esc(p.title)}</a></h3>`
+    : `<h3 class="pcast-title${named ? '' : ' ob-show-unnamed'}">${esc(named ? p.title : copy.unidentified)}</h3>`
 
   // The same qualifier, at the point of the numbers — see Vocabulary in
   // CLAUDE.md. No album count on the face: like the episode count the show
@@ -177,6 +182,9 @@ export function publisherCardHtml(p, { rank = null, copy = COPY } = {}) {
       `</summary>` +
       `<div class="pcast-details" data-lazy-albums>` +
         `<div class="pcast-boosts-status" data-drawer-status>${esc(copy.drawerLoading)}</div>` +
+        (href
+          ? `<div class="pcast-details-foot"><a class="pcast-seeall" href="${esc(href)}">${esc(copy.drawerFoot)} →</a></div>`
+          : '') +
       `</div>` +
     `</details>`
 
