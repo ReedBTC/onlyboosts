@@ -585,6 +585,47 @@ async function call(handler, url, init) {
   check('⚠️ a publisher key gets no ranks and no chart place', () => {
     assert.equal(pbRanks, null)
   })
+
+  /* ── The windows (the Charts strip, 2026-08-31) ──────────────────────────
+   * Brute-forced the same way: the independent implementation over the boost
+   * list filtered to the window. Only the 1w and 1y windows are asserted —
+   * OLD sits exactly on the 1m boundary, and the fixture's clock and the
+   * handler's Date.now() drift by however long the test has been running, so
+   * a 1m expectation would flake on the boundary row. 1w (30d >> 7d) and 1y
+   * (30d << 365d) are safely inside/outside on both clocks. */
+  const inWeek = (b) => b.ts >= NOW - 7 * 86400
+  const weekShows = chartOrder(rollup(BOOSTS.filter((b) => notMusic(b) && inWeek(b)), (b) => b.show, (b) => b.pk))
+  check('a show carries its place in the WEEK window, ranked over that week alone', () => {
+    const exp = weekShows.find((e) => e.id === 's2')
+    assert.equal(showRanks.chartWindows['1w'].rank, exp.rank)
+    assert.equal(showRanks.chartWindows['1w'].tied, exp.tied)
+  })
+  check('the 1y window covers the whole fixture, so it matches the all-time place', () => {
+    assert.equal(showRanks.chartWindows['1y'].rank, showRanks.chart.rank)
+    assert.equal(showRanks.chartWindows.all.rank, showRanks.chart.rank)
+  })
+  const s7Row = db.prepare('SELECT * FROM podcasts WHERE podcast_guid = ?').get('s7')
+  const s7Ranks = await feedRanks(env.DB, 'show', s7Row)
+  check('⚠️ a show with no boost in the window resolves null there, not a rank', () => {
+    assert.equal(s7Ranks.chartWindows['1w'], null)
+    assert.ok(s7Ranks.chartWindows['1y'].rank >= 1)
+  })
+  const weekMems = chartOrder(rollup(BOOSTS.filter((b) => !PUBLISHERS.includes(b.pk) && inWeek(b)), (b) => b.pk, (b) => b.show))
+  check('a member’s week place uses the wall’s windowed population', () => {
+    const exp = weekMems.find((e) => e.id === M[0])
+    assert.equal(boosterRanks.chartWindows['1w'].rank, exp.rank)
+  })
+  const m5agg = memChart.find((e) => e.id === M[4])
+  const m5Ranks = await feedRanks(env.DB, 'booster', { pk: M[4], sats: m5agg.sats, boosts: m5agg.boosts, shows: m5agg.breadth })
+  check('⚠️ a member whose boosts are all old resolves null for the week', () => {
+    assert.equal(m5Ranks.chartWindows['1w'], null)
+    assert.equal(m5Ranks.chartWindows.all.rank, m5agg.rank)
+  })
+  const weekPubs = chartOrder(rollup(BOOSTS.filter((b) => pubOf(b) && isMusic(b) && inWeek(b)), pubOf, (b) => b.pk))
+  check('an artist’s week place matches the windowed publishers chart', () => {
+    const exp = weekPubs.find((e) => e.id === 'pu1')
+    assert.equal(pubRanks.chartWindows['1w'].rank, exp.rank)
+  })
 }
 
 // ── renderStatTiles — the Charts line ──────────────────────────────────────
@@ -595,34 +636,51 @@ async function call(handler, url, init) {
     { key: 'boosts', label: 'boosts', value: '10', exact: '10 boosts' },
     { key: 'boosters', label: 'boosters', value: '2', exact: '2 boosters' },
   ]
+  const win = (rank, tied = false) => (rank == null ? null : { rank, tied })
   const ranks = {
     sats: { rank: 2, tied: false }, boosts: { rank: 3, tied: false }, boosters: { rank: 1, tied: false },
     chart: { rank: 4, tied: false },
+    chartWindows: { '1w': win(3, true), '1m': win(2), '1y': win(4), all: win(4) },
   }
   const html = renderStatTiles(stats, ranks, { rankFeed: 'Shows', backHref: '/#shows' })
-  check('a top-100 chart place renders the line, linked to the chart-sorted feed', () => {
-    assert.ok(html.includes('on the OnlyBoosts Charts'))
-    assert.ok(html.includes('#4'))
+  check('the strip renders all four windows, each cell linked to its chart view', () => {
+    assert.ok(html.includes('OnlyBoosts Chart Positions'))
+    // &amp; — the renderer escapes attribute values, so the test expects HTML.
+    assert.ok(html.includes('href="/#shows?sort=chart&amp;range=1w"'))
+    assert.ok(html.includes('href="/#shows?sort=chart&amp;range=1m"'))
+    assert.ok(html.includes('href="/#shows?sort=chart&amp;range=1y"'))
     assert.ok(html.includes('href="/#shows?sort=chart"'))
   })
-  const tiedHtml = renderStatTiles(stats, { ...ranks, chart: { rank: 7, tied: true } }, { rankFeed: 'Shows', backHref: '/#shows' })
-  check('a shared place wears the T', () => {
-    assert.ok(tiedHtml.includes('T#7 on the OnlyBoosts Charts'))
+  check('a shared place wears the T, and the label links to /about#charts', () => {
+    assert.ok(html.includes('T#3'))
+    assert.ok(html.includes('href="/about#charts"'))
   })
-  const deepHtml = renderStatTiles(stats, { ...ranks, chart: { rank: 101, tied: false } }, { rankFeed: 'Shows', backHref: '/#shows' })
-  check('⚠️ rank 101 renders NO chart line — the top-100 rule', () => {
-    assert.ok(!deepHtml.includes('OnlyBoosts Charts'))
+  const deepHtml = renderStatTiles(stats, { ...ranks, chartWindows: { ...ranks.chartWindows, '1m': win(101) } }, { rankFeed: 'Shows', backHref: '/#shows' })
+  check('⚠️ a window past 100 is a dash <span>, not a link — outside wording', () => {
+    assert.ok(deepHtml.includes('Outside the top 100 this month'))
+    assert.ok(!deepHtml.includes('href="/#shows?sort=chart&amp;range=1m"'))
+  })
+  const quietHtml = renderStatTiles(stats, { ...ranks, chartWindows: { ...ranks.chartWindows, '1w': null } }, { rankFeed: 'Shows', backHref: '/#shows' })
+  check('⚠️ a window with no boosts is a dash too — one wording, outside the top 100', () => {
+    assert.ok(quietHtml.includes('Outside the top 100 this week'))
+    assert.ok(!quietHtml.includes('href="/#shows?sort=chart&amp;range=1w"'))
   })
   const overrideHtml = renderStatTiles(stats, ranks, { rankFeed: 'Members', backHref: '/#members', chartHref: '/#members', chartBreadth: 'shows boosted' })
-  check('/booster’s overrides reach the line: wall href, breadth wording', () => {
+  check('/booster’s overrides reach the strip: wall href on every cell, breadth wording', () => {
     assert.ok(overrideHtml.includes('href="/#members"'))
     assert.ok(overrideHtml.includes('shows boosted'))
     assert.ok(!overrideHtml.includes('?sort=chart'))
   })
-  const noneHtml = renderStatTiles(stats, { sats: { rank: 2, tied: false }, boosts: { rank: 3, tied: false }, boosters: { rank: 1, tied: false } }, { rankFeed: 'Shows', backHref: '/#shows' })
-  check('no chart place, no line — the tiles render exactly as before', () => {
+  const allDeep = { '1w': win(101), '1m': null, '1y': win(200), all: win(101) }
+  const noneHtml = renderStatTiles(stats, { ...ranks, chart: { rank: 101, tied: false }, chartWindows: allDeep }, { rankFeed: 'Shows', backHref: '/#shows' })
+  check('⚠️ no window inside the top 100 renders NO strip at all', () => {
     assert.ok(!noneHtml.includes('OnlyBoosts Charts'))
     assert.ok(noneHtml.includes('show-stats'))
+  })
+  const bareHtml = renderStatTiles(stats, { sats: { rank: 2, tied: false }, boosts: { rank: 3, tied: false }, boosters: { rank: 1, tied: false } }, { rankFeed: 'Shows', backHref: '/#shows' })
+  check('no chart data at all, no strip — the tiles render exactly as before', () => {
+    assert.ok(!bareHtml.includes('OnlyBoosts Charts'))
+    assert.ok(bareHtml.includes('show-stats'))
   })
 }
 

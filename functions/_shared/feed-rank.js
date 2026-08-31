@@ -184,9 +184,17 @@ function publisherRankQuery(row) {
  * The population is the SAME list the three component chips are computed over
  * — the medium partition for a show or an episode, the wall's publisher
  * exclusion for a member, the title-less exclusion for a publisher — so the
- * chart place and the component ranks always describe one corpus. All time,
- * Global, all languages: the feedRanks doctrine at the top of this file. */
-function chartQuery(kind, row) {
+ * chart place and the component ranks always describe one corpus. Global and
+ * all languages always: the feedRanks doctrine at the top of this file.
+ *
+ * ⚠️ A `cutoff` (unix seconds) makes it one WINDOW's chart. The base becomes
+ * the same boost-time GROUP BY the four endpoints run for a windowed
+ * `sort=chart` (aggEpisodes in episodes.js, the `p.cutoff` branches of
+ * podcasts.js and publishers.js, the members AGG join), so a cell on the
+ * strip agrees with the windowed feed view it links to. No cutoff keeps the
+ * precomputed all-time aggregates, which are cheaper and identical by
+ * construction (d1_sync keeps them true). */
+function chartQuery(kind, row, cutoff = null) {
   let base = null;
   let id = null;
   const args = [];
@@ -201,8 +209,10 @@ function chartQuery(kind, row) {
              COUNT(*)                     AS m_boosts,
              COUNT(DISTINCT podcast_guid) AS m_breadth
         FROM boosts
-       WHERE booster_pubkey NOT IN (${holes})
+       WHERE booster_pubkey NOT IN (${holes})${cutoff ? `
+         AND created_at >= ?` : ""}
        GROUP BY booster_pubkey`;
+    if (cutoff) args.push(cutoff);
   } else if (kind === "publisher") {
     if (!row?.guid) return null;
     id = row.guid;
@@ -215,8 +225,10 @@ function chartQuery(kind, row) {
         JOIN podcasts pc    ON pc.podcast_guid    = b.podcast_guid
         JOIN publishers pub ON pub.publisher_guid = pc.publisher_guid
        WHERE pub.title IS NOT NULL
-         AND COALESCE(pc.medium,'podcast') = 'music'
+         AND COALESCE(pc.medium,'podcast') = 'music'${cutoff ? `
+         AND b.created_at >= ?` : ""}
        GROUP BY pc.publisher_guid`;
+    if (cutoff) args.push(cutoff);
   } else {
     const isEpisode = kind === "episode";
     id = isEpisode ? row.item_guid : row.podcast_guid;
@@ -224,7 +236,26 @@ function chartQuery(kind, row) {
     const music = (isEpisode ? row.p_medium : row.medium) === "music";
     // The medium partition, restated from the API: never `= 'podcast'`.
     const op = music ? "=" : "<>";
-    base = isEpisode
+    if (cutoff) {
+      /* Windowed: every figure is the window's own, recomputed over `boosts`
+       * exactly as the endpoints' windowed GROUP BY recomputes it — the
+       * precomputed columns are all-time totals and would rank the wrong
+       * corpus. A subject with no boost in the window finds no row, which is
+       * the honest null the dash cell renders. */
+      const col = isEpisode ? "item_guid" : "podcast_guid";
+      args.push(cutoff);
+      base = `
+      SELECT b.${col}                          AS id,
+             COALESCE(SUM(b.sats),0)           AS m_sats,
+             COUNT(*)                          AS m_boosts,
+             COUNT(DISTINCT b.booster_pubkey)  AS m_breadth
+        FROM boosts b
+        LEFT JOIN podcasts pc ON pc.podcast_guid = b.podcast_guid
+       WHERE b.${col} IS NOT NULL
+         AND b.created_at >= ?
+         AND COALESCE(pc.medium,'podcast') ${op} 'music'
+       GROUP BY b.${col}`;
+    } else base = isEpisode
       ? `
       SELECT e.item_guid                  AS id,
              COALESCE(e.total_sats,0)     AS m_sats,
@@ -268,9 +299,9 @@ function chartQuery(kind, row) {
  * chart line and never the three component chips beside it. A subject outside
  * the population (a publisher key on /booster, a medium mismatch) simply finds
  * no row, which is the same honest silence ranksFrom keeps. */
-async function chartPlace(db, kind, row) {
+async function chartPlace(db, kind, row, cutoff = null) {
   try {
-    const q = chartQuery(kind, row);
+    const q = chartQuery(kind, row, cutoff);
     if (!q) return null;
     const r = await db.prepare(q.sql).bind(...q.args).first();
     const rank = Number(r?.rank);
@@ -280,6 +311,27 @@ async function chartPlace(db, kind, row) {
     console.warn("[feed-rank] chart query failed", err);
     return null;
   }
+}
+
+/* ⚠️ THE WINDOWS ARE THE FEED BAR'S RANGES and the keys are the hash's own
+ * (`range=1w`), so a strip cell's link opens exactly the list it ranks on.
+ * A new range in feed-controls.js RANGE_OPTIONS + the endpoints' RANGE_DAYS
+ * wants a row here too, or the strip simply doesn't show it. */
+const CHART_WINDOWS = [["1w", 7], ["1m", 30], ["1y", 365]];
+
+/* The all-time place plus the three windowed ones, in parallel — each
+ * chartPlace carries its own catch, so one failed window costs one dash and
+ * never the strip. `chart` keeps its historical meaning (the all-time place)
+ * because test-charts.mjs and this file's own callers read it. */
+async function attachChart(db, kind, row, out) {
+  const now = Math.floor(Date.now() / 1000);
+  const [all, ...wins] = await Promise.all([
+    chartPlace(db, kind, row),
+    ...CHART_WINDOWS.map(([, days]) => chartPlace(db, kind, row, now - days * 86400)),
+  ]);
+  out.chart = all;
+  out.chartWindows = { all };
+  CHART_WINDOWS.forEach(([key], i) => { out.chartWindows[key] = wins[i]; });
 }
 
 /**
@@ -304,7 +356,7 @@ export async function feedRanks(db, kind, row) {
       const { sql, args } = boosterRankQuery(row);
       const r = await db.prepare(sql).bind(...args).first();
       const out = ranksFrom(r, BOOSTER_RANK_KEYS);
-      if (out) out.chart = await chartPlace(db, kind, row);
+      if (out) await attachChart(db, kind, row, out);
       return out;
     }
     if (kind === "publisher") {
@@ -312,7 +364,7 @@ export async function feedRanks(db, kind, row) {
       const { sql, args } = publisherRankQuery(row);
       const r = await db.prepare(sql).bind(...args).first();
       const out = ranksFrom(r, RANK_KEYS);
-      if (out) out.chart = await chartPlace(db, kind, row);
+      if (out) await attachChart(db, kind, row, out);
       return out;
     }
     const isEpisode = kind === "episode";
@@ -357,7 +409,7 @@ export async function feedRanks(db, kind, row) {
 
     const r = await db.prepare(`SELECT ${parts} ${from} WHERE ${where}`).bind(...args).first();
     const out = ranksFrom(r, RANK_KEYS);
-    if (out) out.chart = await chartPlace(db, kind, row);
+    if (out) await attachChart(db, kind, row, out);
     return out;
   } catch (err) {
     console.warn("[feed-rank] rank query failed", err);
@@ -417,6 +469,17 @@ function chip(r) {
  */
 const RANK_CUTOFF = 100;
 
+/* The strip's four cells: window key (the hash's own `range` spelling), the
+ * label on the cell, and the phrase its tooltips speak. The first three rows
+ * restate CHART_WINDOWS above — the keys must match or a computed window
+ * simply never renders. */
+const CHART_CELLS = [
+  ["1w", "Week", "this week"],
+  ["1m", "Month", "this month"],
+  ["1y", "Year", "this year"],
+  ["all", "All time", "all time"],
+];
+
 /**
  * The stat tiles with the rank folded into each: value, label, then the rank as
  * a third line. One tile per stat, in the order given; the rank is drawn only
@@ -465,21 +528,55 @@ export function renderStatTiles(stats, ranks, copy) {
     ? `<p class="show-stats-cap">Rank on the all-time <a href="${esc(copy.backHref)}">${esc(copy.rankFeed)} feed</a>${anyTie ? "; T marks a tie" : ""}</p>`
     : "";
 
-  /* ⚠️ THE CHARTS LINE — the subject's OnlyBoosts Charts position, above the
-   * tiles because it is the headline standing and the three tile ranks are
-   * its components (their sum is the score; lowest total wins). Top-100 gated
-   * by the same RANK_CUTOFF, for the same reason as the chips. The link opens
-   * the same list sorted by Chart rank; /booster overrides it via
-   * `copy.chartHref`, its chart living on the members wall rather than behind
-   * a sort key the Members hash would drop. `copy.chartBreadth` names the
-   * subject's breadth key in the tooltip ("boosters" unless overridden). */
-  const c = ranks && ranks.chart;
-  const chartTip = `Rank in sats + rank in boosts + rank in ${copy.chartBreadth || "boosters"}, summed — lowest total first, all time. Ties break by ${copy.chartBreadth || "boosters"}, then sats, then boosts; T marks a remaining tie.`;
-  const chartLine = c && c.rank <= RANK_CUTOFF
-    ? `<p class="show-stats-chart" title="${esc(chartTip)}"><a href="${esc(copy.chartHref || (copy.backHref + "?sort=chart"))}">${esc(chip(c))} on the OnlyBoosts Charts</a></p>`
-    : "";
+  /* ⚠️ THE CHARTS STRIP — the subject's OnlyBoosts Charts position in each of
+   * the four boost-time windows (Week · Month · Year · All time), above the
+   * tiles because the standing is the headline and the three tile ranks are
+   * the all-time score's components. It replaced the single all-time line on
+   * 2026-08-31 (Reed's pick, option A of the windows design pass — the
+   * Billboard idiom: the current window is the news, the all-time standing is
+   * the record, and the all-time cell wears the tint to say which is which).
+   *
+   * Each charted cell links to that window's chart view — the hash already
+   * addresses it (`?sort=chart&range=1w`; the all-time cell elides the
+   * default range). /booster overrides every target via `copy.chartHref`,
+   * its chart living on the members wall rather than behind a sort key the
+   * Members hash would drop. The label links to /about#charts, where the
+   * formula is stated in full, and carries it as a tooltip too.
+   *
+   * The same top-100 gate as the chips applies PER WINDOW. A window past the
+   * gate is an em-dash whose tooltip says which of two things the dash means
+   * — outside the top 100, or no boosts in the window at all (chartPlace
+   * resolves null when the subject has no row in the windowed corpus) — and
+   * a dash cell is a <span>, not a link: sending a reader to a list the
+   * subject is not on answers a question nobody asked. The whole strip is
+   * withheld when no window charts, so most pages render exactly as before
+   * the Charts existed. */
+  const breadth = copy.chartBreadth || "boosters";
+  const cw = ranks && (ranks.chartWindows || (ranks.chart ? { all: ranks.chart } : null));
+  let chartStrip = "";
+  if (cw && CHART_CELLS.some(([key]) => cw[key] && cw[key].rank <= RANK_CUTOFF)) {
+    const labelTip = `Rank in sats + rank in boosts + rank in ${breadth}, summed — lowest total first, within each time window. Ties break by ${breadth}, then sats, then boosts; T marks a remaining tie.`;
+    const cells = CHART_CELLS.map(([key, win, phrase]) => {
+      const c = cw[key];
+      const all = key === "all" ? " show-chart-cell--all" : "";
+      const winEl = `<span class="show-chart-win">${win}</span>`;
+      if (c && c.rank <= RANK_CUTOFF) {
+        const href = copy.chartHref || `${copy.backHref}?sort=chart${key === "all" ? "" : `&range=${key}`}`;
+        return `<a class="show-chart-cell${all}" href="${esc(href)}" title="${esc(`${chip(c)} on the OnlyBoosts Charts ${phrase}`)}">${winEl}<span class="show-chart-rank">${esc(chip(c))}</span></a>`;
+      }
+      /* One wording for both nulls (no boosts in the window, or ranked past
+       * the gate): the chart's claim is the top 100, and "outside the top
+       * 100" is true either way — Reed's call, 2026-08-31, replacing a
+       * "No boosts" variant that answered a question the chart isn't asking. */
+      return `<span class="show-chart-cell show-chart-cell--none${all}" title="${esc(`Outside the top 100 ${phrase}`)}">${winEl}<span class="show-chart-rank">—</span></span>`;
+    });
+    chartStrip = `<nav class="show-chart" aria-label="OnlyBoosts Chart Positions by time window">
+      <a class="show-chart-label" href="/about#charts" title="${esc(labelTip)}">OnlyBoosts Chart Positions</a>
+      <div class="show-chart-strip">${cells.join("")}</div>
+    </nav>`;
+  }
 
-  return `${chartLine}${chartLine ? "\n    " : ""}<dl class="show-stats">
+  return `${chartStrip}${chartStrip ? "\n    " : ""}<dl class="show-stats">
       ${tiles.join("\n      ")}
     </dl>${caption ? "\n    " + caption : ""}`;
 }

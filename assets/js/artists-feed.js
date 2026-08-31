@@ -19,24 +19,24 @@
  */
 import {
   getPublisherPage, searchPublishers, SEARCH_HITS, SEARCH_MIN_CHARS,
-} from '/assets/js/ob-live.js?v=ob-v170'
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v170'
+} from '/assets/js/ob-live.js?v=ob-v174'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v174'
 import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls, RANGE_OPTIONS,
-} from '/assets/js/feed-controls.js?v=ob-v170'
-import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v170'
+} from '/assets/js/feed-controls.js?v=ob-v174'
+import { mountFeedNote, resetFeedNote, viewNote, CHART_INFO } from '/assets/js/feed-note.js?v=ob-v174'
 import {
   LANG_ALL, languageOptions, langControl, langNote, langNoMatchText, langLabelFor,
-} from '/assets/js/feed-lang.js?v=ob-v170'
-import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v170'
-import { competitionRanks, rankLabel, markSliceTies } from '/assets/js/rank.js?v=ob-v170'
+} from '/assets/js/feed-lang.js?v=ob-v174'
+import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v174'
+import { competitionRanks, rankLabel, markSliceTies } from '/assets/js/rank.js?v=ob-v174'
 import {
   COPY, toCard, publisherCardHtml, publisherRankValue,
   SORT_OPTIONS, RANKED_SORTS, PUBLISHER_CARDS_PER_PAGE,
   num, fmtSats, plural,
-} from '/assets/js/publisher-card.js?v=ob-v170'
-import { wirePublisherCards } from '/assets/js/publisher-card-actions.js?v=ob-v170'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v170'
+} from '/assets/js/publisher-card.js?v=ob-v174'
+import { wirePublisherCards } from '/assets/js/publisher-card-actions.js?v=ob-v174'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v174'
 
 /* The hash's language / view on an already-hydrated feed — the same two doors
  * every ranked renderer keeps; see the twin maps in shows-feed.js. */
@@ -344,18 +344,29 @@ export async function renderArtists({ panel, list, scope = 'global', lang = null
   list.className = ''
   list.replaceChildren(cards, moreWrap)
 
-  mountFeedNote(panel, langNote(follows ? copy.noteFollows : copy.noteGlobal, langKey, langLabel, copy.noun))
+  /* The line above the search box, recomposed from the live view — sort,
+   * range, scope — on every change; see viewNote in feed-note.js. The chart
+   * sort carries the ⓘ link to /about#charts. */
+  function paintNote() {
+    mountFeedNote(panel,
+      langNote(viewNote({ sort: sortKey, days: rangeDays(rangeKey), follows, noun: copy.noun }),
+        langKey, langLabel, copy.noun),
+      sortKey === 'chart' ? { info: CHART_INFO } : undefined)
+  }
+  paintNote()
 
   function applyRange(key) {
     if (key === rangeKey) return
     rangeKey = key
     reportView()
+    paintNote()
     requery()
   }
   function applySort(key) {
     if (key === sortKey) return
     sortKey = key
     reportView()
+    paintNote()
     requery()
   }
   let controls = null
@@ -374,7 +385,8 @@ export async function renderArtists({ panel, list, scope = 'global', lang = null
     if (key === langKey) return
     langKey = key
     langLabel = label || langLabelFor(key)
-    mountFeedNote(panel, langNote(follows ? copy.noteFollows : copy.noteGlobal, langKey, langLabel, copy.noun))
+    // The note names the language filter, so it repaints with it.
+    paintNote()
     document.dispatchEvent(new CustomEvent('lb:feed-lang', {
       detail: { feed: feedKey, lang: langKey === LANG_ALL ? '' : langKey },
     }))
@@ -407,6 +419,7 @@ export async function renderArtists({ panel, list, scope = 'global', lang = null
     sortKey = wantSort
     mountViewControls()
     reportView()
+    paintNote()
     requery()
   })
 

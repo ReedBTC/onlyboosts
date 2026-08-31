@@ -50,20 +50,20 @@
 
   <!-- Shared note / card styles (.note-card, .embed-note) — the boosts
        feeds render through the same kind-1 card as boosts-thread.js. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v170" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v174" />
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v170" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v174" />
   <!-- The episode card and its drawer, extracted from the inline block below
        when /episode/<guid> pages needed the same cards. See the file header. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v170" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v170" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v174" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v174" />
   <!-- The 40 HPW boards on the Members tab; shared with the /hpw/<week> pages. -->
-  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v170" />
+  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v174" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. Must stay last
        among the stylesheets so the inline block below still wins. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v170" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v174" />
 
   <style>
     :root {
@@ -863,6 +863,17 @@
     }
     .feed-note[hidden] { display: none; }
 
+    /* The chart note's ⓘ — the link to /about#charts that mountFeedNote
+       appends while the chart sort is on screen. Bold and accent-colored so
+       it reads as a control rather than as a stray character. */
+    .feed-note .feed-note-info {
+      color: var(--accent-d);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .feed-note .feed-note-info:hover,
+    .feed-note .feed-note-info:focus-visible { text-decoration: underline; }
+
     /* ── Feed search ──────────────────────────────────────────────────
        The typeahead at the head of each panel (feed-search.js). Inside the
        panel rather than in the sticky bar above it, deliberately: the range
@@ -1176,8 +1187,8 @@
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
     }
   </style>
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v170" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v170" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v174" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v174" />
 </head>
 <body data-active-feed="episodes-global">
 
@@ -1242,7 +1253,7 @@
             <div class="nav-explore-group">
               <h4>Feeds</h4>
               <a href="/#episodes-global"><span aria-hidden="true">🎙</span> Podcasts</a>
-              <a href="/#albums"><span aria-hidden="true">🎵</span> Music</a>
+              <a href="/#artists"><span aria-hidden="true">🎵</span> Music</a>
               <a href="/#members"><span aria-hidden="true">👥</span> Members</a>
             </div>
             <!-- Stats: the aggregate view over the same data. A coming-soon
@@ -1382,9 +1393,10 @@
         <button type="button" class="feed-sub" data-value="episodes" aria-selected="false">Episodes</button>
       </div>
       <div class="feed-sub-group" data-tab="music">
-        <!-- Tier order, left to right: publisher > album > song. The TAB still
-             opens on Albums (TAB_DEFAULT.music, pinned to the nav's Music
-             href) — the row's order and the tab's landing are two questions. -->
+        <!-- Tier order, left to right: publisher > album > song — and since
+             2026-08-31 (Reed's call) the TAB opens on Artists too, so the
+             row's order and the tab's landing agree. TAB_DEFAULT.music is
+             pinned to the nav's Music href; they move together. -->
         <button type="button" class="feed-sub" data-value="artists" aria-selected="false">Artists</button>
         <button type="button" class="feed-sub" data-value="albums" aria-selected="false">Albums</button>
         <button type="button" class="feed-sub" data-value="songs"  aria-selected="false">Songs</button>
@@ -1833,7 +1845,7 @@
       <h3>Feeds</h3>
       <ul>
         <li><a href="/#episodes-global">🎙 Podcasts</a></li>
-        <li><a href="/#albums">🎵 Music</a></li>
+        <li><a href="/#artists">🎵 Music</a></li>
         <li><a href="/#members">👥 Members</a></li>
       </ul>
     </div>
@@ -1920,7 +1932,7 @@
     members: 'members',
   };
   // What a tab opens on when it is pressed and has no remembered sub-feed.
-  const TAB_DEFAULT = { podcasts: 'episodes', music: 'albums', members: 'members' };
+  const TAB_DEFAULT = { podcasts: 'episodes', music: 'artists', members: 'members' };
   /* Which sub-feed each tab was last on, so leaving Podcasts on Shows and
      coming back returns you to Shows rather than to the default. The twin of
      langByFeed below, and there for the same reason: a reader's place in a tab
@@ -2425,17 +2437,17 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v170"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v174"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v170" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v174" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v170" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v174" defer></script>
 
 <!-- Feed hydration — lazily loads the active feed on first view. -->
-<script type="module" src="/assets/js/feeds.js?v=ob-v170"></script>
-<script src="/assets/js/nav.js?v=ob-v170" defer></script>
+<script type="module" src="/assets/js/feeds.js?v=ob-v174"></script>
+<script src="/assets/js/nav.js?v=ob-v174" defer></script>
 
 </body>
 </html>

@@ -62,6 +62,15 @@ the reader is told and it is correct. Everything else falls out for free —
 `anyRank` stays false when nothing qualifies, so the caption and the reserved
 chip line go with it and the page renders exactly as `/booster` already does.
 
+**⚠️ THE CHARTS STRIP RIDES ABOVE THE TILES SINCE 2026-08-31** — the
+subject's OnlyBoosts Charts place in each boost-time window (Week · Month ·
+Year · All time), replacing the single all-time line. The design record is
+*The OnlyBoosts Charts* in `docs/feeds.md`; the mechanics live beside the
+tiles' in `feed-rank.js` (`chartWindows`, `CHART_CELLS`), and `.show-chart-*`
+in `show-page.css` is the chrome. The tile chips below it stay all-time only —
+the strip is the windowed surface, and windowing the chips too would print
+twelve ranks over three figures.
+
 Three more things a change would break:
 
 - **It fails quietly**, the podroll discipline: null resolves to tiles with no

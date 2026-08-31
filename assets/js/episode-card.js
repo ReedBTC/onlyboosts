@@ -42,11 +42,11 @@
  * what functions/_shared/detail-page.js has always done, so the site now has one
  * date format rather than one for the feeds and another for the detail pages.
  */
-import { showPageHref, episodePageHref } from './show-link.js?v=ob-v170'
-import { episodeBoostLink } from './episode-link.js?v=ob-v170'
-import { boosterPageHref, boosterLinkAttrs } from './booster-link.js?v=ob-v170'
-import { coverChain, httpsUrl } from './cover-art.js?v=ob-v170'
-import { htmlEscape, isSafeUrl, renderMessage } from './nostr-text.js?v=ob-v170'
+import { showPageHref, episodePageHref } from './show-link.js?v=ob-v174'
+import { episodeBoostLink } from './episode-link.js?v=ob-v174'
+import { boosterPageHref, boosterLinkAttrs } from './booster-link.js?v=ob-v174'
+import { coverChain, httpsUrl } from './cover-art.js?v=ob-v174'
+import { htmlEscape, isSafeUrl, renderMessage } from './nostr-text.js?v=ob-v174'
 
 const esc = htmlEscape
 
@@ -75,11 +75,8 @@ export const COPY = {
     rangeTitle: (days) => (days ? `Episodes boosted in the last ${days} days` : 'All time'),
     sortTitle: 'Sort episodes',
     sortDateLabel: 'Latest episode',
-    // The line above the search box. A rollup card is an aggregate, so the
-    // scope names the corpus the RANKING was computed over rather than which
-    // cards survived a filter — see mountFeedNote in feed-controls.js.
-    noteGlobal: 'Ranks based on every boost in the index',
-    noteFollows: 'Ranks based on only boosts from the accounts you follow',
+    // The line above the search box is composed live from the view — see
+    // viewNote in feed-note.js; nothing static here to keep in step.
     moreLabel: (n) => `Load ${n} more episode${n === 1 ? '' : 's'}`,
     loadFail: ['Couldn’t load podcast boosts', 'The boosts feed is unavailable right now — please try again later.'],
     noFollows: ['You’re not following anyone yet', 'Follow some npubs in any Nostr client and the episodes they boost will show up here.'],
@@ -110,8 +107,6 @@ export const COPY = {
     rangeTitle: (days) => (days ? `Songs boosted in the last ${days} days` : 'All time'),
     sortTitle: 'Sort songs',
     sortDateLabel: 'Latest release',
-    noteGlobal: 'Ranks based on every boost in the index',
-    noteFollows: 'Ranks based on only boosts from the accounts you follow',
     moreLabel: (n) => `Load ${n} more song${n === 1 ? '' : 's'}`,
     loadFail: ['Couldn’t load music boosts', 'The boosts feed is unavailable right now — please try again later.'],
     noFollows: ['You’re not following anyone yet', 'Follow some npubs in any Nostr client and the songs they boost will show up here.'],

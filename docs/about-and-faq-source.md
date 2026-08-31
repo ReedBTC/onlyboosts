@@ -296,6 +296,34 @@ In every case, remember the top-line caveat: this is the amount **claimed**, not
 
 ---
 
+## The OnlyBoosts Charts (the default ranking)
+
+Shipped 2026-08-31. Every ranked feed opens on **Chart rank**, the OnlyBoosts
+Charts' composite ordering:
+
+- **Content** (a show, an episode, an album, a song, an artist): rank in total
+  sats + rank in number of boosts + rank in distinct boosters, summed; the
+  lowest total is first.
+- **A member** (npub): the same, with rank in **distinct shows boosted** as the
+  third component, since a person has no booster count of their own.
+
+Component ranks are the site's standard competition ranking (1-2-2-4), computed
+over exactly the corpus the view names: the medium partition, the time range,
+the language filter, the follow scope. Summing ranks rather than raw figures
+keeps one axis from dominating — one enormous boost moves a sats rank by one
+position, not by the size of the payment. Prior art worth naming: sailing's Low
+Point System and cross-country team scoring are both rank sums.
+
+Ties in the total break by the breadth key (boosters, or shows boosted), then
+sats, then boosts; rows still tied after that share a place and print `T#`.
+
+The score is corpus-relative (the Borda property): positions are the claim, and
+raw scores are not comparable across views or weeks. The components behind
+every position are printed on the row itself, so a placement can be checked by
+hand.
+
+---
+
 ## FAQ (seed questions — expand/trim as you like)
 
 > **These are seeds, and the shipped set has moved past them.** `about.html` is

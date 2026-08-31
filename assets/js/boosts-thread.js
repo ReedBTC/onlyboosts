@@ -15,10 +15,10 @@
  * already-fetched profile data, and so the same DOM nodes get reused across
  * mutating repaints.
  */
-import { nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v170'
+import { nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v174'
 // Primal profile lookup lives in its own module so /show pages can use it
 // without importing this one. See primal-profiles.js.
-import { fetchProfilesFromPrimal } from '/assets/js/primal-profiles.js?v=ob-v170'
+import { fetchProfilesFromPrimal } from '/assets/js/primal-profiles.js?v=ob-v174'
 /* ⚠️ THE TWO NIP-52 KINDS, INLINED, AND THAT IS THE WHOLE OF WHAT IS LEFT OF
  * THE CALENDAR PATH. This module used to import four things from
  * calendar-events.js and render a rich card for a calendar event quoted inside

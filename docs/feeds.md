@@ -238,11 +238,20 @@ What a change would break:
 - **The members wall opens on Chart rank** (Reed's call, 2026-08-31,
   superseding the 2026-08-23 `shows` default — see `members-board.js`), and
   the wall's chart carries the same publisher exclusion as its listing.
-- **The detail pages draw a Charts line above the stat tiles** from
-  `feedRanks(...).chart`, under the same top-100 `RANK_CUTOFF` as the chips;
-  the three tile ranks are the score's own components, which is what makes
-  the line self-explaining. `/booster` overrides the link target and the
-  breadth wording (`chartHref`, `chartBreadth`).
+- **The detail pages draw a Charts window STRIP above the stat tiles** (the
+  single all-time line until 2026-08-31; Reed's pick, option A of the windows
+  design pass): Week · Month · Year · All time, each cell that boost-time
+  window's chart place from `feedRanks(...).chartWindows`, computed by the
+  same windowed GROUP BY the endpoints run so a cell agrees with the feed
+  view its link opens (`?sort=chart&range=1w` — the hash already addresses
+  it). The top-100 `RANK_CUTOFF` applies per window; a window past it is a
+  dash `<span>` whose tooltip says which dash it is (outside the top 100, or
+  no boosts in the window), and the strip is withheld entirely when no
+  window charts. The label links to `/about#charts`. The all-time cell wears
+  `--brand-tint`: the rolling windows are the news, all time is the record.
+  `/booster` overrides every cell's target and the breadth wording
+  (`chartHref`, `chartBreadth`), its chart living on the members wall. The
+  three tile ranks below stay the all-time score's components.
 - **⚠️ COMPUTED AT QUERY TIME, DELIBERATELY — no collector precompute.** The
   Follows path can only be computed per request, so the query-time SQL must
   exist regardless, and a precomputed Global table would be a second
@@ -255,6 +264,14 @@ What a change would break:
   re-ranks from scratch. Positions are the stable claim; never compare raw
   scores across corpora or weeks. A definitive published list is therefore a
   **snapshot taken at publication time**, not a live query.
+
+**The feed note explains the chart on screen** (2026-08-31, Reed's ask,
+replacing the fixed "Ranks based on every boost in the index" line): `viewNote`
+in `assets/js/feed-note.js` composes the line above the search box from the
+live view — what orders the list, plus a corpus clause only when the corpus
+deviates from all time/Global — and the chart sort appends an ⓘ (`CHART_INFO`)
+linking to `/about#charts`, where the formula is stated in full. That section
+anchor is now an address in the wild, frozen the way `/about#membership` is.
 
 `scripts/test-charts.mjs` owns the correctness: brute-forced expectations from
 an independent implementation of the rule, a micro-corpus that inverts if the
@@ -317,9 +334,9 @@ already paged in. Two consequences the site's existing discipline demands:
   then filters to nothing is the documented reason `/api/v1/search` is not used
   by these feeds.
 - **The feed note gains a second sentence** rather than a rewritten first one:
-  "Ranks based on every boost in the index. German-language shows only." One rule
-  covers both scopes and both media. `-language` is not padding; "English shows"
-  reads as shows from England.
+  "Ranked by total sats boosted. German-language shows only." One rule covers
+  every base the composed note (`viewNote`, 2026-08-31) can produce.
+  `-language` is not padding; "English shows" reads as shows from England.
 - **`noMatchText` gains a fourth cause, tested FIRST.** It is the narrowest
   filter and the only one whose fix is one press; under Follows plus German,
   "switch to Global" points past the filter actually hiding the reader's show.

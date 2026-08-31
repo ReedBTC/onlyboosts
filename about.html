@@ -48,12 +48,12 @@
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v170" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v170" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v174" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v174" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v170" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v170" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v174" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v174" />
 </head>
 <body>
 
@@ -118,7 +118,7 @@
             <div class="nav-explore-group">
               <h4>Feeds</h4>
               <a href="/#episodes-global"><span aria-hidden="true">🎙</span> Podcasts</a>
-              <a href="/#albums"><span aria-hidden="true">🎵</span> Music</a>
+              <a href="/#artists"><span aria-hidden="true">🎵</span> Music</a>
               <a href="/#members"><span aria-hidden="true">👥</span> Members</a>
             </div>
             <!-- Stats: the aggregate view over the same data. A coming-soon
@@ -196,6 +196,7 @@
         <li><a href="#keysend">What Is Not Indexed</a></li>
         <li><a href="#pipeline">How the Index Is Built</a></li>
         <li><a href="#amounts">How Amounts Are Determined</a></li>
+        <li><a href="#charts">The OnlyBoosts Charts</a></li>
         <li><a href="#limits">Limitations and Disclaimers</a></li>
         <li><a href="#faq">Frequently Asked Questions</a></li>
       </ol>
@@ -407,6 +408,15 @@
         </div>
       </section>
 
+      <section id="charts">
+        <h2>The OnlyBoosts Charts</h2>
+        <p>Every ranked feed on this site opens on <strong>Chart rank</strong>, the OnlyBoosts Charts&rsquo; composite ordering. The formula is short enough to state in full: a show&rsquo;s chart score is its rank in total sats, plus its rank in number of boosts, plus its rank in distinct boosters, and the lowest total leads. The same rule orders episodes, albums, songs and artists. For a member, the third component is the number of distinct shows they have boosted, since a person has no booster count of their own.</p>
+        <p>Summing ranks rather than raw figures keeps any single axis from dominating: one enormous boost moves a show&rsquo;s sats rank by one position, not by the size of the payment. The approach has long prior art; sailing&rsquo;s Low Point System and cross-country team scoring are both rank sums.</p>
+        <p>Each component uses standard competition ranking, in which tied rows share the better place and the next distinct value skips past the group. Ties in the chart total are broken by boosters first, then sats, then boosts; rows still tied after that share their place, marked with a <code>T</code>.</p>
+        <p>The chart is computed over exactly the view on screen. The time range, the language filter and the Global or Follows scope select the corpus, and every component rank is recalculated inside it, so a show&rsquo;s position in a 30-day chart is independent of its all-time standing. Positions are comparable only within one view; the underlying score is relative to its corpus and is not a stable quantity across views or across weeks.</p>
+        <p>The components behind every position are printed on the row itself, so any placement can be checked by hand against the three figures it summarizes. As with every number on this site, the inputs are indexed Nostr boosts and nothing else; see <a href="#limits">Limitations and Disclaimers</a>.</p>
+      </section>
+
       <section id="limits">
         <h2>Limitations and Disclaimers</h2>
         <p>The constraints below are material to how the figures on this site should be interpreted, and they are worth reading in full.</p>
@@ -563,7 +573,7 @@
       <h3>Feeds</h3>
       <ul>
         <li><a href="/#episodes-global">🎙 Podcasts</a></li>
-        <li><a href="/#albums">🎵 Music</a></li>
+        <li><a href="/#artists">🎵 Music</a></li>
         <li><a href="/#members">👥 Members</a></li>
       </ul>
     </div>
@@ -642,15 +652,15 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v170"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v174"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v170" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v174" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v170" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v174" defer></script>
 
-<script src="/assets/js/nav.js?v=ob-v170" defer></script>
+<script src="/assets/js/nav.js?v=ob-v174" defer></script>
 
 </body>
 </html>

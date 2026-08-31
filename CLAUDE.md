@@ -57,7 +57,7 @@ order. They are the site map, so **they're regrouped together or not at all**:
 
 | Group | Items |
 |---|---|
-| **Feeds** | Podcasts `/#episodes-global` · Music `/#albums` · Members `/#members` |
+| **Feeds** | Podcasts `/#episodes-global` · Music `/#artists` · Members `/#members` |
 | **Stats** | Boost Stats `/stats` — coming soon |
 
 **⚠️ `/boosters` (Community) WAS THE SECOND STATS ENTRY AND THE PAGE IS DELETED,
@@ -76,7 +76,7 @@ which was right while the homepage hid them behind a dropdown and wrong the
 moment the tabs put them on screen: the nav then restated a control the page
 carries, in a different order, using different words for the same things.
 **Those three hrefs and `TAB_DEFAULT` in the `index.html` controller move
-together** — Podcasts opens Episodes, Music opens Albums, Members opens Boosts.
+together** — Podcasts opens Episodes, Music opens Artists (Albums until 2026-08-31, Reed's call with the Chart Positions strip), Members opens Boosts.
 
 **The Global/Follows axis is deliberately not in the nav**: it's the second
 dropdown on the page, and listing both scopes would double the group into a grid
@@ -183,13 +183,17 @@ filled by the renderer and stay hidden until one does, so a feed showing "sign
 in" or an error grows neither. They're inside the panel rather than the bar, so
 they scroll away with the cards they describe.
 
-**The note slot is on the four ranked feeds only** (`mountFeedNote` in
-`feed-controls.js`, text off each renderer's `COPY` table). It names the corpus
-the ranking was computed over: "Ranks based on every boost in the index" on
-Global, "Ranks based on only boosts from the accounts you follow" on Follows. On
-a rollup a card is an **aggregate**, so the scope is a claim about what was
-counted rather than about which cards survived. This is deliberately one line and
-no box; don't grow it back into the scope paragraph it replaced.
+**The note slot is on the four ranked feeds only** (`mountFeedNote` and
+`viewNote` in `feed-note.js`). Since 2026-08-31 the line is composed from the
+view itself rather than being a fixed corpus sentence: what orders the list
+("Ranked by total sats boosted"; the chart sort states its formula), plus a
+corpus clause only when the corpus deviates from all time/Global ("Counting
+only boosts from the accounts you follow"), plus `langNote`'s language
+sentence. On the chart sort it also carries an ⓘ linking to `/about#charts` —
+an anchor now in the wild, frozen like `/about#membership`. On a rollup a card
+is an **aggregate**, so the corpus clause is a claim about what was counted
+rather than about which cards survived. This is deliberately one line and no
+box; don't grow it back into the scope paragraph it replaced.
 
 ### The Landing Feed
 
@@ -437,7 +441,7 @@ Sixteen test scripts, all plain `node scripts/<name>.mjs` with no runner:
 | `test-feed-search.mjs` | the search box's two outcomes, driving the **shipped** `mountFeedSearch` against a stub DOM: Enter submits the whole query where a feed supplies `onSubmit`, arrow + Enter still picks, emptying the box or Escape clears through `onPick(null)`, the footer row renders — and **the member lookup, with no `onSubmit`, keeps its old Enter**. Confirmed red on two mutations: auto-highlight restored, and the empty-box clear removed |
 | `test-hpw-cards.mjs` | the 40 HPW share cards, three halves: `hpw-board.js`'s two-sided rules (a **source** scan for absolute imports, `Date.now()` and unpinned locales, plus the row's escaping and `isSafeUrl` on the face); `hpw-share.js`'s pure parts (the note's shape, the link rule, the tags, the `window` listener); the **shipped** `/hpw` Function over a `node:sqlite` build of the real schema (every redirect, the 404s, the page's canonical and `og:image`, the card's frame and ready signal, and that the page carries `rowHtml` byte for byte); and `/api/og/hpw/<name>.png` with **`fetch` stubbed** (the allowlist, the upstream's 200-for-missing answered with the banner, the PNG signature, the 900KB cap, HEAD). Nothing in it touches the VPS |
 | `test-publishers-api.mjs` | the **shipped** `/api/v1/publishers` handlers — listing and per-artist detail — over a `node:sqlite` build of the real `schema.sql`, on the members-search pattern. Three sorts with three winners, the boost-time windows, the language filter recounting through the declaring shows (`lang=unknown` included), LIKE-wildcard decoys, rank retention on `q=`, the title-less publisher's exclusion, HEAD, the album list's publisher-order and its live-row-over-edge-hint preference |
-| `test-charts.mjs` | the OnlyBoosts Charts: `sort=chart` on the **shipped** handlers of all four ranked endpoints over a `node:sqlite` build of the real `schema.sql`. **Expectations are brute-forced from an independent JS implementation of the rule**, one boost list feeding both sides; a micro-corpus that inverts if the tiebreak chain is reordered; `q=` rank retention with pre-filter tie flags; the follows-POST chart on all three POSTing endpoints (podcasts and publishers gained theirs in phase 2, with `publisher=` and boost-time `since=` for the drawers' follows paths); `feedRanks`' chart place and the tiles' Charts line. Confirmed red on five mutations: the tuple tiebreak removed, the chain flipped in members.js and again in feed-rank.js, `peers` counted post-filter, and the podcasts POST's follows filter dropped |
+| `test-charts.mjs` | the OnlyBoosts Charts: `sort=chart` on the **shipped** handlers of all four ranked endpoints over a `node:sqlite` build of the real `schema.sql`. **Expectations are brute-forced from an independent JS implementation of the rule**, one boost list feeding both sides; a micro-corpus that inverts if the tiebreak chain is reordered; `q=` rank retention with pre-filter tie flags; the follows-POST chart on all three POSTing endpoints (podcasts and publishers gained theirs in phase 2, with `publisher=` and boost-time `since=` for the drawers' follows paths); `feedRanks`' chart place — all four boost-time windows since the strip — and the tiles' Charts strip. Confirmed red on five mutations: the tuple tiebreak removed, the chain flipped in members.js and again in feed-rank.js, `peers` counted post-filter, and the podcasts POST's follows filter dropped |
 
 **⚠️ `test-server-render.mjs` IS THE ONE THAT NEEDS AN ARGUMENT, SO IT IS THE ONE
 THAT GOES UNRUN.** Its header carries the `curl` that produces the capture; take
@@ -1470,8 +1474,11 @@ file:
   from the server, and the renderers never renumber chart rows. Computed at
   query time deliberately (no collector precompute; Follows forces the
   query-time path to exist). The members wall opens on it; the detail pages
-  draw its top-100 line above the stat tiles. **See *The OnlyBoosts Charts*
-  in `docs/feeds.md`** — the design record — and `test-charts.mjs`.
+  draw its top-100 **window strip** above the stat tiles — Week · Month ·
+  Year · All time, each cell that boost-time window's chart place
+  (`chartWindows` in `feed-rank.js`), each charted cell linking to that
+  window's chart view. **See *The OnlyBoosts Charts* in `docs/feeds.md`** —
+  the design record — and `test-charts.mjs`.
 - **⚠️ `competitionRanks` ASSUMES THE LIST IS ALREADY ORDERED BY THE VALUE IT
   RANKS**, and returns confident nonsense otherwise. Every caller satisfies it by
   construction; a new one has to check.

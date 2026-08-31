@@ -54,20 +54,20 @@
  */
 import {
   getShowPage, searchShows, getShowEpisodes, SEARCH_HITS, SEARCH_MIN_CHARS,
-} from '/assets/js/ob-live.js?v=ob-v170'
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v170'
+} from '/assets/js/ob-live.js?v=ob-v174'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v174'
 import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls,
   RANGE_OPTIONS,
-} from '/assets/js/feed-controls.js?v=ob-v170'
+} from '/assets/js/feed-controls.js?v=ob-v174'
 // Its own module, not two more exports of feed-controls.js — see the ⚠️ note
 // at the top of that file for the four-hour window that shape opens.
-import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v170'
+import { mountFeedNote, resetFeedNote, viewNote, CHART_INFO } from '/assets/js/feed-note.js?v=ob-v174'
 import {
   LANG_ALL, languageOptions, langControl, langNote, langNoMatchText, langLabelFor,
-} from '/assets/js/feed-lang.js?v=ob-v170'
-import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v170'
-import { competitionRanks, rankLabel, markSliceTies } from '/assets/js/rank.js?v=ob-v170'
+} from '/assets/js/feed-lang.js?v=ob-v174'
+import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v174'
+import { competitionRanks, rankLabel, markSliceTies } from '/assets/js/rank.js?v=ob-v174'
 /* ⚠️ THE CARD ITSELF IS NOT IN THIS FILE ANY MORE. show-card.js emits it as an
  * HTML string and show-card-actions.js attaches its verbs, which is what lets
  * functions/index.js render the opening page of this feed at the edge — a
@@ -84,9 +84,9 @@ import {
   COPY, copyFor, toCard, showCardHtml, showRankValue,
   SORT_OPTIONS, RANKED_SORTS, SHOW_CARDS_PER_PAGE,
   num, fmtSats, plural,
-} from '/assets/js/show-card.js?v=ob-v170'
-import { wireShowCards } from '/assets/js/show-card-actions.js?v=ob-v170'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v170'
+} from '/assets/js/show-card.js?v=ob-v174'
+import { wireShowCards } from '/assets/js/show-card-actions.js?v=ob-v174'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v174'
 
 /* ── The hash's language, on an already-hydrated feed ──
  * The twin of the map in feeds-podcasts.js, and there for the same reason: a
@@ -704,21 +704,31 @@ export async function renderShows({ panel, list, scope = 'global', medium = 'oth
     list.replaceChildren(cards, moreWrap)
   }
 
-  // The same scope-dependent line the Episodes and Songs feeds carry, through
-  // langNote so this line and the language control's cannot drift into two
-  // versions of one sentence.
-  mountFeedNote(panel, langNote(follows ? copy.noteFollows : copy.noteGlobal, langKey, langLabel, copy.noun))
+  /* The line above the search box, recomposed from the live view — sort,
+   * range, scope — on every change. viewNote in feed-note.js is the one
+   * composer, and langNote still appends the language sentence, so this line
+   * and the language control's cannot drift into two versions of one
+   * sentence. The chart sort carries the ⓘ link to /about#charts. */
+  function paintNote() {
+    mountFeedNote(panel,
+      langNote(viewNote({ sort: sortKey, days: rangeDays(rangeKey), follows, noun: copy.noun }),
+        langKey, langLabel, copy.noun),
+      sortKey === 'chart' ? { info: CHART_INFO } : undefined)
+  }
+  paintNote()
 
   function applyRange(key) {
     if (key === rangeKey) return
     rangeKey = key
     reportView()
+    paintNote()
     requery()
   }
   function applySort(key) {
     if (key === sortKey) return
     sortKey = key
     reportView()
+    paintNote()
     requery()
   }
   /* Rebuilt rather than mutated when the view is set from outside, the same
@@ -754,9 +764,8 @@ export async function renderShows({ panel, list, scope = 'global', medium = 'oth
     if (key === langKey) return
     langKey = key
     langLabel = label || langLabelFor(key)
-    // "Ranks based on every boost in the index" stops being true the moment
-    // this is anything but All.
-    mountFeedNote(panel, langNote(follows ? copy.noteFollows : copy.noteGlobal, langKey, langLabel, copy.noun))
+    // The note names the language filter, so it repaints with it.
+    paintNote()
     // The controller writes the hash from this, so a shareable URL falls out of
     // using the control. Reported on a COERCION too, which is what takes an
     // unshowable language back out of the address bar.
@@ -806,6 +815,7 @@ export async function renderShows({ panel, list, scope = 'global', medium = 'oth
     mountViewControls()
     // Reported back, which is what strips a coerced key out of the address bar.
     reportView()
+    paintNote()
     requery()
   })
 
