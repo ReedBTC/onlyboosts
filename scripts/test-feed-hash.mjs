@@ -233,26 +233,28 @@ eq('a non-word sort is dropped', at('#shows?sort=sats;drop').sort, '')
 eq('a one-letter sort is dropped', at('#shows?sort=x').sort, '')
 
 console.log('\nWriting the hash back:')
-eq('no filter writes the hash it always wrote', hashFor('shows'), '#shows')
-langByFeed['shows'] = 'de'
-eq('a filter appends it', hashFor('shows'), '#shows?lang=de')
-rangeByFeed['shows'] = '1m'
-sortByFeed['shows'] = 'sats'
-eq('the whole view rides together', hashFor('shows'), '#shows?lang=de&range=1m&sort=sats')
-langByFeed['shows'] = ''
-eq('each param is independent', hashFor('shows'), '#shows?range=1m&sort=sats')
-rangeByFeed['shows'] = ''
-sortByFeed['shows'] = ''
-eq('another feed is unaffected', hashFor('albums'), '#albums')
+// ⚠️ The key is scoped since 2026-08-31 and the HASH is not: `shows-global`
+// still writes the `#shows` every link in the wild carries, through HASH_OF.
+eq('no filter writes the hash it always wrote', hashFor('shows-global'), '#shows')
+langByFeed['shows-global'] = 'de'
+eq('a filter appends it', hashFor('shows-global'), '#shows?lang=de')
+rangeByFeed['shows-global'] = '1m'
+sortByFeed['shows-global'] = 'sats'
+eq('the whole view rides together', hashFor('shows-global'), '#shows?lang=de&range=1m&sort=sats')
+langByFeed['shows-global'] = ''
+eq('each param is independent', hashFor('shows-global'), '#shows?range=1m&sort=sats')
+rangeByFeed['shows-global'] = ''
+sortByFeed['shows-global'] = ''
+eq('another feed is unaffected', hashFor('albums-global'), '#albums')
 /* ⚠️ THE ROUND TRIP RESOLVES THROUGH KEY_OF, the way fromHash does. Comparing
    `back.key` to the feed directly would fail for any feed whose hash is not its
    key, and "fix" it by dropping that feed from the list — which is how a
    mapping stops being tested. */
 const keyOf = (raw) => KEY_OF[raw] || raw
 for (const [feed, lang, range, sort] of [
-  ['shows', 'de', '1m', 'sats'], ['albums', 'en', '', ''], ['songs-follows', 'unknown', '1y', ''],
+  ['shows-global', 'de', '1m', 'sats'], ['albums-global', 'en', '', ''], ['songs-follows', 'unknown', '1y', ''],
   ['episodes-global', 'nb', '', 'count'], ['members-global', '', '', ''], ['members-follows', '', '', ''],
-  ['artists', '', '1w', 'sats'],
+  ['artists-global', '', '1w', 'sats'], ['shows-follows', '', '', 'chart'],
 ]) {
   langByFeed[feed] = lang
   rangeByFeed[feed] = range
@@ -277,11 +279,20 @@ console.log('\n⚠️ The Members feed is addressed as #members, not #members-gl
      language on several feeds, and this is an assertion about the KEY half of
      the hash, not about the language riding it. */
   const bare = (feed) => hashFor(feed).split('?')[0]
-  eq('⚠️ nothing else elides — shows is still #shows', bare('shows'), '#shows')
-  eq('  nor episodes', bare('episodes-global'), '#episodes-global')
+  /* ⚠️ Since 2026-08-31 the three ex-scopeless feeds elide the same way:
+     their bare hash is every link in the wild, so it stays the GLOBAL scope's
+     canonical address. Follows keeps its suffix everywhere, and the
+     episode-level feeds never elide. */
+  eq('⚠️ shows-global still writes #shows', bare('shows-global'), '#shows')
+  eq('  albums-global writes #albums', bare('albums-global'), '#albums')
+  eq('  artists-global writes #artists', bare('artists-global'), '#artists')
+  eq('⚠️ their follows keep the suffix', bare('shows-follows'), '#shows-follows')
+  eq('  episodes never elides', bare('episodes-global'), '#episodes-global')
   eq('  nor songs', bare('songs-follows'), '#songs-follows')
-  eq('the map has exactly one entry', Object.keys(HASH_OF), ['members-global'])
-  eq('and the derived inverse matches it', KEY_OF.members, 'members-global')
+  eq('the map has exactly four entries', Object.keys(HASH_OF),
+     ['members-global', 'shows-global', 'albums-global', 'artists-global'])
+  eq('and the derived inverse matches', [KEY_OF.members, KEY_OF.shows, KEY_OF.albums, KEY_OF.artists],
+     ['members-global', 'shows-global', 'albums-global', 'artists-global'])
 
   /* ⚠️ AND THE RETIRED HASHES STILL RESOLVE. `#boosts-global` and
      `#boosts-follows` were the shipped addresses of this feed on production
@@ -302,7 +313,7 @@ console.log('\n⚠️ The Members feed is addressed as #members, not #members-gl
 // ── 2. The boot sequence, which is where both bugs lived ─────────────
 console.log('\n⚠️ The cold load, which is what feeds.js reads when its listener attached too late:')
 let r = boot('#shows?lang=de')
-eq('body[data-active-feed]', r.body.dataset.activeFeed, 'shows')
+eq('body[data-active-feed]', r.body.dataset.activeFeed, 'shows-global')
 eq('body[data-feed-lang] carries the language', r.body.dataset.feedLang, 'de')
 eq('the hash is left as it was shared', r.location.hash, '#shows?lang=de')
 r = boot('#episodes-global?lang=de')
@@ -321,11 +332,11 @@ console.log('\nThe event detail agrees with the attribute:')
 r = boot('#albums?lang=en')
 const act = r.events.filter((e) => e.type === 'lb:feed-activate').pop()
 eq('lb:feed-activate fires', !!act, true)
-eq('and carries the same language', act.detail, { feed: 'albums', lang: 'en', range: '', sort: '' })
+eq('and carries the same language', act.detail, { feed: 'albums-global', lang: 'en', range: '', sort: '' })
 eq('the attribute matches it', r.body.dataset.feedLang, 'en')
 r = boot('#albums?range=1w&sort=boosts')
 const act2 = r.events.filter((e) => e.type === 'lb:feed-activate').pop()
-eq('and carries the view', act2.detail, { feed: 'albums', lang: 'all', range: '1w', sort: 'boosts' })
+eq('and carries the view', act2.detail, { feed: 'albums-global', lang: 'all', range: '1w', sort: 'boosts' })
 
 console.log('\nCoercion, with the hash rewritten to match what is on screen:')
 r = boot('#members?lang=de')
@@ -361,10 +372,22 @@ eq('and keeps the view, filed under the resolved key',
 r = boot('#episodes-follows?lang=de', { signedIn: true })
 eq('signed in, follows survives with its language',
   [r.body.dataset.activeFeed, r.body.dataset.feedLang], ['episodes-follows', 'de'])
-// ⚠️ THE FALLBACK IS DEFAULT_TYPE, WHICH IS SHOWS SINCE PHASE D. Shows has no
-// whose-axis, so the rewritten hash is the bare feed key rather than a scoped
-// one — and Shows is not in LANG_FEEDS' company here either: the language is
-// dropped because the hash was never understood, not because the feed refused it.
+/* ⚠️ The show-level feeds joined the axis on 2026-08-31, so the coercions
+   above apply to them now too — and the rewritten hash is the CANONICAL bare
+   one, so a signed-out deep link lands on the address every link already has. */
+r = boot('#shows-follows?lang=de', { signedIn: false })
+eq('signed out, shows-follows coerces to global, hash and language kept',
+  [r.body.dataset.activeFeed, r.location.hash], ['shows-global', '#shows?lang=de'])
+r = boot('#shows-follows', { signedIn: true })
+eq('signed in, Shows · Follows is a real feed now', r.body.dataset.activeFeed, 'shows-follows')
+r = boot('#albums-follows', { signedIn: true })
+eq('Albums · Follows too', r.body.dataset.activeFeed, 'albums-follows')
+r = boot('#artists-follows', { signedIn: true })
+eq('Artists · Follows too', r.body.dataset.activeFeed, 'artists-follows')
+// ⚠️ THE FALLBACK IS DEFAULT_TYPE, WHICH IS SHOWS SINCE PHASE D. The bare
+// `#shows` is the global scope's canonical hash (HASH_OF), so the rewrite is
+// still `#shows` — and the language is dropped because the hash was never
+// understood, not because the feed refused it.
 r = boot('#nonsense?lang=de')
 eq('an unknown hash falls back and drops the language', r.location.hash, '#shows')
 r = boot('#nonsense?range=1m&sort=sats')
@@ -378,12 +401,12 @@ eq('and drops the view with it', r.location.hash, '#shows')
 console.log('\nA control press writes the hash, and a pasted URL commands the feed:')
 {
   const b = boot('#shows')
-  b.dispatch('lb:feed-view', { feed: 'shows', range: '1m', sort: 'sats' })
+  b.dispatch('lb:feed-view', { feed: 'shows-global', range: '1m', sort: 'sats' })
   eq('a reported view lands in the hash', b.location.hash, '#shows?range=1m&sort=sats')
-  b.dispatch('lb:feed-view', { feed: 'shows', range: '', sort: '' })
+  b.dispatch('lb:feed-view', { feed: 'shows-global', range: '', sort: '' })
   eq('reporting the default strips it back out', b.location.hash, '#shows')
   // A report from a feed that is not on screen is remembered, not written.
-  b.dispatch('lb:feed-view', { feed: 'albums', range: '1w', sort: '' })
+  b.dispatch('lb:feed-view', { feed: 'albums-global', range: '1w', sort: '' })
   eq('an inactive feed\'s report leaves the hash alone', b.location.hash, '#shows')
   // The members feeds have the controls but not the shareable view.
   b.dispatch('lb:feed-view', { feed: 'members-global', range: '1w', sort: 'largest' })
@@ -395,14 +418,14 @@ console.log('\nA control press writes the hash, and a pasted URL commands the fe
   b.fire('hashchange')
   const set = b.events.filter((e) => e.type === 'lb:set-feed-view').pop()
   eq('a pasted URL dispatches lb:set-feed-view', !!set, true)
-  eq('with the whole view', set.detail, { feed: 'shows', range: '1m', sort: 'sats' })
+  eq('with the whole view', set.detail, { feed: 'shows-global', range: '1m', sort: 'sats' })
   eq('and the attributes move with it',
     [b.body.dataset.feedRange, b.body.dataset.feedSort], ['1m', 'sats'])
   // Pasting the bare hash asks for the default view, not "leave it alone".
   b.location.hash = '#shows'
   b.fire('hashchange')
   const back = b.events.filter((e) => e.type === 'lb:set-feed-view').pop()
-  eq('a bare hash commands the default view', back.detail, { feed: 'shows', range: '', sort: '' })
+  eq('a bare hash commands the default view', back.detail, { feed: 'shows-global', range: '', sort: '' })
 }
 
 /* ── Tabs ──────────────────────────────────────────────────────────────

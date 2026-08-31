@@ -177,6 +177,14 @@ export function readParams(u) {
   const { lang, error: langError } = readLang(u);
   if (langError) return { error: langError };
   const podcast = u.searchParams.get("podcast") || null;
+  /* `since` is an explicit BOOST-TIME cutoff (unix seconds), applied only on
+   * the follows POST — the show drawer's follows path asks for one show's
+   * episodes counted over exactly the window the card's own figures were
+   * (data-since, the /api/v1/podcasts/<guid>?since= contract). It is not a
+   * third reading of `range`, which stays air date here; it filters
+   * b.created_at the way every `#boosts` section does. The GET path ignores
+   * it: the precomputed columns cannot answer an arbitrary cutoff. */
+  const since = parseInt(u.searchParams.get("since"), 10) || 0;
   const days = RANGE_DAYS[range];
   const include = new Set((u.searchParams.get("include") || "").split(",").filter(Boolean));
   // Free-text over episode title + show name. See _common.js#ftsMatch: a raw
@@ -192,6 +200,7 @@ export function readParams(u) {
     q: match ? rawQ : null,
     match,
     sortKey, range, medium, notMedium, lang, podcast,
+    since: since > 0 ? since : null,
     withBoosts: include.has("boosts"),
     // Cutoff is computed per request; the response is cached briefly, so a
     // window can lag its own edge by the cache TTL. That's invisible at 7-day
@@ -407,6 +416,8 @@ export async function onRequestPost({ request, env }) {
   const where = [`b.booster_pubkey IN (${inList})`, "b.item_guid IS NOT NULL"];
   const args = [];
   if (p.cutoff) { where.push("e.published >= ?"); args.push(p.cutoff); }
+  // Boost-time, beside the air-date range — see `since` in readParams.
+  if (p.since) { where.push("b.created_at >= ?"); args.push(p.since); }
   if (p.medium) { where.push("COALESCE(pc.medium,'podcast') = ?"); args.push(p.medium); }
   if (p.notMedium) { where.push("COALESCE(pc.medium,'podcast') <> ?"); args.push(p.notMedium); }
   { const w = langWhere(p.lang, "pc.language", args); if (w) where.push(w); }

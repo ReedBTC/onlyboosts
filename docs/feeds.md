@@ -349,9 +349,9 @@ this month's shows by sats. Language shipped alone on 2026-08-17, on the argumen
 that a language names a body of work where a range and a sort are how one reader
 is looking at a list; **range and sort joined on 2026-08-27, Reed's ask**, and
 the shape had been left with room for them, so it was the promised extension
-rather than a redesign. They ride the six `PARAM_FEEDS` feeds — Shows, Albums,
-Episodes and Songs on both scopes — and deliberately not the Members feeds,
-which have the controls but no shareable view.
+rather than a redesign. They ride the ten `PARAM_FEEDS` feeds — every
+Shows/Albums/Artists/Episodes/Songs key in both scopes since 2026-08-31 —
+and deliberately not the two Members feeds.
 
 **⚠️ A default value is elided, and the elision is the renderer's.** The bare
 hash is the default view's address (`#shows`, never
@@ -545,6 +545,33 @@ Two data facts that shaped the UI:
 **Both ranges fetch the drawer**, with the window passed as `?since=<unix>` so
 the rows come back scoped and recounted. A drawer showing all-time figures under
 a card showing the week's would contradict the card it opened from.
+
+**Both scopes since 2026-08-31.** The old Global-only constraint died with the
+data source that imposed it: the rollup once read a published aggregate
+computed over everyone, and ranking moved server-side, so the Follows scope
+POSTs the contact list and `/api/v1/podcasts` aggregates the follow set's
+boosts per request — the episodes endpoint's own shape, sorts and `q=`
+included. Three rules carried over from the episode feeds, plus one new
+mechanism:
+
+- **Numerals are withheld on Follows** (`showRanks`): the population is
+  whoever you happen to follow, so a #1 would imply a standing that does not
+  exist. The order still holds.
+- **Adoption is Global-only**, guarded in `adoptServerCards` — the Follows
+  panel ships no state element, and the guard keeps that a fact.
+- **The suggestions are scoped**: `searchShows` carries the follows list, so
+  the typeahead cannot offer a show the feed then filters to nothing.
+- **⚠️ THE DRAWER'S CORPUS RIDES THE LIST CONTAINER AS A JS PROPERTY
+  (`obFollows`)**, read by `show-card-actions.js` at open time. An attribute
+  cannot carry thousands of hex keys, and the drawer must count exactly what
+  the card counted. The follows drawer path is
+  `POST /api/v1/episodes?podcast=<guid>&since=<unix>` — `podcast=` scopes to
+  the one show (and suspends the medium filter, which could only empty a
+  single show's list), and `since=` is an explicit boost-time cutoff matching
+  the card's window, the `/api/v1/podcasts/<guid>?since=` contract. Global
+  lists never set the property, so that path is byte-identical to what always
+  shipped.
+
 ### The Artists feed
 
 `assets/js/artists-feed.js`, behind Artists in the feed bar — the third Music
@@ -563,7 +590,14 @@ split, and the two stay parallel on purpose. The card is
 classes and discipline. What differs from the show-level rollups, each a
 decision:
 
-- **Global only and SCOPELESS**, like Shows and Albums, same reason.
+- **Both scopes since 2026-08-31**, like Shows and Albums and by the same
+  mechanism: `/api/v1/publishers` gained the follows POST (one more WHERE on
+  an endpoint that always aggregates), the numerals are withheld on Follows,
+  and the drawer's follows path is
+  `POST /api/v1/podcasts?publisher=<guid>&since=<unix>` — the declaring shows
+  with the follow set's own figures, no medium filter (an artist's list
+  includes their podcasts), carried to the drawer through the same
+  `obFollows` container property the show cards use.
 - **The endpoint takes no medium.** The tier is ownership: 9 of the 395
   declaring shows are podcasts, and an artist's figures are the figures of
   everything they declared. The SURFACE sits under Music because the tag is a

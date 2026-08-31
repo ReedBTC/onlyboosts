@@ -320,6 +320,7 @@ const EPISODE_PAGE = 60
 export async function getEpisodePage({
   medium = null, sort = 'boosts', range = 'all', lang = null,
   offset = 0, limit = EPISODE_PAGE, follows = null, q = null,
+  podcast = null, since = null,
   withBoosts = true, signal,
 } = {}) {
   const qs = new URLSearchParams({
@@ -331,13 +332,20 @@ export async function getEpisodePage({
   // 'all' is the absence of a filter rather than a value the endpoint knows, so
   // an unfiltered feed sends the query string it always sent.
   if (lang && lang !== 'all') qs.set('lang', lang)
+  // One show's episodes (the show drawer's follows path) and an explicit
+  // boost-time cutoff (`since`, the drawer's data-since — applied only on the
+  // follows POST; see the endpoint's readParams).
+  if (podcast) qs.set('podcast', podcast)
+  if (since) qs.set('since', String(since))
   // Deliberately not `medium=podcast`. Both are the same 6,123 episodes today,
   // but a show that declares `video` (there are two in the index, neither with
   // an enriched boosted episode yet) would be dropped by one and kept by the
   // other, and the partition rule says everything that is not music belongs to
   // Episodes.
   if (medium === 'music') qs.set('medium', 'music')
-  else qs.set('not_medium', 'music')
+  // A single show's list is one show whichever side of the partition it is
+  // on; filtering it by medium could only ever empty it.
+  else if (!podcast) qs.set('not_medium', 'music')
 
   const init = { headers: { Accept: 'application/json' }, signal }
   if (follows && follows.length) {
@@ -438,19 +446,34 @@ const SHOW_PAGE = 60
  */
 export async function getShowPage({
   medium = null, sort = 'boosts', range = 'all', lang = null,
-  offset = 0, limit = SHOW_PAGE, q = null, signal,
+  offset = 0, limit = SHOW_PAGE, q = null, follows = null,
+  publisher = null, since = null, signal,
 } = {}) {
   const qs = new URLSearchParams({
     sort, range, limit: String(limit), offset: String(offset),
   })
   if (medium === 'music') qs.set('medium', 'music')
-  else qs.set('not_medium', 'music')
+  /* One artist's declaring shows (the artist drawer's follows path) take NO
+   * medium filter: the publisher tier is ownership, and 9 declaring shows are
+   * podcasts — filtering them out would shrink the artist's own list. */
+  else if (!publisher) qs.set('not_medium', 'music')
   if (q) qs.set('q', q)
   if (lang && lang !== 'all') qs.set('lang', lang)
+  if (publisher) qs.set('publisher', publisher)
+  // An explicit boost-time cutoff overriding the range bucket — the
+  // /api/v1/podcasts/<guid>?since= contract, now on the listing too.
+  if (since) qs.set('since', String(since))
 
-  const resp = await fetch(`${PODCASTS_API}?${qs}`, {
-    headers: { Accept: 'application/json' }, signal,
-  })
+  // Follows rides a POST, exactly as getEpisodePage's does: a contact list is
+  // too long for a query string and is caller state, not an identifier.
+  const init = { headers: { Accept: 'application/json' }, signal }
+  if (follows && follows.length) {
+    init.method = 'POST'
+    init.headers['Content-Type'] = 'application/json'
+    init.body = JSON.stringify({ follows })
+  }
+
+  const resp = await fetch(`${PODCASTS_API}?${qs}`, init)
   if (!resp.ok) throw new Error(`podcasts: HTTP ${resp.status}`)
   const data = await resp.json()
   return {
@@ -462,12 +485,26 @@ export async function getShowPage({
 /** The Shows/Albums typeahead. Same reasoning as searchEpisodes above. */
 export async function searchShows({
   q, medium = null, sort = 'boosts', range = 'all', lang = null,
-  limit = SEARCH_HITS, signal,
+  follows = null, limit = SEARCH_HITS, signal,
 } = {}) {
   const text = typeof q === 'string' ? q.trim() : ''
   if (text.length < SEARCH_MIN_CHARS) return []
   const { records } = await getShowPage({
-    medium, sort, range, lang, signal, q: text, limit, offset: 0,
+    medium, sort, range, lang, follows, signal, q: text, limit, offset: 0,
+  })
+  return records
+}
+
+/* The show drawer's follows path: one show's episodes, counted over only the
+ * follow set's boosts inside the same boost-time window the card's figures
+ * were (`since`, the container's data-since). The episode records already
+ * carry every field the drawer reads — guid/title/img/date/num/url/boosts/
+ * sats — so the rows pass straight through. Sats-ranked; the drawer re-sorts
+ * by recency itself, the same as the global path's rows. */
+export async function getShowEpisodesFollows({ guid, follows, since = null, signal } = {}) {
+  const { records } = await getEpisodePage({
+    follows, podcast: guid, since, sort: 'sats', range: 'all',
+    withBoosts: false, limit: 200, offset: 0, signal,
   })
   return records
 }
@@ -585,7 +622,7 @@ const PUBLISHERS_API = '/api/v1/publishers'
 /** One page of the ranked artist list. */
 export async function getPublisherPage({
   sort = 'boosters', range = 'all', lang = null,
-  offset = 0, limit = SHOW_PAGE, q = null, signal,
+  offset = 0, limit = SHOW_PAGE, q = null, follows = null, signal,
 } = {}) {
   const qs = new URLSearchParams({
     sort, range, limit: String(limit), offset: String(offset),
@@ -593,9 +630,15 @@ export async function getPublisherPage({
   if (q) qs.set('q', q)
   if (lang && lang !== 'all') qs.set('lang', lang)
 
-  const resp = await fetch(`${PUBLISHERS_API}?${qs}`, {
-    headers: { Accept: 'application/json' }, signal,
-  })
+  // Follows rides a POST — see getShowPage.
+  const init = { headers: { Accept: 'application/json' }, signal }
+  if (follows && follows.length) {
+    init.method = 'POST'
+    init.headers['Content-Type'] = 'application/json'
+    init.body = JSON.stringify({ follows })
+  }
+
+  const resp = await fetch(`${PUBLISHERS_API}?${qs}`, init)
   if (!resp.ok) throw new Error(`publishers: HTTP ${resp.status}`)
   const data = await resp.json()
   return {
@@ -607,12 +650,24 @@ export async function getPublisherPage({
 /** The Artists typeahead. Same reasoning as searchShows. */
 export async function searchPublishers({
   q, sort = 'boosters', range = 'all', lang = null,
-  limit = SEARCH_HITS, signal,
+  follows = null, limit = SEARCH_HITS, signal,
 } = {}) {
   const text = typeof q === 'string' ? q.trim() : ''
   if (text.length < SEARCH_MIN_CHARS) return []
   const { records } = await getPublisherPage({
-    sort, range, lang, signal, q: text, limit, offset: 0,
+    sort, range, lang, follows, signal, q: text, limit, offset: 0,
+  })
+  return records
+}
+
+/* The artist drawer's follows path: the artist's declaring shows, counted
+ * over the follow set's boosts in the card's window. The show records carry
+ * everything albumRowsHtml reads — guid/title/medium/boosts/sats — including
+ * the medium the drawer partitions its groups on. */
+export async function getPublisherAlbumsFollows({ guid, follows, since = null, signal } = {}) {
+  const { records } = await getShowPage({
+    follows, publisher: guid, since, sort: 'sats', range: 'all',
+    limit: 200, offset: 0, signal,
   })
   return records
 }

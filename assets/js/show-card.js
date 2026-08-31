@@ -78,6 +78,8 @@ export const COPY = {
     sortTitle: 'Sort shows',
     // The line above the search box. See mountFeedNote in feed-controls.js.
     noteGlobal: 'Ranks based on every boost in the index',
+    noteFollows: 'Ranks based on only boosts from the accounts you follow',
+    noFollows: ['You’re not following anyone yet', 'Follow some npubs in any Nostr client and the shows they boost will show up here.'],
     moreLabel: (n) => `Load ${n} more show${n === 1 ? '' : 's'}`,
     // No total to count against: the endpoint pages rather than reporting how
     // many shows the range holds, so this states what is on screen and nothing
@@ -114,6 +116,8 @@ export const COPY = {
     rangeTitle: (days) => (days ? `Albums boosted in the last ${days} days` : 'All time'),
     sortTitle: 'Sort albums',
     noteGlobal: 'Ranks based on every boost in the index',
+    noteFollows: 'Ranks based on only boosts from the accounts you follow',
+    noFollows: ['You’re not following anyone yet', 'Follow some npubs in any Nostr client and the albums they boost will show up here.'],
     moreLabel: (n) => `Load ${n} more album${n === 1 ? '' : 's'}`,
     countLine: (shown) => `Showing ${shown}`,
     searchPlaceholder: 'Search albums…',

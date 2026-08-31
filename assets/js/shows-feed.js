@@ -43,17 +43,19 @@
  * latest.json + month archives the Episodes feeds already pull, and ob-data.js
  * caches them for the page's lifetime. Opening Episodes first makes this free.
  *
- * Scope: Global only on both, deliberately. podcasts/index.json is computed
- * over everyone, so it cannot serve a Follows audience — its counts would be
- * wrong for a filtered one. A Shows · Follows would have to roll the D1 corpus
- * up by show (ob-live.js#getFollowsBoosts, the way feeds-podcasts.js does by
- * episode); it just isn't built yet, which is why the scope menu stays hidden
- * on both of these feeds. The two Songs feeds have the axis because they are
- * episode-level and go through feeds-podcasts.js, which never reads this file.
+ * Scope: BOTH, since 2026-08-31. The old note here said Global only, because
+ * the rollup read podcasts/index.json — computed over everyone, so its counts
+ * could not serve a Follows audience. Ranking moved server-side and retired
+ * that constraint: the Follows scope POSTs the contact list and
+ * /api/v1/podcasts aggregates the follow set's boosts per request, exactly the
+ * arrangement the episode feeds have always had. A show appears only if
+ * someone you follow boosted it, and its figures count only those boosts —
+ * scoping the raw rows BEFORE the rollup, never after.
  */
 import {
   getShowPage, searchShows, getShowEpisodes, SEARCH_HITS, SEARCH_MIN_CHARS,
 } from '/assets/js/ob-live.js?v=ob-v167'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v167'
 import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls,
   RANGE_OPTIONS,
@@ -172,10 +174,10 @@ function renderPlaceholder(list, title, body) {
  * and in exchange the All drawer stops fetching the per-show shard, which ran to
  * 1.95MB on the most-boosted show.
  */
-async function loadShowPage({ medium, sort, range, lang, offset, q = null, signal }) {
+async function loadShowPage({ medium, follows = null, sort, range, lang, offset, q = null, signal }) {
   const { records, nextOffset } = await getShowPage({
     medium: medium === 'music' ? 'music' : null,
-    sort, range, lang, offset, q, signal,
+    follows, sort, range, lang, offset, q, signal,
   })
   const items = records.map(toCard)
   // A `q=` page's records carry the server's rank — each row's standing in the
@@ -199,15 +201,41 @@ async function loadShowPage({ medium, sort, range, lang, offset, q = null, signa
  *                                means the default (all time).
  * @param {string}  [opts.sort]   the OPENING sort, off the hash. Same rule.
  */
-export async function renderShows({ panel, list, medium = 'other', lang = null, range = null, sort = null }) {
+export async function renderShows({ panel, list, scope = 'global', medium = 'other', lang = null, range = null, sort = null }) {
   if (!list) return
   const copy = copyFor(medium)
   const wantMusic = medium === 'music'
-  // Neither of these re-renders today (Global only, so no account switch
-  // reaches them), but the reset is what makes that a fact about the feed
-  // rather than an assumption baked into this one.
+  /* Ranks are meaningful on Global, where the ordering is a leaderboard over
+   * the whole network. On Follows the population is "whoever you happen to
+   * follow", so a numeral would imply a standing that doesn't exist — the same
+   * rule feeds-podcasts.js applies. The ORDER still holds; only the number is
+   * withheld. */
+  const showRanks = scope !== 'follows'
+  // An account switch re-renders the Follows feeds, so clear any box a
+  // previous run left behind before deciding whether this one gets one.
   resetFeedSearch(panel)
   resetFeedNote(panel)
+
+  /* Follows scoping applies to the raw boosts BEFORE the show rollup, server-
+   * side — see the scope note at the top of this file. The resolution and its
+   * three early returns mirror feeds-podcasts.js exactly. */
+  let follows = null
+  if (scope === 'follows') {
+    const res = await resolveFollows()
+    if (res.status === 'signed-out') {
+      renderPlaceholder(list, 'Sign in to see this feed', 'Follows feeds read your kind-3 contact list, so they need a signed-in npub.')
+      return
+    }
+    if (res.status === 'unavailable') {
+      renderPlaceholder(list, 'Couldn’t load your follow list', 'We couldn’t reach a relay holding your kind-3 contact list — please try again later.')
+      return
+    }
+    if (res.status === 'empty') {
+      renderPlaceholder(list, ...copy.noFollows)
+      return
+    }
+    follows = res.follows
+  }
 
   /* Distinct people is the default sort, matching the episode rollup's: one
    * listener boosting a show forty times is one vote, not forty. It was
@@ -229,7 +257,7 @@ export async function renderShows({ panel, list, medium = 'other', lang = null, 
   // No language filter, which is NOT the same as English: 341 shows on this
   // side of the medium split and 253 on the music side declare no <language>
   // at all, so All is the only key that holds every card. See feed-lang.js.
-  const feedKey = panel?.dataset.feed || (medium === 'music' ? 'albums' : 'shows')
+  const feedKey = panel?.dataset.feed || `${medium === 'music' ? 'albums' : 'shows'}-${scope}`
   /* What the reader is looking at, reported so the controller can write the
    * hash from it — the shareable URL is a side effect of using the controls.
    * '' is the default, which keeps the bare hash bare. */
@@ -300,6 +328,12 @@ export async function renderShows({ panel, list, medium = 'other', lang = null, 
   // copying its markup into this one. Copying would mean serialising and
   // re-parsing the whole opening page to end up with the same nodes.
   let cards = h('div', { class: 'pcast-list', 'data-show-list': '' })
+  /* The drawer's corpus rides the container as a JS property — an attribute
+   * cannot carry a follow set — and show-card-actions.js reads it at open
+   * time, so a drawer counts exactly what the card counted. Global never sets
+   * it, and the adopted (server-rendered) container never needs it: adoption
+   * is Global-only by the guard below. */
+  if (follows) cards.obFollows = follows
   const moreWrap = h('div', { class: 'pcast-more-wrap' })
 
   const cutoff = () => rangeCutoff(rangeKey)
@@ -317,7 +351,7 @@ export async function renderShows({ panel, list, medium = 'other', lang = null, 
       if (since) cards.setAttribute('data-since', String(since))
       else cards.removeAttribute('data-since')
       cards.insertAdjacentHTML('beforeend', slice.map((s) => showCardHtml(s, {
-        rank: RANKED_SORTS.has(sortKey) ? rankLabel(s._rank, s._tied) : null,
+        rank: (showRanks && RANKED_SORTS.has(sortKey)) ? rankLabel(s._rank, s._tied) : null,
         copy,
       })).join(''))
       wireShowCards(cards)
@@ -341,7 +375,7 @@ export async function renderShows({ panel, list, medium = 'other', lang = null, 
         btn.disabled = true
         btn.textContent = 'Loading…'
         try {
-          const next = await loadShowPage({ medium, sort: sortKey, range: rangeKey, lang: langKey, q: query || null, offset: nextOffset })
+          const next = await loadShowPage({ medium, follows, sort: sortKey, range: rangeKey, lang: langKey, q: query || null, offset: nextOffset })
           shows = shows.concat(next.items)
           nextOffset = next.nextOffset
           rebuild({ keepShown: true })
@@ -380,8 +414,9 @@ export async function renderShows({ panel, list, medium = 'other', lang = null, 
    * a full repaint every label already matches, so it is a no-op. */
   function syncRankLabels() {
     // Query results wear server ranks, which a later page cannot change —
-    // and under the chart sort EVERY row does, tie flags included.
-    if (picked || query || sortKey === 'chart') return
+    // and under the chart sort EVERY row does, tie flags included. A Follows
+    // list paints no numerals, so there is nothing to write back.
+    if (picked || query || sortKey === 'chart' || !showRanks) return
     // The CARD elements, not the rank nodes: an unranked sort renders no rank
     // node at all and indexing those would slide by one. The server's adopted
     // block sits ahead of `view` in the DOM, hence the offset.
@@ -389,7 +424,7 @@ export async function renderShows({ panel, list, medium = 'other', lang = null, 
     view.forEach((s, i) => {
       const node = els[adoptedCount + i]?.querySelector('.pcast-rank')
       if (!node) return
-      const label = RANKED_SORTS.has(sortKey) ? rankLabel(s._rank, s._tied) : null
+      const label = (showRanks && RANKED_SORTS.has(sortKey)) ? rankLabel(s._rank, s._tied) : null
       if (label != null && node.textContent !== label) node.textContent = label
     })
     // The seam itself: the server painted its last card without knowing what
@@ -492,6 +527,7 @@ export async function renderShows({ panel, list, medium = 'other', lang = null, 
     rebuild()
     try {
       const records = await searchShows({
+        follows,
         q: picked.query, medium: wantMusic ? 'music' : null,
         sort: sortKey, range: rangeKey, lang: langKey, limit: SEARCH_HITS,
       })
@@ -533,7 +569,7 @@ export async function renderShows({ panel, list, medium = 'other', lang = null, 
   async function refetchUnfiltered() {
     if (shows.length) { rebuild(); return }
     try {
-      const page = await loadShowPage({ medium, sort: sortKey, range: rangeKey, lang: langKey, q: query || null, offset: 0 })
+      const page = await loadShowPage({ medium, follows, sort: sortKey, range: rangeKey, lang: langKey, q: query || null, offset: 0 })
       shows = page.items
       nextOffset = page.nextOffset
     } catch (e) {
@@ -560,7 +596,7 @@ export async function renderShows({ panel, list, medium = 'other', lang = null, 
     const mine = ++seq
     loading = true
     try {
-      const page = await loadShowPage({ medium, sort: sortKey, range: rangeKey, lang: langKey, q: query || null, offset: 0 })
+      const page = await loadShowPage({ medium, follows, sort: sortKey, range: rangeKey, lang: langKey, q: query || null, offset: 0 })
       if (mine !== seq) return
       shows = page.items
       nextOffset = page.nextOffset
@@ -599,7 +635,9 @@ export async function renderShows({ panel, list, medium = 'other', lang = null, 
    * ⚠️ THE MEDIUM IS CHECKED because one module serves two feeds. A shell
    * rendered for Shows must never be adopted by Albums, which is a different
    * half of the same partition and would paint podcasts under an Albums
-   * heading. There is no scope to check: both of these feeds are Global only.
+   * heading. The SCOPE is checked too since Follows landed: only the Global
+   * feed is ever server-rendered, and the Follows panel has no state element —
+   * the guard is what keeps that a fact rather than an assumption.
    *
    * ⚠️ THE SERVER'S CARDS ARE UNFILTERED, AND THE SERVER CANNOT KNOW OTHERWISE.
    * functions/index.js renders the opening page with no language, and a hash is
@@ -615,6 +653,7 @@ export async function renderShows({ panel, list, medium = 'other', lang = null, 
     try { state = JSON.parse(stateEl.textContent || '{}') } catch { return null }
     const painted = list.querySelector('.pcast-list')
     if (!state || !painted || !painted.querySelector('[data-show-card]')) return null
+    if (scope !== 'global') return null
     if (state.medium !== medium) return null
     if (langKey !== LANG_ALL) return null
     /* Same argument one axis over: the server rendered its own opening range
@@ -651,7 +690,7 @@ export async function renderShows({ panel, list, medium = 'other', lang = null, 
     // fetch that can render a placeholder instead of cards.
     let first
     try {
-      first = await loadShowPage({ medium, sort: sortKey, range: rangeKey, lang: langKey, offset: 0 })
+      first = await loadShowPage({ medium, follows, sort: sortKey, range: rangeKey, lang: langKey, offset: 0 })
     } catch (e) {
       console.error('[shows] index fetch failed', e)
       renderPlaceholder(list, ...copy.loadFail)
@@ -664,12 +703,10 @@ export async function renderShows({ panel, list, medium = 'other', lang = null, 
     list.replaceChildren(cards, moreWrap)
   }
 
-  // The same line the Episodes and Songs feeds carry. There is no Follows scope
-  // here yet, so it has one form; when Shows · Follows lands it gains the second
-  // and this becomes the scope-dependent pick the other renderer already makes.
-  // Through langNote even though the filter is provably All here, so this line
-  // and the language control's cannot drift into two versions of one sentence.
-  mountFeedNote(panel, langNote(copy.noteGlobal, langKey, langLabel, copy.noun))
+  // The same scope-dependent line the Episodes and Songs feeds carry, through
+  // langNote so this line and the language control's cannot drift into two
+  // versions of one sentence.
+  mountFeedNote(panel, langNote(follows ? copy.noteFollows : copy.noteGlobal, langKey, langLabel, copy.noun))
 
   function applyRange(key) {
     if (key === rangeKey) return
@@ -718,7 +755,7 @@ export async function renderShows({ panel, list, medium = 'other', lang = null, 
     langLabel = label || langLabelFor(key)
     // "Ranks based on every boost in the index" stops being true the moment
     // this is anything but All.
-    mountFeedNote(panel, langNote(copy.noteGlobal, langKey, langLabel, copy.noun))
+    mountFeedNote(panel, langNote(follows ? copy.noteFollows : copy.noteGlobal, langKey, langLabel, copy.noun))
     // The controller writes the hash from this, so a shareable URL falls out of
     // using the control. Reported on a COERCION too, which is what takes an
     // unshowable language back out of the address bar.
@@ -836,6 +873,7 @@ export async function renderShows({ panel, list, medium = 'other', lang = null, 
     // state now, and shadowing it here invites reading one as the other.
     searchRemote: async (qText, { signal }) => {
       const records = await searchShows({
+        follows,
         q: qText, medium: wantMusic ? 'music' : null,
         // ⚠️ THE LANGUAGE HAS TO TRAVEL WITH THE SEARCH, like the medium: a
         // suggestion the feed would then filter away to nothing is the

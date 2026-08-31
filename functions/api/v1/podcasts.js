@@ -23,7 +23,7 @@
 //                window's.
 // Both project the same column names, so everything downstream of `base` — the
 // ranking, the search join, the ordering, the record shape — is written once.
-import { json, preflight, clampLimit, ftsMatch, readLang, langWhere } from "./_common.js";
+import { json, preflight, clampLimit, toHexPubkey, ftsMatch, readLang, langWhere } from "./_common.js";
 
 export async function onRequestOptions({ request }) { return preflight(request); }
 
@@ -55,6 +55,7 @@ const DEFAULT_SORT = "latest";   // unchanged from the original shipped default
 // answer 400, so the two lists move together.
 const RANGE_DAYS = { "1w": 7, "1m": 30, "1y": 365, all: null };
 const MEDIA = new Set(["podcast", "music", "video"]);
+const MAX_FOLLOWS = 5000;
 
 // A show guid is a UUID in almost every case, and the feed's search box matches
 // one so a reader can paste the guid off a show page. FTS5 does not index it
@@ -118,6 +119,19 @@ export function readParams(u) {
   const rawQ = (u.searchParams.get("q") || "").trim();
   if (rawQ && rawQ.length < 2) return { error: "q must be >= 2 chars" };
 
+  // The publisher filter: one artist's declaring shows. It exists for the
+  // artist drawer's follows path (publisher-card-actions.js), which needs this
+  // list scoped the way the card's numbers are. Opaque and bound, never parsed
+  // — same rule as a show guid.
+  const publisher = u.searchParams.get("publisher") || null;
+
+  /* `since` is an EXPLICIT boost-time cutoff (unix seconds) overriding the
+   * range bucket — the contract /api/v1/podcasts/<guid>?since= already keeps,
+   * and the show drawer's data-since is exactly this number. It forces the
+   * windowed aggregate: the precomputed columns cannot answer an arbitrary
+   * cutoff. Still BOOST TIME — not a third reading of range. */
+  const since = parseInt(u.searchParams.get("since"), 10) || 0;
+
   const days = RANGE_DAYS[range];
   // See _common.js#ftsMatch. A raw string is an FTS5 EXPRESSION, and a pasted
   // show guid is exactly the input that breaks it: every hyphen reads as an
@@ -125,7 +139,7 @@ export function readParams(u) {
   // unfiltered path rather than emitting an empty MATCH.
   const match = rawQ ? ftsMatch(rawQ) : null;
   return {
-    sortKey, range, medium, notMedium, lang,
+    sortKey, range, medium, notMedium, lang, publisher,
     q: match ? rawQ : null,
     match,
     // FTS5 does not index the guid (podcasts_fts is title + author), so a
@@ -135,7 +149,7 @@ export function readParams(u) {
     // Computed per request. The response is cached briefly, so a window can lag
     // its own edge by the cache TTL; invisible at 7-day granularity and it keeps
     // this a pure function of the URL.
-    cutoff: days ? Math.floor(Date.now() / 1000) - days * 86400 : null,
+    cutoff: since > 0 ? since : (days ? Math.floor(Date.now() / 1000) - days * 86400 : null),
     limit: clampLimit(u.searchParams.get("limit")),
     offset: Math.max(0, parseInt(u.searchParams.get("offset"), 10) || 0),
   };
@@ -161,6 +175,52 @@ export async function onRequestGet({ request, env }) {
   }, { cache: p.cutoff ? 120 : 300 });
 }
 
+/* Follows scope — Shows · Follows and Albums · Follows (2026-08-31, with the
+ * OnlyBoosts Charts branch). POST for the same reason the episodes endpoint's
+ * is: a kind-3 contact list runs to thousands of pubkeys, too long for a query
+ * string and caller state rather than a resource identifier. The body, the
+ * limits, the npub→hex normalization and the interpolation discipline are the
+ * episodes POST's, verbatim in spirit — see the notes there. */
+export async function onRequestPost({ request, env }) {
+  const u = new URL(request.url);
+  const p = readParams(u);
+  if (p.error) return json(request, { error: p.error }, { status: 400 });
+
+  let body;
+  try { body = await request.json(); }
+  catch { return json(request, { error: "body must be JSON" }, { status: 400 }); }
+
+  const raw = Array.isArray(body?.follows) ? body.follows : null;
+  if (!raw) return json(request, { error: "follows must be an array" }, { status: 400 });
+  if (raw.length > MAX_FOLLOWS) {
+    return json(request, { error: `too many follows (max ${MAX_FOLLOWS})` }, { status: 400 });
+  }
+  const hexes = [...new Set(raw.map(toHexPubkey).filter(Boolean))];
+  if (!hexes.length) {
+    return json(request, { count: 0, scope: "follows", sort: p.sortKey, range: p.range,
+                           ...(p.q ? { q: p.q } : {}),
+                           next_offset: null, podcasts: [] }, { cache: 0 });
+  }
+  // Interpolated, not bound — D1 caps bound parameters far below a realistic
+  // follow set, and toHexPubkey has already reduced every element to
+  // /^[0-9a-f]{64}$/. The regex is the sanitizer; do not relax it.
+  p.followsIn = hexes.map((h) => `'${h}'`).join(",");
+
+  const { podcasts, nextOffset } = await globalPodcasts(env, p);
+  return json(request, {
+    count: podcasts.length,
+    scope: "follows",
+    follows: hexes.length,
+    sort: p.sortKey,
+    range: p.range,
+    ...(p.lang ? { lang: p.lang } : {}),
+    ...(p.q ? { q: p.q } : {}),
+    next_offset: nextOffset,
+    podcasts,
+  // Per-user and POSTed: not shared-cacheable.
+  }, { cache: 0 });
+}
+
 /** One page of the ranked show list, as records. See readParams above for why
  *  this is separate from the handler that serves it over HTTP. */
 export async function globalPodcasts(env, p) {
@@ -168,7 +228,34 @@ export async function globalPodcasts(env, p) {
   const args = [];
   let base;
 
-  if (p.cutoff) {
+  if (p.followsIn) {
+    /* ⚠️ FOLLOWS ALWAYS AGGREGATES, whatever the range: the precomputed
+     * columns are computed over everyone, so a follows corpus has no
+     * precomputed path to read. Same shape as the windowed branch below with
+     * the author filter added. `p.followsIn` is a pre-validated,
+     * already-escaped SQL fragment built in onRequestPost from pubkeys that
+     * each passed toHexPubkey — never caller input, same discipline as the
+     * episodes POST. */
+    const where = [`b.booster_pubkey IN (${p.followsIn})`, "b.podcast_guid IS NOT NULL"];
+    if (p.cutoff) { where.push("b.created_at >= ?"); args.push(p.cutoff); }
+    if (p.medium) { where.push("COALESCE(pc.medium,'podcast') = ?"); args.push(p.medium); }
+    if (p.notMedium) { where.push("COALESCE(pc.medium,'podcast') <> ?"); args.push(p.notMedium); }
+    { const w = langWhere(p.lang, "pc.language", args); if (w) where.push(w); }
+    if (p.publisher) { where.push("pc.publisher_guid = ?"); args.push(p.publisher); }
+    base = `
+      SELECT b.podcast_guid                     AS guid,
+             pc.title, pc.image, pc.artwork, pc.feed_url, pc.medium, pc.author,
+             pc.language,
+             COUNT(*)                           AS boost_count,
+             COALESCE(SUM(b.sats),0)            AS total_sats,
+             COUNT(DISTINCT b.booster_pubkey)   AS booster_count,
+             COUNT(DISTINCT b.item_guid)        AS episode_count,
+             MAX(b.created_at)                  AS latest_ts
+      FROM boosts b
+      LEFT JOIN podcasts pc ON pc.podcast_guid = b.podcast_guid
+      WHERE ${where.join(" AND ")}
+      GROUP BY b.podcast_guid`;
+  } else if (p.cutoff) {
     // ⚠️ WINDOWED: every figure is recomputed over the boosts inside the window.
     // `episode_count` is DISTINCT item_guid among those boosts, which is what the
     // drawer's list length agrees with — it is not the show's catalogue size and
@@ -181,6 +268,7 @@ export async function globalPodcasts(env, p) {
     if (p.notMedium) { where.push("COALESCE(pc.medium,'podcast') <> ?"); args.push(p.notMedium); }
     // No COALESCE: a NULL language is its own state, reachable only as lang=unknown.
     { const w = langWhere(p.lang, "pc.language", args); if (w) where.push(w); }
+    if (p.publisher) { where.push("pc.publisher_guid = ?"); args.push(p.publisher); }
     base = `
       SELECT b.podcast_guid                     AS guid,
              pc.title, pc.image, pc.artwork, pc.feed_url, pc.medium, pc.author,
@@ -199,6 +287,7 @@ export async function globalPodcasts(env, p) {
     if (p.medium) { where.push("COALESCE(p.medium,'podcast') = ?"); args.push(p.medium); }
     if (p.notMedium) { where.push("COALESCE(p.medium,'podcast') <> ?"); args.push(p.notMedium); }
     { const w = langWhere(p.lang, "p.language", args); if (w) where.push(w); }
+    if (p.publisher) { where.push("p.publisher_guid = ?"); args.push(p.publisher); }
     base = `
       SELECT p.podcast_guid AS guid, p.title, p.image, p.artwork, p.feed_url,
              p.medium, p.author, p.language, p.boost_count, p.total_sats, p.booster_count,

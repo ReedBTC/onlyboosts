@@ -27,9 +27,9 @@ import { readFileSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
-import { onRequestGet as podcastsGet } from '../functions/api/v1/podcasts.js'
+import { onRequestGet as podcastsGet, onRequestPost as podcastsPost } from '../functions/api/v1/podcasts.js'
 import { onRequestGet as episodesGet, onRequestPost as episodesPost } from '../functions/api/v1/episodes.js'
-import { onRequestGet as publishersGet } from '../functions/api/v1/publishers.js'
+import { onRequestGet as publishersGet, onRequestPost as publishersPost } from '../functions/api/v1/publishers.js'
 import { onRequestGet as membersGet } from '../functions/api/v1/members.js'
 import { PUBLISHERS } from '../functions/api/v1/_common.js'
 import { feedRanks, renderStatTiles } from '../functions/_shared/feed-rank.js'
@@ -408,6 +408,76 @@ async function call(handler, url, init) {
     assert.equal(bots.body.members.length, 1)
     assert.equal(bots.body.members[0].pk, PB)
     assert.equal(bots.body.members[0].rank, 1)
+  })
+}
+
+// ── POST /api/v1/podcasts and /api/v1/publishers — the follows scope ───────
+//
+// Phase 2 of the branch: Shows/Albums/Artists · Follows. The follows corpus
+// can only be aggregated per request, so both endpoints gained the episodes
+// POST's shape; the charts ladder and the single-column sorts ride the same
+// scoped aggregate. `publisher=` and `since=` exist for the drawers' follows
+// paths — one artist's declaring shows with NO medium filter, and an explicit
+// boost-time cutoff matching the card's own window.
+{
+  console.log('\npodcasts & publishers — POST follows')
+  const post = (handler, url, follows) => call(handler, url, {
+    method: 'POST', body: JSON.stringify({ follows }), headers: { 'content-type': 'application/json' },
+  })
+  const follows = [POOL[1], POOL[2]]
+  const mine = BOOSTS.filter((b) => follows.includes(b.pk))
+
+  const expected = chartOrder(rollup(mine.filter(notMusic), (b) => b.show, (b) => b.pk))
+  const { body } = await post(podcastsPost, '/api/v1/podcasts?not_medium=music&sort=chart&limit=200', follows)
+  check('⚠️ the shows chart is computed over the follow corpus alone', () => {
+    assert.equal(body.scope, 'follows')
+    assert.deepEqual(body.podcasts.map((p) => p.guid), expected.map((e) => e.id))
+    for (let i = 0; i < expected.length; i++) assert.equal(body.podcasts[i].rank, expected[i].rank)
+  })
+
+  const sats = await post(podcastsPost, '/api/v1/podcasts?not_medium=music&sort=sats&limit=200', follows)
+  check('⚠️ a single-column sort rides the same scoped aggregate, figures included', () => {
+    const exp = rollup(mine.filter(notMusic), (b) => b.show, (b) => b.pk)
+      .sort((a, b) => b.sats - a.sats || (a.id < b.id ? -1 : 1))
+    assert.deepEqual(sats.body.podcasts.map((p) => p.guid), exp.map((e) => e.id))
+    assert.equal(sats.body.podcasts[0].sats, exp[0].sats, 'the figures are the follow corpus’s own')
+  })
+
+  // pu1 declares a2 and a3; m1/m2 boost a1 and a2 — so their pu1 list is a2
+  // alone, with THEIR figures, and the medium filter must not narrow it.
+  const drawer = await post(podcastsPost, '/api/v1/podcasts?publisher=pu1&sort=sats&limit=200', [M[0], M[1]])
+  check('⚠️ publisher= scopes to one artist’s declaring shows', () => {
+    assert.deepEqual(drawer.body.podcasts.map((p) => p.guid), ['a2'])
+    const exp = rollup(BOOSTS.filter((b) => [M[0], M[1]].includes(b.pk) && b.show === 'a2'), (b) => b.show, (b) => b.pk)[0]
+    assert.equal(drawer.body.podcasts[0].sats, exp.sats)
+    assert.equal(drawer.body.podcasts[0].boosts, exp.boosts)
+  })
+
+  // m5's boosts are OLD; an explicit boost-time cutoff drops them all.
+  const win = await post(podcastsPost, `/api/v1/podcasts?medium=music&sort=sats&since=${NOW - 7 * 86400}&limit=200`, [M[4]])
+  check('⚠️ since= is an explicit boost-time cutoff', () => {
+    assert.equal(win.body.podcasts.length, 0)
+  })
+
+  const pubOf2 = (b) => SHOW_OF.get(b.show)?.publisher || null
+  const pexp = chartOrder(rollup(mine.filter((b) => pubOf2(b)), pubOf2, (b) => b.pk))
+  const pres = await post(publishersPost, '/api/v1/publishers?sort=chart&limit=200', follows)
+  check('⚠️ the artists chart over the follow corpus alone', () => {
+    assert.equal(pres.body.scope, 'follows')
+    assert.deepEqual(pres.body.publishers.map((p) => p.guid), pexp.map((e) => e.id))
+    for (let i = 0; i < pexp.length; i++) assert.equal(pres.body.publishers[i].rank, pexp[i].rank)
+  })
+
+  /* The show drawer's follows path end to end: one show, follows-scoped,
+     boost-time windowed. m1 sends two RECENT boosts to a1 (25 sats each);
+     m5's a1 boosts are OLD and must not count. */
+  const dres = await post(episodesPost, `/api/v1/episodes?podcast=a1&sort=sats&since=${NOW - 7 * 86400}&limit=200`, [M[0], M[4]])
+  check('⚠️ the drawer path: podcast= + since= over follows', () => {
+    assert.equal(dres.body.episodes.length, 1)
+    const row = dres.body.episodes[0]
+    assert.equal(row.guid, 'ep-a1')
+    assert.equal(row.boosts, 2)
+    assert.equal(row.sats, 50)
   })
 }
 

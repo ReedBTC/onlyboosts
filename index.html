@@ -1700,14 +1700,14 @@
     </section>
 
     <!-- Shows: the show-level rollup, where the Episodes feeds are
-         episode-level. Global only — podcasts/index.json is computed over
-         everyone, so it can't serve a Follows audience (shows-feed.js). -->
+         episode-level. Both scopes since 2026-08-31 — the Follows aggregate
+         is a POST to /api/v1/podcasts (shows-feed.js has the scope note). -->
     <!-- ⚠️ THE PANEL THE FRONT DOOR OPENS ON. DEFAULT_TYPE in the controller
          below says so, and this is the half of that decision a reader with no
          JavaScript and a crawler on its first pass actually see: the controller
          hides and shows panels, but until it runs, `is-active` here is what is
          on screen. The two move together. -->
-    <section class="feed-panel is-active" id="panel-shows" role="region" aria-label="Shows" data-feed="shows" data-scope="global">
+    <section class="feed-panel is-active" id="panel-shows" role="region" aria-label="Shows, global" data-feed="shows-global" data-scope="global">
       <p class="feed-note" data-feed-note hidden></p>
       <div class="feed-search" data-feed-search hidden></div>
       <!-- ⚠️ THE MARKER BELOW IS AN INJECTION POINT, not a comment. functions/index.js
@@ -1732,9 +1732,20 @@
       </div>
     </section>
 
-    <!-- Albums: Shows, narrowed to the music side of the same rollup. Global
-         only for the same reason Shows is. -->
-    <section class="feed-panel" id="panel-albums" role="region" aria-label="Albums" data-feed="albums" data-scope="global" hidden>
+    <section class="feed-panel" id="panel-shows-follows" role="region" aria-label="Shows from your follows" data-feed="shows-follows" data-scope="follows" hidden>
+      <p class="feed-note" data-feed-note hidden></p>
+      <div class="feed-search" data-feed-search hidden></div>
+      <div class="feed-list" data-feed-list>
+        <div class="feed-placeholder">
+          <strong>Sign in to see this feed</strong>
+          Follows feeds read your kind&#8209;3 contact list, so they need a signed-in npub.
+        </div>
+      </div>
+    </section>
+
+    <!-- Albums: Shows, narrowed to the music side of the same rollup. Both
+         scopes, for the same reason Shows has both. -->
+    <section class="feed-panel" id="panel-albums" role="region" aria-label="Albums, global" data-feed="albums-global" data-scope="global" hidden>
       <p class="feed-note" data-feed-note hidden></p>
       <div class="feed-search" data-feed-search hidden></div>
       <div class="feed-list" data-feed-list>
@@ -1745,16 +1756,38 @@
       </div>
     </section>
 
+    <section class="feed-panel" id="panel-albums-follows" role="region" aria-label="Albums from your follows" data-feed="albums-follows" data-scope="follows" hidden>
+      <p class="feed-note" data-feed-note hidden></p>
+      <div class="feed-search" data-feed-search hidden></div>
+      <div class="feed-list" data-feed-list>
+        <div class="feed-placeholder">
+          <strong>Sign in to see this feed</strong>
+          Follows feeds read your kind&#8209;3 contact list, so they need a signed-in npub.
+        </div>
+      </div>
+    </section>
+
     <!-- Artists: the publisher tier above Albums — <podcast:publisher>, one
          card per artist (Wavlake, Fountain and RSS Blue mint one publisher
-         feed per artist). Global only, like the two show-level rollups. -->
-    <section class="feed-panel" id="panel-artists" role="region" aria-label="Artists" data-feed="artists" data-scope="global" hidden>
+         feed per artist). Both scopes, like the two show-level rollups. -->
+    <section class="feed-panel" id="panel-artists" role="region" aria-label="Artists, global" data-feed="artists-global" data-scope="global" hidden>
       <p class="feed-note" data-feed-note hidden></p>
       <div class="feed-search" data-feed-search hidden></div>
       <div class="feed-list" data-feed-list>
         <div class="feed-placeholder">
           <strong>Artists feed coming online</strong>
           The layout is ready — boosted artists load here once the rollup lands.
+        </div>
+      </div>
+    </section>
+
+    <section class="feed-panel" id="panel-artists-follows" role="region" aria-label="Artists from your follows" data-feed="artists-follows" data-scope="follows" hidden>
+      <p class="feed-note" data-feed-note hidden></p>
+      <div class="feed-search" data-feed-search hidden></div>
+      <div class="feed-list" data-feed-list>
+        <div class="feed-placeholder">
+          <strong>Sign in to see this feed</strong>
+          Follows feeds read your kind&#8209;3 contact list, so they need a signed-in npub.
         </div>
       </div>
     </section>
@@ -1822,16 +1855,17 @@
 
 <!-- ══════════════════════════════ FEED BAR CONTROLLER ══════════════════════════════
      Owns the tabs, the sub-category row, the scope menu, which panel is on
-     screen, and the hash. The feed key is `<type>-<scope>` (Shows excepted)
+     screen, and the hash. The feed key is `<type>-<scope>`
      and the TAB IS DERIVED FROM IT — see TAB_OF — so no URL in the wild had to
      change when the tabs landed. ALIASES below keeps the retired `#podcasts-*`
      hashes working and upgrades them in place. -->
 <script>
 (function () {
   'use strict';
-  // The feed each hash names, and the two axes it decomposes into. Shows and
-  // Albums have no whose-axis, so their keys are bare and their scope is only
-  // here to keep the shape uniform.
+  // The feed each hash names, and the two axes it decomposes into. Every
+  // feed has both scopes since 2026-08-31 (Shows/Albums/Artists · Follows
+  // shipped with the OnlyBoosts Charts branch); the old bare hashes survive
+  // as the global scope's CANONICAL addresses through HASH_OF below.
   const FEEDS = {
     'episodes-global':  { type: 'episodes', scope: 'global' },
     'episodes-follows': { type: 'episodes', scope: 'follows' },
@@ -1839,15 +1873,20 @@
     'songs-follows':    { type: 'songs',    scope: 'follows' },
     'members-global':   { type: 'members',  scope: 'global' },
     'members-follows':  { type: 'members',  scope: 'follows' },
-    'shows':            { type: 'shows',    scope: 'global' },
-    'albums':           { type: 'albums',   scope: 'global' },
-    'artists':          { type: 'artists',  scope: 'global' },
+    'shows-global':     { type: 'shows',    scope: 'global' },
+    'shows-follows':    { type: 'shows',    scope: 'follows' },
+    'albums-global':    { type: 'albums',   scope: 'global' },
+    'albums-follows':   { type: 'albums',   scope: 'follows' },
+    'artists-global':   { type: 'artists',  scope: 'global' },
+    'artists-follows':  { type: 'artists',  scope: 'follows' },
   };
-  // The two show-level feeds have no whose-axis, so their key is the bare type
-  // rather than `<type>-global`. Songs is episode-level and does have one — the
-  // asymmetry is about which data source each reads, not about medium; see the
-  // scope note at the top of shows-feed.js.
-  const SCOPELESS = { shows: true, albums: true, artists: true };
+  /* Empty since 2026-08-31 — the show-level feeds gained the whose-axis when
+     the server-side rollup made a Follows aggregate possible. The MECHANISM
+     stays: feedKey and the scope-menu rule read it, so a future feed with no
+     whose-axis is one entry here rather than a re-derivation. The retired
+     bare keys (#shows, #albums, #artists) did NOT become aliases; they are
+     the canonical hashes of the global scope, the #members arrangement. */
+  const SCOPELESS = {};
   /* ── The tab a feed belongs to ──
      ⚠️ A TAB IS DERIVED FROM THE FEED KEY, NEVER STORED IN THE HASH. That is
      the whole reason `#shows`, `#songs-global`, `#members` and the two
@@ -1910,7 +1949,9 @@
   const PARAM_FEEDS = {
     'episodes-global': 1, 'episodes-follows': 1,
     'songs-global': 1, 'songs-follows': 1,
-    'shows': 1, 'albums': 1, 'artists': 1,
+    'shows-global': 1, 'shows-follows': 1,
+    'albums-global': 1, 'albums-follows': 1,
+    'artists-global': 1, 'artists-follows': 1,
   };
   // What each feed is currently filtered to, '' meaning no filter. The renderers
   // own the control; this is the controller's copy, kept in step by the
@@ -1978,7 +2019,7 @@
   }
 
   /* ⚠️ THE HASH A FEED IS WRITTEN AS, where it should not simply be the key.
-     One entry: `members-global` is `#members`. Reed's call, 2026-08-23 — the
+     First of four: `members-global` is `#members`. Reed's call, 2026-08-23 — the
      tab is called Members, the sections above the list are about members, and
      `#members` named the smallest part of the page.
 
@@ -1992,7 +2033,16 @@
      ⚠️ ONLY THE GLOBAL SCOPE ELIDES. `#members-follows` keeps its suffix, the
      shape every other scoped feed has. A bare `#members` meaning "whichever
      scope you were last on" would be an address that does not name a view. */
-  const HASH_OF = { 'members-global': 'members' };
+  const HASH_OF = {
+    'members-global': 'members',
+    /* The three feeds that were scopeless until 2026-08-31: their bare hash
+       is every link in the wild, so it stays the global scope's canonical
+       address rather than becoming an alias that force-rewrites. Only the
+       global scope elides, as ever. */
+    'shows-global': 'shows',
+    'albums-global': 'albums',
+    'artists-global': 'artists',
+  };
   const KEY_OF = Object.create(null);
   Object.keys(HASH_OF).forEach(function (k) { KEY_OF[HASH_OF[k]] = k; });
 

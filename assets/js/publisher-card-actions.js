@@ -12,7 +12,7 @@
  * decision and not a gap.
  */
 import { wireArt2 } from '/assets/js/detail-page.js?v=ob-v167'
-import { getPublisherAlbums } from '/assets/js/ob-live.js?v=ob-v167'
+import { getPublisherAlbums, getPublisherAlbumsFollows } from '/assets/js/ob-live.js?v=ob-v167'
 import { COPY, albumRowsHtml } from '/assets/js/publisher-card.js?v=ob-v167'
 import { num } from '/assets/js/show-card.js?v=ob-v167'
 
@@ -90,10 +90,16 @@ function wireDrawer(card) {
 
     const guid = card.getAttribute('data-guid')
     const status = body.querySelector('[data-drawer-status]')
-    const since = num(card.closest('[data-artist-list]')?.getAttribute('data-since')) || null
+    const listEl = card.closest('[data-artist-list]')
+    const since = num(listEl?.getAttribute('data-since')) || null
+    // The follows set rides the container as a JS property — the show
+    // drawer's arrangement, one tier up; see show-card-actions.js.
+    const follows = Array.isArray(listEl?.obFollows) && listEl.obFollows.length ? listEl.obFollows : null
 
     try {
-      const { albums } = await getPublisherAlbums({ guid, since })
+      const albums = follows
+        ? await getPublisherAlbumsFollows({ guid, follows, since })
+        : (await getPublisherAlbums({ guid, since })).albums
       status?.remove()
       body.insertAdjacentHTML('afterbegin', albumRowsHtml(albums, COPY))
     } catch (err) {

@@ -4,7 +4,7 @@
  * sticky feed bar — Podcasts / Music / Members across the top, each with its
  * own sub-feeds, and Global / Follows on the second axis. Scoping: "Global" is
  * unscoped; "Follows" is the signed-in user's own kind-3 contact list,
- * resolved by follow-set.js. Shows and Albums are Global-only for now.
+ * resolved by follow-set.js. Every feed has both scopes since 2026-08-31.
  *
  * Every feed has a loader (see LOADERS at the bottom); each lazy-imports its
  * renderer on first view. All of them read D1 through /api/v1 —
@@ -128,13 +128,17 @@ const LOADERS = {
   'episodes-follows': (view) => hydrate('panel-episodes-follows', PODCASTS, 'follows', 'other', view),
   'songs-global':     (view) => hydrate('panel-songs-global', PODCASTS, 'global', 'music', view),
   'songs-follows':    (view) => hydrate('panel-songs-follows', PODCASTS, 'follows', 'music', view),
-  // Both Global only — see the scope note at the top of shows-feed.js.
-  'shows':            (view) => hydrate('panel-shows', SHOWS, 'global', 'other', view),
-  'albums':           (view) => hydrate('panel-albums', SHOWS, 'global', 'music', view),
+  // Both scopes since 2026-08-31 — see the scope note at the top of
+  // shows-feed.js for what retired the old Global-only constraint.
+  'shows-global':     (view) => hydrate('panel-shows', SHOWS, 'global', 'other', view),
+  'shows-follows':    (view) => hydrate('panel-shows-follows', SHOWS, 'follows', 'other', view),
+  'albums-global':    (view) => hydrate('panel-albums', SHOWS, 'global', 'music', view),
+  'albums-follows':   (view) => hydrate('panel-albums-follows', SHOWS, 'follows', 'music', view),
   /* The publisher tier above Albums — <podcast:publisher>, one card per
-   * artist. Global only, like the two show-level rollups, and it takes no
-   * medium: the tier is ownership, not medium (see /api/v1/publishers). */
-  'artists':          (view) => hydrate('panel-artists', ARTISTS, 'global', undefined, view),
+   * artist. It takes no medium: the tier is ownership, not medium (see
+   * /api/v1/publishers). */
+  'artists-global':   (view) => hydrate('panel-artists', ARTISTS, 'global', undefined, view),
+  'artists-follows':  (view) => hydrate('panel-artists-follows', ARTISTS, 'follows', undefined, view),
 }
 const loaded = new Set()
 
@@ -196,7 +200,7 @@ document.addEventListener('lb:feed-activate', (e) => {
 // Dropping them from `loaded` re-arms both — the visible one reloads now,
 // the other on its next activation, so an account switch can't leave a
 // stale list behind the tab you aren't looking at.
-const FOLLOWS_FEEDS = ['members-follows', 'episodes-follows', 'songs-follows']
+const FOLLOWS_FEEDS = ['members-follows', 'episodes-follows', 'songs-follows', 'shows-follows', 'albums-follows', 'artists-follows']
 let lastSessionPubkey = getSessionPubkey()
 
 function onSessionChange() {

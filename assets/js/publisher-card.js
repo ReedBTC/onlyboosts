@@ -69,6 +69,8 @@ export const COPY = {
   rangeTitle: (days) => (days ? `Artists boosted in the last ${days} days` : 'All time'),
   sortTitle: 'Sort artists',
   noteGlobal: 'Ranks based on every boost in the index',
+  noteFollows: 'Ranks based on only boosts from the accounts you follow',
+  noFollows: ['You’re not following anyone yet', 'Follow some npubs in any Nostr client and the artists they boost will show up here.'],
   moreLabel: (n) => `Load ${n} more artist${n === 1 ? '' : 's'}`,
   countLine: (shown) => `Showing ${shown}`,
   searchPlaceholder: 'Search artists…',

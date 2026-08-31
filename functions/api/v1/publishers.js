@@ -27,7 +27,7 @@
 // under the Music tab because the tag is a music-host feature today (zero
 // coverage on anchor/podhome/buzzsprout — measured), not because the query
 // narrows.
-import { json, preflight, clampLimit, readLang, langWhere } from "./_common.js";
+import { json, preflight, clampLimit, toHexPubkey, readLang, langWhere } from "./_common.js";
 
 export async function onRequestOptions({ request }) { return preflight(request); }
 
@@ -53,6 +53,7 @@ const DEFAULT_SORT = "boosters";
 // Boost-time windows, matching RANGE_OPTIONS in feed-controls.js and RANGE_DAYS
 // in podcasts.js/episodes.js. The lists move together or a range button 400s.
 const RANGE_DAYS = { "1w": 7, "1m": 30, "1y": 365, all: null };
+const MAX_FOLLOWS = 5000;
 
 // A publisher guid is pasteable the way a show guid is; FTS does not exist for
 // this table at all, so the guid is matched as an equality beside the LIKE.
@@ -141,6 +142,45 @@ export async function onRequestHead(ctx) {
   return new Response(null, { status: r.status, headers: r.headers });
 }
 
+/* Follows scope — Artists · Follows (2026-08-31). The podcasts POST one tier
+ * up; see the notes there and on the episodes POST for the body, the limits
+ * and the interpolation discipline. */
+export async function onRequestPost({ request, env }) {
+  const u = new URL(request.url);
+  const p = readParams(u);
+  if (p.error) return json(request, { error: p.error }, { status: 400 });
+
+  let body;
+  try { body = await request.json(); }
+  catch { return json(request, { error: "body must be JSON" }, { status: 400 }); }
+
+  const raw = Array.isArray(body?.follows) ? body.follows : null;
+  if (!raw) return json(request, { error: "follows must be an array" }, { status: 400 });
+  if (raw.length > MAX_FOLLOWS) {
+    return json(request, { error: `too many follows (max ${MAX_FOLLOWS})` }, { status: 400 });
+  }
+  const hexes = [...new Set(raw.map(toHexPubkey).filter(Boolean))];
+  if (!hexes.length) {
+    return json(request, { count: 0, scope: "follows", sort: p.sortKey, range: p.range,
+                           ...(p.q ? { q: p.q } : {}),
+                           next_offset: null, publishers: [] }, { cache: 0 });
+  }
+  p.followsIn = hexes.map((h) => `'${h}'`).join(",");
+
+  const { publishers, nextOffset } = await globalPublishers(env, p);
+  return json(request, {
+    count: publishers.length,
+    scope: "follows",
+    follows: hexes.length,
+    sort: p.sortKey,
+    range: p.range,
+    ...(p.lang ? { lang: p.lang } : {}),
+    ...(p.q ? { q: p.q } : {}),
+    next_offset: nextOffset,
+    publishers,
+  }, { cache: 0 });
+}
+
 /** One page of the ranked artist list, as records. */
 export async function globalPublishers(env, p) {
   const s = SORTS[p.sortKey];
@@ -151,6 +191,10 @@ export async function globalPublishers(env, p) {
   // page is not a card. The collector's parse refuses to store a non-publisher
   // channel's metadata, which is the right refusal; this is its display half.
   const where = ["pub.title IS NOT NULL"];
+  // The follows filter rides the same aggregate: this endpoint always GROUPs,
+  // so the scope is one more WHERE clause rather than a second path.
+  // `p.followsIn` is pre-validated hex, interpolated — see onRequestPost.
+  if (p.followsIn) where.push(`b.booster_pubkey IN (${p.followsIn})`);
   if (p.cutoff) { where.push("b.created_at >= ?"); args.push(p.cutoff); }
   { const w = langWhere(p.lang, "pc.language", args); if (w) where.push(w); }
 
