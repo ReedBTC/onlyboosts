@@ -286,6 +286,24 @@
 .show-stats-cap a:hover,
 .show-stats-cap a:focus-visible { text-decoration: underline; text-underline-offset: 3px; }
 
+/* ── The OnlyBoosts Charts line ─────────────────────────────────────────
+   The subject's chart position, above the stat tiles: the tiles' three ranks
+   are its components (their sum is the score; lowest total wins). Same muted
+   register as the caption below the tiles, a step up in size because it is
+   the headline standing. Top-100 gated in feed-rank.js, so most pages render
+   without it — no reserved space. Tokens only, so dark mode needs nothing. */
+.show-stats-chart {
+  margin: 0 0 0.6rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.show-stats-chart a {
+  color: var(--brand-d);
+  text-decoration: none;
+}
+.show-stats-chart a:hover,
+.show-stats-chart a:focus-visible { text-decoration: underline; text-underline-offset: 3px; }
+
 /* ── The show's description ───────────────────────────────────────────── */
 
 /* The publisher's own summary, between the hero's identity block and the stat

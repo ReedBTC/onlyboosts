@@ -39,6 +39,11 @@ const SORTS = {
   sats:     { agg: "COALESCE(SUM(b.sats),0)",          alias: "total_sats" },
   boosters: { agg: "COUNT(DISTINCT b.booster_pubkey)", alias: "booster_count" },
   latest:   { agg: "MAX(b.created_at)",                alias: "latest_ts" },
+  // ⚠️ THE ONLYBOOSTS CHARTS: rank in sats + rank in boosts + rank in
+  // boosters, summed, lowest total first — see "The OnlyBoosts Charts" in
+  // docs/feeds.md. Not a single-column ranking; globalPublishers branches on
+  // the key before agg/alias is read.
+  chart:    { chart: true },
 };
 // Distinct people, matching the client's opening sort. A new endpoint has no
 // legacy URLs to honour, so unlike podcasts.js there are no sort aliases and
@@ -161,6 +166,53 @@ export async function globalPublishers(env, p) {
     JOIN boosts b    ON b.podcast_guid    = pc.podcast_guid
     WHERE ${where.join(" AND ")}
     GROUP BY pub.publisher_guid`;
+
+  /* ⚠️ THE ONLYBOOSTS CHARTS SORT — the podcasts.js ladder, one tier up; see
+   * the chart note there for the tuple standing and the rank-retention rule.
+   * These aggregates are never NULL (COUNT / COALESCE(SUM)), so no COALESCE. */
+  if (p.sortKey === "chart") {
+    const qFilter = p.q
+      ? `WHERE tied.title LIKE ? ESCAPE '\\'
+         ${p.guid ? "OR tied.guid = ?" : ""}`
+      : "";
+    const sql = `
+      WITH base AS (${base}),
+           scored AS (
+             SELECT base.*,
+                    RANK() OVER (ORDER BY total_sats DESC)    AS r_sats,
+                    RANK() OVER (ORDER BY boost_count DESC)   AS r_boosts,
+                    RANK() OVER (ORDER BY booster_count DESC) AS r_boosters
+             FROM base
+           ),
+           chart AS (
+             SELECT scored.*,
+                    (r_sats + r_boosts + r_boosters) AS score,
+                    RANK() OVER (ORDER BY (r_sats + r_boosts + r_boosters),
+                                 booster_count DESC, total_sats DESC, boost_count DESC) AS rank
+             FROM scored
+           ),
+           tied AS (
+             SELECT chart.*, COUNT(*) OVER (PARTITION BY rank) AS peers FROM chart
+           )
+      SELECT * FROM tied
+      ${qFilter}
+      ORDER BY rank, guid
+      LIMIT ? OFFSET ?`;
+    if (p.q) {
+      args.push(`%${likeEscape(p.q)}%`);
+      if (p.guid) args.push(p.guid);
+    }
+    args.push(p.limit, p.offset);
+    const { results } = await env.DB.prepare(sql).bind(...args).all();
+    const publishers = results.map((r) => {
+      const rec = publisherRecord(r);
+      rec.rank = r.rank;
+      rec.tied = r.peers > 1;
+      rec.chart = { score: r.score, sats: r.r_sats, boosts: r.r_boosts, boosters: r.r_boosters };
+      return rec;
+    });
+    return { publishers, nextOffset: publishers.length === p.limit ? p.offset + p.limit : null };
+  }
 
   // Ties break on sats then guid; the sort column is not repeated. Same total
   // order rule as podcasts.js, so two artists of equal rank cannot swap

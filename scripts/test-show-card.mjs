@@ -207,6 +207,12 @@ check('ties share the better place and the next value skips the group', () => {
 check('showRankValue reads the field the sort key names', () => {
   const row = { boosts: 3, sats: 4, boosters: 5, latest: 6 }
   for (const [key] of SORT_OPTIONS) {
+    /* ⚠️ `chart` IS THE ONE EXEMPTION: a chart standing is a tuple, so every
+     * chart row wears a SERVER rank and the renderers never consult
+     * showRankValue for it (the rebuild guards in shows-feed.js). There is no
+     * row.chart field to read, and inventing one here would assert a contract
+     * nothing ships. */
+    if (key === 'chart') continue
     assert.equal(showRankValue(key)(row), row[key], `${key} must read row.${key}`)
   }
 })

@@ -18,23 +18,23 @@
  */
 import {
   getPublisherPage, searchPublishers, SEARCH_HITS, SEARCH_MIN_CHARS,
-} from '/assets/js/ob-live.js?v=ob-v166'
+} from '/assets/js/ob-live.js?v=ob-v167'
 import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls, RANGE_OPTIONS,
-} from '/assets/js/feed-controls.js?v=ob-v166'
-import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v166'
+} from '/assets/js/feed-controls.js?v=ob-v167'
+import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v167'
 import {
   LANG_ALL, languageOptions, langControl, langNote, langNoMatchText, langLabelFor,
-} from '/assets/js/feed-lang.js?v=ob-v166'
-import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v166'
-import { competitionRanks, rankLabel, markSliceTies } from '/assets/js/rank.js?v=ob-v166'
+} from '/assets/js/feed-lang.js?v=ob-v167'
+import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v167'
+import { competitionRanks, rankLabel, markSliceTies } from '/assets/js/rank.js?v=ob-v167'
 import {
   COPY, toCard, publisherCardHtml, publisherRankValue,
   SORT_OPTIONS, RANKED_SORTS, PUBLISHER_CARDS_PER_PAGE,
   num, fmtSats, plural,
-} from '/assets/js/publisher-card.js?v=ob-v166'
-import { wirePublisherCards } from '/assets/js/publisher-card-actions.js?v=ob-v166'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v166'
+} from '/assets/js/publisher-card.js?v=ob-v167'
+import { wirePublisherCards } from '/assets/js/publisher-card-actions.js?v=ob-v167'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v167'
 
 /* The hash's language / view on an already-hydrated feed — the same two doors
  * every ranked renderer keeps; see the twin maps in shows-feed.js. */
@@ -82,6 +82,9 @@ async function loadPublisherPage({ sort, range, lang, offset, q = null, signal }
   const items = records.map(toCard)
   // A `q=` page's rows carry the server's rank over the FULL ordering.
   for (const it of items) if (Number.isFinite(it.rank)) it._rank = it.rank
+  // The chart sort ranks EVERY row server-side; its corpus-true tie flag
+  // rides beside the rank (see toCard) rather than being re-derived here.
+  for (const it of items) if (it.tied) it._tied = true
   return { items, nextOffset }
 }
 
@@ -201,8 +204,10 @@ export async function renderArtists({ panel, list, lang = null, range = null, so
   function rebuild({ keepShown = false } = {}) {
     /* Rank first, filter second — competition ranks on the unfiltered list,
      * server ranks kept verbatim on a query's rows. See shows-feed.js. */
-    if (query && !picked) markSliceTies(artists)
-    if (!picked && !query) {
+    /* Chart rows wear the server's rank and tie flag on every row — a tuple
+     * standing the client cannot re-derive — so neither branch below runs. */
+    if (sortKey !== 'chart' && query && !picked) markSliceTies(artists)
+    if (sortKey !== 'chart' && !picked && !query) {
       const ranks = competitionRanks(artists, publisherRankValue(sortKey))
       artists.forEach((p, i) => { p._rank = ranks[i].rank; p._tied = ranks[i].tied })
     }
@@ -252,7 +257,7 @@ export async function renderArtists({ panel, list, lang = null, range = null, so
       if (mine !== pickSeq) return
       const hit = records.find((r) => r.guid === picked.key)
       pickedItem = hit ? toCard(hit) : null
-      if (pickedItem) pickedItem._rank = pickedItem.rank
+      if (pickedItem) { pickedItem._rank = pickedItem.rank; if (pickedItem.tied) pickedItem._tied = true }
     } catch (e) {
       if (mine !== pickSeq) return
       console.warn('[artists] search pick failed', e)

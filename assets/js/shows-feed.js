@@ -53,19 +53,19 @@
  */
 import {
   getShowPage, searchShows, getShowEpisodes, SEARCH_HITS, SEARCH_MIN_CHARS,
-} from '/assets/js/ob-live.js?v=ob-v166'
+} from '/assets/js/ob-live.js?v=ob-v167'
 import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls,
   RANGE_OPTIONS,
-} from '/assets/js/feed-controls.js?v=ob-v166'
+} from '/assets/js/feed-controls.js?v=ob-v167'
 // Its own module, not two more exports of feed-controls.js — see the ⚠️ note
 // at the top of that file for the four-hour window that shape opens.
-import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v166'
+import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v167'
 import {
   LANG_ALL, languageOptions, langControl, langNote, langNoMatchText, langLabelFor,
-} from '/assets/js/feed-lang.js?v=ob-v166'
-import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v166'
-import { competitionRanks, rankLabel, markSliceTies } from '/assets/js/rank.js?v=ob-v166'
+} from '/assets/js/feed-lang.js?v=ob-v167'
+import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v167'
+import { competitionRanks, rankLabel, markSliceTies } from '/assets/js/rank.js?v=ob-v167'
 /* ⚠️ THE CARD ITSELF IS NOT IN THIS FILE ANY MORE. show-card.js emits it as an
  * HTML string and show-card-actions.js attaches its verbs, which is what lets
  * functions/index.js render the opening page of this feed at the edge — a
@@ -82,9 +82,9 @@ import {
   COPY, copyFor, toCard, showCardHtml, showRankValue,
   SORT_OPTIONS, RANKED_SORTS, SHOW_CARDS_PER_PAGE,
   num, fmtSats, plural,
-} from '/assets/js/show-card.js?v=ob-v166'
-import { wireShowCards } from '/assets/js/show-card-actions.js?v=ob-v166'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v166'
+} from '/assets/js/show-card.js?v=ob-v167'
+import { wireShowCards } from '/assets/js/show-card-actions.js?v=ob-v167'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v167'
 
 /* ── The hash's language, on an already-hydrated feed ──
  * The twin of the map in feeds-podcasts.js, and there for the same reason: a
@@ -182,6 +182,9 @@ async function loadShowPage({ medium, sort, range, lang, offset, q = null, signa
   // FULL ordering — and the painter reads `_rank`. An unfiltered page carries
   // none and is numbered by position in rebuild() instead.
   for (const it of items) if (Number.isFinite(it.rank)) it._rank = it.rank
+  // The chart sort ranks EVERY row server-side; its corpus-true tie flag
+  // rides beside the rank (see toCard) rather than being re-derived here.
+  for (const it of items) if (it.tied) it._tied = true
   return { items, nextOffset }
 }
 
@@ -376,8 +379,9 @@ export async function renderShows({ panel, list, medium = 'other', lang = null, 
    * those rows arrive this writes the corrected label back. Idempotent, and on
    * a full repaint every label already matches, so it is a no-op. */
   function syncRankLabels() {
-    // Query results wear server ranks, which a later page cannot change.
-    if (picked || query) return
+    // Query results wear server ranks, which a later page cannot change —
+    // and under the chart sort EVERY row does, tie flags included.
+    if (picked || query || sortKey === 'chart') return
     // The CARD elements, not the rank nodes: an unranked sort renders no rank
     // node at all and indexing those would slide by one. The server's adopted
     // block sits ahead of `view` in the DOM, hence the offset.
@@ -408,8 +412,10 @@ export async function renderShows({ panel, list, medium = 'other', lang = null, 
      * by position would tell a searched show it is #1 of 1. Same rule the
      * single-pick path has always had. What IS stamped is the tie flag, from
      * ranks repeated inside the slice. */
-    if (query && !picked) markSliceTies(shows)
-    if (!picked && !query) {
+    /* Chart rows wear the server's rank and tie flag on every row — a tuple
+     * standing the client cannot re-derive — so neither branch below runs. */
+    if (sortKey !== 'chart' && query && !picked) markSliceTies(shows)
+    if (sortKey !== 'chart' && !picked && !query) {
       /* The seed carries the adopted block's last card across the one gap in
        * the run: `shows` is a contiguous prefix of the ranked view starting at
        * `adoptedCount`, not at 0, whenever the server painted the opening page.
@@ -492,7 +498,7 @@ export async function renderShows({ panel, list, medium = 'other', lang = null, 
       if (mine !== pickSeq) return
       const hit = records.find((r) => r.guid === picked.key)
       pickedItem = hit ? toCard(hit) : null
-      if (pickedItem) pickedItem._rank = pickedItem.rank
+      if (pickedItem) { pickedItem._rank = pickedItem.rank; if (pickedItem.tied) pickedItem._tied = true }
     } catch (e) {
       if (mine !== pickSeq) return
       console.warn('[shows] search pick failed', e)

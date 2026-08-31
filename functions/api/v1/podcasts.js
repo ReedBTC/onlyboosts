@@ -38,6 +38,11 @@ const SORTS = {
   sats:     { col: "p.total_sats",    agg: "COALESCE(SUM(b.sats),0)",          alias: "total_sats" },
   boosters: { col: "p.booster_count", agg: "COUNT(DISTINCT b.booster_pubkey)", alias: "booster_count" },
   latest:   { col: "p.latest_ts",     agg: "MAX(b.created_at)",                alias: "latest_ts" },
+  // ⚠️ THE ONLYBOOSTS CHARTS: rank in sats + rank in boosts + rank in
+  // boosters, summed, lowest total first — see "The OnlyBoosts Charts" in
+  // docs/feeds.md. Not a single-column ranking, so no col/agg/alias;
+  // globalPodcasts branches on the key before either is read.
+  chart:    { chart: true },
 };
 // The endpoint shipped as sort=recent|sats|boosts and those URLs are in the
 // wild, so `recent` keeps working as the name for the same ordering the feed
@@ -200,6 +205,71 @@ export async function globalPodcasts(env, p) {
              p.episode_count, p.latest_ts
       FROM podcasts p
       ${where.length ? "WHERE " + where.join(" AND ") : ""}`;
+  }
+
+  /* ⚠️ THE ONLYBOOSTS CHARTS SORT. Three competition ranks over the same
+   * corpus — sats, boosts, boosters — summed into a score, lowest first. The
+   * STANDING is the full tuple (score, then boosters, sats, boosts as
+   * tiebreakers — Reed's spec, 2026-08-31), so RANK() takes the whole tuple:
+   * only rows equal on all four share a place and print T#. That deliberately
+   * differs from the single-column sorts, where the tiebreak is a paging order
+   * and must stay OUT of the window; here the tiebreak IS part of the
+   * published standing. Every row carries its rank and tie flag, because a
+   * client cannot re-derive a tuple standing from any one figure — the
+   * renderers use their server-rank path (the q= path) for this sort.
+   *
+   * The q= path filters AFTER ranking, the same rank-retention rule as the
+   * single-column sorts; `peers` is counted before the filter so a tie flag
+   * survives its partner being filtered out. COALESCE mirrors feed-rank.js:
+   * the all-time aggregate columns are nullable in principle, and a NULL
+   * would sort as its own value rather than as zero. */
+  if (p.sortKey === "chart") {
+    const qFilter = p.match
+      ? `WHERE tied.guid IN (
+              SELECT podcast_guid FROM podcasts_fts WHERE podcasts_fts MATCH ?
+            )
+         ${p.guid ? "OR tied.guid = ?" : ""}`
+      : "";
+    const sql = `
+      WITH base AS (${base}),
+           scored AS (
+             SELECT base.*,
+                    RANK() OVER (ORDER BY COALESCE(total_sats,0) DESC)    AS r_sats,
+                    RANK() OVER (ORDER BY COALESCE(boost_count,0) DESC)   AS r_boosts,
+                    RANK() OVER (ORDER BY COALESCE(booster_count,0) DESC) AS r_boosters
+             FROM base
+           ),
+           chart AS (
+             SELECT scored.*,
+                    (r_sats + r_boosts + r_boosters) AS score,
+                    RANK() OVER (ORDER BY (r_sats + r_boosts + r_boosters),
+                                 COALESCE(booster_count,0) DESC,
+                                 COALESCE(total_sats,0) DESC,
+                                 COALESCE(boost_count,0) DESC) AS rank
+             FROM scored
+           ),
+           tied AS (
+             SELECT chart.*, COUNT(*) OVER (PARTITION BY rank) AS peers FROM chart
+           )
+      SELECT * FROM tied
+      ${qFilter}
+      ORDER BY rank, guid
+      LIMIT ? OFFSET ?`;
+    if (p.match) {
+      args.push(p.match);
+      if (p.guid) args.push(p.guid);
+    }
+    args.push(p.limit, p.offset);
+    const { results } = await env.DB.prepare(sql).bind(...args).all();
+    const podcasts = results.map((r) => {
+      const rec = showRecord(r);
+      rec.rank = r.rank;
+      rec.tied = r.peers > 1;
+      // The formula in the open: the three component ranks and their sum.
+      rec.chart = { score: r.score, sats: r.r_sats, boosts: r.r_boosts, boosters: r.r_boosters };
+      return rec;
+    });
+    return { podcasts, nextOffset: podcasts.length === p.limit ? p.offset + p.limit : null };
   }
 
   // Ties break on sats then guid, and the sort column is NOT repeated: naming it

@@ -36,6 +36,11 @@ const SORTS = {
   count:   { col: "e.booster_count", agg: "COUNT(DISTINCT b.booster_pubkey)", alias: "booster_count" },
   boosts:  { col: "e.boost_count",   agg: "COUNT(*)",                        alias: "boost_count" },
   sats:    { col: "e.total_sats",    agg: "COALESCE(SUM(b.sats),0)",         alias: "total_sats" },
+  // ⚠️ THE ONLYBOOSTS CHARTS: rank in sats + rank in boosts + rank in
+  // boosters, summed, lowest total first — see "The OnlyBoosts Charts" in
+  // docs/feeds.md. Not a single-column ranking, so no col/agg/alias; both
+  // query builders branch on the key before reading either.
+  chart:   { chart: true },
 };
 const DEFAULT_SORT = "boosts";      // the API's default for callers passing none; the feed itself always passes its opening sort (`count`, see functions/index.js)
 
@@ -250,7 +255,50 @@ export async function globalEpisodes(env, p) {
   const whereSql = where.length ? "WHERE " + where.join(" AND ") : "";
 
   let sql;
-  if (p.match) {
+  /* ⚠️ THE ONLYBOOSTS CHARTS SORT — see the chart note in podcasts.js; the
+   * ladder is identical. The narrow base CTE keeps the window scan to the
+   * three aggregates; display columns join back on afterwards, the q= CTE's
+   * own shape. Rank and tie flag ride EVERY row (a tuple standing the client
+   * cannot re-derive from one figure), and `peers` is counted before the q=
+   * filter so a tie flag survives its partner being filtered out. */
+  if (p.sortKey === "chart") {
+    sql = `
+      WITH base AS (
+        SELECT e.item_guid,
+               COALESCE(e.total_sats,0)    AS c_sats,
+               COALESCE(e.boost_count,0)   AS c_boosts,
+               COALESCE(e.booster_count,0) AS c_boosters
+        FROM episodes e
+        LEFT JOIN podcasts pc ON pc.podcast_guid = e.podcast_guid
+        ${whereSql}
+      ),
+      scored AS (
+        SELECT base.*,
+               RANK() OVER (ORDER BY c_sats DESC)     AS r_sats,
+               RANK() OVER (ORDER BY c_boosts DESC)   AS r_boosts,
+               RANK() OVER (ORDER BY c_boosters DESC) AS r_boosters
+        FROM base
+      ),
+      chart AS (
+        SELECT scored.*,
+               (r_sats + r_boosts + r_boosters) AS score,
+               RANK() OVER (ORDER BY (r_sats + r_boosts + r_boosters),
+                            c_boosters DESC, c_sats DESC, c_boosts DESC) AS rank
+        FROM scored
+      ),
+      tied AS (
+        SELECT chart.*, COUNT(*) OVER (PARTITION BY rank) AS peers FROM chart
+      )
+      SELECT ${SELECT_COLS}, t.rank, t.peers, t.score, t.r_sats, t.r_boosts, t.r_boosters
+      FROM tied t
+      JOIN episodes e ON e.item_guid = t.item_guid
+      LEFT JOIN podcasts pc ON pc.podcast_guid = e.podcast_guid
+      ${p.match ? "WHERE e.item_guid IN (SELECT item_guid FROM episodes_fts WHERE episodes_fts MATCH ?)" : ""}
+      ORDER BY t.rank, e.item_guid
+      LIMIT ? OFFSET ?`;
+    if (p.match) args.push(p.match);
+    args.push(p.limit, p.offset);
+  } else if (p.match) {
     // Search answers "where does my show stand", so a hit is useless without its
     // position in the FULL ordering — the client is holding a filtered list and
     // can no longer count rows itself. `rank` is computed over every episode the
@@ -308,7 +356,12 @@ export async function globalEpisodes(env, p) {
   const { results } = await env.DB.prepare(sql).bind(...args).all();
   const episodes = results.map((r) => {
     const rec = episodeRecord(r);
-    if (p.match) rec.rank = r.rank;      // position in the unfiltered ordering
+    if (p.sortKey === "chart") {
+      rec.rank = r.rank;
+      rec.tied = r.peers > 1;
+      // The formula in the open: the three component ranks and their sum.
+      rec.chart = { score: r.score, sats: r.r_sats, boosts: r.r_boosts, boosters: r.r_boosters };
+    } else if (p.match) rec.rank = r.rank;   // position in the unfiltered ordering
     return rec;
   });
   if (p.withBoosts) await attachBoosts(env, episodes, null);
@@ -384,7 +437,44 @@ export async function onRequestPost({ request, env }) {
     GROUP BY b.item_guid`;
 
   let sql;
-  if (p.match) {
+  /* The charts ladder over the follow set's aggregate — see the chart notes in
+   * podcasts.js and on the GET path above. Rank means standing within the
+   * follow corpus; the renderer orders by it and deliberately prints no
+   * numbers on Follows (`showRanks` in feeds-podcasts.js). */
+  if (p.sortKey === "chart") {
+    const ladder = `
+      WITH agg AS (${AGG_SELECT}),
+      scored AS (
+        SELECT agg.*,
+               RANK() OVER (ORDER BY total_sats DESC)    AS r_sats,
+               RANK() OVER (ORDER BY boost_count DESC)   AS r_boosts,
+               RANK() OVER (ORDER BY booster_count DESC) AS r_boosters
+        FROM agg
+      ),
+      chart AS (
+        SELECT scored.*,
+               (r_sats + r_boosts + r_boosters) AS score,
+               RANK() OVER (ORDER BY (r_sats + r_boosts + r_boosters),
+                            booster_count DESC, total_sats DESC, boost_count DESC) AS rank
+        FROM scored
+      ),
+      tied AS (
+        SELECT chart.*, COUNT(*) OVER (PARTITION BY rank) AS peers FROM chart
+      )`;
+    sql = p.match
+      ? `${ladder}
+      SELECT t.* FROM tied t
+      JOIN episodes_fts f ON f.item_guid = t.item_guid
+      WHERE episodes_fts MATCH ?
+      ORDER BY t.rank, t.item_guid
+      LIMIT ? OFFSET ?`
+      : `${ladder}
+      SELECT * FROM tied
+      ORDER BY rank, item_guid
+      LIMIT ? OFFSET ?`;
+    if (p.match) args.push(p.match);
+    args.push(p.limit, p.offset);
+  } else if (p.match) {
     // Same contract as the GET path: `rank` is the position in the follow set's
     // FULL ordering, so a hit still answers "where does this stand among the
     // people I follow". The aggregate is already a full scan over the follow
@@ -422,7 +512,11 @@ export async function onRequestPost({ request, env }) {
   const { results } = await env.DB.prepare(sql).bind(...args).all();
   const episodes = results.map((r) => {
     const rec = episodeRecord({ ...r, item_guid: r.item_guid });
-    if (p.match) rec.rank = r.rank;
+    if (p.sortKey === "chart") {
+      rec.rank = r.rank;
+      rec.tied = r.peers > 1;
+      rec.chart = { score: r.score, sats: r.r_sats, boosts: r.r_boosts, boosters: r.r_boosters };
+    } else if (p.match) rec.rank = r.rank;
     return rec;
   });
   // Notes scoped to the same follow set as the aggregates above — a drawer

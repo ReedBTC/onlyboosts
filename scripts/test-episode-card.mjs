@@ -233,7 +233,9 @@ check('filterEpisodeItems filters on air date and keeps undated rows out', () =>
 })
 
 check('RANKED_SORTS covers exactly the quantitative sorts', () => {
-  assert.deepEqual([...RANKED_SORTS].sort(), ['boosts', 'count', 'sats'])
+  // `chart` joined on 2026-08-31: a composite standing is quantitative, so a
+  // chart card prints its position. scripts/test-charts.mjs owns the rest.
+  assert.deepEqual([...RANKED_SORTS].sort(), ['boosts', 'chart', 'count', 'sats'])
 })
 
 // ── Card variants ───────────────────────────────────────────────────────────

@@ -44,6 +44,11 @@ const SORTS = {
   // COUNT(DISTINCT podcast_guid) ignores NULLs, which is what we want: ~2% of
   // boosts name no show, and those cannot count toward a breadth figure.
   shows:  "shows",
+  /* ⚠️ THE ONLYBOOSTS CHARTS — a computed tuple ordering, not a column: rank
+     in sats + rank in boosts + rank in SHOWS BOOSTED (the npub breadth key),
+     summed, lowest total first. The query builder branches on the key and
+     never reads this value. See "The OnlyBoosts Charts" in docs/feeds.md. */
+  chart:  "chart",
 };
 const DEFAULT_SORT = "sats";
 
@@ -156,8 +161,7 @@ export async function onRequestGet({ request, env }) {
    * "piez" finds Piez and a query differing from a name only by the case of a
    * non-ASCII letter will not. Nothing cheap fixes that; a NOCASE collation is
    * ASCII-only too. */
-  const sql = `
-    WITH hits(pk) AS (
+  const HITS = `hits(pk) AS (
       SELECT pubkey FROM profiles
        WHERE ?1 <> '' AND (display_name LIKE ?1 ESCAPE '\\' OR name LIKE ?1 ESCAPE '\\')
       UNION
@@ -186,8 +190,9 @@ export async function onRequestGet({ request, env }) {
          own flag, so it can never widen a search or a listing. */
       SELECT booster_pubkey FROM boosts
        WHERE ${PUB_FLAG} = 1 AND booster_pubkey IN (${PUB_HOLES})
-    )
-    SELECT b.booster_pubkey AS pk,
+    )`;
+
+  const AGG = `SELECT b.booster_pubkey AS pk,
            MAX(b.booster_npub) AS npub,
            COUNT(*)                          AS boosts,
            COALESCE(SUM(b.sats), 0)          AS sats,
@@ -204,12 +209,49 @@ export async function onRequestGet({ request, env }) {
          join yields no rows, so the GROUP BY yields none either. */
       JOIN boosts b ON b.booster_pubkey = h.pk AND b.created_at >= ${SINCE_HOLE}
       LEFT JOIN profiles p ON p.pubkey = h.pk
-     GROUP BY b.booster_pubkey
-     /* The two trailing keys are a tiebreak, never a ranking: sats settles a
-        tie on boosts or shows, and the pubkey settles a tie on sats so paging
-        is a total order. */
+     GROUP BY b.booster_pubkey`;
+
+  /* ⚠️ THE CHARTS ORDERING IS A TUPLE, so its tiebreak lives INSIDE the
+   * ranking window — shows, then sats, then boosts, remaining ties shared
+   * (Reed's spec, 2026-08-31) — where the single-column sorts below keep the
+   * trailing keys as a paging tiebreak that is never a standing. Rank and tie
+   * flag ride every listing row; a search's hits are not a population, so the
+   * handler withholds them there (see the response map). */
+  let sql;
+  if (sort === "chart") {
+    sql = `
+    WITH ${HITS},
+         agg AS (${AGG}),
+         scored AS (
+           SELECT agg.*,
+                  RANK() OVER (ORDER BY sats DESC)   AS r_sats,
+                  RANK() OVER (ORDER BY boosts DESC) AS r_boosts,
+                  RANK() OVER (ORDER BY shows DESC)  AS r_shows
+           FROM agg
+         ),
+         chart AS (
+           SELECT scored.*,
+                  (r_sats + r_boosts + r_shows) AS score,
+                  RANK() OVER (ORDER BY (r_sats + r_boosts + r_shows),
+                               shows DESC, sats DESC, boosts DESC) AS chart_rank
+           FROM scored
+         ),
+         tied AS (
+           SELECT chart.*, COUNT(*) OVER (PARTITION BY chart_rank) AS peers FROM chart
+         )
+    SELECT * FROM tied
+    ORDER BY chart_rank, pk
+    LIMIT ?4`;
+  } else {
+    /* The two trailing keys are a tiebreak, never a ranking: sats settles a
+       tie on boosts or shows, and the pubkey settles a tie on sats so paging
+       is a total order. */
+    sql = `
+    WITH ${HITS}
+    ${AGG}
      ORDER BY ${SORTS[sort]} DESC, sats DESC, pk
      LIMIT ?4`;
+  }
 
   try {
     const { results } = await env.DB.prepare(sql)
@@ -231,6 +273,14 @@ export async function onRequestGet({ request, env }) {
         boosts: r.boosts,
         sats: r.sats,
         shows: r.shows,
+        /* Chart standing rides only where it means something: the listing and
+           bots modes rank over their whole population. A search's hits are not
+           a population, so its rows carry no rank even under sort=chart. */
+        ...(sort === "chart" && (listing || bots) ? {
+          rank: r.chart_rank,
+          tied: r.peers > 1,
+          chart: { score: r.score, sats: r.r_sats, boosts: r.r_boosts, shows: r.r_shows },
+        } : {}),
       })),
     });
   } catch (err) {

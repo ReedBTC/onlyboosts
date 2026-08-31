@@ -507,8 +507,11 @@ console.log('\n⚠️ A booster\'s rank is over the WALL\'s population:')
       assert.equal(r.sats.rank, 1)
       assert.equal(r.sats.tied, false)
     })
-    check('all three keys are present', () =>
-      assert.deepEqual(Object.keys(r).sort(), ['boosts', 'sats', 'shows']))
+    check('all three keys are present, plus the chart place', () =>
+      // `chart` joined on 2026-08-31 — the OnlyBoosts Charts position rides
+      // beside the three component ranks. scripts/test-charts.mjs owns its
+      // correctness; this only pins the shape.
+      assert.deepEqual(Object.keys(r).sort(), ['boosts', 'chart', 'sats', 'shows']))
   }
   {
     /* ⚠️ A PUBLISHER'S OWN PAGE GETS NO CHIPS. It is not on the wall, so it

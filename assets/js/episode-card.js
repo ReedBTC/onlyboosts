@@ -42,11 +42,11 @@
  * what functions/_shared/detail-page.js has always done, so the site now has one
  * date format rather than one for the feeds and another for the detail pages.
  */
-import { showPageHref, episodePageHref } from './show-link.js?v=ob-v166'
-import { episodeBoostLink } from './episode-link.js?v=ob-v166'
-import { boosterPageHref, boosterLinkAttrs } from './booster-link.js?v=ob-v166'
-import { coverChain, httpsUrl } from './cover-art.js?v=ob-v166'
-import { htmlEscape, isSafeUrl, renderMessage } from './nostr-text.js?v=ob-v166'
+import { showPageHref, episodePageHref } from './show-link.js?v=ob-v167'
+import { episodeBoostLink } from './episode-link.js?v=ob-v167'
+import { boosterPageHref, boosterLinkAttrs } from './booster-link.js?v=ob-v167'
+import { coverChain, httpsUrl } from './cover-art.js?v=ob-v167'
+import { htmlEscape, isSafeUrl, renderMessage } from './nostr-text.js?v=ob-v167'
 
 const esc = htmlEscape
 
@@ -324,7 +324,7 @@ export const EPISODE_SORTERS = {
 // Sorts where a position means something. Kept beside the table so the two can't
 // drift — adding a quantitative sort means adding it here too. On "Latest boost"
 // or "Latest episode" a rank badge would read as a score when it is chronology.
-export const RANKED_SORTS = new Set(['count', 'boosts', 'sats'])
+export const RANKED_SORTS = new Set(['chart', 'count', 'boosts', 'sats'])
 
 /* The figure each ranked sort ranks ON, which a competition rank has to compare
  * to know where one run of equal values ends — ordinal numbering never had to
@@ -350,6 +350,13 @@ export function episodeRankValue(sortKey) {
 }
 
 export const SORT_OPTIONS = [
+  /* ⚠️ THE ONLYBOOSTS CHARTS — rank in sats + rank in boosts + rank in
+   * boosters, summed, lowest total first; see "The OnlyBoosts Charts" in
+   * docs/feeds.md. Server-ranked on every row: the renderer never renumbers
+   * chart rows, a tuple standing being underivable from any one figure. First
+   * in the menu as the composite the single-axis sorts below feed into; the
+   * feed still OPENS on 'count' (Most boosters), deliberately. */
+  ['chart', 'Chart rank'],
   ['recent', 'Latest boost'],
   ['episode', 'Latest episode'],
   ['count', 'Most boosters'],

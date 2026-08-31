@@ -414,15 +414,16 @@ Sixteen test scripts, all plain `node scripts/<name>.mjs` with no runner:
 | `test-feed-search.mjs` | the search box's two outcomes, driving the **shipped** `mountFeedSearch` against a stub DOM: Enter submits the whole query where a feed supplies `onSubmit`, arrow + Enter still picks, emptying the box or Escape clears through `onPick(null)`, the footer row renders — and **the member lookup, with no `onSubmit`, keeps its old Enter**. Confirmed red on two mutations: auto-highlight restored, and the empty-box clear removed |
 | `test-hpw-cards.mjs` | the 40 HPW share cards, three halves: `hpw-board.js`'s two-sided rules (a **source** scan for absolute imports, `Date.now()` and unpinned locales, plus the row's escaping and `isSafeUrl` on the face); `hpw-share.js`'s pure parts (the note's shape, the link rule, the tags, the `window` listener); the **shipped** `/hpw` Function over a `node:sqlite` build of the real schema (every redirect, the 404s, the page's canonical and `og:image`, the card's frame and ready signal, and that the page carries `rowHtml` byte for byte); and `/api/og/hpw/<name>.png` with **`fetch` stubbed** (the allowlist, the upstream's 200-for-missing answered with the banner, the PNG signature, the 900KB cap, HEAD). Nothing in it touches the VPS |
 | `test-publishers-api.mjs` | the **shipped** `/api/v1/publishers` handlers — listing and per-artist detail — over a `node:sqlite` build of the real `schema.sql`, on the members-search pattern. Three sorts with three winners, the boost-time windows, the language filter recounting through the declaring shows (`lang=unknown` included), LIKE-wildcard decoys, rank retention on `q=`, the title-less publisher's exclusion, HEAD, the album list's publisher-order and its live-row-over-edge-hint preference |
+| `test-charts.mjs` | the OnlyBoosts Charts: `sort=chart` on the **shipped** handlers of all four ranked endpoints over a `node:sqlite` build of the real `schema.sql`. **Expectations are brute-forced from an independent JS implementation of the rule**, one boost list feeding both sides; a micro-corpus that inverts if the tiebreak chain is reordered; `q=` rank retention with pre-filter tie flags; the follows-POST chart; `feedRanks`' chart place and the tiles' Charts line. Confirmed red on four mutations: the tuple tiebreak removed, the chain flipped in members.js and again in feed-rank.js, and `peers` counted post-filter |
 
 **⚠️ `test-server-render.mjs` IS THE ONE THAT NEEDS AN ARGUMENT, SO IT IS THE ONE
 THAT GOES UNRUN.** Its header carries the `curl` that produces the capture; take
 a fresh one rather than reusing an old file, since it is also the size
 measurement. It asserted `cards are numbered 1..N with no gaps` — the *ordinal*
 scheme's invariant — until competition ranking shipped on 2026-08-18, and it
-would have been merged red had it not been run. **Run all sixteen before a
+would have been merged red had it not been run. **Run all seventeen before a
 merge**, and treat this one as the guard on the ranking scheme rather than only
-on weight. *(It read "all twelve" until 2026-08-24 and "all fifteen" until 2026-08-30, contradicting the table
+on weight. *(It read "all twelve" until 2026-08-24, "all fifteen" until 2026-08-30 and "all sixteen" until 2026-08-31, contradicting the table
 directly above it — the count moved when a test was added and this sentence did
 not. If the table grows again, this line grows with it.)*
 
@@ -1399,8 +1400,9 @@ are queries now, and changing either refetches.**
 ### Range, sort, rank, language, search: `docs/feeds.md`
 
 **That file is the authority for everything the feed bar does.** Its sections:
-*Range and sort*, *Ranking, And The One Definition Of It*, *The Language Filter*,
-*The Bar On A Phone*, *The View In The Hash*, *Search*, *The Shows feed*.
+*Range and sort*, *Ranking, And The One Definition Of It*, *The OnlyBoosts
+Charts*, *The Language Filter*, *The Bar On A Phone*, *The View In The Hash*,
+*Search*, *The Shows feed*.
 
 What a change would break, restated here because each rule reaches outside that
 file:
@@ -1428,6 +1430,17 @@ file:
   `rankLabel()` owns both forms of the tie marker — `T4` on a feed card, `T#4` in
   a detail-page tile. Dense ranking was measured and rejected; **no denominator,
   anywhere.**
+- **⚠️ THE ONLYBOOSTS CHARTS: `sort=chart`, ONE SPELLING ON ALL FOUR RANKED
+  ENDPOINTS, AND ITS TIEBREAK LIVES INSIDE THE WINDOW.** Rank in sats + rank in
+  boosts + rank in the breadth key (boosters; shows boosted for a member),
+  summed, lowest total first; ties break breadth → sats → boosts, the rest
+  share a `T#`. The standing is the tuple, so — alone among the sorts — the
+  tiebreak is part of the `RANK()` window, every row carries `rank`/`tied`
+  from the server, and the renderers never renumber chart rows. Computed at
+  query time deliberately (no collector precompute; Follows forces the
+  query-time path to exist). The members wall opens on it; the detail pages
+  draw its top-100 line above the stat tiles. **See *The OnlyBoosts Charts*
+  in `docs/feeds.md`** — the design record — and `test-charts.mjs`.
 - **⚠️ `competitionRanks` ASSUMES THE LIST IS ALREADY ORDERED BY THE VALUE IT
   RANKS**, and returns confident nonsense otherwise. Every caller satisfies it by
   construction; a new one has to check.
@@ -1465,7 +1478,7 @@ data attributes, and in the Rules dialog's title.
 
 **`docs/members-tab.md` is the authority**: the four-section idiom and its
 shells, the #40HPW rules and every measurement behind them, the week picker, the
-member wall's three orderings, the lookup, the member search endpoint, the Boost
+member wall's four orderings (Chart rank the default since 2026-08-31), the lookup, the member search endpoint, the Boost
 Bots section, and the intro copy. Nearly every paragraph in it is a Reed call.
 
 What a change elsewhere would break:
@@ -2141,7 +2154,7 @@ would. Never remove an entry** — those links are in the wild.
 | `artists-feed.js` | the feed around that card, behind Artists — the publisher tier |
 | `functions/api/v1/publishers.js` + `…/publishers/[guid].js` | the artist rollup and the per-artist album list, off the collector's publisher pass |
 | `supporter-wall.js` + `supporter-wall.css` | **the** community wall, shared by `/show`, `/episode`, `/artist` and the Members tab |
-| `members-board.js` | the Members tab: the #40HPW boards and their week picker, the wall and its three orderings, the Rules dialog |
+| `members-board.js` | the Members tab: the #40HPW boards and their week picker, the wall and its four orderings (Chart rank the default), the Rules dialog |
 | `feed-controls.js` / `feed-search.js` | the range/sort chrome and the per-feed typeahead |
 | `feed-lang.js` | the language menu on the four ranked feeds, and the copy it rewrites |
 | `boosts-thread.js` / `boost-actions.js` | the content tokenizer and reply / like / repost / zap |

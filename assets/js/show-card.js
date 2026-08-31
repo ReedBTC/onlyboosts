@@ -45,9 +45,9 @@
  * All three are now en-US in UTC, which is what episode-card.js and
  * functions/_shared/detail-page.js already do. The site has one date format.
  */
-import { showPageHref, episodePageHref } from './show-link.js?v=ob-v166'
-import { coverChain } from './cover-art.js?v=ob-v166'
-import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v166'
+import { showPageHref, episodePageHref } from './show-link.js?v=ob-v167'
+import { coverChain } from './cover-art.js?v=ob-v167'
+import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v167'
 
 const esc = htmlEscape
 
@@ -151,6 +151,13 @@ export function copyFor(medium) {
 // value out in the world — so printing one next to a show's name reads as a
 // claim about the show, and ours is not that claim.
 export const SORT_OPTIONS = [
+  /* ⚠️ THE ONLYBOOSTS CHARTS — rank in sats + rank in boosts + rank in
+   * boosters, summed, lowest total first; see "The OnlyBoosts Charts" in
+   * docs/feeds.md. Server-ranked on every row (rank + tie flag through
+   * toCard); the renderer never renumbers chart rows. First in the menu as
+   * the composite the single-axis sorts feed into; the feed still OPENS on
+   * 'boosters', deliberately — that constant is pinned to functions/index.js. */
+  ['chart', 'Chart rank'],
   ['boosters', 'Most boosters'],
   ['boosts', 'Most boosts'],
   ['sats', 'Most sats'],
@@ -159,7 +166,7 @@ export const SORT_OPTIONS = [
 
 // Sorts where a position means something, so the card gets a rank number.
 // 'latest' is chronology, not standing.
-export const RANKED_SORTS = new Set(['boosts', 'sats', 'boosters'])
+export const RANKED_SORTS = new Set(['chart', 'boosts', 'sats', 'boosters'])
 
 // Show cards per page, and per "Load more" batch. ⚠️ ONE NUMBER, READ BY BOTH
 // SIDES: functions/_shared/show-cards.js re-exports it and shows-feed.js
@@ -241,6 +248,8 @@ export function toCard(p) {
     episodes: num(p.episodes),
     latest: num(p.latest),
     rank: Number.isFinite(p.rank) ? p.rank : null,
+    // The chart sort's corpus-true tie flag, riding beside its rank.
+    tied: p.tied === true,
   }
 }
 

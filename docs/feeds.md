@@ -16,9 +16,9 @@ not**, which is why each renderer passes its own tooltips:
 
 | | Range filters on | Sorts |
 |---|---|---|
-| Episodes / Songs | when the episode **aired** (`ep.published`) | latest boost / latest episode / most boosters / most boosts / most sats |
+| Episodes / Songs | when the episode **aired** (`ep.published`) | chart rank / latest boost / latest episode / most boosters / most boosts / most sats |
 | Boosts | when the boost was **sent** (`b.ts`) | latest boost / latest episode / largest boost |
-| Shows / Albums | when the show was **boosted** (`b.ts`) | most boosts / sats / boosters / episodes / recently boosted |
+| Shows / Albums | when the show was **boosted** (`b.ts`) | chart rank / most boosters / boosts / sats / recently boosted |
 
 **⚠️ `range` MEANS BOOST TIME on `/api/v1/podcasts` and AIR DATE on
 `/api/v1/episodes`.** A show is in the 1W view because someone boosted it this
@@ -161,6 +161,87 @@ distinct rank again. A searched card has to agree with the number the same card
 carries on the unfiltered feed. Verified against `bots/global-boost-scan/d1/schema.sql`
 in local sqlite: 400 random corpora x 3 sorts, SQLite's `RANK()`, `competitionRanks` and
 a brute-force reference all agreeing, plus the split-page seam.
+
+### The OnlyBoosts Charts
+
+The site's composite ranking, `sort=chart`, shipped 2026-08-31 to Reed's spec.
+It is the ranking the definitive published lists (a Top 100 of all time, a Top
+10 of the week) will be read off, and the point of it is that the formula can
+be stated completely in two lines:
+
+- **Content** (a show, an episode, an album, a song, an artist): rank in sats
+  + rank in boosts + rank in boosters, summed; **the lowest total is first**.
+- **A member** (npub): rank in sats + rank in boosts + rank in **shows
+  boosted**, the npub breadth key, since a person has no booster count.
+
+Each component rank is the site's standard competition ranking (see the
+section above) computed over the same corpus the request names: the medium
+partition, the range window, the language filter, the follow set on a POST.
+The method has prior art worth naming when asked: sailing's Low Point System
+and cross-country team scoring are rank sums, and the BCS standings averaged
+component rankings for fifteen years. The user-facing name is **OnlyBoosts
+Charts**; the sort menu label is **Chart rank**.
+
+**Ties in the total break by the breadth key (boosters, or shows boosted),
+then sats, then boosts; a row still tied after that shares its place and
+prints `T#`.** Reed's spec, 2026-08-31: audience size settles a tie before
+generosity does. It should be noted that the boosts level is provably
+unreachable (equal sats and breadth values force equal component ranks, so an
+equal total then forces equal boosts); it is kept because the published spec
+names it, and it costs one ORDER BY key.
+
+What a change would break:
+
+- **⚠️ THE STANDING IS THE TUPLE, SO THE TIEBREAK LIVES INSIDE THE `RANK()`
+  WINDOW** — `(score, breadth DESC, sats DESC, boosts DESC)` — where every
+  single-column sort keeps its tiebreak OUT of the window as a paging order
+  that must never decide a standing. Both rules are deliberate and they are
+  opposites, because here the tiebreak IS the published standing. Only rows
+  equal on all four share a place.
+- **⚠️ EVERY CHART ROW CARRIES `rank` AND `tied` FROM THE SERVER, and the
+  renderers never renumber chart rows.** A tuple standing cannot be re-derived
+  client-side from any single figure, so the chart sort rides the same
+  server-rank path a `q=` search always used: `renumber()` and
+  `syncRankLabels()` return early, `markSliceTies` never runs, and the tie
+  flag is corpus-true rather than slice-local.
+- **The formula is in the open on every row**: `chart: { score, sats, boosts,
+  boosters|shows }` beside the rank. Transparency is the feature; do not trim
+  it to save bytes.
+- **⚠️ `q=` KEEPS RANK RETENTION, AND `peers` IS COUNTED BEFORE THE FILTER**,
+  so a searched card agrees with the unfiltered feed and a tie flag survives
+  its partner being filtered out (`test-charts.mjs` pins the TieOne case).
+- **One spelling, `chart`, on all four endpoints** — `/api/v1/podcasts`,
+  `/api/v1/episodes`, `/api/v1/publishers`, `/api/v1/members` — so the
+  `count`/`boosters` wart has no sibling.
+- **Follows feeds order by chart and print no rank numbers**, the standing
+  `showRanks = scope !== 'follows'` rule: a follows corpus must not tell a
+  reader their favourite show is "#1".
+- **The members wall opens on Chart rank** (Reed's call, 2026-08-31,
+  superseding the 2026-08-23 `shows` default — see `members-board.js`), and
+  the wall's chart carries the same publisher exclusion as its listing.
+- **The detail pages draw a Charts line above the stat tiles** from
+  `feedRanks(...).chart`, under the same top-100 `RANK_CUTOFF` as the chips;
+  the three tile ranks are the score's own components, which is what makes
+  the line self-explaining. `/booster` overrides the link target and the
+  breadth wording (`chartHref`, `chartBreadth`).
+- **⚠️ COMPUTED AT QUERY TIME, DELIBERATELY — no collector precompute.** The
+  Follows path can only be computed per request, so the query-time SQL must
+  exist regardless, and a precomputed Global table would be a second
+  implementation of the one definition. Measured cost is a window scan over
+  corpora of a few thousand aggregated rows. If a live measurement ever says
+  otherwise, the escape hatch is a chart table pushed through `d1_sync` the
+  way podroll replaces wholesale.
+- **A chart score is corpus-relative** (the Borda property): adding or
+  excluding one row can move others' scores, and a range or language filter
+  re-ranks from scratch. Positions are the stable claim; never compare raw
+  scores across corpora or weeks. A definitive published list is therefore a
+  **snapshot taken at publication time**, not a live query.
+
+`scripts/test-charts.mjs` owns the correctness: brute-forced expectations from
+an independent implementation of the rule, a micro-corpus that inverts if the
+tiebreak chain is reordered, and it was confirmed red on four mutations (the
+tuple tiebreak removed, the chain flipped in members.js and in feed-rank.js,
+and `peers` counted post-filter).
 
 ### The Language Filter
 

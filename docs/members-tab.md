@@ -91,10 +91,17 @@ taking the shell and its lid with it — so a reader who narrowed to 1W and foun
 nobody **lost the range control that would have widened it again**. The dead end
 was the bug, not the empty list.
 
-**⚠️ `shows` IS THE WALL'S DEFAULT ORDERING, NOT `sats`.** *Reed's call,
-2026-08-23.* Sats ranks by generosity, which one large boost can win; breadth is
-what rewards listening across the network, which is what a wall of *members* is
-a claim about. The other two are one press away.
+**⚠️ `chart` IS THE WALL'S DEFAULT ORDERING SINCE 2026-08-31.** *Reed's call,
+shipping the OnlyBoosts Charts (see that section of `docs/feeds.md`): rank in
+sats + rank in boosts + rank in shows boosted, summed, lowest total first,
+ties broken shows → sats → boosts.* It supersedes the 2026-08-23 `shows`
+default, and the reasoning behind that one carries into this one: breadth is
+what rewards listening across the network, and it stays in the formula as both
+a component and the first tiebreaker, so no single axis is presented as "the"
+story. The single-axis orderings (sats, boosts, shows) are one press away. The
+wall still prints no rank numerals — the face's figure under `chart` is sats,
+with all three components in the tooltip — and the chart inherits the wall's
+publisher exclusion, being computed over the same listing.
 
 **⚠️ THE BOARD TITLES ARE CENTRED AND THEIR SUB-LINES ARE NOT.** *Reed's call,
 2026-08-23.* "This Week" and "High Scores" name the board the way a scoreboard's

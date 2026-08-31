@@ -35,17 +35,17 @@
  * guids — the majority). A pill that fails for most artists is worse than
  * none; boosting stays at the album and song level, one drawer-click away.
  */
-import { showPageHref, publisherPageHref } from './show-link.js?v=ob-v166'
-import { coverChain } from './cover-art.js?v=ob-v166'
-import { htmlEscape } from './nostr-text.js?v=ob-v166'
-import { num, fmtSats, plural, shortDate } from './show-card.js?v=ob-v166'
+import { showPageHref, publisherPageHref } from './show-link.js?v=ob-v167'
+import { coverChain } from './cover-art.js?v=ob-v167'
+import { htmlEscape } from './nostr-text.js?v=ob-v167'
+import { num, fmtSats, plural, shortDate } from './show-card.js?v=ob-v167'
 // Re-exported: artists-feed.js reads the formatting helpers through this
 // module the way shows-feed.js reads them through show-card.js. ⚠️ An import
 // is NOT a re-export — this line shipped missing once, and the unresolved
 // named import was a LINK-TIME error: renderArtists never executed and the
 // whole feed painted the load-failure placeholder (the ob-v53 class, caught
 // on the preview deploy).
-export { num, fmtSats, plural, shortDate } from './show-card.js?v=ob-v166'
+export { num, fmtSats, plural, shortDate } from './show-card.js?v=ob-v167'
 
 const esc = htmlEscape
 
@@ -89,12 +89,15 @@ export const COPY = {
 // The same keys as the shows endpoint, because /api/v1/publishers spells its
 // aggregates the same way — see SORTS there. 'latest' is chronology, no rank.
 export const SORT_OPTIONS = [
+  /* ⚠️ THE ONLYBOOSTS CHARTS — see show-card.js; the same composite, one tier
+   * up. Server-ranked on every row; never renumbered client-side. */
+  ['chart', 'Chart rank'],
   ['boosters', 'Most boosters'],
   ['boosts', 'Most boosts'],
   ['sats', 'Most sats'],
   ['latest', 'Recently boosted'],
 ]
-export const RANKED_SORTS = new Set(['boosts', 'sats', 'boosters'])
+export const RANKED_SORTS = new Set(['chart', 'boosts', 'sats', 'boosters'])
 
 export const PUBLISHER_CARDS_PER_PAGE = 25
 
@@ -118,6 +121,8 @@ export function toCard(p) {
     boosters: num(p.boosters),
     latest: num(p.latest),
     rank: Number.isFinite(p.rank) ? p.rank : null,
+    // The chart sort's corpus-true tie flag, riding beside its rank.
+    tied: p.tied === true,
   }
 }
 
