@@ -20,34 +20,34 @@
  * A repeated name is authentic to it rather than a bug to collapse — Piez holds
  * five of the top ten and that is the actual story of the board.
  */
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v171'
-import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v171'
-import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v171'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v172'
+import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v172'
+import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v172'
 /* ⚠️ THE SAME WALL /show AND /episode RENDER, not a copy of it. It moved out of
  * functions/_shared/detail-page.js into a two-sided module for exactly this;
  * that file re-exports every name, so both Functions were untouched. A reader
  * who screenshots the wall here and on a show page must not be able to tell
  * them apart. */
-import { renderSupporters, initShowMore, compact } from '/assets/js/supporter-wall.js?v=ob-v171'
+import { renderSupporters, initShowMore, compact } from '/assets/js/supporter-wall.js?v=ob-v172'
 /* ⚠️ EXACT BOOST COUNTS HERE, COMPACT SATS. On the wall a row is one of a
  * hundred and `1k` is plenty; here there are four rows and the count is the
  * disclosure itself — "35 boosts for listeners with no identity" is the claim
  * the section exists to make, and `1k` rounds the evidence away. */
-import { num } from '/assets/js/boost-list.js?v=ob-v171'
-import { rangeControl, sortControl } from '/assets/js/feed-controls.js?v=ob-v171'
-import { mountFeedSearch } from '/assets/js/feed-search.js?v=ob-v171'
-import { searchMembers, SEARCH_HITS } from '/assets/js/ob-live.js?v=ob-v171'
+import { num } from '/assets/js/boost-list.js?v=ob-v172'
+import { rangeControl, sortControl } from '/assets/js/feed-controls.js?v=ob-v172'
+import { mountFeedSearch } from '/assets/js/feed-search.js?v=ob-v172'
+import { searchMembers, SEARCH_HITS } from '/assets/js/ob-live.js?v=ob-v172'
 /* ⚠️ THE SAME WEEK RULE THE ENDPOINT CUTS ON, not a second copy of it. That
  * module is two-sided for exactly this: the picker steps and enumerates weeks
  * without a round trip per press, and a Pacific week containing a DST
  * transition is 167 or 169 hours, so a client that stepped by a flat 604800
  * would drift an hour past every March and every November while still
  * producing Mondays. */
-import { prevWeek, nextWeek, weekSeries, weekDateString, weekStartFromDate } from '/assets/js/pacific-week.js?v=ob-v171'
-import { weekTitle, weekLabel, boardHtml, initials, COPY } from '/assets/js/hpw-board.js?v=ob-v171'
+import { prevWeek, nextWeek, weekSeries, weekDateString, weekStartFromDate } from '/assets/js/pacific-week.js?v=ob-v172'
+import { weekTitle, weekLabel, boardHtml, initials, COPY } from '/assets/js/hpw-board.js?v=ob-v172'
 /* The share control: Post to Nostr, Copy link, Share image. A verb, mounted
  * onto each board after it is painted; the same module /hpw/<week> uses. */
-import { mountShare } from '/assets/js/hpw-share.js?v=ob-v171'
+import { mountShare } from '/assets/js/hpw-share.js?v=ob-v172'
 
 const esc = htmlEscape
 const HOURS_API = '/api/v1/members/hours'

@@ -238,11 +238,20 @@ What a change would break:
 - **The members wall opens on Chart rank** (Reed's call, 2026-08-31,
   superseding the 2026-08-23 `shows` default — see `members-board.js`), and
   the wall's chart carries the same publisher exclusion as its listing.
-- **The detail pages draw a Charts line above the stat tiles** from
-  `feedRanks(...).chart`, under the same top-100 `RANK_CUTOFF` as the chips;
-  the three tile ranks are the score's own components, which is what makes
-  the line self-explaining. `/booster` overrides the link target and the
-  breadth wording (`chartHref`, `chartBreadth`).
+- **The detail pages draw a Charts window STRIP above the stat tiles** (the
+  single all-time line until 2026-08-31; Reed's pick, option A of the windows
+  design pass): Week · Month · Year · All time, each cell that boost-time
+  window's chart place from `feedRanks(...).chartWindows`, computed by the
+  same windowed GROUP BY the endpoints run so a cell agrees with the feed
+  view its link opens (`?sort=chart&range=1w` — the hash already addresses
+  it). The top-100 `RANK_CUTOFF` applies per window; a window past it is a
+  dash `<span>` whose tooltip says which dash it is (outside the top 100, or
+  no boosts in the window), and the strip is withheld entirely when no
+  window charts. The label links to `/about#charts`. The all-time cell wears
+  `--brand-tint`: the rolling windows are the news, all time is the record.
+  `/booster` overrides every cell's target and the breadth wording
+  (`chartHref`, `chartBreadth`), its chart living on the members wall. The
+  three tile ranks below stay the all-time score's components.
 - **⚠️ COMPUTED AT QUERY TIME, DELIBERATELY — no collector precompute.** The
   Follows path can only be computed per request, so the query-time SQL must
   exist regardless, and a precomputed Global table would be a second

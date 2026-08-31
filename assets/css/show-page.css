@@ -286,23 +286,74 @@
 .show-stats-cap a:hover,
 .show-stats-cap a:focus-visible { text-decoration: underline; text-underline-offset: 3px; }
 
-/* ── The OnlyBoosts Charts line ─────────────────────────────────────────
-   The subject's chart position, above the stat tiles: the tiles' three ranks
-   are its components (their sum is the score; lowest total wins). Same muted
-   register as the caption below the tiles, a step up in size because it is
-   the headline standing. Top-100 gated in feed-rank.js, so most pages render
-   without it — no reserved space. Tokens only, so dark mode needs nothing. */
-.show-stats-chart {
-  margin: 0 0 0.6rem;
-  font-size: 0.9rem;
-  font-weight: 600;
-}
-.show-stats-chart a {
+/* ── The OnlyBoosts Charts strip ────────────────────────────────────────
+   The subject's chart position in each boost-time window (Week · Month ·
+   Year · All time), above the stat tiles; feed-rank.js renders it and the
+   tiles' three ranks are the all-time score's components. It replaced the
+   single all-time line on 2026-08-31 (option A of the windows design pass).
+
+   The vocabulary is the rank chip's — tabular sans, T#, --brand-d for a
+   standing — at strip scale: hairline-separated cells on the card surface,
+   the all-time cell washed in --brand-tint to mark the durable standing
+   against the three rolling ones. A dash cell (outside the top 100, or no
+   boosts in the window) drops to --muted and is a <span>, so only real
+   standings read as links. Top-100 gated per window in feed-rank.js and the
+   whole strip withheld when nothing charts — no reserved space. Tokens only,
+   so dark mode needs nothing. */
+.show-chart { margin: 0 0 0.7rem; }
+.show-chart-label {
+  display: inline-block;
+  margin: 0 0 0.3rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   color: var(--brand-d);
   text-decoration: none;
 }
-.show-stats-chart a:hover,
-.show-stats-chart a:focus-visible { text-decoration: underline; text-underline-offset: 3px; }
+.show-chart-label:hover,
+.show-chart-label:focus-visible { text-decoration: underline; text-underline-offset: 3px; }
+.show-chart-strip {
+  display: flex;
+  align-items: stretch;
+  max-width: 30rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  overflow: hidden;
+}
+.show-chart-cell {
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: center;
+  padding: 0.4rem 0.3rem 0.45rem;
+  border-left: 1px solid var(--border);
+  text-decoration: none;
+}
+.show-chart-cell:first-child { border-left: 0; }
+.show-chart-cell--all { background: var(--brand-tint); }
+.show-chart-win {
+  display: block;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.show-chart-rank {
+  display: block;
+  margin-top: 0.1rem;
+  font: 700 0.95rem/1.2 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: var(--brand-d);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+a.show-chart-cell:hover .show-chart-rank,
+a.show-chart-cell:focus-visible .show-chart-rank { text-decoration: underline; text-underline-offset: 3px; }
+.show-chart-cell--none .show-chart-rank { color: var(--muted); font-weight: 400; }
 
 /* ── The show's description ───────────────────────────────────────────── */
 
