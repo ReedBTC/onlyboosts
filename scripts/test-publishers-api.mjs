@@ -346,6 +346,16 @@ console.log('\nThe /artist page’s own SQL, extracted from the shipped Function
     assert.deepEqual(wall.map((w) => w.booster_pubkey[0]), ['1', '2', '3'])
     assert.equal(wall[0].sats, 1100)
   })
+  check('⚠️ wall rows keep the RAW column names supporterCard reads', () => {
+    // The renderer reads booster_pubkey / booster_npub / picture /
+    // display_name off the row. A remap to the API's {pk, npub, pic} shape
+    // shipped once: every avatar blank, every card unlinked, names surviving
+    // by coincidence. The fixture's profiles all carry pictures, so a defined
+    // `picture` here is a real assertion.
+    assert.ok(wall.every((w) => w.booster_pubkey && w.picture !== undefined))
+    assert.ok(src.includes('supporters: supporters.results || []'),
+      'the artist page must pass supporter rows through unmapped')
+  })
 }
 
 console.log('\nThe #boosts corpus (?corpus=1):')

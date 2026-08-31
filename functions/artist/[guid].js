@@ -207,16 +207,13 @@ export async function onRequestGet({ env, params }) {
     albums: albums.results || [],
     totals,
     community: community.results || [],
-    supporters: (supporters.results || []).map((r, i) => ({
-      rank: i + 1,
-      pk: r.booster_pubkey,
-      npub: r.booster_npub,
-      name: r.display_name || r.name || null,
-      pic: r.picture || null,
-      sats: r.sats || 0,
-      boosts: r.boosts || 0,
-      latest: r.latest || null,
-    })),
+    /* ⚠️ RAW ROWS, NEVER REMAPPED. supporterCard reads the D1 column names
+     * (booster_pubkey, booster_npub, picture, display_name) — the shape /show
+     * passes. The first cut remapped to the API's {pk, npub, pic} shape and
+     * every avatar rendered the blank circle with its link gone, while the
+     * names survived by field-name coincidence. Caught by Reed on the preview,
+     * 2026-08-30; the test now pins the pass-through. */
+    supporters: supporters.results || [],
     boosts: boostRows,
     names,
     ranks,
