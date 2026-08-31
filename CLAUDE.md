@@ -22,7 +22,7 @@ there rather than restating the argument:
 | Every payment and publishing decision | `docs/money-paths.md` |
 | The feed bar: range, sort, rank, language, search | `docs/feeds.md` |
 | The Members tab, #40HPW, the member wall | `docs/members-tab.md` |
-| The three detail pages | `docs/detail-pages.md` |
+| The four detail pages | `docs/detail-pages.md` |
 | Boost client attribution | `docs/boost-clients.md` |
 
 Deleted reasoning is recoverable: `git log -S <symbol> -- CLAUDE.md` finds the
@@ -891,7 +891,7 @@ event ever published. Both names resolve from the one `.well-known/nostr.json`:
 `assets/onlyboosts_banner_clear.png` is the artwork on transparency and is what
 the masthead renders; `assets/onlyboosts_banner.png` is the same artwork
 flattened onto white and is the `og:image` on every page plus `OG_FALLBACK` on
-the three detail pages and `BANNER_PATH` in `/api/og/booster`. **Change the art
+the four detail pages and `BANNER_PATH` in `/api/og/booster`. **Change the art
 and both files move.**
 
 The split is about who composites. The wordmark is brand cyan and nothing else
@@ -1620,7 +1620,7 @@ place that decides an artist title links — the feed card reads it too.
 
 **`docs/detail-pages.md` carries the rest**: the rank line in the stat tiles,
 where the shared code lives, the section ids, the hash spy, the back link, the
-drawer chrome, each of the three pages in turn, the two shared server modules,
+drawer chrome, each page in turn, the two shared server modules,
 the `#boosts` range and sort, message search, the show filter, the community
 rollups and wall, and the sitemap.
 
@@ -1727,7 +1727,7 @@ back to the show's `img` when the episode has no art, and does not go on to
 `art2`. It bites only where a show has a dead primary *and* an episode with no
 art, and episode art was 100% present on every show sampled.
 
-**⚠️ The share card's TYPE follows its image, on all three detail pages.** A
+**⚠️ The share card's TYPE follows its image, on all four detail pages.** A
 large-image card crops to roughly 1.91:1, and nothing these pages send is that
 shape: podcast artwork is square by specification (Apple requires 1400x1400 to
 3000x3000, and 12 of 12 sampled from the live index are exactly 1.00), and a
@@ -1803,6 +1803,7 @@ private backfill cannot call it on `document`.
 |---|---|---|
 | `/show`, `/episode` | `hydrateProfiles()` | everything; neither page has a private path |
 | `/booster` | `hydrateProfiles(#boosts)` | the boost list only |
+| `/artist` | `hydrateProfiles()` | everything — the bio is plain text with no mention chips, so there is no private path to protect |
 | any card rollup | `hydrateCardProfiles(list)` | its own cards, on approach |
 
 `/booster` is scoped because its **bio** carries a `.bs-mention` chip with its own
@@ -1946,7 +1947,7 @@ What a change elsewhere would break:
   lives there and `functions/api/v1/clients.js` imports it rather than declaring it.
 - **⚠️ THE BOOST DELTA IS `INSERT OR IGNORE`**, so a re-derivation reaches the
   query layer only through `d1_sync.py --remote-clients`. Nothing else re-pushes it.
-- **⚠️ ALL THREE DETAIL-PAGE QUERIES MUST SELECT `b.client_id`.** They are
+- **⚠️ ALL FOUR DETAIL-PAGE BOOST QUERIES MUST SELECT `b.client_id`**, /artist's included. They are
   hand-written rather than `BOOST_SELECT`, so forgetting one renders no chip at the
   edge and a chip on every row after a re-sort. `test-boost-row.mjs` catches it.
 - **⚠️ THE `via != slug` GUARD IS LOAD-BEARING FOR OUR OWN NOTES.** Our template's
@@ -2139,7 +2140,7 @@ would. Never remove an entry** — those links are in the wild.
 | `publisher-card.js` + `publisher-card-actions.js` | **the** artist card, facts and verbs — no edge surface yet, but built to the two-sided rules so gaining one is a Function-only change |
 | `artists-feed.js` | the feed around that card, behind Artists — the publisher tier |
 | `functions/api/v1/publishers.js` + `…/publishers/[guid].js` | the artist rollup and the per-artist album list, off the collector's publisher pass |
-| `supporter-wall.js` + `supporter-wall.css` | **the** community wall, shared by the three detail pages and the Members tab |
+| `supporter-wall.js` + `supporter-wall.css` | **the** community wall, shared by `/show`, `/episode`, `/artist` and the Members tab |
 | `members-board.js` | the Members tab: the #40HPW boards and their week picker, the wall and its three orderings, the Rules dialog |
 | `feed-controls.js` / `feed-search.js` | the range/sort chrome and the per-feed typeahead |
 | `feed-lang.js` | the language menu on the four ranked feeds, and the copy it rewrites |

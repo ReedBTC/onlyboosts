@@ -161,7 +161,7 @@ removed.
 | `assets/js/episode-section.js` | the card rollup's controls and verbs, shared by `/episode` and `/booster` |
 | `assets/css/show-page.css` | linked by all three; the other two reuse its `.show-*` classes verbatim |
 
-The `.show-*` class names are kept on identical boxes on all three pages
+The `.show-*` class names are kept on identical boxes on all four pages
 deliberately: a parallel `.episode-*` set would be a rename with no meaning behind
 it. `episode-page.css` carries only the deltas.
 
@@ -466,7 +466,7 @@ as a paragraph.
 
 ### Range And Sort On `#boosts`
 
-The `#boosts` section on all three pages carries a range and a sort, built by
+The `#boosts` section on /show, /episode, /booster and /artist carries a range and a sort, built by
 `assets/js/boost-section.js`. **The range means when the boost was SENT**,
 matching `/#members` and `/api/v1/podcasts`. It does not mean when the
 episode aired; that axis belongs to the Episodes feeds and to

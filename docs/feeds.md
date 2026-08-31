@@ -256,7 +256,7 @@ means shortening a sort label ("Recently boosted"), which is product copy and a
 separate decision. `.pcast-controls` carries `flex-wrap` for exactly this tail.
 
 **Desktop is untouched.** There is room for the tags there, and `Sort: X ▾` is a
-pattern the three detail pages share.
+pattern the detail pages share.
 
 **The Boosts feeds have no language axis**: `/api/v1/boosts` and
 `/api/v1/boosts/follows` take no `lang`. That is backend work, not a decision.
