@@ -19,7 +19,7 @@
  * per-user and change as boosts arrive, so a page-lifetime cache would serve a
  * stale feed. The endpoints set their own short Cache-Control.
  */
-import { normalizeBoosts } from '/assets/js/ob-data.js?v=ob-v162'
+import { normalizeBoosts } from '/assets/js/ob-data.js?v=ob-v163'
 
 const BASE = '/api/v1/'
 
@@ -617,11 +617,15 @@ export async function searchPublishers({
   return records
 }
 
-/** One artist's album list, for the card's drawer — the publisher's own
- *  channel-level list, in their order, unfiltered (the podroll rule). */
-export async function getPublisherAlbums({ guid, signal } = {}) {
+/** One artist's INDEXED album list, for the card's drawer, ranked by sats.
+ *  `since` windows the rows and recomputes their figures, the same contract
+ *  getShowEpisodes keeps — the card above the drawer shows the range's
+ *  numbers. Index-only (Reed's call, 2026-08-30): the endpoint reads the
+ *  declaring shows, never the artist's own catalogue file. */
+export async function getPublisherAlbums({ guid, since = null, signal } = {}) {
+  const qs = since ? `?since=${encodeURIComponent(String(since))}` : ''
   const resp = await fetch(
-    `${PUBLISHERS_API}/${encodeURIComponent(guid)}`,
+    `${PUBLISHERS_API}/${encodeURIComponent(guid)}${qs}`,
     { headers: { Accept: 'application/json' }, signal },
   )
   if (!resp.ok) throw new Error(`publisher detail: HTTP ${resp.status}`)

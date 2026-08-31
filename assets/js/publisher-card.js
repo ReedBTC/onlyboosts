@@ -17,9 +17,17 @@
  *
  * ⚠️ THE TITLE IS NOT A LINK. There is no /publisher/<guid> page yet, and a
  * dead link is worse than a plain name. The drawer is the navigation: the
- * artist's own album list, each row linking to its /show page where one
- * exists. When a publisher page ships, the href goes here and every surface
- * gets it at once.
+ * artist's INDEXED albums, each linking to its /show page. When a publisher
+ * page ships, the href goes here and every surface gets it at once.
+ *
+ * ⚠️ THE DRAWER IS INDEX-ONLY — Reed's call, 2026-08-30. Nothing without at
+ * least one Nostr boost appears anywhere on this site (the podroll excepted,
+ * and it is not a ranked feed). The first cut listed the publisher feed's own
+ * full catalogue and rendered hundreds of titleless off-index rows linking to
+ * raw XML. The rows are now the declaring shows the card's own figures were
+ * computed over, windowed with the card's range. `publisher_albums` — the
+ * artist's catalogue file — is still collected and deliberately unrendered;
+ * if off-index content ever comes to this site it comes site-wide.
  *
  * ⚠️ NO BOOST PILL, DELIBERATELY. A publisher feed can carry its own value
  * block, but /api/value resolves through Podcast Index, which cannot see most
@@ -27,17 +35,17 @@
  * guids — the majority). A pill that fails for most artists is worse than
  * none; boosting stays at the album and song level, one drawer-click away.
  */
-import { showPageHref } from './show-link.js?v=ob-v162'
-import { coverChain } from './cover-art.js?v=ob-v162'
-import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v162'
-import { num, fmtSats, plural, shortDate } from './show-card.js?v=ob-v162'
+import { showPageHref } from './show-link.js?v=ob-v163'
+import { coverChain } from './cover-art.js?v=ob-v163'
+import { htmlEscape } from './nostr-text.js?v=ob-v163'
+import { num, fmtSats, plural, shortDate } from './show-card.js?v=ob-v163'
 // Re-exported: artists-feed.js reads the formatting helpers through this
 // module the way shows-feed.js reads them through show-card.js. ⚠️ An import
 // is NOT a re-export — this line shipped missing once, and the unresolved
 // named import was a LINK-TIME error: renderArtists never executed and the
 // whole feed painted the load-failure placeholder (the ob-v53 class, caught
 // on the preview deploy).
-export { num, fmtSats, plural, shortDate } from './show-card.js?v=ob-v162'
+export { num, fmtSats, plural, shortDate } from './show-card.js?v=ob-v163'
 
 const esc = htmlEscape
 
@@ -47,8 +55,9 @@ export const COPY = {
   glyph: '🎤',
   unidentified: 'Unnamed artist',
   noun: 'artist',
-  drawer: 'Albums',
-  noItems: 'No albums recorded for this artist yet.',
+  drawer: 'Albums with Nostr Boosts',
+  noItems: 'No album boosts recorded for this artist in this range.',
+  untitledItem: 'Untitled release',
   drawerLoading: 'Loading albums…',
   drawerFail: 'Couldn’t load this artist’s albums.',
   rangeLabel: 'Filter by when the artist was boosted',
@@ -179,27 +188,25 @@ export function publisherCardHtml(p, { rank = null, copy = COPY } = {}) {
 
 /* ── The drawer's album rows ───────────────────────────────────────────
  *
- * ⚠️ PUBLISHER ORDER, NOT BOOST ORDER. The list is the artist's own
- * channel-level album list, the podroll rule one tier up: reordering it (or
- * filtering it) would misreport what they published. Figures appear only on
- * rows we index — null stats mean "we do not index this feed", not zero.
- *
- * A linked row's title goes to its /show page; an unlinked row goes to the
- * album's own feed URL, the podroll's render rule for a show we have no page
- * for. Exported for publisher-card-actions.js, the episodeRowsHtml arrangement.
+ * INDEXED ALBUMS BY SATS — the same reading the show card's episode drawer
+ * gives: the rows are what the card's own figures were computed over, in the
+ * order of what they took. Every row has a boost by construction (the
+ * endpoint reads `podcasts WHERE publisher_guid`), and a row links to its
+ * /show page on the same qualifying rule every other surface uses: the title.
+ * ⚠️ NO EXTERNAL BRANCH, deliberately — an off-index URL cannot be rendered
+ * from here even if a record carries one; see the index-only note above.
+ * Exported for publisher-card-actions.js, the episodeRowsHtml arrangement.
  */
 export function albumRowsHtml(albums, copy = COPY) {
   if (!albums.length) return `<div class="ob-show-note">${esc(copy.noItems)}</div>`
 
   const rows = albums.map((a) => {
-    const title = a.title || 'Untitled release'
-    const href = a.linked && a.guid ? showPageHref(a.guid) : null
+    const title = a.title || copy.untitledItem
+    const href = a.title && a.guid ? showPageHref(a.guid) : null
     const titleEl = href
       ? `<a class="ob-ep-title" href="${esc(href)}" title="Nostr boosts to ${esc(title)}">${esc(title)}</a>`
-      : isSafeUrl(a.url)
-        ? `<a class="ob-ep-title" href="${esc(a.url)}" target="_blank" rel="noopener noreferrer">${esc(title)}</a>`
-        : `<span class="ob-ep-title">${esc(title)}</span>`
-    const meta = a.boosts != null ? plural(num(a.boosts), 'boost', 'boosts') : ''
+      : `<span class="ob-ep-title">${esc(title)}</span>`
+    const meta = a.boosts ? plural(num(a.boosts), 'boost', 'boosts') : ''
     return `<li class="ob-ep">` +
       `<div class="ob-ep-main">${titleEl}` +
       (meta ? `<span class="ob-ep-meta">${esc(meta)}</span>` : '') +

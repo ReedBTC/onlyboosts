@@ -18,23 +18,23 @@
  */
 import {
   getPublisherPage, searchPublishers, SEARCH_HITS, SEARCH_MIN_CHARS,
-} from '/assets/js/ob-live.js?v=ob-v162'
+} from '/assets/js/ob-live.js?v=ob-v163'
 import {
-  rangeDays, rangeControl, sortControl, mountFeedControls, RANGE_OPTIONS,
-} from '/assets/js/feed-controls.js?v=ob-v162'
-import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v162'
+  rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls, RANGE_OPTIONS,
+} from '/assets/js/feed-controls.js?v=ob-v163'
+import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v163'
 import {
   LANG_ALL, languageOptions, langControl, langNote, langNoMatchText, langLabelFor,
-} from '/assets/js/feed-lang.js?v=ob-v162'
-import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v162'
-import { competitionRanks, rankLabel, markSliceTies } from '/assets/js/rank.js?v=ob-v162'
+} from '/assets/js/feed-lang.js?v=ob-v163'
+import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v163'
+import { competitionRanks, rankLabel, markSliceTies } from '/assets/js/rank.js?v=ob-v163'
 import {
   COPY, toCard, publisherCardHtml, publisherRankValue,
   SORT_OPTIONS, RANKED_SORTS, PUBLISHER_CARDS_PER_PAGE,
   num, fmtSats, plural,
-} from '/assets/js/publisher-card.js?v=ob-v162'
-import { wirePublisherCards } from '/assets/js/publisher-card-actions.js?v=ob-v162'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v162'
+} from '/assets/js/publisher-card.js?v=ob-v163'
+import { wirePublisherCards } from '/assets/js/publisher-card-actions.js?v=ob-v163'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v163'
 
 /* The hash's language / view on an already-hydrated feed — the same two doors
  * every ranked renderer keeps; see the twin maps in shows-feed.js. */
@@ -143,12 +143,20 @@ export async function renderArtists({ panel, list, lang = null, range = null, so
   let pickSeq = 0
   let query = ''
 
-  const cards = h('div', { class: 'pcast-list' })
+  /* `data-artist-list` is what a card's drawer walks up to for the active
+   * window, and `data-since` carries it — read at OPEN time, so a range change
+   * moves every drawer with it. The same pair the show cards use. */
+  const cards = h('div', { class: 'pcast-list', 'data-artist-list': '' })
   const moreWrap = h('div', { class: 'pcast-more-wrap' })
+
+  const cutoff = () => rangeCutoff(rangeKey)
 
   function paintMore() {
     const slice = view.slice(shown, shown + PAGE_SIZE)
     if (slice.length) {
+      const since = cutoff()
+      if (since) cards.setAttribute('data-since', String(since))
+      else cards.removeAttribute('data-since')
       cards.insertAdjacentHTML('beforeend', slice.map((p) => publisherCardHtml(p, {
         rank: RANKED_SORTS.has(sortKey) ? rankLabel(p._rank, p._tied) : null,
         copy,

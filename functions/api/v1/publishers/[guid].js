@@ -1,21 +1,28 @@
 // GET /api/v1/publishers/:guid — one artist: the publisher row plus their
-// album list, in the publisher's own order. Serves the Artists feed's drawer.
+// INDEXED albums, ranked by sats. Serves the Artists feed's drawer.
 //
-// ⚠️ THE ALBUM LIST IS THE PUBLISHER'S OWN, UNFILTERED — the podroll rule, one
-// tier up. `publisher_albums` is the channel-level remoteItem list the artist's
-// own feed publishes, so filtering it (by medium, by boosts, by anything) would
-// misreport what they wrote. Most of a catalogue has no boosts; the rows are
-// denormalized onto the edge for exactly that reason (a join to `podcasts`
-// could only title the boosted ones — see the schema note).
+// ⚠️ INDEX-ONLY, REED'S CALL 2026-08-30. Nothing without at least one Nostr
+// boost appears anywhere on this site (the podroll is the one standing
+// exception, and it is not a ranked feed). The first cut listed the publisher
+// feed's own full catalogue on the podroll's argument and rendered ~270
+// titleless off-index Wavlake albums linking to raw XML; if off-index content
+// ever comes to this site it will come SITE-WIDE, not through this feed. So
+// the album list is `podcasts WHERE publisher_guid = ?` — exactly the shows
+// whose boosts built the card's figures — and `publisher_albums` (the
+// artist's own catalogue file, still collected) is deliberately NOT read here.
 //
-// `linked` is the collector's album_linked: the album has a /show page here
-// (boosts AND a title). A 0 renders the row pointed at the feed, not at us.
+// `?since=<unix>` windows the list to the boosts inside it and recomputes each
+// album's figures over the window — the same contract, for the same reason, as
+// /api/v1/podcasts/<guid>?since: the card above the drawer shows the range's
+// numbers, and a drawer of all-time ones would contradict the card it opened
+// from.
 import { json, preflight } from "../_common.js";
 
 export async function onRequestOptions({ request }) { return preflight(request); }
 
 export async function onRequestGet({ request, env, params }) {
   const guid = params.guid;
+  const u = new URL(request.url);
 
   const pub = await env.DB.prepare(
     `SELECT publisher_guid, feed_url, title, image, artwork, description, show_count
@@ -23,22 +30,25 @@ export async function onRequestGet({ request, env, params }) {
   ).bind(guid).first();
   if (!pub) return json(request, { error: "publisher not found" }, { status: 404 });
 
-  // Display fields prefer the live `podcasts` row where the album is indexed:
-  // the collector keeps that row current on its checked_at gate, where the
-  // denormalized edge copy refreshes on the publisher sweep. Same preference
-  // the podroll rendering makes.
-  const { results } = await env.DB.prepare(
-    `SELECT pa.position, pa.album_guid, pa.album_url, pa.album_linked,
-            COALESCE(pc.title,  pa.album_title)   AS title,
-            COALESCE(pc.image,  pa.album_image)   AS image,
-            COALESCE(pc.artwork, pa.album_artwork) AS artwork,
-            COALESCE(pc.medium, pa.album_medium)  AS medium,
-            pc.boost_count, pc.total_sats, pc.booster_count
-     FROM publisher_albums pa
-     LEFT JOIN podcasts pc ON pc.podcast_guid = pa.album_guid
-     WHERE pa.publisher_guid = ?
-     ORDER BY pa.position`
-  ).bind(guid).all();
+  const since = parseInt(u.searchParams.get("since"), 10);
+  const windowed = Number.isFinite(since) && since > 0;
+  const { results } = windowed
+    ? await env.DB.prepare(
+        `SELECT b.podcast_guid AS guid, pc.title, pc.image, pc.artwork,
+                COUNT(*)                AS boost_count,
+                COALESCE(SUM(b.sats),0) AS total_sats
+         FROM boosts b
+         JOIN podcasts pc ON pc.podcast_guid = b.podcast_guid
+         WHERE pc.publisher_guid = ? AND b.created_at >= ?
+         GROUP BY b.podcast_guid
+         ORDER BY total_sats DESC LIMIT 200`
+      ).bind(guid, since).all()
+    : await env.DB.prepare(
+        `SELECT podcast_guid AS guid, title, image, artwork,
+                boost_count, total_sats
+         FROM podcasts WHERE publisher_guid = ?
+         ORDER BY total_sats DESC LIMIT 200`
+      ).bind(guid).all();
 
   return json(request, {
     publisher: {
@@ -51,21 +61,15 @@ export async function onRequestGet({ request, env, params }) {
       albums: pub.show_count,
     },
     albums: results.map((a) => ({
-      guid: a.album_guid,
-      url: a.album_url,
+      guid: a.guid,
       title: a.title,
       img: a.image,
       art2: a.artwork || null,
-      medium: a.medium,
-      linked: !!a.album_linked,
-      // Null (not 0) when the album is not indexed: "no boosts recorded" and
-      // "we do not index this feed" are different states and the drawer only
-      // prints figures for the first.
-      boosts: a.boost_count ?? null,
-      sats: a.total_sats ?? null,
-      boosters: a.booster_count ?? null,
+      boosts: a.boost_count,
+      sats: a.total_sats,
     })),
-  }, { cache: 300 });
+    // A windowed answer is a live aggregate; the plain one is a precomputed read.
+  }, { cache: windowed ? 120 : 300 });
 }
 
 // The GET's status and headers, no body — see the HEAD convention in CLAUDE.md.

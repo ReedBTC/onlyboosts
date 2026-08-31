@@ -64,21 +64,25 @@ addPub(G.pct, '100% Wave', 1)
 addPub(G.decoy, '100 Wave', 1)   // what an unescaped '100%' ALSO matches
 addPub(G.gone, 'Long Gone Artist', 1)
 
-const addShow = (guid, pub, lang, title = 'Show ' + guid) =>
+/* ⚠️ THE AGGREGATE COLUMNS ARE REAL, matching the boosts inserted below. On
+ * the live D1 d1_sync keeps them true, and the detail endpoint's all-time
+ * path READS them (the documented precomputed-columns pattern) — a fixture of
+ * zeros makes every all-time drawer row 0/0 and the assertions meaningless. */
+const addShow = (guid, pub, lang, title, boosts = 0, sats = 0, boosters = 0) =>
   db.prepare(`INSERT INTO podcasts(podcast_guid, title, image, feed_url, medium, language, publisher_guid,
               boost_count, total_sats, booster_count, episode_count, latest_ts)
-              VALUES(?,?,?,?,?,?,?,0,0,0,0,0)`)
-    .run(guid, title, `https://example.com/${guid}.png`, `https://example.com/${guid}.xml`, 'music', lang, pub)
+              VALUES(?,?,?,?,?,?,?,?,?,?,0,0)`)
+    .run(guid, title, `https://example.com/${guid}.png`, `https://example.com/${guid}.xml`, 'music', lang, pub, boosts, sats, boosters)
 
 /* Haleen declares two shows, one English and one untagged — so lang=en and
  * lang=unknown must each recount her over ONLY the matching half. */
-addShow('al-a1', G.haleen, 'en', 'Album A1')
-addShow('al-a2', G.haleen, null, 'Album A2')
-addShow('al-b1', G.zed, 'de', 'Album B1')
-addShow('al-c1', G.bare, null, 'Album C1')
-addShow('al-d1', G.pct, null, 'Album D1')
-addShow('al-e1', G.decoy, null, 'Album E1')
-addShow('al-f1', G.gone, null, 'Album F1')
+addShow('al-a1', G.haleen, 'en', 'Album A1', 3, 300, 3)
+addShow('al-a2', G.haleen, null, 'Album A2', 1, 1000, 1)
+addShow('al-b1', G.zed, 'de', 'Album B1', 2, 5000, 1)
+addShow('al-c1', G.bare, null, 'Album C1', 1, 50, 1)
+addShow('al-d1', G.pct, null, 'Album D1', 1, 10, 1)
+addShow('al-e1', G.decoy, null, 'Album E1', 1, 10, 1)
+addShow('al-f1', G.gone, null, 'Album F1', 1, 999, 1)
 
 let ev = 0
 const NOW = Math.floor(Date.now() / 1000)
@@ -99,8 +103,9 @@ addBoost('al-d1', '5', 10)
 addBoost('al-e1', '6', 10)
 addBoost('al-f1', '7', 999, 400)   // Long Gone: All only, outside 1w/1m/1y
 
-/* Haleen's album list: the live `podcasts` title must beat the denormalized
- * hint on a linked row, and an unlinked row must keep its hint and null stats. */
+/* Haleen's catalogue file. ⚠️ INDEX-ONLY (Reed's call, 2026-08-30): the detail
+ * endpoint must NOT read this table — the drawer lists the declaring shows.
+ * These rows exist so the assertion that they never leak is a real one. */
 const addAlbum = (pub, pos, guid, url, title, linked) =>
   db.prepare(`INSERT INTO publisher_albums(publisher_guid, position, album_guid, album_url,
               album_title, album_image, album_artwork, album_medium, album_author, album_linked)
@@ -133,6 +138,11 @@ const call = async (qs) => {
 }
 const detail = async (guid) => {
   const req = new Request(`https://ob.invalid/api/v1/publishers/${guid}`)
+  const res = await detailGet({ request: req, env, params: { guid } })
+  return { status: res.status, body: await res.json() }
+}
+const detailSince = async (guid, since) => {
+  const req = new Request(`https://ob.invalid/api/v1/publishers/${guid}?since=${since}`)
   const res = await detailGet({ request: req, env, params: { guid } })
   return { status: res.status, body: await res.json() }
 }
@@ -241,23 +251,33 @@ console.log('\nHEAD answers with the GET’s status and no body:')
   check('detail HEAD', () => assert.equal(dres.status, 200))
 }
 
-console.log('\nThe per-artist detail:')
+console.log('\nThe per-artist detail (index-only, Reed 2026-08-30):')
 {
   const { body } = await detail(G.haleen)
   check('the publisher row comes back', () => {
     assert.equal(body.publisher.title, 'Haleen')
     assert.equal(body.publisher.albums, 2)
   })
-  check('⚠️ albums stay in the publisher’s own order', () =>
-    assert.deepEqual(body.albums.map((a) => a.guid), ['al-a1', 'al-x', 'al-a2']))
-  check('a linked row prefers the live podcasts title over the edge hint', () =>
-    assert.equal(body.albums[0].title, 'Album A1'))
-  check('an unlinked row keeps its hint, its feed URL, and NULL stats', () => {
-    const x = body.albums[1]
-    assert.equal(x.title, 'Hint Only')
-    assert.equal(x.linked, false)
-    assert.equal(x.boosts, null)
-    assert.equal(x.sats, null)
+  check('⚠️ the albums are the INDEXED declaring shows, ranked by sats', () =>
+    assert.deepEqual(body.albums.map((a) => a.guid), ['al-a2', 'al-a1']))
+  check('and carry the index’s own figures', () =>
+    assert.deepEqual([body.albums[0].sats, body.albums[0].boosts], [1000, 1]))
+  check('⚠️ the catalogue file never leaks — no off-index row, no feed URL', () => {
+    assert.ok(!body.albums.some((a) => a.guid === 'al-x' || a.title === 'Hint Only'))
+    assert.ok(!body.albums.some((a) => 'url' in a))
+  })
+}
+{
+  // ?since windows the rows and recounts, the show-drawer contract. Every live
+  // boost is stamped NOW-60, so a day-wide window holds them and a minute-wide
+  // one holds nothing.
+  const wide = await detailSince(G.haleen, NOW - 86400)
+  check('?since keeps the in-window albums, recounted', () =>
+    assert.deepEqual(wide.body.albums.map((a) => a.guid), ['al-a2', 'al-a1']))
+  const narrow = await detailSince(G.haleen, NOW - 10)
+  check('and an out-of-window artist answers an empty list, not an error', () => {
+    assert.equal(narrow.status, 200)
+    assert.deepEqual(narrow.body.albums, [])
   })
 }
 {

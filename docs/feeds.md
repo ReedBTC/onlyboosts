@@ -501,11 +501,21 @@ decision:
   guid matches as an equality. The `q=` path still ranks with `RANK()` over
   the whole filtered ordering — rank retention holds.
 - **The card's title is not a link** — there is no `/publisher/<guid>` page
-  yet. The drawer is the navigation: the artist's own channel-level album
-  list from `GET /api/v1/publishers/<guid>`, in THEIR order, unfiltered (the
-  podroll rule one tier up). A linked row goes to its `/show` page; an
-  unlinked one to the album's own feed. Null stats mean "not indexed",
-  not zero.
+  yet. The drawer is the navigation: the artist's **indexed** albums from
+  `GET /api/v1/publishers/<guid>`, ranked by sats and windowed with the
+  card's range (`?since`, the show drawer's contract), each row linking to
+  its `/show` page.
+- **⚠️ THE DRAWER IS INDEX-ONLY.** *Reed's call, 2026-08-30.* Nothing without
+  at least one Nostr boost appears anywhere on this site — the podroll is the
+  one standing exception, and it is not a ranked feed. The first cut listed
+  the publisher feed's own catalogue on the podroll's argument and rendered
+  ~270 titleless off-index Wavlake rows linking to raw XML. The endpoint now
+  reads `podcasts WHERE publisher_guid` — exactly the shows the card's
+  figures were computed over — and `albumRowsHtml` has **no external-URL
+  branch at all**, so the rule is structural. `publisher_albums` (the
+  artist's catalogue file) stays collected and deliberately unrendered; if
+  off-index content ever comes to this site, it comes site-wide, not through
+  this feed.
 - **No boost pill.** `/api/value` resolves through Podcast Index, which cannot
   see most publisher feeds (measured: empty object for Wavlake artist guids).
   A pill that fails for most artists is worse than none; boosting stays one

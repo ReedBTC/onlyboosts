@@ -45,9 +45,9 @@
  * All three are now en-US in UTC, which is what episode-card.js and
  * functions/_shared/detail-page.js already do. The site has one date format.
  */
-import { showPageHref, episodePageHref } from './show-link.js?v=ob-v162'
-import { coverChain } from './cover-art.js?v=ob-v162'
-import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v162'
+import { showPageHref, episodePageHref } from './show-link.js?v=ob-v163'
+import { coverChain } from './cover-art.js?v=ob-v163'
+import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v163'
 
 const esc = htmlEscape
 

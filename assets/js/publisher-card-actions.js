@@ -11,10 +11,10 @@
  * No boost pill — see the header of publisher-card.js for why that is a
  * decision and not a gap.
  */
-import { wireArt2 } from '/assets/js/detail-page.js?v=ob-v162'
-import { getPublisherAlbums } from '/assets/js/ob-live.js?v=ob-v162'
-import { COPY, albumRowsHtml } from '/assets/js/publisher-card.js?v=ob-v162'
-import { num } from '/assets/js/show-card.js?v=ob-v162'
+import { wireArt2 } from '/assets/js/detail-page.js?v=ob-v163'
+import { getPublisherAlbums } from '/assets/js/ob-live.js?v=ob-v163'
+import { COPY, albumRowsHtml } from '/assets/js/publisher-card.js?v=ob-v163'
+import { num } from '/assets/js/show-card.js?v=ob-v163'
 
 /**
  * Wire every artist card under `root` that isn't wired already. Idempotent by
@@ -71,10 +71,13 @@ function relTime(ts) {
   return ''
 }
 
-/* Fill on first open. Unlike the show drawer there is no window to read: the
- * album list is the artist's own catalogue, which no range narrows — the card's
- * figures move with the range, the catalogue does not. A failure resets the
- * marker so collapsing and reopening retries. */
+/* Fill on first open.
+ *
+ * ⚠️ THE WINDOW IS READ AT OPEN TIME, NOT AT WIRE TIME — the show drawer's
+ * rule, for the show drawer's reason: the rows are scoped to the same range
+ * the card's figures were computed over, and the feed writes the active
+ * cutoff onto the list container as `data-since`, changing it in place. A
+ * failure resets the marker so collapsing and reopening retries. */
 function wireDrawer(card) {
   const details = card.querySelector('details.pcast-card-details')
   const body = details?.querySelector('[data-lazy-albums]')
@@ -87,9 +90,10 @@ function wireDrawer(card) {
 
     const guid = card.getAttribute('data-guid')
     const status = body.querySelector('[data-drawer-status]')
+    const since = num(card.closest('[data-artist-list]')?.getAttribute('data-since')) || null
 
     try {
-      const { albums } = await getPublisherAlbums({ guid })
+      const { albums } = await getPublisherAlbums({ guid, since })
       status?.remove()
       body.insertAdjacentHTML('afterbegin', albumRowsHtml(albums, COPY))
     } catch (err) {
