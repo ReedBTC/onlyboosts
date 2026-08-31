@@ -19,24 +19,24 @@
  */
 import {
   getPublisherPage, searchPublishers, SEARCH_HITS, SEARCH_MIN_CHARS,
-} from '/assets/js/ob-live.js?v=ob-v167'
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v167'
+} from '/assets/js/ob-live.js?v=ob-v168'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v168'
 import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls, RANGE_OPTIONS,
-} from '/assets/js/feed-controls.js?v=ob-v167'
-import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v167'
+} from '/assets/js/feed-controls.js?v=ob-v168'
+import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v168'
 import {
   LANG_ALL, languageOptions, langControl, langNote, langNoMatchText, langLabelFor,
-} from '/assets/js/feed-lang.js?v=ob-v167'
-import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v167'
-import { competitionRanks, rankLabel, markSliceTies } from '/assets/js/rank.js?v=ob-v167'
+} from '/assets/js/feed-lang.js?v=ob-v168'
+import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v168'
+import { competitionRanks, rankLabel, markSliceTies } from '/assets/js/rank.js?v=ob-v168'
 import {
   COPY, toCard, publisherCardHtml, publisherRankValue,
   SORT_OPTIONS, RANKED_SORTS, PUBLISHER_CARDS_PER_PAGE,
   num, fmtSats, plural,
-} from '/assets/js/publisher-card.js?v=ob-v167'
-import { wirePublisherCards } from '/assets/js/publisher-card-actions.js?v=ob-v167'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v167'
+} from '/assets/js/publisher-card.js?v=ob-v168'
+import { wirePublisherCards } from '/assets/js/publisher-card-actions.js?v=ob-v168'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v168'
 
 /* The hash's language / view on an already-hydrated feed — the same two doors
  * every ranked renderer keeps; see the twin maps in shows-feed.js. */
@@ -125,10 +125,10 @@ export async function renderArtists({ panel, list, scope = 'global', lang = null
     follows = res.follows
   }
 
-  /* Distinct people, matching the two show-level rollups: one listener boosting
-   * an artist forty times is one vote, not forty. Also the endpoint's own
-   * default, and what the hash elides. */
-  const DEFAULT_SORT = 'boosters'
+  /* ⚠️ CHART RANK, matching every ranked feed since 2026-08-31 (Reed's
+   * call) — also the endpoint's own default, and what the hash elides. It
+   * was 'boosters' from this feed's first day. */
+  const DEFAULT_SORT = 'chart'
   const urlRange = (typeof range === 'string' && RANGE_OPTIONS.some((o) => o[0] === range)) ? range : ''
   const urlSort = (typeof sort === 'string' && SORT_OPTIONS.some((o) => o[0] === sort)) ? sort : ''
   let rangeKey = urlRange || 'all'

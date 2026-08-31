@@ -20,7 +20,14 @@
  * wrangler is unauthenticated, so the input is a saved response from production:
  *
  *   curl -s 'https://onlyboosts.social/api/v1/podcasts?not_medium=music\
- * &sort=boosters&range=all&limit=25' > <file>
+ * &sort=chart&range=all&limit=25' > <file>
+ *
+ * ⚠️ UNTIL A DEPLOY THAT SERVES sort=chart IS LIVE, production coerces the
+ * unknown key to its default and the curl above captures the wrong list —
+ * build the capture through the SHIPPED handler instead: page every row out
+ * of production, load them into a node:sqlite build of the real schema, and
+ * save the local endpoint's own sort=chart answer. That is how the flip was
+ * verified before it deployed.
  *
  * ⚠️ TAKE A FRESH ONE. It is the size measurement as well as the fixture, and a
  * stale capture measures a page nobody is being served.
@@ -55,7 +62,7 @@ const records = api.podcasts || []
 const cards = cardsFromPodcasts(records)
 
 // The same call functions/index.js makes.
-const SORT = 'boosters'
+const SORT = 'chart'
 const block = renderShowCardPage(cards, {
   copy: COPY.other, sort: SORT, range: 'all', limit: SHOW_CARDS_PER_PAGE,
   state: { scope: 'global', medium: 'other', sort: SORT, range: 'all', nextOffset: api.next_offset },
@@ -156,12 +163,14 @@ check('it carries the medium the client checks, and the opening controls', () =>
   assert.equal(state.nextOffset, api.next_offset)
 })
 
-check('it carries the boundary seed the next page needs to number itself', () => {
+check('⚠️ no boundary seed under chart — every row wears the server’s rank', () => {
+  // The seed exists so the client can continue numbering across the adoption
+  // boundary. Under chart the client never numbers: renumber() and
+  // syncRankLabels() return early and every fetched row carries its own rank,
+  // so a seed here would be dead weight claiming a live purpose.
   const state = readState()
-  const last = cards[painted - 1]
-  assert.equal(state.lastValue, showRankValue(SORT)(last),
-    'the seed value is not the last painted card’s figure')
-  assert.equal(typeof state.lastRank, 'number')
+  assert.equal(state.lastRank, undefined)
+  assert.equal(state.lastValue, undefined)
 })
 
 check('it carries state and not content', () => {
@@ -208,49 +217,48 @@ check('the last-boost date is a date, not a relative time', () => {
 console.log('\nRanking:')
 
 check('the server ranking survives into the painted order', () => {
-  const values = cards.slice(0, painted).map(showRankValue(SORT))
-  for (let i = 1; i < values.length; i++) {
-    assert.ok(values[i] <= values[i - 1], `card ${i + 1} outranks card ${i} (${values[i]} > ${values[i - 1]})`)
+  const ranks = cards.slice(0, painted).map((c) => c.rank)
+  assert.equal(ranks[0], 1, 'the first card is #1')
+  for (let i = 1; i < ranks.length; i++) {
+    assert.ok(Number.isFinite(ranks[i]), `card ${i + 1} carries no server rank`)
+    assert.ok(ranks[i] >= ranks[i - 1], `card ${i + 1} outranks card ${i} (${ranks[i]} < ${ranks[i - 1]})`)
   }
 })
 
-/* ⚠️ COMPETITION RANKS, NOT POSITIONS. Ties share the better place and the next
- * distinct value skips the whole group, so `1 2 3 T4 T4 6` is CORRECT and a
- * gapless run would mean the sats-then-guid tiebreak — which exists so that
- * paging is a total order — was deciding standings again. */
-check('cards carry competition ranks: ties share a place, the next value skips', () => {
+/* ⚠️ THE CHART STANDING IS THE SERVER'S TUPLE (score, then boosters, sats,
+ * boosts) and each card wears the endpoint's own rank and tie flag verbatim —
+ * see The OnlyBoosts Charts in docs/feeds.md. The label is verifiable here
+ * against the record, and the ARITHMETIC is verifiable against the page's own
+ * open formula: within a rank-ordered prefix, every row strictly ahead of row
+ * i is also on the page, so the competition rank recomputes exactly. */
+check('every card wears the record’s own chart rank and tie flag', () => {
   const labels = rankLabels()
-  const values = cards.slice(0, labels.length).map(showRankValue(SORT))
   assert.equal(labels.length, painted, 'every card carries a rank')
-  const ranks = labels.map((l) => Number(l.replace(/^T/, '')))
-
-  assert.equal(ranks[0], 1, 'the first card is rank 1')
-  for (let i = 0; i < ranks.length; i++) {
-    // The definition, checked directly against the page's own figures.
-    const ahead = values.filter((v) => v > values[i]).length
-    assert.equal(ranks[i], ahead + 1, `card ${i + 1} is #${ranks[i]} with ${ahead} ahead of it`)
-    if (i > 0) {
-      const same = values[i] === values[i - 1]
-      assert.equal(ranks[i] === ranks[i - 1], same, `card ${i + 1} vs ${i}: rank/figure disagree`)
-    }
-  }
+  labels.forEach((label, i) => {
+    const c = cards[i]
+    assert.equal(label, `${c.tied ? 'T' : ''}${c.rank}`, `card ${i + 1}`)
+  })
 })
 
-check('the T marks a shared place, and only a shared place', () => {
-  const labels = rankLabels()
-  const values = cards.slice(0, labels.length).map(showRankValue(SORT))
-  labels.forEach((label, i) => {
-    const shared = values.filter((v) => v === values[i]).length > 1
-    /* ⚠️ The LAST card is exempt in one direction only: it cannot see whether
-     * its run continues into the next page, so it may under-report a tie it
-     * shares forward. It must never over-report one. That is what the boundary
-     * seed in the state element repairs — see syncRankLabels in shows-feed.js. */
-    const lastRow = i === labels.length - 1
-    if (label.startsWith('T')) {
-      assert.ok(shared, `card ${i + 1} is marked T but its figure ${values[i]} is unique on the page`)
-    } else if (!lastRow) {
-      assert.ok(!shared, `card ${i + 1} shares figure ${values[i]} but carries no T`)
-    }
+check('⚠️ the rank arithmetic holds against the page’s own open formula', () => {
+  const rows = records.slice(0, painted)
+  const key = (r) => [r.chart.score, -r.boosters, -r.sats, -r.boosts]
+  const lt = (a, b) => { for (let k = 0; k < 4; k++) { if (a[k] !== b[k]) return a[k] < b[k] } return false }
+  rows.forEach((r, i) => {
+    assert.equal(r.chart.score, r.chart.sats + r.chart.boosts + r.chart.boosters,
+      `row ${i + 1}: the score is not the sum of its own components`)
+    const ahead = rows.filter((x) => lt(key(x), key(r))).length
+    assert.equal(r.rank, ahead + 1, `row ${i + 1} is #${r.rank} with ${ahead} ahead of it`)
+  })
+})
+
+check('a rank shared ON the page always wears the T; a lone T may reach off it', () => {
+  // The server’s tie flag is corpus-true, so a T with no on-page partner is a
+  // tie straddling the page boundary — legitimate in that direction only.
+  const rows = records.slice(0, painted)
+  rows.forEach((r, i) => {
+    const partners = rows.filter((x, j) => j !== i && x.rank === r.rank).length
+    if (partners > 0) assert.equal(r.tied, true, `row ${i + 1} shares rank ${r.rank} but carries no T`)
   })
 })
 

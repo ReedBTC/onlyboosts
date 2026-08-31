@@ -8,8 +8,8 @@
 // edited there as it always was.
 //
 // ⚠️ THE OPENING FEED IS SHOWS, NOT EPISODES, SINCE PHASE D (2026-08-23). The
-// front door lands on the show-level leaderboard — all time, ranked by distinct
-// boosters — because that is the view that answers "what is this site" to
+// front door lands on the show-level leaderboard — all time, by Chart rank
+// since 2026-08-31 — because that is the view that answers "what is this site" to
 // somebody who has never seen it. Reed's call. What moved with it is this
 // Function: the marker pair is inside the Shows panel now, the cards come from
 // /api/v1/podcasts, and shows-feed.js adopts them the way feeds-podcasts.js
@@ -52,20 +52,21 @@ const CLOSE = "<!--/OB:SSR-SHOWS-->";
 
 /* The opening feed, and it must match shows-feed.js's opening state exactly.
  *
- * `boosters` (Most boosters) because distinct people is the higher-signal
- * ranking: one listener boosting a show forty times is one vote, not forty. It
- * opened on `boosts` (raw volume) until Phase D. `all` because a show-level
- * leaderboard is an all-time question and the windowed ranges narrow it. And
- * not_medium=music because Shows and Albums are a PARTITION — music goes to
- * Albums, and everything else, including video and the feeds Podcast Index
- * cannot identify, comes here. A mismatch would not break anything; it would
- * just make the reader watch the list they were given get replaced by a
- * different one.
+ * `chart` — the OnlyBoosts Charts (rank in sats + rank in boosts + rank in
+ * boosters, summed, lowest total first; see docs/feeds.md) — since 2026-08-31,
+ * Reed's call making Chart rank the opening sort on every ranked feed. It
+ * opened on `boosters` from Phase D to then, and on `boosts` before that.
+ * `all` because a show-level leaderboard is an all-time question and the
+ * windowed ranges narrow it. And not_medium=music because Shows and Albums
+ * are a PARTITION — music goes to Albums, and everything else, including
+ * video and the feeds Podcast Index cannot identify, comes here. A mismatch
+ * would not break anything; it would just make the reader watch the list
+ * they were given get replaced by a different one.
  */
 const FEED = {
   scope: "global",
   medium: "other",
-  sort: "boosters",
+  sort: "chart",
   range: "all",
 };
 

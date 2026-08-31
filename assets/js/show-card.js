@@ -45,9 +45,9 @@
  * All three are now en-US in UTC, which is what episode-card.js and
  * functions/_shared/detail-page.js already do. The site has one date format.
  */
-import { showPageHref, episodePageHref } from './show-link.js?v=ob-v167'
-import { coverChain } from './cover-art.js?v=ob-v167'
-import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v167'
+import { showPageHref, episodePageHref } from './show-link.js?v=ob-v168'
+import { coverChain } from './cover-art.js?v=ob-v168'
+import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v168'
 
 const esc = htmlEscape
 
@@ -159,8 +159,9 @@ export const SORT_OPTIONS = [
    * boosters, summed, lowest total first; see "The OnlyBoosts Charts" in
    * docs/feeds.md. Server-ranked on every row (rank + tie flag through
    * toCard); the renderer never renumbers chart rows. First in the menu as
-   * the composite the single-axis sorts feed into; the feed still OPENS on
-   * 'boosters', deliberately — that constant is pinned to functions/index.js. */
+   * the composite the single-axis sorts feed into, and the feeds OPEN on it
+   * since 2026-08-31 — the opening constant is pinned to functions/index.js
+   * (FEED.sort) and shows-feed.js (DEFAULT_SORT), which move together. */
   ['chart', 'Chart rank'],
   ['boosters', 'Most boosters'],
   ['boosts', 'Most boosts'],

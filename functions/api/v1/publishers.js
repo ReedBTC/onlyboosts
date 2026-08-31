@@ -45,10 +45,12 @@ const SORTS = {
   // the key before agg/alias is read.
   chart:    { chart: true },
 };
-// Distinct people, matching the client's opening sort. A new endpoint has no
-// legacy URLs to honour, so unlike podcasts.js there are no sort aliases and
-// the default is the ranking the feed actually opens on.
-const DEFAULT_SORT = "boosters";
+// The OnlyBoosts Charts, matching the client's opening sort (every ranked
+// feed opens on Chart rank since 2026-08-31). A new endpoint has no legacy
+// URLs to honour, so unlike podcasts.js there are no sort aliases and the
+// default stays the ranking the feed actually opens on — it was "boosters"
+// while the feed was.
+const DEFAULT_SORT = "chart";
 
 // Boost-time windows, matching RANGE_OPTIONS in feed-controls.js and RANGE_DAYS
 // in podcasts.js/episodes.js. The lists move together or a range button 400s.

@@ -190,6 +190,17 @@ unreachable (equal sats and breadth values force equal component ranks, so an
 equal total then forces equal boosts); it is kept because the published spec
 names it, and it costs one ORDER BY key.
 
+**⚠️ CHART RANK IS THE OPENING SORT ON EVERY RANKED FEED SINCE 2026-08-31**
+(Reed's call, the second half of shipping the Charts): Shows, Albums, Artists,
+Episodes and Songs, both scopes, the landing feed (`FEED.sort` in
+`functions/index.js` — the three-declaration rule applies, and
+`test-server-render.mjs` runs against a `sort=chart` capture now) and the
+members wall. The default is elided from the hash, so the bare `#shows` is the
+chart view's address; a link carrying an explicit `sort=boosters` still opens
+exactly what it says. The edge renderer stamps chart cards from the server's
+own rank and tie flag (`_shared/show-cards.js`) and emits no boundary seed,
+the client renumbering nothing under this sort.
+
 What a change would break:
 
 - **⚠️ THE STANDING IS THE TUPLE, SO THE TIEBREAK LIVES INSIDE THE `RANK()`

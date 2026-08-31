@@ -54,20 +54,20 @@
  */
 import {
   getShowPage, searchShows, getShowEpisodes, SEARCH_HITS, SEARCH_MIN_CHARS,
-} from '/assets/js/ob-live.js?v=ob-v167'
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v167'
+} from '/assets/js/ob-live.js?v=ob-v168'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v168'
 import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls,
   RANGE_OPTIONS,
-} from '/assets/js/feed-controls.js?v=ob-v167'
+} from '/assets/js/feed-controls.js?v=ob-v168'
 // Its own module, not two more exports of feed-controls.js — see the ⚠️ note
 // at the top of that file for the four-hour window that shape opens.
-import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v167'
+import { mountFeedNote, resetFeedNote } from '/assets/js/feed-note.js?v=ob-v168'
 import {
   LANG_ALL, languageOptions, langControl, langNote, langNoMatchText, langLabelFor,
-} from '/assets/js/feed-lang.js?v=ob-v167'
-import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v167'
-import { competitionRanks, rankLabel, markSliceTies } from '/assets/js/rank.js?v=ob-v167'
+} from '/assets/js/feed-lang.js?v=ob-v168'
+import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v168'
+import { competitionRanks, rankLabel, markSliceTies } from '/assets/js/rank.js?v=ob-v168'
 /* ⚠️ THE CARD ITSELF IS NOT IN THIS FILE ANY MORE. show-card.js emits it as an
  * HTML string and show-card-actions.js attaches its verbs, which is what lets
  * functions/index.js render the opening page of this feed at the edge — a
@@ -84,9 +84,9 @@ import {
   COPY, copyFor, toCard, showCardHtml, showRankValue,
   SORT_OPTIONS, RANKED_SORTS, SHOW_CARDS_PER_PAGE,
   num, fmtSats, plural,
-} from '/assets/js/show-card.js?v=ob-v167'
-import { wireShowCards } from '/assets/js/show-card-actions.js?v=ob-v167'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v167'
+} from '/assets/js/show-card.js?v=ob-v168'
+import { wireShowCards } from '/assets/js/show-card-actions.js?v=ob-v168'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v168'
 
 /* ── The hash's language, on an already-hydrated feed ──
  * The twin of the map in feeds-podcasts.js, and there for the same reason: a
@@ -237,13 +237,14 @@ export async function renderShows({ panel, list, scope = 'global', medium = 'oth
     follows = res.follows
   }
 
-  /* Distinct people is the default sort, matching the episode rollup's: one
-   * listener boosting a show forty times is one vote, not forty. It was
-   * 'boosts' (raw volume) until Phase D put the front door on this feed.
-   * ⚠️ Must match FEED.sort in functions/index.js, or the reader watches the
-   * server's list get replaced by a different one. It is also what the hash
-   * elides: a default view's address is the bare feed key. */
-  const DEFAULT_SORT = 'boosters'
+  /* ⚠️ CHART RANK IS THE OPENING SORT — the OnlyBoosts Charts, Reed's call
+   * 2026-08-31, on every ranked feed at once. It was 'boosters' from Phase D
+   * (distinct people over raw volume) and 'boosts' before that; both survive
+   * in the menu, and the chart keeps breadth as a component and the first
+   * tiebreaker. ⚠️ Must match FEED.sort in functions/index.js, or the reader
+   * watches the server's list get replaced by a different one. It is also
+   * what the hash elides: a default view's address is the bare feed key. */
+  const DEFAULT_SORT = 'chart'
   /* The hash's range and sort are the opening state, like the language, and a
    * key the tables don't hold — a typo, or the other renderer's spelling
    * ('count' is the episodes endpoint's word for boosters) — coerces to the

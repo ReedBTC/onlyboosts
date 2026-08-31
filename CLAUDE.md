@@ -193,11 +193,15 @@ no box; don't grow it back into the scope paragraph it replaced.
 
 ### The Landing Feed
 
-**The front door opens on Shows / All time / Most boosters.** Reed's call,
-2026-08-23, shipping the last piece of the tabs work (Phase D, idea #18). The
-show-level leaderboard is the view that answers "what is this site" to somebody
-who has never seen it; the episode feed is one press away on the sub-row above
-it. It opened on Episodes · Global from the day the feed bar existed.
+**The front door opens on Shows / All time / Chart rank.** Two Reed calls:
+Shows on 2026-08-23 (Phase D, idea #18, shipping the last piece of the tabs
+work), and Chart rank on 2026-08-31, when the OnlyBoosts Charts became the
+opening sort on **every ranked feed at once** — Shows, Albums, Artists,
+Episodes and Songs, both scopes, plus the members wall. The show-level
+leaderboard is the view that answers "what is this site" to somebody who has
+never seen it; the episode feed is one press away on the sub-row above it. It
+opened on Episodes · Global from the day the feed bar existed, and on Most
+boosters from Phase D to the Charts flip.
 
 **⚠️ IT IS THREE DECLARATIONS AND THEY MOVE TOGETHER.** Any one of them alone is
 a page that contradicts itself, and `test-server-render.mjs` pins all three:
@@ -215,13 +219,19 @@ Podcasts href (`/#episodes-global`), so changing it is the nav's decision as muc
 as the page's. A change that makes those two constants agree has almost
 certainly merged them.
 
-**⚠️ THE OPENING SORT IS `boosters` ON BOTH ROLLUPS, and only one of them moved.**
-`shows-feed.js` opened on `boosts` (raw volume) and is now `boosters` — distinct
-people, because one listener boosting a show forty times is one vote, not forty.
-`feeds-podcasts.js` was **already** there: its key for that ranking is spelled
-`count`, which is the episodes endpoint's own name for it, and setting it to
-`boosters` would be an unknown sort key silently falling back to Latest boost.
-The two endpoints disagree about the word and agree about the ranking.
+**⚠️ THE OPENING SORT IS `chart` ON EVERY RANKED FEED — one key, one
+spelling.** *Reed's call, 2026-08-31.* The OnlyBoosts Charts is deliberately
+spelled `chart` on all four ranked endpoints, so the default is the first sort
+key the two rollups have ever agreed on. The history matters because the wart
+it stepped around is still live for the OPTION menus: the boosters ranking is
+spelled `count` on the episodes endpoint and `boosters` on the shows endpoint,
+and each renderer coerces the other's word to its default — that coercion now
+lands on `chart`. `shows-feed.js` opened on `boosts`, then `boosters` (Phase
+D: distinct people, because one listener boosting a show forty times is one
+vote, not forty), now `chart`; `feeds-podcasts.js` opened on `boosts`, then
+`count`, now `chart`. Breadth stays in the chart as both a component and the
+first tiebreaker, which is what made the flip a sharpening of the Phase-D
+argument rather than a reversal.
 
 **The Function renders ONE feed and it is the one on screen** — see the ⚠️ under
 the rendering rule for why, and for why `feeds-podcasts.js#adoptServerCards` is
@@ -434,8 +444,11 @@ directly above it — the count moved when a test was added and this sentence di
 not. If the table grows again, this line grows with it.)*
 
 **⚠️ AND ITS `curl` CHANGED WITH THE LANDING FEED.** It captures
-`/api/v1/podcasts?not_medium=music&sort=boosters&range=all&limit=25` now, not the
-episodes query. The whole file was rewritten by Phase D, which is the honest
+`/api/v1/podcasts?not_medium=music&sort=chart&range=all&limit=25` now (it read
+`sort=boosters` until the Charts became the opening sort on 2026-08-31 — and
+until a deploy serving `sort=chart` is live, production coerces the unknown
+key, so the capture is built through the shipped handler instead; the test's
+header carries the recipe), not the episodes query. The whole file was rewritten by Phase D, which is the honest
 measure of how big that change was: the landing feed is not a constant this test
 could have been parameterised by, since the two cards share no renderer, no state
 element and no drawer. `git show 4c22017:scripts/test-server-render.mjs` is the

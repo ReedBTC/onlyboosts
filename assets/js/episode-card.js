@@ -42,11 +42,11 @@
  * what functions/_shared/detail-page.js has always done, so the site now has one
  * date format rather than one for the feeds and another for the detail pages.
  */
-import { showPageHref, episodePageHref } from './show-link.js?v=ob-v167'
-import { episodeBoostLink } from './episode-link.js?v=ob-v167'
-import { boosterPageHref, boosterLinkAttrs } from './booster-link.js?v=ob-v167'
-import { coverChain, httpsUrl } from './cover-art.js?v=ob-v167'
-import { htmlEscape, isSafeUrl, renderMessage } from './nostr-text.js?v=ob-v167'
+import { showPageHref, episodePageHref } from './show-link.js?v=ob-v168'
+import { episodeBoostLink } from './episode-link.js?v=ob-v168'
+import { boosterPageHref, boosterLinkAttrs } from './booster-link.js?v=ob-v168'
+import { coverChain, httpsUrl } from './cover-art.js?v=ob-v168'
+import { htmlEscape, isSafeUrl, renderMessage } from './nostr-text.js?v=ob-v168'
 
 const esc = htmlEscape
 
@@ -355,7 +355,8 @@ export const SORT_OPTIONS = [
    * docs/feeds.md. Server-ranked on every row: the renderer never renumbers
    * chart rows, a tuple standing being underivable from any one figure. First
    * in the menu as the composite the single-axis sorts below feed into; the
-   * feed still OPENS on 'count' (Most boosters), deliberately. */
+   * feeds OPEN on it too, since 2026-08-31 (Reed's call, every ranked feed
+   * at once). */
   ['chart', 'Chart rank'],
   ['recent', 'Latest boost'],
   ['episode', 'Latest episode'],

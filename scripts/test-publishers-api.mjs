@@ -170,9 +170,22 @@ const titles = (b) => b.publishers.map((p) => p.title)
 console.log('\nThe ranked listing:')
 {
   const { body } = await call('')
-  check('default sort is boosters and Haleen leads it', () => {
-    assert.equal(body.sort, 'boosters')
-    assert.equal(titles(body)[0], 'Haleen')
+  check('the default sort is the chart, matching the feed\'s opening sort', () => {
+    // The order itself is scripts/test-charts.mjs's to verify; here the bare
+    // call just has to be the same answer as asking for the chart by name.
+    assert.equal(body.sort, 'chart')
+  })
+  const boosters = await call('?sort=boosters')
+  /* ⚠️ Resolved BEFORE the check: check() is synchronous, and an async
+   * callback would return an unawaited promise — an assertion that can never
+   * fail. */
+  const explicitChart = await call('?sort=chart')
+  check('a bare call and ?sort=chart are one answer', () => {
+    assert.deepEqual(titles(body), titles(explicitChart.body))
+  })
+  check('sort=boosters still crowns Haleen', () => {
+    assert.equal(boosters.body.sort, 'boosters')
+    assert.equal(titles(boosters.body)[0], 'Haleen')
   })
   check('⚠️ the bare (title-less) publisher never lists', () => {
     assert.ok(!body.publishers.some((p) => p.guid === G.bare))
@@ -196,7 +209,7 @@ console.log('\nThe ranked listing:')
 {
   const { body } = await call('?sort=nonsense')
   check('an unknown sort coerces to the default rather than 400', () =>
-    assert.equal(body.sort, 'boosters'))
+    assert.equal(body.sort, 'chart'))
 }
 {
   const { status } = await call('?range=2y')
