@@ -1,12 +1,189 @@
-<!DOCTYPE html>
+// /charts/<YYYY-MM-DD> — the OnlyBoosts Charts page: the week's Top 10 for
+// Shows, Episodes, Artists, Albums and Songs, each beside its Weeks at #1
+// companion, all rendered at the edge.
+//
+//   /charts/<date>   the five charts for the week containing that day. Not a
+//                    Monday? A future date? 302 to the canonical Monday, or to
+//                    the live week, so one week has one URL — the /hpw rule.
+//   /charts          302 to the live week.
+//
+// ⚠️ THE WEEK IS THE 40 HPW WEEK: Monday 00:00 US Pacific, cut by
+// assets/js/pacific-week.js on both sides of the query. The ranking is
+// sort=chart and nothing else — see functions/_shared/week-charts.js for the
+// queries and "The OnlyBoosts Charts" in docs/feeds.md for the rule.
+//
+// ⚠️ THE WEEKS AT #1 BOARDS ARE THE SAME ON EVERY WEEK'S PAGE, deliberately:
+// they count completed weeks over the whole index, so they are a property of
+// the chart, not of the week on screen. Rendering them beside every week is
+// the high-scores idiom the 40 HPW tab established.
+//
+// The page is facts only — titles, figures, links — so it ships no client
+// module of its own; the arrows are plain links and the boards are finished
+// HTML. A verb that arrives later (a share control, a picker menu) mounts the
+// way hpw-page.js does, without moving the facts.
+
+import { pacificWeekStart, prevWeek, nextWeek, weekStartFromDate, weekDateString } from "../../assets/js/pacific-week.js";
+import { KINDS, weeklyChart, weeksAtNumberOne } from "../_shared/week-charts.js";
+import { sectionHtml, weekLabel, COPY } from "../_shared/chart-board.js";
+import { htmlEscape } from "../../assets/js/nostr-text.js";
+
+export const SITE_ORIGIN = "https://onlyboosts.social";
+const ROWS = 10;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+export async function onRequestGet({ request, env, params }) {
+  let segs = params.path;
+  if (segs == null) segs = [];
+  if (!Array.isArray(segs)) segs = [segs];
+  segs = segs.filter((s) => s !== "");
+
+  const live = pacificWeekStart(Math.floor(Date.now() / 1000));
+  if (segs.length === 0) return redirect(request, `/charts/${weekDateString(live)}`);
+  if (segs.length > 1) return notFound();
+  const key = segs[0];
+
+  if (!DATE_RE.test(key)) return notFound();
+  const ws = weekStartFromDate(key);
+  if (ws === null) return notFound();
+  if (ws > live) return redirect(request, `/charts/${weekDateString(live)}`);
+  const canon = weekDateString(ws);
+  if (canon !== key) return redirect(request, `/charts/${canon}`);
+
+  const we = nextWeek(ws);
+  const isCurrent = ws >= live;
+
+  let first, weekly, ones;
+  try {
+    /* The floor, the five weekly Top 10s, and the five companions, together.
+       The floor is load-bearing here (unlike the hours endpoint's best-effort
+       first_week): a page for a week before the index began is a URL with
+       nothing behind it, and a crawler would walk the ‹ arrow back forever. */
+    const firstQ = env.DB.prepare("SELECT MIN(created_at) AS t FROM boosts").first()
+      .then((r) => (r && r.t ? pacificWeekStart(r.t) : null));
+    const weeklyQ = Promise.all(KINDS.map((k) => weeklyChart(env, k, ws, we, ROWS)));
+    const onesQ = Promise.all(KINDS.map((k) => weeksAtNumberOne(env, k, live, ROWS)));
+    [first, weekly, ones] = await Promise.all([firstQ, weeklyQ, onesQ]);
+  } catch (err) {
+    console.error("[charts] queries failed", err);
+    return unavailable();
+  }
+  if (first != null && ws < first) return notFound();
+
+  const html = renderPage({ ws, we, live, first, isCurrent, weekly, ones });
+  const empty = weekly.every((rows) => rows.length === 0);
+  return page(html, isCurrent ? 60 : 300, { noindex: empty });
+}
+
+/* ⚠️ Pages routes by method; a HEAD with no handler falls through to the
+   static 404. Same status and headers as the GET, no body. */
+export async function onRequestHead(ctx) {
+  const resp = await onRequestGet(ctx);
+  return new Response(null, { status: resp.status, headers: resp.headers });
+}
+
+// ── the responses ────────────────────────────────────────────────────────────
+
+function page(html, maxAge, { noindex = false } = {}) {
+  const headers = {
+    "Content-Type": "text/html; charset=utf-8",
+    "Cache-Control": `public, max-age=${maxAge}`,
+  };
+  if (noindex) headers["X-Robots-Tag"] = "noindex";
+  return new Response(html, { status: 200, headers });
+}
+
+function redirect(request, path) {
+  const url = new URL(request.url);
+  url.pathname = path;
+  url.search = "";
+  return new Response(null, {
+    status: 302,
+    headers: { Location: url.toString(), "Cache-Control": "public, max-age=60" },
+  });
+}
+
+function unavailable() {
+  return new Response(shell({
+    title: "Charts unavailable — OnlyBoosts",
+    eyebrow: "503",
+    h1: "The charts are unavailable",
+    lead: "The index did not answer. Try again in a moment.",
+    body: `<div class="soon-card"><p><a href="/">Back to the feeds</a></p></div>`,
+    noindex: true,
+  }), { status: 503, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
+}
+
+function notFound() {
+  return new Response(shell({
+    title: "Week not found — OnlyBoosts",
+    eyebrow: "404",
+    h1: "Week not found",
+    lead: "The charts are addressed by a week's Monday, as /charts/YYYY-MM-DD.",
+    body: `<div class="soon-card"><p><a href="/charts">This week's charts</a></p></div>`,
+    noindex: true,
+  }), { status: 404, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=300" } });
+}
+
+// ── the page ─────────────────────────────────────────────────────────────────
+
+function arrowsHtml({ ws, live, first }) {
+  const prev = prevWeek(ws), next = nextWeek(ws);
+  const prevOff = first != null && prev < first;
+  const nextOff = next > live;
+  const arrow = (off, href, glyph, label) => off
+    ? `<span class="cb-arrow" aria-disabled="true" aria-label="${htmlEscape(label)}">${glyph}</span>`
+    : `<a class="cb-arrow" href="${htmlEscape(href)}" aria-label="${htmlEscape(label)}" title="${htmlEscape(label)}">${glyph}</a>`;
+  return `<div class="cb-nav-wrap"><span class="cb-nav">` +
+    arrow(prevOff, `/charts/${weekDateString(prev)}`, "‹", "Previous week") +
+    `<span class="cb-pick">Week of ${htmlEscape(weekLabel(ws))}</span>` +
+    arrow(nextOff, `/charts/${weekDateString(next)}`, "›", "Next week") +
+    `</span></div>`;
+}
+
+/* The og:description. It carries the qualifier in full because it is the
+   string that travels without the page around it. */
+function leadSentence(ws) {
+  return `The top shows, episodes, artists, albums and songs for the week of ${weekLabel(ws)}, ` +
+    `ranked by Nostr boosts; every figure counts only the boosts published to Nostr and indexed by OnlyBoosts.`;
+}
+
+export function renderPage({ ws, live, first, isCurrent, weekly, ones }) {
+  const key = weekDateString(ws);
+  const pageUrl = `${SITE_ORIGIN}/charts/${key}`;
+  const sections = KINDS.map((kind, i) =>
+    sectionHtml(kind, { weekly: weekly[i], ones: ones[i], ws, isCurrent })).join("\n");
+  const body = `
+<div class="charts-page" data-charts-week="${htmlEscape(key)}"${isCurrent ? ' data-charts-live="1"' : ""}>
+  ${arrowsHtml({ ws, live, first })}
+${sections}
+  <p class="cb-formula">${htmlEscape(COPY.formula)} <a href="/about#charts">About the OnlyBoosts Charts</a></p>
+</div>`;
+  const ogTitle = `OnlyBoosts Charts: Week of ${weekLabel(ws)}`;
+  return shell({
+    title: `${ogTitle} — OnlyBoosts`,
+    eyebrow: COPY.eyebrow,
+    h1: `Week of ${weekLabel(ws)}`,
+    lead: COPY.intro,
+    body,
+    canonical: pageUrl,
+    og: { title: ogTitle, description: leadSentence(ws), image: `${SITE_ORIGIN}/assets/onlyboosts_banner.png`, url: pageUrl },
+  });
+}
+
+// ── the shell ────────────────────────────────────────────────────────────────
+
+/* The plain content-page chrome (page.css), the same shape /about, /stats and
+   /hpw wear. The boards sit in a widened column (.cb-inner, 60rem — the site's
+   own --feed-track measure) so a pair fits side by side. */
+function shell({ title, eyebrow, h1, lead, body, canonical = null, og = null, noindex = false }) {
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <!-- Pragmatic baseline CSP, carried over from localbitcoiners. Every
-       page shares the same policy intentionally so future tightening
-       happens in lockstep. -->
+  <!-- Shared CSP. Every page carries the same policy so tightening happens in
+       lockstep; see CLAUDE.md. -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
     script-src 'self' 'unsafe-inline' 'unsafe-eval';
@@ -20,20 +197,12 @@
     object-src 'none';
   " />
 
-  <title>Page Not Found — OnlyBoosts</title>
-  <meta name="description" content="That address does not match anything on OnlyBoosts." />
+  <title>${htmlEscape(title)}</title>
+  ${noindex ? `<meta name="robots" content="noindex" />` : ""}
+  ${og ? `<meta name="description" content="${htmlEscape(og.description)}" />` : ""}
+  ${canonical ? `<link rel="canonical" href="${htmlEscape(canonical)}" />` : ""}
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <meta name="robots" content="noindex, follow" />
 
-  <!-- ⚠️ NO CANONICAL AND NO OPEN GRAPH TAGS HERE, unlike every other page.
-       Cloudflare Pages serves this file under WHATEVER URL was missed, so
-       there is no one address it describes. A canonical would tell a crawler
-       that some other URL is the real version of the page it just failed to
-       fetch, and an og:url would put a fixed address on a share card for a
-       page that has none. `follow` is kept so a crawler that lands here still
-       traverses the nav and footer back into the real site map. -->
-
-  <!-- PWA -->
   <link rel="manifest" href="/manifest.webmanifest" />
   <meta name="theme-color" content="#00aff0" />
   <link rel="apple-touch-icon" href="/assets/onlyboosts_pfp.png" />
@@ -41,18 +210,37 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="OnlyBoosts" />
-
-  <!-- Self-hosted fonts. Variable WOFF2s — one file per family per
-       style covers all needed weights. -->
+${og ? `
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="${htmlEscape(og.url)}" />
+  <meta property="og:title" content="${htmlEscape(og.title)}" />
+  <meta property="og:description" content="${htmlEscape(og.description)}" />
+  <meta property="og:site_name" content="OnlyBoosts" />
+  <!-- The image is the flattened site banner (1800x600), the one artwork on
+       this site that IS the large-card shape — the fallback rule from the
+       detail pages. A per-week rendered card can replace it later the way the
+       hpw share cards did. -->
+  <meta property="og:image" content="${htmlEscape(og.image)}" />
+  <meta property="og:image:alt" content="${htmlEscape(og.title)}" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="${htmlEscape(og.title)}" />
+  <meta name="twitter:description" content="${htmlEscape(og.description)}" />
+  <meta name="twitter:image" content="${htmlEscape(og.image)}" />
+` : ""}
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
   <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v175" />
   <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v175" />
-  <!-- Palette + base type. Every page links this; it's where the tokens
-       the shared stylesheets read off :root are defined. -->
+  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v175" />
   <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v175" />
   <link rel="stylesheet" href="/assets/css/page.css?v=ob-v175" />
+  <style>
+    /* No feed is active on this page, so it supplies the brand accent itself,
+       the same call /hpw and .show-main make. */
+    .charts-page { --accent: var(--brand); --accent-d: var(--brand-d); --accent-dd: var(--brand-dd); --tint: rgba(0, 175, 240, 0.1); }
+    .page-main .cb-inner { max-width: 60rem; margin: 0 auto; }
+  </style>
 </head>
 <body>
 
@@ -175,35 +363,15 @@
 </header>
 <!-- NAV:END -->
 
-<!-- Same shape as the two Function-rendered 404s (`functions/show/[guid].js`
-     and `functions/episode/[guid].js`): the eyebrow carries the status, the
-     h1 names what was not found, and a .soon-card explains and points out.
-     Those two are minimal by necessity, since they are built inline in a
-     template literal; this one is a real page in the tree, so it gets the
-     shared nav and footer, which between them are the whole site map and are
-     the actual answer for a reader who is lost. -->
-<header class="page-header">
-  <span class="page-eyebrow">404</span>
-  <h1>Page Not Found</h1>
-  <p>That address does not match anything on this site.</p>
-</header>
+<section class="page-header">
+  <p class="page-eyebrow">${htmlEscape(eyebrow)}</p>
+  <h1>${htmlEscape(h1)}</h1>
+  <p>${htmlEscape(lead)}</p>
+</section>
 
 <main class="page-main">
-  <div class="page-inner">
-    <section class="soon-card">
-      <div class="soon-mark" aria-hidden="true">🧭</div>
-      <h2>Where to Go Instead</h2>
-      <p>The link may have been mistyped, or it may point at something that has since moved. The Explore menu above and the footer below both carry the full site map; the feeds are the fastest way back in.</p>
-      <p>If you followed this link from somewhere on OnlyBoosts itself, that is a bug worth reporting. Use <strong>Report a bug</strong> in the Explore menu and it will reach us.</p>
-      <div class="soon-links">
-        <a href="/#episodes-global"><span aria-hidden="true">🎙</span> Episodes</a>
-        <a href="/#shows"><span aria-hidden="true">📻</span> Shows</a>
-        <a href="/#songs-global"><span aria-hidden="true">🎵</span> Songs</a>
-        <a href="/#albums"><span aria-hidden="true">💿</span> Albums</a>
-        <a href="/#members"><span aria-hidden="true">⚡</span> Boosts</a>
-        <a href="/about"><span aria-hidden="true">ℹ️</span> About</a>
-      </div>
-    </section>
+  <div class="cb-inner">
+${body}
   </div>
 </main>
 
@@ -265,18 +433,9 @@
 </footer>
 <!-- FOOTER:END -->
 
-<!-- ───────────────── NOSTR LOGIN WIDGET (lazy) ─────────────────
-     Wires the nav's Donate button + identity slot to the ~1MB bundle,
-     which stays unloaded until a session restore or a click needs it.
-     Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v175"></script>
-
-<!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v175" defer></script>
-
-<!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v175" defer></script>
-
 <script src="/assets/js/nav.js?v=ob-v175" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v175"></script>
+<script src="/assets/js/sw-register.js?v=ob-v175" defer></script>
 </body>
-</html>
+</html>`;
+}

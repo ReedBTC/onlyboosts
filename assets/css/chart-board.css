@@ -1,0 +1,138 @@
+/* The OnlyBoosts Charts boards (/charts/<week>): five weekly Top 10s, each
+   beside its Weeks at #1 companion. Markup comes from
+   functions/_shared/chart-board.js, rendered at the edge only.
+
+   ⚠️ THE .cb-* GRAMMAR RESTATES .hpw-* (assets/css/hpw-board.css), IT DOES NOT
+   IMPORT IT — the same seam as .mb-shell restating .bs-shell. The boards must
+   look like the 40 HPW boards (Reed's spec) without the members' stylesheet
+   growing content-row rules: shell fill, radius, hairlines, the centred
+   Playfair title with its left-aligned caption, and the stepper are copied
+   values and MUST STAY IN STEP with hpw-board.css by hand.
+
+   Reads --cream, --cream-d, --white, --border, --ink, --muted, --brand,
+   --accent-d, --accent-dd and --tint; the page supplies the accent family
+   (brand) the way /hpw does. */
+
+/* ── the week stepper ── the /hpw page's segmented header, page-level here
+   because five boards share one week. Static label: the arrows are the whole
+   control, and this page ships no client module to open a menu. */
+.cb-nav-wrap { text-align: center; margin: 0 0 1.6rem; }
+.cb-nav {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 0; max-width: 100%;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+.cb-arrow {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 2rem; height: 2rem; flex: none;
+  font-family: 'Source Serif 4', Georgia, serif;
+  font-size: 1.15rem; line-height: 1;
+  color: var(--accent-d); background: none;
+  border: 0; border-radius: 999px;
+  padding: 0; text-decoration: none;
+  transition: background 0.12s, color 0.12s;
+}
+a.cb-arrow:hover { color: var(--accent-dd); background: var(--tint); }
+.cb-arrow:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.cb-arrow[aria-disabled="true"] { opacity: 0.28; cursor: default; pointer-events: none; }
+.cb-pick {
+  display: inline-flex; align-items: center; max-width: 100%;
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 1.02rem; font-weight: 700; color: var(--ink);
+  padding: 0.3rem 0.75rem; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+  border-left: 1px solid var(--border); border-right: 1px solid var(--border);
+}
+
+/* ── the sections ── one h2 per category, then the pair. */
+.cb-section { margin: 0 0 1.8rem; }
+.cb-section-h {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 1.35rem; font-weight: 700; color: var(--ink);
+  margin: 0 0 0.7rem; text-align: center;
+}
+/* Two boards side by side where there is room, stacked where there is not.
+   The weekly Top 10 is first in the source and so is first on a phone — it is
+   the board with a live race in it, the hpw ordering. */
+.cb-pairs { display: grid; gap: 1.1rem; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); }
+
+/* ── the board shell ── same fill, hairline and radius as .hpw-board. */
+.cb-board {
+  background: var(--cream);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.9rem 1rem 1rem;
+}
+/* Centred title, left-aligned caption — the hpw title's own split. */
+.cb-head {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 1.02rem; font-weight: 700; color: var(--ink); margin: 0 0 0.6rem;
+  text-align: center;
+}
+.cb-head small {
+  display: block; margin-top: 0.15rem; text-align: left;
+  font-family: 'Source Serif 4', Georgia, serif;
+  font-size: 0.72rem; font-weight: 400; color: var(--muted);
+}
+
+/* ── the rows ── */
+.cb-list { list-style: none; margin: 0; padding: 0; }
+.cb-empty { font-size: 0.82rem; color: var(--muted); margin: 0; }
+.cb-row {
+  display: flex; align-items: center; gap: 0.55rem;
+  padding: 0.32rem 0.4rem;
+  border-top: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+  border-radius: 6px;
+}
+.cb-row:first-child { border-top: 0; }
+/* Wide enough for a T10; the hpw column plus the T. */
+.cb-pos { width: 1.7rem; text-align: right; font-size: 0.78rem; color: var(--muted); flex: none; }
+/* Square with a soft corner, not the members' circle: this art is show and
+   episode covers, square by specification. */
+.cb-art {
+  width: 26px; height: 26px; border-radius: 6px; flex: none;
+  object-fit: cover; background: var(--cream-d);
+}
+.cb-art--none {
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.8rem;
+}
+.cb-who { min-width: 0; flex: 1; display: flex; flex-direction: column; line-height: 1.2; }
+.cb-name {
+  font-weight: 700; font-size: 0.86rem; color: var(--ink); text-decoration: none;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+a.cb-name:hover { color: var(--accent-d); text-decoration: underline; }
+.cb-sub {
+  font-size: 0.68rem; color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* On Weeks at #1 the sub-line is a link to that week's own page — the
+   high-scores board's discovery idiom, dressed the same way. */
+a.cb-week-jump {
+  align-self: flex-start; max-width: 100%;
+  text-decoration: underline; text-decoration-style: dotted;
+  text-decoration-color: var(--border); text-underline-offset: 2px;
+}
+a.cb-week-jump:hover { color: var(--accent-d); text-decoration-color: currentColor; }
+a.cb-week-jump:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 3px; }
+.cb-fig { font-weight: 700; font-size: 0.92rem; color: var(--accent-d); flex: none; }
+.cb-unit { font-weight: 400; font-size: 0.72rem; color: var(--muted); }
+.cb-extra { font-size: 0.7rem; color: var(--muted); width: 4.4rem; text-align: right; flex: none; }
+
+/* ── the footnote ── the formula, stated once under the boards. */
+.cb-formula {
+  margin: 0.4rem 0 0; font-size: 0.8rem; color: var(--muted); text-align: center;
+}
+.cb-formula a { color: var(--brand-dd); }
+:root[data-theme="dark"] .cb-formula a { color: var(--brand-d); }
+
+@media (max-width: 640px) {
+  /* Thumb targets, the hpw phone rule; the label between them does not grow. */
+  .cb-arrow { width: 2.5rem; height: 2.5rem; font-size: 1.3rem; }
+  /* The boosters column is the first thing to give on a 320px row. */
+  .cb-extra { display: none; }
+}

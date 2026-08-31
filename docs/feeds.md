@@ -279,6 +279,48 @@ tiebreak chain is reordered, and it was confirmed red on four mutations (the
 tuple tiebreak removed, the chain flipped in members.js and in feed-rank.js,
 and `peers` counted post-filter).
 
+#### The Charts Page
+
+`/charts/<YYYY-MM-DD>`, edge-rendered by `functions/charts/[[path]].js` on the
+`/hpw` URL contract: `/charts` 302s to the live week, a mid-week or future date
+302s to its canonical Monday, garbage and pre-index weeks 404, HEAD is
+answered. One page carries five weekly Top 10s — Shows, Episodes, Artists,
+Albums, Songs, the feed partition exactly — each beside a **Weeks at #1**
+companion, the high-scores idiom one URL scheme over.
+
+- **The week is the 40 HPW week**, Monday 00:00 US Pacific.
+  `assets/js/pacific-week.js` cuts it in JS and `pacificOffsetSql` (exported
+  from the hours endpoint for this) cuts it in SQL; nothing restates the DST
+  rule.
+- **The ranking is `sort=chart` and nothing else.**
+  `functions/_shared/week-charts.js` applies the endpoints' exact ladder —
+  component ranks, tuple tiebreak inside the `RANK()` window — to a bounded
+  calendar-week window, the one corpus shape the feed endpoints do not serve.
+  `weeksAtNumberOne` is the same ladder `PARTITION BY wk`, counting the rank-1
+  holder of every completed week.
+- **⚠️ WEEKS AT #1 COUNTS COMPLETED WEEKS ONLY.** The live week's #1 can still
+  change, so crediting it would hand out a week that might be taken back by
+  Sunday; the weekly board beside it is where the live race shows. A week
+  whose #1 is a tie credits every holder — the standing genuinely is shared.
+- **The boards restate the 40 HPW grammar** (`.cb-*` in
+  `assets/css/chart-board.css`, kept in step with `hpw-board.css` by hand, the
+  `.mb-shell` seam), with square art in place of the round face and the
+  server's own rank and tie flag printed through `rankLabel` — a tuple
+  standing the renderer never renumbers.
+- **The renderer is server-only** (`functions/_shared/chart-board.js`): no tab
+  paints these boards, so there is no browser importer, but it keeps the
+  two-sided discipline (no `Date.now()`, pinned locales) so gaining a client
+  surface later is a move rather than a rewrite. The page ships no client
+  module; the arrows are links.
+- **Not yet linked from the nav or the sitemap.** The Explore menu's Stats
+  group is the natural home and regrouping the site map is Reed's call;
+  `/hpw` set the precedent for staying out of the sitemap.
+
+`scripts/test-weekly-charts.mjs` owns the correctness, brute-forced from an
+independent implementation over one fixture boost list, and was confirmed red
+on four isolated mutations (the chain flipped, the live week counted, the
+medium filter dropped, the per-week partition removed).
+
 ### The Language Filter
 
 `assets/js/feed-lang.js`, mounted as a third control on **all four ranked feeds**
