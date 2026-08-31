@@ -6,23 +6,32 @@
  * both of which are re-orders of nodes already in the DOM, never fetches,
  * because every row ships its figures packed in one attribute.
  *
- * No boost paths, no profile hydration, no boost list: this page has none of
- * the three, which is why it is the smallest of the four page modules.
+ * No boost BUTTON — the page-wide decision — but the wall and #boosts are
+ * here, so the page carries the shared boost-section machinery, the note
+ * verbs, and the Primal backfill like its three siblings.
  */
-import { sortControl } from '/assets/js/feed-controls.js?v=ob-v164'
+import { sortControl } from '/assets/js/feed-controls.js?v=ob-v165'
 import {
-  initShare, initBackLink, initHashRouting, initHashSpy, initArt2,
-} from '/assets/js/detail-page.js?v=ob-v164'
-import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v164'
+  initCopyNpub, initShowMore, initShare, initBackLink,
+  initHashRouting, initHashSpy, initArt2, hydrateProfiles,
+} from '/assets/js/detail-page.js?v=ob-v165'
+import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v165'
+import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v165'
+import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v165'
+
+const GUID = document.body.dataset.artistGuid || ''
 
 // ── Shared detail-page chrome ─────────────────────────
 // Identical on the other three pages; see detail-page.js. No HASH_ALIASES:
 // nothing here has ever been renamed.
+initCopyNpub()
+initShowMore()
 initShare()
 initBackLink()
 initHashRouting()
 initHashSpy()
 initShowDesc()
+initBoostNoteActions()
 
 // The hero, the album rows and the community rows all carry another feed's
 // artwork, so all three ride the art2 chain.
@@ -126,3 +135,27 @@ function initCommunityArtists() {
   slot.hidden = false
 }
 initCommunityArtists()
+
+// ── The #boosts section's range and sort ──────────────────────────────
+// The shared machinery all four pages use; the corpus is fetched on the first
+// control press, never on load. See boost-section.js.
+initBoostSection({
+  fetchCorpus: async () => {
+    if (!GUID) throw new Error('corpus: no artist guid')
+    const resp = await fetch(`/api/v1/publishers/${encodeURIComponent(GUID)}?corpus=1`, {
+      headers: { Accept: 'application/json' },
+    })
+    if (!resp.ok) throw new Error(`corpus: HTTP ${resp.status}`)
+    return (await resp.json())?.corpus || {}
+  },
+  sortTitle: 'Sort the boosts sent to this artist’s albums',
+  emptyText: 'Nobody boosted this artist in this time range — try a wider one.',
+  truncatedNote:
+    'Sorted over the 2,000 most recent boosts to this artist’s albums. They have received more than that, so an older boost may be missing.',
+})
+
+/* The shared Primal backfill, over the whole document — this page has no
+ * private patch path (the bio is the artist's own plain text, no mention
+ * chips), so the unscoped call is safe here exactly as it is on /show. It
+ * fills the wall's and the boost rows' data-missing markers. */
+hydrateProfiles()

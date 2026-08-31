@@ -1604,10 +1604,12 @@ the publisher tier's landing page, structured as the album page one level up
 (Reed's spec): hero, Nostr Boost Stats tiles with the rank chip (`feedRanks`
 gained a `publisher` kind ranking on the Artists feed), **#albums** ("Albums
 with Nostr Boosts", the indexed declaring shows by sats, the episode-drawer
-chrome), and **#community-artists** ("Other Artists This Community Boosts",
+chrome), **#community-artists** ("Other Artists This Community Boosts",
 the /show community rollup one tier up — NOT medium-split, because every row
-is a publisher and there is no partition to cross). No boost list, no wall,
-no boost button (PI cannot resolve most publisher feeds), index-only
+is a publisher and there is no partition to cross), the **#community** wall,
+and **#boosts** (opens on 24, whole corpus behind
+`/api/v1/publishers/<guid>?corpus=1`, the shared boost-section machinery). No
+boost button (PI cannot resolve most publisher feeds); index-only
 throughout. Section ids `#albums` and `#community-artists` are frozen. It is
 in `EDGE_PAGES`, the sitemap, and `show-link.js#publisherPageHref` is the one
 place that decides an artist title links — the feed card reads it too.

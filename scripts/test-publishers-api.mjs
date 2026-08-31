@@ -24,7 +24,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { onRequestGet, onRequestHead } from '../functions/api/v1/publishers.js'
 import {
-  onRequestGet as detailGet, onRequestHead as detailHead,
+  onRequestGet as detailGet, onRequestHead as detailHead, fetchPublisherCorpus,
 } from '../functions/api/v1/publishers/[guid].js'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -337,6 +337,41 @@ console.log('\nThe /artist page’s own SQL, extracted from the shipped Function
 
   check('the page answers HEAD', () =>
     assert.ok(src.includes('export async function onRequestHead')))
+
+  // The wall's SQL, extracted and executed: boosters by sats to the artist's
+  // albums. Booster '1' spans both of Haleen's albums (1,100 sats) and leads.
+  const wallSql = grabSql('SELECT b.booster_pubkey, b.booster_npub,')
+  const wall = db.prepare(wallSql).all(G.haleen, 500)
+  check('the wall ranks the artist’s boosters by sats', () => {
+    assert.deepEqual(wall.map((w) => w.booster_pubkey[0]), ['1', '2', '3'])
+    assert.equal(wall[0].sats, 1100)
+  })
+}
+
+console.log('\nThe #boosts corpus (?corpus=1):')
+{
+  const { boosts, truncated, count, names } = await fetchPublisherCorpus(env, G.haleen)
+  check('every boost to the artist’s albums, newest-first, record shape', () => {
+    assert.equal(count, 4)
+    assert.equal(truncated, false)
+    assert.ok(boosts.every((b) => b.id && b.ts && b.booster?.pk))
+    assert.ok(boosts.every((b, i) => i === 0 || boosts[i - 1].ts >= b.ts))
+  })
+  check('a cross-boost to another artist is not in this corpus', () => {
+    assert.ok(boosts.every((b) => ['al-a1', 'al-a2'].includes(b.podcast.guid)))
+  })
+  check('names is a plain object (the wire shape)', () =>
+    assert.equal(typeof names, 'object'))
+  const { status, body } = await (async () => {
+    const req = new Request(`https://ob.invalid/api/v1/publishers/${G.haleen}?corpus=1`)
+    const res = await detailGet({ request: req, env, params: { guid: G.haleen } })
+    return { status: res.status, body: await res.json() }
+  })()
+  check('and ?corpus=1 answers it over HTTP, corpus only', () => {
+    assert.equal(status, 200)
+    assert.equal(body.corpus.count, 4)
+    assert.ok(!('albums' in body))
+  })
 }
 
 console.log(`\n${passed} passed${failed ? `, ${failed} FAILED` : ''}.`)

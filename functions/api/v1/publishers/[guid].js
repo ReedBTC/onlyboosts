@@ -16,7 +16,13 @@
 // /api/v1/podcasts/<guid>?since: the card above the drawer shows the range's
 // numbers, and a drawer of all-time ones would contradict the card it opened
 // from.
-import { json, preflight } from "../_common.js";
+import { json, preflight, BOOST_SELECT, boostRecord } from "../_common.js";
+// Dependency-free on both sides, which is what keeps this module importable by
+// node for scripts/test-publishers-api.mjs — _shared/detail-page.js re-exports
+// through modules whose stamped sibling imports node cannot resolve, so the
+// mention-name lookup below is a local copy instead (the booster page's
+// toHexPubkey arrangement; the three-copies rule applies).
+import { mentionedPubkeys } from "../../../../assets/js/nostr-text.js";
 
 export async function onRequestOptions({ request }) { return preflight(request); }
 
@@ -29,6 +35,12 @@ export async function onRequestGet({ request, env, params }) {
      FROM publishers WHERE publisher_guid = ?`
   ).bind(guid).first();
   if (!pub) return json(request, { error: "publisher not found" }, { status: 404 });
+
+  // ?corpus=1 answers /artist's #boosts section and nothing else — no album
+  // list. Same door, same reason, as /api/v1/podcasts/<guid>?corpus=1.
+  if (u.searchParams.get("corpus") === "1") {
+    return json(request, { corpus: await fetchPublisherCorpus(env, guid) });
+  }
 
   const since = parseInt(u.searchParams.get("since"), 10);
   const windowed = Number.isFinite(since) && since > 0;
@@ -76,4 +88,43 @@ export async function onRequestGet({ request, env, params }) {
 export async function onRequestHead(ctx) {
   const r = await onRequestGet(ctx);
   return new Response(null, { status: r.status, headers: r.headers });
+}
+
+/* Every boost sent to this artist's albums, bounded and newest-first — the
+ * publisher-tier twin of fetchShowCorpus, serving /artist's #boosts section
+ * through ?corpus=1 and exported so the page Function could one day run it in
+ * its own Promise.all. One row over the cap detects truncation; `names` rides
+ * along for the same one-component-two-renders reason fetchShowCorpus
+ * documents. Same cap, same reasoning: 2,000 against a heaviest artist well
+ * under it. */
+const CORPUS_CAP = 2000;
+
+async function lookupNames(env, messages) {
+  const names = {};
+  const mentioned = mentionedPubkeys(messages).slice(0, 90);
+  if (!mentioned.length) return names;
+  const { results } = await env.DB.prepare(
+    `SELECT pubkey, name, display_name FROM profiles
+     WHERE pubkey IN (${mentioned.map(() => "?").join(",")})`
+  ).bind(...mentioned).all();
+  for (const p of results || []) {
+    const n = p.display_name || p.name;
+    if (n) names[p.pubkey] = n;
+  }
+  return names;
+}
+
+export async function fetchPublisherCorpus(env, guid) {
+  const { results } = await env.DB.prepare(
+    `${BOOST_SELECT}
+     JOIN podcasts pub_pc ON pub_pc.podcast_guid = b.podcast_guid
+     WHERE pub_pc.publisher_guid = ?
+     ORDER BY b.created_at DESC, b.event_id DESC LIMIT ?`
+  ).bind(guid, CORPUS_CAP + 1).all();
+
+  const rows = results || [];
+  const truncated = rows.length > CORPUS_CAP;
+  const kept = truncated ? rows.slice(0, CORPUS_CAP) : rows;
+  const names = await lookupNames(env, kept.map((r) => r.message));
+  return { boosts: kept.map(boostRecord), truncated, count: kept.length, names };
 }

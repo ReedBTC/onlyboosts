@@ -744,11 +744,22 @@ Community Boosts**. Decisions, each deliberate:
 - **Index-only throughout**, the site rule: the albums section is
   `podcasts WHERE publisher_guid` by sats — never `publisher_albums`, the
   artist's own catalogue file, which stays collected and unrendered.
-- **No boost list, no community wall, no boost button.** The albums are the
-  navigation; each album page carries all three. The button specifically:
-  `/api/value` resolves through Podcast Index, which cannot see most publisher
-  feeds (measured on Wavlake artist guids), and a button that fails for most
-  artists is worse than none.
+- **The wall and #boosts joined the same day** (Reed's follow-up to his own
+  spec): the Nostr Community wall is `fetchSupporters` one tier up (boosters
+  by sats to the artist's albums, `SUPPORTER_CAP`, total order), and #boosts
+  opens on the newest 24 with the shared boost-section range/sort over
+  `/api/v1/publishers/<guid>?corpus=1` — `fetchPublisherCorpus`, the
+  fetchShowCorpus twin. Its rows print both the episode and the show
+  (`showTarget` and `showShow` both true), each being new information here.
+- **No boost button.** `/api/value` resolves through Podcast Index, which
+  cannot see most publisher feeds (measured on Wavlake artist guids), and a
+  button that fails for most artists is worse than none. Every album row leads
+  to a page that carries one.
+- **⚠️ `?corpus=1`'s endpoint module stays node-importable** for
+  `test-publishers-api.mjs`, which is why `publishers/[guid].js` carries a
+  LOCAL mention-name lookup (the booster page's `toHexPubkey` arrangement)
+  instead of importing `_shared/detail-page.js`, whose re-export chain node
+  cannot resolve.
 - **The community rollup is not medium-split** — and unlike `/show`'s history
   this is not a reversal waiting to happen: every row is a publisher, one pool,
   no partition to cross.
@@ -756,8 +767,9 @@ Community Boosts**. Decisions, each deliberate:
   in `functions/_shared/feed-rank.js`, the booster branch's shape with the
   listing endpoint's aggregate restated (title-less row excluded), top-100
   cutoff and all.
-- **Section ids `#albums` and `#community-artists` are frozen**, like every
-  other page's. `#community-artists` follows the `#community-shows` /
+- **Section ids `#albums`, `#community-artists`, `#community` and `#boosts`
+  are frozen**, like every other page's — the last two reused deliberately,
+  naming the same kind of section they name everywhere else. `#community-artists` follows the `#community-shows` /
   `#community-episodes` naming; `#albums` is this page's own.
 - **404s**: an unknown guid, the one title-less publisher row, and a publisher
   with no boosts all answer a real 404, `noindex`, pointing at `/#artists`.

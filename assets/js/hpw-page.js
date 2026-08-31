@@ -1,6 +1,6 @@
 /* /hpw/<week>: the verbs. The board is in the document (functions/hpw/
  * [[path]].js rendered it); this attaches the share control to it. */
-import { mountShare } from '/assets/js/hpw-share.js?v=ob-v164'
+import { mountShare } from '/assets/js/hpw-share.js?v=ob-v165'
 
 const page = document.querySelector('[data-hpw-page]')
 const board = page?.querySelector('.hpw-board')

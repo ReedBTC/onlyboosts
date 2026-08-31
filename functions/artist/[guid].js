@@ -12,10 +12,10 @@
 //   /booster/<npub>   one person, and everything they have boosted
 //   /artist/<guid>    one ARTIST, and the albums / audience under them
 //
-// TWO SECTIONS AND NO BOOST LIST — Reed's spec, 2026-08-30: the stat tiles,
-// then "Albums with Nostr Boosts", then "Other Artists This Community Boosts".
-// The albums ARE the navigation to everything deeper; each album page carries
-// its own boost list, wall and boost button.
+// FOUR SECTIONS, the show page's set one tier up (Reed's spec plus his
+// follow-up the same day): "Albums with Nostr Boosts", "Other Artists This
+// Community Boosts", the Nostr Community wall, and #boosts — every boost to
+// the artist's albums, with the shared range/sort machinery.
 //
 // ⚠️ INDEX-ONLY, like the Artists feed's drawer (Reed's call, 2026-08-30): the
 // album list is `podcasts WHERE publisher_guid` — the shows whose boosts are
@@ -33,6 +33,7 @@
 // Do not hand-edit it here.
 import {
   htmlEscape, isSafeUrl, truncate, num, compact, relTime, jsonForScript,
+  renderSupporters, renderBoosts, lookupMentionNames,
 } from "../_shared/detail-page.js";
 import { feedRanks, renderStatTiles } from "../_shared/feed-rank.js";
 
@@ -62,13 +63,21 @@ const ALBUMS_CAP = 400;
 // this is generous already.
 const COMMUNITY_LIMIT = 40;
 
+// The wall's guard against a pathological artist, not a page size — the same
+// number and reasoning as SUPPORTER_CAP on /api/v1/podcasts/<guid>.
+const SUPPORTER_CAP = 500;
+
+// The boost list at the foot opens on the newest 24, the number every other
+// detail page opens on; boost-section.js pages the rest through ?corpus=1.
+const BOOSTS_SHOWN = 24;
+
 export async function onRequestGet({ env, params }) {
   let guid = params.guid;
   if (Array.isArray(guid)) guid = guid[0];
   try { guid = decodeURIComponent(guid); } catch { /* keep the raw form */ }
   if (!guid || guid.length > GUID_MAX) return notFound(guid);
 
-  const [pub, albums, totals, community] = await Promise.all([
+  const [pub, albums, totals, community, supporters, boosts] = await Promise.all([
     env.DB.prepare(
       `SELECT publisher_guid, feed_url, title, image, artwork, description, show_count
        FROM publishers WHERE publisher_guid = ?`
@@ -135,6 +144,41 @@ export async function onRequestGet({ env, params }) {
       console.warn("[artist] community rollup failed", err);
       return { results: [] };
     }),
+
+    // The Nostr Community wall: boosters ranked by sats sent to this artist's
+    // albums, all time — fetchSupporters on /api/v1/podcasts/<guid>, one tier
+    // up, with the same total order so an edge-cached render cannot swap ties.
+    env.DB.prepare(
+      `SELECT b.booster_pubkey, b.booster_npub,
+              SUM(COALESCE(b.sats, 0)) AS sats,
+              COUNT(*)                 AS boosts,
+              MAX(b.created_at)        AS latest,
+              pr.name, pr.display_name, pr.picture
+       FROM boosts b
+       JOIN podcasts pc ON pc.podcast_guid = b.podcast_guid
+       LEFT JOIN profiles pr ON pr.pubkey = b.booster_pubkey
+       WHERE pc.publisher_guid = ?
+       GROUP BY b.booster_pubkey
+       ORDER BY sats DESC, boosts DESC, b.booster_pubkey
+       LIMIT ?`
+    ).bind(guid, SUPPORTER_CAP).all(),
+
+    // The newest 24 boosts to any of the artist's albums. The show is SELECTed
+    // (p_title) because each row's album is new information here, the same
+    // reasoning as /booster's list; the whole corpus is behind ?corpus=1.
+    env.DB.prepare(
+      `SELECT b.event_id, b.booster_pubkey, b.booster_npub, b.created_at, b.sats,
+              b.item_guid, b.podcast_guid, b.message, b.client_id,
+              e.title AS e_title, e.episode_number AS e_num,
+              p.title AS p_title,
+              pr.name AS pr_name, pr.display_name AS pr_dname, pr.picture AS pr_pic
+       FROM boosts b
+       JOIN podcasts p ON p.podcast_guid = b.podcast_guid
+       LEFT JOIN episodes e ON e.item_guid = b.item_guid
+       LEFT JOIN profiles pr ON pr.pubkey = b.booster_pubkey
+       WHERE p.publisher_guid = ?
+       ORDER BY b.created_at DESC, b.event_id DESC LIMIT ?`
+    ).bind(guid, BOOSTS_SHOWN).all(),
   ]);
 
   // The qualifying rule: a publisher row WITH a title. The one bare row (a
@@ -145,20 +189,36 @@ export async function onRequestGet({ env, params }) {
   if (!pub || !pub.title) return notFound(guid);
   if (!totals || !Number(totals.boosts)) return notFound(guid);
 
-  // The second batch, needing the first's totals — the booster page's shape.
-  // Never throws; null renders tiles with no rank line.
-  const ranks = await feedRanks(env.DB, "publisher", {
-    guid,
-    sats: totals.sats,
-    boosts: totals.boosts,
-    boosters: totals.boosters,
-  });
+  const boostRows = boosts.results || [];
+  // The second batch, needing the first's results — the booster page's shape.
+  // feedRanks never throws; null renders tiles with no rank line.
+  const [names, ranks] = await Promise.all([
+    lookupMentionNames(env, boostRows.map((r) => r.message)),
+    feedRanks(env.DB, "publisher", {
+      guid,
+      sats: totals.sats,
+      boosts: totals.boosts,
+      boosters: totals.boosters,
+    }),
+  ]);
 
   const html = renderArtistPage({
     pub,
     albums: albums.results || [],
     totals,
     community: community.results || [],
+    supporters: (supporters.results || []).map((r, i) => ({
+      rank: i + 1,
+      pk: r.booster_pubkey,
+      npub: r.booster_npub,
+      name: r.display_name || r.name || null,
+      pic: r.picture || null,
+      sats: r.sats || 0,
+      boosts: r.boosts || 0,
+      latest: r.latest || null,
+    })),
+    boosts: boostRows,
+    names,
     ranks,
   });
 
@@ -180,7 +240,7 @@ export async function onRequestHead(ctx) {
 
 // ── the page ─────────────────────────────────────────────────────────────────
 
-function renderArtistPage({ pub, albums, totals, community, ranks }) {
+function renderArtistPage({ pub, albums, totals, community, supporters, boosts, names, ranks }) {
   const title = pub.title;
   const pageUrl = `${SITE_ORIGIN}/artist/${encodeURIComponent(pub.publisher_guid)}`;
   const art = isSafeUrl(pub.image) ? pub.image : null;
@@ -270,11 +330,16 @@ function renderArtistPage({ pub, albums, totals, community, ranks }) {
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v164" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v164" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v164" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v164" />
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v164" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v165" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v165" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v165" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v165" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v165" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v165" />
+  <!-- The boost note card and its reaction bar, for #boosts — the same
+       .note-card every other detail page's list paints. -->
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v165" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v165" />
 </head>
 <body data-artist-guid="${htmlEscape(pub.publisher_guid)}">
 
@@ -409,6 +474,24 @@ function renderArtistPage({ pub, albums, totals, community, ranks }) {
 
   ${renderCommunityArtists(community)}
 
+  ${renderSupporters(supporters, {
+    sub: `Everyone who has boosted ${htmlEscape(title)}’s albums on Nostr, ranked by sats sent, all time.`,
+    empty: `No boosters recorded for this artist yet.`,
+  })}
+
+  ${renderBoosts(boosts, names, {
+    heading: "Boosts",
+    sub: `Every boost sent to ${htmlEscape(title)}’s albums, as published to Nostr.`,
+    noun: "album",
+    // TRUE twice: every row here targets a different track and a different
+    // album, so both halves are the row's content rather than a repeat of the
+    // <h1> — the /booster arrangement, minus its linkBooster exception.
+    showTarget: true,
+    showShow: true,
+    total: totals.boosts,
+    state: { page: BOOSTS_SHOWN },
+  })}
+
 </main>
 
 <!-- FOOTER:START (generated by scripts/sync-partials.js — edit the partial) -->
@@ -469,12 +552,12 @@ function renderArtistPage({ pub, albums, totals, community, ranks }) {
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav.js?v=ob-v164" defer></script>
-<script src="/assets/js/artist-page.js?v=ob-v164" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v165" defer></script>
+<script src="/assets/js/artist-page.js?v=ob-v165" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v164"></script>
-<script src="/assets/js/sw-register.js?v=ob-v164" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v165"></script>
+<script src="/assets/js/sw-register.js?v=ob-v165" defer></script>
 </body>
 </html>`;
 }
@@ -655,10 +738,10 @@ function notFound(guid) {
   <meta name="robots" content="noindex" />
   <title>Artist not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v164" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v164" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v164" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v164" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v165" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v165" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v165" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v165" />
 </head>
 <body>
 <section class="page-header">
@@ -676,7 +759,7 @@ function notFound(guid) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v164" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v165" defer></script>
 </body>
 </html>`;
   return new Response(html, {
