@@ -258,7 +258,10 @@
   right: 0.45rem;
   margin: 0;
   padding: 0.1rem 0.4rem;
-  background: var(--cream-d);
+  /* The Chart Positions strip's all-time cell wears --brand-tint, and these
+     chips are all-time ranks too — one shade, one claim (Reed's ask,
+     2026-08-31; --cream-d until then). */
+  background: var(--brand-tint);
   border-radius: 999px;
   /* Explicitly NOT Playfair. `.show-stat dd` sets the family through its `font:`
      shorthand, so the family has to be restated here or the chip inherits the
