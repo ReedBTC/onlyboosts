@@ -587,6 +587,32 @@ console.log('\nBoth hydration entry points are wired:')
   }
 }
 
+/* ── Every feed key reaches the CSS that dresses and reveals it ────────
+ * ⚠️ TWO INLINE CSS BLOCKS ENUMERATE FEED KEYS BY HAND, and the controller
+ * cannot see either: the accent mapping (body[data-active-feed="…"] supplies
+ * --accent/--tint, and an unmatched key leaves them UNDEFINED, invalidating
+ * every declaration that reads them) and the controls-visibility rule (the
+ * matching [data-controls-for] group is the only one displayed, so an
+ * unmatched key is a feed with no range, no sort and no language control —
+ * they mount and are never shown). The 2026-08-31 key rename shipped exactly
+ * that: shows/albums/artists became shows-global etc. in FEEDS and in the
+ * panels while both CSS blocks kept the bare names, and every test here
+ * stayed green because none of them read the CSS. Reed found it in the
+ * browser. This closes the class: every key the controller declares must
+ * appear in BOTH blocks. */
+console.log('\nEvery FEEDS key has its accent row and its controls rule:')
+{
+  const keys = [...SRC.matchAll(/'([a-z]+-[a-z]+)':\s*\{ type:/g)].map((m) => m[1])
+  eq('the FEEDS keys were extracted at all', keys.length >= 12, true)
+  const escRe = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, (c) => '\\' + c)
+  for (const key of keys) {
+    const sel = escRe(`body[data-active-feed="${key}"]`)
+    eq(`${key}: accent row`, new RegExp(`${sel}\\s*\\{ --accent:`).test(html), true)
+    eq(`${key}: controls rule`,
+       new RegExp(`${sel}\\s+\\.feed-bar-controls > \\[data-controls-for="${key}"\\]`).test(html), true)
+  }
+}
+
 console.log('\n⚠️ The feed bar is MOVED into the Members tab, and moved back:')
 {
   /* The Members tab puts three sections above the boost list, so the scope menu

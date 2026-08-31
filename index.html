@@ -112,13 +112,24 @@
     /* Active-feed → accent mapping. Set on <body data-active-feed>. */
     body[data-active-feed="members-global"]    { --accent: var(--bg-accent); --accent-d: var(--bg-accent-d); --accent-dd: var(--bg-accent-dd); --tint: var(--bg-tint); }
     body[data-active-feed="members-follows"]   { --accent: var(--bf-accent); --accent-d: var(--bf-accent-d); --accent-dd: var(--bf-accent-dd); --tint: var(--bf-tint); }
-    body[data-active-feed="shows"]            { --accent: var(--sh-accent); --accent-d: var(--sh-accent-d); --accent-dd: var(--sh-accent-dd); --tint: var(--sh-tint); }
+    /* ⚠️ The three ex-scopeless feeds renamed to scoped keys on 2026-08-31,
+       and each Follows twin reads its type's own family — one family per
+       TYPE, not per key, since the ramp is retired and every family is an
+       alias of --bg-* anyway. A row here exists for every key in the
+       controller's FEEDS map, and test-feed-hash.mjs now asserts exactly
+       that: this block is where the first cut of the rename silently lost
+       Shows/Albums/Artists their tokens AND their controls (the visibility
+       rule below keys the same way). */
+    body[data-active-feed="shows-global"]     { --accent: var(--sh-accent); --accent-d: var(--sh-accent-d); --accent-dd: var(--sh-accent-dd); --tint: var(--sh-tint); }
+    body[data-active-feed="shows-follows"]    { --accent: var(--sh-accent); --accent-d: var(--sh-accent-d); --accent-dd: var(--sh-accent-dd); --tint: var(--sh-tint); }
     body[data-active-feed="episodes-global"]  { --accent: var(--eg-accent); --accent-d: var(--eg-accent-d); --accent-dd: var(--eg-accent-dd); --tint: var(--eg-tint); }
     body[data-active-feed="episodes-follows"] { --accent: var(--ef-accent); --accent-d: var(--ef-accent-d); --accent-dd: var(--ef-accent-dd); --tint: var(--ef-tint); }
     body[data-active-feed="songs-global"]     { --accent: var(--sng-accent); --accent-d: var(--sng-accent-d); --accent-dd: var(--sng-accent-dd); --tint: var(--sng-tint); }
     body[data-active-feed="songs-follows"]    { --accent: var(--snf-accent); --accent-d: var(--snf-accent-d); --accent-dd: var(--snf-accent-dd); --tint: var(--snf-tint); }
-    body[data-active-feed="albums"]           { --accent: var(--alb-accent); --accent-d: var(--alb-accent-d); --accent-dd: var(--alb-accent-dd); --tint: var(--alb-tint); }
-    body[data-active-feed="artists"]          { --accent: var(--art-accent); --accent-d: var(--art-accent-d); --accent-dd: var(--art-accent-dd); --tint: var(--art-tint); }
+    body[data-active-feed="albums-global"]    { --accent: var(--alb-accent); --accent-d: var(--alb-accent-d); --accent-dd: var(--alb-accent-dd); --tint: var(--alb-tint); }
+    body[data-active-feed="albums-follows"]   { --accent: var(--alb-accent); --accent-d: var(--alb-accent-d); --accent-dd: var(--alb-accent-dd); --tint: var(--alb-tint); }
+    body[data-active-feed="artists-global"]   { --accent: var(--art-accent); --accent-d: var(--art-accent-d); --accent-dd: var(--art-accent-dd); --tint: var(--art-tint); }
+    body[data-active-feed="artists-follows"]  { --accent: var(--art-accent); --accent-d: var(--art-accent-d); --accent-dd: var(--art-accent-dd); --tint: var(--art-tint); }
 
     /* ── Dark mode: the accent family ───────────────────────────────
        theme.css owns the page palette; this block owns the feed accent,
@@ -467,9 +478,12 @@
     body[data-active-feed="songs-follows"]    .feed-bar-controls > [data-controls-for="songs-follows"],
     body[data-active-feed="members-global"]    .feed-bar-controls > [data-controls-for="members-global"],
     body[data-active-feed="members-follows"]   .feed-bar-controls > [data-controls-for="members-follows"],
-    body[data-active-feed="shows"]            .feed-bar-controls > [data-controls-for="shows"],
-    body[data-active-feed="albums"]           .feed-bar-controls > [data-controls-for="albums"],
-    body[data-active-feed="artists"]          .feed-bar-controls > [data-controls-for="artists"] {
+    body[data-active-feed="shows-global"]     .feed-bar-controls > [data-controls-for="shows-global"],
+    body[data-active-feed="shows-follows"]    .feed-bar-controls > [data-controls-for="shows-follows"],
+    body[data-active-feed="albums-global"]    .feed-bar-controls > [data-controls-for="albums-global"],
+    body[data-active-feed="albums-follows"]   .feed-bar-controls > [data-controls-for="albums-follows"],
+    body[data-active-feed="artists-global"]   .feed-bar-controls > [data-controls-for="artists-global"],
+    body[data-active-feed="artists-follows"]  .feed-bar-controls > [data-controls-for="artists-follows"] {
       display: flex;
     }
 
