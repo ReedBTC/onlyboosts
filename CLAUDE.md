@@ -308,8 +308,9 @@ heading**, never this list widened again under a narrower name.
 misreport what they wrote. The **booster page** would file one person under two
 half-histories, so its headings still read "Shows and Albums" and "Episodes and
 Songs" and it carries no `COPY` table at all. `episode-section.js`'s range
-tooltip stays medium-neutral ("aired or released") because it serves the
-booster page's rollup too.
+tooltip reads "Boosted in the last N days" — one reading of `range`
+site-wide since 2026-08-31 — which also serves the booster page's unsplit
+rollup with no medium-neutral dance.
 
 ## Where this code came from
 
@@ -1429,12 +1430,14 @@ Charts*, *The Language Filter*, *The Bar On A Phone*, *The View In The Hash*,
 What a change would break, restated here because each rule reaches outside that
 file:
 
-- **⚠️ `range` MEANS BOOST TIME on `/api/v1/podcasts` AND AIR DATE on
-  `/api/v1/episodes`.** A show is in the 1W view because someone boosted it this
-  week; an episode is in the 1W view because it **aired** this week, however long
-  ago it was boosted. Both are deliberate, the parameter name is shared, and
-  **there must not be a third reading.** `#boosts` and the members wall take the
-  boost-time reading.
+- **⚠️ `range` MEANS BOOST TIME, EVERYWHERE — one reading since 2026-08-31.**
+  *Reed's call*, retiring the air-date reading `/api/v1/episodes` inherited
+  from LB (it served a different purpose there, and here it made the music
+  windows structurally near-empty: 612 of 618 boosted tracks were older than
+  30 days). A row is in the 1W view because someone **boosted** it this week,
+  and a windowed card's figures — and its drawer's notes — are the window's
+  own, recomputed over the window's boosts. Air date survives as the "Latest
+  episode" SORT and as the date on the card; it is never a window again.
 - **`RANGE_DAYS` in `functions/api/v1/episodes.js` and `…/podcasts.js` and
   `RANGE_OPTIONS` move together**, or a range button answers 400.
 - **⚠️ THE HASH CARRIES THE WHOLE VIEW: `#shows?lang=de&range=1m&sort=sats`.**

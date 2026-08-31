@@ -298,15 +298,29 @@ async function call(handler, url, init) {
       assert.equal(body.episodes[i].chart.score, expected[i].score, `${expected[i].id} score`)
     }
   })
-  // range on episodes means AIR DATE: ep-s7 aired 400 days ago and drops out
-  // of 1y even though every window still holds boosts for it.
-  const expected1y = chartOrder(rollup(
-    BOOSTS.filter((b) => epNotMusic(b) && (SHOW_OF.get(b.show).pub || PUB_RECENT) >= NOW - 365 * 86400),
-    (b) => b.ep, (b) => b.pk))
-  const y = await call(episodesGet, '/api/v1/episodes?not_medium=music&sort=chart&range=1y&limit=200')
-  check('⚠️ range=1y filters on air date and re-ranks (ep-s7 drops out)', () => {
-    assert.ok(!y.body.episodes.some((e) => e.guid === 'ep-s7'))
-    assert.deepEqual(y.body.episodes.map((e) => e.guid), expected1y.map((e) => e.id))
+  // ⚠️ range means BOOST TIME since 2026-08-31 — the one reading everywhere.
+  // s7's boosts are OLD, so ep-s7 drops out of 1w however recently it aired,
+  // and every surviving row's FIGURES are the window's own recomputed
+  // aggregates, not the precomputed all-time columns.
+  const cutoff1w = NOW - 7 * 86400
+  const expected1w = chartOrder(rollup(
+    BOOSTS.filter((b) => epNotMusic(b) && b.ts >= cutoff1w), (b) => b.ep, (b) => b.pk))
+  const w = await call(episodesGet, '/api/v1/episodes?not_medium=music&sort=chart&range=1w&limit=200')
+  check('⚠️ range=1w windows on boost time and re-ranks (ep-s7 drops out)', () => {
+    assert.ok(!w.body.episodes.some((e) => e.guid === 'ep-s7'))
+    assert.deepEqual(w.body.episodes.map((e) => e.guid), expected1w.map((e) => e.id))
+    for (let i = 0; i < expected1w.length; i++) {
+      assert.equal(w.body.episodes[i].rank, expected1w[i].rank, `${expected1w[i].id} rank`)
+      assert.equal(w.body.episodes[i].sats, expected1w[i].sats, `${expected1w[i].id}: figures must be the window’s own`)
+      assert.equal(w.body.episodes[i].boosters, expected1w[i].breadth, `${expected1w[i].id} boosters`)
+    }
+  })
+  const wSats = await call(episodesGet, '/api/v1/episodes?not_medium=music&sort=sats&range=1w&limit=200')
+  check('the single-column sorts ride the same windowed aggregate', () => {
+    const exp = rollup(BOOSTS.filter((b) => epNotMusic(b) && b.ts >= cutoff1w), (b) => b.ep, (b) => b.pk)
+      .sort((a, b) => b.sats - a.sats || (a.id < b.id ? -1 : 1))
+    assert.deepEqual(wSats.body.episodes.map((e) => e.guid), exp.map((e) => e.id))
+    assert.equal(wSats.body.episodes[0].sats, exp[0].sats)
   })
   const q = await call(episodesGet, '/api/v1/episodes?not_medium=music&sort=chart&q=TieOne&limit=200')
   check('q= keeps the unfiltered rank and tie flag', () => {

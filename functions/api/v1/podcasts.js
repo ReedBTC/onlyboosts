@@ -8,11 +8,11 @@
 // ranking was computed over whatever shards the walk happened to pull, and the
 // All range downloaded a rollup of every show to paint thirty cards.
 //
-// ⚠️ `range` HERE MEANS BOOST TIME. /api/v1/episodes uses the same parameter
-// name for AIR DATE, and the difference is deliberate on both sides: an episode
-// boosted today is out of the Episodes 1W view because it aired years ago,
-// whereas a show is in the Shows 1W view precisely because someone boosted it
-// this week, and its figures are that week's figures. Do not "unify" these.
+// ⚠️ `range` MEANS BOOST TIME — the ONE reading, everywhere, since 2026-08-31.
+// /api/v1/episodes used the same parameter name for AIR DATE until then (an
+// LB-inherited reading that made the music windows structurally near-empty);
+// Reed retired it, so a row is in the 1W view because someone boosted it this
+// week, and its figures are that week's figures, on every ranked surface.
 //
 // TWO PATHS, and which one answers is decided by the range alone:
 //   • all      — reads the precomputed `podcasts` aggregate columns, one

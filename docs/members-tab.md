@@ -497,8 +497,7 @@ idea makes the site look like two sites. Order matches the feeds — filters, th
 ordering.
 
 **⚠️ `range` MEANS WHEN THE BOOST WAS SENT**, the reading `/api/v1/podcasts` and
-every `#boosts` section give it, never the air-date reading `/api/v1/episodes`
-gives the same word. A member is in the 1W wall because they boosted this week.
+every `#boosts` section give it — since 2026-08-31 the one reading of the word site-wide. A member is in the 1W wall because they boosted this week.
 
 All four ranges, where the Boosts note feed offers three: that feed **walks**
 month archives to cover a window, so a year is ~70 sequential requests before

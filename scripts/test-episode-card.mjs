@@ -13,7 +13,7 @@
  */
 import assert from 'node:assert/strict'
 import {
-  buildEpisodes, episodeCardHtml, COPY, sortEpisodeItems, filterEpisodeItems, RANKED_SORTS,
+  buildEpisodes, episodeCardHtml, COPY, sortEpisodeItems, windowEpisodeItems, RANKED_SORTS,
   CARD_PARTS, HOME_CARD_PARTS, boostRowsHtml, namesFrom,
 }
   from '../assets/js/episode-card.js'
@@ -227,9 +227,39 @@ check('sortEpisodeItems orders by the requested key', () => {
   assert.equal(sortEpisodeItems(items, 'recent')[0].guid, 'item-guid-1')
 })
 
-check('filterEpisodeItems filters on air date and keeps undated rows out', () => {
-  assert.equal(filterEpisodeItems(items, 0).length, 2)          // no cutoff → untouched
-  assert.equal(filterEpisodeItems(items, 1_699_999_999).length, 1)
+check('⚠️ windowEpisodeItems windows on BOOST time and recomputes the figures', () => {
+  // The one range reading, everywhere, since 2026-08-31. Its own micro-corpus,
+  // so the expectations are exact: one item with boosts either side of the
+  // cutoff (figures must shrink to the window's own), one with none inside it
+  // (must drop out entirely).
+  const mk = (guid, list) => ({
+    boosts: list.map(([ts, sats, pk]) => ({ item_guid: guid, created_at: ts, sats, booster_pubkey: pk })),
+    episodes: { [guid]: { item_guid: guid, podcast_guid: 'sh', title: guid, published: 1_000 } },
+    shows: { sh: { podcast_guid: 'sh', title: 'Show' } },
+  })
+  const built = buildEpisodes({
+    boosts: [
+      ...mk('in-and-out', [[2_000, 50, 'a'], [2_100, 25, 'a'], [500, 999, 'b']]).boosts,
+      ...mk('all-before', [[400, 10, 'c'], [450, 10, 'c']]).boosts,
+    ],
+    episodes: { ...mk('in-and-out', []).episodes, ...mk('all-before', []).episodes },
+    shows: mk('x', []).shows,
+  })
+  assert.equal(windowEpisodeItems(built, 0).length, 2, 'no cutoff → untouched')
+
+  const windowed = windowEpisodeItems(built, 1_000)
+  assert.equal(windowed.length, 1, 'an item with no boost in the window drops out')
+  const it = windowed[0]
+  assert.equal(it.guid, 'in-and-out')
+  assert.equal(it.boosts.length, 2, 'the out-of-window boost is gone from the drawer corpus')
+  assert.equal(it.totalSats, 75, 'sats are the window’s own, not all-time')
+  assert.equal(it.distinctBoosters.length, 1, 'boosters recount over the window')
+  assert.equal(it.latest, 2_100)
+  assert.equal(it.totals, null, 'the all-time API aggregates are dropped')
+  // The original is untouched: windowing copies, never mutates.
+  const original = built.find((b) => b.guid === 'in-and-out')
+  assert.equal(original.boosts.length, 3)
+  assert.equal(original.totalSats, 1_074)
 })
 
 check('RANKED_SORTS covers exactly the quantitative sorts', () => {

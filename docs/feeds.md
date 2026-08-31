@@ -11,21 +11,29 @@ that used to live there.*
 ### Range and sort
 
 Every feed carries a range and a sort dropdown, built by
-`assets/js/feed-controls.js`. The chrome is shared; **what the range means is
-not**, which is why each renderer passes its own tooltips:
+`assets/js/feed-controls.js`; each renderer passes its own tooltips.
 
 | | Range filters on | Sorts |
 |---|---|---|
-| Episodes / Songs | when the episode **aired** (`ep.published`) | chart rank / latest boost / latest episode / most boosters / most boosts / most sats |
+| Episodes / Songs | when it was **boosted** (`b.ts`) | chart rank / latest boost / latest episode / most boosters / most boosts / most sats |
 | Boosts | when the boost was **sent** (`b.ts`) | latest boost / latest episode / largest boost |
 | Shows / Albums | when the show was **boosted** (`b.ts`) | chart rank / most boosters / boosts / sats / recently boosted |
 
-**⚠️ `range` MEANS BOOST TIME on `/api/v1/podcasts` and AIR DATE on
-`/api/v1/episodes`.** A show is in the 1W view because someone boosted it this
-week; an episode is in the 1W view because it AIRED this week, however long ago
-it was boosted. Both sides are deliberate and the parameter name is shared; do
-not "unify" them. Filtering the note and show feeds by air date instead would
-drop most of what they hold, since most boosts land on back catalogue.
+**⚠️ `range` MEANS BOOST TIME, EVERYWHERE — one reading since 2026-08-31.**
+Reed's call, retiring the air-date reading the episode feeds inherited from
+Local Bitcoiners (where it served a different purpose). What forced the
+decision was measured on the music side: 612 of 618 boosted tracks are older
+than 30 days, so "released in this window" was a structurally near-empty
+filter — Songs · 1W sat blank while 21 tracks were boosted that week. The
+consequences carried through, not merely relabelled: a windowed episode view
+now AGGREGATES over the window's boosts (`aggEpisodes`, the follows POST's
+own path), so a 1W card's sats, boosters and inline drawer notes are the
+week's, never the all-time totals filtered to recent releases; the detail
+rollups window the same way client-side (`windowEpisodeItems`, which rebuilds
+each surviving item's figures from the window's boosts and drops the API's
+all-time `totals`). Air date survives as the **Latest episode** sort and as
+the date printed on the card — chronology by release is still a view, just
+not a window.
 
 The note feed's shorter menu is not an omission — a card there is one boost, so
 "most boosters" has nothing to count. Its `episode` sort has to sink undated rows

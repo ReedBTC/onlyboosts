@@ -19,7 +19,7 @@
  * per-user and change as boosts arrive, so a page-lifetime cache would serve a
  * stale feed. The endpoints set their own short Cache-Control.
  */
-import { normalizeBoosts } from '/assets/js/ob-data.js?v=ob-v168'
+import { normalizeBoosts } from '/assets/js/ob-data.js?v=ob-v169'
 
 const BASE = '/api/v1/'
 
@@ -302,7 +302,7 @@ const EPISODE_PAGE = 60
  *   The Episodes half passes NOT_MUSIC instead of `medium: 'podcast'` — the
  *   split is a partition, so it has to keep video and undeclared feeds too.
  * @param {string}   [opts.sort]    recent|episode|count|boosts|sats
- * @param {string}   [opts.range]   1w|1m|1y|all, filtered on AIR DATE
+ * @param {string}   [opts.range]   1w|1m|1y|all, filtered on BOOST TIME (the one reading, everywhere, since 2026-08-31)
  * @param {string}   [opts.lang]    a 2-3 letter subtag, or 'unknown' for the
  *   shows that declare no `<language>` at all. Omitted or 'all' sends nothing.
  *   ⚠️ The language belongs to the SHOW, so this selects episodes whose FEED
@@ -413,11 +413,10 @@ export async function searchEpisodes({
 
 /* ── The show-level rollup, behind Shows and Albums ──────────────────────────
  *
- * ⚠️ `range` MEANS BOOST TIME HERE, where the episode reader above means AIR
- * DATE. A show is in the 1W view because someone boosted it this week and its
- * figures are that week's; an episode is in the 1W view because it AIRED this
- * week, however long ago it was boosted. The endpoints keep the same split, and
- * each feed writes its own tooltips for exactly this reason.
+ * `range` means BOOST TIME here as everywhere — one reading site-wide since
+ * 2026-08-31, when the episode reader above retired its LB-inherited air-date
+ * reading. A row is in the 1W view because someone boosted it this week, and
+ * its figures are that week's.
  *
  * What this replaces: the All range read the collector's published per-show
  * rollup whole (~440KB of every show, to paint thirty cards) and the windowed

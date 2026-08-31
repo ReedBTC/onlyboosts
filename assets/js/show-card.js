@@ -45,9 +45,9 @@
  * All three are now en-US in UTC, which is what episode-card.js and
  * functions/_shared/detail-page.js already do. The site has one date format.
  */
-import { showPageHref, episodePageHref } from './show-link.js?v=ob-v168'
-import { coverChain } from './cover-art.js?v=ob-v168'
-import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v168'
+import { showPageHref, episodePageHref } from './show-link.js?v=ob-v169'
+import { coverChain } from './cover-art.js?v=ob-v169'
+import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v169'
 
 const esc = htmlEscape
 
@@ -143,9 +143,9 @@ export function copyFor(medium) {
 
 // ── Range + sort ──────────────────────────────────────────────────────
 // The range filters on BOOST time: a show is in the 1W view if it was boosted in
-// the last 7 days, and its numbers are that week's numbers. The Episodes feeds'
-// identical buttons mean episode AIR DATE, which is a different axis; each feed
-// writes its own tooltips for exactly that reason. See CLAUDE.md.
+// the last 7 days, and its numbers are that week's numbers. Since 2026-08-31
+// that is the ONE reading site-wide — the Episodes feeds' identical buttons
+// retired their air-date axis the same day. See Range and sort in docs/feeds.md.
 //
 // On the absence of an episode count: there used to be a fifth axis here, 'Most
 // episodes', and a matching figure on every card. Both are gone. Sats, boosts

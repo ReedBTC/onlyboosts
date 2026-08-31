@@ -52,11 +52,11 @@ const SORTS = {
 };
 const DEFAULT_SORT = "sats";
 
-/* ⚠️ `range` MEANS WHEN THE BOOST WAS SENT, matching /api/v1/podcasts and the
- * `#boosts` sections, and NOT the air-date reading /api/v1/episodes gives the
- * same parameter name. A member is in the 1W wall because they boosted this
- * week, however old the episodes were. The site carries exactly two readings of
- * this word and there must not be a third — see CLAUDE.md under Range and sort.
+/* ⚠️ `range` MEANS WHEN THE BOOST WAS SENT — the ONE reading the whole site
+ * carries since 2026-08-31, when /api/v1/episodes retired its air-date
+ * reading. A member is in the 1W wall because they boosted this week, however
+ * old the episodes were. There must not be a second reading again — see
+ * CLAUDE.md under Range and sort.
  *
  * The four keys mirror RANGE_OPTIONS in feed-controls.js. Those two tables move
  * together, or a range button on the wall answers 400. */
