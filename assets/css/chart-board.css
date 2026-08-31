@@ -13,38 +13,12 @@
    --accent-d, --accent-dd and --tint; the page supplies the accent family
    (brand) the way /hpw does. */
 
-/* ── the week stepper ── the /hpw page's segmented header, page-level here
-   because five boards share one week. Static label: the arrows are the whole
-   control, and this page ships no client module to open a menu. */
+/* ── the week stepper ── the .hpw-nav group itself, dressed by hpw-board.css
+   (this page links it for the Members pair anyway); the wrapper only centres
+   it at page level, because every board shares one week. The dropdown is
+   mounted over the static label by assets/js/charts-page.js and its menu is
+   .pcast-sort-menu from feed-cards.css — the tab's own picker, whole. */
 .cb-nav-wrap { text-align: center; margin: 0 0 1.6rem; }
-.cb-nav {
-  display: inline-flex; align-items: center; justify-content: center;
-  gap: 0; max-width: 100%;
-  background: var(--white);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-}
-.cb-arrow {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 2rem; height: 2rem; flex: none;
-  font-family: 'Source Serif 4', Georgia, serif;
-  font-size: 1.15rem; line-height: 1;
-  color: var(--accent-d); background: none;
-  border: 0; border-radius: 999px;
-  padding: 0; text-decoration: none;
-  transition: background 0.12s, color 0.12s;
-}
-a.cb-arrow:hover { color: var(--accent-dd); background: var(--tint); }
-.cb-arrow:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
-.cb-arrow[aria-disabled="true"] { opacity: 0.28; cursor: default; pointer-events: none; }
-.cb-pick {
-  display: inline-flex; align-items: center; max-width: 100%;
-  font-family: 'Playfair Display', Georgia, serif;
-  font-size: 1.02rem; font-weight: 700; color: var(--ink);
-  padding: 0.3rem 0.75rem; white-space: nowrap;
-  overflow: hidden; text-overflow: ellipsis;
-  border-left: 1px solid var(--border); border-right: 1px solid var(--border);
-}
 
 /* ── the sections ── one h2 per category, then the pair. */
 .cb-section { margin: 0 0 1.8rem; }
@@ -75,6 +49,14 @@ a.cb-arrow:hover { color: var(--accent-dd); background: var(--tint); }
   display: block; margin-top: 0.15rem; text-align: left;
   font-family: 'Source Serif 4', Georgia, serif;
   font-size: 0.72rem; font-weight: 400; color: var(--muted);
+}
+/* The column head over the weekly rows' rank triplet: one right-aligned
+   string in the triplet's own order, read by position the way the values
+   under it are. */
+.cb-colhead {
+  text-align: right; padding: 0 0.4rem 0.15rem;
+  font-size: 0.62rem; color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── the rows ── */
@@ -121,7 +103,13 @@ a.cb-week-jump:hover { color: var(--accent-d); text-decoration-color: currentCol
 a.cb-week-jump:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 3px; }
 .cb-fig { font-weight: 700; font-size: 0.92rem; color: var(--accent-d); flex: none; }
 .cb-unit { font-weight: 400; font-size: 0.72rem; color: var(--muted); }
-.cb-extra { font-size: 0.7rem; color: var(--muted); width: 4.4rem; text-align: right; flex: none; }
+/* The weekly row's component-rank triplet (sats/boosters/boosts), under the
+   .cb-colhead labels. Compact by design — it replaced the raw figures, which
+   took too much of the row (Reed, 2026-08-31). */
+.cb-ranks {
+  flex: none; font-weight: 700; font-size: 0.86rem; color: var(--accent-d);
+  font-variant-numeric: tabular-nums; letter-spacing: 0.02em;
+}
 
 /* ── the footnote ── the formula, stated once under the boards. */
 .cb-formula {
@@ -130,9 +118,5 @@ a.cb-week-jump:focus-visible { outline: 2px solid var(--brand); outline-offset: 
 .cb-formula a { color: var(--brand-dd); }
 :root[data-theme="dark"] .cb-formula a { color: var(--brand-d); }
 
-@media (max-width: 640px) {
-  /* Thumb targets, the hpw phone rule; the label between them does not grow. */
-  .cb-arrow { width: 2.5rem; height: 2.5rem; font-size: 1.3rem; }
-  /* The boosters column is the first thing to give on a 320px row. */
-  .cb-extra { display: none; }
-}
+/* No phone block: hpw-board.css already grows the .hpw-arrow touch targets,
+   and the triplet is compact enough for a 320px row. */

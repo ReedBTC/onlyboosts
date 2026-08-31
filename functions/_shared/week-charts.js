@@ -33,6 +33,7 @@
 
 import { WEEK, MONDAY_EPOCH, PST, pacificOffset } from "../../assets/js/pacific-week.js";
 import { pacificOffsetSql } from "../api/v1/members/hours.js";
+import { PUBLISHERS } from "../api/v1/_common.js";
 
 export const KINDS = ["shows", "episodes", "artists", "albums", "songs"];
 
@@ -145,7 +146,17 @@ export async function weeklyChart(env, kind, ws, we, limit = 10) {
         AND b.created_at >= ? AND b.created_at < ?
       GROUP BY ${L.key}
     ),${ladder("")},
-    tied AS (SELECT chart.*, COUNT(*) OVER (PARTITION BY rank) AS peers FROM chart)
+    tied AS (SELECT chart.*,
+                    COUNT(*) OVER (PARTITION BY rank)       AS peers,
+                    /* Per-COMPONENT tie flags for the row's rank triplet.
+                       RANK() hands equal ranks to equal values only, so
+                       partitioning on the component rank counts exactly the
+                       rows sharing that component's value — including ones
+                       past the LIMIT, which is what makes a lone T honest. */
+                    COUNT(*) OVER (PARTITION BY r_sats)     AS peers_sats,
+                    COUNT(*) OVER (PARTITION BY r_boosts)   AS peers_boosts,
+                    COUNT(*) OVER (PARTITION BY r_boosters) AS peers_boosters
+             FROM chart)
     SELECT * FROM tied
     ORDER BY rank, guid
     LIMIT ?`;
@@ -184,4 +195,55 @@ export async function weeksAtNumberOne(env, kind, before, limit = 10) {
     LIMIT ?`;
   const { results } = await env.DB.prepare(sql).bind(before, limit).all();
   return results.map((r) => ({ ...r, last_week_start: weekStartOfBucket(r.last_wk) }));
+}
+
+/** The members companion: who has finished #1 on the weekly 40 HPW board the
+ *  most completed weeks. NOT the chart ladder — the 40 HPW board ranks by
+ *  HOURS, so its #1 is the hours leader, and this restates the hours
+ *  endpoint's own corpus rules: dedupe (booster, episode) inside the week,
+ *  episodes with a usable duration only, publisher keys excluded. A week
+ *  whose hours lead is shared credits every holder, the content boards'
+ *  reading. */
+export async function hpwWeeksAtNumberOne(env, before, limit = 10) {
+  const holes = PUBLISHERS.map(() => "?").join(",");
+  const wk = `(b.created_at + ${pacificOffsetSql("b.created_at")} - ${MONDAY_EPOCH}) / ${WEEK}`;
+  const sql = `
+    WITH d AS (
+      SELECT DISTINCT b.booster_pubkey AS pk, b.item_guid AS ig, ${wk} AS wk
+      FROM boosts b
+      WHERE b.item_guid IS NOT NULL
+        AND b.booster_pubkey NOT IN (${holes})
+        AND b.created_at < ?
+    ),
+    w AS (
+      SELECT d.pk, d.wk, SUM(e.duration) AS secs
+      FROM d
+      JOIN episodes e ON e.item_guid = d.ig
+      WHERE e.duration IS NOT NULL AND e.duration > 0
+      GROUP BY d.pk, d.wk
+    ),
+    r AS (SELECT w.*, RANK() OVER (PARTITION BY wk ORDER BY secs DESC) AS rank FROM w),
+    counts AS (
+      SELECT pk, COUNT(*) AS weeks, MAX(wk) AS last_wk
+      FROM r WHERE rank = 1
+      GROUP BY pk
+    )
+    SELECT c.pk, c.weeks, c.last_wk,
+           p.display_name AS dname, p.name AS name, p.picture AS pic,
+           (SELECT b2.booster_npub FROM boosts b2
+             WHERE b2.booster_pubkey = c.pk AND b2.booster_npub IS NOT NULL
+             LIMIT 1) AS npub
+    FROM counts c
+    LEFT JOIN profiles p ON p.pubkey = c.pk
+    ORDER BY c.weeks DESC, c.last_wk DESC, c.pk
+    LIMIT ?`;
+  const { results } = await env.DB.prepare(sql).bind(...PUBLISHERS, before, limit).all();
+  return results.map((r) => ({
+    pk: r.pk,
+    npub: r.npub || null,
+    name: r.dname || r.name || null,
+    pic: r.pic || null,
+    weeks: r.weeks,
+    last_week_start: weekStartOfBucket(r.last_wk),
+  }));
 }

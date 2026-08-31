@@ -1,35 +1,44 @@
 // /charts/<YYYY-MM-DD> — the OnlyBoosts Charts page: the week's Top 10 for
-// Shows, Episodes, Artists, Albums and Songs, each beside its Weeks at #1
-// companion, all rendered at the edge.
+// Shows and Artists on the chart rule, and the Members 40 HPW board, each
+// beside its Weeks at #1 companion, all rendered at the edge.
 //
-//   /charts/<date>   the five charts for the week containing that day. Not a
+//   /charts/<date>   the charts for the week containing that day. Not a
 //                    Monday? A future date? 302 to the canonical Monday, or to
 //                    the live week, so one week has one URL — the /hpw rule.
 //   /charts          302 to the live week.
 //
 // ⚠️ THE WEEK IS THE 40 HPW WEEK: Monday 00:00 US Pacific, cut by
-// assets/js/pacific-week.js on both sides of the query. The ranking is
+// assets/js/pacific-week.js on both sides of the query. The content ranking is
 // sort=chart and nothing else — see functions/_shared/week-charts.js for the
-// queries and "The OnlyBoosts Charts" in docs/feeds.md for the rule.
+// queries and "The OnlyBoosts Charts" in docs/feeds.md for the rule. The
+// Members pair ranks by HOURS, the 40 HPW board's own rule, its left board
+// rendered from the hours endpoint's hoursBoard — identical to the tab's.
+//
+// ⚠️ ONLY SHOWS, ARTISTS AND MEMBERS ARE ON THE PAGE (Reed, 2026-08-31): the
+// episode-level charts are too sparse to be interesting yet. PAGE_KINDS is the
+// page's list; week-charts.js keeps serving all five content kinds.
 //
 // ⚠️ THE WEEKS AT #1 BOARDS ARE THE SAME ON EVERY WEEK'S PAGE, deliberately:
 // they count completed weeks over the whole index, so they are a property of
 // the chart, not of the week on screen. Rendering them beside every week is
 // the high-scores idiom the 40 HPW tab established.
 //
-// The page is facts only — titles, figures, links — so it ships no client
-// module of its own; the arrows are plain links and the boards are finished
-// HTML. A verb that arrives later (a share control, a picker menu) mounts the
-// way hpw-page.js does, without moving the facts.
+// The page is facts only — titles, figures, links. The one verb is the week
+// picker's dropdown, mounted by /assets/js/charts-page.js over the static
+// label; the arrows are plain links, so the no-JS page still steps.
 
 import { pacificWeekStart, prevWeek, nextWeek, weekStartFromDate, weekDateString } from "../../assets/js/pacific-week.js";
-import { KINDS, weeklyChart, weeksAtNumberOne } from "../_shared/week-charts.js";
-import { sectionHtml, weekLabel, COPY } from "../_shared/chart-board.js";
+import { weeklyChart, weeksAtNumberOne, hpwWeeksAtNumberOne } from "../_shared/week-charts.js";
+import { sectionHtml, memberSectionHtml, weekLabel, COPY } from "../_shared/chart-board.js";
+import { hoursBoard } from "../api/v1/members/hours.js";
 import { htmlEscape } from "../../assets/js/nostr-text.js";
 
 export const SITE_ORIGIN = "https://onlyboosts.social";
 const ROWS = 10;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+// The page's sections, in order. Restoring a retired chart (episodes, albums,
+// songs) is an element here plus a COPY entry in chart-board.js.
+const PAGE_KINDS = ["shows", "artists"];
 
 export async function onRequestGet({ request, env, params }) {
   let segs = params.path;
@@ -52,25 +61,27 @@ export async function onRequestGet({ request, env, params }) {
   const we = nextWeek(ws);
   const isCurrent = ws >= live;
 
-  let first, weekly, ones;
+  let first, weekly, ones, hours, mOnes;
   try {
-    /* The floor, the five weekly Top 10s, and the five companions, together.
-       The floor is load-bearing here (unlike the hours endpoint's best-effort
+    /* The floor, the content boards, and the members pair, together. The
+       floor is load-bearing here (unlike the hours endpoint's best-effort
        first_week): a page for a week before the index began is a URL with
        nothing behind it, and a crawler would walk the ‹ arrow back forever. */
     const firstQ = env.DB.prepare("SELECT MIN(created_at) AS t FROM boosts").first()
       .then((r) => (r && r.t ? pacificWeekStart(r.t) : null));
-    const weeklyQ = Promise.all(KINDS.map((k) => weeklyChart(env, k, ws, we, ROWS)));
-    const onesQ = Promise.all(KINDS.map((k) => weeksAtNumberOne(env, k, live, ROWS)));
-    [first, weekly, ones] = await Promise.all([firstQ, weeklyQ, onesQ]);
+    const weeklyQ = Promise.all(PAGE_KINDS.map((k) => weeklyChart(env, k, ws, we, ROWS)));
+    const onesQ = Promise.all(PAGE_KINDS.map((k) => weeksAtNumberOne(env, k, live, ROWS)));
+    const hoursQ = hoursBoard(env, { range: "week", week: canon, limit: ROWS });
+    const mOnesQ = hpwWeeksAtNumberOne(env, live, ROWS);
+    [first, weekly, ones, hours, mOnes] = await Promise.all([firstQ, weeklyQ, onesQ, hoursQ, mOnesQ]);
   } catch (err) {
     console.error("[charts] queries failed", err);
     return unavailable();
   }
   if (first != null && ws < first) return notFound();
 
-  const html = renderPage({ ws, we, live, first, isCurrent, weekly, ones });
-  const empty = weekly.every((rows) => rows.length === 0);
+  const html = renderPage({ ws, live, first, isCurrent, weekly, ones, hours: hours.body, mOnes });
+  const empty = weekly.every((rows) => rows.length === 0) && !(hours.body.members || []).length;
   return page(html, isCurrent ? 60 : 300, { noindex: empty });
 }
 
@@ -126,16 +137,19 @@ function notFound() {
 
 // ── the page ─────────────────────────────────────────────────────────────────
 
+/* The week stepper, in the .hpw-nav grammar so hpw-board.css dresses it and
+   the picker the client module mounts is the tab's own. The label ships
+   static; charts-page.js upgrades it to the dropdown. */
 function arrowsHtml({ ws, live, first }) {
   const prev = prevWeek(ws), next = nextWeek(ws);
   const prevOff = first != null && prev < first;
   const nextOff = next > live;
   const arrow = (off, href, glyph, label) => off
-    ? `<span class="cb-arrow" aria-disabled="true" aria-label="${htmlEscape(label)}">${glyph}</span>`
-    : `<a class="cb-arrow" href="${htmlEscape(href)}" aria-label="${htmlEscape(label)}" title="${htmlEscape(label)}">${glyph}</a>`;
-  return `<div class="cb-nav-wrap"><span class="cb-nav">` +
+    ? `<span class="hpw-arrow" aria-disabled="true" aria-label="${htmlEscape(label)}">${glyph}</span>`
+    : `<a class="hpw-arrow" href="${htmlEscape(href)}" aria-label="${htmlEscape(label)}" title="${htmlEscape(label)}">${glyph}</a>`;
+  return `<div class="cb-nav-wrap"><span class="hpw-nav">` +
     arrow(prevOff, `/charts/${weekDateString(prev)}`, "‹", "Previous week") +
-    `<span class="cb-pick">Week of ${htmlEscape(weekLabel(ws))}</span>` +
+    `<span class="hpw-pick-wrap"><span class="hpw-pick hpw-pick--static">Week of ${htmlEscape(weekLabel(ws))}</span></span>` +
     arrow(nextOff, `/charts/${weekDateString(next)}`, "›", "Next week") +
     `</span></div>`;
 }
@@ -143,17 +157,19 @@ function arrowsHtml({ ws, live, first }) {
 /* The og:description. It carries the qualifier in full because it is the
    string that travels without the page around it. */
 function leadSentence(ws) {
-  return `The top shows, episodes, artists, albums and songs for the week of ${weekLabel(ws)}, ` +
+  return `The top shows, artists and members for the week of ${weekLabel(ws)}, ` +
     `ranked by Nostr boosts; every figure counts only the boosts published to Nostr and indexed by OnlyBoosts.`;
 }
 
-export function renderPage({ ws, live, first, isCurrent, weekly, ones }) {
+export function renderPage({ ws, live, first, isCurrent, weekly, ones, hours, mOnes }) {
   const key = weekDateString(ws);
   const pageUrl = `${SITE_ORIGIN}/charts/${key}`;
-  const sections = KINDS.map((kind, i) =>
-    sectionHtml(kind, { weekly: weekly[i], ones: ones[i], ws, isCurrent })).join("\n");
+  const sections = PAGE_KINDS.map((kind, i) =>
+    sectionHtml(kind, { weekly: weekly[i], ones: ones[i], ws, isCurrent })).join("\n") +
+    "\n" + memberSectionHtml({ hours, ones: mOnes, ws, isCurrent });
   const body = `
-<div class="charts-page" data-charts-week="${htmlEscape(key)}"${isCurrent ? ' data-charts-live="1"' : ""}>
+<div class="charts-page" data-charts-week="${htmlEscape(key)}"${isCurrent ? ' data-charts-live="1"' : ""}${
+    first != null ? ` data-charts-first="${htmlEscape(String(first))}"` : ""} data-charts-livews="${htmlEscape(String(live))}">
   ${arrowsHtml({ ws, live, first })}
 ${sections}
   <p class="cb-formula">${htmlEscape(COPY.formula)} <a href="/about#charts">About the OnlyBoosts Charts</a></p>
@@ -167,6 +183,7 @@ ${sections}
     body,
     canonical: pageUrl,
     og: { title: ogTitle, description: leadSentence(ws), image: `${SITE_ORIGIN}/assets/onlyboosts_banner.png`, url: pageUrl },
+    scripts: `<script src="/assets/js/charts-page.js?v=ob-v176" type="module"></script>`,
   });
 }
 
@@ -174,8 +191,10 @@ ${sections}
 
 /* The plain content-page chrome (page.css), the same shape /about, /stats and
    /hpw wear. The boards sit in a widened column (.cb-inner, 60rem — the site's
-   own --feed-track measure) so a pair fits side by side. */
-function shell({ title, eyebrow, h1, lead, body, canonical = null, og = null, noindex = false }) {
+   own --feed-track measure) so a pair fits side by side. feed-cards.css is for
+   the picker's .pcast-sort-menu; hpw-board.css dresses the stepper and the
+   Members pair's rows. */
+function shell({ title, eyebrow, h1, lead, body, canonical = null, og = null, scripts = "", noindex = false }) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -230,11 +249,13 @@ ${og ? `
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v175" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v175" />
-  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v175" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v175" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v175" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v176" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v176" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v176" />
+  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v176" />
+  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v176" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v176" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v176" />
   <style>
     /* No feed is active on this page, so it supplies the brand accent itself,
        the same call /hpw and .show-main make. */
@@ -433,9 +454,10 @@ ${body}
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav.js?v=ob-v175" defer></script>
-<script src="/assets/js/nav-widget-boot.js?v=ob-v175"></script>
-<script src="/assets/js/sw-register.js?v=ob-v175" defer></script>
+<script src="/assets/js/nav.js?v=ob-v176" defer></script>
+${scripts}
+<script src="/assets/js/nav-widget-boot.js?v=ob-v176"></script>
+<script src="/assets/js/sw-register.js?v=ob-v176" defer></script>
 </body>
 </html>`;
 }

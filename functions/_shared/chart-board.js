@@ -11,13 +11,25 @@
 // The classes are .cb-*, restating the .hpw-* grammar in
 // assets/css/chart-board.css the way .mb-shell restates .bs-shell: the boards
 // must LOOK like the 40 HPW boards (Reed's spec) without the members' CSS
-// growing content-row rules. The two stylesheets stay in step by hand.
+// growing content-row rules. The two stylesheets stay in step by hand. The
+// MEMBERS pair is the exception that imports rather than restates: its left
+// board IS hpw-board.js's boardHtml, and its Weeks at #1 rows wear the .hpw-*
+// classes outright, so a member row here and on the tab are one grammar.
+//
+// ⚠️ THE WEEKLY ROWS PRINT COMPONENT RANKS, NOT RAW FIGURES (Reed's ask,
+// 2026-08-31): a `sats/boosters/boosts` column head on the board, and each
+// row's standing in the three components as `3/5/T9` — the formula in the
+// open at the row, where the raw figures took too much room. A component T
+// is computed over the whole week's corpus (peers_* from week-charts.js),
+// never over the visible ten.
 
 import { htmlEscape, isSafeUrl } from "../../assets/js/nostr-text.js";
 import { httpsUrl } from "../../assets/js/cover-art.js";
 import { showPageHref, episodePageHref, publisherPageHref } from "../../assets/js/show-link.js";
+import { boosterPageHref } from "../../assets/js/booster-link.js";
 import { rankLabel, competitionRanks } from "../../assets/js/rank.js";
 import { weekDateString } from "../../assets/js/pacific-week.js";
+import { boardHtml as hpwBoardHtml, initials, COPY as HPW_COPY } from "../../assets/js/hpw-board.js";
 
 const esc = htmlEscape;
 
@@ -76,7 +88,7 @@ function subject(kind, r) {
 /* Square artwork, not the members' round face: these rows are shows and
  * episodes, whose art is square by specification. Promoted to https, then held
  * to http(s) — third-party feed content, the hpw face's own discipline. No
- * error wiring: the page ships no client module, and a dead URL here costs one
+ * error wiring: the page ships no facts-side JS, and a dead URL here costs one
  * thumbnail, the same trade the hpw faces make. */
 function art(r, glyph) {
   const src = [r.image, r.artwork, r.p_image].map(httpsUrl).find((u) => u && isSafeUrl(u)) || null;
@@ -96,15 +108,18 @@ function who(kind, r, subline) {
 
 /* One weekly-chart row. The position is the SERVER's rank and tie flag — a
  * tuple standing the renderer must never renumber (docs/feeds.md, the Charts
- * section) — printed in golf's T-form via the site's one rankLabel. */
+ * section) — and the triplet is the row's standing in each component, in the
+ * column head's order: sats / boosters / boosts. */
 export function weekRowHtml(kind, r) {
   const w = who(kind, r);
+  const c = (rank, peers) => rankLabel(rank, Number(peers) > 1);
   return `<li class="cb-row">` +
     `<span class="cb-pos">${esc(rankLabel(r.rank, r.tied))}</span>` +
     art(r, w.glyph) +
     w.html +
-    `<span class="cb-fig">${esc(fmt(r.total_sats))}<span class="cb-unit"> sats</span></span>` +
-    `<span class="cb-extra">${esc(fmt(r.booster_count))} booster${Number(r.booster_count) === 1 ? "" : "s"}</span>` +
+    `<span class="cb-ranks" title="This week's rank in sats / boosters / boosts">` +
+      `${esc(c(r.r_sats, r.peers_sats))}/${esc(c(r.r_boosters, r.peers_boosters))}/${esc(c(r.r_boosts, r.peers_boosts))}` +
+    `</span>` +
     `</li>`;
 }
 
@@ -125,17 +140,19 @@ export function onesRowHtml(kind, r, rk) {
     `</li>`;
 }
 
-export function boardHtml({ title, sub, rows, empty, board }) {
+export function boardHtml({ title, sub, rows, empty, board, colhead = false }) {
   const body = rows.length
     ? `<ol class="cb-list">${rows.join("")}</ol>`
     : `<p class="cb-empty">${esc(empty)}</p>`;
   return `<section class="cb-board"${board ? ` data-cb-board="${esc(board)}"` : ""}>` +
     `<h3 class="cb-head">${esc(title)}<small>${esc(sub)}</small></h3>` +
+    (colhead && rows.length ? `<div class="cb-colhead">sats/boosters/boosts</div>` : "") +
     body +
     `</section>`;
 }
 
-/* One category: the h2 and the pair. `weekly` and `ones` are the query rows. */
+/* One content category: the h2 and the pair. `weekly` and `ones` are the
+ * query rows. */
 export function sectionHtml(kind, { weekly, ones, ws, isCurrent }) {
   const c = COPY.sections[kind];
   const onesRanks = competitionRanks(ones, (r) => Number(r.weeks));
@@ -145,6 +162,7 @@ export function sectionHtml(kind, { weekly, ones, ws, isCurrent }) {
     sub: isCurrent ? `In progress. ${weekSpan(ws)}.` : `${weekSpan(ws)}.`,
     rows: weekly.map((r) => weekRowHtml(kind, r)),
     empty: isCurrent ? COPY.emptyLive : COPY.emptyPast,
+    colhead: true,
   });
   const onesBoard = boardHtml({
     board: `${kind}-ones`,
@@ -159,20 +177,77 @@ export function sectionHtml(kind, { weekly, ones, ws, isCurrent }) {
     `</section>`;
 }
 
+/* One member's weeks-at-#1 row, wearing the .hpw-* classes outright — a
+ * member row here and on the tab must be one grammar, and this board differs
+ * from a tab row only in its figure (weeks, not hours). */
+export function memberOnesRowHtml(m, rk) {
+  const href = boosterPageHref(m.npub, m.pk);
+  const name = m.name || (m.npub ? m.npub.slice(0, 12) + "…" : (m.pk || "").slice(0, 12) + "…");
+  const upgraded = httpsUrl(m.pic);
+  const pic = upgraded && isSafeUrl(upgraded) ? upgraded : null;
+  const face = pic
+    ? `<img class="hpw-face" src="${esc(pic)}" alt="" loading="lazy" referrerpolicy="no-referrer" />`
+    : `<span class="hpw-face hpw-face--none" aria-hidden="true">${esc(initials(m.name, m.pk))}</span>`;
+  const whoM = href
+    ? `<a class="hpw-name" href="${esc(href)}">${esc(name)}</a>`
+    : `<span class="hpw-name">${esc(name)}</span>`;
+  const date = weekDateString(m.last_week_start);
+  const week = `<a class="hpw-week hpw-week-jump" href="/charts/${esc(date)}"` +
+    ` title="Show this page for that week">Last: ${esc(weekLabel(m.last_week_start))}</a>`;
+  return `<li class="hpw-row">` +
+    `<span class="hpw-pos">${esc(rankLabel(rk.rank, rk.tied))}</span>` +
+    face +
+    `<span class="hpw-who">${whoM}${week}</span>` +
+    `<span class="hpw-hours">${esc(String(m.weeks))}<span class="hpw-unit"> wk${Number(m.weeks) === 1 ? "" : "s"}</span></span>` +
+    `</li>`;
+}
+
+/* The Members pair. The LEFT board is hpw-board.js's boardHtml over the hours
+ * endpoint's own envelope — identical to the tab's weekly 40 HPW board by
+ * construction, gold rows and all. The RIGHT is the Weeks at #1 companion:
+ * most weeks finishing #1 on that board, by hours. `hours` is hoursBoard's
+ * `body`; `ones` is hpwWeeksAtNumberOne's rows. */
+export function memberSectionHtml({ hours, ones, ws, isCurrent }) {
+  const left = hpwBoardHtml({
+    board: "members-week",
+    title: "Top 10",
+    sub: isCurrent ? `In progress. ${weekSpan(ws)}.` : `${weekSpan(ws)}.`,
+    members: hours.members || [],
+    goal: hours.goal_hours || 40,
+    empty: isCurrent ? HPW_COPY.emptyLive : HPW_COPY.emptyPast,
+  });
+  const ranks = competitionRanks(ones, (r) => Number(r.weeks));
+  const body = ones.length
+    ? `<ol class="hpw-list">${ones.map((m, i) => memberOnesRowHtml(m, ranks[i])).join("")}</ol>`
+    : `<p class="cb-empty">${esc(COPY.emptyOnes)}</p>`;
+  const right = `<section class="cb-board" data-cb-board="members-ones">` +
+    `<h3 class="cb-head">Weeks at #1<small>${esc(COPY.sections.members.onesSub)}</small></h3>` +
+    body +
+    `</section>`;
+  return `<section class="cb-section" id="members">` +
+    `<h2 class="cb-section-h">${esc(COPY.sections.members.heading)}</h2>` +
+    `<div class="cb-pairs">${left}${right}</div>` +
+    `</section>`;
+}
+
 /* The words, in one place. Every string is user-visible board copy. The
  * qualifier rides the lead sentence and the og:description; the boards
  * themselves say what each figure is at the point of the number, the
- * vocabulary rule's short-label form. */
+ * vocabulary rule's short-label form.
+ *
+ * ⚠️ ONLY SHOWS, ARTISTS AND MEMBERS ARE ON THE PAGE — Reed's call,
+ * 2026-08-31, the day it shipped with five: the episode-level charts are too
+ * sparse to be interesting yet. week-charts.js still serves all five kinds
+ * (the machinery is generic and tested), so restoring one is a COPY entry
+ * and a PAGE_KINDS element, not new queries. */
 export const COPY = {
   eyebrow: "OnlyBoosts Charts",
-  intro: "The top shows, episodes, artists, albums and songs by Nostr boosts, chart week by chart week.",
+  intro: "The top shows, artists and members by Nostr boosts, chart week by chart week.",
   formula: "Ranked by the OnlyBoosts Charts formula: rank in sats, plus rank in boosts, plus rank in boosters; the lowest total is first.",
   sections: {
     shows: { heading: "Shows", onesSub: "Most weeks finishing #1 on the weekly Shows chart. Completed weeks only." },
-    episodes: { heading: "Episodes", onesSub: "Most weeks finishing #1 on the weekly Episodes chart. Completed weeks only." },
     artists: { heading: "Artists", onesSub: "Most weeks finishing #1 on the weekly Artists chart. Completed weeks only." },
-    albums: { heading: "Albums", onesSub: "Most weeks finishing #1 on the weekly Albums chart. Completed weeks only." },
-    songs: { heading: "Songs", onesSub: "Most weeks finishing #1 on the weekly Songs chart. Completed weeks only." },
+    members: { heading: "Members", onesSub: "Most weeks finishing #1 on the weekly 40 HPW board. Completed weeks only." },
   },
   emptyLive: "No Nostr boosts yet this week.",
   emptyPast: "No Nostr boosts that week.",

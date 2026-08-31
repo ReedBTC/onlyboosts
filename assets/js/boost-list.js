@@ -30,17 +30,17 @@
  */
 import {
   htmlEscape, isSafeUrl, truncate, renderMessage,
-} from './nostr-text.js?v=ob-v175';
-import { episodePageHref, showPageHref } from './show-link.js?v=ob-v175';
+} from './nostr-text.js?v=ob-v176';
+import { episodePageHref, showPageHref } from './show-link.js?v=ob-v176';
 /* ⚠️ THE REAL MODULE, NOT A FOURTH COPY OF THE RULE. booster-link.js has been
  * dependency-free since it was written, so esbuild inlines it here exactly as it
  * does nostr-text.js, and the boost rows link a booster by the same test every
  * feed surface uses rather than by a transcription of it. This is the collapse
  * that functions/_shared/detail-page.js#boosterPageUrl said was available; that
  * name is now an alias for this function rather than a second copy of it. */
-import { boosterPageHref } from './booster-link.js?v=ob-v175';
-import { httpsUrl } from './cover-art.js?v=ob-v175';
-import { clientLabel, hasClientLabel } from './client-label.js?v=ob-v175';
+import { boosterPageHref } from './booster-link.js?v=ob-v176';
+import { httpsUrl } from './cover-art.js?v=ob-v176';
+import { clientLabel, hasClientLabel } from './client-label.js?v=ob-v176';
 
 // ── The formatters the row needs ─────────────────────────────────────────────
 //
