@@ -50,20 +50,20 @@
 
   <!-- Shared note / card styles (.note-card, .embed-note) — the boosts
        feeds render through the same kind-1 card as boosts-thread.js. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v160" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v166" />
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v160" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v166" />
   <!-- The episode card and its drawer, extracted from the inline block below
        when /episode/<guid> pages needed the same cards. See the file header. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v160" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v160" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v166" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v166" />
   <!-- The 40 HPW boards on the Members tab; shared with the /hpw/<week> pages. -->
-  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v160" />
+  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v166" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. Must stay last
        among the stylesheets so the inline block below still wins. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v160" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v166" />
 
   <style>
     :root {
@@ -100,6 +100,7 @@
       --sng-accent: var(--bg-accent); --sng-accent-d: var(--bg-accent-d); --sng-accent-dd: var(--bg-accent-dd); --sng-tint: var(--bg-tint);
       --snf-accent: var(--bg-accent); --snf-accent-d: var(--bg-accent-d); --snf-accent-dd: var(--bg-accent-dd); --snf-tint: var(--bg-tint);
       --alb-accent: var(--bg-accent); --alb-accent-d: var(--bg-accent-d); --alb-accent-dd: var(--bg-accent-dd); --alb-tint: var(--bg-tint);
+      --art-accent: var(--bg-accent); --art-accent-d: var(--bg-accent-d); --art-accent-dd: var(--bg-accent-dd); --art-tint: var(--bg-tint);
 
       /* Defaults (Episodes · Global is the landing feed). */
       --accent:    var(--eg-accent);
@@ -117,6 +118,7 @@
     body[data-active-feed="songs-global"]     { --accent: var(--sng-accent); --accent-d: var(--sng-accent-d); --accent-dd: var(--sng-accent-dd); --tint: var(--sng-tint); }
     body[data-active-feed="songs-follows"]    { --accent: var(--snf-accent); --accent-d: var(--snf-accent-d); --accent-dd: var(--snf-accent-dd); --tint: var(--snf-tint); }
     body[data-active-feed="albums"]           { --accent: var(--alb-accent); --accent-d: var(--alb-accent-d); --accent-dd: var(--alb-accent-dd); --tint: var(--alb-tint); }
+    body[data-active-feed="artists"]          { --accent: var(--art-accent); --accent-d: var(--art-accent-d); --accent-dd: var(--art-accent-dd); --tint: var(--art-tint); }
 
     /* ── Dark mode: the accent family ───────────────────────────────
        theme.css owns the page palette; this block owns the feed accent,
@@ -466,7 +468,8 @@
     body[data-active-feed="members-global"]    .feed-bar-controls > [data-controls-for="members-global"],
     body[data-active-feed="members-follows"]   .feed-bar-controls > [data-controls-for="members-follows"],
     body[data-active-feed="shows"]            .feed-bar-controls > [data-controls-for="shows"],
-    body[data-active-feed="albums"]           .feed-bar-controls > [data-controls-for="albums"] {
+    body[data-active-feed="albums"]           .feed-bar-controls > [data-controls-for="albums"],
+    body[data-active-feed="artists"]          .feed-bar-controls > [data-controls-for="artists"] {
       display: flex;
     }
 
@@ -1144,6 +1147,11 @@
       .feed-subs { padding: 0 1rem 0.4rem; gap: 0.4rem; }
       .feed-sub-group { gap: 0; }
       .feed-sub { font-size: 0.76rem; padding: 0.3rem 0.2rem 0.34rem; }
+      /* Three labels share the music third where the other tabs hold one or
+         two, so this group's type steps down a notch — "Artists" clips at
+         0.76rem inside a ~37px column on a 375px phone. Scoped to the tab so
+         Podcasts' pair keeps its size. */
+      .feed-sub-group[data-tab="music"] .feed-sub { font-size: 0.7rem; padding-inline: 0.05rem; }
       /* All four controls rarely fit one line here, so the range + sort group
          wraps onto its own. Kept right-aligned: left-aligned it would sit at
          the screen edge and the sort menu's right-anchored popover (min-width
@@ -1154,8 +1162,8 @@
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
     }
   </style>
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v160" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v160" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v166" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v166" />
 </head>
 <body data-active-feed="episodes-global">
 
@@ -1360,6 +1368,10 @@
         <button type="button" class="feed-sub" data-value="episodes" aria-selected="false">Episodes</button>
       </div>
       <div class="feed-sub-group" data-tab="music">
+        <!-- Tier order, left to right: publisher > album > song. The TAB still
+             opens on Albums (TAB_DEFAULT.music, pinned to the nav's Music
+             href) — the row's order and the tab's landing are two questions. -->
+        <button type="button" class="feed-sub" data-value="artists" aria-selected="false">Artists</button>
         <button type="button" class="feed-sub" data-value="albums" aria-selected="false">Albums</button>
         <button type="button" class="feed-sub" data-value="songs"  aria-selected="false">Songs</button>
       </div>
@@ -1733,6 +1745,20 @@
       </div>
     </section>
 
+    <!-- Artists: the publisher tier above Albums — <podcast:publisher>, one
+         card per artist (Wavlake, Fountain and RSS Blue mint one publisher
+         feed per artist). Global only, like the two show-level rollups. -->
+    <section class="feed-panel" id="panel-artists" role="region" aria-label="Artists" data-feed="artists" data-scope="global" hidden>
+      <p class="feed-note" data-feed-note hidden></p>
+      <div class="feed-search" data-feed-search hidden></div>
+      <div class="feed-list" data-feed-list>
+        <div class="feed-placeholder">
+          <strong>Artists feed coming online</strong>
+          The layout is ready — boosted artists load here once the rollup lands.
+        </div>
+      </div>
+    </section>
+
   </div>
 </main>
 
@@ -1815,12 +1841,13 @@
     'members-follows':  { type: 'members',  scope: 'follows' },
     'shows':            { type: 'shows',    scope: 'global' },
     'albums':           { type: 'albums',   scope: 'global' },
+    'artists':          { type: 'artists',  scope: 'global' },
   };
   // The two show-level feeds have no whose-axis, so their key is the bare type
   // rather than `<type>-global`. Songs is episode-level and does have one — the
   // asymmetry is about which data source each reads, not about medium; see the
   // scope note at the top of shows-feed.js.
-  const SCOPELESS = { shows: true, albums: true };
+  const SCOPELESS = { shows: true, albums: true, artists: true };
   /* ── The tab a feed belongs to ──
      ⚠️ A TAB IS DERIVED FROM THE FEED KEY, NEVER STORED IN THE HASH. That is
      the whole reason `#shows`, `#songs-global`, `#members` and the two
@@ -1836,7 +1863,7 @@
      under either of the other two without becoming two things it isn't. */
   const TAB_OF = {
     shows: 'podcasts', episodes: 'podcasts',
-    albums: 'music',   songs:    'music',
+    albums: 'music',   songs:    'music',   artists: 'music',
     members: 'members',
   };
   // What a tab opens on when it is pressed and has no remembered sub-feed.
@@ -1883,7 +1910,7 @@
   const PARAM_FEEDS = {
     'episodes-global': 1, 'episodes-follows': 1,
     'songs-global': 1, 'songs-follows': 1,
-    'shows': 1, 'albums': 1,
+    'shows': 1, 'albums': 1, 'artists': 1,
   };
   // What each feed is currently filtered to, '' meaning no filter. The renderers
   // own the control; this is the controller's copy, kept in step by the
@@ -2334,17 +2361,17 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v160"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v166"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v160" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v166" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v160" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v166" defer></script>
 
 <!-- Feed hydration — lazily loads the active feed on first view. -->
-<script type="module" src="/assets/js/feeds.js?v=ob-v160"></script>
-<script src="/assets/js/nav.js?v=ob-v160" defer></script>
+<script type="module" src="/assets/js/feeds.js?v=ob-v166"></script>
+<script src="/assets/js/nav.js?v=ob-v166" defer></script>
 
 </body>
 </html>

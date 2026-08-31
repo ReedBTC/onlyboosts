@@ -132,6 +132,45 @@ function boosterRankQuery(row) {
 }
 
 /**
+ * A publisher's three all-time ranks on the Artists feed.
+ *
+ * The booster branch's shape one tier over: the CTE restates
+ * `/api/v1/publishers`'s aggregate exactly — boosts joined through the
+ * declaring shows, grouped by publisher, the title-less row excluded — so the
+ * rank is a place on the list the reader can go and scroll. The third key is
+ * `boosters`, the same breadth axis a show ranks by, because the Artists feed
+ * offers exactly the show feeds' sorts.
+ */
+function publisherRankQuery(row) {
+  const val = {
+    sats: Number(row.sats) || 0,
+    boosts: Number(row.boosts) || 0,
+    boosters: Number(row.boosters) || 0,
+  };
+  const args = [];
+  const parts = RANK_KEYS.map((k) => {
+    args.push(val[k], val[k]);
+    return `COUNT(CASE WHEN m.${k} > ? THEN 1 END) AS a_${k},
+            COUNT(CASE WHEN m.${k} = ? THEN 1 END) AS t_${k}`;
+  }).join(",\n           ");
+
+  const sql = `
+    WITH m AS (
+      SELECT pc.publisher_guid,
+             COALESCE(SUM(b.sats), 0)         AS sats,
+             COUNT(*)                         AS boosts,
+             COUNT(DISTINCT b.booster_pubkey) AS boosters
+        FROM boosts b
+        JOIN podcasts pc   ON pc.podcast_guid    = b.podcast_guid
+        JOIN publishers pub ON pub.publisher_guid = pc.publisher_guid
+       WHERE pub.title IS NOT NULL
+       GROUP BY pc.publisher_guid
+    )
+    SELECT ${parts} FROM m`;
+  return { sql, args };
+}
+
+/**
  * The three all-time global ranks for a show or an episode.
  *
  * Resolves `{ sats:{rank,tied}, boosts:{…}, boosters:{…} }` or null; never
@@ -153,6 +192,12 @@ export async function feedRanks(db, kind, row) {
       const { sql, args } = boosterRankQuery(row);
       const r = await db.prepare(sql).bind(...args).first();
       return ranksFrom(r, BOOSTER_RANK_KEYS);
+    }
+    if (kind === "publisher") {
+      if (!row || !row.guid) return null;
+      const { sql, args } = publisherRankQuery(row);
+      const r = await db.prepare(sql).bind(...args).first();
+      return ranksFrom(r, RANK_KEYS);
     }
     const isEpisode = kind === "episode";
     const id = isEpisode ? row.item_guid : row.podcast_guid;

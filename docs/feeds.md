@@ -464,6 +464,72 @@ Two data facts that shaped the UI:
 **Both ranges fetch the drawer**, with the window passed as `?since=<unix>` so
 the rows come back scoped and recounted. A drawer showing all-time figures under
 a card showing the week's would contradict the card it opened from.
+### The Artists feed
+
+`assets/js/artists-feed.js`, behind Artists in the feed bar — the third Music
+sub-feed, shipped 2026-08-30. Music has three tiers of ownership — publisher >
+album (show) > song (episode) — and `<podcast:publisher>` is the top one: in
+practice the publisher is the ARTIST (Wavlake, Fountain and RSS Blue mint one
+publisher feed per artist). The collector resolves the linkage from raw RSS
+(Podcast Index carries no publisher field; `bots/global-boost-scan/publishers.py`
+is the design record), and `GET /api/v1/publishers` aggregates the boosts to
+every show declaring the publisher. Coverage, measured on the full corpus:
+386 of 492 music shows (78%) declare one; 182 publishers.
+
+The renderer is `shows-feed.js` minus the adoption machinery and the medium
+split, and the two stay parallel on purpose. The card is
+`assets/js/publisher-card.js` + `publisher-card-actions.js`, on the show card's
+classes and discipline. What differs from the show-level rollups, each a
+decision:
+
+- **Global only and SCOPELESS**, like Shows and Albums, same reason.
+- **The endpoint takes no medium.** The tier is ownership: 9 of the 395
+  declaring shows are podcasts, and an artist's figures are the figures of
+  everything they declared. The SURFACE sits under Music because the tag is a
+  music-host feature today (zero coverage on anchor/podhome/buzzsprout),
+  not because the query narrows.
+- **Always a GROUP BY.** `publishers` carries no precomputed aggregates, so
+  All aggregates like the windowed ranges do. 182 publishers over an indexed
+  join; the windowed show path already does this work on every 1W press.
+- **`lang` runs through the declaring shows' languages**: "German artists" is
+  artists ranked by their German albums' boosts, and `lang=unknown` recounts
+  over only the untagged half — NULL is not English, here as everywhere. The
+  menu is the music facet (`languageOptions({medium:'music'})`), which is this
+  feed's facet to within those nine shows.
+- **Search is a LIKE, not FTS.** 182 rows do not earn an FTS table; the title
+  LIKE escapes its wildcards (`likeEscape`, members.js's rule) and a pasted
+  guid matches as an equality. The `q=` path still ranks with `RANK()` over
+  the whole filtered ordering — rank retention holds.
+- **The card's title links to `/artist/<guid>`** (the page shipped alongside,
+  2026-08-30; `show-link.js#publisherPageHref` owns the rule). The drawer is
+  the inline navigation: the artist's **indexed** albums from
+  `GET /api/v1/publishers/<guid>`, ranked by sats and windowed with the
+  card's range (`?since`, the show drawer's contract), each row linking to
+  its `/show` page, with the foot linking the artist page. A MIXED drawer —
+  an artist who also declares podcasts — renders the medium partition as two
+  labelled groups (Albums, then Shows); unmixed drawers carry no labels.
+- **⚠️ THE DRAWER IS INDEX-ONLY.** *Reed's call, 2026-08-30.* Nothing without
+  at least one Nostr boost appears anywhere on this site — the podroll is the
+  one standing exception, and it is not a ranked feed. The first cut listed
+  the publisher feed's own catalogue on the podroll's argument and rendered
+  ~270 titleless off-index Wavlake rows linking to raw XML. The endpoint now
+  reads `podcasts WHERE publisher_guid` — exactly the shows the card's
+  figures were computed over — and `albumRowsHtml` has **no external-URL
+  branch at all**, so the rule is structural. `publisher_albums` (the
+  artist's catalogue file) stays collected and deliberately unrendered; if
+  off-index content ever comes to this site, it comes site-wide, not through
+  this feed.
+- **No boost pill.** `/api/value` resolves through Podcast Index, which cannot
+  see most publisher feeds (measured: empty object for Wavlake artist guids).
+  A pill that fails for most artists is worse than none; boosting stays one
+  drawer-click away, at the album and song level.
+- **No album count on the card face** — same reasoning as the episode count
+  the show card dropped: a catalogue size is a claim about the artist's work,
+  not about boost activity, and the drawer answers it properly.
+
+`scripts/test-publishers-api.mjs` drives both shipped handlers over a
+node:sqlite build of the real schema.
+
 ### The episode feed adapter
 
 `feeds-podcasts.js` predates this data feed: it groups a flat boost list by

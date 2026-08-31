@@ -19,7 +19,7 @@
  * per-user and change as boosts arrive, so a page-lifetime cache would serve a
  * stale feed. The endpoints set their own short Cache-Control.
  */
-import { normalizeBoosts } from '/assets/js/ob-data.js?v=ob-v160'
+import { normalizeBoosts } from '/assets/js/ob-data.js?v=ob-v166'
 
 const BASE = '/api/v1/'
 
@@ -574,4 +574,64 @@ export async function getLanguages({ medium = null, signal } = {}) {
   if (!resp.ok) throw new Error(`languages: HTTP ${resp.status}`)
   const data = await resp.json()
   return Array.isArray(data?.languages) ? data.languages : []
+}
+
+/* ── Publishers (the Artists feed) ───────────────────────────────────
+ * The tier above the show-level rollup: <podcast:publisher>, one row per
+ * artist. Same shapes as the show trio above, one level up. */
+
+const PUBLISHERS_API = '/api/v1/publishers'
+
+/** One page of the ranked artist list. */
+export async function getPublisherPage({
+  sort = 'boosters', range = 'all', lang = null,
+  offset = 0, limit = SHOW_PAGE, q = null, signal,
+} = {}) {
+  const qs = new URLSearchParams({
+    sort, range, limit: String(limit), offset: String(offset),
+  })
+  if (q) qs.set('q', q)
+  if (lang && lang !== 'all') qs.set('lang', lang)
+
+  const resp = await fetch(`${PUBLISHERS_API}?${qs}`, {
+    headers: { Accept: 'application/json' }, signal,
+  })
+  if (!resp.ok) throw new Error(`publishers: HTTP ${resp.status}`)
+  const data = await resp.json()
+  return {
+    records: Array.isArray(data?.publishers) ? data.publishers : [],
+    nextOffset: Number.isFinite(data?.next_offset) ? data.next_offset : null,
+  }
+}
+
+/** The Artists typeahead. Same reasoning as searchShows. */
+export async function searchPublishers({
+  q, sort = 'boosters', range = 'all', lang = null,
+  limit = SEARCH_HITS, signal,
+} = {}) {
+  const text = typeof q === 'string' ? q.trim() : ''
+  if (text.length < SEARCH_MIN_CHARS) return []
+  const { records } = await getPublisherPage({
+    sort, range, lang, signal, q: text, limit, offset: 0,
+  })
+  return records
+}
+
+/** One artist's INDEXED album list, for the card's drawer, ranked by sats.
+ *  `since` windows the rows and recomputes their figures, the same contract
+ *  getShowEpisodes keeps — the card above the drawer shows the range's
+ *  numbers. Index-only (Reed's call, 2026-08-30): the endpoint reads the
+ *  declaring shows, never the artist's own catalogue file. */
+export async function getPublisherAlbums({ guid, since = null, signal } = {}) {
+  const qs = since ? `?since=${encodeURIComponent(String(since))}` : ''
+  const resp = await fetch(
+    `${PUBLISHERS_API}/${encodeURIComponent(guid)}${qs}`,
+    { headers: { Accept: 'application/json' }, signal },
+  )
+  if (!resp.ok) throw new Error(`publisher detail: HTTP ${resp.status}`)
+  const data = await resp.json()
+  return {
+    publisher: data?.publisher || null,
+    albums: Array.isArray(data?.albums) ? data.albums : [],
+  }
 }

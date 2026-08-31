@@ -40,6 +40,7 @@ passed its size budget. Nothing was rewritten on the way across, so that same
 | `/show/<guid>` | one show, edge-rendered |
 | `/episode/<item-guid>` | one episode, edge-rendered |
 | `/booster/<npub>` | one person, edge-rendered |
+| `/artist/<guid>` | one artist (publisher), edge-rendered — see the detail pages section |
 | `/about` | the project's own explanation of what the data is and isn't |
 | `/stats` | a coming-soon placeholder: nav + header + soon-card, `noindex`, out of the sitemap. `/boosters` was the second one and was **deleted** on 2026-08-23 — see the Stats row of the site map |
 | `/404.html` | see the ⚠️ under LB conventions |
@@ -91,6 +92,7 @@ restating a control the page already has.
 | Members · Follows | `#members-follows` | same, filtered to your kind-3 contacts |
 | Shows | `#shows` | per-show rollup, Global only |
 | Albums | `#albums` | the same rollup, music feeds only, Global only |
+| Artists | `#artists` | the publisher tier above Albums, Global only |
 
 The inline feed-bar controller in `index.html` owns the tabs, the sub-category
 row, the scope menu, which panel is on screen, and the hash, and dispatches
@@ -107,7 +109,7 @@ behind a control you had to know to open, which is idea #18's whole complaint.
 | Tab | Sub-feeds | Why |
 |---|---|---|
 | **Podcasts** | Shows · Episodes | the not-music side of `<podcast:medium>` |
-| **Music** | Albums · Songs | the music side |
+| **Music** | Albums · Songs · Artists | the music side |
 | **Members** | *(none shown)* | the boost firehose, which takes no medium and could not go under either without becoming two things it isn't |
 
 **⚠️ THE TAB IS DERIVED FROM THE FEED KEY AND IS NOT IN THE HASH.** `TAB_OF` in
@@ -151,12 +153,12 @@ measures; those are typographic, not the track.
 **A hash may carry a view: `#shows?lang=de&range=1m&sort=sats`.** The feed key
 stays intact as the part before the `?`, so `FEEDS` and `ALIASES` look up exactly
 as they did and a retired hash still upgrades. `PARAM_FEEDS` (né `LANG_FEEDS`)
-lists the six that have the axes; the two Boosts feeds drop the parameters and
+lists the seven that have the axes; the two Boosts feeds drop the parameters and
 rewrite, the same coercion a signed-out `#episodes-follows` gets. See **The View
 In The Hash** in `docs/feeds.md` for the whole mechanism.
 
 `SCOPELESS` in that controller is the set of types with no whose-axis (`shows`,
-`albums`) — their key is the bare type, and picking one leaves the scope *state*
+`albums`, `artists`) — their key is the bare type, and picking one leaves the scope *state*
 alone, so Boosts · Follows → Shows → Episodes returns you to Follows. Adding
 Shows · Follows means dropping it from that set, renaming the key and keeping
 `#shows` as an alias.
@@ -231,6 +233,16 @@ podcast, 465 music, 2 video**.
 episode-level rollup; Shows and Albums are one show-level rollup. Each pair
 splits on the medium and differs *only* by a copy table at the top of its module.
 Adding a third medium is a third entry in those tables, not a third renderer.
+
+**Music has a third tier above the album: the publisher, which in practice is
+the ARTIST.** `<podcast:publisher>` links an album feed to its artist's own
+publisher feed; the collector resolves it from raw RSS (PI carries no publisher
+field — `bots/global-boost-scan/publishers.py` is that design record) and the
+Artists feed (`#artists`, shipped 2026-08-30) ranks them. **The Artists ENDPOINT
+takes no medium** — the tier is ownership, and 9 of the 395 declaring shows are
+podcasts — while the SURFACE sits under the Music tab because the tag is a
+music-host feature (measured zero coverage outside the music hosts). **The
+Artists feed** in `docs/feeds.md` carries the seven decisions behind it.
 
 **⚠️ The split is a partition, not a narrowing.** `music` goes to Songs and
 Albums; **everything else** goes to Episodes and Shows — podcasts, the two video
@@ -382,7 +394,7 @@ node scripts/stamp-assets.js --check   # verify; non-zero exit if anything is st
 **Order matters.** `sync-partials` injects markup into the page files; anything
 it injects has to be stamped afterwards.
 
-Fifteen test scripts, all plain `node scripts/<name>.mjs` with no runner:
+Sixteen test scripts, all plain `node scripts/<name>.mjs` with no runner:
 
 | | |
 |---|---|
@@ -401,15 +413,16 @@ Fifteen test scripts, all plain `node scripts/<name>.mjs` with no runner:
 | `test-keysend-upgrade.mjs` | the keysend upgrade: the `fountain.fm` exclusion's exact-or-parent rule, the routing pair's whole-or-nothing rule, the strict node-pubkey check, every way `/api/keysend` answers "no endpoint", and the wallet gate. **Stubs `fetch`**, so it probes nobody's well-known |
 | `test-feed-search.mjs` | the search box's two outcomes, driving the **shipped** `mountFeedSearch` against a stub DOM: Enter submits the whole query where a feed supplies `onSubmit`, arrow + Enter still picks, emptying the box or Escape clears through `onPick(null)`, the footer row renders — and **the member lookup, with no `onSubmit`, keeps its old Enter**. Confirmed red on two mutations: auto-highlight restored, and the empty-box clear removed |
 | `test-hpw-cards.mjs` | the 40 HPW share cards, three halves: `hpw-board.js`'s two-sided rules (a **source** scan for absolute imports, `Date.now()` and unpinned locales, plus the row's escaping and `isSafeUrl` on the face); `hpw-share.js`'s pure parts (the note's shape, the link rule, the tags, the `window` listener); the **shipped** `/hpw` Function over a `node:sqlite` build of the real schema (every redirect, the 404s, the page's canonical and `og:image`, the card's frame and ready signal, and that the page carries `rowHtml` byte for byte); and `/api/og/hpw/<name>.png` with **`fetch` stubbed** (the allowlist, the upstream's 200-for-missing answered with the banner, the PNG signature, the 900KB cap, HEAD). Nothing in it touches the VPS |
+| `test-publishers-api.mjs` | the **shipped** `/api/v1/publishers` handlers — listing and per-artist detail — over a `node:sqlite` build of the real `schema.sql`, on the members-search pattern. Three sorts with three winners, the boost-time windows, the language filter recounting through the declaring shows (`lang=unknown` included), LIKE-wildcard decoys, rank retention on `q=`, the title-less publisher's exclusion, HEAD, the album list's publisher-order and its live-row-over-edge-hint preference |
 
 **⚠️ `test-server-render.mjs` IS THE ONE THAT NEEDS AN ARGUMENT, SO IT IS THE ONE
 THAT GOES UNRUN.** Its header carries the `curl` that produces the capture; take
 a fresh one rather than reusing an old file, since it is also the size
 measurement. It asserted `cards are numbered 1..N with no gaps` — the *ordinal*
 scheme's invariant — until competition ranking shipped on 2026-08-18, and it
-would have been merged red had it not been run. **Run all fifteen before a
+would have been merged red had it not been run. **Run all sixteen before a
 merge**, and treat this one as the guard on the ranking scheme rather than only
-on weight. *(It read "all twelve" until 2026-08-24, contradicting the table
+on weight. *(It read "all twelve" until 2026-08-24 and "all fifteen" until 2026-08-30, contradicting the table
 directly above it — the count moved when a test was added and this sentence did
 not. If the table grows again, this line grows with it.)*
 
@@ -1373,6 +1386,7 @@ renderer on first view.
 | `songs-follows` | `feeds-podcasts.js` | same, `medium=music`, as `POST` |
 | `shows` | `shows-feed.js` | `GET /api/v1/podcasts?not_medium=music` |
 | `albums` | `shows-feed.js` | same, `medium=music` |
+| `artists` | `artists-feed.js` | `GET /api/v1/publishers` — the publisher tier, no medium |
 
 **All four ranked feeds rank server-side.** They used to build a corpus in the
 browser and roll it up, which ranked over whatever shards the walk happened to
@@ -1553,10 +1567,10 @@ All three are in `docs/feeds.md`. What a change would break:
   both through `bmbShowUrl()`: "See All Episodes", and a podroll tile for a show we
   have no page for.
 
-## The three detail pages
+## The detail pages
 
-`/show/<guid>`, `/episode/<item-guid>` and `/booster/<npub>` are **one page with
-three subjects**. The back link, the stat tiles, the drawers, the boost list, the
+`/show/<guid>`, `/episode/<item-guid>`, `/booster/<npub>` and `/artist/<guid>`
+are **one page with four subjects** (the artist page joined 2026-08-30). The back link, the stat tiles, the drawers, the boost list, the
 community wall and the whole client chrome come out of two shared modules; what
 differs is the subject and which sections apply.
 
@@ -1584,6 +1598,25 @@ shows, episodes on `/booster`); a fifth wants looking at rather than squeezing i
 The type scales with `clamp()` rather than stepping, and **the binding constraint
 is the LABEL, not the number** — "episodes" and "boosters" are eight characters,
 where the widest figure is five.
+
+**`/artist/<guid>` is the fourth, shipped 2026-08-30 with the Artists feed** —
+the publisher tier's landing page, structured as the album page one level up
+(Reed's spec): hero, Nostr Boost Stats tiles with the rank chip (`feedRanks`
+gained a `publisher` kind ranking on the Artists feed), **#albums** ("Albums
+with Nostr Boosts", the indexed declaring MUSIC shows by sats, the
+episode-drawer chrome) with **#shows** ("Shows with Nostr Boosts") beside
+it for the not-music declaring shows — the medium partition, because 9
+declaring shows are podcasts and a heading names only what is under it —
+**#community-artists** ("Other Artists This Community Boosts",
+the /show community rollup one tier up — NOT medium-split, because every row
+is a publisher and there is no partition to cross), the **#community** wall,
+and **#boosts** (opens on 24, whole corpus behind
+`/api/v1/publishers/<guid>?corpus=1`, the shared boost-section machinery). No
+boost button (PI cannot resolve most publisher feeds); index-only
+throughout. Section ids `#albums` and `#community-artists` are frozen. It is
+in `EDGE_PAGES`, the sitemap, and `show-link.js#publisherPageHref` is the one
+place that decides an artist title links — the feed card reads it too.
+`scripts/test-publishers-api.mjs` executes the page's extracted SQL.
 
 **`docs/detail-pages.md` carries the rest**: the rank line in the stat tiles,
 where the shared code lives, the section ids, the hash spy, the back link, the
@@ -2103,13 +2136,16 @@ would. Never remove an entry** — those links are in the wild.
 | `boost-list.js` + `boost-section.js` | **the** boost row and the `#boosts` range and sort, facts and verbs, shared by the edge and the browser |
 | `show-card.js` + `show-card-actions.js` | **the** show card, facts and verbs, shared by the edge and the browser |
 | `shows-feed.js` | the feed around that card, behind Shows and Albums |
+| `publisher-card.js` + `publisher-card-actions.js` | **the** artist card, facts and verbs — no edge surface yet, but built to the two-sided rules so gaining one is a Function-only change |
+| `artists-feed.js` | the feed around that card, behind Artists — the publisher tier |
+| `functions/api/v1/publishers.js` + `…/publishers/[guid].js` | the artist rollup and the per-artist album list, off the collector's publisher pass |
 | `supporter-wall.js` + `supporter-wall.css` | **the** community wall, shared by the three detail pages and the Members tab |
 | `members-board.js` | the Members tab: the #40HPW boards and their week picker, the wall and its three orderings, the Rules dialog |
 | `feed-controls.js` / `feed-search.js` | the range/sort chrome and the per-feed typeahead |
 | `feed-lang.js` | the language menu on the four ranked feeds, and the copy it rewrites |
 | `boosts-thread.js` / `boost-actions.js` | the content tokenizer and reply / like / repost / zap |
 | `functions/index.js` | the homepage's opening feed — **Shows**, rendered at the edge |
-| `functions/{show,episode,booster}/…` | the three edge-rendered detail pages |
+| `functions/{show,episode,booster,artist}/…` | the four edge-rendered detail pages |
 | `functions/api/v1/*` | the D1 query API |
 | `functions/api/v1/members.js` | member search and the top-members listing, over all 2,011 |
 | `functions/api/v1/members/hours.js` | the #40HPW boards, and any past week by `week=YYYY-MM-DD` |

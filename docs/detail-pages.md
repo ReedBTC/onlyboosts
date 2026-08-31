@@ -729,3 +729,61 @@ OG tags either way; those are about the share card, not about crawling.
 The episode query is a `GROUP BY` over the whole boosts table where the show one
 is a single indexed scan, so it has its **own** `try` — a failure there must not
 cost the show entries that already succeeded.
+
+
+---
+
+### The Artist Page: `/artist/<guid>`
+
+The fourth detail page, shipped 2026-08-30 beside the Artists feed. The subject
+is the publisher tier (`<podcast:publisher>`, the artist in practice); the
+structure is the album page one level up, which was Reed's spec verbatim: hero,
+Nostr Boost Stats tiles, **Albums with Nostr Boosts**, **Other Artists This
+Community Boosts**. Decisions, each deliberate:
+
+- **Index-only throughout**, the site rule: the albums section is
+  `podcasts WHERE publisher_guid` by sats — never `publisher_albums`, the
+  artist's own catalogue file, which stays collected and unrendered.
+- **⚠️ THE DECLARING SHOWS ARE PARTITIONED ON MEDIUM** (Reed caught V4V
+  Roundtable — a podcast — under the "Albums" heading on the preview,
+  2026-08-30): music renders under **#albums** ("Albums with Nostr Boosts"),
+  everything else — podcasts, video, unidentified — under **#shows** ("Shows
+  with Nostr Boosts"), each section only when non-empty, the hero sub-line
+  counting both halves. The feed card's drawer takes the same partition as
+  labelled groups inside one drawer (`albumRowsHtml`), unlabelled when
+  unmixed. The STAT TILES still aggregate both: the tier is ownership, and
+  the two sections together hold exactly the shows the figures cover. The
+  ENDPOINT stays unfiltered and now ships `medium` on every album row —
+  the split is the renderer's, the same seam as everywhere else.
+- **The wall and #boosts joined the same day** (Reed's follow-up to his own
+  spec): the Nostr Community wall is `fetchSupporters` one tier up (boosters
+  by sats to the artist's albums, `SUPPORTER_CAP`, total order), and #boosts
+  opens on the newest 24 with the shared boost-section range/sort over
+  `/api/v1/publishers/<guid>?corpus=1` — `fetchPublisherCorpus`, the
+  fetchShowCorpus twin. Its rows print both the episode and the show
+  (`showTarget` and `showShow` both true), each being new information here.
+- **No boost button.** `/api/value` resolves through Podcast Index, which
+  cannot see most publisher feeds (measured on Wavlake artist guids), and a
+  button that fails for most artists is worse than none. Every album row leads
+  to a page that carries one.
+- **⚠️ `?corpus=1`'s endpoint module stays node-importable** for
+  `test-publishers-api.mjs`, which is why `publishers/[guid].js` carries a
+  LOCAL mention-name lookup (the booster page's `toHexPubkey` arrangement)
+  instead of importing `_shared/detail-page.js`, whose re-export chain node
+  cannot resolve.
+- **The community rollup is not medium-split** — and unlike `/show`'s history
+  this is not a reversal waiting to happen: every row is a publisher, one pool,
+  no partition to cross.
+- **The rank chip ranks on the Artists feed**: `feedRanks(db, "publisher", …)`
+  in `functions/_shared/feed-rank.js`, the booster branch's shape with the
+  listing endpoint's aggregate restated (title-less row excluded), top-100
+  cutoff and all.
+- **Section ids `#albums`, `#shows`, `#community-artists`, `#community` and
+  `#boosts` are frozen**, like every other page's — `#shows`, `#community`
+  and `#boosts` reused deliberately, naming the same kind of section they
+  name everywhere else. `#community-artists` follows the `#community-shows` /
+  `#community-episodes` naming; `#albums` is this page's own.
+- **404s**: an unknown guid, the one title-less publisher row, and a publisher
+  with no boosts all answer a real 404, `noindex`, pointing at `/#artists`.
+- Both drawers sort client-side off packed row attributes
+  (`assets/js/artist-page.js`), never a fetch — the show page's arrangement.
