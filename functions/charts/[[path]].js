@@ -177,13 +177,17 @@ ${sections}
   const ogTitle = `OnlyBoosts Charts: Week of ${weekLabel(ws)}`;
   return shell({
     title: `${ogTitle} — OnlyBoosts`,
-    eyebrow: COPY.eyebrow,
-    h1: `Week of ${weekLabel(ws)}`,
-    lead: COPY.intro,
+    /* The banner IS the heading (Reed, 2026-09-01): the big week h1 restated
+       the stepper pill right under it, and the lead sentence is carried by
+       the og:description where it travels alone. The week's name survives in
+       <title>, the canonical, and the pill. */
+    headerHtml: `<header class="cb-masthead">
+  <img src="/assets/onlyboosts_charts_banner_clear.png" alt="OnlyBoosts Charts" width="1200" height="333" />
+</header>`,
     body,
     canonical: pageUrl,
     og: { title: ogTitle, description: leadSentence(ws), image: `${SITE_ORIGIN}/assets/onlyboosts_banner.png`, url: pageUrl },
-    scripts: `<script src="/assets/js/charts-page.js?v=ob-v177" type="module"></script>`,
+    scripts: `<script src="/assets/js/charts-page.js?v=ob-v178" type="module"></script>`,
   });
 }
 
@@ -194,7 +198,15 @@ ${sections}
    own --feed-track measure) so a pair fits side by side. feed-cards.css is for
    the picker's .pcast-sort-menu; hpw-board.css dresses the stepper and the
    Members pair's rows. */
-function shell({ title, eyebrow, h1, lead, body, canonical = null, og = null, scripts = "", noindex = false }) {
+function shell({ title, eyebrow, h1, lead, body, canonical = null, og = null, scripts = "", noindex = false, headerHtml = null }) {
+  /* The week pages hand in a masthead (the charts banner on the page ground,
+     the homepage's own pattern — the wordmark's darker blue would go muddy on
+     the navy band); the 404/503 shells keep the text header. */
+  const header = headerHtml || `<section class="page-header">
+  <p class="page-eyebrow">${htmlEscape(eyebrow)}</p>
+  <h1>${htmlEscape(h1)}</h1>
+  <p>${htmlEscape(lead)}</p>
+</section>`;
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -249,13 +261,13 @@ ${og ? `
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v177" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v177" />
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v177" />
-  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v177" />
-  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v177" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v177" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v177" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v178" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v178" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v178" />
+  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v178" />
+  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v178" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v178" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v178" />
   <style>
     /* No feed is active on this page, so it supplies the brand accent itself,
        the same call /hpw and .show-main make. */
@@ -384,11 +396,7 @@ ${og ? `
 </header>
 <!-- NAV:END -->
 
-<section class="page-header">
-  <p class="page-eyebrow">${htmlEscape(eyebrow)}</p>
-  <h1>${htmlEscape(h1)}</h1>
-  <p>${htmlEscape(lead)}</p>
-</section>
+${header}
 
 <main class="page-main">
   <div class="cb-inner">
@@ -454,10 +462,10 @@ ${body}
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav.js?v=ob-v177" defer></script>
+<script src="/assets/js/nav.js?v=ob-v178" defer></script>
 ${scripts}
-<script src="/assets/js/nav-widget-boot.js?v=ob-v177"></script>
-<script src="/assets/js/sw-register.js?v=ob-v177" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v178"></script>
+<script src="/assets/js/sw-register.js?v=ob-v178" defer></script>
 </body>
 </html>`;
 }
