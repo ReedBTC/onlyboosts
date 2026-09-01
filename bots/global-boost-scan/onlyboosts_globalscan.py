@@ -5,6 +5,8 @@ Subcommands:
   backfill     deep walk every core relay back to the floor (default 2025-01-01),
                resumable per-relay; classify + store boosts.
   incremental  forward tail scan since the last run (for the recurring timer).
+  deepscan     recover the pre-k-tag era (before ~2025-04-14) by #i-per-guid and
+               authors= walks — those old notes never match the #k filter.
   enrich       fill Podcast Index show/episode metadata + kind-0 profiles.
   excludes     validate excludes.json and report what each entry hides.
   stats        print DB counts.
@@ -20,6 +22,7 @@ classifying.
 """
 
 import argparse
+import fcntl
 import json
 import re
 import requests
@@ -278,6 +281,237 @@ def cmd_outbox(args):
 
     print(f"\nOutbox pass: {totals['seen']} scanned, {totals['boosts']} boosts, "
           f"{totals['new']} new rows.")
+    _print_stats(conn)
+
+
+# ── deep re-scan for the pre-k-tag era ────────────────────────────────────────
+# Diagnosed 2026-08-31: Fountain boost notes carried `i` tags with NO `k` tag
+# until ~2025-04-14, so the whole i-only era is invisible to the #k scan filter
+# on every relay — while relay.fountain.fm retains kind-1s back to late 2022.
+# This pass recovers that era two ways, neither needing the k tag: per-guid #i
+# queries over every show we know, and authors= walks over every booster we
+# know. Recovered boosts name new shows and new boosters, so it iterates until
+# convergence. classify_boost reads i tags and fetches quoted zap receipts, so
+# no classifier change was needed (measured on one guid's 204 pre-cliff notes:
+# 156 classified, 156/156 receipts resolved, 100% sats).
+DEEPSCAN_STATE = str(HERE / "data" / "deepscan_state.json")
+KTAG_ADOPTION_UNTIL = 1748736000   # 2025-06-01 — everything newer is #k-covered
+FLOOR_2022 = 1640995200            # 2022-01-01 — beyond fountain.fm's retention
+
+DEEPSCAN_KINDS = (
+    # (state key, filter builder, values per REQ)
+    ("guids",   lambda c: {"kinds": [1], "#i": [f"podcast:guid:{g}" for g in c]}, 20),
+    ("items",   lambda c: {"kinds": [1], "#i": [p + g for g in c
+                           for p in ("podcast:item:guid:", "podcast:guid:")]}, 20),
+    ("authors", lambda c: {"kinds": [1], "authors": list(c)}, 50),
+)
+
+
+def _deepscan_known_sets(conn, include_items):
+    """Every show guid and booster pubkey the index knows, phantoms included —
+    old notes carry the same phantom guid shapes guid_aliases was built for."""
+    guids = set()
+    for sql in ("SELECT DISTINCT podcast_guid FROM boosts "
+                "WHERE podcast_guid IS NOT NULL AND podcast_guid != ''",
+                "SELECT DISTINCT canonical_guid FROM boosts "
+                "WHERE canonical_guid IS NOT NULL AND canonical_guid != ''",
+                "SELECT podcast_guid FROM shows",
+                "SELECT raw_guid FROM guid_aliases"):
+        guids.update(r[0] for r in conn.execute(sql).fetchall())
+    authors = {r[0] for r in conn.execute(
+        "SELECT DISTINCT booster_pubkey FROM boosts").fetchall()}
+    items = set()
+    if include_items:
+        items = {r[0] for r in conn.execute(
+            "SELECT DISTINCT item_guid FROM boosts "
+            "WHERE item_guid IS NOT NULL AND item_guid != ''").fetchall()}
+    return guids, authors, items
+
+
+def _deepscan_walk(relay, base_filt, until, floor, on_page, max_pages=300,
+                   pace=0):
+    """Backward until-walk with a caller-supplied filter (the #k walker in
+    scan.py hardcodes its filter shape). One empty page is retried once before
+    being trusted — a relay timeout also comes back as an empty list. `pace`
+    sleeps that many seconds between pages: query_relay opens a fresh WebSocket
+    per REQ, and strict nginx fronts (podtards, lexingtonbitcoin) answer
+    back-to-back handshakes with 429 — which reads as an empty page and would
+    record the gap as 'nothing there'."""
+    cursor, empties, pages = until, 0, 0
+    while cursor > floor and pages < max_pages:
+        if pace and pages:
+            time.sleep(pace)
+        f = dict(base_filt)
+        f["until"], f["limit"] = cursor, 500
+        page = query_relay(relay, f, max_wall_seconds=60)
+        pages += 1
+        if not page:
+            empties += 1
+            if empties >= 2:
+                break
+            if pace:
+                time.sleep(pace)
+            continue
+        empties = 0
+        on_page(page)
+        oldest = min(ev.get("created_at", cursor) for ev in page)
+        if oldest >= cursor:
+            break                      # relay ignoring `until` — no progress
+        cursor = oldest - 1
+    return pages
+
+
+def _deepscan_load_state(until, floor, reset):
+    fresh = {"window": [until, floor], "relays": {}}
+    if reset or not Path(DEEPSCAN_STATE).exists():
+        return fresh
+    try:
+        st = json.loads(Path(DEEPSCAN_STATE).read_text())
+    except Exception:
+        return fresh
+    if st.get("window") != [until, floor]:
+        print("[state] window changed — starting fresh deepscan state")
+        return fresh
+    return st
+
+
+def cmd_deepscan(args):
+    conn = db.connect(DB_PATH, check_same_thread=False)
+    lock = threading.Lock()
+    receipt_cache = {}
+    totals = {"seen": 0, "boosts": 0, "new": 0}
+    months = Counter()
+    seen_new = set()
+    disc_guids, disc_authors = set(), set()
+    log = lambda m: print(m, flush=True)
+
+    # A writing run holds the pipeline lock so the incremental timer's ticks
+    # skip (flock -n in run-incremental.sh) instead of contending for SQLite.
+    lock_fh = None
+    if not args.dry_run:
+        lock_fh = open(HERE / "data" / "pipeline.lock", "w")
+        log("acquiring pipeline lock (waits for a running cycle to finish)...")
+        fcntl.flock(lock_fh, fcntl.LOCK_EX)
+        log("pipeline lock held — incremental ticks will skip until this run ends")
+
+    known_guids_0, known_authors_0, _ = _deepscan_known_sets(conn, False)
+    state = _deepscan_load_state(args.until, args.floor, args.reset)
+
+    def save_state():
+        if not args.dry_run:           # a dry run must not mark work done
+            Path(DEEPSCAN_STATE).write_text(json.dumps(state))
+
+    def on_page(events):
+        # The author walks return whole timelines; classify_boost's first gate
+        # is a podcast i tag, so only those notes can need a receipt lookup.
+        podcasty = [ev for ev in events
+                    if any(len(t) >= 2 and t[0] == "i"
+                           and str(t[1]).startswith("podcast:")
+                           for t in ev.get("tags", []))]
+        cand = _candidate_receipt_ids(podcasty)
+        with lock:
+            todo = [c for c in cand if c not in receipt_cache]
+        if todo:
+            fetched = fetch_events_by_ids(todo, RECEIPT_RELAYS)
+            with lock:
+                for c in todo:
+                    receipt_cache[c] = fetched.get(c)
+        with lock:
+            boosts = [b for b in (classify_boost(ev, receipt_cache,
+                                  receipt_fetch=lambda cid: receipt_cache.get(cid))
+                                  for ev in podcasty) if b]
+            totals["seen"] += len(events)
+            totals["boosts"] += len(boosts)
+            fresh = []
+            for b in boosts:
+                if b["event_id"] in seen_new:
+                    continue
+                if conn.execute("SELECT 1 FROM boosts WHERE event_id = ?",
+                                (b["event_id"],)).fetchone():
+                    continue
+                seen_new.add(b["event_id"])
+                fresh.append(b)
+                totals["new"] += 1
+                months[time.strftime("%Y-%m", time.gmtime(b["created_at"]))] += 1
+                if b.get("podcast_guid"):
+                    disc_guids.add(b["podcast_guid"])
+                disc_authors.add(b["booster_pubkey"])
+            if fresh and not args.dry_run:
+                db.upsert_boosts(conn, fresh)
+
+    def relay_job(relay, pending):
+        walked = 0
+        for kind, mk_filter, per in DEEPSCAN_KINDS:
+            vals = pending[kind]
+            for i in range(0, len(vals), per):
+                chunk = vals[i:i + per]
+                _deepscan_walk(relay, mk_filter(chunk), args.until, args.floor,
+                               on_page, pace=args.pace)
+                walked += 1
+                if args.pace:
+                    time.sleep(args.pace)
+                with lock:
+                    state["relays"][relay][kind].extend(chunk)
+                    save_state()
+                if walked % 5 == 0:
+                    log(f"    {relay}: {walked} chunk(s) walked, "
+                        f"{totals['new']} new so far")
+        return walked
+
+    relays = args.relays or CORE_RELAYS
+    rounds = 0
+    while rounds < args.max_rounds:
+        rounds += 1
+        guids, authors, items = _deepscan_known_sets(conn, args.items)
+        guids |= disc_guids
+        authors |= disc_authors
+        jobs, pending_total = [], 0
+        for r in relays:
+            st = state["relays"].setdefault(
+                r, {"guids": [], "authors": [], "items": []})
+            pending = {"guids":   sorted(guids - set(st["guids"])),
+                       "authors": sorted(authors - set(st["authors"])),
+                       "items":   sorted(items - set(st["items"]))}
+            if args.max_chunks is not None:
+                for (kind, _f, per) in DEEPSCAN_KINDS:
+                    pending[kind] = pending[kind][:args.max_chunks * per]
+            n = sum(len(v) for v in pending.values())
+            pending_total += n
+            if n:
+                jobs.append((r, pending))
+        if not jobs:
+            log(f"converged after {rounds - 1} round(s) — nothing left to walk")
+            break
+        log(f"round {rounds}: {len(jobs)} relay(s), {pending_total} pending "
+            f"values ({len(guids)} guids / {len(authors)} authors"
+            + (f" / {len(items)} items" if items else "") + ")")
+        with ThreadPoolExecutor(max_workers=min(12, len(jobs))) as ex:
+            futs = {ex.submit(relay_job, r, p): r for r, p in jobs}
+            for f in as_completed(futs):
+                try:
+                    f.result()
+                except Exception as e:
+                    log(f"  [error] {futs[f]}: {e}")
+        if args.max_chunks is not None:
+            break                      # debug mode: one bounded pass only
+
+    verb = "would add" if args.dry_run else "added"
+    log(f"\nDeepscan: {totals['seen']} notes scanned, {totals['boosts']} "
+        f"classified as boosts, {verb} {totals['new']} new rows")
+    if months:
+        log("new rows by month:")
+        for m in sorted(months):
+            log(f"  {m}  {months[m]}")
+    new_shows = disc_guids - known_guids_0
+    new_boosters = disc_authors - known_authors_0
+    log(f"previously unknown shows: {len(new_shows)}, "
+        f"previously unknown boosters: {len(new_boosters)}")
+    if not args.dry_run:
+        log("\nnext: resolve-guids → dedupe --all → enrich → export → push → "
+            "d1_sync --remote-delta (one manual run-incremental.sh covers all "
+            "but the wide dedupe)")
+    if lock_fh:
+        lock_fh.close()
     _print_stats(conn)
 
 
@@ -1153,6 +1387,30 @@ def main():
     rs.add_argument("--floor", type=int, default=FLOOR_2025)
     rs.add_argument("--relays", nargs="*")
     rs.set_defaults(func=cmd_rescan)
+
+    ds = sub.add_parser("deepscan",
+                        help="recover pre-k-tag boosts: #i-by-guid + author walks, "
+                             "iterated to convergence")
+    ds.add_argument("--until", type=int, default=KTAG_ADOPTION_UNTIL,
+                    help="newest created_at to walk from (default 2025-06-01 — "
+                         "newer notes are #k-covered)")
+    ds.add_argument("--floor", type=int, default=FLOOR_2022,
+                    help="oldest created_at to walk to (default 2022-01-01)")
+    ds.add_argument("--relays", nargs="*", help="override the relay set")
+    ds.add_argument("--items", action="store_true",
+                    help="also walk known item_guids under both #i prefixes (slower)")
+    ds.add_argument("--dry-run", action="store_true",
+                    help="classify + count, write nothing, mark no progress")
+    ds.add_argument("--max-rounds", type=int, default=4,
+                    help="cap on discovery iterations (default 4)")
+    ds.add_argument("--max-chunks", type=int, default=None,
+                    help="debug: cap chunks per relay per kind, single round")
+    ds.add_argument("--pace", type=float, default=0,
+                    help="seconds to sleep between pages/chunks per relay, for "
+                         "hosts whose nginx 429s back-to-back handshakes")
+    ds.add_argument("--reset", action="store_true",
+                    help="forget deepscan progress state and re-walk everything")
+    ds.set_defaults(func=cmd_deepscan)
 
     rg = sub.add_parser("resolve-guids",
                         help="canonicalize phantom podcast_guids (feed ids / item guids / slugs)")
