@@ -44,7 +44,7 @@ passed its size budget. Nothing was rewritten on the way across, so that same
 | `/about` | the project's own explanation of what the data is and isn't |
 | `/stats` | a coming-soon placeholder: nav + header + soon-card, `noindex`, out of the sitemap. `/boosters` was the second one and was **deleted** on 2026-08-23 — see the Stats row of the site map |
 | `/404.html` | see the ⚠️ under LB conventions |
-| `/hpw/<YYYY-MM-DD>`, `/hpw/high-scores` | one 40 HPW board as a page, edge-rendered, the address a shared week has. `/hpw/<key>/card` is the 720x900 portrait frame the collector screenshots for `/api/og/hpw/<key>.png`. See **The Share Cards** under the Members tab |
+| `/hpw/<YYYY-MM-DD>`, `/hpw/high-scores` | one 40 HPW board as a page, edge-rendered, the address a shared week has. **⚠️ `high-scores` is a PATH, not the board's name** — that board is **Proof of #40HPW** since 2026-09-01 and the URL deliberately did not move with it. `/hpw/<key>/card` is the 720x900 portrait frame the collector screenshots for `/api/og/hpw/<key>.png`. See **The Share Cards** under the Members tab |
 | `/charts/<YYYY-MM-DD>` | the OnlyBoosts Charts page, edge-rendered: weekly Top 10s for **Shows and Artists** on the `sort=chart` rule over the 40 HPW calendar week, plus the **Members 40 HPW board**, each beside a Weeks at #1 companion. `/charts` 302s to the live week. Episodes/Albums/Songs were CUT from the page on ship day (Reed: too sparse) but `week-charts.js` still serves them. See **The Charts Page** in `docs/feeds.md` |
 
 `/shows` and `/podcasts` are both 301s to `/#shows` now; the Shows feed replaced
@@ -436,7 +436,7 @@ Sixteen test scripts, all plain `node scripts/<name>.mjs` with no runner:
 | `test-boostbox.mjs` | the BoostBox descriptor path: the comment's whole-or-nothing rule, the record allowlist, and every way `/api/boostbox` is allowed to fail. **Stubs `fetch`**, so it never writes a record to a third party's service |
 | `test-show-card.mjs` | the show card's two-sided contract. Its own reason for existing is the crossing: `renderShowCard` was a DOM builder and could afford `Date.now()` and an unpinned locale, which a two-sided module cannot — see the note under the card |
 | `test-members-search.mjs` | `/api/v1/members`, running the **shipped handler** against a database built from the real `schema.sql` through an `env.DB` shim over `node:sqlite`. LIKE escaping, the identifier/name split, the listing, the publisher asymmetry, and `publishers=1` as its exact complement. **Two publisher keys are in the fixture deliberately**: with one, a single-row answer says nothing about whether the mode asks for the list or found the loudest key |
-| `test-members-hours.mjs` | the 40 HPW boards, same shim, with a fixture built to known answers. Dedupe, week boundaries, the publisher exclusion, the row-multiplying join, and **the week picker**: the bounded window's ceiling, the noon-UTC date rule, DST-safe stepping, and the resolve-rather-than-400 envelope. Confirmed red on three mutations — the ceiling removed, dates resolved at midnight, and stepping by a flat 604800. **Its `env.DB` shim models `.first()`**, which `feed-rank.js` taught `test-members-search.mjs` the hard way |
+| `test-members-hours.mjs` | the 40 HPW boards, same shim, with a fixture built to known answers. Dedupe, week boundaries, the publisher exclusion, the row-multiplying join, and **the week picker**: the bounded window's ceiling, the noon-UTC date rule, DST-safe stepping, and the resolve-rather-than-400 envelope. **Proof of #40HPW has its own six fixture members** (2026-09-01), each written to a hand-computable answer: one row per member, a sub-goal week that must not count, exactly-40 in and one second under out, the best week rather than the newest, and the more recent of two identical bests. Confirmed red on seven mutations — the ceiling removed, dates resolved at midnight, stepping by a flat 604800, the `HAVING` dropped, the best-week tiebreak flipped, the two weeks merged in the inner GROUP BY, and the entry test made strictly greater. **Its `env.DB` shim models `.first()`**, which `feed-rank.js` taught `test-members-search.mjs` the hard way |
 | `test-community-medium.mjs` | the two community rollups and the medium partition they were split on, against a `node:sqlite` build of the real `schema.sql`. **Two halves reached two ways**: `fetchCommunityBoosts` is exported and called directly, where `/show`'s query is inline in the page Function and is **extracted from the source and executed**, the `test-feed-hash.mjs` technique. A copy of the SQL written into the test would pass forever while the shipped one rotted. Confirmed to go red on three mutations: the filter removed, its polarity inverted, and the `COALESCE` dropped |
 | `test-keysend-upgrade.mjs` | the keysend upgrade: the `fountain.fm` exclusion's exact-or-parent rule, the routing pair's whole-or-nothing rule, the strict node-pubkey check, every way `/api/keysend` answers "no endpoint", and the wallet gate. **Stubs `fetch`**, so it probes nobody's well-known |
 | `test-feed-search.mjs` | the search box's two outcomes, driving the **shipped** `mountFeedSearch` against a stub DOM: Enter submits the whole query where a feed supplies `onSubmit`, arrow + Enter still picks, emptying the box or Escape clears through `onPick(null)`, the footer row renders — and **the member lookup, with no `onSubmit`, keeps its old Enter**. Confirmed red on two mutations: auto-highlight restored, and the empty-box clear removed |
@@ -1541,6 +1541,19 @@ What a change elsewhere would break:
   need it at different times. They cannot share code, so `test-members-hours.mjs`
   holds the hand-rolled rule against Node's real tzdata at both transitions, every
   week for four years.
+- **⚠️ THE SECOND BOARD IS "Proof of #40HPW" SINCE 2026-09-01 AND IT IS ONE ROW
+  PER MEMBER.** *Reed's call.* It was **High Scores**, the ten biggest
+  booster-weeks; `range=all` now returns every member who has ever cleared forty
+  hours in a week, ranked by how many such weeks they hold, carrying their best
+  one. The rename followed the data rather than a design idea: clearing forty had
+  happened **twice** when the board shipped and **twenty-three times** by
+  2026-09-01, twenty of those one member's, so a top ten by hours printed one
+  name ten times. **The entry test is `>= 40` on raw seconds, the same
+  comparison the gold row makes**, so a gold row on This Week means that member
+  is on Proof — change one and change both. **⚠️ THE URL DID NOT MOVE:**
+  `/hpw/high-scores`, `high-scores.png` and `mountShare`'s key are all still the
+  old name, which is in the wild and which the collector's card bot screenshots
+  by literal. The design record is **The all-time board** in `docs/members-tab.md`.
 - **⚠️ THE #40HPW FIGURES MOVE WITH THE WEEK RULE *AND* WITH DURATION COVERAGE.**
   Duration coverage adds hours to **past** weeks with no board code touched.
   Re-measure after either changes; the numbers are the whole argument for the name.

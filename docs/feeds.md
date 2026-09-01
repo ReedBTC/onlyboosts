@@ -286,7 +286,7 @@ and `peers` counted post-filter).
 302s to its canonical Monday, garbage and pre-index weeks 404, HEAD is
 answered. One page carries three pairs — the **Shows** and **Artists** weekly
 Top 10s on the chart rule, and the **Members 40 HPW board** — each beside a
-**Weeks at #1** companion, the high-scores idiom one URL scheme over.
+**Weeks at #1** companion, the leaderboard idiom one URL scheme over.
 
 - **⚠️ ONLY SHOWS, ARTISTS AND MEMBERS ARE ON THE PAGE.** *Reed's call,
   2026-08-31, the day it shipped with five*: the episode-level charts

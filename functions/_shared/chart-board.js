@@ -129,7 +129,7 @@ export function weekRowHtml(kind, r) {
 }
 
 /* One weeks-at-#1 row. The sub-line is the most recent #1 week, linking to
- * that week's own page — the high-scores board's discovery idiom, one URL
+ * that week's own page — the Proof of #40HPW board's discovery idiom, one URL
  * scheme over. Ranks are competitionRanks over the weeks figure, computed by
  * the caller so a board is ranked once, not per row. */
 export function onesRowHtml(kind, r, rk) {

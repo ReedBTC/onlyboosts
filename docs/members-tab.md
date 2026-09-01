@@ -104,7 +104,7 @@ with all three components in the tooltip — and the chart inherits the wall's
 publisher exclusion, being computed over the same listing.
 
 **⚠️ THE BOARD TITLES ARE CENTRED AND THEIR SUB-LINES ARE NOT.** *Reed's call,
-2026-08-23.* "This Week" and "High Scores" name the board the way a scoreboard's
+2026-08-23.* "This Week" and "Proof of #40HPW" name the board the way a scoreboard's
 own header does; the line under it is a caption, and a centred caption over a
 left-aligned list of rows reads as a second heading rather than as a note. The
 `<small>` is inside the `<h3>`, so it opts out of the alignment explicitly.
@@ -174,29 +174,43 @@ that word itself.
 Boost an episode and the board assumes you heard all of it, then adds up the
 durations. **It is an assumption, not a measurement**, and the Rules dialog says
 so. Two boards: **This Week** leads (it resets Monday and has a live race in
-it), **High Scores** follows. **⚠️ "This Week" NAMES THE BOARD'S DEFAULT, NOT ITS
-ONLY STATE** — since 2026-08-24 its title is a week picker and it renders any of
-the 99 weeks in the index. See **The week picker on This Week** below.
+it), **Proof of #40HPW** follows. **⚠️ "This Week" NAMES THE BOARD'S DEFAULT, NOT
+ITS ONLY STATE** — since 2026-08-24 its title is a week picker and it renders any
+of the 99 weeks in the index. See **The week picker on This Week** below.
 
-**⚠️ FORTY HOURS IS ALL BUT UNCLEARED.** Over all 10,042 booster-weeks,
-**exactly two pass it**, both Piez: 54.7h the week of 2025-09-22 and 40.2h the
-week of 2026-03-02. Nineteen weeks ever passed 30. **Re-measured 2026-08-24,
-when the collector's derived durations landed** — the 2026-08-23 Pacific re-cut
-had these at one (51.8h) and seventeen, and filling the duration-less feeds is
-what moved them: duration coverage adds hours to PAST weeks with no line of
-board code touched, which is why it is the second thing (after the week rule)
-that silently moves these figures. Before that, Piez's 41.6h UTC week re-cut to
-39.8h at midnight Pacific, the worked example for why the boundary moved.
+**⚠️ FORTY HOURS IS RARE, AND IT IS NO LONGER ALL BUT UNCLEARED.** Measured
+against production on 2026-09-01, **twenty-three booster-weeks have passed it**,
+held by **four members**: Piez with twenty, and The Bullish ₿itcoiner, rev.hodl
+and Nostr Gang with one each. The best week on record is 58.4h. The measurement
+is exact rather than a floor — it was read off the fiftieth row of the old
+board, and the twenty-fourth row is 39.8h, so the cut falls inside the window.
+
+**⚠️ AND THAT MEASUREMENT IS WHY THE SECOND BOARD WAS RENAMED.** It was
+**High Scores**, the ten biggest booster-weeks ever recorded, which was the
+right table while there were **two** of them: on 2026-08-24 the figures were
+54.7h and 40.2h, both Piez, with nineteen weeks ever past thirty. The
+collector's derived durations are what moved it — **duration coverage adds
+hours to PAST weeks with no line of board code touched**, which is the second
+thing (after the week rule) that silently moves every figure in this section —
+and once twenty of the twenty-three belonged to one member, a top ten by hours
+printed one name ten times. It reported a backfill rather than a challenge.
+*Reed's call, 2026-09-01.*
+
 **Re-measure these figures after any change to the week rule OR to duration
-coverage; they are the whole argument for the name and they move with both.**
-The gold row is no longer unique — the second 40h week arrived with the derived
-durations — so the framing question this file used to park on "if a second week
-ever clears 40" is now live, and it is Reed's to call. A typical winning week in
-mid-2026 is 14 to 20 hours. Six of the all-time top
-ten are from 2025, which is why This Week exists beside the high-score
-table rather than instead of it. The name is the provocation, not a threshold,
-and gold marks the rows above forty. **If gold ever marks a third of a
-board the fix is the goal, not the styling.**
+coverage; they are the whole argument for the name, and they move with both.**
+Before the Pacific re-cut, Piez's 41.6h UTC week re-cut to 39.8h at midnight
+Pacific, which is the worked example for why the boundary moved. A typical
+winning week in mid-2026 is 14 to 20 hours, which is why This Week exists
+beside the all-time board rather than instead of it. The name is the
+provocation, not a threshold.
+
+**⚠️ GOLD NOW MARKS EVERY ROW OF THE SECOND BOARD, AND THAT IS NOT THE FAILURE
+THE OLD NOTE WARNED ABOUT.** Gold has always meant "this week cleared forty",
+and on Proof clearing forty is the **entry test**, so the claim is true of every
+row by construction: the marker did not stop meaning anything, the board became
+the set of rows it marks. On a **weekly** board it is still the rare thing it
+was built to be, and **if gold ever marks a third of one of those the fix is
+the goal, not the styling.**
 
 `GET /api/v1/members/hours?range=week|all`. Four rules, each from a measurement:
 
@@ -307,10 +321,38 @@ being hours — both inflated by the same factor and both still a plausible boar
 
 **Units are `hpw`, not `h`:** every row is one member's one week.
 
-**The all-time board is "High Scores", not "Hall of Fame"** (*Reed's call,
-2026-08-23*). It is the arcade idiom the whole board is built on, and a hall of
-fame is a place you are inducted into where a high-score table is one you get
-onto by playing — which is the invitation This Week is making.
+**The all-time board is "Proof of #40HPW"** (*Reed's call, 2026-09-01*), and it
+is **one row per member** rather than one per booster-week: a member reaches it
+by clearing the goal in any single week and stays on it, ranked by how many such
+weeks they hold. The name says what a row is evidence **of** rather than where
+it ranks, which is the right claim for a board whose entry test is an
+achievement and whose ordering is a count of repeats.
+
+It was **"High Scores", not "Hall of Fame"** (*Reed's call, 2026-08-23*) for the
+week it was a table of the biggest weeks: the arcade idiom, where a hall of fame
+is a place you are inducted into and a high-score table is one you get onto by
+playing. **That argument did not die with the rename** — it moved one board
+over, to This Week, which is where the playing happens now.
+
+**⚠️ THE URL DID NOT MOVE WITH THE NAME.** The page is still
+`/hpw/high-scores`, its card is still `high-scores.png`, and `mountShare` is
+still keyed `high-scores`. That path is in the wild, the collector's card bot
+(`bots/hpw-cards/`) screenshots the literal, and
+`functions/api/og/hpw/[name].js` allowlists it; renaming buys nothing a reader
+can see and costs a redirect, a bot change and an allowlist entry.
+
+**The row's figure is the count of weeks; the rest of the row describes the
+member's BEST one** — its date under the name (still the jump button), and
+`best 58.4 hpw` where a weekly row prints its episode count. A total across
+every qualifying week would be a fifth figure nobody asked for, and an average
+would reward a member who stopped after one good week. The episode count moves
+into the tooltip rather than off the row.
+
+**⚠️ THE ENTRY TEST IS `>= 40`, WHICH IS THE COMPARISON THE GOLD ROW HAS ALWAYS
+MADE, AND THE TWO ARE ONE RULE.** A gold row on This Week means that member is
+on Proof, which is the whole invitation. It is tested on raw seconds, never on
+the rounded figure a row prints, so a week that displays as "40.0" and is 39.96
+does not qualify; `test-members-hours.mjs` pins both sides of that second.
 
 **⚠️ THE RULES DIALOG LINKS OUT TO THE BOOST BOTS SECTION, AND CLOSES ITSELF
 FIRST.** A bare `<a href="#boost-bots">` scrolls the document *behind the
@@ -326,7 +368,7 @@ caveat that said the same thing at two sizes.
 #### The week picker on This Week
 
 *Reed's ask, 2026-08-24.* This Week showed the live week and nothing else, so a
-reader who missed a week could not see it, and the High Scores rows named weeks
+reader who missed a week could not see it, and the all-time board's rows named weeks
 there was no way to open. `GET /api/v1/members/hours?range=week&week=YYYY-MM-DD`
 answers any of them.
 
@@ -401,7 +443,7 @@ substituted glyph has no midpoint to ask for. The stroke came down with it: 2px
 on a 6.4px box is a quarter of the shape and reads as a heavy outline, where a
 flat 1px goes to sub-pixel mush on a non-retina screen.
 
-**⚠️ THE HIGH SCORES ROWS ARE THE REAL WAY IN.** Each row's week is a button
+**⚠️ THE PROOF OF #40HPW ROWS ARE THE REAL WAY IN.** Each row's best week is a button
 (`data-hpw-goweek`) that opens that week on the board above. A menu of 99 dated
 rows can only be scrolled; the board beside it already names the weeks worth
 seeing, so the menu is the escape hatch for a week nobody has heard of rather
@@ -793,7 +835,7 @@ The note is exactly `<message>`, `<blossom url>`, `<link>`, each on its own
 paragraph. The message is what the reader typed (the suggestion is a
 placeholder, never content); the image and the link are shown as what will be
 added and added at publish. The link is `/#members` for the live week and the
-week's own page for a past week or High Scores, so a reader does not land on
+week's own page for a past week or Proof of #40HPW, so a reader does not land on
 a different board than the picture.
 
 Three rules the modal follows. It opens for everyone: signed out, Publish is

@@ -23,7 +23,7 @@
   padding: 0.9rem 1rem 1rem;
 }
 /* ⚠️ THE TITLE IS CENTRED AND ITS SUB-LINE IS NOT. Reed's call,
-   2026-08-23. "This Week" and "High Scores" name the board the way a
+   2026-08-23. "This Week" and "Proof of #40HPW" name the board the way a
    scoreboard's own header does; the line under it is a caption, and a
    centred caption over a left-aligned list of rows reads as a second
    heading rather than as a note. `small` is inside the `h3`, so it has to
@@ -178,11 +178,13 @@ a.hpw-arrow { text-decoration: none; }
   border-radius: 6px;
 }
 .hpw-row:first-child { border-top: 0; }
-/* ⚠️ GOLD IS THE ONLY DECORATION ON THIS BOARD, and it marks the two rows in
-   the whole history that cleared forty hours. If it ever marks a third of
-   the list it has stopped meaning anything — the fix would be the goal, not
-   the styling. The tint is a wash rather than a fill so the row still reads
-   as a row. */
+/* ⚠️ GOLD IS THE ONLY DECORATION ON THESE BOARDS, and it marks a week that
+   cleared forty hours. On a WEEKLY board it is still the rare thing it was
+   built to be, and if it ever marks a third of one the fix is the goal rather
+   than the styling. On Proof of #40HPW every row is gold by construction,
+   because clearing forty is that board's entry test — the marker did not stop
+   meaning anything there, the board became the set of rows it marks. The tint
+   is a wash rather than a fill so the row still reads as a row. */
 .hpw-row--gold {
   background: linear-gradient(90deg, rgba(198,150,32,0.16), rgba(198,150,32,0.02));
   box-shadow: inset 3px 0 0 #c69620;
@@ -220,6 +222,12 @@ a.hpw-name:hover { color: var(--accent-d); text-decoration: underline; }
 .hpw-hours { font-weight: 700; font-size: 0.92rem; color: var(--accent-d); flex: none; }
 .hpw-unit { font-weight: 400; font-size: 0.72rem; color: var(--muted); }
 .hpw-eps { font-size: 0.7rem; color: var(--muted); width: 3.6rem; text-align: right; flex: none; }
+/* Proof of #40HPW spends this slot on the best week's hours instead of an
+   episode count, and "best 58.4 hpw" does not fit a column sized for "12 eps".
+   ⚠️ WIDTH ONLY — the card's vertical budget is measured at ten rows in a
+   560px box (see the note in functions/hpw/[[path]].js) and a wider column
+   does not touch it, where a taller row would silently lose row ten. */
+.hpw-best { width: 5.2rem; }
 
 @media (max-width: 640px) {
   /* ⚠️ THE ARROWS GROW ON A PHONE RATHER THAN SHRINKING WITH EVERYTHING

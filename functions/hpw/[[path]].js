@@ -11,8 +11,11 @@
 //   /hpw/<date>          the board for the week containing that day. Not a
 //                        Monday? A future date? 302 to the canonical Monday,
 //                        or to the live week, so one week has one URL.
-//   /hpw/high-scores     the all-time board, with each row's week linking to
-//                        that week's page.
+//   /hpw/high-scores     Proof of #40HPW, with each row's best week linking
+//                        to that week's page. ⚠️ THE PATH IS THE OLD NAME AND
+//                        STAYS THAT WAY: the board was renamed on 2026-09-01,
+//                        the URL is in the wild, and the collector's card bot
+//                        (bots/hpw-cards/) screenshots this literal.
 //   /hpw/<key>/card      THE SHARE CARD. The same board in a fixed 720x900
 //                        frame with no nav, no footer and no theme toggle,
 //                        which the collector's bot (bots/hpw-cards/) loads in
@@ -164,12 +167,12 @@ function describe(view) {
     return {
       goal, members,
       key: HIGH,
-      title: COPY.highScoresTitle,
-      sub: COPY.highScoresSub(goal),
+      title: COPY.proofTitle,
+      sub: COPY.proofSub(goal),
       empty: COPY.emptyAll,
       isCurrent: false,
-      ogTitle: `Nostr Gang #40HPW: High Scores`,
-      lead: leadSentence(members, null),
+      ogTitle: `Nostr Gang: ${COPY.proofTitle}`,
+      lead: leadSentence(members, null, goal),
     };
   }
   const ws = view.ws;
@@ -193,11 +196,20 @@ function describe(view) {
 /* The og:description, and the one sentence on the page that says what the
    figures are. It carries the qualifier in full because it is the string that
    travels without the page around it. */
-function leadSentence(members, ws) {
+function leadSentence(members, ws, goal = 40) {
   const top = members[0];
   const rule = "Boost an episode on Nostr and the board assumes you listened to all of it.";
   if (!top) return `${rule} Nobody is on this board yet.`;
   const name = top.name || "Somebody";
+  /* Proof ranks by a count of weeks, so the sentence has to name that count
+     rather than the hours: "leads with 58.4 hours" over a board ordered by
+     something else is a description of a different table. */
+  if (ws === null && top.weeks != null) {
+    const n = top.weeks;
+    return `${rule} ${members.length} member${members.length === 1 ? " has" : "s have"} cleared ` +
+      `${goal} hours in a week. ${name} leads with ${n} such week${n === 1 ? "" : "s"}, ` +
+      `the best of them ${hours(top.seconds)} hours.`;
+  }
   const when = ws ? ` for the week of ${weekLabel(ws)}` : " of all time";
   return `${rule} ${name} leads${when} with ${hours(top.seconds)} hours across ` +
     `${top.episodes} episode${top.episodes === 1 ? "" : "s"}.`;
@@ -230,7 +242,7 @@ export function renderPage(view) {
     members: d.members,
     goal: d.goal,
     empty: d.empty,
-    // On High Scores a row's week links to that week's page.
+    // On Proof of #40HPW a row's best week links to that week's page.
     weekHref: view.kind === "all" ? (date) => `/hpw/${date}` : null,
   });
   const body = `
@@ -241,7 +253,7 @@ export function renderPage(view) {
   <div class="hpw-share" data-hpw-share hidden></div>
   <p class="hpw-page-links">
     <a href="/#members">The live boards on the Members tab</a>
-    ${view.kind === "week" ? ` · <a href="/hpw/${HIGH}">High Scores</a>` : ""}
+    ${view.kind === "week" ? ` · <a href="/hpw/${HIGH}">${htmlEscape(COPY.proofTitle)}</a>` : ""}
   </p>
 </div>`;
   return shell({
@@ -252,7 +264,7 @@ export function renderPage(view) {
     body,
     canonical: pageUrl,
     og: { title: d.ogTitle, description: d.lead, image, url: pageUrl },
-    scripts: `<script src="/assets/js/hpw-page.js?v=ob-v179" type="module"></script>`,
+    scripts: `<script src="/assets/js/hpw-page.js?v=ob-v180" type="module"></script>`,
     extraCss: `
     /* The tab supplies the accent family off body[data-active-feed]; this page
        has no active feed and supplies the brand, as .show-main does. */
@@ -303,8 +315,8 @@ export function renderCard(view) {
   <title>${htmlEscape(d.ogTitle)} (card)</title>
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
-  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v179" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v179" />
+  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v180" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v180" />
   <style>
     /* ⚠️ THE VERTICAL BUDGET IS MEASURED, NOT DERIVED, AND THE LINE IS THE
        LIST BOX, NOT THE FOOTER. The landscape card overflowed its frame once
@@ -451,16 +463,16 @@ ${og ? `
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v179" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v179" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v180" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v180" />
   <!-- feed-cards.css for the share pill and its menu; boost-actions.css for
        the composer behind Post to Nostr. Both are the same chrome the tab
        already has. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v179" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v179" />
-  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v179" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v179" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v179" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v180" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v180" />
+  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v180" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v180" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v180" />
   ${extraCss ? `<style>${extraCss}\n  </style>` : ""}
 </head>
 <body>
@@ -654,10 +666,10 @@ ${body}
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav.js?v=ob-v179" defer></script>
+<script src="/assets/js/nav.js?v=ob-v180" defer></script>
 ${scripts}
-<script src="/assets/js/nav-widget-boot.js?v=ob-v179"></script>
-<script src="/assets/js/sw-register.js?v=ob-v179" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v180"></script>
+<script src="/assets/js/sw-register.js?v=ob-v180" defer></script>
 </body>
 </html>`;
 }
