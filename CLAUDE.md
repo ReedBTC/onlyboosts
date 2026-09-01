@@ -2263,9 +2263,17 @@ would. Never remove an entry** — those links are in the wild.
 
 5. **Typography.** The brand wordmark is a bold sans; the site is still on LB's
    Playfair Display / Source Serif 4. It reads fine, but the serif is inherited,
-   not chosen. Only those two families are self-hosted in `assets/fonts/`.
+   not chosen. Those two families are self-hosted in `assets/fonts/`.
    **The widget now reads both as `--font-display` / `--font-body` tokens**, so
    a change here reaches the modals without touching them.
+
+   **⚠️ A third file sits beside them and is NOT free to rework: `Movie Poster
+   Personal Use.ttf`** (the CHARTS wordmark link, Reed's pick 2026-09-01) is
+   licensed FREE FOR PERSONAL USE ONLY, and its EULA forbids converting,
+   subsetting or renaming the file — which is why it is a raw 375KB TTF under
+   its original name rather than a woff2, fetched lazily via a caps-only
+   `unicode-range`. The note over its `@font-face` in `theme.css` carries the
+   licensing contact. Don't "optimize" it into a subset.
 
 `/about` is done. Its copy is distilled from `docs/about-and-faq-source.md` —
 **that file is the factual source of record**, so correct it there first if the
