@@ -279,6 +279,79 @@ tiebreak chain is reordered, and it was confirmed red on four mutations (the
 tuple tiebreak removed, the chain flipped in members.js and in feed-rank.js,
 and `peers` counted post-filter).
 
+#### The Charts Page
+
+`/charts/<YYYY-MM-DD>`, edge-rendered by `functions/charts/[[path]].js` on the
+`/hpw` URL contract: `/charts` 302s to the live week, a mid-week or future date
+302s to its canonical Monday, garbage and pre-index weeks 404, HEAD is
+answered. One page carries three pairs — the **Shows** and **Artists** weekly
+Top 10s on the chart rule, and the **Members 40 HPW board** — each beside a
+**Weeks at #1** companion, the high-scores idiom one URL scheme over.
+
+- **⚠️ ONLY SHOWS, ARTISTS AND MEMBERS ARE ON THE PAGE.** *Reed's call,
+  2026-08-31, the day it shipped with five*: the episode-level charts
+  (Episodes, Albums, Songs) are too sparse to be interesting yet.
+  `week-charts.js` still serves all five content kinds and
+  `test-weekly-charts.mjs` still covers the retired three at module level, so
+  restoring one is a `PAGE_KINDS` element plus a `COPY` entry, not new
+  queries.
+- **The week is the 40 HPW week**, Monday 00:00 US Pacific.
+  `assets/js/pacific-week.js` cuts it in JS and `pacificOffsetSql` (exported
+  from the hours endpoint for this) cuts it in SQL; nothing restates the DST
+  rule.
+- **The content ranking is `sort=chart` and nothing else.**
+  `functions/_shared/week-charts.js` applies the endpoints' exact ladder —
+  component ranks, tuple tiebreak inside the `RANK()` window — to a bounded
+  calendar-week window, the one corpus shape the feed endpoints do not serve.
+  `weeksAtNumberOne` is the same ladder `PARTITION BY wk`, counting the rank-1
+  holder of every completed week.
+- **⚠️ A WEEKLY ROW PRINTS COMPONENT RANKS, NOT RAW FIGURES.** *Reed's ask,
+  2026-08-31*: the sats and booster figures took too much of the row, so each
+  row carries its standing in the three components as `#3/#5/T#9` under a
+  `rank in sats/boosters/boosts` column head (`.cb-colhead` / `.cb-ranks`),
+  the head carrying the feed note's ⓘ to `/about#charts`. The `#` is the
+  detail tiles' chip form, on the site's own bare-vs-# line (`rank.js`):
+  these are standings in orderings that are not on screen, where the left
+  column's bare position belongs to the visible list. Without both cues a
+  triplet like `8/8/7` reads as counts. A component `T` is computed over the
+  whole week's corpus — the `peers_*` window counts in `weeklyChart` — never
+  over the visible ten.
+- **The Members pair ranks by HOURS, not the chart rule.** Its left board is
+  `hoursBoard` rendered through `hpw-board.js`'s own `boardHtml`, identical
+  to the tab's weekly 40 HPW board by construction; `hpwWeeksAtNumberOne`
+  restates the hours endpoint's corpus rules (the (booster, episode) dedupe,
+  usable durations only, `PUBLISHERS` excluded) and credits the hours leader
+  of every completed week. Its rows wear the `.hpw-*` classes outright.
+- **⚠️ WEEKS AT #1 COUNTS COMPLETED WEEKS ONLY**, on every companion. The
+  live week's #1 can still change, so crediting it would hand out a week that
+  might be taken back by Sunday; the weekly board beside it is where the live
+  race shows. A week whose #1 is a tie credits every holder — the standing
+  genuinely is shared.
+- **The week picker is the tab's own.** The Function ships the `.hpw-nav`
+  stepper with arrow LINKS and a static label (the no-JS page steps);
+  `assets/js/charts-page.js` upgrades the label into the Members tab's picker
+  — same segmented group, same `.pcast-sort-menu` — navigating to the picked
+  week's page. The menu is built only when the server disclosed
+  `data-charts-first`, the tab's own no-guessing rule.
+- **The content boards restate the 40 HPW grammar** (`.cb-*` in
+  `assets/css/chart-board.css`, kept in step with `hpw-board.css` by hand,
+  the `.mb-shell` seam), with square art in place of the round face and the
+  server's own rank and tie flag printed through `rankLabel` — a tuple
+  standing the renderer never renumbers.
+- **The renderer is server-only** (`functions/_shared/chart-board.js`): no
+  tab paints these boards, so there is no browser importer, but it keeps the
+  two-sided discipline (no `Date.now()`, pinned locales) so gaining a client
+  surface later is a move rather than a rewrite.
+- **Not yet linked from the nav or the sitemap.** The Explore menu's Stats
+  group is the natural home and regrouping the site map is Reed's call;
+  `/hpw` set the precedent for staying out of the sitemap.
+
+`scripts/test-weekly-charts.mjs` owns the correctness, brute-forced from an
+independent implementation over one fixture boost list, and was confirmed red
+on six isolated mutations (the chain flipped, the live week counted on the
+content and member sides, the medium filter dropped, the per-week partition
+removed, and the member boards' publisher exclusion dropped).
+
 ### The Language Filter
 
 `assets/js/feed-lang.js`, mounted as a third control on **all four ranked feeds**

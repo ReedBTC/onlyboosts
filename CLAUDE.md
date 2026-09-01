@@ -45,6 +45,7 @@ passed its size budget. Nothing was rewritten on the way across, so that same
 | `/stats` | a coming-soon placeholder: nav + header + soon-card, `noindex`, out of the sitemap. `/boosters` was the second one and was **deleted** on 2026-08-23 — see the Stats row of the site map |
 | `/404.html` | see the ⚠️ under LB conventions |
 | `/hpw/<YYYY-MM-DD>`, `/hpw/high-scores` | one 40 HPW board as a page, edge-rendered, the address a shared week has. `/hpw/<key>/card` is the 720x900 portrait frame the collector screenshots for `/api/og/hpw/<key>.png`. See **The Share Cards** under the Members tab |
+| `/charts/<YYYY-MM-DD>` | the OnlyBoosts Charts page, edge-rendered: weekly Top 10s for **Shows and Artists** on the `sort=chart` rule over the 40 HPW calendar week, plus the **Members 40 HPW board**, each beside a Weeks at #1 companion. `/charts` 302s to the live week. Episodes/Albums/Songs were CUT from the page on ship day (Reed: too sparse) but `week-charts.js` still serves them. See **The Charts Page** in `docs/feeds.md` |
 
 `/shows` and `/podcasts` are both 301s to `/#shows` now; the Shows feed replaced
 the standalone page. `feeds.html` and `boosts.html` were folded into `/` and
@@ -443,14 +444,16 @@ Sixteen test scripts, all plain `node scripts/<name>.mjs` with no runner:
 | `test-publishers-api.mjs` | the **shipped** `/api/v1/publishers` handlers — listing and per-artist detail — over a `node:sqlite` build of the real `schema.sql`, on the members-search pattern. Three sorts with three winners, the boost-time windows, the language filter recounting through the declaring shows (`lang=unknown` included), LIKE-wildcard decoys, rank retention on `q=`, the title-less publisher's exclusion, HEAD, the album list's publisher-order and its live-row-over-edge-hint preference |
 | `test-charts.mjs` | the OnlyBoosts Charts: `sort=chart` on the **shipped** handlers of all four ranked endpoints over a `node:sqlite` build of the real `schema.sql`. **Expectations are brute-forced from an independent JS implementation of the rule**, one boost list feeding both sides; a micro-corpus that inverts if the tiebreak chain is reordered; `q=` rank retention with pre-filter tie flags; the follows-POST chart on all three POSTing endpoints (podcasts and publishers gained theirs in phase 2, with `publisher=` and boost-time `since=` for the drawers' follows paths); `feedRanks`' chart place — all four boost-time windows since the strip — and the tiles' Charts strip. Confirmed red on five mutations: the tuple tiebreak removed, the chain flipped in members.js and again in feed-rank.js, `peers` counted post-filter, and the podcasts POST's follows filter dropped |
 
+| `test-weekly-charts.mjs` | the OnlyBoosts Charts page: the **shipped** `/charts/<week>` Function over a `node:sqlite` build of the real `schema.sql`, on the members-hours pattern. The routing contract (one URL per week, HEAD answered); the Shows and Artists Top 10s against a **brute-forced independent implementation** of the chart rule, component-rank triplets included; the medium partition; the Members pair (the hours board held to brute-forced hours, the publisher exclusion); and every Weeks at #1 tally — completed weeks only, a tied #1 crediting every holder, a fixture week whose #1 is decided by the tiebreak CHAIN. The retired kinds (episodes, albums, songs) stay covered at module level. Confirmed red on six mutations: the chain flipped, the live week counted on each side, the medium filter dropped, the per-week `PARTITION BY` removed, and the member boards' publisher exclusion dropped |
+
 **⚠️ `test-server-render.mjs` IS THE ONE THAT NEEDS AN ARGUMENT, SO IT IS THE ONE
 THAT GOES UNRUN.** Its header carries the `curl` that produces the capture; take
 a fresh one rather than reusing an old file, since it is also the size
 measurement. It asserted `cards are numbered 1..N with no gaps` — the *ordinal*
 scheme's invariant — until competition ranking shipped on 2026-08-18, and it
-would have been merged red had it not been run. **Run all seventeen before a
+would have been merged red had it not been run. **Run all eighteen before a
 merge**, and treat this one as the guard on the ranking scheme rather than only
-on weight. *(It read "all twelve" until 2026-08-24, "all fifteen" until 2026-08-30 and "all sixteen" until 2026-08-31, contradicting the table
+on weight. *(It read "all twelve" until 2026-08-24, "all fifteen" until 2026-08-30, "all sixteen" and then "all seventeen" until 2026-08-31, contradicting the table
 directly above it — the count moved when a test was added and this sentence did
 not. If the table grows again, this line grows with it.)*
 
@@ -2198,6 +2201,7 @@ would. Never remove an entry** — those links are in the wild.
 | `boosts-thread.js` / `boost-actions.js` | the content tokenizer and reply / like / repost / zap |
 | `functions/index.js` | the homepage's opening feed — **Shows**, rendered at the edge |
 | `functions/{show,episode,booster,artist}/…` | the four edge-rendered detail pages |
+| `functions/charts/[[path]].js` + `_shared/week-charts.js` + `_shared/chart-board.js` | the OnlyBoosts Charts page: the Shows/Artists Top 10s, the Members 40 HPW pair and the Weeks at #1 boards, edge-rendered; `assets/js/charts-page.js` mounts the week-picker dropdown |
 | `functions/api/v1/*` | the D1 query API |
 | `functions/api/v1/members.js` | member search and the top-members listing, over all 2,011 |
 | `functions/api/v1/members/hours.js` | the #40HPW boards, and any past week by `week=YYYY-MM-DD` |

@@ -63,7 +63,11 @@ export async function onRequestOptions({ request }) { return preflight(request);
  * ANY INTEGER. Without the CAST every comparison below is false, every row
  * takes the PST branch, and the board is quietly an hour out for eight months
  * of every year — which looks like nothing at all. */
-function pacificOffsetSql(ts) {
+/* Exported since the OnlyBoosts Charts page (functions/charts/[[path]].js):
+ * its weeks-at-#1 boards bucket boosts by the same Pacific week in SQL, and a
+ * third copy of the DST rule is exactly the drift the note above warns about.
+ * `functions/_shared/week-charts.js` is the importer. */
+export function pacificOffsetSql(ts) {
   const dst = (fmt, hour) =>
     `CAST(strftime('%s', date(strftime('${fmt}', ${ts}, 'unixepoch'), 'weekday 0')` +
     ` || ' ${hour}:00:00') AS INTEGER)`;
