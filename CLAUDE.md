@@ -224,8 +224,11 @@ kept with no producer.
 ## The medium split
 
 `<podcast:medium>` is what separates a podcast from a music release: a `music`
-feed's items are tracks on an album, not episodes of a show. Live counts: **818
-podcast, 465 music, 2 video**.
+feed's items are tracks on an album, not episodes of a show. Live counts
+(2026-09-01, after the deepscan recovery): **1,034 music, 714 podcast, 20 video**,
+plus a handful of radio/course/film/publisher and 10 with none — music became the
+majority when the recovered era landed. Any count or coverage figure in this file
+measured before 2026-09-01 was measured on a corpus 63% smaller.
 
 **Two renderers serve five what-options.** Episodes and Songs are one
 episode-level rollup; Shows and Albums are one show-level rollup. Each pair
@@ -1243,6 +1246,15 @@ Bowl After Bowl, 25,265 sats); the pass runs every incremental cycle over a
   `docs/about-and-faq-source.md` is where that copy starts if it ever should.
 
 ## Data feed
+
+**⚠️ THE CORPUS STARTS 2024-07-01, SINCE THE DEEPSCAN RECOVERY OF 2026-09-01.**
+Fountain notes carried `i` tags with no `k` tag until ~2025-04-14, so the scan's
+`#k` filter was blind to that whole era while the events sat on
+relay.fountain.fm (which retains to late 2022). `onlyboosts_globalscan.py
+deepscan` recovered ~15k boosts by #i-per-guid and authors= walks; a client
+publishing i-without-k **today** is still invisible to the incremental — that
+residual is a known, undecided item, not an oversight. Detail lives with the
+collector (commit 2fa7869 and the deepscan section of the script's docstring).
 
 Two stores, one model. **D1 behind `/api/v1/*` is what every feed and page
 reads.** The collector also publishes static JSON to
