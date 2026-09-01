@@ -35,17 +35,17 @@
  * guids — the majority). A pill that fails for most artists is worse than
  * none; boosting stays at the album and song level, one drawer-click away.
  */
-import { showPageHref, publisherPageHref } from './show-link.js?v=ob-v178'
-import { coverChain } from './cover-art.js?v=ob-v178'
-import { htmlEscape } from './nostr-text.js?v=ob-v178'
-import { num, fmtSats, plural, shortDate } from './show-card.js?v=ob-v178'
+import { showPageHref, publisherPageHref } from './show-link.js?v=ob-v179'
+import { coverChain } from './cover-art.js?v=ob-v179'
+import { htmlEscape } from './nostr-text.js?v=ob-v179'
+import { num, fmtSats, plural, shortDate } from './show-card.js?v=ob-v179'
 // Re-exported: artists-feed.js reads the formatting helpers through this
 // module the way shows-feed.js reads them through show-card.js. ⚠️ An import
 // is NOT a re-export — this line shipped missing once, and the unresolved
 // named import was a LINK-TIME error: renderArtists never executed and the
 // whole feed painted the load-failure placeholder (the ob-v53 class, caught
 // on the preview deploy).
-export { num, fmtSats, plural, shortDate } from './show-card.js?v=ob-v178'
+export { num, fmtSats, plural, shortDate } from './show-card.js?v=ob-v179'
 
 const esc = htmlEscape
 

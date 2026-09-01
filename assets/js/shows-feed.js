@@ -54,20 +54,20 @@
  */
 import {
   getShowPage, searchShows, getShowEpisodes, SEARCH_HITS, SEARCH_MIN_CHARS,
-} from '/assets/js/ob-live.js?v=ob-v178'
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v178'
+} from '/assets/js/ob-live.js?v=ob-v179'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v179'
 import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls,
   RANGE_OPTIONS,
-} from '/assets/js/feed-controls.js?v=ob-v178'
+} from '/assets/js/feed-controls.js?v=ob-v179'
 // Its own module, not two more exports of feed-controls.js — see the ⚠️ note
 // at the top of that file for the four-hour window that shape opens.
-import { mountFeedNote, resetFeedNote, viewNote, CHART_INFO } from '/assets/js/feed-note.js?v=ob-v178'
+import { mountFeedNote, resetFeedNote, viewNote, CHART_INFO } from '/assets/js/feed-note.js?v=ob-v179'
 import {
   LANG_ALL, languageOptions, langControl, langNote, langNoMatchText, langLabelFor,
-} from '/assets/js/feed-lang.js?v=ob-v178'
-import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v178'
-import { competitionRanks, rankLabel, markSliceTies } from '/assets/js/rank.js?v=ob-v178'
+} from '/assets/js/feed-lang.js?v=ob-v179'
+import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v179'
+import { competitionRanks, rankLabel, markSliceTies } from '/assets/js/rank.js?v=ob-v179'
 /* ⚠️ THE CARD ITSELF IS NOT IN THIS FILE ANY MORE. show-card.js emits it as an
  * HTML string and show-card-actions.js attaches its verbs, which is what lets
  * functions/index.js render the opening page of this feed at the edge — a
@@ -84,9 +84,9 @@ import {
   COPY, copyFor, toCard, showCardHtml, showRankValue,
   SORT_OPTIONS, RANKED_SORTS, SHOW_CARDS_PER_PAGE,
   num, fmtSats, plural,
-} from '/assets/js/show-card.js?v=ob-v178'
-import { wireShowCards } from '/assets/js/show-card-actions.js?v=ob-v178'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v178'
+} from '/assets/js/show-card.js?v=ob-v179'
+import { wireShowCards } from '/assets/js/show-card-actions.js?v=ob-v179'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v179'
 
 /* ── The hash's language, on an already-hydrated feed ──
  * The twin of the map in feeds-podcasts.js, and there for the same reason: a
@@ -710,10 +710,16 @@ export async function renderShows({ panel, list, scope = 'global', medium = 'oth
    * and the language control's cannot drift into two versions of one
    * sentence. The chart sort carries the ⓘ link to /about#charts. */
   function paintNote() {
+    /* The CHARTS wordmark rides ONLY the view the charts page opens on —
+     * Shows (not Albums), Global, all time, all languages, chart sort — so
+     * the link never points a reader at a chart that disagrees with the list
+     * they are looking at. Recomputed here, so changing any axis drops it. */
+    const charts = sortKey === 'chart' && !follows && !rangeDays(rangeKey)
+      && (!langKey || langKey === LANG_ALL) && copy.noun === 'show'
     mountFeedNote(panel,
       langNote(viewNote({ sort: sortKey, days: rangeDays(rangeKey), follows, noun: copy.noun }),
         langKey, langLabel, copy.noun),
-      sortKey === 'chart' ? { info: CHART_INFO } : undefined)
+      sortKey === 'chart' ? { info: CHART_INFO, charts } : undefined)
   }
   paintNote()
 

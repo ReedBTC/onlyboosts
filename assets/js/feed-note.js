@@ -10,7 +10,7 @@
  * has a failure window measured in hours: a visitor holding a three-hour-old
  * feed-controls.js who fetches a fresh feeds-podcasts.js gets
  *
- *   SyntaxError: The requested module '/assets/js/feed-controls.js?v=ob-v178' does not
+ *   SyntaxError: The requested module '/assets/js/feed-controls.js?v=ob-v179' does not
  *   provide an export named 'mountFeedNote'
  *
  * and an unresolved named import is a LINK-TIME error: the module never
@@ -49,6 +49,13 @@
  * @param {object}  [opts.info]  { href, title, label } — a small ⓘ link
  *   appended after the text. The href is a site-internal constant (see
  *   CHART_INFO below), never user-supplied, which is why it skips isSafeUrl.
+ * @param {boolean} [opts.charts]  append the CHARTS wordmark link to /charts
+ *   (Reed's ask, 2026-09-01). Callers pass it ONLY on the exact view the
+ *   charts page opens on — chart sort, Global, all time, all languages — so
+ *   it lands right after the ⓘ, the note having no corpus or language clause
+ *   to carry on that view. The Shows and Artists feeds pass it; Albums,
+ *   Songs and Episodes deliberately do not (the page carries no chart for
+ *   them).
  */
 export function mountFeedNote(panel, text, opts = {}) {
   const host = panel?.querySelector('[data-feed-note]')
@@ -74,6 +81,15 @@ export function mountFeedNote(panel, text, opts = {}) {
     a.textContent = 'ⓘ'
     host.append(a)
     if (at < text.length) host.append(text.slice(at))
+  }
+  if (opts.charts) {
+    host.append(' ')
+    const c = document.createElement('a')
+    c.className = 'ob-charts-link'
+    c.href = '/charts'
+    c.title = 'The OnlyBoosts Charts'
+    c.textContent = 'CHARTS'
+    host.append(c)
   }
   host.hidden = false
   return host
