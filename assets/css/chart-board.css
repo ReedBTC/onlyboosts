@@ -52,12 +52,24 @@
 }
 /* The column head over the weekly rows' rank triplet: one right-aligned
    string in the triplet's own order, read by position the way the values
-   under it are. */
+   under it are. "rank in" is load-bearing — without it the triplet reads as
+   counts. */
 .cb-colhead {
   text-align: right; padding: 0 0.4rem 0.15rem;
   font-size: 0.62rem; color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
+/* The head's ⓘ to /about#charts — the feed note's own explainer control
+   (.feed-note-info in index.html), restated at this size: bold and
+   accent-colored so it reads as a control rather than as a stray character. */
+.cb-colhead-info {
+  color: var(--accent-d);
+  font-weight: 700;
+  font-size: 0.7rem;
+  text-decoration: none;
+}
+.cb-colhead-info:hover,
+.cb-colhead-info:focus-visible { text-decoration: underline; }
 
 /* ── the rows ── */
 .cb-list { list-style: none; margin: 0; padding: 0; }

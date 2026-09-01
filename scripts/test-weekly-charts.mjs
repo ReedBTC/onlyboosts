@@ -163,7 +163,10 @@ function bruteChart(rows) {
   })
 }
 const lbl = (rank, tied) => `${tied ? 'T' : ''}${rank}`
-const triplet = (r) => `${lbl(r.rSats, r.tSats)}/${lbl(r.rBoosters, r.tBoosters)}/${lbl(r.rBoosts, r.tBoosts)}`
+// The component form wears the # — the detail tiles' chip notation, because
+// these standings are not positions in the visible list.
+const hlbl = (rank, tied) => `${tied ? 'T' : ''}#${rank}`
+const triplet = (r) => `${hlbl(r.rSats, r.tSats)}/${hlbl(r.rBoosters, r.tBoosters)}/${hlbl(r.rBoosts, r.tBoosts)}`
 
 /* One content category's corpus for [ws, we) out of LOG — the query's WHERE
  * clauses, re-derived rather than copied. */
@@ -329,9 +332,11 @@ for (const kind of ['shows', 'artists']) {
     assert.deepEqual(triplets(frag), expect.map(triplet))
   })
 }
-check('the column head names the triplet order', () => {
+check('the column head says these are ranks, and links the formula', () => {
   const frag = boardOf(html, 'shows-week')
-  assert.ok(frag.includes('<div class="cb-colhead">sats/boosters/boosts</div>'))
+  assert.ok(frag.includes('rank in sats/boosters/boosts'))
+  const head = frag.slice(frag.indexOf('cb-colhead'), frag.indexOf('<ol'))
+  assert.ok(head.includes('href="/about#charts"'))
 })
 check('the medium partition holds: no album on Shows, video counts as a show', () => {
   const shows = boardOf(html, 'shows-week')

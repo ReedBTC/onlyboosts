@@ -10,7 +10,7 @@
  * has a failure window measured in hours: a visitor holding a three-hour-old
  * feed-controls.js who fetches a fresh feeds-podcasts.js gets
  *
- *   SyntaxError: The requested module '/assets/js/feed-controls.js?v=ob-v176' does not
+ *   SyntaxError: The requested module '/assets/js/feed-controls.js?v=ob-v177' does not
  *   provide an export named 'mountFeedNote'
  *
  * and an unresolved named import is a LINK-TIME error: the module never

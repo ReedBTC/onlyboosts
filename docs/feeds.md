@@ -307,10 +307,15 @@ Top 10s on the chart rule, and the **Members 40 HPW board** — each beside a
   holder of every completed week.
 - **⚠️ A WEEKLY ROW PRINTS COMPONENT RANKS, NOT RAW FIGURES.** *Reed's ask,
   2026-08-31*: the sats and booster figures took too much of the row, so each
-  row carries its standing in the three components as `3/5/T9` under a
-  `sats/boosters/boosts` column head (`.cb-colhead` / `.cb-ranks`). A
-  component `T` is computed over the whole week's corpus — the `peers_*`
-  window counts in `weeklyChart` — never over the visible ten.
+  row carries its standing in the three components as `#3/#5/T#9` under a
+  `rank in sats/boosters/boosts` column head (`.cb-colhead` / `.cb-ranks`),
+  the head carrying the feed note's ⓘ to `/about#charts`. The `#` is the
+  detail tiles' chip form, on the site's own bare-vs-# line (`rank.js`):
+  these are standings in orderings that are not on screen, where the left
+  column's bare position belongs to the visible list. Without both cues a
+  triplet like `8/8/7` reads as counts. A component `T` is computed over the
+  whole week's corpus — the `peers_*` window counts in `weeklyChart` — never
+  over the visible ten.
 - **The Members pair ranks by HOURS, not the chart rule.** Its left board is
   `hoursBoard` rendered through `hpw-board.js`'s own `boardHtml`, identical
   to the tab's weekly 40 HPW board by construction; `hpwWeeksAtNumberOne`

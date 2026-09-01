@@ -112,7 +112,12 @@ function who(kind, r, subline) {
  * column head's order: sats / boosters / boosts. */
 export function weekRowHtml(kind, r) {
   const w = who(kind, r);
-  const c = (rank, peers) => rankLabel(rank, Number(peers) > 1);
+  /* `#2`, or `T#9` when the component place is shared — the detail tiles'
+   * chip form (feed-rank.js), and the site's own line: a bare numeral belongs
+   * to a position in the visible list, where these are standings in three
+   * orderings that are NOT on screen, so each wears the #. The left column's
+   * bare position keeps the feed-card form for exactly the same reason. */
+  const c = (rank, peers) => `${Number(peers) > 1 ? "T" : ""}#${rank}`;
   return `<li class="cb-row">` +
     `<span class="cb-pos">${esc(rankLabel(r.rank, r.tied))}</span>` +
     art(r, w.glyph) +
@@ -144,9 +149,16 @@ export function boardHtml({ title, sub, rows, empty, board, colhead = false }) {
   const body = rows.length
     ? `<ol class="cb-list">${rows.join("")}</ol>`
     : `<p class="cb-empty">${esc(empty)}</p>`;
+  /* "rank in" is what stops the triplet reading as counts (`8/8/7` lies
+   * without it); the ⓘ is the feed note's own explainer link, same target,
+   * same new-tab call — a reader mid-browse gets the formula beside the
+   * board, not over it. */
+  const head = `<div class="cb-colhead">rank in sats/boosters/boosts ` +
+    `<a class="cb-colhead-info" href="/about#charts" target="_blank" rel="noopener"` +
+    ` title="How the OnlyBoosts Charts work" aria-label="How the OnlyBoosts Charts work">ⓘ</a></div>`;
   return `<section class="cb-board"${board ? ` data-cb-board="${esc(board)}"` : ""}>` +
     `<h3 class="cb-head">${esc(title)}<small>${esc(sub)}</small></h3>` +
-    (colhead && rows.length ? `<div class="cb-colhead">sats/boosters/boosts</div>` : "") +
+    (colhead && rows.length ? head : "") +
     body +
     `</section>`;
 }
