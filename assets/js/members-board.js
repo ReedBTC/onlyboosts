@@ -3,51 +3,59 @@
  * Boost an episode and the board assumes you listened to all of it, then adds
  * up the durations. It is not a measurement of listening and the page says so.
  *
- * ⚠️ TWO BOARDS, AND THE SECOND ONE IS NOT A NICE-TO-HAVE. Almost nobody clears
- * forty hours: re-measured 2026-08-24 against the collector's derived durations,
- * TWO booster-weeks ever have (Piez, 54.7h in autumn 2025 and 40.2h in March
- * 2026) and nineteen have passed thirty. Six of the all-time top ten are
- * from 2025. So an all-time board on its own is a
- * hall of fame nobody currently reading can get onto, which is the opposite of
- * a leaderboard — This Week is the one with a live race in it, and it leads.
+ * ⚠️ TWO BOARDS, AND THE SECOND ONE IS NOT A NICE-TO-HAVE. Hardly anybody
+ * clears forty hours: re-measured against production on 2026-09-01, TWENTY-THREE
+ * booster-weeks ever have, and twenty of those are one member. So the all-time
+ * board on its own is one nobody currently reading can get onto today, which is
+ * the opposite of a leaderboard — This Week is the one with a live race in it,
+ * and it leads.
+ *
+ * ⚠️ AND THE SECOND BOARD IS "Proof of #40HPW" SINCE 2026-09-01, ONE ROW PER
+ * MEMBER RATHER THAN ONE PER BOOSTER-WEEK. Reed's call. It was High Scores, the
+ * ten biggest weeks ever recorded, which was the right table while there were
+ * two of them; the collector's duration backfill made twenty-three, and a
+ * top-ten by hours then printed one name ten times. It now lists every member
+ * with at least one qualifying week, ranked by how many they have.
  *
  * ⚠️ AND THIS WEEK IS NOW A WEEK PICKER, which is the third thing the pair
  * needed: an all-time table names the great weeks and the live board names
  * this one, and until 2026-08-24 there was no way to look at any week in
  * between — including the one a reader had just missed. See pickerHtml.
  *
- * The arcade idiom is Reed's: a high-score table, gold on anything over forty.
- * A repeated name is authentic to it rather than a bug to collapse — Piez holds
- * five of the top ten and that is the actual story of the board.
+ * The arcade idiom is Reed's, and gold on anything over forty is what survives
+ * of it: on Proof every row is gold by construction, because clearing forty is
+ * the entry test rather than a marker applied afterwards. A repeated name used
+ * to be authentic to a high-score table; collapsing the repeats is exactly what
+ * the rename did, once the repeats stopped being a story and became a backfill.
  */
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v160'
-import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v160'
-import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v160'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v180'
+import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v180'
+import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v180'
 /* ⚠️ THE SAME WALL /show AND /episode RENDER, not a copy of it. It moved out of
  * functions/_shared/detail-page.js into a two-sided module for exactly this;
  * that file re-exports every name, so both Functions were untouched. A reader
  * who screenshots the wall here and on a show page must not be able to tell
  * them apart. */
-import { renderSupporters, initShowMore, compact } from '/assets/js/supporter-wall.js?v=ob-v160'
+import { renderSupporters, initShowMore, compact } from '/assets/js/supporter-wall.js?v=ob-v180'
 /* ⚠️ EXACT BOOST COUNTS HERE, COMPACT SATS. On the wall a row is one of a
  * hundred and `1k` is plenty; here there are four rows and the count is the
  * disclosure itself — "35 boosts for listeners with no identity" is the claim
  * the section exists to make, and `1k` rounds the evidence away. */
-import { num } from '/assets/js/boost-list.js?v=ob-v160'
-import { rangeControl, sortControl } from '/assets/js/feed-controls.js?v=ob-v160'
-import { mountFeedSearch } from '/assets/js/feed-search.js?v=ob-v160'
-import { searchMembers, SEARCH_HITS } from '/assets/js/ob-live.js?v=ob-v160'
+import { num } from '/assets/js/boost-list.js?v=ob-v180'
+import { rangeControl, sortControl } from '/assets/js/feed-controls.js?v=ob-v180'
+import { mountFeedSearch } from '/assets/js/feed-search.js?v=ob-v180'
+import { searchMembers, SEARCH_HITS } from '/assets/js/ob-live.js?v=ob-v180'
 /* ⚠️ THE SAME WEEK RULE THE ENDPOINT CUTS ON, not a second copy of it. That
  * module is two-sided for exactly this: the picker steps and enumerates weeks
  * without a round trip per press, and a Pacific week containing a DST
  * transition is 167 or 169 hours, so a client that stepped by a flat 604800
  * would drift an hour past every March and every November while still
  * producing Mondays. */
-import { prevWeek, nextWeek, weekSeries, weekDateString, weekStartFromDate } from '/assets/js/pacific-week.js?v=ob-v160'
-import { weekTitle, weekLabel, boardHtml, initials, COPY } from '/assets/js/hpw-board.js?v=ob-v160'
+import { prevWeek, nextWeek, weekSeries, weekDateString, weekStartFromDate } from '/assets/js/pacific-week.js?v=ob-v180'
+import { weekTitle, weekLabel, boardHtml, initials, COPY } from '/assets/js/hpw-board.js?v=ob-v180'
 /* The share control: Post to Nostr, Copy link, Share image. A verb, mounted
  * onto each board after it is painted; the same module /hpw/<week> uses. */
-import { mountShare } from '/assets/js/hpw-share.js?v=ob-v160'
+import { mountShare } from '/assets/js/hpw-share.js?v=ob-v180'
 
 const esc = htmlEscape
 const HOURS_API = '/api/v1/members/hours'
@@ -70,15 +78,19 @@ const WALL_CAP = 100
  * makes, so it is the same control. A second shape for one idea makes the site
  * look like two sites. */
 const WALL_VIEWS = [
+  ['chart', 'Chart rank'],
   ['sats', 'Most sats'],
   ['boosts', 'Most boosts'],
   ['shows', 'Most shows'],
 ]
-/* ⚠️ `shows` IS THE DEFAULT, NOT `sats`. Reed's call, 2026-08-23. Sats ranks by
- * generosity, which one large boost can win; breadth is the ordering that
- * rewards listening across the network, which is what a wall of MEMBERS is a
- * claim about. The other two are one press away. */
-let wallView = 'shows'
+/* ⚠️ `chart` IS THE DEFAULT — the OnlyBoosts Charts ordering: rank in sats +
+ * rank in boosts + rank in SHOWS BOOSTED, summed, lowest total first (see
+ * "The OnlyBoosts Charts" in docs/feeds.md). Reed's call, 2026-08-31,
+ * superseding the 2026-08-23 breadth default: breadth stays in the formula as
+ * both a component and the first tiebreaker, so the wall still rewards
+ * listening across the network without presenting any single axis as "the"
+ * story. The single-axis orderings are one press away. */
+let wallView = 'chart'
 
 /* ⚠️ THE RANGE MEANS WHEN THE BOOST WAS SENT, which is the reading
  * /api/v1/podcasts and every `#boosts` section give it, and NOT the air-date
@@ -114,8 +126,8 @@ let wallRange = 'all'
  * common case a page-flip, and its unit is a DAY where the board's unit is a
  * week, so every pick would silently snap somewhere the reader did not tap. The
  * menu exists for the jump a year back, which is why it is behind the label
- * rather than in front of it — and why the High Scores rows above are wired as
- * jumps too.
+ * rather than in front of it — and why the Proof of #40HPW rows above are
+ * wired as jumps too.
  *
  * The menu is deliberately the site's own `.pcast-sort-menu`: this is the same
  * kind of choice the feeds' Sort pill makes and a second menu shape for one
@@ -262,7 +274,7 @@ async function showWeek(root, ws, { scroll = false } = {}) {
 
 /* One delegated listener for the whole boards block, wired once. The weekly
  * board's markup is replaced on every press, so a handler bound to an arrow
- * would not survive the press that used it; and the High Scores rows live in
+ * would not survive the press that used it; and the Proof of #40HPW rows live in
  * the OTHER board, which is never repainted, so a single delegate is the only
  * shape that covers both without two wiring paths. */
 function wirePicker(root) {
@@ -293,7 +305,7 @@ function wirePicker(root) {
     if (go) {
       closeMenus()
       const ws = weekStartFromDate(go.dataset.hpwGoweek)
-      /* Scrolled because the jump can come from the High Scores board, which is
+      /* Scrolled because the jump can come from the Proof of #40HPW board, which is
          BELOW the weekly one on a phone — pressing a date there would otherwise
          change a board the reader cannot see. `nearest` is a no-op on desktop,
          where the two sit side by side. */
@@ -565,8 +577,8 @@ export async function renderMembersBoards(root) {
       boardHtml({
         board: 'all',
         // The words are hpw-board.js's COPY, shared with /hpw/high-scores.
-        title: COPY.highScoresTitle,
-        sub: COPY.highScoresSub(goal),
+        title: COPY.proofTitle,
+        sub: COPY.proofSub(goal),
         members: all.members || [],
         goal,
         empty: COPY.emptyAll,
@@ -578,7 +590,11 @@ export async function renderMembersBoards(root) {
     const weekEl = root.querySelector('[data-hpw-board="week"]')
     if (weekEl && shownWeek) mountShare(weekEl, { key: weekDateString(shownWeek), title: `Week of ${weekLabel(shownWeek)}`, isLive: !liveWeek || shownWeek >= liveWeek })
     const allEl = root.querySelector('[data-hpw-board="all"]')
-    if (allEl) mountShare(allEl, { key: 'high-scores', title: COPY.highScoresTitle, isLive: false })
+    /* ⚠️ THE SHARE KEY IS STILL `high-scores`, WHICH IS THE PATH RATHER THAN
+       THE NAME. The board is Proof of #40HPW since 2026-09-01; /hpw/high-scores
+       and high-scores.png are in the wild and the collector's card bot
+       screenshots that literal, so the URL did not move with the title. */
+    if (allEl) mountShare(allEl, { key: 'high-scores', title: COPY.proofTitle, isLive: false })
     root.dataset.hpwState = 'done'
     /* The wall goes below the boards, in its own container, and is fetched
        alongside them. It fails independently: a wall that cannot load leaves

@@ -245,7 +245,7 @@ the end of an incremental cycle and shipped on the same rsync as the JSON.
 
 ```
 hpw/index.json          the manifest — read this first, as everywhere else here
-hpw/high-scores.png     the all-time High Scores board
+hpw/high-scores.png     the all-time board (Proof of #40HPW; the FILENAME is the old name and stays)
 hpw/<YYYY-MM-DD>.png    one week's board; the date is a Monday, US Pacific
 ```
 

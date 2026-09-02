@@ -24,7 +24,7 @@
  *     <link>
  *
  * where the link is /#members for the live week (the live race) and the
- * week's own page for a past week or High Scores (Reed's call: a link to
+ * week's own page for a past week or Proof of #40HPW (Reed's call: a link to
  * the live board under last week's picture lands on a different board).
  * The image and the link are not in the textarea; they are shown as what
  * will be added, and added at publish. The suggestion is a placeholder,
@@ -44,11 +44,11 @@
  * while a week's card is not rendered yet (X-OB-Image: fallback); that is
  * refused with a note rather than uploaded as "the board".
  */
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v160'
-import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v160'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v180'
+import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v180'
 
 const SITE = 'https://onlyboosts.social'
-const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v160'
+const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v180'
 /* The box-with-arrow share glyph (the iOS / most-websites one), inline so it
  * scales with the button and takes currentColor in either theme. Reed's call,
  * 2026-08-29: the icon rather than the word. */
@@ -90,8 +90,11 @@ export function buildShareTags({ link, imageUrl, sha256, title }) {
 // ── the button ──────────────────────────────────────────────────────────────
 
 /* `key` is `YYYY-MM-DD` or `high-scores`; `title` the board's own name
- * ("Week of Aug 24, 2026", "High Scores"); `isLive` whether this is the
- * week in progress. Idempotent per board element. */
+ * ("Week of Aug 24, 2026", "Proof of #40HPW"). ⚠️ THE KEY IS A PATH AND THE
+ * TITLE IS A NAME, and since the rename on 2026-09-01 they no longer match:
+ * /hpw/high-scores is in the wild and the collector's card bot screenshots
+ * that literal, so only the title moved. `isLive` is whether this is the week
+ * in progress. Idempotent per board element. */
 export function mountShare(boardEl, { key, title, isLive = false }) {
   if (!boardEl || boardEl.querySelector('.hpw-share')) return
   const host = document.createElement('div')

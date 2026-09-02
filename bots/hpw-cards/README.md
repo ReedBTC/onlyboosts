@@ -1,7 +1,7 @@
 # hpw-cards — #40HPW share-card renderer
 
 Screenshots the Nostr Gang #40HPW boards into PNGs the site can hand to a
-preview crawler. One card per week, plus the all-time High Scores board.
+preview crawler. One card per week, plus the all-time board, Proof of #40HPW.
 
 ```
 onlyboosts_hpwcards.py            # dry run → ./preview, nothing published
@@ -91,7 +91,7 @@ That same command installs the fonts, and they are load-bearing for a reason
 that is not obvious: the card page self-hosts its own text faces, so the layout
 looks perfect while any character those faces do not carry falls through to a
 system fallback that does not exist. Measured here before the fonts went in,
-the High Scores board rendered **"The Bullish ◻itcoiner"** — U+20BF, the bitcoin
+the all-time board rendered **"The Bullish ◻itcoiner"** — U+20BF, the bitcoin
 sign, tofu'd in the #2 slot. Nothing logged it. Emoji are the same class of
 problem and the more likely one; `fonts-noto-color-emoji` is in that package
 list, and colour emoji, CJK and Cyrillic were all confirmed rendering

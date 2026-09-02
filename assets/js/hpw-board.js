@@ -21,15 +21,15 @@
  * The VERBS — the week picker, the jump buttons, the Rules dialog — stay in
  * `members-board.js`, which is the browser's alone.
  */
-import { boosterPageHref } from './booster-link.js?v=ob-v160'
-import { httpsUrl } from './cover-art.js?v=ob-v160'
-import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v160'
-import { prevWeek, weekDateString } from './pacific-week.js?v=ob-v160'
+import { boosterPageHref } from './booster-link.js?v=ob-v180'
+import { httpsUrl } from './cover-art.js?v=ob-v180'
+import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v180'
+import { prevWeek, weekDateString } from './pacific-week.js?v=ob-v180'
 
 const esc = htmlEscape
 
 /* en-US in UTC, matching every other date on the site. A board row names the
- * Monday its week started, so the reader can see the hall of fame is old.
+ * Monday its week started, so the reader can see how old a great week is.
  *
  * ⚠️ UTC IS STILL RIGHT HERE EVEN THOUGH THE WEEKS ARE PACIFIC, and the reason
  * is one-directional. `week_start` is the real instant of a Monday 00:00
@@ -107,7 +107,22 @@ function initials(name, pk) {
  * jump button (see the note over `week` below). Omitted, the output is exactly
  * what the tab has always painted. */
 function rowHtml(m, i, goal, { weekHref = null } = {}) {
+  /* ⚠️ THE ROW HAS TWO SHAPES AND `m.weeks` IS WHAT CHOOSES BETWEEN THEM.
+   * On a weekly board a row is one member's one week, so the figure is that
+   * week's hours and the note beside it is the episodes behind them. On Proof
+   * of #40HPW a row is one MEMBER, so the figure is how many weeks they have
+   * cleared and the rest of the row describes the best of those weeks. It is
+   * one function rather than two because everything to the left of the figure
+   * is identical, and a second copy is the drift this module exists to
+   * prevent. */
+  const proof = m.weeks != null
   const h = Number(m.seconds) / 3600
+  /* ⚠️ EVERY PROOF ROW IS GOLD, AND THAT IS THE BOARD RATHER THAN A MARKER
+   * THAT HAS STOPPED MEANING ANYTHING. Gold has always meant "this week
+   * cleared the goal" and it still does; on this board the entry test IS
+   * clearing the goal, so the claim is true of every row by construction.
+   * The comparison is the same one the endpoint's HAVING makes, on the same
+   * raw seconds, so a row can never be on this board and not be gold. */
   const cleared = h >= goal
   const href = boosterPageHref(m.npub, m.pk)
   const name = m.name || (m.npub ? m.npub.slice(0, 12) + '…' : (m.pk || '').slice(0, 12) + '…')
@@ -119,54 +134,74 @@ function rowHtml(m, i, goal, { weekHref = null } = {}) {
   const face = pic
     ? `<img class="hpw-face" src="${esc(pic)}" alt="" loading="lazy" referrerpolicy="no-referrer" />`
     : `<span class="hpw-face hpw-face--none" aria-hidden="true">${esc(initials(m.name, m.pk))}</span>`
-  /* ⚠️ ON HIGH SCORES THE WEEK IS A BUTTON, AND IT IS THE PICKER'S REAL
+  /* ⚠️ ON PROOF OF #40HPW THE WEEK IS A BUTTON, AND IT IS THE PICKER'S REAL
    * DISCOVERY PATH. A menu of ninety-nine dated rows can only be scrolled; this
-   * board already names the weeks worth looking at, so seeing Piez at 54.7h and
+   * board already names the weeks worth looking at, so seeing Piez at 58.4h and
    * pressing the date beside it opens that whole week on the board above. The
    * menu is the escape hatch for a week nobody has heard of, not the way in.
    *
    * It sits OUTSIDE the name's anchor, in the row's second column: a button
    * nested inside a link is neither, which is the same call `.cs-boosts-btn`
    * makes on the booster page's rollup rows. */
+  const weekTip = proof
+    ? 'Show the whole board for this member’s best week'
+    : 'Show the whole board for this week'
   const week = !m.week_start
     ? ''
     : weekHref
       ? `<a class="hpw-week hpw-week-jump" href="${esc(weekHref(weekDateString(m.week_start)))}"` +
-        ` title="Show the whole board for this week">${esc(weekLabel(m.week_start))}</a>`
+        ` title="${esc(weekTip)}">${esc(weekLabel(m.week_start))}</a>`
       : `<button type="button" class="hpw-week hpw-week-jump" data-hpw-goweek="${esc(weekDateString(m.week_start))}"` +
-        ` title="Show the whole board for this week">${esc(weekLabel(m.week_start))}</button>`
+        ` title="${esc(weekTip)}">${esc(weekLabel(m.week_start))}</button>`
   // The name links to that member's page — the same unconditional rule
   // booster-link.js applies everywhere, since a member is on this board only
   // because they boosted.
   const who = href
     ? `<a class="hpw-name" href="${esc(href)}">${esc(name)}</a>`
     : `<span class="hpw-name">${esc(name)}</span>`
+  /* ⚠️ "hpw", NOT "h". Every row on a weekly board is one member's ONE week, so
+   * the figure is hours per week and the unit is the name of the thing. On
+   * Proof the figure is a count of those weeks, so the unit names them. */
+  const figure = proof
+    ? `<span class="hpw-hours">${esc(String(m.weeks))}<span class="hpw-unit"> wk${m.weeks === 1 ? '' : 's'}</span></span>`
+    : `<span class="hpw-hours">${esc(hours(m.seconds))}<span class="hpw-unit"> hpw</span></span>`
+  /* ⚠️ THIS COUNTS EPISODES THAT CONTRIBUTED HOURS, NOT EPISODES BOOSTED, and
+   * the two differ often enough that the figure needs to say so. Reed read
+   * the board against a member's own activity on 2026-08-24, saw four boosts
+   * against "3 eps", and reported it as a bug — which is the right reaction to
+   * a number that looks like a boost count and is not one.
+   *
+   * It cannot be the boost count: the hours beside it are the sum over
+   * exactly these episodes, so printing 4 there would claim four episodes
+   * produced 6.49 hours. What was missing was any way to connect the figure
+   * to the rule. The tooltip does that; the Rules dialog carries the why.
+   *
+   * ⚠️ AND THE WEEKLY BOARD FEELS THIS HARDER THAN THE CORPUS RATE SUGGESTS.
+   * Measured 2026-08-24: 2.2% of episodes across the index have no usable
+   * duration, but 8.5% of the last 200 BOOSTS landed on one, because This
+   * Week is made entirely of boosts on episodes that aired days ago — the
+   * least likely to have been enriched. It self-heals as enrichment catches
+   * up, which is why a row can gain an episode after the fact.
+   *
+   * ⚠️ PROOF SPENDS THIS SLOT ON THE BEST WEEK'S HOURS INSTEAD, because the
+   * hours are what the count is a count OF and dropping them entirely would
+   * leave a board about forty hours printing no hours anywhere. The episode
+   * count moves into the tooltip rather than off the row. */
+  const note = proof
+    ? `<span class="hpw-eps hpw-best" title="Best week: ${esc(hours(m.seconds))} hours across ${esc(String(m.episodes))} episode${m.episodes === 1 ? '' : 's'} with a known length${m.week_start ? `, the week of ${esc(weekLabel(m.week_start))}` : ''}.">` +
+        /* Plain text rather than a nested `.hpw-unit`: that class is sized
+           0.72rem against `.hpw-hours`, which is LARGER than `.hpw-eps`'s
+           0.7rem, so reusing it here would print the unit bigger than the
+           figure it qualifies. This whole column is one muted size already. */
+        `best ${esc(hours(m.seconds))} hpw</span>`
+    : `<span class="hpw-eps" title="${esc(String(m.episodes))} episode${m.episodes === 1 ? '' : 's'} with a known length. Boosts to a show, or to an episode Podcast Index has no length for, add no hours and are not counted here.">` +
+        `${esc(String(m.episodes))} ep${m.episodes === 1 ? '' : 's'}</span>`
   return `<li class="hpw-row${cleared ? ' hpw-row--gold' : ''}">` +
     `<span class="hpw-pos">${i + 1}</span>` +
     face +
     `<span class="hpw-who">${who}${week}</span>` +
-    // ⚠️ "hpw", NOT "h". Every row on both boards is one member's ONE week, so
-    // the figure is hours per week and the unit is the name of the thing.
-    `<span class="hpw-hours">${esc(hours(m.seconds))}<span class="hpw-unit"> hpw</span></span>` +
-    /* ⚠️ THIS COUNTS EPISODES THAT CONTRIBUTED HOURS, NOT EPISODES BOOSTED, and
-     * the two differ often enough that the figure needs to say so. Reed read
-     * the board against a member's own activity on 2026-08-24, saw four boosts
-     * against "3 eps", and reported it as a bug — which is the right reaction to
-     * a number that looks like a boost count and is not one.
-     *
-     * It cannot be the boost count: the hours beside it are the sum over
-     * exactly these episodes, so printing 4 there would claim four episodes
-     * produced 6.49 hours. What was missing was any way to connect the figure
-     * to the rule. The tooltip does that; the Rules dialog carries the why.
-     *
-     * ⚠️ AND THE WEEKLY BOARD FEELS THIS HARDER THAN THE CORPUS RATE SUGGESTS.
-     * Measured 2026-08-24: 2.2% of episodes across the index have no usable
-     * duration, but 8.5% of the last 200 BOOSTS landed on one, because This
-     * Week is made entirely of boosts on episodes that aired days ago — the
-     * least likely to have been enriched. It self-heals as enrichment catches
-     * up, which is why a row can gain an episode after the fact. */
-    `<span class="hpw-eps" title="${esc(String(m.episodes))} episode${m.episodes === 1 ? '' : 's'} with a known length. Boosts to a show, or to an episode Podcast Index has no length for, add no hours and are not counted here.">` +
-      `${esc(String(m.episodes))} ep${m.episodes === 1 ? '' : 's'}</span>` +
+    figure +
+    note +
     `</li>`
 }
 
@@ -191,18 +226,31 @@ function boardHtml({ title, titleHtml, sub, members, goal, empty, board, weekHre
 const COPY = {
   challenge: 'Nostr Gang #40HPW Challenge',
   intro: 'Share boosts for 40 hours of podcasts in a week.',
-  // "High Scores" rather than "Hall of Fame", Reed's call 2026-08-23. It is
-  // the arcade idiom the whole board is built on, and a hall of fame is a
-  // place you are inducted into where a high-score table is one you get onto
-  // by playing — which is the invitation This Week is making.
-  highScoresTitle: 'High Scores',
-  highScoresSub: (goal) => `The best weeks ever recorded. Gold clears ${goal} hours.`,
+  /* ⚠️ "Proof of #40HPW", AND IT REPLACED "High Scores" ON 2026-09-01.
+   * *Reed's call.* High Scores was the arcade idiom the whole board was built
+   * on, and it was the right one while clearing forty hours had happened twice
+   * in the index's history: a table of the ten biggest weeks was then a table
+   * of the only weeks worth naming. The collector's duration backfill took that
+   * to twenty-three qualifying weeks, twenty of them one member's, so the
+   * ten-row table became one name printed ten times. The board now answers who
+   * has done it and how often, and the name says what a row is EVIDENCE of
+   * rather than where it ranks. The arcade reading survives one board over,
+   * where This Week still has a live race in it.
+   *
+   * ⚠️ THE URL DID NOT MOVE WITH THE NAME. The page is still `/hpw/high-scores`
+   * and its card is still `high-scores.png`: that path is in the wild, the
+   * collector's bot (bots/hpw-cards/) screenshots it by name, and
+   * `functions/api/og/hpw/[name].js` allowlists the literal. A rename there
+   * buys nothing a reader can see and costs a redirect, a bot change and an
+   * allowlist entry. */
+  proofTitle: 'Proof of #40HPW',
+  proofSub: (goal) => `Every member who has cleared ${goal} hours in a week, and how many times.`,
   weekSub: (ws, isCurrent) => isCurrent
     ? `Resets midnight Monday, Pacific. Week of ${weekLabel(ws)}.`
     : `${weekSpan(ws)}. Weeks run Monday to Sunday, Pacific.`,
   emptyLive: 'No boosts with a known episode length yet this week.',
   emptyPast: 'Nobody boosted an episode with a known length that week.',
-  emptyAll: 'Nothing recorded yet.',
+  emptyAll: 'Nobody has cleared the goal in a week yet.',
 }
 
 export { weekLabel, weekTitle, weekSpan, hours, initials, rowHtml, boardHtml, COPY }

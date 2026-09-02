@@ -42,11 +42,11 @@
  * what functions/_shared/detail-page.js has always done, so the site now has one
  * date format rather than one for the feeds and another for the detail pages.
  */
-import { showPageHref, episodePageHref } from './show-link.js?v=ob-v160'
-import { episodeBoostLink } from './episode-link.js?v=ob-v160'
-import { boosterPageHref, boosterLinkAttrs } from './booster-link.js?v=ob-v160'
-import { coverChain, httpsUrl } from './cover-art.js?v=ob-v160'
-import { htmlEscape, isSafeUrl, renderMessage } from './nostr-text.js?v=ob-v160'
+import { showPageHref, episodePageHref } from './show-link.js?v=ob-v180'
+import { episodeBoostLink } from './episode-link.js?v=ob-v180'
+import { boosterPageHref, boosterLinkAttrs } from './booster-link.js?v=ob-v180'
+import { coverChain, httpsUrl } from './cover-art.js?v=ob-v180'
+import { htmlEscape, isSafeUrl, renderMessage } from './nostr-text.js?v=ob-v180'
 
 const esc = htmlEscape
 
@@ -71,22 +71,19 @@ export const COPY = {
     searchPlaceholder: 'Search episodes…',
     searchLabel: 'Search episodes',
     searchNoun: 'episode',
-    rangeLabel: 'Filter by episode air date',
-    rangeTitle: (days) => (days ? `Episodes aired in the last ${days} days` : 'All episodes'),
+    rangeLabel: 'Filter by when the episode was boosted',
+    rangeTitle: (days) => (days ? `Episodes boosted in the last ${days} days` : 'All time'),
     sortTitle: 'Sort episodes',
     sortDateLabel: 'Latest episode',
-    // The line above the search box. A rollup card is an aggregate, so the
-    // scope names the corpus the RANKING was computed over rather than which
-    // cards survived a filter — see mountFeedNote in feed-controls.js.
-    noteGlobal: 'Ranks based on every boost in the index',
-    noteFollows: 'Ranks based on only boosts from the accounts you follow',
+    // The line above the search box is composed live from the view — see
+    // viewNote in feed-note.js; nothing static here to keep in step.
     moreLabel: (n) => `Load ${n} more episode${n === 1 ? '' : 's'}`,
     loadFail: ['Couldn’t load podcast boosts', 'The boosts feed is unavailable right now — please try again later.'],
     noFollows: ['You’re not following anyone yet', 'Follow some npubs in any Nostr client and the episodes they boost will show up here.'],
     emptyFollows: ['No episodes from your follows yet', 'Nobody you follow has boosted a podcast episode recently. Switch to Global to see everyone.'],
     emptyGlobal: ['No boosted episodes yet', 'When someone boosts a podcast episode on Nostr, it’ll show up here.'],
-    emptyWindow: ['No episodes in this window', 'Nothing the community boosted aired in this time range — try a wider one.'],
-    outOfRange: 'aired outside this time range — widen the range, or clear the search.',
+    emptyWindow: ['No episodes in this window', 'Nothing was boosted in this time range — try a wider one.'],
+    outOfRange: 'wasn’t boosted in this time range — widen the range, or clear the search.',
     // A miss now means three different things, and the old single line ("No
     // matching episode in this view") read as all three at once. On All/Global
     // the search has seen the entire index, so a miss is a COVERAGE boundary and
@@ -106,19 +103,17 @@ export const COPY = {
     searchPlaceholder: 'Search songs…',
     searchLabel: 'Search songs',
     searchNoun: 'song',
-    rangeLabel: 'Filter by release date',
-    rangeTitle: (days) => (days ? `Songs released in the last ${days} days` : 'All songs'),
+    rangeLabel: 'Filter by when the song was boosted',
+    rangeTitle: (days) => (days ? `Songs boosted in the last ${days} days` : 'All time'),
     sortTitle: 'Sort songs',
     sortDateLabel: 'Latest release',
-    noteGlobal: 'Ranks based on every boost in the index',
-    noteFollows: 'Ranks based on only boosts from the accounts you follow',
     moreLabel: (n) => `Load ${n} more song${n === 1 ? '' : 's'}`,
     loadFail: ['Couldn’t load music boosts', 'The boosts feed is unavailable right now — please try again later.'],
     noFollows: ['You’re not following anyone yet', 'Follow some npubs in any Nostr client and the songs they boost will show up here.'],
     emptyFollows: ['No songs from your follows yet', 'Nobody you follow has boosted a music track recently. Switch to Global to see everyone.'],
     emptyGlobal: ['No boosted songs yet', 'When someone boosts a track from a music feed on Nostr, it’ll show up here.'],
-    emptyWindow: ['No songs in this window', 'Nothing the community boosted was released in this time range — try a wider one.'],
-    outOfRange: 'was released outside this time range — widen the range, or clear the search.',
+    emptyWindow: ['No songs in this window', 'Nothing was boosted in this time range — try a wider one.'],
+    outOfRange: 'wasn’t boosted in this time range — widen the range, or clear the search.',
     searchNoneAll: 'No song matches. The index holds only tracks someone has boosted on Nostr.',
     searchNoneRange: 'No song matches in this time range. Try All.',
     searchNoneFollows: 'No match among the songs your follows have boosted. Switch to Global to search everyone.',
@@ -324,7 +319,7 @@ export const EPISODE_SORTERS = {
 // Sorts where a position means something. Kept beside the table so the two can't
 // drift — adding a quantitative sort means adding it here too. On "Latest boost"
 // or "Latest episode" a rank badge would read as a score when it is chronology.
-export const RANKED_SORTS = new Set(['count', 'boosts', 'sats'])
+export const RANKED_SORTS = new Set(['chart', 'count', 'boosts', 'sats'])
 
 /* The figure each ranked sort ranks ON, which a competition rank has to compare
  * to know where one run of equal values ends — ordinal numbering never had to
@@ -350,6 +345,14 @@ export function episodeRankValue(sortKey) {
 }
 
 export const SORT_OPTIONS = [
+  /* ⚠️ THE ONLYBOOSTS CHARTS — rank in sats + rank in boosts + rank in
+   * boosters, summed, lowest total first; see "The OnlyBoosts Charts" in
+   * docs/feeds.md. Server-ranked on every row: the renderer never renumbers
+   * chart rows, a tuple standing being underivable from any one figure. First
+   * in the menu as the composite the single-axis sorts below feed into; the
+   * feeds OPEN on it too, since 2026-08-31 (Reed's call, every ranked feed
+   * at once). */
+  ['chart', 'Chart rank'],
   ['recent', 'Latest boost'],
   ['episode', 'Latest episode'],
   ['count', 'Most boosters'],
@@ -361,12 +364,39 @@ export function sortEpisodeItems(items, key, fallback = 'recent') {
   return [...items].sort(EPISODE_SORTERS[key] || EPISODE_SORTERS[fallback])
 }
 
-// The range filters on when the episode AIRED (ep.published), not on when it was
-// boosted. That is the Episodes feed's axis and the opposite of the Shows feed's;
-// both are deliberate. See the range table in CLAUDE.md.
-export function filterEpisodeItems(items, cutoff) {
+/* ⚠️ THE RANGE MEANS BOOST TIME — the one reading, everywhere, since
+ * 2026-08-31 (Reed's call; the air-date reading this replaced was inherited
+ * from Local Bitcoiners and made the music windows structurally near-empty).
+ * A surviving item is a COPY whose boosts, and therefore every figure a card
+ * or a rank reads from them, are the window's own: an item boosted this week
+ * shows this week's sats, boosters and notes, never its all-time totals. The
+ * API-path `totals` are dropped for exactly that reason — they are all-time
+ * aggregates and nothing may read a number wider than the window. Items with
+ * no boost in the window drop out entirely. Pure and clock-free (the cutoff
+ * is the caller's), so it stays two-sided. */
+export function windowEpisodeItems(items, cutoff) {
   if (!cutoff) return items
-  return items.filter((it) => (it.ep.published || 0) >= cutoff)
+  const out = []
+  for (const it of items) {
+    const boosts = (it.boosts || []).filter((b) => (b.created_at || 0) >= cutoff)
+    if (!boosts.length) continue
+    const seen = new Set()
+    const distinct = []
+    for (const b of boosts) {
+      if (seen.has(b.booster_pubkey)) continue
+      seen.add(b.booster_pubkey)
+      distinct.push(b)
+    }
+    out.push({
+      ...it,
+      boosts,
+      distinctBoosters: distinct,
+      latest: boosts[0].created_at || 0,
+      totalSats: boosts.reduce((t, b) => t + (b.sats || 0), 0),
+      totals: null,
+    })
+  }
+  return out
 }
 
 // ── Episode link ladder ──────────────────────────────────────────────

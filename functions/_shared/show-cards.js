@@ -62,15 +62,25 @@ export function renderShowCardPage(cards, {
    * this exact with no seed. Chronological sorts pass no rank at all — a numeral
    * under "Recently boosted" reads as a score when it is only order. */
   const ranked = showRanks && RANKED_SORTS.has(sort);
-  const valueOf = ranked ? showRankValue(sort) : null;
-  const ranks = ranked ? competitionRanks(page, valueOf) : null;
+  /* ⚠️ THE CHART SORT'S STANDING IS THE SERVER'S, ON EVERY ROW — a tuple
+   * (score, then boosters, sats, boosts) that competitionRanks cannot
+   * re-derive from any single figure. Each record's own rank and tie flag are
+   * stamped verbatim, the same server-rank path the browser renderers take
+   * for this sort, and the tie flag is corpus-true rather than page-local.
+   * The single-column sorts keep the client-computed competition ranks. */
+  const chart = ranked && sort === "chart";
+  const valueOf = ranked && !chart ? showRankValue(sort) : null;
+  const ranks = valueOf ? competitionRanks(page, valueOf) : null;
 
   const html = renderShowCards(page, {
     copy,
-    // The label, not the number: `T4` where the place is shared. The last card
-    // of this page can only see the ties inside it — the client re-syncs that
-    // one row once it has fetched what follows. See assets/js/rank.js.
-    rankOf: (_s, i) => (ranks ? rankLabel(ranks[i].rank, ranks[i].tied) : null),
+    // The label, not the number: `T4` where the place is shared. On the
+    // single-column sorts the last card can only see the ties inside this
+    // page — the client re-syncs that one row once it has fetched what
+    // follows (see assets/js/rank.js); under chart the flag is already true.
+    rankOf: chart
+      ? (s) => rankLabel(s.rank, s.tied)
+      : (_s, i) => (ranks ? rankLabel(ranks[i].rank, ranks[i].tied) : null),
   });
 
   /* ⚠️ THE LAST PAINTED CARD'S RANK AND VALUE RIDE THE STATE, and they exist for
@@ -78,7 +88,9 @@ export function renderShowCardPage(cards, {
    * behind them, so when it later fetches page two it holds no row ahead of the
    * first one it has to number. A tie straddling that boundary would restart as
    * a new run and every card below it would be off by the size of the tie.
-   * Absent on an unranked sort, where the client numbers nothing. */
+   * Absent on an unranked sort, where the client numbers nothing — and on
+   * chart, where every row wears the server's rank and the client's
+   * renumbering paths return early (renumber / syncRankLabels). */
   const boundary = ranks && page.length
     ? {
         lastRank: ranks[page.length - 1].rank,

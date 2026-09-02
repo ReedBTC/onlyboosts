@@ -204,12 +204,31 @@ await check('the page arrows: ‹ links to the previous week, › is off on the 
   const first = await (await get(`/hpw/${lastKey}`)).text()
   assert.match(first, /<span class="hpw-arrow" aria-disabled="true" aria-label="Previous week">/)
 })
-await check('high-scores links each row to its week and takes 300s', async () => {
+/* ⚠️ THE PATH IS `high-scores` AND THE BOARD IS "Proof of #40HPW". It was
+   renamed on 2026-09-01 and the URL deliberately did not move with it: this
+   path is in the wild, the collector's card bot screenshots the literal, and
+   functions/api/og/hpw/[name].js allowlists it. A change that "tidies" the two
+   into agreement breaks all three. */
+await check('/hpw/high-scores is Proof of #40HPW: one row per member, its best week linked, 300s', async () => {
   const r = await get('/hpw/high-scores')
   assert.equal(r.status, 200)
   const html = await r.text()
+  assert.match(html, /Proof of #40HPW/)
+  assert.doesNotMatch(html, /High Scores/)
+  // Alice's 41h week is the only qualifying one in the fixture; Bob's hour is
+  // on the weekly board and must not reach this one.
   assert.match(html, new RegExp(`<a class="hpw-week hpw-week-jump" href="/hpw/${lastKey}"`))
+  assert.match(html, /<span class="hpw-hours">1<span class="hpw-unit"> wk<\/span><\/span>/)
+  assert.match(html, /<span class="hpw-eps hpw-best"[^>]*>best 41\.0 hpw<\/span>/)
+  assert.doesNotMatch(html, /Bob/)
+  // Every row on this board cleared the goal, so every row is gold.
+  assert.equal((html.match(/hpw-row--gold/g) || []).length, (html.match(/<li class="hpw-row/g) || []).length)
   assert.equal(r.headers.get('cache-control'), 'public, max-age=300')
+})
+await check('the Proof board names the count in its og:description, not the hours', async () => {
+  const html = await (await get('/hpw/high-scores')).text()
+  assert.match(html, /og:description" content="[^"]*1 member has cleared 40 hours in a week\. Alice[^"]*leads with 1 such week, the best of them 41\.0 hours\."/)
+  assert.match(html, /<meta property="og:title" content="Nostr Gang: Proof of #40HPW" \/>/)
 })
 await check('the card: a portrait frame, no nav, noindex, the ready signal, the same row', async () => {
   assert.ok(CARD_H > CARD_W, 'portrait')

@@ -11,21 +11,29 @@ that used to live there.*
 ### Range and sort
 
 Every feed carries a range and a sort dropdown, built by
-`assets/js/feed-controls.js`. The chrome is shared; **what the range means is
-not**, which is why each renderer passes its own tooltips:
+`assets/js/feed-controls.js`; each renderer passes its own tooltips.
 
 | | Range filters on | Sorts |
 |---|---|---|
-| Episodes / Songs | when the episode **aired** (`ep.published`) | latest boost / latest episode / most boosters / most boosts / most sats |
+| Episodes / Songs | when it was **boosted** (`b.ts`) | chart rank / latest boost / latest episode / most boosters / most boosts / most sats |
 | Boosts | when the boost was **sent** (`b.ts`) | latest boost / latest episode / largest boost |
-| Shows / Albums | when the show was **boosted** (`b.ts`) | most boosts / sats / boosters / episodes / recently boosted |
+| Shows / Albums | when the show was **boosted** (`b.ts`) | chart rank / most boosters / boosts / sats / recently boosted |
 
-**⚠️ `range` MEANS BOOST TIME on `/api/v1/podcasts` and AIR DATE on
-`/api/v1/episodes`.** A show is in the 1W view because someone boosted it this
-week; an episode is in the 1W view because it AIRED this week, however long ago
-it was boosted. Both sides are deliberate and the parameter name is shared; do
-not "unify" them. Filtering the note and show feeds by air date instead would
-drop most of what they hold, since most boosts land on back catalogue.
+**⚠️ `range` MEANS BOOST TIME, EVERYWHERE — one reading since 2026-08-31.**
+Reed's call, retiring the air-date reading the episode feeds inherited from
+Local Bitcoiners (where it served a different purpose). What forced the
+decision was measured on the music side: 612 of 618 boosted tracks are older
+than 30 days, so "released in this window" was a structurally near-empty
+filter — Songs · 1W sat blank while 21 tracks were boosted that week. The
+consequences carried through, not merely relabelled: a windowed episode view
+now AGGREGATES over the window's boosts (`aggEpisodes`, the follows POST's
+own path), so a 1W card's sats, boosters and inline drawer notes are the
+week's, never the all-time totals filtered to recent releases; the detail
+rollups window the same way client-side (`windowEpisodeItems`, which rebuilds
+each surviving item's figures from the window's boosts and drops the API's
+all-time `totals`). Air date survives as the **Latest episode** sort and as
+the date printed on the card — chronology by release is still a view, just
+not a window.
 
 The note feed's shorter menu is not an omission — a card there is one boost, so
 "most boosters" has nothing to count. Its `episode` sort has to sink undated rows
@@ -162,6 +170,188 @@ carries on the unfiltered feed. Verified against `bots/global-boost-scan/d1/sche
 in local sqlite: 400 random corpora x 3 sorts, SQLite's `RANK()`, `competitionRanks` and
 a brute-force reference all agreeing, plus the split-page seam.
 
+### The OnlyBoosts Charts
+
+The site's composite ranking, `sort=chart`, shipped 2026-08-31 to Reed's spec.
+It is the ranking the definitive published lists (a Top 100 of all time, a Top
+10 of the week) will be read off, and the point of it is that the formula can
+be stated completely in two lines:
+
+- **Content** (a show, an episode, an album, a song, an artist): rank in sats
+  + rank in boosts + rank in boosters, summed; **the lowest total is first**.
+- **A member** (npub): rank in sats + rank in boosts + rank in **shows
+  boosted**, the npub breadth key, since a person has no booster count.
+
+Each component rank is the site's standard competition ranking (see the
+section above) computed over the same corpus the request names: the medium
+partition, the range window, the language filter, the follow set on a POST.
+The method has prior art worth naming when asked: sailing's Low Point System
+and cross-country team scoring are rank sums, and the BCS standings averaged
+component rankings for fifteen years. The user-facing name is **OnlyBoosts
+Charts**; the sort menu label is **Chart rank**.
+
+**Ties in the total break by the breadth key (boosters, or shows boosted),
+then sats, then boosts; a row still tied after that shares its place and
+prints `T#`.** Reed's spec, 2026-08-31: audience size settles a tie before
+generosity does. It should be noted that the boosts level is provably
+unreachable (equal sats and breadth values force equal component ranks, so an
+equal total then forces equal boosts); it is kept because the published spec
+names it, and it costs one ORDER BY key.
+
+**⚠️ CHART RANK IS THE OPENING SORT ON EVERY RANKED FEED SINCE 2026-08-31**
+(Reed's call, the second half of shipping the Charts): Shows, Albums, Artists,
+Episodes and Songs, both scopes, the landing feed (`FEED.sort` in
+`functions/index.js` — the three-declaration rule applies, and
+`test-server-render.mjs` runs against a `sort=chart` capture now) and the
+members wall. The default is elided from the hash, so the bare `#shows` is the
+chart view's address; a link carrying an explicit `sort=boosters` still opens
+exactly what it says. The edge renderer stamps chart cards from the server's
+own rank and tie flag (`_shared/show-cards.js`) and emits no boundary seed,
+the client renumbering nothing under this sort.
+
+What a change would break:
+
+- **⚠️ THE STANDING IS THE TUPLE, SO THE TIEBREAK LIVES INSIDE THE `RANK()`
+  WINDOW** — `(score, breadth DESC, sats DESC, boosts DESC)` — where every
+  single-column sort keeps its tiebreak OUT of the window as a paging order
+  that must never decide a standing. Both rules are deliberate and they are
+  opposites, because here the tiebreak IS the published standing. Only rows
+  equal on all four share a place.
+- **⚠️ EVERY CHART ROW CARRIES `rank` AND `tied` FROM THE SERVER, and the
+  renderers never renumber chart rows.** A tuple standing cannot be re-derived
+  client-side from any single figure, so the chart sort rides the same
+  server-rank path a `q=` search always used: `renumber()` and
+  `syncRankLabels()` return early, `markSliceTies` never runs, and the tie
+  flag is corpus-true rather than slice-local.
+- **The formula is in the open on every row**: `chart: { score, sats, boosts,
+  boosters|shows }` beside the rank. Transparency is the feature; do not trim
+  it to save bytes.
+- **⚠️ `q=` KEEPS RANK RETENTION, AND `peers` IS COUNTED BEFORE THE FILTER**,
+  so a searched card agrees with the unfiltered feed and a tie flag survives
+  its partner being filtered out (`test-charts.mjs` pins the TieOne case).
+- **One spelling, `chart`, on all four endpoints** — `/api/v1/podcasts`,
+  `/api/v1/episodes`, `/api/v1/publishers`, `/api/v1/members` — so the
+  `count`/`boosters` wart has no sibling.
+- **Follows feeds order by chart and print no rank numbers**, the standing
+  `showRanks = scope !== 'follows'` rule: a follows corpus must not tell a
+  reader their favourite show is "#1".
+- **The members wall opens on Chart rank** (Reed's call, 2026-08-31,
+  superseding the 2026-08-23 `shows` default — see `members-board.js`), and
+  the wall's chart carries the same publisher exclusion as its listing.
+- **The detail pages draw a Charts window STRIP above the stat tiles** (the
+  single all-time line until 2026-08-31; Reed's pick, option A of the windows
+  design pass): Week · Month · Year · All time, each cell that boost-time
+  window's chart place from `feedRanks(...).chartWindows`, computed by the
+  same windowed GROUP BY the endpoints run so a cell agrees with the feed
+  view its link opens (`?sort=chart&range=1w` — the hash already addresses
+  it). The top-100 `RANK_CUTOFF` applies per window; a window past it is a
+  dash `<span>` whose tooltip says which dash it is (outside the top 100, or
+  no boosts in the window), and the strip is withheld entirely when no
+  window charts. The label links to `/about#charts`. The all-time cell wears
+  `--brand-tint`: the rolling windows are the news, all time is the record.
+  `/booster` overrides every cell's target and the breadth wording
+  (`chartHref`, `chartBreadth`), its chart living on the members wall. The
+  three tile ranks below stay the all-time score's components.
+- **⚠️ COMPUTED AT QUERY TIME, DELIBERATELY — no collector precompute.** The
+  Follows path can only be computed per request, so the query-time SQL must
+  exist regardless, and a precomputed Global table would be a second
+  implementation of the one definition. Measured cost is a window scan over
+  corpora of a few thousand aggregated rows. If a live measurement ever says
+  otherwise, the escape hatch is a chart table pushed through `d1_sync` the
+  way podroll replaces wholesale.
+- **A chart score is corpus-relative** (the Borda property): adding or
+  excluding one row can move others' scores, and a range or language filter
+  re-ranks from scratch. Positions are the stable claim; never compare raw
+  scores across corpora or weeks. A definitive published list is therefore a
+  **snapshot taken at publication time**, not a live query.
+
+**The feed note explains the chart on screen** (2026-08-31, Reed's ask,
+replacing the fixed "Ranks based on every boost in the index" line): `viewNote`
+in `assets/js/feed-note.js` composes the line above the search box from the
+live view — what orders the list, plus a corpus clause only when the corpus
+deviates from all time/Global — and the chart sort appends an ⓘ (`CHART_INFO`)
+linking to `/about#charts`, where the formula is stated in full. That section
+anchor is now an address in the wild, frozen the way `/about#membership` is.
+
+`scripts/test-charts.mjs` owns the correctness: brute-forced expectations from
+an independent implementation of the rule, a micro-corpus that inverts if the
+tiebreak chain is reordered, and it was confirmed red on four mutations (the
+tuple tiebreak removed, the chain flipped in members.js and in feed-rank.js,
+and `peers` counted post-filter).
+
+#### The Charts Page
+
+`/charts/<YYYY-MM-DD>`, edge-rendered by `functions/charts/[[path]].js` on the
+`/hpw` URL contract: `/charts` 302s to the live week, a mid-week or future date
+302s to its canonical Monday, garbage and pre-index weeks 404, HEAD is
+answered. One page carries three pairs — the **Shows** and **Artists** weekly
+Top 10s on the chart rule, and the **Members 40 HPW board** — each beside a
+**Weeks at #1** companion, the leaderboard idiom one URL scheme over.
+
+- **⚠️ ONLY SHOWS, ARTISTS AND MEMBERS ARE ON THE PAGE.** *Reed's call,
+  2026-08-31, the day it shipped with five*: the episode-level charts
+  (Episodes, Albums, Songs) are too sparse to be interesting yet.
+  `week-charts.js` still serves all five content kinds and
+  `test-weekly-charts.mjs` still covers the retired three at module level, so
+  restoring one is a `PAGE_KINDS` element plus a `COPY` entry, not new
+  queries.
+- **The week is the 40 HPW week**, Monday 00:00 US Pacific.
+  `assets/js/pacific-week.js` cuts it in JS and `pacificOffsetSql` (exported
+  from the hours endpoint for this) cuts it in SQL; nothing restates the DST
+  rule.
+- **The content ranking is `sort=chart` and nothing else.**
+  `functions/_shared/week-charts.js` applies the endpoints' exact ladder —
+  component ranks, tuple tiebreak inside the `RANK()` window — to a bounded
+  calendar-week window, the one corpus shape the feed endpoints do not serve.
+  `weeksAtNumberOne` is the same ladder `PARTITION BY wk`, counting the rank-1
+  holder of every completed week.
+- **⚠️ A WEEKLY ROW PRINTS COMPONENT RANKS, NOT RAW FIGURES.** *Reed's ask,
+  2026-08-31*: the sats and booster figures took too much of the row, so each
+  row carries its standing in the three components as `#3/#5/T#9` under a
+  `rank in sats/boosters/boosts` column head (`.cb-colhead` / `.cb-ranks`),
+  the head carrying the feed note's ⓘ to `/about#charts`. The `#` is the
+  detail tiles' chip form, on the site's own bare-vs-# line (`rank.js`):
+  these are standings in orderings that are not on screen, where the left
+  column's bare position belongs to the visible list. Without both cues a
+  triplet like `8/8/7` reads as counts. A component `T` is computed over the
+  whole week's corpus — the `peers_*` window counts in `weeklyChart` — never
+  over the visible ten.
+- **The Members pair ranks by HOURS, not the chart rule.** Its left board is
+  `hoursBoard` rendered through `hpw-board.js`'s own `boardHtml`, identical
+  to the tab's weekly 40 HPW board by construction; `hpwWeeksAtNumberOne`
+  restates the hours endpoint's corpus rules (the (booster, episode) dedupe,
+  usable durations only, `PUBLISHERS` excluded) and credits the hours leader
+  of every completed week. Its rows wear the `.hpw-*` classes outright.
+- **⚠️ WEEKS AT #1 COUNTS COMPLETED WEEKS ONLY**, on every companion. The
+  live week's #1 can still change, so crediting it would hand out a week that
+  might be taken back by Sunday; the weekly board beside it is where the live
+  race shows. A week whose #1 is a tie credits every holder — the standing
+  genuinely is shared.
+- **The week picker is the tab's own.** The Function ships the `.hpw-nav`
+  stepper with arrow LINKS and a static label (the no-JS page steps);
+  `assets/js/charts-page.js` upgrades the label into the Members tab's picker
+  — same segmented group, same `.pcast-sort-menu` — navigating to the picked
+  week's page. The menu is built only when the server disclosed
+  `data-charts-first`, the tab's own no-guessing rule.
+- **The content boards restate the 40 HPW grammar** (`.cb-*` in
+  `assets/css/chart-board.css`, kept in step with `hpw-board.css` by hand,
+  the `.mb-shell` seam), with square art in place of the round face and the
+  server's own rank and tie flag printed through `rankLabel` — a tuple
+  standing the renderer never renumbers.
+- **The renderer is server-only** (`functions/_shared/chart-board.js`): no
+  tab paints these boards, so there is no browser importer, but it keeps the
+  two-sided discipline (no `Date.now()`, pinned locales) so gaining a client
+  surface later is a move rather than a rewrite.
+- **Not yet linked from the nav or the sitemap.** The Explore menu's Stats
+  group is the natural home and regrouping the site map is Reed's call;
+  `/hpw` set the precedent for staying out of the sitemap.
+
+`scripts/test-weekly-charts.mjs` owns the correctness, brute-forced from an
+independent implementation over one fixture boost list, and was confirmed red
+on six isolated mutations (the chain flipped, the live week counted on the
+content and member sides, the medium filter dropped, the per-week partition
+removed, and the member boards' publisher exclusion dropped).
+
 ### The Language Filter
 
 `assets/js/feed-lang.js`, mounted as a third control on **all four ranked feeds**
@@ -217,9 +407,9 @@ already paged in. Two consequences the site's existing discipline demands:
   then filters to nothing is the documented reason `/api/v1/search` is not used
   by these feeds.
 - **The feed note gains a second sentence** rather than a rewritten first one:
-  "Ranks based on every boost in the index. German-language shows only." One rule
-  covers both scopes and both media. `-language` is not padding; "English shows"
-  reads as shows from England.
+  "Ranked by total sats boosted. German-language shows only." One rule covers
+  every base the composed note (`viewNote`, 2026-08-31) can produce.
+  `-language` is not padding; "English shows" reads as shows from England.
 - **`noMatchText` gains a fourth cause, tested FIRST.** It is the narrowest
   filter and the only one whose fix is one press; under Follows plus German,
   "switch to Global" points past the filter actually hiding the reader's show.
@@ -256,7 +446,7 @@ means shortening a sort label ("Recently boosted"), which is product copy and a
 separate decision. `.pcast-controls` carries `flex-wrap` for exactly this tail.
 
 **Desktop is untouched.** There is room for the tags there, and `Sort: X ▾` is a
-pattern the three detail pages share.
+pattern the detail pages share.
 
 **The Boosts feeds have no language axis**: `/api/v1/boosts` and
 `/api/v1/boosts/follows` take no `lang`. That is backend work, not a decision.
@@ -268,9 +458,9 @@ this month's shows by sats. Language shipped alone on 2026-08-17, on the argumen
 that a language names a body of work where a range and a sort are how one reader
 is looking at a list; **range and sort joined on 2026-08-27, Reed's ask**, and
 the shape had been left with room for them, so it was the promised extension
-rather than a redesign. They ride the six `PARAM_FEEDS` feeds — Shows, Albums,
-Episodes and Songs on both scopes — and deliberately not the Members feeds,
-which have the controls but no shareable view.
+rather than a redesign. They ride the ten `PARAM_FEEDS` feeds — every
+Shows/Albums/Artists/Episodes/Songs key in both scopes since 2026-08-31 —
+and deliberately not the two Members feeds.
 
 **⚠️ A default value is elided, and the elision is the renderer's.** The bare
 hash is the default view's address (`#shows`, never
@@ -464,6 +654,110 @@ Two data facts that shaped the UI:
 **Both ranges fetch the drawer**, with the window passed as `?since=<unix>` so
 the rows come back scoped and recounted. A drawer showing all-time figures under
 a card showing the week's would contradict the card it opened from.
+
+**Both scopes since 2026-08-31.** The old Global-only constraint died with the
+data source that imposed it: the rollup once read a published aggregate
+computed over everyone, and ranking moved server-side, so the Follows scope
+POSTs the contact list and `/api/v1/podcasts` aggregates the follow set's
+boosts per request — the episodes endpoint's own shape, sorts and `q=`
+included. Three rules carried over from the episode feeds, plus one new
+mechanism:
+
+- **Numerals are withheld on Follows** (`showRanks`): the population is
+  whoever you happen to follow, so a #1 would imply a standing that does not
+  exist. The order still holds.
+- **Adoption is Global-only**, guarded in `adoptServerCards` — the Follows
+  panel ships no state element, and the guard keeps that a fact.
+- **The suggestions are scoped**: `searchShows` carries the follows list, so
+  the typeahead cannot offer a show the feed then filters to nothing.
+- **⚠️ THE DRAWER'S CORPUS RIDES THE LIST CONTAINER AS A JS PROPERTY
+  (`obFollows`)**, read by `show-card-actions.js` at open time. An attribute
+  cannot carry thousands of hex keys, and the drawer must count exactly what
+  the card counted. The follows drawer path is
+  `POST /api/v1/episodes?podcast=<guid>&since=<unix>` — `podcast=` scopes to
+  the one show (and suspends the medium filter, which could only empty a
+  single show's list), and `since=` is an explicit boost-time cutoff matching
+  the card's window, the `/api/v1/podcasts/<guid>?since=` contract. Global
+  lists never set the property, so that path is byte-identical to what always
+  shipped.
+
+### The Artists feed
+
+`assets/js/artists-feed.js`, behind Artists in the feed bar — the third Music
+sub-feed, shipped 2026-08-30. Music has three tiers of ownership — publisher >
+album (show) > song (episode) — and `<podcast:publisher>` is the top one: in
+practice the publisher is the ARTIST (Wavlake, Fountain and RSS Blue mint one
+publisher feed per artist). The collector resolves the linkage from raw RSS
+(Podcast Index carries no publisher field; `bots/global-boost-scan/publishers.py`
+is the design record), and `GET /api/v1/publishers` aggregates the boosts to
+every show declaring the publisher. Coverage, measured on the full corpus:
+386 of 492 music shows (78%) declare one; 182 publishers.
+
+The renderer is `shows-feed.js` minus the adoption machinery and the medium
+split, and the two stay parallel on purpose. The card is
+`assets/js/publisher-card.js` + `publisher-card-actions.js`, on the show card's
+classes and discipline. What differs from the show-level rollups, each a
+decision:
+
+- **Both scopes since 2026-08-31**, like Shows and Albums and by the same
+  mechanism: `/api/v1/publishers` gained the follows POST (one more WHERE on
+  an endpoint that always aggregates), the numerals are withheld on Follows,
+  and the drawer's follows path is
+  `POST /api/v1/podcasts?publisher=<guid>&medium=music&since=<unix>` — the
+  declaring MUSIC shows with the follow set's own figures (music-only since
+  2026-08-31, matching the tier), carried to the drawer through the same
+  `obFollows` container property the show cards use.
+- **⚠️ Music only, hard-wired — no medium parameter because there is no
+  choice.** Reed's call, 2026-08-31, REVERSING launch (which counted
+  everything a publisher declared, the tier being ownership): the surface
+  says ARTIST and sits under Music, so an artist's figures are their music's
+  figures on every artist-tier surface — this listing, the follows POST, the
+  detail endpoint, `/artist` (its `#shows` section removed the same day) and
+  the feed-rank chips. The ~9 podcast-side declaring shows still aggregate
+  into Shows/Episodes as ordinary shows. The standing partition reading
+  applies, so an unidentified declaring feed is not music and does not count.
+- **Always a GROUP BY.** `publishers` carries no precomputed aggregates, so
+  All aggregates like the windowed ranges do. 182 publishers over an indexed
+  join; the windowed show path already does this work on every 1W press.
+- **`lang` runs through the declaring shows' languages**: "German artists" is
+  artists ranked by their German albums' boosts, and `lang=unknown` recounts
+  over only the untagged half — NULL is not English, here as everywhere. The
+  menu is the music facet (`languageOptions({medium:'music'})`), which is this
+  feed's facet to within those nine shows.
+- **Search is a LIKE, not FTS.** 182 rows do not earn an FTS table; the title
+  LIKE escapes its wildcards (`likeEscape`, members.js's rule) and a pasted
+  guid matches as an equality. The `q=` path still ranks with `RANK()` over
+  the whole filtered ordering — rank retention holds.
+- **The card's title links to `/artist/<guid>`** (the page shipped alongside,
+  2026-08-30; `show-link.js#publisherPageHref` owns the rule). The drawer is
+  the inline navigation: the artist's **indexed** albums from
+  `GET /api/v1/publishers/<guid>`, ranked by sats and windowed with the
+  card's range (`?since`, the show drawer's contract), each row linking to
+  its `/show` page, with the foot linking the artist page. A MIXED drawer —
+  an artist who also declares podcasts — renders the medium partition as two
+  labelled groups (Albums, then Shows); unmixed drawers carry no labels.
+- **⚠️ THE DRAWER IS INDEX-ONLY.** *Reed's call, 2026-08-30.* Nothing without
+  at least one Nostr boost appears anywhere on this site — the podroll is the
+  one standing exception, and it is not a ranked feed. The first cut listed
+  the publisher feed's own catalogue on the podroll's argument and rendered
+  ~270 titleless off-index Wavlake rows linking to raw XML. The endpoint now
+  reads `podcasts WHERE publisher_guid` — exactly the shows the card's
+  figures were computed over — and `albumRowsHtml` has **no external-URL
+  branch at all**, so the rule is structural. `publisher_albums` (the
+  artist's catalogue file) stays collected and deliberately unrendered; if
+  off-index content ever comes to this site, it comes site-wide, not through
+  this feed.
+- **No boost pill.** `/api/value` resolves through Podcast Index, which cannot
+  see most publisher feeds (measured: empty object for Wavlake artist guids).
+  A pill that fails for most artists is worse than none; boosting stays one
+  drawer-click away, at the album and song level.
+- **No album count on the card face** — same reasoning as the episode count
+  the show card dropped: a catalogue size is a claim about the artist's work,
+  not about boost activity, and the drawer answers it properly.
+
+`scripts/test-publishers-api.mjs` drives both shipped handlers over a
+node:sqlite build of the real schema.
+
 ### The episode feed adapter
 
 `feeds-podcasts.js` predates this data feed: it groups a flat boost list by

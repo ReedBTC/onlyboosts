@@ -73,7 +73,7 @@ a re-derivation reaches the query layer only through
 
 **The boost note cards render it**, as a `via <App>` chip in the meta row
 beside the sats. Two renderers print it — `boost-list.js#boostRow` (the
-`#boosts` section on all three detail pages) and `boosts-feed.js` (the Members
+`#boosts` section on all four detail pages) and `boosts-feed.js` (the Members
 feed) — and the shared part is the label table, `assets/js/client-label.js`.
 
 **⚠️ THAT TABLE IS TWO-SIDED AND THAT IS WHY IT MOVED.** It was declared inside

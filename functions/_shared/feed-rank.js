@@ -64,6 +64,10 @@
 const RANK_KEYS = ["sats", "boosts", "boosters"];
 const BOOSTER_RANK_KEYS = ["sats", "boosts", "shows"];
 
+/* The publisher aggregates in this file carry the artist tier's MUSIC-ONLY
+ * filter (2026-08-31, Reed's call — see ../api/v1/publishers.js): a chip
+ * claims a place on the Artists list, and that list counts only the declaring
+ * music shows now, so the populations here must count the same corpus. */
 /* ⚠️ RESTATED FROM functions/api/v1/_common.js, WHICH THIS FILE MAY NOT IMPORT
  * WITHOUT DRAGGING THE WHOLE API SURFACE IN. The members wall drops these four
  * keys from its listing, so a booster rank computed over a population that
@@ -132,6 +136,205 @@ function boosterRankQuery(row) {
 }
 
 /**
+ * A publisher's three all-time ranks on the Artists feed.
+ *
+ * The booster branch's shape one tier over: the CTE restates
+ * `/api/v1/publishers`'s aggregate exactly — boosts joined through the
+ * declaring shows, grouped by publisher, the title-less row excluded — so the
+ * rank is a place on the list the reader can go and scroll. The third key is
+ * `boosters`, the same breadth axis a show ranks by, because the Artists feed
+ * offers exactly the show feeds' sorts.
+ */
+function publisherRankQuery(row) {
+  const val = {
+    sats: Number(row.sats) || 0,
+    boosts: Number(row.boosts) || 0,
+    boosters: Number(row.boosters) || 0,
+  };
+  const args = [];
+  const parts = RANK_KEYS.map((k) => {
+    args.push(val[k], val[k]);
+    return `COUNT(CASE WHEN m.${k} > ? THEN 1 END) AS a_${k},
+            COUNT(CASE WHEN m.${k} = ? THEN 1 END) AS t_${k}`;
+  }).join(",\n           ");
+
+  const sql = `
+    WITH m AS (
+      SELECT pc.publisher_guid,
+             COALESCE(SUM(b.sats), 0)         AS sats,
+             COUNT(*)                         AS boosts,
+             COUNT(DISTINCT b.booster_pubkey) AS boosters
+        FROM boosts b
+        JOIN podcasts pc   ON pc.podcast_guid    = b.podcast_guid
+        JOIN publishers pub ON pub.publisher_guid = pc.publisher_guid
+       WHERE pub.title IS NOT NULL
+         AND COALESCE(pc.medium,'podcast') = 'music'
+       GROUP BY pc.publisher_guid
+    )
+    SELECT ${parts} FROM m`;
+  return { sql, args };
+}
+
+/* ⚠️ THE ONLYBOOSTS CHARTS POSITION — rank in sats + rank in boosts + rank in
+ * the subject's breadth key (boosters for content, shows boosted for a
+ * member), summed, lowest total first; ties break breadth → sats → boosts and
+ * a remaining tie is shared (T#). Reed's spec, 2026-08-31; the design record
+ * is "The OnlyBoosts Charts" in docs/feeds.md.
+ *
+ * The population is the SAME list the three component chips are computed over
+ * — the medium partition for a show or an episode, the wall's publisher
+ * exclusion for a member, the title-less exclusion for a publisher — so the
+ * chart place and the component ranks always describe one corpus. Global and
+ * all languages always: the feedRanks doctrine at the top of this file.
+ *
+ * ⚠️ A `cutoff` (unix seconds) makes it one WINDOW's chart. The base becomes
+ * the same boost-time GROUP BY the four endpoints run for a windowed
+ * `sort=chart` (aggEpisodes in episodes.js, the `p.cutoff` branches of
+ * podcasts.js and publishers.js, the members AGG join), so a cell on the
+ * strip agrees with the windowed feed view it links to. No cutoff keeps the
+ * precomputed all-time aggregates, which are cheaper and identical by
+ * construction (d1_sync keeps them true). */
+function chartQuery(kind, row, cutoff = null) {
+  let base = null;
+  let id = null;
+  const args = [];
+  if (kind === "booster") {
+    if (!row?.pk) return null;
+    id = row.pk;
+    const holes = RANK_PUBLISHERS.map(() => "?").join(",");
+    args.push(...RANK_PUBLISHERS);
+    base = `
+      SELECT booster_pubkey AS id,
+             COALESCE(SUM(sats), 0)       AS m_sats,
+             COUNT(*)                     AS m_boosts,
+             COUNT(DISTINCT podcast_guid) AS m_breadth
+        FROM boosts
+       WHERE booster_pubkey NOT IN (${holes})${cutoff ? `
+         AND created_at >= ?` : ""}
+       GROUP BY booster_pubkey`;
+    if (cutoff) args.push(cutoff);
+  } else if (kind === "publisher") {
+    if (!row?.guid) return null;
+    id = row.guid;
+    base = `
+      SELECT pc.publisher_guid                AS id,
+             COALESCE(SUM(b.sats), 0)         AS m_sats,
+             COUNT(*)                         AS m_boosts,
+             COUNT(DISTINCT b.booster_pubkey) AS m_breadth
+        FROM boosts b
+        JOIN podcasts pc    ON pc.podcast_guid    = b.podcast_guid
+        JOIN publishers pub ON pub.publisher_guid = pc.publisher_guid
+       WHERE pub.title IS NOT NULL
+         AND COALESCE(pc.medium,'podcast') = 'music'${cutoff ? `
+         AND b.created_at >= ?` : ""}
+       GROUP BY pc.publisher_guid`;
+    if (cutoff) args.push(cutoff);
+  } else {
+    const isEpisode = kind === "episode";
+    id = isEpisode ? row.item_guid : row.podcast_guid;
+    if (!id) return null;
+    const music = (isEpisode ? row.p_medium : row.medium) === "music";
+    // The medium partition, restated from the API: never `= 'podcast'`.
+    const op = music ? "=" : "<>";
+    if (cutoff) {
+      /* Windowed: every figure is the window's own, recomputed over `boosts`
+       * exactly as the endpoints' windowed GROUP BY recomputes it — the
+       * precomputed columns are all-time totals and would rank the wrong
+       * corpus. A subject with no boost in the window finds no row, which is
+       * the honest null the dash cell renders. */
+      const col = isEpisode ? "item_guid" : "podcast_guid";
+      args.push(cutoff);
+      base = `
+      SELECT b.${col}                          AS id,
+             COALESCE(SUM(b.sats),0)           AS m_sats,
+             COUNT(*)                          AS m_boosts,
+             COUNT(DISTINCT b.booster_pubkey)  AS m_breadth
+        FROM boosts b
+        LEFT JOIN podcasts pc ON pc.podcast_guid = b.podcast_guid
+       WHERE b.${col} IS NOT NULL
+         AND b.created_at >= ?
+         AND COALESCE(pc.medium,'podcast') ${op} 'music'
+       GROUP BY b.${col}`;
+    } else base = isEpisode
+      ? `
+      SELECT e.item_guid                  AS id,
+             COALESCE(e.total_sats,0)     AS m_sats,
+             COALESCE(e.boost_count,0)    AS m_boosts,
+             COALESCE(e.booster_count,0)  AS m_breadth
+        FROM episodes e
+        LEFT JOIN podcasts pc ON pc.podcast_guid = e.podcast_guid
+       WHERE COALESCE(pc.medium,'podcast') ${op} 'music'`
+      : `
+      SELECT p.podcast_guid               AS id,
+             COALESCE(p.total_sats,0)     AS m_sats,
+             COALESCE(p.boost_count,0)    AS m_boosts,
+             COALESCE(p.booster_count,0)  AS m_breadth
+        FROM podcasts p
+       WHERE COALESCE(p.medium,'podcast') ${op} 'music'`;
+  }
+  const sql = `
+    WITH base AS (${base}),
+         scored AS (
+           SELECT base.*,
+                  RANK() OVER (ORDER BY m_sats DESC)    AS r_sats,
+                  RANK() OVER (ORDER BY m_boosts DESC)  AS r_boosts,
+                  RANK() OVER (ORDER BY m_breadth DESC) AS r_breadth
+           FROM base
+         ),
+         chart AS (
+           SELECT id,
+                  RANK() OVER (ORDER BY (r_sats + r_boosts + r_breadth),
+                               m_breadth DESC, m_sats DESC, m_boosts DESC) AS rank
+           FROM scored
+         ),
+         tied AS (
+           SELECT chart.*, COUNT(*) OVER (PARTITION BY rank) AS peers FROM chart
+         )
+    SELECT rank, peers FROM tied WHERE id = ?`;
+  args.push(id);
+  return { sql, args };
+}
+
+/* Resolves { rank, tied } or null; its own catch, so a chart failure costs the
+ * chart line and never the three component chips beside it. A subject outside
+ * the population (a publisher key on /booster, a medium mismatch) simply finds
+ * no row, which is the same honest silence ranksFrom keeps. */
+async function chartPlace(db, kind, row, cutoff = null) {
+  try {
+    const q = chartQuery(kind, row, cutoff);
+    if (!q) return null;
+    const r = await db.prepare(q.sql).bind(...q.args).first();
+    const rank = Number(r?.rank);
+    if (!Number.isFinite(rank) || rank < 1) return null;
+    return { rank, tied: Number(r.peers) > 1 };
+  } catch (err) {
+    console.warn("[feed-rank] chart query failed", err);
+    return null;
+  }
+}
+
+/* ⚠️ THE WINDOWS ARE THE FEED BAR'S RANGES and the keys are the hash's own
+ * (`range=1w`), so a strip cell's link opens exactly the list it ranks on.
+ * A new range in feed-controls.js RANGE_OPTIONS + the endpoints' RANGE_DAYS
+ * wants a row here too, or the strip simply doesn't show it. */
+const CHART_WINDOWS = [["1w", 7], ["1m", 30], ["1y", 365]];
+
+/* The all-time place plus the three windowed ones, in parallel — each
+ * chartPlace carries its own catch, so one failed window costs one dash and
+ * never the strip. `chart` keeps its historical meaning (the all-time place)
+ * because test-charts.mjs and this file's own callers read it. */
+async function attachChart(db, kind, row, out) {
+  const now = Math.floor(Date.now() / 1000);
+  const [all, ...wins] = await Promise.all([
+    chartPlace(db, kind, row),
+    ...CHART_WINDOWS.map(([, days]) => chartPlace(db, kind, row, now - days * 86400)),
+  ]);
+  out.chart = all;
+  out.chartWindows = { all };
+  CHART_WINDOWS.forEach(([key], i) => { out.chartWindows[key] = wins[i]; });
+}
+
+/**
  * The three all-time global ranks for a show or an episode.
  *
  * Resolves `{ sats:{rank,tied}, boosts:{…}, boosters:{…} }` or null; never
@@ -152,7 +355,17 @@ export async function feedRanks(db, kind, row) {
       if (!row || !row.pk) return null;
       const { sql, args } = boosterRankQuery(row);
       const r = await db.prepare(sql).bind(...args).first();
-      return ranksFrom(r, BOOSTER_RANK_KEYS);
+      const out = ranksFrom(r, BOOSTER_RANK_KEYS);
+      if (out) await attachChart(db, kind, row, out);
+      return out;
+    }
+    if (kind === "publisher") {
+      if (!row || !row.guid) return null;
+      const { sql, args } = publisherRankQuery(row);
+      const r = await db.prepare(sql).bind(...args).first();
+      const out = ranksFrom(r, RANK_KEYS);
+      if (out) await attachChart(db, kind, row, out);
+      return out;
     }
     const isEpisode = kind === "episode";
     const id = isEpisode ? row.item_guid : row.podcast_guid;
@@ -195,7 +408,9 @@ export async function feedRanks(db, kind, row) {
       : `COALESCE(${mediumCol},'podcast') <> 'music'`;
 
     const r = await db.prepare(`SELECT ${parts} ${from} WHERE ${where}`).bind(...args).first();
-    return ranksFrom(r, RANK_KEYS);
+    const out = ranksFrom(r, RANK_KEYS);
+    if (out) await attachChart(db, kind, row, out);
+    return out;
   } catch (err) {
     console.warn("[feed-rank] rank query failed", err);
     return null;
@@ -254,6 +469,17 @@ function chip(r) {
  */
 const RANK_CUTOFF = 100;
 
+/* The strip's four cells: window key (the hash's own `range` spelling), the
+ * label on the cell, and the phrase its tooltips speak. The first three rows
+ * restate CHART_WINDOWS above — the keys must match or a computed window
+ * simply never renders. */
+const CHART_CELLS = [
+  ["1w", "Week", "this week"],
+  ["1m", "Month", "this month"],
+  ["1y", "Year", "this year"],
+  ["all", "All time", "all time"],
+];
+
 /**
  * The stat tiles with the rank folded into each: value, label, then the rank as
  * a third line. One tile per stat, in the order given; the rank is drawn only
@@ -302,7 +528,55 @@ export function renderStatTiles(stats, ranks, copy) {
     ? `<p class="show-stats-cap">Rank on the all-time <a href="${esc(copy.backHref)}">${esc(copy.rankFeed)} feed</a>${anyTie ? "; T marks a tie" : ""}</p>`
     : "";
 
-  return `<dl class="show-stats">
+  /* ⚠️ THE CHARTS STRIP — the subject's OnlyBoosts Charts position in each of
+   * the four boost-time windows (Week · Month · Year · All time), above the
+   * tiles because the standing is the headline and the three tile ranks are
+   * the all-time score's components. It replaced the single all-time line on
+   * 2026-08-31 (Reed's pick, option A of the windows design pass — the
+   * Billboard idiom: the current window is the news, the all-time standing is
+   * the record, and the all-time cell wears the tint to say which is which).
+   *
+   * Each charted cell links to that window's chart view — the hash already
+   * addresses it (`?sort=chart&range=1w`; the all-time cell elides the
+   * default range). /booster overrides every target via `copy.chartHref`,
+   * its chart living on the members wall rather than behind a sort key the
+   * Members hash would drop. The label links to /about#charts, where the
+   * formula is stated in full, and carries it as a tooltip too.
+   *
+   * The same top-100 gate as the chips applies PER WINDOW. A window past the
+   * gate is an em-dash whose tooltip says which of two things the dash means
+   * — outside the top 100, or no boosts in the window at all (chartPlace
+   * resolves null when the subject has no row in the windowed corpus) — and
+   * a dash cell is a <span>, not a link: sending a reader to a list the
+   * subject is not on answers a question nobody asked. The whole strip is
+   * withheld when no window charts, so most pages render exactly as before
+   * the Charts existed. */
+  const breadth = copy.chartBreadth || "boosters";
+  const cw = ranks && (ranks.chartWindows || (ranks.chart ? { all: ranks.chart } : null));
+  let chartStrip = "";
+  if (cw && CHART_CELLS.some(([key]) => cw[key] && cw[key].rank <= RANK_CUTOFF)) {
+    const labelTip = `Rank in sats + rank in boosts + rank in ${breadth}, summed — lowest total first, within each time window. Ties break by ${breadth}, then sats, then boosts; T marks a remaining tie.`;
+    const cells = CHART_CELLS.map(([key, win, phrase]) => {
+      const c = cw[key];
+      const all = key === "all" ? " show-chart-cell--all" : "";
+      const winEl = `<span class="show-chart-win">${win}</span>`;
+      if (c && c.rank <= RANK_CUTOFF) {
+        const href = copy.chartHref || `${copy.backHref}?sort=chart${key === "all" ? "" : `&range=${key}`}`;
+        return `<a class="show-chart-cell${all}" href="${esc(href)}" title="${esc(`${chip(c)} on the OnlyBoosts Charts ${phrase}`)}">${winEl}<span class="show-chart-rank">${esc(chip(c))}</span></a>`;
+      }
+      /* One wording for both nulls (no boosts in the window, or ranked past
+       * the gate): the chart's claim is the top 100, and "outside the top
+       * 100" is true either way — Reed's call, 2026-08-31, replacing a
+       * "No boosts" variant that answered a question the chart isn't asking. */
+      return `<span class="show-chart-cell show-chart-cell--none${all}" title="${esc(`Outside the top 100 ${phrase}`)}">${winEl}<span class="show-chart-rank">—</span></span>`;
+    });
+    chartStrip = `<nav class="show-chart" aria-label="OnlyBoosts Chart Positions by time window">
+      <a class="show-chart-label" href="/about#charts" title="${esc(labelTip)}">OnlyBoosts Chart Positions</a>
+      <div class="show-chart-strip">${cells.join("")}</div>
+    </nav>`;
+  }
+
+  return `${chartStrip}${chartStrip ? "\n    " : ""}<dl class="show-stats">
       ${tiles.join("\n      ")}
     </dl>${caption ? "\n    " + caption : ""}`;
 }

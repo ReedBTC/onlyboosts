@@ -94,6 +94,61 @@ boost(DAVE, 'ep2', mid - 3 * WEEK)
 // The bot racked up four hours this week and must not appear.
 for (const g of ['ep1', 'ep2', 'ep3', 'ep4']) boost(BOT, g, mid)
 
+/* ── Proof of #40HPW ─────────────────────────────────────────────────────────
+ *
+ * ⚠️ NOTHING ABOVE THIS LINE CAN TEST THE ALL-TIME BOARD ANY MORE. Until
+ * 2026-09-01 `range=all` was the ten biggest booster-weeks, so a fixture of one-
+ * and two-hour weeks exercised it fully; it is now every member who has cleared
+ * FORTY hours in a week, so the same fixture returns an empty board and every
+ * assertion about it passes vacuously. These five members exist to clear it, and
+ * they are deliberately separate from Alice and Bob rather than scaled up: the
+ * weekly checks above are written against known one-hour arithmetic and a
+ * twenty-one-hour episode in the middle of them would be a second change.
+ *
+ * Every figure below is chosen so the expected board can be written out by hand:
+ *
+ *   Gina  3 weeks, best 60h  (21+20+19, three weeks back)
+ *   Hank  2 weeks, best 41h  (two IDENTICAL 41h weeks; the newer must win)
+ *   Chad  1 week,  best 41h  (a publisher for attribution, a member for ranking)
+ *   Ivy   1 week,  best 41h  (plus a 39h week that must NOT be counted)
+ *   Joe   1 week,  best 40h  (EXACTLY the goal, which must qualify)
+ *   Kay   0 weeks           (40h less one second, which must not)
+ *   Bot   excluded          (a 41h week on a publisher key)
+ */
+episode('ep21', 21 * HOUR); episode('ep20', 20 * HOUR); episode('ep20b', 20 * HOUR)
+episode('ep19', 19 * HOUR); episode('ep20less', 20 * HOUR - 1)
+const GINA = 'g'.repeat(64), HANK = 'h'.repeat(64), IVY = 'i'.repeat(64)
+const JOE = 'j'.repeat(64), KAY = 'k'.repeat(64)
+profile(GINA, 'Gina'); profile(HANK, 'Hank'); profile(IVY, 'Ivy')
+profile(JOE, 'Joe'); profile(KAY, 'Kay')
+/* Wednesday of the week N back. Stepped by the week rule rather than by
+   `- n * WEEK`, for the reason `nextWeek` exists: a Pacific week containing a
+   DST transition is 167 or 169 hours, so flat arithmetic here would put a
+   fixture boost in the wrong week twice a year and the failure would look like
+   the endpoint's. */
+const weeksBack = (n) => {
+  let w = thisMonday
+  for (let i = 0; i < n; i++) w = prevWeek(w)
+  return w + 2 * 86400
+}
+// Gina: 41h, 41h, then 60h three weeks back — her best is NOT her newest.
+boost(GINA, 'ep21', weeksBack(1), 'npub1gina'); boost(GINA, 'ep20', weeksBack(1))
+boost(GINA, 'ep21', weeksBack(2)); boost(GINA, 'ep20', weeksBack(2))
+boost(GINA, 'ep21', weeksBack(3)); boost(GINA, 'ep20', weeksBack(3)); boost(GINA, 'ep19', weeksBack(3))
+// Hank: two weeks that tie exactly. The tiebreak is `wk DESC`, so week 1 wins.
+boost(HANK, 'ep21', weeksBack(1), 'npub1hank'); boost(HANK, 'ep20', weeksBack(1))
+boost(HANK, 'ep21', weeksBack(2)); boost(HANK, 'ep20', weeksBack(2))
+// Chad's own sends, two weeks back: he ranks here exactly as he does above.
+boost(CHAD, 'ep21', weeksBack(2)); boost(CHAD, 'ep20', weeksBack(2))
+// Ivy: one qualifying week, and one at 39h that must not add to her count.
+boost(IVY, 'ep21', weeksBack(2), 'npub1ivy'); boost(IVY, 'ep20', weeksBack(2))
+boost(IVY, 'ep20', weeksBack(4)); boost(IVY, 'ep19', weeksBack(4))
+// Joe: exactly 40h. Kay: one second short.
+boost(JOE, 'ep20', weeksBack(2), 'npub1joe'); boost(JOE, 'ep20b', weeksBack(2))
+boost(KAY, 'ep20', weeksBack(2), 'npub1kay'); boost(KAY, 'ep20less', weeksBack(2))
+// The publisher cleared it too, and must still be nowhere.
+boost(BOT, 'ep21', weeksBack(2)); boost(BOT, 'ep20', weeksBack(2))
+
 /* ⚠️ THE SHIM MODELS `.first()` AS WELL AS `.all()`, AND `.first()` OFF AN
  * UNBOUND STATEMENT. D1 offers both, `first_week` is fetched with the second
  * shape, and a shim that models less than the thing it stands in for turns a
@@ -159,20 +214,52 @@ check('the npub rides along without multiplying the row', () => {
   assert.equal(hours(w.Alice), 3)
 })
 
-console.log('\nAll time, one row per booster-week:')
+console.log('\nProof of #40HPW, one row per member:')
 const all = await call('?range=all')
-check('⚠️ a member who boosted in two weeks gets two rows, not one merged one', () => {
-  const dave = all.members.filter((m) => m.name === 'Dave')
-  assert.equal(dave.length, 2, `Dave has ${dave.length} row(s); weeks were merged`)
-  assert.deepEqual(dave.map(hours), [1, 1])
-  assert.notDeepEqual([...new Set(dave.map((m) => m.week_start))].length, 1)
+const a = byName(all)
+const proofOrder = all.members.map((m) => m.name)
+
+check('⚠️ one row per MEMBER, never one per booster-week', () => {
+  // The board this replaced gave Gina three rows and Hank two. If the second
+  // GROUP BY stage is ever dropped, this is what says so.
+  assert.equal(new Set(proofOrder).size, proofOrder.length,
+    `a name repeats: ${JSON.stringify(proofOrder)}`)
+  assert.equal(a.Gina.weeks, 3)
+  assert.equal(a.Hank.weeks, 2)
 })
-check('a member who boosted in one week gets one row', () => {
-  const cara = all.members.filter((m) => m.name === 'Cara')
-  assert.equal(cara.length, 1)
-  assert.equal(hours(cara[0]), 2)
+check('⚠️ a member who never cleared the goal is not on the board at all', () => {
+  // Alice (3h), Bob (2h), Cara (2h) and Dave (1h + 1h) are the whole of the
+  // old all-time board. Not one of them belongs on this one.
+  for (const n of ['Alice', 'Bob', 'Cara', 'Dave']) {
+    assert.ok(!(n in a), `${n} reached a board with a 40-hour entry test`)
+  }
 })
-check('each row carries the Monday its week started', () => {
+check('⚠️ a member\'s SUB-GOAL weeks do not count toward the figure', () => {
+  // Ivy has a 41h week and a 39h week. The 39 must be invisible: it is inside
+  // the same CTE and only the HAVING keeps it out.
+  assert.equal(a.Ivy.weeks, 1, 'Ivy\'s 39-hour week was counted')
+})
+check('⚠️ EXACTLY the goal qualifies, and one second under does not', () => {
+  // The entry test is `>=`, the same comparison the gold row has always made,
+  // and it is made on raw seconds — Kay's week rounds to 40.0 and is not one.
+  assert.ok('Joe' in a, 'a week of exactly 40 hours was excluded')
+  assert.equal(a.Joe.seconds, 40 * HOUR)
+  assert.ok(!('Kay' in a), 'a week one second under 40 hours qualified')
+})
+check('the row carries the member\'s BEST qualifying week, not their newest', () => {
+  // Gina's 60h week is three weeks back and both her others are 41h.
+  assert.equal(hours(a.Gina), 60)
+  assert.equal(a.Gina.episodes, 3)
+  assert.equal(a.Gina.week_start, prevWeek(prevWeek(prevWeek(thisMonday))))
+})
+check('⚠️ two equally good weeks resolve to the MORE RECENT one', () => {
+  // Hank's weeks are identical, so only the `wk DESC` tiebreak decides which
+  // date the row prints. Without it the choice is whatever the plan happens to
+  // emit, which is stable enough to pass by accident.
+  assert.equal(hours(a.Hank), 41)
+  assert.equal(a.Hank.week_start, prevWeek(thisMonday))
+})
+check('each row carries the Monday its best week started', () => {
   for (const m of all.members) {
     assert.ok(m.week_start, `${m.name} has no week_start`)
     // ⚠️ NOT `% WEEK`, WHICH IS WHAT THIS WAS WHILE WEEKS WERE UTC. A Pacific
@@ -185,6 +272,30 @@ check('each row carries the Monday its week started', () => {
     assert.equal(new Date(m.week_start * 1000).getUTCDay(), 1,
       `${m.name}'s week starts ${new Date(m.week_start * 1000).toUTCString()}, not a Monday`)
   }
+})
+check('⚠️ most weeks first, then the best single week, then the key', () => {
+  // Chad and Ivy both hold one 41h week, so the third key is the only thing
+  // ordering them: 'f3bd…' before 'iiii…'.
+  assert.deepEqual(proofOrder, ['Gina', 'Hank', 'chadf_boostbot', 'Ivy', 'Joe'],
+    `board reads ${JSON.stringify(proofOrder)}`)
+})
+check('the npub rides along without multiplying the row', () => {
+  // The bug this guards: LEFT JOIN boosts for the npub inflates every figure by
+  // that member's boost count. Gina has 7 boosts; 60h would have read 420h.
+  assert.equal(a.Gina.npub, 'npub1gina')
+  assert.equal(hours(a.Gina), 60)
+})
+check('⚠️ a publisher pubkey is not a member and does not rank', () => {
+  assert.ok(!('bmb_site' in a), 'a publisher key cleared the goal and ranked')
+})
+check('⚠️ chadf_boostbot is one person\'s own sends and DOES rank (2026-08-30)', () => {
+  assert.ok('chadf_boostbot' in a, `absent: ${JSON.stringify(proofOrder)}`)
+  assert.equal(a.chadf_boostbot.weeks, 1)
+})
+check('the envelope still names the goal, and carries no week', () => {
+  assert.equal(all.goal_hours, 40)
+  assert.equal(all.week_start, null)
+  assert.equal(all.is_current, null)
 })
 
 /* ⚠️ THE RULE IS IMPLEMENTED TWICE — once in JS for the weekly cutoff, once as
@@ -218,14 +329,6 @@ check('⚠️ the SQL half and the JS half agree, DST transitions included', () 
     assert.equal(ws, pacificWeekStart(ts), `${iso}: SQL says ${ws}, JS says ${pacificWeekStart(ts)}`)
     assert.equal(new Date(ws * 1000).getUTCDay(), 1, `${iso}: not a Monday`)
   }
-})
-check('⚠️ weeks are split, not merged: Cara and Alice are separate rows', () => {
-  const names = all.members.map((m) => m.name)
-  assert.ok(names.includes('Cara') && names.includes('Alice'))
-})
-check('the bot is excluded here too', () => {
-  assert.ok(!all.members.some((m) => m.name === 'bmb_site'))
-  assert.ok(all.members.some((m) => m.name === 'chadf_boostbot'), 'chadf_boostbot missing from all-time')
 })
 
 console.log('\nWeek boundaries:')

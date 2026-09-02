@@ -10,7 +10,7 @@
  * has a failure window measured in hours: a visitor holding a three-hour-old
  * feed-controls.js who fetches a fresh feeds-podcasts.js gets
  *
- *   SyntaxError: The requested module '/assets/js/feed-controls.js?v=ob-v160' does not
+ *   SyntaxError: The requested module '/assets/js/feed-controls.js?v=ob-v180' does not
  *   provide an export named 'mountFeedNote'
  *
  * and an unresolved named import is a LINK-TIME error: the module never
@@ -45,14 +45,116 @@
  *
  * @param {Element} panel
  * @param {string}  text   plain text; null or empty leaves the slot hidden
+ * @param {object}  [opts]
+ * @param {object}  [opts.info]  { href, title, label } — a small ⓘ link
+ *   appended after the text. The href is a site-internal constant (see
+ *   CHART_INFO below), never user-supplied, which is why it skips isSafeUrl.
+ * @param {boolean} [opts.charts]  append the CHARTS wordmark link to /charts
+ *   (Reed's ask, 2026-09-01). Callers pass it ONLY on the exact view the
+ *   charts page opens on — chart sort, Global, all time, all languages — so
+ *   it lands right after the ⓘ, the note having no corpus or language clause
+ *   to carry on that view. The Shows and Artists feeds pass it; Albums,
+ *   Songs and Episodes deliberately do not (the page carries no chart for
+ *   them).
  */
-export function mountFeedNote(panel, text) {
+export function mountFeedNote(panel, text, opts = {}) {
   const host = panel?.querySelector('[data-feed-note]')
   if (!host) return null
   if (!text) { host.textContent = ''; host.hidden = true; return null }
   host.textContent = text
+  const info = opts.info
+  if (info && info.href) {
+    // Inline when the base starts with info.after (the chart head), trailing
+    // otherwise. textContent above already holds the full text; the split
+    // rebuilds it around the anchor.
+    const at = info.after && text.startsWith(info.after) ? info.after.length : text.length
+    host.textContent = text.slice(0, at)
+    host.append(' ')
+    const a = document.createElement('a')
+    a.className = 'feed-note-info'
+    a.href = info.href
+    // A reader mid-browse: the explainer opens beside the feed, not over it.
+    a.target = '_blank'
+    a.rel = 'noopener'
+    if (info.title) a.title = info.title
+    a.setAttribute('aria-label', info.label || info.title || 'More about this ranking')
+    a.textContent = 'ⓘ'
+    host.append(a)
+    if (at < text.length) host.append(text.slice(at))
+  }
+  if (opts.charts) {
+    host.append(' ')
+    const c = document.createElement('a')
+    c.className = 'ob-charts-link'
+    c.href = '/charts'
+    c.title = 'The OnlyBoosts Charts'
+    c.textContent = 'CHARTS'
+    host.append(c)
+  }
   host.hidden = false
   return host
+}
+
+/* The ⓘ beside the chart note. One constant rather than three renderer
+ * copies, so the target and the wording cannot drift. /about#charts is the
+ * section that states the whole formula; the title carries the one-line
+ * version for a reader who only hovers. */
+export const CHART_INFO = {
+  href: '/about#charts',
+  title: 'How the OnlyBoosts Charts work',
+  label: 'How the OnlyBoosts Charts work',
+  // The ⓘ sits INSIDE the sentence, right after this prefix, so the window
+  // and language clauses read past it: "Ranked by the OnlyBoosts Chart
+  // Position ⓘ. Counting boosts from the last 30 days." (Reed's spec,
+  // 2026-08-31.) mountFeedNote splits on it; a base not starting with it
+  // gets the link appended at the end, the original behaviour.
+  after: 'Ranked by the OnlyBoosts Chart Position',
+}
+
+/**
+ * The note's base sentence, composed from the view itself.
+ *
+ * It replaced a fixed corpus line ("Ranks based on every boost in the index")
+ * on 2026-08-31, Reed's ask: the fixed line said nothing about the view on
+ * screen. This says what orders the list, and appends a corpus clause only
+ * when the corpus deviates from the default (all time, everyone) — the
+ * Follows scope and a range window are claims a reader cannot see from the
+ * cards, where "every boost in the index" was the default restated.
+ *
+ * One switch covers every renderer's sort spelling ('count' and 'boosters'
+ * are one ranking; 'recent' and 'latest' are one chronology), the same union
+ * the hash's shape-only sort validation already tolerates. Returns no
+ * trailing period, matching what langNote expects of its base.
+ *
+ * @param {object} view
+ * @param {string} view.sort     the renderer's current sort key
+ * @param {number} view.days     rangeDays(rangeKey) — 0 means all time
+ * @param {boolean} view.follows
+ * @param {string} view.noun     the ROW's word: show, album, episode, track, artist
+ */
+export function viewNote({ sort, days, follows, noun = 'show' }) {
+  let head
+  switch (sort) {
+    case 'chart':
+      // The formula moved into the ⓘ (its tooltip and /about#charts): the
+      // note names the ranking, the link explains it. Must stay equal to
+      // CHART_INFO.after or the ⓘ falls to the end of the line.
+      head = CHART_INFO.after
+      break
+    case 'sats': head = 'Ranked by total sats boosted'; break
+    case 'boosts': head = 'Ranked by number of boosts'; break
+    case 'count':
+    case 'boosters': head = 'Ranked by distinct boosters'; break
+    case 'episode':
+      head = noun === 'track' ? 'Ordered by latest release' : 'Ordered by latest episode'
+      break
+    default: head = 'Ordered by most recent boost'
+  }
+  const corpus = follows
+    ? (days ? `Counting only the last ${days} days of boosts from the accounts you follow`
+      : 'Counting only boosts from the accounts you follow')
+    : (days ? `Counting boosts from the last ${days} days` : '')
+  return corpus ? `${head}. ${corpus}` : head
 }
 
 /** Empty a panel's note slot and hide it again. */

@@ -34,13 +34,13 @@
  * the same comparators, from episode-card.js, so the two cases share code
  * without sharing the mistake.
  */
-import { competitionRanks, rankLabel } from '/assets/js/rank.js?v=ob-v160'
-import { renderEpisodeCards, sortEpisodeItems, filterEpisodeItems, buildEpisodes, COPY, episodeRankValue }
-  from '/assets/js/episode-card.js?v=ob-v160'
+import { competitionRanks, rankLabel } from '/assets/js/rank.js?v=ob-v180'
+import { renderEpisodeCards, sortEpisodeItems, windowEpisodeItems, buildEpisodes, COPY, episodeRankValue }
+  from '/assets/js/episode-card.js?v=ob-v180'
 import { wireEpisodeCards, hydrateCardProfiles, prewarmBoosting }
-  from '/assets/js/episode-card-actions.js?v=ob-v160'
-import { normalizeBoosts, toEpisodeShape } from '/assets/js/ob-data.js?v=ob-v160'
-import { rangeControl, sortControl, rangeDays, rangeCutoff } from '/assets/js/feed-controls.js?v=ob-v160'
+  from '/assets/js/episode-card-actions.js?v=ob-v180'
+import { normalizeBoosts, toEpisodeShape } from '/assets/js/ob-data.js?v=ob-v180'
+import { rangeControl, sortControl, rangeDays, rangeCutoff } from '/assets/js/feed-controls.js?v=ob-v180'
 
 const CARDS_PER_PAGE = 30   // matches CARDS_PER_PAGE in functions/_shared/episode-cards.js
 
@@ -127,16 +127,16 @@ export function initEpisodeSection({
   function mountControls() {
     ctrlSlot.append(
       rangeControl(rangeKey, (key) => { if (key !== rangeKey) { rangeKey = key; onControlChange() } }, {
-        // The range filters on when the episode AIRED, not on when it was
-        // boosted — the same axis the Episodes feed uses, and the reason the
-        // tooltips are written per surface rather than inside feed-controls.js.
-        // The wording stays neutral although both lists ARE split on medium
-        // since 2026-08-24: this same control serves /booster's rollup, which
-        // deliberately is not split (splitting a person would file them under
-        // two half-histories), so "aired or released" has to cover both.
-        label: 'Filter by air or release date',
+        // ⚠️ The range means BOOST TIME — the one reading, everywhere, since
+        // 2026-08-31 (windowEpisodeItems in episode-card.js is the design
+        // record). A windowed card's figures and drawer notes are the
+        // window's own, recomputed from the boosts inside it. The wording
+        // needs no medium-neutral dance any more: "boosted" covers episodes
+        // and songs alike, which is also why /booster's unsplit rollup can
+        // share this control unchanged.
+        label: 'Filter by when it was boosted',
         titleFor: (key, label) => (rangeDays(key)
-          ? `Aired or released in the last ${rangeDays(key)} days`
+          ? `Boosted in the last ${rangeDays(key)} days`
           : label),
       }),
       sortControl(sorts, sortKey, (key) => { if (key !== sortKey) { sortKey = key; onControlChange() } }, {
@@ -201,7 +201,7 @@ export function initEpisodeSection({
    * depends on. There is no search here, but the range filter is the same
    * narrowing: rank over everything in the window, then paint. */
   function rebuild() {
-    view = sortEpisodeItems(filterEpisodeItems(items, rangeCutoff(rangeKey)), sortKey)
+    view = sortEpisodeItems(windowEpisodeItems(items, rangeCutoff(rangeKey)), sortKey)
     stampRanks()
     total = view.length
     painted = 0
@@ -274,7 +274,7 @@ export function initEpisodeSection({
         // First press: the corpus has only just arrived and there is no ranked
         // view yet. Build it without repainting what the server already showed.
         if (!view.length) {
-          view = sortEpisodeItems(filterEpisodeItems(items, rangeCutoff(rangeKey)), sortKey)
+          view = sortEpisodeItems(windowEpisodeItems(items, rangeCutoff(rangeKey)), sortKey)
           stampRanks()
           total = view.length
         }

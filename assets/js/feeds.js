@@ -4,7 +4,7 @@
  * sticky feed bar — Podcasts / Music / Members across the top, each with its
  * own sub-feeds, and Global / Follows on the second axis. Scoping: "Global" is
  * unscoped; "Follows" is the signed-in user's own kind-3 contact list,
- * resolved by follow-set.js. Shows and Albums are Global-only for now.
+ * resolved by follow-set.js. Every feed has both scopes since 2026-08-31.
  *
  * Every feed has a loader (see LOADERS at the bottom); each lazy-imports its
  * renderer on first view. All of them read D1 through /api/v1 —
@@ -39,7 +39,7 @@
  * when this module first runs).
  */
 // Identity, for keeping the Follows feeds in sync with who's signed in.
-import { getSessionPubkey, clearFollowCache } from '/assets/js/follow-set.js?v=ob-v160'
+import { getSessionPubkey, clearFollowCache } from '/assets/js/follow-set.js?v=ob-v180'
 
 // ── DOM state helpers ────────────────────────────────────────────────
 
@@ -104,15 +104,17 @@ async function hydrate(panelId, mod, scope, medium, view) {
 }
 
 // ── Lazy per-feed dispatch ───────────────────────────────────────────
-const BOOSTS = '/assets/js/boosts-feed.js?v=ob-v160'
-const PODCASTS = '/assets/js/feeds-podcasts.js?v=ob-v160'
-const SHOWS = '/assets/js/shows-feed.js?v=ob-v160'
+const BOOSTS = '/assets/js/boosts-feed.js?v=ob-v180'
+const PODCASTS = '/assets/js/feeds-podcasts.js?v=ob-v180'
+const SHOWS = '/assets/js/shows-feed.js?v=ob-v180'
+const ARTISTS = '/assets/js/artists-feed.js?v=ob-v180'
 // Each module's entry point, by module. Named rather than sniffed out of the
 // path, so adding a feed is one line here instead of another branch.
 const RENDERERS = {
   [BOOSTS]: 'renderBoosts',
   [PODCASTS]: 'renderPodcasts',
   [SHOWS]: 'renderShows',
+  [ARTISTS]: 'renderArtists',
 }
 // `view` is the feed's OPENING state — {lang, range, sort}, off the hash
 // (`#shows?lang=de&range=1m&sort=sats`) and carried in the lb:feed-activate
@@ -126,9 +128,17 @@ const LOADERS = {
   'episodes-follows': (view) => hydrate('panel-episodes-follows', PODCASTS, 'follows', 'other', view),
   'songs-global':     (view) => hydrate('panel-songs-global', PODCASTS, 'global', 'music', view),
   'songs-follows':    (view) => hydrate('panel-songs-follows', PODCASTS, 'follows', 'music', view),
-  // Both Global only — see the scope note at the top of shows-feed.js.
-  'shows':            (view) => hydrate('panel-shows', SHOWS, 'global', 'other', view),
-  'albums':           (view) => hydrate('panel-albums', SHOWS, 'global', 'music', view),
+  // Both scopes since 2026-08-31 — see the scope note at the top of
+  // shows-feed.js for what retired the old Global-only constraint.
+  'shows-global':     (view) => hydrate('panel-shows', SHOWS, 'global', 'other', view),
+  'shows-follows':    (view) => hydrate('panel-shows-follows', SHOWS, 'follows', 'other', view),
+  'albums-global':    (view) => hydrate('panel-albums', SHOWS, 'global', 'music', view),
+  'albums-follows':   (view) => hydrate('panel-albums-follows', SHOWS, 'follows', 'music', view),
+  /* The publisher tier above Albums — <podcast:publisher>, one card per
+   * artist. No medium argument because there is no choice: the tier is
+   * MUSIC-ONLY server-side since 2026-08-31 (see /api/v1/publishers). */
+  'artists-global':   (view) => hydrate('panel-artists', ARTISTS, 'global', undefined, view),
+  'artists-follows':  (view) => hydrate('panel-artists-follows', ARTISTS, 'follows', undefined, view),
 }
 const loaded = new Set()
 
@@ -162,7 +172,7 @@ function loadMemberBoards() {
   const root = document.querySelector('[data-hpw-boards]')
   if (!root) return
   boardsWired = true
-  import('/assets/js/members-board.js?v=ob-v160')
+  import('/assets/js/members-board.js?v=ob-v180')
     .then((m) => m.renderMembersBoards(root))
     .catch((err) => {
       console.warn('[feeds] member boards failed to load', err)
@@ -190,7 +200,7 @@ document.addEventListener('lb:feed-activate', (e) => {
 // Dropping them from `loaded` re-arms both — the visible one reloads now,
 // the other on its next activation, so an account switch can't leave a
 // stale list behind the tab you aren't looking at.
-const FOLLOWS_FEEDS = ['members-follows', 'episodes-follows', 'songs-follows']
+const FOLLOWS_FEEDS = ['members-follows', 'episodes-follows', 'songs-follows', 'shows-follows', 'albums-follows', 'artists-follows']
 let lastSessionPubkey = getSessionPubkey()
 
 function onSessionChange() {

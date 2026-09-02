@@ -159,7 +159,12 @@ CREATE TABLE IF NOT EXISTS publishers (
 CREATE TABLE IF NOT EXISTS publisher_albums (
     publisher_guid  TEXT NOT NULL,
     position        INTEGER NOT NULL, -- order in the publisher's own list
-    album_guid      TEXT,             -- remoteItem feedGuid (join key; nullable like podroll)
+    album_guid      TEXT,             -- remoteItem feedGuid — ⚠️ NOT a reliable join key
+                                      -- against shows.podcast_guid: Wavlake writes its
+                                      -- INTERNAL feed id here, not the album's declared
+                                      -- podcast:guid (see the parse-site note in
+                                      -- publishers.py). Join via album_url instead.
+                                      -- Nullable like podroll.
     album_url       TEXT,             -- remoteItem feedUrl
     album_title     TEXT,             -- remoteItem title attr, if any — publisher's own hint
     album_medium    TEXT,             -- remoteItem medium attr ('music' on all observed)
