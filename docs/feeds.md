@@ -344,13 +344,51 @@ Top 10s on the chart rule, and the **Members 40 HPW board** — each beside a
   the `.mb-shell` seam), with square art in place of the round face and the
   server's own rank and tie flag printed through `rankLabel` — a tuple
   standing the renderer never renumbers.
-- **The renderer is server-only** (`functions/_shared/chart-board.js`): no
-  tab paints these boards, so there is no browser importer, but it keeps the
-  two-sided discipline (no `Date.now()`, pinned locales) so gaining a client
-  surface later is a move rather than a rewrite.
-- **Not yet linked from the nav or the sitemap.** The Explore menu's Stats
-  group is the natural home and regrouping the site map is Reed's call;
-  `/hpw` set the precedent for staying out of the sitemap.
+- **The renderer is two-sided since 2026-09-03** (`assets/js/chart-board.js`,
+  moved out of `functions/_shared/` when the boards joined the homepage): the
+  page, the homepage blocks and the card frames paint one function.
+- **⚠️ THE PAGE IS COMING DOWN.** *Reed, 2026-09-03*: once the boards live on
+  the feeds (below) the page is torn down, along with the CHARTS wordmark
+  links. Nothing new links to it; the card frames under `/charts/<key>/card/`
+  are routes in the Function and stay.
+
+#### The chart blocks on the feeds
+
+*2026-09-03, Reed's ask.* The three default feeds — Shows under Podcasts,
+Artists under Music, and the Members tab's boosts — each read the same way:
+the chart, then the search, then the sortable feed. On Shows and Artists the
+chart is a block above the panel (`.charts-block` in `index.html`, one per
+kind, shown by CSS for that kind's two scopes and hydrated by
+`assets/js/charts-block.js` on the feed's first activation through the same
+two entry points the members boards use): the #40HPW pair's grid holding the
+week's Top 10, **with the week picker in its title**, beside Weeks at #1.
+
+- **The data is `GET /api/v1/charts/<kind>?week=` and
+  `GET /api/v1/charts/<kind>/weeks-at-1`** (`functions/api/v1/charts/`), the
+  page's own `week-charts.js` queries behind JSON, in the hours endpoint's
+  envelope shape (`week_start`, `current_week`, `first_week`, `is_current`) so
+  the picker reads either endpoint alike and the collector's bot steps weeks
+  the same way. `members` is served for weeks-at-1 only; its weekly board is
+  the hours endpoint.
+- **The picker is `assets/js/week-picker.js`**: `pickerHtml` and the delegate
+  (`wireWeekPicker`) extracted from `members-board.js`, plus `flipHtml`, the
+  same stepper over the Members tab's two stacked all-time boards. A Weeks at
+  #1 row's "Last:" week is a jump button on the homepage (no `weekHref`) and a
+  link on the page.
+- **Every board has the share button** (`hpw-share.js`, generalized: the
+  image, link, alt, tag, filename and placeholder are options with the 40
+  HPW board's defaults). The image is the collector's card
+  (`/api/og/charts/<key>.png`); **the link is the tab the board lives on**,
+  live or past, since the Charts page is going away; the tag is `onlyboosts`.
+- **The card frames** are `/charts/<date>/card/shows|artists` and
+  `/charts/weeks-at-1/card/shows|artists|members`, rendered through
+  `functions/_shared/card-frame.js` — the hpw card's frame, shared — with
+  `data-card-list` on the list for the bot's clip guard. The PNGs land in the
+  shards tree under `charts/` (`shows-<date>.png`, `artists-<date>.png`,
+  `<kind>-weeks-at-1.png`) and `/api/og/charts/<name>.png` proxies them on the
+  hpw route's rules. The collector-side half is the bot's (`bots/hpw-cards/`).
+- **Client-rendered, deliberately**: the Shows panel is the front door and
+  its first-view budget is the cards'; a crawler had the page for these rows.
 
 `scripts/test-weekly-charts.mjs` owns the correctness, brute-forced from an
 independent implementation over one fixture boost list, and was confirmed red

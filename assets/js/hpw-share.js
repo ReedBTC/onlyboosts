@@ -1,9 +1,13 @@
-/* The 40 HPW share control: one button, one modal, one kind-1 note.
+/* The board share control: one button, one modal, one kind-1 note.
  *
- * A VERB, attached after the board is painted, on the tab (members-board.js
- * mounts one per board) and on /hpw/<week> (hpw-page.js). The board's markup
- * is the two-sided hpw-board.js and carries no button; this adds one to the
- * board's corner. Two surfaces, one control, one file.
+ * A VERB, attached after a board is painted: on the Members tab
+ * (members-board.js mounts one per board), on /hpw/<week> (hpw-page.js) and,
+ * since 2026-09-03, on the chart boards on the Shows and Artists feeds
+ * (charts-block.js). A board's markup is a two-sided module and carries no
+ * button; this adds one to its corner. Several surfaces, one control, one
+ * file — the name is the board it was built for, and the defaults below are
+ * still that board's; a chart board passes its own image, link, alt text,
+ * tag, filename and placeholder through mountShare's options.
  *
  * ⚠️ THE IMAGE IS FROZEN AT THE MOMENT OF SHARING. Reed's call, 2026-08-30,
  * over the first version, which put the proxy's URL (/api/og/hpw/<key>.png)
@@ -44,11 +48,11 @@
  * while a week's card is not rendered yet (X-OB-Image: fallback); that is
  * refused with a note rather than uploaded as "the board".
  */
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v183'
-import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v183'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v184'
+import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v184'
 
 const SITE = 'https://onlyboosts.social'
-const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v183'
+const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v184'
 /* The box-with-arrow share glyph (the iOS / most-websites one), inline so it
  * scales with the button and takes currentColor in either theme. Reed's call,
  * 2026-08-29: the icon rather than the word. */
@@ -73,12 +77,12 @@ export function noteContent(message, imageUrl, link) {
   return [text, imageUrl, link].filter(Boolean).join('\n\n')
 }
 
-export function buildShareTags({ link, imageUrl, sha256, title }) {
+export function buildShareTags({ link, imageUrl, sha256, title, tag = '40hpw', alt = null }) {
   const imeta = [`url ${imageUrl}`, 'm image/png']
   if (sha256) imeta.push(`x ${sha256}`)
-  imeta.push(`alt Nostr Gang #40HPW leaderboard, ${title}`)
+  imeta.push(`alt ${alt || `Nostr Gang #40HPW leaderboard, ${title}`}`)
   return [
-    ['t', '40hpw'],
+    ['t', tag],
     ['r', link],
     // NIP-92: what the image URL in the content is, so a client can lay it
     // out before fetching it.
@@ -94,15 +98,24 @@ export function buildShareTags({ link, imageUrl, sha256, title }) {
  * TITLE IS A NAME, and since the rename on 2026-09-01 they no longer match:
  * /hpw/high-scores is in the wild and the collector's card bot screenshots
  * that literal, so only the title moved. `isLive` is whether this is the week
- * in progress. Idempotent per board element. */
-export function mountShare(boardEl, { key, title, isLive = false }) {
-  if (!boardEl || boardEl.querySelector('.hpw-share')) return
+ * in progress. Idempotent per board element — and REPLACEABLE: a board that
+ * is repainted in place (the stacked all-time boards, a stepped chart week)
+ * mounts again with new options, and the old button goes.
+ *
+ * The rest are the chart boards' overrides, each defaulting to the 40 HPW
+ * board's own value: `image` (a same-origin /api/og/… path), `link` (the
+ * absolute URL the note carries), `alt` (the imeta alt), `tag` (the t tag),
+ * `filename` (the download's name) and `placeholder` (the textarea's). */
+export function mountShare(boardEl, { key, title, isLive = false, image = null, link = null, alt = null, tag = '40hpw', filename = null, placeholder = null }) {
+  if (!boardEl) return
+  boardEl.querySelector(':scope > .hpw-share')?.remove()
   const host = document.createElement('div')
   host.className = 'hpw-share'
   host.innerHTML =
     `<button type="button" class="pcast-sort-btn hpw-share-btn" aria-label="Share on Nostr" title="Share on Nostr">${SHARE_ICON}</button>`
   boardEl.appendChild(host)
-  host.querySelector('button').addEventListener('click', () => openShareModal({ key, title, isLive }))
+  host.querySelector('button').addEventListener('click', () =>
+    openShareModal({ key, title, isLive, image, link, alt, tag, filename, placeholder }))
 }
 
 // ── the modal ───────────────────────────────────────────────────────────────
@@ -156,11 +169,14 @@ function q(sel) { return modal.querySelector(sel) }
 // One placeholder for every board. Reed's wording, 2026-08-30.
 const PLACEHOLDER = 'Share your message about the #40hpw chart'
 
-export function openShareModal({ key, title, isLive }) {
+export function openShareModal({ key, title, isLive, image = null, link = null, alt = null, tag = '40hpw', filename = null, placeholder = null }) {
   if (!modal) modal = buildModal()
   session = {
     key, title, isLive,
-    link: shareLink(key, isLive),
+    link: link || shareLink(key, isLive),
+    image: image || imageHere(key),
+    alt, tag,
+    filename: filename || `onlyboosts-40hpw-${key}.png`,
     blob: null,          // the card as fetched from this origin
     sha256: null,
     blossomUrl: null,    // set once the upload succeeds
@@ -168,7 +184,7 @@ export function openShareModal({ key, title, isLive }) {
     seq: (session?.seq || 0) + 1,
   }
   q('[data-text]').value = ''
-  q('[data-text]').placeholder = PLACEHOLDER
+  q('[data-text]').placeholder = placeholder || PLACEHOLDER
   q('[data-hint]').textContent = `The image and a link to ${session.link.replace(/^https:\/\//, '')} will be added to your message`
   q('[data-preview]').innerHTML = '<span class="hpw-share-preview-empty" aria-hidden="true"></span>'
   q('[data-download]').disabled = true
@@ -202,7 +218,7 @@ function setStatusRetry(text, onRetry) {
 async function fetchImage(s) {
   setStatus('Fetching the image…', 'busy')
   try {
-    const resp = await fetch(imageHere(s.key), { headers: { Accept: 'image/png' } })
+    const resp = await fetch(s.image, { headers: { Accept: 'image/png' } })
     if (s !== session) return
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
     if (resp.headers.get('X-OB-Image') === 'fallback') {
@@ -260,7 +276,7 @@ async function upload(s) {
     await ensureWidget()
     if (s !== session) return
     if (typeof window.LBLogin?.uploadToBlossom !== 'function') throw new Error('the login widget is stale; reload the page')
-    const file = new File([s.blob], `onlyboosts-40hpw-${s.key}.png`, { type: 'image/png' })
+    const file = new File([s.blob], s.filename, { type: 'image/png' })
     const url = await window.LBLogin.uploadToBlossom(file)
     if (s !== session) return
     if (typeof url !== 'string' || !/^https:\/\//.test(url)) throw new Error('no URL came back')
@@ -286,7 +302,7 @@ async function publish(s) {
     const content = noteContent(q('[data-text]').value, s.blossomUrl, s.link)
     const signed = await window.LBLogin.signAndPublish({
       kind: 1, content,
-      tags: buildShareTags({ link: s.link, imageUrl: s.blossomUrl, sha256: s.sha256, title: s.title }),
+      tags: buildShareTags({ link: s.link, imageUrl: s.blossomUrl, sha256: s.sha256, title: s.title, tag: s.tag, alt: s.alt }),
     })
     if (!signed || signed.kind !== 1 || typeof signed.sig !== 'string') throw new Error('widget returned no signed event')
     closeShareModal()
@@ -303,7 +319,7 @@ function download(s) {
   if (!s.blob) return
   const a = document.createElement('a')
   a.href = URL.createObjectURL(s.blob)
-  a.download = `onlyboosts-40hpw-${s.key}.png`
+  a.download = s.filename
   document.body.appendChild(a)
   a.click()
   a.remove()

@@ -45,7 +45,7 @@ passed its size budget. Nothing was rewritten on the way across, so that same
 | `/stats` | a coming-soon placeholder: nav + header + soon-card, `noindex`, out of the sitemap. `/boosters` was the second one and was **deleted** on 2026-08-23 — see the Stats row of the site map |
 | `/404.html` | see the ⚠️ under LB conventions |
 | `/hpw/<YYYY-MM-DD>`, `/hpw/high-scores` | one 40 HPW board as a page, edge-rendered, the address a shared week has. **⚠️ `high-scores` is a PATH, not the board's name** — that board is **Proof of #40HPW** since 2026-09-01 and the URL deliberately did not move with it. `/hpw/<key>/card` is the 720x900 portrait frame the collector screenshots for `/api/og/hpw/<key>.png`. See **The Share Cards** under the Members tab |
-| `/charts/<YYYY-MM-DD>` | the OnlyBoosts Charts page, edge-rendered: weekly Top 10s for **Shows and Artists** on the `sort=chart` rule over the 40 HPW calendar week, plus the **Members 40 HPW board**, each beside a Weeks at #1 companion. `/charts` 302s to the live week. Episodes/Albums/Songs were CUT from the page on ship day (Reed: too sparse) but `week-charts.js` still serves them. See **The Charts Page** in `docs/feeds.md` |
+| `/charts/<YYYY-MM-DD>` | the OnlyBoosts Charts page, edge-rendered: weekly Top 10s for **Shows and Artists** on the `sort=chart` rule over the 40 HPW calendar week, plus the **Members 40 HPW board**, each beside a Weeks at #1 companion. `/charts` 302s to the live week. Episodes/Albums/Songs were CUT from the page on ship day (Reed: too sparse) but `week-charts.js` still serves them. **⚠️ THE PAGE IS COMING DOWN** (Reed, 2026-09-03): the same boards live on the Shows and Artists feeds and the Members tab now, so nothing new links here. `/charts/<key>/card/<kind>` — five share-card frames (`shows`/`artists` per week, `shows`/`artists`/`members` under `weeks-at-1`) — are ROUTES in the Function and outlive the page; the collector's bot screenshots them. See **The Charts Page** and **The chart blocks on the feeds** in `docs/feeds.md` |
 
 `/shows` and `/podcasts` are both 301s to `/#shows` now; the Shows feed replaced
 the standalone page. `feeds.html` and `boosts.html` were folded into `/` and
@@ -445,7 +445,7 @@ Sixteen test scripts, all plain `node scripts/<name>.mjs` with no runner:
 | `test-publishers-api.mjs` | the **shipped** `/api/v1/publishers` handlers — listing and per-artist detail — over a `node:sqlite` build of the real `schema.sql`, on the members-search pattern. Three sorts with three winners, the boost-time windows, the language filter recounting through the declaring shows (`lang=unknown` included), LIKE-wildcard decoys, rank retention on `q=`, the title-less publisher's exclusion, HEAD, the album list's publisher-order and its live-row-over-edge-hint preference |
 | `test-charts.mjs` | the OnlyBoosts Charts: `sort=chart` on the **shipped** handlers of all four ranked endpoints over a `node:sqlite` build of the real `schema.sql`. **Expectations are brute-forced from an independent JS implementation of the rule**, one boost list feeding both sides; a micro-corpus that inverts if the tiebreak chain is reordered; `q=` rank retention with pre-filter tie flags; the follows-POST chart on all three POSTing endpoints (podcasts and publishers gained theirs in phase 2, with `publisher=` and boost-time `since=` for the drawers' follows paths); `feedRanks`' chart place — all four boost-time windows since the strip — and the tiles' Charts strip. Confirmed red on five mutations: the tuple tiebreak removed, the chain flipped in members.js and again in feed-rank.js, `peers` counted post-filter, and the podcasts POST's follows filter dropped |
 
-| `test-weekly-charts.mjs` | the OnlyBoosts Charts page: the **shipped** `/charts/<week>` Function over a `node:sqlite` build of the real `schema.sql`, on the members-hours pattern. The routing contract (one URL per week, HEAD answered); the Shows and Artists Top 10s against a **brute-forced independent implementation** of the chart rule, component-rank triplets included; the medium partition; the Members pair (the hours board held to brute-forced hours, the publisher exclusion); and every Weeks at #1 tally — completed weeks only, a tied #1 crediting every holder, a fixture week whose #1 is decided by the tiebreak CHAIN. The retired kinds (episodes, albums, songs) stay covered at module level. Confirmed red on six mutations: the chain flipped, the live week counted on each side, the medium filter dropped, the per-week `PARTITION BY` removed, and the member boards' publisher exclusion dropped |
+| `test-weekly-charts.mjs` | the OnlyBoosts Charts: the **shipped** `/charts/<week>` Function, **`/api/v1/charts`**, the five **card frames** and the **`/api/og/charts` proxy** (fetch stubbed), over a `node:sqlite` build of the real `schema.sql`, on the members-hours pattern; plus the two-sided source scan of `chart-board.js`. The routing contract (one URL per week, HEAD answered); the Shows and Artists Top 10s against a **brute-forced independent implementation** of the chart rule, component-rank triplets included; the medium partition; the Members pair (the hours board held to brute-forced hours, the publisher exclusion); and every Weeks at #1 tally — completed weeks only, a tied #1 crediting every holder, a fixture week whose #1 is decided by the tiebreak CHAIN. The retired kinds (episodes, albums, songs) stay covered at module level. Confirmed red on six mutations: the chain flipped, the live week counted on each side, the medium filter dropped, the per-week `PARTITION BY` removed, and the member boards' publisher exclusion dropped |
 
 **⚠️ `test-server-render.mjs` IS THE ONE THAT NEEDS AN ARGUMENT, SO IT IS THE ONE
 THAT GOES UNRUN.** Its header carries the `curl` that produces the capture; take
@@ -1551,7 +1551,15 @@ What a change elsewhere would break:
   need it at different times. They cannot share code, so `test-members-hours.mjs`
   holds the hand-rolled rule against Node's real tzdata at both transitions, every
   week for four years.
-- **⚠️ THE SECOND BOARD IS "Proof of #40HPW" SINCE 2026-09-01 AND IT IS ONE ROW
+- **⚠️ THE SECOND SLOT IS A STACK SINCE 2026-09-03: Proof of #40HPW ⇄ Weeks at
+  #1**, flipped by the week picker's own stepper in the board's title (Reed's
+  ask: "like how you can toggle between weeks"). Weeks at #1 is the Charts
+  page's members board (`memberOnesBoardHtml` in `chart-board.js`, rows from
+  `/api/v1/charts/members/weeks-at-1`); its share card is
+  `members-weeks-at-1` under `/api/og/charts/`, its link is `/#members`, and
+  its rows' "Last:" weeks are picker jumps. `paintStack` in
+  `members-board.js` mounts the shown board's share button on every flip.
+- **⚠️ THE PROOF BOARD IS "Proof of #40HPW" SINCE 2026-09-01 AND IT IS ONE ROW
   PER MEMBER.** *Reed's call.* It was **High Scores**, the ten biggest
   booster-weeks; `range=all` now returns every member who has ever cleared forty
   hours in a week, ranked by how many such weeks they hold, carrying their best
@@ -2224,7 +2232,9 @@ would. Never remove an entry** — those links are in the wild.
 | `boosts-thread.js` / `boost-actions.js` | the content tokenizer and reply / like / repost / zap |
 | `functions/index.js` | the homepage's opening feed — **Shows**, rendered at the edge |
 | `functions/{show,episode,booster,artist}/…` | the four edge-rendered detail pages |
-| `functions/charts/[[path]].js` + `_shared/week-charts.js` + `_shared/chart-board.js` | the OnlyBoosts Charts page: the Shows/Artists Top 10s, the Members 40 HPW pair and the Weeks at #1 boards, edge-rendered; `assets/js/charts-page.js` mounts the week-picker dropdown |
+| `functions/charts/[[path]].js` + `_shared/week-charts.js` + **two-sided** `assets/js/chart-board.js` | the OnlyBoosts Charts page (coming down) and the five chart share-card frames; `assets/js/charts-page.js` mounts the page's week-picker dropdown |
+| `assets/js/charts-block.js` + `functions/api/v1/charts/[[path]].js` | **the chart boards on the Shows and Artists feeds** (2026-09-03): the week's Top 10 with the picker in its title beside Weeks at #1, from JSON; `assets/js/week-picker.js` is the picker's markup and delegate, shared with the Members tab |
+| `functions/_shared/card-frame.js` + `functions/api/og/charts/[name].js` | the one 720x900 share-card frame every card renders in, and the proxy for the chart cards' PNGs (`shows-<date>`, `artists-<date>`, `<kind>-weeks-at-1`) |
 | `functions/api/v1/*` | the D1 query API |
 | `functions/api/v1/members.js` | member search and the top-members listing, over all 2,011 |
 | `functions/api/v1/members/hours.js` | the #40HPW boards, and any past week by `week=YYYY-MM-DD` |

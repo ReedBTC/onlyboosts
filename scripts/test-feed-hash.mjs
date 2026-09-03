@@ -597,7 +597,7 @@ console.log('\nBoth hydration entry points are wired:')
   const listenerEnd = feeds.indexOf('\n})', listenerAt)
   const inListener = feeds.slice(listenerAt, listenerEnd)
   const afterListener = feeds.slice(listenerEnd)
-  for (const [what, call] of [['the feed itself', 'loadFeed('], ['the members boards', 'loadMemberBoards()']]) {
+  for (const [what, call] of [['the feed itself', 'loadFeed('], ['the members boards', 'loadMemberBoards()'], ['the chart block', 'loadChartsBlock(']]) {
     eq(`${what}: hydrated from the event`, inListener.includes(call), true)
     eq(`${what}: AND on the cold load`, afterListener.includes(call), true)
   }

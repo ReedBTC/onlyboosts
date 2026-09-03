@@ -33,7 +33,9 @@ import { readFileSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
-import { onRequestGet, onRequestHead } from '../functions/charts/[[path]].js'
+import { onRequestGet, onRequestHead, ONES_KEY } from '../functions/charts/[[path]].js'
+import { onRequestGet as apiGet } from '../functions/api/v1/charts/[[path]].js'
+import { onRequestGet as ogGet, onRequestHead as ogHead, UPSTREAM_BASE, NAME_RE } from '../functions/api/og/charts/[name].js'
 import { weeklyChart, weeksAtNumberOne } from '../functions/_shared/week-charts.js'
 import { pacificWeekStart, prevWeek, weekDateString } from '../assets/js/pacific-week.js'
 
@@ -291,7 +293,7 @@ console.log('\nRouting:')
   const imp = await get('/charts/2026-02-30')
   check('an impossible calendar date is 404', () => assert.equal(imp.status, 404))
   const extra = await get(`/charts/${weekDateString(W1)}/card`)
-  check('extra path segments are 404', () => assert.equal(extra.status, 404))
+  check('a bare /card with no kind is 404, as is any other second segment', () => assert.equal(extra.status, 404))
   const h = await head(`/charts/${weekDateString(W1)}`)
   check('HEAD mirrors GET status with no body', async () => {
     assert.equal(h.status, 200)
@@ -449,3 +451,172 @@ console.log('\nThe live page and the empty week:')
 }
 
 console.log(`\n${passed} passed, ${failed} failed`)
+
+// ── /api/v1/charts — the JSON behind the homepage boards and the card bot ───
+console.log('\n/api/v1/charts:')
+const api = async (path) => {
+  const r = await apiGet({
+    request: new Request('https://ob.invalid' + path), env,
+    params: { path: path.replace(/\?.*$/, '').split('/').filter(Boolean).slice(3) },
+  })
+  return { status: r.status, body: r.status === 200 ? await r.json() : null, cache: r.headers.get('cache-control') }
+}
+{
+  const live = await api('/api/v1/charts/shows')
+  check('the live Shows week: the hours envelope fields, the brute-forced rows, 60s', () => {
+    assert.equal(live.status, 200)
+    assert.equal(live.body.week_start, W0); assert.equal(live.body.current_week, W0)
+    assert.equal(live.body.is_current, true); assert.equal(live.body.first_week, W4)
+    assert.equal(live.body.kind, 'shows')
+    const expect = bruteChart(corpus('shows', W0, W0 + 8 * 86400))
+    assert.deepEqual(live.body.rows.map((r) => r.guid), expect.map((r) => r.guid))
+    assert.match(live.cache, /max-age=60/)
+  })
+  const past = await api(`/api/v1/charts/artists?week=${weekDateString(W1 + 3 * 86400)}`)
+  check('⚠️ a mid-week `week=` resolves to its Monday (the bot steps back with it); a past week is 300s', () => {
+    assert.equal(past.body.week_start, W1); assert.equal(past.body.is_current, false)
+    const expect = bruteChart(corpus('artists', W1, W0))
+    assert.deepEqual(past.body.rows.map((r) => r.guid), expect.map((r) => r.guid))
+    assert.match(past.cache, /max-age=300/)
+  })
+  const fut = await api('/api/v1/charts/shows?week=2099-01-04')
+  check('a future week is the live one, and says so', () => assert.equal(fut.body.week_start, W0))
+  const ones = await api('/api/v1/charts/shows/weeks-at-1')
+  check('Shows weeks-at-1: completed weeks only, before = the live Monday', () => {
+    assert.equal(ones.status, 200); assert.equal(ones.body.before, W0)
+    const P2 = ones.body.rows.find((r) => r.guid === 'P2')
+    assert.ok(P2 && Number(P2.weeks) >= 1)
+    assert.ok(ones.body.rows.every((r) => Number(r.last_week_start) < W0))
+  })
+  const m = await api('/api/v1/charts/members/weeks-at-1')
+  check('⚠️ members weeks-at-1 never credits a publisher key', () => {
+    assert.equal(m.status, 200)
+    assert.ok(m.body.rows.length > 0)
+    assert.ok(!m.body.rows.some((r) => r.pk === BOT))
+    assert.ok(m.body.rows.every((r) => typeof r.weeks === 'number' && r.last_week_start < W0))
+  })
+  for (const p of ['/api/v1/charts/members', '/api/v1/charts/episodes', '/api/v1/charts/shows/ones', '/api/v1/charts', '/api/v1/charts/shows/weeks-at-1/x']) {
+    const r = await api(p)
+    check(`${p} is 404`, () => assert.equal(r.status, 404))
+  }
+}
+
+// ── the card frames ──────────────────────────────────────────────────────────
+console.log('\nThe card frames (/charts/<key>/card/<kind>):')
+{
+  const r = await get(`/charts/${weekDateString(W1)}/card/shows`)
+  const card = await r.text()
+  check('a week card: 200, noindex, the frame, the ready signal, the list marked for the clip guard', () => {
+    assert.equal(r.status, 200)
+    assert.equal(r.headers.get('x-robots-tag'), 'noindex')
+    assert.match(card, /<html lang="en" data-card>/)
+    assert.match(card, /width: 720px; height: 900px; overflow: hidden/)
+    assert.match(card, /setAttribute\('data-card-ready', '1'\)/)
+    assert.match(card, /<ol class="cb-list" data-card-list>/)
+    assert.doesNotMatch(card, /NAV:START|nav-widget-boot|sw-register|data-theme|charts-page\.js/)
+  })
+  check('the week card carries the same rows the page does, and names the week', () => {
+    const expect = bruteChart(corpus('shows', W1, W0))
+    assert.deepEqual(names(card), expect.map((r) => TITLE[r.guid]))
+    assert.deepEqual(triplets(card), expect.map(triplet))
+    assert.ok(card.includes('Shows Top 10'))
+    assert.doesNotMatch(card, /This Week/)
+    assert.match(card, /<footer class="card-foot">onlyboosts\.social\/#shows<\/footer>/)
+  })
+  const liveCard = await (await get(`/charts/${weekDateString(W0)}/card/artists`)).text()
+  check('the live week card says In progress and links the artists tab', () => {
+    assert.match(liveCard, /In progress\./)
+    assert.match(liveCard, /onlyboosts\.social\/#artists/)
+  })
+  const wed = await get(`/charts/${weekDateString(W1 + 2 * 86400)}/card/artists`)
+  check('a mid-week card 302s to the Monday, keeping /card/<kind>', () => {
+    assert.equal(wed.status, 302)
+    assert.equal(loc(wed), `/charts/${weekDateString(W1)}/card/artists`)
+  })
+  const fut = await get('/charts/2099-01-04/card/shows')
+  check('a future week card 302s to the live one', () => assert.equal(loc(fut), `/charts/${weekDateString(W0)}/card/shows`))
+  const ones = await (await get(`/charts/${ONES_KEY}/card/shows`)).text()
+  check('the Shows weeks-at-1 card: the ones rows, the list marked, the tab in the footer', () => {
+    assert.match(ones, /<ol class="cb-list" data-card-list>/)
+    assert.ok(ones.includes('Shows: Weeks at #1'))
+    assert.ok(figs(ones).length > 0)
+    assert.match(ones, /onlyboosts\.social\/#shows/)
+  })
+  const mr = await get(`/charts/${ONES_KEY}/card/members`)
+  const mem = await mr.text()
+  check('the members weeks-at-1 card: hpw rows in a cb shell, no publisher, the members tab', () => {
+    assert.equal(mr.status, 200)
+    assert.match(mem, /<ol class="hpw-list" data-card-list>/)
+    assert.ok(!mem.includes(WHO[BOT]))
+    assert.ok(hpwNames(mem).length > 0)
+    assert.match(mem, /onlyboosts\.social\/#members/)
+  })
+  for (const p of [`/charts/${weekDateString(W1)}/card/members`, `/charts/${weekDateString(W1)}/card/episodes`,
+                   `/charts/${ONES_KEY}/card/episodes`, `/charts/${ONES_KEY}`, `/charts/${ONES_KEY}/card`, '/charts/1999-01-04/card/shows']) {
+    const r = await get(p)
+    check(`${p} is 404`, () => assert.equal(r.status, 404))
+  }
+  const h = await head(`/charts/${ONES_KEY}/card/artists`)
+  check('HEAD on a card mirrors GET', async () => { assert.equal(h.status, 200); assert.equal(await h.text(), '') })
+}
+
+// ── the image proxy ──────────────────────────────────────────────────────────
+console.log('\n/api/og/charts/<name>.png, fetch stubbed:')
+{
+  const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3])
+  let calls = []
+  let upstream = () => new Response(PNG, { status: 200, headers: { 'content-type': 'image/png' } })
+  const realFetch = globalThis.fetch
+  globalThis.fetch = async (url) => { calls.push(String(url)); return upstream() }
+  globalThis.caches = { default: { match: async () => null, put: async () => {} } }
+  const assets = { fetch: async () => new Response(new Uint8Array([9, 9, 9]), { status: 200 }) }
+  const og = (name) => ogGet({ request: new Request(`https://ob.invalid/api/og/charts/${name}`), env: { ASSETS: assets }, params: { name } })
+  const ok = ['shows-2025-08-18.png', 'artists-2025-08-18.png', 'shows-weeks-at-1.png', 'artists-weeks-at-1.png', 'members-weeks-at-1.png']
+  const bad = ['members-2025-08-18.png', 'episodes-2025-08-18.png', 'shows.png', '2025-08-18.png', 'shows-weeks-at-1', 'shows-2025-13-40.png', '../shows-weeks-at-1.png', 'shows-weeks-at-1.png.png']
+  check('the allowlist is the five shapes the collector writes', () => {
+    for (const n of ok) assert.ok(NAME_RE.test(n), n)
+    for (const n of bad) assert.ok(!NAME_RE.test(n) || n === 'shows-2025-13-40.png', n)
+  })
+  calls = []
+  for (const n of bad) {
+    const r = await og(n)
+    check(`${n} is 404 and fetches nothing`, () => assert.equal(r.status, 404))
+  }
+  check('  (nothing was fetched for any of them)', () => assert.equal(calls.length, 0))
+  const wed = await og('shows-2025-08-20.png')
+  check('a non-Monday weekly name 302s to the Monday file', () => {
+    assert.equal(wed.status, 302); assert.match(wed.headers.get('location'), /\/api\/og\/charts\/shows-2025-08-18\.png$/)
+  })
+  calls = []
+  const good = await og('members-weeks-at-1.png')
+  check('a real PNG passes through from charts/ in the collector\'s tree, marked card', async () => {
+    assert.equal(good.status, 200); assert.equal(good.headers.get('x-ob-image'), 'card')
+    assert.equal(calls[0], `${UPSTREAM_BASE}members-weeks-at-1.png`)
+    assert.equal(new Uint8Array(await good.arrayBuffer()).length, PNG.length)
+  })
+  upstream = () => new Response('Please use a Nostr client to connect.', { status: 200, headers: { 'content-type': 'text/plain' } })
+  const miss = await og('shows-weeks-at-1.png')
+  check('⚠️ the upstream\'s 200 text/plain for a missing file is the banner', () => assert.equal(miss.headers.get('x-ob-image'), 'fallback'))
+  upstream = () => new Response(PNG, { status: 200, headers: { 'content-type': 'image/png' } })
+  const h = await ogHead({ request: new Request('https://ob.invalid/api/og/charts/artists-weeks-at-1.png', { method: 'HEAD' }), env: { ASSETS: assets }, params: { name: 'artists-weeks-at-1.png' } })
+  check('HEAD is routed', () => { assert.equal(h.status, 200); assert.equal(h.body, null) })
+  globalThis.fetch = realFetch
+}
+
+// ── chart-board.js is two-sided (since 2026-09-03) ───────────────────────────
+console.log('\nchart-board.js is two-sided:')
+{
+  const src = readFileSync(join(ROOT, 'assets/js/chart-board.js'), 'utf8')
+  const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  check('no absolute /assets/js import; every sibling import is a stamped relative one', () => {
+    assert.ok(!/from\s+['"]\/assets\//.test(code))
+    for (const m of code.matchAll(/from\s+['"]([^'"]+)['"]/g)) assert.match(m[1], /^\.\/[\w-]+\.js\?v=ob-v\d+$/, m[1])
+  })
+  check('no Date.now(), no unpinned locale call, no DOM', () => {
+    assert.ok(!/Date\.now\(/.test(code))
+    assert.ok(!/toLocaleDateString\(\s*(undefined|\))/.test(code))
+    assert.ok(!/\bdocument\.|\bwindow\./.test(code))
+  })
+}
+
+console.log(`\n${failed ? `${failed} FAILED, ` : ''}${passed} passed`)

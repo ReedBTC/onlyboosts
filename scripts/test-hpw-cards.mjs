@@ -114,6 +114,14 @@ await check('the tags: t, r, imeta with the sha, client; no e, no p', () => {
   assert.deepEqual(tags[3], ['client', 'onlyboosts.social'])
   assert.deepEqual(share.buildShareTags({ link: 'L', imageUrl: 'U', sha256: null, title: 't' })[2], ['imeta', 'url U', 'm image/png', 'alt Nostr Gang #40HPW leaderboard, t'])
 })
+await check('a chart board overrides the tag and the alt; the defaults are still the 40 HPW board\'s', () => {
+  const tags = share.buildShareTags({ link: 'L', imageUrl: 'U', sha256: 'ab', title: 'Week of Aug 24, 2026', tag: 'onlyboosts', alt: 'OnlyBoosts Charts: Shows, Week of Aug 24, 2026' })
+  assert.deepEqual(tags[0], ['t', 'onlyboosts'])
+  assert.deepEqual(tags[2], ['imeta', 'url U', 'm image/png', 'x ab', 'alt OnlyBoosts Charts: Shows, Week of Aug 24, 2026'])
+  // mountShare's option surface, so a caller passing an image or a link does not fall back to the hpw proxy
+  assert.match(shareSrc, /export function mountShare\(boardEl, \{ key, title, isLive = false, image = null, link = null, alt = null, tag = '40hpw', filename = null, placeholder = null \}\)/)
+  assert.match(shareSrc, /fetch\(s\.image,/)
+})
 await check('⚠️ lb:session-change is listened for on window, where the widget dispatches it', () => {
   assert.match(shareSrc, /window\.addEventListener\('lb:session-change'/)
   assert.doesNotMatch(shareSrc, /document\.addEventListener\('lb:session-change'/)
@@ -244,6 +252,9 @@ await check('the card: a portrait frame, no nav, noindex, the ready signal, the 
   const expect = board.rowHtml({ pk: 'a'.repeat(64), npub: null, name: 'Alice 🐱 <x>', pic: 'https://x.example/a.png', seconds: 41 * 3600, episodes: 1, week_start: null }, 0, 40)
   assert.ok(cardHtml.includes(expect))
   assert.match(cardHtml, /<footer class="card-foot">onlyboosts\.social\/#members<\/footer>/)
+  // The list the collector's clip guard measures, since the chart cards joined (2026-09-03).
+  assert.match(cardHtml, /<ol class="hpw-list" data-card-list>/)
+  assert.doesNotMatch(pageHtml, /data-card-list/)
 })
 await check('the card names the week, never "This Week"', async () => {
   const html = await (await get(`/hpw/${liveKey}/card`)).text()

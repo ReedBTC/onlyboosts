@@ -42,6 +42,15 @@ border and no top one. **They must stay in step** — a shell here at 10px where
 | Boost Bots | the `<ul>` is the shell, no lid |
 | Boosts | the boosts PANEL is the shell, its lid the feed bar — `.feed-shell`, every feed's since 2026-09-03 |
 
+**The second #40HPW slot is a stack since 2026-09-03**: Proof of #40HPW and
+the members' Weeks at #1 board (the Charts page's, `memberOnesBoardHtml`),
+flipped by the week picker's own stepper in the board's title (`flipHtml` in
+`week-picker.js`; Reed's ask: "like how you can toggle between weeks"). Each
+has its share card — `high-scores` under `/api/og/hpw/`, `members-weeks-at-1`
+under `/api/og/charts/` — and `paintStack` mounts the shown one's button on
+every flip. The picker's markup and delegate moved to `week-picker.js` the
+same day, shared with the chart blocks on the Shows and Artists feeds.
+
 **The Boosts shell was two elements until 2026-09-03, and the seam was the
 whole risk.** The bar was the lid and the cards the body, but the cards live in
 `.feed-panel`s outside the section, so a lid-only `.mb-shell` closed its own
