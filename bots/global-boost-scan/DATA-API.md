@@ -303,6 +303,59 @@ deliberate guard against the upstream's 200-for-a-miss behaviour, and one a PNG
 fails by construction. The cards need a route of their own that keeps the
 content-type check, drops the JSON parse, and enforces the 900KB ceiling.
 
+### `charts/` — the OnlyBoosts Charts share cards (PNG, not JSON)
+
+The second card directory, since 2026-09-03, on exactly the `hpw/` contract
+above: the same renderer (`bots/hpw-cards/`), the same 720x900 frame, the same
+900KB ceiling with the scale-1 retry, the same temp-file-and-rename, the same
+stale-card-is-the-designed-failure rule, and the same `/api/data/` limitation
+— the site proxies these at `/api/og/charts/<name>.png`. Screenshots of
+`/charts/<date>/card/<kind>` and `/charts/weeks-at-1/card/<kind>`.
+
+```
+charts/index.json                the manifest — read this first
+charts/shows-<YYYY-MM-DD>.png    that week's Shows Top 10 on the chart rule
+charts/artists-<YYYY-MM-DD>.png  that week's Artists Top 10
+charts/shows-weeks-at-1.png      Shows: Weeks at #1, over all completed weeks
+charts/artists-weeks-at-1.png    Artists: Weeks at #1
+charts/members-weeks-at-1.png    Members: Weeks at #1 on the 40 HPW board
+```
+
+The Members WEEKLY board and Proof of #40HPW are not here; they are
+`hpw/<date>.png` and `hpw/high-scores.png`. Dates are Pacific Mondays, as for
+`hpw/`. `weeks-at-1` is a filename in the wild and stays, on the `high-scores`
+rule.
+
+```jsonc
+{
+  "generated": 1788476910,
+  "weeks_at_1": {                        // where hpw/ has `high_scores`
+    "shows":   { "sha256": "…", "bytes": 340072, "rendered_at": 1788476903, "source_hash": "…" },
+    "artists": { /* the same four fields */ },
+    "members": { … }
+  },
+  "weeks": {                             // newest first, then by kind
+    "2026-08-31": { "artists": { … }, "shows": { … } },
+    "2026-08-24": { … }
+  }
+}
+```
+
+Each entry is the `hpw/` entry's four fields. **`source_hash` is of the
+`rows` array** of `/api/v1/charts/<kind>?week=` or
+`/api/v1/charts/<kind>/weeks-at-1` — the chart endpoints' name for what the
+hours endpoint calls `members` — with the same meaning: equal hashes are the
+same board whatever the PNG bytes did.
+
+**Which boards move.** Each cycle re-checks the live week and the **12 most
+recent weeks** of Shows and Artists, and the three Weeks at #1 boards; a past
+week's chart moves on a dedupe or an exclusion the way a past week's hours
+move on a late duration. A week may be missing from `weeks` for the same
+reasons as under `hpw/`, and a kind may be missing from a week's entry (a week
+the Artists board was empty for renders a card with no list, which is still a
+card — but a render that failed leaves no entry), so a reader takes the entry
+it finds and never builds `charts/artists-2026-01-05.png` by hand.
+
 
 ---
 

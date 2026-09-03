@@ -1,7 +1,14 @@
-# hpw-cards — #40HPW share-card renderer
+# hpw-cards — the share-card renderer
 
-Screenshots the Nostr Gang #40HPW boards into PNGs the site can hand to a
-preview crawler. One card per week, plus the all-time board, Proof of #40HPW.
+Screenshots the site's boards into PNGs the site can hand to a preview crawler
+or a share modal. Two families, one contract:
+
+| Family | Boards |
+|---|---|
+| **hpw** | the Nostr Gang #40HPW boards: one card per week, plus the all-time board, Proof of #40HPW |
+| **charts** (since 2026-09-03) | the OnlyBoosts Charts boards: the week's Shows and Artists Top 10 on the chart rule, and the three Weeks at #1 boards (shows, artists, members) |
+
+The directory keeps its first name; the bot renders both.
 
 ```
 onlyboosts_hpwcards.py            # dry run → ./preview, nothing published
@@ -25,10 +32,20 @@ Inside the collector's shards tree, so
 a `--delete` mirror run does not prune them:
 
 ```
-../global-boost-scan/data/shards/hpw/<YYYY-MM-DD>.png    one week's board
-../global-boost-scan/data/shards/hpw/high-scores.png     the all-time board
-../global-boost-scan/data/shards/hpw/index.json          the manifest
+../global-boost-scan/data/shards/hpw/<YYYY-MM-DD>.png              one week's #40HPW board
+../global-boost-scan/data/shards/hpw/high-scores.png               the all-time board
+../global-boost-scan/data/shards/hpw/index.json                    the manifest
+../global-boost-scan/data/shards/charts/shows-<YYYY-MM-DD>.png     the week's Shows Top 10
+../global-boost-scan/data/shards/charts/artists-<YYYY-MM-DD>.png   the week's Artists Top 10
+../global-boost-scan/data/shards/charts/shows-weeks-at-1.png       Shows: Weeks at #1
+../global-boost-scan/data/shards/charts/artists-weeks-at-1.png     Artists: Weeks at #1
+../global-boost-scan/data/shards/charts/members-weeks-at-1.png     Members: Weeks at #1
+../global-boost-scan/data/shards/charts/index.json                 the manifest
 ```
+
+The site proxies them at `/api/og/hpw/<name>.png` and
+`/api/og/charts/<name>.png`. A dry run writes the same two subdirectories under
+`./preview/`.
 
 Shapes are documented in `../global-boost-scan/DATA-API.md`. Every write is a
 temp file plus a rename, so a failed render leaves the previous card serving
@@ -39,14 +56,30 @@ is worse than a stale board.
 
 Chromium's PNG output is not byte-stable, so re-rendering on every five-minute
 tick would hand rsync a changed file every time for every board. So the *data*
-is hashed instead — the `members` array of the board's own API response — and a
-board whose hash is unchanged is skipped. That hash travels into the manifest
-as `source_hash`, which is how a consumer tells a real re-render from a
-re-encode.
+is hashed instead — the `members` array of an hpw board's API response, the
+`rows` array of a chart board's — and a board whose hash is unchanged is
+skipped. That hash travels into the manifest as `source_hash`, which is how a
+consumer tells a real re-render from a re-encode.
 
-Each cycle checks the live week, high-scores, and the **12 most recent weeks**:
-the collector fills in episode durations after the fact, so a *past* board can
-still move with no board code touched.
+Each cycle checks the live week, high-scores, the three Weeks at #1 boards,
+and the **12 most recent weeks** of every weekly kind: the collector fills in
+episode durations after the fact, and a dedupe or an exclusion re-ranks a
+past chart, so a *past* board can still move with no board code touched.
+That is 40 boards and ~7s of API calls a cycle; a typical cycle then renders
+the live-week boards and nothing else.
+
+**Live boards render before history.** The wrapper cuts a run at 90s, and a
+first cycle after a deploy has more boards than fit — so the all-time and
+live-week boards go first, and **state and the manifests are saved after every
+render**, not once at the end. A run the bound kills keeps what it rendered and
+the next tick continues from there, rather than re-rendering the same first N
+boards forever.
+
+**The two families fail separately.** The chart endpoints did not exist on
+production until the site's branch merged, and a bot that raised on that 404
+would have stopped rendering the #40HPW cards too. A family whose API is
+missing or down is a logged `[warn] … skipped this run`; only both failing is
+a failed run.
 
 ## Why there is no week rule in this bot
 
@@ -62,6 +95,10 @@ calendar date three days before the current week's start — the Friday of the
 previous week — and the endpoint resolves it with the canonical rule. It is the
 same three-day probe `prevWeek()` uses, evaluated server-side, and it costs
 nothing: every week stepped over is one whose members had to be fetched anyway.
+`/api/v1/charts/<kind>?week=` resolves a date exactly as the hours endpoint
+does, so the chart weeks step with the same probe, through the Shows endpoint;
+the Artists board for each week is fetched by the week's own Monday, and the
+bot refuses to continue if the two endpoints ever disagree about a week.
 
 Verified against production: 99 weeks back to 2024-10-07, every one a Monday,
 every step exactly 7 calendar days, across all four DST transitions in the
@@ -108,12 +145,14 @@ it **~810MB**, plus the fonts apt pulls in.
 |---|---|
 | *(none)* | dry run — renders to `./preview`, writes no state, publishes nothing |
 | `--live` | write into the shards tree and `state.json` |
-| `--all` | every week back to `first_week` (~99 today), not the recent window |
+| `--all` | every week back to `first_week` (~99 hpw weeks, ~114 chart weeks × 2 kinds today), not the recent window |
 | `--force` | re-render even where the hash matches |
-| `--only KEY` | one board: a `YYYY-MM-DD`, or `high-scores` |
-| `--standin` | screenshot `/#members` instead of the card page — see below |
+| `--only K[,K…]` | named boards: `YYYY-MM-DD`, `high-scores`, `shows-<date>`, `artists-<date>`, `shows-weeks-at-1`, `artists-weeks-at-1`, `members-weeks-at-1` |
+| `--standin` | hpw only: screenshot `/#members` instead of the card page — see below |
 
-`--all` needs `HPW_TIMEOUT=0` to escape the wrapper's 90s bound.
+`--all` needs `HPW_TIMEOUT=0` to escape the wrapper's 90s bound (or, since the
+state is checkpointed per render, it can simply be left to the cycle to finish
+over several ticks).
 
 ## Which origin
 
@@ -140,6 +179,32 @@ what closed out the three preview-era cards on 2026-08-30.
 Kept as a fallback, superseded.
 
 
+## The row ceiling, per card kind
+
+The card page clips its list inside the board shell, so a row that grows past
+its budget is not an overlap but a **silently missing tenth row**; the bot
+measures the `[data-card-list]` box before every screenshot and refuses to
+publish a clipped card (`CardOverflow`, exit 2). The budget is measured, not
+derived, and it moves with any chrome change around the list, so re-measure
+after touching a card page:
+
+```sh
+.venv/bin/python test-clip-guard.py https://<branch>.onlyboosts.pages.dev
+```
+
+Measured 2026-09-03 on the `misc-updates` preview, 720x900 at scale 1
+(layout is identical at scale 2):
+
+| Card | List box | Room | Rows | Ceiling | Headroom |
+|---|---|---|---|---|---|
+| hpw week, Proof of #40HPW | 269.5 → 829 | 560px | 49.2–50.2px | **56.0px** | 5.8px |
+| shows / artists / members weeks-at-1 | 269.5 → 829 | 560px | 49.2–50.2px | **56.0px** | 5.8px |
+| shows / artists weekly | 296.9 → 829 | 532.6px | 49.2–50.2px | **53.3px** | 3.1px |
+
+The weekly chart cards are the tight ones: the `rank in sats/boosters/boosts`
+column head costs 27.4px of the list box and the rank triplet does not make the
+row any taller. A row on those cards may grow **3.1px**, an hpw row 5.8px.
+
 ## Cadence
 
 A commented three-line block at the foot of
@@ -151,10 +216,17 @@ same cycle. The comment there explains the trade and the one-push alternative.
 Bounded at 90s by `run-hpwcards.sh` (`HPW_TIMEOUT` to change, `0` to disable).
 Chromium is the one thing in this pipeline that can hang rather than fail, and
 a wedged renderer would hold the pipeline lock and stall the boost cycle behind
-it. A cap that fires is logged and shrugged off: the previous cards stand.
+it. A cap that fires is logged and shrugged off: the previous cards stand, and
+whatever this run rendered before the cap is already saved.
+
+Measured 2026-09-03 against the branch preview: ~7s to check all 40 boards,
+1.3–4.5s a render, ~30s for every chart board from cold. A steady-state cycle
+is well inside the bound; the first cycle after the chart endpoints deploy
+renders 27 chart boards and may need two ticks.
 
 ## Outward reach
 
-Read-only. Two GETs per board checked against `onlyboosts.social`'s public API,
-the card page loads themselves, and nothing else. No Nostr, no signing, no
+Read-only. One GET per board checked against `onlyboosts.social`'s public API
+(`/api/v1/members/hours`, `/api/v1/charts/*`), the card page loads themselves,
+and nothing else. No Nostr, no signing, no
 sats, and no push of its own — the rsync is the collector's, unchanged.

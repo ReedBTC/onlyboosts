@@ -28,8 +28,13 @@ echo "=== $(date -u +%FT%TZ) OnlyBoosts incremental cycle ==="
 "$PY" "$BOT" push                 # rsync changed shards to the VPS (no --delete: nothing is removed on a tail run)
 "$PY" d1_sync.py --remote-delta   # push new boosts to the D1 query layer (/api/v1); no-op if none / no CF creds
 
-# ── #40HPW share cards ───────────────────────────────────────────────────────
-# COMMENTED OUT UNTIL REED FLIPS IT. Uncomment all three lines to enable.
+# ── share cards: the #40HPW boards and the OnlyBoosts Charts boards ──────────
+# One step, two families (since 2026-09-03): the hpw boards → shards/hpw/ and
+# the chart boards → shards/charts/, all hash-gated so a cycle usually renders
+# the live-week boards and nothing else. A family whose API is missing on the
+# site (the chart endpoints before their branch merged) is a logged skip for
+# that family alone. Measured on the branch preview: ~7s to check all 40
+# boards, ~1.5-4.5s a render, ~30s for every chart board from cold.
 #
 # ⚠️ IT RUNS AFTER THE D1 SYNC, WHICH IS WHY IT NEEDS A SECOND PUSH. The card is
 # a screenshot of the LIVE SITE, and the live site reads D1 — so a render before
@@ -50,6 +55,6 @@ echo "=== $(date -u +%FT%TZ) OnlyBoosts incremental cycle ==="
 # The card page merged in 4ec28ae (2026-08-30) and the 99-week history is
 # already on the VPS, so enabling this only keeps it current. See
 # ../hpw-cards/README.md.
-../hpw-cards/run-hpwcards.sh --live || true   # #40HPW boards → shards/hpw/*.png
+../hpw-cards/run-hpwcards.sh --live || true   # share cards → shards/{hpw,charts}/*.png
 "$PY" "$BOT" push                             # ship those PNGs on this cycle
 echo "=== $(date -u +%FT%TZ) cycle done ==="
