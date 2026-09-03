@@ -50,20 +50,20 @@
 
   <!-- Shared note / card styles (.note-card, .embed-note) — the boosts
        feeds render through the same kind-1 card as boosts-thread.js. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v185" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v186" />
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v185" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v186" />
   <!-- The episode card and its drawer, extracted from the inline block below
        when /episode/<guid> pages needed the same cards. See the file header. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v185" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v185" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v186" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v186" />
   <!-- The 40 HPW boards on the Members tab; shared with the /hpw/<week> pages. -->
-  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v185" />
+  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v186" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. Must stay last
        among the stylesheets so the inline block below still wins. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v185" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v186" />
 
   <style>
     :root {
@@ -204,9 +204,11 @@
     /* ── Masthead ────────────────────────────────────────────────────
        Wordmark banner sits above the sticky feed bar. It scrolls away;
        the bar is what stays pinned. */
+    /* No border-bottom since 2026-09-03: it ran edge to edge above the tabs
+       and Reed asked for the two long lines to end. The tab chrome below is
+       boxed at the track width now (.feed-chrome), and that box is the edge. */
     .masthead {
       background: var(--white);
-      border-bottom: 1px solid var(--border);
       padding: 1.4rem 1.25rem 1.2rem;
       text-align: center;
     }
@@ -285,7 +287,29 @@
       top: 64px; /* height of #top-nav */
       z-index: 40;
       background: var(--cream);
-      border-bottom: 1px solid var(--border);
+      /* A little cream above the box so it sits off the masthead. */
+      padding-top: 0.75rem;
+    }
+    /* ══ THE CHROME IS A BOX AT THE TRACK WIDTH ══ (Reed, 2026-09-03: "the
+       two long lines the tabs live in extend too far on desktop… box the
+       buttons off with that thin line"). The tabs and the sub-row sit inside
+       one bordered, rounded box the width of the page track, in place of the
+       two full-bleed hairlines (the masthead's bottom and this wrap's) that
+       used to run edge to edge on a wide screen. `overflow: hidden` clips the
+       selected tab's fill and its 3px top rule to the rounded corner.
+       `box-sizing: border-box` keeps the outer edge exactly the track — the
+       two grids inside read the same track and simply fit within the border.
+       On a phone the sides and the radius come off (the tabs are chips
+       there, with room around them already) and only the bottom hairline
+       stays, as it was. */
+    .feed-chrome {
+      box-sizing: border-box;
+      max-width: var(--feed-track);
+      margin: 0 auto;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      background: var(--cream);
     }
     /* ══ THE TABS ══
        Lifted from Local Bitcoiners' feeds.html (`git show lb/main:feeds.html`):
@@ -1218,16 +1242,18 @@
          175px) would open off-screen. */
       .feed-bar-controls { margin-left: auto; }
       .feed-panels-inner { padding: 1.5rem 1rem 2.5rem; }
+      .feed-bar-wrap { padding-top: 0; }
+      .feed-chrome { border-left: 0; border-right: 0; border-radius: 0; }
       /* Shallower child indent on narrow screens. */
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
     }
   </style>
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v185" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v185" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v186" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v186" />
   <!-- The chart boards on the Shows and Artists feeds (charts-block.js) wear
        the Charts page's .cb-* grammar; hpw-board.css above dresses their
        week picker and the members' Weeks at #1 rows. -->
-  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v185" />
+  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v186" />
 </head>
 <body data-active-feed="shows-global">
 
@@ -1381,6 +1407,7 @@
      tabs are above the fold on every visit, so they shouldn't wait on script
      to exist. -->
 <div class="feed-bar-wrap">
+<div class="feed-chrome">
 
   <!-- The three tabs. Podcasts and Music are the two sides of
        <podcast:medium>; Members is the people half of the site. -->
@@ -1450,6 +1477,7 @@
     </div>
   </div>
 
+</div>
 </div>
 
 <!-- ══════════════════════════════ PANELS ══════════════════════════════
@@ -1675,20 +1703,18 @@
          the Members tab's own section head; the boards are the #40HPW pair's
          grid (.hpw-boards) holding .cb-* boards. No wordmark link: the Charts
          page these boards came from is coming down once they live here. -->
-    <!-- ⚠️ THE SUB-LINE IS "The week's top {items}." AND NOTHING ELSE. Reed,
-         2026-09-03: the charts speak for themselves; the formula's ⓘ is on
-         the board's column head and in the feed note under the controls. -->
+    <!-- ⚠️ NO SUB-LINE UNDER THE HEADING. Reed, 2026-09-03: the charts speak
+         for themselves; the formula's ⓘ is on the board's column head and in
+         the feed note under the controls. -->
     <section class="mb-section charts-block" data-charts-block="shows" aria-label="OnlyBoosts Podcast Charts">
       <div class="mb-section-head">
         <h2>OnlyBoosts Podcast Charts</h2>
-        <p class="mb-section-sub">The week's top shows.</p>
       </div>
       <div class="hpw-boards" data-charts-boards></div>
     </section>
     <section class="mb-section charts-block" data-charts-block="artists" aria-label="OnlyBoosts Music Charts">
       <div class="mb-section-head">
         <h2>OnlyBoosts Music Charts</h2>
-        <p class="mb-section-sub">The week's top artists.</p>
       </div>
       <div class="hpw-boards" data-charts-boards></div>
     </section>
@@ -2576,17 +2602,17 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v185"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v186"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v185" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v186" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v185" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v186" defer></script>
 
 <!-- Feed hydration — lazily loads the active feed on first view. -->
-<script type="module" src="/assets/js/feeds.js?v=ob-v185"></script>
-<script src="/assets/js/nav.js?v=ob-v185" defer></script>
+<script type="module" src="/assets/js/feeds.js?v=ob-v186"></script>
+<script src="/assets/js/nav.js?v=ob-v186" defer></script>
 
 </body>
 </html>

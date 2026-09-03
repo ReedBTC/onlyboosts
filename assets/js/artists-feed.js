@@ -19,24 +19,24 @@
  */
 import {
   getPublisherPage, searchPublishers, SEARCH_HITS, SEARCH_MIN_CHARS,
-} from '/assets/js/ob-live.js?v=ob-v185'
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v185'
+} from '/assets/js/ob-live.js?v=ob-v186'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v186'
 import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls, RANGE_OPTIONS,
-} from '/assets/js/feed-controls.js?v=ob-v185'
-import { mountFeedNote, resetFeedNote, viewNote, CHART_INFO } from '/assets/js/feed-note.js?v=ob-v185'
+} from '/assets/js/feed-controls.js?v=ob-v186'
+import { mountFeedNote, resetFeedNote, viewNote, CHART_INFO } from '/assets/js/feed-note.js?v=ob-v186'
 import {
   LANG_ALL, languageOptions, langControl, langNote, langNoMatchText, langLabelFor,
-} from '/assets/js/feed-lang.js?v=ob-v185'
-import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v185'
-import { competitionRanks, rankLabel, markSliceTies } from '/assets/js/rank.js?v=ob-v185'
+} from '/assets/js/feed-lang.js?v=ob-v186'
+import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v186'
+import { competitionRanks, rankLabel, markSliceTies } from '/assets/js/rank.js?v=ob-v186'
 import {
   COPY, toCard, publisherCardHtml, publisherRankValue,
   SORT_OPTIONS, RANKED_SORTS, PUBLISHER_CARDS_PER_PAGE,
   num, fmtSats, plural,
-} from '/assets/js/publisher-card.js?v=ob-v185'
-import { wirePublisherCards } from '/assets/js/publisher-card-actions.js?v=ob-v185'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v185'
+} from '/assets/js/publisher-card.js?v=ob-v186'
+import { wirePublisherCards } from '/assets/js/publisher-card-actions.js?v=ob-v186'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v186'
 
 /* The hash's language / view on an already-hydrated feed — the same two doors
  * every ranked renderer keeps; see the twin maps in shows-feed.js. */
@@ -344,11 +344,10 @@ export async function renderArtists({ panel, list, scope = 'global', lang = null
   list.className = ''
   list.replaceChildren(cards, moreWrap)
 
-  /* The line above the search box, recomposed from the live view — sort,
+  /* The note under the controls, recomposed from the live view — sort,
    * range, scope — on every change; see viewNote in feed-note.js. The chart
    * sort carries the ⓘ link to /about#charts. */
   function paintNote() {
-      && (!langKey || langKey === LANG_ALL)
     mountFeedNote(panel,
       langNote(viewNote({ sort: sortKey, days: rangeDays(rangeKey), follows, noun: copy.noun }),
         langKey, langLabel, copy.noun),

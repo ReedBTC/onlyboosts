@@ -140,6 +140,12 @@ at a time. `test-feed-hash.mjs` compares them per breakpoint.
 selected tab**, in `--accent-d`. Broken there, the tab and the block below it
 share a fill, touch, and merge into one slab.
 
+**The tabs and the sub-row sit in one bordered, rounded box at the track
+width (`.feed-chrome`) since 2026-09-03**, Reed's call: the masthead's and
+the sticky wrap's hairlines ran edge to edge on a wide screen. The box is the
+edge now; on a phone its sides and radius come off and only the bottom
+hairline stays.
+
 **On a phone the tabs become chips and KEEP THEIR LABELS.** LB goes icon-only
 because four tabs and four words do not fit; three do, and a reorganization that
 exists because visitors cannot tell what the site shows them must not open with
