@@ -146,9 +146,10 @@ exists because visitors cannot tell what the site shows them must not open with
 three unlabelled glyphs.
 
 **⚠️ The page track is `--feed-track: 60rem`, which is `.show-main`'s width.**
-Four elements read it — the tabs, the sub-row, the control bar and the panels —
-so the column no longer narrows by 240px when a reader clicks a card through to
-its detail page. The masthead's logo and subtitle keep their own smaller
+Three elements read it — the tabs, the sub-row and the panels (the control bar
+was the fourth until 2026-09-03, when it became the lid inside the active
+panel's shell) — so the column no longer narrows by 240px when a reader clicks
+a card through to its detail page. The masthead's logo and subtitle keep their own smaller
 measures; those are typographic, not the track.
 
 **A hash may carry a view: `#shows?lang=de&range=1m&sort=sats`.** The feed key
@@ -1529,10 +1530,15 @@ What a change elsewhere would break:
   the cold load does not go through `lb:feed-activate`, so `feeds.js` re-reads
   `body[data-active-feed]` at the end. Hooked to the listener alone, the boards
   were an empty gap on every reload and every shared link.
-- **⚠️ THE FEED BAR IS MOVED INTO THIS TAB AND MOVED BACK**, `appendChild` on the
-  live element. **The move back is the half that breaks**: `.members-block` is
-  `display:none` off this tab, so a bar left behind takes the scope menu and every
-  feed's range and sort with it.
+- **⚠️ THE FEED BAR IS MOVED INTO THE ACTIVE PANEL'S LID, ON EVERY FEED**,
+  `appendChild` on the live element — since 2026-09-03, Reed's ask, every
+  feed is a shell with its controls on the lid (`.feed-shell` / `.feed-lid`
+  in `index.html`), which generalizes the 2026-08-23 move that put the bar
+  beside this tab's boost list. The bar ships in the Shows panel's lid and
+  `placeFeedBar(feed)` relocates it. **A bar left in the wrong panel is the
+  failure**: an inactive panel is `hidden`, so it takes the scope menu and
+  every feed's range and sort with it. The `.members-boosts` section is the
+  heading alone now; the lid-only `.mb-shell` and the seam it had are gone.
 - **⚠️ `.mb-shell` / `.mb-lid` RESTATE `.bs-shell` / `.bs-controls`, THEY DO NOT
   IMPORT THEM** — this page does not link `show-page.css`. 1px `--border`, 12px
   radius, `--cream` fill, lid on `--cream-d`. **They must stay in step.**
@@ -1694,8 +1700,8 @@ rollups and wall, and the sitemap.
 What a change elsewhere would break:
 
 - **⚠️ THE SECTION IDS ARE URLS AND THEY ARE FROZEN.** `/show`: `#episodes`
-  `#community-shows` `#community` `#podroll` `#reverse-podroll` `#boosts`.
-  `/episode`: `#community-episodes` `#community` `#boosts`. `/booster`: `#shows`
+  `#community` `#community-shows` `#podroll` `#reverse-podroll` `#boosts`.
+  `/episode`: `#community` `#community-episodes` `#boosts`. `/booster`: `#shows`
   `#episodes` `#boosts`. Ids are reused across pages on purpose where they name the
   same kind of section. `HASH_ALIASES` holds one permanent entry
   (`#inverse-podroll`) and **is the repair for a rename that already happened, not

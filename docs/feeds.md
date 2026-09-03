@@ -424,6 +424,11 @@ sticky chrome at three rows and 200px with the nav. That is 30% of a 667px
 screen before the first card. Two rows was the state before the language pill
 existed, and it is the state to hold.
 
+*(Measured while the bar was sticky chrome. Since 2026-09-03 it is the lid of
+the active panel's shell and scrolls with the list, so a wrap no longer costs
+sticky height; the label rules below still hold, because the lid is the same
+width and a two-line lid still reads as one control set where three do not.)*
+
 Under 640px, therefore:
 
 - **Both pills drop their tag.** `Sort: ` and `Language: ` cost 41px and 32px
@@ -518,9 +523,10 @@ view and the address.
 
 ### Search
 
-`assets/js/feed-search.js` is the typeahead at the head of every panel, inside
-the panel rather than the sticky bar: range and sort are read while scrolling a
-long list, a search is a thing you do at the top.
+`assets/js/feed-search.js` is the typeahead at the head of every panel, above
+the shell whose lid holds the range and sort (Reed's ask, 2026-09-03; it sat
+under the bar while the bar was sticky chrome): a search is a thing you do at
+the top of a list.
 
 | Feed | Searches | A pick does | Enter does |
 |---|---|---|---|

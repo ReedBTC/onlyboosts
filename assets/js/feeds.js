@@ -1,7 +1,7 @@
 /* Feed hydration for the homepage's feeds.
  *
- * Which feed is on screen is picked by the tabs and the scope menu in the
- * sticky feed bar — Podcasts / Music / Members across the top, each with its
+ * Which feed is on screen is picked by the sticky tabs and the scope menu on
+ * the active panel's lid — Podcasts / Music / Members across the top, each with its
  * own sub-feeds, and Global / Follows on the second axis. Scoping: "Global" is
  * unscoped; "Follows" is the signed-in user's own kind-3 contact list,
  * resolved by follow-set.js. Every feed has both scopes since 2026-08-31.
@@ -39,7 +39,7 @@
  * when this module first runs).
  */
 // Identity, for keeping the Follows feeds in sync with who's signed in.
-import { getSessionPubkey, clearFollowCache } from '/assets/js/follow-set.js?v=ob-v180'
+import { getSessionPubkey, clearFollowCache } from '/assets/js/follow-set.js?v=ob-v181'
 
 // ── DOM state helpers ────────────────────────────────────────────────
 
@@ -93,7 +93,7 @@ async function hydrate(panelId, mod, scope, medium, view) {
     const fn = m[RENDERERS[mod]]
     if (typeof fn !== 'function') throw new Error(`no renderer export for ${mod}`)
     // Every renderer takes the panel: it carries the feed key their range/sort
-    // controls are tagged with in the sticky bar. `medium` is undefined for
+    // controls are tagged with in the feed bar. `medium` is undefined for
     // the Boosts feeds, which don't split, and so is `view` — their hash
     // carries no parameters, and the inline controller strips any it is handed.
     await fn({ panel, list, scope, medium, lang: view?.lang, range: view?.range, sort: view?.sort })
@@ -104,10 +104,10 @@ async function hydrate(panelId, mod, scope, medium, view) {
 }
 
 // ── Lazy per-feed dispatch ───────────────────────────────────────────
-const BOOSTS = '/assets/js/boosts-feed.js?v=ob-v180'
-const PODCASTS = '/assets/js/feeds-podcasts.js?v=ob-v180'
-const SHOWS = '/assets/js/shows-feed.js?v=ob-v180'
-const ARTISTS = '/assets/js/artists-feed.js?v=ob-v180'
+const BOOSTS = '/assets/js/boosts-feed.js?v=ob-v181'
+const PODCASTS = '/assets/js/feeds-podcasts.js?v=ob-v181'
+const SHOWS = '/assets/js/shows-feed.js?v=ob-v181'
+const ARTISTS = '/assets/js/artists-feed.js?v=ob-v181'
 // Each module's entry point, by module. Named rather than sniffed out of the
 // path, so adding a feed is one line here instead of another branch.
 const RENDERERS = {
@@ -172,7 +172,7 @@ function loadMemberBoards() {
   const root = document.querySelector('[data-hpw-boards]')
   if (!root) return
   boardsWired = true
-  import('/assets/js/members-board.js?v=ob-v180')
+  import('/assets/js/members-board.js?v=ob-v181')
     .then((m) => m.renderMembersBoards(root))
     .catch((err) => {
       console.warn('[feeds] member boards failed to load', err)

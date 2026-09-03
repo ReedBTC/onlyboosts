@@ -38,7 +38,7 @@ const SITE_ORIGIN = "https://onlyboosts.social";
 // how a podcaster shares one section of their own page, so the six ids below are
 // a contract with links already in the wild and **must not be renamed**:
 //
-//   #episodes  #community-shows  #community  #podroll  #reverse-podroll  #boosts
+//   #episodes  #community  #community-shows  #podroll  #reverse-podroll  #boosts
 //
 // Same rule as ALIASES in index.html, and it was written here as the stricter
 // one: a feed hash is read by a JS controller that can alias an old form to a
@@ -522,19 +522,19 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v180" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v181" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v181" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v181" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v181" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v181" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v181" />
   <!-- The boost note card and its reaction bar. Added when the boost list at
        the foot of this page became the same .note-card the homepage Boosts
        feed paints; this page linked neither before, which is why show-page.css
        restates .nostr-mention. That restatement is now redundant rather than
        load-bearing, and is left in place rather than removed in the same pass. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v180" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v181" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v181" />
 </head>
 <body data-show-guid="${htmlEscape(show.podcast_guid)}">
 
@@ -671,12 +671,15 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
 
   ${renderEpisodes(episodes, show, copy)}
 
-  ${renderCommunityShows(community, copy)}
-
   ${renderSupporters(supporters, {
     sub: `Everyone who has boosted ${htmlEscape(show.title)} on Nostr, ranked by sats sent, all time.`,
     empty: `No boosters recorded for this ${copy.noun} yet.`,
   })}
+
+  <!-- Below the wall since 2026-09-03 (Reed's call): the wall names the
+       community, and this section then says what else that community boosts.
+       It sat between the episodes and the wall from the day it shipped. -->
+  ${renderCommunityShows(community, copy)}
 
   ${renderPodroll(podroll, "forward", copy, show)}
 
@@ -762,12 +765,12 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
 
 <script type="application/json" id="show-boost-payload">${jsonForScript(boostPayload)}</script>
 
-<script src="/assets/js/nav.js?v=ob-v180" defer></script>
-<script src="/assets/js/show-page.js?v=ob-v180" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v181" defer></script>
+<script src="/assets/js/show-page.js?v=ob-v181" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v180"></script>
-<script src="/assets/js/sw-register.js?v=ob-v180" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v181"></script>
+<script src="/assets/js/sw-register.js?v=ob-v181" defer></script>
 </body>
 </html>`;
 }
@@ -1309,10 +1312,10 @@ function notFound(guid) {
   <meta name="robots" content="noindex" />
   <title>Show not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v180" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v181" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v181" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v181" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v181" />
 </head>
 <body>
 <section class="page-header">
@@ -1331,7 +1334,7 @@ function notFound(guid) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v180" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v181" defer></script>
 </body>
 </html>`;
   return new Response(html, {

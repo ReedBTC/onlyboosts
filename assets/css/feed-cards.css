@@ -288,8 +288,9 @@ a.pcast-show-link:hover { text-decoration: underline; }
 }
 .pcast-fountain-link:hover { text-decoration: underline; }
 
-/* Inline audio player. */
-.pcast-player-row { padding: 0.1rem 0.7rem 0.2rem; }
+/* The episode page's hero player (episode-page.css scopes it under
+   .ep-player-row). The feed card carried one too, in a `.pcast-player-row`,
+   until 2026-09-03; see the note in episode-card.js. */
 .pcast-player { width: 100%; display: block; }
 
 /* The card action row (a pill Boost button beside "↓ Download MP3") is

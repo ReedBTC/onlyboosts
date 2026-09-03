@@ -181,8 +181,8 @@ Every section is addressable so a podcaster can share one part of their page.
 
 | Page | Ids |
 |---|---|
-| `/show` | `#episodes` `#community-shows` `#community` `#podroll` `#reverse-podroll` `#boosts` |
-| `/episode` | `#community-episodes` `#community` `#boosts` |
+| `/show` | `#episodes` `#community` `#community-shows` `#podroll` `#reverse-podroll` `#boosts` |
+| `/episode` | `#community` `#community-episodes` `#boosts` |
 | `/booster` | `#shows` `#episodes` `#boosts` |
 
 Ids are **reused across pages on purpose** where they name the same kind of
@@ -667,6 +667,12 @@ as the reader used it.
 `#community-shows` on `/show` and `#community-episodes` on `/episode` are the
 same object one level apart, and both are **the same `.ep-drawer`** as every
 other drawer on the page.
+
+**The section sits below the Nostr Community wall since 2026-09-03** (Reed's
+call), on all three pages that carry one, `/artist`'s `#community-artists`
+included: the wall names the community, and this section then says what else
+that community boosts. It sat above the wall from the day it shipped. The ids
+did not move with it.
 
 - **Every figure is community-scoped by construction.** The query joins through
   the set of this show's or episode's boosters, so a row's boosts and sats are

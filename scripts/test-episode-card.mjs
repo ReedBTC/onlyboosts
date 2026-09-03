@@ -310,9 +310,10 @@ check('stats:false drops the figures without leaving an empty row', () => {
   assert.match(booster, /class="ob-boost-pill"/)
 })
 
-check('the feed layout is unchanged — pill on the stats line, ⋮ present', () => {
+check('the feed layout — pill on the stats line, ⋮ present, no player', () => {
   assert.match(html, /Nostr Stats:/)
-  assert.match(html, /<audio class="pcast-player"/)
+  // ⚠️ NO <audio> ON ANY LAYOUT since 2026-09-03; the episode page has it.
+  assert.doesNotMatch(html, /<audio/)
   assert.match(html, /pcast-cardmenu/)
   assert.doesNotMatch(html, /pcast-card-rail/)
   // The pill closes the stats row rather than standing alone.

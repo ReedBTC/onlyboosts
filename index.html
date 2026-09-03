@@ -50,20 +50,20 @@
 
   <!-- Shared note / card styles (.note-card, .embed-note) — the boosts
        feeds render through the same kind-1 card as boosts-thread.js. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v180" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v181" />
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v180" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v181" />
   <!-- The episode card and its drawer, extracted from the inline block below
        when /episode/<guid> pages needed the same cards. See the file header. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v180" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v181" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v181" />
   <!-- The 40 HPW boards on the Members tab; shared with the /hpw/<week> pages. -->
-  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v180" />
+  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v181" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. Must stay last
        among the stylesheets so the inline block below still wins. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v180" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v181" />
 
   <style>
     :root {
@@ -260,15 +260,13 @@
     }
 
     /* ── Feed bar ────────────────────────────────────────────────────
-       One row that picks the feed and controls it. Two dropdowns carry the
-       two axes — what (Episodes / Shows / Songs / Albums / Boosts) x whose
-       (Global / Follows) — and each feed mounts its own range + sort controls into
-       the right-hand slot (feed-controls.js). Sticky under the nav, as the
-       four-tab ribbon it replaced was, so switching feed, window or order
-       doesn't mean scrolling back to the top of a long list.
-
-       Width matches .feed-panels-inner rather than the old ribbon's wider
-       track, so the menus line up with the left edge of the cards below. */
+       The sticky chrome under the nav: the three tabs and the sub-feed row.
+       The CONTROL bar (`.feed-bar`: the scope menu plus each feed's mounted
+       range + sort group, feed-controls.js) was the third row of this wrap
+       until 2026-09-03 and is now the lid of the active panel's shell — see
+       THE FEED SHELL below. Switching feed, window or order therefore means
+       the controls scroll away with the list, which is what the Members tab
+       already did and what Reed asked for on every feed. */
     /* ⚠️ ONE TRACK WIDTH FOR THE WHOLE PAGE, AND IT MATCHES THE DETAIL PAGES.
        `.show-main` is 60rem with 1.25rem of padding, so the homepage was 240px
        narrower than /show, /episode and /booster and the whole column jumped
@@ -395,7 +393,10 @@
        the same call .feed-bar-controls makes below, and for the same reason: an
        imperative swap is the version that leaves a tab you come back to showing
        another tab's sub-feeds, or none. */
-    .feed-subs-wrap { border-bottom: 1px solid var(--border); }
+    /* No border-bottom on the sub-row's wrap: `.feed-bar-wrap` closes the
+       sticky chrome with one hairline, and the control bar that used to sit
+       between the two is in the panel's lid now (2026-09-03). Two rules here
+       drew a 2px line. */
     .feed-subs {
       max-width: var(--feed-track);
       margin: 0 auto;
@@ -449,10 +450,13 @@
     .feed-sub[aria-selected="true"] { background: var(--accent); color: var(--white); }
     .feed-sub[aria-selected="true"]:hover { color: var(--white); }
 
+    /* ⚠️ THE BAR LIVES IN A PANEL'S LID SINCE 2026-09-03, not in the sticky
+       wrap, so it reads no `--feed-track` of its own: the panel it sits in is
+       already inside `.feed-panels-inner`, which does. The padding is the
+       lid's — `.mb-lid`'s values, so a feed's lid and the Members wall's lid
+       are the same object. */
     .feed-bar {
-      max-width: var(--feed-track);
-      margin: 0 auto;
-      padding: 0.55rem 1.25rem;
+      padding: 0.5rem 0.75rem;
       display: flex;
       align-items: center;
       gap: 0.5rem;
@@ -662,43 +666,14 @@
        and lets each list bring its own. */
     .mb-body { padding: 1.1rem 1rem; }
 
-    /* ⚠️ THE TWO HALVES OF THE BOOSTS SHELL, AND THE SEAM IS THE WHOLE RISK.
-       The lid closes its own bottom and the panel below opens its own top, so
-       the pair draws one box across two elements. Both are scoped to the
-       Members tab: everywhere else the bar is back in its sticky wrapper and
-       the panel is an ordinary panel.
-
-       ⚠️ THE SECTION'S OWN BOTTOM MARGIN IS THE GAP, and it shipped that way.
-       `.mb-section` carries `margin-bottom: 2.75rem` for the space between
-       sections; on the one section whose box CONTINUES into the element after
-       it, that margin is 2.75rem of nothing between a lid and its body, with
-       the border drawing both edges of the hole. Reported the day it shipped.
-       Anything that puts vertical space between these two halves reopens it. */
+    /* The Boosts heading sits directly on the boosts panel's shell, the way
+       the wall's heading sits on its own: `.mb-section`'s 2.75rem is the gap
+       BETWEEN sections, and this is the last one, its list being the panel
+       that follows the block. (Until 2026-09-03 the shell was two elements —
+       a lid-only `.mb-shell` here and the panel finishing the box — and this
+       zero was what kept the seam closed. The panel is the whole shell now;
+       see `.feed-shell` below.) */
     .members-boosts { margin-bottom: 0; }
-    .mb-shell--lid-only { border-bottom: 0; border-radius: 12px 12px 0 0; }
-    /* ⚠️ NO `max-width` AND NO `margin` HERE, DELIBERATELY. Both would be
-       no-ops — the shell is already inside `.feed-panels-inner`, which reads
-       the track, so the bar cannot exceed it and has nothing to centre within.
-       And `test-feed-hash.mjs` asserts that four elements read
-       `var(--feed-track)` by scanning declarations for `.feed-bar`, so a scoped
-       `max-width: none` reads to it as the track declaration going away. It
-       failed exactly that way once. Restyle the fill and the padding here;
-       leave the box model to the base rule. */
-    body[data-active-tab="members"] .mb-shell--lid-only > .feed-bar {
-      background: var(--cream-d);
-      border-bottom: 1px solid var(--border);
-      padding: 0.5rem 0.75rem;
-    }
-    /* The panel finishes the box. `margin-top: 0` is load-bearing: any gap here
-       is a visible break in a border that is meant to be continuous. */
-    body[data-active-tab="members"] .feed-panel.is-active {
-      margin-top: 0;
-      border: 1px solid var(--border);
-      border-top: 0;
-      border-radius: 0 0 12px 12px;
-      background: var(--cream);
-      padding: 1.1rem 1rem;
-    }
 
     .members-wall-section { margin: 0; }
     .members-wall-section .show-more {
@@ -819,6 +794,41 @@
     .feed-panel { display: none; }
     .feed-panel.is-active { display: block; }
 
+    /* ══ THE FEED SHELL ══
+       Every feed is a bordered box with its controls on the lid — the Members
+       wall's arrangement (`.mb-shell` / `.mb-lid` above), which Reed asked
+       for on every feed on 2026-09-03: the control bar ran the full width of
+       the page between two hairlines, and the search sat under it. Now the
+       note and the search lead the panel, and the shell under them holds the
+       scope menu, range, language and sort on a `--cream-d` lid over the
+       cards. Same 1px `--border`, 12px radius and `--cream` fill as the other
+       two shells on this page and as `.bs-shell` on the detail pages; they
+       stay in step by hand.
+
+       ⚠️ THE LID IS A SLOT AND THE BAR IS ONE ELEMENT. `.feed-bar` ships in
+       the Shows panel's lid and placeFeedBar moves it into the active panel's
+       — so eleven lids are empty at any moment, and an empty lid draws nothing
+       (`:empty` below). This is the Members-tab move of 2026-08-23 made
+       general; the seam it had, between a lid in one element and a body in
+       another, is gone because both halves are in the one panel now.
+
+       ⚠️ NO `overflow: hidden` HERE. The sort and language menus open
+       downward out of the lid, and a shell holding one placeholder or a
+       single searched card is shorter than the popover. The lid takes the top
+       corners itself instead, the call `.mb-shell` already makes. */
+    .feed-shell {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--cream);
+    }
+    .feed-lid {
+      border-bottom: 1px solid var(--border);
+      border-radius: 12px 12px 0 0;
+      background: var(--cream-d);
+    }
+    .feed-lid:empty { display: none; }
+    .feed-body { padding: 1.1rem 1rem; }
+
 
     /* The panels have no head of their own: the feed bar above names the feed
        and carries its controls, so a heading under it would only restate the
@@ -875,11 +885,11 @@
     .feed-note .feed-note-info:focus-visible { text-decoration: underline; }
 
     /* ── Feed search ──────────────────────────────────────────────────
-       The typeahead at the head of each panel (feed-search.js). Inside the
-       panel rather than in the sticky bar above it, deliberately: the range
-       and sort controls are read while scrolling a long list, but a search
-       is a thing you do at the top, and the bar has no room for a text field
-       beside two dropdowns on a phone.
+       The typeahead at the head of each panel (feed-search.js), ABOVE the
+       shell whose lid holds the range and sort (Reed's ask, 2026-09-03: the
+       search over the controls). It was under the bar while the bar was
+       sticky chrome; a search is a thing you do at the top of a list, and the
+       lid has no room for a text field beside three pills on a phone.
 
        Each panel ships the empty [data-feed-search] slot and the renderer
        fills it, so a feed showing "sign in" or an error never grows a search
@@ -1187,8 +1197,8 @@
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
     }
   </style>
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v180" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v181" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v181" />
 </head>
 <body data-active-feed="episodes-global">
 
@@ -1326,17 +1336,20 @@
 </div>
 
 <!-- ══════════════════════════════ FEED BAR ══════════════════════════════
-     Two dropdowns pick the feed on two axes: what (episodes / shows /
-     boosts) x whose (everyone / the npubs you follow). Songs and Albums are
-     the music half of the first two, split on <podcast:medium>. The scope
-     menu is dropped whenever it has only one real option — signed out, or on
-     Shows and Albums, which have no whose-axis. The third slot is filled by
-     whichever feed is active, with its own range + sort controls
-     (feed-controls.js).
+     The sticky chrome: the three tabs and the sub-feed row under them.
+
+     ⚠️ THE CONTROL BAR (`.feed-bar`: the scope menu and every feed's mounted
+     range/sort group) IS NOT IN HERE SINCE 2026-09-03. It ships inside the
+     Shows panel's lid below and placeFeedBar moves the one live element into
+     whichever panel is active, so every feed is a bordered shell with its
+     controls on the lid — the Members wall's arrangement, which Reed asked for
+     on every feed ("all contained in its own area"). It sat in this wrapper,
+     sticky under the tabs, from the day the feed bar existed; the Members tab
+     was the first to move it out, on 2026-08-23, and this generalizes that.
 
      Static markup, wired by the controller at the bottom of the page: the
-     bar is above the fold on every visit, so it shouldn't wait on script to
-     exist. -->
+     tabs are above the fold on every visit, so they shouldn't wait on script
+     to exist. -->
 <div class="feed-bar-wrap">
 
   <!-- The three tabs. Podcasts and Music are the two sides of
@@ -1407,23 +1420,6 @@
     </div>
   </div>
 
-  <div class="feed-bar">
-
-    <div class="feed-menu feed-menu--scope" data-feed-menu="scope" hidden>
-      <button type="button" class="feed-menu-btn" aria-haspopup="true" aria-expanded="false" aria-label="Choose whose boosts">
-        <span class="feed-menu-cur" data-feed-menu-cur>Global</span>
-        <span class="feed-menu-caret" aria-hidden="true">▾</span>
-      </button>
-      <div class="feed-menu-list" role="menu" aria-label="Whose boosts" hidden>
-        <button type="button" class="feed-menu-item" role="menuitemradio" aria-checked="true" data-value="global">Global</button>
-        <button type="button" class="feed-menu-item" role="menuitemradio" aria-checked="false" data-value="follows">Follows</button>
-      </div>
-    </div>
-
-    <!-- Filled by each feed's renderer on first hydration; CSS shows only the
-         active feed's group. -->
-    <div class="feed-bar-controls" data-feed-controls></div>
-  </div>
 </div>
 
 <!-- ══════════════════════════════ PANELS ══════════════════════════════
@@ -1435,10 +1431,10 @@
      Follows narrows to the signed-in user's kind-3 contact list — see
      follow-set.js.
 
-     Each panel leads with an empty [data-feed-search] slot, filled by that
-     feed's renderer through feed-search.js and left hidden until it is. It
-     sits below the sticky bar and scrolls away with the cards it filters;
-     picking a suggestion narrows the list to one subject while keeping the
+     Each panel is: a note line and a search slot, both shipped empty and
+     hidden until a renderer fills them, and under them the SHELL — a lid the
+     control bar moves into (see the FEED BAR comment above) over the list.
+     Picking a suggestion narrows the list to one subject while keeping the
      rank that subject holds under the current sort. -->
 <main class="feed-panels">
   <div class="feed-panels-inner">
@@ -1623,20 +1619,14 @@
            an error where a disclosure was promised. -->
       <section class="mb-section bots" data-members-bots></section>
 
-      <!-- ⚠️ THE BOOST LIST'S OWN HEADING AND ITS CONTROLS, and both are here
-           because the list is here. The scope menu and the range/sort sat in
-           the sticky bar at the top of the page, which is right on every other
-           tab and wrong on this one: the Members tab puts three sections above
-           the boost list, so the controls were a screen and a half from the
-           thing they act on and the list itself had no name at all. Reed's
-           call, 2026-08-23.
-
-           ⚠️ THE BAR IS MOVED, NOT DUPLICATED. `.feed-bar` is one element; the
-           controller relocates it into this slot on the Members tab and back
-           into `.feed-bar-wrap` on every other. A second bar would be a second
-           set of controls over one feed, which is the class of bug the
-           declarative body[data-active-feed] rule exists to avoid. See
-           `placeFeedBar` in the controller. -->
+      <!-- THE BOOST LIST'S OWN HEADING. The list itself is the boosts panel
+           that follows this block, and since 2026-09-03 that panel is a shell
+           whose lid holds the feed bar, like every other feed's — so this
+           section is the heading alone. Until then it also carried a lid-only
+           shell the bar was moved into on this tab and out of on the others
+           (Reed's call, 2026-08-23: the controls belong beside the list, not a
+           screen and a half above it), with the panel finishing the box across
+           a seam that opened once. One element now; no seam. -->
       <section class="mb-section members-boosts">
         <div class="mb-section-head">
           <h2>Boosts</h2>
@@ -1644,15 +1634,6 @@
             Every boost note as it was published, newest first.
           </p>
         </div>
-        <!-- ⚠️ THE SHELL IS TWO ELEMENTS HERE AND THE SEAM IS THE WHOLE
-             RISK. The bar is the lid and the cards are the body, but the cards
-             live in `.feed-panel`s outside this section — the panel system is
-             shared with seven other feeds and moving them into here would fork
-             it. So the lid closes its own bottom and the panel opens its own
-             top, with no margin between them, and `body[data-active-tab]`
-             scopes both. Any vertical margin added to either half opens a gap
-             the border makes visible. -->
-        <div class="mb-shell mb-shell--lid-only" data-feed-bar-slot></div>
       </section>
     </div>
 
@@ -1677,20 +1658,30 @@
     <section class="feed-panel" id="panel-episodes-global" role="region" aria-label="Episodes, global" data-feed="episodes-global" data-scope="global" hidden>
       <p class="feed-note" data-feed-note hidden></p>
       <div class="feed-search" data-feed-search hidden></div>
-      <div class="feed-list" data-feed-list>
-        <div class="feed-placeholder">
-          <strong>Global episodes feed coming online</strong>
-          The layout is ready — boosted episodes load here once the snapshot loader lands.
+      <div class="feed-shell">
+        <div class="feed-lid" data-feed-bar-slot></div>
+        <div class="feed-body">
+          <div class="feed-list" data-feed-list>
+            <div class="feed-placeholder">
+              <strong>Global episodes feed coming online</strong>
+              The layout is ready — boosted episodes load here once the snapshot loader lands.
+            </div>
+          </div>
         </div>
       </div>
     </section>
 
     <section class="feed-panel" id="panel-members-global" role="region" aria-label="Boosts, global" data-feed="members-global" data-scope="global" hidden>
       <div class="feed-search" data-feed-search hidden></div>
-      <div class="feed-list" data-feed-list>
-        <div class="feed-placeholder">
-          <strong>Global boosts feed coming online</strong>
-          The layout is ready — boost notes load here once the snapshot loader lands.
+      <div class="feed-shell">
+        <div class="feed-lid" data-feed-bar-slot></div>
+        <div class="feed-body">
+          <div class="feed-list" data-feed-list>
+            <div class="feed-placeholder">
+              <strong>Global boosts feed coming online</strong>
+              The layout is ready — boost notes load here once the snapshot loader lands.
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -1698,20 +1689,30 @@
     <section class="feed-panel" id="panel-episodes-follows" role="region" aria-label="Episodes from your follows" data-feed="episodes-follows" data-scope="follows" hidden>
       <p class="feed-note" data-feed-note hidden></p>
       <div class="feed-search" data-feed-search hidden></div>
-      <div class="feed-list" data-feed-list>
-        <div class="feed-placeholder">
-          <strong>Sign in to see this feed</strong>
-          Follows feeds read your kind&#8209;3 contact list, so they need a signed-in npub.
+      <div class="feed-shell">
+        <div class="feed-lid" data-feed-bar-slot></div>
+        <div class="feed-body">
+          <div class="feed-list" data-feed-list>
+            <div class="feed-placeholder">
+              <strong>Sign in to see this feed</strong>
+              Follows feeds read your kind&#8209;3 contact list, so they need a signed-in npub.
+            </div>
+          </div>
         </div>
       </div>
     </section>
 
     <section class="feed-panel" id="panel-members-follows" role="region" aria-label="Boosts from your follows" data-feed="members-follows" data-scope="follows" hidden>
       <div class="feed-search" data-feed-search hidden></div>
-      <div class="feed-list" data-feed-list>
-        <div class="feed-placeholder">
-          <strong>Sign in to see this feed</strong>
-          Follows feeds read your kind&#8209;3 contact list, so they need a signed-in npub.
+      <div class="feed-shell">
+        <div class="feed-lid" data-feed-bar-slot></div>
+        <div class="feed-body">
+          <div class="feed-list" data-feed-list>
+            <div class="feed-placeholder">
+              <strong>Sign in to see this feed</strong>
+              Follows feeds read your kind&#8209;3 contact list, so they need a signed-in npub.
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -1723,10 +1724,15 @@
     <section class="feed-panel" id="panel-songs-global" role="region" aria-label="Songs, global" data-feed="songs-global" data-scope="global" hidden>
       <p class="feed-note" data-feed-note hidden></p>
       <div class="feed-search" data-feed-search hidden></div>
-      <div class="feed-list" data-feed-list>
-        <div class="feed-placeholder">
-          <strong>Global songs feed coming online</strong>
-          The layout is ready — boosted tracks load here once the snapshot loader lands.
+      <div class="feed-shell">
+        <div class="feed-lid" data-feed-bar-slot></div>
+        <div class="feed-body">
+          <div class="feed-list" data-feed-list>
+            <div class="feed-placeholder">
+              <strong>Global songs feed coming online</strong>
+              The layout is ready — boosted tracks load here once the snapshot loader lands.
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -1734,10 +1740,15 @@
     <section class="feed-panel" id="panel-songs-follows" role="region" aria-label="Songs from your follows" data-feed="songs-follows" data-scope="follows" hidden>
       <p class="feed-note" data-feed-note hidden></p>
       <div class="feed-search" data-feed-search hidden></div>
-      <div class="feed-list" data-feed-list>
-        <div class="feed-placeholder">
-          <strong>Sign in to see this feed</strong>
-          Follows feeds read your kind&#8209;3 contact list, so they need a signed-in npub.
+      <div class="feed-shell">
+        <div class="feed-lid" data-feed-bar-slot></div>
+        <div class="feed-body">
+          <div class="feed-list" data-feed-list>
+            <div class="feed-placeholder">
+              <strong>Sign in to see this feed</strong>
+              Follows feeds read your kind&#8209;3 contact list, so they need a signed-in npub.
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -1765,23 +1776,54 @@
            unreachable, in which case the placeholder is what a reader sees for
            the moment before the feed hydrates. Everything still works with the
            markers unreplaced; it is a fast path, not a dependency. -->
-      <div class="feed-list" data-feed-list>
-        <!--OB:SSR-SHOWS-->
-        <div class="feed-placeholder">
-          <strong>Shows feed coming online</strong>
-          The layout is ready — boosted shows load here once the rollup lands.
+      <div class="feed-shell">
+        <div class="feed-lid" data-feed-bar-slot>
+          <!-- ⚠️ THE BAR SHIPS IN THIS LID because the front door opens on this
+               panel (DEFAULT_TYPE); placeFeedBar moves the one live element into
+               whichever panel is active. It is one element on the whole page. -->
+          <div class="feed-bar">
+
+            <div class="feed-menu feed-menu--scope" data-feed-menu="scope" hidden>
+              <button type="button" class="feed-menu-btn" aria-haspopup="true" aria-expanded="false" aria-label="Choose whose boosts">
+                <span class="feed-menu-cur" data-feed-menu-cur>Global</span>
+                <span class="feed-menu-caret" aria-hidden="true">▾</span>
+              </button>
+              <div class="feed-menu-list" role="menu" aria-label="Whose boosts" hidden>
+                <button type="button" class="feed-menu-item" role="menuitemradio" aria-checked="true" data-value="global">Global</button>
+                <button type="button" class="feed-menu-item" role="menuitemradio" aria-checked="false" data-value="follows">Follows</button>
+              </div>
+            </div>
+
+            <!-- Filled by each feed's renderer on first hydration; CSS shows only the
+                 active feed's group. -->
+            <div class="feed-bar-controls" data-feed-controls></div>
+          </div>
         </div>
-        <!--/OB:SSR-SHOWS-->
+        <div class="feed-body">
+          <div class="feed-list" data-feed-list>
+            <!--OB:SSR-SHOWS-->
+            <div class="feed-placeholder">
+              <strong>Shows feed coming online</strong>
+              The layout is ready — boosted shows load here once the rollup lands.
+            </div>
+            <!--/OB:SSR-SHOWS-->
+          </div>
+        </div>
       </div>
     </section>
 
     <section class="feed-panel" id="panel-shows-follows" role="region" aria-label="Shows from your follows" data-feed="shows-follows" data-scope="follows" hidden>
       <p class="feed-note" data-feed-note hidden></p>
       <div class="feed-search" data-feed-search hidden></div>
-      <div class="feed-list" data-feed-list>
-        <div class="feed-placeholder">
-          <strong>Sign in to see this feed</strong>
-          Follows feeds read your kind&#8209;3 contact list, so they need a signed-in npub.
+      <div class="feed-shell">
+        <div class="feed-lid" data-feed-bar-slot></div>
+        <div class="feed-body">
+          <div class="feed-list" data-feed-list>
+            <div class="feed-placeholder">
+              <strong>Sign in to see this feed</strong>
+              Follows feeds read your kind&#8209;3 contact list, so they need a signed-in npub.
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -1791,10 +1833,15 @@
     <section class="feed-panel" id="panel-albums" role="region" aria-label="Albums, global" data-feed="albums-global" data-scope="global" hidden>
       <p class="feed-note" data-feed-note hidden></p>
       <div class="feed-search" data-feed-search hidden></div>
-      <div class="feed-list" data-feed-list>
-        <div class="feed-placeholder">
-          <strong>Albums feed coming online</strong>
-          The layout is ready — boosted albums load here once the rollup lands.
+      <div class="feed-shell">
+        <div class="feed-lid" data-feed-bar-slot></div>
+        <div class="feed-body">
+          <div class="feed-list" data-feed-list>
+            <div class="feed-placeholder">
+              <strong>Albums feed coming online</strong>
+              The layout is ready — boosted albums load here once the rollup lands.
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -1802,10 +1849,15 @@
     <section class="feed-panel" id="panel-albums-follows" role="region" aria-label="Albums from your follows" data-feed="albums-follows" data-scope="follows" hidden>
       <p class="feed-note" data-feed-note hidden></p>
       <div class="feed-search" data-feed-search hidden></div>
-      <div class="feed-list" data-feed-list>
-        <div class="feed-placeholder">
-          <strong>Sign in to see this feed</strong>
-          Follows feeds read your kind&#8209;3 contact list, so they need a signed-in npub.
+      <div class="feed-shell">
+        <div class="feed-lid" data-feed-bar-slot></div>
+        <div class="feed-body">
+          <div class="feed-list" data-feed-list>
+            <div class="feed-placeholder">
+              <strong>Sign in to see this feed</strong>
+              Follows feeds read your kind&#8209;3 contact list, so they need a signed-in npub.
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -1816,10 +1868,15 @@
     <section class="feed-panel" id="panel-artists" role="region" aria-label="Artists, global" data-feed="artists-global" data-scope="global" hidden>
       <p class="feed-note" data-feed-note hidden></p>
       <div class="feed-search" data-feed-search hidden></div>
-      <div class="feed-list" data-feed-list>
-        <div class="feed-placeholder">
-          <strong>Artists feed coming online</strong>
-          The layout is ready — boosted artists load here once the rollup lands.
+      <div class="feed-shell">
+        <div class="feed-lid" data-feed-bar-slot></div>
+        <div class="feed-body">
+          <div class="feed-list" data-feed-list>
+            <div class="feed-placeholder">
+              <strong>Artists feed coming online</strong>
+              The layout is ready — boosted artists load here once the rollup lands.
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -1827,10 +1884,15 @@
     <section class="feed-panel" id="panel-artists-follows" role="region" aria-label="Artists from your follows" data-feed="artists-follows" data-scope="follows" hidden>
       <p class="feed-note" data-feed-note hidden></p>
       <div class="feed-search" data-feed-search hidden></div>
-      <div class="feed-list" data-feed-list>
-        <div class="feed-placeholder">
-          <strong>Sign in to see this feed</strong>
-          Follows feeds read your kind&#8209;3 contact list, so they need a signed-in npub.
+      <div class="feed-shell">
+        <div class="feed-lid" data-feed-bar-slot></div>
+        <div class="feed-body">
+          <div class="feed-list" data-feed-list>
+            <div class="feed-placeholder">
+              <strong>Sign in to see this feed</strong>
+              Follows feeds read your kind&#8209;3 contact list, so they need a signed-in npub.
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -2174,30 +2236,31 @@
     subs.forEach(function (el) {
       el.setAttribute('aria-selected', el.dataset.value === type ? 'true' : 'false');
     });
-    placeFeedBar(tab);
     return tab;
   }
 
   /* ⚠️ THE FEED BAR IS MOVED, NEVER DUPLICATED, AND THE MOVE IS WHY THIS IS
      SAFE. `.feed-bar` holds the scope menu and every feed's mounted range/sort
      group; `appendChild` relocates the live element with its listeners, its
-     open-menu state and all eight `[data-controls-for]` groups intact, so the
+     open-menu state and all twelve `[data-controls-for]` groups intact, so the
      declarative body[data-active-feed] rule that decides which group is on
-     screen is untouched. A second bar rendered into the Members tab would be a
-     second set of controls over one feed, which is exactly the failure that
-     rule exists to prevent.
+     screen is untouched. A second bar rendered into a panel would be a second
+     set of controls over one feed, which is exactly the failure that rule
+     exists to prevent.
 
-     WHY ONLY THIS TAB. Every other tab puts its feed directly under the bar, so
-     sticky-at-the-top is right. Members puts three sections above the boost
-     list, which left the scope menu and the range/sort a screen and a half from
-     the list they act on. Reed's call, 2026-08-23.
-
-     The bar stops being sticky for free: `.feed-bar-wrap` is what carries
-     `position: sticky`, and the slot is an ordinary section. */
+     EVERY PANEL HAS A LID (`[data-feed-bar-slot]`) SINCE 2026-09-03, and the
+     bar goes into the active one's, so each feed is a shell with its controls
+     on top — Reed's ask, generalizing the Members-tab move of 2026-08-23 (the
+     tab puts three sections above the boost list, which had left the controls
+     a screen and a half from the list they act on). The bar ships in the Shows
+     panel's lid, the front door's; `barHome` is only the fallback for a panel
+     with no lid, which none has. */
   var barHome = bar.parentNode;
-  function placeFeedBar(tab) {
-    var slot = document.querySelector('[data-feed-bar-slot]');
-    var want = (tab === 'members' && slot) ? slot : barHome;
+  function placeFeedBar(feed) {
+    var panel = null;
+    panels.forEach(function (p) { if (p.dataset.feed === feed) panel = p; });
+    var slot = panel && panel.querySelector('[data-feed-bar-slot]');
+    var want = slot || barHome;
     if (bar.parentNode !== want) want.appendChild(bar);
   }
 
@@ -2270,6 +2333,7 @@
       panel.classList.toggle('is-active', isActive);
       panel.hidden = !isActive;
     });
+    placeFeedBar(feed);
     syncMenus();
     syncTabs();
     if (updateHash && hashFor(feed) !== location.hash) {
@@ -2454,17 +2518,17 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v180"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v181"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v180" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v181" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v180" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v181" defer></script>
 
 <!-- Feed hydration — lazily loads the active feed on first view. -->
-<script type="module" src="/assets/js/feeds.js?v=ob-v180"></script>
-<script src="/assets/js/nav.js?v=ob-v180" defer></script>
+<script type="module" src="/assets/js/feeds.js?v=ob-v181"></script>
+<script src="/assets/js/nav.js?v=ob-v181" defer></script>
 
 </body>
 </html>

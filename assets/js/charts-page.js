@@ -10,9 +10,9 @@
  * (data-charts-first) — the tab's own rule: a menu built from a guess would
  * offer weeks before the index begins as though they were empty rather than
  * absent. */
-import { weekSeries, weekStartFromDate, weekDateString } from '/assets/js/pacific-week.js?v=ob-v180'
-import { weekTitle } from '/assets/js/hpw-board.js?v=ob-v180'
-import { htmlEscape as esc } from '/assets/js/nostr-text.js?v=ob-v180'
+import { weekSeries, weekStartFromDate, weekDateString } from '/assets/js/pacific-week.js?v=ob-v181'
+import { weekTitle } from '/assets/js/hpw-board.js?v=ob-v181'
+import { htmlEscape as esc } from '/assets/js/nostr-text.js?v=ob-v181'
 
 const page = document.querySelector('.charts-page')
 const wrap = page?.querySelector('.hpw-pick-wrap')
