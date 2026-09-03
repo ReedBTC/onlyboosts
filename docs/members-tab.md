@@ -620,12 +620,19 @@ opened.
 
 #### The member lookup
 
-**⚠️ IT LEADS THE TAB AND IT NAVIGATES; IT DOES NOT FILTER THE BOOST LIST.**
-*Reed's call, 2026-08-23.* The question is "where is this person" and the answer
-is `/booster/<npub>` — their whole history, their shows, their totals — not a
+**⚠️ IT NAVIGATES; IT DOES NOT FILTER THE BOOST LIST OR THE WALL.** *Reed's
+call, 2026-08-23.* The question is "where is this person" and the answer is
+`/booster/<npub>` — their whole history, their shows, their totals — not a
 narrowed slice of one feed. It sat inside the Boosts panel while it was a
 filter, which is also how a reader had to reach the feed to find the control
 that finds people.
+
+**It sits inside the Members section, under the heading and above the wall's
+shell, since 2026-09-03** (Reed's ask). It led the whole tab from 2026-08-23
+until then. Nothing in the code moved with it: `mountMemberLookup` still hands
+the whole members block to `mountFeedSearch`, which finds the block's one
+`[data-feed-search]` host wherever it sits, and the box still mounts before
+the boards fetch.
 
 It is the shared `mountFeedSearch`, so the debounce, the abort, the sequence
 guard and the keyboard handling are the four ranked feeds' own. The suggestion

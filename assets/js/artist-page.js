@@ -10,14 +10,14 @@
  * here, so the page carries the shared boost-section machinery, the note
  * verbs, and the Primal backfill like its three siblings.
  */
-import { sortControl } from '/assets/js/feed-controls.js?v=ob-v182'
+import { sortControl } from '/assets/js/feed-controls.js?v=ob-v183'
 import {
   initCopyNpub, initShowMore, initShare, initBackLink,
   initHashRouting, initHashSpy, initArt2, hydrateProfiles, initStatWindows,
-} from '/assets/js/detail-page.js?v=ob-v182'
-import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v182'
-import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v182'
-import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v182'
+} from '/assets/js/detail-page.js?v=ob-v183'
+import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v183'
+import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v183'
+import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v183'
 
 const GUID = document.body.dataset.artistGuid || ''
 

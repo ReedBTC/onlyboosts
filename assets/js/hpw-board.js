@@ -21,10 +21,10 @@
  * The VERBS — the week picker, the jump buttons, the Rules dialog — stay in
  * `members-board.js`, which is the browser's alone.
  */
-import { boosterPageHref } from './booster-link.js?v=ob-v182'
-import { httpsUrl } from './cover-art.js?v=ob-v182'
-import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v182'
-import { prevWeek, weekDateString } from './pacific-week.js?v=ob-v182'
+import { boosterPageHref } from './booster-link.js?v=ob-v183'
+import { httpsUrl } from './cover-art.js?v=ob-v183'
+import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v183'
+import { prevWeek, weekDateString } from './pacific-week.js?v=ob-v183'
 
 const esc = htmlEscape
 

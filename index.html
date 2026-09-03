@@ -50,20 +50,20 @@
 
   <!-- Shared note / card styles (.note-card, .embed-note) — the boosts
        feeds render through the same kind-1 card as boosts-thread.js. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v182" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v183" />
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v182" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v183" />
   <!-- The episode card and its drawer, extracted from the inline block below
        when /episode/<guid> pages needed the same cards. See the file header. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v182" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v182" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v183" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v183" />
   <!-- The 40 HPW boards on the Members tab; shared with the /hpw/<week> pages. -->
-  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v182" />
+  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v183" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. Must stay last
        among the stylesheets so the inline block below still wins. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v182" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v183" />
 
   <style>
     :root {
@@ -785,10 +785,11 @@
       .members-wall-section .mw-controls { margin-left: 0; flex-basis: 100%; }
     }
 
-    /* ⚠️ THE LOOKUP LEADS THE TAB, so it is not `hidden` the way a feed's
-       search host is — mountFeedSearch reveals it, and this only gives it the
-       room a leading control needs. */
-    .members-find { margin: 0 0 1.75rem; }
+    /* The member lookup, between the Members heading and the wall's shell
+       since 2026-09-03 (it led the tab before). mountFeedSearch reveals the
+       host; this only spaces it — the heading's own margin-bottom sits above
+       it, and this gap sits between it and the shell. */
+    .members-find { margin: 0 0 1rem; }
     .members-find [data-feed-search] { margin: 0; }
 
     .feed-panel { display: none; }
@@ -1197,8 +1198,8 @@
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
     }
   </style>
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v182" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v182" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v183" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v183" />
 </head>
 <body data-active-feed="episodes-global">
 
@@ -1465,16 +1466,9 @@
           title="How membership works"><span aria-hidden="true">i</span></a>
       </p>
 
-      <!-- ⚠️ THE LOOKUP LEADS THE TAB AND IT NAVIGATES; IT NO LONGER FILTERS
-           THE BOOST LIST. Reed's call, 2026-08-23: the question is "where is
-           this person", and the answer is their page. It sat inside the Boosts
-           panel while it was a filter, which is also why it could only be found
-           by a reader who had already scrolled to the feed. It is the same
-           `[data-feed-search]` host and the same mountFeedSearch the four
-           ranked feeds use. -->
-      <div class="members-find">
-        <div data-feed-search hidden></div>
-      </div>
+      <!-- The member lookup used to sit here, leading the tab; it is inside
+           the Members section below since 2026-09-03 (Reed's ask), directly
+           above the wall it searches. -->
       <!-- ⚠️ ONE LINE OF EXPLANATION, NOT TWO. The sub-line and the caveat under
            the boards said the same thing twice at two sizes; the mechanics moved
            behind Rules, where a reader who wants them can have all of them and a
@@ -1605,6 +1599,19 @@
            controls make, and safe for the same reason. -->
       <section class="mb-section members-wall" data-members-wall>
         <div data-members-wall-head></div>
+        <!-- ⚠️ THE LOOKUP NAVIGATES; IT DOES NOT FILTER THE WALL OR THE BOOST
+             LIST. Reed's call, 2026-08-23: the question is "where is this
+             person", and the answer is their page. It led the whole tab from
+             then until 2026-09-03, when Reed moved it here, under the Members
+             heading and above the wall of faces it searches; it is still the
+             same `[data-feed-search]` host and the same mountFeedSearch the
+             four ranked feeds use, and mountMemberLookup finds it as the
+             block's one such host. The heading above it is renderSupporters'
+             and lands in the head host by JS, so on a cold load the box paints
+             before its heading does. -->
+        <div class="members-find">
+          <div data-feed-search hidden></div>
+        </div>
         <div class="mb-shell">
           <div class="mw-controls mb-lid" data-members-controls hidden></div>
           <div class="mb-body" data-members-wall-body></div>
@@ -2518,17 +2525,17 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v182"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v183"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v182" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v183" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v182" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v183" defer></script>
 
 <!-- Feed hydration — lazily loads the active feed on first view. -->
-<script type="module" src="/assets/js/feeds.js?v=ob-v182"></script>
-<script src="/assets/js/nav.js?v=ob-v182" defer></script>
+<script type="module" src="/assets/js/feeds.js?v=ob-v183"></script>
+<script src="/assets/js/nav.js?v=ob-v183" defer></script>
 
 </body>
 </html>

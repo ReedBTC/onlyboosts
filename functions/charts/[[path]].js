@@ -187,7 +187,7 @@ ${sections}
     body,
     canonical: pageUrl,
     og: { title: ogTitle, description: leadSentence(ws), image: `${SITE_ORIGIN}/assets/onlyboosts_banner.png`, url: pageUrl },
-    scripts: `<script src="/assets/js/charts-page.js?v=ob-v182" type="module"></script>`,
+    scripts: `<script src="/assets/js/charts-page.js?v=ob-v183" type="module"></script>`,
   });
 }
 
@@ -261,13 +261,13 @@ ${og ? `
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v182" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v182" />
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v182" />
-  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v182" />
-  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v182" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v182" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v182" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v183" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v183" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v183" />
+  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v183" />
+  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v183" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v183" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v183" />
   <style>
     /* No feed is active on this page, so it supplies the brand accent itself,
        the same call /hpw and .show-main make. */
@@ -462,10 +462,10 @@ ${body}
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav.js?v=ob-v182" defer></script>
+<script src="/assets/js/nav.js?v=ob-v183" defer></script>
 ${scripts}
-<script src="/assets/js/nav-widget-boot.js?v=ob-v182"></script>
-<script src="/assets/js/sw-register.js?v=ob-v182" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v183"></script>
+<script src="/assets/js/sw-register.js?v=ob-v183" defer></script>
 </body>
 </html>`;
 }
