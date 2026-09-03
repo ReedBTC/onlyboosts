@@ -77,7 +77,7 @@ which was right while the homepage hid them behind a dropdown and wrong the
 moment the tabs put them on screen: the nav then restated a control the page
 carries, in a different order, using different words for the same things.
 **Those three hrefs and `TAB_DEFAULT` in the `index.html` controller move
-together** — Podcasts opens Episodes, Music opens Artists (Albums until 2026-08-31, Reed's call with the Chart Positions strip), Members opens Boosts.
+together** — Podcasts opens Shows (Episodes until 2026-09-03, Reed's call with the chart blocks: the three default feeds are the charted ones), Music opens Artists (Albums until 2026-08-31, Reed's call with the Chart Positions strip), Members opens Boosts.
 
 **The Global/Follows axis is deliberately not in the nav**: it's the second
 dropdown on the page, and listing both scopes would double the group into a grid
@@ -218,12 +218,13 @@ a page that contradicts itself, and `test-server-render.mjs` pins all three:
 | `is-active` on `#panel-shows`, and the `<!--OB:SSR-SHOWS-->` markers inside it | what a reader with no JavaScript and a crawler on its first pass actually see, since the controller only hides and shows panels once it runs |
 | `FEED` in `functions/index.js` | which query was rendered into that panel, and the `sort` / `range` the client's controls open on |
 
-**⚠️ `TAB_DEFAULT.podcasts` IS DELIBERATELY STILL `'episodes'`.** Where a cold
-load lands and what the **Podcasts tab** opens on when pressed are two questions,
-and only one of them was asked. That constant is also pinned to the nav's own
-Podcasts href (`/#episodes-global`), so changing it is the nav's decision as much
-as the page's. A change that makes those two constants agree has almost
-certainly merged them.
+**`TAB_DEFAULT.podcasts` IS `'shows'` SINCE 2026-09-03**, agreeing with
+`DEFAULT_TYPE`. It stayed `'episodes'` from 2026-08-23 until then, on the
+argument that where a cold load lands and what the **Podcasts tab** opens on
+when pressed are two questions and only one had been asked; Reed asked the
+second when the chart blocks made Shows the Podcasts tab's charted feed. The
+constant is pinned to the nav's and the footer's Podcasts href (`/#shows`),
+so the three move together.
 
 **⚠️ THE OPENING SORT IS `chart` ON EVERY RANKED FEED — one key, one
 spelling.** *Reed's call, 2026-08-31.* The OnlyBoosts Charts is deliberately
@@ -2300,13 +2301,11 @@ would. Never remove an entry** — those links are in the wild.
    **The widget now reads both as `--font-display` / `--font-body` tokens**, so
    a change here reaches the modals without touching them.
 
-   **⚠️ A third file sits beside them and is NOT free to rework: `Movie Poster
-   Personal Use.ttf`** (the CHARTS wordmark link, Reed's pick 2026-09-01) is
-   licensed FREE FOR PERSONAL USE ONLY, and its EULA forbids converting,
-   subsetting or renaming the file — which is why it is a raw 375KB TTF under
-   its original name rather than a woff2, fetched lazily via a caps-only
-   `unicode-range`. The note over its `@font-face` in `theme.css` carries the
-   licensing contact. Don't "optimize" it into a subset.
+   A third file, `Movie Poster Personal Use.ttf` (the CHARTS wordmark link,
+   Reed's pick 2026-09-01, licensed FREE FOR PERSONAL USE ONLY), sat beside
+   them from 2026-09-01 to 2026-09-03, when Reed cut the wordmark links with
+   the Charts page they pointed at; the file, its `@font-face` and
+   `.ob-charts-link` went with them (`git log -S 'Movie Poster'`).
 
 `/about` is done. Its copy is distilled from `docs/about-and-faq-source.md` —
 **that file is the factual source of record**, so correct it there first if the

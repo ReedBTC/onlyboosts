@@ -39,7 +39,7 @@
  * when this module first runs).
  */
 // Identity, for keeping the Follows feeds in sync with who's signed in.
-import { getSessionPubkey, clearFollowCache } from '/assets/js/follow-set.js?v=ob-v184'
+import { getSessionPubkey, clearFollowCache } from '/assets/js/follow-set.js?v=ob-v185'
 
 // ── DOM state helpers ────────────────────────────────────────────────
 
@@ -104,10 +104,10 @@ async function hydrate(panelId, mod, scope, medium, view) {
 }
 
 // ── Lazy per-feed dispatch ───────────────────────────────────────────
-const BOOSTS = '/assets/js/boosts-feed.js?v=ob-v184'
-const PODCASTS = '/assets/js/feeds-podcasts.js?v=ob-v184'
-const SHOWS = '/assets/js/shows-feed.js?v=ob-v184'
-const ARTISTS = '/assets/js/artists-feed.js?v=ob-v184'
+const BOOSTS = '/assets/js/boosts-feed.js?v=ob-v185'
+const PODCASTS = '/assets/js/feeds-podcasts.js?v=ob-v185'
+const SHOWS = '/assets/js/shows-feed.js?v=ob-v185'
+const ARTISTS = '/assets/js/artists-feed.js?v=ob-v185'
 // Each module's entry point, by module. Named rather than sniffed out of the
 // path, so adding a feed is one line here instead of another branch.
 const RENDERERS = {
@@ -172,7 +172,7 @@ function loadMemberBoards() {
   const root = document.querySelector('[data-hpw-boards]')
   if (!root) return
   boardsWired = true
-  import('/assets/js/members-board.js?v=ob-v184')
+  import('/assets/js/members-board.js?v=ob-v185')
     .then((m) => m.renderMembersBoards(root))
     .catch((err) => {
       console.warn('[feeds] member boards failed to load', err)
@@ -195,7 +195,7 @@ function loadChartsBlock(feed) {
   const root = document.querySelector(`[data-charts-block="${kind}"]`)
   if (!root) return
   chartsWired.add(kind)
-  import('/assets/js/charts-block.js?v=ob-v184')
+  import('/assets/js/charts-block.js?v=ob-v185')
     .then((m) => m.renderChartsBlock(root, kind))
     .catch((err) => {
       console.warn('[feeds] chart block failed to load', err)

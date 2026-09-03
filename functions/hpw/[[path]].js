@@ -257,7 +257,7 @@ export function renderPage(view) {
     body,
     canonical: pageUrl,
     og: { title: d.ogTitle, description: d.lead, image, url: pageUrl },
-    scripts: `<script src="/assets/js/hpw-page.js?v=ob-v184" type="module"></script>`,
+    scripts: `<script src="/assets/js/hpw-page.js?v=ob-v185" type="module"></script>`,
     extraCss: `
     /* The tab supplies the accent family off body[data-active-feed]; this page
        has no active feed and supplies the brand, as .show-main does. */
@@ -295,8 +295,8 @@ export function renderCard(view) {
     kickerSub: COPY.intro,
     board,
     footer: "onlyboosts.social/#members",
-    links: `  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v184" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v184" />`,
+    links: `  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v185" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v185" />`,
     css: `
     .card .hpw-board { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0.7rem 1.1rem 0.6rem; }
     .card .hpw-title { margin-bottom: 0.4rem; flex: none; font-size: 1.1rem; }
@@ -372,16 +372,16 @@ ${og ? `
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v184" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v184" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v185" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v185" />
   <!-- feed-cards.css for the share pill and its menu; boost-actions.css for
        the composer behind Post to Nostr. Both are the same chrome the tab
        already has. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v184" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v184" />
-  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v184" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v184" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v184" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v185" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v185" />
+  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v185" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v185" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v185" />
   ${extraCss ? `<style>${extraCss}\n  </style>` : ""}
 </head>
 <body>
@@ -438,15 +438,16 @@ ${og ? `
                  the page carries, in a different order, using different words
                  for the same things. Each entry lands on that tab's DEFAULT
                  sub-feed — TAB_DEFAULT in the index.html controller — so
-                 Podcasts opens Episodes, Music opens Albums and Members opens
-                 Boosts. **Those three hrefs and TAB_DEFAULT move together.**
+                 Podcasts opens Shows (Episodes until 2026-09-03), Music opens
+                 Artists and Members opens Boosts. **Those three hrefs and
+                 TAB_DEFAULT move together.**
 
                  The Global vs Follows axis stays deliberately absent: it is the
                  second dropdown on the page itself, and listing both scopes
                  here made the nav a grid restating a control the page has. -->
             <div class="nav-explore-group">
               <h4>Feeds</h4>
-              <a href="/#episodes-global"><span aria-hidden="true">🎙</span> Podcasts</a>
+              <a href="/#shows"><span aria-hidden="true">🎙</span> Podcasts</a>
               <a href="/#artists"><span aria-hidden="true">🎵</span> Music</a>
               <a href="/#members"><span aria-hidden="true">👥</span> Members</a>
             </div>
@@ -540,7 +541,7 @@ ${body}
            each lands on that tab's default sub-feed. See partials/nav.html. -->
       <h3>Feeds</h3>
       <ul>
-        <li><a href="/#episodes-global">🎙 Podcasts</a></li>
+        <li><a href="/#shows">🎙 Podcasts</a></li>
         <li><a href="/#artists">🎵 Music</a></li>
         <li><a href="/#members">👥 Members</a></li>
       </ul>
@@ -575,10 +576,10 @@ ${body}
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav.js?v=ob-v184" defer></script>
+<script src="/assets/js/nav.js?v=ob-v185" defer></script>
 ${scripts}
-<script src="/assets/js/nav-widget-boot.js?v=ob-v184"></script>
-<script src="/assets/js/sw-register.js?v=ob-v184" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v185"></script>
+<script src="/assets/js/sw-register.js?v=ob-v185" defer></script>
 </body>
 </html>`;
 }
