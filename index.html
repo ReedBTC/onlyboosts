@@ -297,15 +297,23 @@
        two full-bleed hairlines (the masthead's bottom and this wrap's) that
        used to run edge to edge on a wide screen. `overflow: hidden` clips the
        selected tab's fill and its 3px top rule to the rounded corner.
-       `box-sizing: border-box` keeps the outer edge exactly the track — the
-       two grids inside read the same track and simply fit within the border.
-       On a phone the sides and the radius come off (the tabs are chips
-       there, with room around them already) and only the bottom hairline
-       stays, as it was. */
-    .feed-chrome {
-      box-sizing: border-box;
+       ⚠️ THE BOX IS AS WIDE AS THE PAGE COLUMN, NOT AS THE TRACK. Reed, on
+       seeing it: "wider than the rest of the stuff on the page". Everything
+       under it sits inside `.feed-panels-inner`, whose 60rem track INCLUDES
+       1.25rem of side padding (border-box), so the column's content is
+       57.5rem. `.feed-bar-inner` restates exactly that box — same track, same
+       padding — and the chrome fills it, so the two edges line up by the
+       same arithmetic rather than by a number that happens to match. The two
+       grids inside read the track and simply fit within the border. On a
+       phone the sides and the radius come off (the tabs are chips there, with
+       room around them already), the inner padding goes with them, and only
+       the bottom hairline stays, as it was. */
+    .feed-bar-inner {
       max-width: var(--feed-track);
       margin: 0 auto;
+      padding: 0 1.25rem;
+    }
+    .feed-chrome {
       border: 1px solid var(--border);
       border-radius: 12px;
       overflow: hidden;
@@ -1243,6 +1251,7 @@
       .feed-bar-controls { margin-left: auto; }
       .feed-panels-inner { padding: 1.5rem 1rem 2.5rem; }
       .feed-bar-wrap { padding-top: 0; }
+      .feed-bar-inner { padding: 0; }
       .feed-chrome { border-left: 0; border-right: 0; border-radius: 0; }
       /* Shallower child indent on narrow screens. */
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
@@ -1407,6 +1416,7 @@
      tabs are above the fold on every visit, so they shouldn't wait on script
      to exist. -->
 <div class="feed-bar-wrap">
+<div class="feed-bar-inner">
 <div class="feed-chrome">
 
   <!-- The three tabs. Podcasts and Music are the two sides of
@@ -1477,6 +1487,7 @@
     </div>
   </div>
 
+</div>
 </div>
 </div>
 
