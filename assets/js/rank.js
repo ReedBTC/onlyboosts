@@ -105,3 +105,57 @@ export function rankLabel(rank, tied) {
   if (rank == null) return null
   return `${tied ? 'T' : ''}${rank}`
 }
+
+/**
+ * The OnlyBoosts Charts standing, computed over a list held WHOLE — the
+ * detail pages' drawers, which open on it since 2026-09-03 (Reed's ask: "the
+ * same formula as for the charts, but limited to just the items in these
+ * lists"). The feeds and the tiles get theirs from SQL (feed-rank.js,
+ * week-charts.js, the four endpoints); this is the same rule in JS for a
+ * caller that already holds every row it is ranking, so the edge and the
+ * browser order a drawer identically.
+ *
+ * ⚠️ THE RULE, VERBATIM FROM "The OnlyBoosts Charts" IN docs/feeds.md: each
+ * row's competition rank in sats, in boosts and in the breadth key (boosters;
+ * shows for a member; episodes for a booster's shows), summed — lowest total
+ * first; ties break breadth → sats → boosts; what is still equal on the whole
+ * tuple shares a place (a T#) and the next distinct tuple skips the group.
+ * The component ranks are competition ranks too (equal values share), which
+ * is what SQL's RANK() gives the endpoints. A change to the chain here or
+ * there is a change to both; scripts/test-charts.mjs holds this function to
+ * its brute-forced implementation of the same rule.
+ *
+ * O(n²) in the component ranking, which is fine for a drawer (the largest
+ * holds 500 rows) and would not be for a feed.
+ *
+ * @param {Array} rows
+ * @param {{sats:(r)=>number, boosts:(r)=>number, breadth:(r)=>number}} of
+ * @returns {{row:any, rank:number, tied:boolean, score:number,
+ *            rSats:number, rBoosts:number, rBreadth:number}[]} in chart order
+ */
+export function chartRanks(rows, of) {
+  const S = rows.map((r) => Number(of.sats(r)) || 0)
+  const B = rows.map((r) => Number(of.boosts(r)) || 0)
+  const K = rows.map((r) => Number(of.breadth(r)) || 0)
+  const rk = (vals) => vals.map((v) => 1 + vals.filter((x) => x > v).length)
+  const rS = rk(S), rB = rk(B), rK = rk(K)
+  const scored = rows.map((row, i) => ({
+    row, i, sats: S[i], boosts: B[i], breadth: K[i],
+    rSats: rS[i], rBoosts: rB[i], rBreadth: rK[i], score: rS[i] + rB[i] + rK[i],
+  }))
+  // The tuple standing; the original index last, so the order is stable and a
+  // full tie keeps the caller's own order (which is the server's, or the DOM's).
+  scored.sort((a, b) => a.score - b.score || b.breadth - a.breadth
+    || b.sats - a.sats || b.boosts - a.boosts || a.i - b.i)
+  const tup = (x) => `${x.score}|${x.breadth}|${x.sats}|${x.boosts}`
+  let runRank = 1
+  for (let i = 0; i < scored.length; i++) {
+    if (i > 0 && tup(scored[i]) !== tup(scored[i - 1])) runRank = i + 1
+    scored[i].rank = runRank
+  }
+  for (let i = 0; i < scored.length; i++) {
+    scored[i].tied = (i > 0 && tup(scored[i]) === tup(scored[i - 1]))
+      || (i + 1 < scored.length && tup(scored[i]) === tup(scored[i + 1]))
+  }
+  return scored.map(({ i, ...rest }) => rest)
+}

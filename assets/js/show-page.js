@@ -14,30 +14,32 @@
  * block we haven't resolved at render time, and a button that only ever
  * reports failure is worse than no button. See docs/show-pages-spec.md.
  */
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v186'
-import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v186'
-import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v186'
-import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v186'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v187'
+import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v187'
+import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v187'
+import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v187'
 // The same "Sort: X ▾" dropdown the feeds use. feed-controls.js imports
 // nothing, so this costs the page ~4KB and no transitive dependencies;
 // rangeControl and mountFeedControls are deliberately not used (no range here,
 // and no sticky bar to mount into).
-import { sortControl } from '/assets/js/feed-controls.js?v=ob-v186'
+import { sortControl } from '/assets/js/feed-controls.js?v=ob-v187'
+// The drawers' chart standing, the same function the Function ordered them by.
+import { chartRanks, rankLabel } from '/assets/js/rank.js?v=ob-v187'
 // The drawer's per-row buttons are server-rendered, so only the busy-state
 // helper is needed here — the builder is for the feeds, which make theirs in JS.
-import { withBoostBusy } from '/assets/js/boost-button.js?v=ob-v186'
+import { withBoostBusy } from '/assets/js/boost-button.js?v=ob-v187'
 import {
   initCopyNpub, initShowMore, initShare, initBackLink,
   initHashRouting, initHashSpy, initArt2, hydrateProfiles, initStatWindows,
-} from '/assets/js/detail-page.js?v=ob-v186'
+} from '/assets/js/detail-page.js?v=ob-v187'
 // Its own module rather than a ninth export from detail-page.js, deliberately:
 // a stale copy of that file against a fresh copy of this one is a link-time
 // error that takes the whole page's JavaScript down. See the note at its head.
-import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v186'
+import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v187'
 // The reaction bar and ⋮ on this page's server-rendered boost notes. Its own
 // module for the same reason show-desc.js is; see the note at its head.
-import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v186'
-import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v186'
+import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v187'
+import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v187'
 
 const VALUE_API = '/api/value'
 
@@ -85,12 +87,15 @@ initArt2('.pr-art[data-art2]', 'span', 'pr-art pr-art--blank')
 // No range control — a show's catalogue is not a window, and the Episodes feed
 // on the homepage is where "what aired lately" is asked.
 //
-// "Latest episode" is the default and reproduces the server's own ORDER BY, so
-// the first paint and the first sort agree. `published` is null on a real slice
-// of rows and packs as 0; those sink rather than floating to the top, which is
-// the trap the homepage feed's episode sort documents.
+// "Chart Rank" is the default (Reed's ask, 2026-09-03: the chart formula over
+// this show's own episodes) and reproduces the server's own order, which the
+// Function computed with the same rank.js#chartRanks, so the first paint and
+// the first sort agree. It was "Latest Episode" until then. `published` is
+// null on a real slice of rows and packs as 0; those sink rather than floating
+// to the top, which is the trap the homepage feed's episode sort documents.
 
 const EP_SORTS = [
+  ['chart', 'Chart Rank'],
   ['latest', 'Latest Episode'],
   ['boosters', 'Most Boosters'],
   ['boosts', 'Most Boosts'],
@@ -110,10 +115,12 @@ function initEpisodeSort() {
   })
   if (rows.length < 2) return   // nothing to order
 
-  let sort = 'latest'
+  let sort = 'chart'
 
   function paint() {
-    const order = rows.slice().sort((a, b) => {
+    const order = sort === 'chart'
+      ? chartRanks(rows, { sats: (r) => r.sats, boosts: (r) => r.boosts, breadth: (r) => r.boosters }).map((e) => e.row)
+      : rows.slice().sort((a, b) => {
       if (sort === 'boosters') return b.boosters - a.boosters || b.sats - a.sats
       if (sort === 'boosts') return b.boosts - a.boosts || b.sats - a.sats
       if (sort === 'sats') return b.sats - a.sats || b.boosts - a.boosts
@@ -158,7 +165,12 @@ initEpisodeSort()
 // "Community Sort:" is the tag, so each option can be the bare measure — the
 // label already says whose boosts these are, and repeating "here" on every row
 // of the menu only crowded it.
+// Chart Rank first and default (Reed's ask, 2026-09-03), the chart formula over
+// these rows with the community's boosters as the breadth component; the
+// Function ordered the list with the same rank.js#chartRanks. Most Boosters
+// until then.
 const CS_SORTS = [
+  ['chart', 'Chart Rank'],
   ['members', 'Most Boosters'],
   ['boosts', 'Most Boosts'],
   ['sats', 'Most Sats'],
@@ -183,21 +195,25 @@ function initCommunityShows() {
   })
   if (!rows.length) return
 
-  let sort = 'members'
+  let sort = 'chart'
 
   function paint() {
     // Rank is recomputed per sort rather than retained. That differs from the
     // feeds' search, where filtering to one row has to preserve its standing in
     // the full list; here the list is never filtered, so a row's position under
-    // the current sort IS its rank.
-    const order = rows.slice().sort((a, b) => {
+    // the current sort IS its rank — and under the chart it is the tuple's
+    // competition rank, T-marked where shared.
+    const charted = sort === 'chart'
+      ? chartRanks(rows, { sats: (r) => r.sats, boosts: (r) => r.boosts, breadth: (r) => r.members })
+      : null
+    const order = charted ? charted.map((e) => e.row) : rows.slice().sort((a, b) => {
       if (sort === 'boosts') return b.boosts - a.boosts || b.sats - a.sats
       if (sort === 'sats') return b.sats - a.sats || b.boosts - a.boosts
       return b.members - a.members || b.boosts - a.boosts || b.sats - a.sats
     })
     const frag = document.createDocumentFragment()
     order.forEach((r, i) => {
-      if (r.rankEl) r.rankEl.textContent = String(i + 1)
+      if (r.rankEl) r.rankEl.textContent = charted ? rankLabel(charted[i].rank, charted[i].tied) : String(i + 1)
       frag.appendChild(r.el)
     })
     list.appendChild(frag)

@@ -19,17 +19,19 @@
  * `episode-section.js` attaches the controls and the verbs and nothing else.
  * That module is shared with the identical section on /episode/<guid>.
  */
-import { copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v186'
-import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v186'
-import { rangeControl, sortControl, rangeDays } from '/assets/js/feed-controls.js?v=ob-v186'
-import { initEpisodeSection } from '/assets/js/episode-section.js?v=ob-v186'
+import { copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v187'
+import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v187'
+import { rangeControl, sortControl, rangeDays } from '/assets/js/feed-controls.js?v=ob-v187'
+import { initEpisodeSection } from '/assets/js/episode-section.js?v=ob-v187'
 import {
   initCopyNpub, initShowMore, initShare, initBackLink,
   initHashRouting, initHashSpy, initArt2, wireArt2, hydrateProfiles, initStatWindows,
-} from '/assets/js/detail-page.js?v=ob-v186'
-import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v186'
-import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v186'
-import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v186'
+} from '/assets/js/detail-page.js?v=ob-v187'
+// The drawers' chart standing, the same function the Function ordered them by.
+import { chartRanks, rankLabel } from '/assets/js/rank.js?v=ob-v187'
+import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v187'
+import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v187'
+import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v187'
 
 const PK = document.body.dataset.boosterPk || ''
 const NPUB = document.body.dataset.boosterNpub || PK
@@ -334,7 +336,12 @@ hydrateHeader()
 // this person boosted it this week; an episode is in the 1W view because it
 // AIRED this week. Both are deliberate; see the warning in CLAUDE.md against
 // unifying them.
+// Chart rank first and default (Reed's ask, 2026-09-03): the chart formula over
+// these rows, with EPISODES as the breadth component — a person's boosts to
+// one show spread across its episodes are the breadth that boosters are for a
+// show. It was Most Boosts until then.
 const SHOW_SORTS = [
+  ['chart', 'Chart Rank'],
   ['boosts', 'Most Boosts'],
   ['sats', 'Most Sats'],
   ['eps', 'Most Episodes'],
@@ -368,7 +375,7 @@ function initShows() {
   // meaningful on a single row: it answers whether that boost was this week.
   if (!rows.length) return
 
-  let sort = 'boosts'
+  let sort = 'chart'
   let range = 'all'
 
   const figure = (r, i) => r.nums[WINDOW_AT[range] + i] || 0
@@ -405,7 +412,13 @@ function initShows() {
     }
     if (emptyEl) emptyEl.hidden = true
 
-    const order = inWindow.slice().sort((a, b) => {
+    /* The chart is a standing over the window's rows (rank.js#chartRanks),
+       so its label is the tuple's competition rank, T-marked; the single-axis
+       sorts keep their positions. */
+    const charted = sort === 'chart'
+      ? chartRanks(inWindow, { sats: satsOf, boosts: boostsOf, breadth: epsOf })
+      : null
+    const order = charted ? charted.map((e) => e.row) : inWindow.slice().sort((a, b) => {
       if (sort === 'sats') return satsOf(b) - satsOf(a) || boostsOf(b) - boostsOf(a)
       if (sort === 'eps') return epsOf(b) - epsOf(a) || satsOf(b) - satsOf(a)
       if (sort === 'recent') return latestOf(b) - latestOf(a) || satsOf(b) - satsOf(a)
@@ -418,7 +431,7 @@ function initShows() {
       // feeds' search contract, where filtering to one row has to preserve its
       // standing in the full list; here the range IS the list, so a row's
       // position under the current view is its rank.
-      if (r.rankEl) r.rankEl.textContent = String(i + 1)
+      if (r.rankEl) r.rankEl.textContent = charted ? rankLabel(charted[i].rank, charted[i].tied) : String(i + 1)
       if (r.metaEl) {
         r.metaEl.textContent =
           `${plural(boostsOf(r), 'boost', 'boosts')} · ${fmtSats(satsOf(r))} sats · ` +
@@ -497,12 +510,15 @@ initEpisodeSection({
   selector: '[data-booster-episodes]',
   prefix: 'be',
   sorts: [
+    // Chart rank since 2026-09-03 (Reed's ask): sats + boosts, the breadth
+    // component being 1 on every one-person row. Most Sats until then.
+    ['chart', 'Chart Rank'],
     ['sats', 'Most Sats'],
     ['boosts', 'Most Boosts'],
     ['recent', 'Latest Boost'],
     ['episode', 'Latest Episode'],
   ],
-  rankedSorts: new Set(['sats', 'boosts']),
+  rankedSorts: new Set(['chart', 'sats', 'boosts']),
   sortTag: 'Sort: ',
   sortTitle: 'Change how these episodes are ranked',
   fetchCorpus: async () => (await boosterCorpus()).boosts || [],

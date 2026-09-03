@@ -234,7 +234,7 @@ ${sections}
     body,
     canonical: pageUrl,
     og: { title: ogTitle, description: leadSentence(ws), image: `${SITE_ORIGIN}/assets/onlyboosts_banner.png`, url: pageUrl },
-    scripts: `<script src="/assets/js/charts-page.js?v=ob-v186" type="module"></script>`,
+    scripts: `<script src="/assets/js/charts-page.js?v=ob-v187" type="module"></script>`,
   });
 }
 
@@ -244,9 +244,9 @@ ${sections}
    week or the board. Both cards link both board stylesheets: the content
    boards are .cb-* with the stepper's .hpw-nav grammar, the members board is
    .hpw-* rows in a .cb-board shell. */
-const CARD_LINKS = `  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v186" />
-  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v186" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v186" />`;
+const CARD_LINKS = `  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v187" />
+  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v187" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v187" />`;
 
 /* The rows sized to the frame. The hpw card's numbers, restated for the .cb-*
    rows: the collector measures the ceiling per card kind (see card-frame.js),
@@ -389,13 +389,13 @@ ${og ? `
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v186" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v186" />
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v186" />
-  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v186" />
-  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v186" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v186" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v186" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v187" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v187" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v187" />
+  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v187" />
+  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v187" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v187" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v187" />
   <style>
     /* No feed is active on this page, so it supplies the brand accent itself,
        the same call /hpw and .show-main make. */
@@ -591,10 +591,10 @@ ${body}
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav.js?v=ob-v186" defer></script>
+<script src="/assets/js/nav.js?v=ob-v187" defer></script>
 ${scripts}
-<script src="/assets/js/nav-widget-boot.js?v=ob-v186"></script>
-<script src="/assets/js/sw-register.js?v=ob-v186" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v187"></script>
+<script src="/assets/js/sw-register.js?v=ob-v187" defer></script>
 </body>
 </html>`;
 }

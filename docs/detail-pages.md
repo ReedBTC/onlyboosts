@@ -704,6 +704,27 @@ included: the wall names the community, and this section then says what else
 that community boosts. It sat above the wall from the day it shipped. The ids
 did not move with it.
 
+- **⚠️ EVERY DRAWER OPENS ON CHART RANK SINCE 2026-09-03** — `/show`'s
+  `#episodes` and `#community-shows`, `/episode`'s `#community-episodes`,
+  `/booster`'s `#shows` and `#episodes`, `/artist`'s `#albums` and
+  `#community-artists`. *Reed's ask:* "the same formula as for the charts, but
+  limited to just the items in these lists." `assets/js/rank.js#chartRanks` is
+  the rule in JS for a list held whole (rank in sats + rank in boosts + rank
+  in the breadth key, summed; ties break breadth → sats → boosts; a full tie
+  shares a `T#`), and the Function orders the server-rendered list with the
+  same function the page script re-sorts with, so the first paint and the
+  first sort agree. The breadth key is the drawer's own: boosters on the
+  show, album and community lists, the community's boosters on the two
+  community drawers, **episodes** on `/booster`'s shows (a person's boosts to
+  one show spread across its episodes), and on `/booster`'s episodes it is 1
+  on every row, so that drawer's chart is sats plus boosts. The rows that
+  carry a numeral print the tuple's competition rank (`T3`) under the chart
+  and positions under the single-axis sorts. The card drawers reach it
+  through `sortEpisodeItems(…, 'chart')` and `episodeRanks` in
+  `episode-card.js`, one function for the edge and the browser. The previous
+  defaults were Latest Episode (`#episodes`), Most Boosters (the community
+  drawers), Most Boosts (`/episode`, `/booster` shows), Most Sats (`/booster`
+  episodes, `#albums`).
 - **Every figure is community-scoped by construction.** The query joins through
   the set of this show's or episode's boosters, so a row's boosts and sats are
   what *these* people sent, never global totals. The sort labels say so — "Most

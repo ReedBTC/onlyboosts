@@ -13,7 +13,7 @@
  */
 import assert from 'node:assert/strict'
 import {
-  buildEpisodes, episodeCardHtml, COPY, sortEpisodeItems, windowEpisodeItems, RANKED_SORTS,
+  buildEpisodes, episodeCardHtml, COPY, sortEpisodeItems, windowEpisodeItems, RANKED_SORTS, episodeRanks,
   CARD_PARTS, HOME_CARD_PARTS, boostRowsHtml, namesFrom,
 }
   from '../assets/js/episode-card.js'
@@ -225,6 +225,23 @@ check('sortEpisodeItems orders by the requested key', () => {
   const sorted = sortEpisodeItems(items, 'sats')
   assert.equal(sorted[0].guid, 'item-guid-1')
   assert.equal(sortEpisodeItems(items, 'recent')[0].guid, 'item-guid-1')
+})
+
+check('⚠️ the chart sort stamps each item with its tuple standing, and episodeRanks reads it', () => {
+  // Brute-forced from the fixture's own figures: rank in sats + rank in
+  // boosts + rank in boosters, lowest first; the drawers open on this.
+  const rk = (vals, v) => 1 + vals.filter((x) => x > v).length
+  const S = items.map((it) => it.totalSats), B = items.map((it) => it.boosts.length), K = items.map((it) => it.distinctBoosters.length)
+  const score = (it, i) => rk(S, S[i]) + rk(B, B[i]) + rk(K, K[i])
+  const best = items.map((it, i) => [score(it, i), it.guid]).sort((a, b) => a[0] - b[0])[0][1]
+  const sorted = sortEpisodeItems(items, 'chart')
+  assert.equal(sorted[0].guid, best)
+  assert.ok(sorted.every((it) => it._chart && Number.isInteger(it._chart.rank)))
+  assert.equal(sorted[0]._chart.rank, 1)
+  const ranks = episodeRanks(sorted, 'chart')
+  assert.deepEqual(ranks, sorted.map((it) => it._chart))
+  assert.equal(episodeRanks(sorted, 'recent'), null)
+  assert.equal(episodeRanks(sortEpisodeItems(items, 'sats'), 'sats')[0].rank, 1)
 })
 
 check('⚠️ windowEpisodeItems windows on BOOST time and recomputes the figures', () => {

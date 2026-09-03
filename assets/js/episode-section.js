@@ -34,13 +34,13 @@
  * the same comparators, from episode-card.js, so the two cases share code
  * without sharing the mistake.
  */
-import { competitionRanks, rankLabel } from '/assets/js/rank.js?v=ob-v186'
-import { renderEpisodeCards, sortEpisodeItems, windowEpisodeItems, buildEpisodes, COPY, episodeRankValue }
-  from '/assets/js/episode-card.js?v=ob-v186'
+import { rankLabel } from '/assets/js/rank.js?v=ob-v187'
+import { renderEpisodeCards, sortEpisodeItems, windowEpisodeItems, buildEpisodes, COPY, episodeRanks }
+  from '/assets/js/episode-card.js?v=ob-v187'
 import { wireEpisodeCards, hydrateCardProfiles, prewarmBoosting }
-  from '/assets/js/episode-card-actions.js?v=ob-v186'
-import { normalizeBoosts, toEpisodeShape } from '/assets/js/ob-data.js?v=ob-v186'
-import { rangeControl, sortControl, rangeDays, rangeCutoff } from '/assets/js/feed-controls.js?v=ob-v186'
+  from '/assets/js/episode-card-actions.js?v=ob-v187'
+import { normalizeBoosts, toEpisodeShape } from '/assets/js/ob-data.js?v=ob-v187'
+import { rangeControl, sortControl, rangeDays, rangeCutoff } from '/assets/js/feed-controls.js?v=ob-v187'
 
 const CARDS_PER_PAGE = 30   // matches CARDS_PER_PAGE in functions/_shared/episode-cards.js
 
@@ -187,10 +187,12 @@ export function initEpisodeSection({
    * needs no seed. Two episodes with the same booster count share a place
    * rather than being split by the sats tiebreak inside sortEpisodeItems. */
   function stampRanks() {
-    const ranks = competitionRanks(view, episodeRankValue(sortKey))
-    // No open end here and so no seam to re-sync: `view` IS the whole ordering,
-    // which is what lets these sections mark every tie on the first paint.
-    view.forEach((it, i) => { it._rank = ranks[i].rank; it._tied = ranks[i].tied })
+    // episodeRanks: the chart's tuple standing, or a competition rank over the
+    // sort's own figure. No open end here and so no seam to re-sync: `view` IS
+    // the whole ordering, which is what lets these sections mark every tie on
+    // the first paint.
+    const ranks = episodeRanks(view, sortKey) || []
+    view.forEach((it, i) => { it._rank = ranks[i]?.rank; it._tied = !!ranks[i]?.tied })
   }
 
   function rankOf(it) {

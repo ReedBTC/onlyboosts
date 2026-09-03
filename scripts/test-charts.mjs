@@ -32,6 +32,7 @@ import { onRequestGet as episodesGet, onRequestPost as episodesPost } from '../f
 import { onRequestGet as publishersGet, onRequestPost as publishersPost } from '../functions/api/v1/publishers.js'
 import { onRequestGet as membersGet } from '../functions/api/v1/members.js'
 import { PUBLISHERS } from '../functions/api/v1/_common.js'
+import { chartRanks } from '../assets/js/rank.js'
 import { feedRanks, renderStatTiles } from '../functions/_shared/feed-rank.js'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -776,6 +777,46 @@ async function call(handler, url, init) {
   check('no chart data at all, no strip — the tiles render exactly as before', () => {
     assert.ok(!bareHtml.includes('OnlyBoosts Charts'))
     assert.ok(bareHtml.includes('show-stats'))
+  })
+}
+
+// ── rank.js#chartRanks — the drawers' chart standing, in JS ─────────────────
+{
+  console.log('\nrank.js#chartRanks (the detail-page drawers, 2026-09-03)')
+  const of = { sats: (r) => r.sats, boosts: (r) => r.boosts, breadth: (r) => r.breadth }
+  for (const [name, rows] of [
+    ['shows', rollup(BOOSTS.filter(notMusic), (b) => b.show, (b) => b.pk)],
+    ['members', rollup(BOOSTS.filter((b) => !PUBLISHERS.includes(b.pk)), (b) => b.pk, (b) => b.show)],
+    ['episodes', rollup(BOOSTS.filter(notMusic), (b) => b.ep, (b) => b.pk)],
+  ]) {
+    const expect = chartOrder(rows)
+    const got = chartRanks(rows, of)
+    check(`${name}: the same order, ranks and tie flags as the brute force`, () => {
+      // The brute force breaks a full tie by id; chartRanks keeps input order.
+      // Compare the standing per id rather than the position of a tied row.
+      const byId = new Map(got.map((e) => [e.row.id, e]))
+      for (const r of expect) {
+        assert.equal(byId.get(r.id).rank, r.rank, `${r.id} rank`)
+        assert.equal(byId.get(r.id).tied, r.tied, `${r.id} tied`)
+        assert.equal(byId.get(r.id).score, r.score, `${r.id} score`)
+      }
+      assert.deepEqual(got.map((e) => e.rank), got.map((e) => e.rank).slice().sort((a, b) => a - b), 'ordered by rank')
+    })
+  }
+  check('⚠️ the chain: equal scores break on breadth first, then sats, then boosts', () => {
+    const rows = [
+      { id: 'a', sats: 300, boosts: 1, breadth: 1 },  // r: 1,2,2 = 5
+      { id: 'b', sats: 200, boosts: 2, breadth: 2 },  // r: 2,1,1 = 4  -> #1 outright
+      { id: 'c', sats: 100, boosts: 1, breadth: 1 },  // r: 3,2,2 = 7
+    ]
+    assert.deepEqual(chartRanks(rows, of).map((e) => e.row.id), ['b', 'a', 'c'])
+    const tie = [
+      { id: 'x', sats: 100, boosts: 1, breadth: 1 },
+      { id: 'y', sats: 100, boosts: 1, breadth: 1 },
+      { id: 'z', sats: 50, boosts: 1, breadth: 1 },
+    ]
+    const g = chartRanks(tie, of)
+    assert.deepEqual(g.map((e) => [e.row.id, e.rank, e.tied]), [['x', 1, true], ['y', 1, true], ['z', 3, false]])
   })
 }
 

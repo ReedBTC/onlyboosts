@@ -31,6 +31,8 @@ import { piHeaders, piGet } from "../_shared/podcast-index.js";
 import { parseNotes } from "../_shared/rich-text.js";
 // The stat tiles, each carrying its all-time global rank; /episode shares it.
 import { feedRanks, renderStatTiles } from "../_shared/feed-rank.js";
+// The two drawers open on the chart formula over their own rows (2026-09-03).
+import { chartRanks, rankLabel } from "../../assets/js/rank.js";
 
 const SITE_ORIGIN = "https://onlyboosts.social";
 
@@ -522,19 +524,19 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v186" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v186" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v186" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v186" />
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v186" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v186" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v187" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v187" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v187" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v187" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v187" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v187" />
   <!-- The boost note card and its reaction bar. Added when the boost list at
        the foot of this page became the same .note-card the homepage Boosts
        feed paints; this page linked neither before, which is why show-page.css
        restates .nostr-mention. That restatement is now redundant rather than
        load-bearing, and is left in place rather than removed in the same pass. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v186" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v186" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v187" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v187" />
 </head>
 <body data-show-guid="${htmlEscape(show.podcast_guid)}">
 
@@ -766,12 +768,12 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
 
 <script type="application/json" id="show-boost-payload">${jsonForScript(boostPayload)}</script>
 
-<script src="/assets/js/nav.js?v=ob-v186" defer></script>
-<script src="/assets/js/show-page.js?v=ob-v186" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v187" defer></script>
+<script src="/assets/js/show-page.js?v=ob-v187" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v186"></script>
-<script src="/assets/js/sw-register.js?v=ob-v186" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v187"></script>
+<script src="/assets/js/sw-register.js?v=ob-v187" defer></script>
 </body>
 </html>`;
 }
@@ -1050,7 +1052,8 @@ function renderCommunityShows(rows, copy) {
            the homepage panels. -->
       <div class="cs-controls" data-cs-controls hidden></div>
       <ul class="ep-list cs-list" data-cs-list>
-        ${rows.map((r, i) => communityRow(r, i + 1)).join("\n        ")}
+        ${chartRanks(rows, { sats: (r) => r.cs_sats, boosts: (r) => r.cs_boosts, breadth: (r) => r.cs_members })
+          .map((e) => communityRow(e.row, rankLabel(e.rank, e.tied))).join("\n        ")}
       </ul>
     </details>
   </section>`;
@@ -1259,7 +1262,8 @@ function renderEpisodes(rows, show, copy) {
         <a class="cs-allitems" href="${bmb}" target="_blank" rel="noopener">${copy.allItems}<span class="cs-allitems-arrow" aria-hidden="true">↗</span></a>
       </div>
       <ul class="ep-list">
-        ${rows.map((e) => episodeRow(e, copy, isSafeUrl(show.image) ? show.image : null)).join("\n        ")}
+        ${chartRanks(rows, { sats: (e) => e.total_sats, boosts: (e) => e.boost_count, breadth: (e) => e.booster_count })
+          .map((x) => episodeRow(x.row, copy, isSafeUrl(show.image) ? show.image : null)).join("\n        ")}
       </ul>
     </details>
   </section>`;
@@ -1313,10 +1317,10 @@ function notFound(guid) {
   <meta name="robots" content="noindex" />
   <title>Show not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v186" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v186" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v186" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v186" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v187" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v187" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v187" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v187" />
 </head>
 <body>
 <section class="page-header">
@@ -1335,7 +1339,7 @@ function notFound(guid) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v186" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v187" defer></script>
 </body>
 </html>`;
   return new Response(html, {

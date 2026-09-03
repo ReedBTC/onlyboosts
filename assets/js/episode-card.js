@@ -42,11 +42,12 @@
  * what functions/_shared/detail-page.js has always done, so the site now has one
  * date format rather than one for the feeds and another for the detail pages.
  */
-import { showPageHref, episodePageHref } from './show-link.js?v=ob-v186'
-import { episodeBoostLink } from './episode-link.js?v=ob-v186'
-import { boosterPageHref, boosterLinkAttrs } from './booster-link.js?v=ob-v186'
-import { coverChain, httpsUrl } from './cover-art.js?v=ob-v186'
-import { htmlEscape, isSafeUrl, renderMessage } from './nostr-text.js?v=ob-v186'
+import { showPageHref, episodePageHref } from './show-link.js?v=ob-v187'
+import { episodeBoostLink } from './episode-link.js?v=ob-v187'
+import { boosterPageHref, boosterLinkAttrs } from './booster-link.js?v=ob-v187'
+import { coverChain, httpsUrl } from './cover-art.js?v=ob-v187'
+import { htmlEscape, isSafeUrl, renderMessage } from './nostr-text.js?v=ob-v187'
+import { chartRanks, competitionRanks } from './rank.js?v=ob-v187'
 
 const esc = htmlEscape
 
@@ -364,7 +365,29 @@ export const SORT_OPTIONS = [
 ]
 
 export function sortEpisodeItems(items, key, fallback = 'recent') {
+  /* ⚠️ THE CHART IS NOT A COMPARATOR. Its standing is a rank sum over the
+   * whole list, so it is computed once over everything (rank.js#chartRanks)
+   * and the place rides each item as `_chart`, where episodeRanks reads it.
+   * The drawers OPEN on it since 2026-09-03 (Reed's ask); the feeds never
+   * come through here for it, being server-ranked. */
+  if (key === 'chart') {
+    return chartRanks(items, {
+      sats: episodeRankValue('sats'), boosts: episodeRankValue('boosts'), breadth: episodeRankValue('count'),
+    }).map((e) => ({ ...e.row, _chart: { rank: e.rank, tied: e.tied } }))
+  }
   return [...items].sort(EPISODE_SORTERS[key] || EPISODE_SORTERS[fallback])
+}
+
+/* The rank and tie flag of every item in a sorted view, for the sort it was
+ * sorted by: the chart's tuple standing off `_chart`, a single-axis sort's
+ * competition rank over its own figure. One function so the edge
+ * (episode-cards.js) and the browser (episode-section.js) number a card the
+ * same way; null for a chronological sort, where a numeral would read as a
+ * score. The view must be the WHOLE ordering (these callers hold theirs). */
+export function episodeRanks(view, sortKey) {
+  if (!RANKED_SORTS.has(sortKey)) return null
+  if (sortKey === 'chart') return view.map((it) => it._chart || { rank: 0, tied: false })
+  return competitionRanks(view, episodeRankValue(sortKey))
 }
 
 /* ⚠️ THE RANGE MEANS BOOST TIME — the one reading, everywhere, since
