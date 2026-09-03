@@ -1298,10 +1298,30 @@ Bowl After Bowl, 25,265 sats); the pass runs every incremental cycle over a
 Fountain notes carried `i` tags with no `k` tag until ~2025-04-14, so the scan's
 `#k` filter was blind to that whole era while the events sat on
 relay.fountain.fm (which retains to late 2022). `onlyboosts_globalscan.py
-deepscan` recovered ~15k boosts by #i-per-guid and authors= walks; a client
-publishing i-without-k **today** is still invisible to the incremental — that
-residual is a known, undecided item, not an oversight. Detail lives with the
-collector (commit 2fa7869 and the deepscan section of the script's docstring).
+deepscan` recovered ~15k boosts by #i-per-guid and authors= walks. Detail lives
+with the collector (commit 2fa7869 and the deepscan section of the script's
+docstring).
+
+**⚠️ EVERY SCHEDULED WALK ASKS RELAYS WITH THREE FILTER SHAPES, NOT ONE, SINCE
+2026-09-03.** `#k` alone only matches a note that carries a `k` tag, and
+StableKraft and Wavlake's own app still publish `i` tags with no `k` —
+measured that day: 415 boosts since 2025-06-01 sat on the core relays unseen
+by every pass (209 linking stablekraft.app, 140 fountain.fm, 65 wavlake.com),
+found by chasing one StableKraft boost Reed noticed missing. `scan.py`'s
+`boost_filters()` adds `#i` per known show guid and `authors` per known
+booster, read from the index at the start of each run, and the incremental,
+backfill and outbox walkers all take the set — so a show or booster first seen
+through a `#k` note on one tick is covered by the k-free shapes on the next.
+The residual is a first-time booster on a show the index has never seen,
+without a `k` tag; no filter Nostr offers reaches that, and the fix is the
+client sending the tag NIP-73 specifies (Reed is asking StableKraft; Wavlake
+has larger problems). Those boosts land **unlabelled** by design: the only
+evidence of the app is the URL the note links, and `clients.py`'s rule is
+never to guess. The window the single-shape scan had already walked was
+caught up with `backfill --force --floor 1748736000` on 2026-09-03; the scan
+docstring carries the two relay quirks the wider filter set met (per-filter
+caps make a multi-filter REQ unpageable, and two nginx fronts 429 back-to-back
+handshakes).
 
 Two stores, one model. **D1 behind `/api/v1/*` is what every feed and page
 reads.** The collector also publishes static JSON to

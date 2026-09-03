@@ -6,7 +6,13 @@ Subcommands:
                resumable per-relay; classify + store boosts.
   incremental  forward tail scan since the last run (for the recurring timer).
   deepscan     recover the pre-k-tag era (before ~2025-04-14) by #i-per-guid and
-               authors= walks — those old notes never match the #k filter.
+               authors= walks, iterated to convergence over a historical window.
+
+Every scheduled walk (backfill, incremental, outbox) asks relays with THREE
+filter shapes — `#k`, `#i` per known show, `authors` per known booster — since
+2026-09-03; see scan.py's docstring for why the `#k` shape alone missed every
+StableKraft and Wavlake-app boost. Catching up a window the old single-shape
+scan already walked is `backfill --force --floor <ts>`.
   enrich       fill Podcast Index show/episode metadata + kind-0 profiles.
   excludes     validate excludes.json and report what each entry hides.
   stats        print DB counts.
@@ -52,7 +58,7 @@ import resolve_guids                                            # noqa: E402
 from classify import classify_boost, decode_note_or_nevent, _QUOTE_RE  # noqa: E402
 from relays import CORE_RELAYS, PROFILE_RELAYS, RECEIPT_RELAYS, expand_via_outbox  # noqa: E402
 from scan import (scan_relay_backward, scan_relay_incremental,   # noqa: E402
-                  fetch_events_by_ids)
+                  fetch_events_by_ids, boost_filters)
 from collector_common import query_relay                        # noqa: E402
 from nostr_utils import load_config                             # noqa: E402
 
@@ -93,9 +99,38 @@ def _candidate_receipt_ids(events):
     return ids
 
 
+def _podcasty(events):
+    """Only notes carrying a NIP-73 podcast i tag can be boosts. The `authors`
+    shape returns whole timelines, and classify_boost's first gate is that tag —
+    so this is what keeps a booster's ordinary notes from costing a receipt
+    lookup each."""
+    return [ev for ev in events
+            if any(len(t) >= 2 and t[0] == "i" and str(t[1]).startswith("podcast:")
+                   for t in ev.get("tags", []))]
+
+
+def _known_sets(conn):
+    """What the k-free filter shapes are built from: every show guid the index
+    knows (phantoms and aliases included — old notes carry the same phantom
+    shapes guid_aliases was built for) and every booster pubkey. Read once per
+    run, so a show or booster first seen this run is covered next run."""
+    guids = set()
+    for sql in ("SELECT DISTINCT podcast_guid FROM boosts "
+                "WHERE podcast_guid IS NOT NULL AND podcast_guid != ''",
+                "SELECT DISTINCT canonical_guid FROM boosts "
+                "WHERE canonical_guid IS NOT NULL AND canonical_guid != ''",
+                "SELECT podcast_guid FROM shows",
+                "SELECT raw_guid FROM guid_aliases"):
+        guids.update(r[0] for r in conn.execute(sql).fetchall())
+    authors = {r[0] for r in conn.execute(
+        "SELECT DISTINCT booster_pubkey FROM boosts").fetchall()}
+    return {"guids": guids, "authors": authors}
+
+
 def _make_page_handler(conn, lock, receipt_cache, totals):
     """Build an on_page(events) callback: batch-resolve receipts, classify, store."""
     def on_page(events):
+        events = _podcasty(events)
         cand = _candidate_receipt_ids(events)
         with lock:
             todo = [c for c in cand if c not in receipt_cache]
@@ -134,7 +169,12 @@ def cmd_backfill(args):
         if st and st.get("backfill_cursor") is None and st.get("backfilled_to") and not args.force:
             print(f"[skip] {r} already backfilled to {time.strftime('%Y-%m-%d', time.gmtime(st['backfilled_to']))}")
             continue
-        start_until = (st.get("backfill_cursor") if st and st.get("backfill_cursor") else now)
+        # A resumed walk picks up at its cursor. A FORCED walk starts from now:
+        # it exists to re-read a window with a changed filter set, and a stale
+        # cursor below the floor would walk nothing and then mark the relay
+        # complete (it did, 2026-09-03, on the first catch-up attempt).
+        resume = st.get("backfill_cursor") if st and st.get("backfill_cursor") else None
+        start_until = now if args.force or not resume else resume
         plan.append((r, start_until))
 
     if not plan:
@@ -142,8 +182,10 @@ def cmd_backfill(args):
         _print_stats(conn)
         return
 
+    filters = boost_filters(_known_sets(conn))
     print(f"Backfilling {len(plan)} relay(s) to floor "
-          f"{time.strftime('%Y-%m-%d', time.gmtime(floor))} (concurrent)")
+          f"{time.strftime('%Y-%m-%d', time.gmtime(floor))} (concurrent), "
+          f"{len(filters)} filter shapes per relay")
     on_page = _make_page_handler(conn, lock, receipt_cache, totals)
 
     def checkpoint_for(relay):
@@ -156,7 +198,8 @@ def cmd_backfill(args):
         relay, start_until = item
         return scan_relay_backward(relay, floor, start_until, on_page,
                                    checkpoint_for(relay),
-                                   log=lambda m: print(m, flush=True))
+                                   log=lambda m: print(m, flush=True),
+                                   filters=filters)
 
     with ThreadPoolExecutor(max_workers=len(plan)) as ex:
         futs = {ex.submit(run_relay, it): it[0] for it in plan}
@@ -190,16 +233,22 @@ def cmd_incremental(args):
         row = conn.execute("SELECT MAX(created_at) FROM boosts").fetchone()
         global_since = int(row[0]) if row and row[0] else 0
     since = max(args.floor, global_since - INCREMENTAL_OVERLAP) if global_since else args.floor
-    print(f"Incremental since {time.strftime('%Y-%m-%d %H:%M', time.gmtime(since))}")
+    filters = boost_filters(_known_sets(conn))
+    print(f"Incremental since {time.strftime('%Y-%m-%d %H:%M', time.gmtime(since))}, "
+          f"{len(filters)} filter shapes per relay")
 
+    # Relays in parallel: the k-free shapes turned one REQ per relay into
+    # several, and the tail scan has a 5-minute budget to fit inside.
     newest_overall = since
-    for r in relays:
-        try:
-            newest = scan_relay_incremental(r, since, on_page,
-                                            log=lambda m: print(m, flush=True))
-            newest_overall = max(newest_overall, newest)
-        except Exception as e:
-            print(f"[error] {r}: {e}")
+    with ThreadPoolExecutor(max_workers=len(relays)) as ex:
+        futs = {ex.submit(scan_relay_incremental, r, since, on_page,
+                          lambda m: print(m, flush=True), filters): r
+                for r in relays}
+        for f in as_completed(futs):
+            try:
+                newest_overall = max(newest_overall, f.result())
+            except Exception as e:
+                print(f"[error] {futs[f]}: {e}", flush=True)
     db.set_meta(conn, "last_incremental", newest_overall)
     print(f"Incremental done: {totals['seen']} scanned, {totals['boosts']} boosts, "
           f"{totals['new']} new.")
@@ -240,6 +289,7 @@ def cmd_outbox(args):
     non_core = [r for r in relays if r.rstrip("/") not in core]
     log(f"{len(non_core)} non-core outbox relays (core handled by the incremental timer)")
     on_page = _make_page_handler(conn, lock, receipt_cache, totals)
+    filters = boost_filters(_known_sets(conn))
 
     def checkpoint_for(relay):
         def cp(cursor, oldest):
@@ -258,7 +308,7 @@ def cmd_outbox(args):
     if to_walk:
         with ThreadPoolExecutor(max_workers=min(24, len(to_walk))) as ex:
             futs = {ex.submit(scan_relay_backward, r, args.floor, s, on_page,
-                              checkpoint_for(r), log): r for r, s in to_walk}
+                              checkpoint_for(r), log, 2, filters): r for r, s in to_walk}
             for f in as_completed(futs):
                 try:
                     f.result()
@@ -271,7 +321,8 @@ def cmd_outbox(args):
         f"over {len(non_core)} relays")
     if non_core:
         with ThreadPoolExecutor(max_workers=24) as ex:
-            futs = [ex.submit(scan_relay_incremental, r, since, on_page, lambda m: None)
+            futs = [ex.submit(scan_relay_incremental, r, since, on_page, lambda m: None,
+                              filters)
                     for r in non_core]
             for f in as_completed(futs):
                 try:
@@ -294,8 +345,14 @@ def cmd_outbox(args):
 # convergence. classify_boost reads i tags and fetches quoted zap receipts, so
 # no classifier change was needed (measured on one guid's 204 pre-cliff notes:
 # 156 classified, 156/156 receipts resolved, 100% sats).
+#
+# Since 2026-09-03 the same two shapes ride every scheduled walk (scan.py's
+# boost_filters), so this command is the HISTORICAL tool: a bounded window,
+# convergence rounds, and a resumable state file. The default window still
+# ends at KTAG_ADOPTION_UNTIL because everything newer is now covered by the
+# recurring scan and was caught up once by `backfill --force --floor` there.
 DEEPSCAN_STATE = str(HERE / "data" / "deepscan_state.json")
-KTAG_ADOPTION_UNTIL = 1748736000   # 2025-06-01 — everything newer is #k-covered
+KTAG_ADOPTION_UNTIL = 1748736000   # 2025-06-01 — the recurring scan covers newer
 FLOOR_2022 = 1640995200            # 2022-01-01 — beyond fountain.fm's retention
 
 DEEPSCAN_KINDS = (
@@ -308,18 +365,11 @@ DEEPSCAN_KINDS = (
 
 
 def _deepscan_known_sets(conn, include_items):
-    """Every show guid and booster pubkey the index knows, phantoms included —
-    old notes carry the same phantom guid shapes guid_aliases was built for."""
-    guids = set()
-    for sql in ("SELECT DISTINCT podcast_guid FROM boosts "
-                "WHERE podcast_guid IS NOT NULL AND podcast_guid != ''",
-                "SELECT DISTINCT canonical_guid FROM boosts "
-                "WHERE canonical_guid IS NOT NULL AND canonical_guid != ''",
-                "SELECT podcast_guid FROM shows",
-                "SELECT raw_guid FROM guid_aliases"):
-        guids.update(r[0] for r in conn.execute(sql).fetchall())
-    authors = {r[0] for r in conn.execute(
-        "SELECT DISTINCT booster_pubkey FROM boosts").fetchall()}
+    """Every show guid and booster pubkey the index knows (`_known_sets`, the
+    same sets the recurring scan builds its filters from), plus item guids on
+    request."""
+    known = _known_sets(conn)
+    guids, authors = known["guids"], known["authors"]
     items = set()
     if include_items:
         items = {r[0] for r in conn.execute(
