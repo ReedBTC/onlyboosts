@@ -386,7 +386,14 @@ week's Top 10, **with the week picker in its title**, beside Weeks at #1.
   `data-card-list` on the list for the bot's clip guard. The PNGs land in the
   shards tree under `charts/` (`shows-<date>.png`, `artists-<date>.png`,
   `<kind>-weeks-at-1.png`) and `/api/og/charts/<name>.png` proxies them on the
-  hpw route's rules. The collector-side half is the bot's (`bots/hpw-cards/`).
+  hpw route's rules. **The collector side shipped the same day** (the bot's
+  commit fa2e0b6 on the collector's main): live week plus the twelve most
+  recent for Shows and Artists, the three weeks-at-1 boards every cycle,
+  hash-gated, the clip guard reading `[data-card-list]`. Until this branch
+  is live the bot logs the chart family as a skip on the 404s and the hpw
+  cards keep rendering; the first cycle after deploy renders ~27 boards in
+  about 30s, checkpointing so it can span two ticks. The measured row
+  ceilings are in `functions/_shared/card-frame.js`.
 - **Client-rendered, deliberately**: the Shows panel is the front door and
   its first-view budget is the cards'; a crawler had the page for these rows.
 

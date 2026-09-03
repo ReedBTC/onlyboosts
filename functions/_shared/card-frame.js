@@ -35,10 +35,20 @@
 // So an hpw row has about 5.8px of growth in hand. The ceiling is
 // (listBottom − listTop) / 10 and ANY chrome change around the list moves
 // it — trimming the footer to one line moved it 2.2px a row without a row
-// being touched. The chart cards have their own rows and their own ceiling,
-// which the bot measures per kind; change a number in any card's css and
-// have the bot re-measure (its clip_report reads the `[data-card-list]` box)
-// before believing a budget.
+// being touched.
+//
+// The chart cards, measured by the bot on the misc-updates preview
+// (2026-09-03; rows 49.2–50.2px on every kind):
+//
+//   shows / artists / members weeks-at-1   list 269.5 → 829, ceiling 56.0px, 5.8px in hand
+//   shows / artists weekly Top 10          list 296.9 → 829, ceiling 53.3px, 3.1px in hand
+//
+// ⚠️ THE WEEKLY CHART CARDS ARE THE TIGHT ONES: the `rank in sats/boosters/
+// boosts` column head costs 27.4px of the list box, so a weekly row may grow
+// 3.1px before the tenth show drops off the card. The rank triplet itself
+// does not make a row taller. Change a number in any card's css and have the
+// bot re-measure (`bots/hpw-cards/test-clip-guard.py <origin>` reads every
+// kind's `[data-card-list]` box) before believing a budget.
 
 import { htmlEscape } from "../../assets/js/nostr-text.js";
 
