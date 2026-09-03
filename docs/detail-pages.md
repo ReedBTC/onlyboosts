@@ -10,15 +10,44 @@ that used to live there.*
 
 ### The Rank Line In The Stat Tiles
 
-On `/show`, `/episode` **and `/booster`** each stat tile carries a third line,
-`#4` or `T#118`:
-the subject's **all-time, all-language, Global** rank by that tile's own sort
-(sats, boosts, boosters) on the feed its card lives on (Shows or Albums,
-Episodes or Songs, chosen by the same medium partition the API uses). One
-shared caption under the row names the feed and links to it.
-`functions/_shared/feed-rank.js` is both halves: `feedRanks(db, kind, row)`
-runs one scan of `podcasts` or `episodes`, and `renderStatTiles(stats, ranks,
-copy)` prints the tiles for both pages.
+On `/show`, `/episode`, `/booster` and `/artist` each stat tile carries a
+corner chip, `#4` or `T#118`: the subject's **all-language, Global** rank by
+that tile's own sort (sats, boosts, boosters) on the feed its card lives on
+(Shows or Albums, Episodes or Songs, chosen by the same medium partition the
+API uses), **in the boost-time window selected on the Charts strip above the
+tiles**. `functions/_shared/feed-rank.js` is both halves: `feedRanks(db, kind,
+row)` runs the rank scan and the four windowed chart queries, and
+`renderStatTiles(stats, ranks, copy)` prints the strip and the tiles for all
+four pages.
+
+**⚠️ THE TILES FOLLOW THE STRIP SINCE 2026-09-03.** *Reed's ask:* the strip
+showed a chart place for Week, Month, Year and All time over one row of
+all-time figures, so a reader could see that a show was #3 this week and
+nothing about the week itself. Now `feedRanks` returns `windows` — per window,
+the subject's sats, boosts and breadth over that window's boosts, and its
+competition rank on each, all out of the same `RANK()` the chart place is
+summed from — and the renderer ships **four `<dl class="show-stats">` rows, one
+per window, all but All time `hidden`**. The strip cell is the selector:
+`initStatWindows` in `assets/js/detail-page.js` swaps the rows and moves
+`aria-current` (a plain click on a charted cell selects; a modifier-click or a
+middle-click still follows its link to the chart view; a dash cell is a
+`<button>` and only selects). A reader with no JavaScript sees the all-time
+row, which is exactly what the page rendered before.
+
+Three consequences:
+
+- **The caption is gone.** "Rank on the all-time Shows feed; T marks a tie" would
+  restate the highlighted cell; the T is defined in every chip's tooltip, which
+  also names the window ("Tied for #5 by boosts on the Shows feed this week").
+  `.show-stats-cap` has no emitter.
+- **The strip is no longer withheld when nothing charts.** Four dashes are still
+  the way to the other three rows of tiles. The tint that marked the all-time
+  cell marks the selected cell.
+- **The all-time row is the page's own strings, verbatim**; the windowed rows go
+  through the same two formatters (`compact` for sats, `num` for counts) and
+  the same singular rule. A window with no boosts is three zeros and no chips,
+  not a missing row. `.show-stats[hidden] { display: none }` in
+  `show-page.css` is load-bearing: the grid rule outranks the UA's `[hidden]`.
 
 **⚠️ THE SCHEME IS STANDARD COMPETITION RANKING (1-2-2-4), and the site has
 exactly one.** A rank is the count of rows **strictly ahead, plus one**;
@@ -66,10 +95,11 @@ chip line go with it and the page renders exactly as `/booster` already does.
 subject's OnlyBoosts Charts place in each boost-time window (Week · Month ·
 Year · All time), replacing the single all-time line. The design record is
 *The OnlyBoosts Charts* in `docs/feeds.md`; the mechanics live beside the
-tiles' in `feed-rank.js` (`chartWindows`, `CHART_CELLS`), and `.show-chart-*`
-in `show-page.css` is the chrome. The tile chips below it stay all-time only —
-the strip is the windowed surface, and windowing the chips too would print
-twelve ranks over three figures.
+tiles' in `feed-rank.js` (`chartWindows`, `windows`, `CHART_CELLS`), and
+`.show-chart-*` in `show-page.css` is the chrome. The tile chips were all-time
+only until 2026-09-03, on the argument that windowing them too would print
+twelve ranks over three figures; the answer that replaced it is above — one
+row of three figures at a time, the strip choosing which.
 
 Three more things a change would break:
 

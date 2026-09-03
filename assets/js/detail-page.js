@@ -16,9 +16,9 @@
  * page to be complete and legible; it adds the interactive half and every
  * function degrades to what the server rendered.
  */
-import { copyNpub, copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v181'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v181'
-import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v181'
+import { copyNpub, copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v182'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v182'
+import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v182'
 
 // ── copy-npub ────────────────────────────────────────────────────────
 /* Delegated rather than per-element: the community wall can hold 500 cards, and
@@ -39,7 +39,7 @@ export function initCopyNpub() {
  * is 156KB of thread machinery it has no other use for. The handler is generic
  * and scoped to the button's own <section>, so the same one still serves the two
  * podroll grids on /show. The three detail pages import it from here unchanged. */
-export { initShowMore } from "./supporter-wall.js?v=ob-v181";
+export { initShowMore } from "./supporter-wall.js?v=ob-v182";
 
 // ── share ────────────────────────────────────────────────────────────
 /* The canonical URL, not location.href: the hash spy below rewrites the hash as
@@ -321,6 +321,47 @@ export function initArt2(selector, tag, className) {
   for (const img of document.querySelectorAll(selector)) {
     wireArt2(img, () => blankTile(img, tag, className))
   }
+}
+
+// ── The stat tiles follow the Charts strip ──────────────────────────────
+//
+// feed-rank.js renders one row of stat tiles per window on the OnlyBoosts
+// Charts strip (Week · Month · Year · All time), every row but All time
+// `hidden`, and marks the strip's all-time cell `aria-current`. Which row is on
+// screen is the one verb here (Reed's ask, 2026-09-03: click Week and the
+// three boxes below show the week's sats, boosts and boosters, chips and all).
+//
+// A charted cell is still a link to that window's chart view, so a plain click
+// is taken over to select the window in place and a modifier-click or a
+// middle-click follows the link — the tabs-that-are-also-links convention. A
+// dash cell is a <button> and only selects. With no JavaScript the all-time
+// row is what shows, which is exactly what the page rendered before this.
+export function initStatWindows() {
+  const strip = document.querySelector('[data-stat-window-picker]')
+  const host = document.querySelector('[data-stat-windows]')
+  if (!strip || !host) return
+  const rows = Array.from(host.querySelectorAll('.show-stats[data-window]'))
+  if (rows.length < 2) return
+  const cells = Array.from(strip.querySelectorAll('[data-window]'))
+
+  const select = (key) => {
+    if (!rows.some((r) => r.dataset.window === key)) return
+    for (const r of rows) r.hidden = r.dataset.window !== key
+    for (const c of cells) {
+      if (c.dataset.window === key) c.setAttribute('aria-current', 'true')
+      else c.removeAttribute('aria-current')
+    }
+  }
+
+  strip.addEventListener('click', (e) => {
+    const cell = e.target.closest('[data-window]')
+    if (!cell || !strip.contains(cell)) return
+    // Let the browser have the link when the reader asked for a new tab or
+    // window; select in place on an ordinary click.
+    if (cell.tagName === 'A' && (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0)) return
+    e.preventDefault()
+    select(cell.dataset.window)
+  })
 }
 
 // ── Profile fallback ─────────────────────────────────────────────────

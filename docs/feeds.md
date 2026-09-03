@@ -250,8 +250,14 @@ What a change would break:
   window charts. The label links to `/about#charts`. The all-time cell wears
   `--brand-tint`: the rolling windows are the news, all time is the record.
   `/booster` overrides every cell's target and the breadth wording
-  (`chartHref`, `chartBreadth`), its chart living on the members wall. The
-  three tile ranks below stay the all-time score's components.
+  (`chartHref`, `chartBreadth`), its chart living on the members wall.
+  **Since 2026-09-03 the strip is also the tiles' window selector** (Reed's
+  ask): `feedRanks(...).windows` carries each window's figures and component
+  ranks, the renderer ships one row of tiles per window with all but All time
+  `hidden`, and `initStatWindows` in `detail-page.js` swaps them on a cell
+  click. The tint marks the selected cell now rather than the all-time one,
+  and the "Rank on the all-time … feed" caption is gone. See *The Rank Line
+  In The Stat Tiles* in `docs/detail-pages.md`.
 - **⚠️ COMPUTED AT QUERY TIME, DELIBERATELY — no collector precompute.** The
   Follows path can only be computed per request, so the query-time SQL must
   exist regardless, and a precomputed Global table would be a second

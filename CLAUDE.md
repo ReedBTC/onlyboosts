@@ -1481,7 +1481,11 @@ file:
   draw its top-100 **window strip** above the stat tiles — Week · Month ·
   Year · All time, each cell that boost-time window's chart place
   (`chartWindows` in `feed-rank.js`), each charted cell linking to that
-  window's chart view. **See *The OnlyBoosts Charts* in `docs/feeds.md`** —
+  window's chart view. **Since 2026-09-03 the strip is also the tiles'
+  window selector** (Reed's ask): `feedRanks` returns `windows` (each
+  window's figures and component ranks), four rows of tiles ship with all
+  but All time `hidden`, and `initStatWindows` in `detail-page.js` swaps
+  them. The "Rank on the all-time … feed" caption is gone with it. **See *The OnlyBoosts Charts* in `docs/feeds.md`** —
   the design record — and `test-charts.mjs`.
 - **⚠️ `competitionRanks` ASSUMES THE LIST IS ALREADY ORDERED BY THE VALUE IT
   RANKS**, and returns confident nonsense otherwise. Every caller satisfies it by

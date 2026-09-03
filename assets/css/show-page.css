@@ -162,6 +162,11 @@
   margin: 1.5rem 0 0;
   padding: 0;
 }
+/* ⚠️ LOAD-BEARING. Four rows of tiles ship, one per window on the Charts
+   strip, and all but the selected one carry `hidden` (feed-rank.js,
+   2026-09-03) — but `display: grid` above outranks the UA's `[hidden]`, so
+   without this every row would paint at once. */
+.show-stats[hidden] { display: none; }
 
 .show-stat {
   position: relative;   /* the rank chip pins to this corner */
@@ -215,8 +220,9 @@
 }
 .show-stat dd { order: 1; }
 
-/* The subject's rank on the all-time Global feed its card lives on, by the
-   tile's own sort: "#4", or "T#118" where the place is shared. Rendered by
+/* The subject's rank on the Global feed its card lives on, in the window the
+   Charts strip has selected (all time by default), by the tile's own sort:
+   "#4", or "T#118" where the place is shared. Rendered by
    functions/_shared/feed-rank.js and pinned to the tile's top corner.
 
    ⚠️ IT IS A CORNER CHIP, WHICH SEPARATES BY POSITION RATHER THAN BY WEIGHT,
@@ -258,9 +264,10 @@
   right: 0.45rem;
   margin: 0;
   padding: 0.1rem 0.4rem;
-  /* The Chart Positions strip's all-time cell wears --brand-tint, and these
-     chips are all-time ranks too — one shade, one claim (Reed's ask,
-     2026-08-31; --cream-d until then). */
+  /* The Chart Positions strip's SELECTED cell wears --brand-tint, and these
+     chips are that window's ranks — one shade, one claim (Reed's ask,
+     2026-08-31, when the tinted cell was the all-time one; --cream-d until
+     then). */
   background: var(--brand-tint);
   border-radius: 999px;
   /* Explicitly NOT Playfair. `.show-stat dd` sets the family through its `font:`
@@ -276,33 +283,28 @@
   white-space: nowrap;
 }
 
-.show-stats-cap {
-  margin: 0.6rem 0 0;
-  font-size: 0.78rem;
-  color: var(--muted);
-}
-.show-stats-cap a {
-  color: var(--brand-d);
-  text-decoration: none;
-  font-weight: 600;
-}
-.show-stats-cap a:hover,
-.show-stats-cap a:focus-visible { text-decoration: underline; text-underline-offset: 3px; }
+/* `.show-stats-cap` — "Rank on the all-time Shows feed; T marks a tie" — has
+   no emitter since 2026-09-03: the tiles follow the window selected on the
+   strip, so a caption naming the period would restate the highlighted cell
+   (Reed's call). Its rules came out with it; `git log -S show-stats-cap` has
+   them. */
 
 /* ── The OnlyBoosts Charts strip ────────────────────────────────────────
    The subject's chart position in each boost-time window (Week · Month ·
-   Year · All time), above the stat tiles; feed-rank.js renders it and the
-   tiles' three ranks are the all-time score's components. It replaced the
-   single all-time line on 2026-08-31 (option A of the windows design pass).
+   Year · All time), above the stat tiles; feed-rank.js renders it. It
+   replaced the single all-time line on 2026-08-31 (option A of the windows
+   design pass), and since 2026-09-03 it is ALSO THE TILES' WINDOW SELECTOR
+   (Reed's ask): each cell picks which window's row of tiles is on screen,
+   and the tiles' three chips are that window's component ranks.
 
    The vocabulary is the rank chip's — tabular sans, T#, --brand-d for a
    standing — at strip scale: hairline-separated cells on the card surface,
-   the all-time cell washed in --brand-tint to mark the durable standing
-   against the three rolling ones. A dash cell (outside the top 100, or no
-   boosts in the window) drops to --muted and is a <span>, so only real
-   standings read as links. Top-100 gated per window in feed-rank.js and the
-   whole strip withheld when nothing charts — no reserved space. Tokens only,
-   so dark mode needs nothing. */
+   the SELECTED cell (`aria-current`, all time on load) washed in
+   --brand-tint, the same tint the chips below wear. A dash cell (outside the
+   top 100, or no boosts in the window) drops to --muted and is a <button>
+   rather than a link, so only real standings lead to a chart view — but it
+   still selects its window, which is why the strip is no longer withheld
+   when nothing charts. Tokens only, so dark mode needs nothing. */
 .show-chart { margin: 0 0 0.7rem; }
 .show-chart-label {
   display: inline-block;
@@ -332,9 +334,23 @@
   padding: 0.4rem 0.3rem 0.45rem;
   border-left: 1px solid var(--border);
   text-decoration: none;
+  /* The <button> cells reset to the <a> cells' look: same box, same face,
+     no UA chrome. `font: inherit` alone is not enough for a button's
+     colour. */
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border-top: 0; border-right: 0; border-bottom: 0;
+  border-radius: 0;
+  cursor: pointer;
 }
 .show-chart-cell:first-child { border-left: 0; }
-.show-chart-cell--all { background: var(--brand-tint); }
+.show-chart-cell:hover { background: var(--cream-d); }
+.show-chart-cell:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+.show-chart-cell[aria-current="true"] { background: var(--brand-tint); }
+/* The selected window's label steps up to the standing's colour, so the strip
+   reads as a control with a current value and not only as four figures. */
+.show-chart-cell[aria-current="true"] .show-chart-win { color: var(--brand-d); }
 .show-chart-win {
   display: block;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -1373,7 +1389,6 @@ a.boost-who:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px
     padding: 0.08rem 0.3rem;
     font-size: clamp(0.55rem, 2.2vw, 0.63rem);
   }
-  .show-stats-cap { font-size: 0.72rem; }
   /* The wall's phone rules moved to supporter-wall.css with the rest of it. */
   .boost-when { margin-left: 0; }
   /* "Other Shows This Community Boosts" is a long label; keep the hint
