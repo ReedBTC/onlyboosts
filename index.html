@@ -50,20 +50,20 @@
 
   <!-- Shared note / card styles (.note-card, .embed-note) — the boosts
        feeds render through the same kind-1 card as boosts-thread.js. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v187" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v188" />
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v187" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v188" />
   <!-- The episode card and its drawer, extracted from the inline block below
        when /episode/<guid> pages needed the same cards. See the file header. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v187" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v187" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v188" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v188" />
   <!-- The 40 HPW boards on the Members tab; shared with the /hpw/<week> pages. -->
-  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v187" />
+  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v188" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. Must stay last
        among the stylesheets so the inline block below still wins. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v187" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v188" />
 
   <style>
     :root {
@@ -437,7 +437,14 @@
          1.25rem inset here narrows every sub-block and shifts the pair left of
          the tab it belongs to. Whatever padding one row takes, the other takes
          — see the 640px block. */
-      padding: 0 0 0.4rem;
+      /* ⚠️ NO PADDING AT ALL ON DESKTOP since 2026-09-03. The 0.4rem under
+         the blocks was a cream breath below the sub-row while the row ran
+         edge to edge; inside the boxed chrome it read as a dark strip under
+         a filled block that stopped short of the box's edge (Reed's
+         screenshot). The blocks now fill the row to the border. The phone
+         keeps its padding: the tabs are chips there and the box has no
+         sides. */
+      padding: 0;
       display: grid;
       grid-template-columns: repeat(3, 1fr);
     }
@@ -1257,12 +1264,12 @@
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
     }
   </style>
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v187" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v187" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v188" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v188" />
   <!-- The chart boards on the Shows and Artists feeds (charts-block.js) wear
        the Charts page's .cb-* grammar; hpw-board.css above dresses their
        week picker and the members' Weeks at #1 rows. -->
-  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v187" />
+  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v188" />
 </head>
 <body data-active-feed="shows-global">
 
@@ -2613,17 +2620,17 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v187"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v188"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v187" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v188" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v187" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v188" defer></script>
 
 <!-- Feed hydration — lazily loads the active feed on first view. -->
-<script type="module" src="/assets/js/feeds.js?v=ob-v187"></script>
-<script src="/assets/js/nav.js?v=ob-v187" defer></script>
+<script type="module" src="/assets/js/feeds.js?v=ob-v188"></script>
+<script src="/assets/js/nav.js?v=ob-v188" defer></script>
 
 </body>
 </html>

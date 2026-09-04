@@ -1733,8 +1733,9 @@ What a change elsewhere would break:
   navigation, and `replaceState` fires **no `hashchange`** — which is the only thing
   stopping the spy tripping `revealHashTarget()` and opening a drawer as a side
   effect of scrolling past it. The two coexist on exactly that property.
-- **⚠️ EVERY DRAWER ON THE FOUR PAGES OPENS ON CHART RANK** (2026-09-03,
-  Reed's ask): the chart formula over the drawer's own rows, computed by the
+- **⚠️ EVERY DRAWER ON THE FOUR PAGES OPENS ON "Overall"** (2026-09-03,
+  Reed's ask; the key is `chart`, the label deliberately not "Chart rank"
+  inside a drawer): the chart formula over the drawer's own rows, computed by the
   two-sided `rank.js#chartRanks` on both sides, so the Function's order and
   the page script's first re-sort are one function. The breadth key is the
   drawer's own (boosters; the community's boosters; episodes on `/booster`'s

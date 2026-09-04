@@ -704,7 +704,10 @@ included: the wall names the community, and this section then says what else
 that community boosts. It sat above the wall from the day it shipped. The ids
 did not move with it.
 
-- **⚠️ EVERY DRAWER OPENS ON CHART RANK SINCE 2026-09-03** — `/show`'s
+- **⚠️ EVERY DRAWER OPENS ON "Overall" SINCE 2026-09-03 — the chart formula
+  over its own rows** (the key is `chart`; the label is "Overall" here where
+  the feeds say "Chart rank", because inside a drawer the standing is over
+  that list alone). The drawers: `/show`'s
   `#episodes` and `#community-shows`, `/episode`'s `#community-episodes`,
   `/booster`'s `#shows` and `#episodes`, `/artist`'s `#albums` and
   `#community-artists`. *Reed's ask:* "the same formula as for the charts, but

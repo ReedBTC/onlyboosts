@@ -125,6 +125,11 @@ export function rankLabel(rank, tied) {
  * there is a change to both; scripts/test-charts.mjs holds this function to
  * its brute-forced implementation of the same rule.
  *
+ * ⚠️ THE MENU CALLS IT "Overall" ON THE DETAIL PAGES (Reed, 2026-09-03), where
+ * the homepage feeds and the members wall say "Chart rank": inside a drawer
+ * the standing is over that list alone, not the OnlyBoosts Charts, and the
+ * word says so. The key stays `chart` everywhere.
+ *
  * O(n²) in the component ranking, which is fine for a drawer (the largest
  * holds 500 rows) and would not be for a feed.
  *
