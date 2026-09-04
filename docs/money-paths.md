@@ -612,6 +612,27 @@ the podcaster's end; tier two is gated on Helipad's `fetch_metadata`, which
 metadata. So the two are not alternatives of equal standing — tier two is the
 answer for the legs tier one cannot have.
 
+### A Node Address Is Not Always A Pubkey
+
+**A value block's `type: "node"` recipient may carry the node's whole
+connection string**, `<pubkey>@<host>:<port>`, the shape `lncli connect` takes,
+because that is what a podcaster has to hand when they fill in
+`<podcast:valueRecipient address>`, and Podcast Index relays it as published.
+Handed to a wallet as the keysend destination it is refused outright. On
+2026-09-04 Alby Hub answered `encoding/hex: invalid byte: '@'` on a 2,200-sat
+leg to a `.onion:9735` address, three times across two retries; the show
+received nothing while its 1% Podcast Index fee leg paid each time.
+
+`keysendLookup.js#nodePubkeyOf` is the rule: the pubkey is the part before
+the `@`, held to the same strict compressed-secp256k1 test the keysend
+well-known lookup applies, lowercased. `payKeysendLeg` calls it before
+anything is asked of a wallet, on both the NWC and the WebLN path, and an
+address that yields no pubkey is a clean FAILED with the address quoted in the
+reason: nothing is in flight, so the Retry it carries is safe, and it will
+fail the same way, which is honest, since the block rather than the donor's
+wallet is what is wrong. `leg.recipient.address` stays exactly as published;
+only the destination handed to the wallet is trimmed.
+
 ### The Keysend Upgrade
 
 `login-widget/src/lib/keysendLookup.js` + `functions/api/keysend.js`. Some

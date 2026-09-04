@@ -10,16 +10,16 @@
  * here, so the page carries the shared boost-section machinery, the note
  * verbs, and the Primal backfill like its three siblings.
  */
-import { sortControl } from '/assets/js/feed-controls.js?v=ob-v191'
+import { sortControl } from '/assets/js/feed-controls.js?v=ob-v192'
 // The drawers' chart standing, the same function the Function ordered them by.
-import { chartRanks, rankLabel } from '/assets/js/rank.js?v=ob-v191'
+import { chartRanks, rankLabel } from '/assets/js/rank.js?v=ob-v192'
 import {
   initCopyNpub, initShowMore, initShare, initBackLink,
   initHashRouting, initHashSpy, initArt2, hydrateProfiles, initStatWindows,
-} from '/assets/js/detail-page.js?v=ob-v191'
-import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v191'
-import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v191'
-import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v191'
+} from '/assets/js/detail-page.js?v=ob-v192'
+import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v192'
+import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v192'
+import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v192'
 
 const GUID = document.body.dataset.artistGuid || ''
 

@@ -351,16 +351,16 @@ function renderArtistPage({ pub, albums, totals, community, supporters, boosts, 
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v191" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v191" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v191" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v191" />
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v191" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v191" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v192" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v192" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v192" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v192" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v192" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v192" />
   <!-- The boost note card and its reaction bar, for #boosts — the same
        .note-card every other detail page's list paints. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v191" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v191" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v192" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v192" />
 </head>
 <body data-artist-guid="${htmlEscape(pub.publisher_guid)}">
 
@@ -575,12 +575,12 @@ function renderArtistPage({ pub, albums, totals, community, supporters, boosts, 
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav.js?v=ob-v191" defer></script>
-<script src="/assets/js/artist-page.js?v=ob-v191" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v192" defer></script>
+<script src="/assets/js/artist-page.js?v=ob-v192" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v191"></script>
-<script src="/assets/js/sw-register.js?v=ob-v191" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v192"></script>
+<script src="/assets/js/sw-register.js?v=ob-v192" defer></script>
 </body>
 </html>`;
 }
@@ -768,10 +768,10 @@ function notFound(guid) {
   <meta name="robots" content="noindex" />
   <title>Artist not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v191" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v191" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v191" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v191" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v192" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v192" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v192" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v192" />
 </head>
 <body>
 <section class="page-header">
@@ -789,7 +789,7 @@ function notFound(guid) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v191" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v192" defer></script>
 </body>
 </html>`;
   return new Response(html, {

@@ -597,7 +597,11 @@
 // UNCERTAIN forever when the wallet's reply is late. Widget only; the two
 // stranded legs of a 2026-09-04 boost are the reason. REQUIRED: the bundle is
 // stamped at the reference sites like every asset.
-const VERSION = 'ob-v191';
+// ob-v192: a value block's node recipient published as a CONNECTION STRING
+// (`<pubkey>@<host>:<port>`) is paid to its pubkey rather than refused by the
+// wallet — a 2,200-sat leg to a .onion address failed three times on
+// 2026-09-04 with `encoding/hex: invalid byte: '@'`. Widget only.
+const VERSION = 'ob-v192';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;
@@ -633,26 +637,26 @@ const PRECACHE_URLS = [
   // precaching it spent 93KB on every install for nothing.
   '/assets/onlyboosts_banner_clear.png',
   '/assets/avatar-fallback.svg',
-  '/assets/css/theme.css?v=ob-v191',
-  '/assets/css/page.css?v=ob-v191',
-  '/assets/css/nav.css?v=ob-v191',
-  '/assets/css/footer.css?v=ob-v191',
-  '/assets/css/boosts-thread.css?v=ob-v191',
-  '/assets/css/boost-actions.css?v=ob-v191',
+  '/assets/css/theme.css?v=ob-v192',
+  '/assets/css/page.css?v=ob-v192',
+  '/assets/css/nav.css?v=ob-v192',
+  '/assets/css/footer.css?v=ob-v192',
+  '/assets/css/boosts-thread.css?v=ob-v192',
+  '/assets/css/boost-actions.css?v=ob-v192',
   // The episode card and its drawer. Precached alongside the others because the
   // homepage's feeds are painted in it and it used to be inline in index.html,
   // which IS precached — leaving it out would trade an inline block for a
   // network round trip on the one page this list exists to make fast.
-  '/assets/css/feed-cards.css?v=ob-v191',
-  '/assets/js/boosts-thread.js?v=ob-v191',
+  '/assets/css/feed-cards.css?v=ob-v192',
+  '/assets/js/boosts-thread.js?v=ob-v192',
   // A static import of boosts-thread.js, so precaching that without this one
   // leaves a returning visitor fetching half the graph from the network.
-  '/assets/js/primal-profiles.js?v=ob-v191',
-  '/assets/js/boost-actions.js?v=ob-v191',
-  '/assets/js/nav.js?v=ob-v191',
-  '/assets/js/nav-widget-boot.js?v=ob-v191',
-  '/assets/js/widget-loader.js?v=ob-v191',
-  '/assets/js/sw-register.js?v=ob-v191',
+  '/assets/js/primal-profiles.js?v=ob-v192',
+  '/assets/js/boost-actions.js?v=ob-v192',
+  '/assets/js/nav.js?v=ob-v192',
+  '/assets/js/nav-widget-boot.js?v=ob-v192',
+  '/assets/js/widget-loader.js?v=ob-v192',
+  '/assets/js/sw-register.js?v=ob-v192',
 ];
 
 self.addEventListener('install', (event) => {

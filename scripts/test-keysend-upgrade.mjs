@@ -80,7 +80,7 @@ writeFileSync(
   readFileSync(join(ROOT, 'login-widget/src/lib/keysendLookup.js'), 'utf8'),
 )
 const {
-  isLnurlOnlyAddress, parseKeysendResponse, lookupKeysendTarget,
+  isLnurlOnlyAddress, parseKeysendResponse, lookupKeysendTarget, nodePubkeyOf,
   walletCanKeysend, noteKeysendUnsupported, clearKeysendLookupCache,
 } = await import(pathToFileURL(join(dir, 'keysendLookup.js')).href)
 
@@ -142,6 +142,25 @@ try {
   })
   await ok('destination and nodeId are accepted as aliases', () => {
     assert.equal(parseKeysendResponse({ destination: PUBKEY }).pubkey, PUBKEY)
+  })
+
+  console.log('\nnodePubkeyOf — a value block\'s node address, as published')
+  await ok('a bare pubkey passes, lowercased', () => {
+    assert.equal(nodePubkeyOf(PUBKEY), PUBKEY)
+    assert.equal(nodePubkeyOf(` ${PUBKEY.toUpperCase()} `), PUBKEY)
+  })
+  await ok('⚠️ a connection string yields the pubkey before the @ (the 2026-09-04 failure)', () => {
+    assert.equal(nodePubkeyOf(`${PUBKEY}@obxevbeocz3rv2wgeallmgl2luzaog5obo3j625tdbgb2jmbkmz3a6id.onion:9735`), PUBKEY)
+    assert.equal(nodePubkeyOf(`${PUBKEY}@203.0.113.9:9735`), PUBKEY)
+    assert.equal(nodePubkeyOf(`${PUBKEY}@node.example`), PUBKEY)
+  })
+  await ok('anything that is not a compressed pubkey is null', () => {
+    assert.equal(nodePubkeyOf('bob@getalby.com'), null, 'a lightning address under the wrong type')
+    assert.equal(nodePubkeyOf(PUBKEY.slice(0, 65)), null, 'truncated')
+    assert.equal(nodePubkeyOf('04' + 'a'.repeat(64)), null, 'uncompressed prefix')
+    assert.equal(nodePubkeyOf(''), null)
+    assert.equal(nodePubkeyOf(null), null)
+    assert.equal(nodePubkeyOf(`@${PUBKEY}`), null, 'the pubkey is the head, never the tail')
     assert.equal(parseKeysendResponse({ nodeId: PUBKEY2 }).pubkey, PUBKEY2)
   })
   await ok('tag: "keysend" is deliberately not required', () => {

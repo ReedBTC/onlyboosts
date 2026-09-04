@@ -125,6 +125,29 @@ function firstCustomPair(data) {
  * check is the real gate, and self-hosted endpoints are looser about the
  * envelope than the custodial ones.
  */
+/**
+ * The node pubkey a value block's `type: "node"` recipient names, or null.
+ *
+ * ⚠️ A NODE ADDRESS IN THE WILD IS NOT ALWAYS A BARE PUBKEY. Podcasters paste
+ * their node's CONNECTION STRING — `<pubkey>@<host>:<port>`, the shape `lncli
+ * connect` takes — into `<podcast:valueRecipient address>`, and Podcast Index
+ * relays it as published. Handed to a wallet as the keysend destination it is
+ * refused outright: Alby Hub answered `encoding/hex: invalid byte: '@'` on a
+ * 2,200-sat leg to a `.onion:9735` address on 2026-09-04, three times, and the
+ * show got nothing while its fee leg paid. The pubkey is the part before the
+ * `@`; the host is how peers connect to the node and is not part of a payment.
+ *
+ * Same strict rule as parseKeysendResponse: 33-byte compressed secp256k1,
+ * lowercased. Anything else — a lightning address that landed under the wrong
+ * type, a truncated key, an empty string — is null, and the caller fails the
+ * leg before asking a wallet to pay to it.
+ */
+export function nodePubkeyOf(address) {
+  if (typeof address !== 'string') return null
+  const head = address.trim().split('@')[0].trim()
+  return NODE_PUBKEY.test(head) ? head.toLowerCase() : null
+}
+
 export function parseKeysendResponse(data) {
   if (!data || typeof data !== 'object' || Array.isArray(data)) return null
   if (typeof data.status === 'string' && data.status.toUpperCase() === 'ERROR') return null

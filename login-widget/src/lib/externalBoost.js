@@ -47,6 +47,7 @@ import {
   lookupKeysendTarget,
   walletCanKeysend,
   noteKeysendUnsupported,
+  nodePubkeyOf,
 } from './keysendLookup.js'
 import {
   buildBoostagram,
@@ -514,6 +515,16 @@ async function payKeysendLeg(leg, ctx, update, timer, upgraded) {
   // is issued against, and what the boostagram credits — while `dest` is where
   // the sats are actually addressed.
   const dest = upgraded || leg.recipient
+  // ⚠️ THE WALLET GETS A PUBKEY, NEVER THE PUBLISHED STRING. A value block's
+  // node address may be the node's whole connection string; see nodePubkeyOf.
+  // Nothing has been asked of a wallet yet, so an unreadable one is a clean
+  // FAILED — the same standing a pre-payment error has — and carries a Retry
+  // that will fail the same way, which is honest: the block, not the donor's
+  // wallet, is what is wrong.
+  const pubkey = nodePubkeyOf(dest.address)
+  if (!pubkey) {
+    return { status: STATUS.FAILED, error: `This recipient’s node address isn’t a valid pubkey (${String(dest.address || '').slice(0, 24)}…).` }
+  }
   const boostagram = buildBoostagram({
     legMsats: leg.sats * 1000,
     totalMsats: ctx.totalSats * 1000,
@@ -543,7 +554,7 @@ async function payKeysendLeg(leg, ctx, update, timer, upgraded) {
       try {
         res = await client.payKeysend({
           amount: leg.sats * 1000,           // msats
-          pubkey: dest.address,              // node pubkey
+          pubkey,                            // node pubkey, bare
           preimage,
           tlv_records: toTlvHex(boostagram, dest),
         })
@@ -573,7 +584,7 @@ async function payKeysendLeg(leg, ctx, update, timer, upgraded) {
     if (!window.webln) throw new Error('No WebLN provider')
     const res = await withTimeout(
       Promise.resolve(window.webln.keysend({
-        destination: dest.address,
+        destination: pubkey,
         amount: leg.sats,
         customRecords: toWeblnRecords(boostagram, dest),
       })),
