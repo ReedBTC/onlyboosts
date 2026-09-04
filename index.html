@@ -218,9 +218,14 @@
       height: auto;
       margin: 0 auto;
     }
+    /* ⚠️ THE MEASURE IS WIDE ENOUGH FOR THE TAGLINE ON ONE LINE. It was 34rem,
+       which wrapped "Charts and RSS Discoverability powered by Podcasting 2.0
+       Boosts on Nostr" at 0.98rem on a desktop with room to spare (Reed,
+       2026-09-04). The page track is 60rem; the line still wraps on a phone
+       as any line would. */
     .masthead p {
       margin: 0.5rem auto 0;
-      max-width: 34rem;
+      max-width: var(--feed-track);
       font-size: 0.98rem;
       color: var(--muted);
       line-height: 1.5;
