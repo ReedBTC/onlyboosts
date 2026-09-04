@@ -459,4 +459,8 @@ Follows views light up only once someone signs in.
   the hourly tick would be rude for data that changes when a publisher edits a feed.
   A newly-published podroll can take up to a week to appear. Everything else on the
   page is still hourly.
-- Data updates when the collector's timer runs; `generated_at` tells you how fresh a file is.
+- Data updates when the collector's timer runs **and the index changed**. Since 2026-09-04 the
+  five-minute cycle rewrites and pushes these files only when something in the index moved
+  (a boost, an enrichment, an exclusion), so on a quiet stretch `generated_at` can be hours
+  old while the data is current. Read it as "when this file was last built", not as a
+  liveness signal; the boost tail is still scanned every five minutes.

@@ -24,8 +24,35 @@ echo "=== $(date -u +%FT%TZ) OnlyBoosts incremental cycle ==="
 "$PY" "$BOT" dedupe               # mark relay-bot notes duplicating another app's note (7d window)
 "$PY" "$BOT" enrich               # fill metadata/profiles for anything new
 "$PY" "$BOT" durations            # derive durations for boosted episodes with none (#40HPW evenness; capped per tick)
-"$PY" "$BOT" export --per-show    # rebuild the JSON shards
-"$PY" "$BOT" push                 # rsync changed shards to the VPS (no --delete: nothing is removed on a tail run)
+# ── publish: export → push → cards → push, ONLY WHEN THE INDEX CHANGED ────────
+# `publish-due` digests every published column of every published table and
+# compares it with what the last full export recorded (and with what the last
+# push shipped). On a typical cycle nothing above changed a row — 0 or 1 new
+# boosts, enrich/dedupe/durations touched nothing — and rewriting 2,485 files
+# that rsync then skips is the CPU this gate saves. Measured 2026-09-04, before
+# it existed: 3m14s CPU per cycle, 11.7 CPU-hours a day, on a box whose fans
+# tracked the timer. An edited excludes.json still re-exports: every connect
+# re-applies the list onto boosts.excluded, and that flag is in the digest.
+#
+# ⚠️ THE D1 DELTA IS DELIBERATELY OUTSIDE THE GATE. It has its own precise
+# pending state — the d1_boosts_synced markers, the reproject queue, the
+# metadata watermark — and its no-op is one local Python run with no remote
+# call. Gating it would trade that for a coarser test AND lose its retry: a
+# delta that failed on a CF hiccup is retried next tick today, and would
+# otherwise wait for the next unrelated change. D1 is what the site reads;
+# the shards are the published dataset and the /about strip.
+#
+# The share cards ride the gate: they photograph the live site, which reads D1,
+# and D1 changes when the index does. The one thing that moves a board with no
+# index change is the Monday 00:00 Pacific week rollover (Weeks at #1 gains a
+# completed week); that re-renders on the first boost of the new week, which
+# is the accepted lag. The gate FAILS OPEN — an exception in it is "due".
+PUBLISHED=
+if "$PY" "$BOT" publish-due; then
+  "$PY" "$BOT" export --per-show  # rebuild the JSON shards (records the digest it built from)
+  "$PY" "$BOT" push               # rsync changed shards to the VPS (no --delete: nothing is removed on a tail run)
+  PUBLISHED=1
+fi
 "$PY" d1_sync.py --remote-delta   # push new boosts to the D1 query layer (/api/v1); no-op if none / no CF creds
 
 # ── share cards: the #40HPW boards and the OnlyBoosts Charts boards ──────────
@@ -55,6 +82,8 @@ echo "=== $(date -u +%FT%TZ) OnlyBoosts incremental cycle ==="
 # The card page merged in 4ec28ae (2026-08-30) and the 99-week history is
 # already on the VPS, so enabling this only keeps it current. See
 # ../hpw-cards/README.md.
-../hpw-cards/run-hpwcards.sh --live || true   # share cards → shards/{hpw,charts}/*.png
-"$PY" "$BOT" push                             # ship those PNGs on this cycle
+if [ -n "$PUBLISHED" ]; then
+  ../hpw-cards/run-hpwcards.sh --live || true   # share cards → shards/{hpw,charts}/*.png
+  "$PY" "$BOT" push                             # ship those PNGs on this cycle
+fi
 echo "=== $(date -u +%FT%TZ) cycle done ==="

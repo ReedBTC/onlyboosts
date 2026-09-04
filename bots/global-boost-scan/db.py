@@ -1381,16 +1381,22 @@ def apply_aliases(conn):
     # so a bare name binds to the INNER table and the condition degrades to
     # `COALESCE(b.canonical_guid, b.podcast_guid) = b.podcast_guid` — true for
     # every un-aliased boost, which deletes the whole ledger on every cycle.
-    conn.execute(
-        f"""DELETE FROM d1_podcasts_orphaned
-            WHERE EXISTS (SELECT 1 FROM boosts b
-                          WHERE {effective_guid("b")} = d1_podcasts_orphaned.podcast_guid)""")
+    #
+    # ⚠️ `IN (subquery)`, NOT A CORRELATED `EXISTS` — the same trap stats() notes.
+    # The effective guid is a COALESCE, so no index serves it, and a correlated
+    # EXISTS re-scans the whole boosts table once per outer row. The table is
+    # fat (raw_json is inline), so that is ~100MB of page reads per alias:
+    # 923 aliases cost 48s of CPU — half of it in the kernel — every five
+    # minutes, on a step whose answer was "0 re-keyed" (measured 2026-09-04).
+    # The IN form materializes the set of live effective guids once.
+    live = (f"SELECT DISTINCT {effective_guid('b')} FROM boosts b "
+            f"WHERE {effective_guid('b')} IS NOT NULL")
+    conn.execute(f"DELETE FROM d1_podcasts_orphaned WHERE podcast_guid IN ({live})")
     conn.execute(
         f"""INSERT OR IGNORE INTO d1_podcasts_orphaned (podcast_guid)
             SELECT DISTINCT a.raw_guid FROM guid_aliases a
             WHERE a.raw_guid <> a.canonical_guid
-              AND NOT EXISTS (SELECT 1 FROM boosts b
-                              WHERE {effective_guid("b")} = a.raw_guid)""")
+              AND a.raw_guid NOT IN ({live})""")
     conn.commit()
 
     to_change = [r[0] for r in conn.execute(
@@ -1485,6 +1491,50 @@ def set_last_incremental(conn, relay, newest):
              last_incremental=MAX(COALESCE(scan_state.last_incremental, 0), excluded.last_incremental)""",
         (relay, newest))
     conn.commit()
+
+
+# ── the publish gate ──────────────────────────────────────────────────────────
+# The incremental cycle exports and pushes only when the index CHANGED, and this
+# is how it knows. A digest over every published column of every published
+# table: `export --per-show` records it (EXPORT_FP_KEY), `push` records that the
+# recorded export reached the VPS (PUSHED_FP_KEY), and `publish-due` compares
+# the live digest with both. See run-incremental.sh for the block it gates.
+#
+# ⚠️ CONTENT, NOT BOOKKEEPING. The skipped columns are the ones that record
+# that we LOOKED rather than what we found (the refresh gates — checked_at and
+# friends — and event_at/resolved_at), the raw blobs nothing publishes, and
+# `updated_at`, which is redundant with the content it stamps (upsert_show bumps
+# it on an identical re-upsert). A look that found nothing new must not cost a
+# re-export, or the gate is worth nothing. A new content column is covered
+# automatically, and so is a schema change (the column list is hashed); a new
+# look-timestamp has to be added here or every sweep that stamps it re-exports
+# the world — the failure is loud in `Consumed`, not silent.
+FINGERPRINT_TABLES = ("boosts", "episodes", "shows", "profiles", "podroll",
+                      "publishers", "publisher_albums", "guid_aliases", "excluded_ids")
+FINGERPRINT_SKIP = frozenset({"raw_json", "r_urls", "updated_at", "checked_at",
+                              "duration_checked_at", "podroll_checked_at",
+                              "event_at", "resolved_at"})
+EXPORT_FP_KEY = "export_fingerprint"    # meta: the index the shards on disk were built from
+PUSHED_FP_KEY = "pushed_fingerprint"    # meta: the EXPORT_FP_KEY value the VPS last received
+
+
+def content_fingerprint(conn):
+    """sha256 hex over the published content of the index; ~0.5s on 40k boosts.
+
+    Rows are read in rowid order and hashed as tuples — NOT `repr(row)`, which
+    on a sqlite3.Row is an object address and would differ on every call."""
+    import hashlib
+    h = hashlib.sha256()
+    for table in FINGERPRINT_TABLES:
+        if not _has_table(conn, table):
+            continue
+        cols = [r[1] for r in conn.execute(f"PRAGMA table_info({table})")
+                if r[1] not in FINGERPRINT_SKIP]
+        h.update(f"{table}:{','.join(cols)}\n".encode())
+        for row in conn.execute(f"SELECT {', '.join(cols)} FROM {table} ORDER BY rowid"):
+            h.update(repr(tuple(row)).encode())
+            h.update(b"\n")
+    return h.hexdigest()
 
 
 def get_meta(conn, key, default=None):

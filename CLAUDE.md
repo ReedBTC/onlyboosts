@@ -1331,6 +1331,22 @@ docstring carries the two relay quirks the wider filter set met (per-filter
 caps make a multi-filter REQ unpageable, and two nginx fronts 429 back-to-back
 handshakes).
 
+**⚠️ THE FIVE-MINUTE CYCLE PUBLISHES ONLY WHEN THE INDEX CHANGED, SINCE
+2026-09-04.** `publish-due` in `onlyboosts_globalscan.py` digests every
+published column of every published table (`db.content_fingerprint`) and
+compares it with what the last full export recorded and what the last push
+shipped; `export --per-show`, `push` and the share cards run only when it says
+so, and the D1 delta runs every tick regardless — it has its own pending
+state and its own retry. Before the gate a no-change cycle cost **3m14s of
+CPU**, 11.7 CPU-hours a day, to rewrite files rsync then skipped: 135s of it
+the per-show export re-scanning the boosts table twice per show on the
+unindexable `COALESCE` guid, 48s of it `apply_aliases` doing the same once
+per alias. Both are one pass now (`export.py`'s per-show block, and the
+`IN (subquery)` note in `db.apply_aliases`); the daily outbox and podroll runs
+still export unconditionally. A quiet stretch leaves `generated_at` old while
+the data is current — it is when the shards were last built, not a liveness
+signal. The gate fails open: an exception in it is "due".
+
 Two stores, one model. **D1 behind `/api/v1/*` is what every feed and page
 reads.** The collector also publishes static JSON to
 `https://relay.mynostr.app/onlyboosts/`, proxied through

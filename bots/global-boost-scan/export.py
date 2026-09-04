@@ -257,18 +257,45 @@ def export(conn, out_dir, latest_n=1000, per_show=False, log=print):
 
     # ── optional per-show detail shards (full shownotes live here) ────────────
     if per_show:
+        # ⚠️ ONE PASS OVER THE DATA, GROUPED IN PYTHON — NOT ONE QUERY PER SHOW.
+        # Until 2026-09-04 this block ran two queries per show, each filtering
+        # the whole boosts table on the effective guid. That guid is a COALESCE,
+        # so no index serves it: 2,450 shows × 2 × ~39k rows ≈ 190M row
+        # evaluations, 135s at 100% of one core, every five minutes, to rewrite
+        # files that were byte-identical to the previous run. `records` is
+        # already the whole feed in newest-first order, so a show's boost list is
+        # a bucket of it; the per-episode aggregates come from the same GROUP BY
+        # as before with the per-show predicate replaced by a grouping key.
+        #
+        # Both orders are preserved exactly (verified by diff -r against the
+        # per-show version over the live index): boosts newest-first as `records`
+        # has them, episodes by their newest boost within each show. Byte
+        # identity is load-bearing — rsync skips an unchanged shard, and the site
+        # reads these files as a contract.
+        boosts_by_show = {}
+        for rec in records:
+            g = rec["podcast"]["guid"]          # the effective guid, as `agg` keys it
+            if g is not None:
+                boosts_by_show.setdefault(g, []).append(rec)
+        # `e.*` carries its own `podcast_guid` column, so the grouping key gets a
+        # name of its own; sqlite3.Row would otherwise hand back whichever came
+        # first.
+        eps_by_show = {}
+        for e in conn.execute(f"""
+                SELECT {_EFF} AS show_guid, e.*, COUNT(b.event_id) AS boosts,
+                       COALESCE(SUM(b.sats),0) AS sats
+                FROM boosts b LEFT JOIN episodes e ON e.item_guid = b.item_guid
+                WHERE {_EFF} IS NOT NULL AND b.item_guid IS NOT NULL
+                  AND {db.not_excluded('b')}
+                GROUP BY show_guid, b.item_guid
+                ORDER BY show_guid, MAX(b.created_at) DESC"""):
+            eps_by_show.setdefault(e["show_guid"], []).append(e)
+
         n = 0
         for a in agg:
             pg = a["podcast_guid"]
-            eps = conn.execute(f"""
-                SELECT e.*, COUNT(b.event_id) AS boosts,
-                       COALESCE(SUM(b.sats),0) AS sats
-                FROM boosts b LEFT JOIN episodes e ON e.item_guid = b.item_guid
-                WHERE {_EFF} = ? AND b.item_guid IS NOT NULL AND {db.not_excluded('b')}
-                GROUP BY b.item_guid ORDER BY MAX(b.created_at) DESC""", (pg,)).fetchall()
-            show_boosts = [_record(r) for r in
-                           conn.execute(_FEED_SQL + f" AND {_EFF} = ? "
-                                        "ORDER BY b.created_at DESC", (pg,)).fetchall()]
+            eps = eps_by_show.get(pg, ())
+            show_boosts = boosts_by_show.get(pg, [])
             # No generated_at here either — a show's file changes only when that
             # show gets a new boost, so rsync ships just the handful that moved.
             write_json(out / "podcasts" / f"{_safe(pg)}.json", {

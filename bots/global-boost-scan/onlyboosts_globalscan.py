@@ -63,6 +63,7 @@ from collector_common import query_relay                        # noqa: E402
 from nostr_utils import load_config                             # noqa: E402
 
 DB_PATH = str(HERE / "data" / "onlyboosts.db")
+SHARDS_DIR = HERE / "data" / "shards"   # the tree `push` ships; the publish gate stamps only this one
 CREDENTIALS = "/home/reed/.config/nostr-bots/credentials.env"
 # Same restricted-rrsync key + VPS LB uses; shards land UNDER an onlyboosts/
 # subdir of the rrsync-locked deploy root so they can never collide with LB's
@@ -1229,13 +1230,66 @@ def _print_stats(conn):
     print(f"  boosters:    {s['distinct_boosters']:>8}   ({s['profiles']} profiled)")
 
 
+def _is_shards_dir(path):
+    return Path(path).resolve() == SHARDS_DIR.resolve()
+
+
 def cmd_export(args):
     conn = db.connect(DB_PATH, check_same_thread=False)
+    # The publish gate: a full export into the tree `push` ships records what
+    # the shards were built from. A feed-only export leaves the per-show
+    # shards behind the index, and a scratch --out is somebody's diff test, so
+    # neither is recorded. The digest is taken BEFORE the reads: a write that
+    # lands between the two then shows up as "changed" next cycle and costs one
+    # spare export, where taking it after would record a state the shards do
+    # not hold and skip the export that fixes it.
+    stamp = args.per_show and _is_shards_dir(args.out)
+    fp = db.content_fingerprint(conn) if stamp else None
     print(f"Exporting shards → {args.out}")
     n = export_mod.export(conn, args.out, latest_n=args.latest_n,
                           per_show=args.per_show,
                           log=lambda m: print(m, flush=True))
+    if stamp:
+        db.set_meta(conn, db.EXPORT_FP_KEY, fp)
     print(f"Export done: {n} boost records.")
+
+
+def cmd_publish_due(args):
+    """The publish gate for run-incremental.sh: exit 0 when the shards need
+    exporting and pushing, 1 when the index is unchanged since the last full
+    export AND that export reached the VPS. One line of stdout says which.
+
+    Three things make it due, checked in order: no export on record (a fresh
+    box, or the first cycle after this gate shipped); the live digest differs
+    from the exported one (a new boost, an enrichment, a dedupe mark, an
+    edited excludes.json — every connect re-applies the list, so the flags
+    are already in the digest by the time this runs); or the exported digest
+    is not the pushed one (the last rsync failed, and `push` reports that with
+    a message and exit 0, so this is what retries it).
+
+    ⚠️ FAILS OPEN. A gate that breaks must cost CPU, never freshness, so any
+    exception here is "due", not "skip" — a traceback's exit 1 would otherwise
+    read to the shell as "nothing to do" on every cycle until someone noticed.
+    """
+    try:
+        conn = db.connect(DB_PATH, check_same_thread=False)
+        now = db.content_fingerprint(conn)
+        exported = db.get_meta(conn, db.EXPORT_FP_KEY)
+        pushed = db.get_meta(conn, db.PUSHED_FP_KEY)
+    except Exception as e:                      # noqa: BLE001 — see docstring
+        print(f"publish due: gate failed open ({e!r})")
+        return
+    if exported is None:
+        why = "no full export on record"
+    elif now != exported:
+        why = "the index changed since the last export"
+    elif pushed != exported:
+        why = "the last export has not reached the VPS"
+    else:
+        print("publish: index unchanged since the last export and push — "
+              "skipping export, push and cards this cycle")
+        sys.exit(1)
+    print(f"publish due: {why}")
 
 
 def cmd_push(args):
@@ -1284,6 +1338,12 @@ def cmd_push(args):
     else:
         if mirror and not args.dry_run:
             marker.unlink(missing_ok=True)
+        if not args.dry_run and _is_shards_dir(shards):
+            # The VPS now holds whatever the last full export built — record
+            # that for the publish gate. Not touched on failure, so a cycle
+            # whose rsync broke re-exports and re-pushes on the next tick.
+            conn = db.connect(DB_PATH, apply_exclusions=False)
+            db.set_meta(conn, db.PUSHED_FP_KEY, db.get_meta(conn, db.EXPORT_FP_KEY, ""))
         print("push OK" if not args.dry_run else "dry-run OK (nothing written)")
 
 
@@ -1389,10 +1449,10 @@ def cmd_excludes(args):
         # Mirrors db._excluded_expr, including its slot-agnostic guid match — a
         # report that counted differently from the filter would be worse than none.
         where = {
-            "boost":     "b.event_id = ?1",
-            "booster":   "b.booster_pubkey = ?1",
-            "show_feed": f"{eg} IN (SELECT podcast_guid FROM shows WHERE feed_url = ?1)",
-        }.get(e["kind"], f"?1 IN (b.podcast_guid, {eg}, b.item_guid)")
+            "boost":     "b.event_id = ?",
+            "booster":   "b.booster_pubkey = ?",
+            "show_feed": f"{eg} IN (SELECT podcast_guid FROM shows WHERE feed_url = ?)",
+        }.get(e["kind"], f"? IN (b.podcast_guid, {eg}, b.item_guid)")
         hits = conn.execute(
             f"SELECT COUNT(*), COALESCE(SUM(b.sats),0) FROM boosts b WHERE {where}",
             (e["id"],)).fetchone()
@@ -1533,6 +1593,11 @@ def main():
     x.add_argument("--per-show", action="store_true",
                    help="also write per-show detail shards (full shownotes)")
     x.set_defaults(func=cmd_export)
+
+    pd = sub.add_parser("publish-due",
+                        help="exit 0 if the shards need exporting+pushing (index changed, "
+                             "or last export not pushed), 1 if not — the incremental gate")
+    pd.set_defaults(func=cmd_publish_due)
 
     pu = sub.add_parser("push", help="rsync shards to the VPS (onlyboosts/ namespace)")
     pu.add_argument("--out", default=str(HERE / "data" / "shards"),
