@@ -28,34 +28,41 @@
  * to be authentic to a high-score table; collapsing the repeats is exactly what
  * the rename did, once the repeats stopped being a story and became a backfill.
  */
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v180'
-import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v180'
-import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v180'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v188'
+import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v188'
+import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v188'
 /* ⚠️ THE SAME WALL /show AND /episode RENDER, not a copy of it. It moved out of
  * functions/_shared/detail-page.js into a two-sided module for exactly this;
  * that file re-exports every name, so both Functions were untouched. A reader
  * who screenshots the wall here and on a show page must not be able to tell
  * them apart. */
-import { renderSupporters, initShowMore, compact } from '/assets/js/supporter-wall.js?v=ob-v180'
+import { renderSupporters, initShowMore, compact } from '/assets/js/supporter-wall.js?v=ob-v188'
 /* ⚠️ EXACT BOOST COUNTS HERE, COMPACT SATS. On the wall a row is one of a
  * hundred and `1k` is plenty; here there are four rows and the count is the
  * disclosure itself — "35 boosts for listeners with no identity" is the claim
  * the section exists to make, and `1k` rounds the evidence away. */
-import { num } from '/assets/js/boost-list.js?v=ob-v180'
-import { rangeControl, sortControl } from '/assets/js/feed-controls.js?v=ob-v180'
-import { mountFeedSearch } from '/assets/js/feed-search.js?v=ob-v180'
-import { searchMembers, SEARCH_HITS } from '/assets/js/ob-live.js?v=ob-v180'
+import { num } from '/assets/js/boost-list.js?v=ob-v188'
+import { rangeControl, sortControl } from '/assets/js/feed-controls.js?v=ob-v188'
+import { mountFeedSearch } from '/assets/js/feed-search.js?v=ob-v188'
+import { searchMembers, SEARCH_HITS } from '/assets/js/ob-live.js?v=ob-v188'
 /* ⚠️ THE SAME WEEK RULE THE ENDPOINT CUTS ON, not a second copy of it. That
  * module is two-sided for exactly this: the picker steps and enumerates weeks
  * without a round trip per press, and a Pacific week containing a DST
  * transition is 167 or 169 hours, so a client that stepped by a flat 604800
  * would drift an hour past every March and every November while still
  * producing Mondays. */
-import { prevWeek, nextWeek, weekSeries, weekDateString, weekStartFromDate } from '/assets/js/pacific-week.js?v=ob-v180'
-import { weekTitle, weekLabel, boardHtml, initials, COPY } from '/assets/js/hpw-board.js?v=ob-v180'
+import { weekDateString } from '/assets/js/pacific-week.js?v=ob-v188'
+import { weekLabel, boardHtml, initials, COPY } from '/assets/js/hpw-board.js?v=ob-v188'
+/* The picker's markup and delegate moved to week-picker.js on 2026-09-03, when
+ * the chart boards on the Shows and Artists feeds needed the same stepper;
+ * flipHtml is the same shape over the two stacked all-time boards. */
+import { pickerHtml, flipHtml, wireWeekPicker, steppedWeek } from '/assets/js/week-picker.js?v=ob-v188'
+/* The members' Weeks at #1 board — the Charts page's own, two-sided since the
+ * same day, stacked behind Proof of #40HPW here. */
+import { memberOnesBoardHtml } from '/assets/js/chart-board.js?v=ob-v188'
 /* The share control: Post to Nostr, Copy link, Share image. A verb, mounted
  * onto each board after it is painted; the same module /hpw/<week> uses. */
-import { mountShare } from '/assets/js/hpw-share.js?v=ob-v180'
+import { mountShare } from '/assets/js/hpw-share.js?v=ob-v188'
 
 const esc = htmlEscape
 const HOURS_API = '/api/v1/members/hours'
@@ -115,73 +122,58 @@ let wallRange = 'all'
  * paint the same rows this tab does, from the same function. The picker, the
  * jump buttons and the Rules dialog are verbs and stay here. */
 
-/* ⚠️ THE TITLE IS THE PICKER, RATHER THAN A CONTROL ROW ABOVE OR BELOW IT.
- * Reed's call, 2026-08-24. The board's header is what a scoreboard navigates by,
- * so the arrows flank the word they change and nothing new is added to a tab
- * that already carries a range, a sort, a lookup and a rules dialog.
- *
- * ⚠️ ARROWS ARE THE PRIMARY AND THE MENU IS THE JUMP, and the split is about
- * what people actually ask for. "Last week" is one press on a 44px target that
- * behaves identically under a mouse and a thumb; a month grid would make that
- * common case a page-flip, and its unit is a DAY where the board's unit is a
- * week, so every pick would silently snap somewhere the reader did not tap. The
- * menu exists for the jump a year back, which is why it is behind the label
- * rather than in front of it — and why the Proof of #40HPW rows above are
- * wired as jumps too.
- *
- * The menu is deliberately the site's own `.pcast-sort-menu`: this is the same
- * kind of choice the feeds' Sort pill makes and a second menu shape for one
- * idea makes the site look like two sites. Its LENGTH IS DATA — 99 weeks today
- * and one more every Monday — so it scrolls, exactly as the language menu does
- * for the same reason.
- *
- * Both arrows render even when disabled. A control that vanishes at the end of
- * a range moves the two beside it, so the header reflows as the reader walks
- * back through the weeks.
- *
- * ⚠️ THE THREE PIECES ARE ONE BORDERED GROUP, AND THE FIRST VERSION WAS NOT.
- * Reed's call, 2026-08-24, on seeing it: the arrows were transparent until
- * hover and the label wore the title's type, so the control was invisible at
- * rest and a touch device never saw the hover state that would have revealed
- * it. The segmented stepper is in `index.html` — everything here builds is the
- * same markup it always was, which is the point of the chrome living in CSS.
- *
- * ⚠️ THE CARET SPAN IS DELIBERATELY EMPTY. It held `▾` (U+25BE) inside a
- * Playfair element, and Playfair carries no such glyph — so it was already
- * falling through to whatever face the platform substituted, at whatever size
- * that face draws it. It is two borders and a rotation now, sized in CSS, the
- * same call `.drawer-hint`'s chevron makes. Putting a character back in here
- * stacks a glyph on top of the drawn one.
- */
-function pickerHtml(ws, live, first) {
-  const atNewest = !live || ws >= live
-  const atOldest = first != null && ws <= first
-  const arrow = (dir, glyph, label, off) =>
-    `<button type="button" class="hpw-arrow" data-hpw-step="${dir}"` +
-    ` aria-label="${esc(label)}" title="${esc(label)}"${off ? ' disabled' : ''}>${glyph}</button>`
-  /* No menu without `first_week`: that query is allowed to fail quietly, and a
-     menu built from a guess would offer weeks before the index begins as though
-     they were empty rather than absent. The arrows still work, so nothing the
-     reader can do is lost. */
-  const weeks = (first != null && live) ? weekSeries(first, live) : []
-  const menu = weeks.length
-    ? `<div class="pcast-sort-menu hpw-weeks" data-hpw-menu hidden role="listbox">` +
-        weeks.map((w) =>
-          `<button type="button" class="pcast-sort-item${w === ws ? ' is-active' : ''}" role="option"` +
-          ` aria-selected="${w === ws}" data-hpw-goweek="${esc(weekDateString(w))}">` +
-          `${esc(weekTitle(w, live))}</button>`).join('') +
-      `</div>`
-    : ''
-  const label = esc(weekTitle(ws, live))
-  const pick = weeks.length
-    ? `<button type="button" class="hpw-pick" data-hpw-pick aria-haspopup="listbox" aria-expanded="false"` +
-      ` title="Pick a week">${label}<span class="hpw-pick-caret" aria-hidden="true"></span></button>`
-    : `<span class="hpw-pick hpw-pick--static">${label}</span>`
-  return `<span class="hpw-nav" data-hpw-nav>` +
-    arrow('prev', '‹', 'Previous week', atOldest) +
-    `<span class="hpw-pick-wrap">${pick}${menu}</span>` +
-    arrow('next', '›', 'Next week', atNewest) +
-  `</span>`
+/* The picker's markup (pickerHtml) and its ⚠️ design record live in
+ * week-picker.js since 2026-09-03; this file keeps only the state it steps. */
+
+/* The stacked board at `stackIndex`, as markup. Proof's title is the flip
+ * stepper where it was the plain name; the Weeks at #1 board is the Charts
+ * page's, its rows' weeks wired as picker jumps (no weekHref). */
+function stackBoardHtml() {
+  const titleHtml = flipHtml(STACK, stackIndex)
+  if (stackIndex === 0) {
+    return boardHtml({
+      board: 'all',
+      // The words are hpw-board.js's COPY, shared with /hpw/high-scores.
+      title: COPY.proofTitle,
+      titleHtml,
+      sub: COPY.proofSub(goalHours),
+      members: proofData?.members || [],
+      goal: goalHours,
+      empty: COPY.emptyAll,
+    })
+  }
+  if (!onesRows) {
+    return `<section class="cb-board" data-cb-board="members-ones"><h3 class="cb-head">${titleHtml}</h3>` +
+      `<p class="cb-empty">This board is unavailable right now.</p></section>`
+  }
+  return memberOnesBoardHtml(onesRows, { titleHtml })
+}
+
+/* Paint the stack and mount the shown board's share button. ⚠️ THE SHARE KEY
+ * FOR PROOF IS STILL `high-scores`, WHICH IS THE PATH RATHER THAN THE NAME:
+ * /hpw/high-scores and high-scores.png are in the wild and the collector's
+ * card bot screenshots that literal, so the URL did not move with the title
+ * (2026-09-01). Weeks at #1 is a chart card: its image is the collector's
+ * members-weeks-at-1 render and its link is this tab. */
+function paintStack(root) {
+  const stack = root.querySelector('[data-hpw-stack]')
+  if (!stack) return
+  stack.innerHTML = stackBoardHtml()
+  const el = stack.firstElementChild
+  if (!el) return
+  if (stackIndex === 0) {
+    mountShare(el, { key: 'high-scores', title: COPY.proofTitle, isLive: false })
+  } else if (onesRows) {
+    mountShare(el, {
+      key: 'members-weeks-at-1', title: 'Weeks at #1', isLive: false,
+      image: '/api/og/charts/members-weeks-at-1.png',
+      link: 'https://onlyboosts.social/#members',
+      alt: 'OnlyBoosts Charts: Members, Weeks at #1 on the 40 HPW board',
+      tag: 'onlyboosts',
+      filename: 'onlyboosts-charts-members-weeks-at-1.png',
+      placeholder: 'Share your message about the OnlyBoosts Charts',
+    })
+  }
 }
 
 async function board(range, { signal, week } = {}) {
@@ -208,6 +200,18 @@ let liveWeek = null      // the Monday the index is standing in
 let firstWeek = null     // the oldest week with any boost at all; the ◀ floor
 let shownWeek = null     // the week on screen
 let goalHours = 40
+/* ══ THE SECOND SLOT IS A STACK OF TWO BOARDS ══ (Reed's ask, 2026-09-03)
+ * Proof of #40HPW and the members' Weeks at #1 — the board the Charts page
+ * pairs with the 40 HPW board — share the pair's right-hand slot, and the
+ * week picker's own stepper flips between them ("kind of like how you can
+ * toggle between weeks"). Both are all-time boards; This Week keeps the left
+ * slot to itself because it has the live race in it. `proofData` is the
+ * hours endpoint's range=all envelope; `onesRows` is /api/v1/charts/members/
+ * weeks-at-1's rows, or null when that fetch failed. */
+const STACK = ['Proof of #40HPW', 'Weeks at #1']
+let stackIndex = 0
+let proofData = null
+let onesRows = null
 /* A reader stepping through weeks has several requests in flight and the slower
  * must not paint over the newer — the same guard `wallSeq` is. */
 let weekSeq = 0
@@ -272,62 +276,9 @@ async function showWeek(root, ws, { scroll = false } = {}) {
   }
 }
 
-/* One delegated listener for the whole boards block, wired once. The weekly
- * board's markup is replaced on every press, so a handler bound to an arrow
- * would not survive the press that used it; and the Proof of #40HPW rows live in
- * the OTHER board, which is never repainted, so a single delegate is the only
- * shape that covers both without two wiring paths. */
-function wirePicker(root) {
-  if (!root || root.dataset.pickWired) return
-  root.dataset.pickWired = '1'
-  const closeMenus = () => {
-    for (const m of root.querySelectorAll('[data-hpw-menu]')) {
-      m.hidden = true
-      m.closest('.hpw-pick-wrap')?.querySelector('[data-hpw-pick]')?.setAttribute('aria-expanded', 'false')
-    }
-  }
-  root.addEventListener('click', (e) => {
-    const pick = e.target.closest('[data-hpw-pick]')
-    if (pick) {
-      const menu = pick.closest('.hpw-pick-wrap')?.querySelector('[data-hpw-menu]')
-      if (!menu) return
-      const open = menu.hidden
-      closeMenus()
-      menu.hidden = !open
-      pick.setAttribute('aria-expanded', String(open))
-      /* Ninety-nine rows deep, the week on screen is usually well below the
-         fold of its own menu. Opening on it rather than at the top is what
-         makes the menu a jump rather than a scroll. */
-      if (open) menu.querySelector('.is-active')?.scrollIntoView({ block: 'center' })
-      return
-    }
-    const go = e.target.closest('[data-hpw-goweek]')
-    if (go) {
-      closeMenus()
-      const ws = weekStartFromDate(go.dataset.hpwGoweek)
-      /* Scrolled because the jump can come from the Proof of #40HPW board, which is
-         BELOW the weekly one on a phone — pressing a date there would otherwise
-         change a board the reader cannot see. `nearest` is a no-op on desktop,
-         where the two sit side by side. */
-      if (ws) showWeek(root, ws, { scroll: true })
-      return
-    }
-    const step = e.target.closest('[data-hpw-step]')
-    if (step && !step.disabled) {
-      closeMenus()
-      const from = shownWeek || liveWeek
-      if (!from) return
-      const to = step.dataset.hpwStep === 'prev' ? prevWeek(from) : nextWeek(from)
-      if (firstWeek != null && to < firstWeek) return
-      if (liveWeek && to > liveWeek) return
-      showWeek(root, to)
-    }
-  })
-  document.addEventListener('click', (e) => {
-    if (!e.target.closest('.hpw-pick-wrap')) closeMenus()
-  }, true)
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenus() })
-}
+/* The delegate that handles the picker, the jump buttons and the stack's
+ * flip arrows is wireWeekPicker (week-picker.js); renderMembersBoards wires it
+ * with this module's state. */
 
 /* The wall's rows, in the shape renderSupporters reads. That function is the
  * server's, so its field names are D1 column names rather than the API's — the
@@ -555,16 +506,27 @@ export async function renderMembersBoards(root) {
   root.innerHTML = '<p class="hpw-empty">Loading the boards…</p>'
   // Before the fetch, so the rules open even if the boards never arrive.
   wireRules()
-  /* ⚠️ ALSO BEFORE THE FETCH, and for the same reason. The lookup leads the tab
-     and needs no data of its own, so a reader can find somebody while the
-     boards are still loading or after they have failed. It is what this tab is
-     FOR; making it wait on two leaderboards would be the old mistake in a new
+  /* ⚠️ ALSO BEFORE THE FETCH, and for the same reason. The lookup (in the
+     Members section, above the wall, since 2026-09-03; it led the tab before)
+     needs no data of its own, so a reader can find somebody while the boards
+     are still loading or after they have failed. It is what this tab is FOR;
+     making it wait on two leaderboards would be the old mistake in a new
      place. */
   mountMemberLookup(document.querySelector('[data-members-block]'))
   try {
-    const [week, all] = await Promise.all([board('week'), board('all')])
+    const [week, all, ones] = await Promise.all([
+      board('week'), board('all'),
+      /* The stack's second board, allowed to fail on its own: the flip then
+         shows "unavailable" rather than taking Proof down with it. */
+      fetch('/api/v1/charts/members/weeks-at-1', { headers: { Accept: 'application/json' } })
+        .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`charts: HTTP ${r.status}`))))
+        .then((d) => (Array.isArray(d?.rows) ? d.rows : []))
+        .catch((err) => { console.warn('[hpw] weeks-at-1 failed', err); return null }),
+    ])
     const goal = week.goal_hours || all.goal_hours || 40
     goalHours = goal
+    proofData = all
+    onesRows = ones
     /* Read before the first paint, because `pickerHtml` needs all three to
        decide which arrow is disabled and whether there is a menu at all. */
     liveWeek = week.current_week || week.week_start || null
@@ -574,27 +536,29 @@ export async function renderMembersBoards(root) {
       weeklyBoardHtml(
         shownWeek, week.members || [], week.is_current !== false, COPY.emptyLive,
       ) +
-      boardHtml({
-        board: 'all',
-        // The words are hpw-board.js's COPY, shared with /hpw/high-scores.
-        title: COPY.proofTitle,
-        sub: COPY.proofSub(goal),
-        members: all.members || [],
-        goal,
-        empty: COPY.emptyAll,
-      })
+      /* ⚠️ THE STACK IS A GRID CELL OF ITS OWN, so the shown board stretches
+         to the row the way a bare board would (`.hpw-stack` is display:grid
+         in index.html). */
+      `<div class="hpw-stack" data-hpw-stack></div>`
+    paintStack(root)
     /* After the first paint, and once: the arrows and the menu live inside
        markup this line just wrote, and the listener is delegated so it survives
-       every repaint after it. */
-    wirePicker(root)
+       every repaint after it. The jump buttons on Proof AND on Weeks at #1
+       both land here; a jump scrolls because those boards are BELOW the weekly
+       one on a phone. */
+    wireWeekPicker(root, {
+      go: (ws, { jump } = {}) => showWeek(root, ws, { scroll: !!jump }),
+      step: (dir) => {
+        const to = steppedWeek(shownWeek || liveWeek, dir, { live: liveWeek, first: firstWeek })
+        if (to) showWeek(root, to)
+      },
+      flip: (dir) => {
+        stackIndex = (stackIndex + (dir === 'prev' ? STACK.length - 1 : 1)) % STACK.length
+        paintStack(root)
+      },
+    })
     const weekEl = root.querySelector('[data-hpw-board="week"]')
     if (weekEl && shownWeek) mountShare(weekEl, { key: weekDateString(shownWeek), title: `Week of ${weekLabel(shownWeek)}`, isLive: !liveWeek || shownWeek >= liveWeek })
-    const allEl = root.querySelector('[data-hpw-board="all"]')
-    /* ⚠️ THE SHARE KEY IS STILL `high-scores`, WHICH IS THE PATH RATHER THAN
-       THE NAME. The board is Proof of #40HPW since 2026-09-01; /hpw/high-scores
-       and high-scores.png are in the wild and the collector's card bot
-       screenshots that literal, so the URL did not move with the title. */
-    if (allEl) mountShare(allEl, { key: 'high-scores', title: COPY.proofTitle, isLive: false })
     root.dataset.hpwState = 'done'
     /* The wall goes below the boards, in its own container, and is fetched
        alongside them. It fails independently: a wall that cannot load leaves

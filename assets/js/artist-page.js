@@ -10,14 +10,16 @@
  * here, so the page carries the shared boost-section machinery, the note
  * verbs, and the Primal backfill like its three siblings.
  */
-import { sortControl } from '/assets/js/feed-controls.js?v=ob-v180'
+import { sortControl } from '/assets/js/feed-controls.js?v=ob-v188'
+// The drawers' chart standing, the same function the Function ordered them by.
+import { chartRanks, rankLabel } from '/assets/js/rank.js?v=ob-v188'
 import {
   initCopyNpub, initShowMore, initShare, initBackLink,
-  initHashRouting, initHashSpy, initArt2, hydrateProfiles,
-} from '/assets/js/detail-page.js?v=ob-v180'
-import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v180'
-import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v180'
-import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v180'
+  initHashRouting, initHashSpy, initArt2, hydrateProfiles, initStatWindows,
+} from '/assets/js/detail-page.js?v=ob-v188'
+import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v188'
+import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v188'
+import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v188'
 
 const GUID = document.body.dataset.artistGuid || ''
 
@@ -30,6 +32,7 @@ initShare()
 initBackLink()
 initHashRouting()
 initHashSpy()
+initStatWindows()
 initShowDesc()
 initBoostNoteActions()
 
@@ -41,9 +44,12 @@ initArt2('.cs-art[data-art2]', 'span', 'cs-art cs-art--blank')
 
 // ── The albums drawer's sort ──────────────────────────────────────────
 // The show page's episode-drawer arrangement: every row packs its four axes
-// in `data-al`, so a sort is a re-order. "Most Sats" reproduces the server's
-// own ORDER BY, so the first paint and the first sort agree.
+// in `data-al`, so a sort is a re-order. "Chart Rank" (Reed's ask, 2026-09-03;
+// Most Sats until then) reproduces the server's own order, which the Function
+// computed with the same rank.js#chartRanks, so the first paint and the first
+// sort agree.
 const AL_SORTS = [
+  ['chart', 'Overall'],
   ['sats', 'Most Sats'],
   ['boosters', 'Most Boosters'],
   ['boosts', 'Most Boosts'],
@@ -71,7 +77,9 @@ function initOneAlbumDrawer(root) {
   if (rows.length < 2) return
 
   function paint(sort) {
-    const order = rows.slice().sort((a, b) => {
+    const order = sort === 'chart'
+      ? chartRanks(rows, { sats: (r) => r.sats, boosts: (r) => r.boosts, breadth: (r) => r.boosters }).map((e) => e.row)
+      : rows.slice().sort((a, b) => {
       if (sort === 'boosters') return b.boosters - a.boosters || b.sats - a.sats
       if (sort === 'boosts') return b.boosts - a.boosts || b.sats - a.sats
       if (sort === 'latest') return b.latest - a.latest || b.sats - a.sats
@@ -82,7 +90,7 @@ function initOneAlbumDrawer(root) {
     list.appendChild(frag)
   }
 
-  slot.appendChild(sortControl(AL_SORTS, 'sats', (key) => paint(key), {
+  slot.appendChild(sortControl(AL_SORTS, 'chart', (key) => paint(key), {
     title: 'Change how these albums are ranked',
   }))
   slot.hidden = false
@@ -93,7 +101,9 @@ initAlbumSort()
 // The show page's community sort verbatim, over artists instead of shows.
 // Rank is recomputed per sort rather than retained: the list is never
 // filtered, so a row's position under the current sort IS its rank.
+// Chart Rank first and default (2026-09-03), as on /show's community drawer.
 const CS_SORTS = [
+  ['chart', 'Overall'],
   ['members', 'Most Boosters'],
   ['boosts', 'Most Boosts'],
   ['sats', 'Most Sats'],
@@ -118,16 +128,19 @@ function initCommunityArtists() {
   })
   if (rows.length < 2) return
 
-  let sort = 'members'
+  let sort = 'chart'
   function paint() {
-    const order = rows.slice().sort((a, b) => {
+    const charted = sort === 'chart'
+      ? chartRanks(rows, { sats: (r) => r.sats, boosts: (r) => r.boosts, breadth: (r) => r.members })
+      : null
+    const order = charted ? charted.map((e) => e.row) : rows.slice().sort((a, b) => {
       if (sort === 'boosts') return b.boosts - a.boosts || b.sats - a.sats
       if (sort === 'sats') return b.sats - a.sats || b.boosts - a.boosts
       return b.members - a.members || b.boosts - a.boosts || b.sats - a.sats
     })
     const frag = document.createDocumentFragment()
     order.forEach((r, i) => {
-      if (r.rankEl) r.rankEl.textContent = String(i + 1)
+      if (r.rankEl) r.rankEl.textContent = charted ? rankLabel(charted[i].rank, charted[i].tied) : String(i + 1)
       frag.appendChild(r.el)
     })
     list.appendChild(frag)

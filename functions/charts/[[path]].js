@@ -7,6 +7,16 @@
 //                    the live week, so one week has one URL — the /hpw rule.
 //   /charts          302 to the live week.
 //
+//   /charts/<date>/card/shows          THE SHARE CARDS (2026-09-03). The same
+//   /charts/<date>/card/artists        boards in the fixed 720x900 frame
+//   /charts/weeks-at-1/card/shows      (functions/_shared/card-frame.js) the
+//   /charts/weeks-at-1/card/artists    collector's bot screenshots, one per
+//   /charts/weeks-at-1/card/members    board; noindex. The frames are ROUTES
+//                    in this Function, not parts of the page above, so they
+//                    outlive it: Reed's plan (2026-09-03) is to take the page
+//                    down once the boards live on the homepage feeds, and the
+//                    bot's contract (bots/hpw-cards/) names these URLs.
+//
 // ⚠️ THE WEEK IS THE 40 HPW WEEK: Monday 00:00 US Pacific, cut by
 // assets/js/pacific-week.js on both sides of the query. The content ranking is
 // sort=chart and nothing else — see functions/_shared/week-charts.js for the
@@ -29,8 +39,14 @@
 
 import { pacificWeekStart, prevWeek, nextWeek, weekStartFromDate, weekDateString } from "../../assets/js/pacific-week.js";
 import { weeklyChart, weeksAtNumberOne, hpwWeeksAtNumberOne } from "../_shared/week-charts.js";
-import { sectionHtml, memberSectionHtml, weekLabel, COPY } from "../_shared/chart-board.js";
+import {
+  sectionHtml, memberSectionHtml, memberOnesBoardHtml, boardHtml, weekRowHtml, onesRowHtml,
+  weekLabel, weekSpan, COPY,
+} from "../../assets/js/chart-board.js";
 import { hoursBoard } from "../api/v1/members/hours.js";
+import { weekBoard, onesBoard } from "../api/v1/charts/[[path]].js";
+import { competitionRanks } from "../../assets/js/rank.js";
+import { cardHtml } from "../_shared/card-frame.js";
 import { htmlEscape } from "../../assets/js/nostr-text.js";
 
 export const SITE_ORIGIN = "https://onlyboosts.social";
@@ -39,6 +55,13 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 // The page's sections, in order. Restoring a retired chart (episodes, albums,
 // songs) is an element here plus a COPY entry in chart-board.js.
 const PAGE_KINDS = ["shows", "artists"];
+// The card frames' kinds. The members' WEEKLY card is /hpw/<date>/card; only
+// their Weeks at #1 board is a chart card.
+const WEEK_CARD_KINDS = new Set(PAGE_KINDS);
+const ONES_CARD_KINDS = new Set([...PAGE_KINDS, "members"]);
+// ⚠️ A PATH SEGMENT IN THE WILD once the collector renders it (the bot
+// screenshots the literal), on the /hpw/high-scores rule: it does not move.
+export const ONES_KEY = "weeks-at-1";
 
 export async function onRequestGet({ request, env, params }) {
   let segs = params.path;
@@ -48,15 +71,39 @@ export async function onRequestGet({ request, env, params }) {
 
   const live = pacificWeekStart(Math.floor(Date.now() / 1000));
   if (segs.length === 0) return redirect(request, `/charts/${weekDateString(live)}`);
-  if (segs.length > 1) return notFound();
+  /* The card frames: /charts/<key>/card/<kind>. Anything else with more than
+     one segment is a 404, the /hpw rule. */
+  const card = segs.length === 3 && segs[1] === "card";
+  if (segs.length > 1 && !card) return notFound();
   const key = segs[0];
+
+  if (card && key === ONES_KEY) {
+    const kind = segs[2];
+    if (!ONES_CARD_KINDS.has(kind)) return notFound();
+    let data;
+    try { data = await onesBoard(env, { kind, limit: ROWS }); }
+    catch (err) { console.error("[charts] weeks-at-1 card failed", err); return unavailable(); }
+    return page(renderOnesCard({ kind, rows: data.body.rows }), data.cache, { noindex: true });
+  }
 
   if (!DATE_RE.test(key)) return notFound();
   const ws = weekStartFromDate(key);
   if (ws === null) return notFound();
-  if (ws > live) return redirect(request, `/charts/${weekDateString(live)}`);
+  const tail = card ? `/card/${segs[2]}` : "";
+  if (ws > live) return redirect(request, `/charts/${weekDateString(live)}${tail}`);
   const canon = weekDateString(ws);
-  if (canon !== key) return redirect(request, `/charts/${canon}`);
+  if (canon !== key) return redirect(request, `/charts/${canon}${tail}`);
+
+  if (card) {
+    const kind = segs[2];
+    if (!WEEK_CARD_KINDS.has(kind)) return notFound();
+    let data;
+    try { data = await weekBoard(env, { kind, week: canon, limit: ROWS }); }
+    catch (err) { console.error("[charts] week card failed", err); return unavailable(); }
+    const b = data.body;
+    if (b.first_week != null && ws < b.first_week) return notFound();
+    return page(renderWeekCard({ kind, ws, isCurrent: b.is_current, rows: b.rows }), data.cache, { noindex: true });
+  }
 
   const we = nextWeek(ws);
   const isCurrent = ws >= live;
@@ -187,7 +234,88 @@ ${sections}
     body,
     canonical: pageUrl,
     og: { title: ogTitle, description: leadSentence(ws), image: `${SITE_ORIGIN}/assets/onlyboosts_banner.png`, url: pageUrl },
-    scripts: `<script src="/assets/js/charts-page.js?v=ob-v180" type="module"></script>`,
+    scripts: `<script src="/assets/js/charts-page.js?v=ob-v188" type="module"></script>`,
+  });
+}
+
+// ── the cards ────────────────────────────────────────────────────────────────
+
+/* The kicker's second line names the kind; the board's own title names the
+   week or the board. Both cards link both board stylesheets: the content
+   boards are .cb-* with the stepper's .hpw-nav grammar, the members board is
+   .hpw-* rows in a .cb-board shell. */
+const CARD_LINKS = `  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v188" />
+  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v188" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v188" />`;
+
+/* The rows sized to the frame. The hpw card's numbers, restated for the .cb-*
+   rows: the collector measures the ceiling per card kind (see card-frame.js),
+   so a change here wants a re-measure before it is believed. */
+const CARD_CSS = `
+    .card .cb-board, .card .hpw-board { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0.7rem 1.1rem 0.6rem; }
+    .card .cb-head, .card .hpw-title { margin-bottom: 0.4rem; flex: none; font-size: 1.1rem; }
+    .card .cb-colhead { flex: none; }
+    .card .cb-list, .card .hpw-list { flex: 1; min-height: 0; overflow: hidden; }
+    .card .cb-row { padding: 0.22rem 0.5rem; gap: 0.55rem; }
+    .card .cb-art { width: 40px; height: 40px; border-radius: 8px; }
+    .card .cb-art--none { font-size: 1rem; }
+    .card .cb-name { font-size: 0.95rem; }
+    .card .cb-sub, .card .cb-week-jump { font-size: 0.62rem; }
+    .card .cb-ranks, .card .cb-fig { font-size: 1rem; }
+    .card .hpw-row { padding: 0.22rem 0.5rem; gap: 0.55rem; }
+    .card .hpw-face { width: 40px; height: 40px; }
+    .card .hpw-face--none { font-size: 0.85rem; }
+    .card .hpw-name { font-size: 0.95rem; }
+    .card .hpw-week, .card .hpw-week-jump { font-size: 0.62rem; }
+    .card .hpw-hours { font-size: 1.05rem; }`;
+
+/* The footer names the tab the board lives on — the share note's link, and
+   where the page is going. */
+const TAB_OF = { shows: "/#shows", artists: "/#artists", members: "/#members" };
+
+export function renderWeekCard({ kind, ws, isCurrent, rows }) {
+  const heading = COPY.sections[kind].heading;
+  const board = boardHtml({
+    board: `${kind}-week`,
+    title: `Week of ${weekLabel(ws)}`,
+    sub: isCurrent ? `In progress. ${weekSpan(ws)}.` : `${weekSpan(ws)}.`,
+    rows: rows.map((r) => weekRowHtml(kind, r)),
+    empty: isCurrent ? COPY.emptyLive : COPY.emptyPast,
+    colhead: true,
+    card: true,
+  });
+  return cardHtml({
+    title: `OnlyBoosts Charts: ${heading}, Week of ${weekLabel(ws)}`,
+    kicker: COPY.eyebrow,
+    kickerSub: `${heading} Top 10`,
+    board,
+    footer: `onlyboosts.social${TAB_OF[kind]}`,
+    links: CARD_LINKS,
+    css: CARD_CSS,
+  });
+}
+
+export function renderOnesCard({ kind, rows }) {
+  const heading = COPY.sections[kind].heading;
+  const weekHref = (d) => `/charts/${d}`;
+  const board = kind === "members"
+    ? memberOnesBoardHtml(rows, { weekHref, card: true })
+    : boardHtml({
+        board: `${kind}-ones`,
+        title: "Weeks at #1",
+        sub: COPY.sections[kind].onesSub,
+        rows: rows.map((r, i) => onesRowHtml(kind, r, competitionRanks(rows, (x) => Number(x.weeks))[i], { weekHref })),
+        empty: COPY.emptyOnes,
+        card: true,
+      });
+  return cardHtml({
+    title: `OnlyBoosts Charts: ${heading}, Weeks at #1`,
+    kicker: COPY.eyebrow,
+    kickerSub: `${heading}: Weeks at #1`,
+    board,
+    footer: `onlyboosts.social${TAB_OF[kind]}`,
+    links: CARD_LINKS,
+    css: CARD_CSS,
   });
 }
 
@@ -261,13 +389,13 @@ ${og ? `
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v180" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v188" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v188" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v188" />
+  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v188" />
+  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v188" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v188" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v188" />
   <style>
     /* No feed is active on this page, so it supplies the brand accent itself,
        the same call /hpw and .show-main make. */
@@ -329,15 +457,16 @@ ${og ? `
                  the page carries, in a different order, using different words
                  for the same things. Each entry lands on that tab's DEFAULT
                  sub-feed — TAB_DEFAULT in the index.html controller — so
-                 Podcasts opens Episodes, Music opens Albums and Members opens
-                 Boosts. **Those three hrefs and TAB_DEFAULT move together.**
+                 Podcasts opens Shows (Episodes until 2026-09-03), Music opens
+                 Artists and Members opens Boosts. **Those three hrefs and
+                 TAB_DEFAULT move together.**
 
                  The Global vs Follows axis stays deliberately absent: it is the
                  second dropdown on the page itself, and listing both scopes
                  here made the nav a grid restating a control the page has. -->
             <div class="nav-explore-group">
               <h4>Feeds</h4>
-              <a href="/#episodes-global"><span aria-hidden="true">🎙</span> Podcasts</a>
+              <a href="/#shows"><span aria-hidden="true">🎙</span> Podcasts</a>
               <a href="/#artists"><span aria-hidden="true">🎵</span> Music</a>
               <a href="/#members"><span aria-hidden="true">👥</span> Members</a>
             </div>
@@ -427,7 +556,7 @@ ${body}
            each lands on that tab's default sub-feed. See partials/nav.html. -->
       <h3>Feeds</h3>
       <ul>
-        <li><a href="/#episodes-global">🎙 Podcasts</a></li>
+        <li><a href="/#shows">🎙 Podcasts</a></li>
         <li><a href="/#artists">🎵 Music</a></li>
         <li><a href="/#members">👥 Members</a></li>
       </ul>
@@ -462,10 +591,10 @@ ${body}
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav.js?v=ob-v180" defer></script>
+<script src="/assets/js/nav.js?v=ob-v188" defer></script>
 ${scripts}
-<script src="/assets/js/nav-widget-boot.js?v=ob-v180"></script>
-<script src="/assets/js/sw-register.js?v=ob-v180" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v188"></script>
+<script src="/assets/js/sw-register.js?v=ob-v188" defer></script>
 </body>
 </html>`;
 }

@@ -511,7 +511,9 @@ console.log('\n⚠️ A booster\'s rank is over the WALL\'s population:')
       // `chart` joined on 2026-08-31 — the OnlyBoosts Charts position rides
       // beside the three component ranks. scripts/test-charts.mjs owns its
       // correctness; this only pins the shape.
-      assert.deepEqual(Object.keys(r).sort(), ['boosts', 'chart', 'chartWindows', 'sats', 'shows']))
+      // `windows` joined 2026-09-03: per-window figures and component ranks
+      // for the tiles that follow the strip.
+      assert.deepEqual(Object.keys(r).sort(), ['boosts', 'chart', 'chartWindows', 'sats', 'shows', 'windows']))
   }
   {
     /* ⚠️ A PUBLISHER'S OWN PAGE GETS NO CHIPS. It is not on the wall, so it

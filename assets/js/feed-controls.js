@@ -1,5 +1,5 @@
 /* Shared feed controls — the 1W/1M/All range buttons, the "Sort: X ▾"
- * dropdown, and the sticky bar both mount into.
+ * dropdown, and the feed bar both mount into.
  *
  * These started out inside feeds-podcasts.js, where the Episodes rollup was
  * the only view with a range filter. The Boosts note feed now carries the same
@@ -12,8 +12,10 @@
  *             quantitative axis one boost has is its own size
  *
  * Mounting: the controls used to sit in each panel's own head. They now share
- * the sticky feed bar in index.html, which is outside the panels — so a group
- * is tagged with the feed that owns it and the bar shows only the active one.
+ * the one feed bar in index.html — the lid of whichever panel is active, moved
+ * there by the controller (it was sticky chrome outside the panels until
+ * 2026-09-03) — so a group is tagged with the feed that owns it and the bar
+ * shows only the active one.
  * That show/hide is CSS off body[data-active-feed], not JS: feeds hydrate once
  * and keep their controls forever, so a declarative rule is the only version
  * that can't leave a re-visited feed with someone else's controls (or none).
@@ -23,7 +25,7 @@
  * holds each module URL for up to four hours ON ITS OWN CLOCK. A reader
  * carrying a three-hour-old copy of this file who fetches a fresh renderer gets
  *
- *   SyntaxError: The requested module '/assets/js/feed-controls.js?v=ob-v180' does not
+ *   SyntaxError: The requested module '/assets/js/feed-controls.js?v=ob-v188' does not
  *   provide an export named 'X'
  *
  * and an unresolved named import is a LINK-TIME error: the renderer never
@@ -183,7 +185,7 @@ export function sortControl(options, initialKey, onPick, opts = {}) {
 }
 
 /**
- * Put a feed's controls in the sticky bar, tagged with the feed that owns
+ * Put a feed's controls in the feed bar, tagged with the feed that owns
  * them. Replaces that feed's previous group if it had one (a Follows feed
  * re-renders on an account switch), and leaves every other feed's alone.
  *

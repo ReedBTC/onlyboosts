@@ -1,12 +1,16 @@
 // The OnlyBoosts Charts boards' rows, as HTML strings — the FACTS half of the
-// /charts page, on the hpw-board.js pattern.
+// charts, on the hpw-board.js pattern.
 //
-// SERVER-ONLY, unlike hpw-board.js: no tab paints these boards, so there is no
-// browser importer and the file lives in functions/_shared rather than
-// assets/js. It still keeps the two-sided module's discipline — no DOM, no
-// fetch, no Date.now(), every locale pinned to en-US in UTC — because at the
-// edge the clock is the moment the response was cached, and because gaining a
-// client surface later should be a move, not a rewrite.
+// ⚠️ TWO-SIDED SINCE 2026-09-03. It was functions/_shared/chart-board.js,
+// server-only, while the /charts page was the boards' one surface; the move
+// it was written to allow happened when the boards joined the Shows and
+// Artists feeds on the homepage (Reed's ask): assets/js/charts-block.js
+// paints them in the browser from /api/v1/charts, and functions/charts/
+// [[path]].js keeps importing this by relative path for the page and the
+// card frames, so a row on the tab, on the page and in a screenshot is one
+// function. The discipline is hpw-board.js's, enforced the same way by
+// scripts/test-weekly-charts.mjs: siblings imported as './x.js?v=…', no DOM,
+// no fetch, no Date.now(), every locale pinned to en-US in UTC.
 //
 // The classes are .cb-*, restating the .hpw-* grammar in
 // assets/css/chart-board.css the way .mb-shell restates .bs-shell: the boards
@@ -23,13 +27,13 @@
 // is computed over the whole week's corpus (peers_* from week-charts.js),
 // never over the visible ten.
 
-import { htmlEscape, isSafeUrl } from "../../assets/js/nostr-text.js";
-import { httpsUrl } from "../../assets/js/cover-art.js";
-import { showPageHref, episodePageHref, publisherPageHref } from "../../assets/js/show-link.js";
-import { boosterPageHref } from "../../assets/js/booster-link.js";
-import { rankLabel, competitionRanks } from "../../assets/js/rank.js";
-import { weekDateString } from "../../assets/js/pacific-week.js";
-import { boardHtml as hpwBoardHtml, initials, COPY as HPW_COPY } from "../../assets/js/hpw-board.js";
+import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v188';
+import { httpsUrl } from './cover-art.js?v=ob-v188';
+import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v188';
+import { boosterPageHref } from './booster-link.js?v=ob-v188';
+import { rankLabel, competitionRanks } from './rank.js?v=ob-v188';
+import { weekDateString } from './pacific-week.js?v=ob-v188';
+import { boardHtml as hpwBoardHtml, initials, COPY as HPW_COPY } from './hpw-board.js?v=ob-v188';
 
 const esc = htmlEscape;
 
@@ -128,14 +132,24 @@ export function weekRowHtml(kind, r) {
     `</li>`;
 }
 
-/* One weeks-at-#1 row. The sub-line is the most recent #1 week, linking to
- * that week's own page — the Proof of #40HPW board's discovery idiom, one URL
- * scheme over. Ranks are competitionRanks over the weeks figure, computed by
- * the caller so a board is ranked once, not per row. */
-export function onesRowHtml(kind, r, rk) {
+/* The most recent #1 week under a weeks-at-#1 row: the Proof of #40HPW
+ * board's discovery idiom, one board over. `weekHref(dateString)` makes it a
+ * LINK (the /charts page, where every week has a URL); omitted, it is the
+ * picker's jump BUTTON (`data-hpw-goweek`, the tab's delegate), which shows
+ * that week on the Top 10 board beside it — hpw-board.js's exact rule. */
+function lastWeek(cls, r, weekHref) {
   const date = weekDateString(r.last_week_start);
-  const sub = `<a class="cb-sub cb-week-jump" href="/charts/${esc(date)}"` +
-    ` title="Show the whole board for this week">Last: ${esc(weekLabel(r.last_week_start))}</a>`;
+  const label = `Last: ${esc(weekLabel(r.last_week_start))}`;
+  return weekHref
+    ? `<a class="${cls} hpw-week-jump" href="${esc(weekHref(date))}" title="Show the whole board for this week">${label}</a>`
+    : `<button type="button" class="${cls} hpw-week-jump" data-hpw-goweek="${esc(date)}" title="Show the whole board for this week">${label}</button>`;
+}
+
+/* One weeks-at-#1 row. The sub-line is the most recent #1 week (see lastWeek).
+ * Ranks are competitionRanks over the weeks figure, computed by the caller so
+ * a board is ranked once, not per row. */
+export function onesRowHtml(kind, r, rk, { weekHref = null } = {}) {
+  const sub = lastWeek("cb-sub", r, weekHref);
   const w = who(kind, r, sub);
   return `<li class="cb-row">` +
     `<span class="cb-pos">${esc(rankLabel(rk.rank, rk.tied))}</span>` +
@@ -145,9 +159,13 @@ export function onesRowHtml(kind, r, rk) {
     `</li>`;
 }
 
-export function boardHtml({ title, sub, rows, empty, board, colhead = false }) {
+/* `title` is escaped text; `titleHtml` is markup and overrides it — only the
+ * tab's weekly board passes the second, and only because its title IS the
+ * week picker (hpw-board.js's rule). `card` marks the list for the
+ * collector's clip guard (`data-card-list`); only a card frame passes it. */
+export function boardHtml({ title, titleHtml, sub, rows, empty, board, colhead = false, card = false }) {
   const body = rows.length
-    ? `<ol class="cb-list">${rows.join("")}</ol>`
+    ? `<ol class="cb-list"${card ? " data-card-list" : ""}>${rows.join("")}</ol>`
     : `<p class="cb-empty">${esc(empty)}</p>`;
   /* "rank in" is what stops the triplet reading as counts (`8/8/7` lies
    * without it); the ⓘ is the feed note's own explainer link, same target,
@@ -157,7 +175,7 @@ export function boardHtml({ title, sub, rows, empty, board, colhead = false }) {
     `<a class="cb-colhead-info" href="/about#charts" target="_blank" rel="noopener"` +
     ` title="How the OnlyBoosts Charts work" aria-label="How the OnlyBoosts Charts work">ⓘ</a></div>`;
   return `<section class="cb-board"${board ? ` data-cb-board="${esc(board)}"` : ""}>` +
-    `<h3 class="cb-head">${esc(title)}<small>${esc(sub)}</small></h3>` +
+    `<h3 class="cb-head">${titleHtml || esc(title)}<small>${esc(sub)}</small></h3>` +
     (colhead && rows.length ? head : "") +
     body +
     `</section>`;
@@ -180,7 +198,7 @@ export function sectionHtml(kind, { weekly, ones, ws, isCurrent }) {
     board: `${kind}-ones`,
     title: "Weeks at #1",
     sub: c.onesSub,
-    rows: ones.map((r, i) => onesRowHtml(kind, r, onesRanks[i])),
+    rows: ones.map((r, i) => onesRowHtml(kind, r, onesRanks[i], { weekHref: (d) => `/charts/${d}` })),
     empty: COPY.emptyOnes,
   });
   return `<section class="cb-section" id="${esc(kind)}">` +
@@ -192,7 +210,7 @@ export function sectionHtml(kind, { weekly, ones, ws, isCurrent }) {
 /* One member's weeks-at-#1 row, wearing the .hpw-* classes outright — a
  * member row here and on the tab must be one grammar, and this board differs
  * from a tab row only in its figure (weeks, not hours). */
-export function memberOnesRowHtml(m, rk) {
+export function memberOnesRowHtml(m, rk, { weekHref = null } = {}) {
   const href = boosterPageHref(m.npub, m.pk);
   const name = m.name || (m.npub ? m.npub.slice(0, 12) + "…" : (m.pk || "").slice(0, 12) + "…");
   const upgraded = httpsUrl(m.pic);
@@ -203,15 +221,28 @@ export function memberOnesRowHtml(m, rk) {
   const whoM = href
     ? `<a class="hpw-name" href="${esc(href)}">${esc(name)}</a>`
     : `<span class="hpw-name">${esc(name)}</span>`;
-  const date = weekDateString(m.last_week_start);
-  const week = `<a class="hpw-week hpw-week-jump" href="/charts/${esc(date)}"` +
-    ` title="Show this page for that week">Last: ${esc(weekLabel(m.last_week_start))}</a>`;
+  const week = lastWeek("hpw-week", m, weekHref);
   return `<li class="hpw-row">` +
     `<span class="hpw-pos">${esc(rankLabel(rk.rank, rk.tied))}</span>` +
     face +
     `<span class="hpw-who">${whoM}${week}</span>` +
     `<span class="hpw-hours">${esc(String(m.weeks))}<span class="hpw-unit"> wk${Number(m.weeks) === 1 ? "" : "s"}</span></span>` +
     `</li>`;
+}
+
+/* The members' Weeks at #1 board on its own: the page's right-hand board,
+ * the Members tab's second stacked board (charts-block.js / members-board.js)
+ * and the members-weeks-at-1 card are all this. `.hpw-*` rows inside a
+ * `.cb-board` shell, the page's own arrangement. */
+export function memberOnesBoardHtml(ones, { weekHref = null, titleHtml = null, card = false } = {}) {
+  const ranks = competitionRanks(ones, (r) => Number(r.weeks));
+  const body = ones.length
+    ? `<ol class="hpw-list"${card ? " data-card-list" : ""}>${ones.map((m, i) => memberOnesRowHtml(m, ranks[i], { weekHref })).join("")}</ol>`
+    : `<p class="cb-empty">${esc(COPY.emptyOnes)}</p>`;
+  return `<section class="cb-board" data-cb-board="members-ones">` +
+    `<h3 class="cb-head">${titleHtml || "Weeks at #1"}<small>${esc(COPY.sections.members.onesSub)}</small></h3>` +
+    body +
+    `</section>`;
 }
 
 /* The Members pair. The LEFT board is hpw-board.js's boardHtml over the hours
@@ -228,14 +259,7 @@ export function memberSectionHtml({ hours, ones, ws, isCurrent }) {
     goal: hours.goal_hours || 40,
     empty: isCurrent ? HPW_COPY.emptyLive : HPW_COPY.emptyPast,
   });
-  const ranks = competitionRanks(ones, (r) => Number(r.weeks));
-  const body = ones.length
-    ? `<ol class="hpw-list">${ones.map((m, i) => memberOnesRowHtml(m, ranks[i])).join("")}</ol>`
-    : `<p class="cb-empty">${esc(COPY.emptyOnes)}</p>`;
-  const right = `<section class="cb-board" data-cb-board="members-ones">` +
-    `<h3 class="cb-head">Weeks at #1<small>${esc(COPY.sections.members.onesSub)}</small></h3>` +
-    body +
-    `</section>`;
+  const right = memberOnesBoardHtml(ones, { weekHref: (d) => `/charts/${d}` });
   return `<section class="cb-section" id="members">` +
     `<h2 class="cb-section-h">${esc(COPY.sections.members.heading)}</h2>` +
     `<div class="cb-pairs">${left}${right}</div>` +

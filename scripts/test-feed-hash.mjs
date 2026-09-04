@@ -76,12 +76,24 @@ class El {
 function boot(hash, { signedIn = false } = {}) {
   const body = new El('body')
   const bar = new El('div')
-  /* ⚠️ THE BAR STARTS IN ITS STICKY WRAPPER, which is what makes "moved back"
-     a real assertion rather than "never moved". `barHome` is captured from
-     `bar.parentNode` at boot, so the stub has to give it one. */
-  const barWrap = new El('div')
-  barWrap.appendChild(bar)
-  const barSlot = new El('div')
+  /* ⚠️ THE BAR STARTS IN THE SHOWS PANEL'S LID, as the markup ships it, and
+     every panel carries a lid of its own (`[data-feed-bar-slot]`) since
+     2026-09-03. `barHome` is captured from `bar.parentNode` at boot, so the
+     stub has to give it one — and giving it the Shows lid rather than a
+     stray wrapper is what makes "a #shows load leaves it put" a real
+     assertion about the shipped shape. */
+  const FEED_KEYS = ['shows-global', 'shows-follows', 'episodes-global', 'episodes-follows',
+    'albums-global', 'albums-follows', 'songs-global', 'songs-follows',
+    'artists-global', 'artists-follows', 'members-global', 'members-follows']
+  const panelEls = FEED_KEYS.map((key) => {
+    const panel = new El('section'); panel.setAttribute('data-feed', key)
+    const lid = new El('div'); lid.setAttribute('data-feed-bar-slot', '')
+    panel.lid = lid
+    panel.querySelector = (s) => (s === '[data-feed-bar-slot]' ? lid : null)
+    return panel
+  })
+  const lidOf = (key) => panelEls.find((p) => p.dataset.feed === key).lid
+  lidOf('shows-global').appendChild(bar)
   const mk = (attrs) => { const e = new El('button'); Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, v)); return e }
   const tabEls = ['podcasts', 'music', 'members'].map((t) => mk({ 'data-tab': t }))
   /* `data-value` only: `data-tab` moved to the wrapping .feed-sub-group when
@@ -95,7 +107,6 @@ function boot(hash, { signedIn = false } = {}) {
     body,
     querySelector: (s) => {
       if (s === '.feed-bar') return bar
-      if (s === '[data-feed-bar-slot]') return barSlot
       return null
     },
     /* The tabs and the sub-row live OUTSIDE .feed-bar, so the controller queries
@@ -105,6 +116,7 @@ function boot(hash, { signedIn = false } = {}) {
     querySelectorAll: (sel) => {
       if (sel === '.feed-tab[data-tab]') return tabEls
       if (sel === '.feed-sub[data-value]') return subEls
+      if (sel === '.feed-panel[data-feed]') return panelEls
       return []
     },
     addEventListener: (t, fn) => { (listeners[t] ||= []).push(fn) },
@@ -138,7 +150,9 @@ function boot(hash, { signedIn = false } = {}) {
     events,
     tab: () => (selected(tabEls)[0] || {}).dataset?.tab ?? null,
     sub: () => (selected(subEls)[0] || {}).dataset?.value ?? null,
-    barParent: () => (bar.parentNode === barSlot ? 'slot' : bar.parentNode === barWrap ? 'wrap' : 'nowhere'),
+    /* Which panel's lid holds the bar, by feed key; 'nowhere' if none does. */
+    barParent: () => (panelEls.find((p) => p.lid === bar.parentNode) || {}).dataset?.feed ?? 'nowhere',
+    activePanels: () => panelEls.filter((p) => !p.hidden).map((p) => p.dataset.feed),
     fire: (type) => (winListeners[type] || []).forEach((f) => f({ type })),
     // A renderer's report, arriving as a document event the way the real ones do.
     dispatch: (type, detail) => doc.dispatchEvent(new CE(type, { detail })),
@@ -549,7 +563,9 @@ console.log('\nThe tab grid and the sub grid line up:')
    * is why the value is checked and not just the agreement. */
   {
     const base = html.slice(0, cut)
-    for (const sel of ['.feed-tabs', '.feed-subs', '.feed-bar', '.feed-panels-inner']) {
+    /* `.feed-bar` was the fourth until 2026-09-03; it lives inside the panel
+       now, which is inside `.feed-panels-inner`, so it reads no track. */
+    for (const sel of ['.feed-tabs', '.feed-subs', '.feed-panels-inner']) {
       eq(`${sel} reads the shared track`, decls(sel, base)?.['max-width'], 'var(--feed-track)')
     }
     const root = /--feed-track:\s*([^;]+);/.exec(html)
@@ -581,7 +597,7 @@ console.log('\nBoth hydration entry points are wired:')
   const listenerEnd = feeds.indexOf('\n})', listenerAt)
   const inListener = feeds.slice(listenerAt, listenerEnd)
   const afterListener = feeds.slice(listenerEnd)
-  for (const [what, call] of [['the feed itself', 'loadFeed('], ['the members boards', 'loadMemberBoards()']]) {
+  for (const [what, call] of [['the feed itself', 'loadFeed('], ['the members boards', 'loadMemberBoards()'], ['the chart block', 'loadChartsBlock(']]) {
     eq(`${what}: hydrated from the event`, inListener.includes(call), true)
     eq(`${what}: AND on the cold load`, afterListener.includes(call), true)
   }
@@ -613,34 +629,37 @@ console.log('\nEvery FEEDS key has its accent row and its controls rule:')
   }
 }
 
-console.log('\n⚠️ The feed bar is MOVED into the Members tab, and moved back:')
+console.log('\n⚠️ The feed bar is MOVED into the ACTIVE panel\'s lid, every feed:')
 {
-  /* The Members tab puts three sections above the boost list, so the scope menu
-     and the range/sort belong with the list rather than a screen and a half
-     above it. Moving one live element is what keeps the eight mounted
-     [data-controls-for] groups and their listeners intact; a second bar
-     rendered into the tab would be two sets of controls over one feed, which is
-     the failure the declarative body[data-active-feed] rule exists to prevent. */
-  eq('a cold load on #members puts the bar in the slot', boot('#members').barParent(), 'slot')
-  eq('#episodes-global leaves it in the sticky wrap', boot('#episodes-global').barParent(), 'wrap')
-  eq('#shows too', boot('#shows').barParent(), 'wrap')
-  eq('#albums too', boot('#albums').barParent(), 'wrap')
-  eq('#artists too', boot('#artists').barParent(), 'wrap')
-  eq('a signed-in #members-follows also lands in the slot',
-     boot('#members-follows', { signedIn: true }).barParent(), 'slot')
+  /* Every feed is a shell with its controls on the lid since 2026-09-03
+     (Reed's ask, generalizing the Members-tab move of 2026-08-23). Moving one
+     live element is what keeps the twelve mounted [data-controls-for] groups
+     and their listeners intact; a second bar rendered into a panel would be two
+     sets of controls over one feed, which is the failure the declarative
+     body[data-active-feed] rule exists to prevent. */
+  eq('a cold load on #shows leaves the bar where the markup ships it', boot('#shows').barParent(), 'shows-global')
+  eq('#members puts it in the members panel\'s lid', boot('#members').barParent(), 'members-global')
+  eq('#episodes-global', boot('#episodes-global').barParent(), 'episodes-global')
+  eq('#albums', boot('#albums').barParent(), 'albums-global')
+  eq('#artists', boot('#artists').barParent(), 'artists-global')
+  eq('a signed-in #members-follows lands in that panel\'s lid',
+     boot('#members-follows', { signedIn: true }).barParent(), 'members-follows')
+  eq('⚠️ a signed-out #episodes-follows follows the COERCED feed, not the hash',
+     boot('#episodes-follows').barParent(), 'episodes-global')
   {
-    /* ⚠️ THE MOVE BACK IS THE HALF THAT BREAKS. `.members-block` is
-       display:none off the Members tab, so a bar left in the slot disappears
-       from every other feed entirely — no scope menu, no range, no sort, and
-       nothing on screen saying why. */
+    /* ⚠️ THE BAR IS IN THE PANEL ON SCREEN, EVERY TIME. A panel off screen is
+       `hidden`, so a bar left behind in one takes the scope menu and every
+       feed's range and sort with it, and nothing on screen says why. */
     const b = boot('#members')
-    eq('  (starts in the slot)', b.barParent(), 'slot')
+    eq('  (starts in the members lid)', b.barParent(), 'members-global')
     b.location.hash = '#shows'
     b.fire('hashchange')
-    eq('⚠️ switching away from Members moves it back to the wrap', b.barParent(), 'wrap')
-    b.location.hash = '#members'
+    eq('⚠️ switching to Shows moves it into the Shows lid', b.barParent(), 'shows-global')
+    eq('  and that is the one panel on screen', b.activePanels(), ['shows-global'])
+    b.location.hash = '#songs-global'
     b.fire('hashchange')
-    eq('and switching back returns it to the slot', b.barParent(), 'slot')
+    eq('and on to Songs', b.barParent(), 'songs-global')
+    eq('  the bar\'s panel is the active one', b.activePanels(), [b.barParent()])
   }
   eq('the bar is never left parentless', boot('#episodes-global').barParent() !== 'nowhere', true)
 }

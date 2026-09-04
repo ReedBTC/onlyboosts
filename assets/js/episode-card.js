@@ -42,11 +42,12 @@
  * what functions/_shared/detail-page.js has always done, so the site now has one
  * date format rather than one for the feeds and another for the detail pages.
  */
-import { showPageHref, episodePageHref } from './show-link.js?v=ob-v180'
-import { episodeBoostLink } from './episode-link.js?v=ob-v180'
-import { boosterPageHref, boosterLinkAttrs } from './booster-link.js?v=ob-v180'
-import { coverChain, httpsUrl } from './cover-art.js?v=ob-v180'
-import { htmlEscape, isSafeUrl, renderMessage } from './nostr-text.js?v=ob-v180'
+import { showPageHref, episodePageHref } from './show-link.js?v=ob-v188'
+import { episodeBoostLink } from './episode-link.js?v=ob-v188'
+import { boosterPageHref, boosterLinkAttrs } from './booster-link.js?v=ob-v188'
+import { coverChain, httpsUrl } from './cover-art.js?v=ob-v188'
+import { htmlEscape, isSafeUrl, renderMessage } from './nostr-text.js?v=ob-v188'
+import { chartRanks, competitionRanks } from './rank.js?v=ob-v188'
 
 const esc = htmlEscape
 
@@ -142,18 +143,21 @@ export function copyFor(medium) {
  *            has no booster count".
  *
  *   layout   'feed' (default) or 'compact'. Compact is the two detail-page
- *            drawers, and it means three things that go together: no inline
- *            <audio>, no ⋮ subscribe menu, and the boost pill in a right-hand
- *            rail of its own rather than at the end of the stats line.
+ *            drawers, and it means two things that go together: no ⋮ subscribe
+ *            menu, and the boost pill in a right-hand rail of its own rather
+ *            than at the end of the stats line.
  *
- *            The player and the ⋮ both go for the same reason — every card's
- *            title links to that episode's own page, which carries a player and
- *            a subscribe path on a surface with room for them, where this is a
- *            75vh scroll box inside a page with six other sections. And with the
- *            ⋮ gone the card's right edge is free, which is what lets the pill
- *            sit vertically centred instead of riding the bottom of the card.
- *            On the homepage none of that holds: it is a browsing surface with
- *            no page behind each card, so the card is whole.
+ *            The ⋮ goes because every card's title links to that episode's own
+ *            page, which carries a subscribe path on a surface with room for
+ *            it, where this is a 75vh scroll box inside a page with six other
+ *            sections. And with the ⋮ gone the card's right edge is free, which
+ *            is what lets the pill sit vertically centred instead of riding the
+ *            bottom of the card.
+ *
+ *            The inline <audio> player used to be the third thing, present on
+ *            the feed layout and off on compact. It is off everywhere since
+ *            2026-09-03 (Reed's call) on the same argument: the episode page
+ *            has the player, and a card is the way there.
  *
  *   drawer   'inline' (default) or 'lazy'. WHERE THE DRAWER'S BOOST NOTES COME
  *            FROM. Inline, they are rendered into the <details> body as the
@@ -361,7 +365,29 @@ export const SORT_OPTIONS = [
 ]
 
 export function sortEpisodeItems(items, key, fallback = 'recent') {
+  /* ⚠️ THE CHART IS NOT A COMPARATOR. Its standing is a rank sum over the
+   * whole list, so it is computed once over everything (rank.js#chartRanks)
+   * and the place rides each item as `_chart`, where episodeRanks reads it.
+   * The drawers OPEN on it since 2026-09-03 (Reed's ask); the feeds never
+   * come through here for it, being server-ranked. */
+  if (key === 'chart') {
+    return chartRanks(items, {
+      sats: episodeRankValue('sats'), boosts: episodeRankValue('boosts'), breadth: episodeRankValue('count'),
+    }).map((e) => ({ ...e.row, _chart: { rank: e.rank, tied: e.tied } }))
+  }
   return [...items].sort(EPISODE_SORTERS[key] || EPISODE_SORTERS[fallback])
+}
+
+/* The rank and tie flag of every item in a sorted view, for the sort it was
+ * sorted by: the chart's tuple standing off `_chart`, a single-axis sort's
+ * competition rank over its own figure. One function so the edge
+ * (episode-cards.js) and the browser (episode-section.js) number a card the
+ * same way; null for a chronological sort, where a numeral would read as a
+ * score. The view must be the WHOLE ordering (these callers hold theirs). */
+export function episodeRanks(view, sortKey) {
+  if (!RANKED_SORTS.has(sortKey)) return null
+  if (sortKey === 'chart') return view.map((it) => it._chart || { rank: 0, tied: false })
+  return competitionRanks(view, episodeRankValue(sortKey))
 }
 
 /* ⚠️ THE RANGE MEANS BOOST TIME — the one reading, everywhere, since
@@ -719,21 +745,12 @@ export function episodeCardHtml(item, {
   const head = `<div class="pcast-card-head">${rankEl}${mediaCol}${body}` +
     (compact ? rail : subscribeMenuHtml(item)) + `</div>`
 
-  // Inline audio player (native controls, no preload until played). The element
-  // is a fact — it is the episode's enclosure — and needs no JavaScript at all;
-  // the browser's own controls are the interaction.
-  //
-  // A <source> when the feed declared a MIME type, `src` on the element when it
-  // did not — `enclosure_type` is the second of the two fields toEpisodeShape
-  // documents as absent, so on the feeds the browser sniffs it, which is what it
-  // has always done here.
-  const audioUrl = (!compact && isSafeUrl(ep.enclosure_url)) ? ep.enclosure_url : null
-  const playerHtml = !audioUrl ? ''
-    : ep.enclosure_type
-      ? `<div class="pcast-player-row"><audio class="pcast-player" controls preload="none">` +
-        `<source src="${esc(audioUrl)}" type="${esc(ep.enclosure_type)}" /></audio></div>`
-      : `<div class="pcast-player-row">` +
-        `<audio class="pcast-player" controls preload="none" src="${esc(audioUrl)}"></audio></div>`
+  // ⚠️ NO INLINE <audio> ON ANY LAYOUT SINCE 2026-09-03. Reed's call: the feed
+  // card carried the episode's enclosure as a native player, and it came off
+  // because every card's title already links to /episode/<item-guid>, which has
+  // the player — the same argument that kept it off the compact layout from
+  // the start. `git log -S pcast-player-row` has the element and its <source>
+  // handling if a surface ever wants it back.
 
   /* ⚠️ A <details>, NOT A BUTTON AND A HIDDEN DIV. The drawer holds the boost
    * notes, which are FACTS, so they are in the document — and a control that
@@ -781,7 +798,7 @@ export function episodeCardHtml(item, {
     attr('data-feed-url', show?.feed_url) +
     attr('data-feed-id', ep.feed_id || show?.feed_id) +
     attr('data-boost-url', episodeNoteLink(item)) +
-    `>${head}${playerHtml}${drawer}</div>`
+    `>${head}${drawer}</div>`
 }
 
 /* The ⋮ subscribe menu.

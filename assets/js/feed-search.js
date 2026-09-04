@@ -1,9 +1,9 @@
 /* Feed search — the typeahead that sits at the top of every feed panel.
  *
  * One box per feed, mounted into the panel's own [data-feed-search] slot,
- * which puts it *below* the sticky feed bar and inside the scrolling column:
- * the range/sort controls stay pinned, the search scrolls away with the cards
- * it filters.
+ * which since 2026-09-03 sits ABOVE the shell whose lid carries the range and
+ * sort (Reed's ask: the search over the controls). Both scroll away with the
+ * cards; the feed bar stopped being sticky chrome the same day.
  *
  * What it searches is the feed's own subject — episodes on Episodes, shows on
  * Shows, boosters on Boosts — and each renderer supplies its own index through

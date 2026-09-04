@@ -14,37 +14,11 @@
 /* Self-hosted variable WOFF2s — one file per family covers all weights.
    Pages preload these; the @font-face rules live here so a page only has
    to link one stylesheet to get the site's type. */
-/* ⚠️ MOVIE POSTER (Billy Argel) IS "FREE FOR PERSONAL USE ONLY", and its EULA
-   forbids editing, converting or renaming the file — which is why this is the
-   raw 375KB TTF under its original filename rather than a subset woff2 like
-   the faces below. It draws the CHARTS wordmark link and nothing else; the
-   caps-only unicode-range keeps the browser from fetching it until a page
-   actually renders the wordmark. Commercial licensing: billyargel@gmail.com
-   (Reed's pick, 2026-09-01 — dafont.com/movie-poster.font). */
-@font-face {
-  font-family: 'Movie Poster';
-  src: url('/assets/fonts/Movie%20Poster%20Personal%20Use.ttf') format('truetype');
-  font-display: swap;
-  unicode-range: U+0041-005A;
-}
-/* The wordmark link that font exists for: CHARTS, pointing at /charts. Three
-   placements (Reed, 2026-09-01): the Shows and Artists feed notes on the
-   exact default chart view, and the Members tab's #40HPW sub-line. Sized in
-   em so it rides each host line; --brand-dd is the AA text step on light, and
-   per the theming rules a --brand-dd text usage carries its own dark
-   override. */
-.ob-charts-link {
-  font-family: 'Movie Poster', 'Playfair Display', Georgia, serif;
-  font-size: 1.3em;
-  line-height: 1;
-  letter-spacing: 0.05em;
-  color: var(--brand-dd);
-  text-decoration: none;
-}
-.ob-charts-link:hover,
-.ob-charts-link:focus-visible { text-decoration: underline; }
-:root[data-theme="dark"] .ob-charts-link { color: var(--brand-d); }
-
+/* The CHARTS wordmark (Movie Poster, a personal-use-only TTF) and its
+   .ob-charts-link rule lived here from 2026-09-01 to 2026-09-03, when Reed
+   cut the wordmark links along with the Charts page they pointed at; the
+   file went with them. `git log -S 'Movie Poster'` has the rule and the
+   licensing note. */
 @font-face {
   font-family: 'Playfair Display';
   font-style: normal;

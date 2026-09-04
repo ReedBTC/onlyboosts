@@ -40,22 +40,15 @@ import {
 } from "../../assets/js/pacific-week.js";
 import { boardHtml, weekLabel, weekSpan, hours, COPY } from "../../assets/js/hpw-board.js";
 import { htmlEscape } from "../../assets/js/nostr-text.js";
+import { cardHtml, CARD_W, CARD_H } from "../_shared/card-frame.js";
+export { CARD_W, CARD_H };
 
 export const SITE_ORIGIN = "https://onlyboosts.social";
 const HIGH = "high-scores";
 const ROWS = 10;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-// The card's frame. The bot screenshots exactly this viewport at 2x.
-// ⚠️ PORTRAIT, 4:5, since 2026-08-29. It shipped as a 1200x630 landscape,
-// the link-preview shape, and the first thing Reed said on downloading one
-// was "oh man, it's wide screen": the card is shared from phones into Nostr
-// clients and chat apps, which show an image at its own shape, and a phone
-// is tall. 720x900 at 2x is 1440x1800, the standard portrait social size, and
-// well under the 900KB cap. The page's twitter:card takes the square
-// thumbnail rather than the large card for the same reason — a wide crop out
-// of the middle of a tall board would show four rows and no title.
-export const CARD_W = 720;
-export const CARD_H = 900;
+// The card's frame (720x900, portrait) is functions/_shared/card-frame.js's;
+// CARD_W / CARD_H are re-exported above for the test.
 
 export async function onRequestGet({ request, env, params }) {
   let segs = params.path;
@@ -264,7 +257,7 @@ export function renderPage(view) {
     body,
     canonical: pageUrl,
     og: { title: d.ogTitle, description: d.lead, image, url: pageUrl },
-    scripts: `<script src="/assets/js/hpw-page.js?v=ob-v180" type="module"></script>`,
+    scripts: `<script src="/assets/js/hpw-page.js?v=ob-v188" type="module"></script>`,
     extraCss: `
     /* The tab supplies the accent family off body[data-active-feed]; this page
        has no active feed and supplies the brand, as .show-main does. */
@@ -278,11 +271,11 @@ export function renderPage(view) {
 
 // ── the card ─────────────────────────────────────────────────────────────────
 
-/* The frame the bot screenshots. Everything about it is fixed: the size, the
-   light palette (no theme boot script, so `data-theme` is never set), the
-   type scale. It links the same two stylesheets the tab's board is dressed by
-   and overrides only what a portrait 720x900 image needs — a larger base size so the
-   rows fill the frame, faces to match, and no hover chrome anywhere. */
+/* The frame the bot screenshots is functions/_shared/card-frame.js since
+   2026-09-03 (the chart cards share it); this supplies the 40 HPW board and
+   the rules that size its rows to the frame. The numbers are the ones the
+   collector measured (see the frame's note); change one and have the bot
+   re-measure. */
 export function renderCard(view) {
   const d = describe(view);
   const board = boardHtml({
@@ -294,69 +287,17 @@ export function renderCard(view) {
     members: d.members,
     goal: d.goal,
     empty: d.empty,
+    card: true,
   });
-  return `<!DOCTYPE html>
-<html lang="en" data-card>
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=${CARD_W}" />
-  <meta name="robots" content="noindex" />
-  <meta http-equiv="Content-Security-Policy" content="
-    default-src 'self';
-    script-src 'self' 'unsafe-inline';
-    style-src 'self' 'unsafe-inline';
-    img-src 'self' data: https:;
-    font-src 'self' data:;
-    connect-src 'self';
-    base-uri 'self';
-    form-action 'self';
-    object-src 'none';
-  " />
-  <title>${htmlEscape(d.ogTitle)} (card)</title>
-  <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
-  <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
-  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v180" />
-  <style>
-    /* ⚠️ THE VERTICAL BUDGET IS MEASURED, NOT DERIVED, AND THE LINE IS THE
-       LIST BOX, NOT THE FOOTER. The landscape card overflowed its frame once
-       (rows nine and ten painted through the footer; the collector's bot
-       measured it, 2026-08-29) and the list has clipped inside its shell
-       since, so an overrun is a cut-off tenth row rather than an overlap —
-       a SILENT one, which is why the bot refuses to publish a card with a
-       clipped row. A budget I derived from the base size and the footer's
-       position read ~7px a row high; the bot measured the portrait card
-       against the live preview instead:
-
-         list box 269.5 → 829.5 (560px of room), footer top 853
-         rows 49.2–50.2px, ten rows, clipped 0
-         ceiling 56.0px a row: 56px fits, 57px loses row ten
-
-       So a row has about 5.8px of growth in hand. Anything that grows one (a
-       chip, a second line, a bigger face) spends that and then loses the
-       tenth member from the card while the tab still shows them.
-
-       ⚠️ THE CEILING IS NOT A CONSTANT: it is (listBottom − listTop) / 10,
-       and ANY chrome change around the list moves it, not only a row
-       change — trimming the footer to one line moved it 2.2px a row without
-       a row being touched. Change a number anywhere in here and have the
-       bot re-measure (its clip_report returns the list box) before
-       believing a budget. */
-    html { font-size: 21px; background: var(--white); }
-    html, body { margin: 0; padding: 0; }
-    body {
-      width: ${CARD_W}px; height: ${CARD_H}px; overflow: hidden;
-      background: var(--white); color: var(--ink);
-      --accent: var(--brand); --accent-d: var(--brand-d); --accent-dd: var(--brand-dd); --tint: rgba(0, 175, 240, 0.1);
-    }
-    .card { box-sizing: border-box; width: 100%; height: 100%; padding: 28px 32px 22px; display: flex; flex-direction: column; }
-    .card-head { display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: 12px; flex: none; }
-    .card-logo { height: 64px; width: auto; display: block; margin-bottom: 6px; }
-    .card-kicker {
-      font-family: 'Playfair Display', Georgia, serif; font-weight: 700; font-size: 1.2rem;
-      color: var(--ink); letter-spacing: 0.01em;
-    }
-    .card-kicker small { display: block; font-family: 'Source Serif 4', Georgia, serif; font-weight: 400; font-size: 0.74rem; color: var(--muted); margin-top: 2px; }
+  return cardHtml({
+    title: d.ogTitle,
+    kicker: COPY.challenge,
+    kickerSub: COPY.intro,
+    board,
+    footer: "onlyboosts.social/#members",
+    links: `  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v188" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v188" />`,
+    css: `
     .card .hpw-board { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0.7rem 1.1rem 0.6rem; }
     .card .hpw-title { margin-bottom: 0.4rem; flex: none; font-size: 1.1rem; }
     .card .hpw-list { flex: 1; min-height: 0; overflow: hidden; }
@@ -366,40 +307,8 @@ export function renderCard(view) {
     .card .hpw-who { line-height: 1.2; }
     .card .hpw-name { font-size: 0.95rem; }
     .card .hpw-week, .card .hpw-week-jump { font-size: 0.62rem; }
-    .card .hpw-hours { font-size: 1.05rem; }
-    .card-foot { margin-top: 10px; flex: none; text-align: left; font-size: 0.72rem; font-weight: 700; color: var(--brand-dd); }
-    /* A screenshot has no hover, focus or pointer. */
-    .card a { text-decoration: none; color: inherit; pointer-events: none; }
-  </style>
-</head>
-<body>
-<div class="card">
-  <header class="card-head">
-    <img class="card-logo" src="/assets/onlyboosts_banner_clear.png" alt="OnlyBoosts" width="192" height="64" />
-    <div class="card-kicker">${htmlEscape(COPY.challenge)}<small>${htmlEscape(COPY.intro)}</small></div>
-  </header>
-  ${board}
-  <!-- One line, left-aligned, and nothing else. Reed's call, 2026-08-30. -->
-  <footer class="card-foot">onlyboosts.social/#members</footer>
-</div>
-<script>
-/* The bot waits for html[data-card-ready="1"], never for a fixed sleep. Set
-   once the two web fonts and every face have loaded or failed; and set anyway
-   after 8s so a face that never answers cannot hold the render forever. */
-(function () {
-  var done = function () { document.documentElement.setAttribute('data-card-ready', '1'); };
-  var imgs = Array.prototype.slice.call(document.images).map(function (img) {
-    return img.complete ? Promise.resolve() : new Promise(function (r) {
-      img.addEventListener('load', r); img.addEventListener('error', r);
-    });
+    .card .hpw-hours { font-size: 1.05rem; }`,
   });
-  var fonts = (document.fonts && document.fonts.ready) ? document.fonts.ready : Promise.resolve();
-  Promise.all(imgs.concat([fonts])).then(done, done);
-  setTimeout(done, 8000);
-})();
-</script>
-</body>
-</html>`;
 }
 
 // ── the shell ────────────────────────────────────────────────────────────────
@@ -463,16 +372,16 @@ ${og ? `
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v180" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v188" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v188" />
   <!-- feed-cards.css for the share pill and its menu; boost-actions.css for
        the composer behind Post to Nostr. Both are the same chrome the tab
        already has. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v180" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v188" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v188" />
+  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v188" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v188" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v188" />
   ${extraCss ? `<style>${extraCss}\n  </style>` : ""}
 </head>
 <body>
@@ -529,15 +438,16 @@ ${og ? `
                  the page carries, in a different order, using different words
                  for the same things. Each entry lands on that tab's DEFAULT
                  sub-feed — TAB_DEFAULT in the index.html controller — so
-                 Podcasts opens Episodes, Music opens Albums and Members opens
-                 Boosts. **Those three hrefs and TAB_DEFAULT move together.**
+                 Podcasts opens Shows (Episodes until 2026-09-03), Music opens
+                 Artists and Members opens Boosts. **Those three hrefs and
+                 TAB_DEFAULT move together.**
 
                  The Global vs Follows axis stays deliberately absent: it is the
                  second dropdown on the page itself, and listing both scopes
                  here made the nav a grid restating a control the page has. -->
             <div class="nav-explore-group">
               <h4>Feeds</h4>
-              <a href="/#episodes-global"><span aria-hidden="true">🎙</span> Podcasts</a>
+              <a href="/#shows"><span aria-hidden="true">🎙</span> Podcasts</a>
               <a href="/#artists"><span aria-hidden="true">🎵</span> Music</a>
               <a href="/#members"><span aria-hidden="true">👥</span> Members</a>
             </div>
@@ -631,7 +541,7 @@ ${body}
            each lands on that tab's default sub-feed. See partials/nav.html. -->
       <h3>Feeds</h3>
       <ul>
-        <li><a href="/#episodes-global">🎙 Podcasts</a></li>
+        <li><a href="/#shows">🎙 Podcasts</a></li>
         <li><a href="/#artists">🎵 Music</a></li>
         <li><a href="/#members">👥 Members</a></li>
       </ul>
@@ -666,10 +576,10 @@ ${body}
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav.js?v=ob-v180" defer></script>
+<script src="/assets/js/nav.js?v=ob-v188" defer></script>
 ${scripts}
-<script src="/assets/js/nav-widget-boot.js?v=ob-v180"></script>
-<script src="/assets/js/sw-register.js?v=ob-v180" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v188"></script>
+<script src="/assets/js/sw-register.js?v=ob-v188" defer></script>
 </body>
 </html>`;
 }

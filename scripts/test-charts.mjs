@@ -32,6 +32,7 @@ import { onRequestGet as episodesGet, onRequestPost as episodesPost } from '../f
 import { onRequestGet as publishersGet, onRequestPost as publishersPost } from '../functions/api/v1/publishers.js'
 import { onRequestGet as membersGet } from '../functions/api/v1/members.js'
 import { PUBLISHERS } from '../functions/api/v1/_common.js'
+import { chartRanks } from '../assets/js/rank.js'
 import { feedRanks, renderStatTiles } from '../functions/_shared/feed-rank.js'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -604,16 +605,55 @@ async function call(handler, url, init) {
     assert.equal(showRanks.chartWindows['1y'].rank, showRanks.chart.rank)
     assert.equal(showRanks.chartWindows.all.rank, showRanks.chart.rank)
   })
+  /* ── The windows' figures and component ranks (the tiles, 2026-09-03) ──
+   * `windows[key]` carries what the tiles print for that window: the
+   * subject's own sats/boosts/breadth over the window's boosts, and its
+   * competition rank on each, brute-forced here as "rows strictly ahead + 1"
+   * over the same independent rollup the chart place is checked against. */
+  const compRank = (list, id, k) => {
+    const me = list.find((e) => e.id === id)
+    const ahead = list.filter((e) => e[k] > me[k]).length
+    const tied = list.filter((e) => e[k] === me[k]).length > 1
+    return { rank: ahead + 1, tied }
+  }
+  check('a show’s WEEK window carries the week’s own figures under the tile keys', () => {
+    const exp = weekShows.find((e) => e.id === 's2')
+    const w = showRanks.windows['1w']
+    assert.equal(w.sats, exp.sats)
+    assert.equal(w.boosts, exp.boosts)
+    assert.equal(w.boosters, exp.breadth)
+  })
+  check('⚠️ and its three component ranks are competition ranks over the week alone', () => {
+    const w = showRanks.windows['1w']
+    assert.deepEqual(w.ranks.sats, compRank(weekShows, 's2', 'sats'))
+    assert.deepEqual(w.ranks.boosts, compRank(weekShows, 's2', 'boosts'))
+    assert.deepEqual(w.ranks.boosters, compRank(weekShows, 's2', 'breadth'))
+  })
+  check('the all-time window’s component ranks agree with the chips feedRanks always gave', () => {
+    const w = showRanks.windows.all
+    assert.deepEqual(w.ranks.sats, showRanks.sats)
+    assert.deepEqual(w.ranks.boosts, showRanks.boosts)
+    assert.deepEqual(w.ranks.boosters, showRanks.boosters)
+    assert.equal(w.sats, Number(showRow.total_sats))
+  })
   const s7Row = db.prepare('SELECT * FROM podcasts WHERE podcast_guid = ?').get('s7')
   const s7Ranks = await feedRanks(env.DB, 'show', s7Row)
   check('⚠️ a show with no boost in the window resolves null there, not a rank', () => {
     assert.equal(s7Ranks.chartWindows['1w'], null)
     assert.ok(s7Ranks.chartWindows['1y'].rank >= 1)
+    assert.equal(s7Ranks.windows['1w'], null)
   })
   const weekMems = chartOrder(rollup(BOOSTS.filter((b) => !PUBLISHERS.includes(b.pk) && inWeek(b)), (b) => b.pk, (b) => b.show))
   check('a member’s week place uses the wall’s windowed population', () => {
     const exp = weekMems.find((e) => e.id === M[0])
     assert.equal(boosterRanks.chartWindows['1w'].rank, exp.rank)
+  })
+  check('⚠️ a member’s window names its breadth `shows`, the /booster tile key', () => {
+    const exp = weekMems.find((e) => e.id === M[0])
+    const w = boosterRanks.windows['1w']
+    assert.equal(w.shows, exp.breadth)
+    assert.equal(w.boosters, undefined)
+    assert.deepEqual(w.ranks.shows, compRank(weekMems, M[0], 'breadth'))
   })
   const m5agg = memChart.find((e) => e.id === M[4])
   const m5Ranks = await feedRanks(env.DB, 'booster', { pk: M[4], sats: m5agg.sats, boosts: m5agg.boosts, shows: m5agg.breadth })
@@ -673,14 +713,110 @@ async function call(handler, url, init) {
   })
   const allDeep = { '1w': win(101), '1m': null, '1y': win(200), all: win(101) }
   const noneHtml = renderStatTiles(stats, { ...ranks, chart: { rank: 101, tied: false }, chartWindows: allDeep }, { rankFeed: 'Shows', backHref: '/#shows' })
-  check('⚠️ no window inside the top 100 renders NO strip at all', () => {
-    assert.ok(!noneHtml.includes('OnlyBoosts Charts'))
+  check('⚠️ no window inside the top 100 still renders the strip — it is the tiles’ selector now', () => {
+    assert.ok(noneHtml.includes('OnlyBoosts Chart Positions'))
+    assert.equal((noneHtml.match(/show-chart-cell--none/g) || []).length, 4)
+    assert.ok(!noneHtml.includes('href="/#shows?sort=chart'))
     assert.ok(noneHtml.includes('show-stats'))
+  })
+
+  /* ── The tiles follow the strip (2026-09-03) ───────────────────────── */
+  const windows = {
+    all: null,
+    '1w': { sats: 12345, boosts: 1, boosters: 1, ranks: { sats: { rank: 1, tied: false }, boosts: { rank: 5, tied: true }, boosters: { rank: 200, tied: false } } },
+    '1m': null,
+    '1y': { sats: 900, boosts: 9, boosters: 2, ranks: { sats: { rank: 2, tied: false }, boosts: { rank: 3, tied: false }, boosters: { rank: 1, tied: false } } },
+  }
+  const wHtml = renderStatTiles(stats, { ...ranks, windows }, { rankFeed: 'Shows', backHref: '/#shows' })
+  const row = (key) => {
+    const m = wHtml.match(new RegExp(`<dl class="show-stats" data-window="${key}"([^>]*)>([\\s\\S]*?)</dl>`))
+    assert.ok(m, `no row for ${key}`)
+    return { attrs: m[1], body: m[2] }
+  }
+  check('four rows of tiles ship, all time visible and the other three hidden', () => {
+    assert.equal((wHtml.match(/<dl class="show-stats" data-window=/g) || []).length, 4)
+    assert.equal(row('all').attrs, '')
+    for (const k of ['1w', '1m', '1y']) assert.match(row(k).attrs, /\bhidden\b/)
+  })
+  check('the all-time row is the page’s own strings, verbatim', () => {
+    const b = row('all').body
+    assert.ok(b.includes('<dd title="1000 sats">1,000</dd>'))
+    assert.ok(b.includes('#2 by sats on the Shows feed all time'))
+  })
+  check('a window row prints the window’s figures through the pages’ formatters, singularized', () => {
+    const b = row('1w').body
+    assert.ok(b.includes('<dd title="12,345">12k</dd>'))      // compact sats, exact tooltip
+    assert.ok(b.includes('<dt>boost</dt><dd title="1">1</dd>')) // 1 boost, not "1 boosts"
+    assert.ok(b.includes('<dt>booster</dt>'))
+    assert.ok(b.includes('<dt>sats</dt>'))                     // sats never singularizes
+  })
+  check('⚠️ a window row’s chips are that window’s ranks, top-100 gated, tooltip naming the window', () => {
+    const b = row('1w').body
+    assert.ok(b.includes('title="#1 by sats on the Shows feed this week">#1<'))
+    assert.ok(b.includes('Tied for #5 by boosts on the Shows feed this week'))
+    assert.ok(!b.includes('#200'))                              // past the gate: no chip
+    assert.equal((b.match(/show-stat--ranked/g) || []).length, 2)
+  })
+  check('⚠️ a window with no boosts is three zeros and no chips, not a missing row', () => {
+    const b = row('1m').body
+    assert.equal((b.match(/<dd title="0">0<\/dd>/g) || []).length, 3)
+    assert.ok(!b.includes('show-stat-rank'))
+    assert.ok(b.includes('<dt>boosts</dt>'))                   // zero is plural
+  })
+  check('the all-time cell is the current one and the strip is the picker', () => {
+    assert.ok(wHtml.includes('data-window="all" aria-current="true"'))
+    assert.equal((wHtml.match(/aria-current="true"/g) || []).length, 1)
+    assert.ok(wHtml.includes('data-stat-window-picker'))
+    assert.ok(wHtml.includes('data-stat-windows'))
+  })
+  check('⚠️ no caption under the tiles any more', () => {
+    assert.ok(!wHtml.includes('show-stats-cap'))
+    assert.ok(!wHtml.includes('Rank on the all-time'))
   })
   const bareHtml = renderStatTiles(stats, { sats: { rank: 2, tied: false }, boosts: { rank: 3, tied: false }, boosters: { rank: 1, tied: false } }, { rankFeed: 'Shows', backHref: '/#shows' })
   check('no chart data at all, no strip — the tiles render exactly as before', () => {
     assert.ok(!bareHtml.includes('OnlyBoosts Charts'))
     assert.ok(bareHtml.includes('show-stats'))
+  })
+}
+
+// ── rank.js#chartRanks — the drawers' chart standing, in JS ─────────────────
+{
+  console.log('\nrank.js#chartRanks (the detail-page drawers, 2026-09-03)')
+  const of = { sats: (r) => r.sats, boosts: (r) => r.boosts, breadth: (r) => r.breadth }
+  for (const [name, rows] of [
+    ['shows', rollup(BOOSTS.filter(notMusic), (b) => b.show, (b) => b.pk)],
+    ['members', rollup(BOOSTS.filter((b) => !PUBLISHERS.includes(b.pk)), (b) => b.pk, (b) => b.show)],
+    ['episodes', rollup(BOOSTS.filter(notMusic), (b) => b.ep, (b) => b.pk)],
+  ]) {
+    const expect = chartOrder(rows)
+    const got = chartRanks(rows, of)
+    check(`${name}: the same order, ranks and tie flags as the brute force`, () => {
+      // The brute force breaks a full tie by id; chartRanks keeps input order.
+      // Compare the standing per id rather than the position of a tied row.
+      const byId = new Map(got.map((e) => [e.row.id, e]))
+      for (const r of expect) {
+        assert.equal(byId.get(r.id).rank, r.rank, `${r.id} rank`)
+        assert.equal(byId.get(r.id).tied, r.tied, `${r.id} tied`)
+        assert.equal(byId.get(r.id).score, r.score, `${r.id} score`)
+      }
+      assert.deepEqual(got.map((e) => e.rank), got.map((e) => e.rank).slice().sort((a, b) => a - b), 'ordered by rank')
+    })
+  }
+  check('⚠️ the chain: equal scores break on breadth first, then sats, then boosts', () => {
+    const rows = [
+      { id: 'a', sats: 300, boosts: 1, breadth: 1 },  // r: 1,2,2 = 5
+      { id: 'b', sats: 200, boosts: 2, breadth: 2 },  // r: 2,1,1 = 4  -> #1 outright
+      { id: 'c', sats: 100, boosts: 1, breadth: 1 },  // r: 3,2,2 = 7
+    ]
+    assert.deepEqual(chartRanks(rows, of).map((e) => e.row.id), ['b', 'a', 'c'])
+    const tie = [
+      { id: 'x', sats: 100, boosts: 1, breadth: 1 },
+      { id: 'y', sats: 100, boosts: 1, breadth: 1 },
+      { id: 'z', sats: 50, boosts: 1, breadth: 1 },
+    ]
+    const g = chartRanks(tie, of)
+    assert.deepEqual(g.map((e) => [e.row.id, e.rank, e.tied]), [['x', 1, true], ['y', 1, true], ['z', 3, false]])
   })
 }
 

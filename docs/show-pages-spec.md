@@ -537,8 +537,8 @@ one section rather than the whole thing. `/show/<guid>#podroll` is the shape.
 | Hash | Section |
 |---|---|
 | `#episodes` | the episode drawer |
-| `#community-shows` | Other Shows/Albums This Community Boosts |
 | `#community` | the Nostr Community wall |
+| `#community-shows` | Other Shows/Albums This Community Boosts (below the wall since 2026-09-03) |
 | `#podroll` | Podroll - Recommended by Show Authors |
 | `#reverse-podroll` | Reverse Podroll - \<Show Name\> is Recommended By: |
 | `#boosts` | Recent Boosts |

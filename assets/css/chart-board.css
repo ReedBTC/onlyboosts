@@ -1,6 +1,7 @@
-/* The OnlyBoosts Charts boards (/charts/<week>): five weekly Top 10s, each
-   beside its Weeks at #1 companion. Markup comes from
-   functions/_shared/chart-board.js, rendered at the edge only.
+/* The OnlyBoosts Charts boards: a weekly Top 10 beside its Weeks at #1
+   companion, on /charts/<week>, on the Shows and Artists feeds of the
+   homepage (charts-block.js, since 2026-09-03) and in the share cards.
+   Markup comes from assets/js/chart-board.js, two-sided.
 
    ⚠️ THE .cb-* GRAMMAR RESTATES .hpw-* (assets/css/hpw-board.css), IT DOES NOT
    IMPORT IT — the same seam as .mb-shell restating .bs-shell. The boards must
@@ -58,8 +59,11 @@
    the board with a live race in it, the hpw ordering. */
 .cb-pairs { display: grid; gap: 1.1rem; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); }
 
-/* ── the board shell ── same fill, hairline and radius as .hpw-board. */
+/* ── the board shell ── same fill, hairline and radius as .hpw-board.
+   `position: relative` anchors the share button (.hpw-share, absolute in
+   the corner) since the boards joined the homepage feeds (2026-09-03). */
 .cb-board {
+  position: relative;
   background: var(--cream);
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -130,15 +134,21 @@ a.cb-name:hover { color: var(--accent-d); text-decoration: underline; }
   font-size: 0.68rem; color: var(--muted);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-/* On Weeks at #1 the sub-line is a link to that week's own page — the
-   high-scores board's discovery idiom, dressed the same way. */
-a.cb-week-jump {
+/* On Weeks at #1 the sub-line is the most recent #1 week — a LINK to that
+   week's page on /charts, a jump BUTTON on the homepage (the picker's own
+   `data-hpw-goweek`, since 2026-09-03) — dressed the same way either way: the
+   Proof of #40HPW board's discovery idiom. The button carries `.cb-sub` and
+   hpw-board.css's `.hpw-week-jump` reset; this only keeps the sub-line's
+   size and ellipsis on it, which that reset's `font-size` would otherwise
+   override. */
+.cb-week-jump {
   align-self: flex-start; max-width: 100%;
   text-decoration: underline; text-decoration-style: dotted;
   text-decoration-color: var(--border); text-underline-offset: 2px;
 }
-a.cb-week-jump:hover { color: var(--accent-d); text-decoration-color: currentColor; }
-a.cb-week-jump:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 3px; }
+button.cb-sub.hpw-week-jump { font-size: 0.68rem; color: var(--muted); }
+.cb-week-jump:hover { color: var(--accent-d); text-decoration-color: currentColor; }
+.cb-week-jump:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 3px; }
 .cb-fig { font-weight: 700; font-size: 0.92rem; color: var(--accent-d); flex: none; }
 .cb-unit { font-weight: 400; font-size: 0.72rem; color: var(--muted); }
 /* The weekly row's component-rank triplet (sats/boosters/boosts), under the

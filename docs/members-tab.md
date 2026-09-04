@@ -40,23 +40,28 @@ border and no top one. **They must stay in step** — a shell here at 10px where
 | #40HPW | each board is one, no lid (no controls) |
 | Members | heading outside, range + sort as the lid |
 | Boost Bots | the `<ul>` is the shell, no lid |
-| Boosts | **two elements** — see below |
+| Boosts | the boosts PANEL is the shell, its lid the feed bar — `.feed-shell`, every feed's since 2026-09-03 |
 
-**⚠️ THE BOOSTS SHELL IS TWO ELEMENTS AND THE SEAM IS THE WHOLE RISK.** The bar
-is the lid and the cards are the body, but the cards live in `.feed-panel`s
-outside the section — that panel system serves seven other feeds and moving them
-in would fork it. So the lid closes its own bottom (`.mb-shell--lid-only`) and
-the active panel opens its own top, both scoped to
-`body[data-active-tab="members"]`. **Any vertical margin on either half opens a
-gap the border makes visible.**
+**The second #40HPW slot is a stack since 2026-09-03**: Proof of #40HPW and
+the members' Weeks at #1 board (the Charts page's, `memberOnesBoardHtml`),
+flipped by the week picker's own stepper in the board's title (`flipHtml` in
+`week-picker.js`; Reed's ask: "like how you can toggle between weeks"). Each
+has its share card — `high-scores` under `/api/og/hpw/`, `members-weeks-at-1`
+under `/api/og/charts/` — and `paintStack` mounts the shown one's button on
+every flip. The picker's markup and delegate moved to `week-picker.js` the
+same day, shared with the chart blocks on the Shows and Artists feeds.
 
-**⚠️ AND IT OPENED ONE ON THE FIRST TRY: `.mb-section`'s OWN `margin-bottom`.**
-That rule gives every section on the tab 2.75rem of space beneath it, which is
-right for three of them and wrong for the one whose box *continues into the
-element after it* — the result was 2.75rem of nothing between a lid and its
-body with the border drawing both edges of the hole. `.members-boosts` zeroes
-it. The warning above was written before this shipped and did not save it;
-**check the containing section's margin, not only the two halves.**
+**The Boosts shell was two elements until 2026-09-03, and the seam was the
+whole risk.** The bar was the lid and the cards the body, but the cards live in
+`.feed-panel`s outside the section, so a lid-only `.mb-shell` closed its own
+bottom and the active panel opened its own top, both scoped to
+`body[data-active-tab="members"]`; `.mb-section`'s own 2.75rem `margin-bottom`
+opened the gap on the first try, with the border drawing both edges of the
+hole. **That arrangement is gone**: every panel is now a `.feed-shell` with a
+`.feed-lid` slot of its own (Reed's ask, the Members wall's look on every
+feed), so the lid and the body are one element and there is no seam. The
+`.members-boosts` section is the heading alone, still with `margin-bottom: 0`
+so it sits on the panel's shell the way the wall's heading sits on its own.
 
 **⚠️ AND NO `overflow: hidden` ON A SHELL WHOSE LID HOLDS A DROPDOWN.**
 `.bs-shell` carries it and gets away with it because its lid sits on top of a
@@ -67,12 +72,12 @@ compounding into one symptom. `.mb-lid` takes the top corners itself, which is
 all the clip was doing. `.bots-list` keeps its clip: no dropdown, and its rows
 carry their own fill to the rounded edge.
 
-**⚠️ NO `max-width` OR `margin` IN THE SCOPED `.feed-bar` RULE.** Both are
-no-ops (the shell already sits inside `.feed-panels-inner`, which reads the
-track), and `test-feed-hash.mjs` scans declarations for `.feed-bar` to assert
-four elements read `var(--feed-track)` — so a scoped `max-width: none` reads to
-it as the track declaration going away. It failed exactly that way once.
-Restyle the fill and the padding there; leave the box model to the base rule.
+**`.feed-bar` reads no `--feed-track` since 2026-09-03.** It lives inside a
+panel, which is inside `.feed-panels-inner`, which reads the track; the
+`test-feed-hash.mjs` assertion moved from four elements to three with it. (The
+scoped Members rule that once restyled the bar is gone with the two-element
+shell, and the ⚠️ that used to sit here about not putting `max-width` in it
+with it.)
 
 **⚠️ THE WALL'S HEADING IS renderSupporters' AND IS MOVED, NOT REWRITTEN.** The
 word is a parameter — "Members" here, "Nostr Community" on the detail pages — so
@@ -121,26 +126,30 @@ at (0,1,0) against `.mb-section > h2` at (0,1,1) — the exact specificity trap
 `.show-stat dd` documents in `show-page.css`, and it would have won on
 line-height while losing on family.
 
-**⚠️ THE FEED BAR IS MOVED INTO THIS TAB, AND MOVED BACK.** `placeFeedBar` in
-the controller relocates `.feed-bar` — the scope menu plus every feed's mounted
-range/sort group — into `[data-feed-bar-slot]` inside the Boosts section, and
-returns it to `.feed-bar-wrap` on every other tab. *Reed's call, 2026-08-23:*
-every other tab puts its feed directly under the bar, so sticky-at-the-top is
-right; Members puts three sections above the boost list, which left the controls
-a screen and a half from the list they act on, and the list itself unnamed.
+**⚠️ THE FEED BAR IS MOVED INTO THE ACTIVE PANEL'S LID, ON EVERY FEED.**
+`placeFeedBar(feed)` in the controller relocates `.feed-bar` — the scope menu
+plus every feed's mounted range/sort group — into the `[data-feed-bar-slot]`
+lid of whichever panel is active. It ships in the Shows panel's lid. This is
+the general form of a move that began here: *Reed's call, 2026-08-23* put the
+bar beside this tab's boost list (three sections above it had left the
+controls a screen and a half from the list they act on) and returned it to the
+sticky `.feed-bar-wrap` everywhere else; on 2026-09-03 he asked for the same
+contained look on every feed, and the wrap now holds only the tabs and the
+sub-row.
 
 - **It is a MOVE, never a duplicate.** `appendChild` relocates the live element
   with its listeners, its open-menu state and all eight `[data-controls-for]`
   groups intact, so the declarative `body[data-active-feed]` rule that decides
   which group is on screen is untouched. A second bar would be two sets of
   controls over one feed, which is the failure that rule exists to prevent.
-- **⚠️ THE MOVE BACK IS THE HALF THAT BREAKS.** `.members-block` is
-  `display:none` off this tab, so a bar left in the slot vanishes from every
-  other feed: no scope menu, no range, no sort, and nothing saying why.
-- It stops being sticky for free — `.feed-bar-wrap` carries the `position`, and
-  the slot is an ordinary section.
-- `test-feed-hash.mjs` pins both directions, and **its window stub now keeps its
-  listeners** so `hashchange` can be fired. It was `{ addEventListener(){} }`,
+- **⚠️ THE BAR MUST BE IN THE PANEL ON SCREEN.** An inactive panel is `hidden`,
+  so a bar left in the wrong lid vanishes from the feed being read: no scope
+  menu, no range, no sort, and nothing saying why. (Before 2026-09-03 the same
+  failure was "the move back", out of the `display:none` members block.)
+- The bar is not sticky: the lid is an ordinary element inside the panel.
+- `test-feed-hash.mjs` pins the move across three feeds and the coerced
+  signed-out case, and **its window stub keeps its listeners** so `hashchange`
+  can be fired. It was `{ addEventListener(){} }`,
   which silently dropped that handler and made every test in the file a
   cold-load test; anything that happens when a reader moves between tabs was
   untestable before this.
@@ -620,12 +629,19 @@ opened.
 
 #### The member lookup
 
-**⚠️ IT LEADS THE TAB AND IT NAVIGATES; IT DOES NOT FILTER THE BOOST LIST.**
-*Reed's call, 2026-08-23.* The question is "where is this person" and the answer
-is `/booster/<npub>` — their whole history, their shows, their totals — not a
+**⚠️ IT NAVIGATES; IT DOES NOT FILTER THE BOOST LIST OR THE WALL.** *Reed's
+call, 2026-08-23.* The question is "where is this person" and the answer is
+`/booster/<npub>` — their whole history, their shows, their totals — not a
 narrowed slice of one feed. It sat inside the Boosts panel while it was a
 filter, which is also how a reader had to reach the feed to find the control
 that finds people.
+
+**It sits inside the Members section, under the heading and above the wall's
+shell, since 2026-09-03** (Reed's ask). It led the whole tab from 2026-08-23
+until then. Nothing in the code moved with it: `mountMemberLookup` still hands
+the whole members block to `mountFeedSearch`, which finds the block's one
+`[data-feed-search]` host wherever it sits, and the box still mounts before
+the boards fetch.
 
 It is the shared `mountFeedSearch`, so the debounce, the abort, the sequence
 guard and the keyboard handling are the four ranked feeds' own. The suggestion

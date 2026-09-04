@@ -1,7 +1,7 @@
 /* Feed hydration for the homepage's feeds.
  *
- * Which feed is on screen is picked by the tabs and the scope menu in the
- * sticky feed bar — Podcasts / Music / Members across the top, each with its
+ * Which feed is on screen is picked by the sticky tabs and the scope menu on
+ * the active panel's lid — Podcasts / Music / Members across the top, each with its
  * own sub-feeds, and Global / Follows on the second axis. Scoping: "Global" is
  * unscoped; "Follows" is the signed-in user's own kind-3 contact list,
  * resolved by follow-set.js. Every feed has both scopes since 2026-08-31.
@@ -39,7 +39,7 @@
  * when this module first runs).
  */
 // Identity, for keeping the Follows feeds in sync with who's signed in.
-import { getSessionPubkey, clearFollowCache } from '/assets/js/follow-set.js?v=ob-v180'
+import { getSessionPubkey, clearFollowCache } from '/assets/js/follow-set.js?v=ob-v188'
 
 // ── DOM state helpers ────────────────────────────────────────────────
 
@@ -93,7 +93,7 @@ async function hydrate(panelId, mod, scope, medium, view) {
     const fn = m[RENDERERS[mod]]
     if (typeof fn !== 'function') throw new Error(`no renderer export for ${mod}`)
     // Every renderer takes the panel: it carries the feed key their range/sort
-    // controls are tagged with in the sticky bar. `medium` is undefined for
+    // controls are tagged with in the feed bar. `medium` is undefined for
     // the Boosts feeds, which don't split, and so is `view` — their hash
     // carries no parameters, and the inline controller strips any it is handed.
     await fn({ panel, list, scope, medium, lang: view?.lang, range: view?.range, sort: view?.sort })
@@ -104,10 +104,10 @@ async function hydrate(panelId, mod, scope, medium, view) {
 }
 
 // ── Lazy per-feed dispatch ───────────────────────────────────────────
-const BOOSTS = '/assets/js/boosts-feed.js?v=ob-v180'
-const PODCASTS = '/assets/js/feeds-podcasts.js?v=ob-v180'
-const SHOWS = '/assets/js/shows-feed.js?v=ob-v180'
-const ARTISTS = '/assets/js/artists-feed.js?v=ob-v180'
+const BOOSTS = '/assets/js/boosts-feed.js?v=ob-v188'
+const PODCASTS = '/assets/js/feeds-podcasts.js?v=ob-v188'
+const SHOWS = '/assets/js/shows-feed.js?v=ob-v188'
+const ARTISTS = '/assets/js/artists-feed.js?v=ob-v188'
 // Each module's entry point, by module. Named rather than sniffed out of the
 // path, so adding a feed is one line here instead of another branch.
 const RENDERERS = {
@@ -172,11 +172,34 @@ function loadMemberBoards() {
   const root = document.querySelector('[data-hpw-boards]')
   if (!root) return
   boardsWired = true
-  import('/assets/js/members-board.js?v=ob-v180')
+  import('/assets/js/members-board.js?v=ob-v188')
     .then((m) => m.renderMembersBoards(root))
     .catch((err) => {
       console.warn('[feeds] member boards failed to load', err)
       boardsWired = false
+    })
+}
+
+/* The chart block over the Shows and Artists feeds (charts-block.js), the
+ * members boards' twin: the tab's section rather than a panel's, hydrated off
+ * the same two entry points, never awaited, never allowed to throw. Keyed by
+ * the feed's TYPE, so both scopes fill the same block once. */
+const CHART_FEEDS = {
+  'shows-global': 'shows', 'shows-follows': 'shows',
+  'artists-global': 'artists', 'artists-follows': 'artists',
+}
+const chartsWired = new Set()
+function loadChartsBlock(feed) {
+  const kind = CHART_FEEDS[feed]
+  if (!kind || chartsWired.has(kind)) return
+  const root = document.querySelector(`[data-charts-block="${kind}"]`)
+  if (!root) return
+  chartsWired.add(kind)
+  import('/assets/js/charts-block.js?v=ob-v188')
+    .then((m) => m.renderChartsBlock(root, kind))
+    .catch((err) => {
+      console.warn('[feeds] chart block failed to load', err)
+      chartsWired.delete(kind)
     })
 }
 
@@ -187,6 +210,7 @@ document.addEventListener('lb:feed-activate', (e) => {
   // lb:set-feed-lang and lb:set-feed-view.
   if (feed) loadFeed(feed, { lang: e?.detail?.lang, range: e?.detail?.range, sort: e?.detail?.sort })
   if (feed && MEMBER_TABS.has(feed)) loadMemberBoards()
+  if (feed) loadChartsBlock(feed)
 })
 
 // ── Session-driven refresh ───────────────────────────────────────────
@@ -246,3 +270,5 @@ loadFeed(bootFeed, viewFromBody())
  * every shared `#members` link, and every back-navigation onto the tab.
  * Two entry points, one guard: loadMemberBoards is idempotent. */
 if (MEMBER_TABS.has(bootFeed)) loadMemberBoards()
+// And the chart block, on the same two paths for the same reason.
+loadChartsBlock(bootFeed)

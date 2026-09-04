@@ -21,10 +21,10 @@
  * The VERBS — the week picker, the jump buttons, the Rules dialog — stay in
  * `members-board.js`, which is the browser's alone.
  */
-import { boosterPageHref } from './booster-link.js?v=ob-v180'
-import { httpsUrl } from './cover-art.js?v=ob-v180'
-import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v180'
-import { prevWeek, weekDateString } from './pacific-week.js?v=ob-v180'
+import { boosterPageHref } from './booster-link.js?v=ob-v188'
+import { httpsUrl } from './cover-art.js?v=ob-v188'
+import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v188'
+import { prevWeek, weekDateString } from './pacific-week.js?v=ob-v188'
 
 const esc = htmlEscape
 
@@ -209,9 +209,11 @@ function rowHtml(m, i, goal, { weekHref = null } = {}) {
  * weekly board passes the second, and only because its title IS the picker —
  * see pickerHtml. Keeping the escaped path as the default is what stops the
  * next caller reaching for innerHTML by habit. */
-function boardHtml({ title, titleHtml, sub, members, goal, empty, board, weekHref = null }) {
+function boardHtml({ title, titleHtml, sub, members, goal, empty, board, weekHref = null, card = false }) {
+  /* `card` marks the list for the collector's clip guard (`data-card-list`);
+   * only a card frame passes it (functions/_shared/card-frame.js). */
   const body = members.length
-    ? `<ol class="hpw-list">${members.map((m, i) => rowHtml(m, i, goal, { weekHref })).join('')}</ol>`
+    ? `<ol class="hpw-list"${card ? ' data-card-list' : ''}>${members.map((m, i) => rowHtml(m, i, goal, { weekHref })).join('')}</ol>`
     : `<p class="hpw-empty">${esc(empty)}</p>`
   return `<section class="hpw-board"${board ? ` data-hpw-board="${esc(board)}"` : ''}>` +
     `<h3 class="hpw-title">${titleHtml || esc(title)}<small>${esc(sub)}</small></h3>` +
