@@ -6,12 +6,17 @@
  * feeds both sides, so a hand-written expectation cannot be wrong together
  * with the query.
  *
+ * ⚠️ THE PAGE WAS TORN DOWN ON 2026-09-04 (Reed's call): the boards live on the
+ * homepage feeds and the Members tab, and /charts/<date> 302s to the Shows
+ * feed. What survives under /charts is the five CARD FRAMES, and what this
+ * file holds to the brute force is those frames plus /api/v1/charts, the JSON
+ * the homepage paints from — the same expectations the page carried.
+ *
  * What is pinned:
- *   - the routing contract: bare /charts, non-Monday dates, future dates and
- *     garbage all resolve to one URL per week or 404; HEAD mirrors GET;
- *   - the page carries Shows, Artists and Members ONLY (Reed, 2026-08-31) —
- *     the retired kinds stay covered at module level, since week-charts.js
- *     still serves them;
+ *   - the routing contract: the page's old URLs 302 to /#shows; a card for a
+ *     non-Monday date 302s to its Monday keeping /card/<kind>; HEAD mirrors GET;
+ *   - the retired kinds (episodes, albums, songs) stay covered at module
+ *     level, since week-charts.js still serves them;
  *   - the weekly Top 10s against the brute-forced chart: order, T# on a
  *     genuinely shared place, and the per-row COMPONENT-RANK triplet under
  *     the sats/boosters/boosts column head, component ties computed over the
@@ -23,8 +28,6 @@
  *     ordering by weeks then recency, the last-week link addressing that
  *     week's page — and the members tally excluding publisher keys, whose
  *     hours would otherwise take a week from a real member;
- *   - the Members pair: the left board is the hours endpoint's own board
- *     (hoursBoard through hpw-board.js), held to brute-forced hours.
  *
  * Run: node scripts/test-weekly-charts.mjs
  */
@@ -269,135 +272,91 @@ const hpwFigs = (frag) => [...frag.matchAll(/class="hpw-hours">([^<]*)</g)].map(
 
 const loc = (resp) => new URL(resp.headers.get('location')).pathname
 
-console.log('\nRouting:')
+console.log('\nRouting — the page is gone (2026-09-04), the card frames stay:')
 {
-  const r = await get('/charts')
-  check('bare /charts 302s to the live week', () => {
-    assert.equal(r.status, 302)
-    assert.equal(loc(r), `/charts/${weekDateString(W0)}`)
-  })
-  const wed = await get(`/charts/${weekDateString(W1 + 2 * 86400)}`)
-  check('a mid-week date 302s to its Monday', () => {
-    assert.equal(wed.status, 302)
-    assert.equal(loc(wed), `/charts/${weekDateString(W1)}`)
-  })
-  const fut = await get('/charts/2099-01-04')
-  check('a future date 302s to the live week', () => {
-    assert.equal(fut.status, 302)
-    assert.equal(loc(fut), `/charts/${weekDateString(W0)}`)
-  })
-  const early = await get('/charts/1999-01-04')
-  check('pre-index week is 404', () => assert.equal(early.status, 404))
-  const junk = await get('/charts/not-a-date')
-  check('garbage is 404', () => assert.equal(junk.status, 404))
-  const imp = await get('/charts/2026-02-30')
-  check('an impossible calendar date is 404', () => assert.equal(imp.status, 404))
-  const extra = await get(`/charts/${weekDateString(W1)}/card`)
-  check('a bare /card with no kind is 404, as is any other second segment', () => assert.equal(extra.status, 404))
-  const h = await head(`/charts/${weekDateString(W1)}`)
-  check('HEAD mirrors GET status with no body', async () => {
-    assert.equal(h.status, 200)
+  for (const p of ['/charts', `/charts/${weekDateString(W1)}`, `/charts/${weekDateString(W1 + 2 * 86400)}`, '/charts/not-a-date', `/charts/${weekDateString(W1)}/card`, `/charts/${ONES_KEY}`]) {
+    const r = await get(p)
+    check(`${p} 302s to the Shows feed, where the boards live now`, () => {
+      assert.equal(r.status, 302)
+      const u = new URL(r.headers.get('location'))
+      assert.equal(u.pathname + u.hash, '/#shows')
+    })
+  }
+  const h = await head('/charts')
+  check('HEAD mirrors GET with no body', async () => {
+    assert.equal(h.status, 302)
     assert.equal(await h.text(), '')
   })
+  const junkCard = await get(`/charts/${weekDateString(W1)}/card/episodes`)
+  check('a card for a kind that has none is 404, not a redirect', () => assert.equal(junkCard.status, 404))
 }
 
-console.log('\nThe W1 page:')
-const resp = await get(`/charts/${weekDateString(W1)}`)
-const html = await resp.text()
-check('answers 200, cached as a past week', () => {
-  assert.equal(resp.status, 200)
-  assert.match(resp.headers.get('cache-control'), /max-age=300/)
-})
-check('canonical and og name the week URL', () => {
-  assert.ok(html.includes(`https://onlyboosts.social/charts/${weekDateString(W1)}`))
-  assert.ok(html.includes('OnlyBoosts Charts'))
-})
-check('exactly Shows, Artists and Members render — the retired kinds do not', () => {
-  for (const k of ['shows-week', 'shows-ones', 'artists-week', 'artists-ones', 'members-week', 'members-ones']) boardOf(html, k)
-  for (const k of ['episodes', 'albums', 'songs']) {
-    assert.ok(!html.includes(`data-cb-board="${k}-week"`), `${k} absent`)
-  }
-})
-check('the stepper ships the picker data and the static label', () => {
-  assert.ok(html.includes('data-charts-first="'))
-  assert.ok(html.includes('data-charts-livews="'))
-  assert.ok(html.includes('hpw-pick--static'))
-  assert.ok(html.includes('/assets/js/charts-page.js'))
-})
-
-for (const kind of ['shows', 'artists']) {
+/* The W1 boards, read off the CARD FRAMES now that the page is gone — the
+ * same brute-forced expectations the page was held to. */
+console.log('\nThe W1 boards, on the cards:')
+const cardOf = async (kind) => (await get(`/charts/${weekDateString(W1)}/card/${kind}`)).text()
+const showsCard = await cardOf('shows')
+const artistsCard = await cardOf('artists')
+for (const [kind, html] of [['shows', showsCard], ['artists', artistsCard]]) {
   check(`${kind} weekly Top 10 matches the brute-forced chart, triplet included`, () => {
     const expect = bruteChart(corpus(kind, W1, W0))
-    const frag = boardOf(html, `${kind}-week`)
-    assert.deepEqual(names(frag), expect.map((r) => TITLE[r.guid]))
-    assert.deepEqual(positions(frag), expect.map((r) => lbl(r.rank, r.tied)))
-    assert.deepEqual(triplets(frag), expect.map(triplet))
+    assert.deepEqual(names(html), expect.map((r) => TITLE[r.guid]))
+    assert.deepEqual(positions(html), expect.map((r) => lbl(r.rank, r.tied)))
+    assert.deepEqual(triplets(html), expect.map(triplet))
   })
 }
 check('the column head says these are ranks, and links the formula', () => {
-  const frag = boardOf(html, 'shows-week')
-  assert.ok(frag.includes('rank in sats/boosters/boosts'))
-  const head = frag.slice(frag.indexOf('cb-colhead'), frag.indexOf('<ol'))
+  assert.ok(showsCard.includes('rank in sats/boosters/boosts'))
+  const head = showsCard.slice(showsCard.indexOf('cb-colhead'), showsCard.indexOf('<ol'))
   assert.ok(head.includes('href="/about#charts"'))
 })
 check('the medium partition holds: no album on Shows, video counts as a show', () => {
-  const shows = boardOf(html, 'shows-week')
-  assert.ok(!shows.includes(TITLE.A1) && !shows.includes(TITLE.A2))
-  assert.ok(shows.includes(TITLE.V1))
+  assert.ok(!showsCard.includes(TITLE.A1) && !showsCard.includes(TITLE.A2))
+  assert.ok(showsCard.includes(TITLE.V1))
 })
 
-console.log('\nWeeks at #1 (content):')
+/* Weeks at #1, read off the JSON the boards are painted from. */
+console.log('\nWeeks at #1:')
+const onesOf = async (kind) => {
+  const r = await apiGet({ request: new Request(`https://ob.invalid/api/v1/charts/${kind}/weeks-at-1`), env, params: { path: [kind, 'weeks-at-1'] } })
+  return (await r.json()).rows
+}
 for (const kind of ['shows', 'artists']) {
+  const rows = await onesOf(kind)
   check(`${kind} Weeks at #1 matches the brute-forced tally`, () => {
     const expect = onesTally(kind)
-    const frag = boardOf(html, `${kind}-ones`)
-    assert.deepEqual(names(frag), expect.map(([g]) => TITLE[g]))
-    assert.deepEqual(figs(frag), expect.map(([, t]) => String(t.weeks)))
+    assert.deepEqual(rows.map((r) => r.guid), expect.map(([g]) => g))
+    assert.deepEqual(rows.map((r) => Number(r.weeks)), expect.map(([, t]) => t.weeks))
   })
 }
-check('the chain-decided W2 albums week credits Artist One at module level', () => {
-  // The W2 race is score-tied and settled boosters-first; the artists tally
-  // (on the page) and the albums tally (module level, below) both carry it.
-  const expect = onesTally('artists')
-  assert.equal(expect[0][0], 'PUB1')
+check('the chain-decided W2 albums week credits Artist One', () => {
+  // The W2 race is score-tied and settled boosters-first.
+  assert.equal(onesTally('artists')[0][0], 'PUB1')
 })
-check('the live week credits nobody', () => {
-  const expect = onesTally('shows')
-  const p2 = expect.find(([g]) => g === 'P2')
-  assert.equal(p2[1].weeks, 1) // W2 only — the W0 mega boost buys nothing yet
-  assert.deepEqual(names(boardOf(html, 'shows-ones')), expect.map(([g]) => TITLE[g]))
-})
-check('a last-week link addresses that week page', () => {
-  assert.ok(boardOf(html, 'shows-ones').includes(`/charts/${weekDateString(W1)}`))
-})
-check('the title-less publisher never appears', () => {
-  assert.ok(!html.includes('PUBX'))
-})
-
-console.log('\nThe Members pair:')
 {
-  const frag = boardOf(html, 'members-week')
-  check('the left board is the hours board: brute-forced order and hours', () => {
-    const expect = memberHours(W1, W0)
-    assert.deepEqual(hpwNames(frag), expect.map((r) => WHO[r.pk]))
-    const hrs = hpwFigs(frag).map((s) => s.replace(/<.*$/, ''))
-    assert.deepEqual(hrs, expect.map((r) => (r.secs / HOUR).toFixed(1)))
+  const shows = await onesOf('shows')
+  check('the live week credits nobody', () => {
+    const p2 = onesTally('shows').find(([g]) => g === 'P2')
+    assert.equal(p2[1].weeks, 1) // W2 only — the W0 mega boost buys nothing yet
+    assert.equal(shows.find((r) => r.guid === 'P2').weeks, 1)
   })
-  check('the BOT is excluded from both member boards, hours notwithstanding', () => {
-    assert.ok(!frag.includes(WHO[BOT]))
-    assert.ok(!boardOf(html, 'members-ones').includes(WHO[BOT]))
+  check('the title-less publisher never appears', async () => {
+    const pubs = await onesOf('artists')
+    assert.ok(!pubs.some((r) => r.guid === 'PUBX'))
+    assert.ok(!artistsCard.includes('PUBX'))
   })
+}
+{
+  const mem = await onesOf('members')
   check('members Weeks at #1 matches the brute-forced tally', () => {
     const expect = memberOnesTally()
-    const ones = boardOf(html, 'members-ones')
-    assert.deepEqual(hpwNames(ones), expect.map(([pk]) => WHO[pk]))
-    const wks = hpwFigs(ones).map((s) => s.replace(/<.*$/, ''))
-    assert.deepEqual(wks, expect.map(([, t]) => String(t.weeks)))
+    assert.deepEqual(mem.map((r) => r.pk), expect.map(([pk]) => pk))
+    assert.deepEqual(mem.map((r) => Number(r.weeks)), expect.map(([, t]) => t.weeks))
   })
+  check('the BOT is excluded, hours notwithstanding', () => assert.ok(!mem.some((r) => r.pk === BOT)))
   check('the live week credits no member — Xavier holds two weeks, not three', () => {
-    const x = memberOnesTally().find(([pk]) => pk === X)
-    assert.equal(x[1].weeks, 2) // W2 and W1; the W0 mega listen buys nothing yet
-    assert.ok(boardOf(html, 'members-ones').includes(`/charts/${weekDateString(W1)}`))
+    assert.equal(memberOnesTally().find(([pk]) => pk === X)[1].weeks, 2) // W2 and W1; the W0 mega listen buys nothing yet
+    assert.equal(mem.find((r) => r.pk === X).weeks, 2)
   })
 }
 
@@ -427,30 +386,24 @@ console.log('\nModule level — the retired kinds still serve:')
   })
 }
 
-console.log('\nThe live page and the empty week:')
+console.log('\nThe live and the empty week, on the cards:')
 {
-  const r = await get(`/charts/${weekDateString(W0)}`)
+  const r = await get(`/charts/${weekDateString(W0)}/card/shows`)
   const liveHtml = await r.text()
   check('the live week caches short and leads with the mega boost', () => {
     assert.match(r.headers.get('cache-control'), /max-age=60/)
-    assert.equal(names(boardOf(liveHtml, 'shows-week'))[0], TITLE.P2)
-    assert.ok(!r.headers.get('x-robots-tag'))
+    assert.equal(names(liveHtml)[0], TITLE.P2)
+    assert.match(liveHtml, /In progress\./)
   })
-  check('the live page and W1 page carry identical Weeks at #1 boards', () => {
-    assert.equal(boardOf(liveHtml, 'shows-ones'), boardOf(html, 'shows-ones'))
-    assert.equal(boardOf(liveHtml, 'members-ones'), boardOf(html, 'members-ones'))
-  })
-  const e = await get(`/charts/${weekDateString(W3)}`)
+  const e = await get(`/charts/${weekDateString(W3)}/card/shows`)
   const eHtml = await e.text()
-  check('an empty in-range week renders empties and is noindex', () => {
+  check('an empty in-range week renders the empty line, no list, 300s', () => {
     assert.equal(e.status, 200)
-    assert.equal(e.headers.get('x-robots-tag'), 'noindex')
     assert.ok(eHtml.includes('No Nostr boosts that week.'))
-    assert.ok(eHtml.includes('Nobody boosted an episode with a known length that week.'))
+    assert.ok(!eHtml.includes('data-card-list'))
+    assert.match(e.headers.get('cache-control'), /max-age=300/)
   })
 }
-
-console.log(`\n${passed} passed, ${failed} failed`)
 
 // ── /api/v1/charts — the JSON behind the homepage boards and the card bot ───
 console.log('\n/api/v1/charts:')
@@ -551,8 +504,10 @@ console.log('\nThe card frames (/charts/<key>/card/<kind>):')
     assert.ok(hpwNames(mem).length > 0)
     assert.match(mem, /onlyboosts\.social\/#members/)
   })
+  // (`/charts/${ONES_KEY}` and `/charts/${ONES_KEY}/card` are not card frames
+  // and 302 to the Shows feed with the rest of the old page's URLs — above.)
   for (const p of [`/charts/${weekDateString(W1)}/card/members`, `/charts/${weekDateString(W1)}/card/episodes`,
-                   `/charts/${ONES_KEY}/card/episodes`, `/charts/${ONES_KEY}`, `/charts/${ONES_KEY}/card`, '/charts/1999-01-04/card/shows']) {
+                   `/charts/${ONES_KEY}/card/episodes`, '/charts/1999-01-04/card/shows']) {
     const r = await get(p)
     check(`${p} is 404`, () => assert.equal(r.status, 404))
   }

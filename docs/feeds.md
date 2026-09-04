@@ -287,6 +287,16 @@ and `peers` counted post-filter).
 
 #### The Charts Page
 
+**⚠️ TORN DOWN ON 2026-09-04**, Reed's call, two days after it shipped
+(2026-09-01, merge 14cbb08): the boards moved onto the homepage (below), which
+made the page a second copy of three things one tab over. `/charts` and
+`/charts/<date>` 302 to `/#shows`; the five card frames under
+`/charts/<key>/card/<kind>` stay, being the collector bot's contract;
+`week-charts.js` still serves the queries behind `/api/v1/charts`. The
+renderer's page half (`sectionHtml`, `memberSectionHtml`, the stepper, the
+masthead, `charts-page.js`) is in git before the teardown commit. What follows
+is the design record as it stood.
+
 `/charts/<YYYY-MM-DD>`, edge-rendered by `functions/charts/[[path]].js` on the
 `/hpw` URL contract: `/charts` 302s to the live week, a mid-week or future date
 302s to its canonical Monday, garbage and pre-index weeks 404, HEAD is

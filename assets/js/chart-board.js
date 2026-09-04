@@ -1,5 +1,7 @@
 // The OnlyBoosts Charts boards' rows, as HTML strings — the FACTS half of the
-// charts, on the hpw-board.js pattern.
+// charts, on the hpw-board.js pattern. The boards live on the homepage (the
+// Shows and Artists feeds, the Members tab) and in the share cards; the
+// /charts page they were written for was torn down on 2026-09-04.
 //
 // ⚠️ TWO-SIDED SINCE 2026-09-03. It was functions/_shared/chart-board.js,
 // server-only, while the /charts page was the boards' one surface; the move
@@ -27,13 +29,13 @@
 // is computed over the whole week's corpus (peers_* from week-charts.js),
 // never over the visible ten.
 
-import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v188';
-import { httpsUrl } from './cover-art.js?v=ob-v188';
-import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v188';
-import { boosterPageHref } from './booster-link.js?v=ob-v188';
-import { rankLabel, competitionRanks } from './rank.js?v=ob-v188';
-import { weekDateString } from './pacific-week.js?v=ob-v188';
-import { boardHtml as hpwBoardHtml, initials, COPY as HPW_COPY } from './hpw-board.js?v=ob-v188';
+import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v189';
+import { httpsUrl } from './cover-art.js?v=ob-v189';
+import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v189';
+import { boosterPageHref } from './booster-link.js?v=ob-v189';
+import { rankLabel, competitionRanks } from './rank.js?v=ob-v189';
+import { weekDateString } from './pacific-week.js?v=ob-v189';
+import { initials } from './hpw-board.js?v=ob-v189';
 
 const esc = htmlEscape;
 
@@ -181,31 +183,9 @@ export function boardHtml({ title, titleHtml, sub, rows, empty, board, colhead =
     `</section>`;
 }
 
-/* One content category: the h2 and the pair. `weekly` and `ones` are the
- * query rows. */
-export function sectionHtml(kind, { weekly, ones, ws, isCurrent }) {
-  const c = COPY.sections[kind];
-  const onesRanks = competitionRanks(ones, (r) => Number(r.weeks));
-  const weekBoard = boardHtml({
-    board: `${kind}-week`,
-    title: "Top 10",
-    sub: isCurrent ? `In progress. ${weekSpan(ws)}.` : `${weekSpan(ws)}.`,
-    rows: weekly.map((r) => weekRowHtml(kind, r)),
-    empty: isCurrent ? COPY.emptyLive : COPY.emptyPast,
-    colhead: true,
-  });
-  const onesBoard = boardHtml({
-    board: `${kind}-ones`,
-    title: "Weeks at #1",
-    sub: c.onesSub,
-    rows: ones.map((r, i) => onesRowHtml(kind, r, onesRanks[i], { weekHref: (d) => `/charts/${d}` })),
-    empty: COPY.emptyOnes,
-  });
-  return `<section class="cb-section" id="${esc(kind)}">` +
-    `<h2 class="cb-section-h">${esc(c.heading)}</h2>` +
-    `<div class="cb-pairs">${weekBoard}${onesBoard}</div>` +
-    `</section>`;
-}
+/* sectionHtml — one content category's h2 over its pair of boards — was the
+ * /charts page's and went with it (2026-09-04); the homepage block builds its
+ * pair from boardHtml directly. */
 
 /* One member's weeks-at-#1 row, wearing the .hpw-* classes outright — a
  * member row here and on the tab must be one grammar, and this board differs
@@ -245,26 +225,9 @@ export function memberOnesBoardHtml(ones, { weekHref = null, titleHtml = null, c
     `</section>`;
 }
 
-/* The Members pair. The LEFT board is hpw-board.js's boardHtml over the hours
- * endpoint's own envelope — identical to the tab's weekly 40 HPW board by
- * construction, gold rows and all. The RIGHT is the Weeks at #1 companion:
- * most weeks finishing #1 on that board, by hours. `hours` is hoursBoard's
- * `body`; `ones` is hpwWeeksAtNumberOne's rows. */
-export function memberSectionHtml({ hours, ones, ws, isCurrent }) {
-  const left = hpwBoardHtml({
-    board: "members-week",
-    title: "Top 10",
-    sub: isCurrent ? `In progress. ${weekSpan(ws)}.` : `${weekSpan(ws)}.`,
-    members: hours.members || [],
-    goal: hours.goal_hours || 40,
-    empty: isCurrent ? HPW_COPY.emptyLive : HPW_COPY.emptyPast,
-  });
-  const right = memberOnesBoardHtml(ones, { weekHref: (d) => `/charts/${d}` });
-  return `<section class="cb-section" id="members">` +
-    `<h2 class="cb-section-h">${esc(COPY.sections.members.heading)}</h2>` +
-    `<div class="cb-pairs">${left}${right}</div>` +
-    `</section>`;
-}
+/* memberSectionHtml — the page's Members pair — went with the page too; the
+ * tab paints the weekly 40 HPW board itself and stacks memberOnesBoardHtml
+ * behind Proof of #40HPW. */
 
 /* The words, in one place. Every string is user-visible board copy. The
  * qualifier rides the lead sentence and the og:description; the boards
@@ -278,8 +241,6 @@ export function memberSectionHtml({ hours, ones, ws, isCurrent }) {
  * and a PAGE_KINDS element, not new queries. */
 export const COPY = {
   eyebrow: "OnlyBoosts Charts",
-  intro: "The top shows, artists and members by Nostr boosts, chart week by chart week.",
-  formula: "Ranked by the OnlyBoosts Charts formula: rank in sats, plus rank in boosts, plus rank in boosters; the lowest total is first.",
   sections: {
     shows: { heading: "Shows", onesSub: "Most weeks finishing #1 on the weekly Shows chart. Completed weeks only." },
     artists: { heading: "Artists", onesSub: "Most weeks finishing #1 on the weekly Artists chart. Completed weeks only." },

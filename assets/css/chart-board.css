@@ -1,7 +1,8 @@
 /* The OnlyBoosts Charts boards: a weekly Top 10 beside its Weeks at #1
-   companion, on /charts/<week>, on the Shows and Artists feeds of the
-   homepage (charts-block.js, since 2026-09-03) and in the share cards.
-   Markup comes from assets/js/chart-board.js, two-sided.
+   companion, on the Shows and Artists feeds of the homepage (charts-block.js)
+   and in the share cards (/charts/<key>/card/<kind>). Markup comes from
+   assets/js/chart-board.js, two-sided. The /charts page these were written
+   for was torn down on 2026-09-04.
 
    ⚠️ THE .cb-* GRAMMAR RESTATES .hpw-* (assets/css/hpw-board.css), IT DOES NOT
    IMPORT IT — the same seam as .mb-shell restating .bs-shell. The boards must
@@ -14,50 +15,9 @@
    --accent-d, --accent-dd and --tint; the page supplies the accent family
    (brand) the way /hpw does. */
 
-/* ── the masthead ── the charts banner on the page ground, restating the
-   homepage's .masthead (index.html): white band, hairline, centred wordmark.
-   It replaced the navy .page-header block (Reed, 2026-09-01) — the big week
-   h1 restated the stepper pill right under it, and the wordmark's darker
-   blue would go muddy on navy. Wider cap than the homepage's 330px: this
-   banner is a 3.6:1 landscape with smaller letterforms. */
-.cb-masthead {
-  background: var(--white);
-  border-bottom: 1px solid var(--border);
-  padding: 1.4rem 1.25rem 1.2rem;
-  text-align: center;
-}
-.cb-masthead img {
-  width: 100%;
-  max-width: 420px;
-  height: auto;
-  margin: 0 auto;
-}
-/* Dark: --white is a card surface; the masthead joins the page ground, the
-   same line the homepage's dark block draws. */
-:root[data-theme="dark"] .cb-masthead { background: var(--cream); }
-@media (max-width: 640px) {
-  .cb-masthead { padding: 1rem 1rem 0.9rem; }
-  .cb-masthead img { max-width: 300px; }
-}
-
-/* ── the week stepper ── the .hpw-nav group itself, dressed by hpw-board.css
-   (this page links it for the Members pair anyway); the wrapper only centres
-   it at page level, because every board shares one week. The dropdown is
-   mounted over the static label by assets/js/charts-page.js and its menu is
-   .pcast-sort-menu from feed-cards.css — the tab's own picker, whole. */
-.cb-nav-wrap { text-align: center; margin: 0 0 1.6rem; }
-
-/* ── the sections ── one h2 per category, then the pair. */
-.cb-section { margin: 0 0 1.8rem; }
-.cb-section-h {
-  font-family: 'Playfair Display', Georgia, serif;
-  font-size: 1.35rem; font-weight: 700; color: var(--ink);
-  margin: 0 0 0.7rem; text-align: center;
-}
-/* Two boards side by side where there is room, stacked where there is not.
-   The weekly Top 10 is first in the source and so is first on a phone — it is
-   the board with a live race in it, the hpw ordering. */
-.cb-pairs { display: grid; gap: 1.1rem; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); }
+/* The page-only rules (.cb-masthead, .cb-nav-wrap, .cb-section*, .cb-pairs,
+   .cb-formula) went with the /charts page on 2026-09-04; git has them. The
+   homepage block uses hpw-board.css's .hpw-boards grid for the pair. */
 
 /* ── the board shell ── same fill, hairline and radius as .hpw-board.
    `position: relative` anchors the share button (.hpw-share, absolute in
@@ -158,13 +118,3 @@ button.cb-sub.hpw-week-jump { font-size: 0.68rem; color: var(--muted); }
   flex: none; font-weight: 700; font-size: 0.86rem; color: var(--accent-d);
   font-variant-numeric: tabular-nums; letter-spacing: 0.02em;
 }
-
-/* ── the footnote ── the formula, stated once under the boards. */
-.cb-formula {
-  margin: 0.4rem 0 0; font-size: 0.8rem; color: var(--muted); text-align: center;
-}
-.cb-formula a { color: var(--brand-dd); }
-:root[data-theme="dark"] .cb-formula a { color: var(--brand-d); }
-
-/* No phone block: hpw-board.css already grows the .hpw-arrow touch targets,
-   and the triplet is compact enough for a 320px row. */
