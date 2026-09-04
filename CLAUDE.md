@@ -1916,6 +1916,18 @@ Measured over all five shows that carry one: **four primaries return 200 and one
 
 Live coverage is small and real: 5 of 1,287 shows.
 
+**⚠️ SHOW ROWS REFRESH ON THE EPISODE CADENCE SINCE 2026-09-04.** *Reed's ask*,
+after Chad and Reeds Podcast showed its July cover for a month while every
+episode row already had the new one: a show was read from Podcast Index once,
+at first sight, and never again. `db.shows_needing_refresh` now re-reads a
+boosted show daily when it has an episode aired in the last 90 days and
+monthly otherwise — the same `_episode_stale_binds` as the episode gate, so
+the two cannot disagree about "recent" — capped at `SHOW_BATCH` (25) a tick,
+recent first, then longest-unchecked, then newest-aired. `upsert_show` became
+content-aware with it: `checked_at` moves on every look, `updated_at` only
+when one of `SHOW_CONTENT_COLS` differs, so the D1 drift pass and the publish
+gate see a change only when there is one. A miss keeps the row.
+
 ## Profile fallback
 
 **An identity the index doesn't have falls back to Primal's cache before it is

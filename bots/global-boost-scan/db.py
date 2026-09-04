@@ -110,7 +110,9 @@ CREATE TABLE IF NOT EXISTS shows (
                                  -- podroll.py#parse_publisher on the podroll sweep's clean
                                  -- reads; see the publishers table for the other end.
     publisher_feed_url TEXT,
-    updated_at    INTEGER
+    checked_at    INTEGER,       -- when we last LOOKED at Podcast Index for this show
+                                 -- (the refresh gate — see shows_needing_refresh)
+    updated_at    INTEGER        -- when the row's CONTENT last changed (the D1 drift gate)
 );
 
 -- <podcast:podroll> — the shows a show's own feed recommends. Feed-level only:
@@ -307,6 +309,17 @@ EPISODE_MAX_AGE_RECENT = 24 * 60 * 60        # re-read a recent episode daily
 EPISODE_MAX_AGE = 30 * 24 * 60 * 60          # re-read everything else monthly
 EPISODE_BATCH = 100
 
+# Shows ride the same cadence as their episodes (Reed's ask, 2026-09-04: "when we
+# check for updated episode art we also look for updated show art"): a show with
+# an episode aired inside EPISODE_RECENT_WINDOW is re-read daily, the rest
+# monthly. Before this a show row was written once, at first sight, and never
+# read again — Chad and Reeds Podcast changed its art on 2026-08-10 and the site
+# still showed the July cover on 2026-09-04 while every EPISODE row already had
+# the new one. Budget: 196 recent + ~1,400 dormant boosted shows → ~250
+# Podcast Index calls a day, one per tick on average. The cap is what stands
+# between the NULL-checked_at migration and 1,600 requests in one tick.
+SHOW_BATCH = 25
+
 # The show a boost really belongs to: its resolved canonical guid if the as-signed
 # podcast_guid was a phantom, else the as-signed value. Used everywhere boosts are
 # grouped by show or joined to `shows`. `b` is the `boosts` table alias in the query.
@@ -498,6 +511,13 @@ def _migrate(conn):
     for col in ("publisher_guid", "publisher_feed_url"):
         if col not in show_cols:
             conn.execute(f"ALTER TABLE shows ADD COLUMN {col} TEXT")
+    if "checked_at" not in show_cols:
+        # 2026-09-04: the show refresh gate. NULL = never re-read since, so every
+        # existing row comes due at once and SHOW_BATCH meters it out.
+        conn.execute("ALTER TABLE shows ADD COLUMN checked_at INTEGER")
+    # The refresh gate asks "does this show have a recently aired episode" once
+    # per boosted show; without this it is a 12k-row scan per show.
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_episodes_podcast ON episodes(podcast_guid)")
     # A ledger, not a work queue — see apply_aliases. Rows created before
     # `deleted_at` existed migrate with it NULL, so they are re-sent exactly once
     # and then go quiet.
@@ -582,29 +602,111 @@ def upsert_boosts(conn, boosts):
 
 
 # ── enrichment caches ─────────────────────────────────────────────────────────
+# What upsert_show writes, minus the two timestamps and the insert-only
+# provenance. `updated_at` moves only when one of these differs — see the
+# episode twin below for why a look that found nothing new must not stamp it.
+SHOW_CONTENT_COLS = ("title", "image", "artwork", "feed_url", "feed_id", "itunes_id",
+                     "medium", "author", "language")
+
+
 def upsert_show(conn, show, discovered_via="boost"):
     """Cache a resolved show. `discovered_via` is recorded on INSERT only — a
-    re-resolve must not rewrite how the show first arrived."""
+    re-resolve must not rewrite how the show first arrived.
+
+    Two timestamps, the same split upsert_episode documents: `checked_at` is
+    when we last LOOKED and is the refresh gate; `updated_at` is when the row
+    CHANGED and is what the D1 drift pass selects on. Until 2026-09-04 this
+    stamped `updated_at` unconditionally, which was harmless while a show was
+    written once; under the refresh gate it would re-push every re-read show
+    to D1 whether or not Podcast Index said anything new. Returns whether the
+    content changed."""
+    now = int(time.time())
+    show = {"language": None, **show}
+    # `language` is defaulted ahead of the spread so a builder that predates the
+    # column writes NULL instead of failing the bind and taking the whole cycle
+    # down; every current builder supplies it explicitly.
+    before = conn.execute(
+        f"SELECT updated_at, {', '.join(SHOW_CONTENT_COLS)} FROM shows WHERE podcast_guid=?",
+        (show["podcast_guid"],)).fetchone()
+    changed = before is None or any(before[c] != show.get(c) for c in SHOW_CONTENT_COLS)
     conn.execute(
         """INSERT INTO shows (podcast_guid, title, image, artwork, feed_url, feed_id,
                               itunes_id, medium, author, language, discovered_via,
-                              updated_at)
+                              checked_at, updated_at)
            VALUES (:podcast_guid, :title, :image, :artwork, :feed_url, :feed_id,
                    :itunes_id, :medium, :author, :language, :discovered_via,
-                   :updated_at)
+                   :now, :updated_at)
            ON CONFLICT(podcast_guid) DO UPDATE SET
              title=excluded.title, image=excluded.image, artwork=excluded.artwork,
              feed_url=excluded.feed_url,
              feed_id=excluded.feed_id, itunes_id=excluded.itunes_id,
              medium=excluded.medium, author=excluded.author,
              language=excluded.language,
+             checked_at=excluded.checked_at,
              updated_at=excluded.updated_at""",
-        # `language` is defaulted ahead of the spread so a builder that predates the
-        # column writes NULL instead of failing the bind and taking the whole cycle
-        # down; every current builder supplies it explicitly.
-        {"language": None, **show,
-         "discovered_via": discovered_via, "updated_at": int(time.time())})
+        {**show, "discovered_via": discovered_via, "now": now,
+         "updated_at": now if changed else before["updated_at"]})
     conn.commit()
+    return changed
+
+
+def mark_show_checked(conn, podcast_guid):
+    """A refresh where Podcast Index answered nothing still counts as a look, or
+    the same show fills the cap on every tick forever. The row is untouched."""
+    conn.execute("UPDATE shows SET checked_at=? WHERE podcast_guid=?",
+                 (int(time.time()), podcast_guid))
+    conn.commit()
+
+
+def _show_stale_expr():
+    """Stale when not looked at for a day (a show with a recently aired episode)
+    or a month (everyone else). Binds, in order: recent-window cutoff, recent
+    max-age cutoff, old max-age cutoff — _episode_stale_binds supplies them,
+    so the two gates can never disagree about what "recent" means."""
+    return ("COALESCE(s.checked_at, 0) < (CASE WHEN EXISTS ("
+            "SELECT 1 FROM episodes e WHERE e.podcast_guid = s.podcast_guid "
+            "AND COALESCE(e.published, 0) >= ?) THEN ? ELSE ? END)")
+
+
+def _boosted_shows_expr():
+    """Shows with at least one published boost — the only ones worth a request.
+    `IN (subquery)`, not a correlated EXISTS: see apply_aliases."""
+    return (f"s.podcast_guid IN (SELECT DISTINCT {effective_guid('b')} FROM boosts b "
+            f"WHERE {not_excluded('b')})")
+
+
+def shows_needing_refresh(conn, limit=SHOW_BATCH):
+    """Boosted shows whose row is due a re-read from Podcast Index, on the episode
+    cadence. Under the cap a show with a recent episode outranks a dormant one,
+    the longest-unchecked first, and among equals the show whose newest episode
+    aired most recently — that is the show somebody is looking at, and the one
+    whose publisher most plausibly just changed the art."""
+    now = int(time.time())
+    rows = conn.execute(
+        f"""SELECT s.podcast_guid,
+                   EXISTS (SELECT 1 FROM episodes e WHERE e.podcast_guid = s.podcast_guid
+                           AND COALESCE(e.published, 0) >= ?) AS recent,
+                   COALESCE(s.checked_at, 0) AS seen,
+                   (SELECT MAX(e.published) FROM episodes e
+                    WHERE e.podcast_guid = s.podcast_guid) AS latest_aired
+           FROM shows s
+           WHERE {_boosted_shows_expr()} AND {_show_stale_expr()}
+           ORDER BY recent DESC, seen ASC, latest_aired DESC
+           LIMIT ?""",
+        (now - EPISODE_RECENT_WINDOW, *_episode_stale_binds(now), limit)).fetchall()
+    return [r[0] for r in rows]
+
+
+def show_refresh_backlog(conn):
+    """(recent-due, dormant-due) counts, so a capped pass can say what it left."""
+    now = int(time.time())
+    r = conn.execute(
+        f"""SELECT COALESCE(SUM(recent), 0), COALESCE(SUM(NOT recent), 0) FROM (
+              SELECT EXISTS (SELECT 1 FROM episodes e WHERE e.podcast_guid = s.podcast_guid
+                             AND COALESCE(e.published, 0) >= ?) AS recent
+              FROM shows s WHERE {_boosted_shows_expr()} AND {_show_stale_expr()})""",
+        (now - EPISODE_RECENT_WINDOW, *_episode_stale_binds(now))).fetchone()
+    return r[0], r[1]
 
 
 # The columns that make up the row's CONTENT — everything upsert_episode writes

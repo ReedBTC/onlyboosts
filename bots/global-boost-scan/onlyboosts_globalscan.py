@@ -798,6 +798,35 @@ def cmd_fountain_shows(args):
 
 
 # ── enrichment ────────────────────────────────────────────────────────────────
+def _refresh_shows(conn, key, secret):
+    """Re-read show-level metadata — title, art, feed URL, medium, author,
+    language — for the shows db.shows_needing_refresh hands back, on the same
+    daily/monthly cadence as their episodes. The first-fetch loop above only
+    ever sees a show ONCE; this is what notices a publisher changing the cover.
+
+    Same rule as the episode refresh: a Podcast Index miss on a row we already
+    hold is a failed look, not news, so the row is kept and only `checked_at`
+    moves. There is no RSS fallback here for the reasons _enrich_episodes gives.
+    """
+    recent_due, old_due = db.show_refresh_backlog(conn)
+    shows = db.shows_needing_refresh(conn)
+    print(f"Refreshing {len(shows)} show(s) via Podcast Index "
+          f"({recent_due} recent, {old_due} dormant due)...")
+    changed = missed = 0
+    for pg in shows:
+        info = enrich.resolve_show(pg, key, secret)
+        if info:
+            changed += bool(db.upsert_show(conn, info))
+        else:
+            db.mark_show_checked(conn, pg)
+            missed += 1
+    if shows:
+        print(f"  shows: {changed} row(s) changed, {missed} refresh(es) found nothing (row kept)")
+    if len(shows) >= db.SHOW_BATCH:
+        print(f"  show refresh capped at {db.SHOW_BATCH}; "
+              f"{recent_due + old_due - len(shows)} left for the next pass")
+
+
 def _enrich_episodes(conn, key, secret, eps=None):
     """Resolve episode metadata for whatever `db.guids_needing_episode` hands back.
 
@@ -942,6 +971,7 @@ def cmd_enrich(args):
                 print(f"  shows {i}/{len(shows)}")
 
         _enrich_episodes(conn, key, secret)
+        _refresh_shows(conn, key, secret)
     else:
         print("[warn] no Podcast Index credentials — skipping show/episode enrichment")
 
