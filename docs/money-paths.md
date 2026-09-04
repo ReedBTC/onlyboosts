@@ -118,6 +118,44 @@ The one true negative signal is bolt11 expiry, which provably ends an invoice.
 LNURL invoices typically live an hour, far too long to hold a modal open for, so
 it is not used. Do not reintroduce a shorter inference in its place.
 
+**The wallet is the second source of truth, since 2026-09-04.** Everything above
+reads the recipient's side, and two kinds of leg have nothing to read there: a
+keysend, and an lnaddress leg whose provider returns no verify URL (Primal
+returns none). Both were stranded on a real boost that day. A NIP-47 pay call
+answers only when the wallet is done, and Alby Hub over LND is done when the
+payment settles, so two outbound legs that took longer than the SDK's 60-second
+reply window came back as `Nip47ReplyTimeoutError` while the node showed all
+three paid; the third, a self-payment, answered in under a second on the same
+connection. Both stranded legs rested on UNCERTAIN, the note reported one of
+three splits, and nothing could ever correct it.
+
+NIP-47 `lookup_invoice` takes a payment hash and answers for outgoing payments
+too, and the widget holds the hash for every leg it pays: the invoice's own,
+and for a keysend the hash of the preimage it generated (stamped onto the leg
+*before* the pay call, so a lost reply still leaves something to look up).
+`paymentLookup.js` is the pure half, `nwc.js#lookupPayment` the one wallet
+call, and `externalBoost.js#confirmLegSettled` runs it beside LUD-21 under one
+deadline, first definite answer winning. The leg loop asks it for eight seconds
+inline; the 90-second watcher and Check again ask it for the rest. `canCheckLeg`
+now admits any leg with a hash on an NWC wallet, which is what puts the watcher
+in front of a keysend leg and makes the share note wait for it.
+
+**⚠️ THE WALLET MAY SAY FAILED, AND IT IS THE ONLY PARTY THAT MAY.** An explicit
+`state: "failed"` is the wallet stating the sats never left, which is the
+standing a clean decline has, so the leg becomes FAILED and earns the Retry
+that re-pays. That answer is read from that field alone: never inferred from a
+missing `settled_at`, never from NOT_FOUND (a payment the wallet cannot find is
+not one it proved it never made), never from an error. Everything short of the
+two definite answers keeps the leg where it is. `scripts/test-payment-lookup.mjs`
+is red on each of those inferences. The SDK's own `lookupInvoice()` is not
+used: it validates the answer with `!!result.invoice`, and an outgoing keysend
+has no invoice, so it would reject exactly the answer this exists to read.
+
+**The 60-second wait did not move** (Reed's call: users are waiting too long
+already). The lookup is what makes a short wait safe, since giving up on the
+reply no longer means giving up on the leg. WebLN has no lookup call, so a
+WebLN keysend with no reply is what it always was.
+
 ### What A Recipient's Server Says Is Shown To The Donor
 
 `fetchJsonCappedOnce` threw `Request failed (${status})` and discarded the

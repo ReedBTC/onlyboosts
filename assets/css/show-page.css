@@ -992,6 +992,32 @@ a.boost-who:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px
   color: var(--muted);
 }
 
+/* ── The catalogue (podcast drawers, 2026-09-04) ──────────────────────────
+   The drawer lists the show's whole Podcast Index catalogue, merged in the
+   browser onto the rows the edge rendered. An INDEXED row — one with a page
+   here and figures on its meta line — wears a brand outline; a row known only
+   to Podcast Index carries date, duration and a Boost button and nothing
+   else. The outline is drawn INSIDE the row's box (negative offset) so it
+   costs no layout: rows keep their hairline separators and their height
+   whether or not they qualify, and a re-sort that interleaves the two kinds
+   moves nothing but the rows. See "The Catalogue" in docs/show-pages-spec.md. */
+.ep-row--indexed {
+  outline: 1.5px solid var(--brand);
+  outline-offset: -5px;
+  border-radius: 10px;
+}
+
+/* The catalogue's one line of its own: "Loading episodes…", or why the list
+   is shorter than the show. Sits under the list, in the meta's voice. */
+.ep-status {
+  margin: 0;
+  padding: 0.55rem 1rem;
+  font-size: 0.76rem;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+}
+.ep-status[hidden] { display: none; }
+
 /* ── Other shows this community boosts ────────────────────────────────── */
 
 /* Reuses .ep-drawer / .ep-list wholesale — same box, same summary affordance,

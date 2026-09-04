@@ -233,8 +233,9 @@ Four pieces hold the ids up, in four files:
 - **`scroll-margin-top: 5rem` on `.show-section`** in `show-page.css`. `#top-nav`
   is sticky at 64px, so without it an anchor scrolls the heading *behind the bar*;
 - **`revealHashTarget()`** inside `initHashRouting()`, which opens any collapsed
-  **`details.ep-drawer`** inside the targeted section — exactly one case needs it,
-  `/show`'s episode drawer, and every other `.ep-drawer` already ships `open`. It
+  **`details.ep-drawer`** inside the targeted section — two cases need it,
+  `/show`'s episode drawer and `/artist`'s albums drawer (closed since
+  2026-09-04, Reed's call), and every other `.ep-drawer` already ships `open`. It
   does **not** re-scroll afterwards. `getElementById`, never `querySelector`: an
   id off the URL is untrusted and would otherwise be parsed as a selector.
   **⚠️ The selector was `details:not([open])` and that was a bug**: a card rollup

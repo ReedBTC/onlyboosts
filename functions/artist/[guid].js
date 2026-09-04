@@ -351,16 +351,16 @@ function renderArtistPage({ pub, albums, totals, community, supporters, boosts, 
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v189" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v189" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v189" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v189" />
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v189" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v189" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v191" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v191" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v191" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v191" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v191" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v191" />
   <!-- The boost note card and its reaction bar, for #boosts — the same
        .note-card every other detail page's list paints. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v189" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v189" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v191" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v191" />
 </head>
 <body data-artist-guid="${htmlEscape(pub.publisher_guid)}">
 
@@ -575,12 +575,12 @@ function renderArtistPage({ pub, albums, totals, community, supporters, boosts, 
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav.js?v=ob-v189" defer></script>
-<script src="/assets/js/artist-page.js?v=ob-v189" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v191" defer></script>
+<script src="/assets/js/artist-page.js?v=ob-v191" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v189"></script>
-<script src="/assets/js/sw-register.js?v=ob-v189" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v191"></script>
+<script src="/assets/js/sw-register.js?v=ob-v191" defer></script>
 </body>
 </html>`;
 }
@@ -648,11 +648,15 @@ function renderDescription(description) {
 // construction. No "See All Albums" band link — the catalogue file is
 // deliberately unrendered (index-only), so there is nothing off-site to point
 // at that this page's rule would allow.
+//
+// Ships CLOSED, like /show's episode drawer (Reed's call, 2026-09-04); it
+// opened by default from launch until then. A #albums deep link still opens
+// it through revealHashTarget() in detail-page.js.
 function renderAlbums(rows) {
   if (!rows.length) return "";
 
   return `<section class="show-section show-section--bare" id="albums">
-    <details class="ep-drawer" open data-artist-albums>
+    <details class="ep-drawer" data-artist-albums>
       <summary>Albums with Nostr Boosts<span class="drawer-hint" aria-hidden="true"></span></summary>
       <!-- Ships hidden: a sort control that cannot sort is worse than none.
            artist-page.js reveals it when there are at least two rows. -->
@@ -764,10 +768,10 @@ function notFound(guid) {
   <meta name="robots" content="noindex" />
   <title>Artist not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v189" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v189" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v189" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v189" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v191" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v191" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v191" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v191" />
 </head>
 <body>
 <section class="page-header">
@@ -785,7 +789,7 @@ function notFound(guid) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v189" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v191" defer></script>
 </body>
 </html>`;
   return new Response(html, {
