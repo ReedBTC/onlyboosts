@@ -46,9 +46,9 @@
  * same call `.drawer-hint`'s chevron makes. Putting a character back in here
  * stacks a glyph on top of the drawn one.
  */
-import { weekSeries, weekDateString, weekStartFromDate, prevWeek, nextWeek } from './pacific-week.js?v=ob-v188'
-import { weekTitle } from './hpw-board.js?v=ob-v188'
-import { htmlEscape as esc } from './nostr-text.js?v=ob-v188'
+import { weekSeries, weekDateString, weekStartFromDate, prevWeek, nextWeek } from './pacific-week.js?v=ob-v189'
+import { weekTitle } from './hpw-board.js?v=ob-v189'
+import { htmlEscape as esc } from './nostr-text.js?v=ob-v189'
 
 /* The stepper over a week: ‹ [This Week ▾] ›. `ws` is the week on screen,
  * `live` the live week, `first` the index's first week or null. */
