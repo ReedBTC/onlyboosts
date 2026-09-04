@@ -607,8 +607,10 @@
        narrower than the feed, and on a page where the boards and the cards
        below both span the track, a short column of text reads as a mistake
        rather than as typography. Reed's call on ob-v121. */
+    /* Under the Members heading and above the lookup since 2026-09-03; it led
+       the tab before. The heading's own margin sits above it. */
     .members-intro {
-      margin: 0 0 1.5rem;
+      margin: 0 0 1rem;
       font-size: 0.95rem;
       color: var(--muted);
     }
@@ -1404,7 +1406,9 @@
        us, so a share card is the one surface where the flattened copy is the
        safe one. Change the art and BOTH files move. -->
   <img src="/assets/onlyboosts_banner_clear.png" alt="OnlyBoosts" width="1800" height="600" />
-  <p><a href="/about">Podcasting&nbsp;2.0 Nostr Boosts</a>: Feeds, Rankings and Discoverability</p>
+  <!-- Reed's wording, 2026-09-03. The linked half is what a first-time
+       visitor will not recognise, so it is the half that explains itself. -->
+  <p>Charts and RSS Discoverability powered by <a href="/about">Podcasting&nbsp;2.0 Boosts on Nostr</a></p>
 </div>
 
 <!-- ══════════════════════════════ FEED BAR ══════════════════════════════
@@ -1525,21 +1529,9 @@
          that plainly and puts the mechanics on a second line a reader can skip:
          the front door is not where somebody learns what a protocol is. -->
     <div class="members-block" data-members-block>
-      <!-- ⚠️ THE (i) IS A REAL LINK TO /about#membership, NOT A TOOLTIP. What
-           it has to answer is "which app do I use", and the answer is three
-           named applications with a caveat on each; that is a section, not a
-           hover. It is also the one thing on this tab a crawler should follow.
-
-           The badge is a CSS circle rather than the ⓘ character, whose glyph is
-           missing or differently sized in several of the faces this site
-           falls back to; the same call .drawer-hint's chevron makes. -->
-      <p class="members-intro">
-        <strong>Become a member by boosting one podcast or musician and sharing
-        the boost with your Nostr identity.</strong><a class="members-info"
-          href="/about#membership" target="_blank" rel="noopener"
-          aria-label="How membership works (opens in a new tab)"
-          title="How membership works"><span aria-hidden="true">i</span></a>
-      </p>
+      <!-- The membership sentence led the tab until 2026-09-03; it sits in the
+           Members section now, above the lookup (Reed's ask), where the word
+           it defines is the heading over it. -->
 
       <!-- The member lookup used to sit here, leading the tab; it is inside
            the Members section below since 2026-09-03 (Reed's ask), directly
@@ -1669,6 +1661,21 @@
            controls make, and safe for the same reason. -->
       <section class="mb-section members-wall" data-members-wall>
         <div data-members-wall-head></div>
+        <!-- ⚠️ THE (i) IS A REAL LINK TO /about#membership, NOT A TOOLTIP. What
+             it has to answer is "which app do I use", and the answer is three
+             named applications with a caveat on each; that is a section, not a
+             hover. It is also the one thing on this tab a crawler should follow.
+
+             The badge is a CSS circle rather than the ⓘ character, whose glyph
+             is missing or differently sized in several of the faces this site
+             falls back to; the same call .drawer-hint's chevron makes. -->
+        <p class="members-intro">
+          <strong>Become a member by boosting one podcast or musician and sharing
+          the boost with your Nostr identity.</strong><a class="members-info"
+            href="/about#membership" target="_blank" rel="noopener"
+            aria-label="How membership works (opens in a new tab)"
+            title="How membership works"><span aria-hidden="true">i</span></a>
+        </p>
         <!-- ⚠️ THE LOOKUP NAVIGATES; IT DOES NOT FILTER THE WALL OR THE BOOST
              LIST. Reed's call, 2026-08-23: the question is "where is this
              person", and the answer is their page. It led the whole tab from

@@ -954,10 +954,12 @@ The domain appears in `robots.txt`, `manifest.webmanifest`,
 on published events — change them together. The npub is also served for NIP-05
 from `.well-known/nostr.json`.
 
-The site subtitle is **"Podcasting 2.0 Nostr Boosts"**, appearing in four places
-that change together: the masthead line under the banner on `index.html` (where
-it links to `/about`), the homepage `<title>` and `og:title`, and
-`manifest.webmanifest`. It read "Podcasting 2.0 Boosts on Nostr" until
+The site subtitle is **"Podcasting 2.0 Nostr Boosts"**, in the homepage
+`<title>` and `og:title` and in `manifest.webmanifest`, which change together.
+**The masthead line under the banner stopped carrying it on 2026-09-03**
+(Reed's wording): it reads "Charts and RSS Discoverability powered by
+Podcasting 2.0 Boosts on Nostr", the linked half going to `/about`, and is a
+tagline rather than the subtitle of record. It read "Podcasting 2.0 Boosts on Nostr" until
 2026-08-24; *Nostr boost* is the term the project settled on in public, so the
 subtitle now uses it as the compound noun the vocabulary table already treats it
 as. **Show pages still use `<title> — Boosts on Nostr | OnlyBoosts`** and were
