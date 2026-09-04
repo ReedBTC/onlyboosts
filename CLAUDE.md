@@ -449,6 +449,7 @@ Sixteen test scripts, all plain `node scripts/<name>.mjs` with no runner:
 | `test-members-search.mjs` | `/api/v1/members`, running the **shipped handler** against a database built from the real `schema.sql` through an `env.DB` shim over `node:sqlite`. LIKE escaping, the identifier/name split, the listing, the publisher asymmetry, and `publishers=1` as its exact complement. **Two publisher keys are in the fixture deliberately**: with one, a single-row answer says nothing about whether the mode asks for the list or found the loudest key |
 | `test-members-hours.mjs` | the 40 HPW boards, same shim, with a fixture built to known answers. Dedupe, week boundaries, the publisher exclusion, the row-multiplying join, and **the week picker**: the bounded window's ceiling, the noon-UTC date rule, DST-safe stepping, and the resolve-rather-than-400 envelope. **Proof of #40HPW has its own six fixture members** (2026-09-01), each written to a hand-computable answer: one row per member, a sub-goal week that must not count, exactly-40 in and one second under out, the best week rather than the newest, and the more recent of two identical bests. Confirmed red on seven mutations — the ceiling removed, dates resolved at midnight, stepping by a flat 604800, the `HAVING` dropped, the best-week tiebreak flipped, the two weeks merged in the inner GROUP BY, and the entry test made strictly greater. **Its `env.DB` shim models `.first()`**, which `feed-rank.js` taught `test-members-search.mjs` the hard way |
 | `test-community-medium.mjs` | the two community rollups and the medium partition they were split on, against a `node:sqlite` build of the real `schema.sql`. **Two halves reached two ways**: `fetchCommunityBoosts` is exported and called directly, where `/show`'s query is inline in the page Function and is **extracted from the source and executed**, the `test-feed-hash.mjs` technique. A copy of the SQL written into the test would pass forever while the shipped one rotted. Confirmed to go red on three mutations: the filter removed, its polarity inverted, and the `COALESCE` dropped |
+| `test-payment-lookup.mjs` | the wallet-side settlement check (2026-09-04): `paymentLookup.js`'s classification (`failed` only from an explicit `state`, NOT_FOUND is `unknown`), the keysend hash against a SHA-256 vector, the polling loop's deadline and abort, and `externalBoost.js#confirmLegSettled` with the wallet injected and **`fetch` stubbed** for LUD-21. Confirmed red on three mutations: `failed` inferred from a missing `settled_at`, NOT_FOUND made `failed`, the deadline removed |
 | `test-keysend-upgrade.mjs` | the keysend upgrade: the `fountain.fm` exclusion's exact-or-parent rule, the routing pair's whole-or-nothing rule, the strict node-pubkey check, every way `/api/keysend` answers "no endpoint", and the wallet gate. **Stubs `fetch`**, so it probes nobody's well-known |
 | `test-feed-search.mjs` | the search box's two outcomes, driving the **shipped** `mountFeedSearch` against a stub DOM: Enter submits the whole query where a feed supplies `onSubmit`, arrow + Enter still picks, emptying the box or Escape clears through `onPick(null)`, the footer row renders — and **the member lookup, with no `onSubmit`, keeps its old Enter**. Confirmed red on two mutations: auto-highlight restored, and the empty-box clear removed |
 | `test-hpw-cards.mjs` | the 40 HPW share cards, three halves: `hpw-board.js`'s two-sided rules (a **source** scan for absolute imports, `Date.now()` and unpinned locales, plus the row's escaping and `isSafeUrl` on the face); `hpw-share.js`'s pure parts (the note's shape, the link rule, the tags, the `window` listener); the **shipped** `/hpw` Function over a `node:sqlite` build of the real schema (every redirect, the 404s, the page's canonical and `og:image`, the card's frame and ready signal, and that the page carries `rowHtml` byte for byte); and `/api/og/hpw/<name>.png` with **`fetch` stubbed** (the allowlist, the upstream's 200-for-missing answered with the banner, the PNG signature, the 900KB cap, HEAD). Nothing in it touches the VPS |
@@ -462,9 +463,9 @@ THAT GOES UNRUN.** Its header carries the `curl` that produces the capture; take
 a fresh one rather than reusing an old file, since it is also the size
 measurement. It asserted `cards are numbered 1..N with no gaps` — the *ordinal*
 scheme's invariant — until competition ranking shipped on 2026-08-18, and it
-would have been merged red had it not been run. **Run all eighteen before a
+would have been merged red had it not been run. **Run all nineteen before a
 merge**, and treat this one as the guard on the ranking scheme rather than only
-on weight. *(It read "all twelve" until 2026-08-24, "all fifteen" until 2026-08-30, "all sixteen" and then "all seventeen" until 2026-08-31, contradicting the table
+on weight. *(It read "all twelve" until 2026-08-24, "all fifteen" until 2026-08-30, "all sixteen" and then "all seventeen" until 2026-08-31, and "all eighteen" until 2026-09-04, contradicting the table
 directly above it — the count moved when a test was added and this sentence did
 not. If the table grows again, this line grows with it.)*
 
@@ -1060,6 +1061,11 @@ Five rules from it that a change elsewhere would break, so they are restated her
   2026-08-19. `UNCERTAIN` offers only **Check again**; only `FAILED` may be
   re-paid, and only because it means the wallet never sent it
   (`isCleanPaymentDecline` in `utils.js`, read by all three payment paths).
+  **Since 2026-09-04 Check again also asks the WALLET** (NIP-47 lookup by
+  payment hash, `paymentLookup.js`), which is what makes a keysend leg and a
+  no-verify-URL leg checkable at all; the wallet's explicit `failed` is the
+  one thing that moves `UNCERTAIN` to `FAILED`, and it is never inferred.
+  See *The wallet is the second source of truth* in `docs/money-paths.md`.
 - **⚠️ THE TWO OVERRIDE MAPS STAY EMPTY** — see above. That is the one rule in
   this file that has already been violated in production.
 - **⚠️ THE ORACLE'S CAP AND THE MODAL'S ARE THE SAME NUMBER** (5,000,000 sats).
