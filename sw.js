@@ -583,7 +583,15 @@
 // its COPY are two-sided, so a browser holding the old copy against a
 // freshly-rendered /hpw/high-scores would print a weeks count under an hours
 // heading, and .hpw-best does not exist in the old hpw-board.css at all.
-const VERSION = 'ob-v189';
+// ob-v190: the /show episode drawer on a PODCAST is the show's whole catalogue
+// ("Episodes"), from Podcast Index through the new /api/catalogue, fetched when
+// the drawer is opened and merged onto the indexed rows — so an episode nobody
+// has boosted yet can be boosted here. Indexed rows wear an outline; the rest
+// carry date, duration, a BMB link and a Boost button. Opens on Latest Episode.
+// REQUIRED: show-page.js gains an import (episode-catalogue.js), fmtDuration
+// moved into boost-list.js, and episode-link.js gains bmbEpisodeUrl — three
+// link-time failures for a browser holding any old module against a new one.
+const VERSION = 'ob-v190';
 const STATIC_CACHE = `${VERSION}-static`;
 const HTML_CACHE = `${VERSION}-html`;
 const WIDGET_CACHE = `${VERSION}-widgets`;
@@ -619,26 +627,26 @@ const PRECACHE_URLS = [
   // precaching it spent 93KB on every install for nothing.
   '/assets/onlyboosts_banner_clear.png',
   '/assets/avatar-fallback.svg',
-  '/assets/css/theme.css?v=ob-v189',
-  '/assets/css/page.css?v=ob-v189',
-  '/assets/css/nav.css?v=ob-v189',
-  '/assets/css/footer.css?v=ob-v189',
-  '/assets/css/boosts-thread.css?v=ob-v189',
-  '/assets/css/boost-actions.css?v=ob-v189',
+  '/assets/css/theme.css?v=ob-v190',
+  '/assets/css/page.css?v=ob-v190',
+  '/assets/css/nav.css?v=ob-v190',
+  '/assets/css/footer.css?v=ob-v190',
+  '/assets/css/boosts-thread.css?v=ob-v190',
+  '/assets/css/boost-actions.css?v=ob-v190',
   // The episode card and its drawer. Precached alongside the others because the
   // homepage's feeds are painted in it and it used to be inline in index.html,
   // which IS precached — leaving it out would trade an inline block for a
   // network round trip on the one page this list exists to make fast.
-  '/assets/css/feed-cards.css?v=ob-v189',
-  '/assets/js/boosts-thread.js?v=ob-v189',
+  '/assets/css/feed-cards.css?v=ob-v190',
+  '/assets/js/boosts-thread.js?v=ob-v190',
   // A static import of boosts-thread.js, so precaching that without this one
   // leaves a returning visitor fetching half the graph from the network.
-  '/assets/js/primal-profiles.js?v=ob-v189',
-  '/assets/js/boost-actions.js?v=ob-v189',
-  '/assets/js/nav.js?v=ob-v189',
-  '/assets/js/nav-widget-boot.js?v=ob-v189',
-  '/assets/js/widget-loader.js?v=ob-v189',
-  '/assets/js/sw-register.js?v=ob-v189',
+  '/assets/js/primal-profiles.js?v=ob-v190',
+  '/assets/js/boost-actions.js?v=ob-v190',
+  '/assets/js/nav.js?v=ob-v190',
+  '/assets/js/nav-widget-boot.js?v=ob-v190',
+  '/assets/js/widget-loader.js?v=ob-v190',
+  '/assets/js/sw-register.js?v=ob-v190',
 ];
 
 self.addEventListener('install', (event) => {

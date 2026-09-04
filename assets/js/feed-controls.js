@@ -25,7 +25,7 @@
  * holds each module URL for up to four hours ON ITS OWN CLOCK. A reader
  * carrying a three-hour-old copy of this file who fetches a fresh renderer gets
  *
- *   SyntaxError: The requested module '/assets/js/feed-controls.js?v=ob-v189' does not
+ *   SyntaxError: The requested module '/assets/js/feed-controls.js?v=ob-v190' does not
  *   provide an export named 'X'
  *
  * and an unresolved named import is a LINK-TIME error: the renderer never

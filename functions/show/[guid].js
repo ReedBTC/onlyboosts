@@ -333,15 +333,26 @@ const COPY = {
     boostBtn: "Boost this Show",
     itemsPlural: "Episodes",
     untitledItem: "Untitled episode",
-    drawer: "Episodes with Nostr Boosts",
+    // "Episodes", not "Episodes with Nostr Boosts", since 2026-09-04: the
+    // drawer is the show's whole catalogue now — see `catalogue` below.
+    drawer: "Episodes",
+    // ⚠️ THE DRAWER IS THE CATALOGUE. Reed's call, 2026-09-04, reversing the
+    // spec's "No Episode Counts, Anywhere" on its product half: an episode
+    // nobody has boosted yet is where a boost STARTS, and until then it could
+    // not be boosted here at all. The edge still renders only the indexed
+    // rows (the facts this site holds); assets/js/episode-catalogue.js fetches
+    // the rest from Podcast Index through /api/catalogue when the drawer is
+    // opened and merges them in, each with a Boost button and a title linking
+    // to Boost Me Bitch. Music is deliberately not there yet — an album drawer
+    // still lists only the boosted tracks and keeps its way out below.
+    catalogue: true,
     // The community rollup's heading. Split on medium since 2026-08-24; see the
     // note over the query for what that cost and why it was paid.
     communityHeading: "Other Shows This Community Boosts",
-    // The way out of the drawer to a real catalogue. The drawer holds only
-    // episodes carrying an indexed boost, which is a fraction of any show's
-    // output — see "No Episode Counts, Anywhere" in the spec for how small a
-    // fraction — so it needs to say where the rest of them are.
-    allItems: "See All Episodes",
+    // No way out: the drawer IS the catalogue. (Music keeps its link.)
+    allItems: null,
+    // Still true with JavaScript off, which is the only time it is seen: the
+    // catalogue replaces it the moment it lands.
     noItems: "No episodes with Nostr boosts yet.",
     ldType: "PodcastSeries",
     // The #boosts heading. "Show Boosts" rather than "Recent Boosts": the
@@ -370,7 +381,11 @@ const COPY = {
     itemsPlural: "Tracks",
     untitledItem: "Untitled track",
     drawer: "Tracks with Nostr Boosts",
+    // Not yet; see the podcast entry. Reed: "we can talk about music later."
+    catalogue: false,
     communityHeading: "Other Albums This Community Boosts",
+    // The way out of the drawer to a real catalogue, which on this side the
+    // drawer still is not.
     allItems: "See All Tracks",
     noItems: "No tracks with Nostr boosts yet.",
     ldType: "MusicAlbum",
@@ -524,19 +539,19 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v189" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v189" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v189" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v189" />
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v189" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v189" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v190" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v190" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v190" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v190" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v190" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v190" />
   <!-- The boost note card and its reaction bar. Added when the boost list at
        the foot of this page became the same .note-card the homepage Boosts
        feed paints; this page linked neither before, which is why show-page.css
        restates .nostr-mention. That restatement is now redundant rather than
        load-bearing, and is left in place rather than removed in the same pass. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v189" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v189" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v190" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v190" />
 </head>
 <body data-show-guid="${htmlEscape(show.podcast_guid)}">
 
@@ -768,12 +783,12 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
 
 <script type="application/json" id="show-boost-payload">${jsonForScript(boostPayload)}</script>
 
-<script src="/assets/js/nav.js?v=ob-v189" defer></script>
-<script src="/assets/js/show-page.js?v=ob-v189" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v190" defer></script>
+<script src="/assets/js/show-page.js?v=ob-v190" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v189"></script>
-<script src="/assets/js/sw-register.js?v=ob-v189" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v190"></script>
+<script src="/assets/js/sw-register.js?v=ob-v190" defer></script>
 </body>
 </html>`;
 }
@@ -1090,16 +1105,17 @@ function renderCommunityShows(rows, copy) {
 
 // The show's page on Boost Me Bitch.
 //
-// ⚠️ THE LAST TWO SURFACES ON THIS SITE POINTING AT BMB, and both are in this
-// file: "See All Episodes" on the episode drawer's band, and a podroll tile for
-// a show we have no page of our own for. Every EPISODE link moved to
-// /episode/<item-guid>; these two stay because neither has an equivalent here.
-// The drawer lists only the episodes carrying an indexed boost, so "See All
-// Episodes" reaches the one thing this site does not hold — the show's full
-// catalogue — and 44% of podroll targets have no boosts and so no page.
-// assets/js/episode-link.js documents the whole set. Show-level, so
-// `?podcast=<guid>` alone: a /show page carries no Podcast Index numeric id to
-// prefer `?feed=` with.
+// ⚠️ THE SURFACES ON THIS SITE POINTING AT BMB, as of 2026-09-04: "See All
+// Tracks" on the MUSIC drawer's band and a podroll tile for a show we have no
+// page of our own for, both built here; and the un-indexed rows of the podcast
+// drawer's catalogue, built in the browser by assets/js/episode-catalogue.js
+// through episode-link.js#bmbEpisodeUrl. Every indexed EPISODE link moved to
+// /episode/<item-guid>; these stay because none has an equivalent here. The
+// music drawer lists only the tracks carrying an indexed boost, so "See All
+// Tracks" reaches the one thing this site does not hold for an album, and 44%
+// of podroll targets have no boosts and so no page. assets/js/episode-link.js
+// documents the whole set. Show-level, so `?podcast=<guid>` alone: a /show
+// page carries no Podcast Index numeric id to prefer `?feed=` with.
 function bmbShowUrl(guid) {
   return `https://boostmebitch.com/?podcast=${encodeURIComponent(guid)}`;
 }
@@ -1231,40 +1247,56 @@ function renderPodroll(rows, direction, copy, show) {
 }
 
 function renderEpisodes(rows, show, copy) {
-  if (!rows.length) {
+  // A drawer that is the catalogue renders even with no indexed rows: the
+  // catalogue fills it. The non-catalogue (music) drawer has nothing to hold
+  // and stays the one-line empty state it always was.
+  if (!rows.length && !copy.catalogue) {
     return `<section class="show-section show-section--bare" id="episodes">
       <p class="show-empty">${copy.noItems}</p>
     </section>`;
   }
 
-  // Where the rest of the catalogue is. This drawer lists only episodes with an
-  // indexed boost, which is a small slice of most shows' output, and until now
-  // the page said nothing about where the others were.
+  // Two drawers, one markup, off `copy.catalogue`:
   //
-  // ⚠️ Boost Me Bitch is the same TEMPORARY target assets/js/episode-link.js
-  // documents. Built by bmbShowUrl() below, which the podroll tiles also use —
-  // this file emits two BMB links and they resolve through one function so they
-  // cannot drift apart.
-  const bmb = bmbShowUrl(show.podcast_guid);
+  // THE CATALOGUE (podcasts, 2026-09-04). Rows in the query's own order —
+  // newest first, undated last — because a catalogue is chronological and the
+  // client's opening sort is Latest Episode (`data-ep-sort`), so first paint
+  // and first re-sort agree. The control band ships `hidden` with nothing in
+  // it, the community drawer's arrangement, and the sort reveals it. Each
+  // indexed row carries its guid for the merge and the outline class for the
+  // cue. The status line and the empty line are the catalogue script's to
+  // fill and to remove; see assets/js/episode-catalogue.js.
+  //
+  // THE BOOSTED LIST (music). Ordered by the chart formula over its own rows
+  // (Reed, 2026-09-03), the band VISIBLE from the start because it carries a
+  // plain link that works with no JavaScript — hiding it until the sort mounts
+  // would cost the link to save a control that isn't there. The link is where
+  // the rest of the catalogue is: ⚠️ Boost Me Bitch, the same TEMPORARY target
+  // assets/js/episode-link.js documents, built by bmbShowUrl() below, which the
+  // podroll tiles also use, so this file's BMB links cannot drift apart.
+  const cat = !!copy.catalogue;
+  const ordered = cat
+    ? rows
+    : chartRanks(rows, { sats: (e) => e.total_sats, boosts: (e) => e.boost_count, breadth: (e) => e.booster_count }).map((x) => x.row);
+  const band = cat
+    ? `<div class="cs-controls" data-ep-controls hidden></div>`
+    : `<div class="cs-controls" data-ep-controls>
+        <a class="cs-allitems" href="${bmbShowUrl(show.podcast_guid)}" target="_blank" rel="noopener">${copy.allItems}<span class="cs-allitems-arrow" aria-hidden="true">↗</span></a>
+      </div>`;
+  const drawerAttrs = cat ? ` data-catalogue data-ep-sort="latest" data-glyph="${htmlEscape(copy.glyph)}"` : "";
 
   // No heading or sub-line of its own: the summary IS this section's heading,
   // and show-page.css styles it as one (Playfair, the .show-stats-title size).
   // An <h2> above it would only say the same words a second time.
   return `<section class="show-section show-section--bare" id="episodes">
-    <details class="ep-drawer" data-episode-drawer>
+    <details class="ep-drawer" data-episode-drawer${drawerAttrs}>
       <summary>${copy.drawer}<span class="drawer-hint" aria-hidden="true"></span></summary>
-      <!-- Unlike the community drawer's row, this one ships VISIBLE: it carries
-           a plain link that works with no JavaScript, so hiding the band until
-           the sort mounts would cost the link to save a control that isn't
-           there. The sort still appends into it, and still only when there are
-           at least two rows to order. -->
-      <div class="cs-controls" data-ep-controls>
-        <a class="cs-allitems" href="${bmb}" target="_blank" rel="noopener">${copy.allItems}<span class="cs-allitems-arrow" aria-hidden="true">↗</span></a>
-      </div>
+      ${band}
       <ul class="ep-list">
-        ${chartRanks(rows, { sats: (e) => e.total_sats, boosts: (e) => e.boost_count, breadth: (e) => e.booster_count })
-          .map((x) => episodeRow(x.row, copy, isSafeUrl(show.image) ? show.image : null)).join("\n        ")}
-      </ul>
+        ${ordered.map((e) => episodeRow(e, copy, isSafeUrl(show.image) ? show.image : null, cat)).join("\n        ")}
+      </ul>${cat && !rows.length ? `
+      <p class="show-empty ep-empty" data-ep-empty>${copy.noItems}</p>` : ""}${cat ? `
+      <p class="ep-status" data-ep-status hidden></p>` : ""}
     </details>
   </section>`;
 }
@@ -1275,7 +1307,16 @@ function renderEpisodes(rows, show, copy) {
 // certainly have been. The show's art2 is deliberately NOT a third link here:
 // it is a fallback for a dead show image, and these rows already fall back to
 // the show image only when the episode has none of its own.
-function episodeRow(e, copy, fallbackArt) {
+// `indexed` marks the row as one of ours — a page here and figures on its meta
+// line — which only means anything on the catalogue drawer, where rows Podcast
+// Index knows and we do not sit beside it. The guid attribute is the merge key
+// that keeps the catalogue from adding a row the edge already rendered.
+//
+// ⚠️ THE ROW'S SHAPE IS RESTATED IN assets/js/episode-catalogue.js#buildRow,
+// which builds the un-indexed rows with DOM calls. Same element order, same
+// classes, same meta separator; a change here wants the same change there or
+// the two kinds of row stop reading as one list.
+function episodeRow(e, copy, fallbackArt, indexed = false) {
   const bits = [fmtDate(e.published), fmtDuration(e.duration)].filter(Boolean);
   const art = (isSafeUrl(e.image) && e.image) || fallbackArt || null;
   // The row's TITLE links to that episode's page, the same move the show name
@@ -1289,7 +1330,7 @@ function episodeRow(e, copy, fallbackArt) {
   // packed one attribute per row the way the community drawer does it.
   const pack = [e.booster_count, e.boost_count, e.total_sats, e.published]
     .map((v) => Number(v || 0)).join(",");
-  return `<li class="ep-row" data-ep="${pack}">
+  return `<li class="ep-row${indexed ? " ep-row--indexed" : ""}" data-ep="${pack}"${indexed ? ` data-guid="${htmlEscape(e.item_guid || "")}"` : ""}>
           ${art
             ? `<img class="ep-art" src="${htmlEscape(art)}" alt="" width="44" height="44" loading="lazy" referrerpolicy="no-referrer" />`
             : `<span class="ep-art ep-art--blank" aria-hidden="true">${copy.glyph}</span>`}
@@ -1317,10 +1358,10 @@ function notFound(guid) {
   <meta name="robots" content="noindex" />
   <title>Show not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v189" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v189" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v189" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v189" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v190" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v190" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v190" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v190" />
 </head>
 <body>
 <section class="page-header">
@@ -1339,7 +1380,7 @@ function notFound(guid) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v189" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v190" defer></script>
 </body>
 </html>`;
   return new Response(html, {

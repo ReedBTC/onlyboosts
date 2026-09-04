@@ -351,14 +351,23 @@ can drop or re-guid an old item, so our count can **exceed** the real
 catalogue. It was not reliably a subset, which means no short label could have
 rescued it. "Episodes boosted" would still have overclaimed.
 
-**The alternative was rejected on product grounds.** Pulling each show's full
-catalogue would make the number true, and would also turn OnlyBoosts into a
-podcast directory. That is BMB's job and BMB already does it. This site is for
-seeing what people on Nostr are boosting and finding others with the same
-taste; an episode nobody boosted is, here, not information. It would also cost
-a per-show RSS or Podcast Index fetch across every qualifying show, and put
-LINUX Unplugged's 612 unboosted episodes into a drawer where each one reads
-"none".
+**The full catalogue was rejected on product grounds when this was written,
+and the product half of that decision was reversed on 2026-09-04.** The
+original argument ran: pulling each show's catalogue would make the number
+true, and would also turn OnlyBoosts into a podcast directory, which is BMB's
+job; it would cost a per-show RSS or Podcast Index fetch across every
+qualifying show; and it would put LINUX Unplugged's 612 unboosted episodes into
+a drawer where each one reads as having nothing. Reed's reversal (see The
+Catalogue below) answers the three in turn. The catalogue exists for boosting
+rather than browsing; an episode nobody has boosted is where a boost starts,
+and until then it could not be boosted here at all. The fetch happens once per
+show per hour per colo, and only when a reader opens the drawer. An un-indexed
+row prints no figures at all, never zeros.
+
+**What did not reverse is this section's rule.** The catalogue is fetched into
+the browser and never counted: the summary still carries no number, the tiles
+still show three, and Podcast Index's ceiling of 1,000 items per call means a
+count read off the catalogue would itself be wrong for the longest shows.
 
 The underlying figure is still loaded and still returned by
 `/api/v1/podcasts/:guid`, because the Shows feed uses it to decide whether a
@@ -694,37 +703,83 @@ The community drawer's was removed deliberately, and the episode drawer's cannot
 be honest at all; see No Episode Counts, Anywhere. The cues above are form
 rather than information, which is why they were available.
 
-### The Way Out of the Episode Drawer
+### The Catalogue
 
-The episode drawer lists only episodes carrying an **indexed boost**, which is a
-small slice of what most shows have published: LINUX Unplugged shows 64 rows
-against 676 in its own feed, Rabbit Hole Recap 70 against 415. No Episode Counts,
-Anywhere is why the page never states that as a number, but the page also said
-nothing at all about where the rest of the catalogue was, which left the drawer
-reading as a claim about the show's output rather than about our index of it.
+**Since 2026-09-04 the podcast drawer is the show's whole catalogue, and its
+summary reads "Episodes".** Reed's call, and the reason is one sentence: an
+episode nobody had boosted yet could not be boosted on this site, so the first
+boost to any episode had to be sent from Fountain or Boost Me Bitch. The
+drawer is where that boost starts now.
 
-**See All Episodes** ("See All Tracks" on music, off the `COPY` table) sits at
-the left end of the control band, opposite the sort, linking to the show on Boost
-Me Bitch. It is styled as the same pill as the sort beside it, because they are
-two controls on one band and a link styled as a link reads as body text stranded
-in a toolbar; the outbound arrow is the only difference, carrying the one thing
-the sort does not do.
+The edge still renders only the indexed rows, from D1, exactly as before. When
+the drawer is opened (or its summary is hovered or focused, a prefetch so the
+open feels instant) `assets/js/episode-catalogue.js` asks `/api/catalogue` for
+the show's episodes and merges them in by item guid. That Function asks
+Podcast Index for up to 1,000 items (PI's ceiling for one call, with no offset
+to reach past it), projects each to guid, title, date, duration and art, and is
+edge-cached for an hour per colo; PI's multi-megabyte answer becomes roughly a
+hundred bytes a row. It is fetched on intent and never on load, since the
+drawer ships closed and most readers never open it.
 
-**BMB is a temporary target and this is its second surface.**
-`assets/js/episode-link.js` owns it for boost notes and documents why. This link
-is built inline in `renderEpisodes` because a Pages Function cannot import a
-client module and nothing else in `functions/` reaches outside it; both files
-carry a ⚠️ naming the other. This one is show-level (`?podcast=<guid>` alone — a
-`/show` page holds no Podcast Index numeric id to prefer `?feed=` with) and is
-not a boost note, so retiring BMB for notes does not have to retire it here.
+**Two kinds of row, one list.** An indexed row keeps its figures and its
+`/episode` link and wears a brand outline (`.ep-row--indexed`), drawn inside
+the row's box so it costs no layout. A row known only to Podcast Index shows
+date and duration, links its title to that episode on Boost Me Bitch, and
+carries the same Boost button; it prints no sats and no boosts, because "0
+sats" would be a claim about the episode where the blank is only a statement
+about our index. The list opens on Latest Episode, newest first, because a
+catalogue is chronological; the other sorts reorder both kinds together and
+the un-indexed rows sink under every figure-based one. A status line under
+the list says "Showing the most recent 1,000 episodes" when the ceiling was
+hit, and says so plainly when the catalogue could not be loaded; the indexed
+rows are unaffected either way.
+
+**Boosting an un-indexed row needs nothing new.** `/api/value` resolves a
+value block for any item guid, indexed or not, and the row's button goes
+through the same `resolveValue` and `openBoost` the indexed rows use. The
+boost's note is picked up by the collector on its next cycle, which is what
+creates the episode's page here. Nothing is written to D1 and nothing is
+stored.
+
+**This is a deliberate exception to the rendering rule.** The un-indexed rows
+are facts rendered by JavaScript. They are Podcast Index's facts rather than
+the site's, nothing about them is wanted in a crawler's copy of the page, and
+the indexed rows still ship in the HTML, so search and a reader with no
+JavaScript lose nothing they had. The empty state ("No episodes with Nostr
+boosts yet.") is rendered inside the drawer for exactly that reader, and the
+catalogue removes it when it lands.
+
+**Music is not there yet.** Reed: "we can talk about music later." An album
+drawer still lists only the boosted tracks under "Tracks with Nostr Boosts",
+and keeps its way out: **See All Tracks** at the left end of the control band,
+opposite the sort, linking to the album on Boost Me Bitch. It is styled as the
+same pill as the sort beside it, because they are two controls on one band and
+a link styled as a link reads as body text stranded in a toolbar; the outbound
+arrow is the only difference. `COPY.music.catalogue` is the switch, and the
+podcast entry beside it is the record of why.
+
+**BMB is a temporary target and this is now its third surface.**
+`assets/js/episode-link.js` owns it for boost notes and documents why, and its
+`bmbEpisodeUrl` is the one builder the catalogue's rows and the boost note's
+fallback share. The album drawer's link is built inline in `renderEpisodes`
+because a Pages Function cannot import a client module; both files carry a ⚠️
+naming the other. That one is show-level (`?podcast=<guid>` alone, a `/show`
+page holding no Podcast Index numeric id to prefer `?feed=` with) and is not a
+boost note, so retiring BMB for notes does not have to retire it here. BMB's
+own episode deep link reaches a show's most recent 1,000 episodes, the same
+ceiling as the catalogue; the note in `episode-link.js` said "~50" until
+2026-09-04, when it was checked against BMB's source.
 
 ### The Sort Row
 
-The two bands ship differently, and only in one way: the episode band holds that
-link, which needs no JavaScript, so it renders visible and only the sort is
-conditional on there being at least two rows to order. The community band holds
-nothing but a sort, so it still ships `hidden` and JavaScript reveals it — a sort
-control that cannot sort is worse than none.
+The bands ship in two ways. The album drawer's band holds that link, which
+needs no JavaScript, so it renders visible and only the sort is conditional on
+there being at least two rows to order. The catalogue drawer's band and the
+community band hold nothing but a sort, so they ship `hidden` and JavaScript
+reveals them; a sort control that cannot sort is worse than none. On the
+catalogue drawer the second row that earns the control may arrive from either
+side, the edge or the catalogue, so `initEpisodeSort` in `show-page.js` returns
+a controller and mounts the pill the first time it has two rows to order.
 
 `.cs-controls` is mounted by **both** drawers and was painted `--cream`, the page
 background. Inside a white card that reads as a gap punched through to the page
@@ -745,15 +800,23 @@ instead of brand and its active menu item had no highlight.
 The episode list comes from D1's `episodes` table, which already carries
 `boost_count` and `total_sats` per episode.
 
-**Ordered by air date, newest first** by default, not by sats. The drawer is a
-catalogue, and a catalogue is chronological; opening it ranked by sats would make
-it a second leaderboard next to the supporters wall and bury this week's episode.
+**The podcast drawer opens on Latest Episode, newest first**, not by sats.
+It is the catalogue (see The Catalogue above), and a catalogue is
+chronological; opening it ranked by sats would make it a second leaderboard
+next to the supporters wall and bury this week's episode. The album drawer
+opens on Overall, the chart formula over its own rows (Reed's ask, 2026-09-03,
+when every drawer on the four pages moved to it; the podcast drawer moved back
+with the catalogue on 2026-09-04). The drawer declares its opening sort in
+`data-ep-sort`, and the edge renders the rows in that order.
 
-**It carries a sort control** — Latest Episode / Most Boosters / Most Boosts /
-Most Sats — the same chrome and the same shape as the community drawer below:
-each row ships its four figures in one `data-ep` attribute and the client only
-re-orders. The default reproduces the server's own `ORDER BY`, so the first paint
-and the first sort agree, and undated rows sink under it rather than floating.
+**It carries a sort control** (Overall / Latest Episode / Most Boosters / Most
+Boosts / Most Sats), the same chrome and the same shape as the community drawer
+below: each row ships its four figures in one `data-ep` attribute and the
+client only re-orders. The default reproduces the server's own order, so the
+first paint and the first sort agree, and undated rows sink under it rather
+than floating. A catalogue row packs three zeros and its air date, so it sorts
+under every indexed row on the figure-based orderings and among them on the
+chronological one.
 
 `booster_count` is **not** a column on `episodes`; the collector stores boosts
 and sats per episode but not distinct boosters. "Most Boosters" derives it with a
