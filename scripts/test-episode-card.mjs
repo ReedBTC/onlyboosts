@@ -13,7 +13,7 @@
  */
 import assert from 'node:assert/strict'
 import {
-  buildEpisodes, episodeCardHtml, COPY, sortEpisodeItems, windowEpisodeItems, RANKED_SORTS,
+  buildEpisodes, episodeCardHtml, COPY, sortEpisodeItems, windowEpisodeItems, RANKED_SORTS, episodeRanks,
   CARD_PARTS, HOME_CARD_PARTS, boostRowsHtml, namesFrom,
 }
   from '../assets/js/episode-card.js'
@@ -227,6 +227,23 @@ check('sortEpisodeItems orders by the requested key', () => {
   assert.equal(sortEpisodeItems(items, 'recent')[0].guid, 'item-guid-1')
 })
 
+check('⚠️ the chart sort stamps each item with its tuple standing, and episodeRanks reads it', () => {
+  // Brute-forced from the fixture's own figures: rank in sats + rank in
+  // boosts + rank in boosters, lowest first; the drawers open on this.
+  const rk = (vals, v) => 1 + vals.filter((x) => x > v).length
+  const S = items.map((it) => it.totalSats), B = items.map((it) => it.boosts.length), K = items.map((it) => it.distinctBoosters.length)
+  const score = (it, i) => rk(S, S[i]) + rk(B, B[i]) + rk(K, K[i])
+  const best = items.map((it, i) => [score(it, i), it.guid]).sort((a, b) => a[0] - b[0])[0][1]
+  const sorted = sortEpisodeItems(items, 'chart')
+  assert.equal(sorted[0].guid, best)
+  assert.ok(sorted.every((it) => it._chart && Number.isInteger(it._chart.rank)))
+  assert.equal(sorted[0]._chart.rank, 1)
+  const ranks = episodeRanks(sorted, 'chart')
+  assert.deepEqual(ranks, sorted.map((it) => it._chart))
+  assert.equal(episodeRanks(sorted, 'recent'), null)
+  assert.equal(episodeRanks(sortEpisodeItems(items, 'sats'), 'sats')[0].rank, 1)
+})
+
 check('⚠️ windowEpisodeItems windows on BOOST time and recomputes the figures', () => {
   // The one range reading, everywhere, since 2026-08-31. Its own micro-corpus,
   // so the expectations are exact: one item with boosts either side of the
@@ -310,9 +327,10 @@ check('stats:false drops the figures without leaving an empty row', () => {
   assert.match(booster, /class="ob-boost-pill"/)
 })
 
-check('the feed layout is unchanged — pill on the stats line, ⋮ present', () => {
+check('the feed layout — pill on the stats line, ⋮ present, no player', () => {
   assert.match(html, /Nostr Stats:/)
-  assert.match(html, /<audio class="pcast-player"/)
+  // ⚠️ NO <audio> ON ANY LAYOUT since 2026-09-03; the episode page has it.
+  assert.doesNotMatch(html, /<audio/)
   assert.match(html, /pcast-cardmenu/)
   assert.doesNotMatch(html, /pcast-card-rail/)
   // The pill closes the stats row rather than standing alone.

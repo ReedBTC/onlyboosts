@@ -105,10 +105,12 @@ travel D1 → edge and, on a client-fetched page, D1 → browser as JSON; they s
 being *rendered* into the document. A lighter faces-only include is the follow-up
 if that JSON ever matters.
 
-The player and the ⋮ both come off for one reason: every card's title links to
-that episode's own page, which carries both on a surface with room for them.
-**The pill can only be centred because the ⋮ is gone** — they share the card's
-right edge.
+The ⋮ comes off for one reason: every card's title links to that episode's own
+page, which carries a subscribe path on a surface with room for it. **The pill
+can only be centred because the ⋮ is gone** — they share the card's right edge.
+The inline player came off the compact layout for the same reason, and off the
+feed layout too on 2026-09-03 (Reed's call): the episode page has the player,
+and the card is the way there. No layout renders an `<audio>` now.
 
 **⚠️ The Function declares the variant and it travels in the state element**, so
 a client repaint cannot render a different card than the edge did. **Spacing is

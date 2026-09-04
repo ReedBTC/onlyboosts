@@ -45,7 +45,7 @@ passed its size budget. Nothing was rewritten on the way across, so that same
 | `/stats` | a coming-soon placeholder: nav + header + soon-card, `noindex`, out of the sitemap. `/boosters` was the second one and was **deleted** on 2026-08-23 — see the Stats row of the site map |
 | `/404.html` | see the ⚠️ under LB conventions |
 | `/hpw/<YYYY-MM-DD>`, `/hpw/high-scores` | one 40 HPW board as a page, edge-rendered, the address a shared week has. **⚠️ `high-scores` is a PATH, not the board's name** — that board is **Proof of #40HPW** since 2026-09-01 and the URL deliberately did not move with it. `/hpw/<key>/card` is the 720x900 portrait frame the collector screenshots for `/api/og/hpw/<key>.png`. See **The Share Cards** under the Members tab |
-| `/charts/<YYYY-MM-DD>` | the OnlyBoosts Charts page, edge-rendered: weekly Top 10s for **Shows and Artists** on the `sort=chart` rule over the 40 HPW calendar week, plus the **Members 40 HPW board**, each beside a Weeks at #1 companion. `/charts` 302s to the live week. Episodes/Albums/Songs were CUT from the page on ship day (Reed: too sparse) but `week-charts.js` still serves them. See **The Charts Page** in `docs/feeds.md` |
+| `/charts/<YYYY-MM-DD>` | the OnlyBoosts Charts page, edge-rendered: weekly Top 10s for **Shows and Artists** on the `sort=chart` rule over the 40 HPW calendar week, plus the **Members 40 HPW board**, each beside a Weeks at #1 companion. `/charts` 302s to the live week. Episodes/Albums/Songs were CUT from the page on ship day (Reed: too sparse) but `week-charts.js` still serves them. **⚠️ THE PAGE IS COMING DOWN** (Reed, 2026-09-03): the same boards live on the Shows and Artists feeds and the Members tab now, so nothing new links here. `/charts/<key>/card/<kind>` — five share-card frames (`shows`/`artists` per week, `shows`/`artists`/`members` under `weeks-at-1`) — are ROUTES in the Function and outlive the page; the collector's bot screenshots them. See **The Charts Page** and **The chart blocks on the feeds** in `docs/feeds.md` |
 
 `/shows` and `/podcasts` are both 301s to `/#shows` now; the Shows feed replaced
 the standalone page. `feeds.html` and `boosts.html` were folded into `/` and
@@ -77,7 +77,7 @@ which was right while the homepage hid them behind a dropdown and wrong the
 moment the tabs put them on screen: the nav then restated a control the page
 carries, in a different order, using different words for the same things.
 **Those three hrefs and `TAB_DEFAULT` in the `index.html` controller move
-together** — Podcasts opens Episodes, Music opens Artists (Albums until 2026-08-31, Reed's call with the Chart Positions strip), Members opens Boosts.
+together** — Podcasts opens Shows (Episodes until 2026-09-03, Reed's call with the chart blocks: the three default feeds are the charted ones), Music opens Artists (Albums until 2026-08-31, Reed's call with the Chart Positions strip), Members opens Boosts.
 
 **The Global/Follows axis is deliberately not in the nav**: it's the second
 dropdown on the page, and listing both scopes would double the group into a grid
@@ -140,15 +140,22 @@ at a time. `test-feed-hash.mjs` compares them per breakpoint.
 selected tab**, in `--accent-d`. Broken there, the tab and the block below it
 share a fill, touch, and merge into one slab.
 
+**The tabs and the sub-row sit in one bordered, rounded box at the track
+width (`.feed-chrome`) since 2026-09-03**, Reed's call: the masthead's and
+the sticky wrap's hairlines ran edge to edge on a wide screen. The box is the
+edge now; on a phone its sides and radius come off and only the bottom
+hairline stays.
+
 **On a phone the tabs become chips and KEEP THEIR LABELS.** LB goes icon-only
 because four tabs and four words do not fit; three do, and a reorganization that
 exists because visitors cannot tell what the site shows them must not open with
 three unlabelled glyphs.
 
 **⚠️ The page track is `--feed-track: 60rem`, which is `.show-main`'s width.**
-Four elements read it — the tabs, the sub-row, the control bar and the panels —
-so the column no longer narrows by 240px when a reader clicks a card through to
-its detail page. The masthead's logo and subtitle keep their own smaller
+Three elements read it — the tabs, the sub-row and the panels (the control bar
+was the fourth until 2026-09-03, when it became the lid inside the active
+panel's shell) — so the column no longer narrows by 240px when a reader clicks
+a card through to its detail page. The masthead's logo and subtitle keep their own smaller
 measures; those are typographic, not the track.
 
 **A hash may carry a view: `#shows?lang=de&range=1m&sort=sats`.** The feed key
@@ -217,12 +224,13 @@ a page that contradicts itself, and `test-server-render.mjs` pins all three:
 | `is-active` on `#panel-shows`, and the `<!--OB:SSR-SHOWS-->` markers inside it | what a reader with no JavaScript and a crawler on its first pass actually see, since the controller only hides and shows panels once it runs |
 | `FEED` in `functions/index.js` | which query was rendered into that panel, and the `sort` / `range` the client's controls open on |
 
-**⚠️ `TAB_DEFAULT.podcasts` IS DELIBERATELY STILL `'episodes'`.** Where a cold
-load lands and what the **Podcasts tab** opens on when pressed are two questions,
-and only one of them was asked. That constant is also pinned to the nav's own
-Podcasts href (`/#episodes-global`), so changing it is the nav's decision as much
-as the page's. A change that makes those two constants agree has almost
-certainly merged them.
+**`TAB_DEFAULT.podcasts` IS `'shows'` SINCE 2026-09-03**, agreeing with
+`DEFAULT_TYPE`. It stayed `'episodes'` from 2026-08-23 until then, on the
+argument that where a cold load lands and what the **Podcasts tab** opens on
+when pressed are two questions and only one had been asked; Reed asked the
+second when the chart blocks made Shows the Podcasts tab's charted feed. The
+constant is pinned to the nav's and the footer's Podcasts href (`/#shows`),
+so the three move together.
 
 **⚠️ THE OPENING SORT IS `chart` ON EVERY RANKED FEED — one key, one
 spelling.** *Reed's call, 2026-08-31.* The OnlyBoosts Charts is deliberately
@@ -447,7 +455,7 @@ Sixteen test scripts, all plain `node scripts/<name>.mjs` with no runner:
 | `test-publishers-api.mjs` | the **shipped** `/api/v1/publishers` handlers — listing and per-artist detail — over a `node:sqlite` build of the real `schema.sql`, on the members-search pattern. Three sorts with three winners, the boost-time windows, the language filter recounting through the declaring shows (`lang=unknown` included), LIKE-wildcard decoys, rank retention on `q=`, the title-less publisher's exclusion, HEAD, the album list's publisher-order and its live-row-over-edge-hint preference |
 | `test-charts.mjs` | the OnlyBoosts Charts: `sort=chart` on the **shipped** handlers of all four ranked endpoints over a `node:sqlite` build of the real `schema.sql`. **Expectations are brute-forced from an independent JS implementation of the rule**, one boost list feeding both sides; a micro-corpus that inverts if the tiebreak chain is reordered; `q=` rank retention with pre-filter tie flags; the follows-POST chart on all three POSTing endpoints (podcasts and publishers gained theirs in phase 2, with `publisher=` and boost-time `since=` for the drawers' follows paths); `feedRanks`' chart place — all four boost-time windows since the strip — and the tiles' Charts strip. Confirmed red on five mutations: the tuple tiebreak removed, the chain flipped in members.js and again in feed-rank.js, `peers` counted post-filter, and the podcasts POST's follows filter dropped |
 
-| `test-weekly-charts.mjs` | the OnlyBoosts Charts page: the **shipped** `/charts/<week>` Function over a `node:sqlite` build of the real `schema.sql`, on the members-hours pattern. The routing contract (one URL per week, HEAD answered); the Shows and Artists Top 10s against a **brute-forced independent implementation** of the chart rule, component-rank triplets included; the medium partition; the Members pair (the hours board held to brute-forced hours, the publisher exclusion); and every Weeks at #1 tally — completed weeks only, a tied #1 crediting every holder, a fixture week whose #1 is decided by the tiebreak CHAIN. The retired kinds (episodes, albums, songs) stay covered at module level. Confirmed red on six mutations: the chain flipped, the live week counted on each side, the medium filter dropped, the per-week `PARTITION BY` removed, and the member boards' publisher exclusion dropped |
+| `test-weekly-charts.mjs` | the OnlyBoosts Charts: the **shipped** `/charts/<week>` Function, **`/api/v1/charts`**, the five **card frames** and the **`/api/og/charts` proxy** (fetch stubbed), over a `node:sqlite` build of the real `schema.sql`, on the members-hours pattern; plus the two-sided source scan of `chart-board.js`. The routing contract (one URL per week, HEAD answered); the Shows and Artists Top 10s against a **brute-forced independent implementation** of the chart rule, component-rank triplets included; the medium partition; the Members pair (the hours board held to brute-forced hours, the publisher exclusion); and every Weeks at #1 tally — completed weeks only, a tied #1 crediting every holder, a fixture week whose #1 is decided by the tiebreak CHAIN. The retired kinds (episodes, albums, songs) stay covered at module level. Confirmed red on six mutations: the chain flipped, the live week counted on each side, the medium filter dropped, the per-week `PARTITION BY` removed, and the member boards' publisher exclusion dropped |
 
 **⚠️ `test-server-render.mjs` IS THE ONE THAT NEEDS AN ARGUMENT, SO IT IS THE ONE
 THAT GOES UNRUN.** Its header carries the `curl` that produces the capture; take
@@ -1512,7 +1520,11 @@ file:
   draw its top-100 **window strip** above the stat tiles — Week · Month ·
   Year · All time, each cell that boost-time window's chart place
   (`chartWindows` in `feed-rank.js`), each charted cell linking to that
-  window's chart view. **See *The OnlyBoosts Charts* in `docs/feeds.md`** —
+  window's chart view. **Since 2026-09-03 the strip is also the tiles'
+  window selector** (Reed's ask): `feedRanks` returns `windows` (each
+  window's figures and component ranks), four rows of tiles ship with all
+  but All time `hidden`, and `initStatWindows` in `detail-page.js` swaps
+  them. The "Rank on the all-time … feed" caption is gone with it. **See *The OnlyBoosts Charts* in `docs/feeds.md`** —
   the design record — and `test-charts.mjs`.
 - **⚠️ `competitionRanks` ASSUMES THE LIST IS ALREADY ORDERED BY THE VALUE IT
   RANKS**, and returns confident nonsense otherwise. Every caller satisfies it by
@@ -1561,10 +1573,15 @@ What a change elsewhere would break:
   the cold load does not go through `lb:feed-activate`, so `feeds.js` re-reads
   `body[data-active-feed]` at the end. Hooked to the listener alone, the boards
   were an empty gap on every reload and every shared link.
-- **⚠️ THE FEED BAR IS MOVED INTO THIS TAB AND MOVED BACK**, `appendChild` on the
-  live element. **The move back is the half that breaks**: `.members-block` is
-  `display:none` off this tab, so a bar left behind takes the scope menu and every
-  feed's range and sort with it.
+- **⚠️ THE FEED BAR IS MOVED INTO THE ACTIVE PANEL'S LID, ON EVERY FEED**,
+  `appendChild` on the live element — since 2026-09-03, Reed's ask, every
+  feed is a shell with its controls on the lid (`.feed-shell` / `.feed-lid`
+  in `index.html`), which generalizes the 2026-08-23 move that put the bar
+  beside this tab's boost list. The bar ships in the Shows panel's lid and
+  `placeFeedBar(feed)` relocates it. **A bar left in the wrong panel is the
+  failure**: an inactive panel is `hidden`, so it takes the scope menu and
+  every feed's range and sort with it. The `.members-boosts` section is the
+  heading alone now; the lid-only `.mb-shell` and the seam it had are gone.
 - **⚠️ `.mb-shell` / `.mb-lid` RESTATE `.bs-shell` / `.bs-controls`, THEY DO NOT
   IMPORT THEM** — this page does not link `show-page.css`. 1px `--border`, 12px
   radius, `--cream` fill, lid on `--cream-d`. **They must stay in step.**
@@ -1573,7 +1590,15 @@ What a change elsewhere would break:
   need it at different times. They cannot share code, so `test-members-hours.mjs`
   holds the hand-rolled rule against Node's real tzdata at both transitions, every
   week for four years.
-- **⚠️ THE SECOND BOARD IS "Proof of #40HPW" SINCE 2026-09-01 AND IT IS ONE ROW
+- **⚠️ THE SECOND SLOT IS A STACK SINCE 2026-09-03: Proof of #40HPW ⇄ Weeks at
+  #1**, flipped by the week picker's own stepper in the board's title (Reed's
+  ask: "like how you can toggle between weeks"). Weeks at #1 is the Charts
+  page's members board (`memberOnesBoardHtml` in `chart-board.js`, rows from
+  `/api/v1/charts/members/weeks-at-1`); its share card is
+  `members-weeks-at-1` under `/api/og/charts/`, its link is `/#members`, and
+  its rows' "Last:" weeks are picker jumps. `paintStack` in
+  `members-board.js` mounts the shown board's share button on every flip.
+- **⚠️ THE PROOF BOARD IS "Proof of #40HPW" SINCE 2026-09-01 AND IT IS ONE ROW
   PER MEMBER.** *Reed's call.* It was **High Scores**, the ten biggest
   booster-weeks; `range=all` now returns every member who has ever cleared forty
   hours in a week, ranked by how many such weeks they hold, carrying their best
@@ -1726,8 +1751,8 @@ rollups and wall, and the sitemap.
 What a change elsewhere would break:
 
 - **⚠️ THE SECTION IDS ARE URLS AND THEY ARE FROZEN.** `/show`: `#episodes`
-  `#community-shows` `#community` `#podroll` `#reverse-podroll` `#boosts`.
-  `/episode`: `#community-episodes` `#community` `#boosts`. `/booster`: `#shows`
+  `#community` `#community-shows` `#podroll` `#reverse-podroll` `#boosts`.
+  `/episode`: `#community` `#community-episodes` `#boosts`. `/booster`: `#shows`
   `#episodes` `#boosts`. Ids are reused across pages on purpose where they name the
   same kind of section. `HASH_ALIASES` holds one permanent entry
   (`#inverse-podroll`) and **is the repair for a rename that already happened, not
@@ -1740,6 +1765,13 @@ What a change elsewhere would break:
   navigation, and `replaceState` fires **no `hashchange`** — which is the only thing
   stopping the spy tripping `revealHashTarget()` and opening a drawer as a side
   effect of scrolling past it. The two coexist on exactly that property.
+- **⚠️ EVERY DRAWER ON THE FOUR PAGES OPENS ON "Overall"** (2026-09-03,
+  Reed's ask; the key is `chart`, the label deliberately not "Chart rank"
+  inside a drawer): the chart formula over the drawer's own rows, computed by the
+  two-sided `rank.js#chartRanks` on both sides, so the Function's order and
+  the page script's first re-sort are one function. The breadth key is the
+  drawer's own (boosters; the community's boosters; episodes on `/booster`'s
+  shows). See **The community rollups** in `docs/detail-pages.md`.
 - **⚠️ THE RANK CHIP IS DRAWN ONLY INSIDE THE TOP 100** (`RANK_CUTOFF`), a
   display rule and not a change to `feedRanks`. It fails quietly to no third line.
   **`RANK_PUBLISHERS` in `feed-rank.js` restates `PUBLISHERS` from
@@ -2246,7 +2278,9 @@ would. Never remove an entry** — those links are in the wild.
 | `boosts-thread.js` / `boost-actions.js` | the content tokenizer and reply / like / repost / zap |
 | `functions/index.js` | the homepage's opening feed — **Shows**, rendered at the edge |
 | `functions/{show,episode,booster,artist}/…` | the four edge-rendered detail pages |
-| `functions/charts/[[path]].js` + `_shared/week-charts.js` + `_shared/chart-board.js` | the OnlyBoosts Charts page: the Shows/Artists Top 10s, the Members 40 HPW pair and the Weeks at #1 boards, edge-rendered; `assets/js/charts-page.js` mounts the week-picker dropdown |
+| `functions/charts/[[path]].js` + `_shared/week-charts.js` + **two-sided** `assets/js/chart-board.js` | the OnlyBoosts Charts page (coming down) and the five chart share-card frames; `assets/js/charts-page.js` mounts the page's week-picker dropdown |
+| `assets/js/charts-block.js` + `functions/api/v1/charts/[[path]].js` | **the chart boards on the Shows and Artists feeds** (2026-09-03): the week's Top 10 with the picker in its title beside Weeks at #1, from JSON; `assets/js/week-picker.js` is the picker's markup and delegate, shared with the Members tab |
+| `functions/_shared/card-frame.js` + `functions/api/og/charts/[name].js` | the one 720x900 share-card frame every card renders in, and the proxy for the chart cards' PNGs (`shows-<date>`, `artists-<date>`, `<kind>-weeks-at-1`) |
 | `functions/api/v1/*` | the D1 query API |
 | `functions/api/v1/members.js` | member search and the top-members listing, over all 2,011 |
 | `functions/api/v1/members/hours.js` | the #40HPW boards, and any past week by `week=YYYY-MM-DD` |
@@ -2312,13 +2346,11 @@ would. Never remove an entry** — those links are in the wild.
    **The widget now reads both as `--font-display` / `--font-body` tokens**, so
    a change here reaches the modals without touching them.
 
-   **⚠️ A third file sits beside them and is NOT free to rework: `Movie Poster
-   Personal Use.ttf`** (the CHARTS wordmark link, Reed's pick 2026-09-01) is
-   licensed FREE FOR PERSONAL USE ONLY, and its EULA forbids converting,
-   subsetting or renaming the file — which is why it is a raw 375KB TTF under
-   its original name rather than a woff2, fetched lazily via a caps-only
-   `unicode-range`. The note over its `@font-face` in `theme.css` carries the
-   licensing contact. Don't "optimize" it into a subset.
+   A third file, `Movie Poster Personal Use.ttf` (the CHARTS wordmark link,
+   Reed's pick 2026-09-01, licensed FREE FOR PERSONAL USE ONLY), sat beside
+   them from 2026-09-01 to 2026-09-03, when Reed cut the wordmark links with
+   the Charts page they pointed at; the file, its `@font-face` and
+   `.ob-charts-link` went with them (`git log -S 'Movie Poster'`).
 
 `/about` is done. Its copy is distilled from `docs/about-and-faq-source.md` —
 **that file is the factual source of record**, so correct it there first if the

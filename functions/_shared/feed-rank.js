@@ -282,23 +282,44 @@ function chartQuery(kind, row, cutoff = null) {
            FROM base
          ),
          chart AS (
-           SELECT id,
+           SELECT scored.*,
                   RANK() OVER (ORDER BY (r_sats + r_boosts + r_breadth),
                                m_breadth DESC, m_sats DESC, m_boosts DESC) AS rank
            FROM scored
          ),
          tied AS (
-           SELECT chart.*, COUNT(*) OVER (PARTITION BY rank) AS peers FROM chart
+           /* peers is the chart place's tie group; the three t_* are each
+            * component rank's, so the windowed tiles can wear the T the
+            * all-time chips get from ranksFrom's at > 1. (No backticks in
+            * here: this is inside a JS template literal.) */
+           SELECT chart.*,
+                  COUNT(*) OVER (PARTITION BY rank)      AS peers,
+                  COUNT(*) OVER (PARTITION BY r_sats)    AS t_sats,
+                  COUNT(*) OVER (PARTITION BY r_boosts)  AS t_boosts,
+                  COUNT(*) OVER (PARTITION BY r_breadth) AS t_breadth
+           FROM chart
          )
-    SELECT rank, peers FROM tied WHERE id = ?`;
+    SELECT rank, peers,
+           m_sats, m_boosts, m_breadth,
+           r_sats, r_boosts, r_breadth,
+           t_sats, t_boosts, t_breadth
+      FROM tied WHERE id = ?`;
   args.push(id);
   return { sql, args };
 }
 
-/* Resolves { rank, tied } or null; its own catch, so a chart failure costs the
- * chart line and never the three component chips beside it. A subject outside
- * the population (a publisher key on /booster, a medium mismatch) simply finds
- * no row, which is the same honest silence ranksFrom keeps. */
+/* Resolves { rank, tied, figures, ranks } or null; its own catch, so a chart
+ * failure costs the chart line and never the three component chips beside it.
+ * A subject outside the population (a publisher key on /booster, a medium
+ * mismatch) simply finds no row, which is the same honest silence ranksFrom
+ * keeps.
+ *
+ * `figures` and `ranks` joined on 2026-09-03 (Reed's ask: the stat tiles
+ * follow the window picked on the strip): the window's own sats, boosts and
+ * breadth for the subject, and its competition rank on each — the same
+ * `RANK()` the chart is summed from, so a windowed tile's chip and the chart
+ * cell above it are one computation. `breadth` is the third key, whatever the
+ * kind calls it; attachChart names it. */
 async function chartPlace(db, kind, row, cutoff = null) {
   try {
     const q = chartQuery(kind, row, cutoff);
@@ -306,7 +327,12 @@ async function chartPlace(db, kind, row, cutoff = null) {
     const r = await db.prepare(q.sql).bind(...q.args).first();
     const rank = Number(r?.rank);
     if (!Number.isFinite(rank) || rank < 1) return null;
-    return { rank, tied: Number(r.peers) > 1 };
+    const comp = (k) => ({ rank: Number(r[`r_${k}`]), tied: Number(r[`t_${k}`]) > 1 });
+    return {
+      rank, tied: Number(r.peers) > 1,
+      figures: { sats: Number(r.m_sats) || 0, boosts: Number(r.m_boosts) || 0, breadth: Number(r.m_breadth) || 0 },
+      ranks: { sats: comp("sats"), boosts: comp("boosts"), breadth: comp("breadth") },
+    };
   } catch (err) {
     console.warn("[feed-rank] chart query failed", err);
     return null;
@@ -322,7 +348,15 @@ const CHART_WINDOWS = [["1w", 7], ["1m", 30], ["1y", 365]];
 /* The all-time place plus the three windowed ones, in parallel — each
  * chartPlace carries its own catch, so one failed window costs one dash and
  * never the strip. `chart` keeps its historical meaning (the all-time place)
- * because test-charts.mjs and this file's own callers read it. */
+ * because test-charts.mjs and this file's own callers read it.
+ *
+ * `windows` (2026-09-03) is the tiles' half of the same answers: per window,
+ * the subject's figures under the page's own stat keys and its component
+ * ranks under the same keys, or null where the subject has no boost in the
+ * window — which the renderer prints as three zeros with no chips, the
+ * honest figure rather than a missing row. The breadth key is renamed here
+ * to what the kind's tiles call it (`shows` on /booster, `boosters`
+ * elsewhere), so renderStatTiles can look figures up by `stat.key`. */
 async function attachChart(db, kind, row, out) {
   const now = Math.floor(Date.now() / 1000);
   const [all, ...wins] = await Promise.all([
@@ -332,6 +366,13 @@ async function attachChart(db, kind, row, out) {
   out.chart = all;
   out.chartWindows = { all };
   CHART_WINDOWS.forEach(([key], i) => { out.chartWindows[key] = wins[i]; });
+  const breadthKey = kind === "booster" ? "shows" : "boosters";
+  const windowOf = (c) => c && {
+    sats: c.figures.sats, boosts: c.figures.boosts, [breadthKey]: c.figures.breadth,
+    ranks: { sats: c.ranks.sats, boosts: c.ranks.boosts, [breadthKey]: c.ranks.breadth },
+  };
+  out.windows = {};
+  for (const key of Object.keys(out.chartWindows)) out.windows[key] = windowOf(out.chartWindows[key]) || null;
 }
 
 /**
@@ -437,6 +478,13 @@ function ranksFrom(r, keys) {
   return out;
 }
 
+// The pages' own two formatters, so a windowed tile prints its figure exactly
+// as the all-time tile the page built prints its own: compact sats ("163.5k"),
+// plain thousands for the counts. Both modules are two-sided and dependency-
+// light; the Functions already import them through _shared/detail-page.js.
+import { compact } from "../../assets/js/supporter-wall.js";
+import { num } from "../../assets/js/boost-list.js";
+
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const numFmt = (n) => Number(n).toLocaleString("en-US");
 
@@ -482,101 +530,144 @@ const CHART_CELLS = [
 
 /**
  * The stat tiles with the rank folded into each: value, label, then the rank as
- * a third line. One tile per stat, in the order given; the rank is drawn only
+ * a corner chip. One tile per stat, in the order given; the rank is drawn only
  * where `ranks` resolved and the stat carries a `key` the ranks know, so a
- * failed query costs the third line and nothing else and /booster can pass null.
+ * failed query costs the chip and nothing else and /booster can pass null.
  *
  * ⚠️ ONLY A TOP-100 RANK IS DRAWN — see RANK_CUTOFF. A page whose every stat
- * falls outside it renders bare tiles and no caption, which is the same output
- * /booster has always produced.
+ * falls outside it renders bare tiles, which is the same output /booster
+ * produced before it had ranks.
  *
- * ⚠️ THE CAPTION IS SHARED AND THE TILES ARE BARE. Three tiles cannot each
- * carry "rank on the Shows feed" without saying it three times, and a tooltip
- * cannot say it at all on a phone. One line under the row names the list once,
- * links to it, and — only when a T is actually on screen — defines the T.
+ * ⚠️ THE TILES FOLLOW THE WINDOW PICKED ON THE STRIP (2026-09-03, Reed's ask).
+ * The Charts strip used to be four chart places over ONE row of all-time
+ * figures, with a caption under the row saying "Rank on the all-time Shows
+ * feed". Now every window the strip names has a row of tiles of its own —
+ * that window's sats, boosts and breadth for the subject, each with its chip
+ * on that window's own list — and the strip cell is the selector. Four <dl>s
+ * ship in the document, all but All time `hidden`; the verb (which one is on
+ * screen) is initStatWindows in assets/js/detail-page.js, and a reader with
+ * no JavaScript sees exactly the all-time row this always rendered. The
+ * caption is gone with the change: the figures ARE the period selected, so a
+ * line saying which period would restate the highlighted cell. What the
+ * caption also said — that T marks a tie — is in every chip's tooltip.
+ *
+ * The all-time row is built from the `stats` the page passed, verbatim — the
+ * page's own labels, values and exact tooltips — so that row renders as it
+ * always did. The three windowed rows are built from `ranks.windows`, through
+ * the same two formatters the pages use and the same singular/plural rule the
+ * pages apply (sats never singularizes). A window in which the subject has no
+ * boost is three zeros and no chips: `windows[key]` is null there, and zero is
+ * the true figure.
  *
  * @param {{key?:string,label:string,value:string,exact:string}[]} stats
  * @param {object|null} ranks  from feedRanks
- * @param {{rankFeed:string, backHref:string}} copy
+ * @param {{rankFeed:string, backHref:string, chartHref?:string, chartBreadth?:string}} copy
  */
 export function renderStatTiles(stats, ranks, copy) {
-  let anyRank = false;
-  let anyTie = false;
+  /* One row of tiles. `figures` is null for the all-time row (the page's own
+   * strings are used); for a window it is that window's record, whose `ranks`
+   * carry the chips. `phrase` is the tooltip's window ("this week"). */
+  const tilesFor = (windowKey, rowRanks, figures, phrase) => {
+    const tiles = stats.map((s) => {
+      let label = s.label, value = s.value, exact = s.exact;
+      if (figures) {
+        const n = Number(figures[s.key]) || 0;
+        // The page's rule: "1 boost", "2 boosts"; sats is never singular.
+        const plural = /s$/.test(s.label) ? s.label : s.label + "s";
+        label = n === 1 && s.key !== "sats" ? plural.replace(/s$/, "") : plural;
+        value = s.key === "sats" ? compact(n) : num(n);
+        exact = num(n);
+      }
+      const r = rowRanks && s.key ? rowRanks[s.key] : null;
+      let rankEl = "";
+      if (r && r.rank <= RANK_CUTOFF) {
+        const tip = r.tied
+          ? `Tied for ${chip(r).slice(1)} by ${s.key} on the ${copy.rankFeed} feed ${phrase}`
+          : `${chip(r)} by ${s.key} on the ${copy.rankFeed} feed ${phrase}`;
+        rankEl = `<dd class="show-stat-rank" title="${esc(tip)}">${esc(chip(r))}</dd>`;
+      }
+      // ⚠️ THE MODIFIER IS WHAT RESERVES THE CHIP'S LINE. The rank is pinned to
+      // the tile's top corner, so the tile has to open a gap for it — but only a
+      // tile that HAS one, or rankless tiles would carry dead space above the
+      // figure. A `:has()` rule would do it without the class and is silently a
+      // no-op wherever :has() is unsupported, which is the one failure mode
+      // here that shows as an overlapping number rather than a spacing nit.
+      const cls = rankEl ? "show-stat show-stat--ranked" : "show-stat";
+      return `<div class="${cls}"><dt>${esc(label)}</dt><dd title="${esc(exact)}">${esc(value)}</dd>${rankEl}</div>`;
+    });
+    const hidden = windowKey === "all" ? "" : " hidden";
+    return `<dl class="show-stats" data-window="${windowKey}"${hidden}>
+      ${tiles.join("\n      ")}
+    </dl>`;
+  };
 
-  const tiles = stats.map((s) => {
-    const r = ranks && s.key ? ranks[s.key] : null;
-    let rankEl = "";
-    if (r && r.rank <= RANK_CUTOFF) {
-      anyRank = true;
-      if (r.tied) anyTie = true;
-      const tip = r.tied
-        ? `Tied for ${chip(r).slice(1)} by ${s.key} on the all-time ${copy.rankFeed} feed`
-        : `${chip(r)} by ${s.key} on the all-time ${copy.rankFeed} feed`;
-      rankEl = `<dd class="show-stat-rank" title="${esc(tip)}">${esc(chip(r))}</dd>`;
-    }
-    // ⚠️ THE MODIFIER IS WHAT RESERVES THE CHIP'S LINE. The rank is pinned to
-    // the tile's top corner, so the tile has to open a gap for it — but only a
-    // tile that HAS one, or /booster's rankless tiles would carry dead space
-    // above the figure. A `:has()` rule would do it without the class and is
-    // silently a no-op wherever :has() is unsupported, which is the one failure
-    // mode here that shows as an overlapping number rather than a spacing nit.
-    const cls = rankEl ? "show-stat show-stat--ranked" : "show-stat";
-    return `<div class="${cls}"><dt>${esc(s.label)}</dt><dd title="${esc(s.exact)}">${esc(s.value)}</dd>${rankEl}</div>`;
-  });
+  const breadth = copy.chartBreadth || "boosters";
+  const cw = ranks && (ranks.chartWindows || (ranks.chart ? { all: ranks.chart } : null));
 
-  const caption = anyRank
-    ? `<p class="show-stats-cap">Rank on the all-time <a href="${esc(copy.backHref)}">${esc(copy.rankFeed)} feed</a>${anyTie ? "; T marks a tie" : ""}</p>`
-    : "";
+  /* No chart data at all (a failed query, or a caller from before the strip):
+   * the all-time row alone, with whatever chips the component ranks give it,
+   * and no strip — there is nothing to select between. */
+  if (!cw) return tilesFor("all", ranks, null, "all time");
 
   /* ⚠️ THE CHARTS STRIP — the subject's OnlyBoosts Charts position in each of
    * the four boost-time windows (Week · Month · Year · All time), above the
-   * tiles because the standing is the headline and the three tile ranks are
-   * the all-time score's components. It replaced the single all-time line on
-   * 2026-08-31 (Reed's pick, option A of the windows design pass — the
-   * Billboard idiom: the current window is the news, the all-time standing is
-   * the record, and the all-time cell wears the tint to say which is which).
+   * tiles, and since 2026-09-03 ALSO THE TILES' WINDOW SELECTOR. It replaced
+   * the single all-time line on 2026-08-31 (Reed's pick, option A of the
+   * windows design pass — the Billboard idiom: the current window is the news,
+   * the all-time standing is the record). The tint that used to mark the
+   * all-time cell now marks the SELECTED cell, which opens on All time, so a
+   * page with no JavaScript looks as it did.
    *
-   * Each charted cell links to that window's chart view — the hash already
-   * addresses it (`?sort=chart&range=1w`; the all-time cell elides the
-   * default range). /booster overrides every target via `copy.chartHref`,
-   * its chart living on the members wall rather than behind a sort key the
-   * Members hash would drop. The label links to /about#charts, where the
-   * formula is stated in full, and carries it as a tooltip too.
+   * Each charted cell is a link to that window's chart view — the hash already
+   * addresses it (`?sort=chart&range=1w`; the all-time cell elides the default
+   * range) — and initStatWindows takes over a plain click to select the window
+   * in place; a modifier-click or middle-click still follows the link.
+   * /booster overrides every target via `copy.chartHref`, its chart living on
+   * the members wall rather than behind a sort key the Members hash would
+   * drop. The label links to /about#charts, where the formula is stated in
+   * full, and carries it as a tooltip too.
    *
    * The same top-100 gate as the chips applies PER WINDOW. A window past the
    * gate is an em-dash whose tooltip says which of two things the dash means
    * — outside the top 100, or no boosts in the window at all (chartPlace
    * resolves null when the subject has no row in the windowed corpus) — and
-   * a dash cell is a <span>, not a link: sending a reader to a list the
-   * subject is not on answers a question nobody asked. The whole strip is
-   * withheld when no window charts, so most pages render exactly as before
-   * the Charts existed. */
-  const breadth = copy.chartBreadth || "boosters";
-  const cw = ranks && (ranks.chartWindows || (ranks.chart ? { all: ranks.chart } : null));
-  let chartStrip = "";
-  if (cw && CHART_CELLS.some(([key]) => cw[key] && cw[key].rank <= RANK_CUTOFF)) {
-    const labelTip = `Rank in sats + rank in boosts + rank in ${breadth}, summed — lowest total first, within each time window. Ties break by ${breadth}, then sats, then boosts; T marks a remaining tie.`;
-    const cells = CHART_CELLS.map(([key, win, phrase]) => {
-      const c = cw[key];
-      const all = key === "all" ? " show-chart-cell--all" : "";
-      const winEl = `<span class="show-chart-win">${win}</span>`;
-      if (c && c.rank <= RANK_CUTOFF) {
-        const href = copy.chartHref || `${copy.backHref}?sort=chart${key === "all" ? "" : `&range=${key}`}`;
-        return `<a class="show-chart-cell${all}" href="${esc(href)}" title="${esc(`${chip(c)} on the OnlyBoosts Charts ${phrase}`)}">${winEl}<span class="show-chart-rank">${esc(chip(c))}</span></a>`;
-      }
-      /* One wording for both nulls (no boosts in the window, or ranked past
-       * the gate): the chart's claim is the top 100, and "outside the top
-       * 100" is true either way — Reed's call, 2026-08-31, replacing a
-       * "No boosts" variant that answered a question the chart isn't asking. */
-      return `<span class="show-chart-cell show-chart-cell--none${all}" title="${esc(`Outside the top 100 ${phrase}`)}">${winEl}<span class="show-chart-rank">—</span></span>`;
-    });
-    chartStrip = `<nav class="show-chart" aria-label="OnlyBoosts Chart Positions by time window">
+   * a dash cell is a <button>, not a link: sending a reader to a list the
+   * subject is not on answers a question nobody asked, but the cell still has
+   * to select its window. THE STRIP IS NO LONGER WITHHELD when nothing charts:
+   * a row of four dashes is still the way to the other three rows of tiles. */
+  const labelTip = `Rank in sats + rank in boosts + rank in ${breadth}, summed — lowest total first, within each time window. Ties break by ${breadth}, then sats, then boosts; T marks a remaining tie.`;
+  const cells = CHART_CELLS.map(([key, win, phrase]) => {
+    const c = cw[key];
+    const sel = key === "all" ? ` aria-current="true"` : "";
+    const winEl = `<span class="show-chart-win">${win}</span>`;
+    if (c && c.rank <= RANK_CUTOFF) {
+      const href = copy.chartHref || `${copy.backHref}?sort=chart${key === "all" ? "" : `&range=${key}`}`;
+      return `<a class="show-chart-cell" data-window="${key}"${sel} href="${esc(href)}" title="${esc(`${chip(c)} on the OnlyBoosts Charts ${phrase}`)}">${winEl}<span class="show-chart-rank">${esc(chip(c))}</span></a>`;
+    }
+    /* One wording for both nulls (no boosts in the window, or ranked past
+     * the gate): the chart's claim is the top 100, and "outside the top
+     * 100" is true either way — Reed's call, 2026-08-31, replacing a
+     * "No boosts" variant that answered a question the chart isn't asking. */
+    return `<button type="button" class="show-chart-cell show-chart-cell--none" data-window="${key}"${sel} title="${esc(`Outside the top 100 ${phrase}`)}">${winEl}<span class="show-chart-rank">—</span></button>`;
+  });
+  const chartStrip = `<nav class="show-chart" aria-label="OnlyBoosts Chart Positions by time window">
       <a class="show-chart-label" href="/about#charts" title="${esc(labelTip)}">OnlyBoosts Chart Positions</a>
-      <div class="show-chart-strip">${cells.join("")}</div>
+      <div class="show-chart-strip" data-stat-window-picker>${cells.join("")}</div>
     </nav>`;
-  }
 
-  return `${chartStrip}${chartStrip ? "\n    " : ""}<dl class="show-stats">
-      ${tiles.join("\n      ")}
-    </dl>${caption ? "\n    " + caption : ""}`;
+  /* The rows: all time from the page's strings, each other window from its
+   * record. A caller with no `windows` (test fixtures from before this, or a
+   * failed attach) gets the all-time row alone under the strip. */
+  const rows = [tilesFor("all", ranks, null, "all time")];
+  if (ranks.windows) {
+    for (const [key, , phrase] of CHART_CELLS) {
+      if (key === "all") continue;
+      const w = ranks.windows[key];
+      rows.push(tilesFor(key, w ? w.ranks : null, w || {}, phrase));
+    }
+  }
+  return `${chartStrip}
+    <div class="show-stats-windows" data-stat-windows>
+    ${rows.join("\n    ")}
+    </div>`;
 }

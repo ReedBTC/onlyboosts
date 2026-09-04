@@ -13,16 +13,19 @@
 //
 //   functions/index.js          Episodes · Global, ranked by /api/v1/episodes
 //   functions/episode/[guid].js #community-episodes, over this episode's
-//                               community corpus, opening on Most boosts
-//   functions/booster/[npub].js #episodes, over one person's own corpus,
-//                               opening on Most sats
+//                               community corpus
+//   functions/booster/[npub].js #episodes, over one person's own corpus
+//
+// Both open on Chart rank since 2026-09-03 (Reed's ask), the chart formula
+// over the drawer's own rows — sortEpisodeItems(…, 'chart') in episode-card.js.
+// They opened on Most boosts and Most sats respectively before that.
 //
 // Only the corpus and the opening sort differ, which is why they share this.
 import {
   COPY, CARD_PARTS, buildEpisodes, renderEpisodeCards, sortEpisodeItems, RANKED_SORTS,
-  episodeRankValue,
+  episodeRankValue, episodeRanks,
 } from "../../assets/js/episode-card.js";
-import { competitionRanks, rankLabel } from "../../assets/js/rank.js";
+import { rankLabel } from "../../assets/js/rank.js";
 import { normalizeBoosts, toEpisodeShape } from "../../assets/js/ob-data.js";
 import { jsonForScript } from "./detail-page.js";
 
@@ -74,8 +77,12 @@ export function renderCardPage(items, {
    * pass no rank at all — a numeral under "Latest boost" reads as a score when
    * it is only order. */
   const ranked = showRanks && RANKED_SORTS.has(sort);
-  const valueOf = ranked ? episodeRankValue(sort) : null;
-  const ranks = ranked ? competitionRanks(page, valueOf) : null;
+  /* episodeRanks over the WHOLE view (the chart's standing is a rank sum over
+   * everything, not over the page), then the page's prefix of it. */
+  const ranks = ranked ? episodeRanks(items, sort).slice(0, page.length) : null;
+  // The chart has no single figure to carry across a page boundary; the
+  // homepage adoption this serves ranks on one axis.
+  const valueOf = ranked && sort !== "chart" ? episodeRankValue(sort) : null;
 
   const html = renderEpisodeCards(page, {
     copy,
@@ -100,7 +107,7 @@ export function renderCardPage(items, {
   const boundary = ranks && page.length
     ? {
         lastRank: ranks[page.length - 1].rank,
-        lastValue: valueOf(page[page.length - 1], page.length - 1),
+        lastValue: valueOf ? valueOf(page[page.length - 1], page.length - 1) : null,
       }
     : {};
 

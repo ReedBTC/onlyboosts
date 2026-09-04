@@ -47,6 +47,8 @@ import {
   renderSupporters, renderBoosts, lookupMentionNames,
 } from "../_shared/detail-page.js";
 import { feedRanks, renderStatTiles } from "../_shared/feed-rank.js";
+// The two drawers open on the chart formula over their own rows (2026-09-03).
+import { chartRanks, rankLabel } from "../../assets/js/rank.js";
 
 const SITE_ORIGIN = "https://onlyboosts.social";
 const OG_FALLBACK = `${SITE_ORIGIN}/assets/onlyboosts_banner.png`;
@@ -349,16 +351,16 @@ function renderArtistPage({ pub, albums, totals, community, supporters, boosts, 
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v180" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v188" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v188" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v188" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v188" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v188" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v188" />
   <!-- The boost note card and its reaction bar, for #boosts — the same
        .note-card every other detail page's list paints. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v180" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v188" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v188" />
 </head>
 <body data-artist-guid="${htmlEscape(pub.publisher_guid)}">
 
@@ -414,15 +416,16 @@ function renderArtistPage({ pub, albums, totals, community, supporters, boosts, 
                  the page carries, in a different order, using different words
                  for the same things. Each entry lands on that tab's DEFAULT
                  sub-feed — TAB_DEFAULT in the index.html controller — so
-                 Podcasts opens Episodes, Music opens Albums and Members opens
-                 Boosts. **Those three hrefs and TAB_DEFAULT move together.**
+                 Podcasts opens Shows (Episodes until 2026-09-03), Music opens
+                 Artists and Members opens Boosts. **Those three hrefs and
+                 TAB_DEFAULT move together.**
 
                  The Global vs Follows axis stays deliberately absent: it is the
                  second dropdown on the page itself, and listing both scopes
                  here made the nav a grid restating a control the page has. -->
             <div class="nav-explore-group">
               <h4>Feeds</h4>
-              <a href="/#episodes-global"><span aria-hidden="true">🎙</span> Podcasts</a>
+              <a href="/#shows"><span aria-hidden="true">🎙</span> Podcasts</a>
               <a href="/#artists"><span aria-hidden="true">🎵</span> Music</a>
               <a href="/#members"><span aria-hidden="true">👥</span> Members</a>
             </div>
@@ -491,12 +494,13 @@ function renderArtistPage({ pub, albums, totals, community, supporters, boosts, 
 
   ${renderAlbums(albumRows)}
 
-  ${renderCommunityArtists(community)}
-
   ${renderSupporters(supporters, {
     sub: `Everyone who has boosted ${htmlEscape(title)}’s albums on Nostr, ranked by sats sent, all time.`,
     empty: `No boosters recorded for this artist yet.`,
   })}
+
+  <!-- Below the wall since 2026-09-03, with /show and /episode. -->
+  ${renderCommunityArtists(community)}
 
   ${renderBoosts(boosts, names, {
     heading: "Boosts",
@@ -536,7 +540,7 @@ function renderArtistPage({ pub, albums, totals, community, supporters, boosts, 
            each lands on that tab's default sub-feed. See partials/nav.html. -->
       <h3>Feeds</h3>
       <ul>
-        <li><a href="/#episodes-global">🎙 Podcasts</a></li>
+        <li><a href="/#shows">🎙 Podcasts</a></li>
         <li><a href="/#artists">🎵 Music</a></li>
         <li><a href="/#members">👥 Members</a></li>
       </ul>
@@ -571,12 +575,12 @@ function renderArtistPage({ pub, albums, totals, community, supporters, boosts, 
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav.js?v=ob-v180" defer></script>
-<script src="/assets/js/artist-page.js?v=ob-v180" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v188" defer></script>
+<script src="/assets/js/artist-page.js?v=ob-v188" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v180"></script>
-<script src="/assets/js/sw-register.js?v=ob-v180" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v188"></script>
+<script src="/assets/js/sw-register.js?v=ob-v188" defer></script>
 </body>
 </html>`;
 }
@@ -654,7 +658,8 @@ function renderAlbums(rows) {
            artist-page.js reveals it when there are at least two rows. -->
       <div class="cs-controls" data-al-controls hidden></div>
       <ul class="ep-list" data-al-list>
-        ${rows.map((a) => albumRow(a)).join("\n        ")}
+        ${chartRanks(rows, { sats: (a) => a.total_sats, boosts: (a) => a.boost_count, breadth: (a) => a.booster_count })
+          .map((e) => albumRow(e.row)).join("\n        ")}
       </ul>
     </details>
   </section>`;
@@ -741,7 +746,8 @@ function renderCommunityArtists(rows) {
       <summary>Other Artists This Community Boosts<span class="drawer-hint" aria-hidden="true"></span></summary>
       <div class="cs-controls" data-cs-controls hidden></div>
       <ul class="ep-list cs-list" data-cs-list>
-        ${rows.map((r, i) => communityArtistRow(r, i + 1)).join("\n        ")}
+        ${chartRanks(rows, { sats: (r) => r.cs_sats, boosts: (r) => r.cs_boosts, breadth: (r) => r.cs_members })
+          .map((e) => communityArtistRow(e.row, rankLabel(e.rank, e.tied))).join("\n        ")}
       </ul>
     </details>
   </section>`;
@@ -758,10 +764,10 @@ function notFound(guid) {
   <meta name="robots" content="noindex" />
   <title>Artist not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v180" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v188" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v188" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v188" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v188" />
 </head>
 <body>
 <section class="page-header">
@@ -779,7 +785,7 @@ function notFound(guid) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v180" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v188" defer></script>
 </body>
 </html>`;
   return new Response(html, {

@@ -39,6 +39,8 @@ import {
 } from "../_shared/detail-page.js";
 import { itemsFromBoosts, renderCardPage, CARDS_PER_PAGE } from "../_shared/episode-cards.js";
 import { feedRanks, renderStatTiles } from "../_shared/feed-rank.js";
+// The drawers open on the chart formula over their own rows (2026-09-03).
+import { chartRanks, rankLabel } from "../../assets/js/rank.js";
 import { fetchBoosterCorpus } from "../api/v1/boosters/[npub].js";
 import { COPY as CARD_COPY } from "../../assets/js/episode-card.js";
 
@@ -420,23 +422,23 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v180" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v188" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v188" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v188" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v188" />
   <!-- The hero, the drawers and the boost list are the show page's, so this
        page links its stylesheet and adds only the deltas. -->
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v180" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v188" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v188" />
   <!-- The episode card, for the #episodes rollup: the same chrome
        feeds-podcasts.js paints on the homepage. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v180" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v188" />
   <!-- The boost thread inside a card's drawer, and its reply / like / repost /
        zap bar, both reached through that same card. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/booster-page.css?v=ob-v180" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v188" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v188" />
+  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v188" />
+  <link rel="stylesheet" href="/assets/css/booster-page.css?v=ob-v188" />
 </head>
 <body data-booster-pk="${htmlEscape(hex)}"${npub ? ` data-booster-npub="${htmlEscape(npub)}"` : ""}>
 
@@ -492,15 +494,16 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
                  the page carries, in a different order, using different words
                  for the same things. Each entry lands on that tab's DEFAULT
                  sub-feed — TAB_DEFAULT in the index.html controller — so
-                 Podcasts opens Episodes, Music opens Albums and Members opens
-                 Boosts. **Those three hrefs and TAB_DEFAULT move together.**
+                 Podcasts opens Shows (Episodes until 2026-09-03), Music opens
+                 Artists and Members opens Boosts. **Those three hrefs and
+                 TAB_DEFAULT move together.**
 
                  The Global vs Follows axis stays deliberately absent: it is the
                  second dropdown on the page itself, and listing both scopes
                  here made the nav a grid restating a control the page has. -->
             <div class="nav-explore-group">
               <h4>Feeds</h4>
-              <a href="/#episodes-global"><span aria-hidden="true">🎙</span> Podcasts</a>
+              <a href="/#shows"><span aria-hidden="true">🎙</span> Podcasts</a>
               <a href="/#artists"><span aria-hidden="true">🎵</span> Music</a>
               <a href="/#members"><span aria-hidden="true">👥</span> Members</a>
             </div>
@@ -630,7 +633,7 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
            each lands on that tab's default sub-feed. See partials/nav.html. -->
       <h3>Feeds</h3>
       <ul>
-        <li><a href="/#episodes-global">🎙 Podcasts</a></li>
+        <li><a href="/#shows">🎙 Podcasts</a></li>
         <li><a href="/#artists">🎵 Music</a></li>
         <li><a href="/#members">👥 Members</a></li>
       </ul>
@@ -665,12 +668,12 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav.js?v=ob-v180" defer></script>
-<script src="/assets/js/booster-page.js?v=ob-v180" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v188" defer></script>
+<script src="/assets/js/booster-page.js?v=ob-v188" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v180"></script>
-<script src="/assets/js/sw-register.js?v=ob-v180" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v188"></script>
+<script src="/assets/js/sw-register.js?v=ob-v188" defer></script>
 </body>
 </html>`;
 }
@@ -892,7 +895,8 @@ function renderShows(rows, realName) {
            All, which is the view they would land on. -->
       <div class="cs-controls" data-bs-shows-controls hidden></div>
       <ul class="ep-list cs-list" data-bs-shows-list>
-        ${rows.map((r, i) => showRow(r, i + 1, realName)).join("\n        ")}
+        ${chartRanks(rows, { sats: (r) => r.sats, boosts: (r) => r.boosts, breadth: (r) => r.eps })
+          .map((e) => showRow(e.row, rankLabel(e.rank, e.tied), realName)).join("\n        ")}
       </ul>
       <!-- Painted by booster-page.js when a range empties the list. A window
            with nothing in it is a real answer here — half of all boosters have
@@ -1049,7 +1053,10 @@ function showMeta(boosts, sats, eps) {
 function renderEpisodes(corpus) {
   // A booster whose every boost carries no item guid has no episode-level
   // history at all, and no section. A failed corpus fetch takes the same exit.
-  const { items, profiles } = itemsFromBoosts(corpus?.boosts, { sort: "sats" });
+  // Chart rank since 2026-09-03 (Reed's ask); Most sats until then. Every card
+  // here is one person's, so the breadth component is 1 on every row and the
+  // standing is effectively rank in sats + rank in boosts.
+  const { items, profiles } = itemsFromBoosts(corpus?.boosts, { sort: "chart" });
   if (!items.length) return "";
 
   return `<section class="show-section show-section--bare" id="episodes" data-booster-episodes${
@@ -1070,7 +1077,7 @@ function renderEpisodes(corpus) {
           // music are one history, and the cards read correctly either way.
           copy: CARD_COPY.other,
           profiles,
-          sort: "sats",
+          sort: "chart",
           range: "all",
           limit: CARDS_PER_PAGE,
           // The figures go too, unlike the twin on /episode: every card here
@@ -1104,10 +1111,10 @@ function notFound(raw) {
   <meta name="robots" content="noindex" />
   <title>Booster not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v180" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v180" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v188" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v188" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v188" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v188" />
 </head>
 <body>
 <section class="page-header">
@@ -1125,7 +1132,7 @@ function notFound(raw) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v180" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v188" defer></script>
 </body>
 </html>`;
   return new Response(html, {
