@@ -140,9 +140,9 @@ function unavailable() {
    the stepper's .hpw-nav grammar, the members board is .hpw-* rows in a
    .cb-board shell. Written here so scripts/stamp-assets.js sees an href it
    can restamp. */
-const CARD_LINKS = `  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v190" />
-  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v190" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v190" />`;
+const CARD_LINKS = `  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v191" />
+  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v191" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v191" />`;
 
 /* The rows sized to the frame. ⚠️ MEASURED BY THE BOT, 2026-09-03: the weekly
    cards' list box is 296.9 → 829 (the column head costs 27.4px), ceiling

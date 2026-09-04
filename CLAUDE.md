@@ -457,15 +457,16 @@ Sixteen test scripts, all plain `node scripts/<name>.mjs` with no runner:
 | `test-charts.mjs` | the OnlyBoosts Charts: `sort=chart` on the **shipped** handlers of all four ranked endpoints over a `node:sqlite` build of the real `schema.sql`. **Expectations are brute-forced from an independent JS implementation of the rule**, one boost list feeding both sides; a micro-corpus that inverts if the tiebreak chain is reordered; `q=` rank retention with pre-filter tie flags; the follows-POST chart on all three POSTing endpoints (podcasts and publishers gained theirs in phase 2, with `publisher=` and boost-time `since=` for the drawers' follows paths); `feedRanks`' chart place — all four boost-time windows since the strip — and the tiles' Charts strip. Confirmed red on five mutations: the tuple tiebreak removed, the chain flipped in members.js and again in feed-rank.js, `peers` counted post-filter, and the podcasts POST's follows filter dropped |
 
 | `test-weekly-charts.mjs` | the OnlyBoosts Charts: the **shipped** `/charts` Function (the old page URLs' redirects and the five **card frames**), **`/api/v1/charts`** and the **`/api/og/charts` proxy** (fetch stubbed), over a `node:sqlite` build of the real `schema.sql`, on the members-hours pattern; plus the two-sided source scan of `chart-board.js`. The routing contract (one URL per week, HEAD answered); the Shows and Artists Top 10s against a **brute-forced independent implementation** of the chart rule, component-rank triplets included; the medium partition; the Members pair (the hours board held to brute-forced hours, the publisher exclusion); and every Weeks at #1 tally — completed weeks only, a tied #1 crediting every holder, a fixture week whose #1 is decided by the tiebreak CHAIN. The retired kinds (episodes, albums, songs) stay covered at module level. Confirmed red on six mutations: the chain flipped, the live week counted on each side, the medium filter dropped, the per-week `PARTITION BY` removed, and the member boards' publisher exclusion dropped |
+| `test-catalogue.mjs` | `/api/catalogue`, the /show episode drawer's catalogue: the **shipped** handlers with **`fetch` stubbed**, so it never asks Podcast Index. The five-field projection (coerced, guid-less and duplicate items dropped, newest first with undated rows last, a total order), the request contract (400/503, a PI miss answered 200-empty and `no-store`, HEAD, OPTIONS, the exact-match CORS origin), the fallback route through `podcasts/byguid` and `byfeedurl` to `episodes/byfeedid`, `truncated` at PI's ceiling, and **the streamed byte cap added to `_shared/podcast-index.js#piGet`**, at the cap and past it. Confirmed red on three mutations: the undated rule flipped, the duplicate guard removed, the cap's comparison made `>=` |
 
 **⚠️ `test-server-render.mjs` IS THE ONE THAT NEEDS AN ARGUMENT, SO IT IS THE ONE
 THAT GOES UNRUN.** Its header carries the `curl` that produces the capture; take
 a fresh one rather than reusing an old file, since it is also the size
 measurement. It asserted `cards are numbered 1..N with no gaps` — the *ordinal*
 scheme's invariant — until competition ranking shipped on 2026-08-18, and it
-would have been merged red had it not been run. **Run all nineteen before a
+would have been merged red had it not been run. **Run all twenty before a
 merge**, and treat this one as the guard on the ranking scheme rather than only
-on weight. *(It read "all twelve" until 2026-08-24, "all fifteen" until 2026-08-30, "all sixteen" and then "all seventeen" until 2026-08-31, and "all eighteen" until 2026-09-04, contradicting the table
+on weight. *(It read "all twelve" until 2026-08-24, "all fifteen" until 2026-08-30, "all sixteen" and then "all seventeen" until 2026-08-31, and "all eighteen" and then "all nineteen" until 2026-09-04, contradicting the table
 directly above it — the count moved when a test was added and this sentence did
 not. If the table grows again, this line grows with it.)*
 
@@ -1711,9 +1712,13 @@ All three are in `docs/feeds.md`. What a change would break:
   IS PERMANENT AND ABSOLUTE.** Notes published before the flip still point at BMB
   and always will. It returns null for a show-level boost; `/show/<guid>` is **not**
   the fallback target.
-- **Two surfaces still point at boostmebitch.com on purpose**, both show-level and
-  both through `bmbShowUrl()`: "See All Episodes", and a podroll tile for a show we
-  have no page for.
+- **Three surfaces still point at boostmebitch.com on purpose.** Two are
+  show-level, through `bmbShowUrl()` in the show Function: "See All Tracks" on
+  the ALBUM drawer, and a podroll tile for a show we have no page for. The
+  third is episode-level: the un-indexed rows of the podcast drawer's
+  catalogue, built in the browser through `episode-link.js#bmbEpisodeUrl`,
+  the one builder the boost note's BMB fallback also uses. "See All Episodes"
+  went with the catalogue on 2026-09-04.
 
 ## The detail pages
 
@@ -1795,7 +1800,20 @@ What a change elsewhere would break:
   two-sided `rank.js#chartRanks` on both sides, so the Function's order and
   the page script's first re-sort are one function. The breadth key is the
   drawer's own (boosters; the community's boosters; episodes on `/booster`'s
-  shows). See **The community rollups** in `docs/detail-pages.md`.
+  shows). See **The community rollups** in `docs/detail-pages.md`. **⚠️ ONE
+  EXCEPTION SINCE 2026-09-04: THE PODCAST `/show` DRAWER IS THE SHOW'S WHOLE
+  CATALOGUE AND OPENS ON LATEST EPISODE.** *Reed's call.* Its summary reads
+  "Episodes"; the edge renders the indexed rows and
+  `assets/js/episode-catalogue.js` merges the rest of the show's episodes from
+  Podcast Index through `/api/catalogue` when the drawer is opened, each with a
+  Boost button (the existing `/api/value` path resolves any item guid), a title
+  linking to BMB, date and duration and **no figures**. Indexed rows wear
+  `.ep-row--indexed`. Nothing touches D1; the boost's note is what creates the
+  episode's page, on the next collector cycle. The drawer declares its opening
+  sort in `data-ep-sort`, and `COPY.podcast.catalogue` is the switch (music is
+  deliberately still the boosted list). It is a written exception to the
+  rendering rule. **The Catalogue** in `docs/show-pages-spec.md` is the design
+  record; `test-catalogue.mjs` covers the Function and the drawer markup.
 - **⚠️ THE RANK CHIP IS DRAWN ONLY INSIDE THE TOP 100** (`RANK_CUTOFF`), a
   display rule and not a change to `feedRanks`. It fails quietly to no third line.
   **`RANK_PUBLISHERS` in `feed-rank.js` restates `PUBLISHERS` from

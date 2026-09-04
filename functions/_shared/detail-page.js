@@ -85,13 +85,10 @@ export function isoDate(ts) {
   return Number.isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 10);
 }
 
-export function fmtDuration(sec) {
-  const s = Number(sec || 0);
-  if (!s || s < 0) return "";
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  return h ? `${h}h ${m}m` : `${m}m`;
-}
+// fmtDuration moved to assets/js/boost-list.js on 2026-09-04, where fmtDate
+// already was: the episode catalogue (assets/js/episode-catalogue.js) builds
+// drawer rows in the browser that must match the edge's byte for byte.
+export { fmtDuration } from "../../assets/js/boost-list.js";
 
 /* Display names for any npub mentioned inside a boost message.
  *

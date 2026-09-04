@@ -30,17 +30,17 @@
  */
 import {
   htmlEscape, isSafeUrl, truncate, renderMessage,
-} from './nostr-text.js?v=ob-v190';
-import { episodePageHref, showPageHref } from './show-link.js?v=ob-v190';
+} from './nostr-text.js?v=ob-v191';
+import { episodePageHref, showPageHref } from './show-link.js?v=ob-v191';
 /* ⚠️ THE REAL MODULE, NOT A FOURTH COPY OF THE RULE. booster-link.js has been
  * dependency-free since it was written, so esbuild inlines it here exactly as it
  * does nostr-text.js, and the boost rows link a booster by the same test every
  * feed surface uses rather than by a transcription of it. This is the collapse
  * that functions/_shared/detail-page.js#boosterPageUrl said was available; that
  * name is now an alias for this function rather than a second copy of it. */
-import { boosterPageHref } from './booster-link.js?v=ob-v190';
-import { httpsUrl } from './cover-art.js?v=ob-v190';
-import { clientLabel, hasClientLabel } from './client-label.js?v=ob-v190';
+import { boosterPageHref } from './booster-link.js?v=ob-v191';
+import { httpsUrl } from './cover-art.js?v=ob-v191';
+import { clientLabel, hasClientLabel } from './client-label.js?v=ob-v191';
 
 // ── The formatters the row needs ─────────────────────────────────────────────
 //
@@ -55,6 +55,18 @@ import { clientLabel, hasClientLabel } from './client-label.js?v=ob-v190';
 
 export function num(n) {
   return Number(n || 0).toLocaleString("en-US");
+}
+
+/* An episode's length, "1h 15m" / "42m". Two-sided since 2026-09-04: it was
+ * functions/_shared/detail-page.js's own until the episode catalogue rebuilt a
+ * drawer row in the browser, which has to read character for character as the
+ * row the edge rendered beside it. detail-page.js re-exports it from here. */
+export function fmtDuration(sec) {
+  const s = Number(sec || 0);
+  if (!s || s < 0) return "";
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  return h ? `${h}h ${m}m` : `${m}m`;
 }
 
 export function fmtDate(ts) {

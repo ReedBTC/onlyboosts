@@ -14,32 +14,35 @@
  * block we haven't resolved at render time, and a button that only ever
  * reports failure is worse than no button. See docs/show-pages-spec.md.
  */
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v190'
-import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v190'
-import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v190'
-import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v190'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v191'
+import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v191'
+import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v191'
+import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v191'
 // The same "Sort: X ▾" dropdown the feeds use. feed-controls.js imports
 // nothing, so this costs the page ~4KB and no transitive dependencies;
 // rangeControl and mountFeedControls are deliberately not used (no range here,
 // and no sticky bar to mount into).
-import { sortControl } from '/assets/js/feed-controls.js?v=ob-v190'
+import { sortControl } from '/assets/js/feed-controls.js?v=ob-v191'
 // The drawers' chart standing, the same function the Function ordered them by.
-import { chartRanks, rankLabel } from '/assets/js/rank.js?v=ob-v190'
+import { chartRanks, rankLabel } from '/assets/js/rank.js?v=ob-v191'
 // The drawer's per-row buttons are server-rendered, so only the busy-state
 // helper is needed here — the builder is for the feeds, which make theirs in JS.
-import { withBoostBusy } from '/assets/js/boost-button.js?v=ob-v190'
+import { withBoostBusy } from '/assets/js/boost-button.js?v=ob-v191'
 import {
   initCopyNpub, initShowMore, initShare, initBackLink,
   initHashRouting, initHashSpy, initArt2, hydrateProfiles, initStatWindows,
-} from '/assets/js/detail-page.js?v=ob-v190'
+} from '/assets/js/detail-page.js?v=ob-v191'
 // Its own module rather than a ninth export from detail-page.js, deliberately:
 // a stale copy of that file against a fresh copy of this one is a link-time
 // error that takes the whole page's JavaScript down. See the note at its head.
-import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v190'
+import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v191'
 // The reaction bar and ⋮ on this page's server-rendered boost notes. Its own
 // module for the same reason show-desc.js is; see the note at its head.
-import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v190'
-import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v190'
+import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v191'
+import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v191'
+// The podcast drawer's catalogue: the rest of the show's episodes, from
+// Podcast Index, merged in when the drawer is opened. See the note at its head.
+import { initEpisodeCatalogue } from '/assets/js/episode-catalogue.js?v=ob-v191'
 
 const VALUE_API = '/api/value'
 
@@ -87,12 +90,20 @@ initArt2('.pr-art[data-art2]', 'span', 'pr-art pr-art--blank')
 // No range control — a show's catalogue is not a window, and the Episodes feed
 // on the homepage is where "what aired lately" is asked.
 //
-// "Chart Rank" is the default (Reed's ask, 2026-09-03: the chart formula over
-// this show's own episodes) and reproduces the server's own order, which the
-// Function computed with the same rank.js#chartRanks, so the first paint and
-// the first sort agree. It was "Latest Episode" until then. `published` is
-// null on a real slice of rows and packs as 0; those sink rather than floating
-// to the top, which is the trap the homepage feed's episode sort documents.
+// The opening sort is the drawer's to declare (`data-ep-sort`), and it
+// reproduces the server's own order so the first paint and the first re-sort
+// agree. The podcast drawer — the catalogue since 2026-09-04 — opens on
+// Latest Episode, because a catalogue is chronological (Reed's call). The
+// music drawer opens on Overall (Reed's ask, 2026-09-03: the chart formula
+// over the show's own rows, computed by the same rank.js#chartRanks on both
+// sides). `published` is null on a real slice of rows and packs as 0; those
+// sink rather than floating to the top, which is the trap the homepage feed's
+// episode sort documents.
+//
+// Returns a controller rather than finishing on load: the catalogue adds rows
+// to this list after it, and they take the current sort as they land. The
+// control mounts the first time there are two rows to order, whichever side
+// supplied the second.
 
 const EP_SORTS = [
   ['chart', 'Overall'],
@@ -104,18 +115,19 @@ const EP_SORTS = [
 
 function initEpisodeSort() {
   const root = document.querySelector('[data-episode-drawer]')
-  if (!root) return
+  if (!root) return null
   const list = root.querySelector('.ep-list')
   const slot = root.querySelector('[data-ep-controls]')
-  if (!list || !slot) return
+  if (!list || !slot) return null
 
-  const rows = Array.from(list.querySelectorAll('.ep-row')).map((el) => {
+  const read = (el) => {
     const [boosters, boosts, sats, published] = String(el.dataset.ep || '').split(',').map(Number)
     return { el, boosters: boosters || 0, boosts: boosts || 0, sats: sats || 0, published: published || 0 }
-  })
-  if (rows.length < 2) return   // nothing to order
+  }
+  const rows = Array.from(list.querySelectorAll('.ep-row'), read)
 
-  let sort = 'chart'
+  let sort = root.dataset.epSort === 'latest' ? 'latest' : 'chart'
+  let mounted = false
 
   function paint() {
     const order = sort === 'chart'
@@ -133,17 +145,34 @@ function initEpisodeSort() {
     list.appendChild(frag)
   }
 
-  // Appended, not assigned: the band is already on screen carrying the
-  // "See All Episodes" link, which needs no JavaScript and so is not ours to
-  // reveal. Only the sort is conditional, and only on there being an order to
-  // change — a one-row drawer keeps the link and gets no pill.
-  slot.appendChild(sortControl(EP_SORTS, sort, (key) => { sort = key; paint() }, {
-    tag: 'Sort: ',
-    title: 'Change how these episodes are ordered',
-  }))
+  // Appended, not assigned: on the music drawer the band is already on screen
+  // carrying the "See All Tracks" link, which needs no JavaScript and so is
+  // not ours to reveal. On the catalogue drawer the band ships hidden and
+  // empty, and revealing it is this. Either way the sort is conditional on
+  // there being an order to change — a one-row drawer gets no pill.
+  function mount() {
+    if (mounted || rows.length < 2) return
+    mounted = true
+    slot.hidden = false
+    slot.appendChild(sortControl(EP_SORTS, sort, (key) => { sort = key; paint() }, {
+      tag: 'Sort: ',
+      title: 'Change how these episodes are ordered',
+    }))
+  }
+  mount()
+
+  return {
+    // Rows the catalogue appended. They are already in the DOM at the end of
+    // the list; the repaint puts them where the current sort says.
+    add(els) {
+      for (const el of els) rows.push(read(el))
+      if (els.length) paint()
+      mount()
+    },
+  }
 }
 
-initEpisodeSort()
+const episodeSort = initEpisodeSort()
 
 // ── Other shows this community boosts ────────────────────────────────
 //
@@ -400,24 +429,47 @@ function wireBoostButton(btn, itemGuid, episodeTitle) {
  * has every episode boostable. A show with none has nothing to boost at any
  * level, and the buttons stay hidden.
  */
-async function initBoosting() {
-  if (!SHOW || (!SHOW.guid && !SHOW.feed)) return
-  const probe = await resolveValue(null)
-  // A transient failure leaves the buttons hidden rather than showing controls
-  // that would fail on click; a reload retries.
-  if (!probe || probe.error) return
+// What the probe answered: null until it has, then whether the show has a
+// payable block. The catalogue's rows arrive on their own schedule — before
+// or after the probe — so the per-row wiring is a pass that either side can
+// run, and `data-wired` is what stops a button being wired twice.
+let boostable = null
 
-  const showBtn = document.querySelector('[data-show-boost]')
-  if (showBtn) wireBoostButton(showBtn, '', '')
-
-  for (const btn of document.querySelectorAll('[data-ep-boost]')) {
+function wireEpisodeButtons() {
+  if (boostable !== true) return
+  for (const btn of document.querySelectorAll('[data-ep-boost]:not([data-wired])')) {
+    btn.dataset.wired = '1'
     const guid = btn.getAttribute('data-ep-boost')
     if (!guid) continue
     wireBoostButton(btn, guid, btn.getAttribute('data-ep-title') || '')
   }
 }
 
+async function initBoosting() {
+  if (!SHOW || (!SHOW.guid && !SHOW.feed)) return
+  const probe = await resolveValue(null)
+  // A transient failure leaves the buttons hidden rather than showing controls
+  // that would fail on click; a reload retries.
+  if (!probe || probe.error) { boostable = false; return }
+  boostable = true
+
+  const showBtn = document.querySelector('[data-show-boost]')
+  if (showBtn) wireBoostButton(showBtn, '', '')
+
+  wireEpisodeButtons()
+}
+
 initBoosting()
+
+// The catalogue lands after both of the above are set up: its rows take the
+// drawer's current sort and, once the probe has answered, their Boost buttons.
+initEpisodeCatalogue({
+  show: SHOW,
+  onRows: (els) => {
+    episodeSort?.add(els)
+    wireEpisodeButtons()
+  },
+})
 
 // ── Profile fallback ───────────────────────────────────
 //

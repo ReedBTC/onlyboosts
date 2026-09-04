@@ -42,9 +42,12 @@
  * `?podcast=<podcastGuid>` picks the show, and `&episode=<itemGuid>` opens that
  * episode, where itemGuid is the RSS item guid (exactly our item_guid). Prefer
  * ?feed, a direct Podcast Index lookup, and fall back to the podcast guid.
- * Episodes older than a show's most recent ~50 aren't in BMB's list and land on
- * the show instead of the exact episode, which is a graceful degradation rather
- * than a broken link.
+ * BMB loads a show's most recent 1,000 episodes in one Podcast Index call (its
+ * PI_EPISODE_MAX; PI's ceiling for one request, with no offset to reach past
+ * it) and finds the episode in that list, so the deep link opens the exact
+ * episode for anything inside that window. An older one lands on the show,
+ * which is a graceful degradation rather than a broken link. (This note read
+ * "~50" until 2026-09-04, verified against BMB's source that day.)
  */
 
 // ABSOLUTE, because this string is published into a Nostr event and read
@@ -67,6 +70,26 @@ const SITE_ORIGIN = 'https://onlyboosts.social'
  *          link", which is also what a show-level boost gets: there is no
  *          episode in it.
  */
+/**
+ * An episode's page on Boost Me Bitch. Two callers: the BMB half of
+ * episodeBoostLink below, and the /show episode catalogue
+ * (episode-catalogue.js), whose un-indexed rows have no page here and link
+ * their titles to BMB instead. One builder so the two cannot spell the same
+ * address two ways.
+ *
+ * @returns {string|null} null when there is no way to name the show.
+ */
+export function bmbEpisodeUrl({ itemGuid, podcastGuid, feedId } = {}) {
+  const ep = itemGuid ? String(itemGuid).trim() : ''
+  if (!ep) return null
+  const p = new URLSearchParams()
+  if (feedId) p.set('feed', String(feedId))
+  else if (podcastGuid) p.set('podcast', String(podcastGuid))
+  else return null
+  p.set('episode', ep)
+  return 'https://boostmebitch.com/?' + p.toString()
+}
+
 export function episodeBoostLink({ itemGuid, title, podcastGuid, feedId } = {}) {
   const ep = itemGuid ? String(itemGuid).trim() : ''
   if (!ep) return null
@@ -79,11 +102,5 @@ export function episodeBoostLink({ itemGuid, title, podcastGuid, feedId } = {}) 
     return `${SITE_ORIGIN}/episode/${encodeURIComponent(ep)}`
   }
 
-  const p = new URLSearchParams()
-  if (feedId) p.set('feed', String(feedId))
-  else if (podcastGuid) p.set('podcast', String(podcastGuid))
-  else return null
-
-  p.set('episode', ep)
-  return 'https://boostmebitch.com/?' + p.toString()
+  return bmbEpisodeUrl({ itemGuid: ep, podcastGuid, feedId })
 }

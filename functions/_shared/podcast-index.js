@@ -36,16 +36,24 @@ export async function piHeaders(key, secret, userAgent = "OnlyBoosts/1.0") {
 }
 
 /* One PI call. Returns the parsed body, or null for anything that is not a
- * clean answer — a non-2xx, a timeout, a body that will not parse. The caller
- * cannot tell those apart on purpose: every one of them means the same thing to
- * a surface that is additive, and collapsing them here is what keeps that
- * decision out of the callers.
+ * clean answer — a non-2xx, a timeout, a body that will not parse, or a body
+ * past `maxBytes`. The caller cannot tell those apart on purpose: every one of
+ * them means the same thing to a surface that is additive, and collapsing them
+ * here is what keeps that decision out of the callers.
  *
  * cacheEverything puts the response in the colo's cache for an hour, which is
  * what makes a per-request lookup affordable: the first reader of a show pays
  * the round trip and the rest of that hour's readers in the same colo do not.
+ *
+ * `maxBytes` is the bounded read every upstream fetch here is held to (see
+ * CLAUDE.md, "Pages Functions bound every upstream fetch"). The body is
+ * streamed and abandoned the moment it passes the cap, because resp.json()
+ * buffers the whole thing before anything can be measured. The two lookups
+ * that predate the option answer a single record each and pass none; the
+ * catalogue lookup (/api/catalogue) answers with up to a thousand and passes
+ * one. A capped body is a null like any other miss.
  */
-export async function piGet(path, headers, { timeoutMs = DEFAULT_TIMEOUT_MS, cacheTtl = 3600 } = {}) {
+export async function piGet(path, headers, { timeoutMs = DEFAULT_TIMEOUT_MS, cacheTtl = 3600, maxBytes = 0 } = {}) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
@@ -55,10 +63,40 @@ export async function piGet(path, headers, { timeoutMs = DEFAULT_TIMEOUT_MS, cac
       signal: ctrl.signal,
     });
     if (!resp.ok) return null;
-    return await resp.json();
+    if (!maxBytes) return await resp.json();
+    const text = await readBounded(resp, ctrl, maxBytes);
+    return text === null ? null : JSON.parse(text);
   } catch {
     return null;
   } finally {
     clearTimeout(timer);
   }
+}
+
+// Stream the body, bailing once cumulative bytes exceed the cap. The same shape
+// as readBounded() in functions/api/data/[[path]].js, which is the reference.
+async function readBounded(resp, ctrl, maxBytes) {
+  const reader = resp.body?.getReader?.();
+  if (!reader) {
+    const text = await resp.text();
+    return text.length > maxBytes ? null : text;
+  }
+  const chunks = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (!value) continue;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      try { ctrl.abort(); } catch {}
+      try { reader.cancel(); } catch {}
+      return null;
+    }
+    chunks.push(value);
+  }
+  const out = new Uint8Array(total);
+  let off = 0;
+  for (const c of chunks) { out.set(c, off); off += c.byteLength; }
+  return new TextDecoder().decode(out);
 }
