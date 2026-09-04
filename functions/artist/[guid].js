@@ -648,11 +648,15 @@ function renderDescription(description) {
 // construction. No "See All Albums" band link — the catalogue file is
 // deliberately unrendered (index-only), so there is nothing off-site to point
 // at that this page's rule would allow.
+//
+// Ships CLOSED, like /show's episode drawer (Reed's call, 2026-09-04); it
+// opened by default from launch until then. A #albums deep link still opens
+// it through revealHashTarget() in detail-page.js.
 function renderAlbums(rows) {
   if (!rows.length) return "";
 
   return `<section class="show-section show-section--bare" id="albums">
-    <details class="ep-drawer" open data-artist-albums>
+    <details class="ep-drawer" data-artist-albums>
       <summary>Albums with Nostr Boosts<span class="drawer-hint" aria-hidden="true"></span></summary>
       <!-- Ships hidden: a sort control that cannot sort is worse than none.
            artist-page.js reveals it when there are at least two rows. -->
