@@ -1,6 +1,6 @@
 /**
  * Hand a just-published boost note to the site's own index, so it is on the
- * feeds now rather than after the collector's next five-minute cycle.
+ * feeds now rather than after the collector's next cycle (two minutes).
  *
  * The client half of `functions/api/v1/boosts/ingest.js`, which carries the
  * reasoning. Two rules from it that this side enforces:

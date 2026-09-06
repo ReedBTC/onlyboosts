@@ -9,9 +9,9 @@
 // ── Why this exists ──────────────────────────────────────────────────────────
 //
 // Everything the site shows comes out of D1, and D1 is fed by the collector on
-// a five-minute timer: scan the relays, resolve guids, dedupe, enrich from
-// Podcast Index, push the delta. So a boost sent from THIS site took anywhere
-// from a few seconds to about seven minutes to appear on it. This endpoint is
+// a timer (two minutes since 2026-09-06, five before): scan the relays, resolve
+// guids, dedupe, enrich from Podcast Index, push the delta. So a boost sent
+// from THIS site took anywhere from seconds to several minutes to appear on it. This endpoint is
 // the second sink for the site's own boosts: the widget publishes the note to
 // the relays, and when at least one relay acks it, hands the same event here,
 // and the row is on the feeds before the modal closes.
@@ -367,7 +367,7 @@ export async function onRequestPost({ request, env }) {
       item_guid: submission.row.item_guid,
     });
   } catch (e) {
-    // A failed write is the collector's problem to fix in five minutes; the
+    // A failed write is the collector's problem to fix on its next tick; the
     // caller only needs to know the fast path did not happen.
     return reply(request, { error: "index write failed" }, 502);
   }

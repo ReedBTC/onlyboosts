@@ -965,10 +965,10 @@ splits and label the published note with another's.
 ### The Boost Is Indexed At The Edge Before The Collector Sees It
 
 *Shipped 2026-09-06, Reed's ask.* Every number on this site comes out of D1,
-and D1 is fed by the collector on a five-minute timer: scan the relays,
-resolve guids, dedupe, enrich from Podcast Index, push the delta. So a boost
-sent from OnlyBoosts itself took anywhere from a few seconds to about seven
-minutes to appear on the feeds, and a first boost on an un-indexed episode
+and D1 is fed by the collector on a timer (five minutes then, two since the
+same day's collector change): scan the relays, resolve guids, dedupe, enrich
+from Podcast Index, push the delta. So a boost sent from OnlyBoosts itself
+took anywhere from a few seconds to several minutes to appear on the feeds, and a first boost on an un-indexed episode
 (the catalogue drawer's whole purpose) had no page until the collector
 enriched it.
 
