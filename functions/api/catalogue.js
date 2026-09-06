@@ -141,8 +141,34 @@ export function projectCatalogue(items) {
 // PI's episodes/bypodcastguid is one call and the usual path. A show PI keys
 // only by feed id (older records) answers with nothing there, so the fallback
 // is the route /api/value takes: resolve the feed id, then episodes/byfeedid.
+// ⚠️ THE STORED FEED URL RESOLVES BEFORE THE GUID (2026-09-06). Podcast Index
+// keeps one feed per podcastGuid for `byguid` and `episodes/bypodcastguid`,
+// and it is not always the live one: Stacker News Live moved from Anchor to a
+// Fountain-hosted feed in August 2025 and kept its guid, so PI holds two feed
+// ids under the one guid and the guid lookups answer the Anchor record — 404
+// for a year, its list frozen at episode #186 while the show was at #240. The
+// collector resolves a moved show through its live sibling and stores THAT
+// URL (enrich.resolve_show), so the URL the page passes is the better key:
+// `podcasts/byfeedurl` names the record that actually carries the feed. The
+// guid chain is the fallback for a URL PI does not know, and for a page that
+// passed none, and it is what every show got before this date. A stale stored
+// URL (a show that moved within the day, before the refresh) resolves to the
+// same record the guid does, so the fallback is never worse than the old path.
 async function fetchItems(headers, podcastGuid, feedUrl) {
   const opts = { timeoutMs: TIMEOUT_MS, maxBytes: MAX_UPSTREAM_BYTES };
+  const byFeedId = async (feedId) => {
+    if (!Number.isInteger(feedId) || feedId <= 0) return null;
+    const byId = await piGet(`/episodes/byfeedid?id=${feedId}&max=${PI_EPISODE_MAX}`, headers, opts);
+    return Array.isArray(byId?.items) ? byId.items : null;
+  };
+
+  let urlItems = null;
+  if (feedUrl) {
+    const byUrl = await piGet(`/podcasts/byfeedurl?url=${encodeURIComponent(feedUrl)}`, headers, opts);
+    urlItems = await byFeedId(Number(byUrl?.feed?.id));
+    if (urlItems?.length) return urlItems;
+  }
+
   const byGuid = await piGet(
     `/episodes/bypodcastguid?guid=${encodeURIComponent(podcastGuid)}&max=${PI_EPISODE_MAX}`,
     headers, opts,
@@ -150,16 +176,11 @@ async function fetchItems(headers, podcastGuid, feedUrl) {
   if (Array.isArray(byGuid?.items) && byGuid.items.length) return byGuid.items;
 
   const feed = await piGet(`/podcasts/byguid?guid=${encodeURIComponent(podcastGuid)}`, headers, opts);
-  let feedId = Number(feed?.feed?.id);
-  if (!Number.isInteger(feedId) || feedId <= 0) {
-    if (!feedUrl) return Array.isArray(byGuid?.items) ? byGuid.items : null;
-    const byUrl = await piGet(`/podcasts/byfeedurl?url=${encodeURIComponent(feedUrl)}`, headers, opts);
-    feedId = Number(byUrl?.feed?.id);
-    if (!Number.isInteger(feedId) || feedId <= 0) return Array.isArray(byGuid?.items) ? byGuid.items : null;
-  }
-  const byId = await piGet(`/episodes/byfeedid?id=${feedId}&max=${PI_EPISODE_MAX}`, headers, opts);
-  if (Array.isArray(byId?.items)) return byId.items;
-  return Array.isArray(byGuid?.items) ? byGuid.items : null;
+  const idItems = await byFeedId(Number(feed?.feed?.id));
+  if (idItems) return idItems;
+  // Every lookup missed or answered empty. An empty answer from PI is a real
+  // answer (the show has nothing there) and is preferred to a null miss.
+  return urlItems ?? (Array.isArray(byGuid?.items) ? byGuid.items : null);
 }
 
 export async function onRequestGet({ request, env }) {

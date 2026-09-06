@@ -1039,3 +1039,33 @@ edge-rendered pages, 30s on `/api/v1`), which is a reload away.
 
 `scripts/test-boost-ingest.mjs` covers the endpoint end to end, on the
 members-search pattern.
+
+### The Feed URL Resolves Before The Guid
+
+*2026-09-06, found on Stacker News Live.* Podcast Index keeps one feed per
+`podcastGuid` for `podcasts/byguid` and `episodes/bypodcastguid`, and after a
+show moves hosts and keeps its guid that can be the dead record: the show went
+from Anchor to a Fountain-hosted feed in August 2025, and a year later the guid
+lookups still answered the Anchor record, 404 since 2025-08-26, its episode
+list frozen at #186 while the show was at #240, and **its value block a year
+old**: a keysend split of 95/4/1 with a Podcast Index leg, where the live feed
+declares lightning-address recipients at 98/2. Every boost from this site paid
+the old split. Same person at the end of both, so nobody was misdirected; the
+site's rule is nonetheless that the external boost pays exactly what the show
+published, and it did not.
+
+The collector resolves a moved show through its live sibling and stores that
+feed's URL (`enrich.resolve_show`, the same day). **So the URL the page passes
+is the better key**, and `/api/value` and `/api/catalogue` now resolve it
+first (`podcasts/byfeedurl`), falling back to the guid for a URL Podcast Index
+does not know or a caller that passed none. The old order rested on "a guid is
+stable where a URL can move"; the URL moving was exactly the case it got
+wrong. A stale stored URL (a show that moved within the day, before the
+refresh) resolves to the same record the guid does, so the fallback is never
+worse than the old path. Every boost surface already passed the feed URL when
+it had one; no client changed.
+
+Measured over every stored feed URL on 2026-09-06, this show was the only one
+with real traffic in the state (four hard 404s in ~1,000 feeds that answered).
+`scripts/test-value.mjs` pins the order on the money path, `test-catalogue.mjs`
+on the drawer.

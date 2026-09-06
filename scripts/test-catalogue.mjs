@@ -108,10 +108,10 @@ const item = (guid, datePublished, extra = {}) => ({ guid, title: `Ep ${guid}`, 
   assert.equal(r.headers.get('access-control-allow-origin'), 'https://onlyboosts.social')
 }
 
-// the usual path: bypodcastguid answers, and nothing else is asked
+// the usual path with no feed URL: bypodcastguid answers, and nothing else is asked
 {
   stub({ '/episodes/bypodcastguid': { items: [item('old', 100), item('new', 200)] } })
-  const r = await onRequestGet({ request: req('?podcastGuid=abc&feedUrl=https://f.example/rss'), env })
+  const r = await onRequestGet({ request: req('?podcastGuid=abc'), env })
   assert.equal(r.status, 200)
   const body = await r.json()
   assert.deepEqual(body.episodes.map((e) => e.guid), ['new', 'old'])
@@ -122,6 +122,37 @@ const item = (guid, datePublished, extra = {}) => ({ guid, title: `Ep ${guid}`, 
   assert.ok(calls[0].includes(`max=${PI_EPISODE_MAX}`))
   assert.ok(calls[0].includes('guid=abc'))
   assert.ok(!calls[0].includes('fulltext'), 'no fulltext: descriptions are dropped anyway and the body would be 8x')
+}
+
+// ⚠️ THE STORED FEED URL RESOLVES FIRST (2026-09-06, Stacker News Live): the
+// guid lookups name a dead record frozen at #186; byfeedurl names the live
+// one. With a feed URL, the guid is never consulted when the URL answers.
+{
+  stub({
+    '/podcasts/byfeedurl': { feed: { id: 7475249 } },
+    '/episodes/byfeedid': { items: [item('snl-240', 400), item('snl-239', 300)] },
+    '/episodes/bypodcastguid': { items: [item('snl-186', 100)] },
+    '/podcasts/byguid': { feed: { id: 4866432 } },
+  })
+  const r = await onRequestGet({ request: req('?podcastGuid=abc&feedUrl=https://f.example/rss'), env })
+  assert.deepEqual((await r.json()).episodes.map((e) => e.guid), ['snl-240', 'snl-239'])
+  assert.equal(calls.length, 2)
+  assert.ok(calls[0].includes('/podcasts/byfeedurl?url=https%3A%2F%2Ff.example%2Frss'))
+  assert.ok(calls[1].includes('/episodes/byfeedid?id=7475249&'))
+  assert.ok(!calls.some((c) => c.includes('byguid') || c.includes('bypodcastguid')), 'the guid chain is not consulted')
+}
+
+// a feed URL PI does not know falls through to the guid chain
+{
+  stub({
+    '/podcasts/byfeedurl': { feed: {} },
+    '/episodes/bypodcastguid': { items: [item('g1', 100)] },
+  })
+  const r = await onRequestGet({ request: req('?podcastGuid=abc&feedUrl=https://f.example/rss'), env })
+  assert.deepEqual((await r.json()).episodes.map((e) => e.guid), ['g1'])
+  assert.ok(calls[0].includes('byfeedurl'))
+  assert.ok(calls[1].includes('bypodcastguid'))
+  assert.equal(calls.length, 2)
 }
 
 // the fallback: empty bypodcastguid → byguid → byfeedid
@@ -138,17 +169,18 @@ const item = (guid, datePublished, extra = {}) => ({ guid, title: `Ep ${guid}`, 
   assert.ok(calls[2].includes('/episodes/byfeedid?id=4242&'))
 }
 
-// the fallback's fallback: no id by guid, the feed URL resolves it
+// a known feed URL whose record is EMPTY, and a guid that knows nothing: the
+// empty answer stands (PI answered), and it is a 200 empty rather than a miss
 {
   stub({
+    '/podcasts/byfeedurl': { feed: { id: 7 } },
+    '/episodes/byfeedid': { items: [] },
     '/episodes/bypodcastguid': { items: [] },
     '/podcasts/byguid': { feed: {} },
-    '/podcasts/byfeedurl': { feed: { id: 7 } },
-    '/episodes/byfeedid': { items: [item('f2', 10)] },
   })
   let r = await onRequestGet({ request: req('?podcastGuid=abc&feedUrl=https://f.example/rss'), env })
-  assert.deepEqual((await r.json()).episodes.map((e) => e.guid), ['f2'])
-  assert.ok(calls.some((c) => c.includes('/podcasts/byfeedurl?url=https%3A%2F%2Ff.example%2Frss')))
+  assert.equal(r.status, 200)
+  assert.deepEqual((await r.json()).episodes, [])
 
   // No feed URL to fall back on: the empty answer stands, and it is a 200
   // empty rather than a miss (PI answered; the show has nothing there).

@@ -129,23 +129,35 @@ export async function onRequest(context) {
   const headers = await piHeaders(key, secret);
 
   if (!feedId) {
-    // podcastGuid first: it's a stable identifier, where a feed URL can move.
+    // ⚠️ THE FEED URL RESOLVES BEFORE THE GUID (2026-09-06; it was the other
+    // way round, on the argument that a guid is stable where a URL can move).
+    // The URL moving is exactly the case that broke: Podcast Index keeps ONE
+    // feed per podcastGuid for `byguid`, and after Stacker News Live moved
+    // hosts in August 2025 that was the dead Anchor record, whose value block
+    // is a year old (a keysend split of 95/4/1 where the live feed declares
+    // 98/2). The collector stores the live feed's URL once it resolves the
+    // move (enrich.resolve_show), so the URL the page passes names the record
+    // that carries the show's current splits. The guid is the fallback for a
+    // URL PI does not know; a stale stored URL resolves to the same record
+    // the guid does. This is the money path, so the rule is restated in
+    // docs/money-paths.md. Bound what is forwarded — the URL reaches an
+    // upstream API.
     let resolved = null;
-    if (podcastGuid) {
-      const r = await piGet(`/podcasts/byguid?guid=${encodeURIComponent(podcastGuid)}`, headers);
-      resolved = r?.feed?.id ?? null;
-    }
-    if (!resolved && feedUrl) {
-      // Bound what we'll forward — this string reaches an upstream API.
+    if (feedUrl) {
       let ok = false;
       try {
         const u = new URL(feedUrl);
-        ok = (u.protocol === "http:" || u.protocol === "https:") && feedUrl.length <= 2048;
+        // Same rule as /api/catalogue: http(s), bounded, and no credentials in it.
+        ok = (u.protocol === "http:" || u.protocol === "https:") && !u.username && !u.password && feedUrl.length <= 2048;
       } catch {}
       if (ok) {
         const r = await piGet(`/podcasts/byfeedurl?url=${encodeURIComponent(feedUrl)}`, headers);
         resolved = r?.feed?.id ?? null;
       }
+    }
+    if (!resolved && podcastGuid) {
+      const r = await piGet(`/podcasts/byguid?guid=${encodeURIComponent(podcastGuid)}`, headers);
+      resolved = r?.feed?.id ?? null;
     }
     if (!resolved) {
       // Not an error — plenty of feeds simply aren't in Podcast Index. The
