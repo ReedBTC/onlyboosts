@@ -102,10 +102,75 @@ def _show_from_feed(feed, podcast_guid=None):
     }
 
 
+def feed_answers(feed):
+    """Podcast Index's last crawl actually reached this feed: a 2xx/3xx
+    `lastHttpStatus`. PI keeps a feed whose URL has been 404 for a year with
+    `dead: 0`, so `dead` is not the test."""
+    st = feed.get("lastHttpStatus")
+    return isinstance(st, int) and 200 <= st < 400
+
+
+def live_sibling(feed, key, secret, log=print):
+    """A SECOND Podcast Index entry for the same podcast:guid whose feed still
+    answers, or None.
+
+    ⚠️ `podcasts/byguid` RETURNS ONE FEED PER GUID AND IT IS NOT ALWAYS THE LIVE
+    ONE. A show that moves hosts and keeps its guid — Stacker News Live went
+    from Anchor to a Fountain-hosted feed in August 2025 — leaves PI holding two
+    feed ids under one podcastGuid, and byguid answered the Anchor one, 404 since
+    2025-08-26, on every look. Every episode after the move exists only on the
+    other feed, so `episodes/byguid` with our feed id said "not found" and the
+    raw-RSS fallback fetched a 404, for a year. The one window the row was right
+    was the two days between the Fountain resolver writing the live feed by URL
+    (2026-09-01) and the show refresh writing byguid's answer back (09-03).
+
+    The sibling is found through the identifiers the dead entry itself carries —
+    its `itunesId`, then a title search — and accepted ONLY when it names the
+    same podcastGuid and answers. It is then re-read through `podcasts/byfeedid`
+    because the search and itunes objects are thinner (byitunesid returned
+    `medium: null` for a feed byfeedid calls `podcast`), and `_show_from_feed`
+    would file a music show as a podcast off the thin one. Two to three extra
+    calls, on the rare path only."""
+    guid, dead_id = feed.get("podcastGuid"), feed.get("id")
+    if not guid:
+        return None
+    candidates = []
+    if feed.get("itunesId"):
+        try:
+            candidates.append(pi_get("podcasts/byitunesid", {"id": feed["itunesId"]},
+                                     key, secret).get("feed") or {})
+        except Exception as e:
+            log(f"  [warn] PI byitunesid lookup failed for {feed['itunesId']}: {e}")
+    if feed.get("title"):
+        try:
+            candidates.extend(pi_get("search/byterm", {"q": feed["title"]},
+                                     key, secret).get("feeds") or [])
+        except Exception as e:
+            log(f"  [warn] PI search failed for {feed['title']!r}: {e}")
+    for c in candidates:
+        if not c.get("id") or c["id"] == dead_id or c.get("podcastGuid") != guid:
+            continue
+        if not feed_answers(c):
+            continue
+        try:
+            full = pi_get("podcasts/byfeedid", {"id": c["id"]}, key, secret).get("feed") or {}
+        except Exception as e:
+            log(f"  [warn] PI byfeedid lookup failed for {c['id']}: {e}")
+            continue
+        if full.get("podcastGuid") == guid and feed_answers(full):
+            log(f"  show {guid}: PI byguid names feed {dead_id} "
+                f"(status {feed.get('lastHttpStatus')}); taking live sibling "
+                f"{full['id']} {full.get('url')}")
+            return full
+    return None
+
+
 def resolve_show(podcast_guid, key, secret):
     try:
         feed = (pi_get("podcasts/byguid", {"guid": podcast_guid}, key, secret)
                 .get("feed") or {})
+        if feed and not feed_answers(feed):
+            feed = live_sibling(feed, key, secret) or feed
         return _show_from_feed(feed, podcast_guid)
     except Exception as e:
         print(f"  [warn] PI show lookup failed for {podcast_guid}: {e}")

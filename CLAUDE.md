@@ -1968,6 +1968,23 @@ content-aware with it: `checked_at` moves on every look, `updated_at` only
 when one of `SHOW_CONTENT_COLS` differs, so the D1 drift pass and the publish
 gate see a change only when there is one. A miss keeps the row.
 
+**⚠️ `podcasts/byguid` RETURNS ONE FEED PER GUID AND IT IS NOT ALWAYS THE LIVE
+ONE.** Found 2026-09-06 on Stacker News Live: the show moved from Anchor to a
+Fountain-hosted feed in August 2025 and kept its guid, so Podcast Index holds
+two feed ids under one `podcastGuid` and `byguid` answers the Anchor one, 404
+since 2025-08-26 and still `dead: 0`. Every episode after the move exists only
+on the other feed, so `episodes/byguid` with our feed id said "not found" and
+the raw-RSS fallback fetched a 404, on every retry, for a year; the refresh
+above then wrote the dead feed back over the live one the Fountain resolver had
+set two days earlier. `enrich.resolve_show` now takes a **live sibling** when
+`byguid`'s feed does not answer (`lastHttpStatus` outside 2xx/3xx): found
+through the dead entry's own `itunesId`, then a title search, accepted only
+when it names the same `podcastGuid` and answers, and re-read in full through
+`byfeedid` because the thin objects drop `medium`. Anything else keeps
+`byguid`'s answer as before. `bots/global-boost-scan/test_enrich_sibling.py`
+pins the rule. Measured over the 388 shows boosted in the prior 120 days it was
+the only show in this state; seven others sit on PI status 667 with no sibling.
+
 ## Profile fallback
 
 **An identity the index doesn't have falls back to Primal's cache before it is
