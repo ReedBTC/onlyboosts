@@ -13,6 +13,14 @@ Resolution strategies, cheapest first:
   • feedurl-local  numeric feed id whose tag URL matches a show we already know.
   • pi-byfeedid    numeric feed id → Podcast Index /podcasts/byfeedid → podcastGuid.
   • pi-byfeedurl   a bare feed URL, or a numeric id with an unknown URL → byfeedurl.
+  • episode-row    `unknown:<item_guid>` → the podcast_guid on that episode's own
+                   row, once some other boost has had it enriched. OnlyBoosts'
+                   Episodes card emits this placeholder when the rollup gave it no
+                   show (the endpoint read the guid off the episodes table, which
+                   had no row yet), and the widget tagged it into a real note on
+                   2026-09-03 (420 sats, SNL #239). Local, no PI call; an item the
+                   index still can't place stays un-aliased and is re-asked each
+                   tick, so it heals the moment the episode does.
   • curated        freeform slugs, from data/guid_aliases.json (hand-maintained;
                    these have no reliable anchor in the event, so a human decides).
 
@@ -36,6 +44,8 @@ _UUID = re.compile(
 _UUID_SUFFIX = re.compile(
     r"^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})-.+$")
 _NUMERIC = re.compile(r"^\d{4,9}$")
+# ob-data.js#toEpisodeShape's synthetic grouping key, as the widget published it.
+UNKNOWN_PREFIX = "unknown:"
 
 
 def is_uuid(v):
@@ -104,6 +114,14 @@ def derive(conn, raw_guid, key, secret, curated):
         show = enrich.resolve_feed_by_url(raw_guid, key, secret)
         if show and is_uuid(show["podcast_guid"]):
             return (show["podcast_guid"], "pi-byfeedurl", show)
+        return None
+
+    # `unknown:<item_guid>`: the site's own placeholder for a show it could not
+    # name. The item guid is the anchor, and only our own episodes table is asked.
+    if raw_guid.startswith(UNKNOWN_PREFIX):
+        real = db.episode_show_guid(conn, raw_guid[len(UNKNOWN_PREFIX):])
+        if is_uuid(real):
+            return (real, "episode-row", None)
         return None
 
     # Freeform slug: no anchor in the event — trust the curated map only.

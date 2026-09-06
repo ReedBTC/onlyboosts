@@ -1447,6 +1447,16 @@ def feed_url_to_guid(conn, feed_url):
     return row[0] if row else None
 
 
+def episode_show_guid(conn, item_guid):
+    """The podcast_guid on an already-enriched episode row, or None. The anchor
+    for a boost whose show slot is `unknown:<item_guid>` — see resolve_guids."""
+    if not item_guid:
+        return None
+    row = conn.execute("SELECT podcast_guid FROM episodes WHERE item_guid=?",
+                       (item_guid,)).fetchone()
+    return row[0] if row else None
+
+
 def upsert_alias(conn, raw_guid, canonical_guid, method):
     conn.execute(
         """INSERT INTO guid_aliases (raw_guid, canonical_guid, method, resolved_at)
