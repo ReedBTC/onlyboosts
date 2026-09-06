@@ -56,10 +56,10 @@ import podroll                                                  # noqa: E402
 import publishers as publishers_mod                             # noqa: E402
 import resolve_guids                                            # noqa: E402
 from classify import classify_boost, decode_note_or_nevent, _QUOTE_RE  # noqa: E402
-from relays import CORE_RELAYS, PROFILE_RELAYS, RECEIPT_RELAYS, expand_via_outbox  # noqa: E402
+from relays import CORE_RELAYS, PROFILE_RELAYS, RECEIPT_RELAYS, expand_via_outbox, reachable_from_here  # noqa: E402
 from scan import (scan_relay_backward, scan_relay_incremental,   # noqa: E402
                   fetch_events_by_ids, boost_filters)
-from collector_common import query_relay                        # noqa: E402
+from collector_common import RelayTimeout, query_relay          # noqa: E402
 from nostr_utils import load_config                             # noqa: E402
 
 DB_PATH = str(HERE / "data" / "onlyboosts.db")
@@ -72,9 +72,12 @@ VPS_KEY_FILE = str(Path.home() / ".ssh" / "relay_mynostr_ed25519")
 VPS_REMOTE_NS = "onlyboosts"
 FLOOR_2025 = 1735689600          # 2025-01-01T00:00:00Z
 INCREMENTAL_OVERLAP = 3 * 3600   # re-scan a 3h overlap so nothing slips the seam
-OUTBOX_CACHE_TTL = 6 * 3600      # re-resolve the booster outbox relay set at most this often
+OUTBOX_CACHE_TTL = 7 * 86400     # FULL re-resolve of every booster's relay list at most this often (was 6h, and --refresh forced it daily: 30 min a run)
 OUTBOX_WINDOW = 26 * 3600        # freshness sweep window over known outbox relays (covers a daily gap)
 OUTBOX_RELAYS_CACHE = str(HERE / "data" / "outbox_relays.json")
+OUTBOX_DEEPWALK_BUDGET = 45 * 60 # wall budget for the deep-walk phase; the sweep, export and push always run after it. 45 so a weekly full-resolve run (31 min) + this + a 25-min sweep clears the unit's 2h timeout; 60 ran 1h54m on 2026-09-06
+OUTBOX_PARK_AFTER = 3            # consecutive runs of handshake timeouts before a relay is parked
+OUTBOX_PARK_DAYS = 7             # how long a parked relay is skipped before its next probe
 
 
 def _pi_creds():
@@ -261,19 +264,51 @@ def cmd_incremental(args):
 
 # ── outbox expansion ──────────────────────────────────────────────────────────
 def _resolve_outbox_relays(conn, now, refresh, log):
-    """Core relays ∪ every booster's NIP-65 write relays, cached to disk. Resolving
-    ~2k boosters' relay lists is the expensive part, so it's reused within the TTL."""
-    if not refresh and Path(OUTBOX_RELAYS_CACHE).exists():
-        c = json.loads(Path(OUTBOX_RELAYS_CACHE).read_text())
-        if now - c.get("resolved_at", 0) < OUTBOX_CACHE_TTL:
-            log(f"Reusing cached outbox set: {len(c['relays'])} relays "
-                f"({(now - c['resolved_at']) // 3600}h old)")
-            return c["relays"]
+    """Core relays ∪ every booster's NIP-65 write relays, cached to disk.
+
+    Resolving ~3k boosters' relay lists costs ~30 minutes (measured 2026-09-06:
+    50 boosters per 30s), and until that day the runner forced it on every
+    daily run. Now the cache also records WHICH boosters it covers, so a run
+    resolves only the boosters new since the last one — a handful, seconds —
+    and re-resolves everyone only when the cache is older than
+    OUTBOX_CACHE_TTL (someone's relay list changing is the thing a full pass
+    catches, and a week is soon enough for that) or when `--refresh` asks.
+    A cache written before the `boosters` key existed is treated as a full
+    resolve, once. The set is filtered through `reachable_from_here` on the
+    way out, cached entries included, so an on-device relay advertised in a
+    NIP-65 list never reaches a walker."""
     boosters = [r[0] for r in conn.execute("SELECT DISTINCT booster_pubkey FROM boosts").fetchall()]
-    log(f"Resolving NIP-65 outbox relays for {len(boosters)} boosters...")
-    relays = expand_via_outbox(boosters, CORE_RELAYS, log=log)
-    Path(OUTBOX_RELAYS_CACHE).write_text(json.dumps({"resolved_at": now, "relays": relays}))
-    return relays
+    cache = None
+    if Path(OUTBOX_RELAYS_CACHE).exists():
+        try:
+            cache = json.loads(Path(OUTBOX_RELAYS_CACHE).read_text())
+        except Exception:
+            cache = None
+    full = (refresh or not cache or "boosters" not in cache
+            or now - cache.get("resolved_at", 0) >= OUTBOX_CACHE_TTL)
+    if full:
+        log(f"Resolving NIP-65 outbox relays for {len(boosters)} boosters (full pass)...")
+        relays = expand_via_outbox(boosters, CORE_RELAYS, log=log)
+        cache = {"resolved_at": now, "relays": relays, "boosters": boosters}
+    else:
+        known = set(cache["boosters"])
+        new = [b for b in boosters if b not in known]
+        relays = set(cache["relays"])
+        if new:
+            log(f"Resolving NIP-65 outbox relays for {len(new)} booster(s) new since the last run "
+                f"(cached set {len(relays)} relays, {(now - cache['resolved_at']) // 3600}h old)...")
+            relays |= set(expand_via_outbox(new, [], log=log))
+        else:
+            log(f"Reusing cached outbox set: {len(relays)} relays "
+                f"({(now - cache['resolved_at']) // 3600}h old), no new boosters")
+        cache = {"resolved_at": cache["resolved_at"], "relays": sorted(relays),
+                 "boosters": sorted(known | set(new))}
+    Path(OUTBOX_RELAYS_CACHE).write_text(json.dumps(cache))
+    kept = [r for r in cache["relays"] if reachable_from_here(r)]
+    if len(kept) != len(cache["relays"]):
+        log(f"    {len(cache['relays']) - len(kept)} relay(s) unreachable by construction dropped "
+            f"(private/CGNAT address, .local/.onion, or a mangled URL)")
+    return kept
 
 
 def cmd_outbox(args):
@@ -295,6 +330,29 @@ def cmd_outbox(args):
     on_page = _make_page_handler(conn, lock, receipt_cache, totals)
     filters = boost_filters(_known_sets(conn))
 
+    # ── parking ──────────────────────────────────────────────────────────────
+    # A relay whose handshake timed out on OUTBOX_PARK_AFTER consecutive runs is
+    # skipped for OUTBOX_PARK_DAYS, then probed once. Before 2026-09-06 a
+    # timeout read as an empty page, so a dead relay was walked (and timed
+    # out, per filter shape) on every run forever; the 09-03 filter set turned
+    # that into 67 x 15s per dead relay, and the run stopped fitting its unit
+    # timeout — three days of runs killed before the sweep, export and push.
+    # The streak is counted by both phases below and cleared by any answered
+    # handshake, so a relay that comes back is un-parked by its own probe.
+    states = {r: db.get_scan_state(conn, r) for r in non_core}
+    parked = [r for r in non_core
+              if db.relay_parked(states[r], now, OUTBOX_PARK_AFTER, OUTBOX_PARK_DAYS)]
+    active = [r for r in non_core if r not in set(parked)]
+    log(f"{len(parked)} relay(s) parked after {OUTBOX_PARK_AFTER}+ consecutive timeouts "
+        f"(re-probed after {OUTBOX_PARK_DAYS}d); {len(active)} to scan")
+    dead = set()
+
+    def note_dead(relay):
+        with lock:
+            dead.add(relay)
+            db.note_relay_timeout(conn, relay, now)
+            conn.commit()
+
     def checkpoint_for(relay):
         def cp(cursor, oldest):
             with lock:
@@ -303,36 +361,53 @@ def cmd_outbox(args):
 
     # deep-walk relays not yet completed (new ones since last run get full history)
     to_walk = []
-    for r in non_core:
-        st = db.get_scan_state(conn, r)
+    for r in active:
+        st = states[r]
         if st and st.get("backfill_cursor") is None and st.get("backfilled_to"):
             continue
         to_walk.append((r, st.get("backfill_cursor") if st and st.get("backfill_cursor") else now))
-    log(f"deep-walking {len(to_walk)} new/unfinished relays to floor")
+    # The phase has a wall budget, and the walkers checkpoint where they stood
+    # when it ran out, so a run that cannot finish every relay still reaches
+    # the sweep and the publish steps — the unit timeout used to take those
+    # with it. A relay's k-free shapes are redone next run (they carry no
+    # checkpoint), which costs pages rather than coverage.
+    deadline = time.monotonic() + OUTBOX_DEEPWALK_BUDGET
+    log(f"deep-walking {len(to_walk)} new/unfinished relays to floor "
+        f"({OUTBOX_DEEPWALK_BUDGET // 60}-minute budget)")
     if to_walk:
         with ThreadPoolExecutor(max_workers=min(24, len(to_walk))) as ex:
             futs = {ex.submit(scan_relay_backward, r, args.floor, s, on_page,
-                              checkpoint_for(r), log, 2, filters): r for r, s in to_walk}
+                              checkpoint_for(r), log, 2, filters, deadline): r
+                    for r, s in to_walk}
             for f in as_completed(futs):
                 try:
                     f.result()
+                except RelayTimeout:
+                    note_dead(futs[f])
                 except Exception as e:
                     print(f"[error] {futs[f]}: {e}", flush=True)
+        log(f"deep-walk phase done: {len(dead)} relay(s) timed out their handshake")
 
     # windowed freshness sweep over all known outbox relays
     since = now - OUTBOX_WINDOW
     log(f"windowed sweep since {time.strftime('%Y-%m-%d %H:%M', time.gmtime(since))} "
-        f"over {len(non_core)} relays")
-    if non_core:
+        f"over {len(active)} relays")
+    if active:
         with ThreadPoolExecutor(max_workers=24) as ex:
             futs = [ex.submit(scan_relay_incremental, r, since, on_page, lambda m: None,
-                              filters)
-                    for r in non_core]
+                              filters, note_dead)
+                    for r in active if r not in dead]
             for f in as_completed(futs):
                 try:
                     f.result()
                 except Exception:
                     pass
+    answered = [r for r in active if r not in dead and (states[r] or {}).get("timeouts")]
+    with lock:
+        for r in answered:
+            db.clear_relay_timeouts(conn, r)
+        conn.commit()
+    log(f"sweep done: {len(dead)} relay(s) dead this run, {len(answered)} streak(s) cleared")
 
     print(f"\nOutbox pass: {totals['seen']} scanned, {totals['boosts']} boosts, "
           f"{totals['new']} new rows.")

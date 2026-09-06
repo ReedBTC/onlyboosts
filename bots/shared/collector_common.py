@@ -80,7 +80,15 @@ def query_relay(relay, filt, timeout=DEFAULT_RELAY_TIMEOUT,
     try:
         try:
             ws = websocket.create_connection(relay, timeout=timeout)
-        except websocket.WebSocketTimeoutException as e:
+        except (websocket.WebSocketTimeoutException, TimeoutError) as e:
+            # Two classes, one cost. A host that accepts TCP and never answers
+            # the upgrade (relay.mostr.pub behind Cloudflare, 2026-09-06) is
+            # WebSocketTimeoutException('Connection timed out'); a host that
+            # never answers the SYN at all (a dead IP:4848 from someone's
+            # relay list) is the bare socket TimeoutError('timed out'), which
+            # websocket-client re-raises unwrapped. Both ran out the full
+            # `timeout`; a refusal (429, ECONNREFUSED) is neither and is
+            # still an empty page.
             print(f"    [warn] {relay}: {e}")
             if raise_on_timeout:
                 raise RelayTimeout(f"{relay}: {e}") from e

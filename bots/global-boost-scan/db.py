@@ -215,7 +215,9 @@ CREATE TABLE IF NOT EXISTS scan_state (
     relay             TEXT PRIMARY KEY,
     backfill_cursor   INTEGER,     -- oldest `until` still to walk (None once complete)
     backfilled_to     INTEGER,     -- oldest created_at actually reached
-    last_incremental  INTEGER      -- newest created_at seen on the incremental tail
+    last_incremental  INTEGER,     -- newest created_at seen on the incremental tail
+    timeouts          INTEGER NOT NULL DEFAULT 0,  -- consecutive outbox runs ending in a handshake timeout
+    last_timeout      INTEGER      -- when the latest of those happened (the parking clock)
 );
 
 CREATE TABLE IF NOT EXISTS meta (
@@ -542,6 +544,11 @@ def _migrate(conn):
     orphan_cols = {r[1] for r in conn.execute("PRAGMA table_info(d1_podcasts_orphaned)")}
     if "deleted_at" not in orphan_cols:
         conn.execute("ALTER TABLE d1_podcasts_orphaned ADD COLUMN deleted_at INTEGER")
+    ss_cols = {r[1] for r in conn.execute("PRAGMA table_info(scan_state)")}
+    if "timeouts" not in ss_cols:
+        conn.execute("ALTER TABLE scan_state ADD COLUMN timeouts INTEGER NOT NULL DEFAULT 0")
+    if "last_timeout" not in ss_cols:
+        conn.execute("ALTER TABLE scan_state ADD COLUMN last_timeout INTEGER")
     conn.commit()
 
 
@@ -1572,6 +1579,34 @@ def clear_reproject_queue(conn, pairs):
 def get_scan_state(conn, relay):
     row = conn.execute("SELECT * FROM scan_state WHERE relay=?", (relay,)).fetchone()
     return dict(row) if row else None
+
+
+def note_relay_timeout(conn, relay, now):
+    """One more consecutive outbox run on which this relay's handshake timed
+    out. `timeouts` is the count the parking rule reads; `last_timeout` is when
+    a parked relay gets its next look."""
+    conn.execute(
+        """INSERT INTO scan_state (relay, timeouts, last_timeout) VALUES (?, 1, ?)
+           ON CONFLICT(relay) DO UPDATE SET
+             timeouts = scan_state.timeouts + 1, last_timeout = excluded.last_timeout""",
+        (relay, now))
+
+
+def clear_relay_timeouts(conn, relay):
+    """The relay answered a handshake this run: the streak is over."""
+    conn.execute("UPDATE scan_state SET timeouts = 0 WHERE relay = ? AND timeouts > 0",
+                 (relay,))
+
+
+def relay_parked(state, now, after, days):
+    """True when a relay has timed out on `after` or more consecutive runs and
+    its latest timeout is under `days` old — it is skipped until then, when it
+    gets one probe: a success clears the streak, another timeout re-parks it
+    for another `days`. A relay that once answered and has gone dark stays a
+    weekly probe forever, which is the cost of a name that might come back."""
+    if not state or (state.get("timeouts") or 0) < after:
+        return False
+    return now - (state.get("last_timeout") or 0) < days * 86400
 
 
 def set_backfill_cursor(conn, relay, cursor, backfilled_to):

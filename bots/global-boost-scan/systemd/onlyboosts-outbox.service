@@ -5,7 +5,7 @@ Wants=network-online.target
 # Non-zero exit opens a GitHub issue — see onlyboosts-incremental.service for the
 # caveats (hardcoded repo, non-zero exits only) and why the exclusion-list check
 # makes this worth having. This one runs daily, so a silent stop here would go
-# unnoticed far longer than on the five-minute incremental.
+# unnoticed far longer than on the two-minute incremental.
 OnFailure=lb-bot-alert@%n.service
 
 [Service]

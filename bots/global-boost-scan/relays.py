@@ -69,6 +69,41 @@ def _norm(u):
     return u.rstrip("/")
 
 
+def reachable_from_here(url):
+    """False for a NIP-65 write relay that cannot answer from the public
+    internet however long we wait: a private, loopback, link-local or CGNAT
+    address, a `.local`/`.lan`/`.onion`/`localhost` name, or a bare hostname
+    with no dot. Phone apps advertise their own on-device relay
+    (`ws://192.168.x.x:4848`, `ws://100.111.x.x:4848`) in the user's relay
+    list, and the outbox set carried ~130 of them — each walked daily, each
+    costing a connect timeout per filter shape. Measured 2026-09-06 over the
+    1,604-relay cache: 28 private IPs, 78 plain `ws://` (mostly those), 21
+    local names. Only the structurally unreachable are dropped here; a dead
+    public hostname is left to the parking rule, since a name can come back."""
+    import ipaddress
+    from urllib.parse import urlsplit
+    try:
+        parts = urlsplit(url)
+        host = (parts.hostname or "").rstrip(".").lower()
+        parts.port    # raises on a mangled port such as '4848 '
+    except ValueError:
+        return False
+    if not host or "." not in host:
+        return False
+    if host == "localhost" or host.endswith((".local", ".lan", ".onion", ".localhost", ".internal", ".home", ".arpa")):
+        return False
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return True
+    if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast \
+            or ip.is_reserved or ip.is_unspecified:
+        return False
+    if ip.version == 4 and ip in ipaddress.ip_network("100.64.0.0/10"):   # CGNAT / Tailscale
+        return False
+    return True
+
+
 def expand_via_outbox(booster_pubkeys, base_relays, max_workers=16, log=print):
     """Return base_relays ∪ every booster's NIP-65 write relays (deduped)."""
     import threading
@@ -91,7 +126,8 @@ def expand_via_outbox(booster_pubkeys, base_relays, max_workers=16, log=print):
             new = fut.result()
             with lock:
                 for u in new:
-                    if isinstance(u, str) and u.startswith(("wss://", "ws://")):
+                    if isinstance(u, str) and u.startswith(("wss://", "ws://")) \
+                            and reachable_from_here(u):
                         relays.add(_norm(u))
                 done += 1
                 if done % 50 == 0 or done == total:

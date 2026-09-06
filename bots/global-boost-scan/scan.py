@@ -108,20 +108,44 @@ def _page_filter(until, since=None, limit=PAGE_LIMIT):
 
 
 def _walk(relay, filt, floor_ts, start_until, on_page, checkpoint=None,
-          log=print, max_empty=2, label=""):
+          log=print, max_empty=2, label="", deadline=None):
     """Walk ONE filter backward from `start_until` to `floor_ts`. Calls
     `on_page(events)` per page and, when given, `checkpoint(cursor,
     oldest_reached)` after each so a killed run resumes. Returns
-    (oldest_reached, pages)."""
+    (oldest_reached, pages).
+
+    Two ways out besides the floor, both leaving the checkpoint where the walk
+    stood so the next run resumes rather than restarts:
+
+    - `deadline` (a `time.monotonic()` instant) — the caller's wall budget.
+      The outbox deep-walk has ~1,600 relays and a unit timeout that used to
+      kill the whole run, sweep and export included, when they did not fit.
+    - `RelayTimeout` — the handshake ran out its connect timeout. Until
+      2026-09-06 that read as an empty page: the cursor stepped back a day,
+      a second timeout ended the walk, and the relay came back the next run
+      one day further along a two-year floor. 1,627 of 1,642 relays were
+      "unfinished" that way. It is raised through to the caller, which is
+      what lets the outbox count consecutive dead runs and park the relay."""
     cursor = start_until
     oldest_reached = start_until
     empty_streak = 0
     pages = 0
     while cursor is not None and cursor > floor_ts:
+        if deadline is not None and time.monotonic() >= deadline:
+            log(f"    {relay}{label}: wall budget spent at {_fmt(oldest_reached)} — resuming next run")
+            if checkpoint:
+                checkpoint(cursor, oldest_reached)
+            return oldest_reached, pages
         if pages:
             time.sleep(REQ_PAUSE)
-        page = query_relay(relay, _stamp(filt, until=cursor),
-                           max_wall_seconds=PAGE_WALL_SECONDS)
+        try:
+            page = query_relay(relay, _stamp(filt, until=cursor),
+                               max_wall_seconds=PAGE_WALL_SECONDS,
+                               raise_on_timeout=True)
+        except RelayTimeout:
+            if checkpoint:
+                checkpoint(cursor, oldest_reached)
+            raise
         pages += 1
         if not page:
             empty_streak += 1
@@ -149,25 +173,34 @@ def _walk(relay, filt, floor_ts, start_until, on_page, checkpoint=None,
 
 
 def scan_relay_backward(relay, floor_ts, start_until, on_page, checkpoint,
-                        log=print, max_empty=2, filters=None):
+                        log=print, max_empty=2, filters=None, deadline=None):
     """Walk one relay backward from `start_until` to `floor_ts` with every shape
     in `filters` (default: the `#k` shape alone). The FIRST filter is the one
     the checkpoint tracks — `scan_state` holds one cursor per relay, and that
     cursor has always described the `#k` walk. The k-free shapes are walked
     after it, each to the floor, with no checkpoint: a killed run redoes them,
     which costs pages rather than coverage. Returns the oldest created_at the
-    checkpointed walk reached."""
+    checkpointed walk reached.
+
+    `deadline` and `RelayTimeout` pass through from `_walk`; a timeout on any
+    shape ends the relay's walk, since every remaining shape would pay the same
+    connect timeout (67 shapes x 15s was the outbox's 2026-09-04 failure)."""
     filters = filters or boost_filters()
     oldest_reached, pages = _walk(relay, filters[0], floor_ts, start_until,
-                                  on_page, checkpoint, log, max_empty)
+                                  on_page, checkpoint, log, max_empty,
+                                  deadline=deadline)
     log(f"    {relay}: #k done — {pages} pages, oldest {_fmt(oldest_reached)}")
     extra = filters[1:]
     if extra:
         total = 0
         for n, filt in enumerate(extra, 1):
+            if deadline is not None and time.monotonic() >= deadline:
+                log(f"    {relay}: wall budget spent before k-free shape {n}/{len(extra)}")
+                break
             time.sleep(REQ_PAUSE)
             _, pages = _walk(relay, filt, floor_ts, start_until, on_page, None,
-                             log, max_empty, label=f" [{n}/{len(extra)}]")
+                             log, max_empty, label=f" [{n}/{len(extra)}]",
+                             deadline=deadline)
             total += pages
         log(f"    {relay}: {len(extra)} k-free filter(s) done — {total} pages")
     return oldest_reached
@@ -191,7 +224,8 @@ def fetch_events_by_ids(ids, relays, chunk=200, max_wall=30):
     return out
 
 
-def scan_relay_incremental(relay, since_ts, on_page, log=print, filters=None):
+def scan_relay_incremental(relay, since_ts, on_page, log=print, filters=None,
+                           on_timeout=None):
     """Forward tail: everything since `since_ts`, every shape in `filters`
     (default: the `#k` shape alone). Filters go to the relay in groups of
     FILTERS_PER_REQ over one socket; a group whose page comes back at the cap
@@ -199,7 +233,11 @@ def scan_relay_incremental(relay, since_ts, on_page, log=print, filters=None):
     is a page with something missing (see the module docstring). Returns the
     newest created_at seen, clamped to now — an author walk returns whole
     timelines, and one future-dated note must not push the watermark past
-    the present, where every later tick would start."""
+    the present, where every later tick would start.
+
+    `on_timeout(relay)`, when given, is called once if the relay's handshake
+    times out and the rest of the tick is skipped — the outbox sweep uses it
+    to count consecutive dead runs. The core tail scan passes nothing."""
     filters = filters or boost_filters()
     now = int(time.time())
     seen_ids = set()
@@ -244,6 +282,8 @@ def scan_relay_incremental(relay, since_ts, on_page, log=print, filters=None):
             reqs += 1
             log(f"    {relay}: handshake timed out on REQ {reqs} — skipping "
                 f"its remaining {len(groups) - gi - 1} group(s) this tick")
+            if on_timeout:
+                on_timeout(relay)
             break
         reqs += 1
         handle(page)
