@@ -40,6 +40,8 @@ with tempfile.TemporaryDirectory() as tmp:
     for i, raw in enumerate((f"unknown:{ITEM}", "unknown:orphan-item", "unknown:never-seen", SHOW)):
         conn.execute("""INSERT INTO boosts (event_id, booster_pubkey, created_at, sats, podcast_guid, item_guid)
                         VALUES (?,?,?,?,?,?)""", (f"ev{i}", "pk", NOW, 100, raw, raw.split(":", 1)[-1]))
+    conn.execute("CREATE TABLE d1_boosts_synced (event_id TEXT PRIMARY KEY)")     # d1_sync owns this table
+    conn.execute("INSERT INTO d1_boosts_synced (event_id) VALUES ('ev0')")   # D1 already holds it
     conn.commit()
     curated = resolve_guids.load_curated()
 
@@ -60,6 +62,9 @@ with tempfile.TemporaryDirectory() as tmp:
     new, rekeyed = resolve_guids.resolve_all(conn, "k", "s", log=lambda m: None)
     row = conn.execute("SELECT canonical_guid FROM boosts WHERE event_id='ev0'").fetchone()
     check(new == 1 and rekeyed == 1 and row[0] == SHOW, f"new={new} rekeyed={rekeyed} canonical={row[0]}")
+    check(("boost", "ev0") in {(k, i) for k, ids in db.reproject_queue(conn).items() for i in ids}
+          and conn.execute("SELECT COUNT(*) FROM d1_boosts_synced WHERE event_id='ev0'").fetchone()[0] == 0,
+          "the re-keyed row is queued for a D1 delete AND un-synced, so one delta replaces it")
     pending = db.raw_guids_needing_alias(conn)
     check("unknown:orphan-item" in pending and "unknown:never-seen" in pending,
           "the two unresolved placeholders stay in the queue")

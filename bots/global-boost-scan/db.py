@@ -1533,6 +1533,20 @@ def apply_aliases(conn):
     if _has_table(conn, "d1_boosts_synced"):
         conn.executemany("DELETE FROM d1_boosts_synced WHERE event_id=?",
                          [(i,) for i in to_change])
+    # ⚠️ UN-SYNCING ALONE DOES NOT RE-KEY A ROW D1 ALREADY HOLDS. The delta's
+    # boost insert is OR IGNORE on event_id — a boost is immutable — so a
+    # re-pushed row that D1 has under the old guid is a no-op, and the row
+    # stays filed under the phantom while the box has it right. That was the
+    # documented state until 2026-09-06 ("run a full --remote after a bulk
+    # re-key"), and the single-row case had no answer at all: the 420-sat
+    # boost re-keyed from `unknown:<item>` to Stacker News Live sat in D1
+    # under the placeholder after a delta that reported pushing it. Queueing
+    # the row for reprojection makes the SAME cycle delete it first — the
+    # queue's statements lead the delta's on purpose — and the un-synced
+    # insert then lands under the canonical guid, FTS row included.
+    if _has_table(conn, "d1_reproject"):
+        conn.executemany("INSERT OR IGNORE INTO d1_reproject (kind, id) VALUES ('boost', ?)",
+                         [(i,) for i in to_change])
     conn.commit()
     return len(to_change)
 
