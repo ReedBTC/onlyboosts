@@ -48,6 +48,7 @@ import { payExternalBoost, distributeSats, STATUS, confirmLegSettled, legIsCheck
 import { buildExternalNoteTemplate, buildDonationNoteTemplate, sanitizeSenderName, MAX_MESSAGE_CHARS, MAX_SENDER_NAME_CHARS } from '../lib/externalBoostagram.js'
 import { signKindOneShareWithUser, publishSignedKindOne, fetchLnurlMeta } from '../lib/boostagram.js'
 import { signKindOneWithSite } from '../lib/siteSign.js'
+import { ingestBoostNote } from '../lib/siteIngest.js'
 import { setBoostModalProgressVisible } from '../lib/boostModalSignal.js'
 import { fireConfetti } from '../lib/confetti.js'
 import ConfirmLeaveOverlay from './ConfirmLeaveOverlay.jsx'
@@ -654,7 +655,11 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
       const signed = noteRoute === 'bot'
         ? await signKindOneWithSite(template)
         : await signKindOneShareWithUser(template)
-      await publishSignedKindOne(signed)
+      const published = await publishSignedKindOne(signed)
+      // ⚠️ NOT AWAITED AND NOT ON THE SHARE STATE. The note is on Nostr; this
+      // only decides whether it is on the site's feeds now or after the
+      // collector's next cycle, and it never fails visibly (siteIngest.js).
+      void ingestBoostNote(signed, published, episode)
       if (cancelledRef.current) return
       setShareState('shared')
     } catch (e) {
@@ -680,7 +685,8 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
     setShareState('signing')
     setShareError('')
     try {
-      await publishSignedKindOne(event)
+      const published = await publishSignedKindOne(event)
+      void ingestBoostNote(event, published, episode)   // same rule as handleShare
       if (cancelledRef.current) return
       setShareState('shared')
     } catch (e) {

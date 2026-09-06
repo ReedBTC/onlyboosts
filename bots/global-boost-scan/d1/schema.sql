@@ -199,3 +199,24 @@ CREATE VIRTUAL TABLE IF NOT EXISTS podcasts_fts USING fts5(podcast_guid UNINDEXE
 -- episodes of that show but only 2 episodes with the word in their own title, both
 -- belonging to other shows.
 CREATE VIRTUAL TABLE IF NOT EXISTS episodes_fts USING fts5(item_guid UNINDEXED, title, show);
+
+-- ⚠️ WRITTEN BY THE SITE, NOT THE COLLECTOR. `/api/v1/boosts/ingest`
+-- (functions/api/v1/boosts/ingest.js) indexes a boost sent from OnlyBoosts the
+-- moment its note is published, ahead of the scan, and records every row it
+-- wrote here so the collector can tell an edge-written boost from its own. The
+-- endpoint creates this table itself (CREATE TABLE IF NOT EXISTS on its write
+-- batch) so it works from first deploy; this copy is so a rebuilt database
+-- carries it. Two collector duties hang off it — see d1_sync.py:
+--   1. a boost in this table is REPLACED by the delta, not ignored, so the
+--      collector's parse, guid canonicalization and client classification win;
+--   2. a row here older than a few hours with no local counterpart is an orphan
+--      (the note never reached a relay the scan reads) and is deleted, with the
+--      show and episode it touched recounted.
+-- The stub `podcasts` / `episodes` rows the endpoint may create (title only)
+-- are overwritten by the collector's INSERT OR REPLACE with no marker needed.
+CREATE TABLE IF NOT EXISTS boosts_edge (
+  event_id     TEXT PRIMARY KEY,
+  ingested_at  INTEGER NOT NULL,   -- unix seconds, when the edge wrote it
+  podcast_guid TEXT,
+  item_guid    TEXT
+);

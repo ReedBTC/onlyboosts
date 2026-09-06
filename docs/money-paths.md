@@ -961,3 +961,76 @@ the one the surface is about.** The target guid and feed URL come off the row's
 own data attributes and are threaded through `resolveValue` *and* `openBoost`
 together — passing a guid to one and not the other would resolve one show's
 splits and label the published note with another's.
+
+### The Boost Is Indexed At The Edge Before The Collector Sees It
+
+*Shipped 2026-09-06, Reed's ask.* Every number on this site comes out of D1,
+and D1 is fed by the collector on a five-minute timer: scan the relays,
+resolve guids, dedupe, enrich from Podcast Index, push the delta. So a boost
+sent from OnlyBoosts itself took anywhere from a few seconds to about seven
+minutes to appear on the feeds, and a first boost on an un-indexed episode
+(the catalogue drawer's whole purpose) had no page until the collector
+enriched it.
+
+**`POST /api/v1/boosts/ingest` is the second sink for the site's own boosts.**
+`ingestBoostNote` in `login-widget/src/lib/siteIngest.js` runs after
+`publishSignedKindOne` on both publish paths in `ExternalBoostModal` (the
+fresh sign and the pre-signed note) and hands the published event to the
+endpoint, which writes the boost row, its FTS row, a marker in `boosts_edge`,
+a title-only stub for an episode or show D1 has never seen, and recounts the
+touched show's and episode's aggregates from D1.
+
+Five rules, each of which decides something a change elsewhere could undo:
+
+- **⚠️ THE COLLECTOR REMAINS THE SOURCE OF TRUTH; THE EDGE'S ROW IS
+  PROVISIONAL.** The delta's boost insert is keyed on the event id, so the
+  row it writes for this note collides with the one written here and nothing
+  is counted twice; its podcast and episode projections are `INSERT OR
+  REPLACE` from the box database, so every recount and every stub written
+  here is overwritten within one cycle. **The collector-side half is two
+  duties hanging off `boosts_edge`** (recorded in `schema.sql` beside the
+  table): a boost listed there is *replaced* by the delta rather than
+  ignored, so the collector's parse, guid canonicalization and client
+  classification win; and a row there older than a few hours with no local
+  counterpart is an orphan (the note never reached a relay the scan reads)
+  and is deleted with its show and episode recounted. Until those land, an
+  edge-written row simply persists as the edge wrote it, which for a note the
+  site's own builder produced is the same row the collector would have
+  written.
+- **⚠️ ONLY A NOTE A RELAY ACKED IS HANDED OVER.** The index counts notes on
+  Nostr. A note no relay accepted is not on Nostr, the collector would never
+  see it, and its row would be an orphan: the boost would appear and then
+  vanish when the sweep ran. `publishSignedKindOne`'s answer gates the call.
+- **⚠️ THE ENDPOINT ACCEPTS ONLY WHAT THE ORACLE WOULD SIGN.** The signature
+  has to verify, and the note has to pass `validateBoostTemplate` imported
+  from `sign-boost.js` (not restated), with one widening: the clock window
+  is ±15 minutes rather than ±5, because a pre-signed note reaches here after
+  the payment settles and an UNCERTAIN leg can hold that for minutes. It
+  also has to carry the site's own `client` tag and name a show. The trust
+  level is unchanged from the collector's: anyone may already publish a
+  burner boost note and be scanned; this removes the wait, not the
+  requirement, and `excludes.json` answers a fabricated note the same way.
+- **⚠️ EVERY FAILURE IS INVISIBLE TO THE DONOR, DELIBERATELY.** The sats are
+  gone and the note is published; the only thing at stake is whether the
+  boost shows in seconds or minutes, and the collector closes that gap by
+  itself. So the call is not awaited, never touches the share state, and
+  logs at `info`. A 503 (no D1, no KV), a 429 or a 400 costs the fast path
+  and nothing else. It is a `keepalive` fetch so the modal closing does not
+  cancel it.
+- **⚠️ NO EPISODE METADATA IS FETCHED AT THE EDGE.** The stub carries the
+  title the widget already had and nothing else: artwork falls back to the
+  show's through the chain every row already uses (`e_image || p_image`),
+  and the date, duration, enclosure and shownotes arrive with the collector's
+  enrich. Asking Podcast Index here would be a second enricher disagreeing
+  with the first. For the same reason no `profiles` row is written: a
+  first-time booster's name resolves through the Primal fallback on the
+  client, as any unresolved booster's does, until the collector stores it.
+
+What it does not change: boosts from Fountain, Wavlake and every other app
+keep the collector's cadence; a private boost publishes no note and so has
+nothing to ingest; and a page the reader loaded within the last five minutes
+may still be served from the browser's HTTP cache (`max-age=300` on the
+edge-rendered pages, 30s on `/api/v1`), which is a reload away.
+
+`scripts/test-boost-ingest.mjs` covers the endpoint end to end, on the
+members-search pattern.

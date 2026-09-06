@@ -458,15 +458,16 @@ Sixteen test scripts, all plain `node scripts/<name>.mjs` with no runner:
 
 | `test-weekly-charts.mjs` | the OnlyBoosts Charts: the **shipped** `/charts` Function (the old page URLs' redirects and the five **card frames**), **`/api/v1/charts`** and the **`/api/og/charts` proxy** (fetch stubbed), over a `node:sqlite` build of the real `schema.sql`, on the members-hours pattern; plus the two-sided source scan of `chart-board.js`. The routing contract (one URL per week, HEAD answered); the Shows and Artists Top 10s against a **brute-forced independent implementation** of the chart rule, component-rank triplets included; the medium partition; the Members pair (the hours board held to brute-forced hours, the publisher exclusion); and every Weeks at #1 tally — completed weeks only, a tied #1 crediting every holder, a fixture week whose #1 is decided by the tiebreak CHAIN. The retired kinds (episodes, albums, songs) stay covered at module level. Confirmed red on six mutations: the chain flipped, the live week counted on each side, the medium filter dropped, the per-week `PARTITION BY` removed, and the member boards' publisher exclusion dropped |
 | `test-catalogue.mjs` | `/api/catalogue`, the /show episode drawer's catalogue: the **shipped** handlers with **`fetch` stubbed**, so it never asks Podcast Index. The five-field projection (coerced, guid-less and duplicate items dropped, newest first with undated rows last, a total order), the request contract (400/503, a PI miss answered 200-empty and `no-store`, HEAD, OPTIONS, the exact-match CORS origin), the fallback route through `podcasts/byguid` and `byfeedurl` to `episodes/byfeedid`, `truncated` at PI's ceiling, and **the streamed byte cap added to `_shared/podcast-index.js#piGet`**, at the cap and past it. Confirmed red on three mutations: the undated rule flipped, the duplicate guard removed, the cap's comparison made `>=` |
+| `test-boost-ingest.mjs` | `/api/v1/boosts/ingest` (2026-09-06): the **shipped** handler over a `node:sqlite` build of the real `schema.sql`, fed by the **shipped** note builder and a real signature. The row as the collector would read it, the FTS row and the `boosts_edge` marker, the show's five and the episode's four aggregates against a brute-force recount (`booster_count` DISTINCT), the title-only episode stub and its non-creation over a collector-filled row, the collector's `INSERT OR REPLACE` overwriting the stub, idempotence, every refusal (tampered, foreign client tag, no show, donation shape, outside the ±15 min window — and a 10-minute-old note admitted where the oracle's own ±5 would refuse), 503 with no D1 or KV, 429 past the limiter, `no-store`. Confirmed red on three mutations: DISTINCT dropped, the existence pre-read removed, `verifyEvent` bypassed |
 
 **⚠️ `test-server-render.mjs` IS THE ONE THAT NEEDS AN ARGUMENT, SO IT IS THE ONE
 THAT GOES UNRUN.** Its header carries the `curl` that produces the capture; take
 a fresh one rather than reusing an old file, since it is also the size
 measurement. It asserted `cards are numbered 1..N with no gaps` — the *ordinal*
 scheme's invariant — until competition ranking shipped on 2026-08-18, and it
-would have been merged red had it not been run. **Run all twenty before a
+would have been merged red had it not been run. **Run all twenty-one before a
 merge**, and treat this one as the guard on the ranking scheme rather than only
-on weight. *(It read "all twelve" until 2026-08-24, "all fifteen" until 2026-08-30, "all sixteen" and then "all seventeen" until 2026-08-31, and "all eighteen" and then "all nineteen" until 2026-09-04, contradicting the table
+on weight. *(It read "all twelve" until 2026-08-24, "all fifteen" until 2026-08-30, "all sixteen" and then "all seventeen" until 2026-08-31, and "all eighteen" and then "all nineteen" until 2026-09-04, and "all twenty" until 2026-09-06, contradicting the table
 directly above it — the count moved when a test was added and this sentence did
 not. If the table grows again, this line grows with it.)*
 
@@ -1044,6 +1045,7 @@ sections, so you know when to open it:
 | The Wallet Gate Is Behind The Boost Button | compose first, pay second; `remembered` is not `connected` |
 | The Site Signs For A Booster Who Has No Key | `/api/sign-boost`, the allowlist validator, why proof-of-payment was rejected |
 | The one boost button | `boost-button.js` is chrome, not a money path; six surfaces, six handlers |
+| The Boost Is Indexed At The Edge Before The Collector Sees It | `/api/v1/boosts/ingest`, the site's own boosts on the feeds in seconds; why the edge's row is provisional and what the collector owes `boosts_edge` |
 
 Five rules from it that a change elsewhere would break, so they are restated here:
 
@@ -1355,6 +1357,20 @@ per alias. Both are one pass now (`export.py`'s per-show block, and the
 still export unconditionally. A quiet stretch leaves `generated_at` old while
 the data is current — it is when the shards were last built, not a liveness
 signal. The gate fails open: an exception in it is "due".
+
+**⚠️ THE SITE'S OWN BOOSTS REACH D1 AHEAD OF THE COLLECTOR, SINCE 2026-09-06.**
+*Reed's ask.* `POST /api/v1/boosts/ingest` writes a boost row, its FTS row, a
+title-only stub for an episode or show D1 has never seen, and a recount of the
+touched show and episode the moment the widget's note is acked by a relay;
+`boosts_edge` records every row it wrote. **The collector is still the source
+of truth**: its delta collides on the event id, its `INSERT OR REPLACE`
+projections overwrite the stubs and the recounts within one cycle, and two
+collector duties hang off the marker table (replace rather than ignore an
+edge-written boost; sweep one that never turned up on a relay). So **a D1 row
+no longer implies a local row** on the collector box, and anything that
+reconciles the two directions has to allow for it. The design record is *The
+Boost Is Indexed At The Edge Before The Collector Sees It* in
+`docs/money-paths.md`; `test-boost-ingest.mjs` covers the endpoint.
 
 Two stores, one model. **D1 behind `/api/v1/*` is what every feed and page
 reads.** The collector also publishes static JSON to
