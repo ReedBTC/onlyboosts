@@ -993,10 +993,15 @@ Five rules, each of which decides something a change elsewhere could undo:
   ignored, so the collector's parse, guid canonicalization and client
   classification win; and a row there older than a few hours with no local
   counterpart is an orphan (the note never reached a relay the scan reads)
-  and is deleted with its show and episode recounted. Until those land, an
-  edge-written row simply persists as the edge wrote it, which for a note the
-  site's own builder produced is the same row the collector would have
-  written.
+  and is deleted with its show and episode recounted. **Both landed the same
+  day** (`build_edge_sql` in `d1_sync.py`, on every `--remote-delta`; the
+  orphan age is `EDGE_ORPHAN_AGE`, 3 hours, the scan's own overlap; the walk
+  is pinned by `bots/global-boost-scan/test_d1_edge.py`). Two cases the
+  contract did not name are handled on the same walk: a marker whose local
+  row is excluded or a duplicate is removed from D1 with its guids recounted,
+  and a marker whose local row was already synced is re-pushed as a replace
+  so the edge's version never wins by history. The read of `boosts_edge`
+  fails open — before the first edge boost the table does not exist.
 - **⚠️ ONLY A NOTE A RELAY ACKED IS HANDED OVER.** The index counts notes on
   Nostr. A note no relay accepted is not on Nostr, the collector would never
   see it, and its row would be an orphan: the boost would appear and then

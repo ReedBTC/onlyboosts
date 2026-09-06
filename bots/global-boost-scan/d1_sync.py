@@ -298,11 +298,39 @@ def _profile_upsert_sql(p, verb="INSERT OR REPLACE"):
 
 
 # ── delta projection (only what changed since last sync) ──────────────────────
-def build_delta_sql(conn, rows):
+def _boost_insert_sql(r, replace=False):
+    """One boost row + its FTS row. OR IGNORE by default — a boost is immutable
+    and a re-push must not clobber it. OR REPLACE for a row the EDGE wrote
+    first (see build_edge_sql): the collector's parse, guid canonicalization
+    and client classification have to land over the provisional row, and the
+    FTS row is deleted first because FTS5 has no primary key to replace on."""
+    out = []
+    if replace:
+        out.append(f"DELETE FROM boosts_fts WHERE event_id={q(r['event_id'])};")
+    out.append(
+        f"INSERT OR {'REPLACE' if replace else 'IGNORE'} INTO boosts (event_id,booster_pubkey,"
+        "booster_npub,created_at,sats,amount_source,podcast_guid,item_guid,item_url,client,"
+        "client_id,client_via,message) VALUES ("
+        f"{q(r['event_id'])},{q(r['booster_pubkey'])},{q(r['booster_npub'])},{q(r['created_at'])},"
+        f"{q(r['sats'])},{q(r['amount_source'])},{q(r['podcast_guid'])},"
+        f"{q(r['item_guid'])},{q(r['item_url'])},{q(r['client'])},"
+        f"{q(r['client_id'])},{q(r['client_via'])},{q(r['message'])});")
+    if r["message"]:
+        out.append("INSERT INTO boosts_fts (event_id,message) VALUES ("
+                   f"{q(r['event_id'])},{q(r['message'])});")
+    return out
+
+
+def build_delta_sql(conn, rows, edge_ids=frozenset()):
     """SQL for `rows` (boosts not yet in D1): the new boosts (OR IGNORE, immutable)
     + FTS, plus a recomputed upsert of every podcast/episode they touched (an
     aggregate depends on ALL its boosts, so it's recomputed from the box DB) +
     the boosters' profiles + refreshed meta.
+
+    A row whose event_id is in `edge_ids` — the site wrote it to D1 at the
+    moment the note was acked, before this scan saw it — is INSERT OR REPLACEd
+    instead, so the collector's version lands over the edge's. The marker row
+    that made it an edge id is dropped by build_edge_sql in the same push.
 
     Returns (statements, podcast_guids, item_guids, skipped) — the caller feeds
     those guid sets to build_meta_drift_sql so a row isn't projected twice in one
@@ -311,16 +339,7 @@ def build_delta_sql(conn, rows):
     out = []
     pods, items, pubs = set(), set(), set()
     for r in rows:
-        out.append(
-            "INSERT OR IGNORE INTO boosts (event_id,booster_pubkey,booster_npub,created_at,sats,"
-            "amount_source,podcast_guid,item_guid,item_url,client,client_id,client_via,message) VALUES ("
-            f"{q(r['event_id'])},{q(r['booster_pubkey'])},{q(r['booster_npub'])},{q(r['created_at'])},"
-            f"{q(r['sats'])},{q(r['amount_source'])},{q(r['podcast_guid'])},"
-            f"{q(r['item_guid'])},{q(r['item_url'])},{q(r['client'])},"
-            f"{q(r['client_id'])},{q(r['client_via'])},{q(r['message'])});")
-        if r["message"]:
-            out.append("INSERT INTO boosts_fts (event_id,message) VALUES ("
-                       f"{q(r['event_id'])},{q(r['message'])});")
+        out.extend(_boost_insert_sql(r, replace=r["event_id"] in edge_ids))
         if r["podcast_guid"]:
             pods.add(r["podcast_guid"])
         if r["item_guid"]:
@@ -344,6 +363,164 @@ def build_delta_sql(conn, rows):
 
     out.extend(_meta_sql(conn))
     return out, pods, items, skipped
+
+
+# ── the edge-written boosts: `boosts_edge` ───────────────────────────────────
+# Since 2026-09-06 the site writes its OWN boosts straight into D1 the moment a
+# relay acks the note (`functions/api/v1/boosts/ingest.js`; design record: "The
+# Boost Is Indexed At The Edge Before The Collector Sees It" in
+# docs/money-paths.md). Every such row is recorded in `boosts_edge`, and the
+# collector owes that table two things, both done here on every delta:
+#
+#   1. REPLACE, NOT IGNORE. The delta's boost insert is OR IGNORE, so for an
+#      edge-written row the collector's parse would never land — no guid
+#      canonicalization, no client reclassification. A local row whose id is
+#      in boosts_edge is INSERT OR REPLACEd (build_delta_sql) and its marker
+#      dropped, so the marker means "the edge's version is still in place".
+#      If the edge wrote the boost under a guid the collector resolves to a
+#      different one, the edge's guid is recounted too, which deletes the
+#      title-only stub it made (the upsert-or-delete rule below).
+#   2. THE ORPHAN SWEEP. A note no relay the scan reads ever carried has an
+#      edge row with no local counterpart; every recount the collector pushes
+#      excludes it while the row sits in D1 and in the counts the edge wrote.
+#      A marker older than EDGE_ORPHAN_AGE with no local row is deleted with
+#      its boost and FTS rows, and its show and episode are recounted from the
+#      box — which DELETES a stub with nothing left, the way an excluded
+#      show's row goes. The sweep is self-healing in the other direction: a
+#      swept note the scan finds later is an ordinary new boost, re-inserted
+#      by the next delta.
+#
+# Three smaller cases fall out of the same walk: a marker whose local row is
+# excluded or a duplicate (the reproject queue removes the boost; here the
+# marker goes with it, and the recount is repeated, which is free); a marker
+# whose local row was already synced (the collector's insert won a race with
+# the edge's, or an earlier read of this table failed) — re-pushed as a
+# replace so the outcome does not depend on that history; and a marker
+# younger than the age with no local row, which is simply left for next tick.
+#
+# The read of boosts_edge FAILS OPEN: before the first edge boost lands the
+# table does not exist and the query answers 400, and a transient CF error
+# must not stall the delta. Either way the edge rows are left as written and
+# the walk runs on the next cycle.
+EDGE_ORPHAN_AGE = 3 * 3600   # the scan's INCREMENTAL_OVERLAP: a note it can see, it has seen by then
+
+
+def _d1_rows(url, hdr, sql):
+    """SELECT against D1. Returns (rows, None) or (None, detail) — the URL and
+    token never appear in `detail`."""
+    import json
+    import urllib.error
+    import urllib.request
+    req = urllib.request.Request(url, data=json.dumps({"sql": sql}).encode(),
+                                 headers=hdr, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            data = json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        try:
+            return None, json.loads(e.read()).get("errors")
+        except Exception:
+            return None, f"HTTP {e.code}"
+    except Exception as e:
+        return None, type(e).__name__
+    if not data.get("success"):
+        return None, data.get("errors")
+    res = data.get("result") or []
+    return ((res[0] or {}).get("results") or []) if res else [], None
+
+
+def _edge_rows(cf):
+    """Every boosts_edge row, or [] with a printed reason when it cannot be read."""
+    rows, detail = _d1_rows(*cf, "SELECT event_id, ingested_at, podcast_guid, item_guid FROM boosts_edge")
+    if rows is None:
+        if "no such table" in str(detail):
+            return []            # nothing has been ingested at the edge yet
+        print(f"[warn] boosts_edge unreadable ({detail}) — edge rows left as written this cycle")
+        return []
+    return rows
+
+
+def _local_boost_state(conn, event_id):
+    """(exists, published, synced) for one event id in the box DB."""
+    r = conn.execute(
+        f"""SELECT ({db.not_excluded('b')}) AS published,
+                  EXISTS (SELECT 1 FROM d1_boosts_synced d WHERE d.event_id=b.event_id) AS synced
+           FROM boosts b WHERE b.event_id=?""", (event_id,)).fetchone()
+    if not r:
+        return False, False, False
+    return True, bool(r["published"]), bool(r["synced"])
+
+
+def build_edge_sql(conn, edge_rows, delta_rows, now, delta_pods=(), delta_items=()):
+    """The boosts_edge walk described above. Statements go BEFORE the delta's in
+    the same push (the delta's replace must follow the FTS delete emitted here
+    for a re-pushed synced row, and its podcast/episode upserts supersede any
+    recount of the same guid emitted here).
+
+    Returns (statements, counts) — counts keyed replaced / repushed / removed /
+    orphaned / pending."""
+    delta_by_id = {r["event_id"]: r for r in delta_rows}
+    counts = {"replaced": 0, "repushed": 0, "removed": 0, "orphaned": 0, "pending": 0}
+    out = []
+    recount_pods, recount_items = set(), set()
+
+    def drop_boost(eid):
+        out.append(f"DELETE FROM boosts WHERE event_id={q(eid)};")
+        out.append(f"DELETE FROM boosts_fts WHERE event_id={q(eid)};")
+
+    def drop_marker(eid):
+        out.append(f"DELETE FROM boosts_edge WHERE event_id={q(eid)};")
+
+    def recount(e, local=None):
+        # The edge counted the boost under the guids the NOTE named; the
+        # collector counts it under the canonical ones. Any guid the edge
+        # touched that the collector's own upsert will not is recounted here.
+        if e.get("podcast_guid") and (not local or e["podcast_guid"] != local["podcast_guid"]):
+            recount_pods.add(e["podcast_guid"])
+        if e.get("item_guid") and (not local or e["item_guid"] != local["item_guid"]):
+            recount_items.add(e["item_guid"])
+
+    for e in edge_rows:
+        eid = e["event_id"]
+        local = delta_by_id.get(eid)
+        if local is not None:                       # duty 1: the delta replaces it
+            counts["replaced"] += 1
+            drop_marker(eid)
+            recount(e, local)
+            continue
+        exists, published, synced = _local_boost_state(conn, eid)
+        if exists and published:
+            # Synced already (a race, or a failed earlier read of this table):
+            # re-push the collector's row so the edge's never wins by history.
+            row = conn.execute(f"{_delta_select()} WHERE b.event_id=?", (eid,)).fetchone()
+            out.extend(_boost_insert_sql(row, replace=True))
+            counts["repushed"] += 1
+            drop_marker(eid)
+            recount(e, row)
+            continue
+        if exists:                                  # excluded or a duplicate
+            counts["removed"] += 1
+            drop_boost(eid)
+            drop_marker(eid)
+            recount(e)
+            continue
+        if now - int(e.get("ingested_at") or 0) < EDGE_ORPHAN_AGE:
+            counts["pending"] += 1                  # the scan may still find it
+            continue
+        counts["orphaned"] += 1                     # duty 2
+        drop_boost(eid)
+        drop_marker(eid)
+        recount(e)
+
+    for g in sorted(recount_pods - set(delta_pods)):
+        out.extend(_podcast_upsert_sql(conn, g)
+                   or [f"DELETE FROM podcasts WHERE podcast_guid={q(g)};",
+                       f"DELETE FROM podcasts_fts WHERE podcast_guid={q(g)};"])
+    for i in sorted(recount_items - set(delta_items)):
+        out.extend(_episode_upsert_sql(conn, i)
+                   or [f"DELETE FROM episodes WHERE item_guid={q(i)};",
+                       f"DELETE FROM episodes_fts WHERE item_guid={q(i)};"])
+    return out, counts
 
 
 def build_reproject_sql(conn, queue):
@@ -468,13 +645,19 @@ def _ensure_sync_table(conn):
     conn.commit()
 
 
-def _unsynced_boosts(conn):
+def _delta_select():
+    """The boost columns the delta projects, with the show guid CANONICALIZED
+    (`canonical_guid` over the as-signed `podcast_guid`). One place, because
+    the edge path below has to project the same shape for one event id."""
     eg = db.effective_guid("b")
+    return (f"SELECT b.event_id,b.booster_pubkey,b.booster_npub,b.created_at,b.sats,"
+            f"b.amount_source,{eg} AS podcast_guid,b.item_guid,b.item_url,b.client,"
+            f"b.client_id,b.client_via,b.message FROM boosts b")
+
+
+def _unsynced_boosts(conn):
     return conn.execute(
-        f"""SELECT b.event_id,b.booster_pubkey,b.booster_npub,b.created_at,b.sats,
-                  b.amount_source,{eg} AS podcast_guid,b.item_guid,b.item_url,b.client,
-                  b.client_id,b.client_via,b.message
-           FROM boosts b LEFT JOIN d1_boosts_synced d ON d.event_id=b.event_id
+        f"""{_delta_select()} LEFT JOIN d1_boosts_synced d ON d.event_id=b.event_id
            WHERE d.event_id IS NULL AND {db.not_excluded('b')}""").fetchall()
 
 
@@ -599,9 +782,18 @@ def cmd_remote_delta(args):
     # reads the same box DB — duplicating an upsert is free, dropping one isn't.
     reproj, reproj_pairs = build_reproject_sql(conn, db.reproject_queue(conn))
     stmts, pods, items, skipped = (list(reproj), set(), set(), 0)
+    # The edge-written rows (see the boosts_edge section): read once, replace
+    # the ones the scan has since found, sweep the ones it never will. Their
+    # statements sit between the exclusions and the delta on purpose — the
+    # delta's replace follows the FTS delete, and its upserts win over any
+    # recount of the same guid.
+    edge = _edge_rows(cf)
+    delta = []
     if rows:
-        delta, pods, items, skipped = build_delta_sql(conn, rows)
-        stmts += delta
+        delta, pods, items, skipped = build_delta_sql(conn, rows, {e["event_id"] for e in edge})
+    edge_stmts, edge_counts = build_edge_sql(conn, edge, rows, started, pods, items)
+    stmts += edge_stmts
+    stmts += delta
     # Shows emptied by guid re-keying: the projection is upsert-only, so a phantom
     # that lost all its boosts has to be deleted explicitly or its page lives on
     # in D1 double-counting them against the real show.
@@ -638,6 +830,8 @@ def cmd_remote_delta(args):
           + (f", deleted {len(orphans)} emptied show(s)" if orphans else "")
           + (f", re-derived {len(reproj_pairs)} row(s) for the exclusion list"
              if reproj_pairs else "")
+          + (", edge: " + ", ".join(f"{v} {k}" for k, v in edge_counts.items() if v)
+             if any(edge_counts.values()) else "")
           + f" ({len(stmts)} statements)")
     # Never let the un-projectable population be silent: a boosted episode with
     # no metadata row is skipped on purpose, but "on purpose" and "unnoticed" are
