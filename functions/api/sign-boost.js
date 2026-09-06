@@ -229,15 +229,20 @@ function checkTagShape(rawTags, allowed) {
 
 /** ±5 minutes, shared by both families. A note dated outside this window is
  *  either a clock problem or an attempt to place it somewhere else in the
- *  timeline. */
-function checkCreatedAt(value) {
+ *  timeline.
+ *
+ *  `skewSecs` widens it for ONE caller: `/api/v1/boosts/ingest` validates a
+ *  note that was signed here (or by the donor) BEFORE the payment ran and is
+ *  handed back after it settled, which on the UNCERTAIN path can be minutes
+ *  later. The oracle itself always uses the default. */
+function checkCreatedAt(value, skewSecs = CREATED_AT_SKEW_SECS) {
   const now = Math.floor(Date.now() / 1000)
   const createdAt = Number.isFinite(value) ? Math.floor(value) : now
-  if (Math.abs(createdAt - now) > CREATED_AT_SKEW_SECS) throw new Error('created_at out of range')
+  if (Math.abs(createdAt - now) > skewSecs) throw new Error('created_at out of range')
   return createdAt
 }
 
-export function validateBoostTemplate(body) {
+export function validateBoostTemplate(body, { skewSecs } = {}) {
   if (!body || typeof body !== 'object') throw new Error('bad template')
   if (body.kind !== 1) throw new Error('only kind 1 boost notes may be signed')
 
@@ -276,7 +281,7 @@ export function validateBoostTemplate(body) {
     throw new Error('invalid amount')
   }
 
-  const createdAt = checkCreatedAt(body.created_at)
+  const createdAt = checkCreatedAt(body.created_at, skewSecs)
 
   return { kind: 1, created_at: createdAt, tags, content: body.content }
 }
