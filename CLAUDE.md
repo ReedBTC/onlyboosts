@@ -1335,10 +1335,20 @@ backfill and outbox walkers all take the set — so a show or booster first seen
 through a `#k` note on one tick is covered by the k-free shapes on the next.
 The residual is a first-time booster on a show the index has never seen,
 without a `k` tag; no filter Nostr offers reaches that, and the fix is the
-client sending the tag NIP-73 specifies (Reed is asking StableKraft; Wavlake
-has larger problems). Those boosts land **unlabelled** by design: the only
-evidence of the app is the URL the note links, and `clients.py`'s rule is
-never to guess. The window the single-shape scan had already walked was
+client sending the tag NIP-73 specifies. **StableKraft does since
+2026-09-06** (Reed's issue, ChadFarrow/stablekraft-app#237, closed by PR
+#243): every `i` is paired with its `k`, plus `["client","StableKraft"]`,
+which `clients.py` already slugs and labels. Forward-only — kind 1 is
+immutable — so the 274 StableKraft notes from before the fix stay k-less,
+unlabelled, and reachable only through the `#i`/`authors` shapes. Its
+companion, #242/PR #245, stopped StableKraft naming an internal row id as
+`podcast:item:guid` when a track has no RSS guid; a boost to such a track
+now names the show only. Six boosts in the index (242 sats, four tracks)
+carry those unresolvable ids with no show guid beside them; nothing automatic
+heals them, but three of the four albums are shows the index knows, so a
+hand re-key to a show-level boost is possible if Reed wants it. Wavlake's own app still sends no `k` and has larger problems.
+Untagged boosts land **unlabelled** by design: the only evidence of the app
+is the URL the note links, and `clients.py`'s rule is never to guess. The window the single-shape scan had already walked was
 caught up with `backfill --force --floor 1748736000` on 2026-09-03; the scan
 docstring carries the two relay quirks the wider filter set met (per-filter
 caps make a multi-filter REQ unpageable, and two nginx fronts 429 back-to-back
