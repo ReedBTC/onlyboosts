@@ -42,8 +42,18 @@ AUTHOR_BATCH_SIZE = 50   # conservative per-filter author count (relay caps vary
 
 
 # ── relay I/O ────────────────────────────────────────────────────────────────
+class RelayTimeout(Exception):
+    """A relay whose WebSocket handshake ran out the connect timeout. Raised by
+    `query_relay` only when asked (`raise_on_timeout=True`): it is the one
+    failure class that costs the caller the full `timeout` rather than a
+    half-second refusal, so a caller looping several REQs over one relay wants
+    to know it happened and stop paying for it. A fast refusal (HTTP 429/502,
+    connection refused) is deliberately NOT this — it is cheap to retry on the
+    next REQ, and a relay that 429s one handshake usually passes the next."""
+
+
 def query_relay(relay, filt, timeout=DEFAULT_RELAY_TIMEOUT,
-                max_wall_seconds=60, max_events=50000):
+                max_wall_seconds=60, max_events=50000, raise_on_timeout=False):
     """REQ one or more filters against one relay in a single subscription,
     returning whatever EVENTs arrive before EOSE, the socket times out, or a hard
     wall-clock / event-count cap is hit (partial results are kept, not discarded).
@@ -56,12 +66,25 @@ def query_relay(relay, filt, timeout=DEFAULT_RELAY_TIMEOUT,
 
     The per-recv timeout alone can't bound a relay that dribbles messages slower
     than `timeout` apart but never sends EOSE, so `max_wall_seconds` bounds total
-    time and `max_events` guards against an unbounded backlog stream."""
+    time and `max_events` guards against an unbounded backlog stream.
+
+    Every failure is swallowed and reported as an empty page — a relay that is
+    down reads as "nothing there" — except a handshake TIMEOUT when
+    `raise_on_timeout` is set, which raises `RelayTimeout` after printing the
+    same warning. Measured 2026-09-06 on relay.mostr.pub (behind Cloudflare,
+    TCP accepts, the upgrade never answers): 15.1s per attempt, 7 attempts a
+    tick, 90s of a 2-minute cycle spent on one dead relay."""
     filters = filt if isinstance(filt, list) else [filt]
     got = []
     deadline = time.monotonic() + max_wall_seconds
     try:
-        ws = websocket.create_connection(relay, timeout=timeout)
+        try:
+            ws = websocket.create_connection(relay, timeout=timeout)
+        except websocket.WebSocketTimeoutException as e:
+            print(f"    [warn] {relay}: {e}")
+            if raise_on_timeout:
+                raise RelayTimeout(f"{relay}: {e}") from e
+            return got
         sub = "cf"
         ws.send(json.dumps(["REQ", sub, *filters]))
         while time.monotonic() < deadline and len(got) < max_events:
@@ -88,6 +111,8 @@ def query_relay(relay, filt, timeout=DEFAULT_RELAY_TIMEOUT,
         except Exception:
             pass
         ws.close()
+    except RelayTimeout:
+        raise            # the handshake branch above already printed the warning
     except Exception as e:
         print(f"    [warn] {relay}: {e}")
     return got

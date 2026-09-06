@@ -9,7 +9,7 @@ Wants=network-online.target
 # The reason it is wired now: the cycle validates excludes.json as its first step
 # and `set -e` aborts on a malformed one. That is the right behaviour — better to
 # publish nothing than to publish content someone was told was removed — but
-# without this line the pipeline would simply stop every five minutes in silence.
+# without this line the pipeline would simply stop every two minutes in silence.
 OnFailure=lb-bot-alert@%n.service
 
 [Service]

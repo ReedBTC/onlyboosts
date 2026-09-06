@@ -62,7 +62,7 @@ that matters. `REQ_PAUSE` is the courtesy gap, not the fix.
 
 import time
 
-from collector_common import query_relay
+from collector_common import RelayTimeout, query_relay
 
 BOOST_FILTER_K = ["podcast:guid", "podcast:item:guid"]
 PAGE_LIMIT = 500
@@ -222,12 +222,29 @@ def scan_relay_incremental(relay, since_ts, on_page, log=print, filters=None):
             newest = max(newest, max(ev.get("created_at", since_ts) for ev in fresh))
 
     overflow = 0
-    for i in range(0, len(filters), FILTERS_PER_REQ):
-        group = filters[i:i + FILTERS_PER_REQ]
+    groups = [filters[i:i + FILTERS_PER_REQ]
+              for i in range(0, len(filters), FILTERS_PER_REQ)]
+    for gi, group in enumerate(groups):
         if reqs:
             time.sleep(REQ_PAUSE)
-        page = query_relay(relay, [_stamp(f, since=since_ts) for f in group],
-                           max_wall_seconds=PAGE_WALL_SECONDS)
+        # A relay whose handshake times out is skipped for the REST OF THIS
+        # TICK, not retried per group: every group would run out the same
+        # connect timeout, and the tick's wall budget is what a dead relay
+        # eats (relay.mostr.pub, 2026-09-06: 7 x 15s on a 2-minute timer).
+        # Only the timeout class is skipped — a 429'd handshake is a
+        # half-second refusal and the next group usually passes (see the
+        # podtards note in the module docstring). The groups it never sent
+        # are covered by INCREMENTAL_OVERLAP on the next tick, the same
+        # safety net an empty page from a down relay already relies on.
+        try:
+            page = query_relay(relay, [_stamp(f, since=since_ts) for f in group],
+                               max_wall_seconds=PAGE_WALL_SECONDS,
+                               raise_on_timeout=True)
+        except RelayTimeout:
+            reqs += 1
+            log(f"    {relay}: handshake timed out on REQ {reqs} — skipping "
+                f"its remaining {len(groups) - gi - 1} group(s) this tick")
+            break
         reqs += 1
         handle(page)
         if len(page) >= PAGE_LIMIT:

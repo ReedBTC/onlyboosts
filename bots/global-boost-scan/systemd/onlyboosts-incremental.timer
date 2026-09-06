@@ -1,9 +1,15 @@
 [Unit]
-Description=Run OnlyBoosts incremental every 5 minutes
+Description=Run OnlyBoosts incremental every 2 minutes
 
 [Timer]
 OnBootSec=10min
-OnUnitActiveSec=5min
+# 2 minutes since 2026-09-06 (5 before). Measured 2026-09-05 on the 5-minute
+# cadence: a quiet tick is ~30s wall / ~11.5s CPU, a publish tick ~53s / ~22s,
+# ~1 CPU-hour a day on an 8-core box. OnUnitActiveSec counts from the tick's
+# START, and run-incremental.sh's flock skips a tick that finds the previous
+# one still running, so an overrun costs a skipped tick and never a pile-up.
+# 1 minute was rejected: a publish tick would overlap the next tick routinely.
+OnUnitActiveSec=2min
 Persistent=true
 
 [Install]

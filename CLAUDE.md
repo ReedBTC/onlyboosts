@@ -1340,8 +1340,8 @@ docstring carries the two relay quirks the wider filter set met (per-filter
 caps make a multi-filter REQ unpageable, and two nginx fronts 429 back-to-back
 handshakes).
 
-**⚠️ THE FIVE-MINUTE CYCLE PUBLISHES ONLY WHEN THE INDEX CHANGED, SINCE
-2026-09-04.** `publish-due` in `onlyboosts_globalscan.py` digests every
+**⚠️ THE INCREMENTAL CYCLE (EVERY 2 MINUTES SINCE 2026-09-06, 5 BEFORE)
+PUBLISHES ONLY WHEN THE INDEX CHANGED, SINCE 2026-09-04.** `publish-due` in `onlyboosts_globalscan.py` digests every
 published column of every published table (`db.content_fingerprint`) and
 compares it with what the last full export recorded and what the last push
 shipped; `export --per-show`, `push` and the share cards run only when it says

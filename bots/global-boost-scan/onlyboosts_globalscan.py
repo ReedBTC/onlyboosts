@@ -239,7 +239,10 @@ def cmd_incremental(args):
           f"{len(filters)} filter shapes per relay")
 
     # Relays in parallel: the k-free shapes turned one REQ per relay into
-    # several, and the tail scan has a 5-minute budget to fit inside.
+    # several, and the tail scan has a 2-minute budget to fit inside (5 until
+    # 2026-09-06; a relay that times out its handshake is dropped for the tick
+    # rather than waited on per group, which is what made the shorter budget
+    # safe — see scan_relay_incremental).
     newest_overall = since
     with ThreadPoolExecutor(max_workers=len(relays)) as ex:
         futs = {ex.submit(scan_relay_incremental, r, since, on_page,
