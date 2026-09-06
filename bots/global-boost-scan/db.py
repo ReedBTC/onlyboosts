@@ -1409,12 +1409,25 @@ def show_feed_for_guid(conn, podcast_guid):
 # ── phantom-guid aliasing ─────────────────────────────────────────────────────
 def raw_guids_needing_alias(conn):
     """Distinct as-signed podcast_guids that carry no alias yet. The resolver looks
-    at each and decides whether it's a phantom that maps to a real guid."""
+    at each and decides whether it's a phantom that maps to a real guid.
+
+    Skips the ones whose last Podcast Index lookup failed inside the enrich
+    cooldown (`enrich_failed` kind 'alias'). Until 2026-09-06 there was no
+    such gate: fifteen URL-shaped raw guids — episode PAGE urls like
+    `fatburningman.com/?p=19122` sitting in the show slot, plus two feeds PI
+    does not know — were asked of `podcasts/byfeedurl` on every 2-minute
+    tick, answered 400 every time, and were asked again: ~10,800 calls a day
+    for an answer that cannot change. The local rungs (suffix-strip, the
+    `unknown:` placeholder, curated) never mark a failure, so a slug stays
+    cheap to re-ask and the `unknown:` rung still heals on the tick its
+    episode does."""
     rows = conn.execute(
         f"""SELECT DISTINCT b.podcast_guid FROM boosts b
            LEFT JOIN guid_aliases a ON a.raw_guid = b.podcast_guid
+           LEFT JOIN enrich_failed f ON f.kind = 'alias' AND f.id = b.podcast_guid
            WHERE b.podcast_guid IS NOT NULL AND a.raw_guid IS NULL
-             AND {not_excluded('b')}""").fetchall()
+             AND (f.id IS NULL OR f.last_try < ?)
+             AND {not_excluded('b')}""", (_cutoff(),)).fetchall()
     return [r[0] for r in rows]
 
 

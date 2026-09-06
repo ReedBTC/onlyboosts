@@ -73,6 +73,32 @@ with tempfile.TemporaryDirectory() as tmp:
     new, rekeyed = resolve_guids.resolve_all(conn, "k", "s", log=lambda m: None)
     check(new == 1 and rekeyed == 1, "heals the tick after the episode resolves")
 
+    print("a Podcast Index miss is parked for the cooldown; a local miss is not")
+    calls = []
+    def missing(path, params, key, secret):
+        calls.append(path); return {"feed": {}}
+    enrich.pi_get = missing
+    for i, raw in enumerate(("https://fatburningman.com/?p=19122", "20250508FH"), 10):
+        conn.execute("""INSERT INTO boosts (event_id, booster_pubkey, created_at, sats, podcast_guid, item_guid)
+                        VALUES (?,?,?,?,?,?)""", (f"ev{i}", "pk", NOW, 100, raw, "x"))
+    conn.commit()
+    resolve_guids.resolve_all(conn, "k", "s", log=lambda m: None)
+    check(calls == ["podcasts/byfeedurl"], f"the URL asked PI exactly once ({calls})")
+    parked = {r[0] for r in conn.execute("SELECT id FROM enrich_failed WHERE kind='alias'")}
+    check(parked == {"https://fatburningman.com/?p=19122"}, f"only the PI-routed miss is parked ({parked})")
+    calls.clear()
+    pending = db.raw_guids_needing_alias(conn)
+    resolve_guids.resolve_all(conn, "k", "s", log=lambda m: None)
+    check("https://fatburningman.com/?p=19122" not in pending and "20250508FH" in pending and calls == [],
+          "inside the cooldown the URL is not re-asked; the slug still is, locally")
+    conn.execute("UPDATE enrich_failed SET last_try = last_try - ?", (db.ENRICH_RETRY_COOLDOWN + 1,)); conn.commit()
+    resolve_guids.resolve_all(conn, "k", "s", log=lambda m: None)
+    check(calls == ["podcasts/byfeedurl"], "once the cooldown lapses it is asked again")
+    conn.execute("DELETE FROM enrich_failed"); conn.commit()
+    resolve_guids.resolve_all(conn, None, None, log=lambda m: None)
+    check(conn.execute("SELECT COUNT(*) FROM enrich_failed").fetchone()[0] == 0,
+          "with no PI credentials nothing is asked, so nothing is parked")
+
 print()
 print("FAILURES:" if failures else "all checks passed", *failures, sep="\n  ")
 sys.exit(1 if failures else 0)

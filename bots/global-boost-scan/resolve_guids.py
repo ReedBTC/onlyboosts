@@ -131,6 +131,13 @@ def derive(conn, raw_guid, key, secret, curated):
     return None
 
 
+def asks_podcast_index(raw_guid):
+    """Whether derive() reaches Podcast Index for this shape — the numeric and
+    URL rungs. A miss on one of these is recorded under the enrich cooldown
+    (db.raw_guids_needing_alias says why); a miss on a local rung is not."""
+    return bool(_NUMERIC.match(raw_guid) or raw_guid.startswith("http"))
+
+
 def resolve_all(conn, key, secret, log=print):
     """Resolve every un-aliased phantom guid, then materialize aliases onto boosts.
     Returns (new_aliases, rekeyed_boosts)."""
@@ -139,9 +146,12 @@ def resolve_all(conn, key, secret, log=print):
     log(f"Resolving {len(raw_guids)} un-aliased guid(s)...")
     by_method = {}
     new = 0
+    pi_missed = []
     for rg in raw_guids:
         out = derive(conn, rg, key, secret, curated)
         if not out:
+            if key and secret and asks_podcast_index(rg):
+                pi_missed.append(rg)
             continue
         canonical, method, show = out
         if canonical == rg:
@@ -151,6 +161,9 @@ def resolve_all(conn, key, secret, log=print):
             db.upsert_show(conn, show)                 # cache the show we just learned
         by_method[method] = by_method.get(method, 0) + 1
         new += 1
+    if pi_missed:
+        db.mark_enrich_failed(conn, "alias", pi_missed)
+        log(f"  {len(pi_missed)} guid(s) Podcast Index could not place, parked for the cooldown")
     rekeyed = db.apply_aliases(conn)
     if by_method:
         log("  aliases by method: " + ", ".join(f"{m}={n}" for m, n in sorted(by_method.items())))
