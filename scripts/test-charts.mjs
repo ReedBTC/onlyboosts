@@ -820,4 +820,78 @@ async function call(handler, url, init) {
   })
 }
 
+
+// ── the windowed rollup resolves the show from the GROUP, not from a row ─────
+// 2026-09-06: an episode the collector had not enriched (no `episodes` row)
+// came back with show.guid null on the 1W/1M/1Y and follows paths although
+// every boost named the show, and one boost carrying the client rollup's
+// `unknown:<item_guid>` placeholder blanked the show's title — the `pc.*`
+// columns were bare under the GROUP BY. The placeholder reached a signed note
+// through that card. The all-time path reads the episodes projection and was
+// never affected.
+{
+  console.log('\nepisodes — the windowed rollup\'s show (un-enriched episode)')
+  const db3 = new DatabaseSync(':memory:')
+  db3.exec(readFileSync(join(ROOT, 'bots/global-boost-scan/d1/schema.sql'), 'utf8'))
+  db3.prepare("INSERT INTO podcasts(podcast_guid,title,image,medium,language) VALUES('real-show','The Real Show','https://x/s.png','podcast','en')").run()
+  db3.prepare("INSERT INTO podcasts(podcast_guid,title,medium) VALUES('music-show','An Album','music')").run()
+  // an enriched episode, as a control
+  db3.prepare("INSERT INTO episodes(item_guid,podcast_guid,title) VALUES('ep-known','real-show','Known Episode')").run()
+  const ins3 = db3.prepare('INSERT INTO boosts(event_id,booster_pubkey,created_at,sats,podcast_guid,item_guid) VALUES(?,?,?,?,?,?)')
+  let n = 0
+  const P = [pkHex(0x401), pkHex(0x402), pkHex(0x403)]
+  // ep-new: NO episodes row. Four boosts name the show; the FIFTH carries the
+  // placeholder and, being 'u…', sorts after every real guid.
+  for (let i = 0; i < 4; i++) ins3.run('n' + String(n++).padStart(63, '0'), P[i % 3], RECENT, 100, 'real-show', 'ep-new')
+  ins3.run('n' + String(n++).padStart(63, '0'), P[0], RECENT, 100, 'unknown:ep-new', 'ep-new')
+  // ep-known: one boost, so it ranks below ep-new on every key
+  ins3.run('n' + String(n++).padStart(63, '0'), P[1], RECENT, 50, 'real-show', 'ep-known')
+  // a music-show episode with no row: must land under medium=music, not on Episodes
+  ins3.run('n' + String(n++).padStart(63, '0'), P[2], RECENT, 70, 'music-show', 'ep-music')
+  const env3 = { DB: { prepare(sql) { return { bind(...args) { return {
+    all: async () => ({ results: db3.prepare(sql).all(...args) }),
+    first: async () => db3.prepare(sql).get(...args) ?? null,
+  } } } } } }
+  const get = async (url) => (await (await episodesGet({ request: new Request('https://ob.invalid' + url), env: env3 })).json())
+  const post = async (url, follows) => (await (await episodesPost({
+    request: new Request('https://ob.invalid' + url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ follows }) }), env: env3 })).json())
+
+  for (const sort of ['chart', 'sats', 'boosts', 'count', 'recent']) {
+    const body = await get(`/api/v1/episodes?not_medium=music&sort=${sort}&range=1w&limit=50`)
+    const row = body.episodes.find((e) => e.guid === 'ep-new')
+    check(`range=1w sort=${sort}: the un-enriched episode carries its show, from the boosts`, () => {
+      assert.ok(row, 'ep-new missing from the window')
+      assert.equal(row.show.guid, 'real-show')
+      assert.equal(row.show.title, 'The Real Show')
+      assert.equal(row.boosts, 5, 'the placeholder boost still counts')
+      assert.equal(row.boosters, 3)
+      assert.ok(!body.episodes.some((e) => e.guid === 'ep-music'), 'the music episode is on the wrong side of the partition')
+    })
+  }
+  check('the enriched episode still reads its show off its own row', async () => {
+    const body = await get('/api/v1/episodes?not_medium=music&sort=sats&range=1w&limit=50')
+    const row = body.episodes.find((e) => e.guid === 'ep-known')
+    assert.equal(row.show.guid, 'real-show'); assert.equal(row.title, 'Known Episode')
+  })
+  check('medium=music admits the row-less music episode through the resolved show', async () => {
+    const body = await get('/api/v1/episodes?medium=music&sort=sats&range=1w&limit=50')
+    assert.deepEqual(body.episodes.map((e) => e.guid), ['ep-music'])
+    assert.equal(body.episodes[0].show.title, 'An Album')
+  })
+  check('lang=en filters on the resolved show too', async () => {
+    const body = await get('/api/v1/episodes?not_medium=music&lang=en&sort=sats&range=1w&limit=50')
+    assert.ok(body.episodes.some((e) => e.guid === 'ep-new'))
+  })
+  check('the follows POST resolves the show the same way', async () => {
+    const body = await post('/api/v1/episodes?not_medium=music&sort=chart&range=1w&limit=50', [P[0], P[1]])
+    const row = body.episodes.find((e) => e.guid === 'ep-new')
+    assert.equal(row.show.guid, 'real-show'); assert.equal(row.show.title, 'The Real Show'); assert.equal(row.boosts, 4)
+  })
+  check('q= on the windowed path still names the show', async () => {
+    db3.prepare("INSERT INTO episodes_fts(item_guid,title,show) VALUES('ep-new','fresh one','The Real Show')").run()
+    const body = await get('/api/v1/episodes?not_medium=music&sort=sats&range=1w&q=fresh&limit=50')
+    assert.equal(body.episodes[0]?.show.guid, 'real-show')
+  })
+}
+
 console.log(`\n${failed ? `${failed} FAILED, ` : ''}${passed} passed`)

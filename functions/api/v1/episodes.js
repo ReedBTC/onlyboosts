@@ -406,39 +406,68 @@ export async function globalEpisodes(env, p) {
  * `followsIn` is a pre-validated, already-escaped SQL fragment (or null);
  * see the interpolation note in onRequestPost. */
 async function aggEpisodes(env, p, followsIn) {
-  const where = ["b.item_guid IS NOT NULL"];
-  if (followsIn) where.unshift(`b.booster_pubkey IN (${followsIn})`);
-  const args = [];
+  // Two WHERE clauses, because the aggregate is now two queries deep (see
+  // AGG_SELECT): the boost-level filters prune rows BEFORE the GROUP BY, the
+  // show-level ones (medium, language) apply to the show the GROUP resolved
+  // to, after it. Their bound arguments are concatenated in that order.
+  const inner = ["b.item_guid IS NOT NULL"];
+  const outer = [];
+  if (followsIn) inner.unshift(`b.booster_pubkey IN (${followsIn})`);
+  const innerArgs = [], outerArgs = [];
   // ⚠️ BOOST TIME, both of them: `range`'s bucket cutoff and the drawer
   // path's exact `since` are the same axis in two forms.
-  if (p.cutoff) { where.push("b.created_at >= ?"); args.push(p.cutoff); }
-  if (p.since) { where.push("b.created_at >= ?"); args.push(p.since); }
-  if (p.medium) { where.push("COALESCE(pc.medium,'podcast') = ?"); args.push(p.medium); }
-  if (p.notMedium) { where.push("COALESCE(pc.medium,'podcast') <> ?"); args.push(p.notMedium); }
-  { const w = langWhere(p.lang, "pc.language", args); if (w) where.push(w); }
-  if (p.podcast) { where.push("b.podcast_guid = ?"); args.push(p.podcast); }
+  if (p.cutoff) { inner.push("b.created_at >= ?"); innerArgs.push(p.cutoff); }
+  if (p.since) { inner.push("b.created_at >= ?"); innerArgs.push(p.since); }
+  if (p.podcast) { inner.push("b.podcast_guid = ?"); innerArgs.push(p.podcast); }
+  if (p.medium) { outer.push("COALESCE(pc.medium,'podcast') = ?"); outerArgs.push(p.medium); }
+  if (p.notMedium) { outer.push("COALESCE(pc.medium,'podcast') <> ?"); outerArgs.push(p.notMedium); }
+  { const w = langWhere(p.lang, "pc.language", outerArgs); if (w) outer.push(w); }
+  const args = [...innerArgs, ...outerArgs];
 
   // Aggregates are recomputed over the filtered boosts — the precomputed
   // columns are global all-time totals and would be wrong for any corpus this
   // path serves. Same tiebreak discipline as the precomputed path (a total
   // order, sort key not repeated); no index can serve a GROUP BY, so here it
   // is for stable paging rather than speed.
-  const agg = SORTS[p.sortKey].agg;
+  //
+  // ⚠️ THE SHOW IS RESOLVED FROM THE GROUP, NOT FROM AN ARBITRARY ROW OF IT
+  // (2026-09-06). This used to select `e.podcast_guid` and the `pc.*` columns
+  // under the GROUP BY with `pc` joined on `b.podcast_guid`. For an episode
+  // the collector has not enriched yet — no `episodes` row — the card's show
+  // guid came back null although every boost in the group named the show;
+  // and the bare `pc.*` columns came from whichever row SQLite happened to
+  // land on, so one boost carrying the rollup's `unknown:` placeholder was
+  // enough to blank the show's title on the whole card. Now the boosts are
+  // grouped first, the show guid is the episode row's or else the group's
+  // (MIN: deterministic, and a real guid sorts before the placeholder), and
+  // `episodes` and `podcasts` are joined to the resolved guid outside the
+  // aggregate. The medium and language filters apply to THAT show, which is
+  // why they sit in the outer WHERE.
   const AGG_SELECT = `
-    SELECT b.item_guid, e.podcast_guid, e.title, e.image, e.published,
-           e.episode_number, e.enclosure_url,
-           COUNT(*)                            AS boost_count,
-           COALESCE(SUM(b.sats),0)             AS total_sats,
-           COUNT(DISTINCT b.booster_pubkey)    AS booster_count,
-           MAX(b.created_at)                   AS latest_ts,
+    SELECT g.item_guid                         AS item_guid,
+           COALESCE(e.podcast_guid, g.b_podcast_guid) AS podcast_guid,
+           e.title, e.image, e.published, e.episode_number, e.enclosure_url,
+           g.boost_count                       AS boost_count,
+           g.total_sats                        AS total_sats,
+           g.booster_count                     AS booster_count,
+           g.latest_ts                         AS latest_ts,
            pc.title AS p_title, pc.image AS p_image, pc.artwork AS p_artwork,
            pc.feed_url AS p_feed, pc.medium AS p_medium, pc.author AS p_author,
            pc.language AS p_language
-    FROM boosts b
-    LEFT JOIN episodes e  ON e.item_guid    = b.item_guid
-    LEFT JOIN podcasts pc ON pc.podcast_guid = b.podcast_guid
-    WHERE ${where.join(" AND ")}
-    GROUP BY b.item_guid`;
+    FROM (
+      SELECT b.item_guid,
+             MIN(b.podcast_guid)                 AS b_podcast_guid,
+             COUNT(*)                            AS boost_count,
+             COALESCE(SUM(b.sats),0)             AS total_sats,
+             COUNT(DISTINCT b.booster_pubkey)    AS booster_count,
+             MAX(b.created_at)                   AS latest_ts
+      FROM boosts b
+      WHERE ${inner.join(" AND ")}
+      GROUP BY b.item_guid
+    ) g
+    LEFT JOIN episodes e  ON e.item_guid    = g.item_guid
+    LEFT JOIN podcasts pc ON pc.podcast_guid = COALESCE(e.podcast_guid, g.b_podcast_guid)
+    ${outer.length ? "WHERE " + outer.join(" AND ") : ""}`;
 
   let sql;
   /* The charts ladder over the aggregate — see the chart notes in podcasts.js
@@ -498,8 +527,10 @@ async function aggEpisodes(env, p, followsIn) {
       LIMIT ? OFFSET ?`;
     args.push(p.match, p.limit, p.offset);
   } else {
+    // Outside the aggregate the sort key exists only under its projected
+    // alias (the `agg` expression names `b`, which is inside the subquery).
     sql = `${AGG_SELECT}
-    ORDER BY ${agg} DESC, total_sats DESC, b.item_guid
+    ORDER BY ${SORTS[p.sortKey].alias} DESC, total_sats DESC, item_guid
     LIMIT ? OFFSET ?`;
     args.push(p.limit, p.offset);
   }

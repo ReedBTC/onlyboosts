@@ -188,6 +188,15 @@ check('the boost path gets primitives, not a serialized item', () => {
   assert.match(html, /data-noun="episode"/)
 })
 
+check('⚠️ the rollup\'s synthetic show guid never leaves the client', () => {
+  // item-guid-2 has no show, so toEpisodeShape files it under `unknown:item-guid-2`.
+  // That key is for grouping; on 2026-09-03 it reached a signed boost note as
+  // `podcast:guid:unknown:…` through data-show-guid → onBoostClick → the widget.
+  assert.doesNotMatch(bare, /data-show-guid=/)
+  assert.doesNotMatch(bare, /unknown/)
+  assert.match(html, /data-show-guid="show-guid-1"/, 'a real guid still ships')
+})
+
 check('no inline event handler anywhere in either card', () => {
   for (const s of [html, bare]) {
     assert.doesNotMatch(s, /\son[a-z]+=/)

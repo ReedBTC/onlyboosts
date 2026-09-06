@@ -1720,6 +1720,23 @@ All three are in `docs/feeds.md`. What a change would break:
   when `ev.sig` was present, so every repost from this site was an unrenderable
   bare kind-6. **When a new action is added, decide explicitly whether it needs the
   real signed event or only the projection.**
+- **⚠️ THE ROLLUP'S SYNTHETIC SHOW GUID NEVER LEAVES THE CLIENT.**
+  `toEpisodeShape` files a boost with no show under `unknown:<item_guid>` so it
+  can group; on 2026-09-03 that key reached a **signed boost note** as
+  `podcast:guid:unknown:…`, through the card's `data-show-guid` →
+  `onBoostClick` → the widget's tag builder (the collector heals such a note
+  after the fact, `resolve_guids.py`; the note itself is permanent). Since
+  2026-09-06 `show-link.js#isSyntheticGuid` is the one test and
+  `episode-card.js#realShowGuid` applies it at every site that hands a show
+  guid outside the page: the boost primitives, the note link, and the
+  Castamatic/Podverse subscribe links. **The same day the windowed
+  `/api/v1/episodes` rollup stopped losing the show of an un-enriched
+  episode**: it selected `e.podcast_guid` and bare `pc.*` columns under the
+  GROUP BY, so an episode with no row had a null show and one placeholder
+  boost blanked the show's title; the boosts are grouped first now and the
+  show joined to the resolved guid outside the aggregate (the medium and
+  language filters moved to that outer WHERE with it). `test-episode-card.mjs`
+  and `test-charts.mjs` pin both halves.
 - **⚠️ EVERY EPISODE LINK POINTS AT `/episode/<item-guid>`, AND THE QUALIFYING
   RULE IS THE TITLE**, not the guid. **Three copies of that one test must agree**:
   `show-link.js#episodePageHref`, `functions/show/[guid].js#episodePageUrl`, and

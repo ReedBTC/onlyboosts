@@ -42,12 +42,12 @@
  * what functions/_shared/detail-page.js has always done, so the site now has one
  * date format rather than one for the feeds and another for the detail pages.
  */
-import { showPageHref, episodePageHref } from './show-link.js?v=ob-v193'
-import { episodeBoostLink } from './episode-link.js?v=ob-v193'
-import { boosterPageHref, boosterLinkAttrs } from './booster-link.js?v=ob-v193'
-import { coverChain, httpsUrl } from './cover-art.js?v=ob-v193'
-import { htmlEscape, isSafeUrl, renderMessage } from './nostr-text.js?v=ob-v193'
-import { chartRanks, competitionRanks } from './rank.js?v=ob-v193'
+import { showPageHref, episodePageHref, isSyntheticGuid } from './show-link.js?v=ob-v194'
+import { episodeBoostLink } from './episode-link.js?v=ob-v194'
+import { boosterPageHref, boosterLinkAttrs } from './booster-link.js?v=ob-v194'
+import { coverChain, httpsUrl } from './cover-art.js?v=ob-v194'
+import { htmlEscape, isSafeUrl, renderMessage } from './nostr-text.js?v=ob-v194'
+import { chartRanks, competitionRanks } from './rank.js?v=ob-v194'
 
 const esc = htmlEscape
 
@@ -460,9 +460,24 @@ export function episodeNoteLink(item) {
   return episodeBoostLink({
     itemGuid: item.guid,
     title: item.ep?.title || '',
-    podcastGuid: item.ep?.podcast_guid || item.show?.podcast_guid || null,
+    podcastGuid: realShowGuid(item),
     feedId: item.ep?.feed_id || item.show?.feed_id || null,
   })
+}
+
+/**
+ * The show guid the card may hand to anything outside the page, or null.
+ *
+ * ⚠️ THE ROLLUP'S `unknown:<item_guid>` PLACEHOLDER IS RESOLVED TO NULL HERE
+ * (`show-link.js#isSyntheticGuid`). It reached a published boost note once,
+ * through `data-show-guid` → `episode-card-actions.js#onBoostClick` → the
+ * widget's `i` tag; with null the boost path falls back to the feed URL or
+ * feed id the card also carries, or shows its "Can't identify this show's
+ * feed" toast, and the note carries no show it cannot name.
+ */
+function realShowGuid(item) {
+  const g = item.ep?.podcast_guid || item.show?.podcast_guid || null
+  return isSyntheticGuid(g) ? null : g
 }
 
 // ── Subscribe links ──────────────────────────────────────────────────
@@ -482,7 +497,10 @@ export function episodeNoteLink(item) {
 function subscribeLinks(item) {
   const { ep, show, boosts } = item
   const feedId = ep.feed_id || show?.feed_id || null
-  const guid = ep.podcast_guid || null
+  // Third site the placeholder reached: a Castamatic / Podverse link built on
+  // `unknown:<item_guid>` is a link to nothing, so a synthetic guid means no
+  // guid-keyed app links at all.
+  const guid = realShowGuid(item)
   const itunes = show?.itunes_id || null
   const fountain = boosts.find((b) => typeof b.show_url === 'string' && /^https?:\/\/fountain\.fm\/show\//.test(b.show_url))?.show_url
 
@@ -793,7 +811,7 @@ export function episodeCardHtml(item, {
     attr('data-guid', item.guid) +
     attr('data-title', ep.title || '') +
     attr('data-noun', copy.noun) +
-    attr('data-show-guid', ep.podcast_guid || show?.podcast_guid) +
+    attr('data-show-guid', realShowGuid(item)) +
     attr('data-show-title', show?.title) +
     attr('data-feed-url', show?.feed_url) +
     attr('data-feed-id', ep.feed_id || show?.feed_id) +

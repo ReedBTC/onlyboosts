@@ -28,6 +28,21 @@
 const SYNTHETIC_PREFIX = 'unknown:'
 
 /**
+ * Is this the rollup's placeholder rather than a show's guid?
+ *
+ * ⚠️ A SYNTHETIC GUID MUST NEVER LEAVE THE CLIENT. It exists so
+ * `toEpisodeShape` can group boosts that carry no show, and it looks enough
+ * like a guid that one reached a signed Nostr note on 2026-09-03
+ * (`['i', 'podcast:guid:unknown:<item_guid>']`, through the card's
+ * `data-show-guid` and the widget's tag builder). Every site that hands a show
+ * guid to anything outside the page — a data attribute, a link, the boost
+ * path — resolves it to null through this test first.
+ */
+export function isSyntheticGuid(guid) {
+  return typeof guid === 'string' && guid.startsWith(SYNTHETIC_PREFIX)
+}
+
+/**
  * The landing-page URL for a show guid, or null when there isn't one.
  *
  * Callers should treat null as "render plain text": an unidentified show is
@@ -36,7 +51,7 @@ const SYNTHETIC_PREFIX = 'unknown:'
 export function showPageHref(guid) {
   if (typeof guid !== 'string') return null
   const g = guid.trim()
-  if (!g || g.startsWith(SYNTHETIC_PREFIX)) return null
+  if (!g || isSyntheticGuid(g)) return null
   return `/show/${encodeURIComponent(g)}`
 }
 
