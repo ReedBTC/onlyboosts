@@ -164,10 +164,24 @@ def log(msg):
 
 
 # ── the site's API ───────────────────────────────────────────────────────────
+# ⚠️ EVERY FETCH THIS BOT MAKES BYPASSES THE EDGE CACHE (2026-09-07). A zone
+# Cache Rule now caches the read API and the /hpw pages at Cloudflare's edge on
+# their own max-age (60s on the hours and chart endpoints, 300s on a board or
+# card page). This bot runs right after the D1 delta and hashes the endpoint
+# to decide whether to re-render, so a cached answer would say "unchanged" for
+# a board that just changed — or, worse, photograph the previous board. The
+# cache key includes the query string, so a fresh `_=<ms>` on every URL is a
+# guaranteed miss; the card frames also declare no-store server-side.
+def fresh(url):
+    sep = "&" if "?" in url else "?"
+    return f"{url}{sep}_={int(time.time() * 1000)}"
+
+
 def api(path, **params):
     url = f"{SITE}{path}"
     if params:
         url += "?" + urllib.parse.urlencode({k: v for k, v in params.items() if v is not None})
+    url = fresh(url)
     req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
     with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as r:
         return json.loads(r.read().decode("utf-8"))
@@ -357,7 +371,7 @@ def capture(browser, url, scale, clip_selector=None):
     ctx = browser.new_context(viewport=VIEWPORT, device_scale_factor=scale)
     try:
         page = ctx.new_page()
-        page.goto(url, wait_until="load", timeout=READY_TIMEOUT_MS)
+        page.goto(fresh(url), wait_until="load", timeout=READY_TIMEOUT_MS)
         if clip_selector:
             # Stand-in path: no ready flag to wait on, so settle the network
             # (avatars) and then clip to the board element.

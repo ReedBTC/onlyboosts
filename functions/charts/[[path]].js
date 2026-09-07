@@ -94,12 +94,17 @@ export async function onRequestHead(ctx) {
 
 // ── the responses ────────────────────────────────────────────────────────────
 
-function page(html, maxAge) {
+/* Every page this Function still serves is a card frame, and a card frame is
+   no-store (2026-09-07): the collector's bot photographs it right after the
+   D1 delta, and an edge-cached frame would photograph the previous board.
+   `maxAge` is kept in the signature because the data envelope still carries
+   it and the JSON endpoint still uses it; the frame ignores it. */
+function page(html, maxAge) { // eslint-disable-line no-unused-vars
   return new Response(html, {
     status: 200,
     headers: {
       "Content-Type": "text/html; charset=utf-8",
-      "Cache-Control": `public, max-age=${maxAge}`,
+      "Cache-Control": "no-store",
       // The card is the thing the bot photographs, never a page to index.
       "X-Robots-Tag": "noindex",
     },
