@@ -235,7 +235,7 @@ export async function onRequestGet({ request, env }) {
     ...(p.q ? { q: p.q } : {}),
     next_offset: nextOffset,
     episodes,
-  }, { cache: 300 });
+  }, { cache: 120 });
 }
 
 /** One page of the global ranking, as records. See readParams above for why

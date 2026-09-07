@@ -138,7 +138,7 @@ export async function onRequestGet({ request, env }) {
     ...(p.q ? { q: p.q } : {}),
     next_offset: nextOffset,
     publishers,
-  }, { cache: p.cutoff ? 120 : 300 });
+  }, { cache: 120 });
 }
 
 // The GET's status and headers, no body — link checkers and unfurlers HEAD

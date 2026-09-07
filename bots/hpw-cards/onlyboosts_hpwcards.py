@@ -200,14 +200,26 @@ def chart_ones(kind):
 
 
 def board_hash(envelope, field):
-    """Hash the board itself, not the envelope around it.
+    """Hash what the card draws, not the envelope around it.
 
     `generated`-style fields and the live week's moving `week_end` would change
     on every call and defeat the whole point; the `members` (hpw) or `rows`
-    (charts) array is exactly what the card draws.
+    (charts) array is what the card lists.
+
+    ⚠️ PLUS `is_current`, SINCE 2026-09-07. The card's header says "In
+    progress." while the week is live and the plain date range once it has
+    ended, and the frame reads that off the same flag. With the rows alone in
+    the hash, a week whose last boost landed before Monday kept the card it
+    was photographed with: Reed saw the Aug 31 – Sep 6 Shows card still saying
+    "In progress." days after the week closed, while the page beside it had
+    moved on. The rollover is a change to the card and it hashes as one. (The
+    flag is null on the all-time boards, which is a constant and hashes as
+    one.) Every existing card re-renders once the first run after this ships;
+    the checkpoint-per-render loop below spreads that over a few ticks.
     """
     board = envelope.get(field) or []
-    blob = json.dumps(board, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    drawn = {"is_current": envelope.get("is_current"), field: board}
+    blob = json.dumps(drawn, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
 

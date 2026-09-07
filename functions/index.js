@@ -115,9 +115,11 @@ export async function onRequestGet(context) {
     status: 200,
     headers: {
       "Content-Type": "text/html; charset=utf-8",
-      // Matches the two detail pages. The collector runs a five-minute cycle, so
-      // anything tighter buys nothing but origin load.
-      "Cache-Control": "public, max-age=300",
+      // Matches the four detail pages: two minutes is the collector's tick
+      // (2026-09-06), and since the zone Cache Rule of 2026-09-07 this
+      // header is honored at the edge, so it is how stale a visitor's copy
+      // can be. Reed's call: what a visitor sees moves with the tick.
+      "Cache-Control": "public, max-age=120",
     },
   });
 }

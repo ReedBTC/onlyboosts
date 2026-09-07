@@ -180,9 +180,10 @@ export async function onRequestGet(context) {
     status: 200,
     headers: {
       "Content-Type": "text/html; charset=utf-8",
-      // The collector runs a five-minute cycle, so anything tighter buys
-      // nothing but origin load.
-      "Cache-Control": "public, max-age=300",
+      // Two minutes is the collector's tick (2026-09-06), and since the zone
+      // Cache Rule of 2026-09-07 this header is honored at the edge, so it is
+      // how stale a visitor's copy can be. Reed's call.
+      "Cache-Control": "public, max-age=120",
     },
   });
 }
@@ -1079,6 +1080,6 @@ function notFound(guid) {
 </html>`;
   return new Response(html, {
     status: 404,
-    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=300" },
+    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=120" },
   });
 }

@@ -1692,7 +1692,14 @@ What a change elsewhere would break:
   the bot (`bots/hpw-cards/`) loads `/hpw/<key>/card`, waits for
   `html[data-card-ready="1"]`, captures 720x900 at 2x, and writes the PNG
   **inside the shards tree**, which is also what saves it from a `--delete`
-  mirror run. **⚠️ ITS STEP IN `run-incremental.sh` CARRIES A SECOND `push`,
+  mirror run. **A board is re-rendered when its hash moves, and since
+  2026-09-07 the hash covers the rows AND `is_current`**: the frame says "In
+  progress." off that flag, and with the rows alone a week whose last boost
+  landed before Monday kept its live-week card for good (Reed saw the
+  Aug 31 week's Shows card still "In progress." days later). **Every URL the
+  bot loads carries a `_=<ms>` cache-buster and the card frames answer
+  `no-store`**, because the zone Cache Rule of 2026-09-07 would otherwise
+  hand it the previous board. **⚠️ ITS STEP IN `run-incremental.sh` CARRIES A SECOND `push`,
   AND THAT IS NOT REDUNDANT**: the card photographs the live site and the live
   site reads D1, so the render has to follow `d1_sync --remote-delta` — which
   sits BELOW the routine `push`, so by then the rsync has already run. Rendering

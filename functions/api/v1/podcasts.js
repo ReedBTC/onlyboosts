@@ -172,7 +172,7 @@ export async function onRequestGet({ request, env }) {
     podcasts,
     // A windowed page is a live aggregate and a plain one is a precomputed read,
     // so they cache differently. Both are identical for every visitor.
-  }, { cache: p.cutoff ? 120 : 300 });
+  }, { cache: 120 });
 }
 
 /* Follows scope — Shows · Follows and Albums · Follows (2026-08-31, with the
