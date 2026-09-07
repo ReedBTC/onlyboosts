@@ -33,7 +33,7 @@ import { onRequestGet as publishersGet, onRequestPost as publishersPost } from '
 import { onRequestGet as membersGet } from '../functions/api/v1/members.js'
 import { PUBLISHERS } from '../functions/api/v1/_common.js'
 import { chartRanks } from '../assets/js/rank.js'
-import { feedRanks, renderStatTiles } from '../functions/_shared/feed-rank.js'
+import { feedRanks, renderStatTiles, chartCacheOf } from '../functions/_shared/feed-rank.js'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -777,6 +777,150 @@ async function call(handler, url, init) {
   check('no chart data at all, no strip — the tiles render exactly as before', () => {
     assert.ok(!bareHtml.includes('OnlyBoosts Charts'))
     assert.ok(bareHtml.includes('show-stats'))
+  })
+}
+
+// ── feedRanks — the chart table cache (2026-09-07) ─────────────────────────
+// The population query used to run four times per page view with a single
+// row kept; now each leaderboard is computed once, kept in KV, and looked
+// up. What these pin: the cached answer IS the direct answer, a warm cache
+// runs no chart query, a stale table is served and refreshed behind the
+// reader, a refresh under way is not repeated, and a malformed entry is
+// recomputed rather than trusted.
+{
+  console.log('\nfeedRanks — the chart table cache')
+  const makeKv = () => {
+    const store = new Map()
+    return {
+      store,
+      async get(k, o) { const v = store.get(k); if (v === undefined) return null; return o && o.type === 'json' ? JSON.parse(v) : v },
+      async put(k, v) { store.set(k, v) },
+    }
+  }
+  const tables = (kv) => [...kv.store.keys()].filter((k) => !k.endsWith(':lock'))
+  const stale = (kv) => { for (const k of tables(kv)) { const t = JSON.parse(kv.store.get(k)); t.t -= 400; kv.store.set(k, JSON.stringify(t)) } }
+  /* Counts a chart query when it RESOLVES, on a tick's delay, so a render that
+   * did not wait for the refresh is measurably ahead of it. */
+  let statements = 0
+  const countingDb = {
+    prepare(sql) {
+      const stmt = env.DB.prepare(sql)
+      return { bind(...args) {
+        const bound = stmt.bind(...args)
+        return { ...bound, all: async () => { await new Promise((r) => setTimeout(r, 5)); statements++; return bound.all() } }
+      } }
+    },
+  }
+
+  const showRow = db.prepare('SELECT * FROM podcasts WHERE podcast_guid = ?').get('s2')
+  const s7Row = db.prepare('SELECT * FROM podcasts WHERE podcast_guid = ?').get('s7')
+  const bare = await feedRanks(env.DB, 'show', showRow)
+  const bare7 = await feedRanks(env.DB, 'show', s7Row)
+  const kv = makeKv()
+  statements = 0
+  const cold = await feedRanks(countingDb, 'show', showRow, { kv })
+  check('a cold cache computes the four tables once and answers exactly what the direct path answers', () => {
+    assert.deepEqual(cold, bare)
+    assert.equal(statements, 4)
+    assert.equal(tables(kv).length, 4)
+    assert.ok(tables(kv).every((k) => k.startsWith('chart:v1:show:other:')), tables(kv).join(','))
+  })
+  statements = 0
+  const warm = await feedRanks(countingDb, 'show', showRow, { kv })
+  check('⚠️ a warm cache reads no chart rows from D1 at all', () => {
+    assert.deepEqual(warm, bare)
+    assert.equal(statements, 0)
+  })
+  statements = 0
+  const other = await feedRanks(countingDb, 'show', s7Row, { kv })
+  check('a second subject on the same population is a lookup, not a query', () => {
+    assert.deepEqual(other, bare7)
+    assert.equal(statements, 0)
+  })
+  const albumRow = db.prepare("SELECT * FROM podcasts WHERE medium = 'music' LIMIT 1").get()
+  statements = 0
+  await feedRanks(countingDb, 'show', albumRow, { kv })
+  check('⚠️ the other medium side is its own set of tables, not a lookup in the wrong one', () => {
+    assert.equal(statements, 4)
+    assert.equal(tables(kv).filter((k) => k.startsWith('chart:v1:show:music:')).length, 4)
+  })
+
+  stale(kv)
+  const pending = []
+  statements = 0
+  const served = await feedRanks(countingDb, 'show', showRow, { kv, waitUntil: (p) => pending.push(p) })
+  check('⚠️ a stale table is served as is and refreshed behind the reader', () => {
+    assert.deepEqual(served, bare)
+    assert.equal(statements, 0, 'the render itself ran no chart query')
+    assert.equal(pending.length, 4)
+  })
+  await Promise.all(pending)
+  check('the background refresh rewrote the four tables and left its locks', () => {
+    assert.equal(statements, 4)
+    const now = Math.floor(Date.now() / 1000)
+    for (const k of tables(kv).filter((k) => k.includes(':other:'))) assert.ok(now - JSON.parse(kv.store.get(k)).t <= 5, k)
+    assert.equal([...kv.store.keys()].filter((k) => k.endsWith(':lock')).length, 4)
+  })
+  stale(kv)
+  const pending2 = []
+  statements = 0
+  await feedRanks(countingDb, 'show', showRow, { kv, waitUntil: (p) => pending2.push(p) })
+  await Promise.all(pending2)
+  check('⚠️ a refresh already under way (lock held) is not repeated', () => {
+    assert.equal(statements, 0)
+  })
+  stale(kv)
+  statements = 0
+  const awaited = await feedRanks(countingDb, 'show', showRow, { kv })
+  check('with no waitUntil the stale refresh is awaited instead, still answering', () => {
+    assert.deepEqual(awaited, bare)
+  })
+
+  const kv2 = makeKv()
+  kv2.store.set('chart:v1:show:other:all', '{"nope":true}')
+  kv2.store.set('chart:v1:show:other:1w', 'not json at all')
+  statements = 0
+  const warn = console.warn
+  console.warn = () => {}   // the malformed entry is logged on its way to the recompute
+  const repaired = await feedRanks(countingDb, 'show', showRow, { kv: kv2 })
+  console.warn = warn
+  check('a malformed cache entry is recomputed, not trusted', () => {
+    assert.deepEqual(repaired, bare)
+    assert.equal(statements, 4)
+  })
+
+  const epRow = db.prepare(`SELECT e.*, pc.medium AS p_medium FROM episodes e
+    LEFT JOIN podcasts pc ON pc.podcast_guid = e.podcast_guid WHERE e.item_guid = ?`).get('ep-s2')
+  const kv3 = makeKv()
+  const direct = [
+    await feedRanks(env.DB, 'episode', epRow),
+    await feedRanks(env.DB, 'booster', { pk: M[0] }),
+    await feedRanks(env.DB, 'publisher', { guid: 'pu1' }),
+    await feedRanks(env.DB, 'booster', { pk: PB }),
+  ]
+  const cached = [
+    await feedRanks(env.DB, 'episode', epRow, { kv: kv3 }),
+    await feedRanks(env.DB, 'booster', { pk: M[0] }, { kv: kv3 }),
+    await feedRanks(env.DB, 'publisher', { guid: 'pu1' }, { kv: kv3 }),
+    await feedRanks(env.DB, 'booster', { pk: PB }, { kv: kv3 }),
+  ]
+  check('the cached answer is the direct answer for an episode, a member and an artist too', () => {
+    assert.ok(direct[0] && direct[1] && direct[2], 'the fixture subjects all rank')
+    assert.deepEqual(cached, direct)
+    assert.equal(cached[3], null, 'a publisher key is on no table')
+    assert.equal(tables(kv3).length, 12)
+  })
+
+  check('chartCacheOf: a dedicated CHART_KV wins, the oracle’s namespace is the fallback, nothing bound is no cache', () => {
+    const a = makeKv(), b = makeKv()
+    const ctx = { env: { CHART_KV: a, SIGN_RATELIMIT: b }, waitUntil() {} }
+    assert.equal(chartCacheOf(ctx).kv, a)
+    assert.equal(chartCacheOf({ env: { SIGN_RATELIMIT: b } }).kv, b)
+    assert.equal(chartCacheOf({ env: { SIGN_RATELIMIT: b } }).waitUntil, null)
+    assert.equal(typeof chartCacheOf(ctx).waitUntil, 'function')
+    assert.equal(chartCacheOf({ env: {} }).kv, null)
+    assert.equal(chartCacheOf({ env: { SIGN_RATELIMIT: { get() {} } } }).kv, null)
+    assert.equal(chartCacheOf(undefined).kv, null)
   })
 }
 

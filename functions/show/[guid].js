@@ -30,7 +30,7 @@ import {
 import { piHeaders, piGet } from "../_shared/podcast-index.js";
 import { parseNotes } from "../_shared/rich-text.js";
 // The stat tiles, each carrying its all-time global rank; /episode shares it.
-import { feedRanks, renderStatTiles } from "../_shared/feed-rank.js";
+import { feedRanks, renderStatTiles, chartCacheOf } from "../_shared/feed-rank.js";
 // The two drawers open on the chart formula over their own rows (2026-09-03).
 import { chartRanks, rankLabel } from "../../assets/js/rank.js";
 
@@ -84,7 +84,8 @@ const COMMUNITY_SHOWS_LIMIT = 150;
 // .show-more button the community wall uses.
 const PODROLL_VISIBLE = 10;
 
-export async function onRequestGet({ request, env, params }) {
+export async function onRequestGet(context) {
+  const { request, env, params } = context;
   let guid = params.guid;
   if (Array.isArray(guid)) guid = guid[0];
   try { guid = decodeURIComponent(guid); } catch { /* keep the raw form */ }
@@ -237,7 +238,7 @@ export async function onRequestGet({ request, env, params }) {
     // The show's all-time rank on Shows or Albums, by boosts, sats and
     // boosters. One scan of `podcasts`; never rejects, resolves null instead,
     // and the header prints no row for null. See functions/_shared/feed-rank.js.
-    feedRanks(env.DB, "show", show),
+    feedRanks(env.DB, "show", show, chartCacheOf(context)),
   ]);
 
   const boostRows = boosts.results || [];

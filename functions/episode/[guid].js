@@ -29,7 +29,7 @@ import {
 } from "../_shared/detail-page.js";
 import { itemsFromBoosts, renderCardPage, CARDS_PER_PAGE } from "../_shared/episode-cards.js";
 // The stat tiles, each carrying its all-time global rank; /show shares it.
-import { feedRanks, renderStatTiles } from "../_shared/feed-rank.js";
+import { feedRanks, renderStatTiles, chartCacheOf } from "../_shared/feed-rank.js";
 import { fetchCommunityBoosts } from "../api/v1/episodes/[guid].js";
 import { COPY as CARD_COPY } from "../../assets/js/episode-card.js";
 
@@ -69,7 +69,8 @@ const GUID_MAX = 400;
 // against a pathological row rather than a page size.
 const BOOSTS_CAP = 500;
 
-export async function onRequestGet({ env, params }) {
+export async function onRequestGet(context) {
+  const { env, params } = context;
   let guid = params.guid;
   if (Array.isArray(guid)) guid = guid[0];
   try { guid = decodeURIComponent(guid); } catch { /* keep the raw form */ }
@@ -158,7 +159,7 @@ export async function onRequestGet({ env, params }) {
     // The episode's all-time rank on Episodes or Songs, by boosts, sats and
     // boosters, compared on the same `episodes` aggregate columns the feed
     // sorts on. Never rejects; the header prints no row for null.
-    feedRanks(env.DB, "episode", ep),
+    feedRanks(env.DB, "episode", ep, chartCacheOf(context)),
   ]);
 
   const boostRows = boosts.results || [];

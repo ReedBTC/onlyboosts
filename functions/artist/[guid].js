@@ -46,7 +46,7 @@ import {
   htmlEscape, isSafeUrl, truncate, num, compact, relTime, jsonForScript,
   renderSupporters, renderBoosts, lookupMentionNames,
 } from "../_shared/detail-page.js";
-import { feedRanks, renderStatTiles } from "../_shared/feed-rank.js";
+import { feedRanks, renderStatTiles, chartCacheOf } from "../_shared/feed-rank.js";
 // The two drawers open on the chart formula over their own rows (2026-09-03).
 import { chartRanks, rankLabel } from "../../assets/js/rank.js";
 
@@ -84,7 +84,8 @@ const SUPPORTER_CAP = 500;
 // detail page opens on; boost-section.js pages the rest through ?corpus=1.
 const BOOSTS_SHOWN = 24;
 
-export async function onRequestGet({ env, params }) {
+export async function onRequestGet(context) {
+  const { env, params } = context;
   let guid = params.guid;
   if (Array.isArray(guid)) guid = guid[0];
   try { guid = decodeURIComponent(guid); } catch { /* keep the raw form */ }
@@ -220,7 +221,7 @@ export async function onRequestGet({ env, params }) {
       sats: totals.sats,
       boosts: totals.boosts,
       boosters: totals.boosters,
-    }),
+    }, chartCacheOf(context)),
   ]);
 
   const html = renderArtistPage({

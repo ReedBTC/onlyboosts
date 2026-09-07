@@ -1859,6 +1859,40 @@ What a change elsewhere would break:
   deliberately still the boosted list). It is a written exception to the
   rendering rule. **The Catalogue** in `docs/show-pages-spec.md` is the design
   record; `test-catalogue.mjs` covers the Function and the drawer markup.
+- **⚠️ THE CHART STRIP'S FOUR LEADERBOARDS ARE COMPUTED ONCE AND CACHED IN
+  KV, NOT ONCE PER PAGE VIEW — SINCE 2026-09-07, AND THE REASON WAS A BILL.**
+  `feedRanks` ran the population-wide `RANK()` query four times per render
+  with one row kept (all time + Week/Month/Year), 286k D1 rows read for the
+  all-time episode chart alone, ~590k per episode page and ~540k per booster
+  page; SEO and AI crawlers (Ahrefs, Semrush, Amazonbot, Meta) were 70% of
+  the page views, and D1 read **12 billion rows on 2026-09-04** against
+  ~150M/day before the strip shipped on 2026-08-31 — the month's included 25B
+  ran out that day and the budget alert fired. `chartTable` in
+  `feed-rank.js` now computes each (kind, medium side, window) table once,
+  keeps it in KV (`env.CHART_KV` if ever bound, else the oracle's
+  `SIGN_RATELIMIT` namespace under a `chart:` prefix), serves a stale copy
+  while refreshing behind `waitUntil`, and every page looks its subject up —
+  the all-time component chips too, so a warm render reads **no** chart rows,
+  and the ranking runs in JavaScript over the base rows (the SQL window
+  functions cost 286k rows per all-time episode table, the base 24k). **Two
+  minutes is the collector's tick**, Reed's call: a boost on the site is on
+  the strip too, so a share-card screenshot matches everything around it. `chartCacheOf(context)` is what
+  the four pages pass; with no KV (tests, local dev) it computes per call as
+  before. `test-charts.mjs` pins that the cached answer is the direct answer
+  and that a warm cache runs zero statements. **Same day, Reed blocked
+  Meta-ExternalAgent, Amazonbot, ClaudeBot and GPTBot in AI Crawl Control
+  and `robots.txt` disallows AhrefsBot, SemrushBot and MJ12bot.** The
+  read-only `CF_ANALYTICS_TOKEN` in `credentials.env` is how the per-query
+  numbers were pulled (GraphQL `d1QueriesAdaptiveGroups`); check it before
+  guessing at a D1 cost again. **⚠️ THE PAGES' `max-age=300` NEVER CACHED
+  ANYTHING AT THE EDGE.** Cloudflare caches only static file types by default
+  and ignores `Cache-Control` on HTML and JSON, so every Function response
+  answered `cf-cache-status: DYNAMIC` and every repeat hit ran the Function; a
+  zone Cache Rule marking the page and `/api/v1` paths eligible (respecting the
+  origin's own header, so the money endpoints' `no-store` still holds) is the
+  dashboard-side half, Reed's to set. (A HEAD request answers `no-store` on
+  the same paths, which is what misled the first diagnosis into blaming a
+  zone rule; check GET.)
 - **⚠️ THE RANK CHIP IS DRAWN ONLY INSIDE THE TOP 100** (`RANK_CUTOFF`), a
   display rule and not a change to `feedRanks`. It fails quietly to no third line.
   **`RANK_PUBLISHERS` in `feed-rank.js` restates `PUBLISHERS` from
