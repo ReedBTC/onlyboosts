@@ -34,6 +34,7 @@ import { feedRanks, renderStatTiles, chartCacheOf } from "../_shared/feed-rank.j
 // The two drawers open on the chart formula over their own rows (2026-09-03).
 import { chartRanks, rankLabel } from "../../assets/js/rank.js";
 
+import { headOf } from "../_shared/head.js";
 const SITE_ORIGIN = "https://onlyboosts.social";
 
 // ⚠️ EVERY SECTION id ON THIS PAGE IS A PUBLIC URL. `/show/<guid>#podroll` is
@@ -1390,3 +1391,6 @@ function notFound(guid) {
     headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=120" },
   });
 }
+
+// The GET's status and headers, no body — see _shared/head.js.
+export const onRequestHead = headOf(onRequestGet);

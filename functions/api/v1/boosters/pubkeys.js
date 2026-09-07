@@ -28,6 +28,7 @@
 // bech32-encoding 2,003 keys per response would be work done twice.
 import { json, preflight } from "../_common.js";
 
+import { headOf } from "../../../_shared/head.js";
 // Lowercase 64-char hex. The same test toHexPubkey applies, and the reason to
 // apply it is that /booster/<npub> binds the hex form to `booster_pubkey = ?`:
 // a row stored in any other shape has no page, so publishing it would hand the
@@ -63,3 +64,6 @@ export async function onRequestGet({ request, env }) {
     pubkeys,
   }, { cache: 1800 });
 }
+
+// The GET's status and headers, no body — see _shared/head.js.
+export const onRequestHead = headOf(onRequestGet);

@@ -1,6 +1,7 @@
 // GET /api/v1/stats — top-line totals (mirrors meta.json, straight from D1).
 import { json, preflight } from "./_common.js";
 
+import { headOf } from "../../_shared/head.js";
 export async function onRequestOptions({ request }) { return preflight(request); }
 
 export async function onRequestGet({ request, env }) {
@@ -15,3 +16,6 @@ export async function onRequestGet({ request, env }) {
   ).first();
   return json(request, row, { cache: 60 });
 }
+
+// The GET's status and headers, no body — see _shared/head.js.
+export const onRequestHead = headOf(onRequestGet);

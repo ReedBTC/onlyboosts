@@ -44,6 +44,7 @@ import { chartRanks, rankLabel } from "../../assets/js/rank.js";
 import { fetchBoosterCorpus } from "../api/v1/boosters/[npub].js";
 import { COPY as CARD_COPY } from "../../assets/js/episode-card.js";
 
+import { headOf } from "../_shared/head.js";
 const SITE_ORIGIN = "https://onlyboosts.social";
 const OG_FALLBACK = `${SITE_ORIGIN}/assets/onlyboosts_banner.png`;
 
@@ -1141,3 +1142,6 @@ function notFound(raw) {
     headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=120" },
   });
 }
+
+// The GET's status and headers, no body — see _shared/head.js.
+export const onRequestHead = headOf(onRequestGet);

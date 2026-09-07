@@ -1,3 +1,4 @@
+import { headOf } from "../../_shared/head.js";
 // GET /api/v1/boosts — the boost feed, filterable + cursor-paginated (newest first).
 // Query params: id=<event id> podcast=<guid> item=<guid> booster=<npub|hex>
 //               since= until= cursor= limit=
@@ -66,3 +67,6 @@ export async function onRequestGet({ request, env }) {
     boosts,
   });
 }
+
+// The GET's status and headers, no body — see _shared/head.js.
+export const onRequestHead = headOf(onRequestGet);

@@ -25,6 +25,7 @@
 // ranking, the search join, the ordering, the record shape — is written once.
 import { json, preflight, clampLimit, toHexPubkey, ftsMatch, readLang, langWhere } from "./_common.js";
 
+import { headOf } from "../../_shared/head.js";
 export async function onRequestOptions({ request }) { return preflight(request); }
 
 // `col` is the all-time column; `agg` the windowed expression and `alias` the
@@ -426,3 +427,6 @@ export async function globalPodcasts(env, p) {
     nextOffset: podcasts.length === p.limit ? p.offset + p.limit : null,
   };
 }
+
+// The GET's status and headers, no body — see _shared/head.js.
+export const onRequestHead = headOf(onRequestGet);

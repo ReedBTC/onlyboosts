@@ -2,6 +2,7 @@
 // boostagram text, podcast titles/authors, or episode titles.
 import { json, preflight, BOOST_SELECT, boostRecord, clampLimit, ftsMatch } from "./_common.js";
 
+import { headOf } from "../../_shared/head.js";
 export async function onRequestOptions({ request }) { return preflight(request); }
 
 export async function onRequestGet({ request, env }) {
@@ -71,3 +72,6 @@ export async function onRequestGet({ request, env }) {
   ).bind(match, limit).all();
   return json(request, { type, q, count: results.length, boosts: results.map(boostRecord) });
 }
+
+// The GET's status and headers, no body — see _shared/head.js.
+export const onRequestHead = headOf(onRequestGet);

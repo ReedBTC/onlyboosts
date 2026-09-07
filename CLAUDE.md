@@ -459,6 +459,7 @@ Sixteen test scripts, all plain `node scripts/<name>.mjs` with no runner:
 | `test-weekly-charts.mjs` | the OnlyBoosts Charts: the **shipped** `/charts` Function (the old page URLs' redirects and the five **card frames**), **`/api/v1/charts`** and the **`/api/og/charts` proxy** (fetch stubbed), over a `node:sqlite` build of the real `schema.sql`, on the members-hours pattern; plus the two-sided source scan of `chart-board.js`. The routing contract (one URL per week, HEAD answered); the Shows and Artists Top 10s against a **brute-forced independent implementation** of the chart rule, component-rank triplets included; the medium partition; the Members pair (the hours board held to brute-forced hours, the publisher exclusion); and every Weeks at #1 tally — completed weeks only, a tied #1 crediting every holder, a fixture week whose #1 is decided by the tiebreak CHAIN. The retired kinds (episodes, albums, songs) stay covered at module level. Confirmed red on six mutations: the chain flipped, the live week counted on each side, the medium filter dropped, the per-week `PARTITION BY` removed, and the member boards' publisher exclusion dropped |
 | `test-catalogue.mjs` | `/api/catalogue`, the /show episode drawer's catalogue: the **shipped** handlers with **`fetch` stubbed**, so it never asks Podcast Index. The five-field projection (coerced, guid-less and duplicate items dropped, newest first with undated rows last, a total order), the request contract (400/503, a PI miss answered 200-empty and `no-store`, HEAD, OPTIONS, the exact-match CORS origin), the fallback route through `podcasts/byguid` and `byfeedurl` to `episodes/byfeedid`, `truncated` at PI's ceiling, and **the streamed byte cap added to `_shared/podcast-index.js#piGet`**, at the cap and past it. Confirmed red on three mutations: the undated rule flipped, the duplicate guard removed, the cap's comparison made `>=` |
 | `test-boost-ingest.mjs` | `/api/v1/boosts/ingest` (2026-09-06): the **shipped** handler over a `node:sqlite` build of the real `schema.sql`, fed by the **shipped** note builder and a real signature. The row as the collector would read it, the FTS row and the `boosts_edge` marker, the show's five and the episode's four aggregates against a brute-force recount (`booster_count` DISTINCT), the title-only episode stub and its non-creation over a collector-filled row, the collector's `INSERT OR REPLACE` overwriting the stub, idempotence, every refusal (tampered, foreign client tag, no show, donation shape, outside the ±15 min window — and a 10-minute-old note admitted where the oracle's own ±5 would refuse), 503 with no D1 or KV, 429 past the limiter, `no-store`. Confirmed red on three mutations: DISTINCT dropped, the existence pre-read removed, `verifyEvent` bypassed |
+| `test-head-routes.mjs` | every Function exporting `onRequestGet` also exports `onRequestHead` (2026-09-07): a **source scan** of `functions/` with the two money endpoints as the allowlist (and a check that the allowlist is not stale), every such module importable, and `headOf` itself: the GET's status and every header with no body, run once with the same context, a redirect preserved |
 | `test-value.mjs` | `/api/value`, the value-block resolver every boost pays through (2026-09-06): the **shipped** handler with **`fetch` stubbed**. The stored feed URL resolves before the guid (the live record's splits, the guid never asked), the guid fallback, an unusable URL as no lookup, `feedId` short-circuiting both, the episode-level block over the feed's under the same record, recipient normalization, 200 `value:null` for a feed PI lacks, 400/503/204 and the exact-match origin. Confirmed red on two mutations: the order flipped back, the episode preference dropped |
 
 **⚠️ `test-server-render.mjs` IS THE ONE THAT NEEDS AN ARGUMENT, SO IT IS THE ONE
@@ -466,9 +467,9 @@ THAT GOES UNRUN.** Its header carries the `curl` that produces the capture; take
 a fresh one rather than reusing an old file, since it is also the size
 measurement. It asserted `cards are numbered 1..N with no gaps` — the *ordinal*
 scheme's invariant — until competition ranking shipped on 2026-08-18, and it
-would have been merged red had it not been run. **Run all twenty-two before a
+would have been merged red had it not been run. **Run all twenty-three before a
 merge**, and treat this one as the guard on the ranking scheme rather than only
-on weight. *(It read "all twelve" until 2026-08-24, "all fifteen" until 2026-08-30, "all sixteen" and then "all seventeen" until 2026-08-31, and "all eighteen" and then "all nineteen" until 2026-09-04, and "all twenty" and then "all twenty-one" until 2026-09-06, contradicting the table
+on weight. *(It read "all twelve" until 2026-08-24, "all fifteen" until 2026-08-30, "all sixteen" and then "all seventeen" until 2026-08-31, and "all eighteen" and then "all nineteen" until 2026-09-04, and "all twenty" and then "all twenty-one" until 2026-09-06, and "all twenty-two" until 2026-09-07, contradicting the table
 directly above it — the count moved when a test was added and this sentence did
 not. If the table grows again, this line grows with it.)*
 
@@ -726,7 +727,15 @@ What a change would break:
   `onRequestHead`** (the GET's status and headers, no body). Pages routes by
   method, and a HEAD with no handler falls through to the static lookup and
   answers 404 for a URL whose GET is fine; link checkers and some unfurlers
-  HEAD first. Bitten three times in two days on 2026-08-29/30.
+  HEAD first. Bitten three times in two days on 2026-08-29/30 — **and the
+  rule was then found unenforced on 2026-09-07: `/show`, `/episode`,
+  `/booster`, `/` and every `/api/v1` endpoint still answered 404 to HEAD.**
+  The handler is one line now, `export const onRequestHead =
+  headOf(onRequestGet)` from `functions/_shared/head.js`, and
+  `test-head-routes.mjs` scans `functions/` for any GET without it. **The two
+  money endpoints, `/api/lnurl` and `/api/keysend`, are the allowlist on
+  purpose**: their GET asks a third party for an invoice or a node record,
+  which a link checker's HEAD must not do.
 - **CORS origin allowlists are exact-match `Set` lookups**, never `startsWith` —
   a prefix check lets a lookalike origin get reflected into
   `Access-Control-Allow-Origin`.

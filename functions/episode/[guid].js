@@ -33,6 +33,7 @@ import { feedRanks, renderStatTiles, chartCacheOf } from "../_shared/feed-rank.j
 import { fetchCommunityBoosts } from "../api/v1/episodes/[guid].js";
 import { COPY as CARD_COPY } from "../../assets/js/episode-card.js";
 
+import { headOf } from "../_shared/head.js";
 const SITE_ORIGIN = "https://onlyboosts.social";
 
 // ⚠️ EVERY SECTION id ON THIS PAGE IS A PUBLIC URL, exactly as on /show/<guid>:
@@ -1083,3 +1084,6 @@ function notFound(guid) {
     headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=120" },
   });
 }
+
+// The GET's status and headers, no body — see _shared/head.js.
+export const onRequestHead = headOf(onRequestGet);

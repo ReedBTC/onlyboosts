@@ -21,6 +21,7 @@ import { json, preflight, BOOST_SELECT, boostRecord, toHexPubkey,
          encodeCursor, decodeCursor, clampLimit } from "../_common.js";
 import { lookupMentionNames } from "../../../_shared/detail-page.js";
 
+import { headOf } from "../../../_shared/head.js";
 // See the note above: ~2x the heaviest booster in the index.
 const CORPUS_CAP = 2000;
 
@@ -144,3 +145,6 @@ export async function fetchBoosterCorpus(env, hex, { names: wantNames = false } 
     npub: rows[0]?.booster_npub,
   };
 }
+
+// The GET's status and headers, no body — see _shared/head.js.
+export const onRequestHead = headOf(onRequestGet);

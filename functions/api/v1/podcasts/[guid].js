@@ -16,6 +16,7 @@
 import { json, preflight, BOOST_SELECT, boostRecord, clampLimit } from "../_common.js";
 import { lookupMentionNames } from "../../../_shared/detail-page.js";
 
+import { headOf } from "../../../_shared/head.js";
 export async function onRequestOptions({ request }) { return preflight(request); }
 
 // The busiest show in the index has 210 boosters, so this is a guard against a
@@ -204,3 +205,6 @@ async function fetchSupporters(env, guid) {
     latest: r.latest || null,
   }));
 }
+
+// The GET's status and headers, no body — see _shared/head.js.
+export const onRequestHead = headOf(onRequestGet);
