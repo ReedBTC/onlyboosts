@@ -22,11 +22,11 @@
  * Nothing on the list is dropped for being unresolvable: an entry nobody can
  * name renders its guid, since it is still somebody's favorite.
  */
-import { fetchFavorites, widgetDeps } from '/assets/js/favorites-sync.js?v=ob-v205'
-import { favoriteButtonHtml } from '/assets/js/favorite-button.js?v=ob-v205'
-import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v205'
-import { isSafeUrl } from '/assets/js/nostr-text.js?v=ob-v205'
-import { sortControl } from '/assets/js/feed-controls.js?v=ob-v205'
+import { fetchFavorites, widgetDeps } from '/assets/js/favorites-sync.js?v=ob-v206'
+import { favoriteButtonHtml } from '/assets/js/favorite-button.js?v=ob-v206'
+import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v206'
+import { isSafeUrl } from '/assets/js/nostr-text.js?v=ob-v206'
+import { sortControl } from '/assets/js/feed-controls.js?v=ob-v206'
 
 const RESOLVE_URL = '/api/v1/favorites/resolve'
 
@@ -207,7 +207,7 @@ export function rowHtml(row, group, { owner = false } = {}) {
 
 export function groupsHtml(groups, { owner = false } = {}) {
   return groups.map((g) =>
-    `<h3 class="fav-group-title">${esc(g.title)}<span class="fav-count">${g.rows.length}</span></h3>` +
+    `<h3 class="fav-group-title">${esc(g.title)}</h3>` +
     `<ul class="ep-list cs-list">${g.rows.map((r) => rowHtml(r, g, { owner })).join('')}</ul>`,
   ).join('')
 }

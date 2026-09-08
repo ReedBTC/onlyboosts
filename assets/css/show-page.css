@@ -1177,7 +1177,15 @@ a.boost-who:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px
   text-transform: uppercase;
   color: var(--ink-muted, var(--navy-l));
 }
-.fav-group-title .fav-count { font-weight: 400; opacity: 0.75; margin-left: 0.35rem; }
+/* The drawer's dropdown menu is absolutely positioned below its pill, and
+   .ep-drawer clips its overflow to keep its rounded corners; on a short or
+   empty list the menu had nowhere to open into (Reed, 2026-09-09). This
+   drawer overflows when open, and the lid and the foot carry the corner
+   radii themselves so nothing else changes. */
+[data-booster-favorites] .ep-drawer[open] { overflow: visible; }
+[data-booster-favorites] .ep-drawer[open] > summary { border-radius: 11px 11px 0 0; }
+[data-booster-favorites] .ep-drawer[open] > :last-child { border-radius: 0 0 11px 11px; }
+[data-booster-favorites] .ep-drawer[open] .cs-controls { position: relative; z-index: 2; }
 .fav-groups .cs-row .cs-rank { display: none; }
 .fav-groups .cs-row .ob-fav-pill { margin-right: 0.6rem; }
 .fav-groups .cs-row .cs-link--external .cs-title::after { content: ' ↗'; opacity: 0.6; font-size: 0.85em; }
