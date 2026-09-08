@@ -70,6 +70,28 @@ better than a real boost filtered out).
   note text (APP_DOMAINS) for apps the classifier leaves null. A bot that
   publishes none of these contributes no tier-2/3 evidence — by design.
 
+  BOTH SIDES OF A COMPARISON ARE NORMALISED FIRST, AND EACH REPAIR CLOSED A
+  MEASURED HOLE (2026-09-08, Reed's report of one visibly duplicated pair;
+  the two together mark 3 relay notes over full history, 1,544 sats, and lose
+  none):
+
+    * A `nostr:npub1…` mention is resolved to the name this index holds for
+      it, because the donor's app prints the URI where the bot prints `@Name`
+      and `_TOKEN` strips the URI. One shared sentence therefore arrived as
+      two runs too short to be evidence, and the bot's rendering of the name
+      read as prose the partner contradicted — blocking a same-app pair 25
+      seconds apart. See `_resolve_mentions`.
+    * A note's own app name is neutralised from `note_app` and its via-line
+      rather than from a list of app names, which is what lagged: an app not
+      on any list read as the donor's only word, so a bot note with NO donor
+      prose looked contradicted instead of taking tier 3. See `_app_words`.
+
+  Rejected the same day, and worth not re-inventing: bridging the run across
+  the stripped token (a wildcard word matching anything) needs no profile
+  lookup and catches the pair, but it also paired an LB publisher note with a
+  DIFFERENT payment's note 22 minutes away on an accidental 3-word run. The
+  evidence has to be the same word, not a hole in the same place.
+
   Measured on the full corpus 2026-08-24 (1,027 chadf-boostbot notes): 62
   duplicates — 42 BoostMeBitch, 14 StableKraft, 6 Bowl After Bowl — 25,265
   over-counted sats, max true-pair gap 162s. Distinctive-overlap separation
@@ -95,9 +117,17 @@ minutes, but relay/scan order can deliver either side first, so unmarked
 relay notes are re-evaluated every tick until the window ages them out).
 """
 import re
+import sys
 import time
+from pathlib import Path
 
+import clients
 import db
+
+if str(Path(__file__).resolve().parent.parent / "shared") not in sys.path:
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "shared"))
+
+from nostr_utils import npub_to_hex          # noqa: E402
 
 # Publishers whose notes RESTATE a node payment other apps also publish notes
 # for — the only droppable side. localbitcoiners checks this very index before
@@ -129,10 +159,68 @@ this is at in zap zapped sent""".split())
 _TOKEN = re.compile(r"(?:nostr:\S+|https?://\S+)")
 _WORD = re.compile(r"[^\W_]+", re.UNICODE)
 _VIA_LINE = re.compile("\N{MOBILE PHONE}\\s*via\\s+(.+?)\\s*(?:\\n|$)")
+_MENTION = re.compile(r"nostr:(npub1[02-9ac-hj-np-z]{20,})")
+_NAMES = {}
+
+
+def _mention_name(conn, bech):
+    """The display name OUR index holds for a mentioned npub, or "" if none."""
+    if bech not in _NAMES:
+        name = ""
+        try:
+            pk = npub_to_hex(bech)
+            row = conn.execute("SELECT COALESCE(name, display_name) FROM "
+                               "profiles WHERE pubkey=?", (pk,)).fetchone()
+            if row and row[0]:
+                name = str(row[0])
+        except Exception:
+            pass
+        _NAMES[bech] = name
+    return _NAMES[bech]
+
+
+def _resolve_mentions(conn, text):
+    """One mention, two renderings: the donor's app writes `nostr:npub1…` and
+    the relay bot writes the profile's `@Name`. `_TOKEN` strips the URI, so the
+    ONE sentence they share arrives as two short runs either side of the hole,
+    and the bot's `reed` reads as prose the partner contradicts — which blocks
+    even a same-app match 25 seconds apart, by design. Resolving the URI to the
+    name this index already stores makes the two renderings the same word.
+
+    It is not a loosening: an npub we hold no profile for still strips to
+    nothing (fails closed), a name that disagrees with the bot's still
+    contradicts, and every other tier is untouched. Measured over full history
+    2026-09-08: 2 pairs found (both same-app, 25s and 27s apart), 0 lost.
+    `nprofile1…` is deliberately not decoded — 2 in the corpus against 2,103
+    npubs — and strips as before.
+    """
+    return _MENTION.sub(lambda m: " " + (_mention_name(conn, m.group(1)) or " ")
+                        + " ", text or "")
 
 
 def _words(text):
     return [w.lower() for w in _WORD.findall(_TOKEN.sub(" ", text or ""))]
+
+
+def _app_words(row):
+    """The app name THIS note prints about itself, which is never donor prose.
+
+    Derived per note rather than read off a list, because the list is what
+    lags: a bot note whose whole text was `⚡ 1111 sats /
+    📱 via BoostMeBuddy` had `boostmebuddy` counted as the
+    donor's own word — an app four months old and not in any literal here nor
+    in clients.DISPLAY_NAMES, which labels a slug and does not gate it. So a
+    no-prose note six seconds from its partner, same app on both sides, read
+    as CONTRADICTED prose and was let through (1,111 sats, found 2026-09-08).
+    `note_app` and the via-line answer for any app, including the next one."""
+    words = set()
+    app = note_app(row)
+    if app:
+        words.update(_words(app.replace("-", " ")))
+    m = _VIA_LINE.search(row["message"] or "")
+    if m:
+        words.update(_words(m.group(1)))
+    return words
 
 
 def _known_facts(conn, row):
@@ -145,6 +233,9 @@ def _known_facts(conn, row):
     known.update({"fountain", "castamatic", "podcastguru", "curiocaster",
                   "podverse", "onlyboosts", "localbitcoiners", "fm", "com",
                   "app", "social"})
+    known.update(_words(" ".join(clients.DISPLAY_NAMES.values())))
+    known.update(w for slug in clients.DISPLAY_NAMES
+                 for w in _words(slug.replace("-", " ")))
     if row["item_guid"]:
         for t in conn.execute("SELECT title FROM episodes WHERE item_guid=?",
                               (row["item_guid"],)):
@@ -199,9 +290,15 @@ def note_app(row):
 
 def _match(conn, b, cands, claimed):
     """The evidence tiers, against one relay note. Returns (partner, tier, gap)
-    or None. `cands` already satisfy the hard key within MSG_WINDOW."""
-    known = _known_facts(conn, b)
-    bw = _words(b["message"])
+    or None. `cands` already satisfy the hard key within MSG_WINDOW.
+
+    Both texts arrive mention-resolved (`_resolve_mentions`) and with every
+    note's own app name neutralised (`_app_words`); both are corrections, and
+    each has its reason where it is defined."""
+    known = _known_facts(conn, b) | _app_words(b)
+    for o in cands:
+        known |= _app_words(o)
+    bw = _words(_resolve_mentions(conn, b["message"]))
     b_prose = set(_distinctive(bw, known))
     b_app = note_app(b)
     best = None
@@ -209,7 +306,7 @@ def _match(conn, b, cands, claimed):
         if o["event_id"] in claimed:
             continue
         gap = abs(o["created_at"] - b["created_at"])
-        ow = _words(o["message"])
+        ow = _words(_resolve_mentions(conn, o["message"]))
         run = _overlap_run(bw, ow, known)
         apps_agree = b_app is not None and note_app(o) == b_app
         if run >= STRONG_OVERLAP:
