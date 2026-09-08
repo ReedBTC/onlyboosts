@@ -1,16 +1,17 @@
 # PC 2.0 Favorites (kind 10333)
 
 The design record for OnlyBoosts' support of Chad Farrow's cross-app podcast
-favorites. **Status, 2026-09-07: phase one built, nothing on any surface, no
-relay ever written.** The merge module and its test exist; the button, the
-`/booster` section, the writer and the settings rows do not.
+favorites. **Status, 2026-09-08: steps one and two built, nothing on any surface, no
+relay ever written.** The merge module and the relay reader exist with their
+tests; the writer, the button, the `/booster` section and the settings rows
+do not.
 
 | | |
 |---|---|
 | Spec | https://github.com/ChadFarrow/PC20-Nostr/blob/main/pc20-favorites.md (re-read it before building on this file; it moved five times in the first week of September 2026, the last a rewrite of the item entry) |
 | Vendored vectors | `scripts/vendor/pc20-favorites/` at the SHA in its `PROVENANCE` |
-| The module | `assets/js/favorites-merge.js`, the spec's reference implementation with two adaptations |
-| The test | `node scripts/test-favorites-merge.mjs` |
+| The merge | `assets/js/favorites-merge.js`, the spec's reference implementation with two adaptations; `node scripts/test-favorites-merge.mjs` |
+| The reader | `assets/js/favorites-read.js`, per-relay trust on raw sockets; `node scripts/test-favorites-read.mjs` |
 | Other writers | BoostMeBitch (`lib/nostr/favorites-list.ts`) and StableKraft (`lib/nostr/favorites-single-list.ts`); both carry `content`, both write the `visibility` tag, both implement the private half |
 
 ## What The List Is
@@ -102,12 +103,29 @@ held the current event; `relay.ditto.pub` a copy 19 hours stale;
 three weeks stale; `relay.primal.net`, `relay.snort.social` and
 `theforest.nostr1.com` nothing, though both apps publish to primal.
 
-So: **read** nos.lol, damus, ditto and mostr plus the user's NIP-65 write
-relays; require two answers; newest `created_at` wins; **never publish on a
-degraded read** (rule 1, and BMB's rule too). **Publish** to nos.lol, damus and
-ditto plus the NIP-65 write relays. A throwaway-key publish test of primal is
-still owed. Chad's own hardcoded set (BMB's `DEFAULT_RELAYS`) includes fountain
-and primal and he reports it fine; the difference is that his apps have a local
+**The reader (`favorites-read.js`, step two, 2026-09-08)** reads nos.lol,
+damus, ditto and mostr plus the member's NIP-65 write relays through
+`extraRelays`, one raw socket each, and counts for itself: a relay is
+*reached* when its socket opened and has *answered* when it sent EOSE inside
+the window (6s). The read is trusted only when **every reached relay answered
+and at least two did**; a relay that never connected is out of both counts, so
+a dead default does not degrade every read forever, and a relay that connected
+and hung is a genuine unknown, so it does. A CLOSED (fountain's "kinds not
+supported") is a refusal and is excluded rather than counted as evidence of an
+empty list. Only an event of the right kind, by the right pubkey, with a
+verifying signature counts; newest `created_at` wins and a tie goes to the
+lowest id. An untrusted read hands the merge `null`, which is not an empty
+list; a trusted read with nothing held is `{tags: [], content: ''}`. BMB's
+`read-trust.ts` is the rule this restates, with the two-answer floor added
+because mostr alone would have been "event in hand". The test drives the
+shipped module against scripted sockets; the live smoke on 2026-09-08 read
+Chad's list from five relays in under a second, with primal now holding the
+current copy too.
+
+**Publish** (step three) goes to nos.lol, damus and ditto plus the NIP-65
+write relays. A throwaway-key publish test is still owed before the writer
+ships. Chad's own hardcoded set (BMB's `DEFAULT_RELAYS`) includes fountain and
+primal and he reports it fine; the difference is that his apps have a local
 library to fall back on and this site does not.
 
 ## Decisions Standing From The 2026-09-06 Session
@@ -132,8 +150,7 @@ library to fall back on and this site does not.
 
 ## What Is Next
 
-1. The relay reader: raw sockets or nostr-tools, two-relay agreement, newest
-   wins, `null` for a degraded read.
+1. ~~The relay reader~~ built 2026-09-08.
 2. The writer around `plan`: baseline per pubkey per half in `localStorage`,
    NIP-44 through the widget's signer, publish, record the baseline only on a
    relay's OK.

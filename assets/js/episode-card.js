@@ -42,12 +42,12 @@
  * what functions/_shared/detail-page.js has always done, so the site now has one
  * date format rather than one for the feeds and another for the detail pages.
  */
-import { showPageHref, episodePageHref, isSyntheticGuid } from './show-link.js?v=ob-v195'
-import { episodeBoostLink } from './episode-link.js?v=ob-v195'
-import { boosterPageHref, boosterLinkAttrs } from './booster-link.js?v=ob-v195'
-import { coverChain, httpsUrl } from './cover-art.js?v=ob-v195'
-import { htmlEscape, isSafeUrl, renderMessage } from './nostr-text.js?v=ob-v195'
-import { chartRanks, competitionRanks } from './rank.js?v=ob-v195'
+import { showPageHref, episodePageHref, isSyntheticGuid } from './show-link.js?v=ob-v196'
+import { episodeBoostLink } from './episode-link.js?v=ob-v196'
+import { boosterPageHref, boosterLinkAttrs } from './booster-link.js?v=ob-v196'
+import { coverChain, httpsUrl } from './cover-art.js?v=ob-v196'
+import { htmlEscape, isSafeUrl, renderMessage } from './nostr-text.js?v=ob-v196'
+import { chartRanks, competitionRanks } from './rank.js?v=ob-v196'
 
 const esc = htmlEscape
 

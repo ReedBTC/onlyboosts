@@ -462,15 +462,16 @@ Sixteen test scripts, all plain `node scripts/<name>.mjs` with no runner:
 | `test-boost-ingest.mjs` | `/api/v1/boosts/ingest` (2026-09-06): the **shipped** handler over a `node:sqlite` build of the real `schema.sql`, fed by the **shipped** note builder and a real signature. The row as the collector would read it, the FTS row and the `boosts_edge` marker, the show's five and the episode's four aggregates against a brute-force recount (`booster_count` DISTINCT), the title-only episode stub and its non-creation over a collector-filled row, the collector's `INSERT OR REPLACE` overwriting the stub, idempotence, every refusal (tampered, foreign client tag, no show, donation shape, outside the ±15 min window — and a 10-minute-old note admitted where the oracle's own ±5 would refuse), 503 with no D1 or KV, 429 past the limiter, `no-store`. Confirmed red on three mutations: DISTINCT dropped, the existence pre-read removed, `verifyEvent` bypassed |
 | `test-value.mjs` | `/api/value`, the value-block resolver every boost pays through (2026-09-06): the **shipped** handler with **`fetch` stubbed**. The stored feed URL resolves before the guid (the live record's splits, the guid never asked), the guid fallback, an unusable URL as no lookup, `feedId` short-circuiting both, the episode-level block over the feed's under the same record, recipient normalization, 200 `value:null` for a feed PI lacks, 400/503/204 and the exact-match origin. Confirmed red on two mutations: the order flipped back, the episode preference dropped |
 | `test-favorites-merge.mjs` | the PC 2.0 Favorites merge (2026-09-07): the **spec's own 28 vectors**, vendored in `scripts/vendor/pc20-favorites/` with their upstream SHA, run against the **shipped** `favorites-merge.js` through a shim that supplies the spec's stand-in codec; the async seam the reference lacks (`readPrivate` in, `privatePlaintext` out, an opaque half carried byte for byte, an empty one `''`); and a source scan (no imports, no stand-in codec, no Buffer, no clock, no locale, no DOM), and the legacy two-element item's dual-read. Confirmed red on five mutations: rule 5 removed, an untrusted read treated as empty, the opaque half replaced with `''`, the read compared as it arrived rather than reframed, and an entry keyed on position 1 alone |
+| `test-favorites-read.mjs` | the favorites relay reader (2026-09-08): the **shipped** `favorites-read.js` with its one bundle import repointed at nostr-tools, driven against **scripted sockets** that answer, hang, refuse, never connect, drop, forge and disagree, with really signed events. The trust rule (every reached relay answered, at least two), the refusal exclusion, the dead-entry exclusion, newest-wins and the lowest-id tie, the signature check through JSON the way a relay message arrives, the REQ's shape, the timeout. Confirmed red on six mutations: the two-answer floor dropped, a hung relay excused, offline read as empty, the tiebreak flipped, the signature skipped, a refusal counted as an answer |
 
 **⚠️ `test-server-render.mjs` IS THE ONE THAT NEEDS AN ARGUMENT, SO IT IS THE ONE
 THAT GOES UNRUN.** Its header carries the `curl` that produces the capture; take
 a fresh one rather than reusing an old file, since it is also the size
 measurement. It asserted `cards are numbered 1..N with no gaps` — the *ordinal*
 scheme's invariant — until competition ranking shipped on 2026-08-18, and it
-would have been merged red had it not been run. **Run all twenty-three before a
+would have been merged red had it not been run. **Run all twenty-four before a
 merge**, and treat this one as the guard on the ranking scheme rather than only
-on weight. *(It read "all twelve" until 2026-08-24, "all fifteen" until 2026-08-30, "all sixteen" and then "all seventeen" until 2026-08-31, and "all eighteen" and then "all nineteen" until 2026-09-04, and "all twenty" and then "all twenty-one" until 2026-09-06, and "all twenty-two" until 2026-09-07, contradicting the table
+on weight. *(It read "all twelve" until 2026-08-24, "all fifteen" until 2026-08-30, "all sixteen" and then "all seventeen" until 2026-08-31, and "all eighteen" and then "all nineteen" until 2026-09-04, and "all twenty" and then "all twenty-one" until 2026-09-06, and "all twenty-two" until 2026-09-07, and "all twenty-three" until 2026-09-08, contradicting the table
 directly above it — the count moved when a test was added and this sentence did
 not. If the table grows again, this line grows with it.)*
 
@@ -2221,8 +2222,10 @@ merge module and its test. No surface, no writer, no relay ever written.**
   Feed and artist favorites are safe to write now; a publish onto a list
   holding legacy items is declined until then, since republishing rewrites them.
 - **⚠️ `relay.fountain.fm` REFUSES THE KIND, AND ONE RELAY HELD A STALE
-  PRIVATE-MODE COPY WITH ZERO PUBLIC TAGS.** Read several, require two
-  answers, newest wins, never publish on a degraded read.
+  PRIVATE-MODE COPY WITH ZERO PUBLIC TAGS.** `favorites-read.js` counts per
+  relay on raw sockets, never a pool's aggregate EOSE: trusted only when
+  every reached relay answered and at least two did; newest wins; an
+  untrusted read is `null`, which is not an empty list.
 
 ## Not indexed: `podcast:person`
 
