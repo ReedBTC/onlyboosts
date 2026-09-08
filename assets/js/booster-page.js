@@ -19,20 +19,20 @@
  * `episode-section.js` attaches the controls and the verbs and nothing else.
  * That module is shared with the identical section on /episode/<guid>.
  */
-import { copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v203'
-import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v203'
-import { rangeControl, sortControl, rangeDays } from '/assets/js/feed-controls.js?v=ob-v203'
-import { initEpisodeSection } from '/assets/js/episode-section.js?v=ob-v203'
+import { copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v204'
+import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v204'
+import { rangeControl, sortControl, rangeDays } from '/assets/js/feed-controls.js?v=ob-v204'
+import { initEpisodeSection } from '/assets/js/episode-section.js?v=ob-v204'
 import {
   initCopyNpub, initShowMore, initShare, initBackLink,
   initHashRouting, initHashSpy, initArt2, wireArt2, hydrateProfiles, initStatWindows,
-} from '/assets/js/detail-page.js?v=ob-v203'
+} from '/assets/js/detail-page.js?v=ob-v204'
 // The drawers' chart standing, the same function the Function ordered them by.
-import { chartRanks, rankLabel } from '/assets/js/rank.js?v=ob-v203'
-import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v203'
-import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v203'
-import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v203'
-import { initFavoritesSection } from '/assets/js/favorites-section.js?v=ob-v203'
+import { chartRanks, rankLabel } from '/assets/js/rank.js?v=ob-v204'
+import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v204'
+import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v204'
+import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v204'
+import { initFavoritesSection } from '/assets/js/favorites-section.js?v=ob-v204'
 
 const PK = document.body.dataset.boosterPk || ''
 const NPUB = document.body.dataset.boosterNpub || PK
@@ -443,7 +443,14 @@ function initShows() {
     list.appendChild(frag)
   }
 
-  slot.append(
+  // Range and sort ride together at the RIGHT end of the band, the
+  // .bs-knobs group the Boosts section already uses (Reed, 2026-09-09: the
+  // range buttons sat at the far left here and beside the sort everywhere
+  // else). .cs-controls pins a lone sort right by its own auto margin; the
+  // group carries that margin instead so the pair moves as one.
+  const knobs = document.createElement('div')
+  knobs.className = 'bs-knobs'
+  knobs.append(
     rangeControl(range, (key) => { if (key !== range) { range = key; paint() } }, {
       label: 'Filter by when the show was boosted',
       titleFor: (key, label) => (rangeDays(key) ? `Boosted in the last ${rangeDays(key)} days` : label),
@@ -453,6 +460,7 @@ function initShows() {
       title: 'Change how these shows are ranked',
     }),
   )
+  slot.append(knobs)
   slot.hidden = false
   paint()
 }

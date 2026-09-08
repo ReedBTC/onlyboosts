@@ -19,24 +19,24 @@
  */
 import {
   getPublisherPage, searchPublishers, SEARCH_HITS, SEARCH_MIN_CHARS,
-} from '/assets/js/ob-live.js?v=ob-v203'
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v203'
+} from '/assets/js/ob-live.js?v=ob-v204'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v204'
 import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls, RANGE_OPTIONS,
-} from '/assets/js/feed-controls.js?v=ob-v203'
-import { mountFeedNote, resetFeedNote, viewNote, CHART_INFO } from '/assets/js/feed-note.js?v=ob-v203'
+} from '/assets/js/feed-controls.js?v=ob-v204'
+import { mountFeedNote, resetFeedNote, viewNote, CHART_INFO } from '/assets/js/feed-note.js?v=ob-v204'
 import {
   LANG_ALL, languageOptions, langControl, langNote, langNoMatchText, langLabelFor,
-} from '/assets/js/feed-lang.js?v=ob-v203'
-import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v203'
-import { competitionRanks, rankLabel, markSliceTies } from '/assets/js/rank.js?v=ob-v203'
+} from '/assets/js/feed-lang.js?v=ob-v204'
+import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v204'
+import { competitionRanks, rankLabel, markSliceTies } from '/assets/js/rank.js?v=ob-v204'
 import {
   COPY, toCard, publisherCardHtml, publisherRankValue,
   SORT_OPTIONS, RANKED_SORTS, PUBLISHER_CARDS_PER_PAGE,
   num, fmtSats, plural,
-} from '/assets/js/publisher-card.js?v=ob-v203'
-import { wirePublisherCards } from '/assets/js/publisher-card-actions.js?v=ob-v203'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v203'
+} from '/assets/js/publisher-card.js?v=ob-v204'
+import { wirePublisherCards } from '/assets/js/publisher-card-actions.js?v=ob-v204'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v204'
 
 /* The hash's language / view on an already-hydrated feed — the same two doors
  * every ranked renderer keeps; see the twin maps in shows-feed.js. */

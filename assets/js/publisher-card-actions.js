@@ -11,10 +11,10 @@
  * No boost pill — see the header of publisher-card.js for why that is a
  * decision and not a gap.
  */
-import { wireArt2 } from '/assets/js/detail-page.js?v=ob-v203'
-import { getPublisherAlbums, getPublisherAlbumsFollows } from '/assets/js/ob-live.js?v=ob-v203'
-import { COPY, albumRowsHtml } from '/assets/js/publisher-card.js?v=ob-v203'
-import { num } from '/assets/js/show-card.js?v=ob-v203'
+import { wireArt2 } from '/assets/js/detail-page.js?v=ob-v204'
+import { getPublisherAlbums, getPublisherAlbumsFollows } from '/assets/js/ob-live.js?v=ob-v204'
+import { COPY, albumRowsHtml } from '/assets/js/publisher-card.js?v=ob-v204'
+import { num } from '/assets/js/show-card.js?v=ob-v204'
 
 /**
  * Wire every artist card under `root` that isn't wired already. Idempotent by
