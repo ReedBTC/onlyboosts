@@ -16,6 +16,7 @@ migration gate.
 | The writer | `assets/js/favorites-sync.js`, the cycle around `plan`: adopt, merge, encrypt, sign, publish, record; `node scripts/test-favorites-sync.mjs` |
 | The heart | `assets/js/favorite-button.js` (two-sided chrome) and `assets/js/favorites-ui.js` (reveal, paint, click); `node scripts/test-favorite-button.mjs` |
 | The section | `assets/js/favorites-section.js` on `/booster`, over `POST /api/v1/favorites/resolve`; `node scripts/test-favorites-section.mjs` |
+| The settings | `assets/js/account-settings.js`, the account menu's settings as a NIP-78 event; `node scripts/test-account-settings.mjs` |
 | Upstream | https://github.com/ChadFarrow/PC20-Nostr/issues/37, the reference's private-list removal defect |
 | Other writers | BoostMeBitch (`lib/nostr/favorites-list.ts`) and StableKraft (`lib/nostr/favorites-single-list.ts`); both carry `content`, both write the `visibility` tag, both implement the private half |
 
@@ -209,6 +210,19 @@ pruned from the page that shows it. A visitor to a member with an empty list
 sees no section; the owner sees a line inviting the first favorite, or one
 saying the list is private and the signer cannot open it.
 
+**The drawer sits directly under the Nostr Boost Stats tiles, normally
+closed** (Reed, 2026-09-09), and carries a dropdown on the sort pill's chrome:
+All, Shows, Episodes, Artists, Albums, Songs. All is the default so a member
+whose favorites are all songs does not open on an empty Shows view; a pick
+filters the groups on screen and says so when the pick has nothing.
+
+**Per-entry public/private is tabled** (Reed, 2026-09-09). Reed's model is
+NIP-51 bookmarks, where each entry chooses its half; the spec settled on one
+mode for the whole list after measuring a mixed list (13 of 449 entries left
+public by an app that could only move its own). Reed will take it up with
+Chad before anything goes to GitHub; until then the site ships to the spec,
+and the account menu's Public/Private row stays as the list's mode switch.
+
 **The resolver is bounded on both sides.** The index side is one bound JSON
 array unrolled by `json_each` per table (the follows endpoint's pattern); the
 Podcast Index side is at most eight lookups per request through `piGet`'s
@@ -233,6 +247,19 @@ lets only a choice flip a list's half; a standing setting that disagrees with
 the list is never acted on. On anything but success the stored choice is put
 back. `getMode()` answers from the stored choice, else from the list itself
 (its `visibility` tag, or the half that holds entries), else "not chosen".
+
+**The settings follow the account** (Reed's ask, 2026-09-09: the wallet comes
+back on its own after a login, so these should too). `account-settings.js`
+keeps them in a NIP-78 event, kind 30078, `d` = `onlyboosts:settings`,
+content NIP-44 encrypted to the member's own key: `{ theme, favoritesMode,
+updatedAt }`. The same pattern BoostMeBitch uses for its own preferences
+(`lib/nostr/settings-backup.ts`, `d` = `boostmebitch:settings`). Pushed,
+debounced, when the theme toggle is pressed or the favorites mode chosen,
+signed in with a NIP-44 signer; pulled on login and applied only when the
+relay copy's `updatedAt` is later than this device's own last change, the
+theme through the nav's own toggle. The favorites mode on the event is the
+member's stored CHOICE, never something that flips a list on its own. A
+signer without NIP-44 keeps the settings on the device, silently.
 
 **The controller is loaded on every page by `nav.js`**, through a dynamic
 import at the end of its IIFE, lazily: a page with no hearts pays for the
@@ -312,5 +339,7 @@ beyond the markup.
 3. ~~The heart~~ built 2026-09-08, show surfaces live, episode surfaces gated.
 4. ~~The `#favorites` section~~ built 2026-09-08.
 5. ~~The dropdown rows~~ built 2026-09-08.
-6. Later, and the real reason to do it: the collector indexes public lists and
+6. Per-entry public/private (NIP-51 bookmarks' model): tabled 2026-09-09
+   pending Reed's conversation with Chad; a spec change, not a site change.
+7. Later, and the real reason to do it: the collector indexes public lists and
    "favorited by N members" becomes a show stat or chart component.

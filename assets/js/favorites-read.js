@@ -32,7 +32,7 @@
  * `connect` and `verify` are injectable so the test can script relays that
  * hang, refuse, forge and disagree; production takes the defaults.
  */
-import { verifyEvent } from '/assets/widgets/nostr-tools.js?v=ob-v204'
+import { verifyEvent } from '/assets/widgets/nostr-tools.js?v=ob-v205'
 
 export const FAVORITES_KIND = 10333
 export const RELAY_LIST_KIND = 10002
@@ -102,11 +102,14 @@ export function readIsTrustworthy({ reached, answered, minAnswers = MIN_ANSWERS,
 }
 
 /** The one event this read is allowed to believe: right kind, right author, real signature. */
-export function acceptsEvent(pubkey, ev, verify, kind = FAVORITES_KIND) {
+export function acceptsEvent(pubkey, ev, verify, kind = FAVORITES_KIND, dTag = null) {
   if (!ev || typeof ev !== 'object') return false
   if (ev.kind !== kind) return false
   if (ev.pubkey !== pubkey) return false
   if (!Array.isArray(ev.tags) || typeof ev.content !== 'string') return false
+  // An addressable event (kind 3xxxx) is keyed on its d tag too; one with
+  // another d, or none, is a different event that happens to share the kind.
+  if (dTag !== null && !ev.tags.some((t) => t[0] === 'd' && t[1] === dTag)) return false
   try { return verify(ev) === true } catch { return false }
 }
 
@@ -122,7 +125,7 @@ export function newest(events) {
 }
 
 /** One relay, one REQ, one verdict. Never throws. */
-function readOne(url, pubkey, kind, { connect, verify, timeoutMs, now }) {
+function readOne(url, pubkey, kind, { connect, verify, timeoutMs, now, dTag = null }) {
   return new Promise((resolve) => {
     const t0 = now()
     const subId = 'fav-' + Math.random().toString(36).slice(2, 10)
@@ -149,7 +152,7 @@ function readOne(url, pubkey, kind, { connect, verify, timeoutMs, now }) {
     ws.addEventListener('open', () => {
       opened = true
       try {
-        ws.send(JSON.stringify(['REQ', subId, { kinds: [kind], authors: [pubkey] }]))
+        ws.send(JSON.stringify(['REQ', subId, { kinds: [kind], authors: [pubkey], ...(dTag !== null ? { '#d': [dTag] } : {}) }]))
       } catch {
         finish('hung')
       }
@@ -160,7 +163,7 @@ function readOne(url, pubkey, kind, { connect, verify, timeoutMs, now }) {
       if (!Array.isArray(msg)) return
       const [type, id, payload] = msg
       if (type === 'EVENT' && id === subId) {
-        if (acceptsEvent(pubkey, payload, verify, kind)) events.push(payload)
+        if (acceptsEvent(pubkey, payload, verify, kind, dTag)) events.push(payload)
         return
       }
       if (type === 'EOSE' && id === subId) { finish('answered'); return }
@@ -207,7 +210,7 @@ export async function readWriteRelays(pubkey, options = {}) {
   ).slice(0, 16)
 }
 
-/** The read itself, for any replaceable kind; `readFavorites` is this with kind 10333. */
+/** The read itself, for any replaceable kind (`dTag` for an addressable one); `readFavorites` is this with kind 10333. */
 export async function readNewestEvent(pubkey, kind, {
   relays = READ_RELAYS,
   extraRelays = [],
@@ -216,9 +219,10 @@ export async function readNewestEvent(pubkey, kind, {
   connect = (url) => new WebSocket(url),
   verify = verifyEvent,
   now = () => Date.now(),
+  dTag = null,
 } = {}) {
   const urls = relaySet(relays, extraRelays)
-  const opts = { connect, verify, timeoutMs, now }
+  const opts = { connect, verify, timeoutMs, now, dTag }
   const rows = await Promise.all(urls.map((url) => readOne(url, pubkey, kind, opts)))
 
   const candidates = rows.flatMap((r) => r.events)

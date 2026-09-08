@@ -22,10 +22,11 @@
  * Nothing on the list is dropped for being unresolvable: an entry nobody can
  * name renders its guid, since it is still somebody's favorite.
  */
-import { fetchFavorites, widgetDeps } from '/assets/js/favorites-sync.js?v=ob-v204'
-import { favoriteButtonHtml } from '/assets/js/favorite-button.js?v=ob-v204'
-import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v204'
-import { isSafeUrl } from '/assets/js/nostr-text.js?v=ob-v204'
+import { fetchFavorites, widgetDeps } from '/assets/js/favorites-sync.js?v=ob-v205'
+import { favoriteButtonHtml } from '/assets/js/favorite-button.js?v=ob-v205'
+import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v205'
+import { isSafeUrl } from '/assets/js/nostr-text.js?v=ob-v205'
+import { sortControl } from '/assets/js/feed-controls.js?v=ob-v205'
 
 const RESOLVE_URL = '/api/v1/favorites/resolve'
 
@@ -50,6 +51,28 @@ export const GROUPS = [
   { key: 'songs', title: 'Songs', kind: 'item', music: true },
   { key: 'artists', title: 'Artists', kind: 'artist', music: true },
 ]
+
+/**
+ * The drawer's dropdown (Reed, 2026-09-09), on the sort pill's chrome: which
+ * group to show. `all` is the default so a member whose favorites are all
+ * songs does not open on an empty Shows view; the five groups follow, in the
+ * order Reed listed them.
+ */
+export const GROUP_OPTIONS = [
+  ['all', 'All'],
+  ['shows', 'Shows'],
+  ['episodes', 'Episodes'],
+  ['artists', 'Artists'],
+  ['albums', 'Albums'],
+  ['songs', 'Songs'],
+]
+
+/** The groups a pick leaves on screen. An unknown key shows everything. */
+export function visibleGroups(groups, key) {
+  if (!key || key === 'all') return groups
+  if (!GROUP_OPTIONS.some(([k]) => k === key)) return groups
+  return groups.filter((g) => g.key === key)
+}
 
 /** The resolved medium, the hint, or the podcast side. Never a guess dressed as a fact: this only decides which heading a row sits under. */
 export function mediumOf(resolvedFeed, hint) {
@@ -212,8 +235,28 @@ export function initFavoritesSection({ pubkey, root }) {
   if (!root || !pubkey) return
   const groupsEl = root.querySelector('[data-fav-groups]')
   const emptyEl = root.querySelector('[data-fav-empty]')
+  const ctrlEl = root.querySelector('[data-fav-controls]')
   if (!groupsEl || !emptyEl) return
   let run = 0
+  let filter = 'all'
+  let shown = { groups: [], owner: false }
+
+  function render() {
+    const visible = visibleGroups(shown.groups, filter)
+    groupsEl.innerHTML = groupsHtml(visible, { owner: shown.owner })
+    if (!visible.length && shown.groups.length) {
+      const label = (GROUP_OPTIONS.find(([k]) => k === filter) || [])[1] || 'that'
+      emptyEl.textContent = `No ${label.toLowerCase()} on this list.`
+      emptyEl.hidden = false
+    } else emptyEl.hidden = true
+  }
+
+  if (ctrlEl && !ctrlEl.childElementCount) {
+    ctrlEl.append(sortControl(GROUP_OPTIONS, filter, (key) => { if (key !== filter) { filter = key; render() } }, {
+      tag: 'Show: ',
+      title: 'Which favorites to show',
+    }))
+  }
 
   async function paint() {
     const mine = ++run
@@ -243,9 +286,9 @@ export function initFavoritesSection({ pubkey, root }) {
     }
     const resolved = await resolveAll(entries)
     if (mine !== run) return
-    const groups = groupEntries(entries, resolved)
-    groupsEl.innerHTML = groupsHtml(groups, { owner })
-    emptyEl.hidden = true
+    shown = { groups: groupEntries(entries, resolved), owner }
+    render()
+    if (ctrlEl) ctrlEl.hidden = false
     root.hidden = false
   }
 

@@ -465,6 +465,7 @@ Sixteen test scripts, all plain `node scripts/<name>.mjs` with no runner:
 | `test-favorites-read.mjs` | the favorites relay reader (2026-09-08): the **shipped** `favorites-read.js` with its one bundle import repointed at nostr-tools, driven against **scripted sockets** that answer, hang, refuse, never connect, drop, forge and disagree, with really signed events. The trust rule (every reached relay answered, at least two), the refusal exclusion, the dead-entry exclusion, newest-wins and the lowest-id tie, the signature check through JSON the way a relay message arrives, the REQ's shape, the timeout. Confirmed red on six mutations: the two-answer floor dropped, a hung relay excused, offline read as empty, the tiebreak flipped, the signature skipped, a refusal counted as an answer |
 | `test-favorites-sync.mjs` | the favorites writer (2026-09-08): the **shipped** `favorites-sync.js` end to end — read, adopt, merge, encrypt, sign, publish, record — against **scripted relays** that answer REQs and OK or refuse EVENTs, a real key, a stand-in codec and a fake `localStorage`. The first favorite's Public/Private question, the adopt-and-hydrate model (unfavoriting another app's entry sticks on first contact, in either half), the item gate and the legacy-list gate, an opaque half carried byte for byte, `no-nip44`, `not-landed` recording no baseline, the member's NIP-65 write relays, a signer answering under another key. Confirmed red on six mutations: baseline recorded on a publish that never landed, the hydrate pass removed, a degraded read acted on, the private half written in plaintext, the signer's event unchecked, the item gate removed |
 | `test-favorite-button.mjs` | the Favorite heart (2026-09-08): `favorite-button.js`'s markup on the three kinds, its escaping, a guid with quote characters refused, `setFavoriteState`'s verb and fill, `changeFor` and `keyFor` against the merge's keys; the two-sided source rules; that every renderer imports it by relative path; that `favorites-ui.js` keeps `ITEMS_ALLOWED` false and never reaches NIP-04, that nav.js loads it and the two page imports are gone, and the account menu's rows (the pill's `/booster` link, the nav toggle, `window.OBFavorites`, no opacity modifier on a `var()` colour) |
+| `test-account-settings.mjs` | the account settings that follow the account (2026-09-09): `account-settings.js`'s NIP-78 plaintext both ways, newest-wins with the tie to the device, `applySettings` pressing the nav toggle only on a difference, and the push/pull cycle over **scripted relays** with a real key and a stand-in codec (an encrypted kind 30078 under `d=onlyboosts:settings`, another `d` or author refused, no NIP-44 or a foreign signer publishing nothing, a laptop-to-phone round trip). Confirmed red on three mutations: a tie letting the remote win, the pull ignoring the d tag, the signer's key unchecked |
 | `test-favorites-section.mjs` | the Favorites section on `/booster` (2026-09-08): the **shipped** `POST /api/v1/favorites/resolve` over a `node:sqlite` build of the real `schema.sql` with **`fetch` stubbed** (D1 first, Podcast Index for the rest at most `PI_MAX` a request, the item resolved as the PAIR, an untitled show linking to BMB, input hygiene, 400/503, the five-minute cache and exact-match origin), and the section module's pure parts: the resolve request, grouping on the RESOLVED medium with the hint as fallback and unknown on the podcast side, and the row markup with the owner's heart a sibling of the link |
 
 **⚠️ `test-server-render.mjs` IS THE ONE THAT NEEDS AN ARGUMENT, SO IT IS THE ONE
@@ -472,9 +473,9 @@ THAT GOES UNRUN.** Its header carries the `curl` that produces the capture; take
 a fresh one rather than reusing an old file, since it is also the size
 measurement. It asserted `cards are numbered 1..N with no gaps` — the *ordinal*
 scheme's invariant — until competition ranking shipped on 2026-08-18, and it
-would have been merged red had it not been run. **Run all twenty-seven before a
+would have been merged red had it not been run. **Run all twenty-eight before a
 merge**, and treat this one as the guard on the ranking scheme rather than only
-on weight. *(It read "all twelve" until 2026-08-24, "all fifteen" until 2026-08-30, "all sixteen" and then "all seventeen" until 2026-08-31, and "all eighteen" and then "all nineteen" until 2026-09-04, and "all twenty" and then "all twenty-one" until 2026-09-06, and "all twenty-two" until 2026-09-07, and "all twenty-three", "all twenty-four", "all twenty-five" and "all twenty-six" until 2026-09-08, contradicting the table
+on weight. *(It read "all twelve" until 2026-08-24, "all fifteen" until 2026-08-30, "all sixteen" and then "all seventeen" until 2026-08-31, and "all eighteen" and then "all nineteen" until 2026-09-04, and "all twenty" and then "all twenty-one" until 2026-09-06, and "all twenty-two" until 2026-09-07, and "all twenty-three", "all twenty-four", "all twenty-five" and "all twenty-six" until 2026-09-08, and "all twenty-seven" until 2026-09-09, contradicting the table
 directly above it — the count moved when a test was added and this sentence did
 not. If the table grows again, this line grows with it.)*
 
@@ -2220,6 +2221,14 @@ migration gate.**
   exposes `window.OBFavorites` for the widget's Favorites row; a mode change
   from there is a `userChose` publish cycle, never a standing setting acted
   on. The dark-mode row presses `.nav-theme-toggle` so nav.js keeps ownership.
+- **⚠️ THE MENU'S SETTINGS FOLLOW THE ACCOUNT AS A NIP-78 EVENT** (kind 30078,
+  `d` = `onlyboosts:settings`, NIP-44 to self; BMB's own pattern):
+  `account-settings.js` pushes on change and pulls on login, newest wins
+  with the tie to the device. The theme is applied by pressing the nav
+  toggle; `favoritesMode` on the event is a stored choice, never a flip.
+- **Per-entry public/private is TABLED** (Reed, 2026-09-09): the spec is one
+  mode per list; Reed takes NIP-51's per-entry model up with Chad first, and
+  nothing goes to GitHub on it before that.
 
 - **⚠️ THE HEART SHIPS `hidden` AND `favorites-ui.js` REVEALS IT FOR A
   SIGNED-IN MEMBER ONLY** (Reed: signed out gets nothing). `favorite-button.js`

@@ -40,16 +40,17 @@
  * after which the list is re-read with NIP-44 and the hearts fill. That is a
  * known cost of not loading 1MB to draw an outline.
  */
-import { fetchFavorites, syncFavorites, widgetDeps, saveMode, loadMode } from '/assets/js/favorites-sync.js?v=ob-v204'
-import { statedVisibility } from '/assets/js/favorites-merge.js?v=ob-v204'
-import { setFavoriteState, changeFor, keyFor } from '/assets/js/favorite-button.js?v=ob-v204'
-import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v204'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v204'
+import { fetchFavorites, syncFavorites, widgetDeps, saveMode, loadMode } from '/assets/js/favorites-sync.js?v=ob-v205'
+import { statedVisibility } from '/assets/js/favorites-merge.js?v=ob-v205'
+import { setFavoriteState, changeFor, keyFor } from '/assets/js/favorite-button.js?v=ob-v205'
+import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v205'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v205'
+import { initAccountSettings, noteSettingsChange } from '/assets/js/account-settings.js?v=ob-v205'
 
 /** Flip to true when Chad confirms BMB and StableKraft read `["i", feed, item]`. */
 export const ITEMS_ALLOWED = false
 
-const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v204'
+const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v205'
 
 const state = {
   pubkey: null,
@@ -225,6 +226,7 @@ async function onClick(btn) {
       const mode = await askMode()
       if (!mode) return
       saveMode(window.localStorage, deps.pubkey, mode)
+      noteSettingsChange()
       r = await syncFavorites(change, { ...base, mode, userChose: true })
     }
 
@@ -292,6 +294,7 @@ async function setMode(mode) {
     saveMode(window.localStorage, deps.pubkey, mode)
     const r = await syncFavorites(null, { ...deps, store: window.localStorage, itemsAllowed: ITEMS_ALLOWED, mode, userChose: true })
     if (r.status === 'published' || r.status === 'unchanged') {
+      noteSettingsChange()
       await reload({ withWidget: true })
       showToast(mode === 'private' ? 'Your favorites are private now' : 'Your favorites are public now')
       return r
@@ -312,6 +315,9 @@ async function setMode(mode) {
 
 function boot() {
   window.OBFavorites = { getMode, setMode, reload: () => reload({ withWidget: true }), ITEMS_ALLOWED }
+  // The account menu's settings follow the account (account-settings.js):
+  // restored on login, pushed on change.
+  initAccountSettings()
 
   document.addEventListener('click', (e) => {
     const btn = e.target.closest?.('[data-fav]')

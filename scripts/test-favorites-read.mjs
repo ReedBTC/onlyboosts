@@ -227,6 +227,19 @@ await check('a tie on created_at goes to the lowest id on both relays', async ()
   assert.equal(r.event.id, lower.id)
 })
 
+await check('an addressable kind reads by d tag: the REQ carries #d and a copy under another d is refused', async () => {
+  const mine = finalizeEvent({ kind: 30078, created_at: 10, tags: [['d', 'onlyboosts:settings']], content: 'x' }, sk)
+  const other = finalizeEvent({ kind: 30078, created_at: 20, tags: [['d', 'other:settings']], content: 'y' }, sk)
+  const seen = []
+  const connect = (url) => { const s = new FakeSocket({ steps: [['event', other], ['event', mine], ['eose']] }); seen.push(s); return s }
+  const r = await R.readNewestEvent(pk, 30078, { relays: ['wss://a', 'wss://b'], timeoutMs: 60, connect, verify: verifyEvent, dTag: 'onlyboosts:settings' })
+  assert.equal(r.trusted, true)
+  assert.equal(r.event.id, mine.id, 'the newer event under another d is not this one')
+  assert.deepEqual(seen[0].sent[0][2], { kinds: [30078], authors: [pk], '#d': ['onlyboosts:settings'] })
+  assert.equal(R.acceptsEvent(pk, mine, verifyEvent, 30078, 'onlyboosts:settings'), true)
+  assert.equal(R.acceptsEvent(pk, mine, verifyEvent, 30078, 'other'), false)
+})
+
 await check('the REQ asks for exactly this kind and this author', async () => {
   const seen = []
   const connect = (url) => { const s = new FakeSocket({ steps: [['eose']] }); seen.push(s); return s }

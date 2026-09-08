@@ -148,6 +148,7 @@ const src = readFileSync(join(ROOT, 'assets/js/favorites-section.js'), 'utf8')
   .replace(/from '\/assets\/js\/follow-set\.js[^']*'/, "from 'data:text/javascript,export const getSessionPubkey=()=>null'")
   .replace(/from '\/assets\/js\/favorite-button\.js[^']*'/, `from '${pathToFileURL(join(ROOT, 'assets/js/favorite-button.js')).href}'`)
   .replace(/from '\/assets\/js\/nostr-text\.js[^']*'/, `from '${pathToFileURL(join(ROOT, 'assets/js/nostr-text.js')).href}'`)
+  .replace(/from '\/assets\/js\/feed-controls\.js[^']*'/, "from 'data:text/javascript,export const sortControl=()=>null'")
 const S = await import('data:text/javascript;base64,' + Buffer.from(src, 'utf8').toString('base64'))
 
 const entries = [
@@ -212,6 +213,18 @@ await check('rows: page links here, BMB links out, a nameless entry shows its gu
   const xss = S.rowHtml({ ...shows.rows[0], title: '<b>x</b>', href: 'javascript:alert(1)' }, shows)
   assert.match(xss, /&lt;b&gt;x&lt;\/b&gt;/)
   assert.doesNotMatch(xss, /javascript:/)
+})
+
+await check('the dropdown: All by default, then the five groups in Reed\'s order; a pick filters, an unknown key shows everything', () => {
+  assert.deepEqual(S.GROUP_OPTIONS.map(([k]) => k), ['all', 'shows', 'episodes', 'artists', 'albums', 'songs'])
+  assert.deepEqual(S.GROUP_OPTIONS.map(([, l]) => l), ['All', 'Shows', 'Episodes', 'Artists', 'Albums', 'Songs'])
+  const groups = S.groupEntries(entries, resolved)
+  assert.equal(S.visibleGroups(groups, 'all').length, groups.length)
+  assert.deepEqual(S.visibleGroups(groups, 'songs').map((g) => g.key), ['songs'])
+  assert.deepEqual(S.visibleGroups(groups, 'playlists').map((g) => g.key), groups.map((g) => g.key))
+  const src = readFileSync(join(ROOT, 'assets/js/favorites-section.js'), 'utf8')
+  assert.match(src, /sortControl\(GROUP_OPTIONS, filter/, 'built on the sort pill\'s chrome')
+  assert.match(readFileSync(join(ROOT, 'functions/booster/[npub].js'), 'utf8'), /<div class="cs-controls" data-fav-controls hidden><\/div>/, 'the shell carries the controls band')
 })
 
 await check('the booster page ships the hidden shell with the frozen id, and imports the module', () => {
