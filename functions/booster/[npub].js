@@ -422,23 +422,23 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v206" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v206" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v206" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v206" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v207" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v207" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v207" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v207" />
   <!-- The hero, the drawers and the boost list are the show page's, so this
        page links its stylesheet and adds only the deltas. -->
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v206" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v206" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v207" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v207" />
   <!-- The episode card, for the #episodes rollup: the same chrome
        feeds-podcasts.js paints on the homepage. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v206" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v207" />
   <!-- The boost thread inside a card's drawer, and its reply / like / repost /
        zap bar, both reached through that same card. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v206" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v206" />
-  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v206" />
-  <link rel="stylesheet" href="/assets/css/booster-page.css?v=ob-v206" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v207" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v207" />
+  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v207" />
+  <link rel="stylesheet" href="/assets/css/booster-page.css?v=ob-v207" />
 </head>
 <body data-booster-pk="${htmlEscape(hex)}"${npub ? ` data-booster-npub="${htmlEscape(npub)}"` : ""}>
 
@@ -669,12 +669,12 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav.js?v=ob-v206" defer></script>
-<script src="/assets/js/booster-page.js?v=ob-v206" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v207" defer></script>
+<script src="/assets/js/booster-page.js?v=ob-v207" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v206"></script>
-<script src="/assets/js/sw-register.js?v=ob-v206" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v207"></script>
+<script src="/assets/js/sw-register.js?v=ob-v207" defer></script>
 </body>
 </html>`;
 }
@@ -1056,12 +1056,14 @@ function showMeta(boosts, sats, eps) {
 // ciphertext only the member's own signer can open, so the edge can render the
 // shell and nothing more. assets/js/favorites-section.js reads the list,
 // resolves the guids through /api/v1/favorites/resolve, fills this in and
-// reveals it; a member with nothing on their list keeps it hidden. The id is
-// frozen the way every section id on these pages is. See docs/favorites.md.
-// It sits directly under the Nostr Boost Stats tiles as a NORMALLY CLOSED
-// drawer (Reed, 2026-09-09): a summary line first, the list on a press.
+// fills it in. The id is frozen the way every section id on these pages is.
+// See docs/favorites.md. It sits directly under the Nostr Boost Stats tiles as
+// a NORMALLY CLOSED drawer, and it is ON SCREEN FROM THE FIRST PAINT (Reed,
+// 2026-09-09): a relay read takes seconds, and a drawer that appears late
+// reads as a page that changed under the reader. Until the read answers the
+// foot says so; a list with nothing on it says that instead of vanishing.
 function renderFavorites() {
-  return `<section class="show-section show-section--bare" id="favorites" hidden data-booster-favorites>
+  return `<section class="show-section show-section--bare" id="favorites" data-booster-favorites>
     <details class="ep-drawer cs-drawer">
       <summary>
         <span class="cs-head">
@@ -1074,7 +1076,7 @@ function renderFavorites() {
            on the sort pill's chrome. Filled and revealed by favorites-section.js. -->
       <div class="cs-controls" data-fav-controls hidden></div>
       <div class="fav-groups" data-fav-groups></div>
-      <p class="cs-empty" data-fav-empty hidden></p>
+      <p class="cs-empty" data-fav-empty>Loading favorites from Nostr…</p>
     </details>
   </section>`;
 }
@@ -1140,10 +1142,10 @@ function notFound(raw) {
   <meta name="robots" content="noindex" />
   <title>Booster not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v206" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v206" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v206" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v206" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v207" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v207" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v207" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v207" />
 </head>
 <body>
 <section class="page-header">
@@ -1161,7 +1163,7 @@ function notFound(raw) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v206" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v207" defer></script>
 </body>
 </html>`;
   return new Response(html, {

@@ -19,8 +19,8 @@ import {
   getCachedProfile,
   setCachedProfile,
   registerEvent,
-} from '/assets/js/boosts-thread.js?v=ob-v206'
-import { nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v206'
+} from '/assets/js/boosts-thread.js?v=ob-v207'
+import { nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v207'
 
 // ── Module state ─────────────────────────────────────────────────────
 const state = {

@@ -211,7 +211,12 @@ sees no section; the owner sees a line inviting the first favorite, or one
 saying the list is private and the signer cannot open it.
 
 **The drawer sits directly under the Nostr Boost Stats tiles, normally
-closed** (Reed, 2026-09-09), and carries a dropdown on the sort pill's chrome:
+closed, and is on screen from the first paint** (Reed, 2026-09-09): a relay
+read takes seconds and a drawer that appears late reads as a page changing
+under the reader, so the Function renders it with a "Loading favorites from
+Nostr…" foot and the module only ever changes the foot — "No favorites yet",
+"keeps their favorites private", or a couldn't-reach line, never a vanished
+section. It carries a dropdown on the sort pill's chrome:
 All, Shows, Episodes, Artists, Albums, Songs. All is the default so a member
 whose favorites are all songs does not open on an empty Shows view; a pick
 filters the groups on screen and says so when the pick has nothing.

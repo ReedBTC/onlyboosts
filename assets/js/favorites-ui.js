@@ -40,17 +40,17 @@
  * after which the list is re-read with NIP-44 and the hearts fill. That is a
  * known cost of not loading 1MB to draw an outline.
  */
-import { fetchFavorites, syncFavorites, widgetDeps, saveMode, loadMode } from '/assets/js/favorites-sync.js?v=ob-v206'
-import { statedVisibility } from '/assets/js/favorites-merge.js?v=ob-v206'
-import { setFavoriteState, changeFor, keyFor } from '/assets/js/favorite-button.js?v=ob-v206'
-import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v206'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v206'
-import { initAccountSettings, noteSettingsChange } from '/assets/js/account-settings.js?v=ob-v206'
+import { fetchFavorites, syncFavorites, widgetDeps, saveMode, loadMode } from '/assets/js/favorites-sync.js?v=ob-v207'
+import { statedVisibility } from '/assets/js/favorites-merge.js?v=ob-v207'
+import { setFavoriteState, changeFor, keyFor } from '/assets/js/favorite-button.js?v=ob-v207'
+import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v207'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v207'
+import { initAccountSettings, noteSettingsChange } from '/assets/js/account-settings.js?v=ob-v207'
 
 /** Flip to true when Chad confirms BMB and StableKraft read `["i", feed, item]`. */
 export const ITEMS_ALLOWED = false
 
-const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v206'
+const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v207'
 
 const state = {
   pubkey: null,

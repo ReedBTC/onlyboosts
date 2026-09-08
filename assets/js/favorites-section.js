@@ -22,11 +22,11 @@
  * Nothing on the list is dropped for being unresolvable: an entry nobody can
  * name renders its guid, since it is still somebody's favorite.
  */
-import { fetchFavorites, widgetDeps } from '/assets/js/favorites-sync.js?v=ob-v206'
-import { favoriteButtonHtml } from '/assets/js/favorite-button.js?v=ob-v206'
-import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v206'
-import { isSafeUrl } from '/assets/js/nostr-text.js?v=ob-v206'
-import { sortControl } from '/assets/js/feed-controls.js?v=ob-v206'
+import { fetchFavorites, widgetDeps } from '/assets/js/favorites-sync.js?v=ob-v207'
+import { favoriteButtonHtml } from '/assets/js/favorite-button.js?v=ob-v207'
+import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v207'
+import { isSafeUrl } from '/assets/js/nostr-text.js?v=ob-v207'
+import { sortControl } from '/assets/js/feed-controls.js?v=ob-v207'
 
 const RESOLVE_URL = '/api/v1/favorites/resolve'
 
@@ -264,24 +264,34 @@ export function initFavoritesSection({ pubkey, root }) {
     const owner = !!viewer && viewer === pubkey
     const deps = owner && window.LBLogin ? await widgetDeps(window.LBLogin) : {}
     let r
-    try { r = await fetchFavorites(pubkey, { ...deps, pubkey }) } catch (err) { console.warn('[favorites] read failed', err); return }
+    try { r = await fetchFavorites(pubkey, { ...deps, pubkey }) } catch (err) {
+      console.warn('[favorites] read failed', err)
+      emptyEl.textContent = 'Couldn’t read favorites right now.'
+      emptyEl.hidden = false
+      return
+    }
     if (mine !== run) return
+    // The section is on screen from the first paint (the Function renders it
+    // with a "loading" foot); every outcome below only changes the foot.
     if (!r.trusted) {
-      // Could not read enough relays to say anything. Owner gets a line; a
-      // visitor gets nothing rather than a section claiming an empty list.
-      if (owner) { emptyEl.textContent = 'Couldn’t reach enough relays to read your favorites right now.'; emptyEl.hidden = false; root.hidden = false }
+      // Could not read enough relays to say anything — never "empty".
+      emptyEl.textContent = owner
+        ? 'Couldn’t reach enough relays to read your favorites right now.'
+        : 'Couldn’t reach enough relays to read this member’s favorites right now.'
+      emptyEl.hidden = false
       return
     }
     const entries = r.entries ?? []
     if (!entries.length) {
-      if (owner) {
-        emptyEl.textContent = r.parsedPrivate === null && r.read?.content
-          ? 'Your favorites are private. Log in with a signer that can decrypt them to see them here.'
-          : 'Nothing favorited yet. Press the heart on any show to start a list other Podcasting 2.0 apps can read too.'
-        emptyEl.hidden = false
-        groupsEl.innerHTML = ''
-        root.hidden = false
-      } else root.hidden = true
+      emptyEl.textContent = owner
+        ? (r.parsedPrivate === null && r.read?.content
+            ? 'Your favorites are private. Log in with a signer that can decrypt them to see them here.'
+            : 'Nothing favorited yet. Press the heart on any show to start a list other Podcasting 2.0 apps can read too.')
+        : (r.read?.content
+            ? 'This member keeps their favorites private.'
+            : 'No favorites yet.')
+      emptyEl.hidden = false
+      groupsEl.innerHTML = ''
       return
     }
     const resolved = await resolveAll(entries)
@@ -289,7 +299,6 @@ export function initFavoritesSection({ pubkey, root }) {
     shown = { groups: groupEntries(entries, resolved), owner }
     render()
     if (ctrlEl) ctrlEl.hidden = false
-    root.hidden = false
   }
 
   paint()

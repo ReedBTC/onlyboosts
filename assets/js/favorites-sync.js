@@ -35,10 +35,10 @@
  * shipped cycle against scripted relays, a stand-in codec and a real key.
  * Nothing here is reached signed out; the bot cannot hold favorites.
  */
-import { readFavorites, readWriteRelays, relaySet, acceptsEvent } from '/assets/js/favorites-read.js?v=ob-v206'
+import { readFavorites, readWriteRelays, relaySet, acceptsEvent } from '/assets/js/favorites-read.js?v=ob-v207'
 import {
   KIND, plan, parse, parseTags, statedVisibility, decodePlaintext, kindOf, feedIdOf, feedGuidOf,
-} from '/assets/js/favorites-merge.js?v=ob-v206'
+} from '/assets/js/favorites-merge.js?v=ob-v207'
 
 /**
  * Where a list is published. The read set less relay.mostr.pub, which held a

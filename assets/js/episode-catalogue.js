@@ -42,9 +42,9 @@
  * feed) and reaches the page only as a text node or an attribute set through
  * the DOM — no innerHTML anywhere in this file.
  */
-import { fmtDate, fmtDuration } from '/assets/js/boost-list.js?v=ob-v206'
-import { bmbEpisodeUrl } from '/assets/js/episode-link.js?v=ob-v206'
-import { isSafeUrl } from '/assets/js/nostr-text.js?v=ob-v206'
+import { fmtDate, fmtDuration } from '/assets/js/boost-list.js?v=ob-v207'
+import { bmbEpisodeUrl } from '/assets/js/episode-link.js?v=ob-v207'
+import { isSafeUrl } from '/assets/js/nostr-text.js?v=ob-v207'
 
 const API = '/api/catalogue'
 

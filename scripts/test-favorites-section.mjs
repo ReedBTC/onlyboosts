@@ -229,7 +229,8 @@ await check('the dropdown: All by default, then the five groups in Reed\'s order
 
 await check('the booster page ships the hidden shell with the frozen id, and imports the module', () => {
   const fn = readFileSync(join(ROOT, 'functions/booster/[npub].js'), 'utf8')
-  assert.match(fn, /<section class="show-section show-section--bare" id="favorites" hidden data-booster-favorites>/)
+  assert.match(fn, /<section class="show-section show-section--bare" id="favorites" data-booster-favorites>/, 'on screen from the first paint')
+  assert.match(fn, /<p class="cs-empty" data-fav-empty>Loading favorites from Nostr…<\/p>/, 'the foot says loading until the read answers')
   assert.match(fn, /\$\{renderFavorites\(\)\}/)
   const page = readFileSync(join(ROOT, 'assets/js/booster-page.js'), 'utf8')
   assert.match(page, /import \{ initFavoritesSection \} from '\/assets\/js\/favorites-section\.js\?v=ob-v\d+'/)
