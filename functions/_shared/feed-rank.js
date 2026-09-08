@@ -42,11 +42,13 @@
 //     readers of this page will never have on screen.
 //   • Global, never Follows.
 //
-// COST. One scan of `podcasts` (~1.3k rows) or `episodes` (~6.7k rows, joined
-// to `podcasts` for the medium) per render, inside the page's existing
-// Promise.all and behind its 300s edge cache. Cheaper than the community
-// rollup beside it, and cheaper than the ordinal version this replaced, which
-// had to restate the feed's whole tiebreak to place a row inside its own tie.
+// COST. ⚠️ ZERO CHART ROWS FROM D1 ON A WARM CACHE, SINCE 2026-09-07. Each
+// (kind, medium side, window) leaderboard is computed once, kept in KV for
+// five minutes and looked up per subject — see THE CHART TABLE CACHE below
+// for the numbers that forced it (an episode page was 590k rows read, four
+// population-wide RANK() queries per view, and crawlers made D1 read 12
+// billion rows in a day). The all-time component chips come out of the same
+// table, so the COUNT(CASE …) scan that used to compute them is gone too.
 //
 // ⚠️ IT NEVER THROWS. A rank is decoration on a page about a show's boosts, so
 // a failure costs the rank line and nothing else — the discipline the two
@@ -82,99 +84,6 @@ const RANK_PUBLISHERS = [
   "3820f4ff8587747530c7feafe47c1e592e3ce0fd2929b4f907e40714bd26f408",
 ];
 
-/**
- * A booster's three all-time ranks on the members wall.
- *
- * ⚠️ THE POPULATION IS THE WALL'S, PUBLISHER EXCLUSION AND ALL. Rank means the
- * place the subject holds on a list a reader can go and scroll, and that list is
- * `/api/v1/members` with no `q` — every member, publishers dropped, ordered by
- * one of these three columns. The aggregates are restated here rather than
- * imported for the same reason the pubkey list is.
- *
- * ⚠️ A PUBLISHER'S OWN PAGE GETS NO CHIPS, AND IT FALLS OUT FOR FREE. The
- * subject is not in the CTE, so `at` is 0 and the shared guard below returns
- * null — the same guard that catches a medium mismatch. That is the honest
- * answer: those four keys are deliberately not on the wall, so they hold no
- * place on it, and printing one would contradict the section that says so.
- *
- * COST: one scan of `boosts` (~23k rows) grouped to ~2k, against ~1.3k for a
- * show. Heavier than its siblings and still inside the page's existing
- * Promise.all behind a 300s edge cache; and it never throws, so the worst case
- * is the page rendering exactly as it did before this existed.
- */
-function boosterRankQuery(row) {
-  const val = {
-    sats: Number(row.sats) || 0,
-    boosts: Number(row.boosts) || 0,
-    shows: Number(row.shows) || 0,
-  };
-  const holes = RANK_PUBLISHERS.map(() => "?").join(",");
-  const args = [...RANK_PUBLISHERS];
-  const parts = BOOSTER_RANK_KEYS.map((k) => {
-    args.push(val[k], val[k]);
-    return `COUNT(CASE WHEN m.${k} > ? THEN 1 END) AS a_${k},
-            COUNT(CASE WHEN m.${k} = ? THEN 1 END) AS t_${k}`;
-  }).join(",\n           ");
-
-  /* The CTE restates `/api/v1/members`'s aggregate exactly: SUM(sats),
-     COUNT(*), COUNT(DISTINCT podcast_guid) — the last ignoring NULLs, so a
-     boost naming no show is still a boost and is not a show. Same three
-     definitions the subject's own totals are computed with one file over, which
-     is what makes comparing them meaningful. */
-  const sql = `
-    WITH m AS (
-      SELECT booster_pubkey AS pk,
-             COALESCE(SUM(sats), 0)        AS sats,
-             COUNT(*)                      AS boosts,
-             COUNT(DISTINCT podcast_guid)  AS shows
-        FROM boosts
-       WHERE booster_pubkey NOT IN (${holes})
-       GROUP BY booster_pubkey
-    )
-    SELECT ${parts} FROM m`;
-  return { sql, args };
-}
-
-/**
- * A publisher's three all-time ranks on the Artists feed.
- *
- * The booster branch's shape one tier over: the CTE restates
- * `/api/v1/publishers`'s aggregate exactly — boosts joined through the
- * declaring shows, grouped by publisher, the title-less row excluded — so the
- * rank is a place on the list the reader can go and scroll. The third key is
- * `boosters`, the same breadth axis a show ranks by, because the Artists feed
- * offers exactly the show feeds' sorts.
- */
-function publisherRankQuery(row) {
-  const val = {
-    sats: Number(row.sats) || 0,
-    boosts: Number(row.boosts) || 0,
-    boosters: Number(row.boosters) || 0,
-  };
-  const args = [];
-  const parts = RANK_KEYS.map((k) => {
-    args.push(val[k], val[k]);
-    return `COUNT(CASE WHEN m.${k} > ? THEN 1 END) AS a_${k},
-            COUNT(CASE WHEN m.${k} = ? THEN 1 END) AS t_${k}`;
-  }).join(",\n           ");
-
-  const sql = `
-    WITH m AS (
-      SELECT pc.publisher_guid,
-             COALESCE(SUM(b.sats), 0)         AS sats,
-             COUNT(*)                         AS boosts,
-             COUNT(DISTINCT b.booster_pubkey) AS boosters
-        FROM boosts b
-        JOIN podcasts pc   ON pc.podcast_guid    = b.podcast_guid
-        JOIN publishers pub ON pub.publisher_guid = pc.publisher_guid
-       WHERE pub.title IS NOT NULL
-         AND COALESCE(pc.medium,'podcast') = 'music'
-       GROUP BY pc.publisher_guid
-    )
-    SELECT ${parts} FROM m`;
-  return { sql, args };
-}
-
 /* ⚠️ THE ONLYBOOSTS CHARTS POSITION — rank in sats + rank in boosts + rank in
  * the subject's breadth key (boosters for content, shows boosted for a
  * member), summed, lowest total first; ties break breadth → sats → boosts and
@@ -187,20 +96,42 @@ function publisherRankQuery(row) {
  * chart place and the component ranks always describe one corpus. Global and
  * all languages always: the feedRanks doctrine at the top of this file.
  *
+ * ⚠️ THE QUERY RANKS THE WHOLE POPULATION AND RETURNS ALL OF IT, SINCE
+ * 2026-09-07. It used to end `WHERE id = ?` and run four times per page view
+ * (all time + the three windows), which is the same work with one row kept:
+ * D1 counted 286k rows read for the all-time episode chart and ~92k for a
+ * windowed one, so an episode page cost ~590k rows and a booster page ~540k,
+ * and 70% of those page views were SEO and AI crawlers walking the sitemap.
+ * D1 read 12 BILLION rows on 2026-09-04 against 200M/day the week before the
+ * strip shipped, and the month's included allowance ran out that day. The
+ * leaderboard is identical for every subject; only the lookup differs. So
+ * `chartTable` computes it once, keeps it in KV (see there), and every page
+ * looks its subject up in the cached table. The three all-time component
+ * chips come out of the same table (`r_*`/`t_*` are exactly the ahead+1 and
+ * at counts the old COUNT(CASE …) queries produced), so a page render on a
+ * warm cache reads NO chart rows from D1 at all.
+ *
  * ⚠️ A `cutoff` (unix seconds) makes it one WINDOW's chart. The base becomes
  * the same boost-time GROUP BY the four endpoints run for a windowed
  * `sort=chart` (aggEpisodes in episodes.js, the `p.cutoff` branches of
  * podcasts.js and publishers.js, the members AGG join), so a cell on the
  * strip agrees with the windowed feed view it links to. No cutoff keeps the
  * precomputed all-time aggregates, which are cheaper and identical by
- * construction (d1_sync keeps them true). */
-function chartQuery(kind, row, cutoff = null) {
+ * construction (d1_sync keeps them true).
+ *
+ * The booster population is the wall's, publisher exclusion and all: rank
+ * means the place the subject holds on a list a reader can go and scroll, and
+ * that list is `/api/v1/members` with no `q`. A publisher's own page gets no
+ * chips and it falls out for free — the subject is not in the table, so the
+ * lookup finds nothing, which is the honest answer: those keys are
+ * deliberately not on the wall, so they hold no place on it. The publisher
+ * population restates `/api/v1/publishers`' aggregate: boosts joined through
+ * the declaring MUSIC shows, grouped by publisher, the title-less row
+ * excluded. */
+function chartPopulationQuery(kind, music, cutoff = null) {
   let base = null;
-  let id = null;
   const args = [];
   if (kind === "booster") {
-    if (!row?.pk) return null;
-    id = row.pk;
     const holes = RANK_PUBLISHERS.map(() => "?").join(",");
     args.push(...RANK_PUBLISHERS);
     base = `
@@ -212,10 +143,16 @@ function chartQuery(kind, row, cutoff = null) {
        WHERE booster_pubkey NOT IN (${holes})${cutoff ? `
          AND created_at >= ?` : ""}
        GROUP BY booster_pubkey`;
+    /* ⚠️ THE WINDOWED BASE NAMES ITS INDEX. Left to itself the planner
+     * serves the GROUP BY off idx_boosts_booster (or _item / _podcast below)
+     * and filters the date afterwards, reading all ~40k boosts for a week
+     * that holds 500 — measured 2026-09-07: 79k rows for the member week,
+     * 37k for the episode week. A range scan of idx_boosts_created and a
+     * sort is the cheap plan, and INDEXED BY is how SQLite is told so. The
+     * all-time bases stay on their own plan (no date to range on). */
+    if (cutoff) base = base.replace("FROM boosts", "FROM boosts INDEXED BY idx_boosts_created");
     if (cutoff) args.push(cutoff);
   } else if (kind === "publisher") {
-    if (!row?.guid) return null;
-    id = row.guid;
     base = `
       SELECT pc.publisher_guid                AS id,
              COALESCE(SUM(b.sats), 0)         AS m_sats,
@@ -231,16 +168,13 @@ function chartQuery(kind, row, cutoff = null) {
     if (cutoff) args.push(cutoff);
   } else {
     const isEpisode = kind === "episode";
-    id = isEpisode ? row.item_guid : row.podcast_guid;
-    if (!id) return null;
-    const music = (isEpisode ? row.p_medium : row.medium) === "music";
     // The medium partition, restated from the API: never `= 'podcast'`.
     const op = music ? "=" : "<>";
     if (cutoff) {
       /* Windowed: every figure is the window's own, recomputed over `boosts`
        * exactly as the endpoints' windowed GROUP BY recomputes it — the
        * precomputed columns are all-time totals and would rank the wrong
-       * corpus. A subject with no boost in the window finds no row, which is
+       * corpus. A subject with no boost in the window has no row, which is
        * the honest null the dash cell renders. */
       const col = isEpisode ? "item_guid" : "podcast_guid";
       args.push(cutoff);
@@ -249,7 +183,7 @@ function chartQuery(kind, row, cutoff = null) {
              COALESCE(SUM(b.sats),0)           AS m_sats,
              COUNT(*)                          AS m_boosts,
              COUNT(DISTINCT b.booster_pubkey)  AS m_breadth
-        FROM boosts b
+        FROM boosts b INDEXED BY idx_boosts_created
         LEFT JOIN podcasts pc ON pc.podcast_guid = b.podcast_guid
        WHERE b.${col} IS NOT NULL
          AND b.created_at >= ?
@@ -272,71 +206,66 @@ function chartQuery(kind, row, cutoff = null) {
         FROM podcasts p
        WHERE COALESCE(p.medium,'podcast') ${op} 'music'`;
   }
-  const sql = `
-    WITH base AS (${base}),
-         scored AS (
-           SELECT base.*,
-                  RANK() OVER (ORDER BY m_sats DESC)    AS r_sats,
-                  RANK() OVER (ORDER BY m_boosts DESC)  AS r_boosts,
-                  RANK() OVER (ORDER BY m_breadth DESC) AS r_breadth
-           FROM base
-         ),
-         chart AS (
-           SELECT scored.*,
-                  RANK() OVER (ORDER BY (r_sats + r_boosts + r_breadth),
-                               m_breadth DESC, m_sats DESC, m_boosts DESC) AS rank
-           FROM scored
-         ),
-         tied AS (
-           /* peers is the chart place's tie group; the three t_* are each
-            * component rank's, so the windowed tiles can wear the T the
-            * all-time chips get from ranksFrom's at > 1. (No backticks in
-            * here: this is inside a JS template literal.) */
-           SELECT chart.*,
-                  COUNT(*) OVER (PARTITION BY rank)      AS peers,
-                  COUNT(*) OVER (PARTITION BY r_sats)    AS t_sats,
-                  COUNT(*) OVER (PARTITION BY r_boosts)  AS t_boosts,
-                  COUNT(*) OVER (PARTITION BY r_breadth) AS t_breadth
-           FROM chart
-         )
-    SELECT rank, peers,
-           m_sats, m_boosts, m_breadth,
-           r_sats, r_boosts, r_breadth,
-           t_sats, t_boosts, t_breadth
-      FROM tied WHERE id = ?`;
-  args.push(id);
-  return { sql, args };
+  /* ⚠️ ONLY THE BASE ROWS COME BACK; THE RANKING IS DONE IN rankTable BELOW.
+   * The SQL version of this ranking — three RANK() windows and four COUNT()
+   * OVER (PARTITION BY …) windows on top of the base — re-scanned the
+   * materialized rows once per window, so 12k episodes cost D1 286k rows
+   * read. The base alone is one pass: ~24k for the all-time episode table
+   * (the podcasts join for the medium), a few thousand for a windowed one.
+   * That is what makes a two-minute refresh affordable. rankTable restates
+   * the window functions' semantics exactly, and test-charts.mjs holds the
+   * result to the same brute-forced expectations the API's SQL is held to. */
+  return { sql: base, args };
 }
 
-/* Resolves { rank, tied, figures, ranks } or null; its own catch, so a chart
- * failure costs the chart line and never the three component chips beside it.
- * A subject outside the population (a publisher key on /booster, a medium
- * mismatch) simply finds no row, which is the same honest silence ranksFrom
- * keeps.
- *
- * `figures` and `ranks` joined on 2026-09-03 (Reed's ask: the stat tiles
- * follow the window picked on the strip): the window's own sats, boosts and
- * breadth for the subject, and its competition rank on each — the same
- * `RANK()` the chart is summed from, so a windowed tile's chip and the chart
- * cell above it are one computation. `breadth` is the third key, whatever the
- * kind calls it; attachChart names it. */
-async function chartPlace(db, kind, row, cutoff = null) {
-  try {
-    const q = chartQuery(kind, row, cutoff);
-    if (!q) return null;
-    const r = await db.prepare(q.sql).bind(...q.args).first();
-    const rank = Number(r?.rank);
-    if (!Number.isFinite(rank) || rank < 1) return null;
-    const comp = (k) => ({ rank: Number(r[`r_${k}`]), tied: Number(r[`t_${k}`]) > 1 });
-    return {
-      rank, tied: Number(r.peers) > 1,
-      figures: { sats: Number(r.m_sats) || 0, boosts: Number(r.m_boosts) || 0, breadth: Number(r.m_breadth) || 0 },
-      ranks: { sats: comp("sats"), boosts: comp("boosts"), breadth: comp("breadth") },
-    };
-  } catch (err) {
-    console.warn("[feed-rank] chart query failed", err);
-    return null;
+/* Competition ranks (1-2-2-4) over one column, descending, plus each row's
+ * tie-group size — RANK() OVER (ORDER BY v DESC) and COUNT(*) OVER
+ * (PARTITION BY that rank), in one sort. O(n log n); rank.js#chartRanks does
+ * the same job for a drawer's few dozen rows with a quadratic count that
+ * would take seconds on 12k. */
+function compRanks(vals) {
+  const idx = vals.map((_, i) => i).sort((a, b) => vals[b] - vals[a]);
+  const rank = new Array(vals.length), at = new Array(vals.length);
+  let i = 0;
+  while (i < idx.length) {
+    let j = i;
+    while (j < idx.length && vals[idx[j]] === vals[idx[i]]) j++;
+    for (let k = i; k < j; k++) { rank[idx[k]] = i + 1; at[idx[k]] = j - i; }
+    i = j;
   }
+  return [rank, at];
+}
+
+/* The chart over the base rows: the three component ranks, the chart place
+ * (rank in sats + rank in boosts + rank in breadth, lowest first; ties break
+ * breadth → sats → boosts, a remaining tie shared) and every tie-group size,
+ * as `id → TABLE_COLS`. Same standing rank.js#chartRanks computes for the
+ * drawers and the API's SQL computes for sort=chart. */
+function rankTable(results) {
+  const n = results.length;
+  const S = new Array(n), B = new Array(n), K = new Array(n);
+  for (let i = 0; i < n; i++) {
+    S[i] = Number(results[i].m_sats) || 0;
+    B[i] = Number(results[i].m_boosts) || 0;
+    K[i] = Number(results[i].m_breadth) || 0;
+  }
+  const [rS, tS] = compRanks(S), [rB, tB] = compRanks(B), [rK, tK] = compRanks(K);
+  const score = new Array(n);
+  for (let i = 0; i < n; i++) score[i] = rS[i] + rB[i] + rK[i];
+  const order = S.map((_, i) => i).sort((a, b) => score[a] - score[b] || K[b] - K[a] || S[b] - S[a] || B[b] - B[a]);
+  const same = (a, b) => score[a] === score[b] && K[a] === K[b] && S[a] === S[b] && B[a] === B[b];
+  const rows = {};
+  let i = 0;
+  while (i < n) {
+    let j = i;
+    while (j < n && same(order[j], order[i])) j++;
+    for (let k = i; k < j; k++) {
+      const r = order[k];
+      rows[results[r].id] = [i + 1, j - i, S[r], B[r], K[r], rS[r], rB[r], rK[r], tS[r], tB[r], tK[r]];
+    }
+    i = j;
+  }
+  return rows;
 }
 
 /* ⚠️ THE WINDOWS ARE THE FEED BAR'S RANGES and the keys are the hash's own
@@ -344,6 +273,162 @@ async function chartPlace(db, kind, row, cutoff = null) {
  * A new range in feed-controls.js RANGE_OPTIONS + the endpoints' RANGE_DAYS
  * wants a row here too, or the strip simply doesn't show it. */
 const CHART_WINDOWS = [["1w", 7], ["1m", 30], ["1y", 365]];
+const WINDOW_DAYS = Object.fromEntries(CHART_WINDOWS);
+
+/* ── THE CHART TABLE CACHE ───────────────────────────────────────────────────
+ *
+ * One entry per (kind, medium side, window): `{ t, cutoff, rows }` where
+ * `rows` maps a subject id to the eleven numbers the population query
+ * returns, in TABLE_COLS order. The all-time episode table is the largest,
+ * ~12k ids and ~1MB of JSON; KV's ceiling is 25MB.
+ *
+ * WHERE IT LIVES. `env.CHART_KV` if the project ever binds a namespace of its
+ * own, else `env.SIGN_RATELIMIT` — the KV namespace the signing oracle's rate
+ * limiter already has bound to the Pages project (its keys are `rl:`-prefixed,
+ * these are `chart:`, and a namespace is a flat key space, so they share it
+ * without meeting). Reusing it is what made this fix a push rather than a
+ * dashboard change plus a redeploy; `chartCacheOf(context)` picks. With no KV
+ * at all — the tests, a local `wrangler pages dev` without the binding — the
+ * table is computed per call, which is exactly what every render did before.
+ *
+ * FRESHNESS. `CHART_TTL_SECS` is the logical age at which a table is stale;
+ * the KV entry itself lives `CHART_KV_TTL_SECS` so a stale copy is still
+ * there to serve. A stale hit is served AS IS and refreshed in the
+ * background through `waitUntil` (or awaited, when the caller has none), so
+ * a reader never waits on the population query except on a cold key. A
+ * 60-second `:lock` key keeps a burst of crawler hits at expiry from all
+ * refreshing the same table at once — best-effort, KV being eventually
+ * consistent, and that is enough: the failure it bounds is a handful of
+ * duplicate computations, not a wrong answer.
+ *
+ * ⚠️ TWO MINUTES IS THE COLLECTOR'S TICK — Reed's call, 2026-09-07: a boost
+ * that is on the site is on the strip too, so a share-card screenshot
+ * matches everything around it. It was five minutes for the first hour of
+ * this cache's life, on the page's own `max-age=300`; what made two
+ * affordable is rankTable — the SQL ranking cost 286k rows per all-time
+ * episode table, the base-only query ~24k. Worst case, every table hot in
+ * every window all day: 720 refreshes × the ~450k rows all 24 bases add up
+ * to (measured 2026-09-07, INDEXED BY in place) ≈ 0.3B rows/day, against the
+ * 25B/month D1 includes; a quiet population
+ * is never refreshed at all, since a refresh only follows a request. The
+ * windowed tiles' FIGURES come out of the same table, so a boost sent a
+ * minute ago shows on the all-time row (the page's own live totals) before
+ * it shows on the Week row, by at most one tick. (Cloudflare's edge does not
+ * cache HTML or JSON on `max-age` alone — `cf-cache-status: DYNAMIC` on every
+ * Function response until a Cache Rule says the paths are eligible — which
+ * is why the pages' own header never absorbed a single crawler hit.)
+ *
+ * ⚠️ `cutoff` IS STORED WITH THE TABLE. A windowed table is "the last N days
+ * as of `t`", and a lookup must not recompute the boundary — the figures in
+ * it were counted against the stored cutoff. */
+const CHART_TTL_SECS = 120;
+const CHART_KV_TTL_SECS = 3600;
+const CHART_LOCK_SECS = 60;
+const CHART_CACHE_VERSION = 1;
+const TABLE_COLS = ["rank", "peers", "m_sats", "m_boosts", "m_breadth",
+  "r_sats", "r_boosts", "r_breadth", "t_sats", "t_boosts", "t_breadth"];
+
+/**
+ * The cache options `feedRanks` takes, off a Pages Function context:
+ * `{ kv, waitUntil }`. Prefers a dedicated `CHART_KV` binding, falls back to
+ * the oracle's `SIGN_RATELIMIT` namespace, and hands back `{}` when neither
+ * is bound so the caller degrades to computing per render.
+ */
+export function chartCacheOf(context) {
+  const env = context?.env || {};
+  const kv = env.CHART_KV || env.SIGN_RATELIMIT || null;
+  const usable = kv && typeof kv.get === "function" && typeof kv.put === "function";
+  return {
+    kv: usable ? kv : null,
+    waitUntil: typeof context?.waitUntil === "function" ? context.waitUntil.bind(context) : null,
+  };
+}
+
+function chartKey(kind, music, win) {
+  const side = kind === "show" || kind === "episode" ? (music ? "music" : "other") : "all";
+  return `chart:v${CHART_CACHE_VERSION}:${kind}:${side}:${win}`;
+}
+
+async function computeTable(db, kind, music, win) {
+  const t = Math.floor(Date.now() / 1000);
+  const cutoff = win === "all" ? null : t - WINDOW_DAYS[win] * 86400;
+  const q = chartPopulationQuery(kind, music, cutoff);
+  const { results } = await db.prepare(q.sql).bind(...q.args).all();
+  return { t, cutoff, rows: rankTable(results || []) };
+}
+
+async function refreshTable(db, kv, key, kind, music, win, background) {
+  if (background) {
+    const lock = `${key}:lock`;
+    if (await kv.get(lock).catch(() => null)) return null;
+    await kv.put(lock, "1", { expirationTtl: CHART_LOCK_SECS }).catch(() => {});
+  }
+  const table = await computeTable(db, kind, music, win);
+  await kv.put(key, JSON.stringify(table), { expirationTtl: CHART_KV_TTL_SECS }).catch((err) => {
+    console.warn("[feed-rank] chart cache put failed", err);
+  });
+  return table;
+}
+
+/* The chart table for one population and window, from KV when there is one.
+ * Resolves the `{ t, cutoff, rows }` record; throws only if the population
+ * query itself fails, which chartPlace catches. */
+async function chartTable(db, kind, music, win, cache) {
+  const kv = cache?.kv;
+  if (!kv) return computeTable(db, kind, music, win);
+  const key = chartKey(kind, music, win);
+  let hit = null;
+  try {
+    hit = await kv.get(key, { type: "json", cacheTtl: 60 });
+  } catch (err) {
+    console.warn("[feed-rank] chart cache get failed", err);
+  }
+  if (hit && hit.rows && typeof hit.rows === "object" && Number.isFinite(hit.t)) {
+    if (Math.floor(Date.now() / 1000) - hit.t > CHART_TTL_SECS) {
+      const refresh = refreshTable(db, kv, key, kind, music, win, true)
+        .catch((err) => console.warn("[feed-rank] chart refresh failed", err));
+      if (cache.waitUntil) cache.waitUntil(refresh); else await refresh;
+    }
+    return hit;
+  }
+  return refreshTable(db, kv, key, kind, music, win, false);
+}
+
+/* One subject's place in a table: { rank, tied, figures, ranks } or null when
+ * the subject is not in the population — outside the window, the wrong
+ * medium side, a publisher key on /booster. Same honest silence the old
+ * per-subject query kept. */
+function placeIn(table, id) {
+  const v = table && table.rows ? table.rows[id] : null;
+  if (!v) return null;
+  const r = Object.fromEntries(TABLE_COLS.map((c, i) => [c, v[i]]));
+  if (!Number.isFinite(r.rank) || r.rank < 1) return null;
+  const comp = (k) => ({ rank: r[`r_${k}`], tied: r[`t_${k}`] > 1 });
+  return {
+    rank: r.rank, tied: r.peers > 1,
+    figures: { sats: r.m_sats || 0, boosts: r.m_boosts || 0, breadth: r.m_breadth || 0 },
+    ranks: { sats: comp("sats"), boosts: comp("boosts"), breadth: comp("breadth") },
+  };
+}
+
+/* Resolves { rank, tied, figures, ranks } or null; its own catch, so a chart
+ * failure costs the chart line and never the chips beside it.
+ *
+ * `figures` and `ranks` joined on 2026-09-03 (Reed's ask: the stat tiles
+ * follow the window picked on the strip): the window's own sats, boosts and
+ * breadth for the subject, and its competition rank on each — the same
+ * `RANK()` the chart is summed from, so a windowed tile's chip and the chart
+ * cell above it are one computation. `breadth` is the third key, whatever the
+ * kind calls it; attachChart names it. */
+async function chartPlace(db, kind, music, id, win, cache) {
+  try {
+    const table = await chartTable(db, kind, music, win, cache);
+    return placeIn(table, id);
+  } catch (err) {
+    console.warn("[feed-rank] chart query failed", err);
+    return null;
+  }
+}
 
 /* The all-time place plus the three windowed ones, in parallel — each
  * chartPlace carries its own catch, so one failed window costs one dash and
@@ -357,12 +442,8 @@ const CHART_WINDOWS = [["1w", 7], ["1m", 30], ["1y", 365]];
  * honest figure rather than a missing row. The breadth key is renamed here
  * to what the kind's tiles call it (`shows` on /booster, `boosters`
  * elsewhere), so renderStatTiles can look figures up by `stat.key`. */
-async function attachChart(db, kind, row, out) {
-  const now = Math.floor(Date.now() / 1000);
-  const [all, ...wins] = await Promise.all([
-    chartPlace(db, kind, row),
-    ...CHART_WINDOWS.map(([, days]) => chartPlace(db, kind, row, now - days * 86400)),
-  ]);
+async function attachChart(db, kind, music, id, all, out, cache) {
+  const wins = await Promise.all(CHART_WINDOWS.map(([key]) => chartPlace(db, kind, music, id, key, cache)));
   out.chart = all;
   out.chartWindows = { all };
   CHART_WINDOWS.forEach(([key], i) => { out.chartWindows[key] = wins[i]; });
@@ -376,106 +457,47 @@ async function attachChart(db, kind, row, out) {
 }
 
 /**
- * The three all-time global ranks for a show or an episode.
+ * The three all-time global ranks for a subject, plus its chart places.
  *
- * Resolves `{ sats:{rank,tied}, boosts:{…}, boosters:{…} }` or null; never
- * rejects. `tied` is true when at least one other row holds the same place.
+ * Resolves `{ sats:{rank,tied}, boosts:{…}, boosters:{…} }` (`shows` in place
+ * of `boosters` for a booster) with `chart`, `chartWindows` and `windows`
+ * attached, or null; never rejects. `tied` is true when at least one other
+ * row holds the same place.
+ *
+ * ⚠️ NULL MEANS THE SUBJECT IS NOT ON THE LIST. Three ways that happens, and
+ * all three want silence rather than a number: a medium mismatch between the
+ * population and the row we were handed, a booster whose key is one of the
+ * four the wall excludes, and a subject with no rows at all. Printing a rank
+ * on a list the subject is not on is worse than printing none.
  *
  * @param {D1Database} db
- * @param {"show"|"episode"} kind
- * @param {object} row  the subject's own D1 row: `podcast_guid` or `item_guid`,
- *   `boost_count`, `total_sats`, `booster_count`, and for a show its `medium`,
- *   for an episode the show's medium as `p_medium`.
+ * @param {"show"|"episode"|"booster"|"publisher"} kind
+ * @param {object} row  the subject's own D1 row: `podcast_guid` or `item_guid`
+ *   (and for a show its `medium`, for an episode the show's medium as
+ *   `p_medium`); `pk` for a booster; `guid` for a publisher.
+ * @param {{kv?:object, waitUntil?:function}} [cache]  from chartCacheOf; omit
+ *   to compute per call.
  */
-export async function feedRanks(db, kind, row) {
+export async function feedRanks(db, kind, row, cache = null) {
   try {
-    /* ⚠️ THE BOOSTER BRANCH SHARES THE TAIL DELIBERATELY. The ahead/at → rank
-       conversion, the `at < 1` guard and the catch below are the parts that are
-       easy to get subtly wrong; only the query and the key list differ. */
-    if (kind === "booster") {
-      if (!row || !row.pk) return null;
-      const { sql, args } = boosterRankQuery(row);
-      const r = await db.prepare(sql).bind(...args).first();
-      const out = ranksFrom(r, BOOSTER_RANK_KEYS);
-      if (out) await attachChart(db, kind, row, out);
-      return out;
-    }
-    if (kind === "publisher") {
-      if (!row || !row.guid) return null;
-      const { sql, args } = publisherRankQuery(row);
-      const r = await db.prepare(sql).bind(...args).first();
-      const out = ranksFrom(r, RANK_KEYS);
-      if (out) await attachChart(db, kind, row, out);
-      return out;
-    }
-    const isEpisode = kind === "episode";
-    const id = isEpisode ? row.item_guid : row.podcast_guid;
+    let id = null, music = false;
+    if (kind === "booster") id = row?.pk || null;
+    else if (kind === "publisher") id = row?.guid || null;
+    else if (kind === "episode") { id = row?.item_guid || null; music = row?.p_medium === "music"; }
+    else { id = row?.podcast_guid || null; music = row?.medium === "music"; }
     if (!id) return null;
-    const music = (isEpisode ? row.p_medium : row.medium) === "music";
 
-    // ⚠️ Every subject value is COALESCEd to 0 exactly as the SQL side is. The
-    // aggregate columns are nullable in principle, and a NULL on either side of
-    // a comparison is NULL rather than false, which would silently drop the row
-    // from both counts and report the subject as rank 1, untied.
-    const val = {
-      sats: Number(row.total_sats) || 0,
-      boosts: Number(row.boost_count) || 0,
-      boosters: Number(row.booster_count) || 0,
-    };
-
-    const cols = isEpisode
-      ? { sats: "e.total_sats", boosts: "e.boost_count", boosters: "e.booster_count" }
-      : { sats: "p.total_sats", boosts: "p.boost_count", boosters: "p.booster_count" };
-    const from = isEpisode
-      ? "FROM episodes e LEFT JOIN podcasts pc ON pc.podcast_guid = e.podcast_guid"
-      : "FROM podcasts p";
-    const mediumCol = isEpisode ? "pc.medium" : "p.medium";
-
-    // Two counts per stat off one scan: how many are strictly ahead, and how
-    // many share the value (including the subject itself, so `at > 1` is the
-    // tie test).
-    const args = [];
-    const parts = RANK_KEYS.map((k) => {
-      args.push(val[k], val[k]);
-      return `COUNT(CASE WHEN COALESCE(${cols[k]},0) > ? THEN 1 END) AS a_${k},
-              COUNT(CASE WHEN COALESCE(${cols[k]},0) = ? THEN 1 END) AS t_${k}`;
-    }).join(",\n             ");
-
-    // The medium partition, restated from the API: `music` is Albums/Songs and
-    // EVERYTHING else — podcasts, video, and shows the collector cannot
-    // identify — is Shows/Episodes. Never `= 'podcast'`.
-    const where = music
-      ? `COALESCE(${mediumCol},'podcast') = 'music'`
-      : `COALESCE(${mediumCol},'podcast') <> 'music'`;
-
-    const r = await db.prepare(`SELECT ${parts} ${from} WHERE ${where}`).bind(...args).first();
-    const out = ranksFrom(r, RANK_KEYS);
-    if (out) await attachChart(db, kind, row, out);
+    const all = await chartPlace(db, kind, music, id, "all", cache);
+    if (!all) return null;
+    const keys = kind === "booster" ? BOOSTER_RANK_KEYS : RANK_KEYS;
+    const out = {};
+    keys.forEach((k, i) => { out[k] = all.ranks[["sats", "boosts", "breadth"][i]]; });
+    await attachChart(db, kind, music, id, all, out, cache);
     return out;
   } catch (err) {
     console.warn("[feed-rank] rank query failed", err);
     return null;
   }
-}
-
-/* The two counts per stat → `{rank, tied}`, shared by every kind.
- *
- * ⚠️ `at` COUNTS THE SUBJECT, so 0 means the subject was not in the set the
- * query admits and the whole result is withheld. Three ways that happens, and
- * all three want silence rather than a number: a medium mismatch between this
- * query and the row we were handed, a booster whose key is one of the five the
- * wall excludes, and a subject with no rows at all. Printing a rank on a list
- * the subject is not on is worse than printing none. */
-function ranksFrom(r, keys) {
-  if (!r) return null;
-  const out = {};
-  for (const k of keys) {
-    const ahead = Number(r[`a_${k}`]);
-    const at = Number(r[`t_${k}`]);
-    if (!Number.isFinite(ahead) || !Number.isFinite(at) || at < 1) return null;
-    out[k] = { rank: ahead + 1, tied: at > 1 };
-  }
-  return out;
 }
 
 // The pages' own two formatters, so a windowed tile prints its figure exactly

@@ -48,6 +48,7 @@
 // `range=week` leads the pair: this board is one nobody currently reading can
 // get onto today, and the live race beside it is where they get onto it.
 import { json, preflight, clampLimit, PUBLISHERS } from "../_common.js";
+import { headOf } from "../../../_shared/head.js";
 /* ⚠️ THE WEEK RULE IS A TWO-SIDED MODULE NOW, imported here by relative path
  * (esbuild inlines it off the filesystem) and by the browser as
  * `/assets/js/pacific-week.js?v=<VERSION>`. It lived in this file until the
@@ -323,3 +324,6 @@ export async function hoursBoard(env, { range = "week", week = null, limit = 10 
    `cache` above). The live board changes as boosts land, which is what the
    short life buys; a closed week only moves when the collector fills in a
    missing episode duration, so it takes the Proof board's 300s. */
+
+// The GET's status and headers, no body — see _shared/head.js.
+export const onRequestHead = headOf(onRequestGet);

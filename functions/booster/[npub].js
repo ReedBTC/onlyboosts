@@ -38,12 +38,13 @@ import {
   renderBoosts,
 } from "../_shared/detail-page.js";
 import { itemsFromBoosts, renderCardPage, CARDS_PER_PAGE } from "../_shared/episode-cards.js";
-import { feedRanks, renderStatTiles } from "../_shared/feed-rank.js";
+import { feedRanks, renderStatTiles, chartCacheOf } from "../_shared/feed-rank.js";
 // The drawers open on the chart formula over their own rows (2026-09-03).
 import { chartRanks, rankLabel } from "../../assets/js/rank.js";
 import { fetchBoosterCorpus } from "../api/v1/boosters/[npub].js";
 import { COPY as CARD_COPY } from "../../assets/js/episode-card.js";
 
+import { headOf } from "../_shared/head.js";
 const SITE_ORIGIN = "https://onlyboosts.social";
 const OG_FALLBACK = `${SITE_ORIGIN}/assets/onlyboosts_banner.png`;
 
@@ -81,7 +82,8 @@ const SHOWS_CAP = 400;
 // the two rollups above it are for.
 const BOOSTS_SHOWN = 24;
 
-export async function onRequestGet({ env, params }) {
+export async function onRequestGet(context) {
+  const { env, params } = context;
   let raw = params.npub;
   if (Array.isArray(raw)) raw = raw[0];
   try { raw = decodeURIComponent(raw); } catch { /* keep the raw form */ }
@@ -233,7 +235,7 @@ export async function onRequestGet({ env, params }) {
       sats: totals.sats,
       boosts: totals.boosts,
       shows: totals.shows,
-    }),
+    }, chartCacheOf(context)),
   ]);
 
   const html = renderBoosterPage({
@@ -1168,6 +1170,9 @@ function notFound(raw) {
 </html>`;
   return new Response(html, {
     status: 404,
-    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=300" },
+    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=120" },
   });
 }
+
+// The GET's status and headers, no body — see _shared/head.js.
+export const onRequestHead = headOf(onRequestGet);

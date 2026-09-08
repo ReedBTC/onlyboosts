@@ -22,6 +22,7 @@
 // language that matches nothing on the feed the reader is looking at.
 import { json, preflight } from "./_common.js";
 
+import { headOf } from "../../_shared/head.js";
 export async function onRequestOptions({ request }) { return preflight(request); }
 
 const MEDIA = new Set(["podcast", "music", "video"]);
@@ -66,3 +67,6 @@ export async function onRequestGet({ request, env }) {
     // does, so it caches like the other precomputed reads.
   }, { cache: 300 });
 }
+
+// The GET's status and headers, no body — see _shared/head.js.
+export const onRequestHead = headOf(onRequestGet);

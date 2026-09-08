@@ -27,6 +27,7 @@ import { json, preflight, clampLimit } from "../_common.js";
 import { pacificWeekStart, nextWeek, weekStartFromDate } from "../../../../assets/js/pacific-week.js";
 import { weeklyChart, weeksAtNumberOne, hpwWeeksAtNumberOne } from "../../../_shared/week-charts.js";
 
+import { headOf } from "../../../_shared/head.js";
 const WEEKLY_KINDS = new Set(["shows", "artists"]);
 const ONES_KINDS = new Set(["shows", "artists", "members"]);
 
@@ -108,3 +109,6 @@ export async function onesBoard(env, { kind, limit = 10 } = {}) {
     body: { kind, before: live, current_week: live, count: rows.length, rows },
   };
 }
+
+// The GET's status and headers, no body — see _shared/head.js.
+export const onRequestHead = headOf(onRequestGet);

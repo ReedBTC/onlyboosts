@@ -46,7 +46,7 @@ import {
   htmlEscape, isSafeUrl, truncate, num, compact, relTime, jsonForScript,
   renderSupporters, renderBoosts, lookupMentionNames,
 } from "../_shared/detail-page.js";
-import { feedRanks, renderStatTiles } from "../_shared/feed-rank.js";
+import { feedRanks, renderStatTiles, chartCacheOf } from "../_shared/feed-rank.js";
 // The two drawers open on the chart formula over their own rows (2026-09-03).
 import { chartRanks, rankLabel } from "../../assets/js/rank.js";
 import { favoriteButtonHtml } from "../../assets/js/favorite-button.js";
@@ -85,7 +85,8 @@ const SUPPORTER_CAP = 500;
 // detail page opens on; boost-section.js pages the rest through ?corpus=1.
 const BOOSTS_SHOWN = 24;
 
-export async function onRequestGet({ env, params }) {
+export async function onRequestGet(context) {
+  const { env, params } = context;
   let guid = params.guid;
   if (Array.isArray(guid)) guid = guid[0];
   try { guid = decodeURIComponent(guid); } catch { /* keep the raw form */ }
@@ -221,7 +222,7 @@ export async function onRequestGet({ env, params }) {
       sats: totals.sats,
       boosts: totals.boosts,
       boosters: totals.boosters,
-    }),
+    }, chartCacheOf(context)),
   ]);
 
   const html = renderArtistPage({
@@ -245,8 +246,9 @@ export async function onRequestGet({ env, params }) {
     status: 200,
     headers: {
       "Content-Type": "text/html; charset=utf-8",
-      // The collector's five-minute cycle bounds freshness; same as /show.
-      "Cache-Control": "public, max-age=300",
+      // Two minutes is the collector's tick; same as /show, and honored at
+      // the edge since the zone Cache Rule of 2026-09-07.
+      "Cache-Control": "public, max-age=120",
     },
   });
 }
@@ -797,6 +799,6 @@ function notFound(guid) {
 </html>`;
   return new Response(html, {
     status: 404,
-    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=300" },
+    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=120" },
   });
 }

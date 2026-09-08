@@ -22,6 +22,7 @@
 // All paths return the same record shape; only the corpus differs.
 import { json, preflight, clampLimit, toHexPubkey, ftsMatch, readLang, langWhere } from "./_common.js";
 
+import { headOf } from "../../_shared/head.js";
 export async function onRequestOptions({ request }) { return preflight(request); }
 
 // Sort keys are the frontend's own (SORT_OPTIONS in feeds-podcasts.js) so the
@@ -235,7 +236,7 @@ export async function onRequestGet({ request, env }) {
     ...(p.q ? { q: p.q } : {}),
     next_offset: nextOffset,
     episodes,
-  }, { cache: 300 });
+  }, { cache: 120 });
 }
 
 /** One page of the global ranking, as records. See readParams above for why
@@ -602,3 +603,6 @@ export async function onRequestPost({ request, env }) {
   // Per-user and POSTed: not shared-cacheable.
   }, { cache: 0 });
 }
+
+// The GET's status and headers, no body — see _shared/head.js.
+export const onRequestHead = headOf(onRequestGet);

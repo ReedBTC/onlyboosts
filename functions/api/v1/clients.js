@@ -34,6 +34,7 @@ export async function onRequestOptions({ request }) { return preflight(request);
  */
 import { clientLabel as label } from "../../../assets/js/client-label.js";
 
+import { headOf } from "../../_shared/head.js";
 const RANGE_DAYS = { "1w": 7, "1m": 30, "1y": 365, all: null };
 
 export async function onRequestGet({ request, env }) {
@@ -87,3 +88,6 @@ export async function onRequestGet({ request, env }) {
     })),
   }, { cache: 300 });
 }
+
+// The GET's status and headers, no body — see _shared/head.js.
+export const onRequestHead = headOf(onRequestGet);

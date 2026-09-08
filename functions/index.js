@@ -44,6 +44,7 @@ import { readParams, globalPodcasts } from "./api/v1/podcasts.js";
 import { cardsFromPodcasts, renderShowCardPage, SHOW_CARDS_PER_PAGE } from "./_shared/show-cards.js";
 import { COPY } from "../assets/js/show-card.js";
 
+import { headOf } from "./_shared/head.js";
 // The slot in index.html. A marker PAIR, not a single point: the block it wraps
 // is the placeholder the page shows when this does nothing, and that has to go
 // when the cards arrive.
@@ -115,9 +116,11 @@ export async function onRequestGet(context) {
     status: 200,
     headers: {
       "Content-Type": "text/html; charset=utf-8",
-      // Matches the two detail pages. The collector runs a five-minute cycle, so
-      // anything tighter buys nothing but origin load.
-      "Cache-Control": "public, max-age=300",
+      // Matches the four detail pages: two minutes is the collector's tick
+      // (2026-09-06), and since the zone Cache Rule of 2026-09-07 this
+      // header is honored at the edge, so it is how stale a visitor's copy
+      // can be. Reed's call: what a visitor sees moves with the tick.
+      "Cache-Control": "public, max-age=120",
     },
   });
 }
@@ -168,3 +171,6 @@ function injectFeed(html, block) {
   if (start === -1 || end === -1 || end < start) throw new Error("marker not found");
   return html.slice(0, start) + block + html.slice(end + CLOSE.length);
 }
+
+// The GET's status and headers, no body — see _shared/head.js.
+export const onRequestHead = headOf(onRequestGet);

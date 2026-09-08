@@ -68,7 +68,7 @@ export async function onRequestGet({ request, env, params }) {
     try { data = await hoursBoard(env, { range: "all", limit: ROWS }); }
     catch (err) { console.error("[hpw] all-time board failed", err); return unavailable(); }
     const html = card ? renderCard({ kind: "all", body: data.body, live }) : renderPage({ kind: "all", body: data.body, live });
-    return page(html, data.cache, { noindex: card });
+    return page(html, data.cache, { noindex: card, card });
   }
 
   if (!DATE_RE.test(key)) return notFound();
@@ -91,7 +91,7 @@ export async function onRequestGet({ request, env, params }) {
   const view = { kind: "week", ws, live, first: body.first_week ?? null, body };
   const html = card ? renderCard(view) : renderPage(view);
   // An empty past week stays reachable but is not worth an index entry.
-  return page(html, data.cache, { noindex: card || !(body.members || []).length });
+  return page(html, data.cache, { noindex: card || !(body.members || []).length, card });
 }
 
 /* ⚠️ PAGES ROUTES BY METHOD, AND A HEAD FALLS THROUGH TO THE STATIC 404 WHEN
@@ -106,10 +106,15 @@ export async function onRequestHead(ctx) {
 
 // ── the responses ────────────────────────────────────────────────────────────
 
-function page(html, maxAge, { noindex = false } = {}) {
+/* ⚠️ A CARD FRAME IS no-store (2026-09-07). It exists to be photographed by
+   the collector's bot right after the D1 delta, and a zone Cache Rule now
+   caches /hpw/* at Cloudflare's edge on its max-age — so a cached frame would
+   photograph the PREVIOUS board while the hash said the board changed. The
+   bot also cache-busts every URL it loads; this is the frame's own word. */
+function page(html, maxAge, { noindex = false, card = false } = {}) {
   const headers = {
     "Content-Type": "text/html; charset=utf-8",
-    "Cache-Control": `public, max-age=${maxAge}`,
+    "Cache-Control": card ? "no-store" : `public, max-age=${maxAge}`,
   };
   if (noindex) headers["X-Robots-Tag"] = "noindex";
   return new Response(html, { status: 200, headers });

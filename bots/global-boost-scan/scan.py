@@ -26,8 +26,10 @@ THREE FILTER SHAPES, NOT ONE (since 2026-09-03). A boost note is found by:
 
 The `#k` shape was the only one until 2026-09-03, and it only matches a note
 that carries a `k` tag. NIP-73 specifies one, but not every client sends it:
-Fountain didn't until ~2025-04-14, and StableKraft and Wavlake's own app still
-don't — measured 2026-09-03, 415 boosts since 2025-06-01 sat on the core relays
+Fountain didn't until ~2025-04-14, StableKraft didn't until 2026-09-06
+(ChadFarrow/stablekraft-app#237, forward-only: its 274 earlier notes stay
+k-less), and Wavlake's own app still doesn't — measured 2026-09-03, 415
+boosts since 2025-06-01 sat on the core relays
 with `i` tags and no `k` tag (209 linking stablekraft.app, 140 fountain.fm, 65
 wavlake.com), invisible to every scheduled pass because the relay never
 returned them. The other two shapes don't need the tag: a note is found by the

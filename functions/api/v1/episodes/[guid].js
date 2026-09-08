@@ -23,6 +23,7 @@
 import { json, preflight, BOOST_SELECT, boostRecord, clampLimit } from "../_common.js";
 import { lookupMentionNames } from "../../../_shared/detail-page.js";
 
+import { headOf } from "../../../_shared/head.js";
 export async function onRequestOptions({ request }) { return preflight(request); }
 
 // Every boost to this episode, not a page of them: the busiest episode in the
@@ -220,3 +221,6 @@ export async function fetchCommunityBoosts(env, guid, showGuid, medium) {
     boosts: (truncated ? rows.slice(0, COMMUNITY_ROWS) : rows).map(boostRecord),
   };
 }
+
+// The GET's status and headers, no body — see _shared/head.js.
+export const onRequestHead = headOf(onRequestGet);

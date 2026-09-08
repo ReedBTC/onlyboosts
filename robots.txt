@@ -1,4 +1,19 @@
 User-agent: *
 Allow: /
 
+# SEO-tool crawlers. On 2026-09-05 AhrefsBot, SemrushBot and MJ12bot were 40%
+# of every /episode page load (Cloudflare zone analytics), each render then
+# costing ~590k D1 rows for the chart strip. They bring no readers; the AI
+# training crawlers of the same class are blocked in the Cloudflare dashboard
+# (AI Crawl Control), which does not know these three. All three honor
+# robots.txt.
+User-agent: AhrefsBot
+Disallow: /
+
+User-agent: SemrushBot
+Disallow: /
+
+User-agent: MJ12bot
+Disallow: /
+
 Sitemap: https://onlyboosts.social/sitemap.xml

@@ -460,6 +460,7 @@ Sixteen test scripts, all plain `node scripts/<name>.mjs` with no runner:
 | `test-weekly-charts.mjs` | the OnlyBoosts Charts: the **shipped** `/charts` Function (the old page URLs' redirects and the five **card frames**), **`/api/v1/charts`** and the **`/api/og/charts` proxy** (fetch stubbed), over a `node:sqlite` build of the real `schema.sql`, on the members-hours pattern; plus the two-sided source scan of `chart-board.js`. The routing contract (one URL per week, HEAD answered); the Shows and Artists Top 10s against a **brute-forced independent implementation** of the chart rule, component-rank triplets included; the medium partition; the Members pair (the hours board held to brute-forced hours, the publisher exclusion); and every Weeks at #1 tally — completed weeks only, a tied #1 crediting every holder, a fixture week whose #1 is decided by the tiebreak CHAIN. The retired kinds (episodes, albums, songs) stay covered at module level. Confirmed red on six mutations: the chain flipped, the live week counted on each side, the medium filter dropped, the per-week `PARTITION BY` removed, and the member boards' publisher exclusion dropped |
 | `test-catalogue.mjs` | `/api/catalogue`, the /show episode drawer's catalogue: the **shipped** handlers with **`fetch` stubbed**, so it never asks Podcast Index. The five-field projection (coerced, guid-less and duplicate items dropped, newest first with undated rows last, a total order), the request contract (400/503, a PI miss answered 200-empty and `no-store`, HEAD, OPTIONS, the exact-match CORS origin), the fallback route through `podcasts/byguid` and `byfeedurl` to `episodes/byfeedid`, `truncated` at PI's ceiling, and **the streamed byte cap added to `_shared/podcast-index.js#piGet`**, at the cap and past it. Confirmed red on three mutations: the undated rule flipped, the duplicate guard removed, the cap's comparison made `>=` |
 | `test-boost-ingest.mjs` | `/api/v1/boosts/ingest` (2026-09-06): the **shipped** handler over a `node:sqlite` build of the real `schema.sql`, fed by the **shipped** note builder and a real signature. The row as the collector would read it, the FTS row and the `boosts_edge` marker, the show's five and the episode's four aggregates against a brute-force recount (`booster_count` DISTINCT), the title-only episode stub and its non-creation over a collector-filled row, the collector's `INSERT OR REPLACE` overwriting the stub, idempotence, every refusal (tampered, foreign client tag, no show, donation shape, outside the ±15 min window — and a 10-minute-old note admitted where the oracle's own ±5 would refuse), 503 with no D1 or KV, 429 past the limiter, `no-store`. Confirmed red on three mutations: DISTINCT dropped, the existence pre-read removed, `verifyEvent` bypassed |
+| `test-head-routes.mjs` | every Function exporting `onRequestGet` also exports `onRequestHead` (2026-09-07): a **source scan** of `functions/` with the two money endpoints as the allowlist (and a check that the allowlist is not stale), every such module importable, and `headOf` itself: the GET's status and every header with no body, run once with the same context, a redirect preserved |
 | `test-value.mjs` | `/api/value`, the value-block resolver every boost pays through (2026-09-06): the **shipped** handler with **`fetch` stubbed**. The stored feed URL resolves before the guid (the live record's splits, the guid never asked), the guid fallback, an unusable URL as no lookup, `feedId` short-circuiting both, the episode-level block over the feed's under the same record, recipient normalization, 200 `value:null` for a feed PI lacks, 400/503/204 and the exact-match origin. Confirmed red on two mutations: the order flipped back, the episode preference dropped |
 | `test-favorites-merge.mjs` | the PC 2.0 Favorites merge (2026-09-07): the **spec's own 29 vectors**, vendored in `scripts/vendor/pc20-favorites/` with their upstream SHA, run against the **shipped** `favorites-merge.js` through a shim that supplies the spec's stand-in codec; the async seam the reference lacks (`readPrivate` in, `privatePlaintext` out, an opaque half carried byte for byte, an empty one `''`); and a source scan (no imports, no stand-in codec, no Buffer, no clock, no locale, no DOM), and the legacy two-element item's dual-read. Confirmed red on five mutations: rule 5 removed, an untrusted read treated as empty, the opaque half replaced with `''`, the read compared as it arrived rather than reframed, and an entry keyed on position 1 alone |
 | `test-favorites-read.mjs` | the favorites relay reader (2026-09-08): the **shipped** `favorites-read.js` with its one bundle import repointed at nostr-tools, driven against **scripted sockets** that answer, hang, refuse, never connect, drop, forge and disagree, with really signed events. The trust rule (every reached relay answered, at least two), the refusal exclusion, the dead-entry exclusion, newest-wins and the lowest-id tie, the signature check through JSON the way a relay message arrives, the REQ's shape, the timeout. Confirmed red on six mutations: the two-answer floor dropped, a hung relay excused, offline read as empty, the tiebreak flipped, the signature skipped, a refusal counted as an answer |
@@ -473,9 +474,9 @@ THAT GOES UNRUN.** Its header carries the `curl` that produces the capture; take
 a fresh one rather than reusing an old file, since it is also the size
 measurement. It asserted `cards are numbered 1..N with no gaps` — the *ordinal*
 scheme's invariant — until competition ranking shipped on 2026-08-18, and it
-would have been merged red had it not been run. **Run all twenty-eight before a
+would have been merged red had it not been run. **Run all twenty-nine before a
 merge**, and treat this one as the guard on the ranking scheme rather than only
-on weight. *(It read "all twelve" until 2026-08-24, "all fifteen" until 2026-08-30, "all sixteen" and then "all seventeen" until 2026-08-31, and "all eighteen" and then "all nineteen" until 2026-09-04, and "all twenty" and then "all twenty-one" until 2026-09-06, and "all twenty-two" until 2026-09-07, and "all twenty-three", "all twenty-four", "all twenty-five" and "all twenty-six" until 2026-09-08, and "all twenty-seven" until 2026-09-09, contradicting the table
+on weight. *(It read "all twelve" until 2026-08-24, "all fifteen" until 2026-08-30, "all sixteen" and then "all seventeen" until 2026-08-31, and "all eighteen" and then "all nineteen" until 2026-09-04, and "all twenty" and then "all twenty-one" until 2026-09-06, and "all twenty-two" until 2026-09-07, and "all twenty-three", "all twenty-four", "all twenty-five" and "all twenty-six" until 2026-09-08, and "all twenty-seven" and "all twenty-eight" until 2026-09-09, contradicting the table
 directly above it — the count moved when a test was added and this sentence did
 not. If the table grows again, this line grows with it.)*
 
@@ -734,7 +735,15 @@ What a change would break:
   `onRequestHead`** (the GET's status and headers, no body). Pages routes by
   method, and a HEAD with no handler falls through to the static lookup and
   answers 404 for a URL whose GET is fine; link checkers and some unfurlers
-  HEAD first. Bitten three times in two days on 2026-08-29/30.
+  HEAD first. Bitten three times in two days on 2026-08-29/30 — **and the
+  rule was then found unenforced on 2026-09-07: `/show`, `/episode`,
+  `/booster`, `/` and every `/api/v1` endpoint still answered 404 to HEAD.**
+  The handler is one line now, `export const onRequestHead =
+  headOf(onRequestGet)` from `functions/_shared/head.js`, and
+  `test-head-routes.mjs` scans `functions/` for any GET without it. **The two
+  money endpoints, `/api/lnurl` and `/api/keysend`, are the allowlist on
+  purpose**: their GET asks a third party for an invoice or a node record,
+  which a link checker's HEAD must not do.
 - **CORS origin allowlists are exact-match `Set` lookups**, never `startsWith` —
   a prefix check lets a lookalike origin get reflected into
   `Access-Control-Allow-Origin`.
@@ -1343,10 +1352,20 @@ backfill and outbox walkers all take the set — so a show or booster first seen
 through a `#k` note on one tick is covered by the k-free shapes on the next.
 The residual is a first-time booster on a show the index has never seen,
 without a `k` tag; no filter Nostr offers reaches that, and the fix is the
-client sending the tag NIP-73 specifies (Reed is asking StableKraft; Wavlake
-has larger problems). Those boosts land **unlabelled** by design: the only
-evidence of the app is the URL the note links, and `clients.py`'s rule is
-never to guess. The window the single-shape scan had already walked was
+client sending the tag NIP-73 specifies. **StableKraft does since
+2026-09-06** (Reed's issue, ChadFarrow/stablekraft-app#237, closed by PR
+#243): every `i` is paired with its `k`, plus `["client","StableKraft"]`,
+which `clients.py` already slugs and labels. Forward-only — kind 1 is
+immutable — so the 274 StableKraft notes from before the fix stay k-less,
+unlabelled, and reachable only through the `#i`/`authors` shapes. Its
+companion, #242/PR #245, stopped StableKraft naming an internal row id as
+`podcast:item:guid` when a track has no RSS guid; a boost to such a track
+now names the show only. Six boosts in the index (242 sats, four tracks)
+carry those unresolvable ids with no show guid beside them; nothing automatic
+heals them, but three of the four albums are shows the index knows, so a
+hand re-key to a show-level boost is possible if Reed wants it. Wavlake's own app still sends no `k` and has larger problems.
+Untagged boosts land **unlabelled** by design: the only evidence of the app
+is the URL the note links, and `clients.py`'s rule is never to guess. The window the single-shape scan had already walked was
 caught up with `backfill --force --floor 1748736000` on 2026-09-03; the scan
 docstring carries the two relay quirks the wider filter set met (per-filter
 caps make a multi-filter REQ unpageable, and two nginx fronts 429 back-to-back
@@ -1690,7 +1709,14 @@ What a change elsewhere would break:
   the bot (`bots/hpw-cards/`) loads `/hpw/<key>/card`, waits for
   `html[data-card-ready="1"]`, captures 720x900 at 2x, and writes the PNG
   **inside the shards tree**, which is also what saves it from a `--delete`
-  mirror run. **⚠️ ITS STEP IN `run-incremental.sh` CARRIES A SECOND `push`,
+  mirror run. **A board is re-rendered when its hash moves, and since
+  2026-09-07 the hash covers the rows AND `is_current`**: the frame says "In
+  progress." off that flag, and with the rows alone a week whose last boost
+  landed before Monday kept its live-week card for good (Reed saw the
+  Aug 31 week's Shows card still "In progress." days later). **Every URL the
+  bot loads carries a `_=<ms>` cache-buster and the card frames answer
+  `no-store`**, because the zone Cache Rule of 2026-09-07 would otherwise
+  hand it the previous board. **⚠️ ITS STEP IN `run-incremental.sh` CARRIES A SECOND `push`,
   AND THAT IS NOT REDUNDANT**: the card photographs the live site and the live
   site reads D1, so the render has to follow `d1_sync --remote-delta` — which
   sits BELOW the routine `push`, so by then the rsync has already run. Rendering
@@ -1857,6 +1883,40 @@ What a change elsewhere would break:
   deliberately still the boosted list). It is a written exception to the
   rendering rule. **The Catalogue** in `docs/show-pages-spec.md` is the design
   record; `test-catalogue.mjs` covers the Function and the drawer markup.
+- **⚠️ THE CHART STRIP'S FOUR LEADERBOARDS ARE COMPUTED ONCE AND CACHED IN
+  KV, NOT ONCE PER PAGE VIEW — SINCE 2026-09-07, AND THE REASON WAS A BILL.**
+  `feedRanks` ran the population-wide `RANK()` query four times per render
+  with one row kept (all time + Week/Month/Year), 286k D1 rows read for the
+  all-time episode chart alone, ~590k per episode page and ~540k per booster
+  page; SEO and AI crawlers (Ahrefs, Semrush, Amazonbot, Meta) were 70% of
+  the page views, and D1 read **12 billion rows on 2026-09-04** against
+  ~150M/day before the strip shipped on 2026-08-31 — the month's included 25B
+  ran out that day and the budget alert fired. `chartTable` in
+  `feed-rank.js` now computes each (kind, medium side, window) table once,
+  keeps it in KV (`env.CHART_KV` if ever bound, else the oracle's
+  `SIGN_RATELIMIT` namespace under a `chart:` prefix), serves a stale copy
+  while refreshing behind `waitUntil`, and every page looks its subject up —
+  the all-time component chips too, so a warm render reads **no** chart rows,
+  and the ranking runs in JavaScript over the base rows (the SQL window
+  functions cost 286k rows per all-time episode table, the base 24k). **Two
+  minutes is the collector's tick**, Reed's call: a boost on the site is on
+  the strip too, so a share-card screenshot matches everything around it. `chartCacheOf(context)` is what
+  the four pages pass; with no KV (tests, local dev) it computes per call as
+  before. `test-charts.mjs` pins that the cached answer is the direct answer
+  and that a warm cache runs zero statements. **Same day, Reed blocked
+  Meta-ExternalAgent, Amazonbot, ClaudeBot and GPTBot in AI Crawl Control
+  and `robots.txt` disallows AhrefsBot, SemrushBot and MJ12bot.** The
+  read-only `CF_ANALYTICS_TOKEN` in `credentials.env` is how the per-query
+  numbers were pulled (GraphQL `d1QueriesAdaptiveGroups`); check it before
+  guessing at a D1 cost again. **⚠️ THE PAGES' `max-age=300` NEVER CACHED
+  ANYTHING AT THE EDGE.** Cloudflare caches only static file types by default
+  and ignores `Cache-Control` on HTML and JSON, so every Function response
+  answered `cf-cache-status: DYNAMIC` and every repeat hit ran the Function; a
+  zone Cache Rule marking the page and `/api/v1` paths eligible (respecting the
+  origin's own header, so the money endpoints' `no-store` still holds) is the
+  dashboard-side half, Reed's to set. (A HEAD request answers `no-store` on
+  the same paths, which is what misled the first diagnosis into blaming a
+  zone rule; check GET.)
 - **⚠️ THE RANK CHIP IS DRAWN ONLY INSIDE THE TOP 100** (`RANK_CUTOFF`), a
   display rule and not a change to `feedRanks`. It fails quietly to no third line.
   **`RANK_PUBLISHERS` in `feed-rank.js` restates `PUBLISHERS` from

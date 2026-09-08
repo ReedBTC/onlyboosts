@@ -390,18 +390,18 @@ console.log('\nThe live and the empty week, on the cards:')
 {
   const r = await get(`/charts/${weekDateString(W0)}/card/shows`)
   const liveHtml = await r.text()
-  check('the live week caches short and leads with the mega boost', () => {
-    assert.match(r.headers.get('cache-control'), /max-age=60/)
+  check('⚠️ the live week’s card is no-store (the bot photographs it right after the delta) and leads with the mega boost', () => {
+    assert.equal(r.headers.get('cache-control'), 'no-store')
     assert.equal(names(liveHtml)[0], TITLE.P2)
     assert.match(liveHtml, /In progress\./)
   })
   const e = await get(`/charts/${weekDateString(W3)}/card/shows`)
   const eHtml = await e.text()
-  check('an empty in-range week renders the empty line, no list, 300s', () => {
+  check('an empty in-range week renders the empty line, no list, and is no-store like every card', () => {
     assert.equal(e.status, 200)
     assert.ok(eHtml.includes('No Nostr boosts that week.'))
     assert.ok(!eHtml.includes('data-card-list'))
-    assert.match(e.headers.get('cache-control'), /max-age=300/)
+    assert.equal(e.headers.get('cache-control'), 'no-store')
   })
 }
 

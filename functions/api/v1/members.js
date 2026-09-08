@@ -21,6 +21,7 @@
 // has been no way to reach someone's page except by catching them boosting.
 import { json, preflight, clampLimit, toHexPubkey, PUBLISHERS } from "./_common.js";
 
+import { headOf } from "../../_shared/head.js";
 export async function onRequestOptions({ request }) { return preflight(request); }
 
 // Matches SEARCH_MIN_CHARS in ob-live.js. One character matches 1,150 of the
@@ -288,3 +289,6 @@ export async function onRequestGet({ request, env }) {
     return json(request, { error: "query failed" }, { status: 500, cache: 0 });
   }
 }
+
+// The GET's status and headers, no body — see _shared/head.js.
+export const onRequestHead = headOf(onRequestGet);

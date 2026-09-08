@@ -30,11 +30,12 @@ import {
 import { piHeaders, piGet } from "../_shared/podcast-index.js";
 import { parseNotes } from "../_shared/rich-text.js";
 // The stat tiles, each carrying its all-time global rank; /episode shares it.
-import { feedRanks, renderStatTiles } from "../_shared/feed-rank.js";
+import { feedRanks, renderStatTiles, chartCacheOf } from "../_shared/feed-rank.js";
 // The two drawers open on the chart formula over their own rows (2026-09-03).
 import { chartRanks, rankLabel } from "../../assets/js/rank.js";
 import { favoriteButtonHtml } from "../../assets/js/favorite-button.js";
 
+import { headOf } from "../_shared/head.js";
 const SITE_ORIGIN = "https://onlyboosts.social";
 
 // ⚠️ EVERY SECTION id ON THIS PAGE IS A PUBLIC URL. `/show/<guid>#podroll` is
@@ -85,7 +86,8 @@ const COMMUNITY_SHOWS_LIMIT = 150;
 // .show-more button the community wall uses.
 const PODROLL_VISIBLE = 10;
 
-export async function onRequestGet({ request, env, params }) {
+export async function onRequestGet(context) {
+  const { request, env, params } = context;
   let guid = params.guid;
   if (Array.isArray(guid)) guid = guid[0];
   try { guid = decodeURIComponent(guid); } catch { /* keep the raw form */ }
@@ -238,7 +240,7 @@ export async function onRequestGet({ request, env, params }) {
     // The show's all-time rank on Shows or Albums, by boosts, sats and
     // boosters. One scan of `podcasts`; never rejects, resolves null instead,
     // and the header prints no row for null. See functions/_shared/feed-rank.js.
-    feedRanks(env.DB, "show", show),
+    feedRanks(env.DB, "show", show, chartCacheOf(context)),
   ]);
 
   const boostRows = boosts.results || [];
@@ -261,9 +263,10 @@ export async function onRequestGet({ request, env, params }) {
     status: 200,
     headers: {
       "Content-Type": "text/html; charset=utf-8",
-      // The collector runs a five-minute cycle, so anything tighter buys
-      // nothing but origin load.
-      "Cache-Control": "public, max-age=300",
+      // Two minutes is the collector's tick (2026-09-06), and since the zone
+      // Cache Rule of 2026-09-07 this header is honored at the edge, so it is
+      // how stale a visitor's copy can be. Reed's call.
+      "Cache-Control": "public, max-age=120",
     },
   });
 }
@@ -1388,6 +1391,9 @@ function notFound(guid) {
 </html>`;
   return new Response(html, {
     status: 404,
-    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=300" },
+    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=120" },
   });
 }
+
+// The GET's status and headers, no body — see _shared/head.js.
+export const onRequestHead = headOf(onRequestGet);

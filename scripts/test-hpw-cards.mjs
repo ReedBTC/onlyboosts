@@ -261,6 +261,12 @@ await check('the card names the week, never "This Week"', async () => {
   assert.doesNotMatch(html, /This Week/)
   assert.match(html, /In progress\./)
 })
+await check('⚠️ a card frame is no-store while the board page beside it caches: the bot photographs the frame right after the delta', async () => {
+  assert.equal((await get(`/hpw/${liveKey}/card`)).headers.get('cache-control'), 'no-store')
+  assert.equal((await get(`/hpw/${lastKey}/card`)).headers.get('cache-control'), 'no-store')
+  assert.equal((await get('/hpw/high-scores/card')).headers.get('cache-control'), 'no-store')
+  assert.equal((await get(`/hpw/${lastKey}`)).headers.get('cache-control'), 'public, max-age=300')
+})
 await check('⚠️ HEAD on the page is routed: the GET\'s status and headers, no body', async () => {
   const r = await pageHead({ request: new Request(`https://ob.invalid/hpw/${lastKey}`, { method: 'HEAD' }), env, params: { path: [lastKey] } })
   assert.equal(r.status, 200); assert.equal(r.headers.get('cache-control'), 'public, max-age=300'); assert.equal(r.body, null)
