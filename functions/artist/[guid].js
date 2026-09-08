@@ -49,6 +49,7 @@ import {
 import { feedRanks, renderStatTiles } from "../_shared/feed-rank.js";
 // The two drawers open on the chart formula over their own rows (2026-09-03).
 import { chartRanks, rankLabel } from "../../assets/js/rank.js";
+import { favoriteButtonHtml } from "../../assets/js/favorite-button.js";
 
 const SITE_ORIGIN = "https://onlyboosts.social";
 const OG_FALLBACK = `${SITE_ORIGIN}/assets/onlyboosts_banner.png`;
@@ -351,16 +352,16 @@ function renderArtistPage({ pub, albums, totals, community, supporters, boosts, 
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v202" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v202" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v202" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v202" />
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v202" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v202" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v203" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v203" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v203" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v203" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v203" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v203" />
   <!-- The boost note card and its reaction bar, for #boosts — the same
        .note-card every other detail page's list paints. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v202" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v202" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v203" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v203" />
 </head>
 <body data-artist-guid="${htmlEscape(pub.publisher_guid)}">
 
@@ -575,12 +576,12 @@ function renderArtistPage({ pub, albums, totals, community, supporters, boosts, 
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav.js?v=ob-v202" defer></script>
-<script src="/assets/js/artist-page.js?v=ob-v202" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v203" defer></script>
+<script src="/assets/js/artist-page.js?v=ob-v203" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v202"></script>
-<script src="/assets/js/sw-register.js?v=ob-v202" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v203"></script>
+<script src="/assets/js/sw-register.js?v=ob-v203" defer></script>
 </body>
 </html>`;
 }
@@ -609,6 +610,7 @@ function renderHeader(pub, art, art2, title, albumCount, totals, stats, ranks) {
           ].filter(Boolean).join(" · ")
         }</p>
         <div class="show-actions">
+          ${favoriteButtonHtml({ kind: "artist", guid: pub.publisher_guid, label: title, extraClass: "btn" })}
           ${isSafeUrl(pub.feed_url)
             ? `<a class="btn btn-quiet" href="${htmlEscape(pub.feed_url)}" target="_blank" rel="noopener">RSS feed</a>`
             : ""}
@@ -739,6 +741,7 @@ function communityArtistRow(r, rank) {
         <span class="cs-meta">${htmlEscape(communityMeta(members, boosts, sats))}</span>
       </span>
     </a>
+    ${favoriteButtonHtml({ kind: "artist", guid: r.publisher_guid, label: title })}
   </li>`;
 }
 
@@ -768,10 +771,10 @@ function notFound(guid) {
   <meta name="robots" content="noindex" />
   <title>Artist not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v202" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v202" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v202" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v202" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v203" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v203" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v203" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v203" />
 </head>
 <body>
 <section class="page-header">
@@ -789,7 +792,7 @@ function notFound(guid) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v202" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v203" defer></script>
 </body>
 </html>`;
   return new Response(html, {

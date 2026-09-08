@@ -115,15 +115,15 @@ check('favorite-button.js is two-sided: no imports, no clock, no locale, no DOM 
   assert.doesNotMatch(c, /Date\.now|toLocale|\bdocument\.|\bwindow\./)
 })
 check('every renderer of the heart imports it two-sided-safely', () => {
-  for (const f of ['assets/js/show-card.js', 'assets/js/episode-card.js']) {
+  for (const f of ['assets/js/show-card.js', 'assets/js/episode-card.js', 'assets/js/publisher-card.js']) {
     const s = readFileSync(path.join(root, f), 'utf8')
     assert.match(s, /from '\.\/favorite-button\.js\?v=ob-v\d+'/, `${f} imports the heart by relative stamped path`)
     assert.match(s, /favoriteButtonHtml\(/, `${f} renders it`)
   }
-  for (const f of ['functions/show/[guid].js', 'functions/episode/[guid].js']) {
+  for (const f of ['functions/show/[guid].js', 'functions/episode/[guid].js', 'functions/artist/[guid].js']) {
     const s = readFileSync(path.join(root, f), 'utf8')
     assert.match(s, /from "\.\.\/\.\.\/assets\/js\/favorite-button\.js"/, `${f} imports the heart by relative path`)
-    assert.match(s, /favoriteButtonHtml\(\{ kind: "(show|episode)"/, `${f} renders it`)
+    assert.match(s, /favoriteButtonHtml\(\{ kind: "(show|episode|artist)"/, `${f} renders it`)
   }
 })
 check('the controller keeps the migration gate closed and never reaches NIP-04', () => {

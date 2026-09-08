@@ -35,17 +35,18 @@
  * guids — the majority). A pill that fails for most artists is worse than
  * none; boosting stays at the album and song level, one drawer-click away.
  */
-import { showPageHref, publisherPageHref } from './show-link.js?v=ob-v202'
-import { coverChain } from './cover-art.js?v=ob-v202'
-import { htmlEscape } from './nostr-text.js?v=ob-v202'
-import { num, fmtSats, plural, shortDate } from './show-card.js?v=ob-v202'
+import { showPageHref, publisherPageHref } from './show-link.js?v=ob-v203'
+import { favoriteButtonHtml } from './favorite-button.js?v=ob-v203'
+import { coverChain } from './cover-art.js?v=ob-v203'
+import { htmlEscape } from './nostr-text.js?v=ob-v203'
+import { num, fmtSats, plural, shortDate } from './show-card.js?v=ob-v203'
 // Re-exported: artists-feed.js reads the formatting helpers through this
 // module the way shows-feed.js reads them through show-card.js. ⚠️ An import
 // is NOT a re-export — this line shipped missing once, and the unresolved
 // named import was a LINK-TIME error: renderArtists never executed and the
 // whole feed painted the load-failure placeholder (the ob-v53 class, caught
 // on the preview deploy).
-export { num, fmtSats, plural, shortDate } from './show-card.js?v=ob-v202'
+export { num, fmtSats, plural, shortDate } from './show-card.js?v=ob-v203'
 
 const esc = htmlEscape
 
@@ -157,6 +158,15 @@ export function publisherCardHtml(p, { rank = null, copy = COPY } = {}) {
   // CLAUDE.md. No album count on the face: like the episode count the show
   // card dropped, a catalogue size reads as a claim about the artist's work
   // rather than about boost activity, and the drawer answers it properly.
+  /* The Favorite heart: an ARTIST favorite, `podcast:publisher:guid:<guid>`,
+   * an entry that belongs to no feed (the spec's artist section, 2026-09-07).
+   * This card has no boost pill (Podcast Index cannot resolve most publisher
+   * feeds), so the heart takes the right end of the stats line alone. Ships
+   * hidden; favorites-ui.js reveals it for a signed-in member. */
+  const fav = named && p.guid
+    ? favoriteButtonHtml({ kind: 'artist', guid: p.guid, label: p.title })
+    : ''
+
   const stats =
     `<div class="pcast-meta ob-show-stats">` +
       `<span class="ob-stats-label">Nostr Stats:</span>` +
@@ -165,6 +175,7 @@ export function publisherCardHtml(p, { rank = null, copy = COPY } = {}) {
       `<span>${esc(plural(p.boosts, 'boost', 'boosts'))}</span>` +
       `<span class="pcast-dot" aria-hidden="true">·</span>` +
       `<span>${esc(plural(p.boosters, 'booster', 'boosters'))}</span>` +
+      fav +
     `</div>`
 
   // Absolute date rendered, relative form attached — the facts/verbs line the
