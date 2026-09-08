@@ -2212,8 +2212,9 @@ was built for and still has no surface.
 kind 10333: one replaceable event per pubkey, feed and item entries, public or
 private as a whole. **All six steps built 2026-09-08: the merge, the reader,
 the writer, the heart, the `/booster` section and the account menu rows.
-Reed's first live lists reached BoostMeBitch. Open: the episode hearts behind
-the migration gate, and the artist heart.**
+Reed's first live lists reached BoostMeBitch, and artist favorites are written
+here first (neither app renders one yet). Open: the episode hearts behind the
+migration gate.**
 - **⚠️ `favorites-ui.js` IS LOADED ON EVERY PAGE BY `nav.js`**, a dynamic
   import at the end of its IIFE, lazily (no hearts, no relay read). It
   exposes `window.OBFavorites` for the widget's Favorites row; a mode change
