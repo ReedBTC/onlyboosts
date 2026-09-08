@@ -313,7 +313,7 @@ const booster = episodeCardHtml(byGuid['item-guid-1'], {
 check('compact drops the player and the ⋮ menu, and rails the pill', () => {
   assert.doesNotMatch(community, /<audio/)
   assert.doesNotMatch(community, /pcast-cardmenu/)
-  assert.match(community, /<div class="pcast-card-rail"><button type="button" class="ob-boost-pill"/)
+  assert.match(community, /<div class="pcast-card-rail">(<button type="button" class="ob-fav-pill"[^>]*>.*?<\/button>)?<button type="button" class="ob-boost-pill"/)
   // The rail is a child of the head, so it can stretch to the head's height —
   // which is what centres the pill vertically.
   assert.match(community, /pcast-card-head[\s\S]*pcast-card-rail/)
@@ -343,7 +343,7 @@ check('the feed layout — pill on the stats line, ⋮ present, no player', () =
   assert.match(html, /pcast-cardmenu/)
   assert.doesNotMatch(html, /pcast-card-rail/)
   // The pill closes the stats row rather than standing alone.
-  assert.match(html, /3 boosts<\/span><button type="button" class="ob-boost-pill"/)
+  assert.match(html, /3 boosts<\/span>(<button type="button" class="ob-fav-pill"[^>]*>.*?<\/button>)?<button type="button" class="ob-boost-pill"/)
 })
 
 // The homepage's variant: the whole card, the drawer's rows fetched on open.

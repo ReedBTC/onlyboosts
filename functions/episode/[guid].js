@@ -32,6 +32,7 @@ import { itemsFromBoosts, renderCardPage, CARDS_PER_PAGE } from "../_shared/epis
 import { feedRanks, renderStatTiles } from "../_shared/feed-rank.js";
 import { fetchCommunityBoosts } from "../api/v1/episodes/[guid].js";
 import { COPY as CARD_COPY } from "../../assets/js/episode-card.js";
+import { favoriteButtonHtml } from "../../assets/js/favorite-button.js";
 
 const SITE_ORIGIN = "https://onlyboosts.social";
 
@@ -424,22 +425,22 @@ function renderEpisodePage({ ep, supporters, boosts, boosterCount, latestTs, nam
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v197" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v197" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v197" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v197" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v198" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v198" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v198" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v198" />
   <!-- The hero, the community wall and the boost list are the show page's, so
        this page links its stylesheet and adds only the deltas. -->
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v197" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v197" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v198" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v198" />
   <!-- The episode card, for the community-episodes section: the same chrome
        feeds-podcasts.js paints on the homepage. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v197" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v198" />
   <!-- The boost thread inside a card's drawer, and its reply / like / repost /
        zap bar. Only this page's community section needs them; /show does not. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v197" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v197" />
-  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v197" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v198" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v198" />
+  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v198" />
 </head>
 <body data-episode-guid="${htmlEscape(ep.item_guid)}"${ep.podcast_guid ? ` data-show-guid="${htmlEscape(ep.podcast_guid)}"` : ""}>
 
@@ -662,12 +663,12 @@ function renderEpisodePage({ ep, supporters, boosts, boosterCount, latestTs, nam
 
 <script type="application/json" id="episode-boost-payload">${jsonForScript(boostPayload)}</script>
 
-<script src="/assets/js/nav.js?v=ob-v197" defer></script>
-<script src="/assets/js/episode-page.js?v=ob-v197" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v198" defer></script>
+<script src="/assets/js/episode-page.js?v=ob-v198" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v197"></script>
-<script src="/assets/js/sw-register.js?v=ob-v197" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v198"></script>
+<script src="/assets/js/sw-register.js?v=ob-v198" defer></script>
 </body>
 </html>`;
 }
@@ -750,6 +751,7 @@ function renderHeader(ep, { art, art2, art3, copy, showTitle, showUrl, boosterCo
             <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" width="14" height="14"><path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd"/></svg>
             ${copy.boostBtn}
           </button>
+          ${favoriteButtonHtml({ kind: "episode", guid: ep.podcast_guid, itemGuid: ep.item_guid, medium: ep.p_medium ?? null, label: ep.title, extraClass: "btn" })}
           ${showUrl
             ? `<a class="btn btn-quiet" href="${htmlEscape(showUrl)}">${htmlEscape(copy.viewShow)}</a>`
             : ""}
@@ -1052,10 +1054,10 @@ function notFound(guid) {
   <meta name="robots" content="noindex" />
   <title>Episode not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v197" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v197" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v197" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v197" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v198" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v198" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v198" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v198" />
 </head>
 <body>
 <section class="page-header">
@@ -1073,7 +1075,7 @@ function notFound(guid) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v197" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v198" defer></script>
 </body>
 </html>`;
   return new Response(html, {

@@ -1,11 +1,10 @@
 # PC 2.0 Favorites (kind 10333)
 
 The design record for OnlyBoosts' support of Chad Farrow's cross-app podcast
-favorites. **Status, 2026-09-08: steps one to three built, nothing on any surface, no
-relay ever written by this site.** The merge, the reader and the writer exist
-with their tests; the button, the `/booster` section and the settings rows do
-not. The writer has not yet published a real event: the throwaway-key relay
-test is still owed, and it is the first thing that will.
+favorites. **Status, 2026-09-08: steps one to four built. The heart is on the show
+surfaces; the `/booster` section and the settings rows are not built; this
+site has never published a real list.** The throwaway-key relay test is still
+owed, and it is the first thing that will.
 
 | | |
 |---|---|
@@ -14,6 +13,8 @@ test is still owed, and it is the first thing that will.
 | The merge | `assets/js/favorites-merge.js`, the spec's reference implementation with two adaptations; `node scripts/test-favorites-merge.mjs` |
 | The reader | `assets/js/favorites-read.js`, per-relay trust on raw sockets; `node scripts/test-favorites-read.mjs` |
 | The writer | `assets/js/favorites-sync.js`, the cycle around `plan`: adopt, merge, encrypt, sign, publish, record; `node scripts/test-favorites-sync.mjs` |
+| The heart | `assets/js/favorite-button.js` (two-sided chrome) and `assets/js/favorites-ui.js` (reveal, paint, click); `node scripts/test-favorite-button.mjs` |
+| Upstream | https://github.com/ChadFarrow/PC20-Nostr/issues/37, the reference's private-list removal defect |
 | Other writers | BoostMeBitch (`lib/nostr/favorites-list.ts`) and StableKraft (`lib/nostr/favorites-single-list.ts`); both carry `content`, both write the `visibility` tag, both implement the private half |
 
 ## What The List Is
@@ -142,6 +143,47 @@ the 28 vectors still pass, and `test-favorites-merge.mjs` holds the three
 cases (removal on a private list, an unclaimed entry still carried, removal
 across the licensed move).
 
+## The Heart
+
+`favorite-button.js` is chrome on the boost-button.js pattern: two-sided and
+dependency-free, because the two cards and the /show and /episode Functions
+render it at the edge and a card rebuilt in the browser must match byte for
+byte. An outline pill where the boost pill is solid (two filled brand
+controls on one line would read as one action twice, and Boost is the
+primary), the word Favorite, the heart filling when on. It carries full
+NIP-73 identifiers on the element (`data-fav-id`, `data-fav-item`) and the
+feed's declared medium when the surface knows it, never a default.
+
+**It ships `hidden` and favorites-ui.js reveals it for a signed-in member
+only**, reading the session pubkey the way follow-set.js does, so painting
+hearts on a cold page loads no widget. The widget comes in on the first click,
+through the nav's own loader, because signing needs it. The private half is
+opened only once the widget is present, so a member with a private list sees
+outlines until their first click on the page.
+
+Surfaces, 2026-09-08:
+
+| Surface | Heart | Written by |
+|---|---|---|
+| Shows / Albums cards | show | `show-card.js`, ahead of the boost pill on the Nostr Stats line |
+| `/show` hero | show, as a `.btn` in `.show-actions` | `functions/show/[guid].js` |
+| `/show` community rows | show | the same Function, ahead of the row's boost pill |
+| Episodes / Songs cards, `/episode` and `/booster` cards | episode | `episode-card.js`, on the stats line and in the compact rail |
+| `/episode` hero | episode | `functions/episode/[guid].js` |
+
+**Episode hearts are rendered but never revealed while `ITEMS_ALLOWED` is
+false** in favorites-ui.js, the migration gate: nothing on screen promises
+what the writer refuses. Flipping the constant lights every episode surface
+at once. `/artist` has no heart yet (artists wait on the two apps reading the
+entry), and the catalogue drawer's un-indexed rows have none either.
+
+**The first favorite asks Public or Private** in a small dialog of the
+controller's own (`.ob-fav-ask`), when the list cannot say which half it
+lives in and this member has not chosen here; the answer is stored per pubkey
+and offered again in the account menu (step six). Every outcome that is not a
+quiet success is a toast; a degraded read or a publish no relay accepted
+changes nothing and says so.
+
 ## Relays
 
 Measured 2026-09-06 against Chad's own list (read-only): `relay.fountain.fm`
@@ -201,7 +243,8 @@ library to fall back on and this site does not.
 
 1. ~~The relay reader~~ built 2026-09-08.
 2. ~~The writer~~ built 2026-09-08.
-3. The heart on the six boost-button surfaces, and the `#favorites` section.
-4. The dropdown rows and the Public/Private prompt.
-5. Later, and the real reason to do it: the collector indexes public lists and
+3. ~~The heart~~ built 2026-09-08, show surfaces live, episode surfaces gated.
+4. The `#favorites` section on `/booster`.
+5. The dropdown rows and the Public/Private prompt.
+6. Later, and the real reason to do it: the collector indexes public lists and
    "favorited by N members" becomes a show stat or chart component.

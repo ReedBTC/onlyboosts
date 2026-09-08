@@ -464,15 +464,16 @@ Sixteen test scripts, all plain `node scripts/<name>.mjs` with no runner:
 | `test-favorites-merge.mjs` | the PC 2.0 Favorites merge (2026-09-07): the **spec's own 28 vectors**, vendored in `scripts/vendor/pc20-favorites/` with their upstream SHA, run against the **shipped** `favorites-merge.js` through a shim that supplies the spec's stand-in codec; the async seam the reference lacks (`readPrivate` in, `privatePlaintext` out, an opaque half carried byte for byte, an empty one `''`); and a source scan (no imports, no stand-in codec, no Buffer, no clock, no locale, no DOM), and the legacy two-element item's dual-read. Confirmed red on five mutations: rule 5 removed, an untrusted read treated as empty, the opaque half replaced with `''`, the read compared as it arrived rather than reframed, and an entry keyed on position 1 alone |
 | `test-favorites-read.mjs` | the favorites relay reader (2026-09-08): the **shipped** `favorites-read.js` with its one bundle import repointed at nostr-tools, driven against **scripted sockets** that answer, hang, refuse, never connect, drop, forge and disagree, with really signed events. The trust rule (every reached relay answered, at least two), the refusal exclusion, the dead-entry exclusion, newest-wins and the lowest-id tie, the signature check through JSON the way a relay message arrives, the REQ's shape, the timeout. Confirmed red on six mutations: the two-answer floor dropped, a hung relay excused, offline read as empty, the tiebreak flipped, the signature skipped, a refusal counted as an answer |
 | `test-favorites-sync.mjs` | the favorites writer (2026-09-08): the **shipped** `favorites-sync.js` end to end — read, adopt, merge, encrypt, sign, publish, record — against **scripted relays** that answer REQs and OK or refuse EVENTs, a real key, a stand-in codec and a fake `localStorage`. The first favorite's Public/Private question, the adopt-and-hydrate model (unfavoriting another app's entry sticks on first contact, in either half), the item gate and the legacy-list gate, an opaque half carried byte for byte, `no-nip44`, `not-landed` recording no baseline, the member's NIP-65 write relays, a signer answering under another key. Confirmed red on six mutations: baseline recorded on a publish that never landed, the hydrate pass removed, a degraded read acted on, the private half written in plaintext, the signer's event unchecked, the item gate removed |
+| `test-favorite-button.mjs` | the Favorite heart (2026-09-08): `favorite-button.js`'s markup on the three kinds, its escaping, a guid with quote characters refused, `setFavoriteState`'s verb and fill, `changeFor` and `keyFor` against the merge's keys; the two-sided source rules; that every renderer imports it by relative path; and that `favorites-ui.js` keeps `ITEMS_ALLOWED` false and never reaches NIP-04 |
 
 **⚠️ `test-server-render.mjs` IS THE ONE THAT NEEDS AN ARGUMENT, SO IT IS THE ONE
 THAT GOES UNRUN.** Its header carries the `curl` that produces the capture; take
 a fresh one rather than reusing an old file, since it is also the size
 measurement. It asserted `cards are numbered 1..N with no gaps` — the *ordinal*
 scheme's invariant — until competition ranking shipped on 2026-08-18, and it
-would have been merged red had it not been run. **Run all twenty-five before a
+would have been merged red had it not been run. **Run all twenty-six before a
 merge**, and treat this one as the guard on the ranking scheme rather than only
-on weight. *(It read "all twelve" until 2026-08-24, "all fifteen" until 2026-08-30, "all sixteen" and then "all seventeen" until 2026-08-31, and "all eighteen" and then "all nineteen" until 2026-09-04, and "all twenty" and then "all twenty-one" until 2026-09-06, and "all twenty-two" until 2026-09-07, and "all twenty-three" and then "all twenty-four" until 2026-09-08, contradicting the table
+on weight. *(It read "all twelve" until 2026-08-24, "all fifteen" until 2026-08-30, "all sixteen" and then "all seventeen" until 2026-08-31, and "all eighteen" and then "all nineteen" until 2026-09-04, and "all twenty" and then "all twenty-one" until 2026-09-06, and "all twenty-two" until 2026-09-07, and "all twenty-three", "all twenty-four" and "all twenty-five" until 2026-09-08, contradicting the table
 directly above it — the count moved when a test was added and this sentence did
 not. If the table grows again, this line grows with it.)*
 
@@ -669,8 +670,9 @@ What a change would break:
   an absolute `/assets/js/…` — the browser resolves that and esbuild cannot.
   Enforced by `scripts/stamp-assets.js`.
 - **Everything a two-sided module imports must itself be two-sided.**
-  `show-link.js`, `episode-link.js`, `booster-link.js`, `cover-art.js` and
-  `nostr-text.js` are all dependency-free, which is what made this cheap.
+  `show-link.js`, `episode-link.js`, `booster-link.js`, `cover-art.js`,
+  `nostr-text.js` and `favorite-button.js` are all dependency-free, which is
+  what made this cheap.
 - **⚠️ NO `Date.now()`, NO UNPINNED LOCALE.** Three formatters were safe in a DOM
   builder and are not safe here; at the edge the clock is the moment the response
   was *cached*. All three are `en-US` in UTC, and `test-show-card.mjs` scans the
@@ -2207,9 +2209,16 @@ was built for and still has no surface.
 
 **`docs/favorites.md` is the authority.** Chad Farrow's cross-app favorites,
 kind 10333: one replaceable event per pubkey, feed and item entries, public or
-private as a whole. **Steps one to three, 2026-09-08: the merge, the reader
-and the writer, each with its test. No surface yet, and this site has never
-published a real list.**
+private as a whole. **Steps one to four, 2026-09-08: the merge, the reader,
+the writer and the heart, each with its test. The heart is on the show
+surfaces; this site has never published a real list.**
+
+- **⚠️ THE HEART SHIPS `hidden` AND `favorites-ui.js` REVEALS IT FOR A
+  SIGNED-IN MEMBER ONLY** (Reed: signed out gets nothing). `favorite-button.js`
+  is two-sided chrome on the boost-button pattern, rendered by both cards and
+  the /show and /episode Functions ahead of the boost pill. **Episode hearts
+  stay hidden behind `ITEMS_ALLOWED = false`** until both shipped apps read
+  the three-element item; flipping it lights every episode surface at once.
 
 - **⚠️ THE MERGE IS THE SPEC'S REFERENCE IMPLEMENTATION, LIFTED WITH CHAD'S
   OK, AND THE SPEC'S OWN VECTORS RUN AGAINST IT.** Two adaptations: no

@@ -42,12 +42,13 @@
  * what functions/_shared/detail-page.js has always done, so the site now has one
  * date format rather than one for the feeds and another for the detail pages.
  */
-import { showPageHref, episodePageHref, isSyntheticGuid } from './show-link.js?v=ob-v197'
-import { episodeBoostLink } from './episode-link.js?v=ob-v197'
-import { boosterPageHref, boosterLinkAttrs } from './booster-link.js?v=ob-v197'
-import { coverChain, httpsUrl } from './cover-art.js?v=ob-v197'
-import { htmlEscape, isSafeUrl, renderMessage } from './nostr-text.js?v=ob-v197'
-import { chartRanks, competitionRanks } from './rank.js?v=ob-v197'
+import { showPageHref, episodePageHref, isSyntheticGuid } from './show-link.js?v=ob-v198'
+import { favoriteButtonHtml } from './favorite-button.js?v=ob-v198'
+import { episodeBoostLink } from './episode-link.js?v=ob-v198'
+import { boosterPageHref, boosterLinkAttrs } from './booster-link.js?v=ob-v198'
+import { coverChain, httpsUrl } from './cover-art.js?v=ob-v198'
+import { htmlEscape, isSafeUrl, renderMessage } from './nostr-text.js?v=ob-v198'
+import { chartRanks, competitionRanks } from './rank.js?v=ob-v198'
 
 const esc = htmlEscape
 
@@ -721,6 +722,15 @@ export function episodeCardHtml(item, {
   const pill = `<button type="button" class="ob-boost-pill" hidden data-boost-episode` +
     ` title="Boost ${esc(titleText)}" aria-label="Boost ${esc(titleText)}">Boost</button>`
 
+  /* The Favorite heart, an ITEM favorite: the episode under its show's feed
+   * guid, which is why it needs the real show guid and is withheld when the
+   * rollup only has its synthetic one. Ships hidden; favorites-ui.js reveals
+   * it for a signed-in member once the migration gate lifts. */
+  const fav = favoriteButtonHtml({
+    kind: 'episode', guid: realShowGuid(item), itemGuid: item.guid,
+    medium: item.show?.medium ?? null, label: titleText,
+  })
+
   const figures = showStats
     ? `<span class="ob-stats-label">Nostr Stats:</span>` +
       `<span>${esc(nBoosters.toLocaleString('en-US'))} booster${nBoosters === 1 ? '' : 's'}</span>` +
@@ -732,7 +742,7 @@ export function episodeCardHtml(item, {
   // in it is a gap the reader reads as a mistake — which is exactly what the
   // compact card with no figures would be, since its pill has moved to the rail.
   const statsRow = (figures || !compact)
-    ? `<div class="pcast-meta pcast-nstats">${figures}${compact ? '' : pill}</div>`
+    ? `<div class="pcast-meta pcast-nstats">${figures}${compact ? '' : fav + pill}</div>`
     : ''
 
   /* The right rail: the boost pill, vertically centred against the whole card
@@ -743,7 +753,7 @@ export function episodeCardHtml(item, {
    * vertically would otherwise collide with a menu button pinned to the top of
    * it. `.pcast-card-rail` stretches to the head's height and centres its one
    * child; see feed-cards.css. */
-  const rail = compact ? `<div class="pcast-card-rail">${pill}</div>` : ''
+  const rail = compact ? `<div class="pcast-card-rail">${fav}${pill}</div>` : ''
 
   const body = `<div class="pcast-card-body">${showEl}${titleEl}${descP}${linksRow}${statsRow}</div>`
 

@@ -33,6 +33,7 @@ import { parseNotes } from "../_shared/rich-text.js";
 import { feedRanks, renderStatTiles } from "../_shared/feed-rank.js";
 // The two drawers open on the chart formula over their own rows (2026-09-03).
 import { chartRanks, rankLabel } from "../../assets/js/rank.js";
+import { favoriteButtonHtml } from "../../assets/js/favorite-button.js";
 
 const SITE_ORIGIN = "https://onlyboosts.social";
 
@@ -211,7 +212,7 @@ export async function onRequestGet({ request, env, params }) {
       `WITH community AS (
          SELECT DISTINCT booster_pubkey FROM boosts WHERE podcast_guid = ?
        )
-       SELECT b.podcast_guid, p.title, p.image, p.artwork, p.feed_url,
+       SELECT b.podcast_guid, p.title, p.image, p.artwork, p.feed_url, p.medium,
               COUNT(*)                         AS cs_boosts,
               SUM(COALESCE(b.sats, 0))         AS cs_sats,
               COUNT(DISTINCT b.booster_pubkey) AS cs_members
@@ -539,19 +540,19 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v197" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v197" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v197" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v197" />
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v197" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v197" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v198" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v198" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v198" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v198" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v198" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v198" />
   <!-- The boost note card and its reaction bar. Added when the boost list at
        the foot of this page became the same .note-card the homepage Boosts
        feed paints; this page linked neither before, which is why show-page.css
        restates .nostr-mention. That restatement is now redundant rather than
        load-bearing, and is left in place rather than removed in the same pass. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v197" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v197" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v198" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v198" />
 </head>
 <body data-show-guid="${htmlEscape(show.podcast_guid)}">
 
@@ -783,12 +784,12 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
 
 <script type="application/json" id="show-boost-payload">${jsonForScript(boostPayload)}</script>
 
-<script src="/assets/js/nav.js?v=ob-v197" defer></script>
-<script src="/assets/js/show-page.js?v=ob-v197" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v198" defer></script>
+<script src="/assets/js/show-page.js?v=ob-v198" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v197"></script>
-<script src="/assets/js/sw-register.js?v=ob-v197" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v198"></script>
+<script src="/assets/js/sw-register.js?v=ob-v198" defer></script>
 </body>
 </html>`;
 }
@@ -966,6 +967,7 @@ function renderHeader(show, art, title, copy, art2, description, ranks) {
             <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" width="14" height="14"><path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd"/></svg>
             ${copy.boostBtn}
           </button>
+          ${favoriteButtonHtml({ kind: "show", guid: show.podcast_guid, medium: show.medium ?? null, label: title, extraClass: "btn" })}
           ${isSafeUrl(show.feed_url)
             ? `<a class="btn btn-quiet" href="${htmlEscape(show.feed_url)}" target="_blank" rel="noopener">RSS feed</a>`
             : ""}
@@ -1042,6 +1044,7 @@ function communityRow(r, rank) {
         <span class="cs-meta">${htmlEscape(communityMeta(members, boosts, sats))}</span>
       </span>
     </a>
+    ${favoriteButtonHtml({ kind: "show", guid: r.podcast_guid, medium: r.medium ?? null, label: title })}
     <button type="button" class="ob-boost-pill" hidden
       data-cs-boost="${htmlEscape(r.podcast_guid)}"
       data-cs-feed="${htmlEscape(isSafeUrl(r.feed_url) ? r.feed_url : "")}"
@@ -1358,10 +1361,10 @@ function notFound(guid) {
   <meta name="robots" content="noindex" />
   <title>Show not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v197" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v197" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v197" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v197" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v198" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v198" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v198" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v198" />
 </head>
 <body>
 <section class="page-header">
@@ -1380,7 +1383,7 @@ function notFound(guid) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v197" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v198" defer></script>
 </body>
 </html>`;
   return new Response(html, {

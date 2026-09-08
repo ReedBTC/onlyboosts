@@ -45,9 +45,10 @@
  * All three are now en-US in UTC, which is what episode-card.js and
  * functions/_shared/detail-page.js already do. The site has one date format.
  */
-import { showPageHref, episodePageHref } from './show-link.js?v=ob-v197'
-import { coverChain } from './cover-art.js?v=ob-v197'
-import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v197'
+import { showPageHref, episodePageHref } from './show-link.js?v=ob-v198'
+import { favoriteButtonHtml } from './favorite-button.js?v=ob-v198'
+import { coverChain } from './cover-art.js?v=ob-v198'
+import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v198'
 
 const esc = htmlEscape
 
@@ -300,6 +301,13 @@ export function showCardHtml(s, { rank = null, copy = COPY.other } = {}) {
     ? `<button type="button" class="ob-boost-pill" hidden data-boost-show` +
       ` title="Boost ${esc(s.title)}" aria-label="Boost ${esc(s.title)}">Boost</button>`
     : ''
+  /* The Favorite heart rides the same line, just ahead of the boost pill.
+   * Withheld from unidentified shows on the same argument: a feed guid the
+   * index cannot name is not one to put on a member's list. Ships hidden;
+   * favorites-ui.js reveals it for a signed-in member. */
+  const fav = named && s.guid
+    ? favoriteButtonHtml({ kind: 'show', guid: s.guid, medium: s.medium ?? null, label: s.title })
+    : ''
 
   /* "Nostr Stats:" carries the qualifier that used to sit in a paragraph above
    * the whole feed. Two words on the line the figures are already on, rather
@@ -314,6 +322,7 @@ export function showCardHtml(s, { rank = null, copy = COPY.other } = {}) {
       `<span>${esc(plural(s.boosts, 'boost', 'boosts'))}</span>` +
       `<span class="pcast-dot" aria-hidden="true">·</span>` +
       `<span>${esc(plural(s.boosters, 'booster', 'boosters'))}</span>` +
+      fav +
       pill +
     `</div>`
 
