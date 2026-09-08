@@ -24,6 +24,7 @@ there rather than restating the argument:
 | The Members tab, #40HPW, the member wall | `docs/members-tab.md` |
 | The four detail pages | `docs/detail-pages.md` |
 | Boost client attribution | `docs/boost-clients.md` |
+| PC 2.0 Favorites (kind 10333) | `docs/favorites.md` |
 
 Deleted reasoning is recoverable: `git log -S <symbol> -- CLAUDE.md` finds the
 paragraph that used to explain any name in here.
@@ -460,15 +461,16 @@ Sixteen test scripts, all plain `node scripts/<name>.mjs` with no runner:
 | `test-catalogue.mjs` | `/api/catalogue`, the /show episode drawer's catalogue: the **shipped** handlers with **`fetch` stubbed**, so it never asks Podcast Index. The five-field projection (coerced, guid-less and duplicate items dropped, newest first with undated rows last, a total order), the request contract (400/503, a PI miss answered 200-empty and `no-store`, HEAD, OPTIONS, the exact-match CORS origin), the fallback route through `podcasts/byguid` and `byfeedurl` to `episodes/byfeedid`, `truncated` at PI's ceiling, and **the streamed byte cap added to `_shared/podcast-index.js#piGet`**, at the cap and past it. Confirmed red on three mutations: the undated rule flipped, the duplicate guard removed, the cap's comparison made `>=` |
 | `test-boost-ingest.mjs` | `/api/v1/boosts/ingest` (2026-09-06): the **shipped** handler over a `node:sqlite` build of the real `schema.sql`, fed by the **shipped** note builder and a real signature. The row as the collector would read it, the FTS row and the `boosts_edge` marker, the show's five and the episode's four aggregates against a brute-force recount (`booster_count` DISTINCT), the title-only episode stub and its non-creation over a collector-filled row, the collector's `INSERT OR REPLACE` overwriting the stub, idempotence, every refusal (tampered, foreign client tag, no show, donation shape, outside the ±15 min window — and a 10-minute-old note admitted where the oracle's own ±5 would refuse), 503 with no D1 or KV, 429 past the limiter, `no-store`. Confirmed red on three mutations: DISTINCT dropped, the existence pre-read removed, `verifyEvent` bypassed |
 | `test-value.mjs` | `/api/value`, the value-block resolver every boost pays through (2026-09-06): the **shipped** handler with **`fetch` stubbed**. The stored feed URL resolves before the guid (the live record's splits, the guid never asked), the guid fallback, an unusable URL as no lookup, `feedId` short-circuiting both, the episode-level block over the feed's under the same record, recipient normalization, 200 `value:null` for a feed PI lacks, 400/503/204 and the exact-match origin. Confirmed red on two mutations: the order flipped back, the episode preference dropped |
+| `test-favorites-merge.mjs` | the PC 2.0 Favorites merge (2026-09-07): the **spec's own 28 vectors**, vendored in `scripts/vendor/pc20-favorites/` with their upstream SHA, run against the **shipped** `favorites-merge.js` through a shim that supplies the spec's stand-in codec; the async seam the reference lacks (`readPrivate` in, `privatePlaintext` out, an opaque half carried byte for byte, an empty one `''`); and a source scan (no imports, no stand-in codec, no Buffer, no clock, no locale, no DOM), and the legacy two-element item's dual-read. Confirmed red on five mutations: rule 5 removed, an untrusted read treated as empty, the opaque half replaced with `''`, the read compared as it arrived rather than reframed, and an entry keyed on position 1 alone |
 
 **⚠️ `test-server-render.mjs` IS THE ONE THAT NEEDS AN ARGUMENT, SO IT IS THE ONE
 THAT GOES UNRUN.** Its header carries the `curl` that produces the capture; take
 a fresh one rather than reusing an old file, since it is also the size
 measurement. It asserted `cards are numbered 1..N with no gaps` — the *ordinal*
 scheme's invariant — until competition ranking shipped on 2026-08-18, and it
-would have been merged red had it not been run. **Run all twenty-two before a
+would have been merged red had it not been run. **Run all twenty-three before a
 merge**, and treat this one as the guard on the ranking scheme rather than only
-on weight. *(It read "all twelve" until 2026-08-24, "all fifteen" until 2026-08-30, "all sixteen" and then "all seventeen" until 2026-08-31, and "all eighteen" and then "all nineteen" until 2026-09-04, and "all twenty" and then "all twenty-one" until 2026-09-06, contradicting the table
+on weight. *(It read "all twelve" until 2026-08-24, "all fifteen" until 2026-08-30, "all sixteen" and then "all seventeen" until 2026-08-31, and "all eighteen" and then "all nineteen" until 2026-09-04, and "all twenty" and then "all twenty-one" until 2026-09-06, and "all twenty-two" until 2026-09-07, contradicting the table
 directly above it — the count moved when a test was added and this sentence did
 not. If the table grows again, this line grows with it.)*
 
@@ -2198,6 +2200,29 @@ What a change elsewhere would break:
 
 **Still open: `/stats`.** A "boosts by app" breakdown is what `/api/v1/clients`
 was built for and still has no surface.
+
+## PC 2.0 Favorites: `favorites-merge.js`
+
+**`docs/favorites.md` is the authority.** Chad Farrow's cross-app favorites,
+kind 10333: one replaceable event per pubkey, feed and item entries grouped by
+position, public or private as a whole. **Phase one only, 2026-09-07: the
+merge module and its test. No surface, no writer, no relay ever written.**
+
+- **⚠️ THE MODULE IS THE SPEC'S REFERENCE IMPLEMENTATION, LIFTED WITH CHAD'S
+  OK, AND THE SPEC'S OWN VECTORS RUN AGAINST IT.** Two adaptations and no
+  more: no stand-in codec (real NIP-44 is async, so `plan` takes `readPrivate`
+  in and hands `privatePlaintext` out), and TextEncoder for Buffer. **A change
+  the vectors do not cover is a change to the spec and goes upstream first.**
+- **⚠️ ONE FAVORITE, ONE TAG, SINCE THE SPEC'S 9b04dfe (2026-09-07):** a
+  feed is `["i", feed]`, an item is `["i", feed, item]`, an artist is a bare
+  publisher entry. **No item favorite is written until BOTH existing apps read
+  the three-element form** (stage 1 of the feed-guid migration): a reader that
+  does not know it turns an episode favorite into a favorite of the whole show.
+  Feed and artist favorites are safe to write now; a publish onto a list
+  holding legacy items is declined until then, since republishing rewrites them.
+- **⚠️ `relay.fountain.fm` REFUSES THE KIND, AND ONE RELAY HELD A STALE
+  PRIVATE-MODE COPY WITH ZERO PUBLIC TAGS.** Read several, require two
+  answers, newest wins, never publish on a degraded read.
 
 ## Not indexed: `podcast:person`
 

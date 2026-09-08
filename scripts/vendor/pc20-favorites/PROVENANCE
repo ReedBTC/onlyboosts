@@ -1,0 +1,5 @@
+Vendored from https://github.com/ChadFarrow/PC20-Nostr
+commit fcb9d79 ("Rule 5 said to compare the wrong bytes, and two conforming events differ (#35)"), read 2026-09-07
+files: conformance/vectors.test.mjs, conformance/adapter.d.ts, unmodified
+run by: scripts/test-favorites-merge.mjs (sets PC20_FAVORITES_ADAPTER to scripts/favorites-conformance-adapter.mjs)
+update: re-copy both files, bump this SHA, re-run the test; a new vector that fails is the spec moving under us
