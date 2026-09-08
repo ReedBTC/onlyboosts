@@ -1,10 +1,11 @@
 # PC 2.0 Favorites (kind 10333)
 
 The design record for OnlyBoosts' support of Chad Farrow's cross-app podcast
-favorites. **Status, 2026-09-08: steps one and two built, nothing on any surface, no
-relay ever written.** The merge module and the relay reader exist with their
-tests; the writer, the button, the `/booster` section and the settings rows
-do not.
+favorites. **Status, 2026-09-08: steps one to three built, nothing on any surface, no
+relay ever written by this site.** The merge, the reader and the writer exist
+with their tests; the button, the `/booster` section and the settings rows do
+not. The writer has not yet published a real event: the throwaway-key relay
+test is still owed, and it is the first thing that will.
 
 | | |
 |---|---|
@@ -12,6 +13,7 @@ do not.
 | Vendored vectors | `scripts/vendor/pc20-favorites/` at the SHA in its `PROVENANCE` |
 | The merge | `assets/js/favorites-merge.js`, the spec's reference implementation with two adaptations; `node scripts/test-favorites-merge.mjs` |
 | The reader | `assets/js/favorites-read.js`, per-relay trust on raw sockets; `node scripts/test-favorites-read.mjs` |
+| The writer | `assets/js/favorites-sync.js`, the cycle around `plan`: adopt, merge, encrypt, sign, publish, record; `node scripts/test-favorites-sync.mjs` |
 | Other writers | BoostMeBitch (`lib/nostr/favorites-list.ts`) and StableKraft (`lib/nostr/favorites-single-list.ts`); both carry `content`, both write the `visibility` tag, both implement the private half |
 
 ## What The List Is
@@ -93,6 +95,53 @@ a change to the spec, and it goes upstream as an issue or PR before it ships.
 Re-vendoring is copying the two files, bumping the SHA in `PROVENANCE` and
 running the test; a new vector going red is the spec moving under us.
 
+## The Writer
+
+`favorites-sync.js` (step three, 2026-09-08) is the cycle the spec describes,
+with each side effect injected so the test drives the shipped code against
+scripted relays, a stand-in codec and a real key:
+
+1. **Read**, through the reader; a degraded read ends the cycle with nothing
+   published and nothing recorded.
+2. **Open the private half** with NIP-44 through the widget's signer
+   (`LBLogin.getNDK().signer`, the same path the NWC secret uses), never
+   NIP-04. A signer without NIP-44 carries the bytes and cannot write into
+   that half; the cycle says so (`no-nip44`).
+3. **Adopt both halves.** OnlyBoosts has no library of its own, so what it
+   renders is the shared list and it claims what it renders (rule 2). Every
+   cycle therefore opens with a HYDRATE pass: adopt the list and let `plan`
+   record the claims when the bytes already agree. Without it, unfavoriting
+   an entry another app wrote is read as "another app's, carry it" on first
+   contact and silently does not stick. The private half is adopted beside
+   the public one for the same reason; the merge's own `parse` reads the
+   public tags only.
+4. **Ask before the first favorite** on a list with no `visibility` tag that
+   cannot say which half it lives in (`needs-mode`); the caller prompts
+   Public or Private and calls again with `userChose`.
+5. **Merge** through `plan`, **encrypt** the returned plaintext when the
+   publish needs the private half, **sign** through `LBLogin.signEvent`, and
+   refuse an event the signer returns under another key.
+6. **Publish** on raw sockets to nos.lol, damus and ditto plus the member's
+   NIP-65 write relays (read off their kind 10002), one OK per relay. One
+   `OK true` is landing; the baseline is recorded then and only then.
+
+**The migration gate is enforced here**: an item favorite is refused
+(`items-gated`), and so is any publish onto a list still holding legacy
+two-element items, because the merge rewrites them on the way through.
+`itemsAllowed` lifts both once Chad confirms both apps read the new form.
+
+**One departure from the spec's reference, found by the writer's test and
+raised upstream on 2026-09-08.** In the two whole-list-move branches of
+`plan` (going private, and a licensed private → public move) the reference
+merges the active half with `adoptAll`, which keeps every entry read whatever
+the baseline says. The move itself is already complete in `moving`; on the
+outer merge the flag means a claimed entry this device no longer holds is
+never dropped, so **a removal from a private list never propagates**. No
+vector covers a removal on that path. Our copy runs rule 3 as written there,
+the 28 vectors still pass, and `test-favorites-merge.mjs` holds the three
+cases (removal on a private list, an unclaimed entry still carried, removal
+across the licensed move).
+
 ## Relays
 
 Measured 2026-09-06 against Chad's own list (read-only): `relay.fountain.fm`
@@ -151,9 +200,7 @@ library to fall back on and this site does not.
 ## What Is Next
 
 1. ~~The relay reader~~ built 2026-09-08.
-2. The writer around `plan`: baseline per pubkey per half in `localStorage`,
-   NIP-44 through the widget's signer, publish, record the baseline only on a
-   relay's OK.
+2. ~~The writer~~ built 2026-09-08.
 3. The heart on the six boost-button surfaces, and the `#favorites` section.
 4. The dropdown rows and the Public/Private prompt.
 5. Later, and the real reason to do it: the collector indexes public lists and

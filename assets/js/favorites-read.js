@@ -32,9 +32,10 @@
  * `connect` and `verify` are injectable so the test can script relays that
  * hang, refuse, forge and disagree; production takes the defaults.
  */
-import { verifyEvent } from '/assets/widgets/nostr-tools.js?v=ob-v196'
+import { verifyEvent } from '/assets/widgets/nostr-tools.js?v=ob-v197'
 
 export const FAVORITES_KIND = 10333
+export const RELAY_LIST_KIND = 10002
 
 /**
  * The relays read by default. Measured 2026-09-06 (see the header): the four
@@ -95,9 +96,9 @@ export function readIsTrustworthy({ reached, answered, minAnswers = MIN_ANSWERS,
 }
 
 /** The one event this read is allowed to believe: right kind, right author, real signature. */
-export function acceptsEvent(pubkey, ev, verify) {
+export function acceptsEvent(pubkey, ev, verify, kind = FAVORITES_KIND) {
   if (!ev || typeof ev !== 'object') return false
-  if (ev.kind !== FAVORITES_KIND) return false
+  if (ev.kind !== kind) return false
   if (ev.pubkey !== pubkey) return false
   if (!Array.isArray(ev.tags) || typeof ev.content !== 'string') return false
   try { return verify(ev) === true } catch { return false }
@@ -115,7 +116,7 @@ export function newest(events) {
 }
 
 /** One relay, one REQ, one verdict. Never throws. */
-function readOne(url, pubkey, { connect, verify, timeoutMs, now }) {
+function readOne(url, pubkey, kind, { connect, verify, timeoutMs, now }) {
   return new Promise((resolve) => {
     const t0 = now()
     const subId = 'fav-' + Math.random().toString(36).slice(2, 10)
@@ -142,7 +143,7 @@ function readOne(url, pubkey, { connect, verify, timeoutMs, now }) {
     ws.addEventListener('open', () => {
       opened = true
       try {
-        ws.send(JSON.stringify(['REQ', subId, { kinds: [FAVORITES_KIND], authors: [pubkey] }]))
+        ws.send(JSON.stringify(['REQ', subId, { kinds: [kind], authors: [pubkey] }]))
       } catch {
         finish('hung')
       }
@@ -153,7 +154,7 @@ function readOne(url, pubkey, { connect, verify, timeoutMs, now }) {
       if (!Array.isArray(msg)) return
       const [type, id, payload] = msg
       if (type === 'EVENT' && id === subId) {
-        if (acceptsEvent(pubkey, payload, verify)) events.push(payload)
+        if (acceptsEvent(pubkey, payload, verify, kind)) events.push(payload)
         return
       }
       if (type === 'EOSE' && id === subId) { finish('answered'); return }
@@ -179,7 +180,29 @@ function readOne(url, pubkey, { connect, verify, timeoutMs, now }) {
  *   relays    one row per relay: url, status, ms, createdAt of what it held
  *   holding   relays that hold the winning event; stale ones are in `relays`
  */
-export async function readFavorites(pubkey, {
+export async function readFavorites(pubkey, options = {}) {
+  return readNewestEvent(pubkey, FAVORITES_KIND, options)
+}
+
+/**
+ * The member's NIP-65 write relays, off their newest kind 10002 on the read
+ * set. Best-effort: no list, or no trustworthy read, is `[]`, and the caller
+ * unions the answer with the defaults either way. Capped at 16 the way the
+ * widget caps its own read of the same event.
+ */
+export async function readWriteRelays(pubkey, options = {}) {
+  const r = await readNewestEvent(pubkey, RELAY_LIST_KIND, options)
+  if (!r.event) return []
+  return relaySet(
+    r.event.tags
+      .filter((t) => t[0] === 'r' && typeof t[1] === 'string' && (!t[2] || t[2] === 'write'))
+      .map((t) => t[1])
+      .filter((u) => { try { const x = new URL(u); return !x.username && !x.password } catch { return false } }),
+  ).slice(0, 16)
+}
+
+/** The read itself, for any replaceable kind; `readFavorites` is this with kind 10333. */
+export async function readNewestEvent(pubkey, kind, {
   relays = READ_RELAYS,
   extraRelays = [],
   timeoutMs = DEFAULT_TIMEOUT_MS,
@@ -190,7 +213,7 @@ export async function readFavorites(pubkey, {
 } = {}) {
   const urls = relaySet(relays, extraRelays)
   const opts = { connect, verify, timeoutMs, now }
-  const rows = await Promise.all(urls.map((url) => readOne(url, pubkey, opts)))
+  const rows = await Promise.all(urls.map((url) => readOne(url, pubkey, kind, opts)))
 
   const candidates = rows.flatMap((r) => r.events)
   const event = newest(candidates)

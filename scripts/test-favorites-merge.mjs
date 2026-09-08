@@ -110,6 +110,50 @@ check('parse takes the decoded private half from the caller', () => {
   assert.equal(p.favorited.get(FEED), true);
 });
 
+// 2b. THE DEPARTURE FROM THE REFERENCE: a removal propagates on a private
+// list, and across a licensed private -> public move. The reference's outer
+// merge on those two branches carries `adoptAll`, which keeps a claimed entry
+// this device no longer holds. Raised upstream 2026-09-08.
+const FEED_B = 'podcast:guid:bbbbbbbb-0000-0000-0000-000000000002';
+check('a claimed entry removed locally is dropped from a PRIVATE list', () => {
+  const readPrivate = [['medium', 'podcast'], ['i', FEED], ['i', FEED_B]];
+  const r = M.plan({
+    read: { tags: [['alt', M.ALT], ['visibility', 'private']], content: 'cipher' },
+    readPrivate,
+    local: [{ id: FEED, medium: 'podcast', items: [], favorited: true }],
+    baseline: { public: [], private: [FEED, FEED_B] },
+    mode: 'private',
+  });
+  assert.ok(r.publish, 'the removal is a publish');
+  const ids = M.decodePlaintext(r.publish.privatePlaintext).filter((t) => t[0] === 'i').map((t) => t[1]);
+  assert.deepEqual(ids, [FEED]);
+  assert.deepEqual(r.baselineIfLanded.private, [FEED]);
+});
+check('an unclaimed private entry is still carried, and an unclaimed public one still moves whole on going private', () => {
+  const r = M.plan({
+    read: { tags: [['alt', M.ALT], ['medium', 'podcast'], ['i', FEED_B]], content: 'cipher' },
+    readPrivate: [['medium', 'podcast'], ['i', FEED]],
+    local: [],
+    baseline: { public: [], private: [] },
+    mode: 'private', userChose: true,
+  });
+  assert.ok(r.publish);
+  const ids = M.decodePlaintext(r.publish.privatePlaintext).filter((t) => t[0] === 'i').map((t) => t[1]);
+  assert.deepEqual(ids.sort(), [FEED, FEED_B].sort(), 'nothing this device never claimed is dropped');
+  assert.equal(r.publish.tags.some((t) => t[0] === 'i'), false, 'the public half is emptied by the move');
+});
+check('a claimed entry removed locally is dropped across a licensed private -> public move', () => {
+  const r = M.plan({
+    read: { tags: [['alt', M.ALT], ['visibility', 'public'], ['medium', 'podcast'], ['i', FEED_B]], content: 'cipher' },
+    readPrivate: [['medium', 'podcast'], ['i', FEED]],
+    local: [{ id: FEED, medium: 'podcast', items: [], favorited: true }],
+    baseline: { public: [FEED_B], private: [] },
+    mode: 'public',
+  });
+  assert.ok(r.publish);
+  assert.deepEqual(r.publish.tags.filter((t) => t[0] === 'i'), [['i', FEED]], 'FEED_B, claimed and dropped locally, goes; FEED moves in');
+});
+
 // 3. Source scan.
 const src = readFileSync(path.join(root, 'assets/js/favorites-merge.js'), 'utf8');
 const code = src.split('\n').filter((l) => !/^\s*(\*|\/\/|\/\*)/.test(l)).join('\n');

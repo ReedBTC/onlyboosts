@@ -12,6 +12,11 @@
  *
  * WHAT DIFFERS FROM THE REFERENCE, and nothing else does:
  *
+ *   0. `plan`'s two whole-list-move branches merge the active half WITHOUT
+ *      `adoptAll`, so a claimed entry that is no longer held is dropped
+ *      there too. With the flag a removal never propagates on a private
+ *      list (or on a licensed private → public move). Raised upstream on
+ *      2026-09-08; see the comment at the two sites.
  *   1. No fake codec. The reference seals the private half with a reversible,
  *      unauthenticated stand-in so its vectors need no crypto. That code is
  *      NOT here: a stand-in that ships is a private half anyone can read. The
@@ -876,10 +881,16 @@ export function plan({
     const moving = mergeHalf(inactiveReadTags, [], inactiveBaseline, {
       adoptAll: true,
     });
+    // ONLYBOOSTS DEPARTURE FROM THE REFERENCE (2026-09-08, raised upstream):
+    // the reference passes `adoptAll: true` to this outer merge as well as to
+    // `moving`, and `adoptAll` keeps every entry read whatever the baseline
+    // says — so an entry this device claims and no longer holds is never
+    // dropped, and a removal from a list in this mode never propagates. The
+    // whole-list move is already complete in `moving`; the outer merge is
+    // rule 3 as written, which is what lets an unfavorite stick. No vector
+    // covered a removal on this path; test-favorites-merge.mjs does.
     mergedActive = dedupeEntries(
-      mergeHalf([...activeReadTags, ...moving], local, activeBaseline, {
-        adoptAll: true,
-      }),
+      mergeHalf([...activeReadTags, ...moving], local, activeBaseline),
     );
     mergedInactive = [];
   } else if (licensedPublic && inactiveReadTags.some((t) => t[0] === 'i')) {
@@ -895,10 +906,16 @@ export function plan({
     const moving = mergeHalf(inactiveReadTags, [], inactiveBaseline, {
       adoptAll: true,
     });
+    // ONLYBOOSTS DEPARTURE FROM THE REFERENCE (2026-09-08, raised upstream):
+    // the reference passes `adoptAll: true` to this outer merge as well as to
+    // `moving`, and `adoptAll` keeps every entry read whatever the baseline
+    // says — so an entry this device claims and no longer holds is never
+    // dropped, and a removal from a list in this mode never propagates. The
+    // whole-list move is already complete in `moving`; the outer merge is
+    // rule 3 as written, which is what lets an unfavorite stick. No vector
+    // covered a removal on this path; test-favorites-merge.mjs does.
     mergedActive = dedupeEntries(
-      mergeHalf([...activeReadTags, ...moving], local, activeBaseline, {
-        adoptAll: true,
-      }),
+      mergeHalf([...activeReadTags, ...moving], local, activeBaseline),
     );
     mergedInactive = [];
   } else {
