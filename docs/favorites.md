@@ -78,9 +78,9 @@ For OnlyBoosts, a fresh writer with no legacy of its own, that means:
 ## The Module
 
 `assets/js/favorites-merge.js` is the spec's `conformance/reference/favorites.mjs`
-at commit fcb9d79, lifted with Chad's OK (via Reed, 2026-09-07). The reference's
+at commit 0fc52c4, lifted with Chad's OK (via Reed, 2026-09-07). The reference's
 own header says it has never served traffic; what makes it the right base is
-that every rule in it cites the spec section it implements and the spec's 28
+that every rule in it cites the spec section it implements and the spec's 29
 vectors run against it unchanged. Two adaptations, and nothing else differs:
 
 - **No stand-in codec.** The reference seals the private half with reversible
@@ -132,85 +132,19 @@ scripted relays, a stand-in codec and a real key:
 two-element items, because the merge rewrites them on the way through.
 `itemsAllowed` lifts both once Chad confirms both apps read the new form.
 
-**One departure from the spec's reference, found by the writer's test and
-raised upstream on 2026-09-08.** In the two whole-list-move branches of
-`plan` (going private, and a licensed private → public move) the reference
-merges the active half with `adoptAll`, which keeps every entry read whatever
-the baseline says. The move itself is already complete in `moving`; on the
-outer merge the flag means a claimed entry this device no longer holds is
-never dropped, so **a removal from a private list never propagates**. No
-vector covers a removal on that path. Our copy runs rule 3 as written there,
-the 28 vectors still pass, and `test-favorites-merge.mjs` holds the three
-cases (removal on a private list, an unclaimed entry still carried, removal
-across the licensed move).
-
-## The Heart
-
-`favorite-button.js` is chrome on the boost-button.js pattern: two-sided and
-dependency-free, because the two cards and the /show and /episode Functions
-render it at the edge and a card rebuilt in the browser must match byte for
-byte. An outline pill where the boost pill is solid (two filled brand
-controls on one line would read as one action twice, and Boost is the
-primary), the word Favorite, the heart filling when on. It carries full
-NIP-73 identifiers on the element (`data-fav-id`, `data-fav-item`) and the
-feed's declared medium when the surface knows it, never a default.
-
-**It ships `hidden` and favorites-ui.js reveals it for a signed-in member
-only**, reading the session pubkey the way follow-set.js does, so painting
-hearts on a cold page loads no widget. The widget comes in on the first click,
-through the nav's own loader, because signing needs it. The private half is
-opened only once the widget is present, so a member with a private list sees
-outlines until their first click on the page.
-
-Surfaces, 2026-09-08:
-
-| Surface | Heart | Written by |
-|---|---|---|
-| Shows / Albums cards | show | `show-card.js`, ahead of the boost pill on the Nostr Stats line |
-| `/show` hero | show, as a `.btn` in `.show-actions` | `functions/show/[guid].js` |
-| `/show` community rows | show | the same Function, ahead of the row's boost pill |
-| Episodes / Songs cards, `/episode` and `/booster` cards | episode | `episode-card.js`, on the stats line and in the compact rail |
-| `/episode` hero | episode | `functions/episode/[guid].js` |
-
-**Episode hearts are rendered but never revealed while `ITEMS_ALLOWED` is
-false** in favorites-ui.js, the migration gate: nothing on screen promises
-what the writer refuses. Flipping the constant lights every episode surface
-at once. `/artist` has no heart yet (artists wait on the two apps reading the
-entry), and the catalogue drawer's un-indexed rows have none either.
-
-**The first favorite asks Public or Private** in a small dialog of the
-controller's own (`.ob-fav-ask`), when the list cannot say which half it
-lives in and this member has not chosen here; the answer is stored per pubkey
-and offered again in the account menu (step six). Every outcome that is not a
-quiet success is a toast; a degraded read or a publish no relay accepted
-changes nothing and says so.
-
-## The Section On `/booster`
-
-`#favorites` (a frozen id, like every section id on the detail pages) sits
-between Episodes and Boosts. The Function ships the shell hidden and
-`favorites-section.js` fills it: the list read through the reader (the
-private half too when the viewer is the member and the widget is loaded),
-every guid resolved through **`POST /api/v1/favorites/resolve`**, and the
-rows grouped by the RESOLVED medium into the site's words — Shows, Episodes,
-Albums, Songs, and Artists when the list carries any. The lookup wins over the
-list's hint, the spec's rule, and a feed with no known medium files on the
-podcast side, the Shows feed's rule. Rows are on the community-row vocabulary
-(`.cs-row`), link to the page here or to BoostMeBitch when there is none (the
-podroll tiles' rule for a show we have no page for), and for the owner carry
-the Favorite heart, painted and handled by favorites-ui.js, so a list can be
-pruned from the page that shows it. A visitor to a member with an empty list
-sees no section; the owner sees a line inviting the first favorite, or one
-saying the list is private and the signer cannot open it.
-
-**The resolver is bounded on both sides.** The index side is one bound JSON
-array unrolled by `json_each` per table (the follows endpoint's pattern); the
-Podcast Index side is at most eight lookups per request through `piGet`'s
-timeout, byte cap and edge cache, first come. A long list of unknown feeds
-resolves over a few loads rather than one burst. An item is resolved as the
-PAIR: the same item guid under another feed is not this favorite. A guid
-nobody can name is absent from the answer and the row renders the guid,
-because it is still somebody's favorite.
+**Issue #37, found by the writer's test and fixed upstream the same day.**
+In the two whole-list-move branches of `plan` (going private, and a licensed
+private → public move) the reference merged the active half with `adoptAll`,
+which kept every entry read whatever the baseline said, so **a removal from a
+private list never propagated**. Chad confirmed it, and found a third case one
+level down that our first patch had left open: the *moving* merge was handed
+an empty local set, so an entry unfavorited in the other half rode the move
+across, permanently. PR #38 (commit 0fc52c4) fixes both sites, adds vector 29
+for all three cases, and writes the rule into §3 of the spec: a move between
+halves is a merge, not a copy. The module here is lifted from that commit, so
+there is no local departure any more; `test-favorites-merge.mjs` keeps the
+first two cases as a regression beside the 29 vectors. The vendored SHA is
+ahead of the spec's `main` until the PR merges.
 
 ## Relays
 

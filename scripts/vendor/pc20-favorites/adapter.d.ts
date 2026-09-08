@@ -2,7 +2,7 @@
  * The contract `vectors.test.mjs` drives.
  *
  * Two pure functions do the work, and a handful of small ones beside them.
- * Everything the 28 vectors need is expressible through them, and keeping them
+ * Everything the 29 vectors need is expressible through them, and keeping them
  * pure is what lets the suite run with no relay, no signer, no clock and no
  * network — so a failure is always your merge and never your test environment.
  *

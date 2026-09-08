@@ -1,10 +1,10 @@
 /**
- * The 28 test vectors of ../pc20-favorites.md, executable.
+ * The 29 test vectors of ../pc20-favorites.md, executable.
  *
  * The spec states them as behaviors "so they can be written against any test
  * runner". This is that, for one runner, driven through the pure functions
  * described in ./adapter.d.ts. Point ADAPTER at your own implementation and
- * the same 28 run against it.
+ * the same 29 run against it.
  *
  * Two ways to point it. Edit the import below, or leave this file alone and
  * set `PC20_FAVORITES_ADAPTER` to the path of your shim — which is what lets
@@ -1754,4 +1754,99 @@ test('28. An artist entry is a favorite that belongs to no feed', () => {
     own.publish.tags.some((t) => t[0] === 'k' && t[1] === 'podcast:publisher:guid'),
     'the kind must reach the `k` tags, or `#k` discovery misses it',
   );
+});
+
+test('29. A whole-list move is not an exemption from rule 3', () => {
+  // FEED_B was ours and the user has just unfavorited it: our baseline for the
+  // half it sits in claims it, and we no longer hold it. That is rule 3's
+  // third row, and it fires the same whether the list is public, private, or
+  // being moved between the two. A merge that suspends it while moving does
+  // not lose the removal for one cycle — it loses it for good, because the
+  // baseline it writes next cannot claim what this device does not hold, so no
+  // later cycle can drop the entry either.
+  const local = [feed(FEED_A, 'podcast')];
+
+  // 1. The list is private and nothing is moving. The merge still ran with the
+  // move's exemption switched on, so an unfavorite on a private list produced
+  // bytes identical to the read and rule 5 published nothing at all.
+  const priv = plan({
+    read: ev(
+      [ALT, VIS_PRIVATE],
+      encodePrivate([['medium', 'podcast'], ['i', FEED_A], ['i', FEED_B]]),
+    ),
+    local,
+    baseline: base([], [FEED_A, FEED_B]),
+    mode: 'private',
+  });
+  assert.ok(priv.publish, 'an unfavorite on a private list published nothing');
+  assert.deepEqual(
+    ids(decodePrivate(priv.publish.content)),
+    [FEED_A],
+    'the entry we removed came back on the private half',
+  );
+  assert.deepEqual(
+    priv.baselineIfLanded.private,
+    [FEED_A],
+    'we still claim an entry we no longer hold',
+  );
+
+  // 2. The licensed private → public move, with the removal on the half being
+  // moved INTO. The move is a merge, so the entry we dropped does not survive
+  // it by being read on the way past.
+  const shown = plan({
+    read: ev(
+      [ALT, VIS_PUBLIC, ['medium', 'podcast'], ['i', FEED_B], K_FEED],
+      encodePrivate([['medium', 'podcast'], ['i', FEED_A]]),
+    ),
+    local,
+    baseline: base([FEED_B]),
+    mode: 'public',
+  });
+  assert.ok(shown.publish, 'the move itself is a change and must publish');
+  assert.deepEqual(
+    ids(shown.publish.tags),
+    [FEED_A],
+    'the move carried an entry this device had removed',
+  );
+  assert.deepEqual(
+    ids(decodePrivate(shown.publish.content)),
+    [],
+    'the half being emptied kept an entry',
+  );
+
+  // 3. Going private, with the removal on the half being moved FROM. This is
+  // the same defect one level down: the merge that reads the emptying half was
+  // handed no local state, so every entry in it looked unheld and row 3 could
+  // never fire.
+  const hidden = plan({
+    read: ev([ALT, VIS_PUBLIC, ['medium', 'podcast'], ['i', FEED_A], ['i', FEED_B], K_FEED]),
+    local,
+    baseline: base([FEED_A, FEED_B]),
+    mode: 'private',
+    userChose: true,
+  });
+  assert.ok(hidden.publish, 'going private is a change and must publish');
+  assert.deepEqual(
+    ids(decodePrivate(hidden.publish.content)),
+    [FEED_A],
+    'the entry we removed rode the move into the private half',
+  );
+  assert.deepEqual(ids(hidden.publish.tags), [], 'the public half was not emptied');
+
+  // The second cycle, because that is where the old behaviour became
+  // permanent. FEED_B is now in a half our baseline does not claim it in, so
+  // nothing here could ever remove it — and nothing must put it back either.
+  const again = plan({
+    read: hidden.publish,
+    local: hidden.holds ?? local,
+    baseline: hidden.baselineIfLanded,
+    mode: 'private',
+  });
+  const after = again.publish ?? hidden.publish;
+  assert.deepEqual(
+    ids(decodePrivate(after.content)),
+    [FEED_A],
+    'the removed entry returned, or our own entry was dropped, on the second cycle',
+  );
+  assert.equal(again.publish, null, 'the move is not idempotent: it republishes forever');
 });
