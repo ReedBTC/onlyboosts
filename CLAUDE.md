@@ -25,6 +25,9 @@ there rather than restating the argument:
 | The four detail pages | `docs/detail-pages.md` |
 | Boost client attribution | `docs/boost-clients.md` |
 | PC 2.0 Favorites (kind 10333) | `docs/favorites.md` |
+| The test scripts, one row each | `docs/tests.md` |
+| Show artwork and the share cards' images | `docs/show-artwork.md` |
+| The relay sets and their measurements | `docs/relay-sets.md` |
 
 Deleted reasoning is recoverable: `git log -S <symbol> -- CLAUDE.md` finds the
 paragraph that used to explain any name in here.
@@ -434,40 +437,10 @@ node scripts/stamp-assets.js --check   # verify; non-zero exit if anything is st
 **Order matters.** `sync-partials` injects markup into the page files; anything
 it injects has to be stamped afterwards.
 
-Sixteen test scripts, all plain `node scripts/<name>.mjs` with no runner:
-
-| | |
-|---|---|
-| `test-episode-card.mjs` | the card's HTML against fixtures |
-| `test-boost-row.mjs` | the boost row's two-sided contract: a D1 row through `boostRecord` and back through `rowsFromRecords` must render **character for character** as the edge rendered it, or a reader who re-sorts watches half the list change shape |
-| `test-server-render.mjs` | the assembled homepage against a captured production response: the injection, **the three declarations that name the landing feed**, the state element, a 256KB first-view budget, and the ranking invariants. Takes the capture as an argument, and is written against the **show** card since Phase D |
-| `test-feed-hash.mjs` | the inline feed-bar controller: hash parsing, and the boot sequence |
-| `test-feed-lang.mjs` | `feed-lang.js`: menu ordering, the withholding rule, and the copy |
-| `test-sign-boost.mjs` | the signing oracle's validator and its KV rate limiter, fed by the **shipped** note builder |
-| `test-boost-modal-render.mjs` | the widget's four silent-failure classes: use-before-declare, themed classes that emit no CSS, portals with no container, and the missing preflight. See the ⚠️ below |
-| `test-boostbox.mjs` | the BoostBox descriptor path: the comment's whole-or-nothing rule, the record allowlist, and every way `/api/boostbox` is allowed to fail. **Stubs `fetch`**, so it never writes a record to a third party's service |
-| `test-show-card.mjs` | the show card's two-sided contract. Its own reason for existing is the crossing: `renderShowCard` was a DOM builder and could afford `Date.now()` and an unpinned locale, which a two-sided module cannot — see the note under the card |
-| `test-members-search.mjs` | `/api/v1/members`, running the **shipped handler** against a database built from the real `schema.sql` through an `env.DB` shim over `node:sqlite`. LIKE escaping, the identifier/name split, the listing, the publisher asymmetry, and `publishers=1` as its exact complement. **Two publisher keys are in the fixture deliberately**: with one, a single-row answer says nothing about whether the mode asks for the list or found the loudest key |
-| `test-members-hours.mjs` | the 40 HPW boards, same shim, with a fixture built to known answers. Dedupe, week boundaries, the publisher exclusion, the row-multiplying join, and **the week picker**: the bounded window's ceiling, the noon-UTC date rule, DST-safe stepping, and the resolve-rather-than-400 envelope. **Proof of #40HPW has its own six fixture members** (2026-09-01), each written to a hand-computable answer: one row per member, a sub-goal week that must not count, exactly-40 in and one second under out, the best week rather than the newest, and the more recent of two identical bests. Confirmed red on seven mutations — the ceiling removed, dates resolved at midnight, stepping by a flat 604800, the `HAVING` dropped, the best-week tiebreak flipped, the two weeks merged in the inner GROUP BY, and the entry test made strictly greater. **Its `env.DB` shim models `.first()`**, which `feed-rank.js` taught `test-members-search.mjs` the hard way |
-| `test-community-medium.mjs` | the two community rollups and the medium partition they were split on, against a `node:sqlite` build of the real `schema.sql`. **Two halves reached two ways**: `fetchCommunityBoosts` is exported and called directly, where `/show`'s query is inline in the page Function and is **extracted from the source and executed**, the `test-feed-hash.mjs` technique. A copy of the SQL written into the test would pass forever while the shipped one rotted. Confirmed to go red on three mutations: the filter removed, its polarity inverted, and the `COALESCE` dropped |
-| `test-payment-lookup.mjs` | the wallet-side settlement check (2026-09-04): `paymentLookup.js`'s classification (`failed` only from an explicit `state`, NOT_FOUND is `unknown`), the keysend hash against a SHA-256 vector, the polling loop's deadline and abort, and `externalBoost.js#confirmLegSettled` with the wallet injected and **`fetch` stubbed** for LUD-21. Confirmed red on three mutations: `failed` inferred from a missing `settled_at`, NOT_FOUND made `failed`, the deadline removed |
-| `test-keysend-upgrade.mjs` | the keysend upgrade: the `fountain.fm` exclusion's exact-or-parent rule, the routing pair's whole-or-nothing rule, the strict node-pubkey check, every way `/api/keysend` answers "no endpoint", and the wallet gate. **Stubs `fetch`**, so it probes nobody's well-known |
-| `test-feed-search.mjs` | the search box's two outcomes, driving the **shipped** `mountFeedSearch` against a stub DOM: Enter submits the whole query where a feed supplies `onSubmit`, arrow + Enter still picks, emptying the box or Escape clears through `onPick(null)`, the footer row renders — and **the member lookup, with no `onSubmit`, keeps its old Enter**. Confirmed red on two mutations: auto-highlight restored, and the empty-box clear removed |
-| `test-hpw-cards.mjs` | the 40 HPW share cards, three halves: `hpw-board.js`'s two-sided rules (a **source** scan for absolute imports, `Date.now()` and unpinned locales, plus the row's escaping and `isSafeUrl` on the face); `hpw-share.js`'s pure parts (the note's shape, the link rule, the tags, the `window` listener); the **shipped** `/hpw` Function over a `node:sqlite` build of the real schema (every redirect, the 404s, the page's canonical and `og:image`, the card's frame and ready signal, and that the page carries `rowHtml` byte for byte); and `/api/og/hpw/<name>.png` with **`fetch` stubbed** (the allowlist, the upstream's 200-for-missing answered with the banner, the PNG signature, the 900KB cap, HEAD). Nothing in it touches the VPS |
-| `test-publishers-api.mjs` | the **shipped** `/api/v1/publishers` handlers — listing and per-artist detail — over a `node:sqlite` build of the real `schema.sql`, on the members-search pattern. Three sorts with three winners, the boost-time windows, the language filter recounting through the declaring shows (`lang=unknown` included), LIKE-wildcard decoys, rank retention on `q=`, the title-less publisher's exclusion, HEAD, the album list's publisher-order and its live-row-over-edge-hint preference |
-| `test-charts.mjs` | the OnlyBoosts Charts: `sort=chart` on the **shipped** handlers of all four ranked endpoints over a `node:sqlite` build of the real `schema.sql`. **Expectations are brute-forced from an independent JS implementation of the rule**, one boost list feeding both sides; a micro-corpus that inverts if the tiebreak chain is reordered; `q=` rank retention with pre-filter tie flags; the follows-POST chart on all three POSTing endpoints (podcasts and publishers gained theirs in phase 2, with `publisher=` and boost-time `since=` for the drawers' follows paths); `feedRanks`' chart place — all four boost-time windows since the strip — and the tiles' Charts strip. Confirmed red on five mutations: the tuple tiebreak removed, the chain flipped in members.js and again in feed-rank.js, `peers` counted post-filter, and the podcasts POST's follows filter dropped |
-
-| `test-weekly-charts.mjs` | the OnlyBoosts Charts: the **shipped** `/charts` Function (the old page URLs' redirects and the five **card frames**), **`/api/v1/charts`** and the **`/api/og/charts` proxy** (fetch stubbed), over a `node:sqlite` build of the real `schema.sql`, on the members-hours pattern; plus the two-sided source scan of `chart-board.js`. The routing contract (one URL per week, HEAD answered); the Shows and Artists Top 10s against a **brute-forced independent implementation** of the chart rule, component-rank triplets included; the medium partition; the Members pair (the hours board held to brute-forced hours, the publisher exclusion); and every Weeks at #1 tally — completed weeks only, a tied #1 crediting every holder, a fixture week whose #1 is decided by the tiebreak CHAIN. The retired kinds (episodes, albums, songs) stay covered at module level. Confirmed red on six mutations: the chain flipped, the live week counted on each side, the medium filter dropped, the per-week `PARTITION BY` removed, and the member boards' publisher exclusion dropped |
-| `test-catalogue.mjs` | `/api/catalogue`, the /show episode drawer's catalogue: the **shipped** handlers with **`fetch` stubbed**, so it never asks Podcast Index. The five-field projection (coerced, guid-less and duplicate items dropped, newest first with undated rows last, a total order), the request contract (400/503, a PI miss answered 200-empty and `no-store`, HEAD, OPTIONS, the exact-match CORS origin), the fallback route through `podcasts/byguid` and `byfeedurl` to `episodes/byfeedid`, `truncated` at PI's ceiling, and **the streamed byte cap added to `_shared/podcast-index.js#piGet`**, at the cap and past it. Confirmed red on three mutations: the undated rule flipped, the duplicate guard removed, the cap's comparison made `>=` |
-| `test-boost-ingest.mjs` | `/api/v1/boosts/ingest` (2026-09-06): the **shipped** handler over a `node:sqlite` build of the real `schema.sql`, fed by the **shipped** note builder and a real signature. The row as the collector would read it, the FTS row and the `boosts_edge` marker, the show's five and the episode's four aggregates against a brute-force recount (`booster_count` DISTINCT), the title-only episode stub and its non-creation over a collector-filled row, the collector's `INSERT OR REPLACE` overwriting the stub, idempotence, every refusal (tampered, foreign client tag, no show, donation shape, outside the ±15 min window — and a 10-minute-old note admitted where the oracle's own ±5 would refuse), 503 with no D1 or KV, 429 past the limiter, `no-store`. Confirmed red on three mutations: DISTINCT dropped, the existence pre-read removed, `verifyEvent` bypassed |
-| `test-head-routes.mjs` | every Function exporting `onRequestGet` also exports `onRequestHead` (2026-09-07): a **source scan** of `functions/` with the two money endpoints as the allowlist (and a check that the allowlist is not stale), every such module importable, and `headOf` itself: the GET's status and every header with no body, run once with the same context, a redirect preserved |
-| `test-value.mjs` | `/api/value`, the value-block resolver every boost pays through (2026-09-06): the **shipped** handler with **`fetch` stubbed**. The stored feed URL resolves before the guid (the live record's splits, the guid never asked), the guid fallback, an unusable URL as no lookup, `feedId` short-circuiting both, the episode-level block over the feed's under the same record, recipient normalization, 200 `value:null` for a feed PI lacks, 400/503/204 and the exact-match origin. Confirmed red on two mutations: the order flipped back, the episode preference dropped |
-| `test-favorites-merge.mjs` | the PC 2.0 Favorites merge (2026-09-07): the **spec's own 29 vectors**, vendored in `scripts/vendor/pc20-favorites/` with their upstream SHA, run against the **shipped** `favorites-merge.js` through a shim that supplies the spec's stand-in codec; the async seam the reference lacks (`readPrivate` in, `privatePlaintext` out, an opaque half carried byte for byte, an empty one `''`); and a source scan (no imports, no stand-in codec, no Buffer, no clock, no locale, no DOM), and the legacy two-element item's dual-read. Confirmed red on five mutations: rule 5 removed, an untrusted read treated as empty, the opaque half replaced with `''`, the read compared as it arrived rather than reframed, and an entry keyed on position 1 alone |
-| `test-favorites-read.mjs` | the favorites relay reader (2026-09-08): the **shipped** `favorites-read.js` with its one bundle import repointed at nostr-tools, driven against **scripted sockets** that answer, hang, refuse, never connect, drop, forge and disagree, with really signed events. The trust rule (every reached relay answered, at least two), the refusal exclusion, the dead-entry exclusion, newest-wins and the lowest-id tie, the signature check through JSON the way a relay message arrives, the REQ's shape, the timeout. Confirmed red on six mutations: the two-answer floor dropped, a hung relay excused, offline read as empty, the tiebreak flipped, the signature skipped, a refusal counted as an answer |
-| `test-favorites-sync.mjs` | the favorites writer (2026-09-08): the **shipped** `favorites-sync.js` end to end — read, adopt, merge, encrypt, sign, publish, record — against **scripted relays** that answer REQs and OK or refuse EVENTs, a real key, a stand-in codec and a fake `localStorage`. The first favorite's Public/Private question, the adopt-and-hydrate model (unfavoriting another app's entry sticks on first contact, in either half), the item gate and the legacy-list gate, an opaque half carried byte for byte, `no-nip44`, `not-landed` recording no baseline, the member's NIP-65 write relays, a signer answering under another key. Confirmed red on six mutations: baseline recorded on a publish that never landed, the hydrate pass removed, a degraded read acted on, the private half written in plaintext, the signer's event unchecked, the item gate removed |
-| `test-favorite-button.mjs` | the Favorite heart (2026-09-08): `favorite-button.js`'s markup on the three kinds, its escaping, a guid with quote characters refused, `setFavoriteState`'s verb and fill, `changeFor` and `keyFor` against the merge's keys; the two-sided source rules; that every renderer imports it by relative path; that `favorites-ui.js` keeps `ITEMS_ALLOWED` false and never reaches NIP-04, that nav.js loads it and the two page imports are gone, and the account menu's rows (the pill's `/booster` link, the nav toggle, `window.OBFavorites`, no opacity modifier on a `var()` colour) |
-| `test-account-settings.mjs` | the account settings that follow the account (2026-09-09): `account-settings.js`'s NIP-78 plaintext both ways, newest-wins with the tie to the device, `applySettings` pressing the nav toggle only on a difference, and the push/pull cycle over **scripted relays** with a real key and a stand-in codec (an encrypted kind 30078 under `d=onlyboosts:settings`, another `d` or author refused, no NIP-44 or a foreign signer publishing nothing, a laptop-to-phone round trip). Confirmed red on three mutations: a tie letting the remote win, the pull ignoring the d tag, the signer's key unchecked |
-| `test-favorites-section.mjs` | the Favorites section on `/booster` (2026-09-08): the **shipped** `POST /api/v1/favorites/resolve` over a `node:sqlite` build of the real `schema.sql` with **`fetch` stubbed** (D1 first, Podcast Index for the rest at most `PI_MAX` a request, the item resolved as the PAIR, an untitled show linking to BMB, input hygiene, 400/503, the five-minute cache and exact-match origin), and the section module's pure parts: the resolve request, grouping on the RESOLVED medium with the hint as fallback and unknown on the podcast side, and the row markup with the owner's heart a sibling of the link |
+Twenty-nine test scripts, all plain `node scripts/<name>.mjs` with no runner.
+**`docs/tests.md` is the per-test reference** — one row each, saying what it
+covers and what it was confirmed red against. What follows here is only what a
+change elsewhere would break.
 
 **⚠️ `test-server-render.mjs` IS THE ONE THAT NEEDS AN ARGUMENT, SO IT IS THE ONE
 THAT GOES UNRUN.** Its header carries the `curl` that produces the capture; take
@@ -476,16 +449,14 @@ measurement. It asserted `cards are numbered 1..N with no gaps` — the *ordinal
 scheme's invariant — until competition ranking shipped on 2026-08-18, and it
 would have been merged red had it not been run. **Run all twenty-nine before a
 merge**, and treat this one as the guard on the ranking scheme rather than only
-on weight. *(It read "all twelve" until 2026-08-24, "all fifteen" until 2026-08-30, "all sixteen" and then "all seventeen" until 2026-08-31, and "all eighteen" and then "all nineteen" until 2026-09-04, and "all twenty" and then "all twenty-one" until 2026-09-06, and "all twenty-two" until 2026-09-07, and "all twenty-three", "all twenty-four", "all twenty-five" and "all twenty-six" until 2026-09-08, and "all twenty-seven" and "all twenty-eight" until 2026-09-09, contradicting the table
-directly above it — the count moved when a test was added and this sentence did
-not. If the table grows again, this line grows with it.)*
+on weight. *(That number has been wrong before — it lagged from twelve to twenty-eight, a
+test at a time, while the table beside it grew. `git log -S "before a\nmerge" -- CLAUDE.md` has every value it has held. **Bump it and `docs/tests.md`
+together.**)*
 
 **⚠️ AND ITS `curl` CHANGED WITH THE LANDING FEED.** It captures
-`/api/v1/podcasts?not_medium=music&sort=chart&range=all&limit=25` now (it read
-`sort=boosters` until the Charts became the opening sort on 2026-08-31 — and
-until a deploy serving `sort=chart` is live, production coerces the unknown
-key, so the capture is built through the shipped handler instead; the test's
-header carries the recipe), not the episodes query. The whole file was rewritten by Phase D, which is the honest
+`/api/v1/podcasts?not_medium=music&sort=chart&range=all&limit=25` now (it read `sort=boosters`
+until the Charts became the opening sort on 2026-08-31), not the episodes
+query. The whole file was rewritten by Phase D, which is the honest
 measure of how big that change was: the landing feed is not a constant this test
 could have been parameterised by, since the two cards share no renderer, no state
 element and no drawer. `git show 4c22017:scripts/test-server-render.mjs` is the
@@ -509,28 +480,17 @@ screen. **Anything about how this page boots wants a test here, not a unit test.
 version-stamped absolute imports to stubs, so the module under test is the
 shipped source.
 
-**⚠️ `test-boost-modal-render.mjs` EXISTS BECAUSE A TEMPORAL DEAD ZONE REACHED
-PRODUCTION AND DID NOT LOOK LIKE A CRASH.** `paySeconds` read `payTick` thirty
-lines above its `useState`, inside the ternary
-`payingLeg?.startedAt ? (… payTick …) : 0` — so the branch was only evaluated
-once a leg was actually paying. The form rendered, the done screen rendered,
-every test passed, and a live boost threw during render about a second in.
-
-**A render error with no boundary above it unmounts the whole `createRoot`**,
-which is why one missing line-order produced four unrelated-looking faults: the
-modal vanished mid-payment; the payment completed anyway, its promise being
-detached; **no Nostr note was ever published**, because the publish lives in
-`phase === 'done'` and phase never got there; and the page's Boost button was
-dead until a reload, because the host root was gone. Nothing anywhere said an
-error had been thrown.
-
-Two things came out of it and both are load-bearing. The scan is a **text
-check, not a render** — advancing state past `'form'` needs a DOM, and
-`renderToString` runs no effects, so a real render test would mean adding jsdom.
-And **this repo has no linter**: `no-use-before-define` would catch the class in
-one rule, and adding eslint to `login-widget/` is the better fix whenever anyone
-wants it. Until then the scan is the whole defence, so point it at any component
-that renders while a payment is in flight.
+**⚠️ `test-boost-modal-render.mjs` IS A TEXT SCAN, NOT A RENDER, AND THIS REPO
+HAS NO LINTER.** It exists because a temporal dead zone reached production and
+did not look like a crash: a render error with no boundary above it unmounts the
+whole `createRoot`, so one missing line-order produced four unrelated-looking
+faults — the modal vanished mid-payment, the payment completed anyway, **no
+Nostr note was ever published**, and the page's Boost button was dead until a
+reload. Nothing anywhere said an error had been thrown. **Point the scan at any
+component that renders while a payment is in flight**, and see *Why
+`test-boost-modal-render.mjs` Is A Text Scan* in `docs/tests.md` for the whole
+account (`no-use-before-define` would catch the class in one rule; adding eslint
+to `login-widget/` is the better fix whenever anyone wants it).
 
 ### Asset Stamping, And The Rule It Replaced
 
@@ -1111,116 +1071,36 @@ Five rules from it that a change elsewhere would break, so they are restated her
 **A relay list is defined by the kind it carries and the audience it reaches, not
 by which relays are popular.** Every set in this repo was re-derived from that
 rule on 2026-08-12, measured against the 61 distinct boosters behind the 100 most
-recent boosts. **Re-measure before changing one**; the numbers below are the
-whole argument, and reputation is a bad proxy for them.
+recent boosts. **Re-measure before changing one**; reputation is a bad proxy.
 
-**⚠️ Reading and publishing are different jobs and take different sets.** A read
-set answers "who HAS this event", which is measurable, and a useless member costs
-latency on every query. A publish set answers "who will SEE this event", which
-cannot be measured from outside, and an extra member costs one socket on an
-infrequent action while omitting one costs reach nobody can observe. **So the
-read sets are cut to what the measurement supports and the publish sets are
-deliberately generous, and a low score is not an argument against a publish
-target.** One list doing both jobs is the smell that produced the split.
+**`docs/relay-sets.md` is the authority** — the coverage table, every set and the
+file it lives in, the `NC_RELAYS` NIP-46 findings, and the floors worth knowing
+(11% of boosters have no kind 0 anywhere, 36% no kind 10002). Five things from it
+that a change elsewhere would break:
 
-| Relay | kind 0 | kind 10002 | kind 3 | kind 1 |
-|---|---|---|---|---|
-| `relay.fountain.fm` | 0% | 0% | 4% | **98%** |
-| `nos.lol` | 78% | **59%** | **75%** | 44% |
-| `relay.ditto.pub` | **80%** | 42% | 67% | 32% |
-| `relay.mostr.pub` | 47% | 36% | 47% | 44% |
-| `relay.wavlake.com` | 37% | 37% | 24% | 14% |
-| `purplepag.es` | 32% | 37% | 50% | 0% |
-| `relay.primal.net` | 6% | 4% | 18% | 29% |
-| `relay.nostr.band` | 0% | 0% | 0% | 0% |
-
-| Set | File | Kinds |
-|---|---|---|
-| `STATIC_RELAYS` | `assets/js/boosts-thread.js` | read 1 threads + 3 follows |
-| `FALLBACK_RELAYS` | `login-widget/src/lib/ndk.js` | **read** 0, 10002 |
-| `OUTBOX_RELAYS` | `login-widget/src/lib/ndk.js` | read 10002 only |
-| `PUBLISH_RELAYS` | `login-widget/src/lib/ndk.js` | **publish** 1 share notes |
-| `BOOSTAGRAM_RELAYS` | `login-widget/src/lib/boostagram.js` | publish 30078 |
-| `NC_RELAYS` | `login-widget/src/components/LoginScreen.jsx` | 24133 bunker transport |
-| `BUG_RELAY` | `login-widget/src/lib/bugReport.js` | 1, tag-gated, isolated |
-| `BOOTSTRAP_RELAYS` | `bots/shared/nostr_utils.py` | 0, 3, 10002 |
-| `NOSTR_RELAYS` | `bots/shared/nostr_utils.py` | publish 1 |
-| `CORE_` / `PROFILE_` / `RECEIPT_RELAYS` | `bots/global-boost-scan/relays.py` | 1 / 0+10002 / 9735 |
-| NIP-05 hints | `.well-known/nostr.json` | mirrors `FALLBACK_RELAYS` |
-
-Findings that outlive the numbers:
-
-- **⚠️ `relay.damus.io` is gone and must not come back.** It answers a WebSocket
-  connect with **HTTP 503**. It was first in every browser-side list.
-- **⚠️ `relay.getalby.com` is NWC transport, not a relay.** Both it and `/v1`
-  answer *every* REQ with `blocked: Request rejected`, so a note published there
-  can never be read. NWC is unaffected either way: the wallet's relay comes from
-  the connection string.
-- **A relay has to accept the kind.** `purplepag.es` stores only 0/3/10002 and
-  was in `BOOSTAGRAM_RELAYS`, where a kind-30078 publish could never be stored;
-  `relay.fountain.fm` refuses 30078 with `kinds not supported`.
-- **Aggregators are not automatically worth a slot.** `purplepag.es` scored
-  respectably alone and added **zero** marginal coverage once ditto and nos.lol
-  were present. Same for `relay.primal.net`, which was in five sets. That is the
-  *relay*; `cache1.primal.net` behind `primal-profiles.js` is a different service.
-- **⚠️ NDK dials relays this repo never names.** It builds a second, outbox pool
-  from its own `DEFAULT_OUTBOX_RELAYS` (`purplepag.es`, `nos.lol`) unless
-  `outboxRelayUrls` is passed. `ndk.js` now passes the option explicitly.
-- **⚠️ Publishing to Primal's RELAY is not how Primal users see a note.**
-  Measured on a real boost note: absent from `relay.primal.net`, which held **0**
-  of that author's kind-1s, and simultaneously **present in `cache1.primal.net`**,
-  which is what the Primal client reads. `relay.primal.net` is in
-  `PUBLISH_RELAYS` on the read/publish asymmetry above, not on evidence.
-- **Fountain boosts are heavily `relay.fountain.fm`-only (~90%)**, which is why
-  it is in `NOSTR_RELAYS` despite not being general-purpose. Don't prune it.
-
-**⚠️ `publishRelaySet()` in `ndk.js` unions `PUBLISH_RELAYS` with NDK's pool, and
-the union is load-bearing.** `ensureUserWriteRelays` seeds that pool with the
-signed-in user's NIP-65 write relays, so a relay set built from `PUBLISH_RELAYS`
-alone would replace the pool and silently stop publishing to the user's own
-relays — the note still publishes, to the wrong audience, and no error is raised.
-
-Floors worth knowing before chasing coverage: **11% of boosters have no kind 0 on
-any relay tested, and 36% have no kind 10002.** No list closes that.
-
-### `NC_RELAYS` Is a Third Job, and the Signer Pays for a Bad Member
-
-**⚠️ The `nostrconnect://` relay list is OURS, not the user's signer's.** NIP-46
-requires the signer to answer on the relays named in the URI, so the relays
-configured in someone's Amber do not govern that handshake; they govern the
-`bunker://` path, where the pasted string carries the signer's own list.
-
-That makes this neither a read set nor a publish set. A member has to be
-reachable **by both sides** and has to carry kind 24133, which is ephemeral, so
-nothing is stored and a reply arriving while nobody is subscribed is gone for
-good. Re-derived by publishing a throwaway 24133 to each relay and watching a
-second socket for delivery:
-
-| Relay | Publish | Relayed |
-|---|---|---|
-| `relay.primal.net` | `OK: true` | yes |
-| `relay.ditto.pub` | `OK: true` | yes |
-| `nos.lol` | `OK: true` | yes |
-| `relay.mostr.pub` | `OK: true` | yes (tested spare, not shipped) |
-| `relay.nsec.app` | HTTP 502, socket closes 1006 in ~540ms | — |
-| `relay.nostr.band` | TCP connect never completes; ~10s, then 1006 | — |
-
-- **⚠️ An OK is not proof of transport.** `relay.fountain.fm` answers `OK: true`
-  and then CLOSEs the subscription with `kinds not supported`. **Test the read
-  side too.**
-- **⚠️ A hang costs more than a refusal, and the SIGNER pays it.** A 502 is half
-  a second; a connect that never completes costs the dialer's whole timeout, and
-  the dialer is the signer app, off where this site cannot see or report it. That
-  is what a login "taking forever and then working" looks like.
-
-The URI also names `perms` (`get_public_key`, `sign_event`). Amber prompts once
-per ungranted scope and the second prompt lands after the user has tabbed back to
-the browser, which is where a connect appears to hang; naming both up front lets
-one screen approve them.
-
-Untested, and the one thing to confirm: **write policy.** Every relay above
-reports open writes in NIP-11, but strfry usually leaves `restricted_writes`
-unset, so a publish target is unproven until an event actually lands.
+- **⚠️ Reading and publishing are different jobs and take different sets.** A read
+  set answers "who HAS this event", which is measurable, and a useless member costs
+  latency on every query. A publish set answers "who will SEE this event", which
+  cannot be measured from outside. **So the read sets are cut to what the
+  measurement supports and the publish sets are deliberately generous, and a low
+  score is not an argument against a publish target.** One list doing both jobs is
+  the smell that produced the split.
+- **⚠️ `relay.damus.io` answers a WebSocket connect with HTTP 503 and must not come
+  back** — it was first in every browser-side list. *(Measured 2026-08-12; the
+  favorites work reached it fine in ~300ms on 2026-09-08, so this one wants
+  re-measuring before it is trusted either way.)*
+- **⚠️ `relay.getalby.com` is NWC transport, not a relay.** Both it and `/v1` answer
+  *every* REQ with `blocked: Request rejected`, so a note published there can never
+  be read. NWC is unaffected: the wallet's relay comes from the connection string.
+- **⚠️ A relay has to accept the kind.** `purplepag.es` stores only 0/3/10002;
+  `relay.fountain.fm` refuses 30078 *and* kind 10333 with `kinds not supported`.
+  **An OK is not proof of transport** — fountain answers `OK: true` and then CLOSEs
+  the subscription. Test the read side too.
+- **⚠️ NDK dials relays this repo never names**, building a second outbox pool from
+  its own `DEFAULT_OUTBOX_RELAYS` unless `outboxRelayUrls` is passed; `ndk.js` now
+  passes it explicitly. And **`publishRelaySet()` unions `PUBLISH_RELAYS` with
+  NDK's pool** — a set built from `PUBLISH_RELAYS` alone would replace the pool and
+  silently stop publishing to the user's own NIP-65 write relays.
 
 ## The exclusion list
 
@@ -1952,125 +1832,30 @@ What a change elsewhere would break:
 Some feeds publish two artwork URLs, RSS `<image><url>` and `<itunes:image>`, and
 the first is sometimes dead while the second resolves. The collector publishes the
 second as **`art2`**, null when identical to `img`; `assets/js/cover-art.js` walks
-the chain on error.
+the chain on error (`episode art → show img → show art2 → glyph`). Live coverage
+is small and real: 5 of 1,287 shows.
 
-```
-episode art  →  show art (img)  →  show art2  →  glyph / placeholder
-```
+**`docs/show-artwork.md` is the authority** — the chain's rules, every wiring
+site, the `/episode` third link, the `/booster` OG route and the measurements
+behind all of it. Three rules restated here because a change elsewhere would
+break them:
 
-**⚠️ `coverChain()` PROMOTES `http://` TO `https://` BEFORE IT FILTERS.** Every
-page here is https, so an http image is mixed content: Chrome auto-upgrades it
-and **blocks it outright if https fails**, never falling back to the insecure
-copy. The http URL was therefore already unreachable as written, and promoting
-it only stops the console filling with warnings and stops the chain holding two
-entries for one picture. Measured over 200 boosts on 2026-08-22: 7
-`episode.img`, 5 `podcast.img`, 1 `booster.pic`. A host with no https at all is
-not made worse — an upgraded URL that fails advances to the next source exactly
-as a dead https URL always has, which is what makes this safe to do to a third
-party's URL. `httpsUrl` is exported for the two avatar render sites
-(`boost-list.js`, `episode-card.js`), which do not go through the chain.
-
-`coverChain()` filters to http(s) and **dedupes** — `art2` is meant to be null
-when it equals `img`, but the shards are third-party data and a repeat would cost
-a second request for the URL that just failed. `wireCoverFallback()` advances on
-each error and clears its own handler at the end, so an unreachable placeholder
-cannot loop; it returns `false` for an empty chain, which is the caller's cue to
-render its no-art state rather than an empty `<img>`.
-
-Wired on the feeds through `ob-data.js` (`normalizeBoosts` carries
-`podcast.art2`, `toEpisodeShape` builds `imageChain`), `shows-feed.js`,
-`boosts-feed.js` and `feeds-podcasts.js`. On the detail pages it is a
-**`data-art2` attribute, not a second `<img>` or an inline `onerror`**: the
-Function emits the attribute and `detail-page.js#initArt2` wires the swap through
-the same `cover-art.js` helpers, so there is **no fetch at all** and the
-no-inline-handler convention holds. It also handles what a deferred module can't
-observe directly — the hero is `loading="eager"`, so it may have already failed by
-the time the module runs, which `img.complete && !img.naturalWidth` detects.
-
-`wireArt2()` covers all three `/show` surfaces: the hero, the community rows and
-the podroll tiles. **The community drawer row was the surface this was missed on**,
-and the one where it mattered most: those rows are *other* shows' artwork, so a
-single show with a dead primary rendered broken on every page listing it while its
-own page had already recovered. The cause was the query rather than the render —
-the community CTE selected `p.image` and not `p.artwork`.
-
-The `/episode` hero is the one chain that is **two** fallbacks long, because an
-episode with no art of its own falls back to the show's primary before the show's
-second chance. `data-art3` is that third link and exists nowhere else.
-
-**The `/show` episode drawer rows are deliberately outside this.** A row falls
-back to the show's `img` when the episode has no art, and does not go on to
-`art2`. It bites only where a show has a dead primary *and* an episode with no
-art, and episode art was 100% present on every show sampled.
-
-**⚠️ The share card's TYPE follows its image, on all four detail pages.** A
-large-image card crops to roughly 1.91:1, and nothing these pages send is that
-shape: podcast artwork is square by specification (Apple requires 1400x1400 to
-3000x3000, and 12 of 12 sampled from the live index are exactly 1.00), and a
-booster's avatar is square or portrait (0 of 26 sampled were wide enough; 13 were
-exactly square, the rest ran down to 0.67). Every page shipped
-`summary_large_image` until 2026-08-16, so every cover and every face was being
-sliced into a horizontal band — **a worse failure than sending no image, because
-it reads as a broken picture rather than a missing one.** Artwork now gets
-`summary`; only the fallback keeps the large card, `OG_FALLBACK` being the
-1800x600 site banner. Two shapes, two cards, chosen by which is in use.
-
-**⚠️ `/booster`'s share image is served through `/api/og/booster/<npub>`, not
-named as the raw avatar URL.** A preview fetcher makes one request and cannot
-fall back, and it stops reading at a size the page cannot see: **Signal Desktop
-at 1MB** (`MAX_IMAGE_BYTES_TO_LOAD`), Android and iOS at 2MB. Measured
-2026-08-18 over the 49 stored avatars behind the last 100 boosts, 5 answered 404
-and 7 were over 1MB (largest 4.3MB), so a quarter of booster pages drew a card
-with no image on Desktop while the phones were fine. The route looks the picture
-up **by npub in D1** (never off the query string, so it is not an open proxy),
-fetches it bounded, asks Cloudflare to resize it to 600x600 JPEG on the way
-through (`cf.image`; ignored on a zone without Image Transformations enabled),
-and answers with the banner for anything that is not a 200 raster under 900KB.
-The header `<img>` still uses the raw URL, because a browser can run `onerror`.
-`X-OB-Image: avatar|fallback` on the response says which path answered.
-
-Two things that follow. **A platform caches OG data per URL**, so a link shared
-before a page existed keeps its 404 card until the TTL expires or someone forces
-a re-scrape — worth knowing before concluding a card is broken. And **`node
---check` is not a syntax check for these Functions**: it accepted a template
-literal broken by backticks inside an HTML comment. Import the module instead.
-
-**⚠️ `og:image` stays on the primary, deliberately.** A crawler cannot run the
-error handler, so the temptation is to prefer `art2` there — but `art2`'s presence
-means the feed publishes *two different* URLs, not that the primary is dead.
-Measured over all five shows that carry one: **four primaries return 200 and one
-404s**. Preferring art2 would swap four working share cards to fix one.
-
-Live coverage is small and real: 5 of 1,287 shows.
-
-**⚠️ SHOW ROWS REFRESH ON THE EPISODE CADENCE SINCE 2026-09-04.** *Reed's ask*,
-after Chad and Reeds Podcast showed its July cover for a month while every
-episode row already had the new one: a show was read from Podcast Index once,
-at first sight, and never again. `db.shows_needing_refresh` now re-reads a
-boosted show daily when it has an episode aired in the last 90 days and
-monthly otherwise — the same `_episode_stale_binds` as the episode gate, so
-the two cannot disagree about "recent" — capped at `SHOW_BATCH` (25) a tick,
-recent first, then longest-unchecked, then newest-aired. `upsert_show` became
-content-aware with it: `checked_at` moves on every look, `updated_at` only
-when one of `SHOW_CONTENT_COLS` differs, so the D1 drift pass and the publish
-gate see a change only when there is one. A miss keeps the row.
-
-**⚠️ `podcasts/byguid` RETURNS ONE FEED PER GUID AND IT IS NOT ALWAYS THE LIVE
-ONE.** Found 2026-09-06 on Stacker News Live: the show moved from Anchor to a
-Fountain-hosted feed in August 2025 and kept its guid, so Podcast Index holds
-two feed ids under one `podcastGuid` and `byguid` answers the Anchor one, 404
-since 2025-08-26 and still `dead: 0`. Every episode after the move exists only
-on the other feed, so `episodes/byguid` with our feed id said "not found" and
-the raw-RSS fallback fetched a 404, on every retry, for a year; the refresh
-above then wrote the dead feed back over the live one the Fountain resolver had
-set two days earlier. `enrich.resolve_show` now takes a **live sibling** when
-`byguid`'s feed does not answer (`lastHttpStatus` outside 2xx/3xx): found
-through the dead entry's own `itunesId`, then a title search, accepted only
-when it names the same `podcastGuid` and answers, and re-read in full through
-`byfeedid` because the thin objects drop `medium`. Anything else keeps
-`byguid`'s answer as before. `bots/global-boost-scan/test_enrich_sibling.py`
-pins the rule. Measured over the 388 shows boosted in the prior 120 days it was
-the only show in this state; seven others sit on PI status 667 with no sibling.
+- **⚠️ `coverChain()` PROMOTES `http://` TO `https://` BEFORE IT FILTERS.** Every
+  page here is https, so an http image is mixed content: Chrome auto-upgrades it
+  and **blocks it outright if https fails**, never falling back to the insecure
+  copy. `httpsUrl` is exported for the two avatar render sites that do not go
+  through the chain.
+- **⚠️ The share card's TYPE follows its image, on all four detail pages.**
+  Podcast artwork is square by specification and a booster's avatar is square or
+  portrait, so artwork gets `summary`; only the 1800x600 banner fallback keeps
+  `summary_large_image`. Every page shipped the large card until 2026-08-16, which
+  sliced every cover into a horizontal band — a worse failure than sending no
+  image, because it reads as a broken picture rather than a missing one.
+- **⚠️ `og:image` stays on the primary, deliberately.** A crawler cannot run the
+  error handler, so preferring `art2` there is tempting — but `art2`'s presence
+  means the feed publishes *two different* URLs, not that the primary is dead.
+  Measured over all five shows that carry one: four primaries return 200 and one
+  404s. Preferring art2 would swap four working share cards to fix one.
 
 ## Profile fallback
 
