@@ -1,10 +1,11 @@
 # PC 2.0 Favorites (kind 10333)
 
 The design record for OnlyBoosts' support of Chad Farrow's cross-app podcast
-favorites. **Status, 2026-09-08: steps one to five built. The heart is on the show
-surfaces, the Favorites section is on `/booster`, and Reed's first live test
-published real lists that BoostMeBitch read back.** The settings rows (step
-six) are not built.
+favorites. **Status, 2026-09-08: all six steps built.** The heart is on the show
+surfaces, the Favorites section is on `/booster`, the account menu carries the
+dark-mode and Public/Private rows, and Reed's first live test published real
+lists that BoostMeBitch read back. Open: the episode hearts behind the
+migration gate, and the artist heart.
 
 | | |
 |---|---|
@@ -146,6 +147,27 @@ there is no local departure any more; `test-favorites-merge.mjs` keeps the
 first two cases as a regression beside the 29 vectors. The vendored SHA is
 ahead of the spec's `main` until the PR merges.
 
+## The Account Menu
+
+Two rows in the widget's identity dropdown (`IdentityDropdown.jsx`), not a
+settings page (Reed, 2026-09-06). The pill at the top links to the member's
+own `/booster` page, where their boosts and favorites are. **Dark mode**
+presses the nav's own toggle button so `nav.js` keeps ownership of the
+attribute, the storage write and the cross-tab sync. **Favorites: Public /
+Private** goes through `window.OBFavorites`, the API `favorites-ui.js`
+exposes for exactly this, because the widget is a React bundle that cannot
+import a site module. A change there is a whole-list move on the relays and
+runs the same publish cycle a heart does, with `userChose` set, since the spec
+lets only a choice flip a list's half; a standing setting that disagrees with
+the list is never acted on. On anything but success the stored choice is put
+back. `getMode()` answers from the stored choice, else from the list itself
+(its `visibility` tag, or the half that holds entries), else "not chosen".
+
+**The controller is loaded on every page by `nav.js`**, through a dynamic
+import at the end of its IIFE, lazily: a page with no hearts pays for the
+module and makes no relay read, and the menu's rows have their API anywhere
+the nav is. The two page-level imports it had on 2026-09-08 came out.
+
 ## Relays
 
 Measured 2026-09-06 against Chad's own list (read-only): `relay.fountain.fm`
@@ -218,6 +240,6 @@ beyond the markup.
 2. ~~The writer~~ built 2026-09-08.
 3. ~~The heart~~ built 2026-09-08, show surfaces live, episode surfaces gated.
 4. ~~The `#favorites` section~~ built 2026-09-08.
-5. The dropdown rows and the Public/Private prompt.
+5. ~~The dropdown rows~~ built 2026-09-08.
 6. Later, and the real reason to do it: the collector indexes public lists and
    "favorited by N members" becomes a show stat or chart component.

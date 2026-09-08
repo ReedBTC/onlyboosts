@@ -1,8 +1,9 @@
 /**
  * favorites-ui.js — the Favorite hearts on every page: reveal, paint, toggle.
  *
- * Imported for its side effects by feeds.js (the homepage) and detail-page.js
- * (the four detail pages). One controller per page:
+ * Loaded on EVERY page by nav.js (a dynamic import at the end of its IIFE),
+ * lazily: a page with no hearts costs the module and no relay read. One
+ * controller per page:
  *
  *   1. Reads the signed-in member's list ONCE (favorites-sync.js#fetchFavorites)
  *      and paints every `[data-fav]` button on the page from it: revealed,
@@ -15,6 +16,12 @@
  *      outcome that is not a quiet success.
  *   3. Re-reads on `lb:session-change`, so a login paints hearts and a logout
  *      hides them.
+ *   4. Exposes `window.OBFavorites` — `getMode()`, `setMode(mode)`, `reload()`
+ *      — for the account menu's Favorites row in the widget, which is a
+ *      React component in the bundle and cannot import a site module. A mode
+ *      change from the menu is a whole-list move and runs the same publish
+ *      cycle as a heart, with `userChose` set, because the spec lets only a
+ *      choice flip a list's half.
  *
  * ⚠️ SIGNED OUT GETS NOTHING (Reed, 2026-09-06). The buttons ship `hidden` and
  * are revealed only when a session pubkey exists. That pubkey is read the way
@@ -33,15 +40,16 @@
  * after which the list is re-read with NIP-44 and the hearts fill. That is a
  * known cost of not loading 1MB to draw an outline.
  */
-import { fetchFavorites, syncFavorites, widgetDeps, saveMode } from '/assets/js/favorites-sync.js?v=ob-v201'
-import { setFavoriteState, changeFor, keyFor } from '/assets/js/favorite-button.js?v=ob-v201'
-import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v201'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v201'
+import { fetchFavorites, syncFavorites, widgetDeps, saveMode, loadMode } from '/assets/js/favorites-sync.js?v=ob-v202'
+import { statedVisibility } from '/assets/js/favorites-merge.js?v=ob-v202'
+import { setFavoriteState, changeFor, keyFor } from '/assets/js/favorite-button.js?v=ob-v202'
+import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v202'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v202'
 
 /** Flip to true when Chad confirms BMB and StableKraft read `["i", feed, item]`. */
 export const ITEMS_ALLOWED = false
 
-const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v201'
+const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v202'
 
 const state = {
   pubkey: null,
@@ -49,6 +57,7 @@ const state = {
   trusted: false,
   privateOpened: false,
   loading: null,
+  everRead: false,     // the lazy read: a page with no hearts never reads
 }
 
 /* ------------------------------------------------------------------------ */
@@ -65,6 +74,7 @@ function allowed(btn) {
 
 function paint(btn) {
   if (!state.pubkey || !allowed(btn)) { btn.hidden = true; return }
+  if (!state.everRead && !state.loading) reload()
   btn.hidden = false
   const key = keyFor(btn)
   setFavoriteState(btn, state.trusted ? state.keys.has(key) : null)
@@ -90,6 +100,7 @@ function keysOf(entries) {
 async function load({ withWidget = false } = {}) {
   const pubkey = getSessionPubkey()
   state.pubkey = pubkey
+  state.everRead = true
   if (!pubkey) {
     state.keys = new Set(); state.trusted = false; state.privateOpened = false
     paintAll()
@@ -186,7 +197,7 @@ const MESSAGES = {
   degraded: 'Couldn’t reach enough relays to read your favorites safely. Nothing was changed; try again in a moment.',
   'not-landed': 'No relay accepted the update. Nothing was changed; try again in a moment.',
   'no-nip44': 'Your signer can’t encrypt a private list, so this favorite wasn’t saved.',
-  'items-gated': 'Episode favorites are coming soon; other apps can’t read them yet.',
+  'items-gated': 'Episode favorites are coming soon; other apps can’t read them yet. Until then a list holding episodes from another app can’t be changed here.',
   'sign-failed': 'Your signer didn’t sign the update, so nothing was changed.',
   'bad-change': 'This one can’t be favorited.',
 }
@@ -237,9 +248,71 @@ async function onClick(btn) {
 }
 
 /* ------------------------------------------------------------------------ */
+/* The account menu's API                                                    */
+
+/**
+ * The list's mode as this member would see it in a setting: the choice
+ * stored here, else what the list itself says (its visibility tag, or the
+ * half that holds entries), else null. `source` says which answered.
+ */
+async function getMode() {
+  const pubkey = getSessionPubkey()
+  if (!pubkey) return { mode: null, source: 'signed-out' }
+  const stored = loadMode(window.localStorage, pubkey)
+  if (stored) return { mode: stored, source: 'setting' }
+  try {
+    const r = await fetchFavorites(pubkey, { pubkey })
+    if (!r.trusted) return { mode: null, source: 'unknown' }
+    const stated = statedVisibility(r.read.tags)
+    if (stated) return { mode: stated, source: 'list' }
+    const hasPublic = r.read.tags.some((t) => t[0] === 'i')
+    const hasContent = !!r.read.content
+    if (hasPublic && !hasContent) return { mode: 'public', source: 'list' }
+    if (hasContent && !hasPublic) return { mode: 'private', source: 'list' }
+    return { mode: null, source: hasPublic || hasContent ? 'ambiguous' : 'empty' }
+  } catch {
+    return { mode: null, source: 'unknown' }
+  }
+}
+
+/**
+ * Change the list's mode: a whole-list move, published through the same
+ * cycle as a heart with `userChose` set. Resolves to the sync result; on
+ * anything but success the stored choice is put back so the menu does not
+ * show a state the list does not have.
+ */
+async function setMode(mode) {
+  if (mode !== 'public' && mode !== 'private') return { status: 'bad-change' }
+  try {
+    await ensureWidget()
+    const user = window.LBLogin?.getUser?.()
+    if (!user?.pubkey) { window.LBLogin?.requestLogin?.(); return { status: 'signed-out' } }
+    const deps = await widgetDeps(window.LBLogin)
+    const previous = loadMode(window.localStorage, deps.pubkey)
+    saveMode(window.localStorage, deps.pubkey, mode)
+    const r = await syncFavorites(null, { ...deps, store: window.localStorage, itemsAllowed: ITEMS_ALLOWED, mode, userChose: true })
+    if (r.status === 'published' || r.status === 'unchanged') {
+      await reload({ withWidget: true })
+      showToast(mode === 'private' ? 'Your favorites are private now' : 'Your favorites are public now')
+      return r
+    }
+    saveMode(window.localStorage, deps.pubkey, previous)
+    showToast(MESSAGES[r.status] || 'Couldn’t change that.', true)
+    console.warn('[favorites] setMode', r)
+    return r
+  } catch (err) {
+    console.warn('[favorites] setMode failed', err)
+    showToast('Couldn’t change that.', true)
+    return { status: 'error' }
+  }
+}
+
+/* ------------------------------------------------------------------------ */
 /* Boot                                                                      */
 
 function boot() {
+  window.OBFavorites = { getMode, setMode, reload: () => reload({ withWidget: true }), ITEMS_ALLOWED }
+
   document.addEventListener('click', (e) => {
     const btn = e.target.closest?.('[data-fav]')
     if (!btn) return
@@ -263,7 +336,9 @@ function boot() {
   window.addEventListener('lb:session-change', () => reload({ withWidget: true }))
   window.addEventListener('storage', (e) => { if (e.key === 'lb_nostr_session') reload() })
 
-  reload()
+  // Lazy: read only when this page has a heart to paint. A page without one
+  // (about, stats) loads the module for the menu's API and nothing more.
+  if (buttons().length) reload()
 }
 
 if (typeof document !== 'undefined') {

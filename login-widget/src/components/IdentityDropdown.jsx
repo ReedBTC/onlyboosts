@@ -119,13 +119,25 @@ export default function IdentityDropdown({
           </p>
         </div>
       ) : (
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--modal-line,#b9d4e6)]">
+        /* The pill links to the member's own page (Reed's ask, 2026-09-06):
+           their boosts, and since 2026-09-08 their favorites, live there. A
+           member with no boosts has no page (docs/favorites.md); the link
+           then lands on the 404, which is the honest answer rather than a
+           dead pill. */
+        <a
+          href={npub ? `/booster/${encodeURIComponent(npub)}` : undefined}
+          role="menuitem"
+          onClick={() => onClose()}
+          title="Your boosts and favorites"
+          className="flex items-center gap-3 px-4 py-3 border-b border-[var(--modal-line,#b9d4e6)] no-underline hover:bg-[var(--modal-inset,#e6f1f9)] transition-colors"
+        >
           <AvatarPill profile={profile} npub={npub} size={36} />
           <div className="min-w-0 flex-1">
             <p className="font-semibold text-[var(--ink,#0f2733)] truncate">{displayName}</p>
             <p className="text-[11px] text-[var(--muted,#5a7488)] font-mono truncate">{truncatedNpub}</p>
           </div>
-        </div>
+          <span className="text-[var(--muted,#5a7488)] text-xs" aria-hidden="true">›</span>
+        </a>
       )}
 
       {/* Wallet section */}
@@ -232,6 +244,16 @@ export default function IdentityDropdown({
         </div>
       )}
 
+      {/* Settings. Dark mode for everyone; the favorites list's mode for a
+          signed-in member. Both are rows in this menu rather than a settings
+          page (Reed, 2026-09-06). Dark mode presses the nav's own toggle so
+          nav.js keeps ownership of the attribute, the storage write and the
+          cross-tab sync; the favorites row goes through window.OBFavorites,
+          the site controller nav.js loads on every page, because a mode
+          change is a whole-list move on the relays and only a CHOICE may
+          flip a list's half. */}
+      <SettingsRows signedOut={signedOut} />
+
       {/* Sign in / sign out. Signed out, this is the way back to an
           identity — the pill that normally offers it was replaced by the
           wallet pill, so the offer moves in here rather than vanishing. */}
@@ -294,6 +316,116 @@ export default function IdentityDropdown({
 // generic "Browser extension" label rather than risk an empty trailing
 // "Connected · ". NWC almost always has an alias when the wallet
 // implements get_info; if not, fall through to a plain "Connected".
+function SettingsRows({ signedOut }) {
+  const [dark, setDark] = useState(() =>
+    typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'dark')
+  // { mode: 'public'|'private'|null, source } from the site controller, or
+  // null while loading / when the controller is not on this page.
+  const [fav, setFav] = useState(null)
+  const [favBusy, setFavBusy] = useState(false)
+  const api = typeof window !== 'undefined' ? window.OBFavorites : null
+
+  useEffect(() => {
+    if (signedOut || !api) return
+    let live = true
+    api.getMode().then((m) => { if (live) setFav(m) }).catch(() => { if (live) setFav({ mode: null, source: 'unknown' }) })
+    return () => { live = false }
+  }, [signedOut, api])
+
+  function toggleDark() {
+    const btn = document.querySelector('.nav-theme-toggle')
+    if (btn) btn.click()
+    else {
+      // No nav toggle on this page: do what nav.js would.
+      const next = !dark
+      if (next) document.documentElement.setAttribute('data-theme', 'dark')
+      else document.documentElement.removeAttribute('data-theme')
+      try { localStorage.setItem('ob-theme', next ? 'dark' : 'light') } catch {}
+    }
+    setDark(document.documentElement.getAttribute('data-theme') === 'dark')
+  }
+
+  async function pickMode(mode) {
+    if (!api || favBusy || fav?.mode === mode) return
+    setFavBusy(true)
+    try {
+      const r = await api.setMode(mode)
+      if (r?.status === 'published' || r?.status === 'unchanged') setFav({ mode, source: 'setting' })
+    } finally {
+      setFavBusy(false)
+    }
+  }
+
+  const seg = (mode, label) => (
+    <button
+      type="button"
+      role="menuitemradio"
+      aria-checked={fav?.mode === mode}
+      disabled={favBusy || !api}
+      onClick={() => pickMode(mode)}
+      className={
+        'flex-1 px-2 py-1 rounded-md text-[11px] font-medium transition-colors ' +
+        (fav?.mode === mode
+          ? 'bg-[var(--brand-dd,#0a6fa8)] text-white'
+          : 'bg-transparent text-[var(--ink,#0f2733)] hover:bg-[var(--modal-inset,#e6f1f9)]')
+      }
+    >
+      {label}
+    </button>
+  )
+
+  return (
+    <div className="px-4 py-3 border-b border-[var(--modal-line,#b9d4e6)] space-y-2">
+      <p className="text-[11px] text-[var(--muted,#5a7488)] uppercase tracking-wide">Settings</p>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-xs text-[var(--ink,#0f2733)]">Dark mode</span>
+        <button
+          type="button"
+          role="menuitemcheckbox"
+          aria-checked={dark}
+          onClick={toggleDark}
+          className={
+            'relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full border transition-colors ' +
+            (dark
+              ? 'bg-[var(--brand-dd,#0a6fa8)] border-[var(--brand-dd,#0a6fa8)]'
+              : 'bg-[var(--modal-inset,#e6f1f9)] border-[var(--modal-line,#b9d4e6)]')
+          }
+        >
+          <span
+            aria-hidden="true"
+            className={'inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ' + (dark ? 'translate-x-4' : 'translate-x-0.5')}
+          />
+        </button>
+      </div>
+      {!signedOut && api && (
+        <div className="space-y-1">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-xs text-[var(--ink,#0f2733)]">Favorites</span>
+            <div
+              className="inline-flex w-[132px] rounded-lg border border-[var(--modal-line,#b9d4e6)] p-0.5"
+              aria-busy={favBusy}
+            >
+              {seg('public', 'Public')}
+              {seg('private', 'Private')}
+            </div>
+          </div>
+          <p className="text-[11px] text-[var(--muted,#5a7488)] leading-snug">
+            {fav === null
+              ? 'Checking…'
+              : fav.mode === 'private'
+                ? 'Encrypted so only you can read the list.'
+                : fav.mode === 'public'
+                  ? 'Anyone can see what you favorite, in any app that reads them.'
+                  : fav.source === 'ambiguous'
+                    ? 'Your list is in both states at once; pick one to settle it.'
+                    : 'Not chosen yet. You will be asked at your first favorite.'}
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function walletKindLabel(status) {
   const alias = sanitizeAlias(status.alias)
   // A remembered-but-not-yet-engaged wallet has no live `kind` (nothing is

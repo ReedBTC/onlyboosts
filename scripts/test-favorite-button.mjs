@@ -133,10 +133,25 @@ check('the controller keeps the migration gate closed and never reaches NIP-04',
   assert.match(uiSrc, /from '\/assets\/js\/favorite-button\.js\?v=ob-v\d+'/)
   assert.match(uiSrc, /if \(btn\.dataset\.fav === 'episode'\) return ITEMS_ALLOWED/, 'the gate is what decides an episode heart\'s reveal')
 })
-check('the controller is imported where the hearts are: feeds.js and detail-page.js', () => {
+check('the controller is loaded on every page by nav.js, lazily, and nowhere else', () => {
+  assert.match(readFileSync(path.join(root, 'assets/js/nav.js'), 'utf8'), /import\('\/assets\/js\/favorites-ui\.js\?v=ob-v\d+'\)/, 'nav.js dynamic-imports it')
   for (const f of ['assets/js/feeds.js', 'assets/js/detail-page.js']) {
-    assert.match(readFileSync(path.join(root, f), 'utf8'), /import '\/assets\/js\/favorites-ui\.js\?v=ob-v\d+'/, f)
+    assert.doesNotMatch(readFileSync(path.join(root, f), 'utf8'), /favorites-ui\.js/, `${f} no longer imports it`)
   }
+  assert.match(uiSrc, /if \(buttons\(\)\.length\) reload\(\)/, 'a page with no hearts reads nothing')
+  assert.match(uiSrc, /window\.OBFavorites = \{ getMode, setMode, reload/, 'the menu\'s API is exposed')
+  assert.match(uiSrc, /syncFavorites\(null, \{ \.\.\.deps, store: window\.localStorage, itemsAllowed: ITEMS_ALLOWED, mode, userChose: true \}\)/, 'a mode change is a userChose cycle')
+})
+
+check('the account menu: the pill links to the member\'s page, the rows press the nav toggle and the site controller', () => {
+  const jsx = readFileSync(path.join(root, 'login-widget/src/components/IdentityDropdown.jsx'), 'utf8')
+  assert.match(jsx, /href=\{npub \? `\/booster\/\$\{encodeURIComponent\(npub\)\}` : undefined\}/)
+  assert.match(jsx, /document\.querySelector\('\.nav-theme-toggle'\)/, 'dark mode goes through nav.js\'s own button')
+  assert.match(jsx, /window\.OBFavorites/, 'the favorites row goes through the site controller')
+  assert.match(jsx, /api\.setMode\(mode\)/)
+  assert.doesNotMatch(jsx, /\[var\(--[a-z-]+\)\]\/\d/, 'no opacity modifier on a var() colour (emits nothing)')
+  const bundle = readFileSync(path.join(root, 'assets/widgets/login-widget.js'), 'utf8')
+  assert.ok(bundle.includes('OBFavorites') && bundle.includes('nav-theme-toggle'), 'the built bundle carries the rows')
 })
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')
