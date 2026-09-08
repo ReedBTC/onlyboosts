@@ -422,23 +422,23 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v199" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v199" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v199" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v199" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v200" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v200" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v200" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v200" />
   <!-- The hero, the drawers and the boost list are the show page's, so this
        page links its stylesheet and adds only the deltas. -->
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v199" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v199" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v200" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v200" />
   <!-- The episode card, for the #episodes rollup: the same chrome
        feeds-podcasts.js paints on the homepage. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v199" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v200" />
   <!-- The boost thread inside a card's drawer, and its reply / like / repost /
        zap bar, both reached through that same card. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v199" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v199" />
-  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v199" />
-  <link rel="stylesheet" href="/assets/css/booster-page.css?v=ob-v199" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v200" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v200" />
+  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v200" />
+  <link rel="stylesheet" href="/assets/css/booster-page.css?v=ob-v200" />
 </head>
 <body data-booster-pk="${htmlEscape(hex)}"${npub ? ` data-booster-npub="${htmlEscape(npub)}"` : ""}>
 
@@ -578,6 +578,7 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
   ${renderShows(shows, realName)}
 
   ${renderEpisodes(corpus)}
+  ${renderFavorites()}
 
   ${renderBoosts(boosts, names, {
     // "Boosts Sent" rather than "Recent Boosts", for the same reason as on
@@ -668,12 +669,12 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav.js?v=ob-v199" defer></script>
-<script src="/assets/js/booster-page.js?v=ob-v199" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v200" defer></script>
+<script src="/assets/js/booster-page.js?v=ob-v200" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v199"></script>
-<script src="/assets/js/sw-register.js?v=ob-v199" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v200"></script>
+<script src="/assets/js/sw-register.js?v=ob-v200" defer></script>
 </body>
 </html>`;
 }
@@ -1050,6 +1051,29 @@ function showMeta(boosts, sats, eps) {
 // is one person's giving to one episode and the median booster has two boosts
 // in total, so a boost-count ranking is mostly ties; sats is the axis that
 // actually orders a single person's history.
+// The member's PC 2.0 Favorites (kind 10333). A written exception to the
+// rendering rule: the list lives on relays, not in D1, and its private half is
+// ciphertext only the member's own signer can open, so the edge can render the
+// shell and nothing more. assets/js/favorites-section.js reads the list,
+// resolves the guids through /api/v1/favorites/resolve, fills this in and
+// reveals it; a member with nothing on their list keeps it hidden. The id is
+// frozen the way every section id on these pages is. See docs/favorites.md.
+function renderFavorites() {
+  return `<section class="show-section show-section--bare" id="favorites" hidden data-booster-favorites>
+    <details class="ep-drawer cs-drawer" open>
+      <summary>
+        <span class="cs-head">
+          <span class="cs-head-title">Favorites</span>
+          <span class="cs-head-sub">Shows, episodes, albums and songs this member favorited in any Podcasting 2.0 app</span>
+        </span>
+        <span class="drawer-hint" aria-hidden="true"></span>
+      </summary>
+      <div class="fav-groups" data-fav-groups></div>
+      <p class="cs-empty" data-fav-empty hidden></p>
+    </details>
+  </section>`;
+}
+
 function renderEpisodes(corpus) {
   // A booster whose every boost carries no item guid has no episode-level
   // history at all, and no section. A failed corpus fetch takes the same exit.
@@ -1111,10 +1135,10 @@ function notFound(raw) {
   <meta name="robots" content="noindex" />
   <title>Booster not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v199" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v199" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v199" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v199" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v200" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v200" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v200" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v200" />
 </head>
 <body>
 <section class="page-header">
@@ -1132,7 +1156,7 @@ function notFound(raw) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v199" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v200" defer></script>
 </body>
 </html>`;
   return new Response(html, {

@@ -465,15 +465,16 @@ Sixteen test scripts, all plain `node scripts/<name>.mjs` with no runner:
 | `test-favorites-read.mjs` | the favorites relay reader (2026-09-08): the **shipped** `favorites-read.js` with its one bundle import repointed at nostr-tools, driven against **scripted sockets** that answer, hang, refuse, never connect, drop, forge and disagree, with really signed events. The trust rule (every reached relay answered, at least two), the refusal exclusion, the dead-entry exclusion, newest-wins and the lowest-id tie, the signature check through JSON the way a relay message arrives, the REQ's shape, the timeout. Confirmed red on six mutations: the two-answer floor dropped, a hung relay excused, offline read as empty, the tiebreak flipped, the signature skipped, a refusal counted as an answer |
 | `test-favorites-sync.mjs` | the favorites writer (2026-09-08): the **shipped** `favorites-sync.js` end to end — read, adopt, merge, encrypt, sign, publish, record — against **scripted relays** that answer REQs and OK or refuse EVENTs, a real key, a stand-in codec and a fake `localStorage`. The first favorite's Public/Private question, the adopt-and-hydrate model (unfavoriting another app's entry sticks on first contact, in either half), the item gate and the legacy-list gate, an opaque half carried byte for byte, `no-nip44`, `not-landed` recording no baseline, the member's NIP-65 write relays, a signer answering under another key. Confirmed red on six mutations: baseline recorded on a publish that never landed, the hydrate pass removed, a degraded read acted on, the private half written in plaintext, the signer's event unchecked, the item gate removed |
 | `test-favorite-button.mjs` | the Favorite heart (2026-09-08): `favorite-button.js`'s markup on the three kinds, its escaping, a guid with quote characters refused, `setFavoriteState`'s verb and fill, `changeFor` and `keyFor` against the merge's keys; the two-sided source rules; that every renderer imports it by relative path; and that `favorites-ui.js` keeps `ITEMS_ALLOWED` false and never reaches NIP-04 |
+| `test-favorites-section.mjs` | the Favorites section on `/booster` (2026-09-08): the **shipped** `POST /api/v1/favorites/resolve` over a `node:sqlite` build of the real `schema.sql` with **`fetch` stubbed** (D1 first, Podcast Index for the rest at most `PI_MAX` a request, the item resolved as the PAIR, an untitled show linking to BMB, input hygiene, 400/503, the five-minute cache and exact-match origin), and the section module's pure parts: the resolve request, grouping on the RESOLVED medium with the hint as fallback and unknown on the podcast side, and the row markup with the owner's heart a sibling of the link |
 
 **⚠️ `test-server-render.mjs` IS THE ONE THAT NEEDS AN ARGUMENT, SO IT IS THE ONE
 THAT GOES UNRUN.** Its header carries the `curl` that produces the capture; take
 a fresh one rather than reusing an old file, since it is also the size
 measurement. It asserted `cards are numbered 1..N with no gaps` — the *ordinal*
 scheme's invariant — until competition ranking shipped on 2026-08-18, and it
-would have been merged red had it not been run. **Run all twenty-six before a
+would have been merged red had it not been run. **Run all twenty-seven before a
 merge**, and treat this one as the guard on the ranking scheme rather than only
-on weight. *(It read "all twelve" until 2026-08-24, "all fifteen" until 2026-08-30, "all sixteen" and then "all seventeen" until 2026-08-31, and "all eighteen" and then "all nineteen" until 2026-09-04, and "all twenty" and then "all twenty-one" until 2026-09-06, and "all twenty-two" until 2026-09-07, and "all twenty-three", "all twenty-four" and "all twenty-five" until 2026-09-08, contradicting the table
+on weight. *(It read "all twelve" until 2026-08-24, "all fifteen" until 2026-08-30, "all sixteen" and then "all seventeen" until 2026-08-31, and "all eighteen" and then "all nineteen" until 2026-09-04, and "all twenty" and then "all twenty-one" until 2026-09-06, and "all twenty-two" until 2026-09-07, and "all twenty-three", "all twenty-four", "all twenty-five" and "all twenty-six" until 2026-09-08, contradicting the table
 directly above it — the count moved when a test was added and this sentence did
 not. If the table grows again, this line grows with it.)*
 
@@ -1823,7 +1824,7 @@ What a change elsewhere would break:
 - **⚠️ THE SECTION IDS ARE URLS AND THEY ARE FROZEN.** `/show`: `#episodes`
   `#community` `#community-shows` `#podroll` `#reverse-podroll` `#boosts`.
   `/episode`: `#community` `#community-episodes` `#boosts`. `/booster`: `#shows`
-  `#episodes` `#boosts`. Ids are reused across pages on purpose where they name the
+  `#episodes` `#favorites` `#boosts`. Ids are reused across pages on purpose where they name the
   same kind of section. `HASH_ALIASES` holds one permanent entry
   (`#inverse-podroll`) and **is the repair for a rename that already happened, not
   a licence for the next one** — it needs the module to have run, so a rename is
@@ -2209,9 +2210,9 @@ was built for and still has no surface.
 
 **`docs/favorites.md` is the authority.** Chad Farrow's cross-app favorites,
 kind 10333: one replaceable event per pubkey, feed and item entries, public or
-private as a whole. **Steps one to four, 2026-09-08: the merge, the reader,
-the writer and the heart, each with its test. The heart is on the show
-surfaces; this site has never published a real list.**
+private as a whole. **Steps one to five, 2026-09-08: the merge, the reader,
+the writer, the heart and the `/booster` section, each with its test. Reed's
+first live lists reached BoostMeBitch; the settings rows are still to build.**
 
 - **⚠️ THE HEART SHIPS `hidden` AND `favorites-ui.js` REVEALS IT FOR A
   SIGNED-IN MEMBER ONLY** (Reed: signed out gets nothing). `favorite-button.js`

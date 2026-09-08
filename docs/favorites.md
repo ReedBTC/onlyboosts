@@ -1,10 +1,10 @@
 # PC 2.0 Favorites (kind 10333)
 
 The design record for OnlyBoosts' support of Chad Farrow's cross-app podcast
-favorites. **Status, 2026-09-08: steps one to four built. The heart is on the show
-surfaces; the `/booster` section and the settings rows are not built; this
-site has never published a real list.** The throwaway-key relay test is still
-owed, and it is the first thing that will.
+favorites. **Status, 2026-09-08: steps one to five built. The heart is on the show
+surfaces, the Favorites section is on `/booster`, and Reed's first live test
+published real lists that BoostMeBitch read back.** The settings rows (step
+six) are not built.
 
 | | |
 |---|---|
@@ -14,6 +14,7 @@ owed, and it is the first thing that will.
 | The reader | `assets/js/favorites-read.js`, per-relay trust on raw sockets; `node scripts/test-favorites-read.mjs` |
 | The writer | `assets/js/favorites-sync.js`, the cycle around `plan`: adopt, merge, encrypt, sign, publish, record; `node scripts/test-favorites-sync.mjs` |
 | The heart | `assets/js/favorite-button.js` (two-sided chrome) and `assets/js/favorites-ui.js` (reveal, paint, click); `node scripts/test-favorite-button.mjs` |
+| The section | `assets/js/favorites-section.js` on `/booster`, over `POST /api/v1/favorites/resolve`; `node scripts/test-favorites-section.mjs` |
 | Upstream | https://github.com/ChadFarrow/PC20-Nostr/issues/37, the reference's private-list removal defect |
 | Other writers | BoostMeBitch (`lib/nostr/favorites-list.ts`) and StableKraft (`lib/nostr/favorites-single-list.ts`); both carry `content`, both write the `visibility` tag, both implement the private half |
 
@@ -184,6 +185,33 @@ and offered again in the account menu (step six). Every outcome that is not a
 quiet success is a toast; a degraded read or a publish no relay accepted
 changes nothing and says so.
 
+## The Section On `/booster`
+
+`#favorites` (a frozen id, like every section id on the detail pages) sits
+between Episodes and Boosts. The Function ships the shell hidden and
+`favorites-section.js` fills it: the list read through the reader (the
+private half too when the viewer is the member and the widget is loaded),
+every guid resolved through **`POST /api/v1/favorites/resolve`**, and the
+rows grouped by the RESOLVED medium into the site's words — Shows, Episodes,
+Albums, Songs, and Artists when the list carries any. The lookup wins over the
+list's hint, the spec's rule, and a feed with no known medium files on the
+podcast side, the Shows feed's rule. Rows are on the community-row vocabulary
+(`.cs-row`), link to the page here or to BoostMeBitch when there is none (the
+podroll tiles' rule for a show we have no page for), and for the owner carry
+the Favorite heart, painted and handled by favorites-ui.js, so a list can be
+pruned from the page that shows it. A visitor to a member with an empty list
+sees no section; the owner sees a line inviting the first favorite, or one
+saying the list is private and the signer cannot open it.
+
+**The resolver is bounded on both sides.** The index side is one bound JSON
+array unrolled by `json_each` per table (the follows endpoint's pattern); the
+Podcast Index side is at most eight lookups per request through `piGet`'s
+timeout, byte cap and edge cache, first come. A long list of unknown feeds
+resolves over a few loads rather than one burst. An item is resolved as the
+PAIR: the same item guid under another feed is not this favorite. A guid
+nobody can name is absent from the answer and the row renders the guid,
+because it is still somebody's favorite.
+
 ## Relays
 
 Measured 2026-09-06 against Chad's own list (read-only): `relay.fountain.fm`
@@ -255,7 +283,7 @@ beyond the markup.
 1. ~~The relay reader~~ built 2026-09-08.
 2. ~~The writer~~ built 2026-09-08.
 3. ~~The heart~~ built 2026-09-08, show surfaces live, episode surfaces gated.
-4. The `#favorites` section on `/booster`.
+4. ~~The `#favorites` section~~ built 2026-09-08.
 5. The dropdown rows and the Public/Private prompt.
 6. Later, and the real reason to do it: the collector indexes public lists and
    "favorited by N members" becomes a show stat or chart component.
