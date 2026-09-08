@@ -2245,6 +2245,11 @@ surfaces; this site has never published a real list.**
   relay on raw sockets, never a pool's aggregate EOSE: trusted only when
   every reached relay answered and at least two did; newest wins; an
   untrusted read is `null`, which is not an empty list.
+- **⚠️ EVERY RELAY ANOTHER APP READS THAT ACCEPTS THE KIND IS IN
+  `PUBLISH_RELAYS`.** BMB believes the newest copy it hears within 1.5s of
+  the first; primal was in its read set and not in our publish set, and a
+  favorite made on `/show` did not reach BMB until re-made (Reed's first
+  live test, 2026-09-08). Primal is in both sets now.
 
 ## Not indexed: `podcast:person`
 

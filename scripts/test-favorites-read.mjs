@@ -245,8 +245,9 @@ await check('the timeout bounds a hung relay', async () => {
   assert.ok(took < 1000, `resolved in ${took}ms`)
 })
 
-await check('the default set is the four measured relays and none that refuse', () => {
-  assert.deepEqual([...R.READ_RELAYS], ['wss://nos.lol', 'wss://relay.damus.io', 'wss://relay.ditto.pub', 'wss://relay.mostr.pub'])
+await check('the default set is the measured relays, BMB\'s readable ones included, and none that refuse', () => {
+  assert.deepEqual([...R.READ_RELAYS], ['wss://nos.lol', 'wss://relay.damus.io', 'wss://relay.primal.net', 'wss://relay.ditto.pub', 'wss://relay.mostr.pub'])
+  for (const url of ['wss://relay.damus.io', 'wss://relay.primal.net', 'wss://nos.lol']) assert.ok(R.READ_RELAYS.includes(url), `${url}: a relay BMB reads`)
   assert.ok(!R.READ_RELAYS.includes('wss://relay.fountain.fm'))
 })
 

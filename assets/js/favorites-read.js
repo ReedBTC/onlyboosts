@@ -32,21 +32,27 @@
  * `connect` and `verify` are injectable so the test can script relays that
  * hang, refuse, forge and disagree; production takes the defaults.
  */
-import { verifyEvent } from '/assets/widgets/nostr-tools.js?v=ob-v198'
+import { verifyEvent } from '/assets/widgets/nostr-tools.js?v=ob-v199'
 
 export const FAVORITES_KIND = 10333
 export const RELAY_LIST_KIND = 10002
 
 /**
- * The relays read by default. Measured 2026-09-06 (see the header): the four
- * that held any copy of a real list. The writer unions the member's own
+ * The relays read by default: the four that held any copy of a real list on
+ * 2026-09-06, plus `relay.primal.net`, which held nothing that day and the
+ * CURRENT copy on 2026-09-08 (it accepts the kind; it had simply not been
+ * written to yet). Primal matters for a second reason: it is in BoostMeBitch's
+ * read set, and BMB takes the newest copy it hears within a short grace
+ * period after the first event, so a relay it reads that we never write is a
+ * stale copy that can win a race (Reed's test, 2026-09-08: a favorite made on
+ * /show did not reach BMB until re-made). The writer unions the member's own
  * NIP-65 write relays through `extraRelays`. Not `relay.fountain.fm`, which
- * refuses the kind, and not `relay.primal.net`, which held nothing though two
- * apps publish there.
+ * refuses the kind.
  */
 export const READ_RELAYS = Object.freeze([
   'wss://nos.lol',
   'wss://relay.damus.io',
+  'wss://relay.primal.net',
   'wss://relay.ditto.pub',
   'wss://relay.mostr.pub',
 ])

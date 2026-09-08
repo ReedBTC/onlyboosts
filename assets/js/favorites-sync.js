@@ -35,20 +35,30 @@
  * shipped cycle against scripted relays, a stand-in codec and a real key.
  * Nothing here is reached signed out; the bot cannot hold favorites.
  */
-import { readFavorites, readWriteRelays, relaySet, acceptsEvent } from '/assets/js/favorites-read.js?v=ob-v198'
+import { readFavorites, readWriteRelays, relaySet, acceptsEvent } from '/assets/js/favorites-read.js?v=ob-v199'
 import {
   KIND, plan, parse, parseTags, statedVisibility, decodePlaintext, kindOf, feedIdOf, feedGuidOf,
-} from '/assets/js/favorites-merge.js?v=ob-v198'
+} from '/assets/js/favorites-merge.js?v=ob-v199'
 
 /**
  * Where a list is published. The read set less relay.mostr.pub, which held a
  * three-day-stale copy on 2026-09-06 and mirrors rather than serves; the
  * member's own NIP-65 write relays are unioned in. Not relay.fountain.fm,
  * which refuses the kind.
+ *
+ * ⚠️ EVERY RELAY THE OTHER APPS READ AND THAT ACCEPTS THE KIND IS IN HERE.
+ * BoostMeBitch reads damus, primal, nos.lol and fountain (and the member's
+ * NIP-65 set) and believes the newest copy it hears within a short grace
+ * period; a relay in that set we do not write to is a stale copy waiting to
+ * win a race. Primal was missing until 2026-09-08 and a favorite made on
+ * /show did not reach BMB until it was re-made (Reed's test). StableKraft
+ * reads nos.lol, snort, primal, theforest and damus; snort and theforest
+ * held nothing on 2026-09-06 and are not yet known to accept the kind.
  */
 export const PUBLISH_RELAYS = Object.freeze([
   'wss://nos.lol',
   'wss://relay.damus.io',
+  'wss://relay.primal.net',
   'wss://relay.ditto.pub',
 ])
 

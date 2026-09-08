@@ -213,11 +213,22 @@ shipped module against scripted sockets; the live smoke on 2026-09-08 read
 Chad's list from five relays in under a second, with primal now holding the
 current copy too.
 
-**Publish** (step three) goes to nos.lol, damus and ditto plus the NIP-65
-write relays. A throwaway-key publish test is still owed before the writer
-ships. Chad's own hardcoded set (BMB's `DEFAULT_RELAYS`) includes fountain and
-primal and he reports it fine; the difference is that his apps have a local
+**Publish** (step three) goes to nos.lol, damus, primal and ditto plus the
+NIP-65 write relays. **Primal joined both sets on 2026-09-08, after Reed's
+first live test**: two shows favorited from the feed reached BoostMeBitch, a
+show favorited from `/show` did not until it was unfavorited and re-favorited.
+BMB reads damus, primal, nos.lol and fountain, takes the newest copy it hears,
+and stops listening 1.5 seconds after the first event arrives; primal held a
+copy we had never written to, so whenever primal answered first the stale copy
+won and our favorite was invisible there. The rule that falls out: **every
+relay another app reads that accepts the kind is in our publish set**, or a
+stale copy is waiting to win a race. Fountain refuses the kind and stays out.
+Chad's own set includes fountain and he reports it fine; his apps have a local
 library to fall back on and this site does not.
+
+The two shows favorited from the feed most likely won the same race by timing
+rather than by surface; nothing in the code differs between the two surfaces
+beyond the markup.
 
 ## Decisions Standing From The 2026-09-06 Session
 

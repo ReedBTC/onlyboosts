@@ -33,15 +33,15 @@
  * after which the list is re-read with NIP-44 and the hearts fill. That is a
  * known cost of not loading 1MB to draw an outline.
  */
-import { fetchFavorites, syncFavorites, widgetDeps, saveMode } from '/assets/js/favorites-sync.js?v=ob-v198'
-import { setFavoriteState, changeFor, keyFor } from '/assets/js/favorite-button.js?v=ob-v198'
-import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v198'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v198'
+import { fetchFavorites, syncFavorites, widgetDeps, saveMode } from '/assets/js/favorites-sync.js?v=ob-v199'
+import { setFavoriteState, changeFor, keyFor } from '/assets/js/favorite-button.js?v=ob-v199'
+import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v199'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v199'
 
 /** Flip to true when Chad confirms BMB and StableKraft read `["i", feed, item]`. */
 export const ITEMS_ALLOWED = false
 
-const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v198'
+const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v199'
 
 const state = {
   pubkey: null,

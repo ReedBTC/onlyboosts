@@ -363,8 +363,13 @@ await check('the baseline store: malformed is empty, the mode is only ever publi
   S.saveMode(store, pk, 'whatever'); assert.equal(S.loadMode(store, pk), null)
   assert.equal(S.loadMode(null, pk), null)
 })
-await check('the publish set is nos.lol, damus, ditto and nothing that refuses or mirrors', () => {
-  assert.deepEqual([...S.PUBLISH_RELAYS], ['wss://nos.lol', 'wss://relay.damus.io', 'wss://relay.ditto.pub'])
+await check('the publish set covers every relay BMB reads that accepts the kind, and nothing that refuses or mirrors', () => {
+  assert.deepEqual([...S.PUBLISH_RELAYS], ['wss://nos.lol', 'wss://relay.damus.io', 'wss://relay.primal.net', 'wss://relay.ditto.pub'])
+  // BMB's DEFAULT_RELAYS less fountain, which refuses kind 10333. A relay in
+  // BMB's read set that we never write is a stale copy waiting to win a race.
+  for (const url of ['wss://relay.damus.io', 'wss://relay.primal.net', 'wss://nos.lol']) assert.ok(S.PUBLISH_RELAYS.includes(url), url)
+  assert.ok(!S.PUBLISH_RELAYS.includes('wss://relay.fountain.fm'))
+  assert.ok(!S.PUBLISH_RELAYS.includes('wss://relay.mostr.pub'))
 })
 
 // ---- source scan
