@@ -125,7 +125,13 @@ export function initEpisodeSection({
 
   // ── Controls ───────────────────────────────────────────────────────
   function mountControls() {
-    ctrlSlot.append(
+    // Range and sort as one right-aligned group (.bs-knobs), the Boosts
+    // section's arrangement, so every band on the four pages reads the same
+    // (Reed, 2026-09-09, asked of the /booster Shows band; this band had the
+    // same left-hand range).
+    const knobs = document.createElement('div')
+    knobs.className = 'bs-knobs'
+    knobs.append(
       rangeControl(rangeKey, (key) => { if (key !== rangeKey) { rangeKey = key; onControlChange() } }, {
         // ⚠️ The range means BOOST TIME — the one reading, everywhere, since
         // 2026-08-31 (windowEpisodeItems in episode-card.js is the design
@@ -144,6 +150,7 @@ export function initEpisodeSection({
         title: sortTitle,
       }),
     )
+    ctrlSlot.append(knobs)
     ctrlSlot.hidden = false
   }
 
