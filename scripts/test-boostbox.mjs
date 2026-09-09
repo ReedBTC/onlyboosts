@@ -24,7 +24,7 @@
  */
 import assert from 'node:assert/strict'
 import { buildRecord, overRateLimit, onRequestPost, HELIPAD_READS } from '../functions/api/boostbox.js'
-import { buildLnurlComment, MAX_MESSAGE_CHARS } from '../login-widget/src/lib/externalBoostagram.js'
+import { buildLnurlComment, MAX_MESSAGE_BYTES } from '../login-widget/src/lib/externalBoostagram.js'
 
 let passed = 0
 async function ok(label, fn) {
@@ -107,8 +107,8 @@ await ok('a recipient taking no comment gets none', () => {
 })
 
 await ok('the message cap still applies inside the comment', () => {
-  const c = buildLnurlComment({ descriptorUrl: '', message: 'z'.repeat(MAX_MESSAGE_CHARS + 50), commentAllowed: 5000 })
-  assert.equal(c.length, MAX_MESSAGE_CHARS)
+  const c = buildLnurlComment({ descriptorUrl: '', message: 'z'.repeat(MAX_MESSAGE_BYTES + 50), commentAllowed: 5000 })
+  assert.equal(c.length, MAX_MESSAGE_BYTES)
 })
 
 console.log('\nThe record, and what a caller may not put in it:\n')

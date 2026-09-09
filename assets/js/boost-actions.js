@@ -19,8 +19,9 @@ import {
   getCachedProfile,
   setCachedProfile,
   registerEvent,
-} from '/assets/js/boosts-thread.js?v=ob-v207'
-import { nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v207'
+} from '/assets/js/boosts-thread.js?v=ob-v209'
+import { nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v209'
+import { attachMentionPicker } from '/assets/js/mention-picker.js?v=ob-v209'
 
 // ── Module state ─────────────────────────────────────────────────────
 const state = {
@@ -320,6 +321,9 @@ function toggleReplyComposer(parent, cardEl) {
   const ta = document.createElement('textarea')
   ta.placeholder = 'Reply on Nostr…'
   composer.appendChild(ta)
+  // `@` opens the people menu; the picker holds the labels' npubs and is
+  // what the send reads. ⚠️ NEVER `ta.value` — that is `@reed`, not the note.
+  const mentions = attachMentionPicker(ta)
 
   const actions = document.createElement('div')
   actions.className = 'rc-actions'
@@ -335,7 +339,7 @@ function toggleReplyComposer(parent, cardEl) {
   send.type = 'button'
   send.className = 'rc-send'
   send.textContent = 'Send Reply'
-  send.addEventListener('click', () => sendReply(parent, ta.value, send, composer))
+  send.addEventListener('click', () => sendReply(parent, mentions.expand(), send, composer, mentions.pubkeys()))
   actions.appendChild(send)
 
   composer.appendChild(actions)
@@ -343,7 +347,7 @@ function toggleReplyComposer(parent, cardEl) {
   ta.focus()
 }
 
-function buildReplyTags(parent) {
+function buildReplyTags(parent, mentionPubkeys = []) {
   const rootId = state.rootEvent?.id
   const tags = []
   // Root e-tag (NIP-10 marked). If parent IS the root, only emit the
@@ -363,13 +367,19 @@ function buildReplyTags(parent) {
     }
   }
   if (parent.pubkey && !seenP.has(parent.pubkey)) {
+    seenP.add(parent.pubkey)
     tags.push(['p', parent.pubkey])
+  }
+  // NIP-27: everyone the text mentions as `nostr:npub1…` is tagged, so their
+  // client can notify them. Same dedupe as the thread's own p tags.
+  for (const pk of mentionPubkeys) {
+    if (/^[0-9a-f]{64}$/i.test(pk) && !seenP.has(pk)) { seenP.add(pk); tags.push(['p', pk]) }
   }
   tags.push(['client', 'onlyboosts.social'])
   return tags
 }
 
-async function sendReply(parent, content, sendBtn, composer) {
+async function sendReply(parent, content, sendBtn, composer, mentionPubkeys = []) {
   const text = (content || '').trim()
   if (!text) return
   if (!ensureLoggedIn()) return
@@ -379,7 +389,7 @@ async function sendReply(parent, content, sendBtn, composer) {
     const signed = await window.LBLogin.signAndPublish({
       kind: 1,
       content: text,
-      tags: buildReplyTags(parent),
+      tags: buildReplyTags(parent, mentionPubkeys),
     })
     // Defence-in-depth: validate the widget actually returned a
     // well-formed signed event before we splice it into the thread
@@ -720,6 +730,11 @@ function buildZapModal(targetEvent, recipientProfile) {
   const msgInput = document.createElement('textarea')
   msgInput.placeholder = 'Onward and upward!'
   modal.appendChild(msgInput)
+  // The zap request's content is rendered by the recipient's client like any
+  // note, so it gets the same menu and the same `nostr:npub1…` expansion. It
+  // gets NO extra `p` tags: NIP-57 reads a zap request's single `p` as the
+  // recipient, and a second one is a malformed request to every validator.
+  const mentions = attachMentionPicker(msgInput)
 
   const submit = document.createElement('button')
   submit.type = 'button'
@@ -747,7 +762,7 @@ function buildZapModal(targetEvent, recipientProfile) {
         recipientPubkey: targetEvent.pubkey,
         targetEvent,
         amountSats: sats,
-        message: msgInput.value || '',
+        message: mentions.expand() || '',
         onStatus: (msg) => { status.textContent = msg },
       })
       if (result.paid) {

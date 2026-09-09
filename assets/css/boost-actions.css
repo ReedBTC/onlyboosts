@@ -521,3 +521,41 @@
   background: #1c2127;
   border: 1px solid #2e343b;
 }
+
+/* ── @mention menu (mention-picker.js) ───────────────────────────
+   One menu for the reply box, the zap message and the share modal's
+   text; the widget's boost modal draws its own on the same tokens.
+   The host wraps the composer's textarea so the menu can hang under
+   it at the field's own width; the textarea rules above still match
+   because the wrapper is outside their selectors' path. Card
+   surfaces, hairlines and one accent, in both themes. */
+.ob-mention-host { position: relative; }
+.ob-mention-host > textarea { display: block; }
+.ob-mention-menu {
+  position: absolute; left: 0; right: 0; top: 100%; margin-top: 4px;
+  z-index: 20; max-height: 17rem; overflow-y: auto;
+  background: var(--modal-bg, var(--white)); color: var(--ink, var(--text));
+  border: 1px solid var(--modal-line, var(--border)); border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(11,58,82,0.18);
+  padding: 0.25rem;
+}
+.ob-mention-menu[hidden] { display: none; }
+.ob-mention-row {
+  display: flex; align-items: center; gap: 0.6rem; width: 100%;
+  padding: 0.4rem 0.55rem; border: 0; border-radius: 6px;
+  background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.ob-mention-row.is-active { background: var(--tint, rgba(0,175,240,0.1)); }
+.ob-mention-pic {
+  flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%; object-fit: cover;
+  background: var(--cream-d, var(--border));
+}
+.ob-mention-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.ob-mention-name {
+  font-size: 0.9rem; font-weight: 600; color: var(--ink, var(--text));
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ob-mention-meta {
+  font-size: 0.74rem; color: var(--muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}

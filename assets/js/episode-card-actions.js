@@ -40,17 +40,17 @@
  * bundle having shrunk — measured, it grew by 12.3KB gzipped. See the header of
  * feeds-podcasts.js.
  */
-import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v207'
-import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v207'
-import { copyText, showToast, copyNpub } from '/assets/js/copy-npub.js?v=ob-v207'
-import { withBoostBusy } from '/assets/js/boost-button.js?v=ob-v207'
-import { wireArt2, blankTile, hydrateProfiles } from '/assets/js/detail-page.js?v=ob-v207'
+import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v209'
+import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v209'
+import { copyText, showToast, copyNpub } from '/assets/js/copy-npub.js?v=ob-v209'
+import { withBoostBusy } from '/assets/js/boost-button.js?v=ob-v209'
+import { wireArt2, blankTile, hydrateProfiles } from '/assets/js/detail-page.js?v=ob-v209'
 // The row renderer, for a drawer that fills on open. THE SAME FUNCTION the edge
 // and the inline card run, so a row fetched here is byte-identical to one that
 // shipped in the document. episode-card.js is already in the graph on every
 // surface this module runs on, so a static import costs nothing.
-import { boostRowsHtml, namesFrom } from '/assets/js/episode-card.js?v=ob-v207'
-import { normalizeBoosts, toEpisodeShape } from '/assets/js/ob-data.js?v=ob-v207'
+import { boostRowsHtml, namesFrom } from '/assets/js/episode-card.js?v=ob-v209'
+import { normalizeBoosts, toEpisodeShape } from '/assets/js/ob-data.js?v=ob-v209'
 
 const VALUE_API = '/api/value'   // Podcast Index value-block proxy (splits)
 
@@ -289,6 +289,9 @@ async function onBoostClick(card, btn) {
           // two pages cannot produce two different notes. It is absolute because
           // the string is read wherever the event is rendered.
           bmbUrl: d.boostUrl || '',
+          // The boostagram's `url` (bLIP-10: the RSS feed URL). Same source the
+          // value lookup above used, so the two cannot name different feeds.
+          feedUrl: feedUrl || '',
         },
         recipientsBundle: { recipients, totalWeight },
       })
@@ -462,7 +465,7 @@ function wireBoostMenu(row) {
 async function copyNevent(eventId, author) {
   let nevent = ''
   try {
-    const { nip19 } = await import('/assets/widgets/nostr-tools.js?v=ob-v207')
+    const { nip19 } = await import('/assets/widgets/nostr-tools.js?v=ob-v209')
     nevent = nip19.neventEncode({ id: eventId, author: author || undefined })
   } catch {}
   if (!nevent) { showToast('Could not build nevent', true); return }
@@ -490,7 +493,7 @@ async function copyNevent(eventId, author) {
 async function attachActionBars(details) {
   let actions
   try {
-    actions = await import('/assets/js/boost-actions.js?v=ob-v207')
+    actions = await import('/assets/js/boost-actions.js?v=ob-v209')
     // The signer. Without it the bar still renders and each button reports that
     // it needs a sign-in, which is the same behaviour every other surface has.
     await ensureLoginWidget()

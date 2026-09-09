@@ -12,7 +12,36 @@
  */
 
 const TLV_BOOSTAGRAM = 7629169  // Podcasting 2.0 TLV record for the boostagram JSON
-export const MAX_MESSAGE_CHARS = 200  // match Boost Me Bitch's message cap
+/**
+ * ⚠️ THE MESSAGE CAP IS 300 BYTES OF UTF-8, NOT 300 CHARACTERS. Reed's call,
+ * 2026-09-09, measured rather than inherited (it was 200, BMB's number).
+ *
+ * The only hard limit on a keysend boost is Lightning's 1,300-byte onion,
+ * shared between the route's hops and the final hop's custom records, and it
+ * counts bytes. A boostagram that does not fit is not truncated: the wallet
+ * cannot build the onion, or finds no route short enough, and the leg fails.
+ * Modelled over 800 indexed episodes with this builder's own output, a
+ * five-hop reserve, `url` as the feed URL and `boost_link` as the episode
+ * page: 300 bytes fits 98% of episodes at five hops and every one at four;
+ * 350 fits 84%; 400 fits 28%. The lnaddress path is bounded separately by
+ * each recipient's `commentAllowed` (Alby 255, Fountain 500), which
+ * buildLnurlComment already honours. *The Boostagram Message Cap* in
+ * docs/money-paths.md carries the measurement.
+ *
+ * `clipMessage` cuts on a character boundary, never inside a code point, so
+ * an emoji at the edge is dropped whole rather than left as a broken byte.
+ */
+export const MAX_MESSAGE_BYTES = 300
+const _enc = new TextEncoder()
+export function utf8Bytes(s) { return _enc.encode(String(s || '')).length }
+export function clipMessage(s, max = MAX_MESSAGE_BYTES) {
+  let out = String(s || '')
+  if (utf8Bytes(out) <= max) return out
+  const chars = Array.from(out)
+  let n = 0, i = 0
+  for (; i < chars.length; i++) { const b = utf8Bytes(chars[i]); if (n + b > max) break; n += b }
+  return chars.slice(0, i).join('')
+}
 // Rides in the TLV record, so it is what the recipient's Helipad (or any other
 // boostagram reader) shows as the sending app. Left as LB's on fork; every
 // boost sent before this was mislabelled to the podcaster.
@@ -110,13 +139,14 @@ export function randomPreimageHex() {
  * @param {string} [p.episodeTitle]
  * @param {string} [p.podcastGuid]
  * @param {string} [p.itemGuid]
- * @param {string} [p.url]         - the Boost Me Bitch episode URL
+ * @param {string} [p.feedUrl]     - the show's RSS feed URL → `url` (bLIP-10: "RSS feed URL of podcast")
+ * @param {string} [p.boostLink]   - the episode's page here, or Boost Me Bitch → `boost_link`
  * @param {string} [p.recipientName]
  * @param {string} [p.boostUuid]
  */
 export function buildBoostagram({
   legMsats, totalMsats, message, senderName, senderPubkey,
-  showTitle, episodeTitle, podcastGuid, itemGuid, url, recipientName, boostUuid,
+  showTitle, episodeTitle, podcastGuid, itemGuid, feedUrl, boostLink, recipientName, boostUuid,
 }) {
   const b = {
     action: 'boost',
@@ -126,14 +156,22 @@ export function buildBoostagram({
     ts: 0,
   }
   const msg = (message || '').trim()
-  if (msg) b.message = msg.slice(0, MAX_MESSAGE_CHARS)
+  if (msg) b.message = clipMessage(msg)
   if (senderName) b.sender_name = senderName
   if (senderPubkey) b.sender_id = senderPubkey
   if (showTitle) b.podcast = showTitle
   if (episodeTitle) b.episode = episodeTitle
   if (podcastGuid) b.guid = podcastGuid
   if (itemGuid) b.episode_guid = itemGuid
-  if (url) { b.url = url; b.boost_link = url }
+  // ⚠️ TWO FIELDS, TWO LINKS. Both carried the BMB episode URL until
+  // 2026-09-09, ~125 bytes twice over, in a payload whose ceiling is the onion.
+  // bLIP-10 defines `url` as the podcast's RSS feed URL and `boost_link` as
+  // the app's own link to the episode; Helipad reads neither by name (it keeps
+  // the raw TLV), so the feed URL costs about half what the duplicate did and
+  // the spec is met. `boostLink` is the note's own link: our /episode page for
+  // a titled episode, BMB for one without a page.
+  if (feedUrl) b.url = feedUrl
+  if (boostLink) b.boost_link = boostLink
   if (recipientName) b.name = recipientName
   if (boostUuid) b.uuid = boostUuid
   return b
@@ -180,6 +218,7 @@ export function toWeblnRecords(boostagram, recipient) {
  */
 export function buildExternalNoteTemplate({
   paidSats, legsPaid, legsTotal, message, senderName, showTitle, episodeTitle, podcastGuid, itemGuid, bmbUrl,
+  mentionPubkeys = [],
 }) {
   const sats = Number(paidSats) || 0
   const paid = Number(legsPaid) || 0
@@ -207,7 +246,7 @@ export function buildExternalNoteTemplate({
   // from the donor, and a "From" line on it would be the author naming
   // themselves in the third person.
   if (from) lines.push(`👤 From ${from}`)
-  if (msg) lines.push(`💬 "${msg.slice(0, MAX_MESSAGE_CHARS)}"`)
+  if (msg) lines.push(`💬 "${clipMessage(msg)}"`)
   lines.push('')
   lines.push(`🎙️ ${showEp}`)
   if (bmbUrl) lines.push(bmbUrl)
@@ -227,8 +266,29 @@ export function buildExternalNoteTemplate({
   if (podcastGuid) { tags.push(['i', `podcast:guid:${podcastGuid}`]); tags.push(['k', 'podcast:guid']) }
   if (itemGuid) { tags.push(['i', `podcast:item:guid:${itemGuid}`]); tags.push(['k', 'podcast:item:guid']) }
   tags.push(['amount', String(Math.round(sats * 1000))])
+  for (const t of mentionTags(mentionPubkeys)) tags.push(t)
 
   return { kind: 1, created_at: Math.floor(Date.now() / 1000), content: lines.join('\n'), tags }
+}
+
+/**
+ * NIP-27: a `p` tag for every person the message mentions as `nostr:npub1…`,
+ * so their client can notify them. ⚠️ THE DONOR ROUTE ONLY. The caller passes
+ * the list when the donor's own key signs, and nothing when the site's bot
+ * does: `functions/api/sign-boost.js` refuses `p` outright, because a note
+ * that mentions strangers under an identity carrying our NIP-05 is the
+ * harassment vehicle its allowlist exists to close. The mention still rides
+ * in the text on that route and renders as one; it just notifies nobody.
+ * The default is empty so the oracle's test, fed by this builder, sees the
+ * shape it validates.
+ */
+function mentionTags(pubkeys) {
+  const out = []
+  for (const pk of Array.isArray(pubkeys) ? pubkeys : []) {
+    const hex = String(pk || '').toLowerCase()
+    if (/^[0-9a-f]{64}$/.test(hex) && !out.some((t) => t[1] === hex)) out.push(['p', hex])
+  }
+  return out
 }
 
 /**
@@ -264,7 +324,7 @@ export function buildExternalNoteTemplate({
  * three things this note must not have — so a donation cannot be signed by the
  * bot through the boost path. See `validateDonationTemplate` there.
  */
-export function buildDonationNoteTemplate({ paidSats, message, senderName }) {
+export function buildDonationNoteTemplate({ paidSats, message, senderName, mentionPubkeys = [] }) {
   const sats = Number(paidSats) || 0
   const msg = (message || '').trim()
   const from = sanitizeSenderName(senderName)
@@ -276,7 +336,7 @@ export function buildDonationNoteTemplate({ paidSats, message, senderName }) {
   // claim. Only the bot path passes a name; a donor-signed note is already
   // from the donor.
   if (from) lines.push(`👤 From ${from}`)
-  if (msg) lines.push(`💬 "${msg.slice(0, MAX_MESSAGE_CHARS)}"`)
+  if (msg) lines.push(`💬 "${clipMessage(msg)}"`)
   lines.push('')
   lines.push(DONATION_URL)
 
@@ -290,6 +350,7 @@ export function buildDonationNoteTemplate({ paidSats, message, senderName }) {
     ['client', 'onlyboosts.social'],
     ['r', DONATION_URL],
   ]
+  for (const t of mentionTags(mentionPubkeys)) tags.push(t)   // donor route only; see mentionTags
 
   return { kind: 1, created_at: Math.floor(Date.now() / 1000), content: lines.join('\n'), tags }
 }
@@ -338,7 +399,7 @@ export function donationHeadline(sats) {
 export function buildLnurlComment({ descriptorUrl, message, commentAllowed }) {
   const allowed = Number(commentAllowed) || 0
   if (allowed <= 0) return ''
-  const msg = (message || '').trim().slice(0, MAX_MESSAGE_CHARS)
+  const msg = clipMessage((message || '').trim())
   const url = (descriptorUrl || '').trim()
   if (!url) return msg.slice(0, allowed)
 

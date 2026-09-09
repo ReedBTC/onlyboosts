@@ -28,6 +28,7 @@ there rather than restating the argument:
 | The test scripts, one row each | `docs/tests.md` |
 | Show artwork and the share cards' images | `docs/show-artwork.md` |
 | The relay sets and their measurements | `docs/relay-sets.md` |
+| @mentions in the four composers | `docs/mentions.md` |
 
 Deleted reasoning is recoverable: `git log -S <symbol> -- CLAUDE.md` finds the
 paragraph that used to explain any name in here.
@@ -437,7 +438,7 @@ node scripts/stamp-assets.js --check   # verify; non-zero exit if anything is st
 **Order matters.** `sync-partials` injects markup into the page files; anything
 it injects has to be stamped afterwards.
 
-Twenty-nine test scripts, all plain `node scripts/<name>.mjs` with no runner.
+Thirty test scripts, all plain `node scripts/<name>.mjs` with no runner.
 **`docs/tests.md` is the per-test reference** — one row each, saying what it
 covers and what it was confirmed red against. What follows here is only what a
 change elsewhere would break.
@@ -447,7 +448,7 @@ THAT GOES UNRUN.** Its header carries the `curl` that produces the capture; take
 a fresh one rather than reusing an old file, since it is also the size
 measurement. It asserted `cards are numbered 1..N with no gaps` — the *ordinal*
 scheme's invariant — until competition ranking shipped on 2026-08-18, and it
-would have been merged red had it not been run. **Run all twenty-nine before a
+would have been merged red had it not been run. **Run all thirty before a
 merge**, and treat this one as the guard on the ranking scheme rather than only
 on weight. *(That number has been wrong before — it lagged from twelve to twenty-eight, a
 test at a time, while the table beside it grew. `git log -S "before a\nmerge" -- CLAUDE.md` has every value it has held. **Bump it and `docs/tests.md`
@@ -1024,6 +1025,7 @@ sections, so you know when to open it:
 | The Site Signs For A Booster Who Has No Key | `/api/sign-boost`, the allowlist validator, why proof-of-payment was rejected |
 | The one boost button | `boost-button.js` is chrome, not a money path; six surfaces, six handlers |
 | The Boost Is Indexed At The Edge Before The Collector Sees It | `/api/v1/boosts/ingest`, the site's own boosts on the feeds in seconds; why the edge's row is provisional and what the collector owes `boosts_edge` |
+| The Boostagram Message Cap | 300 bytes, measured against the 1,300-byte onion over 800 episodes; why `url` became the feed URL and `boost_link` the page; the lnaddress side's `commentAllowed` sample |
 | The Feed URL Resolves Before The Guid | `/api/value` and `/api/catalogue` resolve the stored feed URL before the guid, because Podcast Index's one-feed-per-guid answer can be a dead record with a year-old value block |
 
 Five rules from it that a change elsewhere would break, so they are restated here:
@@ -1054,6 +1056,39 @@ Five rules from it that a change elsewhere would break, so they are restated her
   `SITE_SIGN_MAX_SATS` restates `MAX_AMOUNT_MSAT`; `scripts/test-sign-boost.mjs`
   enforces the equality, and the validator is fed by the **shipped** note builder
   so a new tag fails the test rather than production.
+
+## @Mentions: `mention-search.js`
+
+**`docs/mentions.md` is the authority.** Type `@` and a name in any of the
+four composers (the boost modal's message, the reply box, the zap message,
+the share modal's text) and a menu of people from Primal's cache opens,
+**most followed first**; a pick inserts `@label`. Built 2026-09-09, Reed's
+ask, on mynostr's shape. What a change elsewhere would break:
+
+- **⚠️ THE NOTE CARRIES `nostr:npub1…`, NEVER `@npub1…` AND NEVER THE LABEL.**
+  Reed's rule: the NIP-27 form is what Helipad and every client render as a
+  mention. The field holds `@reed`; the composer's map (`createMentionMap`)
+  holds the pubkey; **`expand()` is the note**. Every publish reads the picker
+  (`mentions.expand()`, or `expandedMessage` in the boost modal) and never the
+  field's value — a note that ships the label publishes fine and mentions
+  nobody. `test-mentions.mjs` holds each call site by text scan.
+- **⚠️ THE BOT ROUTE CARRIES NO `p` TAG, AND THE ORACLE REFUSES ONE.** The
+  note builders take `mentionPubkeys` as an opt-in defaulting to empty; the
+  boost modal passes it on the donor route alone. A zap request gets none
+  either (NIP-57 reads its one `p` as the recipient). Replies and shares tag
+  every mentioned pubkey.
+- **⚠️ THE MESSAGE CAP IS 300 BYTES OF UTF-8, MEASURED ON THE EXPANDED
+  MESSAGE** (`MAX_MESSAGE_BYTES` / `clipMessage`; it was 200 characters, BMB's
+  number, until 2026-09-09). An npub is 69 bytes and an emoji four; the boost
+  modal's counter and its `onChange` guard read the expansion in bytes, and
+  `maxLength` came off the textarea. **The boostagram's `url` is the feed URL
+  and `boost_link` the episode page**, which is what made 300 fit; see *The
+  Boostagram Message Cap* in `docs/money-paths.md` for the measurement.
+- **⚠️ `mention-search.js` IMPORTS NOTHING.** The widget inlines it by
+  relative path (`../../../assets/js/`) and the site loads it stamped; a
+  `./sibling.js?v=` import is read differently by Vite and the stamper.
+  The bech32 codec is written out there for that reason, checked against
+  nostr-tools in the test.
 
 ## Bot conventions
 

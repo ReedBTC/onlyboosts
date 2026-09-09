@@ -112,7 +112,7 @@
         return
       }
       var s = document.createElement('script')
-      s.src = '/assets/widgets/login-widget.js?v=ob-v207'
+      s.src = '/assets/widgets/login-widget.js?v=ob-v209'
       s.async = true
       s.onload = function () { Promise.resolve().then(resolve) }
       s.onerror = function () { window.__lbWidgetLoad = null; reject(new Error('widget load failed')) }
@@ -134,5 +134,5 @@
   // controller (assets/js/favorites-ui.js), and the menu is on every page, so
   // the controller is too. A dynamic import so a page with no hearts pays for
   // the module and no relay read; the stamper rewrites this URL like any other.
-  try { import('/assets/js/favorites-ui.js?v=ob-v207').catch(function () {}) } catch (e) {}
+  try { import('/assets/js/favorites-ui.js?v=ob-v209').catch(function () {}) } catch (e) {}
 })()

@@ -1040,6 +1040,61 @@ edge-rendered pages, 30s on `/api/v1`), which is a reload away.
 `scripts/test-boost-ingest.mjs` covers the endpoint end to end, on the
 members-search pattern.
 
+### The Boostagram Message Cap
+
+**300 bytes of UTF-8, since 2026-09-09.** Reed's call, after the number was
+measured rather than inherited: it had been 200 characters, BoostMeBitch's
+cap, from the day the external boost shipped. `MAX_MESSAGE_BYTES` and
+`clipMessage` in `externalBoostagram.js` are the one definition; the modal's
+counter, its edit guard and every builder read them.
+
+**The keysend path has one hard limit and it counts bytes.** Lightning's
+onion is 1,300 bytes shared between the route's hop records and the final
+hop's custom records (BOLT 4). bLIP-10 sets no limit of its own, and Helipad
+truncates nothing. A boostagram that does not fit is not cut: the wallet
+cannot build the onion, or the pathfinder finds no route short enough, and
+the leg fails. So the cap is about routability, and the question is how much
+of the 1,300 our own JSON spends before the message.
+
+**Measured over 800 indexed episodes** (400 podcast, 400 music), building the
+boostagram this site actually sends for a signed-in donor and reserving 55
+bytes per intermediate hop and 97 for the final hop's fixed records:
+
+| `url` / `boost_link` | JSON without message (median) | Headroom at 5 hops, worst / p5 / median | 300 fits | 350 | 400 |
+|---|---|---|---|---|---|
+| BMB link in both (until 2026-09-09) | 687 | −59 / 216 / 283 | 21% | 1% | 0% |
+| feed URL / episode page here | 592 | 131 / 318 / 380 | 98% | 84% | 28% |
+| feed URL / BMB link (an episode with no page) | 637 | 86 / 273 / 335 | 86% | 32% | 1% |
+
+At four hops or fewer, 300 fits every episode in the index on the page link.
+The bottom of every column is an episode whose item guid is a full URL (9%
+contain a slash), which lands in `episode_guid` and again in the link; no
+link choice reaches those, only a per-boost budget would.
+
+**Why the two link fields changed with it.** Both carried the BMB episode
+URL, ~125 bytes twice. bLIP-10 defines `url` as the podcast's RSS feed URL
+and `boost_link` as the app's own episode link, and Helipad (`RawBoost` in
+`src/boost.rs`, checked at commit 2cdca7d) reads neither by name, keeping
+them only in the raw TLV it shows in a boost's detail panel. The feed URL
+(median 65 bytes, present for every show in the index) now rides `url`, and
+`boost_link` is the note's own link: `/episode/<guid>` for a titled episode,
+BMB for one without a page, which is what `episodeBoostLink` already chose
+for the note. Every boost surface passes `feedUrl` beside `bmbUrl`.
+
+**The lnaddress path is bounded per recipient and needs nothing.** LUD-12's
+`commentAllowed`, sampled over the 82 distinct Lightning addresses in the top
+233 value blocks (all answered): Alby 255 (68% of lnaddress legs), Fountain
+500 (27%), Primal and Strike 200, Minibits 100, Blitz 150. The BoostBox
+descriptor is 72 characters and takes precedence when it fits whole, so an
+Alby leg that stays on LNURL carries 182 of the message and a Fountain leg
+427; `buildLnurlComment` already does exactly that.
+
+**Bytes, not characters, and cut on a boundary.** The corpus runs 1.25 bytes
+per character at p95 and 3 at the max; an emoji is four bytes and a mention
+is 69. `clipMessage` drops a character that would straddle the edge rather
+than leaving a broken byte, and the modal's counter shows the byte count.
+`scripts/test-mentions.mjs` pins all of it.
+
 ### The Feed URL Resolves Before The Guid
 
 *2026-09-06, found on Stacker News Live.* Podcast Index keeps one feed per

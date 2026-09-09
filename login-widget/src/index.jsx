@@ -731,7 +731,9 @@ const api = {
    * by design. See the warning there before adding one.
    *
    * @param {object} args
-   * @param {object} args.episode          - { showTitle, episodeTitle, podcastGuid, itemGuid, bmbUrl }
+   * @param {object} args.episode          - { showTitle, episodeTitle, podcastGuid, itemGuid, bmbUrl, feedUrl }
+   *   `bmbUrl` is the note's link and the boostagram's `boost_link`; `feedUrl`
+   *   is the show's RSS URL and becomes the boostagram's `url` (bLIP-10).
    * @param {object} args.recipientsBundle - { recipients, totalWeight }
    */
   async openExternalBoost({ episode, recipientsBundle, donation = false }) {

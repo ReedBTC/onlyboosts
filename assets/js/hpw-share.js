@@ -48,11 +48,12 @@
  * while a week's card is not rendered yet (X-OB-Image: fallback); that is
  * refused with a note rather than uploaded as "the board".
  */
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v207'
-import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v207'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v209'
+import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v209'
+import { attachMentionPicker } from '/assets/js/mention-picker.js?v=ob-v209'
 
 const SITE = 'https://onlyboosts.social'
-const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v207'
+const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v209'
 /* The box-with-arrow share glyph (the iOS / most-websites one), inline so it
  * scales with the button and takes currentColor in either theme. Reed's call,
  * 2026-08-29: the icon rather than the word. */
@@ -77,7 +78,7 @@ export function noteContent(message, imageUrl, link) {
   return [text, imageUrl, link].filter(Boolean).join('\n\n')
 }
 
-export function buildShareTags({ link, imageUrl, sha256, title, tag = '40hpw', alt = null }) {
+export function buildShareTags({ link, imageUrl, sha256, title, tag = '40hpw', alt = null, mentionPubkeys = [] }) {
   const imeta = [`url ${imageUrl}`, 'm image/png']
   if (sha256) imeta.push(`x ${sha256}`)
   imeta.push(`alt ${alt || `Nostr Gang #40HPW leaderboard, ${title}`}`)
@@ -88,6 +89,8 @@ export function buildShareTags({ link, imageUrl, sha256, title, tag = '40hpw', a
     // out before fetching it.
     ['imeta', ...imeta],
     ['client', 'onlyboosts.social'],
+    // NIP-27: a `p` tag for each person the text mentions as `nostr:npub1…`.
+    ...mentionPubkeys.filter((pk) => /^[0-9a-f]{64}$/i.test(pk)).map((pk) => ['p', pk.toLowerCase()]),
   ]
 }
 
@@ -122,6 +125,7 @@ export function mountShare(boardEl, { key, title, isLive = false, image = null, 
 
 let modal = null
 let session = null   // the open share, so a second press or a login lands on it
+let mentions = null  // the text's @mention picker; `expand()` is what is published
 
 function buildModal() {
   const el = document.createElement('div')
@@ -147,6 +151,10 @@ function buildModal() {
       `</div>` +
     `</div>`
   document.body.appendChild(el)
+  // `@` in the text opens the people menu. The map it builds lives for the
+  // life of the modal; a label picked for one share still expands on the next,
+  // which is harmless since the field is emptied on open.
+  mentions = attachMentionPicker(el.querySelector('[data-text]'))
   for (const c of el.querySelectorAll('[data-close]')) c.addEventListener('click', closeShareModal)
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !el.hidden) closeShareModal() })
   el.querySelector('[data-download]').addEventListener('click', () => session && download(session))
@@ -299,10 +307,13 @@ async function publish(s) {
   const was = btn.textContent
   btn.textContent = 'Publishing…'
   try {
-    const content = noteContent(q('[data-text]').value, s.blossomUrl, s.link)
+    // ⚠️ THE PICKER, NOT THE FIELD: the field holds `@reed`, the note needs
+    // `nostr:npub1…` (Reed's rule; it is what Helipad and every client render).
+    const text = mentions ? mentions.expand() : q('[data-text]').value
+    const content = noteContent(text, s.blossomUrl, s.link)
     const signed = await window.LBLogin.signAndPublish({
       kind: 1, content,
-      tags: buildShareTags({ link: s.link, imageUrl: s.blossomUrl, sha256: s.sha256, title: s.title, tag: s.tag, alt: s.alt }),
+      tags: buildShareTags({ link: s.link, imageUrl: s.blossomUrl, sha256: s.sha256, title: s.title, tag: s.tag, alt: s.alt, mentionPubkeys: mentions ? mentions.pubkeys() : [] }),
     })
     if (!signed || signed.kind !== 1 || typeof signed.sig !== 'string') throw new Error('widget returned no signed event')
     closeShareModal()

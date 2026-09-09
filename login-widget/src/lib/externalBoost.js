@@ -55,7 +55,7 @@ import {
   toTlvHex,
   toWeblnRecords,
   randomPreimageHex,
-  MAX_MESSAGE_CHARS,
+  MAX_MESSAGE_BYTES,
 } from './externalBoostagram.js'
 import { confirmViaWallet, keysendPaymentHash } from './paymentLookup.js'
 

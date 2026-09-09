@@ -39,13 +39,13 @@
  * leg shape / skipped legs / keysend-uncertain retry rules stay independent.
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { lockBodyScroll, unlockBodyScroll } from '../lib/scrollLock.js'
 import { useModalTransition } from '../lib/useModalTransition.js'
 import { isSafeUrl } from '../lib/utils.js'
 import * as wallet from '../lib/wallet.js'
 import { payExternalBoost, distributeSats, STATUS, confirmLegSettled, legIsCheckable } from '../lib/externalBoost.js'
-import { buildExternalNoteTemplate, buildDonationNoteTemplate, sanitizeSenderName, MAX_MESSAGE_CHARS, MAX_SENDER_NAME_CHARS } from '../lib/externalBoostagram.js'
+import { buildExternalNoteTemplate, buildDonationNoteTemplate, sanitizeSenderName, MAX_MESSAGE_BYTES, utf8Bytes, MAX_SENDER_NAME_CHARS } from '../lib/externalBoostagram.js'
 import { signKindOneShareWithUser, publishSignedKindOne, fetchLnurlMeta } from '../lib/boostagram.js'
 import { signKindOneWithSite } from '../lib/siteSign.js'
 import { ingestBoostNote } from '../lib/siteIngest.js'
@@ -53,6 +53,8 @@ import { setBoostModalProgressVisible } from '../lib/boostModalSignal.js'
 import { fireConfetti } from '../lib/confetti.js'
 import ConfirmLeaveOverlay from './ConfirmLeaveOverlay.jsx'
 import LoginButton from './LoginButton.jsx'
+import MentionAutocomplete from './MentionAutocomplete.jsx'
+import { createMentionMap, insertMention, mentionedPubkeys } from '../../../assets/js/mention-search.js'
 
 // ⚠️ WHAT A BOOST IS "FROM" WHEN NOBODY TYPED ANYTHING. It fills the
 // boostagram's `sender_name` only — the field a podcaster's Helipad prints —
@@ -297,6 +299,52 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
 
   const [amount, setAmount] = useState('')
   const [message, setMessage] = useState('')
+  /**
+   * @mentions. The field shows `@reed`; the note and the boostagram carry
+   * `nostr:npub1…` (Reed's rule, 2026-09-09: the NIP-27 form is what Helipad
+   * and every client render as a mention). `mentionMap` holds the labels
+   * picked from the menu and `expandedMessage` is the only form of the
+   * message anything below this line reads — the TLV, the note template, the
+   * counter. ⚠️ THE CAP IS MEASURED ON THE EXPANDED TEXT, IN BYTES: 300 bytes
+   * is what the onion leaves for a message (MAX_MESSAGE_BYTES carries the
+   * measurement), an npub is 69 of them and an emoji four, so the field's
+   * own character count is not the number that matters. `onChange` refuses an edit whose
+   * expansion would not fit and a pick that would not fit is declined with a
+   * line under the field, since a mention cut mid-npub names nobody.
+   */
+  const mentionMapRef = useRef(null)
+  if (!mentionMapRef.current) mentionMapRef.current = createMentionMap()
+  const messageRef = useRef(null)
+  const [caret, setCaret] = useState(0)
+  const [mentionNotice, setMentionNotice] = useState('')
+  const expandedMessage = useMemo(() => mentionMapRef.current.expand(message).trim(), [message])
+  const messageBytes = useMemo(() => utf8Bytes(expandedMessage), [expandedMessage])
+  const mentionPubkeys = useMemo(() => mentionedPubkeys(expandedMessage), [expandedMessage])
+  function onMessageChange(e) {
+    const next = e.target.value
+    setCaret(e.target.selectionStart)
+    if (next.length < message.length || utf8Bytes(mentionMapRef.current.expand(next).trim()) <= MAX_MESSAGE_BYTES) {
+      setMessage(next)
+      setMentionNotice('')
+    }
+  }
+  const onMentionPick = useCallback((profile, range) => {
+    const map = mentionMapRef.current
+    const label = map.label(profile)
+    const { text, caret: nextCaret } = insertMention(message, range, label)
+    if (utf8Bytes(map.expand(text).trim()) > MAX_MESSAGE_BYTES) {
+      // `nostr:` + a 63-character npub, which is what the wire carries.
+      setMentionNotice(`No room for @${label}: a mention takes 69 of the ${MAX_MESSAGE_BYTES}.`)
+      return
+    }
+    setMessage(text)
+    setCaret(nextCaret)
+    setMentionNotice('')
+    requestAnimationFrame(() => {
+      const ta = messageRef.current
+      if (ta) { ta.focus(); ta.setSelectionRange(nextCaret, nextCaret) }
+    })
+  }, [message])
   const [anonymous, setAnonymous] = useState(false)
   // The signed-out identity route: a name, or nothing. Held raw so the field
   // behaves like a field; every read of it goes through `typedName`.
@@ -592,8 +640,8 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
    */
   function noteTemplate(args) {
     if (donation) {
-      const { paidSats, message: msg, senderName } = args
-      return buildDonationNoteTemplate({ paidSats, message: msg, senderName })
+      const { paidSats, message: msg, senderName, mentionPubkeys: mentioned } = args
+      return buildDonationNoteTemplate({ paidSats, message: msg, senderName, mentionPubkeys: mentioned })
     }
     return buildExternalNoteTemplate(args)
   }
@@ -627,7 +675,10 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
         paidSats,
         legsPaid: paidCount,
         legsTotal: activeCount,
-        message: message.trim(),
+        message: expandedMessage,
+        // ⚠️ DONOR ROUTE ONLY. The oracle refuses `p` (see mentionTags in
+        // externalBoostagram.js); on the bot route the mention is text alone.
+        mentionPubkeys: noteRoute === 'donor' ? mentionPubkeys : [],
         // ⚠️ BOT ROUTE ONLY, and it is a line of prose rather than any kind of
         // claim (D15). A donor-signed note is already from the donor, so a
         // "From" line on it would be the author naming themselves in the third
@@ -827,7 +878,8 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
         // nothing fell short, so it must carry no shortfall line.
         legsPaid: projected,
         legsTotal: projected,
-        message: message.trim(),
+        message: expandedMessage,
+        mentionPubkeys,   // presign runs on the donor route alone
         senderName: '',
         showTitle: episode?.showTitle,
         episodeTitle: episode?.episodeTitle,
@@ -864,7 +916,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
         recipients,
         totalWeight,
         totalSats: sats,
-        message: message.trim(),
+        message: expandedMessage,
         senderName: wireSenderName,
         senderPubkey: wireSenderPubkey,
         meta: {
@@ -872,7 +924,8 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
           episodeTitle: episode?.episodeTitle,
           podcastGuid: episode?.podcastGuid,
           itemGuid: episode?.itemGuid,
-          url: episode?.bmbUrl,
+          feedUrl: episode?.feedUrl,
+          boostLink: episode?.bmbUrl,
         },
         // ⚠️ A DONATION SKIPS THE BOOSTBOX DESCRIPTOR. That descriptor exists so
         // a PODCASTER's Helipad can resolve who boosted them and for what; on a
@@ -925,12 +978,12 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
         recipients: [recipient],
         totalWeight: recipient.splitWeight || 1,
         totalSats: leg.sats || 0,
-        message: message.trim(),
+        message: expandedMessage,
         senderName: wireSenderName,
         senderPubkey: wireSenderPubkey,
         meta: {
           showTitle: episode?.showTitle, episodeTitle: episode?.episodeTitle,
-          podcastGuid: episode?.podcastGuid, itemGuid: episode?.itemGuid, url: episode?.bmbUrl,
+          podcastGuid: episode?.podcastGuid, itemGuid: episode?.itemGuid, feedUrl: episode?.feedUrl, boostLink: episode?.bmbUrl,
         },
         donation,
         // A leg that failed at the LNURL step has a null cache entry, so a
@@ -1163,10 +1216,22 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
 
                 <div>
                   <label className="block text-xs text-[var(--muted,#5a7488)] mb-1.5">Message (optional)</label>
-                  <textarea value={message} onChange={(e) => setMessage(e.target.value.slice(0, MAX_MESSAGE_CHARS))} rows={3} maxLength={MAX_MESSAGE_CHARS}
-                    className="w-full bg-[var(--modal-field,#ffffff)] border border-[var(--modal-line,#b9d4e6)] rounded-lg px-3 py-2 text-sm text-[var(--ink,#0f2733)] focus:outline-none focus:border-[var(--brand,#00aff0)] focus:ring-2 focus:ring-[var(--brand-ring,rgba(0,175,240,0.32))] resize-none leading-relaxed"
-                    placeholder="Say something to the show (rides along with the boost)" />
-                  <p className="mt-1 text-[10px] text-[var(--muted,#5a7488)] text-right">{message.length}/{MAX_MESSAGE_CHARS}</p>
+                  {/* `relative` is the menu's anchor. The counter reads the
+                      EXPANDED length: it is the boostagram's own figure, and
+                      `@reed` in the field is 63 characters longer on the wire. */}
+                  <div className="relative">
+                    <textarea ref={messageRef} value={message} onChange={onMessageChange}
+                      onClick={(e) => setCaret(e.target.selectionStart)}
+                      onKeyUp={(e) => { if (/^Arrow|^Home$|^End$/.test(e.key)) setCaret(e.target.selectionStart) }}
+                      rows={3}
+                      className="w-full bg-[var(--modal-field,#ffffff)] border border-[var(--modal-line,#b9d4e6)] rounded-lg px-3 py-2 text-sm text-[var(--ink,#0f2733)] focus:outline-none focus:border-[var(--brand,#00aff0)] focus:ring-2 focus:ring-[var(--brand-ring,rgba(0,175,240,0.32))] resize-none leading-relaxed"
+                      placeholder="Say something to the show (rides along with the boost). Type @ to mention someone." />
+                    <MentionAutocomplete textareaRef={messageRef} value={message} caret={caret} onPick={onMentionPick} />
+                  </div>
+                  <div className="mt-1 flex items-baseline justify-between gap-3">
+                    <p className="text-[10px] text-[var(--muted,#5a7488)] leading-snug" aria-live="polite">{mentionNotice}</p>
+                    <p className="text-[10px] text-[var(--muted,#5a7488)] text-right shrink-0">{messageBytes}/{MAX_MESSAGE_BYTES}</p>
+                  </div>
                 </div>
 
                 {/* ⚠️ THE LABEL CARRIES ITS OWN SCOPE, and a bare "Boost
