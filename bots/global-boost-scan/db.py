@@ -267,6 +267,27 @@ ENRICH_RETRY_COOLDOWN = 7 * 24 * 60 * 60
 PROFILE_MAX_AGE = 30 * 24 * 60 * 60
 PROFILE_BATCH = 100
 
+# ⚠️ A BOOSTER'S FIRST-EVER PROFILE MISS GETS A SHORT COOLDOWN, NOT
+# ENRICH_RETRY_COOLDOWN, AND THE RACE IS WHY. The incremental tick runs every 2
+# minutes, so a first boost is typically looked up within a minute of arriving —
+# before a brand-new account has published its kind-0 at all. Measured
+# 2026-09-11: Boostr_Bot's first boost landed at 01:15:15, the profile pass ran
+# at 01:15:59, and the account published its kind-0 at 01:22:49, seven minutes
+# later. The flat 7-day cooldown then held that member as a bare npub on every
+# surface until 2026-09-15. The fast tick is what created the race; a slower one
+# would have missed it.
+#
+# It costs nothing. A profile fetch is ONE REQ per relay carrying up to
+# PROFILE_BATCH authors, so a handful of re-queried new pubkeys ride in a batch
+# already being sent — the cap only binds above 100, and new boosters run ~1.4 a
+# day. And it is scoped to the window deliberately: of the 99 boosters with no
+# profile row on 2026-09-11, NONE was a race (median lag from first boost to the
+# failed attempt: 594 days), and 77 have no kind-0 on any of 15 relays tested.
+# Those keep the 7-day cooldown, so nothing hammers a relay for a profile that
+# does not exist.
+PROFILE_NEW_WINDOW = 7 * 24 * 60 * 60
+PROFILE_NEW_RETRY = 30 * 60
+
 # How long a stored episode's metadata is trusted before it is re-read.
 #
 # ⚠️ TWO WINDOWS, BECAUSE FRESHNESS IS WORTH MORE ON A RECENT EPISODE. A monthly
@@ -924,6 +945,8 @@ def upsert_profile(conn, pubkey, prof):
 
 # ── work queues for the enrichment pass ───────────────────────────────────────
 # Each excludes ids that failed enrichment within the cooldown (see enrich_failed).
+# The profile queue is the one exception: a booster inside PROFILE_NEW_WINDOW gets
+# the much shorter PROFILE_NEW_RETRY instead — see `_profile_cooldown_clause`.
 def _cutoff():
     return int(time.time()) - ENRICH_RETRY_COOLDOWN
 
@@ -1050,6 +1073,25 @@ def episode_refresh_backlog(conn):
         (*_episode_stale_binds(), _cutoff())).fetchone()
 
 
+def _profile_cooldown_clause():
+    """The retry gate for a kind-0 fetch, as a HAVING fragment plus its binds.
+
+    Two cooldowns, selected by how old the booster's FIRST boost is — see
+    PROFILE_NEW_RETRY. It has to be HAVING rather than WHERE: the window is a
+    property of the booster (MIN over their boosts), not of the boost row the
+    join is standing on.
+
+    COALESCE(f.last_try, 0) is what lets a never-failed pubkey through — 0 is
+    below every cutoff — so this replaces the old `f.id IS NULL OR ...` pair
+    rather than sitting beside it.
+    """
+    now = int(time.time())
+    return ("""MIN(COALESCE(f.last_try, 0)) <
+                 CASE WHEN MIN(b.created_at) >= ? THEN ? ELSE ? END""",
+            [now - PROFILE_NEW_WINDOW, now - PROFILE_NEW_RETRY,
+             now - ENRICH_RETRY_COOLDOWN])
+
+
 def pubkeys_needing_profile(conn, limit=PROFILE_BATCH, max_age=PROFILE_MAX_AGE):
     """Pubkeys to fetch a kind-0 for: the ones we have never resolved, then the
     ones whose stored profile has gone stale.
@@ -1068,6 +1110,9 @@ def pubkeys_needing_profile(conn, limit=PROFILE_BATCH, max_age=PROFILE_MAX_AGE):
     - **New pubkeys sort first.** A refresh makes an existing page better; a new
       fetch is what makes a page render at all. Under the cap, refreshes are
       what gets starved.
+    - **A first-week booster's miss is retried in 30 minutes, not 7 days.** The
+      2-minute tick looks for a kind-0 before a brand-new account has published
+      one; see PROFILE_NEW_RETRY and `_profile_cooldown_clause`.
     - **The cap is per-tick, and it is sized on the RELAY budget, not the row
       count.** `resolve_profiles` queries PROFILE_RELAYS serially at up to 30s
       of wall each per batch of 100, and the incremental timer fires every 300s
@@ -1076,6 +1121,7 @@ def pubkeys_needing_profile(conn, limit=PROFILE_BATCH, max_age=PROFILE_MAX_AGE):
       written by the same backfill — and one tick tries to walk 1,948 pubkeys.
       At this cap the corpus turns over in ~20 ticks whenever it does come due.
     """
+    cooldown, cd_binds = _profile_cooldown_clause()
     rows = conn.execute(
         f"""SELECT b.booster_pubkey, MIN(p.pubkey IS NOT NULL) AS known,
                    MIN(COALESCE(p.checked_at, 0)) AS seen
@@ -1084,16 +1130,17 @@ def pubkeys_needing_profile(conn, limit=PROFILE_BATCH, max_age=PROFILE_MAX_AGE):
            LEFT JOIN enrich_failed f ON f.kind='profile' AND f.id = b.booster_pubkey
            WHERE {not_excluded('b')}
              AND (p.pubkey IS NULL OR COALESCE(p.checked_at, 0) < ?)
-             AND (f.id IS NULL OR f.last_try < ?)
            GROUP BY b.booster_pubkey
+           HAVING {cooldown}
            ORDER BY known ASC, seen ASC
            LIMIT ?""",
-        (int(time.time()) - max_age, _cutoff(), limit)).fetchall()
+        [int(time.time()) - max_age, *cd_binds, limit]).fetchall()
     return [r[0] for r in rows]
 
 
 def profile_refresh_backlog(conn, max_age=PROFILE_MAX_AGE):
     """(never-fetched, stale) counts, so a capped pass can say what it left."""
+    cooldown, cd_binds = _profile_cooldown_clause()
     return conn.execute(
         f"""SELECT COUNT(*) FILTER (WHERE known = 0),
                    COUNT(*) FILTER (WHERE known = 1)
@@ -1103,9 +1150,9 @@ def profile_refresh_backlog(conn, max_age=PROFILE_MAX_AGE):
                  LEFT JOIN enrich_failed f ON f.kind='profile' AND f.id = b.booster_pubkey
                  WHERE {not_excluded('b')}
                    AND (p.pubkey IS NULL OR COALESCE(p.checked_at, 0) < ?)
-                   AND (f.id IS NULL OR f.last_try < ?)
-                 GROUP BY b.booster_pubkey)""",
-        (int(time.time()) - max_age, _cutoff())).fetchone()
+                 GROUP BY b.booster_pubkey
+                 HAVING {cooldown})""",
+        [int(time.time()) - max_age, *cd_binds]).fetchone()
 
 
 def mark_enrich_failed(conn, kind, ids):
