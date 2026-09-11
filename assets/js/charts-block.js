@@ -17,11 +17,11 @@
  * One instance per kind; the two blocks (shows, artists) are separate roots
  * with separate state, which is why this is a factory and not module state.
  */
-import { boardHtml, weekRowHtml, onesRowHtml, weekSpan, weekLabel, COPY } from '/assets/js/chart-board.js?v=ob-v210'
-import { competitionRanks } from '/assets/js/rank.js?v=ob-v210'
-import { weekDateString } from '/assets/js/pacific-week.js?v=ob-v210'
-import { pickerHtml, wireWeekPicker, steppedWeek } from '/assets/js/week-picker.js?v=ob-v210'
-import { mountShare } from '/assets/js/hpw-share.js?v=ob-v210'
+import { boardHtml, weekRowHtml, onesRowHtml, weekSpan, weekLabel, COPY } from '/assets/js/chart-board.js?v=ob-v211'
+import { competitionRanks } from '/assets/js/rank.js?v=ob-v211'
+import { weekDateString } from '/assets/js/pacific-week.js?v=ob-v211'
+import { pickerHtml, wireWeekPicker, steppedWeek } from '/assets/js/week-picker.js?v=ob-v211'
+import { mountShare } from '/assets/js/hpw-share.js?v=ob-v211'
 
 const API = '/api/v1/charts'
 const ROWS = 10
