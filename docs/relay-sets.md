@@ -69,6 +69,25 @@ Findings that outlive the numbers:
   respectably alone and added **zero** marginal coverage once ditto and nos.lol
   were present. Same for `relay.primal.net`, which was in five sets. That is the
   *relay*; `cache1.primal.net` behind `primal-profiles.js` is a different service.
+- **⚠️ BUT THAT ZERO IS ABOUT A POPULATION, NOT ABOUT THE RELAY, AND THE TAIL
+  DISAGREES.** *Re-measured 2026-09-11* against the 99 boosters who had no
+  profile row at all — the residual left over after every pass, mostly the
+  2024-era audience the deepscan recovered. The standing four reached 5 of them.
+  `relay.fountain.fm` reached 16 (**+15** marginal) and `purplepag.es` 16
+  (**+13**, overlapping 11); every other relay tried — primal, damus,
+  nostr.band, snort, nostr.mom, chadf, noderunners, nostr21, lexingtonbitcoin,
+  mynostr — added **zero**. 22 reachable in total, 17 of which parse to
+  something storable, 77 with no kind-0 on any of 15 relays tested. So the
+  whole-corpus floor is **2.6%** of boosters with no kind-0 anywhere, tighter
+  than the 11% the 61-booster sample gave.
+
+  The two were **not** added to `PROFILE_RELAYS`. The 17 were recovered by a
+  one-off pass instead, because the set is queried serially at up to 30s per
+  relay per batch on a 120s tick and this is a one-time tail, not a standing
+  gap. Fountain is the odder miss of the two: it is already in `CORE_RELAYS`
+  and `RECEIPT_RELAYS`, so it is dialled every tick and had simply never been
+  asked for a kind-0 — it scores 0% on the table above because that measurement
+  used recent boosters, whose profiles live elsewhere.
 - **⚠️ NDK dials relays this repo never names.** It builds a second, outbox pool
   from its own `DEFAULT_OUTBOX_RELAYS` (`purplepag.es`, `nos.lol`) unless
   `outboxRelayUrls` is passed. `ndk.js` now passes the option explicitly.

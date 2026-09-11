@@ -48,6 +48,20 @@ CORE_RELAYS = [
 #
 # 11% of boosters have no kind 0 on ANY relay tested and 36% no kind 10002.
 # That floor is a fact about them; adding relays does not move it.
+#
+# ⚠️ THE ZERO-MARGINAL FINDINGS ABOVE ARE ABOUT RECENT BOOSTERS, AND THE
+# ARCHIVAL TAIL DISAGREES. Re-measured 2026-09-11 against the 99 boosters with no
+# profile row at all — mostly the 2024-era audience the deepscan recovered. These
+# four reached 5 of them; `relay.fountain.fm` reached 16 (+15 marginal) and
+# `purplepag.es` 16 (+13, overlapping 11), and every other relay tried added
+# zero. 77 have no kind-0 on any of 15 relays, which puts the whole-corpus floor
+# at 2.6% rather than 11%.
+#
+# Neither was added here. The 17 storable profiles were recovered by a one-off
+# pass, because this set is queried SERIALLY at up to 30s per relay per batch on
+# a 120s tick and that tail is finite. Add one only for a standing gap, and
+# re-measure first. Fountain is the odd one: already in CORE_RELAYS and
+# RECEIPT_RELAYS, dialled every tick, and never asked for a kind-0.
 PROFILE_RELAYS = [
     "wss://nos.lol",
     "wss://relay.ditto.pub",
