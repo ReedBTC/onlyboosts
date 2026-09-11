@@ -406,6 +406,20 @@ week's Top 10, **with the week picker in its title**, beside Weeks at #1.
   ceilings are in `functions/_shared/card-frame.js`.
 - **Client-rendered, deliberately**: the Shows panel is the front door and
   its first-view budget is the cards'; a crawler had the page for these rows.
+- **⚠️ AN UNTITLED SHOW IS ON NO CHART BLOCK, AND ONLY THERE.** *Reed's
+  call, 2026-09-11*, off a screenshot of the week of 2024-07-22: seven of the
+  Shows chart's ten rows read "Untitled show", guids the collector holds
+  boosts for and Podcast Index cannot identify. `TITLED` in
+  `week-charts.js`'s show level (`COALESCE(pc.title,'') <> ''`) drops them
+  from the week's Top 10 and, because Weeks at #1 is tallied from the same
+  base, from that board too, so a titled show inherits any #1 week an
+  untitled one held; the collector's card bot re-renders the affected weeks
+  on its next cycle as their hashes move. The artist level has carried the
+  same rule since it shipped. **Everywhere else they stay**: the Shows
+  feed's own `sort=chart`, the detail pages' strip, the totals. A boost to a
+  show we cannot name is still a boost; a chart is a list of names, and a
+  row nobody can name is a row nobody can act on. `test-weekly-charts.mjs`
+  holds it with a show that would otherwise take a week.
 
 `scripts/test-weekly-charts.mjs` owns the correctness, brute-forced from an
 independent implementation over one fixture boost list, and was confirmed red

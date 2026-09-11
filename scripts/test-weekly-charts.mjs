@@ -21,8 +21,9 @@
  *     genuinely shared place, and the per-row COMPONENT-RANK triplet under
  *     the sats/boosters/boosts column head, component ties computed over the
  *     whole week's corpus;
- *   - the medium partition (an album never on the Shows chart, video and
- *     unidentified shows on it);
+ *   - the medium partition (an album never on the Shows chart, video on it);
+ *   - the title rule (2026-09-11): a show the index cannot name is on no
+ *     chart block however it scores, and a titled show inherits its #1 week;
  *   - Weeks at #1, content and members both: completed weeks only (the live
  *     week's boosts credit nobody), a tied #1 crediting every holder,
  *     ordering by weeks then recency, the last-week link addressing that
@@ -68,7 +69,9 @@ const BOT = '3820f4ff8587747530c7feafe47c1e592e3ce0fd2929b4f907e40714bd26f408'
 
 /* ── the fixture, mirrored into JS ── every boost lands in the DB and in LOG,
  * and the expectations below are computed from LOG alone. */
-const MEDIUM = { P1: null, P2: 'podcast', V1: 'video', A1: 'music', A2: 'music' }
+/* U1 has a podcasts row with no title; U2 has no podcasts row at all. Both
+ * render as "Untitled show" on a card, and both are off the chart blocks. */
+const MEDIUM = { P1: null, P2: 'podcast', V1: 'video', A1: 'music', A2: 'music', U1: null }
 const PUBLISHER = { A1: 'PUB1', A2: 'PUB2' }
 const SHOW_OF = { e1: 'P1', e2: 'P1', e3: 'P2', s1: 'A1', s2: 'A2' }
 const HOUR = 3600
@@ -82,7 +85,7 @@ const WHO = { [X]: 'Xavier', [Y]: 'Yara', [Z]: 'Zed', [BOT]: 'bmb_site' }
 
 for (const [g, m] of Object.entries(MEDIUM)) {
   db.prepare('INSERT INTO podcasts(podcast_guid,title,medium,publisher_guid) VALUES(?,?,?,?)')
-    .run(g, TITLE[g], m, PUBLISHER[g] ?? null)
+    .run(g, TITLE[g] ?? null, m, PUBLISHER[g] ?? null)
 }
 db.prepare('INSERT INTO publishers(publisher_guid,title) VALUES(?,?)').run('PUB1', TITLE.PUB1)
 db.prepare('INSERT INTO publishers(publisher_guid,title) VALUES(?,?)').run('PUB2', TITLE.PUB2)
@@ -121,6 +124,11 @@ boost(X, 100, 'A1', 's1', at(W2, 3))
 boost(Y, 100, 'A1', 's1', at(W2, 4))
 boost(Z, 150, 'A2', 's2', at(W2, 5))
 boost(Z, 150, 'A2', 's2', at(W2, 6))
+// W2 also holds the untitled show's best week: more sats than P2 on the same
+// two boosters, so it would take the Shows #1 (score 3 against P2's 4) if the
+// title rule let it on. It must not, and P2 keeps the week.
+boost(Z, 5000, 'U1', null, at(W2, 7))
+boost(Y, 5000, 'U1', null, at(W2, 8))
 // W1: a mixed shows race, a video boost, an unenriched episode, a COMPLETE tie
 // between the two albums (both on T1, both credited a week), and the BOT
 // racking up four hours that must be excluded from every member board while
@@ -137,6 +145,7 @@ boost(Y, 300, 'A2', 's2', at(W1, 8))
 boost(BOT, 10, 'P1', 'e1', at(W1, 9))
 boost(BOT, 10, 'P1', 'e2', at(W1, 10))
 boost(BOT, 10, 'P2', 'e3', at(W1, 11))
+boost(X, 400, 'U2', null, at(W1, 12)) // a show with no podcasts row: mid-table if it were allowed on
 // W0 — the LIVE week: a mega boost that must top the live weekly board (and
 // Xavier's live hours) while crediting NOBODY a week at #1.
 boost(X, 999999, 'P2', 'e3', W0 + 3600)
@@ -179,8 +188,9 @@ function corpus(kind, ws, we) {
   const inWin = LOG.filter((b) => b.ts >= ws && b.ts < we)
   const isMusic = (b) => (b.podcast ? MEDIUM[b.podcast] === 'music' : false)
   let keyed
-  if (kind === 'shows') keyed = inWin.filter((b) => b.podcast && !isMusic(b)).map((b) => [b.podcast, b])
-  else if (kind === 'albums') keyed = inWin.filter((b) => b.podcast && isMusic(b)).map((b) => [b.podcast, b])
+  // The show levels take a NAMED show only: TITLE has no entry for U1/U2.
+  if (kind === 'shows') keyed = inWin.filter((b) => b.podcast && TITLE[b.podcast] && !isMusic(b)).map((b) => [b.podcast, b])
+  else if (kind === 'albums') keyed = inWin.filter((b) => b.podcast && TITLE[b.podcast] && isMusic(b)).map((b) => [b.podcast, b])
   else if (kind === 'episodes') keyed = inWin.filter((b) => b.item && !isMusic(b)).map((b) => [b.item, b])
   else if (kind === 'songs') keyed = inWin.filter((b) => b.item && isMusic(b)).map((b) => [b.item, b])
   else keyed = inWin.filter((b) => b.podcast && PUBLISHER[b.podcast]).map((b) => [PUBLISHER[b.podcast], b])
@@ -313,6 +323,22 @@ check('the column head says these are ranks, and links the formula', () => {
 check('the medium partition holds: no album on Shows, video counts as a show', () => {
   assert.ok(!showsCard.includes(TITLE.A1) && !showsCard.includes(TITLE.A2))
   assert.ok(showsCard.includes(TITLE.V1))
+})
+// Awaited outside `check`, which is synchronous: a rejected promise inside it
+// would count as a pass.
+const titleW2 = await weeklyChart(env, 'shows', W2, W1)
+const titleW1 = await weeklyChart(env, 'shows', W1, W0)
+const titleOnes = await weeksAtNumberOne(env, 'shows', W0)
+check('the title rule holds: an untitled show is on no chart block, however it scores', () => {
+  assert.ok(!showsCard.includes('Untitled show'), 'no "Untitled show" row on the live shows card')
+  // W2: U1 outscores P2 there (score 3 against 4) and must still be absent.
+  assert.ok(!titleW2.some((r) => r.guid === 'U1'), 'U1 (podcasts row, null title) is off the W2 board')
+  assert.equal(titleW2[0].guid, 'P2', 'P2 keeps the W2 week U1 would have taken')
+  assert.ok(!titleW1.some((r) => r.guid === 'U2'), 'U2 (no podcasts row) is off the W1 board')
+  assert.ok(!titleOnes.some((r) => r.guid === 'U1' || r.guid === 'U2'), 'no untitled show on Weeks at #1')
+  // P1 takes W1 on the tiebreak (score 4 to P2's 5), so P2's one week IS W2:
+  // the week U1 would have held. Without the rule this row is absent.
+  assert.equal(titleOnes.find((r) => r.guid === 'P2')?.weeks, 1, 'P2 holds W2, inherited from U1')
 })
 
 /* Weeks at #1, read off the JSON the boards are painted from. */

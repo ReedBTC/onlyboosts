@@ -52,6 +52,18 @@ const MUSIC = (yes) => `COALESCE(pc.medium,'podcast') ${yes ? "=" : "<>"} 'music
  * string. `meta` re-joins display fields for the weeks-at-#1 outer SELECT,
  * where the inner grouping is (wk, guid) and carrying them through would work
  * but reads worse than one join at the end. */
+/* ⚠️ A SHOW ON A CHART BLOCK HAS A TITLE. Reed's call, 2026-09-11, off a
+ * screenshot of the week of 2024-07-22 on the Shows feed: seven of the ten
+ * rows read "Untitled show" — guids the collector holds boosts for and Podcast
+ * Index cannot identify. They stay everywhere else (the Shows feed's own
+ * sort=chart, the detail pages, the totals): a boost to a show we cannot name
+ * is still a boost. But a chart is a list of names, and a row that cannot be
+ * named is a row nobody can act on, so the two boards built here — the week's
+ * Top 10 and Weeks at #1, which is tallied from the same base — drop them,
+ * and a titled show inherits any #1 week an untitled one held. The artist
+ * level below has carried the same rule since it shipped. */
+const TITLED = `COALESCE(pc.title,'') <> ''`;
+
 const LEVELS = {
   show: (music) => ({
     key: "b.podcast_guid",
@@ -59,7 +71,7 @@ const LEVELS = {
              NULL AS p_title`,
     from: `FROM boosts b
            LEFT JOIN podcasts pc ON pc.podcast_guid = b.podcast_guid`,
-    where: [`b.podcast_guid IS NOT NULL`, MUSIC(music)],
+    where: [`b.podcast_guid IS NOT NULL`, TITLED, MUSIC(music)],
     meta: {
       select: `pc.title AS title, pc.image AS image, pc.artwork AS artwork, pc.author AS author,
                NULL AS p_title`,
