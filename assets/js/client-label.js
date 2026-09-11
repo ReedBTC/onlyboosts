@@ -35,6 +35,10 @@ const DISPLAY = {
   "podverse": "Podverse",
   "podcast-index": "Podcast Index",
   "boostcli": "BoostCLI",
+  // Boostr_Bot, the split-recipient republisher registered as a publisher on
+  // 2026-09-10. Its notes carry `["client","Boostr_Bot"]` too, which slugifies
+  // to the same thing; the underscore is its handle, not its name.
+  "boostr-bot": "Boostr Bot",
   // Carried over from the Boosts feed's own map, which read the raw client tag
   // and is now deleted. No boost in the index currently classifies to this slug;
   // it costs a line and saves the label if one ever does.

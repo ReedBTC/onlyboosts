@@ -108,17 +108,39 @@ from urllib.parse import urlparse
 # is FOR is the site's PUBLISHERS list in `functions/api/v1/_common.js`, which
 # keeps single keys that sign many people's boosts off the member boards, and
 # which this map must not fall behind. Registered 2026-08-24.
+# ⚠️ THE SIXTH IS Boostr_Bot, a split-recipient republisher: a podcaster adds
+# boostr@getalby.com as a 1% leg of their value block and the bot publishes a
+# note for every boost that leg receives, whichever app sent it. Its notes
+# carry `["client","Boostr_Bot"]` (slugifies to `boostr-bot`, the slug below,
+# so this entry moves `client_src` only — plus the one early test note tagged
+# `Boostr`) and name the origin app in an `["app", <name>, <version>]` tag
+# rather than a `📱 via` line; `_app_tag` below reads it into `client_via` on
+# the same terms. The body names the SENDER ("ChadF boosted 111 sats →"),
+# which is text and never an identity. Registered 2026-09-10 on Reed's
+# instruction, the day it went live; in dedupe.py's RELAY_PUBLISHERS the same
+# day, two duplicate pairs having landed in its first hour.
 PUBLISHER_PUBKEYS = {
     "f3bd42a91af5f3f1c40ca45ad2269464ab79996b32da78e8ed2ab91111b08e65": "chadf-boostbot",
     "d35ae076512c29b01a5b33aa764ed4db44a9d0bbd96009705f48101f6cfe76a2": "lnaddress-music",
     "c330881e28768381dd8bdfd274341dca0c5882c29b8642ea4bc82f7563264592": "localbitcoiners",
     "3a87a19c801d57111b0905569225d2b20b39d154fc93bef5a8f2860c409b84d9": "onlyboosts",
     "3820f4ff8587747530c7feafe47c1e592e3ce0fd2929b4f907e40714bd26f408": "boostmebitch",
+    "adab4ccd313996520304a5b1ec6c4076bc271bc6a3236702321c5811009d0649": "boostr-bot",
 }
 
 # Fountain links its own episode/show pages from the URL slot of each NIP-73
 # i-tag. Exact host — see the warning above.
 FOUNTAIN_HOST = "fountain.fm"
+
+# `["app", <name>, <version>]`: Boostr_Bot's structured form of the same claim,
+# read for a publisher key only and only when the via line is absent. Not a
+# fourth signal: an app tag on a note the pubkey rule did not match says
+# nothing about who PUBLISHED it, so it never reaches `client_id`.
+def _app_tag(event):
+    for t in event.get("tags") or []:
+        if t and len(t) >= 2 and t[0] == "app" and isinstance(t[1], str):
+            return t[1]
+    return None
 
 # `📱 via <App>`, the bot's own attribution line. Anchored on the emoji rather
 # than the word so it cannot match prose; the 54 bot notes without it are its
@@ -144,6 +166,7 @@ DISPLAY_NAMES = {
     "podverse":        "Podverse",
     "podcast-index":   "Podcast Index",
     "boostcli":        "BoostCLI",
+    "boostr-bot":      "Boostr Bot",
 }
 
 # Self-identified names that are the same product under two spellings. Kept
@@ -208,7 +231,7 @@ def classify_client(event):
     slug = PUBLISHER_PUBKEYS.get(event.get("pubkey"))
     if slug:
         m = _VIA_RE.search(event.get("content") or "")
-        via = slugify(m.group(1)) if m else None
+        via = slugify(m.group(1)) if m else slugify(_app_tag(event))
         return {
             "client_id":  slug,
             # A publisher naming itself as the origin is not a subcategory of

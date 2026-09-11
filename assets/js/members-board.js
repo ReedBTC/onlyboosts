@@ -28,41 +28,41 @@
  * to be authentic to a high-score table; collapsing the repeats is exactly what
  * the rename did, once the repeats stopped being a story and became a backfill.
  */
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v209'
-import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v209'
-import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v209'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v211'
+import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v211'
+import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v211'
 /* ⚠️ THE SAME WALL /show AND /episode RENDER, not a copy of it. It moved out of
  * functions/_shared/detail-page.js into a two-sided module for exactly this;
  * that file re-exports every name, so both Functions were untouched. A reader
  * who screenshots the wall here and on a show page must not be able to tell
  * them apart. */
-import { renderSupporters, initShowMore, compact } from '/assets/js/supporter-wall.js?v=ob-v209'
+import { renderSupporters, initShowMore, compact } from '/assets/js/supporter-wall.js?v=ob-v211'
 /* ⚠️ EXACT BOOST COUNTS HERE, COMPACT SATS. On the wall a row is one of a
  * hundred and `1k` is plenty; here there are four rows and the count is the
  * disclosure itself — "35 boosts for listeners with no identity" is the claim
  * the section exists to make, and `1k` rounds the evidence away. */
-import { num } from '/assets/js/boost-list.js?v=ob-v209'
-import { rangeControl, sortControl } from '/assets/js/feed-controls.js?v=ob-v209'
-import { mountFeedSearch } from '/assets/js/feed-search.js?v=ob-v209'
-import { searchMembers, SEARCH_HITS } from '/assets/js/ob-live.js?v=ob-v209'
+import { num } from '/assets/js/boost-list.js?v=ob-v211'
+import { rangeControl, sortControl } from '/assets/js/feed-controls.js?v=ob-v211'
+import { mountFeedSearch } from '/assets/js/feed-search.js?v=ob-v211'
+import { searchMembers, SEARCH_HITS } from '/assets/js/ob-live.js?v=ob-v211'
 /* ⚠️ THE SAME WEEK RULE THE ENDPOINT CUTS ON, not a second copy of it. That
  * module is two-sided for exactly this: the picker steps and enumerates weeks
  * without a round trip per press, and a Pacific week containing a DST
  * transition is 167 or 169 hours, so a client that stepped by a flat 604800
  * would drift an hour past every March and every November while still
  * producing Mondays. */
-import { weekDateString } from '/assets/js/pacific-week.js?v=ob-v209'
-import { weekLabel, boardHtml, initials, COPY } from '/assets/js/hpw-board.js?v=ob-v209'
+import { weekDateString } from '/assets/js/pacific-week.js?v=ob-v211'
+import { weekLabel, boardHtml, initials, COPY } from '/assets/js/hpw-board.js?v=ob-v211'
 /* The picker's markup and delegate moved to week-picker.js on 2026-09-03, when
  * the chart boards on the Shows and Artists feeds needed the same stepper;
  * flipHtml is the same shape over the two stacked all-time boards. */
-import { pickerHtml, flipHtml, wireWeekPicker, steppedWeek } from '/assets/js/week-picker.js?v=ob-v209'
+import { pickerHtml, flipHtml, wireWeekPicker, steppedWeek } from '/assets/js/week-picker.js?v=ob-v211'
 /* The members' Weeks at #1 board — the Charts page's own, two-sided since the
  * same day, stacked behind Proof of #40HPW here. */
-import { memberOnesBoardHtml } from '/assets/js/chart-board.js?v=ob-v209'
+import { memberOnesBoardHtml } from '/assets/js/chart-board.js?v=ob-v211'
 /* The share control: Post to Nostr, Copy link, Share image. A verb, mounted
  * onto each board after it is painted; the same module /hpw/<week> uses. */
-import { mountShare } from '/assets/js/hpw-share.js?v=ob-v209'
+import { mountShare } from '/assets/js/hpw-share.js?v=ob-v211'
 
 const esc = htmlEscape
 const HOURS_API = '/api/v1/members/hours'
@@ -342,8 +342,8 @@ async function wall(sort, range, signal) {
 const BOTS_ID = 'boost-bots'
 
 /* ⚠️ THE BOTS SECTION IS THE WALL'S EXCLUSION, SHOWN. `/api/v1/members` drops
- * four publisher keys from every ranked listing because each one stands in
- * for many listeners; `?publishers=1` asks for exactly those four, so what
+ * five publisher keys from every ranked listing because each one stands in
+ * for many listeners; `?publishers=1` asks for exactly those five, so what
  * the wall removes is named directly under it rather than silently missing.
  * Reed's call, 2026-08-23: "either way we need to be transparent about anything
  * we are NOT including on this page".
@@ -359,7 +359,7 @@ const BOTS_ID = 'boost-bots'
  * and nothing detects these automatically.
  *
  * ⚠️ A KEY WITH NO ENTRY STILL RENDERS. The server owns the list and this table
- * owns the prose, so a fifth publisher added to PUBLISHERS appears here with its
+ * owns the prose, so a sixth publisher added to PUBLISHERS appears here with its
  * figures and no description — which is a row missing a sentence, where the
  * alternative is a bot the section quietly fails to disclose. */
 const BOT_ROLES = {
@@ -378,6 +378,10 @@ const BOT_ROLES = {
      under this account when they do not. Exactly the arrangement above. */
   '3820f4ff8587747530c7feafe47c1e592e3ce0fd2929b4f907e40714bd26f408':
     'Signs a note for a boost sent from boostmebitch.com without a connected identity.',
+  /* Boostr_Bot, 2026-09-10. Reed's wording: the one row that addresses the
+     podcaster, because opting a show in is the reader's own move. */
+  adab4ccd313996520304a5b1ec6c4076bc271bc6a3236702321c5811009d0649:
+    'Add a 1% split to boostr@getalby.com and it will post all your boosts to Nostr.',
 }
 
 async function bots(signal) {

@@ -48,12 +48,12 @@
  * while a week's card is not rendered yet (X-OB-Image: fallback); that is
  * refused with a note rather than uploaded as "the board".
  */
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v209'
-import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v209'
-import { attachMentionPicker } from '/assets/js/mention-picker.js?v=ob-v209'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v211'
+import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v211'
+import { attachMentionPicker } from '/assets/js/mention-picker.js?v=ob-v211'
 
 const SITE = 'https://onlyboosts.social'
-const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v209'
+const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v211'
 /* The box-with-arrow share glyph (the iOS / most-websites one), inline so it
  * scales with the button and takes currentColor in either theme. Reed's call,
  * 2026-08-29: the icon rather than the word. */

@@ -32,7 +32,7 @@
  * `connect` and `verify` are injectable so the test can script relays that
  * hang, refuse, forge and disagree; production takes the defaults.
  */
-import { verifyEvent } from '/assets/widgets/nostr-tools.js?v=ob-v209'
+import { verifyEvent } from '/assets/widgets/nostr-tools.js?v=ob-v211'
 
 export const FAVORITES_KIND = 10333
 export const RELAY_LIST_KIND = 10002

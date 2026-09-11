@@ -66,7 +66,7 @@ better than a real boost filtered out).
 
   App identity is best-effort, in order: the classifier's answer (client_via
   names the app a relay note restates, client_id the publisher itself); the
-  note's own "📱 via <App>" line where one exists; the app's domain in the
+  note's own "📱 via <App>" line or `app` tag where one exists; the app's domain in the
   note text (APP_DOMAINS) for apps the classifier leaves null. A bot that
   publishes none of these contributes no tier-2/3 evidence — by design.
 
@@ -134,7 +134,11 @@ from nostr_utils import npub_to_hex          # noqa: E402
 # publishing and so should never pair (its presence here is a safety net for a
 # race, and a place to watch: a MATCH on an LB note means its dedupe failed).
 # The other PUBLISHER_PUBKEYS entries are first-party and never belong here.
-RELAY_PUBLISHERS = {"chadf-boostbot", "localbitcoiners"}
+# boostr-bot joined 2026-09-10, its first hour live having produced two pairs
+# against BoostMeBitch notes. Two relay notes of one payment (chadf-boostbot
+# watching the sending node, boostr-bot the receiving leg) are NOT paired —
+# the partner side is non-relay by construction — and stand as two boosts.
+RELAY_PUBLISHERS = {"chadf-boostbot", "localbitcoiners", "boostr-bot"}
 
 MSG_WINDOW = 30 * 60      # strong message corroboration: generous
 APP_WINDOW = 10 * 60      # app-identity corroboration: tight
