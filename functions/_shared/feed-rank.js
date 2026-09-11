@@ -71,17 +71,19 @@ const BOOSTER_RANK_KEYS = ["sats", "boosts", "shows"];
  * claims a place on the Artists list, and that list counts only the declaring
  * music shows now, so the populations here must count the same corpus. */
 /* ⚠️ RESTATED FROM functions/api/v1/_common.js, WHICH THIS FILE MAY NOT IMPORT
- * WITHOUT DRAGGING THE WHOLE API SURFACE IN. The members wall drops these four
+ * WITHOUT DRAGGING THE WHOLE API SURFACE IN. The members wall drops these five
  * keys from its listing, so a booster rank computed over a population that
  * INCLUDED them would be a rank on a list the reader cannot scroll: every
  * member below a publisher would be one place worse here than on the wall.
  * **The two copies must stay in step.** (chadf-boostbot came off both on
- * 2026-08-30; see the note on PUBLISHERS for why.) */
+ * 2026-08-30, and Boostr_Bot joined both on 2026-09-10; see the note on
+ * PUBLISHERS for why.) */
 const RANK_PUBLISHERS = [
   "d35ae076512c29b01a5b33aa764ed4db44a9d0bbd96009705f48101f6cfe76a2",
   "c330881e28768381dd8bdfd274341dca0c5882c29b8642ea4bc82f7563264592",
   "3a87a19c801d57111b0905569225d2b20b39d154fc93bef5a8f2860c409b84d9",
   "3820f4ff8587747530c7feafe47c1e592e3ce0fd2929b4f907e40714bd26f408",
+  "adab4ccd313996520304a5b1ec6c4076bc271bc6a3236702321c5811009d0649",
 ];
 
 /* ⚠️ THE ONLYBOOSTS CHARTS POSITION — rank in sats + rank in boosts + rank in

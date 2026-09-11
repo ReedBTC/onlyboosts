@@ -48,12 +48,12 @@
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v209" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v209" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v210" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v210" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v209" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v209" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v210" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v210" />
 </head>
 <body>
 
@@ -243,9 +243,10 @@
       <section id="bots">
         <h2>Accounts That Publish for Other People</h2>
         <p>A second route into this index exists, and it produces a different result. It is the explanation for any boost here carrying a name that is not a person&rsquo;s.</p>
-        <p>Because most podcast applications publish nothing to Nostr, a small number of automated accounts have stepped into the gap. They observe boosts sent by listeners who published nothing themselves and publish a note for each one, so the boost is recorded rather than lost. Four such keys are known to this index.</p>
+        <p>Because most podcast applications publish nothing to Nostr, a small number of automated accounts have stepped into the gap. They observe boosts sent by listeners who published nothing themselves and publish a note for each one, so the boost is recorded rather than lost. Five such keys are known to this index.</p>
         <ul>
           <li><strong><a href="https://boostmebitch.com" target="_blank" rel="noopener noreferrer">BoostMeBitch</a></strong> keeps a site account for the same purpose, publishing a note for a listener who boosted from that site without connecting an identity. It therefore appears in both lists on this page: the application publishes under your own key when you have one, and under its own when you do not.</li>
+          <li><strong>Boostr_Bot</strong> publishes a note for every boost received by a value-block split that names it. A podcaster adds its Lightning address as a small leg of their split, and each boost that leg receives is recorded here, whichever application sent it.</li>
           <li><strong>lnaddress music</strong> publishes boosts sent to music feeds through a Lightning address.</li>
           <li><strong>Local Bitcoiners</strong> publishes a note for a boost to that show where the donor produced none themselves, which is the case for roughly a quarter of them.</li>
           <li><strong>OnlyBoosts</strong> signs a note for a boost sent from this site by someone with no Nostr identity, so a listener who wants no account still counts toward the show&rsquo;s totals.</li>
@@ -653,15 +654,15 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v209"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v210"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v209" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v210" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v209" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v210" defer></script>
 
-<script src="/assets/js/nav.js?v=ob-v209" defer></script>
+<script src="/assets/js/nav.js?v=ob-v210" defer></script>
 
 </body>
 </html>

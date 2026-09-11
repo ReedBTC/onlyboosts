@@ -586,8 +586,8 @@ ordered by** — a `metric` parameter on `supporterCard`, defaulting to `sats` s
 the detail pages are byte-identical.
 
 **⚠️ THE LISTING EXCLUDES PUBLISHER KEYS AND THE SEARCH DOES NOT.** `PUBLISHERS`
-in `functions/api/v1/_common.js` is the four keys that sign boosts for many
-donors.
+in `functions/api/v1/_common.js` is the five keys that sign boosts for many
+donors (Boostr_Bot the fifth, 2026-09-10).
 
 **⚠️ `chadf_boostbot` IS NOT ONE OF THEM, SINCE 2026-08-30, AND IT WAS THE
 MOTIVATING CASE.** *Reed's call.* It was excluded on the claim that it carried
@@ -693,7 +693,7 @@ Three more rules in `functions/api/v1/members.js`:
 #### The Boost Bots section, and what the tab discloses
 
 `/api/v1/members?publishers=1` is the **exact complement of the listing**: the
-wall drops the four `PUBLISHERS` keys, and this asks for those four and nothing
+wall drops the five `PUBLISHERS` keys, and this asks for those five and nothing
 else. Same endpoint, same row shape, one place the aggregate is computed; a
 second path would be two answers to "who is a member" that could disagree. It
 wins over an empty `q`, so it is never also the listing, and a `q` alongside it
@@ -742,7 +742,7 @@ Four rules a change would break:
   claim is additive, so its absence costs a reader nothing they were promised.
   It is started after the wall and never awaited.
 
-**How the four were determined: by hand, and nothing detects them.**
+**How the five were determined: by hand, and nothing detects them.**
 `PUBLISHERS` in `functions/api/v1/_common.js` is the collector's
 `PUBLISHER_PUBKEYS` less `chadf_boostbot`. Naming an account a bot is a claim,
 and the cost of getting it wrong is a real person left off a leaderboard; that

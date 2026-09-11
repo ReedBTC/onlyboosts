@@ -111,6 +111,50 @@ homepage card downloads. Not a rule, just untouched scope.
 **Still open: `/stats`.** A "boosts by app" breakdown is what
 `/api/v1/clients` was built for and still has no surface.
 
+### Boostr_Bot Publishes For Any Split That Names It
+
+Registered 2026-09-10, on Reed's instruction, the day it went live.
+`adab4ccd…0649` (`npub14k45enf…97740t`) is the **sixth** entry in
+`PUBLISHER_PUBKEYS` and the fifth in the site's `PUBLISHERS`. Its profile
+says what it is: *"I republish Podcasting 2.0 boostagrams to Nostr. Add
+boostr@getalby.com as a 1% split in your value block and your boosts show up
+here"*, marked alpha. A podcaster opts a show in by adding the leg, and the
+bot then publishes one note per boost that leg receives, whichever app sent
+it. First show: Chad and Reed's Podcast, six notes on day one.
+
+**Slug `boostr-bot`, the same one its own `["client","Boostr_Bot"]` tag
+already slugified to**, so registering the key changes `client_src`
+(client-tag → publisher-pubkey) and nothing a card prints. One early test
+note carried `["client","Boostr"]` instead and classified as `boostr`; the
+pubkey rule folds it into the same slug, which is the one row the reclassify
+moves on `client_id`.
+
+**⚠️ THE ORIGIN APP RIDES AN `app` TAG, NOT A `📱 via` LINE.** The notes
+carry `["app","Castamatic","13.2.3"]`, `["app","BoostMeBitch","0.1.0"]`, and
+so on, and the body names the sender rather than the app ("ChadF boosted 111
+sats → Chad and Reeds Podcast"). `classify_client` reads that tag as
+`client_via` for a publisher key when the via line is absent, and the rule is
+the same as the line's: nested under the publisher, never promoted, and a tag
+naming the publisher itself is dropped. Reading it is what gives `dedupe.py`
+its app-agreement evidence for these notes, since the body shares almost no
+prose with the donor app's own.
+
+**It is a relay publisher and it duplicates.** The first hour produced two
+pairs: a BoostMeBitch note signed by Chad's own key at 23:39:14 and the bot's
+restatement at 23:39:15, and a BoostMeBitch site-account note at 23:03:13
+against the bot's at 23:03:10. So `boostr-bot` is in `RELAY_PUBLISHERS`, the
+droppable side, and the donor app's note is the one kept. **One class it
+does not close, by construction: a boost Chad sends from Castamatic to a show
+carrying the split is published by `chadf-boostbot` (watching the sending
+node) AND by Boostr_Bot (watching the receiving leg), and both are relay
+notes.** The filter pairs a relay note only with a non-relay partner, so that
+pair stands as two boosts; deciding which of two restatements is the record
+is a call not made here.
+
+**⚠️ THE BOOSTER IS THE BOT, NOT THE PERSON THE BODY NAMES.** "ChadF and 33
+others" is a display name read off a payment, and the same rule as the `P`
+tag below applies: text, never an identity.
+
 ### OnlyBoosts Publishes On Behalf Of Its Own Donors
 
 Registered 2026-08-20. `3a87a19c…84d9` is the **fourth** entry in

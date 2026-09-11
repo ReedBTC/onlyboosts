@@ -174,7 +174,7 @@ of this list" question.
 Most podcast apps publish nothing to Nostr at all. A handful of automated
 accounts fill that gap: they watch for boosts sent from apps with no Nostr
 support and publish a note for each one, so the boost is recorded rather than
-lost. **Four such keys are known to this index**, and the list is maintained by
+lost. **Five such keys are known to this index**, and the list is maintained by
 hand (`PUBLISHERS` in `functions/api/v1/_common.js`; the collector's
 `PUBLISHER_PUBKEYS` is the attribution list and carries one more key, see
 below). Nothing detects them
@@ -184,11 +184,12 @@ cost of getting it wrong is leaving a real person off a leaderboard.
 | Key | Boosts | Sats | What it does |
 |---|---|---|---|
 | BoostMeBitch (site account) | 35 | 114,753 | Publishes for a boostmebitch.com listener who connected no identity. ⚠️ **The app is ALSO in the members list above** — it signs under the donor's own key when they have one, under this account when they do not. Added 2026-08-23 on Reed's instruction |
+| Boostr_Bot | 6 | 611 | Publishes a note for every boost received by a value-block split naming `boostr@getalby.com`, whichever app sent it; the origin app rides an `app` tag. Live since 2026-09-10 on Chad and Reed's Podcast, an alpha by its own profile. Added 2026-09-10 on Reed's instruction |
 | lnaddress music | 31 | 0 | Boosts sent to music feeds through a Lightning address |
 | Local Bitcoiners (show account) | ~8 over 14 days | — | Publishes for a donor to that show who produced no note themselves |
 | OnlyBoosts (boost bot) | part of 23 | — | Signs a note for a boost sent from this site by someone with no Nostr identity |
 
-Figures measured 2026-08-23 off `/api/v1/clients`.
+Figures measured 2026-08-23 off `/api/v1/clients`; Boostr_Bot's off `/api/v1/boosters` on 2026-09-10, the day it went live.
 
 **⚠️ ChadF Boost Bot is NOT one of these, since 2026-08-30, and it was listed
 first until then.** It is a node-watching bot, but the node is Chad's own and
@@ -205,11 +206,11 @@ the client" still holds: the note is bot-published, and the app it names is
 notes often carry a sender name, in the message body or a `From` field. Nothing
 verifies that the person named authorised a note signed by a key they do not
 hold, so the name is treated as text and never as an identity. Same call for
-all four, including our own.
+all five, including our own.
 
 **What that costs and what it does not.** Every one of these boosts is indexed
 and counted: sats totals, boost counts, show pages, episode pages, every feed
-and every ranking those feeds produce. What the four keys are excluded from is
+and every ranking those feeds produce. What the five keys are excluded from is
 the two surfaces that rank **people** — the member wall and the #40HPW boards.
 One key carrying a thousand boosts from dozens of listeners would top both on
 other people's listening, which is a claim about who the top members are that
