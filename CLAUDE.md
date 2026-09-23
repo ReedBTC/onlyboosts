@@ -29,13 +29,17 @@ there rather than restating the argument:
 | Show artwork and the share cards' images | `docs/show-artwork.md` |
 | The relay sets and their measurements | `docs/relay-sets.md` |
 | @mentions in the four composers | `docs/mentions.md` |
+| What the 2026-08-23 strip deleted, and the checks for the next one | `docs/strip-removed.md` |
+| Dark mode: the grammar, the tokens that do and don't flip | `docs/dark-mode.md` |
 
 Deleted reasoning is recoverable: `git log -S <symbol> -- CLAUDE.md` finds the
 paragraph that used to explain any name in here.
 
 The last seven were **split out of this file on 2026-08-29**, verbatim, when it
 passed its size budget. Nothing was rewritten on the way across, so that same
-`git log -S` finds them too.
+`git log -S` finds them too. **Two more went the same way on 2026-09-23**
+(`docs/strip-removed.md`, `docs/dark-mode.md`), each leaving a stub of the
+rules a change elsewhere would break.
 
 ## Pages
 
@@ -361,47 +365,15 @@ Design and code are also expected to be pulled from:
 
 ### What The Strip Removed
 
-The fork left LB's own products in the tree, unreachable but shipped. They were
-deleted on 2026-08-23, before the `homepage` branch merged. **~6,600 lines of
-source, and what a homepage visitor downloads went down by 202KB raw:**
-
-| | |
-|---|---|
-| `assets/js/feeds.js` | 50.4KB → **12.4KB**. The whole Events path: `loadEvents`, the NIP-52 calendar machinery, the streaming relay subscription, the month browser. Unreachable since the Events tab went on fork — `LOADERS` never mapped it — and two endpoints it read, `/api/community-events` and `/api/meetups`, do not exist on this fork at all. |
-| `assets/js/boosts-thread.js` | 29.6KB → **18.4KB**. `ROOT_NEVENT`, `EXCLUDED_NOTE_IDS`, `fetchBoostThread` and the six helpers only it called. |
-| `assets/js/calendar-events.js` | **deleted** (24.4KB, and it was precached). |
-| `assets/js/supporter-set.js` | **deleted** (7.1KB). Its only importer was `feeds.js`. |
-| `assets/widgets/login-widget.js` | 1,051KB → **929KB**. 22 source files: `BoostModal`, `EpisodeBoostModal`, `MultiLegBoostForm`, `BoostProgressView`, `BoostExpectations`, and the entire LB meetup product (`CreateMeetupModal`, `MyMeetupsModal`, `SearchMeetupsModal`, `EventComposer`, `eventForm`, `eventPublish`, `eventTypes`, `eventAnnouncement`, `primalSearch`, …), plus `openShowBoost`, `openEpisodeBoost`, `openMeetupModal` and `mountFindFlow` out of `index.jsx`. |
-
-**⚠️ THE CALENDAR CARD HAD ALREADY BEEN UNREACHABLE, AND THE NOTE HERE SAID
-OTHERWISE FOR MONTHS.** This file used to claim `calendar-events.js` was
-"retained because `boosts-thread.js` imports it to render calendar-event quotes
-inside boost notes — that circular import is what makes the cleanup fiddly."
-Both halves were wrong. There was no circular import: the module had two
-ordinary importers. And the rich card could never appear, because the only
-writer of the cache it read was `fetchBoostThread`, which has had no caller
-since the fork — so every quoted calendar event fell through to the naddr chip,
-every time. **The chip's own reading of the two NIP-52 kinds is what survives**,
-inlined as two integers in `boosts-thread.js`, so a quoted event still links out
-as "📅 Linked event on Nostr →" rather than as an article. Nothing a reader
-could see changed.
-
-**⚠️ THE BUILD DOES NOT CATCH A DELETION THAT GOES TOO FAR, AND THIS ONE DID.**
-Cutting `index.jsx` by banner-comment ranges swallowed `BoostApp` — the nav's
-Donate button — and `let mounted = false`, which `api.mount()` guards on. Vite
-built both away without a word: an undeclared module-level identifier is a
-runtime `ReferenceError`, not a build error, and there is no linter here.
-`scripts/test-boost-modal-render.mjs` is what failed, because it walks for
-`function BoostApp()` by name. **A widget deletion is verified by that test and
-by a declared-versus-referenced diff against the previous revision, never by a
-green build.**
-
-**Two checks are worth reusing for any future strip**, and neither is a test in
-the repo: a module-graph walk that resolves every import *and* every named
-import against the target's exports (the `ob-v53` failure class), and a
-reachability walk over `login-widget/src` from `index.jsx` that lists orphaned
-files. The second one must count bare side-effect imports (`import './x.js'`)
-or it reports `styles.css` and `navigationGuard.js` as dead.
+**Moved verbatim to `docs/strip-removed.md` on 2026-09-23.** LB's own
+products (the Events path, the calendar card, the meetup product, ~6,600
+lines of source and 202KB off the homepage) were deleted on 2026-08-23; that
+file has the table, the calendar-card note this file got wrong for months,
+and the two checks worth reusing for any future strip. **A widget deletion
+is verified by `test-boost-modal-render.mjs` and by a declared-versus-
+referenced diff against the previous revision, never by a green build**:
+Vite builds an undeclared identifier away without a word, and this repo has
+no linter.
 
 ## Stack
 
@@ -731,83 +703,18 @@ for the plain content pages (`.page-header`, `.soon-card`).
 
 ### Dark Mode
 
-**`data-theme="dark"` on `<html>`, set before first paint by the boot script in
-`partials/nav.html` and toggled by the moon/sun button beside it; the choice is
-per-browser in `localStorage` under `ob-theme`.** Absence of the attribute — and
-any stored value other than `dark` — is the light theme, which is exactly what
-every visitor saw before the toggle existed. `nav.js` owns the click, the
-storage write, the button's label, and cross-tab sync via the `storage` event;
-the boot script only replays the stored choice. Riding the nav partial is what
-puts both on every page, the edge-rendered ones included, from one source —
-which is also why **neither may contain a backtick or `${`** (sync-partials
-exits nonzero if one appears; it bit once, in a comment).
-
-The theme itself is `:root[data-theme="dark"]` blocks: the palette flip in
-`theme.css`, the feed accent's flip in `index.html`'s inline block (one family
-since the ramp retired — its `-d`/`-dd` steps lighten against the dark
-background, the same derivation the light `-dd` used against white), and a short
-dark section at the foot of each stylesheet that needed one. Every shipped value
-was contrast-measured; text ≥ 4.5:1 on its surface, links and accents ≥ 6:1.
-
-**⚠️ THE DARK GRAMMAR IS ONE GROUND, HAIRLINES, AND ONE ACCENT.** *Reed's call,
-2026-08-27, against a Primal dark-mode screenshot* ("ours feels blocky and
-choppy"). The first cut flipped each light surface to its own blue-tinted dark
-shade and kept the navy chrome, which read as bands and boxes. What replaced it:
-a near-neutral black ground; the nav, footer and `.page-header` band sit ON
-that ground behind a 1px `--border` hairline instead of on their own navy; the
-card (`--white`/`--surface`) and sunken (`--cream-d`) surfaces are within a few
-percent of the ground, with borders doing the separating; and cyan appears only
-as text, accents and fills, never as a wash a region wears (`--bg-tint` is
-barely off the ground for the same reason). **Don't re-introduce a surface with
-its own colour into dark mode** — that is the specific thing this pass removed.
-
-**⚠️ TWO TOKENS DELIBERATELY DO NOT FLIP, AND `--navy` FLIPS TO THE GROUND:**
-
-- **`--navy` becomes the page ground in dark**, which is what merges the nav
-  and footer into the page. Three consequences carry scoped repairs: those
-  components read `--cream`/`--cream-d`/`--white` as light TEXT, so `theme.css`
-  re-supplies those inside `#top-nav`, `#site-footer` and `.page-header`; the
-  `.tagblock` and `.lb-toast` fills vanished into the ground and became
-  bordered surfaces (dark sections of `page.css` / `boost-actions.css`); and
-  `boosts-thread.css` / `boost-actions.css` remap `--navy`/`--navy-l` *inside*
-  the components that used them as text on light surfaces (`.note-card`,
-  `.embed-note`, `.zap-modal`). **A new `--navy` fill needs a dark-scoped
-  border or fill of its own**; a new navy-as-text usage needs a remap.
-- **`--brand-dd` / `--brand-ddd`.** They are the AA fills under white on every
-  filled widget button, read live by the bundle, so lightening them breaks the
-  checkout. Where they were doing the *other* job — darkest text step on a
-  light page — each stylesheet carries a dark-scoped override reading the
-  lightened `--brand-d` instead. **A new `--brand-dd` text usage needs its own
-  override**; a new filled button needs nothing.
-- **`--warn` / `--danger`** are lightened, never re-hued: amber is UNCERTAIN
-  and red is FAILED, and the double-pay guard rests on telling them apart in
-  either theme.
-
-**`--brand-d` inverts its role in dark**: it is the brand TEXT step (lightened),
-so the two filled controls that hover onto it (`.ob-boost-pill`, `.show-main
-.btn-boost`) carry scoped rules hovering to `--brand-dd` instead — contrast
-still only ever increases.
-
-**⚠️ A DARK OVERRIDE OF AN ALIASED TOKEN GOES ON THE ELEMENT THE ALIAS IS
-DECLARED ON, AND THIS SHIPPED WRONG ONCE.** A custom property substitutes its
-`var()` at computed-value time on the element that *declares* it, then inherits
-as the resolved value. The accent families are aliases on `:root`
-(`--eg-tint: var(--bg-tint)`), and the dark remap sat on `body` — so every
-alias had already baked in the light value before body's override existed, and
-dark mode rendered the feed panels on the light-mode cyan with the light
-`--accent-d` (a blue picked for white, ~2.5:1 on a dark card) on every eyebrow
-and link. Nothing errors; the page is simply the wrong colors. The remap lives
-on `:root[data-theme="dark"]` now, and the inline comment beside it says why.
-Reed's screenshots are what caught it — "still a lot of different shades".
-
-Two structural notes. **The widget needed no change**: it reads the tokens live
-off `:root`, so the dark `--modal-*`/state values reach the modals by
-themselves, and its `var()` fallbacks stay mirrors of the *light* values — a
-fallback only fires when a token is undefined (a stale `theme.css`), never in
-dark mode. Which is also why **the dark block must stay below the base `:root`
-block in `theme.css`**: `test-boost-modal-render.mjs` parses the first `:root`
-block it finds. And the masthead needed no second banner — the clear PNG's
-wordmark is cyan on transparency, which is what that file's split was for.
+**Moved verbatim to `docs/dark-mode.md` on 2026-09-23.** The rules that
+reach outside it: `data-theme="dark"` on `<html>`, set before first paint by
+the boot script in `partials/nav.html` and toggled by `nav.js` (**neither may
+contain a backtick or `${`**; sync-partials exits nonzero); the grammar is
+**one ground, hairlines, and one accent** (Reed's call, 2026-08-27), so
+**don't re-introduce a surface with its own colour**; `--navy` flips to the
+ground, `--brand-dd`/`--brand-ddd` and `--warn`/`--danger` deliberately do
+not flip, and a new `--navy` fill or `--brand-dd` text usage needs its own
+dark-scoped rule; and **a dark override of an aliased token goes on
+`:root[data-theme="dark"]`, never on `body`**, or every alias bakes in the
+light value first. **The dark block stays below the base `:root` block in
+`theme.css`**: `test-boost-modal-render.mjs` parses the first one it finds.
 
 ### The Widget Wears The Site's Palette
 
@@ -961,7 +868,7 @@ Two separate things are both called "boost":
   synthetic one-leg bundle. See *A Donation Is The Boost Flow With One Leg* in
   `docs/money-paths.md`.
   `BoostModal.jsx` and `MultiLegBoostForm` were the retired LB path and were
-  **deleted on 2026-08-23**; see *What The Strip Removed*. `boostagram.js`
+  **deleted on 2026-08-23**; see `docs/strip-removed.md`. `boostagram.js`
   survives and is live — `index.jsx` imports `bolt11PaymentHash`,
   `confirmInvoiceSettled` and `RECIPIENT_LUD16` from it.
 
@@ -2384,7 +2291,7 @@ would. Never remove an entry** — those links are in the wild.
 
 4. **Dead LB code — mostly gone, one layer left.** The bulk of it was deleted
    on 2026-08-23 (`git show 75f88ef` and the commit after it); what that
-   removed and what it did not is under **What The Strip Removed** below.
+   removed and what it did not is in `docs/strip-removed.md`.
 
    **What is left is `boostQueue.js` and `payAllLegs.js`.** `submitBoost`'s only
    caller was `MultiLegBoostForm`, so both are now dead — but `boostQueue.js` is
