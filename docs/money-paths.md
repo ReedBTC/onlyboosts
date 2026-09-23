@@ -1124,3 +1124,45 @@ Measured over every stored feed URL on 2026-09-06, this show was the only one
 with real traffic in the state (four hard 404s in ~1,000 feeds that answered).
 `scripts/test-value.mjs` pins the order on the money path, `test-catalogue.mjs`
 on the drawer.
+
+### The Value Block Comes From The RSS, And Podcast Index Is The Fallback
+
+*2026-09-23, found by a listener's question about Jimmy V's collection.* From
+the day `/api/value` shipped it read the split from Podcast Index, on the
+argument that many hosts (Anchor and Spotify especially) strip
+`<podcast:value>` from the feed while PI still holds the block from the
+host's own settings. That argument is correct about those feeds and wrong as
+a rule: PI's episode records keep the block each item was ingested with, and a
+publisher editing their feed does not rewrite them.
+
+Measured on the feed in question (`music.jimmyv4v.com`, thirteen songs): the
+RSS declares one channel block, six legs, and no item blocks. `/api/value`
+answered three songs with that block and **ten with a stale seven-leg block**:
+Fountain Boostbot at 1%, a Kolomona leg carrying a custom value, Steven Bell at
+3 rather than the feed's 4. Every song boost from this site to those ten
+tracks paid it. The site's rule is that the external boost pays exactly what
+the show published, and only the feed says what that is. A second finding
+sharpens it: PI labels a copied channel block `episode` too, so from PI alone
+an item's own block cannot be told from a copy of the feed's.
+
+**The rule now.** The Function fetches the feed first, bounded three ways
+(6s, 4MB, a streamed read), and reads it with a namespace-agnostic regex, the
+same shape the collector's podroll and publisher passes take, since Workers
+have no DOMParser. The item's own block wins; a `valueTimeSplit`'s recipients
+are cut out first, since they belong to a window of the episode and not to
+the boost; a `liveItem`'s block is not the channel's. An item with no block
+gets the channel's, and so does an item no longer in a complete feed. PI is
+asked only when the feed is unreachable, is not RSS, declares no block
+anywhere (the Anchor case, which is why PI was the source), or was cut by
+the cap before the item, when PI's record of that item is the next best
+reading and the channel block read from the head comes after it. A caller
+that passed no URL still gets the feed's answer, through the URL PI's record
+names. The response carries `source: 'rss' | 'pi'` so a live boost can be
+checked against this rule.
+
+**What did not change.** The PI side keeps its own order (the section above:
+the stored feed URL before the guid). Recipients from both sources come out
+through the one normalizer, so the wallet sees one shape whichever answered.
+`value-block.js` in the browser still carries a DOMParser reader of the same
+block with no caller; the edge does the read now. `scripts/test-value.mjs`
+holds the rule, confirmed red on five mutations.

@@ -5,6 +5,15 @@
  * parser rather than refactoring that one into shared code. The two look
  * similar on purpose; they are allowed to diverge.
  *
+ * ⚠️ `parseEpisodeValue` HAS NO CALLER. It was written against an `/api/feed`
+ * proxy that never shipped, and since 2026-09-23 the EDGE reads the feed:
+ * `functions/api/value.js` fetches the RSS first and falls back to Podcast
+ * Index, so every boost surface goes through `fromApiValue` below. The DOM
+ * reader is kept as the browser-side statement of the same rules (episode
+ * block over channel block, node/lnaddress only, custom key and value
+ * together); the edge restates them with a regex because Workers have no
+ * DOMParser. See *The Value Block Comes From The RSS* in docs/money-paths.md.
+ *
  * Differences from the LB parser that matter here:
  *   - Captures customKey / customValue on each recipient (external node
  *     recipients on shared nodes — Alby 696969, Fountain 906608 — need them
@@ -12,8 +21,8 @@
  *     credited to the right podcaster).
  *   - Prefers the per-EPISODE value block, falling back to the channel block.
  *
- * Input is the raw feed XML (fetched via /api/feed). Returns recipients ready
- * for the boost orchestrator, or null when the episode has no payable value.
+ * Input is the raw feed XML. Returns recipients ready for the boost
+ * orchestrator, or null when the episode has no payable value.
  */
 
 // Walk direct element children matching a local name (namespace-prefix
@@ -61,7 +70,7 @@ function parseValueEl(valueEl) {
 /**
  * Parse a feed's XML for a given episode's value block.
  *
- * @param {string} xml       Raw feed XML (from /api/feed).
+ * @param {string} xml       Raw feed XML.
  * @param {string} itemGuid  The episode's RSS <guid> (our item_guid).
  * @returns {{recipients:Array, totalWeight:number, level:'episode'|'channel'}|null}
  *          null when the feed has no payable value block for this episode.
@@ -94,10 +103,11 @@ export function parseEpisodeValue(xml, itemGuid) {
 }
 
 /**
- * Normalize the /api/value proxy response (Podcast Index, the authoritative
- * source) into the same shape parseEpisodeValue returns. PI covers shows whose
- * RSS carries no <podcast:value> at all, so this is the PRIMARY path; the RSS
- * parser above is a fallback when the proxy is unavailable.
+ * Normalize the /api/value response into the same shape parseEpisodeValue
+ * returns. The proxy reads the show's own RSS first and Podcast Index as the
+ * fallback (PI covers shows whose feed carries no <podcast:value> at all), and
+ * hands back one normalized shape whichever answered; `source` on the
+ * response says which. This is the ONLY path every boost surface takes.
  *
  * @param {{level?:string, value?:{recipients?:Array}}} apiResp
  * @returns {{recipients:Array, totalWeight:number, level:string}|null}
