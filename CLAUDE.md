@@ -1124,6 +1124,20 @@ Bowl After Bowl, 25,265 sats); the pass runs every incremental cycle over a
   let through, and contradicted prose blocks even a same-app match** — Reed's
   call, 2026-08-24: a duplicate slipping through beats a real boost filtered
   out. Don't tighten toward recall.
+- **⚠️ `SAME SATS` HAS ONE EXCEPTION, AND IT IS THE NAMED SENDER (tier 0,
+  2026-09-24).** `Boostr_Bot` reconstructs the amount from its own 1% leg
+  (100 for a 123-sat boost; 11 of its first 25 partnered notes disagreed), so
+  the hard key never held and Reed saw both notes counted. Its notes name the
+  donor in a `["sender", npub]` tag, and the partner note is **signed by that
+  key** — the signature is the evidence, not the tag. `_sender_match` pairs
+  such a note with the donor's own note on the same episode within
+  `APP_WINDOW`, sats ignored, nearest first; **a named donor with no note of
+  their own is let through and never falls to tiers 1–3**, since any other
+  partner is a different donor's payment. The `sender` tag is still read
+  nowhere for attribution (see the `client_id` section). Also the day the
+  registration commit (21a70b1) finally reached the collector: it had been
+  on origin since 2026-09-10 with "still to run on the collector box" in its
+  message, and the timers run this checkout. `test_dedupe_sender.py`.
 - **⚠️ ONE-TO-ONE HAS ONE EXCEPTION, ON THE RELAY SIDE.** `chadf-boostbot`
   signs one receipt and one note **per keysend leg**, so a multi-leg boost is
   2–3 identical bot notes and the claim used to block the second from the

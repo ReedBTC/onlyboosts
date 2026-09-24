@@ -17,7 +17,8 @@ account) are never the droppable side: their note IS the payment's note.
 THE RULE. A relay note is a duplicate of exactly one partner when the hard key
 holds — same sats, same item_guid, same effective show guid, pairing strictly
 one-to-one (two same-amount boosts in one live-show hour keep both notes) —
-AND one tier of corroborating evidence holds.
+AND one tier of corroborating evidence holds. Tier 0 below is the one
+exception to `same sats`, and it is the strongest evidence of the four.
 
 ONE-TO-ONE HAS ONE EXCEPTION, AND IT IS ON THE RELAY SIDE (2026-08-30).
 chadf-boostbot signs one kind-9735 receipt and one note PER KEYSEND LEG, so a
@@ -40,6 +41,25 @@ not conventions the bots are trusted to follow: a bot whose note format we
 have never seen simply produces no evidence, and a pair with no evidence is
 LET THROUGH (Reed's call, 2026-08-24: a duplicate slipping through is far
 better than a real boost filtered out).
+
+  0. named sender     The relay note NAMES the donor in a `["sender", npub]`
+                      tag (Boostr_Bot does; chadf-boostbot never has) and a
+                      non-relay note SIGNED BY THAT KEY sits on the same
+                      episode and show within ±APP_WINDOW. The amount is not
+                      consulted: this is the one tier that waives the hard
+                      key's `same sats`, because Boostr_Bot reconstructs the
+                      total from its own 1% leg and lands on the split's
+                      rounding (100 for 123, 1200 for 1212, 600 for 566 —
+                      11 of its first 25 partnered notes disagreed, 2026-09-24,
+                      and every one of the 25 named exactly the key that
+                      signed the partner). It is not a trusted claim: the
+                      partner note's own signature is what verifies it. A
+                      named donor with NO note of their own in the window is
+                      let through and never falls back to tiers 1-3, since
+                      pairing them with a note signed by somebody else would
+                      pair two donors' payments. Nearest gap wins among a
+                      donor's own burst of boosts to one episode (six such
+                      bursts measured, the true partner ≤5s away in each).
 
   1. strong message   The two notes share a run of the donor's own words:
                       the longest common contiguous word sequence, counting
@@ -116,6 +136,7 @@ Runs per-cycle over a trailing window (the relay bot lags its partner by ~1-3
 minutes, but relay/scan order can deliver either side first, so unmarked
 relay notes are re-evaluated every tick until the window ages them out).
 """
+import json
 import re
 import sys
 import time
@@ -326,6 +347,50 @@ def _match(conn, b, cands, claimed):
     return best
 
 
+def _sender_pubkey(row):
+    """The donor a relay note names in its `["sender", npub]` tag, as hex —
+    or None when there is no such tag, it does not decode, or it names the
+    signer itself (a note that says "I sent this" carries no second party)."""
+    try:
+        tags = json.loads(row["raw_json"] or "{}").get("tags") or []
+    except Exception:
+        return None
+    for t in tags:
+        if len(t) >= 2 and t[0] == "sender" and str(t[1]).startswith("npub1"):
+            try:
+                pk = npub_to_hex(t[1])
+            except Exception:
+                return None
+            return pk if pk != row["booster_pubkey"] else None
+    return None
+
+
+def _sender_match(conn, b, sender, claimed):
+    """Tier 0 (see the module docstring): the non-relay note SIGNED BY the
+    donor the relay note names, on the same episode and show, within
+    ±APP_WINDOW, nearest first. Sats deliberately not in the key. Returns
+    (partner, "sender", gap) or None."""
+    ph = ",".join("?" * len(RELAY_PUBLISHERS))
+    egb = db.effective_guid("b")
+    cands = conn.execute(
+        f"""SELECT * FROM boosts b
+            WHERE b.booster_pubkey = ? AND b.created_at BETWEEN ? AND ?
+              AND COALESCE(b.item_guid,'') = ? AND COALESCE({egb},'') = ?
+              AND (b.client_id IS NULL OR b.client_id NOT IN ({ph}))
+              AND b.excluded = 0 AND b.dup_of IS NULL AND b.event_id != ?""",
+        [sender, b["created_at"] - APP_WINDOW, b["created_at"] + APP_WINDOW,
+         b["item_guid"] or "", b["canonical_guid"] or b["podcast_guid"] or ""]
+        + list(RELAY_PUBLISHERS) + [b["event_id"]]).fetchall()
+    best = None
+    for o in cands:
+        if o["event_id"] in claimed:
+            continue
+        gap = abs(o["created_at"] - b["created_at"])
+        if best is None or gap < best[2]:
+            best = (o, "sender", gap)
+    return best
+
+
 def find_duplicates(conn, since=None):
     """Pair unmarked relay-publisher notes against partner notes. Read-only.
 
@@ -350,6 +415,18 @@ def find_duplicates(conn, since=None):
     egb = db.effective_guid("b")
     pairs = []
     for b in bots:
+        sender = _sender_pubkey(b)
+        if sender:
+            # Tier 0: a named donor is their own note or nothing (docstring).
+            hit = _sender_match(conn, b, sender, claimed)
+            if hit is None:
+                hit = _sibling_match(conn, b, marked_by)
+            if hit is not None:
+                o, tier, gap = hit
+                claimed.add(o["event_id"])
+                marked_by[b["event_id"]] = o["event_id"]
+                pairs.append((b, o, tier, gap))
+            continue
         cands = conn.execute(
             f"""SELECT * FROM boosts b
                 WHERE b.sats = ? AND b.created_at BETWEEN ? AND ?
