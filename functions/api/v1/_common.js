@@ -210,7 +210,7 @@ export function boostRecord(r) {
   };
 }
 
-/* ⚠️ A BOARD OF PEOPLE MUST NOT RANK A BOT, AND THESE FIVE ARE PUBLISHERS.
+/* ⚠️ A BOARD OF PEOPLE MUST NOT RANK A BOT, AND THESE SIX ARE PUBLISHERS.
  * Each is a single key that signs boosts made by many different people. The
  * site's standing rule is that the booster is the bot and never the donor —
  * right for attribution, and a category error on a leaderboard of listeners,
@@ -246,13 +246,26 @@ export function boostRecord(r) {
  * one key, and the sender it names in the body ("ChadF boosted 111 sats →")
  * is text, never an identity — the same rule as the other four. It went live
  * on 2026-09-10 against Chad and Reed's Podcast and is the same shape as the
- * Local Bitcoiners show account, one node's boosts published by one key. */
+ * Local Bitcoiners show account, one node's boosts published by one key.
+ *
+ * ⚠️ THE SIXTH IS MSP_bot (ffff6a7a…fc3e), REGISTERED 2026-10-02 ON REED'S
+ * INSTRUCTION. Music Side Project's bot, and Boostr_Bot's shape exactly: a
+ * podcaster who builds their RSS feed at musicsideproject.com adds
+ * musicsideproject@getalby.com as a 1% leg and the bot publishes a note for
+ * every boost that leg receives, naming the origin app in the same
+ * `["app", <name>, <version>]` tag (Fountain, BoostMeBitch, Castamatic,
+ * PodcastGuru, v4vmusic-com, candr.space seen on its first weeks of notes).
+ * Its notes carry `["client","MSP 2.0"]`, so the slug is `msp-2-0`. The
+ * sender it names in the body ("quincy@fountain.fm boosted 500 sats →") is
+ * text, never an identity. Nine notes on the index the day it was registered,
+ * across four music shows. */
 export const PUBLISHERS = [
   "d35ae076512c29b01a5b33aa764ed4db44a9d0bbd96009705f48101f6cfe76a2", // lnaddress-music
   "c330881e28768381dd8bdfd274341dca0c5882c29b8642ea4bc82f7563264592", // Local Bitcoiners show account
   "3a87a19c801d57111b0905569225d2b20b39d154fc93bef5a8f2860c409b84d9", // OnlyBoosts' own bot
   "3820f4ff8587747530c7feafe47c1e592e3ce0fd2929b4f907e40714bd26f408", // BoostMeBitch's site account
   "adab4ccd313996520304a5b1ec6c4076bc271bc6a3236702321c5811009d0649", // Boostr_Bot
+  "ffff6a7af32ea2239cb71548f476eec0dd9ae56673abda536bef5c241276fc3e", // MSP_bot
 ];
 
 /* ⚠️ BOOSTMEBITCH IS IN BOTH LISTS AND THAT IS NOT A CONTRADICTION. The app

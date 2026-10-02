@@ -119,6 +119,16 @@ from urllib.parse import urlparse
 # which is text and never an identity. Registered 2026-09-10 on Reed's
 # instruction, the day it went live; in dedupe.py's RELAY_PUBLISHERS the same
 # day, two duplicate pairs having landed in its first hour.
+# ⚠️ THE SEVENTH IS MSP_bot, Music Side Project's bot and Boostr_Bot's shape
+# exactly: an artist who builds their feed at musicsideproject.com adds
+# musicsideproject@getalby.com as a 1% leg and the bot publishes a note for
+# every boost that leg receives, the origin app in the same `["app", <name>,
+# <version>]` tag (Fountain, BoostMeBitch, Castamatic, PodcastGuru,
+# v4vmusic-com, candr.space seen). Its notes carry `["client","MSP 2.0"]`,
+# which slugifies to `msp-2-0`, the slug below — so this entry moves
+# `client_src` only on its rows and `client_id` on none. Registered 2026-10-02
+# on Reed's instruction, nine notes on the index across four music shows;
+# in RELAY_PUBLISHERS the same day.
 PUBLISHER_PUBKEYS = {
     "f3bd42a91af5f3f1c40ca45ad2269464ab79996b32da78e8ed2ab91111b08e65": "chadf-boostbot",
     "d35ae076512c29b01a5b33aa764ed4db44a9d0bbd96009705f48101f6cfe76a2": "lnaddress-music",
@@ -126,6 +136,7 @@ PUBLISHER_PUBKEYS = {
     "3a87a19c801d57111b0905569225d2b20b39d154fc93bef5a8f2860c409b84d9": "onlyboosts",
     "3820f4ff8587747530c7feafe47c1e592e3ce0fd2929b4f907e40714bd26f408": "boostmebitch",
     "adab4ccd313996520304a5b1ec6c4076bc271bc6a3236702321c5811009d0649": "boostr-bot",
+    "ffff6a7af32ea2239cb71548f476eec0dd9ae56673abda536bef5c241276fc3e": "msp-2-0",
 }
 
 # Fountain links its own episode/show pages from the URL slot of each NIP-73
@@ -167,6 +178,7 @@ DISPLAY_NAMES = {
     "podcast-index":   "Podcast Index",
     "boostcli":        "BoostCLI",
     "boostr-bot":      "Boostr Bot",
+    "msp-2-0":         "MSP Bot",
 }
 
 # Self-identified names that are the same product under two spellings. Kept
