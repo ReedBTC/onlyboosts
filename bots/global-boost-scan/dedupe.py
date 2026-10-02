@@ -138,7 +138,12 @@ from nostr_utils import npub_to_hex          # noqa: E402
 # against BoostMeBitch notes. Two relay notes of one payment (chadf-boostbot
 # watching the sending node, boostr-bot the receiving leg) are NOT paired —
 # the partner side is non-relay by construction — and stand as two boosts.
-RELAY_PUBLISHERS = {"chadf-boostbot", "localbitcoiners", "boostr-bot"}
+# msp-2-0 (MSP_bot) joined 2026-10-02 on the same reasoning: the same shape
+# of bot, restating Fountain, BoostMeBitch and Castamatic boosts to Music
+# Side Project feeds. Not measured against the live rows before the add (the
+# site box has no copy of the index); run `dedupe --days 14 --dry-run` on the
+# collector first and read the pairs before letting it mark.
+RELAY_PUBLISHERS = {"chadf-boostbot", "localbitcoiners", "boostr-bot", "msp-2-0"}
 
 MSG_WINDOW = 30 * 60      # strong message corroboration: generous
 APP_WINDOW = 10 * 60      # app-identity corroboration: tight

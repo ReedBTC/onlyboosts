@@ -586,8 +586,8 @@ ordered by** — a `metric` parameter on `supporterCard`, defaulting to `sats` s
 the detail pages are byte-identical.
 
 **⚠️ THE LISTING EXCLUDES PUBLISHER KEYS AND THE SEARCH DOES NOT.** `PUBLISHERS`
-in `functions/api/v1/_common.js` is the five keys that sign boosts for many
-donors (Boostr_Bot the fifth, 2026-09-10).
+in `functions/api/v1/_common.js` is the six keys that sign boosts for many
+donors (Boostr_Bot the fifth, 2026-09-10; MSP_bot the sixth, 2026-10-02).
 
 **⚠️ `chadf_boostbot` IS NOT ONE OF THEM, SINCE 2026-08-30, AND IT WAS THE
 MOTIVATING CASE.** *Reed's call.* It was excluded on the claim that it carried
@@ -693,7 +693,7 @@ Three more rules in `functions/api/v1/members.js`:
 #### The Boost Bots section, and what the tab discloses
 
 `/api/v1/members?publishers=1` is the **exact complement of the listing**: the
-wall drops the five `PUBLISHERS` keys, and this asks for those five and nothing
+wall drops the six `PUBLISHERS` keys, and this asks for those six and nothing
 else. Same endpoint, same row shape, one place the aggregate is computed; a
 second path would be two answers to "who is a member" that could disagree. It
 wins over an empty `q`, so it is never also the listing, and a `q` alongside it
@@ -706,7 +706,7 @@ the second run's numbering depend on where the first happens to sit in the SQL.
 `PUB_FIRST` / `PUB_HOLES` / `PUB_FLAG` in `members.js` are the whole of it.
 
 **The heading is "Shoutout to the Boost Bots"** (*Reed's call, 2026-08-23*),
-not a bare "Boost Bots". These four accounts are the only reason a listener with
+not a bare "Boost Bots". These accounts are the only reason a listener with
 no Nostr account is represented here at all, and the section's job is to credit
 them; the flatter label read as a category of thing being disclosed rather than
 as thanks. **The Rules dialog's link still says "Boost Bots"** — it is a
@@ -716,17 +716,17 @@ longer name does not fit that grammar. The section id stays `boost-bots`, and
 
 **⚠️ THE SECTION IS THE EXCLUSION, SHOWN — it is not a disclosure notice.**
 *Reed's call, 2026-08-23: "either way we need to be transparent about anything
-we are NOT including on this page."* These four accounts are the only reason a
+we are NOT including on this page."* These accounts are the only reason a
 listener who wants no Nostr account is represented here at all, so the section
 carries their totals and links to their pages the way any member's row does.
 
 Four rules a change would break:
 
 - **Rows, not faces.** The wall is a grid of avatars because it is a community;
-  these are four accounts each needing a sentence saying what it does. Rendering
+  these are a handful of accounts each needing a sentence saying what it does. Rendering
   them as more faces puts them back in the list they were taken out of.
 - **⚠️ A KEY WITH NO `BOT_ROLES` ENTRY STILL RENDERS.** The server owns the list
-  and `members-board.js` owns the prose, so a fifth publisher appears with its
+  and `members-board.js` owns the prose, so a new publisher appears with its
   figures and no description. A row missing a sentence beats a bot the section
   quietly fails to disclose.
 - **Exact boost counts, compact sats.** `num(m.boosts)` and `compact(m.sats)`.
@@ -742,7 +742,7 @@ Four rules a change would break:
   claim is additive, so its absence costs a reader nothing they were promised.
   It is started after the wall and never awaited.
 
-**How the five were determined: by hand, and nothing detects them.**
+**How the six were determined: by hand, and nothing detects them.**
 `PUBLISHERS` in `functions/api/v1/_common.js` is the collector's
 `PUBLISHER_PUBKEYS` less `chadf_boostbot`. Naming an account a bot is a claim,
 and the cost of getting it wrong is a real person left off a leaderboard; that

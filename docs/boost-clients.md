@@ -155,6 +155,55 @@ is a call not made here.
 others" is a display name read off a payment, and the same rule as the `P`
 tag below applies: text, never an identity.
 
+### MSP_bot Publishes For Music Side Project Feeds
+
+Registered 2026-10-02, on Reed's instruction. `ffff6a7a…fc3e`
+(`npub1lllk57h…nx7eul`) is the **seventh** entry in `PUBLISHER_PUBKEYS` and
+the sixth in the site's `PUBLISHERS`. Its profile says what it is: *"If you
+use musicsideproject.com to make your RSS feed and add me in as a 1% this can
+relay all your PC 2.0 Boost to Nostr"*, marked alpha, with
+`musicsideproject@getalby.com` as its Lightning address. Boostr_Bot's shape
+exactly, and the same note template (the `⚡ Boost ⚡` header, "X boosted N
+sats → Show", the `📻` episode line, a tardbox.com share image): an artist
+opts a feed in by adding the leg, and the bot publishes one note per boost
+that leg receives, whichever app sent it. Nine notes on the index when
+registered, across four music shows (Kulture Collection, The Drake Equation,
+Songs From The Seaside, Government Approved), 1,808 sats.
+
+**Slug `msp-2-0`, the one its own `["client","MSP 2.0"]` tag already
+slugified to**, so registering the key changes `client_src` (client-tag →
+publisher-pubkey) on its rows and `client_id` on none; `/api/v1/clients`
+listed it under that slug, unlabelled, before the registration. The label is
+"MSP Bot", after its profile name, the way Boostr_Bot's is.
+
+**The origin app rides the same `app` tag** (`["app","Fountain"]`,
+`["app","BoostMeBitch","0.1.0"]`, `["app","v4vmusic-com","0.17.6"]`,
+`["app","candr.space","1.0.0"]`, `["app","PodcastGuru","2.3.2-beta2"]`,
+`["app","Castamatic","13.2.7"]` on its first weeks of notes), read by
+`_app_tag` into `client_via` on the terms above. Some notes also carry a `p`
+tag naming a pubkey; nothing here reads it, on the standing rule that a
+sender the bot names is text and never an identity.
+
+**It is a relay publisher and it duplicates**, so `msp-2-0` is in
+`RELAY_PUBLISHERS`. The pairing was NOT measured before the add: the site
+machine holds no copy of the index, so the live rows could not be run through
+`find_duplicates` the way Boostr_Bot's were. The expected pairs are the
+Fountain-origin boosts (Fountain publishes its own note) and the
+BoostMeBitch-origin ones; run `onlyboosts_globalscan.py dedupe --days 14
+--dry-run` on the collector and read the report before the first marking
+pass.
+
+**⚠️ MOST OF ITS NOTES WERE NOT ON THE INDEX WHEN IT WAS REGISTERED.** A
+`kinds:[1], authors:[key], limit:50` read across relay.fountain.fm, nos.lol,
+relay.primal.net and relay.mynostr.app on 2026-10-02 returned 51 boost notes
+from 2026-06-29 to 06:44 UTC that day, every one carrying `k` tags; three of
+them were on the index, and the index's other six were published later that
+day, past where the capped read reached. So at least 48 notes are off the
+index. Whether they are `dup_of`-marked, excluded, or were never fetched is a
+collector-side question (the 2026-09-22 to 09-25 run sat on relay.fountain.fm
+as well as primal, so the read set alone does not explain it), noted here
+rather than diagnosed.
+
 ### OnlyBoosts Publishes On Behalf Of Its Own Donors
 
 Registered 2026-08-20. `3a87a19c…84d9` is the **fourth** entry in

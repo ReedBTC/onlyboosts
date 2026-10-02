@@ -39,6 +39,11 @@ const DISPLAY = {
   // 2026-09-10. Its notes carry `["client","Boostr_Bot"]` too, which slugifies
   // to the same thing; the underscore is its handle, not its name.
   "boostr-bot": "Boostr Bot",
+  // MSP_bot, Music Side Project's split-recipient republisher, registered as a
+  // publisher on 2026-10-02. Its notes carry `["client","MSP 2.0"]`, which is
+  // where the slug comes from; the label follows its profile name, the way
+  // Boostr_Bot's does, because the chip names the publisher.
+  "msp-2-0": "MSP Bot",
   // Carried over from the Boosts feed's own map, which read the raw client tag
   // and is now deleted. No boost in the index currently classifies to this slug;
   // it costs a line and saves the label if one ever does.
