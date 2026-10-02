@@ -28,41 +28,41 @@
  * to be authentic to a high-score table; collapsing the repeats is exactly what
  * the rename did, once the repeats stopped being a story and became a backfill.
  */
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v213'
-import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v213'
-import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v213'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v214'
+import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v214'
+import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v214'
 /* ⚠️ THE SAME WALL /show AND /episode RENDER, not a copy of it. It moved out of
  * functions/_shared/detail-page.js into a two-sided module for exactly this;
  * that file re-exports every name, so both Functions were untouched. A reader
  * who screenshots the wall here and on a show page must not be able to tell
  * them apart. */
-import { renderSupporters, initShowMore, compact } from '/assets/js/supporter-wall.js?v=ob-v213'
+import { renderSupporters, initShowMore, compact } from '/assets/js/supporter-wall.js?v=ob-v214'
 /* ⚠️ EXACT BOOST COUNTS HERE, COMPACT SATS. On the wall a row is one of a
  * hundred and `1k` is plenty; here there are four rows and the count is the
  * disclosure itself — "35 boosts for listeners with no identity" is the claim
  * the section exists to make, and `1k` rounds the evidence away. */
-import { num } from '/assets/js/boost-list.js?v=ob-v213'
-import { rangeControl, sortControl } from '/assets/js/feed-controls.js?v=ob-v213'
-import { mountFeedSearch } from '/assets/js/feed-search.js?v=ob-v213'
-import { searchMembers, SEARCH_HITS } from '/assets/js/ob-live.js?v=ob-v213'
+import { num } from '/assets/js/boost-list.js?v=ob-v214'
+import { rangeControl, sortControl } from '/assets/js/feed-controls.js?v=ob-v214'
+import { mountFeedSearch } from '/assets/js/feed-search.js?v=ob-v214'
+import { searchMembers, SEARCH_HITS } from '/assets/js/ob-live.js?v=ob-v214'
 /* ⚠️ THE SAME WEEK RULE THE ENDPOINT CUTS ON, not a second copy of it. That
  * module is two-sided for exactly this: the picker steps and enumerates weeks
  * without a round trip per press, and a Pacific week containing a DST
  * transition is 167 or 169 hours, so a client that stepped by a flat 604800
  * would drift an hour past every March and every November while still
  * producing Mondays. */
-import { weekDateString } from '/assets/js/pacific-week.js?v=ob-v213'
-import { weekLabel, boardHtml, initials, COPY } from '/assets/js/hpw-board.js?v=ob-v213'
+import { weekDateString } from '/assets/js/pacific-week.js?v=ob-v214'
+import { weekLabel, boardHtml, initials, COPY } from '/assets/js/hpw-board.js?v=ob-v214'
 /* The picker's markup and delegate moved to week-picker.js on 2026-09-03, when
  * the chart boards on the Shows and Artists feeds needed the same stepper;
  * flipHtml is the same shape over the two stacked all-time boards. */
-import { pickerHtml, flipHtml, wireWeekPicker, steppedWeek } from '/assets/js/week-picker.js?v=ob-v213'
+import { pickerHtml, flipHtml, wireWeekPicker, steppedWeek } from '/assets/js/week-picker.js?v=ob-v214'
 /* The members' Weeks at #1 board — the Charts page's own, two-sided since the
  * same day, stacked behind Proof of #40HPW here. */
-import { memberOnesBoardHtml } from '/assets/js/chart-board.js?v=ob-v213'
+import { memberOnesBoardHtml } from '/assets/js/chart-board.js?v=ob-v214'
 /* The share control: Post to Nostr, Copy link, Share image. A verb, mounted
  * onto each board after it is painted; the same module /hpw/<week> uses. */
-import { mountShare } from '/assets/js/hpw-share.js?v=ob-v213'
+import { mountShare } from '/assets/js/hpw-share.js?v=ob-v214'
 
 const esc = htmlEscape
 const HOURS_API = '/api/v1/members/hours'
@@ -382,11 +382,11 @@ const BOT_ROLES = {
      podcaster, because opting a show in is the reader's own move. */
   adab4ccd313996520304a5b1ec6c4076bc271bc6a3236702321c5811009d0649:
     'Add a 1% split to boostr@getalby.com and it will post all your boosts to Nostr.',
-  /* MSP_bot, 2026-10-02. Music Side Project's own, the same arrangement as
-     Boostr_Bot and worded the same way, since opting a feed in is again the
-     podcaster's move. */
+  /* MSP_bot, 2026-10-02. Reed's wording, same day: Music Side Project's own,
+     the same arrangement as Boostr_Bot and the same sentence shape, since
+     opting a feed in is again the podcaster's move. */
   ffff6a7af32ea2239cb71548f476eec0dd9ae56673abda536bef5c241276fc3e:
-    'Build your RSS feed at musicsideproject.com, add a 1% split to musicsideproject@getalby.com, and it will post all your boosts to Nostr.',
+    'Add a 1% split to musicsideproject@getalby.com, and it will post all your boosts to Nostr.',
 }
 
 async function bots(signal) {
