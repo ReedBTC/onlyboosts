@@ -58,7 +58,7 @@ import resolve_guids                                            # noqa: E402
 from classify import classify_boost, decode_note_or_nevent, _QUOTE_RE  # noqa: E402
 from relays import CORE_RELAYS, PROFILE_RELAYS, RECEIPT_RELAYS, expand_via_outbox, reachable_from_here  # noqa: E402
 from scan import (scan_relay_backward, scan_relay_incremental,   # noqa: E402
-                  fetch_events_by_ids, boost_filters)
+                  fetch_events_by_ids, boost_filters, _walk, REQ_PAUSE)
 from collector_common import RelayTimeout, query_relay          # noqa: E402
 from nostr_utils import load_config                             # noqa: E402
 
@@ -258,6 +258,78 @@ def cmd_incremental(args):
                 print(f"[error] {futs[f]}: {e}", flush=True)
     db.set_meta(conn, "last_incremental", newest_overall)
     print(f"Incremental done: {totals['seen']} scanned, {totals['boosts']} boosts, "
+          f"{totals['new']} new.")
+    _print_stats(conn)
+
+
+# ── publisher re-read ─────────────────────────────────────────────────────────
+PUBLISHER_RESCAN_DAYS = 30
+
+
+def cmd_rescan_publishers(args):
+    """Re-read the registered publisher keys' own timelines over a wide window.
+
+    THE BLIND SPOT THIS CLOSES (found 2026-10-02 on MSP_bot). The tail scan
+    reads a `since` window of INCREMENTAL_OVERLAP on `created_at`, and the
+    backfill is complete, so a note that reaches the core relays more than
+    three hours after its own timestamp is read by nothing, ever. A relay bot
+    stamps `created_at` with the payment time and publishes when it gets
+    round to it — a backlog replay, an outage, a queue — and MSP_bot had 195
+    boosts (43,605 sats, back to February) on relay.fountain.fm that no walk
+    had seen, every one of them matched by the live filter set the moment it
+    was asked. The classifier, the shapes and the ticks were ruled out first;
+    the only thing left was that the notes were not there when the walks
+    looked.
+
+    Why the publisher keys and not every booster: a late note from a person's
+    own app is rare, and the `authors` shape for 3,000 keys is the outbox
+    sweep's job; the handful of keys in PUBLISHER_PUBKEYS sign most of the
+    relay-bot notes, which is where late publishing lives. One `authors`
+    filter per key per relay, paged backward to the floor through `_walk`;
+    `_podcasty` keeps a key's ordinary notes from costing a receipt lookup.
+    Idempotent (INSERT OR IGNORE), so the daily run on the outbox timer
+    re-reads the last PUBLISHER_RESCAN_DAYS and inserts only what it missed.
+    `--days` / `--floor` widen it; the recovery was `--floor 1767225600`
+    (2026-01-01). A key's walk ends at the floor, at `--max-minutes`, or on
+    a relay's handshake timeout, which skips that relay for the run."""
+    conn = db.connect(DB_PATH, check_same_thread=False)
+    lock = threading.Lock()
+    receipt_cache = {}
+    totals = {"seen": 0, "boosts": 0, "new": 0}
+    relays = args.relays or CORE_RELAYS
+    now = int(time.time())
+    floor = args.floor if args.floor else now - args.days * 86400
+    keys = sorted(clients.PUBLISHER_PUBKEYS.items(), key=lambda kv: kv[1])
+    on_page = _make_page_handler(conn, lock, receipt_cache, totals)
+    deadline = time.monotonic() + args.max_minutes * 60
+    log = lambda m: print(m, flush=True)   # noqa: E731
+    print(f"Re-reading {len(keys)} publisher key(s) on {len(relays)} relay(s) back to "
+          f"{time.strftime('%Y-%m-%d', time.gmtime(floor))}, {args.max_minutes}min budget")
+
+    def one_relay(relay):
+        pages = 0
+        for pk, slug in keys:
+            if time.monotonic() >= deadline:
+                log(f"    {relay}: wall budget spent before {slug} — the rest waits for the next run")
+                break
+            try:
+                _, p = _walk(relay, {"kinds": [1], "authors": [pk]}, floor, now,
+                             on_page, None, log, label=f" [{slug}]", deadline=deadline)
+            except RelayTimeout:
+                log(f"    {relay}: handshake timed out on {slug} — skipping the relay this run")
+                break
+            pages += p
+            time.sleep(REQ_PAUSE)
+        return pages
+
+    with ThreadPoolExecutor(max_workers=len(relays)) as ex:
+        futs = {ex.submit(one_relay, r): r for r in relays}
+        for f in as_completed(futs):
+            try:
+                log(f"    {futs[f]}: {f.result()} page(s)")
+            except Exception as e:
+                log(f"[error] {futs[f]}: {e}")
+    print(f"Publisher re-read done: {totals['seen']} scanned, {totals['boosts']} boosts, "
           f"{totals['new']} new.")
     _print_stats(conn)
 
@@ -1734,6 +1806,17 @@ def main():
                     help="only rows never classified (default: re-derive all)")
     rc.add_argument("--dry-run", action="store_true")
     rc.set_defaults(func=cmd_reclassify_clients)
+
+    rp = sub.add_parser("rescan-publishers",
+                        help="re-read the publisher keys' own timelines over a wide window "
+                             "(late-published relay-bot notes the tail scan cannot see)")
+    rp.add_argument("--days", type=int, default=PUBLISHER_RESCAN_DAYS,
+                    help=f"trailing window on created_at (default {PUBLISHER_RESCAN_DAYS})")
+    rp.add_argument("--floor", type=int, default=None,
+                    help="absolute unix floor instead of --days")
+    rp.add_argument("--max-minutes", type=int, default=15, help="wall budget (default 15)")
+    rp.add_argument("--relays", nargs="*", help="override the relay set")
+    rp.set_defaults(func=cmd_rescan_publishers)
 
     s = sub.add_parser("stats", help="print index counts")
     s.set_defaults(func=cmd_stats)

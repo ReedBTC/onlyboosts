@@ -1211,6 +1211,23 @@ docstring carries the two relay quirks the wider filter set met (per-filter
 caps make a multi-filter REQ unpageable, and two nginx fronts 429 back-to-back
 handshakes).
 
+**⚠️ A NOTE PUBLISHED MORE THAN THREE HOURS AFTER ITS OWN `created_at` IS
+INVISIBLE TO THE TICK, AND THE PUBLISHER KEYS ARE RE-READ DAILY FOR THAT
+REASON, SINCE 2026-10-02.** The tail scan's `since` is `last_incremental`
+less `INCREMENTAL_OVERLAP` on `created_at`, and the backfill is complete, so
+a relay bot that stamps the payment time and publishes from a backlog, an
+outage or a queue slips every walk: MSP_bot had **195 boosts (43,605 sats,
+back to 2026-02)** on relay.fountain.fm that nothing had read, each matched
+by the live filter set the moment it was asked, with the classifier, the
+shapes and the ticks all ruled out first. `rescan-publishers` in
+`onlyboosts_globalscan.py` walks every `PUBLISHER_PUBKEYS` key's own
+timeline back 30 days on the daily outbox run (one `authors` filter per key
+per core relay, idempotent); `--floor` is the recovery form. **The diagnostic
+order that proved it — gate, shapes, ticks, then the backfill-date check —
+is in the command's docstring and is the order to use for the next "my boost
+is missing".** A late note from a person's own app is still unread until the
+outbox sweep's `authors` shape meets it, which is the accepted residual.
+
 **⚠️ THE INCREMENTAL CYCLE (EVERY 2 MINUTES SINCE 2026-09-06, 5 BEFORE)
 PUBLISHES ONLY WHEN THE INDEX CHANGED, SINCE 2026-09-04.** `publish-due` in `onlyboosts_globalscan.py` digests every
 published column of every published table (`db.content_fingerprint`) and

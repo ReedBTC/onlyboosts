@@ -27,6 +27,15 @@ echo "=== $(date -u +%FT%TZ) OnlyBoosts outbox expansion ==="
 # the flag still forces a full pass by hand.
 "$PY" "$BOT" outbox               # resolve new boosters' relays, deep-walk (budgeted), sweep known
 
+# ── the publisher keys' own timelines, re-read over 30 days (since 2026-10-02) ─
+# The tail scan reads a 3h window on created_at and the backfill is complete,
+# so a relay-bot note that reaches the relays later than that — stamped with
+# the payment time, published from a backlog — is read by nothing. MSP_bot had
+# 195 such boosts back to February. Seven keys, one `authors` filter each per
+# core relay, idempotent; see cmd_rescan_publishers. Outside the lock for the
+# same reason the sweep above is.
+"$PY" "$BOT" rescan-publishers    # late-published publisher notes the tick cannot see (30d window)
+
 # ── publish steps take the lock, and WAIT for a running incremental ──────────
 exec 9>data/pipeline.lock
 flock -w 600 9 || { echo "[skip] pipeline still busy after 10min — skipping this outbox publish"; exit 0; }

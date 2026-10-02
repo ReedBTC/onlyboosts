@@ -184,25 +184,35 @@ listed it under that slug, unlabelled, before the registration. The label is
 tag naming a pubkey; nothing here reads it, on the standing rule that a
 sender the bot names is text and never an identity.
 
-**It is a relay publisher and it duplicates**, so `msp-2-0` is in
-`RELAY_PUBLISHERS`. The pairing was NOT measured before the add: the site
-machine holds no copy of the index, so the live rows could not be run through
-`find_duplicates` the way Boostr_Bot's were. The expected pairs are the
-Fountain-origin boosts (Fountain publishes its own note) and the
-BoostMeBitch-origin ones; run `onlyboosts_globalscan.py dedupe --days 14
---dry-run` on the collector and read the report before the first marking
-pass.
+**It is a relay publisher and it duplicates, and the `sender` tag is how
+it is caught.** Measured on the collector the day it was registered: five of
+the first nine notes restated a Fountain or BoostMeBitch note 1–5 seconds
+away, each carrying `["sender", npub]`, and on every one the npub decoded
+to exactly the key that signed the partner. The amount is reconstructed from
+the leg (300 for Fountain's 333), so the hard key would not hold; tier 0 of
+`dedupe.py` pairs on the signature with sats waived. The dry run marked
+exactly those five and nothing else. After the backlog below was recovered,
+`dedupe --days 250` marked 16 more (4,515 sats), 21 in all; 39 sender-tagged
+notes stand because the named donor has no note of their own in the index,
+and 9 stand beside a non-relay partner the evidence tiers could not pair
+(the bot's boilerplate body defeats the prose tiers) — the let-through rule.
+The v4vmusic.com autoboosts name no sender and have no partner to find.
 
-**⚠️ MOST OF ITS NOTES WERE NOT ON THE INDEX WHEN IT WAS REGISTERED.** A
-`kinds:[1], authors:[key], limit:50` read across relay.fountain.fm, nos.lol,
-relay.primal.net and relay.mynostr.app on 2026-10-02 returned 51 boost notes
-from 2026-06-29 to 06:44 UTC that day, every one carrying `k` tags; three of
-them were on the index, and the index's other six were published later that
-day, past where the capped read reached. So at least 48 notes are off the
-index. Whether they are `dup_of`-marked, excluded, or were never fetched is a
-collector-side question (the 2026-09-22 to 09-25 run sat on relay.fountain.fm
-as well as primal, so the read set alone does not explain it), noted here
-rather than diagnosed.
+**⚠️ MOST OF ITS NOTES WERE NOT ON THE INDEX WHEN IT WAS REGISTERED, AND THE
+CAUSE WAS LATE PUBLICATION, NOT ANYTHING ON OUR SIDE.** relay.fountain.fm
+held 205 of its kind-1s back to 2026-02-06, 195 of them real boosts (43,605
+sats); the index held nine. Diagnosed 2026-10-02 in this order, which is the
+order to use next time: every note passes `classify_boost`; a replay of the
+live filter set over a gap window returns every missing note on three
+shapes; the ticks over the 10-01 gap were 96 clean runs; and 111 of the
+notes are stamped before the 2026-09-03 forced backfill that walked
+fountain's `#k` shape to 2025-06-01, none indexed. The bot stamps the
+payment time and publishes late, and the tail scan's 3h `since` window over
+a complete backfill reads such a note never. `rescan-publishers` in
+`onlyboosts_globalscan.py` is the fix (the publisher keys' own timelines,
+30 days, daily on the outbox run) and the recovery (`--floor 1767225600`
+inserted exactly the 195; the other six keys had nothing late). The data
+feed section of CLAUDE.md carries the rule.
 
 ### OnlyBoosts Publishes On Behalf Of Its Own Donors
 
