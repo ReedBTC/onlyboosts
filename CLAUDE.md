@@ -1138,6 +1138,9 @@ Bowl After Bowl, 25,265 sats); the pass runs every incremental cycle over a
   registration commit (21a70b1) finally reached the collector: it had been
   on origin since 2026-09-10 with "still to run on the collector box" in its
   message, and the timers run this checkout. `test_dedupe_sender.py`.
+  **MSP_bot (`msp-2-0`, registered 2026-10-02) is the second bot on this
+  tier**: the same 1%-leg shape for musicsideproject.com feeds, the same
+  `sender` tag, and five of its first nine notes paired by it.
 - **⚠️ ONE-TO-ONE HAS ONE EXCEPTION, ON THE RELAY SIDE.** `chadf-boostbot`
   signs one receipt and one note **per keysend leg**, so a multi-leg boost is
   2–3 identical bot notes and the claim used to block the second from the
