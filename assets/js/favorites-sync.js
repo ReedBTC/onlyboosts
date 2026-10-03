@@ -22,23 +22,29 @@
  * contact would otherwise be read as "another app's, carry it" and silently
  * not stick.
  *
- * THE MIGRATION GATE (docs/favorites.md). Both shipped apps still write the
- * legacy two-element item and read an item's feed from the entry above. Until
- * both read the three-element form, a reader that does not know it turns an
- * episode favorite into a favorite of the whole show. So `itemsAllowed` is
- * false by default: an item favorite is refused, and so is a publish onto a
- * list holding legacy items, because the merge rewrites them on the way
- * through (vector 27), which is itself a three-element write. Feed and
- * artist favorites are safe now.
+ * THE MIGRATION GATE IS LIFTED (2026-10-03, docs/favorites.md). Until then
+ * an item favorite was refused here, and so was a publish onto a list holding
+ * legacy two-element items, because a reader that did not know the
+ * three-element form turned an episode favorite into a favorite of the whole
+ * show. BoostMeBitch has read and written `["i", feed, item]` since
+ * 2026-09-07 (its PR #364) and StableKraft since 2026-09-08 (its PR #256), so
+ * an item favorite is an ordinary change now and a legacy item on the list is
+ * rewritten on the next publish (vector 27), as the spec requires.
+ *
+ * A NEW LIST IS PUBLIC. The spec's rule since its #47: an empty, untagged
+ * list publishes into the tags and writes no `visibility` tag, because nobody
+ * chose one. The Public/Private question (`needs-mode`) is asked only when
+ * the list cannot say which half it lives in: entries in both halves with no
+ * tag, or a `content` this signer cannot open.
  *
  * Every dependency with a side effect is injectable, so the test drives the
  * shipped cycle against scripted relays, a stand-in codec and a real key.
  * Nothing here is reached signed out; the bot cannot hold favorites.
  */
-import { readFavorites, readWriteRelays, relaySet, acceptsEvent } from '/assets/js/favorites-read.js?v=ob-v214'
+import { readFavorites, readWriteRelays, relaySet, acceptsEvent } from '/assets/js/favorites-read.js?v=ob-v215'
 import {
   KIND, plan, parse, parseTags, statedVisibility, decodePlaintext, kindOf, feedIdOf, feedGuidOf,
-} from '/assets/js/favorites-merge.js?v=ob-v214'
+} from '/assets/js/favorites-merge.js?v=ob-v215'
 
 /**
  * Where a list is published. The read set less relay.mostr.pub, which held a
@@ -52,14 +58,20 @@ import {
  * period; a relay in that set we do not write to is a stale copy waiting to
  * win a race. Primal was missing until 2026-09-08 and a favorite made on
  * /show did not reach BMB until it was re-made (Reed's test). StableKraft
- * reads nos.lol, snort, primal, theforest and damus; snort and theforest
- * held nothing on 2026-09-06 and are not yet known to accept the kind.
+ * reads nos.lol, snort, primal, theforest and damus (plus the member's own
+ * relays); snort and theforest joined on 2026-10-03, both answering a
+ * kind-10333 REQ with EOSE that day (they accept the kind on the read side;
+ * neither held any list yet). They are publish targets only: the read set
+ * trusts a read only when every reached relay answers, and two more relays
+ * there is two more ways for a read to degrade.
  */
 export const PUBLISH_RELAYS = Object.freeze([
   'wss://nos.lol',
   'wss://relay.damus.io',
   'wss://relay.primal.net',
   'wss://relay.ditto.pub',
+  'wss://relay.snort.social',
+  'wss://theforest.nostr1.com',
 ])
 
 export const PUBLISH_TIMEOUT_MS = 8000
@@ -202,12 +214,6 @@ export function validateChange(change) {
   return 'bad-kind'
 }
 
-/** Does either half still hold a legacy two-element item? A publish would rewrite it. */
-export function holdsLegacyItems(parsed, parsedPrivate = null) {
-  const legacy = (e) => e.kind === 'podcast:item:guid' && e.legacy === true
-  return (parsed?.entries ?? []).some(legacy) || (parsedPrivate?.entries ?? []).some(legacy)
-}
-
 // ---------------------------------------------------------------------------
 // Publishing
 // ---------------------------------------------------------------------------
@@ -320,12 +326,13 @@ export async function fetchFavorites(pubkey, deps = {}) {
  *
  *   signed-out     no pubkey
  *   bad-change     the change does not name valid identifiers
- *   items-gated    an item favorite, or a list holding legacy items, before
- *                  both shipped apps read the three-element form
  *   degraded       the read cannot be trusted; nothing published
- *   needs-mode     the list has no visibility tag and cannot say which half
- *                  it lives in, and this member has not chosen: ask them,
- *                  then call again with `userChose: true`
+ *   needs-mode     the list has no visibility tag, holds entries, and cannot
+ *                  say which half it lives in (entries in both halves, or a
+ *                  `content` this signer cannot open), and this member has
+ *                  not chosen: ask them, then call again with
+ *                  `userChose: true`. An EMPTY untagged list never asks: it
+ *                  is public by the spec's rule, with no tag written
  *   no-nip44       the publish needs the private half and this signer cannot
  *                  encrypt it
  *   unchanged      the bytes already say this; baseline recorded
@@ -334,7 +341,7 @@ export async function fetchFavorites(pubkey, deps = {}) {
  *
  * `deps`: { pubkey, sign, canDecrypt, decrypt, encrypt } from `widgetDeps`,
  * plus `store` (localStorage), and optionally `connect`, `verify`, `now`,
- * `readRelays`, `publishRelays`, `itemsAllowed`, `mode`, `userChose`.
+ * `readRelays`, `publishRelays`, `mode`, `userChose`.
  */
 export async function syncFavorites(change, deps) {
   const { pubkey, store } = deps ?? {}
@@ -342,7 +349,6 @@ export async function syncFavorites(change, deps) {
   if (change) {
     const why = validateChange(change)
     if (why) return { status: 'bad-change', reason: why }
-    if (change.kind === 'item' && change.op === 'add' && !deps.itemsAllowed) return { status: 'items-gated' }
   }
 
   const extra = await safeWriteRelays(pubkey, deps)
@@ -355,15 +361,17 @@ export async function syncFavorites(change, deps) {
   const parsedPrivate = readPrivate ? parseTags(readPrivate) : null
   const adopted = adoptLocal(parsed, parsedPrivate)
 
-  if (!deps.itemsAllowed && holdsLegacyItems(parsed, parsedPrivate)) return { status: 'items-gated', reason: 'legacy-on-list' }
-
   const mode = deps.mode !== undefined ? deps.mode : loadMode(store, pubkey)
   const userChose = !!deps.userChose
   const stated = statedVisibility(r.read.tags)
   const hasPublic = r.read.tags.some((t) => t[0] === 'i')
   const hasPrivate = (readPrivate ?? []).some((t) => t[0] === 'i')
   const listMode = stated ?? (hasPublic && !hasPrivate ? 'public' : hasPrivate && !hasPublic ? 'private' : null)
-  if (mode === null && listMode === null) return { status: 'needs-mode' }
+  // An empty, untagged list is public by rule (the spec's vector 16), and
+  // `plan` defaults it so; only a list that HOLDS something and cannot say
+  // where is a question for the member.
+  const listEmpty = !hasPublic && r.read.content === ''
+  if (mode === null && listMode === null && !listEmpty) return { status: 'needs-mode' }
 
   const common = { read: r.read, mode, canReadPrivate, userChose, readPrivate }
 

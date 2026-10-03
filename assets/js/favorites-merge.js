@@ -3,10 +3,12 @@
  * own reference implementation, adapted for this site.
  *
  * SOURCE: https://github.com/ChadFarrow/PC20-Nostr conformance/reference/favorites.mjs
- * at commit 0fc52c4 (2026-09-08, PR #38, the fix for issue #37 this site
- * reported), lifted with Chad's OK (via Reed, 2026-09-07). Every rule below
- * cites the section of pc20-favorites.md it comes from, and the spec's 29
- * vectors run against THIS file: `node scripts/test-favorites-merge.mjs`
+ * at commit ca652a9 (main, 2026-09-17; first lifted at 0fc52c4, PR #38, the
+ * fix for issue #37 this site reported, and re-lifted 2026-10-03 to pick up
+ * #40, #47 and #49: the claim-back path, the public default on an empty
+ * list, and the empty-run prune), with Chad's OK (via Reed, 2026-09-07).
+ * Every rule below cites the section of pc20-favorites.md it comes from,
+ * and the spec's 31 vectors run against THIS file: `node scripts/test-favorites-merge.mjs`
  * (scripts/vendor/pc20-favorites/ holds the vectors and the SHA they came from).
  * A change here that the vectors do not cover is a change to the spec; raise it
  * upstream as an issue or PR before shipping it, that is the deal — issue #37
@@ -67,7 +69,7 @@ export const feedIdOf = (guid) => FEED_PREFIX + guid;
  * points at the feed, `feedGuid` plus `itemGuid` points at one item in it.
  *
  * Position 2 is a full `podcast:item:guid:` identifier, not a bare guid. It
- * costs about 18 bytes an entry and buys a tag that says what each half of it
+ * costs about 18 bytes an entry and buys a tag that says what each place of it
  * is without a table — the same reason position 1 is not a bare feed guid.
  * A position 2 this writer cannot recognise is NOT an item entry: the tag is
  * carried whole and untouched instead of guessed at (rule 4).
@@ -315,7 +317,7 @@ export function parse(event, readPrivate = null) {
 }
 
 // ---------------------------------------------------------------------------
-// The private half
+// The private list
 // ---------------------------------------------------------------------------
 
 
@@ -325,9 +327,9 @@ export function parse(event, readPrivate = null) {
  * NIP-44 v2 as first published capped plaintext at 65535 bytes; the current
  * text allows more and switches to a 6-byte length prefix at 65536, so a
  * library built to the older text REJECTS a payload across that line — and a
- * private half that cannot be decrypted is indistinguishable from an empty
+ * private list that cannot be decrypted is indistinguishable from an empty
  * one. Sized under the cliff with room for the 1.5x NIP-44 adds on the way to
- * `content`. Writing the private half, "Refuse to publish past 60,000 bytes".
+ * `content`. Writing the encrypted entries, "Refuse to publish past 60,000 bytes".
  */
 export const PRIVATE_PLAINTEXT_MAX = 60_000;
 
@@ -338,7 +340,7 @@ export const plaintextBytes = (text) => new TextEncoder().encode(text).length;
  * The bytes handed to the signer: a stringified tag array, with `?` written as
  * its six-character JSON escape.
  *
- * Writing the private half, "The plaintext carries no `?`": a NIP-55 signer
+ * Writing the encrypted entries, "The plaintext carries no `?`": a NIP-55 signer
  * URL-decodes the whole `nostrsigner:` URI and only then splits it on `?`, so
  * one favorited track with a query string in its guid would otherwise break
  * every private publish on Android, forever. Every JSON reader already
@@ -352,9 +354,9 @@ export function encodePlaintext(tags) {
  * The plaintext back into a tag array, or NULL when it is not one.
  *
  * Null, not `[]`, for valid JSON that is not an array of string arrays. A
- * `JSON.parse` that succeeds on `{}` would otherwise mark the half readable
+ * `JSON.parse` that succeeds on `{}` would otherwise mark the place readable
  * and empty, and the next republish rewrites `content` from that emptiness.
- * Writing the private half, "A plaintext that is not a tag array is unreadable".
+ * Writing the encrypted entries, "A plaintext that is not a tag array is unreadable".
  */
 export function decodePlaintext(text) {
   let parsed;
@@ -377,8 +379,8 @@ export function decodePlaintext(text) {
 /**
  * One `i` per ENTRY KEY, first position wins.
  *
- * Only reachable from the both-halves state: an entry in BOTH halves is one
- * entry, and a whole-list move that concatenates the halves emits it twice.
+ * Only reachable from the both-places state: an entry in BOTH places is one
+ * entry, and a whole-list move that concatenates the places emits it twice.
  * The key is the pair for an item, so the same item guid under two different
  * feed guids is two entries and both survive — they are two different items.
  */
@@ -439,7 +441,32 @@ const itemTag = (itemId, feedGuid) =>
   feedGuid === null ? ['i', itemId] : ['i', feedIdOf(feedGuid), itemId];
 
 /**
- * Rule 3, over ONE half's tag array.
+ * Drop a `medium` run left with nothing under it.
+ *
+ * `mergeHalf` already refuses to emit one — "a byte change for nothing" — but
+ * the claim-back below builds its side with a filter of its own, and a filter
+ * that only inspects `i` tags keeps the run that held the entry it just took
+ * back. That leftover is not cosmetic. `encodePrivate` returns `''` only for
+ * an EMPTY array, so one stray tag is the difference between a place that
+ * encodes to nothing and a place that encodes to real ciphertext — and a
+ * signer with no NIP-44 reads ciphertext it cannot open as a private list
+ * another writer owns. It then declines to change the mode on top of bytes it
+ * cannot see, which is correct, and leaves a user who asked for private on a
+ * public list with nothing on screen saying why. Vector 30.
+ *
+ * The test is `mergeHalf`'s, deliberately: only an `i` tag keeps a run alive,
+ * because only an entry is what a `medium` labels.
+ */
+const pruneEmptyRuns = (tags) =>
+  (tags ?? []).filter((tag, index) => {
+    if (tag[0] !== 'medium') return true;
+    const next = tags.findIndex((t, i) => i > index && t[0] === 'medium');
+    const end = next === -1 ? tags.length : next;
+    return tags.some((t, i) => i > index && i < end && t[0] === 'i');
+  });
+
+/**
+ * Rule 3, over ONE place's tag array.
  *
  *   an entry you hold locally            keep it
  *   an entry not in your baseline        carry it — another app added it
@@ -451,7 +478,7 @@ const itemTag = (itemId, feedGuid) =>
  * resurrection loop.
  *
  * `append: false` turns that second pass off, and is what the whole-list move
- * between halves needs — the move reads the half it is emptying, where an entry
+ * between places needs — the move reads the place it is emptying, where an entry
  * this device holds is already on the list and appending it again would open a
  * second `medium` run for it. The three rows above still run: `append` decides
  * what is ADDED, never what is kept.
@@ -552,8 +579,8 @@ function mergeHalf(readTags, localGroups, baselineIds, { append = true } = {}) {
   };
 
   // `append: false` skips this pass and only this pass. The caller is merging
-  // the half it is about to empty, where an entry we hold is already on the
-  // list; what we hold is appended once, by the merge that owns the half it is
+  // the place it is about to empty, where an entry we hold is already on the
+  // list; what we hold is appended once, by the merge that owns the place it is
   // moving INTO.
   for (const g of append ? (localGroups ?? []) : []) {
     const kind = kindOf(g.id);
@@ -610,7 +637,7 @@ const bandOf = (e) => {
 /**
  * Emit order inside each `medium` run. Data Structure, "Tag order".
  *
- * Applied ONCE, to the whole merged half, rather than threaded through the two
+ * Applied ONCE, to the whole merged array, rather than threaded through the two
  * merge passes. That is what makes an entry land in the same place whether it
  * came off the wire or out of local state — two passes each doing half the job
  * is how two writers' orders drift apart.
@@ -715,7 +742,7 @@ const stripFrame = (tags) =>
  * The mode the event STATES, or null when it does not.
  *
  * Null is not "public". It means the list was written before this tag existed,
- * and the caller falls back to inferring the mode from whichever half holds
+ * and the caller falls back to inferring the mode from whichever place holds
  * entries — which answers correctly for every list that has any, and cannot
  * answer at all for a list that has none.
  */
@@ -790,7 +817,7 @@ export function plan({
   // must carry and may not reason about.
   //
   // EXCEPT when there is nothing there. An empty `content` is readable by
-  // anybody — there is no half to be blind to — so a signer with no NIP-44 may
+  // anybody — there is nothing to be blind to — so a signer with no NIP-44 may
   // still set the mode on a fresh list. Treating empty as opaque would freeze
   // every new account on such a signer at whatever the first writer guessed.
   const decode = codec ? codec.decode : (c) => (c === '' ? [] : readPrivateIn);
@@ -802,40 +829,58 @@ export function plan({
   const stated = statedVisibility(read.tags);
   const opaque = readPrivate === null;
 
-  // The fallback for a list with no tag: whichever half holds entries. It
-  // answers for every list that has any, and it cannot answer for one that has
-  // none — which is the gap the tag exists to close.
+  // The fallback for a list with no tag: whichever place holds entries.
   const hasPublicEntries = readTags.some((t) => t[0] === 'i');
   const hasPrivateEntries = (readPrivate ?? []).some((t) => t[0] === 'i');
+
   const inferred =
     hasPublicEntries && !hasPrivateEntries
       ? 'public'
       : hasPrivateEntries && !hasPublicEntries
         ? 'private'
-        : null; // both, or neither — a question, not an answer
+        : null; // both, or neither — not something the places can answer
+
+  // Is there genuinely nothing here? Note what this test is NOT.
+  // `hasPrivateEntries` is false both for a place that is empty and for one we
+  // could not decode, so it cannot stand alone — an opaque `content` would
+  // read as empty and the next publish would put `i` tags beside ciphertext,
+  // splitting a list somebody else owns. The empty STRING is the only content
+  // that means "there is nothing on the other side", which is why vector 30
+  // requires an emptied `content` to encode to exactly that.
+  const listEmpty = !hasPublicEntries && readContent === '';
 
   // `mode: null` is a writer with no stored preference: it follows the list.
-  // If the list cannot say either, it must ASK — publishing on a guess is how
-  // a favorite someone hid becomes a relay-indexed `i` tag.
+  // When the list cannot say either, PUBLIC is the default — but only on a
+  // list that is genuinely empty, where nobody has chosen anything and every
+  // new user starts. Anywhere else the guess is a disclosure: entries in both
+  // places, or a `content` we cannot account for, means somebody has already
+  // hidden something, and an `i` tag cannot be taken back. Ask there.
+  //
+  // The default is deliberately NOT folded into `inferred`. An inferred mode
+  // outranks this writer's standing setting (see `effective` below), so a
+  // default sitting there would answer 'public' for a writer whose own setting
+  // is Private and publish its first favorite in plaintext — the disclosure
+  // this rule exists to prevent, arrived at from the other side. It is a
+  // tiebreak for a writer that has no preference either, and nothing more.
   const listMode = stated ?? inferred;
-  if (mode === null && listMode === null) {
+  if (mode === null && listMode === null && !listEmpty) {
     return { publish: null, baselineIfLanded: base };
   }
-  const wanted = mode ?? listMode;
+  const wanted = mode ?? listMode ?? 'public';
 
   // CHANGING A STATED MODE TAKES TWO THINGS, and neither is this writer's
   // standing preference.
   //
   //   the user asking for it — a stored setting that merely disagrees is two
   //   apps holding different answers about one shared event, and letting the
-  //   one that loaded last win is how a list flips halves on a page load;
+  //   one that loaded last win is how a list flips places on a page load;
   //
-  //   being able to read BOTH halves — an app whose signer has no NIP-44
+  //   being able to read BOTH places — an app whose signer has no NIP-44
   //   cannot move what it cannot see, so claiming the list is public would
   //   publish a false statement about someone's privacy, and the next writer
   //   to believe it converges on the strength of it.
   const mayChange = userChose && !opaque;
-  // The list's own answer — stated, or inferred from a single populated half
+  // The list's own answer — stated, or inferred from a single populated place
   // — outranks this writer's standing setting. Acting on the setting is one
   // app silently overruling another; the apps ask instead, and following the
   // list is the answer that publishes nothing surprising. A choice may still
@@ -846,7 +891,7 @@ export function plan({
   // The tag is carried forward once the list has one, and written for the
   // first time only when the user has actually chosen. A writer stamping its
   // own default on a legacy list would state a mode nobody picked — and on a
-  // list that already has a private half, that stamp is what would license
+  // list that already has a private list, that stamp is what would license
   // disclosing it.
   const mayState = userChose || stated !== null;
 
@@ -863,7 +908,7 @@ export function plan({
   const activeBaseline = goingPrivate ? base.private : base.public;
   const inactiveBaseline = goingPrivate ? base.public : base.private;
 
-  // We cannot read the private half. Carry the bytes and never touch them.
+  // We cannot read the encrypted entries. Carry the bytes and never touch them.
   // Rule 4's `content` clause: "Republish event.content byte for byte, unless
   // you encrypted the bytes you are replacing it with."
   const privateIsOpaque = opaque;
@@ -872,32 +917,32 @@ export function plan({
   let mergedInactive;
 
   if (goingPrivate && privateIsOpaque) {
-    // Another writer owns the private half and we cannot merge into it.
+    // Another writer owns the encrypted entries and we cannot merge into it.
     // Do not switch on top of bytes we cannot read — that would drop them.
     //
-    // NULL, not `[]`. An empty array is a private half we are asserting is
+    // NULL, not `[]`. An empty array is a private list we are asserting is
     // empty, and it re-encodes to real bytes that replace theirs — rule 4's
     // `content` clause broken by the one branch that exists to honour it.
     // Vector 17 is what caught this; vector 12 never reaches this branch,
-    // because it reads the opaque half from the OTHER side.
+    // because it reads the opaque `content` from the OTHER side.
     mergedActive = null;
     mergedInactive = readTags;
   } else if (goingPrivate) {
     // public → private takes the WHOLE list, ours and theirs. It only ever
     // reduces exposure, and it is reversible by any app that can decrypt.
     // Nothing needs an exemption from rule 3 to make that happen: another
-    // app's entry is not in OUR baseline for the half it is leaving, so row 2
-    // carries it, and it is not in our baseline for the half it is entering
+    // app's entry is not in OUR baseline for the place it is leaving, so row 2
+    // carries it, and it is not in our baseline for the place it is entering
     // either, so row 2 carries it again.
     //
     // `append: false`, not `[]` for the local state. Pass 2 is what had to go —
-    // merging `local` into an empty public half appended our own groups a
+    // merging `local` into an empty public entries appended our own groups a
     // second time, under a second `medium` run, a byte change on every
     // private-mode cycle, so the list never reached a fixed point. Handing this
     // merge `[]` turned pass 2 off and took the `held` set with it, and row 3
     // needs that set: without it every entry looks unheld, so an entry we
     // claim here and no longer hold — an unfavorite, made in this app — rode
-    // the move into the private half instead of being dropped. There is no
+    // the move into the encrypted entries instead of being dropped. There is no
     // second chance at it either. Our new private baseline cannot claim what
     // we do not hold, so no later cycle can remove it. Vector 29.
     const moving = mergeHalf(inactiveReadTags, local, inactiveBaseline, {
@@ -910,11 +955,11 @@ export function plan({
   } else if (licensedPublic && inactiveReadTags.some((t) => t[0] === 'i')) {
     // THE STATED MODE IS THE CONSENT, and it is the only thing that lifts the
     // private → public asymmetry. Two ways to have it: the event already says
-    // public — which only a writer that could read both halves may have
+    // public — which only a writer that could read both places may have
     // written — or the user is choosing it right now, in an app that can see
     // everything it is about to disclose. Either way the whole list moves and
     // each entry is emitted once.
-    // `append: false` on the moving side: `moving` is what the OTHER half
+    // `append: false` on the moving side: `moving` is what the OTHER place
     // holds, not our own favorites a second time. The outer merge appends
     // those once, where they belong. Rule 3 runs on both merges — see the
     // going-private branch above for what suppressing it cost, and vector 29
@@ -938,25 +983,43 @@ export function plan({
       // Keys, not identifiers. An item is the pair, so the same item guid
       // under another feed guid is a different entry and is NOT ours to
       // reclaim.
+      //
+      // AND WE MUST STILL HOLD IT. `returning` is a claim, not a favorite: an
+      // entry our baseline names and the user has since unfavorited is rule
+      // 3's third row, and it fires while claiming back like anywhere else.
+      // Skip the test and the removal is not merely kept, it is DISCLOSED —
+      // published as an `i` tag relays index, by the one branch that exists
+      // because a disclosure cannot be taken back. Nor is there a second
+      // chance at it: `activeClaims` below cannot claim what we do not hold,
+      // so the baseline we land still names it in the place it just left, and
+      // no later cycle can drop it. Vector 29, fourth case.
+      const heldHere = keysOf(local);
       const inactiveKeyAt = new Map();
       for (const e of parseTags(inactiveReadTags).entries) {
         inactiveKeyAt.set(e.index, e.key);
       }
-      mergedInactive = inactiveReadTags.filter((t, i) => {
-        if (t[0] !== 'i') return true;
-        return !returning.has(inactiveKeyAt.get(i));
-      });
-      // Skip anything the active half ALREADY holds. An entry can sit in both
-      // halves at once — see vector 15 — and concatenating the claimed-back
+      // Pruned, because this is the one place built without `mergeHalf`.
+      // Claiming back the last entry of a run leaves the run, and a place
+      // holding nothing but a `medium` tag still encodes to ciphertext.
+      // Vector 30.
+      mergedInactive = pruneEmptyRuns(
+        inactiveReadTags.filter((t, i) => {
+          if (t[0] !== 'i') return true;
+          return !returning.has(inactiveKeyAt.get(i));
+        }),
+      );
+      // Skip anything the active place ALREADY holds. An entry can sit in both
+      // places at once — see vector 15 — and concatenating the claimed-back
       // ones unconditionally emits that identifier twice, which opens a second
       // group for the same feed and double-counts it for every reader. Only
-      // reachable from the both-halves state, which is why no vector below 15
+      // reachable from the both-places state, which is why no vector below 15
       // caught it.
       const already = new Set(parseTags(mergedActive).entries.map((e) => e.key));
       const claimedBack = inactiveReadTags.filter(
         (t, i) =>
           t[0] === 'i' &&
           returning.has(inactiveKeyAt.get(i)) &&
+          heldHere.has(inactiveKeyAt.get(i)) &&
           !already.has(inactiveKeyAt.get(i)),
       );
       mergedActive = mergeHalf(
@@ -975,7 +1038,7 @@ export function plan({
   );
   const privateTags = goingPrivate ? mergedActive : mergedInactive;
 
-  // Rule 4: an opaque half is republished byte for byte. Note the shape —
+  // Rule 4: an opaque `content` is republished byte for byte. Note the shape —
   // `content` is a value threaded from the read, never a literal. A default
   // parameter is how a `''` gets written back in by habit.
   //
@@ -998,7 +1061,7 @@ export function plan({
   // Rule 5: compare against THE READ, byte for byte. Only that notices that
   // another app has edited the event since.
   //
-  // Compare the DECODED private half, not the encoded bytes. Real NIP-44
+  // Compare the DECODED private list, not the encoded bytes. Real NIP-44
   // draws a fresh nonce per encryption, so identical entries produce
   // different ciphertext every time and a bytes comparison always differs —
   // every load republishes, forever. The fake codec here is deterministic and
@@ -1020,7 +1083,7 @@ export function plan({
     sameTags(publicTags, frame(readTags, carriedKinds, stated)) &&
     JSON.stringify(privateTags ?? readPrivate) === JSON.stringify(readPrivate);
 
-  // Writing the private half: a plaintext past the NIP-44 v2 cliff reads back
+  // Writing the encrypted entries: a plaintext past the NIP-44 v2 cliff reads back
   // as EMPTY on an older signer, not as an error. Refusing costs one favorite;
   // publishing costs the whole list on that device. Vector 24.
   if (
@@ -1038,11 +1101,11 @@ export function plan({
       ? { kind: KIND, tags: publicTags, content }
       : { kind: KIND, tags: publicTags, content, privatePlaintext };
 
-  // Rule 2, per half. The half we did NOT publish into has no new
+  // Rule 2, per place. The one we did NOT publish into has no new
   // contribution, so its claims are CARRIED, never recomputed. Recompute them
   // and we claim every entry in it, another writer's included; nothing backs
   // the claim next cycle, so rule 3's "in your baseline, absent locally" row
-  // fires on the whole half at once.
+  // fires on all of them at once.
   //
   // Claims are ENTRY KEYS. A feed favorite is an ordinary entry now, so it
   // needs no claim of its own: its presence on the list is the favorite, and
@@ -1053,8 +1116,37 @@ export function plan({
     .entries.map((e) => e.key)
     .filter((key) => heldLocally.has(key) || activeBaseline.includes(key));
 
+  // A claim on the place we did not publish into is CARRIED, never recomputed
+  // — recompute it and we claim every entry in that place, another writer's
+  // included. Carrying it is not the same as keeping it alive past the entry
+  // it names, and this writer removes entries from the INACTIVE place too: the
+  // claim-back takes them out of it, and a whole-list move empties it
+  // outright. A claim left behind by either cannot be satisfied on any later
+  // cycle, and the one thing it can still do is rule 3's third row — so the
+  // moment a second app writes that entry back into that place, we delete it,
+  // silently, on someone else's device. Vector 31.
+  //
+  // It retires only when there is nothing left for it to do. An entry still
+  // IN the place has a live claim. An entry we still HOLD keeps its claim in
+  // wherever it sits, because there the claim is also the resurrection
+  // guard — pass 2 re-adds what we hold, and the baseline is the only thing
+  // that stops it. Neither one true means we removed the entry and already
+  // published the removal, so the claim is spent.
+  //
+  // A `content` we could not read is one we did not edit. Its claims are
+  // carried untouched, because presence is not a question we can ask of
+  // bytes we cannot open.
+  const inactiveTags = goingPrivate ? publicTags : privateTags;
+  const inactiveStillHas =
+    inactiveTags === null
+      ? null
+      : new Set(parseTags(inactiveTags).entries.map((e) => e.key));
   const carriedInactive = inactiveBaseline.filter(
-    (id) => !activeClaims.includes(id),
+    (id) =>
+      !activeClaims.includes(id) &&
+      (inactiveStillHas === null ||
+        inactiveStillHas.has(id) ||
+        heldLocally.has(id)),
   );
 
   const baselineIfLanded = goingPrivate

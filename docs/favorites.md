@@ -1,15 +1,19 @@
 # PC 2.0 Favorites (kind 10333)
 
 The design record for OnlyBoosts' support of Chad Farrow's cross-app podcast
-favorites. **Status, 2026-09-08: all six steps built.** The heart is on the show
-surfaces, the Favorites section is on `/booster`, the account menu carries the
-dark-mode and Public/Private rows, and Reed's first live test published real
-lists that BoostMeBitch read back. Open: the episode hearts behind the
-migration gate.
+favorites. **Status, 2026-10-03: all six steps built and the migration gate
+lifted.** The heart is on the show, episode and artist surfaces, the Favorites
+section is on `/booster`, the account menu carries the dark-mode and
+Public/Private rows, and Reed's first live test (2026-09-08) published real
+lists that BoostMeBitch read back. The 2026-10-03 review against the spec's
+current main (ca652a9) and both apps' current code re-vendored the reference
+(31 vectors, up from 29), lifted the gate, retired the first-favorite dialog
+in favour of the spec's public default, and added StableKraft's two relays
+to the publish set. Open: a live test of an episode favorite reaching BMB.
 
 | | |
 |---|---|
-| Spec | https://github.com/ChadFarrow/PC20-Nostr/blob/main/pc20-favorites.md (re-read it before building on this file; it moved five times in the first week of September 2026, the last a rewrite of the item entry) |
+| Spec | https://github.com/ChadFarrow/PC20-Nostr/blob/main/pc20-favorites.md (re-read it before building on this file; it moved five times in the first week of September 2026, the last a rewrite of the item entry, and three more times on 2026-09-08 after this site vendored it, which the 2026-10-03 re-vendor caught up with) |
 | Vendored vectors | `scripts/vendor/pc20-favorites/` at the SHA in its `PROVENANCE` |
 | The merge | `assets/js/favorites-merge.js`, the spec's reference implementation with two adaptations; `node scripts/test-favorites-merge.mjs` |
 | The reader | `assets/js/favorites-read.js`, per-relay trust on raw sockets; `node scripts/test-favorites-read.mjs` |
@@ -18,7 +22,7 @@ migration gate.
 | The section | `assets/js/favorites-section.js` on `/booster`, over `POST /api/v1/favorites/resolve`; `node scripts/test-favorites-section.mjs` |
 | The settings | `assets/js/account-settings.js`, the account menu's settings as a NIP-78 event; `node scripts/test-account-settings.mjs` |
 | Upstream | https://github.com/ChadFarrow/PC20-Nostr/issues/37, the reference's private-list removal defect |
-| Other writers | BoostMeBitch (`lib/nostr/favorites-list.ts`) and StableKraft (`lib/nostr/favorites-single-list.ts`); both carry `content`, both write the `visibility` tag, both implement the private half |
+| Other writers | BoostMeBitch (`lib/nostr/favorites-list.ts`) and StableKraft (`lib/nostr/favorites-single-list.ts`); both carry `content`, both write the `visibility` tag, both implement the private half, and both read AND write the three-element item (BMB since its PR #364, 2026-09-07; StableKraft since its PR #256, 2026-09-08), rewriting a legacy item once. Neither originates or renders an artist favorite (checked 2026-10-03) |
 
 ## What The List Is
 
@@ -32,7 +36,7 @@ element count, and a `medium` tag that runs until the next one:
 | `["i", "podcast:guid:F"]` | a feed favorite (a show or an album) |
 | `["i", "podcast:guid:F", "podcast:item:guid:X"]` | item X of feed F (an episode or a song); the feed is on the tag, so nothing above it means anything |
 | `["i", "podcast:publisher:guid:P"]` | an artist; belongs to no feed |
-| `["i", "podcast:item:guid:X"]` | **legacy**: an item whose feed is the entry above it. Both shipped writers still write this; a reader must accept it and a writer rewrites it on its next publish |
+| `["i", "podcast:item:guid:X"]` | **legacy**: an item whose feed is the entry above it. Every list published before 2026-09-07 holds these; neither app writes them any more, a reader must still accept them, and a writer rewrites one on its next publish |
 
 This is `<podcast:remoteItem>` as one tag, `feedGuid` first and `itemGuid`
 second, both carrying their NIP-73 prefix. It is the flat model Reed argued
@@ -57,34 +61,39 @@ Shows feed already uses. **Artist favorites are written here since
 and neither creates or displays one yet, so an artist favorited here shows on
 OnlyBoosts alone until they render it. Chad is told.
 
-## The Migration Gate, And What We May Write Today
+## The Migration Gate, Lifted 2026-10-03
 
-Both shipped writers still emit the legacy item and read an item's feed from
-the entry above it. `pc20-favorites-feed-guid-migration.md` orders the move,
-and the order protects live data: **neither app may write the three-element
-item until both read it** (stage 1), because a reader that does not know the
-form sees `podcast:guid:F` at position 1 and silently converts someone's
-episode favorite into a favorite of the whole show. Our module is built on the
-reference, which writes only the new form and rewrites a legacy tag on sight.
+`pc20-favorites-feed-guid-migration.md` ordered the move to the three-element
+item, and the order protected live data: **neither app may write the
+three-element item until both read it** (stage 1), because a reader that does
+not know the form sees `podcast:guid:F` at position 1 and silently converts
+someone's episode favorite into a favorite of the whole show. Our module is
+built on the reference, which writes only the new form and rewrites a legacy
+tag on sight, so from 2026-09-08 this site refused an item favorite
+(`items-gated`) and refused to publish onto any list still holding legacy
+items, and kept the episode hearts hidden (`ITEMS_ALLOWED = false`).
 
-For OnlyBoosts, a fresh writer with no legacy of its own, that means:
-
-- **Show, album and artist favorites are safe to write now.** Two-element
-  feed entries are what every reader already understands.
-- **Episode and song favorites wait for stage 1 in both apps.** Until Chad
-  confirms it, this site reads and renders item favorites and writes none.
-- **A list we republish is upgraded on the way through** (vector 27), which
-  is itself a three-element write. So the gate applies to any publish onto a
-  list holding legacy items, not only to our own item favorites: until stage
-  1, a publish onto such a list is declined, with a line on screen.
+**Both apps cleared stage 2 the week the gate was written.** BoostMeBitch
+reads and writes the pair since its PR #364 (2026-09-07) and StableKraft since
+its PR #256 (2026-09-08); each rewrites a legacy item once and bands each run
+(stage 4), and each deliberately leaves stage 3 undone, carrying a placement
+feed entry already on the wire rather than retracting it. The 2026-10-03
+review found this in both headers, and the gate, the constant, the
+`items-gated` status, `holdsLegacyItems` and the `itemsAllowed` dependency
+came out rather than being flipped: a gate whose condition is permanently
+met is a second way to read the same decision. Episode and song hearts are
+revealed and written like show hearts; a legacy item on a list is rewritten on
+the next publish, as vector 27 requires. `test-favorites-sync.mjs` pins the
+three-element write and the rewrite.
 
 ## The Module
 
 `assets/js/favorites-merge.js` is the spec's `conformance/reference/favorites.mjs`
-at commit 0fc52c4, lifted with Chad's OK (via Reed, 2026-09-07). The reference's
-own header says it has never served traffic; what makes it the right base is
-that every rule in it cites the spec section it implements and the spec's 29
-vectors run against it unchanged. Two adaptations, and nothing else differs:
+at commit ca652a9 (first lifted at 0fc52c4, re-lifted 2026-10-03), with Chad's
+OK (via Reed, 2026-09-07). The reference's own header says it has never served
+traffic; what makes it the right base is that every rule in it cites the spec
+section it implements and the spec's 31 vectors run against it unchanged. Two
+adaptations, and nothing else differs:
 
 - **No stand-in codec.** The reference seals the private half with reversible
   base64 so its vectors need no crypto. That code lives only in the test shim
@@ -120,20 +129,22 @@ scripted relays, a stand-in codec and a real key:
    contact and silently does not stick. The private half is adopted beside
    the public one for the same reason; the merge's own `parse` reads the
    public tags only.
-4. **Ask before the first favorite** on a list with no `visibility` tag that
-   cannot say which half it lives in (`needs-mode`); the caller prompts
-   Public or Private and calls again with `userChose`.
+4. **Ask only when the list cannot answer.** A list with no `visibility` tag
+   that holds entries in both halves, or a `content` this signer cannot open,
+   is `needs-mode`; the caller prompts Public or Private and calls again with
+   `userChose`. **An empty, untagged list is public by the spec's rule** (its
+   #47, vector 16, adopted here 2026-10-03, Reed's call): the first favorite
+   publishes into the tags, writes no `visibility` tag and stores no choice,
+   so a new member's first heart just works and the Public/Private switch
+   waits in the account menu. The dialog asked on every first favorite from
+   2026-09-08 until then, on the spec's earlier "no default" rule.
 5. **Merge** through `plan`, **encrypt** the returned plaintext when the
    publish needs the private half, **sign** through `LBLogin.signEvent`, and
    refuse an event the signer returns under another key.
-6. **Publish** on raw sockets to nos.lol, damus and ditto plus the member's
-   NIP-65 write relays (read off their kind 10002), one OK per relay. One
-   `OK true` is landing; the baseline is recorded then and only then.
-
-**The migration gate is enforced here**: an item favorite is refused
-(`items-gated`), and so is any publish onto a list still holding legacy
-two-element items, because the merge rewrites them on the way through.
-`itemsAllowed` lifts both once Chad confirms both apps read the new form.
+6. **Publish** on raw sockets to nos.lol, damus, primal, ditto, snort and
+   theforest plus the member's NIP-65 write relays (read off their kind
+   10002), one OK per relay. One `OK true` is landing; the baseline is
+   recorded then and only then.
 
 **Issue #37, found by the writer's test and fixed upstream the same day.**
 In the two whole-list-move branches of `plan` (going private, and a licensed
@@ -146,8 +157,22 @@ across, permanently. PR #38 (commit 0fc52c4) fixes both sites, adds vector 29
 for all three cases, and writes the rule into §3 of the spec: a move between
 halves is a merge, not a copy. The module here is lifted from that commit, so
 there is no local departure any more; `test-favorites-merge.mjs` keeps the
-first two cases as a regression beside the 29 vectors. The vendored SHA is
-ahead of the spec's `main` until the PR merges.
+first two cases as a regression beside the vectors.
+
+**The same day, main moved three more times, and this site did not follow
+until 2026-10-03.** #40 fixed three defects on the claim-back path (a
+whole-list move claimed back an entry the member no longer held, and a
+carried claim outlived its entry, so a removal made in the other half could
+resurrect; vector 29 was rewritten and vector 31 added), #47 made an empty
+untagged list public by rule and pruned an emptied `medium` run from the
+private half (vectors 16 and 30: our module encrypted `[["medium","podcast"]]`
+where the other apps wrote `''`, which they then read as a private half), and
+#49 fixed the `visibility` tag's position (vector 21, which already passed).
+Against the 31 vectors the shipped module failed 16, 29, 30 and 31. The
+reference's diff (206 lines, 23 of 27 hunks code, the four rejects prose)
+applied cleanly over the two adaptations; the module is now at ca652a9 and
+all 31 pass. **Vendoring from a PR branch is how this slipped**: the
+re-vendor rule in `PROVENANCE` is unchanged, but the SHA to take is main's.
 
 ## The Heart
 
@@ -179,18 +204,23 @@ Surfaces, 2026-09-08:
 | Artists cards | artist | `publisher-card.js`, alone at the right end of the stats line (no boost pill there) |
 | `/artist` hero and its community rows | artist | `functions/artist/[guid].js` |
 
-**Episode hearts are rendered but never revealed while `ITEMS_ALLOWED` is
-false** in favorites-ui.js, the migration gate: nothing on screen promises
-what the writer refuses. Flipping the constant lights every episode surface
-at once. The catalogue drawer's un-indexed rows have no heart (they are
-episodes, behind the same gate).
+**Episode hearts are revealed like show hearts since 2026-10-03**, when the
+migration gate (`ITEMS_ALLOWED`, false from 2026-09-08) came out of
+favorites-ui.js; see **The Migration Gate, Lifted** above. The catalogue
+drawer's un-indexed rows still have no heart: they are built by
+`episode-catalogue.js` from Podcast Index on open, and a heart there is a
+follow-up rather than a gate. An episode whose show the collector never
+identified has no feed guid on its heart (`episode-card.js#realShowGuid`) and
+cannot be favorited, which is the spec's own rule: without the feed, an item
+is unresolvable by every app.
 
-**The first favorite asks Public or Private** in a small dialog of the
-controller's own (`.ob-fav-ask`), when the list cannot say which half it
-lives in and this member has not chosen here; the answer is stored per pubkey
-and offered again in the account menu (step six). Every outcome that is not a
-quiet success is a toast; a degraded read or a publish no relay accepted
-changes nothing and says so.
+**A favorite on a list that cannot say which half it lives in asks Public or
+Private** in a small dialog of the controller's own (`.ob-fav-ask`): no
+`visibility` tag, and entries in both halves or a `content` this signer
+cannot open. The answer is stored per pubkey and offered again in the account
+menu (step six). An empty list never asks (public by rule, 2026-10-03). Every
+outcome that is not a quiet success is a toast; a degraded read or a publish
+no relay accepted changes nothing and says so.
 
 ## The Section On `/booster`
 
@@ -300,8 +330,14 @@ shipped module against scripted sockets; the live smoke on 2026-09-08 read
 Chad's list from five relays in under a second, with primal now holding the
 current copy too.
 
-**Publish** (step three) goes to nos.lol, damus, primal and ditto plus the
-NIP-65 write relays. **Primal joined both sets on 2026-09-08, after Reed's
+**Publish** (step three) goes to nos.lol, damus, primal, ditto, snort and
+theforest plus the NIP-65 write relays. **Snort and theforest joined on
+2026-10-03**: they are two of StableKraft's five defaults (nos.lol, snort,
+primal, theforest, damus, plus the member's own), both answered a kind-10333
+REQ with EOSE that day (the kind is accepted on the read side), and neither
+held any list yet. Publish targets only, on the same reasoning as primal
+below; they are deliberately not in the read set, where every reached relay
+must answer before a read is trusted. **Primal joined both sets on 2026-09-08, after Reed's
 first live test**: two shows favorited from the feed reached BoostMeBitch, a
 show favorited from `/show` did not until it was unfavorited and re-favorited.
 BMB reads damus, primal, nos.lol and fountain, takes the newest copy it hears,
@@ -328,8 +364,11 @@ beyond the markup.
   boost note's reaction bar already uses `♥`/`♡` for Like; the two never
   share a row and the word carries the difference.
 - Settings rows in the existing identity dropdown (dark mode, Public/Private),
-  not a settings page. First favorite on an untagged, empty list prompts
-  Public or Private; the spec allows no default.
+  not a settings page. First favorite on an untagged, empty list prompted
+  Public or Private while the spec allowed no default; **the spec gained a
+  public default on 2026-09-08 (#47) and this site follows it since
+  2026-10-03**, Reed's call, so the dialog is reserved for a list that
+  genuinely cannot say.
 - Foreign entries the index cannot resolve go through a bounded Podcast Index
   lookup on `_shared/podcast-index.js#piGet` and link to BMB, the way podroll
   tiles already do for a show with no page here.
@@ -341,7 +380,8 @@ beyond the markup.
 
 1. ~~The relay reader~~ built 2026-09-08.
 2. ~~The writer~~ built 2026-09-08.
-3. ~~The heart~~ built 2026-09-08, show surfaces live, episode surfaces gated.
+3. ~~The heart~~ built 2026-09-08, show surfaces live; episode surfaces
+   revealed 2026-10-03 when the gate lifted.
 4. ~~The `#favorites` section~~ built 2026-09-08.
 5. ~~The dropdown rows~~ built 2026-09-08.
 6. Per-entry public/private (NIP-51 bookmarks' model): tabled 2026-09-09

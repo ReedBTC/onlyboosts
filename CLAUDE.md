@@ -2016,8 +2016,10 @@ kind 10333: one replaceable event per pubkey, feed and item entries, public or
 private as a whole. **All six steps built 2026-09-08: the merge, the reader,
 the writer, the heart, the `/booster` section and the account menu rows.
 Reed's first live lists reached BoostMeBitch, and artist favorites are written
-here first (neither app renders one yet). Open: the episode hearts behind the
-migration gate.**
+here first (neither app renders one yet). The migration gate lifted
+2026-10-03: episode and song hearts are live, the merge is re-vendored at
+the spec's ca652a9 (31 vectors), an empty list is public by rule, and snort
+and theforest are publish targets.**
 - **⚠️ `favorites-ui.js` IS LOADED ON EVERY PAGE BY `nav.js`**, a dynamic
   import at the end of its IIFE, lazily (no hearts, no relay read). It
   exposes `window.OBFavorites` for the widget's Favorites row; a mode change
@@ -2036,8 +2038,10 @@ migration gate.**
   SIGNED-IN MEMBER ONLY** (Reed: signed out gets nothing). `favorite-button.js`
   is two-sided chrome on the boost-button pattern, rendered by both cards and
   the /show and /episode Functions ahead of the boost pill. **Episode hearts
-  stay hidden behind `ITEMS_ALLOWED = false`** until both shipped apps read
-  the three-element item; flipping it lights every episode surface at once.
+  are revealed like show hearts since 2026-10-03**: `ITEMS_ALLOWED` and the
+  writer's `items-gated` status are gone, not flipped, because both shipped
+  apps have read and written the three-element item since 2026-09-08. The
+  catalogue drawer's un-indexed rows still carry no heart.
 
 - **⚠️ THE MERGE IS THE SPEC'S REFERENCE IMPLEMENTATION, LIFTED WITH CHAD'S
   OK, AND THE SPEC'S OWN VECTORS RUN AGAINST IT.** Two adaptations: no
@@ -2046,7 +2050,11 @@ migration gate.**
   vectors do not cover is a change to the spec and goes upstream first**:
   issue #37 (a removal never propagated on a private list) went that way on
   2026-09-08, Chad found a third case, and the module is lifted from the fix
-  (PR #38, commit 0fc52c4, 29 vectors).
+  (PR #38). **Vendor from main, never a PR branch**: main moved three more
+  times that day (#40, #47, #49) and the site shipped four red vectors for
+  three weeks; re-lifted at ca652a9 on 2026-10-03, 31 vectors. **An empty,
+  untagged list is public by rule** (#47) and never asks; the Public/Private
+  dialog is for a list that holds entries and cannot say which half.
 - **⚠️ ONLYBOOSTS ADOPTS THE LIST AND CLAIMS WHAT IT RENDERS**, both halves,
   with a hydrate pass at the top of every cycle; without it an unfavorite of
   another app's entry silently does not stick. The writer never uses NIP-04,
@@ -2057,8 +2065,9 @@ migration gate.**
   publisher entry. **No item favorite is written until BOTH existing apps read
   the three-element form** (stage 1 of the feed-guid migration): a reader that
   does not know it turns an episode favorite into a favorite of the whole show.
-  Feed and artist favorites are safe to write now; a publish onto a list
-  holding legacy items is declined until then, since republishing rewrites them.
+  **Both have since 2026-09-08 (BMB #364, StableKraft #256)**, so item
+  favorites are written and a legacy item on a list is rewritten on the next
+  publish, as vector 27 requires (2026-10-03).
 - **⚠️ `relay.fountain.fm` REFUSES THE KIND, AND ONE RELAY HELD A STALE
   PRIVATE-MODE COPY WITH ZERO PUBLIC TAGS.** `favorites-read.js` counts per
   relay on raw sockets, never a pool's aggregate EOSE: trusted only when

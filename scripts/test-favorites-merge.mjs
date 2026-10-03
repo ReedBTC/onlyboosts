@@ -41,7 +41,7 @@ const check = (name, fn) => {
   const n = (k) => Number((out.match(new RegExp(`^ℹ ${k} (\\d+)`, 'm')) ?? [])[1] ?? NaN);
   check(`spec vectors: ${n('pass')} of ${n('tests')} pass, ${n('fail')} fail`, () => {
     assert.equal(r.status, 0, out.split('\n').filter((l) => /^not ok|Error/.test(l)).join(' | '));
-    assert.ok(n('tests') >= 28, `expected the 28 vectors of e44843a or more, ran ${n('tests')}`);
+    assert.ok(n('tests') >= 31, `expected the 31 vectors of ca652a9 or more, ran ${n('tests')}`);
     assert.equal(n('fail'), 0);
   });
   const prov = readFileSync(path.join(root, 'scripts/vendor/pc20-favorites/PROVENANCE'), 'utf8');
