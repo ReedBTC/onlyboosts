@@ -28,7 +28,7 @@ import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import {
   npubEncode, pubkeyFromNpub, mentionQueryAt, insertMention, mentionLabel, createMentionMap,
-  normaliseNpubs, mentionedPubkeys, rankSearchEvents, formatFollowers, SEARCH_LIMIT,
+  normaliseNpubs, mentionedPubkeys, rankSearchEvents, formatFollowers, matchesSpacedQuery, SEARCH_LIMIT,
 } from '../assets/js/mention-search.js'
 import { nip19 } from '../functions/_shared/nostr-sign.js'
 import { buildExternalNoteTemplate, buildDonationNoteTemplate, buildBoostagram, buildLnurlComment, clipMessage, utf8Bytes, MAX_MESSAGE_BYTES } from '../login-widget/src/lib/externalBoostagram.js'
@@ -80,14 +80,41 @@ ok('an email address is not a trigger, and neither is an `@` mid-word', () => {
 ok('a bare `@` reports an empty query; the caller decides whether to search', () => {
   assert.deepEqual(mentionQueryAt('@', 1), { query: '', start: 0, end: 1 })
 })
-ok('whitespace after the `@` closes the lead-in, and so does a 41-character one', () => {
-  assert.equal(mentionQueryAt('@reed btc', 9), null)
+ok('the lead-in runs past a space (a display name has them), to three spaces and forty characters', () => {
+  assert.deepEqual(mentionQueryAt('@reed btc', 9), { query: 'reed btc', start: 0, end: 9 })
+  assert.deepEqual(mentionQueryAt('@sir tj the w', 13), { query: 'sir tj the w', start: 0, end: 13 })
+  assert.equal(mentionQueryAt('@a b c d e', 10), null, 'a fourth space is prose')
   assert.equal(mentionQueryAt('@' + 'x'.repeat(41), 42), null)
   assert.ok(mentionQueryAt('@' + 'x'.repeat(40), 41))
 })
+ok('a space straight after the `@`, a line break and a second `@` close it', () => {
+  assert.equal(mentionQueryAt('@ foo', 5), null)
+  assert.equal(mentionQueryAt('@reed\nhi', 8), null)
+  assert.equal(mentionQueryAt('@reed@x', 7), null)
+})
+ok('a picked label, alone or followed by prose, does not re-open the menu', () => {
+  const isPicked = (l) => l === 'reed' || l === 'Sir TJ'
+  assert.equal(mentionQueryAt('@reed', 5, { isPicked }), null)
+  assert.equal(mentionQueryAt('@reed ', 6, { isPicked }), null)
+  assert.equal(mentionQueryAt('@reed hello there', 17, { isPicked }), null)
+  assert.equal(mentionQueryAt('@Sir TJ rocks', 13, { isPicked }), null)
+  assert.deepEqual(mentionQueryAt('@reedbtc', 8, { isPicked }), { query: 'reedbtc', start: 0, end: 8 }, 'a label is matched whole')
+  assert.deepEqual(mentionQueryAt('@Sir T', 6, { isPicked }), { query: 'Sir T', start: 0, end: 6 }, 'typing toward a picked label still searches')
+  assert.deepEqual(mentionQueryAt('@reed', 5), { query: 'reed', start: 0, end: 5 }, 'without a map nothing is picked')
+})
+ok('a spaced query matches the letters in order with spaces ignored, on handle, display name or NIP-05', () => {
+  assert.equal(matchesSpacedQuery({ name: 'manbyt', displayName: 'Sir Double T' }, 'sir d'), true)
+  assert.equal(matchesSpacedQuery({ name: 'sirtj', displayName: '' }, 'Sir TJ'), true)
+  assert.equal(matchesSpacedQuery({ name: '', displayName: '', nip05: 'sir.tj@example.com' }, 'sir tj'), false, 'the dot is kept; only spaces are ignored')
+  assert.equal(matchesSpacedQuery({ name: 'Iris' }, 'sir t'), false)
+  assert.equal(matchesSpacedQuery({ name: 'x' }, '  '), false)
+})
 ok('the caret, not the end of the text, is what is examined', () => {
   assert.deepEqual(mentionQueryAt('@re and more', 3), { query: 're', start: 0, end: 3 })
-  assert.equal(mentionQueryAt('@re and more', 12), null)
+  // Past the prose the lead-in is three words, which is still a query (the
+  // menu shows only while the cache has a matching row); the fourth closes it.
+  assert.deepEqual(mentionQueryAt('@re and more', 12), { query: 're and more', start: 0, end: 12 })
+  assert.equal(mentionQueryAt('@re and more and so', 19), null)
 })
 
 console.log('\nthe token:')
@@ -307,6 +334,19 @@ ok('the zap request gains no `p` tag from a mention (NIP-57 reads one `p` as the
 ok('the share modal publishes the expansion and its `p` tags', () => {
   assert.ok(share.includes('const text = mentions ? mentions.expand() : q(\'[data-text]\').value'))
   assert.ok(share.includes('mentionPubkeys: mentions ? mentions.pubkeys() : []'))
+})
+ok('both pickers hand the trigger their own map, so a made mention does not re-open the menu', () => {
+  assert.ok(picker.includes('mentionQueryAt(textarea.value, textarea.selectionStart, { isPicked: (label) => map.has(label) })'))
+  assert.ok(component.includes('mentionQueryAt(value, caret, { isPicked })'))
+  assert.ok(modal.includes('isPicked={isMentionPicked}'))
+  assert.ok(modal.includes('const isMentionPicked = useCallback((label) => mentionMapRef.current.has(label), [])'))
+})
+ok('a spaced query goes to Primal spaceless and wider, and is narrowed here', () => {
+  const shared = readFileSync(join(ROOT, 'assets/js/mention-search.js'), 'utf8')
+  const fn = shared.slice(shared.indexOf('export async function searchUsers'), shared.indexOf('const squash'))
+  assert.ok(fn.includes("query: spaced ? q.replace(/\\s+/g, '') : q"), 'Primal answers a spaced query with nothing (measured 2026-10-03)')
+  assert.ok(fn.includes('Math.max(limit, SPACED_FETCH_LIMIT)'))
+  assert.ok(fn.includes('rows.filter((r) => matchesSpacedQuery(r, q))'))
 })
 ok('the shared module is imported by both builds from the one file', () => {
   assert.ok(/from '\/assets\/js\/mention-search\.js\?v=ob-v\d+'/.test(picker))

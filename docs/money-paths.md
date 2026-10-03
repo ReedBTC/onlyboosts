@@ -925,6 +925,85 @@ read-modify-write loses concurrent increments, and an IP limit falls to anyone
 with a proxy pool. It still **fails closed** with nothing bound, because refusing
 to run is what makes the operator decide.
 
+### The Note Quotes One Receipt
+
+`functions/api/sign-receipt.js`, `assets/js/zap-receipt.js`,
+`login-widget/src/lib/summaryReceipt.js`, since 2026-10-03 (Reed's call, from
+the BMB review of that day; BMB's #408 and #444 are the design record it
+follows).
+
+**Fountain draws a boost's ⚡ figure off the first kind 9735 the note quotes,
+and off nothing else.** Not the note's `amount` tag, not the sum of several
+receipts. BMB measured it on 2026-09-16 (two 33-sat leg receipts quoted under
+a 100-sat note rendered "⚡ 33"), asked Fountain, and was told Fountain signs
+one receipt for the total under its own key, because Fountain IS the recipient
+and splits server-side. A client-side split can never produce a provider
+receipt for the whole: four recipients are four invoices from four providers,
+and the keysend legs have no receipt at all. So the only receipt for the whole
+is one this site signs, and a note from here carried none, which is why an
+OnlyBoosts boost showed in Fountain with no figure. BMB's first boost through
+the same shape (note 81802c0c…, receipt 470f0fa0…, 2026-09-17) rendered
+"⚡ 100" for a 100-sat boost split four ways, with no bolt11 on the receipt.
+
+**The shape.** A kind 9734 names the sats that settled, the bot's key as `p`,
+the relays the receipt is bound for, and the show's and item's NIP-73 pairs
+(Fountain's own request shape, read out of two of its receipts). The oracle
+derives the 9735 from it: `p` the bot, `P` the sender, `description` the
+request verbatim, `amount`, the pairs mirrored. **No bolt11**: there is no
+invoice for the total and a minted one nobody can pay would be a fabricated
+payment record, which is a different thing from an attestation. The note then
+quotes it twice over, because Fountain lists a note off the `q` tag and draws
+the figure off the body: `['q', id, hint, bot]` and a final `nostr:nevent1…`
+line (`receiptQuote`). A note with no receipt is byte-identical to the note
+before receipts existed, and the collector reads `amount`, never the quote.
+
+**Who signs the request follows who signs the note.** On the donor route the
+donor signs the 9734 (one more signer prompt) and the receipt's `P` names
+them. On the bot route (signed out, Anonymous) the bot authors the 9734 from a
+spec of three bounded facts, so the receipt's sender is the bot, as the note's
+author is, and nothing names the person; this is the same rule as the note's
+"From" line being prose. A donation mints nothing: it is not a boost.
+
+**⚠️ THE ORACLE SIGNS NOTHING A CALLER WROTE.** It takes a 9734 and derives
+the 9735; `validateSummaryRequest` refuses prose, any `e`, `client` or second
+`p`, a `p` that is not the bot, fractional sats, more than the cap, a relay
+that is not `wss://`, more than eight of them, and a ref outside the podcast
+namespace; `verifyEvent` then holds the request to its signature. So a
+stranger can make the bot attest a payment from their OWN key, or an anonymous
+one from the bot's, which are the two claims `/api/sign-boost` already lets
+them make, and nothing else. **The cap is the boost oracle's cap**
+(`SUMMARY_MAX_MSAT` restates `MAX_AMOUNT_MSAT`, held equal by the test): one
+number signs under this key. The counter is the boost oracle's KV counter in
+its own window (`sign-receipt:`), because a bot-route boost now makes one call
+to each. **The boost oracle admits the `q` tag once, and only under the bot's
+own key**, so a note signed there can never present a stranger's event as the
+receipt for a boost; the ingest endpoint reuses the validator without a key
+and checks the shape alone.
+
+**⚠️ THE PRE-SIGNED NOTE'S RECEIPT IS SIGNED AND HELD.** The modal signs the
+note before the payment (*compose first, pay second*), so the receipt has to
+exist then too, but a receipt on the relays for sats that may never settle is
+a fabricated record. `mintSummaryReceipt({ publish: false })` signs it and
+holds it in `presignedRef`; `publishPresigned` puts it on the relays only when
+the pre-signed note is about to go out, which is only when every leg paid the
+figure it names, and if no relay takes it the pre-signed note is dropped and
+`handleShare` signs a fresh one from live leg state, minting again on the way.
+A receipt minted after the payment carries the relays that ACCEPTED it as its
+hints; a held one carries the relays it was bound for, and the oracle allows
+the empty hint for that reason.
+
+**⚠️ `BOOSTBOT_PUBKEY_HEX` IN `zap-receipt.js` RESTATES THE SITE IDENTITY
+TABLE.** The widget addresses the donor's 9734 to it, and the oracle derives
+its own from `BOOSTBOT_NSEC` and refuses a request addressed anywhere else, so
+a rotated bot key not mirrored there makes every donor-route receipt fail
+quietly: the note still publishes and quotes nothing. Rotate both.
+
+**What the first live boost must prove**, as BMB's did: that Fountain's reader
+takes the figure from a receipt signed by this bot key with no bolt11. BMB's
+measurement is of its own site key; nothing in Fountain's reader is known to
+distinguish the two, but it has not been measured for this one. Nothing
+Fountain does with the receipt changes what the collector indexes.
+
 ### The one boost button
 
 Boosting a SHOW (as opposed to an episode) pays the **feed-level** value block —

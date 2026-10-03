@@ -79,10 +79,26 @@ broken composer.
 ## The Trigger
 
 `@` opens the menu only at the start of the text or after whitespace or an
-opening bracket or quote, so `reed@nostrplebs.com` never does. The lead-in
-ends at whitespace or a second `@`, is at most forty characters, and is read
-at the caret, not the end of the text. Results are requested 250ms after the
-last keystroke and a late answer to a lead-in the typist has left is dropped.
+opening bracket or quote, so `reed@nostrplebs.com` never does. The lead-in is
+at most forty characters and is read at the caret, not the end of the text.
+Results are requested 250ms after the last keystroke and a late answer to a
+lead-in the typist has left is dropped.
+
+**The lead-in runs past a space since 2026-10-03** (BMB's #457, on Reed's
+ask): a display name has spaces, and `@Sir` could not narrow a crowded prefix
+while `@Sir T` closed the list. It ends at a line break, a second `@`, a space
+straight after the `@`, or a fourth space; three spaces is four words, which
+no name needs and which keeps the prose after a mention from being searched
+word by word. The other half of that guard is the composer's own map: a
+lead-in that is a picked label, or opens with one and a space, is the mention
+already made and the prose after it, so `mentionQueryAt` takes `isPicked`
+from both pickers and does not re-open on it. **Primal answers a spaced query
+with nothing** (measured 2026-10-03: `sir tj` → 0 rows, `sirtj` → 4, all of
+them Sir TJ; `chad f` → 0, `chadf` → 14), so `searchUsers` sends the spaceless
+form, asks for 24 rows rather than 8, and narrows them with
+`matchesSpacedQuery`: the letters of the query in order somewhere in the
+handle, the display name or the NIP-05, spaces ignored on both sides. A
+single-word query is sent and ranked exactly as before.
 
 Keys while the menu is open: ↑ ↓ move, Enter or Tab pick, Escape closes and
 stays closed for that lead-in. A pointer pick is on mousedown with the default

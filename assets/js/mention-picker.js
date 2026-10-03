@@ -31,7 +31,7 @@
  * Styled by the `.ob-mention-*` rules in boost-actions.css, which every page
  * with a composer links.
  */
-import { searchUsers, mentionQueryAt, insertMention, createMentionMap, mentionedPubkeys, formatFollowers, isSafeUrl } from '/assets/js/mention-search.js?v=ob-v217'
+import { searchUsers, mentionQueryAt, insertMention, createMentionMap, mentionedPubkeys, formatFollowers, isSafeUrl } from '/assets/js/mention-search.js?v=ob-v218'
 
 const DEBOUNCE_MS = 250
 const AVATAR_FALLBACK = '/assets/avatar-fallback.svg'
@@ -136,7 +136,7 @@ export function attachMentionPicker(textarea, { limit } = {}) {
 
   function update() {
     if (destroyed) return
-    const r = mentionQueryAt(textarea.value, textarea.selectionStart)
+    const r = mentionQueryAt(textarea.value, textarea.selectionStart, { isPicked: (label) => map.has(label) })
     if (!r || !r.query) { close(); return }
     range = r
     clearTimeout(timer)

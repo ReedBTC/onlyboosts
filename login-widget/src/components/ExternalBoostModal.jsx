@@ -46,8 +46,9 @@ import { isSafeUrl } from '../lib/utils.js'
 import * as wallet from '../lib/wallet.js'
 import { payExternalBoost, distributeSats, STATUS, confirmLegSettled, legIsCheckable } from '../lib/externalBoost.js'
 import { buildExternalNoteTemplate, buildDonationNoteTemplate, sanitizeSenderName, MAX_MESSAGE_BYTES, utf8Bytes, MAX_SENDER_NAME_CHARS } from '../lib/externalBoostagram.js'
-import { signKindOneShareWithUser, publishSignedKindOne, fetchLnurlMeta } from '../lib/boostagram.js'
+import { signKindOneShareWithUser, publishSignedKindOne, fetchLnurlMeta, SITE_URL } from '../lib/boostagram.js'
 import { signKindOneWithSite } from '../lib/siteSign.js'
+import { mintSummaryReceipt, publishReceipt } from '../lib/summaryReceipt.js'
 import { ingestBoostNote } from '../lib/siteIngest.js'
 import { setBoostModalProgressVisible } from '../lib/boostModalSignal.js'
 import { fireConfetti } from '../lib/confetti.js'
@@ -328,6 +329,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
       setMentionNotice('')
     }
   }
+  const isMentionPicked = useCallback((label) => mentionMapRef.current.has(label), [])
   const onMentionPick = useCallback((profile, range) => {
     const map = mentionMapRef.current
     const label = map.label(profile)
@@ -638,6 +640,21 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
    * shapes, so passing the wrong one here fails at the oracle rather than
    * publishing something wrong.
    */
+  /**
+   * The show and item the receipt names, in the 9734's NIP-73 pairs: the same
+   * guids the note tags, with the episode page as the item hint and the show
+   * page as the show hint. A donation has none and mints no receipt.
+   */
+  function receiptRefs() {
+    const podcastGuid = episode?.podcastGuid || undefined
+    return {
+      podcastGuid,
+      episodeGuid: episode?.itemGuid || undefined,
+      episodeUrl: episode?.bmbUrl || undefined,
+      podcastUrl: podcastGuid ? `${SITE_URL}/show/${encodeURIComponent(podcastGuid)}` : undefined,
+    }
+  }
+
   function noteTemplate(args) {
     if (donation) {
       const { paidSats, message: msg, senderName, mentionPubkeys: mentioned } = args
@@ -671,11 +688,21 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
     setShareState('signing')
     setShareError('')
     try {
+      // ⚠️ THE RECEIPT FIRST, FOR THE SATS THAT SETTLED, ON THE SAME ROUTE AS
+      // THE NOTE: the donor signs its 9734 where the donor signs the note, the
+      // bot authors it where the bot signs the note. Published before the note
+      // so the quote points at something, and null on any failure, in which
+      // case the note quotes nothing (summaryReceipt.js). A donation skips it.
+      const minted = donation ? null : await mintSummaryReceipt({
+        paidSats, refs: receiptRefs(), as: noteRoute === 'donor' ? 'self' : 'site', publish: true,
+      })
+      if (cancelledRef.current) return
       const template = noteTemplate({
         paidSats,
         legsPaid: paidCount,
         legsTotal: activeCount,
         message: expandedMessage,
+        receipt: minted?.quote || null,
         // ⚠️ DONOR ROUTE ONLY. The oracle refuses `p` (see mentionTags in
         // externalBoostagram.js); on the bot route the mention is text alone.
         mentionPubkeys: noteRoute === 'donor' ? mentionPubkeys : [],
@@ -721,9 +748,10 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
     }
   }
 
-  /** The note signed before the payment ran, or null. `{ event, sats, legs }` —
-   *  the two figures ride along so the publish step can re-check that they
-   *  still describe what happened. Built by `presignNote`, which carries the
+  /** The note signed before the payment ran, or null. `{ event, sats, legs,
+   *  receipt }` — the two figures ride along so the publish step can re-check
+   *  that they still describe what happened, and `receipt` is the signed,
+   *  unpublished kind 9735 the note quotes (null when none was minted). Built by `presignNote`, which carries the
    *  reasoning; declared up here because both the effect below and
    *  `publishPresigned` read it, and a `const` read above its declaration is
    *  the exact shape that took the whole widget down on 2026-08-21. */
@@ -732,9 +760,24 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
   /** Publish a note that was signed before the payment. Same reporting rules as
    *  `handleShare` from here on: it is the same event shape, published through
    *  the same relay set, and a failure is a failure to POST rather than to pay. */
-  async function publishPresigned(event) {
+  async function publishPresigned(pre) {
     setShareState('signing')
     setShareError('')
+    // The receipt the pre-signed note quotes was signed and HELD before the
+    // payment (summaryReceipt.js, `publish: false`); it goes on the relays
+    // now, ahead of the note. If no relay takes it, the quote would point at
+    // nothing — so the pre-signed note is dropped and `handleShare` signs a
+    // fresh one from live leg state, minting again on the way.
+    if (pre.receipt) {
+      const landed = await publishReceipt(pre.receipt)
+      if (cancelledRef.current) return
+      if (!landed) {
+        presignedRef.current = null
+        setShareState('idle')
+        return handleShare()
+      }
+    }
+    const event = pre.event
     try {
       const published = await publishSignedKindOne(event)
       void ingestBoostNote(event, published, episode)   // same rule as handleShare
@@ -796,7 +839,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
     // amount than it was allocated would satisfy the count and not the total.
     const pre = presignedRef.current
     if (pre && pre.sats === paidSats && pre.legs === activeCount) {
-      publishPresigned(pre.event)
+      publishPresigned(pre)
       return
     }
     // It did not hold, or there was nothing pre-signed. `handleShare` signs
@@ -872,8 +915,18 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
     const projected = distributeSats(sats, recipients, totalWeight).filter((l) => l.sats > 0).length
     if (projected === 0) return
     try {
+      // The receipt for the typed amount, signed now (a second prompt, before
+      // the note's) and held unpublished until the pre-signed note is about to
+      // go out — which is only when every leg paid exactly this figure, so the
+      // receipt is never on the relays for sats that did not settle. Declined
+      // or failed, the note is still signed, quoting nothing.
+      const minted = donation ? null : await mintSummaryReceipt({
+        paidSats: sats, refs: receiptRefs(), as: 'self', publish: false,
+      })
+      if (cancelledRef.current) return
       const template = noteTemplate({
         paidSats: sats,
+        receipt: minted?.quote || null,
         // Equal on purpose: a pre-signed note is only ever published when
         // nothing fell short, so it must carry no shortfall line.
         legsPaid: projected,
@@ -889,7 +942,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
       })
       const signed = await signKindOneShareWithUser(template)
       if (cancelledRef.current) return
-      presignedRef.current = { event: signed, sats, legs: projected }
+      presignedRef.current = { event: signed, sats, legs: projected, receipt: minted?.event || null }
     } catch (e) {
       console.warn('[lb] pre-sign declined or failed; the note falls back to a press', e?.message || e)
     }
@@ -1226,7 +1279,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
                       rows={3}
                       className="w-full bg-[var(--modal-field,#ffffff)] border border-[var(--modal-line,#b9d4e6)] rounded-lg px-3 py-2 text-sm text-[var(--ink,#0f2733)] focus:outline-none focus:border-[var(--brand,#00aff0)] focus:ring-2 focus:ring-[var(--brand-ring,rgba(0,175,240,0.32))] resize-none leading-relaxed"
                       placeholder="Say something to the show (rides along with the boost). Type @ to mention someone." />
-                    <MentionAutocomplete textareaRef={messageRef} value={message} caret={caret} onPick={onMentionPick} />
+                    <MentionAutocomplete textareaRef={messageRef} value={message} caret={caret} onPick={onMentionPick} isPicked={isMentionPicked} />
                   </div>
                   <div className="mt-1 flex items-baseline justify-between gap-3">
                     <p className="text-[10px] text-[var(--muted,#5a7488)] leading-snug" aria-live="polite">{mentionNotice}</p>

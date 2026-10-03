@@ -31,6 +31,8 @@ const TLV_BOOSTAGRAM = 7629169  // Podcasting 2.0 TLV record for the boostagram 
  * `clipMessage` cuts on a character boundary, never inside a code point, so
  * an emoji at the edge is dropped whole rather than left as a broken byte.
  */
+import { receiptQuote } from '../../../assets/js/zap-receipt.js'
+
 export const MAX_MESSAGE_BYTES = 300
 const _enc = new TextEncoder()
 export function utf8Bytes(s) { return _enc.encode(String(s || '')).length }
@@ -218,7 +220,7 @@ export function toWeblnRecords(boostagram, recipient) {
  */
 export function buildExternalNoteTemplate({
   paidSats, legsPaid, legsTotal, message, senderName, showTitle, episodeTitle, podcastGuid, itemGuid, bmbUrl,
-  mentionPubkeys = [],
+  mentionPubkeys = [], receipt = null,
 }) {
   const sats = Number(paidSats) || 0
   const paid = Number(legsPaid) || 0
@@ -250,6 +252,16 @@ export function buildExternalNoteTemplate({
   lines.push('')
   lines.push(`🎙️ ${showEp}`)
   if (bmbUrl) lines.push(bmbUrl)
+  // ⚠️ THE ONE RECEIPT THIS NOTE QUOTES: the bot-signed summary for the sats
+  // that settled (summaryReceipt.js, assets/js/zap-receipt.js). Fountain lists
+  // the note off the `q` tag below and draws its ⚡ figure off THIS line, so
+  // both halves are written. Never a leg's own receipt: Fountain renders the
+  // first quote and nothing else, and a leg's figure is not the boost's. A
+  // boost with no receipt (the oracle off, no relay took it, the signer
+  // declined the 9734) produces byte-identical content and tags to the note
+  // before receipts existed; the collector reads `amount`, never the quote.
+  const quote = receipt?.id && receipt?.pubkey ? receiptQuote(receipt) : null
+  if (quote) lines.push(quote.line)
 
   const tags = [
     ['t', 'boost'],
@@ -266,6 +278,7 @@ export function buildExternalNoteTemplate({
   if (podcastGuid) { tags.push(['i', `podcast:guid:${podcastGuid}`]); tags.push(['k', 'podcast:guid']) }
   if (itemGuid) { tags.push(['i', `podcast:item:guid:${itemGuid}`]); tags.push(['k', 'podcast:item:guid']) }
   tags.push(['amount', String(Math.round(sats * 1000))])
+  if (quote) tags.push(quote.tag)
   for (const t of mentionTags(mentionPubkeys)) tags.push(t)
 
   return { kind: 1, created_at: Math.floor(Date.now() / 1000), content: lines.join('\n'), tags }

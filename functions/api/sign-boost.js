@@ -51,7 +51,7 @@
  * about one shape of one kind, and the validator is an ALLOWLIST so a new tag
  * in the template fails loudly here rather than being signed silently.
  */
-import { finalizeEvent, nip19 } from '../_shared/nostr-sign.js'
+import { finalizeEvent, getPublicKey, nip19 } from '../_shared/nostr-sign.js'
 
 // The exact opening `buildExternalNoteTemplate` emits. It constrains the first
 // characters and nothing more: the rest is the donor's own typed message, which
@@ -117,7 +117,16 @@ const DONATION_URL = 'https://onlyboosts.social/'
 // `login-widget/src/lib/externalBoostagram.js`. An allowlist, not a denylist.
 // ⚠️ IF THAT BUILDER EMITS A NEW TAG, ADD IT HERE IN THE SAME CHANGE or every
 // site-signed note starts failing.
-const ALLOWED_TAGS = new Set(['i', 'k', 'r', 't', 'client', 'amount'])
+//
+// `q` joined on 2026-10-03: the note quotes the summary receipt the bot signed
+// for the sats that settled (`/api/sign-receipt`, `assets/js/zap-receipt.js`).
+// It is admitted ONCE, and — when the oracle is the caller — only when its
+// author is the bot's own key, so a note signed here can never present a
+// stranger's event as the receipt for a boost. The ingest endpoint reuses the
+// validator without a key and checks the shape alone; it indexes a note's
+// `amount`, never its quote.
+const ALLOWED_TAGS = new Set(['i', 'k', 'r', 't', 'client', 'amount', 'q'])
+const HEX64 = /^[0-9a-f]{64}$/
 
 // ⚠️ `e` AND `p` ARE REFUSED BY OMISSION, AND THAT IS THE POINT OF THE
 // ALLOWLIST. Our template emits neither. With an `e` tag a note signed by this
@@ -176,7 +185,7 @@ const RATE_WINDOW_SECS = 60
 // from the widget source and the bundle cannot import from here, the same split
 // `CALLBACK_HOST_ALLOWLIST` lives with. **The two copies must stay in step, and
 // the widget's `MAX_SATS` is now a third: all three are 5,000,000 sats.**
-const MAX_AMOUNT_MSAT = 5_000_000_000   // 5M sats, matching the modal's MAX_SATS
+export const MAX_AMOUNT_MSAT = 5_000_000_000   // 5M sats, matching the modal's MAX_SATS
 
 // The attribution is OURS and is not caller-settable. A `client` tag naming
 // something else would put a false publisher on a note we signed.
@@ -242,7 +251,7 @@ function checkCreatedAt(value, skewSecs = CREATED_AT_SKEW_SECS) {
   return createdAt
 }
 
-export function validateBoostTemplate(body, { skewSecs } = {}) {
+export function validateBoostTemplate(body, { skewSecs, sitePubkey } = {}) {
   if (!body || typeof body !== 'object') throw new Error('bad template')
   if (body.kind !== 1) throw new Error('only kind 1 boost notes may be signed')
 
@@ -261,6 +270,21 @@ export function validateBoostTemplate(body, { skewSecs } = {}) {
   for (const tag of tags) {
     if (tag[0] === 'r' && !isSafeUrl(tag[1] || '')) throw new Error('unsupported url')
     if (tag[0] === 'client' && tag[1] !== CLIENT_TAG) throw new Error('unsupported client')
+  }
+
+  // ⚠️ AT MOST ONE `q`, NIP-18's shape (id, relay hint, author), AND WHEN THE
+  // ORACLE ASKS, THE AUTHOR IS THE BOT. Fountain draws a boost's figure off the
+  // FIRST quoted kind 9735, so a second quote is a second claim about the
+  // amount; and a quote of anyone else's event under this key would present a
+  // stranger's receipt — or a stranger's note — as this boost's. The relay
+  // hint may be empty: a pre-signed note names the relays the receipt is
+  // bound for, and the oracle has no way to know which took it.
+  const quotes = tags.filter((tag) => tag[0] === 'q')
+  if (quotes.length > 1) throw new Error('invalid quote')
+  for (const q of quotes) {
+    if (q.length !== 4 || !HEX64.test(q[1]) || !HEX64.test(q[3])) throw new Error('invalid quote')
+    if (q[2] !== '' && !/^wss:\/\//.test(q[2])) throw new Error('invalid quote')
+    if (sitePubkey && q[3] !== sitePubkey) throw new Error('unsupported quote')
   }
 
   // ⚠️ Exactly one `amount`, and it is the figure this index will read off the
@@ -365,11 +389,11 @@ export function validateDonationTemplate(body) {
  * turn two strict shapes into one loose one, and the error a caller sees would
  * name whichever validator happened to complain last.
  */
-export function validateTemplate(body) {
+export function validateTemplate(body, opts = {}) {
   const content = body && typeof body.content === 'string' ? body.content : ''
   return content.startsWith(DONATION_BANNER_URL)
     ? validateDonationTemplate(body)
-    : validateBoostTemplate(body)
+    : validateBoostTemplate(body, opts)
 }
 
 /** nsec or 64-char hex, to a 32-byte key. Returns null on anything else, which
@@ -400,9 +424,9 @@ export function secretKeyFrom(value) {
  * twice the window because KV's minimum is 60 seconds and a key must outlive
  * the window it counts.
  */
-export async function overRateLimit(kv, ip, now = Date.now()) {
+export async function overRateLimit(kv, ip, now = Date.now(), scope = 'sign-boost') {
   const window = Math.floor(now / 1000 / RATE_WINDOW_SECS)
-  const key = `sign-boost:${ip}:${window}`
+  const key = `${scope}:${ip}:${window}`
   const current = Number(await kv.get(key)) || 0
   if (current >= RATE_LIMIT) return true
   await kv.put(key, String(current + 1), { expirationTtl: RATE_WINDOW_SECS * 2 })
@@ -436,7 +460,7 @@ export async function onRequestPost({ request, env }) {
   try { body = await request.json() } catch { return bad('invalid JSON') }
 
   let template
-  try { template = validateTemplate(body) } catch (e) {
+  try { template = validateTemplate(body, { sitePubkey: getPublicKey(sk) }) } catch (e) {
     return bad(e instanceof Error ? e.message : 'invalid template')
   }
 

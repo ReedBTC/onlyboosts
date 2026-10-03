@@ -214,6 +214,21 @@ identified has no feed guid on its heart (`episode-card.js#realShowGuid`) and
 cannot be favorited, which is the spec's own rule: without the feed, an item
 is unresolvable by every app.
 
+**A degraded read retries itself since 2026-10-03** (BMB's #430, on Reed's
+ask). The read's guard is right and stays: an untrusted read keeps what is on
+the device, paints the hearts unknown, and publishes nothing. But it was the
+one reader on the page with no way back: on a phone every launch is a cold
+page load against a radio that is not up yet, so the first read failed at
+t=0 and the member saw unknown hearts for the life of the page or until they
+pressed one. favorites-ui.js now re-asks on a ladder of three rungs (2, 8 and
+20 seconds) armed when a read ends untrusted, and from the first rung again
+when the page comes back (`online`, `focus`, the document turning visible).
+Only a trusted read resets the budget; a retry's own pass going through
+`loading` must not, or it is a retry storm (BMB measured two reads every four
+seconds). The retry repeats the read that failed with the same options, so a
+read that was going to open the private half still does, and a timer never
+loads the widget on its own.
+
 **A favorite on a list that cannot say which half it lives in asks Public or
 Private** in a small dialog of the controller's own (`.ob-fav-ask`): no
 `visibility` tag, and entries in both halves or a `content` this signer

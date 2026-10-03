@@ -41,14 +41,14 @@
  * after which the list is re-read with NIP-44 and the hearts fill. That is a
  * known cost of not loading 1MB to draw an outline.
  */
-import { fetchFavorites, syncFavorites, widgetDeps, saveMode, loadMode } from '/assets/js/favorites-sync.js?v=ob-v217'
-import { statedVisibility } from '/assets/js/favorites-merge.js?v=ob-v217'
-import { setFavoriteState, changeFor, keyFor } from '/assets/js/favorite-button.js?v=ob-v217'
-import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v217'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v217'
-import { initAccountSettings, noteSettingsChange } from '/assets/js/account-settings.js?v=ob-v217'
+import { fetchFavorites, syncFavorites, widgetDeps, saveMode, loadMode } from '/assets/js/favorites-sync.js?v=ob-v218'
+import { statedVisibility } from '/assets/js/favorites-merge.js?v=ob-v218'
+import { setFavoriteState, changeFor, keyFor } from '/assets/js/favorite-button.js?v=ob-v218'
+import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v218'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v218'
+import { initAccountSettings, noteSettingsChange } from '/assets/js/account-settings.js?v=ob-v218'
 
-const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v217'
+const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v218'
 
 const state = {
   pubkey: null,
@@ -125,8 +125,71 @@ async function load({ withWidget = false } = {}) {
 }
 
 function reload(opts) {
-  state.loading = load(opts).finally(() => { state.loading = null })
+  lastReadOpts = opts
+  state.loading = load(opts).finally(() => {
+    state.loading = null
+    settleRetry()
+  })
   return state.loading
+}
+
+/* ------------------------------------------------------------------------ */
+/* A degraded read retries itself                                            */
+
+/**
+ * The read's guard is right and stays: an untrusted read keeps what is on
+ * the device and the hearts paint unknown. But it was the one reader on the
+ * page with no way back. On a phone, every launch is a cold page load against
+ * a radio that is not up yet, so the first read fails at t=0 and the member
+ * saw unknown hearts for the life of the page, or until they pressed one.
+ * BMB met the same fault from Android (its #430, 2026-09-23); this is its
+ * ladder: three rungs at 2, 8 and 20 seconds, armed when a read ends
+ * untrusted, and re-armed from the first rung when the page comes back —
+ * `online`, `focus`, or the document turning visible.
+ *
+ * ⚠️ ONLY A TRUSTED READ RESETS THE BUDGET. A retry's own pass goes through
+ * `loading` on its way back to untrusted; resetting on anything but success
+ * is a retry storm (BMB measured two reads every four seconds for as long as
+ * the page was open). A wake resets it too, deliberately: the fault it is
+ * about is the one a wake ends. The retry repeats the read that failed, with
+ * the same options, so a read that was going to open the private half still
+ * does; a timer never loads the widget on its own.
+ */
+const READ_RETRY_GAPS_MS = [2_000, 8_000, 20_000]
+let retryStep = 0
+let retryTimer = null
+let lastReadOpts
+
+function readWorthRetrying() {
+  return !!state.pubkey && state.everRead && !state.trusted && !state.loading
+}
+
+function cancelRetry() {
+  clearTimeout(retryTimer)
+  retryTimer = null
+}
+
+function armRetry() {
+  if (retryTimer || retryStep >= READ_RETRY_GAPS_MS.length) return
+  retryTimer = setTimeout(() => {
+    retryTimer = null
+    retryStep += 1
+    if (readWorthRetrying()) reload(lastReadOpts)
+  }, READ_RETRY_GAPS_MS[retryStep])
+}
+
+/** After every read: a trusted one clears the ladder, an untrusted one arms
+ *  the next rung. Nothing here runs a read itself. */
+function settleRetry() {
+  if (state.trusted || !state.pubkey) { cancelRetry(); retryStep = 0; return }
+  armRetry()
+}
+
+function onWake() {
+  if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+  retryStep = 0
+  cancelRetry()
+  if (readWorthRetrying()) reload(lastReadOpts)
 }
 
 /* ------------------------------------------------------------------------ */
@@ -341,6 +404,11 @@ function boot() {
 
   window.addEventListener('lb:session-change', () => reload({ withWidget: true }))
   window.addEventListener('storage', (e) => { if (e.key === 'lb_nostr_session') reload() })
+  // A degraded read retries itself, and the page coming back is the moment
+  // to ask again (see the ladder above).
+  document.addEventListener('visibilitychange', onWake)
+  window.addEventListener('focus', onWake)
+  window.addEventListener('online', onWake)
 
   // Lazy: read only when this page has a heart to paint. A page without one
   // (about, stats) loads the module for the menu's API and nothing more.

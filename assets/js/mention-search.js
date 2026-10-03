@@ -45,6 +45,17 @@ export const SEARCH_LIMIT = 8
 /** The longest label the trigger will search for. Nobody's handle is longer,
  *  and it bounds what gets sent to a third party on every keystroke. */
 const MAX_QUERY_CHARS = 40
+/** A lead-in may run past a space, since a display name has them ("Sir TJ The
+ *  Wrathful") and `@Sir` cannot narrow a crowded prefix. Three spaces is four
+ *  words, which no name needs and which keeps ordinary prose after a mention
+ *  from being searched word by word (BMB's number, #457). */
+const MAX_QUERY_SPACES = 3
+/** ⚠️ PRIMAL ANSWERS A SPACED QUERY WITH NOTHING, AND THE SAME LETTERS WITH
+ *  THE SPACES REMOVED WITH THE RIGHT PEOPLE. Measured 2026-10-03: `sir tj` →
+ *  0 rows, `sirtj` → 4, all of them Sir TJ; `chad f` → 0, `chadf` → 14. So a
+ *  spaced query goes over the wire spaceless, wider than the menu, and is
+ *  narrowed here by `matchesSpacedQuery`. */
+const SPACED_FETCH_LIMIT = 24
 
 // ── the socket ──────────────────────────────────────────────────────────────
 
@@ -195,10 +206,28 @@ export function rankSearchEvents(events) {
 export async function searchUsers(query, limit = SEARCH_LIMIT) {
   const q = String(query || '').trim().slice(0, MAX_QUERY_CHARS)
   if (!q) return []
+  const spaced = /\s/.test(q)
   try {
-    const events = await primalSearchQuery('user_search', { query: q, limit })
-    return rankSearchEvents(events).slice(0, limit)
+    const events = await primalSearchQuery('user_search', {
+      query: spaced ? q.replace(/\s+/g, '') : q,
+      limit: spaced ? Math.max(limit, SPACED_FETCH_LIMIT) : limit,
+    })
+    const rows = rankSearchEvents(events)
+    return (spaced ? rows.filter((r) => matchesSpacedQuery(r, q)) : rows).slice(0, limit)
   } catch { return [] }
+}
+
+const squash = (s) => String(s || '').replace(/\s+/g, '').toLowerCase()
+
+/** Does this profile answer to a spaced query? The letters of the query, in
+ *  order, somewhere in the letters of the handle, the display name or the
+ *  NIP-05, spaces ignored on both sides — so `@sir tj` and `@sirtj` both find
+ *  "Sir TJ The Wrathful", and the cache's fuzzier matches ("Iris" for `sir`)
+ *  do not survive a query the typist has made specific. */
+export function matchesSpacedQuery(profile, query) {
+  const q = squash(query)
+  if (!q) return false
+  return [profile?.name, profile?.displayName, profile?.nip05].some((v) => squash(v).includes(q))
 }
 
 export function formatFollowers(n) {
@@ -213,14 +242,29 @@ export function formatFollowers(n) {
 /** The `@` lead-in the caret is sitting in, or null. An `@` counts only at the
  *  start of the text or after whitespace or an opening bracket/quote, so
  *  `reed@nostrplebs.com` never opens the menu. `start` is the `@`; `end` is the
- *  caret; `query` is what was typed after the `@`, which may be empty. */
-export function mentionQueryAt(text, caret) {
+ *  caret; `query` is what was typed after the `@`, which may be empty.
+ *
+ *  The lead-in runs past a space (up to `MAX_QUERY_SPACES`), never past a line
+ *  break, a second `@`, or a space straight after the `@`. `isPicked(label)`,
+ *  when given, is the composer's own map: a lead-in that IS a picked label, or
+ *  opens with one and a space, is the mention already made and the prose after
+ *  it, so it does not re-open the menu — without it, every word typed after
+ *  `@reed ` would be searched. */
+export function mentionQueryAt(text, caret, { isPicked } = {}) {
   const before = String(text || '').slice(0, Math.max(0, caret | 0))
   const at = before.lastIndexOf('@')
   if (at < 0) return null
   const query = before.slice(at + 1)
-  if (query.length > MAX_QUERY_CHARS || /[\s@]/.test(query)) return null
+  if (query.length > MAX_QUERY_CHARS || /[@\r\n\t]/.test(query) || /^\s/.test(query)) return null
+  if ((query.match(/ /g) || []).length > MAX_QUERY_SPACES) return null
   if (at > 0 && !/[\s(\["'“‘]/.test(before[at - 1])) return null
+  if (typeof isPicked === 'function') {
+    for (let i = 0; i <= query.length; i++) {
+      if (i < query.length && query[i] !== ' ') continue
+      const label = query.slice(0, i)
+      if (label && isPicked(label)) return null
+    }
+  }
   return { query, start: at, end: before.length }
 }
 

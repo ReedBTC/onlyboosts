@@ -30,7 +30,7 @@ import { searchUsers, mentionQueryAt, formatFollowers, isSafeUrl } from '../../.
 
 const DEBOUNCE_MS = 250
 
-export default function MentionAutocomplete({ textareaRef, value, caret, onPick }) {
+export default function MentionAutocomplete({ textareaRef, value, caret, onPick, isPicked }) {
   const [range, setRange] = useState(null)
   const [items, setItems] = useState([])
   const [active, setActive] = useState(0)
@@ -39,7 +39,7 @@ export default function MentionAutocomplete({ textareaRef, value, caret, onPick 
 
   // Follow the caret: the `@` lead-in it sits in, or nothing.
   useEffect(() => {
-    const r = mentionQueryAt(value, caret)
+    const r = mentionQueryAt(value, caret, { isPicked })
     seqRef.current++
     if (!r || !r.query || (closed && closed.start === r.start)) {
       setRange(null)
@@ -56,7 +56,7 @@ export default function MentionAutocomplete({ textareaRef, value, caret, onPick 
       setActive(0)
     }, DEBOUNCE_MS)
     return () => clearTimeout(t)
-  }, [value, caret, closed])
+  }, [value, caret, closed, isPicked])
 
   const pick = useCallback((profile) => {
     if (!range || !profile) return

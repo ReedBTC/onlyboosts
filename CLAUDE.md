@@ -410,7 +410,7 @@ node scripts/stamp-assets.js --check   # verify; non-zero exit if anything is st
 **Order matters.** `sync-partials` injects markup into the page files; anything
 it injects has to be stamped afterwards.
 
-Thirty test scripts, all plain `node scripts/<name>.mjs` with no runner.
+Thirty-one test scripts, all plain `node scripts/<name>.mjs` with no runner.
 **`docs/tests.md` is the per-test reference** — one row each, saying what it
 covers and what it was confirmed red against. What follows here is only what a
 change elsewhere would break.
@@ -420,7 +420,7 @@ THAT GOES UNRUN.** Its header carries the `curl` that produces the capture; take
 a fresh one rather than reusing an old file, since it is also the size
 measurement. It asserted `cards are numbered 1..N with no gaps` — the *ordinal*
 scheme's invariant — until competition ranking shipped on 2026-08-18, and it
-would have been merged red had it not been run. **Run all thirty before a
+would have been merged red had it not been run. **Run all thirty-one before a
 merge**, and treat this one as the guard on the ranking scheme rather than only
 on weight. *(That number has been wrong before — it lagged from twelve to twenty-eight, a
 test at a time, while the table beside it grew. `git log -S "before a\nmerge" -- CLAUDE.md` has every value it has held. **Bump it and `docs/tests.md`
@@ -816,7 +816,10 @@ the shared chrome sees.
 **⚠️ THE BOT IS A SECOND IDENTITY AND THE SEPARATION IS THE POINT.** It signs
 boost notes for donors with no Nostr account (see "The Site Signs For A Booster
 Who Has No Key" in `docs/money-paths.md`), and a signing endpoint is an attack
-surface however well validated. Rotating a bot key costs a profile and one booster page; rotating the
+surface however well validated. Rotating a bot key costs a profile, one booster page and
+`BOOSTBOT_PUBKEY_HEX` in `assets/js/zap-receipt.js` (the donor's zap request is addressed to it, and
+`/api/sign-receipt` refuses one addressed anywhere else; see *The Note Quotes One Receipt* in
+`docs/money-paths.md`); rotating the
 site npub costs NIP-05, `.well-known/nostr.json`, and the `client` tag on every
 event ever published. Both names resolve from the one `.well-known/nostr.json`:
 `onlyboosts@` and `boostbot@`.
@@ -930,6 +933,7 @@ sections, so you know when to open it:
 | The Keysend Upgrade | the wallet gate, the `fountain.fm` exclusion, the whole-or-nothing routing pair |
 | The Wallet Gate Is Behind The Boost Button | compose first, pay second; `remembered` is not `connected` |
 | The Site Signs For A Booster Who Has No Key | `/api/sign-boost`, the allowlist validator, why proof-of-payment was rejected |
+| The Note Quotes One Receipt | **`/api/sign-receipt`, since 2026-10-03**: the bot-signed kind 9735 for the sats that settled, quoted in the `q` tag AND the body because Fountain draws the ⚡ figure off the first quoted receipt and nothing else; who signs the 9734 follows who signs the note; the pre-signed note's receipt is signed and HELD until every leg paid; the boost oracle admits `q` once, under the bot's key only |
 | The one boost button | `boost-button.js` is chrome, not a money path; six surfaces, six handlers |
 | The Boost Is Indexed At The Edge Before The Collector Sees It | `/api/v1/boosts/ingest`, the site's own boosts on the feeds in seconds; why the edge's row is provisional and what the collector owes `boosts_edge` |
 | The Boostagram Message Cap | 300 bytes, measured against the 1,300-byte onion over 800 episodes; why `url` became the feed URL and `boost_link` the page; the lnaddress side's `commentAllowed` sample |
@@ -992,6 +996,11 @@ ask, on mynostr's shape. What a change elsewhere would break:
   `maxLength` came off the textarea. **The boostagram's `url` is the feed URL
   and `boost_link` the episode page**, which is what made 300 fit; see *The
   Boostagram Message Cap* in `docs/money-paths.md` for the measurement.
+- **The lead-in runs past a space since 2026-10-03** (a display name has
+  them), to three spaces; Primal answers a spaced query with nothing, so it is
+  sent spaceless and narrowed locally, and each picker hands the trigger its
+  own map so a made mention does not re-open the menu. **The Trigger** in
+  `docs/mentions.md` has the measurements.
 - **⚠️ `mention-search.js` IMPORTS NOTHING.** The widget inlines it by
   relative path (`../../../assets/js/`) and the site loads it stamped; a
   `./sibling.js?v=` import is read differently by Vite and the stamper.

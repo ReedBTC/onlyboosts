@@ -928,14 +928,27 @@ export async function signKindOneShareWithUser(template) {
  * `publishRelaySet` in ndk.js for why the union rather than the set alone.
  */
 export async function publishSignedKindOne(signedEvent) {
-  if (!signedEvent?.id || !signedEvent?.sig) return { published: false }
+  const r = await publishSignedEvent(signedEvent)
+  return { published: r.published }
+}
+
+/**
+ * Publish any signed event through the share-note relay set and report which
+ * relays ACKed it. `relays` is a lower bound on where the event now lives,
+ * which is what a quote's relay hints want (summaryReceipt.js); the kind-1
+ * path above only ever asked whether anyone took it.
+ */
+export async function publishSignedEvent(signedEvent) {
+  if (!signedEvent?.id || !signedEvent?.sig) return { published: false, relays: [] }
   const ndk = getNDK()
   try {
     const ev = new NDKEvent(ndk, signedEvent)
     const ackd = await ev.publish(publishRelaySet(ndk))
-    return { published: !!(ackd && ackd.size > 0) }
+    const relays = []
+    for (const r of ackd || []) if (typeof r?.url === 'string') relays.push(r.url)
+    return { published: !!(ackd && ackd.size > 0), relays }
   } catch {
-    return { published: false }
+    return { published: false, relays: [] }
   }
 }
 
