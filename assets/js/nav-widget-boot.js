@@ -40,7 +40,7 @@
       }
       const s = document.createElement('script');
       // Absolute — this file is shared by pages at more than one path.
-      s.src = '/assets/widgets/login-widget.js?v=ob-v215';
+      s.src = '/assets/widgets/login-widget.js?v=ob-v216';
       s.async = true;
       s.onload = () => { Promise.resolve().then(resolve); };
       s.onerror = () => {

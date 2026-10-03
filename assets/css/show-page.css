@@ -1175,7 +1175,10 @@ a.boost-who:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px
   font: 700 0.8rem/1.3 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--ink-muted, var(--navy-l));
+  /* --muted, the stat tiles' and section subtitles' label colour. It read
+     --ink-muted, a token that does not exist, and fell back to --navy-l,
+     which in dark mode is one shade off the ground (Reed, 2026-10-03). */
+  color: var(--muted);
 }
 /* The drawer's dropdown menu is absolutely positioned below its pill, and
    .ep-drawer clips its overflow to keep its rounded corners; on a short or
