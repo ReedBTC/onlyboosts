@@ -132,11 +132,13 @@ await check('a change naming the wrong kind of identifier is refused', async () 
   assert.equal((await S.syncFavorites({ op: 'add', kind: 'item', feedId: FEED, itemId: FEED }, deps(w, makeStore()))).status, 'bad-change')
   assert.equal((await S.syncFavorites({ op: 'nope', kind: 'feed', id: FEED }, deps(w, makeStore()))).status, 'bad-change')
 })
-await check('an item favorite is gated until both apps read the three-element form', async () => {
+await check('an item favorite publishes the three-element entry, feed first, with its k tag (the gate lifted 2026-10-03)', async () => {
   const w = twoRelays()
   const r = await S.syncFavorites({ op: 'add', kind: 'item', feedId: FEED, itemId: ITEM, medium: 'podcast' }, deps(w, makeStore()))
-  assert.equal(r.status, 'items-gated')
-  assert.equal(w.relays['wss://a'].published.length, 0)
+  assert.equal(r.status, 'published')
+  assert.deepEqual(iTags(r.event), [['i', FEED, ITEM]], 'one tag, the pair; no feed entry written for a feed the member did not favorite')
+  assert.ok(r.event.tags.some((t) => t[0] === 'k' && t[1] === 'podcast:item:guid'), 'the kind is the LAST identifier\'s')
+  assert.equal(w.relays['wss://a'].published.length, 1)
 })
 
 // ---- the read gate
@@ -150,8 +152,21 @@ await check('a degraded read publishes nothing and records nothing', async () =>
 })
 
 // ---- the first favorite
-await check('first favorite on an empty untagged list with no stored choice: asks, publishes nothing', async () => {
+await check('first favorite on an empty untagged list with no stored choice: public by rule, no visibility tag, no question (spec #47, vector 16)', async () => {
   const w = twoRelays()
+  const store = makeStore()
+  const r = await S.syncFavorites(addFeed(), deps(w, store))
+  assert.equal(r.status, 'published')
+  assert.deepEqual(iTags(r.event), [['i', FEED]])
+  assert.ok(!r.event.tags.some((t) => t[0] === 'visibility'), 'the default is a behaviour, not a declaration')
+  assert.equal(r.event.content, '')
+  assert.equal(S.loadMode(store, pk), null, 'no choice is stored for the member either')
+})
+
+await check('a list holding entries that cannot say which half it lives in (no tag, both halves) asks, publishes nothing', async () => {
+  const w = twoRelays()
+  const both = list([['alt', 'PC 2.0 Favorites'], ['medium', 'podcast'], ['i', FEED2], ['k', 'podcast:guid']], await encrypt(JSON.stringify([['medium', 'podcast'], ['i', ARTIST]])))
+  w.relays['wss://a'].hold(both); w.relays['wss://b'].hold(both)
   const r = await S.syncFavorites(addFeed(), deps(w, makeStore()))
   assert.equal(r.status, 'needs-mode')
   assert.equal(w.relays['wss://a'].published.length, 0)
@@ -226,17 +241,13 @@ await check('adding to another app\'s list keeps everything it holds, artists in
   assert.ok(r.event.tags.some((t) => t[0] === 'k' && t[1] === 'podcast:publisher:guid'), 'the artist kind survives in k')
 })
 
-await check('a list holding a legacy two-element item is not published onto, until the gate lifts', async () => {
+await check('a list holding a legacy two-element item is rewritten on the next publish (vector 27; the gate that refused this lifted 2026-10-03)', async () => {
   const w = twoRelays()
   const legacy = list([['alt', 'PC 2.0 Favorites'], ['visibility', 'public'], ['medium', 'podcast'], ['i', FEED2], ['i', ITEM], ['k', 'podcast:guid'], ['k', 'podcast:item:guid']])
   w.relays['wss://a'].hold(legacy); w.relays['wss://b'].hold(legacy)
-  const r1 = await S.syncFavorites(addFeed(), deps(w, makeStore()))
-  assert.equal(r1.status, 'items-gated')
-  assert.equal(r1.reason, 'legacy-on-list')
-  assert.equal(w.relays['wss://a'].published.length, 0)
-  const r2 = await S.syncFavorites(addFeed(), deps(w, makeStore(), { itemsAllowed: true }))
-  assert.equal(r2.status, 'published')
-  assert.deepEqual(iTags(r2.event), [['i', FEED2], ['i', FEED], ['i', FEED2, ITEM]], 'the legacy item is rewritten with its feed, in band 3')
+  const r = await S.syncFavorites(addFeed(), deps(w, makeStore()))
+  assert.equal(r.status, 'published')
+  assert.deepEqual(iTags(r.event), [['i', FEED2], ['i', FEED], ['i', FEED2, ITEM]], 'the legacy item is rewritten with its feed, in band 3')
 })
 
 // ---- the private half
@@ -363,11 +374,12 @@ await check('the baseline store: malformed is empty, the mode is only ever publi
   S.saveMode(store, pk, 'whatever'); assert.equal(S.loadMode(store, pk), null)
   assert.equal(S.loadMode(null, pk), null)
 })
-await check('the publish set covers every relay BMB reads that accepts the kind, and nothing that refuses or mirrors', () => {
-  assert.deepEqual([...S.PUBLISH_RELAYS], ['wss://nos.lol', 'wss://relay.damus.io', 'wss://relay.primal.net', 'wss://relay.ditto.pub'])
-  // BMB's DEFAULT_RELAYS less fountain, which refuses kind 10333. A relay in
-  // BMB's read set that we never write is a stale copy waiting to win a race.
-  for (const url of ['wss://relay.damus.io', 'wss://relay.primal.net', 'wss://nos.lol']) assert.ok(S.PUBLISH_RELAYS.includes(url), url)
+await check('the publish set covers every relay BMB and StableKraft read that accepts the kind, and nothing that refuses or mirrors', () => {
+  assert.deepEqual([...S.PUBLISH_RELAYS], ['wss://nos.lol', 'wss://relay.damus.io', 'wss://relay.primal.net', 'wss://relay.ditto.pub', 'wss://relay.snort.social', 'wss://theforest.nostr1.com'])
+  // BMB's DEFAULT_RELAYS less fountain, which refuses kind 10333, plus the two
+  // of StableKraft's defaults BMB does not share (2026-10-03). A relay in
+  // either read set that we never write is a stale copy waiting to win a race.
+  for (const url of ['wss://relay.damus.io', 'wss://relay.primal.net', 'wss://nos.lol', 'wss://relay.snort.social', 'wss://theforest.nostr1.com']) assert.ok(S.PUBLISH_RELAYS.includes(url), url)
   assert.ok(!S.PUBLISH_RELAYS.includes('wss://relay.fountain.fm'))
   assert.ok(!S.PUBLISH_RELAYS.includes('wss://relay.mostr.pub'))
 })

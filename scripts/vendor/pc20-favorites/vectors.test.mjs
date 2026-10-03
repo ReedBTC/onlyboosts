@@ -1,10 +1,10 @@
 /**
- * The 29 test vectors of ../pc20-favorites.md, executable.
+ * The 31 test vectors of ../pc20-favorites.md, executable.
  *
  * The spec states them as behaviors "so they can be written against any test
  * runner". This is that, for one runner, driven through the pure functions
  * described in ./adapter.d.ts. Point ADAPTER at your own implementation and
- * the same 29 run against it.
+ * the same 31 run against it.
  *
  * Two ways to point it. Edit the import below, or leave this file alone and
  * set `PC20_FAVORITES_ADAPTER` to the path of your shim — which is what lets
@@ -37,7 +37,15 @@ const {
   decodePlaintext,
   seal,
   itemClaim,
+  capabilities = {},
 } = ADAPTER;
+
+// The spec makes ORIGINATING some entry kinds optional while carrying them
+// stays mandatory, so a vector that covers one has a place no adapter can pass
+// without the feature. An adapter opts out by exporting `capabilities`; see
+// adapter.d.ts. The default is ON, deliberately — an adapter that says nothing
+// gets tested, because silence must never skip a check.
+const ORIGINATES_ARTISTS = capabilities.artistFavorites !== false;
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -648,7 +656,7 @@ test('13. Going private takes the whole list, and coming back does not', () => {
     userChose: true,
   });
   assert.ok(hidden.publish);
-  assert.deepEqual(ids(hidden.publish.tags), [], 'entries were left in the public half');
+  assert.deepEqual(ids(hidden.publish.tags), [], 'entries were left in the tags');
 
   const inPrivate = ids(decodePrivate(hidden.publish.content));
   assert.ok(inPrivate.includes(FEED_A), 'our own entry did not move');
@@ -667,7 +675,7 @@ test('13. Going private takes the whole list, and coming back does not', () => {
   const shown = plan({
     read: hidden.publish,
     // What the device holds now — unchanged for a writer that carries, the
-    // whole private half for one that paints the active half into its store.
+    // whole private list for one that paints the active place into its store.
     local: hidden.holds ?? local,
     baseline: hidden.baselineIfLanded,
     mode: 'public',
@@ -689,8 +697,8 @@ test('13. Going private takes the whole list, and coming back does not', () => {
   );
 });
 
-test('14. A writer does not delete the half it does not write into (TWO cycles)', () => {
-  // The half we do NOT publish into holds entries that are not ours.
+test('14. A writer does not delete the place it does not write into (TWO cycles)', () => {
+  // The place we do NOT publish into holds entries that are not ours.
   const foreignPrivate = encodePrivate([
     ['medium', 'podcast'],
     ['i', FEED_B],
@@ -708,12 +716,12 @@ test('14. A writer does not delete the half it does not write into (TWO cycles)'
   const afterOne = one.publish ?? read;
   assert.ok(
     ids(decodePrivate(afterOne.content)).includes(FEED_B),
-    'cycle 1 already lost the private half',
+    'cycle 1 already lost the encrypted entries',
   );
 
   // Cycle 2, fed the baseline cycle 1 recorded. If that baseline claimed the
-  // half we never write into, rule 3's "in your baseline, absent locally" row
-  // now fires on the whole half at once.
+  // place we never write into, rule 3's "in your baseline, absent locally" row
+  // now fires on all of them at once.
   const two = plan({
     read: afterOne,
     local: one.holds ?? local,
@@ -724,23 +732,23 @@ test('14. A writer does not delete the half it does not write into (TWO cycles)'
 
   assert.ok(
     ids(decodePrivate(afterTwo.content)).includes(FEED_B),
-    "cycle 2 deleted the other writer's half — the claims were recomputed, not carried",
+    "cycle 2 deleted the other writer's entries — the claims were recomputed, not carried",
   );
 
   // The control, in the same fixture. A writer that never claims anything
   // also survives the assertion above, and it is broken in the other
-  // direction: a later move between halves copies instead of moving, and the
+  // direction: a later move between places copies instead of moving, and the
   // entries the user asked to hide stay in plaintext beside the encrypted copy.
   assert.ok(
     one.baselineIfLanded.public.includes(FEED_A),
-    'a list adopted off the relay must still enter the baseline for the half we DO write into',
+    'a list adopted off the relay must still enter the baseline for the place we DO write into',
   );
 });
 
-test('15. A list found with entries in BOTH halves is carried, then converged once', () => {
-  // The state: FEED_A is in both halves, FEED_C only in the private one, and
+test('15. A list found with entries in BOTH places is carried, then converged once', () => {
+  // The state: FEED_A is in both places, FEED_C only in the private one, and
   // this device's private baseline claims nothing — which is how a real
-  // account reached 284 entries in both halves at once.
+  // account reached 284 entries in both places at once.
   const read = ev(
     [ALT, ['medium', 'podcast'], ['i', FEED_A], ['i', FEED_B], K_FEED],
     encodePrivate([['medium', 'podcast'], ['i', FEED_A], ['i', FEED_C]]),
@@ -748,23 +756,23 @@ test('15. A list found with entries in BOTH halves is carried, then converged on
   const local = [feed(FEED_A, 'podcast')];
 
   // A cycle may not converge the list on its own initiative. Emptying either
-  // half deletes entries this writer never wrote, and an entry appearing
+  // place deletes entries this writer never wrote, and an entry appearing
   // twice is not evidence that either copy is ours.
   const carried = plan({ read, local, baseline: base([FEED_A]), mode: 'public' });
   const after = carried.publish ?? read;
   assert.deepEqual(
     ids(after.tags),
     [FEED_A, FEED_B],
-    'the public half was rewritten by a cycle that was only asked to carry it',
+    'the tags was rewritten by a cycle that was only asked to carry it',
   );
   assert.deepEqual(
     ids(decodePrivate(after.content)),
     [FEED_A, FEED_C],
-    'the private half was tidied away — an overlap is not permission to delete it',
+    'the encrypted entries was tidied away — an overlap is not permission to delete it',
   );
 
-  // Converging, once the baseline claims the half. This device put FEED_A and
-  // FEED_C in the private half and still holds both — a claim without the
+  // Converging, once the baseline claims the place. This device put FEED_A and
+  // FEED_C in the encrypted entries and still holds both — a claim without the
   // entry behind it is a removal, rule 3 — so both come to the tags, and
   // FEED_A must appear ONCE: it was already there, and the claimed-back copy
   // is the same entry, not a second one. Concatenating the two opens a second
@@ -781,7 +789,7 @@ test('15. A list found with entries in BOTH halves is carried, then converged on
   assert.deepEqual(
     out.filter((id) => id === FEED_A).length,
     1,
-    'the entry that was in both halves was emitted twice',
+    'the entry that was in both places was emitted twice',
   );
   assert.ok(
     out.includes(FEED_C),
@@ -790,13 +798,13 @@ test('15. A list found with entries in BOTH halves is carried, then converged on
   assert.deepEqual(
     ids(decodePrivate(converged.publish.content)),
     [],
-    'the private half should be empty once its claimed entries have moved',
+    'the encrypted entries should be empty once its claimed entries have moved',
   );
 });
 
-test('16. The stated mode outranks whatever the halves happen to hold', () => {
+test('16. The stated mode outranks whatever the places happen to hold', () => {
   // FIXTURE 1 — the empty list, which nothing else in this file can reach.
-  // Both halves are empty, so "whichever half holds entries is the mode" has
+  // Both places are empty, so "whichever place holds entries is the mode" has
   // no answer, and every implementation before the tag had to guess. Guessing
   // `public` publishes this favorite as a relay-indexed `i` tag on the account
   // of someone who chose Private in another app.
@@ -815,22 +823,60 @@ test('16. The stated mode outranks whatever the halves happen to hold', () => {
   );
   assert.deepEqual(ids(decodePrivate(seeded.publish.content)), [FEED_A]);
 
-  // And with no tag, the same emptiness is a QUESTION. Publishing on a guess
-  // is the disclosure; the writer must ask.
+  // And with no tag, emptiness IS an answer: public is the default. Nobody has
+  // chosen a mode — not the event, and not this writer — which is where every
+  // new user starts, and the alternative is an "ask the user" flow in front of
+  // a brand-new account's first favorite.
   const untagged = plan({
     read: ev([ALT], ''),
     local: [feed(FEED_A, 'podcast')],
     baseline: base(),
     mode: null,
   });
-  assert.equal(
-    untagged.publish,
-    null,
-    'an empty untagged list has no mode to infer — asking is the only safe answer',
+  assert.ok(untagged.publish, 'an empty untagged list defaults to public');
+  assert.deepEqual(ids(untagged.publish.tags), [FEED_A]);
+  assert.equal(untagged.publish.content, '', 'the default must not encrypt');
+  assert.ok(
+    !untagged.publish.tags.some((t) => t[0] === 'visibility'),
+    'the default is a behavior, not a declaration: it states no mode',
   );
 
-  // FIXTURE 2 — the tag says public and the private half still holds entries.
-  // Only a writer that could read both halves may have written that tag, so it
+  // It is a TIEBREAK for a writer with no preference, never an inference the
+  // list makes. An inferred mode outranks a writer's standing setting, so a
+  // default living there would answer public for a writer set to Private and
+  // publish its first favorite in plaintext — the same disclosure, reached
+  // from the other side.
+  const privateWriter = plan({
+    read: ev([ALT], ''),
+    local: [feed(FEED_A, 'podcast')],
+    baseline: base(),
+    mode: 'private',
+  });
+  assert.deepEqual(
+    ids(privateWriter.publish.tags),
+    [],
+    'the default overrode a writer whose own setting is private',
+  );
+  assert.deepEqual(ids(decodePrivate(privateWriter.publish.content)), [FEED_A]);
+
+  // And it applies only where there is genuinely nothing. A `content` this
+  // writer cannot account for is somebody's encrypted list: an empty tag list is not an
+  // empty LIST, and defaulting there puts `i` tags beside ciphertext, which
+  // splits a list somebody else owns.
+  const opaqueUntagged = plan({
+    read: ev([ALT], seal('{"not":"a list"}')),
+    local: [feed(FEED_A, 'podcast')],
+    baseline: base(),
+    mode: null,
+  });
+  assert.equal(
+    opaqueUntagged.publish,
+    null,
+    'defaulted to public over a place this writer could not read',
+  );
+
+  // FIXTURE 2 — the tag says public and the encrypted entries still holds entries.
+  // Only a writer that could read both places may have written that tag, so it
   // is the user's stated intent for the whole list: finish the move.
   const halfConverged = ev(
     [ALT, VIS_PUBLIC, ['medium', 'podcast'], ['i', FEED_A], K_FEED],
@@ -842,15 +888,15 @@ test('16. The stated mode outranks whatever the halves happen to hold', () => {
     baseline: base([FEED_A]),
     mode: 'public',
   });
-  assert.ok(converged.publish, 'a half-converged list must be finished');
+  assert.ok(converged.publish, 'a place-converged list must be finished');
   assert.deepEqual(ids(converged.publish.tags), [FEED_A, FEED_B]);
   assert.deepEqual(
     ids(decodePrivate(converged.publish.content)),
     [],
-    'the half the tag does not name must end up empty',
+    'the place the tag does not name must end up empty',
   );
 
-  // The control, and it is the half that fails a naive implementation: the
+  // The control, and it is the place that fails a naive implementation: the
   // SAME entries with no tag must NOT move. There is no stated intent, so
   // vector 13's conservative rule stands and moving FEED_B would be a
   // disclosure nobody asked for.
@@ -863,7 +909,7 @@ test('16. The stated mode outranks whatever the halves happen to hold', () => {
     baseline: base([FEED_A]),
     mode: 'public',
   });
-  // A writer may republish here — its canonical rendering of the private half
+  // A writer may republish here — its canonical rendering of the encrypted entries
   // can differ from the bytes another app wrote — but it may not MOVE anything.
   const stillPrivate = noTag.publish ?? noTag.read ?? null;
   const settled = noTag.publish ?? {
@@ -881,7 +927,7 @@ test('16. The stated mode outranks whatever the halves happen to hold', () => {
   void stillPrivate;
 });
 
-test('17. A writer that cannot read a half may not restate the mode', () => {
+test('17. A writer that cannot read a place may not restate the mode', () => {
   // `content` this writer's codec cannot decode — another app's NIP-44, or a
   // signer with no `nip44` at all. The user has just chosen Public here.
   const opaque = ev([ALT, VIS_PRIVATE, K_FEED], 'not-something-we-can-decode');
@@ -895,13 +941,13 @@ test('17. A writer that cannot read a half may not restate the mode', () => {
   });
 
   // Nothing may be said at all. Everything this writer would publish belongs
-  // in a half it cannot open, and the one thing it could technically emit —
+  // in a place it cannot open, and the one thing it could technically emit —
   // `visibility: public` — would be a false statement about someone's privacy
   // that the next writer converges on the strength of.
   assert.equal(
     publish,
     null,
-    'a writer that cannot open the half the list lives in has nothing it may say',
+    'a writer that cannot open the place the list lives in has nothing it may say',
   );
 
   // The same shape one step along, and the reason `null` above is not enough
@@ -941,7 +987,7 @@ test('17. A writer that cannot read a half may not restate the mode', () => {
   assert.ok(allowed.publish, 'an honest mode change must publish');
   assert.ok(
     allowed.publish.tags.some((t) => t[0] === 'visibility' && t[1] === 'public'),
-    'the user chose Public in an app that could see both halves',
+    'the user chose Public in an app that could see both places',
   );
   assert.ok(
     ids(allowed.publish.tags).includes(FEED_B),
@@ -950,7 +996,7 @@ test('17. A writer that cannot read a half may not restate the mode', () => {
   assert.deepEqual(ids(decodePrivate(allowed.publish.content)), []);
 
   // And the boundary: an EMPTY `content` is readable by anybody, because there
-  // is no half to be blind to. A signer with no NIP-44 must still be able to
+  // is nothing to be blind to. A signer with no NIP-44 must still be able to
   // set the mode on a fresh list — treating empty as opaque freezes every new
   // account on such a signer at whatever the first writer guessed.
   const fresh = plan({
@@ -1251,7 +1297,7 @@ test('20. An item that names no feed is carried, in place, and never deleted', (
   );
 });
 
-test('21. Exactly one `alt`, ours, first', () => {
+test('21. The framing tags are ours, and they lead', () => {
   // A NIP-31 rendering hint, not user data. A writer regenerates it rather
   // than carrying a foreign value, because the event can hold only one and a
   // reader that has no definition for kind 10333 shows whatever is there.
@@ -1273,6 +1319,50 @@ test('21. Exactly one `alt`, ours, first', () => {
     publish.tags.filter((t) => t[0] === 'alt').length,
     1,
     'a foreign alt was carried beside ours',
+  );
+
+  // THE MODE IS MARKED AT THE TOP. On a list that states one, `visibility` is
+  // the second tag, so a reader knows whether it is looking at a public or a
+  // private list before it parses an entry. The fixture puts it in the MIDDLE
+  // on the way in: a reader must find it wherever it sits — an older list may
+  // carry it anywhere — and a writer must still emit it second. Those two
+  // rules are what let both be true without a republish, which is rule 5's
+  // normalisation doing its job.
+  //
+  // The list stays PUBLIC here on purpose. Emit the entries into `content` and
+  // the tag array collapses to `alt` and `visibility` alone, where "second"
+  // and "last" are the same slot and a writer that appends the mode still
+  // passes. Entries have to remain in the tags for the position to mean
+  // anything.
+  const misplaced = ev([
+    ALT,
+    ['medium', 'podcast'],
+    ['i', FEED_A],
+    VIS_PUBLIC,
+    K_FEED,
+  ]);
+  const framed = plan({
+    read: misplaced,
+    local: [feed(FEED_A, 'podcast'), feed(FEED_C, 'podcast')],
+    baseline: base([FEED_A]),
+    mode: null, // follow the list
+  });
+  assert.ok(framed.publish, 'adding a favorite is a change');
+  const out = framed.publish;
+  assert.deepEqual(out.tags[0], ALT, 'alt is still first');
+  assert.deepEqual(
+    out.tags[1],
+    VIS_PUBLIC,
+    'the mode is not marked at the top: `visibility` must be the second tag',
+  );
+  assert.ok(
+    out.tags.some((t) => t[0] === 'i'),
+    'the fixture must keep entries in the tags, or position 1 proves nothing',
+  );
+  assert.equal(
+    out.tags.filter((t) => t[0] === 'visibility').length,
+    1,
+    'the mode was stated twice',
   );
 });
 
@@ -1301,9 +1391,9 @@ test('22. The private plaintext carries no `?`', () => {
   assert.ok(ids(decodePrivate(publish.content)).includes(QUERY_ITEM));
 });
 
-test('23. A plaintext that is not a tag array is an unreadable half, not an empty one', () => {
+test('23. A plaintext that is not a tag array is an unreadable `content`, not an empty one', () => {
   // `JSON.parse` succeeding is not the same as having read a list. Valid JSON
-  // that is not an array of string arrays marks the half "readable and empty"
+  // that is not an array of string arrays marks the place "readable and empty"
   // in the obvious implementation, and the next republish rewrites `content`
   // from that emptiness — another app's data gone, from a decrypt that worked.
   assert.equal(decodePlaintext('{"tags":[]}'), null);
@@ -1325,7 +1415,7 @@ test('23. A plaintext that is not a tag array is an unreadable half, not an empt
     baseline: base([FEED_A]),
     mode: 'public',
   });
-  assert.ok(carrying.publish, 'a public-half change still publishes');
+  assert.ok(carrying.publish, 'a change to the tags still publishes');
   assert.equal(carrying.publish.content, notAList, 'the bytes were rewritten');
 
   const into = plan({
@@ -1334,10 +1424,10 @@ test('23. A plaintext that is not a tag array is an unreadable half, not an empt
     baseline: base([FEED_A]),
     mode: 'private',
   });
-  assert.equal(into.publish, null, 'published into a half this writer could not read');
+  assert.equal(into.publish, null, 'published into a place this writer could not read');
 });
 
-test('24. A private half past the NIP-44 v2 cliff is refused, not published', () => {
+test('24. A private list past the NIP-44 v2 cliff is refused, not published', () => {
   // NIP-44 v2 as first published capped plaintext at 65535 bytes, and a signer
   // built to that text rejects a payload across the line — so the list reads
   // back as EMPTY on that device, not as an error. The writer refuses at
@@ -1361,7 +1451,7 @@ test('24. A private half past the NIP-44 v2 cliff is refused, not published', ()
     baseline: base(),
     mode: 'private',
   });
-  assert.equal(over.publish, null, 'a private half past the cliff was published');
+  assert.equal(over.publish, null, 'a private list past the cliff was published');
   assert.deepEqual(over.baselineIfLanded, base(), 'a refused publish claims nothing');
 
   // The control: the same shape well under the line publishes.
@@ -1371,7 +1461,7 @@ test('24. A private half past the NIP-44 v2 cliff is refused, not published', ()
     baseline: base(),
     mode: 'private',
   });
-  assert.ok(under.publish, 'a private half under the cliff must still publish');
+  assert.ok(under.publish, 'a private list under the cliff must still publish');
 });
 
 test('25. A feed favorite and an item favorite are stated separately', () => {
@@ -1455,7 +1545,7 @@ test('25. A feed favorite and an item favorite are stated separately', () => {
   assert.deepEqual(ids(feedOnly.publish.tags), [FEED_B]);
   assert.deepEqual(tagFor(feedOnly.publish.tags, FEED_B), ['i', FEED_B]);
 
-  // An entry in BOTH halves is one entry, and a whole-list move must emit it
+  // An entry in BOTH places is one entry, and a whole-list move must emit it
   // once. Vector 15 pins the public copy; this pins that the pair is what the
   // dedupe compares, so the feed favorite and the item favorite do not
   // collapse into each other.
@@ -1468,16 +1558,16 @@ test('25. A feed favorite and an item favorite are stated separately', () => {
     baseline: base([FEED_A, claim(ITEM_A1, FEED_A)]),
     mode: 'public',
   });
-  assert.ok(folded.publish, 'a half-converged list must be finished');
+  assert.ok(folded.publish, 'a place-converged list must be finished');
   assert.equal(
     ids(folded.publish.tags).filter((id) => id === FEED_A).length,
     1,
-    'the feed favorite that was in both halves was emitted twice',
+    'the feed favorite that was in both places was emitted twice',
   );
   assert.equal(
     ids(folded.publish.tags).filter((id) => id === ITEM_A1).length,
     1,
-    'the item that was in both halves was emitted twice',
+    'the item that was in both places was emitted twice',
   );
 
   // IDENTITY IS THE PAIR. An item guid is unique inside its feed and is not
@@ -1723,6 +1813,32 @@ test('28. An artist entry is a favorite that belongs to no feed', () => {
     'the run was not emitted in band order: artists, albums, then tracks',
   );
 
+  // EVERYTHING ABOVE IS MANDATORY FOR EVERY APP, whether or not it offers
+  // artist favorites: the entry parses, it names no feed, it does not disturb
+  // the track after it, and it comes back bare and in its band.
+  //
+  // What follows needs the feature. The spec's rule is "carrying one is
+  // mandatory; offering the feature is not", so an app with no artist
+  // favorites in its UI cannot reach the states below — its local state never
+  // holds an artist. It says so with `capabilities.artistFavorites: false`.
+  if (!ORIGINATES_ARTISTS) {
+    // The flag has to be true in the direction that matters. An adapter that
+    // declares no artist favorites and originates one anyway is claiming an
+    // exemption it is not using, so pin that it really does not.
+    const none = plan({
+      read: ev([]),
+      local: [feed(ARTIST, 'music')],
+      baseline: base(),
+      mode: 'public',
+    });
+    assert.ok(
+      !none.publish || !none.publish.tags.some((t) => t[0] === 'i' && t[1] === ARTIST),
+      'this adapter declares artistFavorites: false but originated one anyway — '
+        + 'drop the flag and let the rest of this vector run',
+    );
+    return;
+  }
+
   // The same, from the app that HOLDS the artist — which is where a writer
   // reaches for an extra element, because it has state and somewhere to put it.
   const held = plan({
@@ -1758,7 +1874,7 @@ test('28. An artist entry is a favorite that belongs to no feed', () => {
 
 test('29. A whole-list move is not an exemption from rule 3', () => {
   // FEED_B was ours and the user has just unfavorited it: our baseline for the
-  // half it sits in claims it, and we no longer hold it. That is rule 3's
+  // place it sits in claims it, and we no longer hold it. That is rule 3's
   // third row, and it fires the same whether the list is public, private, or
   // being moved between the two. A merge that suspends it while moving does
   // not lose the removal for one cycle — it loses it for good, because the
@@ -1782,7 +1898,7 @@ test('29. A whole-list move is not an exemption from rule 3', () => {
   assert.deepEqual(
     ids(decodePrivate(priv.publish.content)),
     [FEED_A],
-    'the entry we removed came back on the private half',
+    'the entry we removed came back on the encrypted entries',
   );
   assert.deepEqual(
     priv.baselineIfLanded.private,
@@ -1790,7 +1906,7 @@ test('29. A whole-list move is not an exemption from rule 3', () => {
     'we still claim an entry we no longer hold',
   );
 
-  // 2. The licensed private → public move, with the removal on the half being
+  // 2. The licensed private → public move, with the removal on the place being
   // moved INTO. The move is a merge, so the entry we dropped does not survive
   // it by being read on the way past.
   const shown = plan({
@@ -1811,11 +1927,11 @@ test('29. A whole-list move is not an exemption from rule 3', () => {
   assert.deepEqual(
     ids(decodePrivate(shown.publish.content)),
     [],
-    'the half being emptied kept an entry',
+    'the place being emptied kept an entry',
   );
 
-  // 3. Going private, with the removal on the half being moved FROM. This is
-  // the same defect one level down: the merge that reads the emptying half was
+  // 3. Going private, with the removal on the place being moved FROM. This is
+  // the same defect one level down: the merge that reads the emptying place was
   // handed no local state, so every entry in it looked unheld and row 3 could
   // never fire.
   const hidden = plan({
@@ -1829,12 +1945,12 @@ test('29. A whole-list move is not an exemption from rule 3', () => {
   assert.deepEqual(
     ids(decodePrivate(hidden.publish.content)),
     [FEED_A],
-    'the entry we removed rode the move into the private half',
+    'the entry we removed rode the move into the encrypted entries',
   );
-  assert.deepEqual(ids(hidden.publish.tags), [], 'the public half was not emptied');
+  assert.deepEqual(ids(hidden.publish.tags), [], 'the tags was not emptied');
 
   // The second cycle, because that is where the old behaviour became
-  // permanent. FEED_B is now in a half our baseline does not claim it in, so
+  // permanent. FEED_B is now in a place our baseline does not claim it in, so
   // nothing here could ever remove it — and nothing must put it back either.
   const again = plan({
     read: hidden.publish,
@@ -1849,4 +1965,196 @@ test('29. A whole-list move is not an exemption from rule 3', () => {
     'the removed entry returned, or our own entry was dropped, on the second cycle',
   );
   assert.equal(again.publish, null, 'the move is not idempotent: it republishes forever');
+
+  // 4. The claim-back, which is the third path that moves entries between
+  // places and the only one where getting this wrong DISCLOSES the removal.
+  // No `visibility` tag and both places populated, so the list cannot state
+  // its own mode and this writer is not licensed to move anyone else's
+  // entries: it takes back only what its own baseline claims. A claim is not
+  // a favorite, though. FEED_B is claimed in the encrypted entries and unfavorited
+  // here, so it is a removal, and taking it back publishes it as an `i` tag
+  // relays index — on the one branch that exists because a disclosure cannot
+  // be undone.
+  const back = plan({
+    read: ev(
+      [ALT, ['medium', 'podcast'], ['i', FEED_A], K_FEED],
+      encodePrivate([['medium', 'podcast'], ['i', FEED_B]]),
+    ),
+    local,
+    baseline: base([FEED_A], [FEED_B]),
+    mode: 'public',
+  });
+  assert.ok(back.publish, 'the claim-back is a change and must publish');
+  assert.deepEqual(
+    ids(back.publish.tags),
+    [FEED_A],
+    'an entry we claimed and no longer hold was claimed back into the PUBLIC tags',
+  );
+  assert.deepEqual(
+    ids(decodePrivate(back.publish.content)),
+    [],
+    'the removed entry stayed in the encrypted entries',
+  );
+
+  // And the second cycle again, for the same reason as above: the baseline we
+  // land cannot claim what we do not hold, so a removal that survives this
+  // path survives every later one too.
+  const backAgain = plan({
+    read: back.publish,
+    local: back.holds ?? local,
+    baseline: back.baselineIfLanded,
+    mode: 'public',
+  });
+  assert.deepEqual(
+    ids((backAgain.publish ?? back.publish).tags),
+    [FEED_A],
+    'the removed entry returned, or ours was dropped, on the second cycle',
+  );
+  assert.equal(backAgain.publish, null, 'the claim-back never reaches a fixed point');
+});
+
+test('30. When nothing is private, `content` is the empty string', () => {
+  // Claiming back the last entry of a `medium` run must take the run with it.
+  // `encodePrivate` returns `''` only for an EMPTY array, so one leftover tag
+  // is the difference between a place that encodes to nothing and a place that
+  // encodes to real ciphertext — and ciphertext is what tells the next writer
+  // somebody owns this place.
+  const cleared = plan({
+    read: ev(
+      [ALT, ['medium', 'podcast'], ['i', FEED_B], K_FEED],
+      encodePrivate([['medium', 'podcast'], ['i', FEED_A]]),
+    ),
+    local: [feed(FEED_A, 'podcast')],
+    baseline: base([], [FEED_A]),
+    mode: 'public',
+  });
+  assert.ok(cleared.publish, 'the claim-back is a change and must publish');
+  assert.deepEqual(
+    ids(cleared.publish.tags),
+    [FEED_B, FEED_A],
+    'the entry we claimed back did not reach the tags',
+  );
+  assert.equal(
+    cleared.publish.content,
+    '',
+    'a place holding no entries still encoded to ciphertext',
+  );
+
+  // THE COST OF GETTING IT WRONG IS SOMEBODY ELSE'S PRIVACY CHOICE. A signer
+  // with no NIP-44 cannot open those bytes, so it reads them as a private list
+  // another writer owns and refuses to change the mode on top of what it
+  // cannot see. That refusal is correct. It is the empty `content` claiming to be
+  // occupied that is not, and the user who asked for private is left on a
+  // public list with nothing on screen saying why.
+  const both = [feed(FEED_A, 'podcast'), feed(FEED_B, 'podcast')];
+  const hidden = plan({
+    read: cleared.publish,
+    local: both,
+    baseline: base([FEED_A, FEED_B]),
+    mode: 'private',
+    userChose: true,
+    canReadPrivate: false,
+  });
+  assert.ok(hidden.publish, 'the user asked for private and nothing was published');
+  assert.ok(
+    hidden.publish.tags.some((t) => t[0] === 'visibility' && t[1] === 'private'),
+    'the list did not go private: the empty `content` read as one somebody owns',
+  );
+  assert.deepEqual(ids(hidden.publish.tags), [], 'entries were left in the tags');
+  assert.deepEqual(
+    ids(decodePrivate(hidden.publish.content)),
+    [FEED_B, FEED_A],
+    'the encrypted entries did not receive the entries',
+  );
+});
+
+test('31. A carried claim retires with the entry it names', () => {
+  // Rule 2 says the inactive place's claims are CARRIED, never recomputed, and
+  // that is what stops a writer claiming another app's entries. It does not
+  // mean a claim outlives the entry. A writer edits the inactive place too —
+  // the claim-back takes entries out of it, a whole-list move empties it — and
+  // a claim left behind by either can no longer be satisfied. The one thing it
+  // can still do is rule 3's third row, so the next app to write that entry
+  // back into that place has it deleted.
+  const local = [feed(FEED_A, 'podcast')];
+
+  // 1. The claim-back. FEED_B is claimed in the encrypted entries and unfavorited
+  // here, so it is removed from that place — and the claim goes with it.
+  const took = plan({
+    read: ev(
+      [ALT, ['medium', 'podcast'], ['i', FEED_A], K_FEED],
+      encodePrivate([['medium', 'podcast'], ['i', FEED_B]]),
+    ),
+    local,
+    baseline: base([FEED_A], [FEED_B]),
+    mode: 'public',
+  });
+  assert.ok(took.publish, 'the claim-back is a change and must publish');
+  assert.deepEqual(
+    took.baselineIfLanded.private,
+    [],
+    'we still claim an entry we removed from that place',
+  );
+
+  // A second app now writes FEED_B back into the encrypted entries. It is theirs.
+  const theirs = ev(took.publish.tags, encodePrivate([['medium', 'podcast'], ['i', FEED_B]]));
+  const next = plan({
+    read: theirs,
+    local,
+    baseline: took.baselineIfLanded,
+    mode: 'public',
+  });
+  assert.deepEqual(
+    ids(decodePrivate((next.publish ?? theirs).content)),
+    [FEED_B],
+    'a stale claim deleted the second app entry on the very next cycle',
+  );
+
+  // 2. The same rule on a whole-list move, where the place is emptied outright
+  // rather than edited entry by entry.
+  const moved = plan({
+    read: ev([ALT, VIS_PUBLIC, ['medium', 'podcast'], ['i', FEED_A], ['i', FEED_B], K_FEED]),
+    local,
+    baseline: base([FEED_A, FEED_B]),
+    mode: 'private',
+    userChose: true,
+  });
+  assert.ok(moved.publish, 'going private is a change and must publish');
+  assert.deepEqual(
+    moved.baselineIfLanded.public,
+    [],
+    'we still claim the tags after emptying it',
+  );
+
+  const alsoTheirs = ev(
+    [ALT, VIS_PRIVATE, ['medium', 'podcast'], ['i', FEED_B], K_FEED],
+    moved.publish.content,
+  );
+  const after = plan({
+    read: alsoTheirs,
+    local,
+    baseline: moved.baselineIfLanded,
+    mode: 'private',
+  });
+  const landed = after.publish ?? alsoTheirs;
+  assert.ok(
+    ids(landed.tags).concat(ids(decodePrivate(landed.content))).includes(FEED_B),
+    'a stale claim on the emptied place deleted the second app entry',
+  );
+
+  // 3. AND THE CLAIM MUST NOT RETIRE WHILE WE STILL HOLD THE ENTRY. Here a
+  // second app removed FEED_A from the encrypted entries and we still favorite it.
+  // That claim is the resurrection guard — pass 2 re-adds what we hold, and
+  // the baseline is the only thing that stops it — so presence in the place is
+  // not on its own the test.
+  const guarded = plan({
+    read: ev([ALT, ['medium', 'podcast'], ['i', FEED_B], K_FEED]),
+    local,
+    baseline: base([FEED_A], [FEED_A]),
+    mode: 'public',
+  });
+  assert.ok(
+    guarded.baselineIfLanded.private.includes(FEED_A),
+    'we dropped the claim that stops us re-adding what another app removed',
+  );
 });

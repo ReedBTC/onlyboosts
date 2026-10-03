@@ -30,9 +30,10 @@
  * widget is loaded on the FIRST CLICK, through the nav's own loader, because
  * signing needs it; the read of the public half does not.
  *
- * ⚠️ THE MIGRATION GATE: `ITEMS_ALLOWED` is false until both shipped apps read
- * the three-element item (docs/favorites.md). While false, episode hearts are
- * never revealed, so nothing on screen promises what the writer refuses.
+ * THE MIGRATION GATE IS LIFTED (2026-10-03). `ITEMS_ALLOWED` kept the episode
+ * hearts hidden until both shipped apps read the three-element item; both
+ * have since 2026-09-08, so the three kinds are revealed alike now. See
+ * docs/favorites.md.
  *
  * ⚠️ THE PRIVATE HALF IS PAINTED ONLY ONCE THE WIDGET IS LOADED, because
  * opening it needs the signer. A member with a private list sees empty hearts
@@ -40,17 +41,14 @@
  * after which the list is re-read with NIP-44 and the hearts fill. That is a
  * known cost of not loading 1MB to draw an outline.
  */
-import { fetchFavorites, syncFavorites, widgetDeps, saveMode, loadMode } from '/assets/js/favorites-sync.js?v=ob-v214'
-import { statedVisibility } from '/assets/js/favorites-merge.js?v=ob-v214'
-import { setFavoriteState, changeFor, keyFor } from '/assets/js/favorite-button.js?v=ob-v214'
-import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v214'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v214'
-import { initAccountSettings, noteSettingsChange } from '/assets/js/account-settings.js?v=ob-v214'
+import { fetchFavorites, syncFavorites, widgetDeps, saveMode, loadMode } from '/assets/js/favorites-sync.js?v=ob-v216'
+import { statedVisibility } from '/assets/js/favorites-merge.js?v=ob-v216'
+import { setFavoriteState, changeFor, keyFor } from '/assets/js/favorite-button.js?v=ob-v216'
+import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v216'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v216'
+import { initAccountSettings, noteSettingsChange } from '/assets/js/account-settings.js?v=ob-v216'
 
-/** Flip to true when Chad confirms BMB and StableKraft read `["i", feed, item]`. */
-export const ITEMS_ALLOWED = false
-
-const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v214'
+const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v216'
 
 const state = {
   pubkey: null,
@@ -69,8 +67,8 @@ function buttons(root = document) {
 }
 
 function allowed(btn) {
-  if (btn.dataset.fav === 'episode') return ITEMS_ALLOWED
-  return btn.dataset.fav === 'show' || btn.dataset.fav === 'artist'
+  const k = btn.dataset.fav
+  return k === 'show' || k === 'episode' || k === 'artist'
 }
 
 function paint(btn) {
@@ -157,9 +155,12 @@ function ensureWidget() {
 /* The Public / Private question                                             */
 
 /**
- * The first favorite on a list that cannot say which half it lives in. The
- * spec allows no default, so this is a real question with two answers and a
- * way out. Resolves to 'public' | 'private' | null.
+ * A favorite on a list that holds entries and cannot say which half it lives
+ * in (no visibility tag, entries in both halves, or a content this signer
+ * cannot open). The spec says ask rather than guess there, and only there: an
+ * empty list is public by rule and never reaches this dialog (2026-10-03,
+ * Reed's call, following the spec's #47). Resolves to 'public' | 'private' |
+ * null.
  */
 function askMode() {
   return new Promise((resolve) => {
@@ -198,7 +199,6 @@ const MESSAGES = {
   degraded: 'Couldn’t reach enough relays to read your favorites safely. Nothing was changed; try again in a moment.',
   'not-landed': 'No relay accepted the update. Nothing was changed; try again in a moment.',
   'no-nip44': 'Your signer can’t encrypt a private list, so this favorite wasn’t saved.',
-  'items-gated': 'Episode favorites are coming soon; other apps can’t read them yet. Until then a list holding episodes from another app can’t be changed here.',
   'sign-failed': 'Your signer didn’t sign the update, so nothing was changed.',
   'bad-change': 'This one can’t be favorited.',
 }
@@ -218,7 +218,7 @@ async function onClick(btn) {
     if (!state.privateOpened || state.pubkey !== user.pubkey) await reload({ withWidget: true })
 
     const deps = await widgetDeps(window.LBLogin)
-    const base = { ...deps, store: window.localStorage, itemsAllowed: ITEMS_ALLOWED }
+    const base = { ...deps, store: window.localStorage }
     const change = changeFor(btn, wasOn)
     let r = await syncFavorites(change, base)
 
@@ -292,7 +292,7 @@ async function setMode(mode) {
     const deps = await widgetDeps(window.LBLogin)
     const previous = loadMode(window.localStorage, deps.pubkey)
     saveMode(window.localStorage, deps.pubkey, mode)
-    const r = await syncFavorites(null, { ...deps, store: window.localStorage, itemsAllowed: ITEMS_ALLOWED, mode, userChose: true })
+    const r = await syncFavorites(null, { ...deps, store: window.localStorage, mode, userChose: true })
     if (r.status === 'published' || r.status === 'unchanged') {
       noteSettingsChange()
       await reload({ withWidget: true })
@@ -314,7 +314,7 @@ async function setMode(mode) {
 /* Boot                                                                      */
 
 function boot() {
-  window.OBFavorites = { getMode, setMode, reload: () => reload({ withWidget: true }), ITEMS_ALLOWED }
+  window.OBFavorites = { getMode, setMode, reload: () => reload({ withWidget: true }) }
   // The account menu's settings follow the account (account-settings.js):
   // restored on login, pushed on change.
   initAccountSettings()

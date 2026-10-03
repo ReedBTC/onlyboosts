@@ -126,12 +126,12 @@ check('every renderer of the heart imports it two-sided-safely', () => {
     assert.match(s, /favoriteButtonHtml\(\{ kind: "(show|episode|artist)"/, `${f} renders it`)
   }
 })
-check('the controller keeps the migration gate closed and never reaches NIP-04', () => {
-  assert.match(uiSrc, /export const ITEMS_ALLOWED = false/, 'episode hearts stay hidden until both apps read the three-element item')
+check('the controller reveals all three kinds (the migration gate lifted 2026-10-03) and never reaches NIP-04', () => {
+  assert.doesNotMatch(strip(uiSrc), /ITEMS_ALLOWED|itemsAllowed/, 'the gate is gone, not merely open')
+  assert.match(uiSrc, /return k === 'show' \|\| k === 'episode' \|\| k === 'artist'/, 'an episode heart is revealed like a show heart')
   assert.doesNotMatch(strip(uiSrc), /nip04|nip-04/i)
   assert.match(uiSrc, /from '\/assets\/js\/favorites-sync\.js\?v=ob-v\d+'/)
   assert.match(uiSrc, /from '\/assets\/js\/favorite-button\.js\?v=ob-v\d+'/)
-  assert.match(uiSrc, /if \(btn\.dataset\.fav === 'episode'\) return ITEMS_ALLOWED/, 'the gate is what decides an episode heart\'s reveal')
 })
 check('the controller is loaded on every page by nav.js, lazily, and nowhere else', () => {
   assert.match(readFileSync(path.join(root, 'assets/js/nav.js'), 'utf8'), /import\('\/assets\/js\/favorites-ui\.js\?v=ob-v\d+'\)/, 'nav.js dynamic-imports it')
@@ -140,7 +140,7 @@ check('the controller is loaded on every page by nav.js, lazily, and nowhere els
   }
   assert.match(uiSrc, /if \(buttons\(\)\.length\) reload\(\)/, 'a page with no hearts reads nothing')
   assert.match(uiSrc, /window\.OBFavorites = \{ getMode, setMode, reload/, 'the menu\'s API is exposed')
-  assert.match(uiSrc, /syncFavorites\(null, \{ \.\.\.deps, store: window\.localStorage, itemsAllowed: ITEMS_ALLOWED, mode, userChose: true \}\)/, 'a mode change is a userChose cycle')
+  assert.match(uiSrc, /syncFavorites\(null, \{ \.\.\.deps, store: window\.localStorage, mode, userChose: true \}\)/, 'a mode change is a userChose cycle')
 })
 
 check('the account menu: the pill links to the member\'s page, the rows press the nav toggle and the site controller', () => {
