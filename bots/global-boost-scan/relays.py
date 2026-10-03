@@ -72,10 +72,19 @@ PROFILE_RELAYS = [
 # Where to look up quoted kind-9735 zap receipts (Fountain boosts carry no amount
 # tag; the receipt is how we detect the boost + its sats). Fountain first — it's
 # where Fountain publishes its receipts — then a couple of wide general relays.
+#
+# ⚠️ relay.wavlake.com HOLDS WAVLAKE'S RECEIPTS AND NOTHING ELSE DOES. Measured
+# 2026-10-03 (probes/): of 35 quoted kind-9735s the three relays above could
+# not return, 34 were on relay.wavlake.com (12 also on nostr.mom, 9 on damus,
+# none on nos.lol/ditto/fountain). Wavlake's LNURL server signs them and
+# publishes them to its own relay, so a Wavlake boost note quoting one was
+# being rejected as "no receipt" for want of asking the relay in CORE_RELAYS
+# that the note itself came from.
 RECEIPT_RELAYS = [
     "wss://relay.fountain.fm",
     "wss://nos.lol",
     "wss://relay.ditto.pub",
+    "wss://relay.wavlake.com",
 ]
 
 
