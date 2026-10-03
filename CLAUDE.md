@@ -2039,7 +2039,7 @@ Reed's first live lists reached BoostMeBitch, and artist favorites are written
 here first (neither app renders one yet). The migration gate lifted
 2026-10-03: episode and song hearts are live, the merge is re-vendored at
 the spec's ca652a9 (31 vectors), an empty list is public by rule, and snort
-and theforest are publish targets.**
+is a publish target (theforest refuses the write and is deliberately out).**
 - **⚠️ `favorites-ui.js` IS LOADED ON EVERY PAGE BY `nav.js`**, a dynamic
   import at the end of its IIFE, lazily (no hearts, no relay read). It
   exposes `window.OBFavorites` for the widget's Favorites row; a mode change

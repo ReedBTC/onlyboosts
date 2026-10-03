@@ -375,11 +375,13 @@ await check('the baseline store: malformed is empty, the mode is only ever publi
   assert.equal(S.loadMode(null, pk), null)
 })
 await check('the publish set covers every relay BMB and StableKraft read that accepts the kind, and nothing that refuses or mirrors', () => {
-  assert.deepEqual([...S.PUBLISH_RELAYS], ['wss://nos.lol', 'wss://relay.damus.io', 'wss://relay.primal.net', 'wss://relay.ditto.pub', 'wss://relay.snort.social', 'wss://theforest.nostr1.com'])
-  // BMB's DEFAULT_RELAYS less fountain, which refuses kind 10333, plus the two
-  // of StableKraft's defaults BMB does not share (2026-10-03). A relay in
-  // either read set that we never write is a stale copy waiting to win a race.
-  for (const url of ['wss://relay.damus.io', 'wss://relay.primal.net', 'wss://nos.lol', 'wss://relay.snort.social', 'wss://theforest.nostr1.com']) assert.ok(S.PUBLISH_RELAYS.includes(url), url)
+  assert.deepEqual([...S.PUBLISH_RELAYS], ['wss://nos.lol', 'wss://relay.damus.io', 'wss://relay.primal.net', 'wss://relay.ditto.pub', 'wss://relay.snort.social'])
+  // BMB's DEFAULT_RELAYS less fountain, which refuses kind 10333, plus snort
+  // from StableKraft's defaults (2026-10-03). A relay in either read set that
+  // we never write is a stale copy waiting to win a race. theforest, the
+  // other StableKraft default, refuses the write and is deliberately out.
+  for (const url of ['wss://relay.damus.io', 'wss://relay.primal.net', 'wss://nos.lol', 'wss://relay.snort.social']) assert.ok(S.PUBLISH_RELAYS.includes(url), url)
+  assert.ok(!S.PUBLISH_RELAYS.includes('wss://theforest.nostr1.com'))
   assert.ok(!S.PUBLISH_RELAYS.includes('wss://relay.fountain.fm'))
   assert.ok(!S.PUBLISH_RELAYS.includes('wss://relay.mostr.pub'))
 })

@@ -41,10 +41,10 @@
  * shipped cycle against scripted relays, a stand-in codec and a real key.
  * Nothing here is reached signed out; the bot cannot hold favorites.
  */
-import { readFavorites, readWriteRelays, relaySet, acceptsEvent } from '/assets/js/favorites-read.js?v=ob-v216'
+import { readFavorites, readWriteRelays, relaySet, acceptsEvent } from '/assets/js/favorites-read.js?v=ob-v217'
 import {
   KIND, plan, parse, parseTags, statedVisibility, decodePlaintext, kindOf, feedIdOf, feedGuidOf,
-} from '/assets/js/favorites-merge.js?v=ob-v216'
+} from '/assets/js/favorites-merge.js?v=ob-v217'
 
 /**
  * Where a list is published. The read set less relay.mostr.pub, which held a
@@ -59,11 +59,14 @@ import {
  * win a race. Primal was missing until 2026-09-08 and a favorite made on
  * /show did not reach BMB until it was re-made (Reed's test). StableKraft
  * reads nos.lol, snort, primal, theforest and damus (plus the member's own
- * relays); snort and theforest joined on 2026-10-03, both answering a
- * kind-10333 REQ with EOSE that day (they accept the kind on the read side;
- * neither held any list yet). They are publish targets only: the read set
- * trusts a read only when every reached relay answers, and two more relays
- * there is two more ways for a read to degrade.
+ * relays); snort joined on 2026-10-03, answering a kind-10333 REQ with EOSE
+ * that day and holding Reed's list after his first publish. A publish target
+ * only: the read set trusts a read only when every reached relay answers,
+ * and one more relay there is one more way for a read to degrade.
+ *
+ * theforest.nostr1.com, StableKraft's fifth, was added the same day and
+ * dropped the same day (Reed's call): it answers a read but took nothing on
+ * the write (a members-only relay), so the socket bought nothing.
  */
 export const PUBLISH_RELAYS = Object.freeze([
   'wss://nos.lol',
@@ -71,7 +74,6 @@ export const PUBLISH_RELAYS = Object.freeze([
   'wss://relay.primal.net',
   'wss://relay.ditto.pub',
   'wss://relay.snort.social',
-  'wss://theforest.nostr1.com',
 ])
 
 export const PUBLISH_TIMEOUT_MS = 8000

@@ -141,9 +141,9 @@ scripted relays, a stand-in codec and a real key:
 5. **Merge** through `plan`, **encrypt** the returned plaintext when the
    publish needs the private half, **sign** through `LBLogin.signEvent`, and
    refuse an event the signer returns under another key.
-6. **Publish** on raw sockets to nos.lol, damus, primal, ditto, snort and
-   theforest plus the member's NIP-65 write relays (read off their kind
-   10002), one OK per relay. One `OK true` is landing; the baseline is
+6. **Publish** on raw sockets to nos.lol, damus, primal, ditto and snort
+   plus the member's NIP-65 write relays (read off their kind 10002), one OK
+   per relay. One `OK true` is landing; the baseline is
    recorded then and only then.
 
 **Issue #37, found by the writer's test and fixed upstream the same day.**
@@ -330,14 +330,18 @@ shipped module against scripted sockets; the live smoke on 2026-09-08 read
 Chad's list from five relays in under a second, with primal now holding the
 current copy too.
 
-**Publish** (step three) goes to nos.lol, damus, primal, ditto, snort and
-theforest plus the NIP-65 write relays. **Snort and theforest joined on
-2026-10-03**: they are two of StableKraft's five defaults (nos.lol, snort,
-primal, theforest, damus, plus the member's own), both answered a kind-10333
-REQ with EOSE that day (the kind is accepted on the read side), and neither
-held any list yet. Publish targets only, on the same reasoning as primal
-below; they are deliberately not in the read set, where every reached relay
-must answer before a read is trusted. **Primal joined both sets on 2026-09-08, after Reed's
+**Publish** (step three) goes to nos.lol, damus, primal, ditto and snort
+plus the NIP-65 write relays. **Snort joined on 2026-10-03**: it is one of
+StableKraft's five defaults (nos.lol, snort, primal, theforest, damus, plus
+the member's own), it answered a kind-10333 REQ with EOSE that day, and it
+held Reed's list after his first publish from the branch. A publish target
+only, on the same reasoning as primal below; deliberately not in the read
+set, where every reached relay must answer before a read is trusted.
+**Theforest (`theforest.nostr1.com`), the fifth, was added and dropped the
+same day** (Reed's call): it answers a read but held nothing after the
+publish, a members-only relay refusing the write, so the socket bought
+nothing. A StableKraft member who is also a theforest member could still be
+served a stale copy from it; nothing this site can do reaches that. **Primal joined both sets on 2026-09-08, after Reed's
 first live test**: two shows favorited from the feed reached BoostMeBitch, a
 show favorited from `/show` did not until it was unfavorited and re-favorited.
 BMB reads damus, primal, nos.lol and fountain, takes the newest copy it hears,
