@@ -32,7 +32,11 @@ const check = (name, fn) => {
 // 1. The spec's vectors.
 {
   const vectors = path.join(root, 'scripts/vendor/pc20-favorites/vectors.test.mjs');
-  const r = spawnSync(process.execPath, ['--test', vectors], {
+  // The reporter is pinned: node picks `spec` on a TTY and `tap` on a pipe,
+  // and the `ℹ tests N` summary parsed below is the spec reporter's. Node 22
+  // on a pipe printed TAP (`# tests N`), every count read NaN, and the test
+  // went red with all 31 vectors passing (2026-10-16).
+  const r = spawnSync(process.execPath, ['--test', '--test-reporter=spec', vectors], {
     cwd: root,
     env: { ...process.env, PC20_FAVORITES_ADAPTER: 'scripts/favorites-conformance-adapter.mjs' },
     encoding: 'utf8',
