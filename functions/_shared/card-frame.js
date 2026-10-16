@@ -98,6 +98,10 @@ export function cardHtml({ title, kicker, kickerSub, board, footer, links, css =
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=${CARD_W}" />
   <meta name="robots" content="noindex" />
+  <!-- Narrower than the page policy on purpose, and the one policy on the
+       site that does NOT allow static.cloudflareinsights.com: the frame is
+       loaded only by the collector's screenshot bot, and letting the Web
+       Analytics beacon run here would count every render as a visit. -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
     script-src 'self' 'unsafe-inline';

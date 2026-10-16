@@ -332,7 +332,7 @@ function shell({ title, eyebrow, h1, lead, body, canonical = null, og = null, sc
        lockstep; see CLAUDE.md. -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
-    script-src 'self' 'unsafe-inline' 'unsafe-eval';
+    script-src 'self' 'unsafe-inline' 'unsafe-eval' https://static.cloudflareinsights.com;
     style-src 'self' 'unsafe-inline';
     img-src 'self' data: https:;
     font-src 'self' data:;

@@ -634,7 +634,12 @@ What a change would break:
   happens in lockstep. **`img-src` allows `data:` and `https:` and not
   `blob:`**, so a preview of a fetched blob is a `data:` URL, never
   `createObjectURL` (the share modal shipped a broken-image icon that way);
-  don't widen the shared policy for one preview.
+  don't widen the shared policy for one preview. **`script-src` allows
+  `https://static.cloudflareinsights.com`** (2026-10-15): Cloudflare injects
+  its Web Analytics beacon into every HTML response as an external module
+  script, and the policy refused it, so analytics recorded nothing. The
+  card frame (`card-frame.js`) deliberately keeps it out; the collector's
+  screenshot bot is its only visitor.
 - **Shared nav/footer are generated.** Edit `partials/nav.html` /
   `partials/footer.html`, then run `node scripts/sync-partials.js`. Never edit
   the copies inside page files — they're between `NAV:START`/`NAV:END` markers
