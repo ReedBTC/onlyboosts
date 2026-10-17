@@ -78,7 +78,7 @@ async function fillRail(section) {
       return
     }
     const src = SOURCES[key]
-    if (!src) return
+    if (!src) { track.innerHTML = '<p class="rail-empty">Unavailable right now.</p>'; return }
     const rows = src.rows(await getJson(src.url)) || []
     track.innerHTML = railListHtml(rows.slice(0, TILES).map(src.tile), { empty: 'Nothing here yet.' })
     wireArt(track)
@@ -119,6 +119,49 @@ async function paintFollows(section, follows) {
   }
 }
 
+function unlock(section, html) {
+  const track = section.querySelector('.rail-track')
+  if (!track) return
+  track.classList.remove('rail-locked')
+  track.removeAttribute('data-locked')
+  track.innerHTML = html
+  wireArt(track)
+}
+
+/* Recommended For You, Recommended Music and Because You Boosted X, all off
+   one POST: the member's boosted shows are the seeds (favorites join them
+   once the favorites list has an accessor here), and the endpoint sums the
+   collector's similarity scores over them. */
+async function paintRecommended(sections, pubkey) {
+  const rec = sections.find((s) => s.dataset.rail === 'recommended')
+  const music = sections.find((s) => s.dataset.rail === 'recommended-music')
+  const because = sections.find((s) => s.dataset.rail === 'because')
+  try {
+    const j = await getJson('/api/v1/recommend', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pubkey, limit: TILES }),
+    })
+    const none = (what) => `Boost a few ${what} and the shows their boosters also boost will rank here.`
+    if (rec) {
+      if (j.podcasts?.length) unlock(rec, railListHtml(j.podcasts.map(showTile)))
+      else lockedCardNote(rec, j.seeds ? 'Nothing to recommend yet' : 'No boosts from this account yet', j.seeds ? 'The shows you boost have no neighbours the index can vouch for yet; it grows with every boost.' : none('shows'))
+    }
+    if (music) {
+      if (j.music?.length) unlock(music, railListHtml(j.music.map(albumTile)))
+      else lockedCardNote(music, j.seeds ? 'Nothing to recommend yet' : 'No music boosts from this account yet', j.seeds ? 'The albums you boost have no neighbours the index can vouch for yet.' : none('albums'))
+    }
+    if (because && j.because?.rows?.length) {
+      const a = because.querySelector('[data-because-seed]')
+      if (a) { a.textContent = j.because.seed.title || 'this show'; a.href = `/show/${encodeURIComponent(j.because.seed.guid)}` }
+      const track = because.querySelector('.rail-track')
+      if (track) { track.innerHTML = railListHtml(j.because.rows.map(showTile)); wireArt(track) }
+      because.hidden = false
+    }
+  } catch (e) {
+    console.warn('[discover] recommend', e)
+    for (const s of [rec, music]) if (s) lockedCardNote(s, 'Your recommendations could not be loaded', 'Reload to try again.')
+  }
+}
+
 let personalRun = 0
 async function paintPersonal() {
   const my = ++personalRun
@@ -126,18 +169,14 @@ async function paintPersonal() {
   if (!sections.length) return
   const res = await resolveFollows()
   if (my !== personalRun) return
+  if (res.status === 'signed-out') return // the locked cards stay: the carrot
   for (const s of sections) {
-    const key = s.dataset.rail
-    if (res.status === 'signed-out') continue // the locked card stays: the carrot
-    if (key === 'follows') {
-      if (res.status === 'ok') paintFollows(s, res.follows)
-      else if (res.status === 'empty') lockedCardNote(s, 'You follow nobody yet', 'Follow a few boosters on the Members tab and their shows will rank here.')
-      else lockedCardNote(s, 'Your follow list could not be read', 'The relays did not answer. Reload to try again.')
-    } else if (key === 'recommended') {
-      lockedCardNote(s, 'Your recommendations are being built',
-        'They will rank the shows the people who boost what you boost are listening to. Keep boosting and favoriting; that is what feeds them.')
-    }
+    if (s.dataset.rail !== 'follows') continue
+    if (res.status === 'ok') paintFollows(s, res.follows)
+    else if (res.status === 'empty') lockedCardNote(s, 'You follow nobody yet', 'Follow a few boosters on the Members tab and their shows will rank here.')
+    else lockedCardNote(s, 'Your follow list could not be read', 'The relays did not answer. Reload to try again.')
   }
+  if (res.pubkey) paintRecommended(sections, res.pubkey)
 }
 
 /* The Log in buttons on the locked cards: the nav's own login, lazily. */

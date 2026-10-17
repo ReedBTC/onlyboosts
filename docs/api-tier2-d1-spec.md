@@ -245,3 +245,14 @@ gets the token.
    leave the global feed/aggregates on the static shards.
 5. (Reed) provision remote D1 + binding + token → flip prod on.
 6. (Later, optional) public: open CORS + rate limit + OpenAPI + NIP-98.
+
+
+## `POST /api/v1/recommend` (2026-10-17)
+
+The discovery homepage's personal rails. Body `{ pubkey: <hex|npub>,
+favorites?: [feedGuid], limit?: n }`; answer `{ seeds, podcasts: [row],
+music: [row], because: { seed, rows } | null }`, each row the podcasts record
+shape plus `score`, `shared`, `via`. Reads `show_similar` (the collector's
+distinct-booster cosine, top 20 per show) through one bound JSON array of
+seeds; see the file's header for the floor and the partition. Not cached:
+it is one member's one request, and nothing is stored per member.

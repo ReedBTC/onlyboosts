@@ -25,10 +25,13 @@
 // rail open; the response is cached 120s at the edge (the collector's tick),
 // so this is a handful of queries per colo per two minutes, not per visitor.
 import { weekBoard } from "./api/v1/charts/[[path]].js";
+import { weeklyChart } from "./_shared/week-charts.js";
+import { pacificWeekStart, prevWeek, nextWeek } from "../assets/js/pacific-week.js";
 import { readParams as podcastParams, globalPodcasts } from "./api/v1/podcasts.js";
 import { readParams as episodeParams, globalEpisodes } from "./api/v1/episodes.js";
 import { hoursBoard } from "./api/v1/members/hours.js";
-import { railListHtml, showTile, albumTile, episodeTile, artistTile, memberTile } from "../assets/js/rail-tile.js";
+import { railListHtml, tileHtml, showTile, albumTile, episodeTile, artistTile, memberTile } from "../assets/js/rail-tile.js";
+import { showPageHref } from "../assets/js/show-link.js";
 import { boostRows } from "../assets/js/boost-list.js";
 import { BOOST_SELECT } from "./api/v1/_common.js";
 import { lookupMentionNames } from "./_shared/detail-page.js";
@@ -80,6 +83,71 @@ export const RAILS = {
   "artists-week": async (env) => {
     const { body } = await weekBoard(env, { kind: "artists", limit: TILES });
     return railListHtml(body.rows.map(artistTile), { empty: "No artists boosted yet this week." });
+  },
+  /* NEW AND NOTEWORTHY: shows whose FIRST boost ever landed in the last 90
+     days, two or more distinct boosters, by boosters then sats. The all-time
+     charts bury a debut; this is the Billboard instrument. 90 days and the
+     floor are the collector's measurement (2026-10-17: 41 debuts in 30 days,
+     3 of them with three boosters; 21 in 90 days with two). */
+  "new-shows": async (env) => {
+    const since = Math.floor(Date.now() / 1000) - 90 * 86400;
+    const { results } = await env.DB.prepare(
+      `SELECT podcast_guid AS guid, title, image, artwork, author, medium, total_sats, booster_count, first_boost_ts
+         FROM podcasts
+        WHERE first_boost_ts >= ? AND booster_count >= 2 AND COALESCE(title, '') <> ''
+        ORDER BY booster_count DESC, total_sats DESC, first_boost_ts DESC LIMIT ?`
+    ).bind(since, TILES).all();
+    const rows = results || [];
+    return railListHtml(rows.map((r, i) => tileHtml({
+      rank: i + 1, href: showPageHref(r.guid), title: r.title,
+      sub: "First boost " + new Date(r.first_boost_ts * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }),
+      subTitle: `${r.booster_count} boosters since its first boost`,
+      img: r.image, art2: r.artwork, glyph: (r.medium === "music" ? "🎵" : "🎙"),
+    })), { empty: "No show had its first boost in the last 90 days." });
+  },
+  /* MOVERS: the biggest climbs on this week's Shows chart against last
+     week's, then this week's debuts in chart order. Both weeks are the
+     same query /api/v1/charts answers, read to 100 places. */
+  "movers": async (env) => {
+    const live = pacificWeekStart(Math.floor(Date.now() / 1000));
+    const last = prevWeek(live);
+    const [now, before] = await Promise.all([
+      weeklyChart(env, "shows", live, nextWeek(live), 100),
+      weeklyChart(env, "shows", last, live, 100),
+    ]);
+    const was = new Map(before.map((r) => [r.guid, r.rank]));
+    const climbers = now.filter((r) => was.has(r.guid) && was.get(r.guid) > r.rank)
+      .map((r) => ({ r, climb: was.get(r.guid) - r.rank }))
+      .sort((a, b) => b.climb - a.climb || a.r.rank - b.r.rank);
+    const debuts = now.filter((r) => !was.has(r.guid)).map((r) => ({ r, climb: null }));
+    const picks = [...climbers, ...debuts].slice(0, TILES);
+    return railListHtml(picks.map(({ r, climb }) => tileHtml({
+      rank: r.rank, tied: !!r.tied, href: showPageHref(r.guid), title: r.title,
+      sub: climb != null ? `▲ ${climb} · was #${was.get(r.guid)}` : "New this week",
+      subTitle: climb != null ? "Places climbed since last week's chart" : "Not on last week's chart",
+      img: r.image, art2: r.artwork, glyph: "🎙",
+    })), { empty: "Nothing has moved yet this week." });
+  },
+  /* PODCASTERS RECOMMEND: the shows most often listed on other shows'
+     podrolls, the one editorial signal publishers wrote themselves. A
+     target the index has no page for is a figure, not a link. */
+  "podroll": async (env) => {
+    const { results } = await env.DB.prepare(
+      `SELECT target_guid AS guid, MAX(target_title) AS title, MAX(target_image) AS image,
+              MAX(target_artwork) AS artwork, MAX(target_linked) AS linked, MAX(target_medium) AS medium,
+              COUNT(DISTINCT source_guid) AS n
+         FROM podroll
+        WHERE target_guid IS NOT NULL AND COALESCE(target_title, '') <> ''
+        GROUP BY target_guid
+        ORDER BY n DESC, title ASC LIMIT ?`
+    ).bind(TILES).all();
+    const rows = results || [];
+    return railListHtml(rows.map((r, i) => tileHtml({
+      rank: i + 1, href: Number(r.linked) ? showPageHref(r.guid) : null, title: r.title,
+      sub: `On ${r.n} podroll${Number(r.n) === 1 ? "" : "s"}`,
+      subTitle: "How many shows list it on their podroll",
+      img: r.image, art2: r.artwork, glyph: (r.medium === "music" ? "🎵" : "🎙"),
+    })), { empty: "No podroll in the index yet." });
   },
   /* The boost firehose's newest rows, the same two-sided boost row every
      detail page's #boosts list renders (boost-list.js), facts at the edge

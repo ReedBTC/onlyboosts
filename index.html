@@ -269,6 +269,37 @@
     </div>
   </section>
 
+  <section class="rail" data-rail="recommended-music" data-rail-personal aria-labelledby="rail-recommended-music">
+    <div class="rail-head">
+      <h2 id="rail-recommended-music">Recommended Music</h2>
+      <span class="rail-more" style="color: var(--muted); font-weight: 500;">Albums the people who boost what you boost are into</span>
+    </div>
+    <div class="rail-track rail-locked" data-locked>
+      <ol class="rail-list" aria-hidden="true">
+        <li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: 80%"></span><span class="rail-locked-ph" style="width: 50%"></span></span></li>
+        <li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: 70%"></span><span class="rail-locked-ph" style="width: 45%"></span></span></li>
+        <li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: 85%"></span><span class="rail-locked-ph" style="width: 55%"></span></span></li>
+        <li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: 65%"></span><span class="rail-locked-ph" style="width: 40%"></span></span></li>
+        <li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: 75%"></span><span class="rail-locked-ph" style="width: 50%"></span></span></li>
+        <li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: 80%"></span><span class="rail-locked-ph" style="width: 45%"></span></span></li>
+        <li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: 60%"></span><span class="rail-locked-ph" style="width: 55%"></span></span></li>
+        <li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: 85%"></span><span class="rail-locked-ph" style="width: 40%"></span></span></li>
+        <li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: 70%"></span><span class="rail-locked-ph" style="width: 50%"></span></span></li>
+        <li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: 75%"></span><span class="rail-locked-ph" style="width: 45%"></span></span></li>
+      </ol>
+      <div class="rail-locked-card">
+        <div>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>
+          <div>
+            <h3>Log in to see your music recommendations</h3>
+            <p>Albums ranked by how much their boosters overlap with the music you boost and favorite.</p>
+          </div>
+          <button type="button" class="ob-cta" data-lb-login-trigger>Log in</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section class="rail" data-rail="follows" data-rail-personal aria-labelledby="rail-follows">
     <div class="rail-head">
       <h2 id="rail-follows">Top Shows From Your Follows</h2>
@@ -300,6 +331,31 @@
     </div>
   </section>
 
+  <!-- Filled for a signed-in member with a seed show; stays hidden otherwise. -->
+  <section class="rail" data-rail="because" data-rail-personal aria-labelledby="rail-because" hidden>
+    <div class="rail-head">
+      <h2 id="rail-because">Because you boosted <a href="#" data-because-seed></a></h2>
+      <span class="rail-more" style="color: var(--muted); font-weight: 500;">Shows its boosters also boost</span>
+    </div>
+    <div class="rail-track"></div>
+  </section>
+
+  <section class="rail" data-rail="new-shows" aria-labelledby="rail-new-shows">
+    <div class="rail-head">
+      <h2 id="rail-new-shows">New and Noteworthy</h2>
+      <span class="rail-more" style="color: var(--muted); font-weight: 500;">First boosted in the last 90 days</span>
+    </div>
+    <div class="rail-track"><!--OB:RAIL:new-shows--><p class="rail-placeholder">Loading the debuts…</p><!--/OB:RAIL:new-shows--></div>
+  </section>
+
+  <section class="rail" data-rail="movers" aria-labelledby="rail-movers">
+    <div class="rail-head">
+      <h2 id="rail-movers"><a href="/charts#shows">Movers</a></h2>
+      <a class="rail-more" href="/charts#shows">This week's chart →</a>
+    </div>
+    <div class="rail-track"><!--OB:RAIL:movers--><p class="rail-placeholder">Loading this week's climbers…</p><!--/OB:RAIL:movers--></div>
+  </section>
+
   <section class="rail" data-rail="episodes-year" aria-labelledby="rail-episodes-year">
     <div class="rail-head">
       <h2 id="rail-episodes-year"><a href="/charts#episodes-global?range=1y">Top Episodes This Year</a></h2>
@@ -322,6 +378,14 @@
       <a class="rail-more" href="/charts#artists">View the chart →</a>
     </div>
     <div class="rail-track"><!--OB:RAIL:artists-week--><p class="rail-placeholder">Loading this week's artists…</p><!--/OB:RAIL:artists-week--></div>
+  </section>
+
+  <section class="rail" data-rail="podroll" aria-labelledby="rail-podroll">
+    <div class="rail-head">
+      <h2 id="rail-podroll">Podcasters Recommend</h2>
+      <span class="rail-more" style="color: var(--muted); font-weight: 500;">The shows most often on other shows' podrolls</span>
+    </div>
+    <div class="rail-track"><!--OB:RAIL:podroll--><p class="rail-placeholder">Loading the podrolls…</p><!--/OB:RAIL:podroll--></div>
   </section>
 
   <!-- The foot of the page: the newest boost notes, the same row the detail

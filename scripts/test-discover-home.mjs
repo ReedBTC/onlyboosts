@@ -17,6 +17,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
 
 const ROOT = new URL('..', import.meta.url).pathname
 const read = (p) => readFileSync(join(ROOT, p), 'utf8')
@@ -187,6 +188,7 @@ console.log('\nThe search page:')
   })
   await checkAsync('no query serves the shell untouched; a query with a dead DB still answers 200', async () => {
     const warn = console.warn; console.warn = () => {}
+    const error = console.error; console.error = () => {}
     try {
       const r0 = await searchGet({ request: new Request('https://ob.invalid/search'), env: { ASSETS, DB: dead } })
       assert.equal(r0.status, 200)
@@ -196,7 +198,7 @@ console.log('\nThe search page:')
       const html = await r1.text()
       assert.ok(html.includes('value="bitcoin"'), 'the query is back in the field')
       assert.ok(html.includes('<title>bitcoin — Search — OnlyBoosts</title>'))
-    } finally { console.warn = warn }
+    } finally { console.warn = warn; console.error = error }
   })
   check('the nav form submits to /search and the charts page carries no feed search box', () => {
     assert.ok(read('partials/nav.html').includes('action="/search"'))
@@ -213,6 +215,90 @@ console.log('\nThe search page:')
     assert.ok(tile.showTile({ guid: 'g', title: 'T', r_sats: 3, r_boosters: 1, r_boosts: 2 }, 0).includes('>3/1/2<'))
     assert.ok(tile.showTile({ guid: 'g', title: 'T', chart: { sats: 5, boosters: 4, boosts: 6 } }, 0).includes('>5/4/6<'))
     assert.ok(tile.showTile({ guid: 'g', title: 'T', boosters: 7, sats: 38849 }, 0).includes('7 boosters · 38.8k sats'))
+  })
+}
+
+console.log('\nThe recommendations and the data rails, over the real schema:')
+{
+  const db = new DatabaseSync(':memory:')
+  db.exec(read('bots/global-boost-scan/d1/schema.sql'))
+  const now = Math.floor(Date.now() / 1000)
+  const ME = 'a'.repeat(64), YOU = 'b'.repeat(64), THEM = 'c'.repeat(64)
+  const pod = db.prepare('INSERT INTO podcasts(podcast_guid,title,image,medium,total_sats,booster_count,boost_count,first_boost_ts) VALUES(?,?,?,?,?,?,?,?)')
+  pod.run('show-1', 'Seed One', 'https://x/1.jpg', 'podcast', 1000, 3, 5, now - 400 * 86400)
+  pod.run('show-2', 'Seed Two', 'https://x/2.jpg', 'podcast', 500, 2, 2, now - 300 * 86400)
+  pod.run('show-A', 'Neighbour A', 'https://x/a.jpg', 'podcast', 900, 4, 9, now - 200 * 86400)
+  pod.run('show-B', 'Neighbour B', 'https://x/b.jpg', 'podcast', 800, 2, 4, now - 200 * 86400)
+  pod.run('show-C', 'Brand New', 'https://x/c.jpg', 'podcast', 300, 3, 3, now - 10 * 86400)
+  pod.run('show-D', 'Lonely Debut', 'https://x/d.jpg', 'podcast', 50, 1, 1, now - 5 * 86400)
+  pod.run('album-1', 'Seed Album', 'https://x/m1.jpg', 'music', 400, 2, 2, now - 100 * 86400)
+  pod.run('album-A', 'Neighbour Album', 'https://x/ma.jpg', 'music', 350, 3, 3, now - 100 * 86400)
+  const sim = db.prepare('INSERT INTO show_similar(podcast_guid,other_guid,score,shared_boosters,rank) VALUES(?,?,?,?,?)')
+  sim.run('show-1', 'show-A', 0.5, 3, 1)
+  sim.run('show-1', 'show-2', 0.3, 2, 2)   // a seed: never recommended back
+  sim.run('show-1', 'show-B', 0.2, 1, 3)   // one booster shared, reached twice below
+  sim.run('show-2', 'show-B', 0.3, 1, 1)
+  sim.run('show-2', 'show-D', 0.1, 1, 2)   // one booster, one seed: under the floor
+  sim.run('album-1', 'album-A', 0.4, 2, 1)
+  const boost = db.prepare('INSERT INTO boosts(event_id,booster_pubkey,created_at,sats,podcast_guid,item_guid) VALUES(?,?,?,?,?,?)')
+  boost.run('e1', ME, now - 100, 100, 'show-1', null)
+  boost.run('e2', ME, now - 90, 100, 'show-1', null)
+  boost.run('e3', ME, now - 80, 100, 'show-2', null)
+  boost.run('e4', ME, now - 70, 100, 'album-1', null)
+  boost.run('e5', YOU, now - 60, 100, 'show-1', null)   // this week's chart: show-1 by two boosters
+  boost.run('e6', THEM, now - 50, 100, 'show-A', null)
+  const roll = db.prepare('INSERT INTO podroll(source_guid,position,target_guid,target_title,target_image,target_linked) VALUES(?,?,?,?,?,?)')
+  roll.run('show-1', 1, 'show-A', 'Neighbour A', 'https://x/a.jpg', 1)
+  roll.run('show-2', 1, 'show-A', 'Neighbour A', 'https://x/a.jpg', 1)
+  roll.run('show-2', 2, 'ext-1', 'Somewhere Else', null, 0)
+  const env = { DB: { prepare: (sql) => ({ bind: (...a) => ({ all: async () => ({ results: db.prepare(sql).all(...a) }), first: async () => db.prepare(sql).get(...a) ?? null }), all: async () => ({ results: db.prepare(sql).all() }), first: async () => db.prepare(sql).get() ?? null }) } }
+  const { onRequestPost: recommend } = await import('../functions/api/v1/recommend.js')
+  const post = (body) => recommend({ request: new Request('https://ob.invalid/api/v1/recommend', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }), env })
+
+  await checkAsync('seeds are excluded, the floor holds, the media stay apart, and Because names the most-boosted seed', async () => {
+    const r = await post({ pubkey: ME })
+    assert.equal(r.status, 200)
+    const j = await r.json()
+    assert.equal(j.seeds, 3)
+    const pods = j.podcasts.map((x) => x.guid)
+    assert.ok(pods.includes('show-A'), 'three shared boosters with one seed')
+    assert.ok(pods.includes('show-B'), 'reached from two seeds')
+    assert.ok(!pods.includes('show-2') && !pods.includes('show-1'), 'a seed is never recommended')
+    assert.ok(!pods.includes('show-D'), 'one booster from one seed is under the floor')
+    assert.ok(!pods.includes('album-A'), 'music stays on the music side')
+    assert.deepEqual(j.music.map((x) => x.guid), ['album-A'])
+    assert.equal(j.because.seed.guid, 'show-1')
+    assert.deepEqual(j.because.rows.map((x) => x.guid), ['show-A'])
+  })
+  await checkAsync('a member with no boosts gets empty lists, a bad pubkey a 400, a publisher key nothing', async () => {
+    const j = await (await post({ pubkey: 'd'.repeat(64) })).json()
+    assert.deepEqual([j.seeds, j.podcasts, j.music, j.because], [0, [], [], null])
+    assert.equal((await post({ pubkey: 'nope' })).status, 400)
+    const { PUBLISHERS } = await import('../functions/api/v1/_common.js')
+    const p = await (await post({ pubkey: PUBLISHERS[0] })).json()
+    assert.equal(p.seeds, 0)
+  })
+  await checkAsync('favorites join the seeds and are excluded as candidates', async () => {
+    const j = await (await post({ pubkey: 'd'.repeat(64), favorites: ['show-1', 'bad guid with spaces'] })).json()
+    assert.equal(j.seeds, 1)
+    // show-2 is a candidate HERE: this member never boosted it, so it is not a seed.
+    assert.deepEqual(j.podcasts.map((x) => x.guid).sort(), ['show-2', 'show-A'])
+    assert.equal(j.because, null, 'because needs a BOOSTED seed')
+  })
+  await checkAsync('New and Noteworthy: first boost within 90 days and two boosters, newest debuts after the better-backed', async () => {
+    const html = await RAILS['new-shows'](env)
+    assert.ok(html.includes('Brand New') && !html.includes('Lonely Debut') && !html.includes('Seed One'))
+    assert.match(html, /First boost [A-Z][a-z]{2} \d{1,2}/)
+  })
+  await checkAsync('Podcasters Recommend: ranked by how many podrolls list a show; an unindexed target is a figure, not a link', async () => {
+    const html = await RAILS.podroll(env)
+    assert.ok(html.indexOf('Neighbour A') < html.indexOf('Somewhere Else'))
+    assert.ok(html.includes('On 2 podrolls') && html.includes('On 1 podroll<'))
+    assert.ok(html.includes('href="/show/show-A"') && !html.includes('href="/show/ext-1"'))
+  })
+  await checkAsync('Movers: a show on this week\'s chart and not last week\'s is a debut', async () => {
+    const html = await RAILS.movers(env)
+    assert.ok(html.includes('Seed One') && html.includes('New this week'))
   })
 }
 

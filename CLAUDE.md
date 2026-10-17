@@ -116,11 +116,25 @@ was picked from is in the session memory; direction A won, with the sans.
 - **The foot of the page is the newest boost rows**, the detail pages' own
   two-sided `boost-list.js` row with the reaction bar attached by
   `discover.js`; the whole feed with its controls is the Members tab.
-- **Still to build here**: the Recommended rail's endpoint over the
-  collector's `show_similar` table (the signed-in slot says so honestly
-  meanwhile), New and Noteworthy over `first_boost_ts`, Movers, Podcasters
-  Recommend (podroll), Because You Boosted X, and boost messages on the
-  results page. Most Favorited is held: 15 lists on the whole network on
+- **The personal rails are `POST /api/v1/recommend`** (`{pubkey,
+  favorites?}` → `{seeds, podcasts, music, because}`): the member's boosted
+  shows, plus the favorites the browser hands over, are the seeds; the
+  collector's `show_similar` scores (distinct-booster cosine, top 20 per
+  show, daily full replace) are summed over them, seeds excluded, **floor:
+  reached from two seeds or two boosters shared with one** (half of all
+  pairs share exactly one booster, measured 2026-10-17). Two lists, never
+  one: the music side's overlap runs nearly three times the podcast side's.
+  `because` is the most-boosted seed with neighbours over the floor. Nothing
+  is stored per member. **Favorites are not yet handed over**: `favorites-ui.js`
+  exposes no accessor for the current list; the endpoint accepts them.
+- **Three more fact rails off the new columns**: New and Noteworthy
+  (`first_boost_ts` within 90 days and two boosters; the collector measured
+  21 such shows), Movers (this week's Shows chart against last week's to 100
+  places, climbers by places then debuts), Podcasters Recommend (podroll
+  targets by how many sources list them; an unindexed target is a figure,
+  not a link).
+- **Still to build here**: boost messages on the results page, favorites as
+  seeds. Most Favorited is held: 15 lists on the whole network on
   2026-10-17.
 
 ## Site map
