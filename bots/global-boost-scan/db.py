@@ -538,6 +538,21 @@ def _migrate(conn):
         # 2026-09-04: the show refresh gate. NULL = never re-read since, so every
         # existing row comes due at once and SHOW_BATCH meters it out.
         conn.execute("ALTER TABLE shows ADD COLUMN checked_at INTEGER")
+    if "description" not in show_cols:
+        # 2026-10-17: the channel <description> off PI's byguid answer, for the
+        # show page and the front-door search. Existing rows migrate NULL and
+        # backfill_description.py fills them (the refresh gate would take a
+        # month); the fill bumps updated_at, which is what carries it to D1.
+        conn.execute("ALTER TABLE shows ADD COLUMN description TEXT")
+    # Show similarity (similar.py): recomputed whole on the daily podroll run,
+    # replaced wholesale in D1 on the podroll rule. rank is 1..TOP per show.
+    conn.execute("""CREATE TABLE IF NOT EXISTS show_similar (
+                      podcast_guid    TEXT NOT NULL,
+                      other_guid      TEXT NOT NULL,
+                      score           REAL NOT NULL,
+                      shared_boosters INTEGER NOT NULL,
+                      rank            INTEGER NOT NULL,
+                      PRIMARY KEY (podcast_guid, rank))""")
     # The refresh gate asks "does this show have a recently aired episode" once
     # per boosted show; without this it is a 12k-row scan per show.
     conn.execute("CREATE INDEX IF NOT EXISTS idx_episodes_podcast ON episodes(podcast_guid)")
@@ -634,7 +649,7 @@ def upsert_boosts(conn, boosts):
 # provenance. `updated_at` moves only when one of these differs — see the
 # episode twin below for why a look that found nothing new must not stamp it.
 SHOW_CONTENT_COLS = ("title", "image", "artwork", "feed_url", "feed_id", "itunes_id",
-                     "medium", "author", "language")
+                     "medium", "author", "language", "description")
 
 
 def upsert_show(conn, show, discovered_via="boost"):
@@ -649,27 +664,27 @@ def upsert_show(conn, show, discovered_via="boost"):
     to D1 whether or not Podcast Index said anything new. Returns whether the
     content changed."""
     now = int(time.time())
-    show = {"language": None, **show}
-    # `language` is defaulted ahead of the spread so a builder that predates the
-    # column writes NULL instead of failing the bind and taking the whole cycle
-    # down; every current builder supplies it explicitly.
+    show = {"language": None, "description": None, **show}
+    # `language` and `description` are defaulted ahead of the spread so a builder
+    # that predates the column writes NULL instead of failing the bind and taking
+    # the whole cycle down; every current builder supplies them explicitly.
     before = conn.execute(
         f"SELECT updated_at, {', '.join(SHOW_CONTENT_COLS)} FROM shows WHERE podcast_guid=?",
         (show["podcast_guid"],)).fetchone()
     changed = before is None or any(before[c] != show.get(c) for c in SHOW_CONTENT_COLS)
     conn.execute(
         """INSERT INTO shows (podcast_guid, title, image, artwork, feed_url, feed_id,
-                              itunes_id, medium, author, language, discovered_via,
-                              checked_at, updated_at)
+                              itunes_id, medium, author, language, description,
+                              discovered_via, checked_at, updated_at)
            VALUES (:podcast_guid, :title, :image, :artwork, :feed_url, :feed_id,
-                   :itunes_id, :medium, :author, :language, :discovered_via,
-                   :now, :updated_at)
+                   :itunes_id, :medium, :author, :language, :description,
+                   :discovered_via, :now, :updated_at)
            ON CONFLICT(podcast_guid) DO UPDATE SET
              title=excluded.title, image=excluded.image, artwork=excluded.artwork,
              feed_url=excluded.feed_url,
              feed_id=excluded.feed_id, itunes_id=excluded.itunes_id,
              medium=excluded.medium, author=excluded.author,
-             language=excluded.language,
+             language=excluded.language, description=excluded.description,
              checked_at=excluded.checked_at,
              updated_at=excluded.updated_at""",
         {**show, "discovered_via": discovered_via, "now": now,
@@ -1415,6 +1430,22 @@ def publisher_rows(conn):
         FROM publishers p
         WHERE {_publisher_ok('p')}
         ORDER BY p.publisher_guid""").fetchall()
+
+
+def replace_show_similar(conn, rows):
+    """Wholesale replace of the similarity table (similar.py#compute's rows)."""
+    conn.execute("DELETE FROM show_similar")
+    conn.executemany(
+        "INSERT INTO show_similar (podcast_guid, other_guid, score, shared_boosters, rank) "
+        "VALUES (?,?,?,?,?)", rows)
+    conn.commit()
+
+
+def similar_rows(conn):
+    """The whole similarity table, in projection order."""
+    return conn.execute(
+        "SELECT podcast_guid, other_guid, score, shared_boosters, rank "
+        "FROM show_similar ORDER BY podcast_guid, rank").fetchall()
 
 
 def publisher_album_rows(conn):

@@ -52,6 +52,7 @@ import dedupe                                                   # noqa: E402
 import fountain                                                 # noqa: E402
 import export as export_mod                                     # noqa: E402
 import duration_probe                                           # noqa: E402
+import similar                                                  # noqa: E402
 import podroll                                                  # noqa: E402
 import publishers as publishers_mod                             # noqa: E402
 import resolve_guids                                            # noqa: E402
@@ -1414,6 +1415,23 @@ def _is_shards_dir(path):
     return Path(path).resolve() == SHARDS_DIR.resolve()
 
 
+def cmd_similar(args):
+    """Recompute the show-similarity table (similar.py carries the design
+    record). Daily, on the podroll run; --dry-run computes and reports only."""
+    conn = db.connect(DB_PATH)
+    t0 = time.time()
+    rows, stats = similar.compute(conn, top=args.top, min_boosters=args.min_boosters)
+    for sd, st in stats["sides"].items():
+        print(f"  {sd:<8} candidates={st['candidates']:>5}  pairs={st['pairs']:>7}  "
+              f"with-neighbours={st['with_neighbours']:>5}  rows={st['rows']:>6}")
+    if args.dry_run:
+        print(f"  [dry-run] {len(rows)} row(s) computed in {time.time() - t0:.1f}s; nothing written")
+        return
+    db.replace_show_similar(conn, rows)
+    print(f"similar: {len(rows)} row(s) over {stats['shows']} boosted show(s) "
+          f"in {time.time() - t0:.1f}s")
+
+
 def cmd_export(args):
     conn = db.connect(DB_PATH, check_same_thread=False)
     # The publish gate: a full export into the tree `push` ships records what
@@ -1764,6 +1782,17 @@ def main():
     pb.add_argument("--dry-run", action="store_true",
                     help="fetch and report; write nothing")
     pb.set_defaults(func=cmd_publishers)
+
+    sm = sub.add_parser("similar",
+                        help="recompute show_similar: each show's most similar shows "
+                             "by distinct-booster overlap (daily, on the podroll run)")
+    sm.add_argument("--top", type=int, default=similar.TOP,
+                    help=f"neighbours kept per show (default {similar.TOP})")
+    sm.add_argument("--min-boosters", type=int, default=similar.MIN_BOOSTERS,
+                    help="distinct boosters a show needs to take part "
+                         f"(default {similar.MIN_BOOSTERS})")
+    sm.add_argument("--dry-run", action="store_true", help="compute and report; write nothing")
+    sm.set_defaults(func=cmd_similar)
 
     x = sub.add_parser("export", help="write static JSON shards for the website")
     x.add_argument("--out", default=str(HERE / "data" / "shards"),

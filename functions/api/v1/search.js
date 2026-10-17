@@ -1,5 +1,8 @@
 // GET /api/v1/search?q=&type=boosts|podcasts|episodes — FTS5 search over
-// boostagram text, podcast titles/authors, or episode titles.
+// boostagram text, podcast titles/authors, or episode titles. Descriptions and
+// show notes are in the FTS tables too (2026-10-17) and deliberately NOT
+// matched here; the ordering is sats, so a show-notes hit would outrank the
+// title hit a typed query means. The front-door search is the surface for them.
 import { json, preflight, BOOST_SELECT, boostRecord, clampLimit, ftsMatch } from "./_common.js";
 
 import { headOf } from "../../_shared/head.js";
@@ -19,6 +22,9 @@ export async function onRequestGet({ request, env }) {
   // Nothing tokenizable survived (all punctuation, or a lone quote). No hits is
   // the honest answer; an empty MATCH string is a syntax error.
   if (!match) return json(request, { type, q, count: 0, [type]: [] });
+  // Column-scoped forms for the two tables that carry `description`.
+  const matchEpisodes = ftsMatch(q, ["title", "show"]);
+  const matchPodcasts = ftsMatch(q, ["title", "author"]);
 
   if (type === "episodes") {
     // Flat relevance-ordered lookup. The ranked, sort-aware version lives on
@@ -32,7 +38,7 @@ export async function onRequestGet({ request, env }) {
        JOIN episodes e ON e.item_guid = f.item_guid
        LEFT JOIN podcasts p ON p.podcast_guid = e.podcast_guid
        WHERE episodes_fts MATCH ? ORDER BY e.total_sats DESC LIMIT ?`
-    ).bind(match, limit).all();
+    ).bind(matchEpisodes, limit).all();
     return json(request, {
       type, q, count: results.length,
       episodes: results.map((r) => ({
@@ -53,7 +59,7 @@ export async function onRequestGet({ request, env }) {
               p.booster_count, p.episode_count, p.latest_ts
        FROM podcasts_fts f JOIN podcasts p ON p.podcast_guid = f.podcast_guid
        WHERE podcasts_fts MATCH ? ORDER BY p.total_sats DESC LIMIT ?`
-    ).bind(match, limit).all();
+    ).bind(matchPodcasts, limit).all();
     return json(request, {
       type, q, count: results.length,
       podcasts: results.map((r) => ({
