@@ -11,11 +11,11 @@
  *    recommendations endpoint lands, an honest line in the Recommended slot.
  *    Re-run on lb:session-change and on the storage event, like feeds.js.
  */
-import { railListHtml, showTile, albumTile, episodeTile, artistTile, memberTile } from '/assets/js/rail-tile.js?v=ob-v219'
-import { rowsFromRecords } from '/assets/js/boost-list.js?v=ob-v219'
-import { initBoostNoteActions, wireBoostNotes } from '/assets/js/boost-note-actions.js?v=ob-v219'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v219'
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v219'
+import { railListHtml, showTile, albumTile, episodeTile, artistTile, memberTile } from '/assets/js/rail-tile.js?v=ob-v220'
+import { rowsFromRecords } from '/assets/js/boost-list.js?v=ob-v220'
+import { initBoostNoteActions, wireBoostNotes } from '/assets/js/boost-note-actions.js?v=ob-v220'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v220'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v220'
 
 const TILES = 10
 
@@ -69,7 +69,7 @@ async function fillRail(section) {
          map is empty here (a mention chip then shows the npub until
          hydrateProfiles fills it). */
       const j = await getJson('/api/v1/boosts?limit=12')
-      const { boostRows } = await import('/assets/js/boost-list.js?v=ob-v219')
+      const { boostRows } = await import('/assets/js/boost-list.js?v=ob-v220')
       const rows = rowsFromRecords(j.boosts || [])
       track.innerHTML = rows.length
         ? `<ul class="boost-list ob-boost-list" data-bs-list>${boostRows(rows, new Map(), { noun: 'episode', showTarget: true, linkBooster: true, showShow: true })}</ul>`
@@ -194,7 +194,7 @@ document.addEventListener('click', async (e) => {
 async function wireBoosts(root) {
   try {
     await wireBoostNotes(root)
-    const { hydrateProfiles } = await import('/assets/js/detail-page.js?v=ob-v219')
+    const { hydrateProfiles } = await import('/assets/js/detail-page.js?v=ob-v220')
     hydrateProfiles(root)
   } catch (e) { console.warn('[discover] boost rows', e) }
 }
@@ -206,7 +206,7 @@ initBoostNoteActions()
 {
   const boosts = document.querySelector('[data-rail="boosts-latest"] [data-boost-section]')
   if (boosts && !boosts.querySelector('.rail-placeholder')) {
-    import('/assets/js/detail-page.js?v=ob-v219').then((m) => m.hydrateProfiles(boosts)).catch(() => {})
+    import('/assets/js/detail-page.js?v=ob-v220').then((m) => m.hydrateProfiles(boosts)).catch(() => {})
   }
 }
 paintPersonal()
