@@ -94,13 +94,18 @@ def build_publishers_sql(conn):
     to `podcasts` only answers for albums that have boosts, and most of a
     publisher's catalogue doesn't. Our resolved title/medium win over the
     remoteItem's own attributes — hints in someone else's feed go stale."""
-    out = ["DELETE FROM publishers;", "DELETE FROM publisher_albums;"]
+    out = ["DELETE FROM publishers;", "DELETE FROM publisher_albums;",
+           "DELETE FROM publishers_fts;"]
     for r in db.publisher_rows(conn):
         out.append(
             "INSERT INTO publishers (publisher_guid,feed_url,title,image,artwork,"
             "description,show_count) VALUES ("
             f"{q(r['publisher_guid'])},{q(r['feed_url'])},{q(r['title'])},"
             f"{q(r['image'])},{q(r['artwork'])},{q(r['description'])},{q(r['show_count'])});")
+        if r["title"]:
+            # An artist name is what the front-door search is typed for most.
+            out.append("INSERT INTO publishers_fts (publisher_guid,title) VALUES ("
+                       f"{q(r['publisher_guid'])},{q(r['title'])});")
     for r in db.publisher_album_rows(conn):
         title = r["alb_title"] or r["album_title"]
         out.append(
@@ -114,12 +119,34 @@ def build_publishers_sql(conn):
     return out
 
 
+def build_similar_sql(conn):
+    """Replace the show-similarity projection wholesale — the podroll rule
+    again: it is recomputed whole on the daily run (similar.py) and a show
+    that dropped out of a neighbour list has to actually disappear. ~12k rows,
+    so they go as multi-row INSERTs (SIMILAR_PER_STMT rows per statement)
+    rather than one statement per row; at BATCH statements per request that
+    is a dozen API calls, not a hundred and twenty."""
+    out = ["DELETE FROM show_similar;"]
+    rows = db.similar_rows(conn)
+    for i in range(0, len(rows), SIMILAR_PER_STMT):
+        vals = ",".join(
+            f"({q(r['podcast_guid'])},{q(r['other_guid'])},{q(r['score'])},"
+            f"{q(r['shared_boosters'])},{q(r['rank'])})"
+            for r in rows[i:i + SIMILAR_PER_STMT])
+        out.append("INSERT INTO show_similar (podcast_guid,other_guid,score,"
+                   f"shared_boosters,rank) VALUES {vals};")
+    return out
+
+
+SIMILAR_PER_STMT = 50
+
+
 def build_full_sql(conn):
     """Full-load statements: wipe the projection tables and repopulate."""
     out = []
     out.append("PRAGMA foreign_keys=OFF;")
     for t in ("boosts", "podcasts", "episodes", "profiles", "meta",
-              "boosts_fts", "podcasts_fts", "episodes_fts"):
+              "boosts_fts", "podcasts_fts", "episodes_fts", "show_similar"):
         out.append(f"DELETE FROM {t};")
 
     # boosts + FTS
@@ -142,9 +169,9 @@ def build_full_sql(conn):
                COUNT(*) AS boost_count, COALESCE(SUM(b.sats),0) AS total_sats,
                COUNT(DISTINCT b.booster_pubkey) AS booster_count,
                COUNT(DISTINCT b.item_guid) AS episode_count,
-               MAX(b.created_at) AS latest_ts,
+               MAX(b.created_at) AS latest_ts, MIN(b.created_at) AS first_boost_ts,
                s.title, s.image, s.artwork, s.feed_url, s.medium, s.author, s.language,
-               s.publisher_guid
+               s.publisher_guid, s.description
         FROM boosts b LEFT JOIN shows s ON s.podcast_guid={eg}
         WHERE {eg} IS NOT NULL AND {db.not_excluded('b')} GROUP BY {eg}""").fetchall():
         # `artwork` is the second-chance art URL (<itunes:image> when it differs
@@ -153,14 +180,16 @@ def build_full_sql(conn):
         # so it's projected here and in the --remote-delta path below.
         out.append(
             "INSERT INTO podcasts (podcast_guid,title,image,artwork,feed_url,medium,author,language,"
-            "publisher_guid,boost_count,total_sats,booster_count,episode_count,latest_ts) VALUES ("
+            "publisher_guid,description,boost_count,total_sats,booster_count,episode_count,"
+            "latest_ts,first_boost_ts) VALUES ("
             f"{q(a['guid'])},{q(a['title'])},{q(a['image'])},{q(a['artwork'])},{q(a['feed_url'])},"
             f"{q(a['medium'])},{q(a['author'])},{q(a['language'])},{q(a['publisher_guid'])},"
-            f"{q(a['boost_count'])},{q(a['total_sats'])},"
-            f"{q(a['booster_count'])},{q(a['episode_count'])},{q(a['latest_ts'])});")
-        if a["title"] or a["author"]:
-            out.append("INSERT INTO podcasts_fts (podcast_guid,title,author) VALUES ("
-                       f"{q(a['guid'])},{q(a['title'])},{q(a['author'])});")
+            f"{q(a['description'])},{q(a['boost_count'])},{q(a['total_sats'])},"
+            f"{q(a['booster_count'])},{q(a['episode_count'])},{q(a['latest_ts'])},"
+            f"{q(a['first_boost_ts'])});")
+        if a["title"] or a["author"] or a["description"]:
+            out.append("INSERT INTO podcasts_fts (podcast_guid,title,author,description) VALUES ("
+                       f"{q(a['guid'])},{q(a['title'])},{q(a['author'])},{q(a['description'])});")
 
     # episodes (metadata + per-episode aggregates). The aggregate subquery is an
     # INNER join, so filtering it is also what drops an excluded episode entirely:
@@ -169,10 +198,12 @@ def build_full_sql(conn):
         SELECT e.item_guid, e.podcast_guid, e.title, e.image, e.published,
                e.duration, e.episode_number, e.enclosure_url, e.description,
                s.title AS show_title,
-               agg.boost_count, agg.total_sats, agg.booster_count, agg.latest_ts
+               agg.boost_count, agg.total_sats, agg.booster_count, agg.latest_ts,
+               agg.first_boost_ts
         FROM episodes e
         JOIN (SELECT item_guid, COUNT(*) boost_count, COALESCE(SUM(sats),0) total_sats,
-                     COUNT(DISTINCT booster_pubkey) booster_count, MAX(created_at) latest_ts
+                     COUNT(DISTINCT booster_pubkey) booster_count, MAX(created_at) latest_ts,
+                     MIN(created_at) first_boost_ts
               FROM boosts WHERE item_guid IS NOT NULL AND {db.not_excluded('')}
               GROUP BY item_guid) agg
           ON agg.item_guid = e.item_guid
@@ -180,14 +211,14 @@ def build_full_sql(conn):
         out.append(
             "INSERT INTO episodes (item_guid,podcast_guid,title,image,published,"
             "duration,episode_number,enclosure_url,description,boost_count,total_sats,"
-            "booster_count,latest_ts) VALUES ("
+            "booster_count,latest_ts,first_boost_ts) VALUES ("
             f"{q(e['item_guid'])},{q(e['podcast_guid'])},{q(e['title'])},{q(e['image'])},"
             f"{q(e['published'])},{q(e['duration'])},{q(e['episode_number'])},"
             f"{q(e['enclosure_url'])},{q(e['description'])},{q(e['boost_count'])},{q(e['total_sats'])},"
-            f"{q(e['booster_count'])},{q(e['latest_ts'])});")
-        if e["title"] or e["show_title"]:
-            out.append("INSERT INTO episodes_fts (item_guid,title,show) VALUES ("
-                       f"{q(e['item_guid'])},{q(e['title'])},{q(e['show_title'])});")
+            f"{q(e['booster_count'])},{q(e['latest_ts'])},{q(e['first_boost_ts'])});")
+        if e["title"] or e["show_title"] or e["description"]:
+            out.append("INSERT INTO episodes_fts (item_guid,title,show,description) VALUES ("
+                       f"{q(e['item_guid'])},{q(e['title'])},{q(e['show_title'])},{q(e['description'])});")
 
     # profiles (excluded boosters lose their identity row here as in the shards)
     for p in conn.execute(
@@ -198,6 +229,7 @@ def build_full_sql(conn):
 
     out.extend(build_podroll_sql(conn))
     out.extend(build_publishers_sql(conn))
+    out.extend(build_similar_sql(conn))
 
     s = db.stats(conn)
     for k, v in {"generated_at": int(time.time()), "boosts": s["boosts"],
@@ -234,9 +266,9 @@ def _podcast_upsert_sql(conn, guid):
                   COALESCE(SUM(b.sats),0) AS total_sats,
                   COUNT(DISTINCT b.booster_pubkey) AS booster_count,
                   COUNT(DISTINCT b.item_guid) AS episode_count,
-                  MAX(b.created_at) AS latest_ts,
+                  MAX(b.created_at) AS latest_ts, MIN(b.created_at) AS first_boost_ts,
                   s.title, s.image, s.artwork, s.feed_url, s.medium, s.author, s.language,
-                  s.publisher_guid
+                  s.publisher_guid, s.description
            FROM boosts b LEFT JOIN shows s ON s.podcast_guid={eg}
            WHERE {eg}=? AND {db.not_excluded('b')} GROUP BY {eg}""", (guid,)).fetchone()
     if not a:
@@ -244,15 +276,17 @@ def _podcast_upsert_sql(conn, guid):
     # `artwork` (second-chance art URL) is projected here and in the full load;
     # the remote D1 column exists.
     out = ["INSERT OR REPLACE INTO podcasts (podcast_guid,title,image,artwork,feed_url,medium,author,language,"
-           "publisher_guid,boost_count,total_sats,booster_count,episode_count,latest_ts) VALUES ("
+           "publisher_guid,description,boost_count,total_sats,booster_count,episode_count,"
+           "latest_ts,first_boost_ts) VALUES ("
            f"{q(a['guid'])},{q(a['title'])},{q(a['image'])},{q(a['artwork'])},{q(a['feed_url'])},"
            f"{q(a['medium'])},{q(a['author'])},{q(a['language'])},{q(a['publisher_guid'])},"
-           f"{q(a['boost_count'])},{q(a['total_sats'])},"
-           f"{q(a['booster_count'])},{q(a['episode_count'])},{q(a['latest_ts'])});",
+           f"{q(a['description'])},{q(a['boost_count'])},{q(a['total_sats'])},"
+           f"{q(a['booster_count'])},{q(a['episode_count'])},{q(a['latest_ts'])},"
+           f"{q(a['first_boost_ts'])});",
            f"DELETE FROM podcasts_fts WHERE podcast_guid={q(guid)};"]
-    if a["title"] or a["author"]:
-        out.append("INSERT INTO podcasts_fts (podcast_guid,title,author) VALUES ("
-                   f"{q(guid)},{q(a['title'])},{q(a['author'])});")
+    if a["title"] or a["author"] or a["description"]:
+        out.append("INSERT INTO podcasts_fts (podcast_guid,title,author,description) VALUES ("
+                   f"{q(guid)},{q(a['title'])},{q(a['author'])},{q(a['description'])});")
     return out
 
 
@@ -272,7 +306,8 @@ def _episode_upsert_sql(conn, item_guid):
                   (SELECT COUNT(*) FROM boosts WHERE item_guid=e.item_guid AND {nx}) AS boost_count,
                   (SELECT COALESCE(SUM(sats),0) FROM boosts WHERE item_guid=e.item_guid AND {nx}) AS total_sats,
                   (SELECT COUNT(DISTINCT booster_pubkey) FROM boosts WHERE item_guid=e.item_guid AND {nx}) AS booster_count,
-                  (SELECT MAX(created_at) FROM boosts WHERE item_guid=e.item_guid AND {nx}) AS latest_ts
+                  (SELECT MAX(created_at) FROM boosts WHERE item_guid=e.item_guid AND {nx}) AS latest_ts,
+                  (SELECT MIN(created_at) FROM boosts WHERE item_guid=e.item_guid AND {nx}) AS first_boost_ts
            FROM episodes e
            LEFT JOIN shows s ON s.podcast_guid = e.podcast_guid
            WHERE e.item_guid=?""", (item_guid,)).fetchone()
@@ -280,15 +315,15 @@ def _episode_upsert_sql(conn, item_guid):
         return []
     out = ["INSERT OR REPLACE INTO episodes (item_guid,podcast_guid,title,image,published,"
            "duration,episode_number,enclosure_url,description,boost_count,total_sats,"
-           "booster_count,latest_ts) VALUES ("
+           "booster_count,latest_ts,first_boost_ts) VALUES ("
            f"{q(e['item_guid'])},{q(e['podcast_guid'])},{q(e['title'])},{q(e['image'])},"
            f"{q(e['published'])},{q(e['duration'])},{q(e['episode_number'])},"
            f"{q(e['enclosure_url'])},{q(e['description'])},{q(e['boost_count'])},{q(e['total_sats'])},"
-           f"{q(e['booster_count'])},{q(e['latest_ts'])});",
+           f"{q(e['booster_count'])},{q(e['latest_ts'])},{q(e['first_boost_ts'])});",
            f"DELETE FROM episodes_fts WHERE item_guid={q(e['item_guid'])};"]
-    if e["title"] or e["show_title"]:
-        out.append("INSERT INTO episodes_fts (item_guid,title,show) VALUES ("
-                   f"{q(e['item_guid'])},{q(e['title'])},{q(e['show_title'])});")
+    if e["title"] or e["show_title"] or e["description"]:
+        out.append("INSERT INTO episodes_fts (item_guid,title,show,description) VALUES ("
+                   f"{q(e['item_guid'])},{q(e['title'])},{q(e['show_title'])},{q(e['description'])});")
     return out
 
 
@@ -883,6 +918,28 @@ def cmd_remote_publishers(args):
     print(f"D1 publishers: replaced with {len(stmts) - 2} row(s) across both tables")
 
 
+def cmd_remote_similar(args):
+    """Push the show-similarity projection alone (full replace). Run after the
+    collector's `similar` pass on the daily podroll run; the boost delta
+    never touches this table."""
+    cf = _cf(load_config(CREDENTIALS))
+    if not cf:
+        print("[error] CF_ACCOUNT_ID / CF_D1_DATABASE_ID / CF_API_TOKEN missing from credentials.env")
+        return
+    conn = db.connect(DB_PATH)
+    stmts = build_similar_sql(conn)
+    BATCH = 20   # 20 statements × SIMILAR_PER_STMT rows = 1,000 rows per request
+    for i in range(0, len(stmts), BATCH):
+        ok, detail = _d1_exec(*cf, "\n".join(stmts[i:i + BATCH]))
+        if not ok:
+            # A missing-table error here means d1/schema.sql hasn't been applied to
+            # the remote yet: run --apply-schema first (it's CREATE ... IF NOT EXISTS).
+            print(f"[error] similar batch {i // BATCH} failed: {detail}")
+            return
+    n = conn.execute("SELECT COUNT(*) FROM show_similar").fetchone()[0]
+    print(f"D1 show_similar: replaced with {n} row(s)")
+
+
 def cmd_remote_clients(args):
     """Push client attribution onto boosts D1 ALREADY HAS, as UPDATEs.
 
@@ -922,13 +979,15 @@ def cmd_remote_clients(args):
 
 
 def cmd_rebuild_fts(args):
-    """Drop and repopulate the podcasts/episodes FTS tables.
+    """Drop and repopulate the podcasts/episodes/publishers FTS tables.
 
     Needed because `CREATE VIRTUAL TABLE IF NOT EXISTS` will not reshape a table
     that already exists: adding `author` to podcasts_fts, or introducing
     episodes_fts at all, is invisible to --apply-schema on a live database.
+    2026-10-17: `description` joined both (the front-door search over show
+    descriptions and show notes) and publishers_fts arrived (artist names).
 
-    Only these two — boosts_fts is untouched and far the largest, so this stays a
+    Only these three — boosts_fts is untouched and far the largest, so this stays a
     few thousand statements instead of a full reload. The base tables aren't
     touched either: FTS content is derived, so rebuilding it is safe at any time
     (search is briefly empty mid-run)."""
@@ -940,26 +999,32 @@ def cmd_rebuild_fts(args):
     stmts = [
         "DROP TABLE IF EXISTS podcasts_fts;",
         "DROP TABLE IF EXISTS episodes_fts;",
-        "CREATE VIRTUAL TABLE podcasts_fts USING fts5(podcast_guid UNINDEXED, title, author);",
-        "CREATE VIRTUAL TABLE episodes_fts USING fts5(item_guid UNINDEXED, title, show);",
+        "DROP TABLE IF EXISTS publishers_fts;",
+        "CREATE VIRTUAL TABLE podcasts_fts USING fts5(podcast_guid UNINDEXED, title, author, description);",
+        "CREATE VIRTUAL TABLE episodes_fts USING fts5(item_guid UNINDEXED, title, show, description);",
+        "CREATE VIRTUAL TABLE publishers_fts USING fts5(publisher_guid UNINDEXED, title);",
     ]
     eg = db.effective_guid("b")
     for a in conn.execute(f"""
-        SELECT {eg} AS guid, s.title, s.author
+        SELECT {eg} AS guid, s.title, s.author, s.description
         FROM boosts b LEFT JOIN shows s ON s.podcast_guid={eg}
         WHERE {eg} IS NOT NULL AND {db.not_excluded('b')} GROUP BY {eg}""").fetchall():
-        if a["title"] or a["author"]:
-            stmts.append("INSERT INTO podcasts_fts (podcast_guid,title,author) VALUES ("
-                         f"{q(a['guid'])},{q(a['title'])},{q(a['author'])});")
+        if a["title"] or a["author"] or a["description"]:
+            stmts.append("INSERT INTO podcasts_fts (podcast_guid,title,author,description) VALUES ("
+                         f"{q(a['guid'])},{q(a['title'])},{q(a['author'])},{q(a['description'])});")
     for e in conn.execute(f"""
-        SELECT e.item_guid, e.title, s.title AS show_title
+        SELECT e.item_guid, e.title, e.description, s.title AS show_title
         FROM episodes e
         LEFT JOIN shows s ON s.podcast_guid = e.podcast_guid
-        WHERE (e.title IS NOT NULL OR s.title IS NOT NULL)
+        WHERE (e.title IS NOT NULL OR s.title IS NOT NULL OR e.description IS NOT NULL)
           AND EXISTS (SELECT 1 FROM boosts
                       WHERE item_guid = e.item_guid AND {db.not_excluded('')})""").fetchall():
-        stmts.append("INSERT INTO episodes_fts (item_guid,title,show) VALUES ("
-                     f"{q(e['item_guid'])},{q(e['title'])},{q(e['show_title'])});")
+        stmts.append("INSERT INTO episodes_fts (item_guid,title,show,description) VALUES ("
+                     f"{q(e['item_guid'])},{q(e['title'])},{q(e['show_title'])},{q(e['description'])});")
+    for r in db.publisher_rows(conn):
+        if r["title"]:
+            stmts.append("INSERT INTO publishers_fts (publisher_guid,title) VALUES ("
+                         f"{q(r['publisher_guid'])},{q(r['title'])});")
 
     BATCH = 100
     for i in range(0, len(stmts), BATCH):
@@ -969,7 +1034,7 @@ def cmd_rebuild_fts(args):
             return
         if (i // BATCH) % 20 == 0:
             print(f"  …{min(i + BATCH, len(stmts))}/{len(stmts)} statements", flush=True)
-    print(f"rebuilt podcasts_fts + episodes_fts ({len(stmts)} statements)")
+    print(f"rebuilt podcasts_fts + episodes_fts + publishers_fts ({len(stmts)} statements)")
 
 
 def cmd_mark_all_synced(args):
@@ -994,6 +1059,8 @@ def main():
                     help="push re-derived client attribution onto existing D1 boosts")
     ap.add_argument("--remote-publishers", action="store_true",
                     help="full-replace the publisher projection (run after the publishers pass)")
+    ap.add_argument("--remote-similar", action="store_true",
+                    help="replace the show_similar projection (after the collector's `similar` pass)")
     ap.add_argument("--rebuild-fts", action="store_true",
                     help="drop + repopulate podcasts_fts/episodes_fts (needed after a column change)")
     ap.add_argument("--mark-all-synced", action="store_true", help="one-time: mark all current boosts as already in D1")
@@ -1010,6 +1077,8 @@ def main():
         cmd_remote_podroll(args)
     elif args.remote_publishers:
         cmd_remote_publishers(args)
+    elif args.remote_similar:
+        cmd_remote_similar(args)
     elif args.remote_clients:
         cmd_remote_clients(args)
     elif args.rebuild_fts:
@@ -1018,7 +1087,7 @@ def main():
         cmd_mark_all_synced(args)
     else:
         ap.error("choose --emit-sql <file>, --apply-schema, --remote, --remote-delta, "
-                 "--remote-podroll, --remote-publishers, --rebuild-fts, or --mark-all-synced")
+                 "--remote-podroll, --remote-publishers, --remote-similar, --rebuild-fts, or --mark-all-synced")
 
 
 if __name__ == "__main__":

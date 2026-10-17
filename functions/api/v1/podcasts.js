@@ -138,7 +138,9 @@ export function readParams(u) {
   // show guid is exactly the input that breaks it: every hyphen reads as an
   // operator. Null when nothing tokenizable survives, which takes the
   // unfiltered path rather than emitting an empty MATCH.
-  const match = rawQ ? ftsMatch(rawQ) : null;
+  // Title and author only: podcasts_fts also holds the description (2026-10-17),
+  // and the feed search means the name a reader typed, not a word in the blurb.
+  const match = rawQ ? ftsMatch(rawQ, ["title", "author"]) : null;
   return {
     sortKey, range, medium, notMedium, lang, publisher,
     q: match ? rawQ : null,

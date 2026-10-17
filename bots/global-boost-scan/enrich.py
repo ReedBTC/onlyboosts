@@ -99,6 +99,11 @@ def _show_from_feed(feed, podcast_guid=None):
         # split hard by medium — 99% of podcasts, 48% of music, because Wavlake
         # (198 of the 251 music misses) publishes no <language> at all.
         "language":  _normalize_language(feed.get("language")),
+        # The channel <description>, HTML stripped the way episode show notes
+        # are. Rides the same byguid answer; feeds the show page, the front-door
+        # search (podcasts_fts) and nothing else. Not length-capped: measured
+        # 2026-10-17, the episode column it mirrors tops out at 9.5 KB.
+        "description": clean_html(feed.get("description")),
     }
 
 

@@ -49,6 +49,17 @@ CREATE TABLE IF NOT EXISTS podcasts (
   -- part of (<podcast:publisher> / flat medium="publisher" remoteItem); joins
   -- publishers.publisher_guid. NULL = the feed declares none.
   publisher_guid TEXT,
+  -- ⚠️ BOTH ADDED OUT-OF-BAND (2026-10-17), like `language`:
+  --   ALTER TABLE podcasts ADD COLUMN description TEXT;
+  --   ALTER TABLE podcasts ADD COLUMN first_boost_ts INTEGER;
+  -- description: the channel <description> off PI's byguid answer, HTML stripped
+  -- (the show page and podcasts_fts read it). first_boost_ts: created_at of the
+  -- show's OLDEST live boost — the "New and Noteworthy" rail's axis (first boost
+  -- within a window), stored raw so the query picks the window. Measured at
+  -- build: 41 shows first boosted in the trailing 30 days, 98 in 90, and only 3
+  -- of the 41 had three boosters, so the rail wants 90 days and a boosters floor.
+  description   TEXT,
+  first_boost_ts INTEGER,
   boost_count   INTEGER,
   total_sats    INTEGER,
   booster_count INTEGER,
@@ -56,6 +67,7 @@ CREATE TABLE IF NOT EXISTS podcasts (
   latest_ts     INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_podcasts_publisher ON podcasts(publisher_guid);
+CREATE INDEX IF NOT EXISTS idx_podcasts_first  ON podcasts(first_boost_ts DESC);
 CREATE INDEX IF NOT EXISTS idx_podcasts_latest ON podcasts(latest_ts DESC);
 CREATE INDEX IF NOT EXISTS idx_podcasts_sats   ON podcasts(total_sats DESC);
 CREATE INDEX IF NOT EXISTS idx_podcasts_boosts ON podcasts(boost_count DESC);
@@ -73,9 +85,12 @@ CREATE TABLE IF NOT EXISTS episodes (
   boost_count    INTEGER,
   total_sats     INTEGER,
   booster_count  INTEGER,                 -- DISTINCT boosters; 'Most boosters' sort
-  latest_ts      INTEGER                  -- newest boost on this episode; 'Latest boost' sort
+  latest_ts      INTEGER,                 -- newest boost on this episode; 'Latest boost' sort
+  -- ⚠️ ADDED OUT-OF-BAND (2026-10-17): ALTER TABLE episodes ADD COLUMN first_boost_ts INTEGER;
+  first_boost_ts INTEGER                  -- oldest live boost on this episode; the podcasts column's twin
 );
 CREATE INDEX IF NOT EXISTS idx_episodes_podcast ON episodes(podcast_guid);
+CREATE INDEX IF NOT EXISTS idx_episodes_first   ON episodes(first_boost_ts DESC, total_sats DESC, item_guid);
 -- One index per ranked sort /api/v1/episodes offers. Each is (sort column,
 -- then the endpoint's exact tiebreakers) so ORDER BY is an index walk rather
 -- than a temp B-tree over every episode: measured 19,499 rows read → 202 for an
@@ -157,6 +172,26 @@ CREATE TABLE IF NOT EXISTS publisher_albums (
 );
 CREATE INDEX IF NOT EXISTS idx_pub_albums_album ON publisher_albums(album_guid);
 
+-- Show similarity (2026-10-17; bots/global-boost-scan/similar.py is the design
+-- record). For every show with >= 3 distinct boosters, its 20 most similar shows
+-- on the same medium side by cosine over the DISTINCT-booster sets,
+-- |A∩B| / sqrt(|A|·|B|), relay-bot publisher keys left out. Replaced wholesale by
+-- `d1_sync.py --remote-similar` on the daily podroll run; the boost delta never
+-- touches it. Nothing per member lives here: the edge POSTs a member's seed
+-- shows and sums `score` over the candidates. The full top 20 is stored rather
+-- than a floored list so a single-seed rail can insist on shared_boosters >= 2
+-- (half of all pairs share exactly one booster) while the summed rail relaxes
+-- it, with no resync. ~12k rows at build.
+CREATE TABLE IF NOT EXISTS show_similar (
+  podcast_guid    TEXT NOT NULL,
+  other_guid      TEXT NOT NULL,     -- joins podcasts.podcast_guid (always a boosted show)
+  score           REAL NOT NULL,     -- cosine, 0 < score <= 1
+  shared_boosters INTEGER NOT NULL,  -- |A∩B|
+  rank            INTEGER NOT NULL,  -- 1..20 within podcast_guid; score desc, shared desc, guid asc
+  PRIMARY KEY (podcast_guid, rank)
+);
+CREATE INDEX IF NOT EXISTS idx_show_similar_other ON show_similar(other_guid);
+
 -- ⚠️ CREATE TABLE IF NOT EXISTS DOES NOT ADD A COLUMN to an existing remote
 -- table, so applying this file is NOT how the five fields below reach a D1 that
 -- already has a `profiles` table. They were added out-of-band with ALTER TABLE
@@ -192,13 +227,21 @@ CREATE VIRTUAL TABLE IF NOT EXISTS boosts_fts   USING fts5(event_id UNINDEXED, m
 -- author alongside title: an artist name is what people type when they're looking
 -- for a music feed, and matching it here is what lets /api/v1/search?type=podcasts
 -- answer that server-side instead of only the static rollup doing it client-side.
-CREATE VIRTUAL TABLE IF NOT EXISTS podcasts_fts USING fts5(podcast_guid UNINDEXED, title, author);
+-- description joined both tables on 2026-10-17 for the front-door search (6.1 MB
+-- of show notes over 11.5k episodes, p50 578 bytes, max 9.5 KB; already plain
+-- text). ⚠️ EVERY EXISTING MATCH SITE NAMES ITS COLUMNS — `{title author} : (…)`
+-- through _common.js#ftsMatch's second argument — so the feed typeaheads kept
+-- their title/author/show semantics when the column arrived; only a search that
+-- wants show notes omits the column list.
+CREATE VIRTUAL TABLE IF NOT EXISTS podcasts_fts USING fts5(podcast_guid UNINDEXED, title, author, description);
 -- `show` alongside the episode title because the feed contract is "episode title,
 -- plus the show behind it" — typing a show name into the Episodes feed has to list
 -- that show's episodes. Title alone regresses it badly: "UNGOVERNABLE" is 135
 -- episodes of that show but only 2 episodes with the word in their own title, both
 -- belonging to other shows.
-CREATE VIRTUAL TABLE IF NOT EXISTS episodes_fts USING fts5(item_guid UNINDEXED, title, show);
+CREATE VIRTUAL TABLE IF NOT EXISTS episodes_fts USING fts5(item_guid UNINDEXED, title, show, description);
+-- Artist names, for the same search; replaced with the publisher projection.
+CREATE VIRTUAL TABLE IF NOT EXISTS publishers_fts USING fts5(publisher_guid UNINDEXED, title);
 
 -- ⚠️ WRITTEN BY THE SITE, NOT THE COLLECTOR. `/api/v1/boosts/ingest`
 -- (functions/api/v1/boosts/ingest.js) indexes a boost sent from OnlyBoosts the

@@ -104,13 +104,22 @@ export function clampLimit(v, def = 50, max = 200) {
  * adjacent. Verified across `-`, `:`, `(`, `***`, bare `OR` and a full guid:
  * every one either matches or returns nothing, and none of them errors.
  */
-export function ftsMatch(raw) {
+export function ftsMatch(raw, cols = null) {
   if (typeof raw !== "string") return null;
   // The double quote is the one character that cannot survive: it is the
   // quoting mechanism itself, and FTS5 offers no escape for it.
   const parts = raw.replace(/"/g, " ").split(/\s+/).filter(Boolean);
   if (!parts.length) return null;
-  return parts.map((t, i) => `"${t}"${i === parts.length - 1 ? "*" : ""}`).join(" ");
+  const expr = parts.map((t, i) => `"${t}"${i === parts.length - 1 ? "*" : ""}`).join(" ");
+  // `cols` restricts the match to those FTS columns: `{title author} : (…)`.
+  // Since 2026-10-17 podcasts_fts and episodes_fts also carry `description`
+  // (show descriptions and show notes, for the front-door search), and a bare
+  // MATCH reads every column — so a feed typeahead that means "title or
+  // author" has to say so, or a word in a show's notes would list the episode
+  // under the same sats ordering as a title hit. Column names come from the
+  // schema, never from the request.
+  if (!cols || !cols.length) return expr;
+  return `{${cols.join(" ")}} : (${expr})`;
 }
 
 /**

@@ -25,8 +25,10 @@ flock -w 900 9 || { echo "[skip] pipeline still busy after 15min — skipping th
 echo "=== $(date -u +%FT%TZ) OnlyBoosts podroll refresh ==="
 "$PY" "$BOT" podroll              # fetch feeds → parse podroll + publisher links → resolve targets
 "$PY" "$BOT" publishers           # fetch the publisher (artist) feeds those links declare
+"$PY" "$BOT" similar              # recompute show_similar (booster-overlap neighbours); slow-moving, daily
 "$PY" "$BOT" export --per-show    # podroll rides in the per-show shards + index counts
 "$PY" "$BOT" push                 # rsync changed shards to the VPS
 "$PY" d1_sync.py --remote-podroll # replace the podroll table in D1 (/api/v1 + /show pages)
 "$PY" d1_sync.py --remote-publishers # replace the publisher projection in D1
+"$PY" d1_sync.py --remote-similar # replace show_similar in D1 (the recommendation rails)
 echo "=== $(date -u +%FT%TZ) podroll cycle done ==="

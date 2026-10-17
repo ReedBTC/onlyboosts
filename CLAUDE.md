@@ -1818,6 +1818,48 @@ What a change elsewhere would break:
 - **The podroll's two queries and both community rollups are allowed to fail
   quietly.** A rollup below the fold must never cost a reader the page they came for.
 
+## Discoverability data: `show_similar`, `first_boost_ts`, `description`
+
+Three collector-side pieces for the rails homepage, built 2026-10-17 on
+OB-web's spec, all ending in D1. **`bots/global-boost-scan/similar.py` is the
+design record for the first**; the D1 shapes are commented in `d1/schema.sql`.
+
+| | |
+|---|---|
+| `show_similar` | per show with **>= 3 distinct boosters**, its **top 20** same-medium-side shows by cosine over the booster sets, `(podcast_guid, other_guid, score, shared_boosters, rank)`. Recomputed whole by `onlyboosts_globalscan.py similar` on the daily podroll run, replaced wholesale by `d1_sync.py --remote-similar`. 12,186 rows at build (454 podcast + 222 music seeds). |
+| `podcasts.first_boost_ts`, `episodes.first_boost_ts` | `MIN(created_at)` of the row's live boosts, on every projection path. Stored raw; the New and Noteworthy rail picks its window (measured: 41 shows first boosted in 30 days, 98 in 90, 3 of the 41 with three boosters). |
+| `podcasts.description` | the channel `<description>` off PI's byguid answer, HTML-stripped, via `enrich._show_from_feed`; `backfill_description.py` fills existing rows and bumps `updated_at` so the drift pass carries them. |
+
+What a change elsewhere would break:
+
+- **⚠️ THE RELAY-BOT PUBLISHER KEYS ARE NOT BOOSTERS IN THE SIMILARITY.** One
+  key relaying hundreds of donors reads as one person who boosted everything
+  and manufactures overlap; `similar.py` drops `PUBLISHER_PUBKEYS` less
+  `chadf-boostbot`, the complement `_common.js#PUBLISHERS` takes. Measured:
+  with the keys in, 6,627 music pairs; without, 4,354.
+- **⚠️ THE FULL TOP 20 IS STORED AND THE FLOOR IS THE EDGE'S.** Half of all
+  pairs share exactly one booster (podcast median score 0.09, music 0.24). A
+  single-seed rail floors at `shared_boosters >= 2`; the summed rail relaxes
+  it. Don't floor in the collector; it forces a resync per rail.
+- **⚠️ `podcasts_fts` AND `episodes_fts` CARRY `description` SINCE 2026-10-17,
+  AND EVERY FEED SEARCH NAMES ITS COLUMNS.** `ftsMatch(raw, cols)` emits
+  `{title author} : (…)`; `podcasts.js`, `episodes.js` and `search.js` pass
+  theirs, so a word in a show's notes does not list the episode under the
+  sats ordering as if its title matched. Only the front-door search omits the
+  list. `publishers_fts(title)` rides the publisher replace. All three are
+  `--rebuild-fts` (drop and repopulate) on the remote.
+- **⚠️ THE REMOTE STEPS RUN BEFORE THE COLLECTOR PULLS THE CODE**, in this
+  order, with the incremental timer stopped: the three `ALTER TABLE`s named
+  in `schema.sql`, `--apply-schema` (the new tables), then after the pull
+  `--rebuild-fts`, `similar` + `--remote-similar`, and a drift pass. A
+  projection naming an absent column fails the whole batch, and the delta
+  then stops reaching D1 until it is fixed.
+- **Favorites counts (kind 10333) were scoped and deliberately not built**:
+  15 lists on the publish relays, 9 with public entries, 843 of 931 entries
+  on two of them, top feed favorited by 5. A Most Favorited rail would be two
+  people's lists. The probe is in the 2026-10-17 report; re-measure before
+  building it.
+
 ## Show artwork: the `art2` fallback
 
 Some feeds publish two artwork URLs, RSS `<image><url>` and `<itunes:image>`, and

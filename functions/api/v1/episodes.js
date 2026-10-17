@@ -205,7 +205,9 @@ export function readParams(u) {
   if (rawQ && rawQ.length < 2) return { error: "q must be >= 2 chars" };
   // A query that tokenizes to nothing takes the unfiltered path rather than an
   // empty MATCH, which is a syntax error.
-  const match = rawQ ? ftsMatch(rawQ) : null;
+  // Title and show only: episodes_fts also holds the show notes (2026-10-17),
+  // and a searched card has to be one whose NAME matched, as the feed promises.
+  const match = rawQ ? ftsMatch(rawQ, ["title", "show"]) : null;
   return {
     q: match ? rawQ : null,
     match,
