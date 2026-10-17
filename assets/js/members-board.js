@@ -43,8 +43,6 @@ import { renderSupporters, initShowMore, compact } from '/assets/js/supporter-wa
  * the section exists to make, and `1k` rounds the evidence away. */
 import { num } from '/assets/js/boost-list.js?v=ob-v219'
 import { rangeControl, sortControl } from '/assets/js/feed-controls.js?v=ob-v219'
-import { mountFeedSearch } from '/assets/js/feed-search.js?v=ob-v219'
-import { searchMembers, SEARCH_HITS } from '/assets/js/ob-live.js?v=ob-v219'
 /* ⚠️ THE SAME WEEK RULE THE ENDPOINT CUTS ON, not a second copy of it. That
  * module is two-sided for exactly this: the picker steps and enumerates weeks
  * without a round trip per press, and a Pacific week containing a DST
@@ -521,7 +519,6 @@ export async function renderMembersBoards(root) {
      are still loading or after they have failed. It is what this tab is FOR;
      making it wait on two leaderboards would be the old mistake in a new
      place. */
-  mountMemberLookup(document.querySelector('[data-members-block]'))
   try {
     const [week, all, ones] = await Promise.all([
       board('week'), board('all'),
@@ -657,41 +654,6 @@ async function paintWall(wallRoot) {
   }
 }
 
-/* ⚠️ THE LOOKUP NAVIGATES; IT DOES NOT FILTER. Reed's call, 2026-08-23. It was
- * a filter over the Boosts feed's loaded window, which is the bug that put it
- * inside that panel in the first place — a reader had to reach the feed to find
- * the control that finds people. The question it answers is "where is this
- * person", and the answer is `/booster/<npub>`: their whole history, their
- * shows, their totals, rather than a narrowed slice of one feed.
- *
- * ⚠️ IT IS THE SHARED WIDGET, so the debounce, the abort, the sequence guard
- * and the keyboard handling are the four ranked feeds' own. The suggestion rows
- * are `role="option"` buttons rather than anchors because that is what a
- * combobox listbox is; the navigation lives in onPick. */
-function mountMemberLookup(block) {
-  if (!block || block.dataset.findWired) return
-  block.dataset.findWired = '1'
-  mountFeedSearch(block, {
-    placeholder: 'Find a member by name or npub…',
-    label: 'Find a member',
-    noun: 'member',
-    glyph: '👤',
-    /* ⚠️ THE ENDPOINT'S SEARCH IS DELIBERATELY NOT RANGE-SCOPED AND DOES NOT
-       EXCLUDE PUBLISHERS. A ranked listing is a claim; this is a lookup, and a
-       member who last boosted in March is still the person being looked for. */
-    searchRemote: async (q, { signal } = {}) => {
-      const found = await searchMembers({ q, limit: SEARCH_HITS, signal })
-      return found.map((m) => ({
-        key: m.pk,
-        href: boosterPageHref(m.npub, m.pk),
-        label: m.name || (m.npub ? m.npub.slice(0, 12) + '…' : m.pk.slice(0, 12) + '…'),
-        sub: `${num(m.boosts)} boost${m.boosts === 1 ? '' : 's'} · ${compact(m.sats)} sats`,
-        img: m.pic,
-      }))
-    },
-    onPick: (entry) => {
-      /* A clear passes null. Nothing to undo — the list was never filtered. */
-      if (entry?.href) window.location.assign(entry.href)
-    },
-  })
-}
+/* The member lookup that sat between the Members heading and the wall from
+ 2026-08-23 to 2026-10-17 is gone: the nav bar's site search (nav-search.js,
+ /search) finds members on every page. */

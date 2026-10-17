@@ -852,13 +852,6 @@
       .members-wall-section .mw-controls { margin-left: 0; flex-basis: 100%; }
     }
 
-    /* The member lookup, between the Members heading and the wall's shell
-       since 2026-09-03 (it led the tab before). mountFeedSearch reveals the
-       host; this only spaces it — the heading's own margin-bottom sits above
-       it, and this gap sits between it and the shell. */
-    .members-find { margin: 0 0 1rem; }
-    .members-find [data-feed-search] { margin: 0; }
-
     .feed-panel { display: none; }
     .feed-panel.is-active { display: block; }
 
@@ -962,105 +955,11 @@
        sticky chrome; a search is a thing you do at the top of a list, and the
        lid has no room for a text field beside three pills on a phone.
 
-       Each panel ships the empty [data-feed-search] slot and the renderer
-       fills it, so a feed showing "sign in" or an error never grows a search
-       box over a list that isn't there. */
-    .feed-search { margin-bottom: 1rem; }
-    .feed-search[hidden] { display: none; }
-    .feed-search-wrap { position: relative; }
-    .feed-search-field {
-      display: flex; align-items: center; gap: 0.5rem;
-      padding: 0.45rem 0.85rem;
-      background: var(--white);
-      border: 1px solid var(--border); border-radius: 999px;
-      transition: border-color 0.12s, box-shadow 0.12s;
-    }
-    .feed-search-field:focus-within {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px var(--tint);
-    }
-    /* An active filter is a state the page is in, so the field carries the
-       accent while it holds one — the cleared box and the filtering box
-       shouldn't look alike. */
-    .feed-search-field.is-filtered {
-      border-color: var(--accent);
-      background: var(--tint);
-    }
-    .feed-search-icon { flex-shrink: 0; color: var(--muted); }
-    .feed-search-field:focus-within .feed-search-icon,
-    .feed-search-field.is-filtered .feed-search-icon { color: var(--accent-d); }
-    .feed-search-input {
-      flex: 1; min-width: 0;
-      font: inherit; font-size: 0.9rem;
-      color: var(--text); background: transparent;
-      border: none; outline: none;
-    }
-    .feed-search-input::placeholder { color: var(--muted); }
-    .feed-search-clear {
-      flex-shrink: 0;
-      width: 1.4rem; height: 1.4rem; padding: 0;
-      display: flex; align-items: center; justify-content: center;
-      font: inherit; font-size: 1.05rem; line-height: 1;
-      color: var(--muted); background: transparent;
-      border: none; border-radius: 999px; cursor: pointer;
-    }
-    .feed-search-clear:hover { color: var(--accent-d); background: var(--tint); }
-    .feed-search-clear[hidden] { display: none; }
-
-    .feed-search-menu {
-      position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 6;
-      background: var(--white);
-      border: 1px solid var(--border); border-radius: 12px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.18);
-      padding: 0.35rem;
-    }
-    .feed-search-menu[hidden] { display: none; }
-    .feed-search-item {
-      display: flex; align-items: center; gap: 0.6rem;
-      width: 100%; text-align: left;
-      padding: 0.4rem 0.5rem;
-      font: inherit; color: var(--text);
-      background: transparent; border: none; border-radius: 8px; cursor: pointer;
-    }
-    .feed-search-item:hover, .feed-search-item.is-active { background: var(--tint); }
-    /* The submit row under the suggestions (feed-search.js#appendSubmitRow) —
-       same hit area, set apart as an ACTION rather than a result: no thumb, a
-       hairline above, and the accent ink a link would wear. */
-    .feed-search-all { border-top: 1px solid var(--border); border-radius: 0 0 8px 8px; }
-    .feed-search-all .feed-search-label { color: var(--accent-d); }
-    .feed-search-thumb {
-      flex-shrink: 0;
-      width: 34px; height: 34px;
-      border-radius: 6px; object-fit: cover;
-      background: var(--tint);
-    }
-    .feed-search-thumb--none {
-      display: flex; align-items: center; justify-content: center;
-      font-size: 1rem;
-    }
-    /* minmax(0,…) territory: without the min-width the flex item is as wide as
-       its longest title and the row spills out of the menu. */
-    .feed-search-text { min-width: 0; display: flex; flex-direction: column; }
-    .feed-search-label {
-      font-size: 0.86rem; font-weight: 600; color: var(--text);
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-    .feed-search-sub {
-      font-size: 0.74rem; color: var(--muted);
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-    .feed-search-empty {
-      padding: 0.6rem 0.55rem;
-      font-size: 0.85rem; color: var(--muted);
-    }
-    /* "Searching…" occupies the same row a miss does, so it needs to read as a
-       state rather than an answer. A pulse says "still going" where the same
-       muted line in the same place would say "nothing found". */
-    .feed-search-empty.is-loading { animation: feed-search-pulse 1.1s ease-in-out infinite; }
-    @keyframes feed-search-pulse { 50% { opacity: 0.45; } }
-    @media (prefers-reduced-motion: reduce) {
-      .feed-search-empty.is-loading { animation: none; opacity: 0.7; }
-    }
+       Each panel shipped an empty search slot the renderer filled; the
+       slot and the box went on 2026-10-17 with the site search in the nav. */
+    /* The per-feed search box (.feed-search*) lived here from 2026-08-17 to
+       2026-10-17, when the nav bar's site search replaced the three of them;
+       the ranked endpoints' q= paths stay for the API. */
 
     /* Collapsed "Past events / older posts" section under a feed's list. */
     .feed-past {
@@ -1369,9 +1268,9 @@
       <a href="/charts#members">Members</a>
     </nav>
     <!-- The site search. nav-search.js turns typing into a grouped menu
-         (shows, episodes, artists, members) and Enter into a visit to the
-         first match; with no script the form lands on the charts page. -->
-    <form class="nav-search" role="search" action="/charts" method="get" data-nav-search autocomplete="off">
+         (shows, episodes, artists, members); Enter, or the form with no
+         script, lands on /search?q=, the full results page. -->
+    <form class="nav-search" role="search" action="/search" method="get" data-nav-search autocomplete="off">
       <svg class="nav-search-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
       <label class="nav-sr-only" for="nav-search-q">Search OnlyBoosts</label>
       <input id="nav-search-q" type="search" name="q" placeholder="Search shows, episodes, artists, members" autocomplete="off" spellcheck="false" />
@@ -1688,19 +1587,8 @@
             aria-label="How membership works (opens in a new tab)"
             title="How membership works"><span aria-hidden="true">i</span></a>
         </p>
-        <!-- ⚠️ THE LOOKUP NAVIGATES; IT DOES NOT FILTER THE WALL OR THE BOOST
-             LIST. Reed's call, 2026-08-23: the question is "where is this
-             person", and the answer is their page. It led the whole tab from
-             then until 2026-09-03, when Reed moved it here, under the Members
-             heading and above the wall of faces it searches; it is still the
-             same `[data-feed-search]` host and the same mountFeedSearch the
-             four ranked feeds use, and mountMemberLookup finds it as the
-             block's one such host. The heading above it is renderSupporters'
-             and lands in the head host by JS, so on a cold load the box paints
-             before its heading does. -->
-        <div class="members-find">
-          <div data-feed-search hidden></div>
-        </div>
+        <!-- The member lookup sat here from 2026-09-03 to 2026-10-17; the nav
+             bar's site search finds members on every page now. -->
         <div class="mb-shell">
           <div class="mw-controls mb-lid" data-members-controls hidden></div>
           <div class="mb-body" data-members-wall-body></div>
@@ -1774,7 +1662,6 @@
          edge — a second thirty-card list inside a hidden panel is bytes nobody
          reads and two rankings on one URL for a crawler. -->
     <section class="feed-panel" id="panel-episodes-global" role="region" aria-label="Episodes, global" data-feed="episodes-global" data-scope="global" hidden>
-      <div class="feed-search" data-feed-search hidden></div>
       <div class="feed-shell">
         <div class="feed-lid" data-feed-bar-slot></div>
         <div class="feed-body">
@@ -1790,7 +1677,6 @@
     </section>
 
     <section class="feed-panel" id="panel-members-global" role="region" aria-label="Boosts, global" data-feed="members-global" data-scope="global" hidden>
-      <div class="feed-search" data-feed-search hidden></div>
       <div class="feed-shell">
         <div class="feed-lid" data-feed-bar-slot></div>
         <div class="feed-body">
@@ -1805,7 +1691,6 @@
     </section>
 
     <section class="feed-panel" id="panel-episodes-follows" role="region" aria-label="Episodes from your follows" data-feed="episodes-follows" data-scope="follows" hidden>
-      <div class="feed-search" data-feed-search hidden></div>
       <div class="feed-shell">
         <div class="feed-lid" data-feed-bar-slot></div>
         <div class="feed-body">
@@ -1821,7 +1706,6 @@
     </section>
 
     <section class="feed-panel" id="panel-members-follows" role="region" aria-label="Boosts from your follows" data-feed="members-follows" data-scope="follows" hidden>
-      <div class="feed-search" data-feed-search hidden></div>
       <div class="feed-shell">
         <div class="feed-lid" data-feed-bar-slot></div>
         <div class="feed-body">
@@ -1840,7 +1724,6 @@
          episode. Both scopes, because this path never reads the show-level
          rollup that keeps Shows and Albums Global-only. -->
     <section class="feed-panel" id="panel-songs-global" role="region" aria-label="Songs, global" data-feed="songs-global" data-scope="global" hidden>
-      <div class="feed-search" data-feed-search hidden></div>
       <div class="feed-shell">
         <div class="feed-lid" data-feed-bar-slot></div>
         <div class="feed-body">
@@ -1856,7 +1739,6 @@
     </section>
 
     <section class="feed-panel" id="panel-songs-follows" role="region" aria-label="Songs from your follows" data-feed="songs-follows" data-scope="follows" hidden>
-      <div class="feed-search" data-feed-search hidden></div>
       <div class="feed-shell">
         <div class="feed-lid" data-feed-bar-slot></div>
         <div class="feed-body">
@@ -1880,7 +1762,6 @@
          hides and shows panels, but until it runs, `is-active` here is what is
          on screen. The two move together. -->
     <section class="feed-panel is-active" id="panel-shows" role="region" aria-label="Shows, global" data-feed="shows-global" data-scope="global">
-      <div class="feed-search" data-feed-search hidden></div>
       <!-- ⚠️ THE MARKER BELOW IS AN INJECTION POINT, not a comment. functions/index.js
            fetches this file through env.ASSETS, replaces that exact string with
            the server-rendered opening page of show cards, and serves the result
@@ -1931,7 +1812,6 @@
     </section>
 
     <section class="feed-panel" id="panel-shows-follows" role="region" aria-label="Shows from your follows" data-feed="shows-follows" data-scope="follows" hidden>
-      <div class="feed-search" data-feed-search hidden></div>
       <div class="feed-shell">
         <div class="feed-lid" data-feed-bar-slot></div>
         <div class="feed-body">
@@ -1949,7 +1829,6 @@
     <!-- Albums: Shows, narrowed to the music side of the same rollup. Both
          scopes, for the same reason Shows has both. -->
     <section class="feed-panel" id="panel-albums" role="region" aria-label="Albums, global" data-feed="albums-global" data-scope="global" hidden>
-      <div class="feed-search" data-feed-search hidden></div>
       <div class="feed-shell">
         <div class="feed-lid" data-feed-bar-slot></div>
         <div class="feed-body">
@@ -1965,7 +1844,6 @@
     </section>
 
     <section class="feed-panel" id="panel-albums-follows" role="region" aria-label="Albums from your follows" data-feed="albums-follows" data-scope="follows" hidden>
-      <div class="feed-search" data-feed-search hidden></div>
       <div class="feed-shell">
         <div class="feed-lid" data-feed-bar-slot></div>
         <div class="feed-body">
@@ -1984,7 +1862,6 @@
          card per artist (Wavlake, Fountain and RSS Blue mint one publisher
          feed per artist). Both scopes, like the two show-level rollups. -->
     <section class="feed-panel" id="panel-artists" role="region" aria-label="Artists, global" data-feed="artists-global" data-scope="global" hidden>
-      <div class="feed-search" data-feed-search hidden></div>
       <div class="feed-shell">
         <div class="feed-lid" data-feed-bar-slot></div>
         <div class="feed-body">
@@ -2000,7 +1877,6 @@
     </section>
 
     <section class="feed-panel" id="panel-artists-follows" role="region" aria-label="Artists from your follows" data-feed="artists-follows" data-scope="follows" hidden>
-      <div class="feed-search" data-feed-search hidden></div>
       <div class="feed-shell">
         <div class="feed-lid" data-feed-bar-slot></div>
         <div class="feed-body">

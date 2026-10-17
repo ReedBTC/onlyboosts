@@ -14,6 +14,7 @@
 import { coverChain } from './cover-art.js?v=ob-v219'
 import { rankLabel } from './rank.js?v=ob-v219'
 import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v219'
+import { boosterPageHref } from './booster-link.js?v=ob-v219'
 
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => (
@@ -39,22 +40,40 @@ export function statsLine({ boosters, sats }) {
 }
 
 /**
+ * The chart triplet under a charted tile — rank in sats / boosters / boosts,
+ * the same figure and the same order the chart view's `cb-ranks` prints
+ * (chart-board.js), which is what says WHY a tile is where it is. Reed's
+ * call, 2026-10-17: the "7 boosters · 38.8k sats" line was unreadable at
+ * tile size. Reads either the weekly chart's `r_*` columns or a ranked
+ * endpoint's `chart` object; null when the row carries neither.
+ */
+export function rankTriplet(r) {
+  const c = r && r.chart
+  if (c && c.sats != null) return `${c.sats}/${c.boosters}/${c.boosts}`
+  if (r && r.r_sats != null) return `${r.r_sats}/${r.r_boosters}/${r.r_boosts}`
+  return null
+}
+export const TRIPLET_TITLE = 'Rank in sats / boosters / boosts'
+
+/**
  * One tile. `rank`/`tied` come from the server's ranking (never re-derived
  * here); `href` null renders the tile as a plain figure rather than a dead
- * link. `glyph` is the no-artwork fallback text (a medium's emoji).
+ * link. `glyph` is the no-artwork fallback text (a medium's emoji). `sub`
+ * is the one line under the title; `subTitle` its tooltip; `gold` marks the
+ * rank badge (a #40HPW member over the goal).
  */
-export function tileHtml({ rank = null, tied = false, href = null, title, sub = '', img = null, art2 = null, glyph = '🎙' }) {
+export function tileHtml({ rank = null, tied = false, href = null, title, sub = '', subTitle = '', subClass = '', img = null, art2 = null, glyph = '🎙', gold = false }) {
   const chain = coverChain(img, art2)
   const media = chain.length
     ? `<img alt="" loading="lazy" referrerpolicy="no-referrer" src="${esc(chain[0])}"${attr('data-art2', chain[1])} />`
     : `<span class="rt-glyph" aria-hidden="true">${esc(glyph)}</span>`
   const badge = rank != null
-    ? `<span class="rt-rank"${tied ? ' data-tied="1"' : ''}>${esc(rankLabel(rank, tied))}</span>`
+    ? `<span class="rt-rank${gold ? ' rt-rank--gold' : ''}"${tied ? ' data-tied="1"' : ''}>${esc(rankLabel(rank, tied))}</span>`
     : ''
   const inner =
     `<span class="rt-media${chain.length ? '' : ' rt-media--none'}">${media}${badge}</span>` +
     `<span class="rt-title">${esc(title || 'Untitled')}</span>` +
-    (sub ? `<span class="rt-sub">${esc(sub)}</span>` : '')
+    (sub ? `<span class="rt-sub${subClass ? ' ' + subClass : ''}"${attr('title', subTitle)}>${esc(sub)}</span>` : '')
   return href
     ? `<li class="rail-tile"><a class="rt" href="${esc(href)}">${inner}</a></li>`
     : `<li class="rail-tile"><span class="rt">${inner}</span></li>`
@@ -71,12 +90,16 @@ export function railListHtml(tiles, { empty = 'Nothing here yet.' } = {}) {
  * the weekly chart's (`image`/`artwork`/`booster_count`) or the ranked
  * endpoints' records (`img`/`art2`/`boosters`); both are accepted so a rail
  * can be rebuilt from either source. `rank`/`tied` are the server's. ── */
+function subOf(r, fallback) {
+  const t = rankTriplet(r)
+  return t ? { sub: t, subTitle: TRIPLET_TITLE, subClass: 'rt-ranks' } : { sub: fallback }
+}
 export function showTile(r, i) {
   return tileHtml({
     rank: r.rank ?? i + 1, tied: !!r.tied,
     href: showPageHref(r.guid),
     title: r.title,
-    sub: statsLine({ boosters: r.booster_count ?? r.boosters, sats: r.total_sats ?? r.sats }),
+    ...subOf(r, statsLine({ boosters: r.booster_count ?? r.boosters, sats: r.total_sats ?? r.sats })),
     img: r.image ?? r.img, art2: r.artwork ?? r.art2, glyph: '🎙',
   })
 }
@@ -85,7 +108,7 @@ export function albumTile(r, i) {
     rank: r.rank ?? i + 1, tied: !!r.tied,
     href: showPageHref(r.guid),
     title: r.title,
-    sub: r.author || statsLine({ boosters: r.booster_count ?? r.boosters, sats: r.total_sats ?? r.sats }),
+    ...subOf(r, r.author || statsLine({ boosters: r.booster_count ?? r.boosters, sats: r.total_sats ?? r.sats })),
     img: r.image ?? r.img, art2: r.artwork ?? r.art2, glyph: '🎵',
   })
 }
@@ -94,7 +117,7 @@ export function episodeTile(r, i, glyph = '🎙') {
     rank: r.rank ?? i + 1, tied: !!r.tied,
     href: episodePageHref(r.guid, r.title),
     title: r.title,
-    sub: r.show?.title || statsLine({ boosters: r.boosters, sats: r.sats }),
+    ...subOf(r, r.show?.title || statsLine({ boosters: r.boosters, sats: r.sats })),
     img: r.img || r.show?.img, art2: r.show?.art2, glyph,
   })
 }
@@ -103,7 +126,33 @@ export function artistTile(r, i) {
     rank: r.rank ?? i + 1, tied: !!r.tied,
     href: publisherPageHref(r.guid),
     title: r.title,
-    sub: statsLine({ boosters: r.booster_count ?? r.boosters, sats: r.total_sats ?? r.sats }),
+    ...subOf(r, statsLine({ boosters: r.booster_count ?? r.boosters, sats: r.total_sats ?? r.sats })),
     img: r.image ?? r.img, art2: r.artwork ?? r.art2, glyph: '🎤',
+  })
+}
+
+/** A #40HPW row (the hours endpoint's member shape) as a tile: the face, the
+ *  name, "34.3 HPW · 26 episodes", gold past the goal. Reed's call,
+ *  2026-10-17: the rail looks like every other rail, not like the board. */
+export function memberTile(m, i, goalHours = 40) {
+  const h = Number(m.seconds) / 3600
+  const eps = Number(m.episodes) || 0
+  return tileHtml({
+    rank: i + 1,
+    href: boosterPageHref(m.npub, m.pk),
+    title: m.name || (m.npub ? m.npub.slice(0, 12) + '…' : 'Unknown'),
+    sub: `${h.toFixed(1)} HPW · ${eps} episode${eps === 1 ? '' : 's'}`,
+    subTitle: 'Hours of podcasts boosted this week · episodes that counted',
+    img: m.pic, glyph: '👤', gold: h >= goalHours,
+  })
+}
+
+/** A member from the member search (/api/v1/members?q=) as a tile. */
+export function memberSearchTile(m) {
+  return tileHtml({
+    href: boosterPageHref(m.npub, m.pk),
+    title: m.name || (m.npub ? m.npub.slice(0, 12) + '…' : 'Unknown'),
+    sub: statsLine({ boosters: null, sats: m.sats }).replace(/^/, m.boosts != null ? `${Number(m.boosts)} boost${Number(m.boosts) === 1 ? '' : 's'} · ` : ''),
+    img: m.pic, glyph: '👤',
   })
 }

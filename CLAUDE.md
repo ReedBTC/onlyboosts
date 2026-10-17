@@ -51,6 +51,7 @@ rules a change elsewhere would break.
 | `/episode/<item-guid>` | one episode, edge-rendered |
 | `/booster/<npub>` | one person, edge-rendered |
 | `/artist/<guid>` | one artist (publisher), edge-rendered — see the detail pages section |
+| `/search?q=` | the site search's results page, edge-rendered, `noindex` (2026-10-17) |
 | `/about` | the project's own explanation of what the data is and isn't |
 | `/stats` | a coming-soon placeholder: nav + header + soon-card, `noindex`, out of the sitemap. `/boosters` was the second one and was **deleted** on 2026-08-23 — see the Stats row of the site map |
 | `/404.html` | see the ⚠️ under LB conventions |
@@ -101,12 +102,26 @@ was picked from is in the session memory; direction A won, with the sans.
 - **`--font-sans` is Outfit** (`assets/fonts/outfit.woff2`, OFL, a variable
   file), used by the bar and the rails. The two serifs are still the display
   and body faces everywhere else; the typography item below is still open.
+- **A tile's one line is the chart triplet** (rank in sats / boosters /
+  boosts, the chart view's own figure, `rankTriplet` in `rail-tile.js`);
+  Reed's call after seeing "7 boosters · 38.8k sats" at tile size. The #40HPW
+  rail is tiles too (face, name, "34.3 HPW · 26 episodes", gold past the
+  goal), not the board: every rail the same shape.
+- **`/search?q=` is the results page** (`search.html` + `functions/search.js`
+  + `functions/_shared/search-all.js`, shared with the typeahead): every hit
+  grouped as shows, albums, episodes and songs, artists, members, each the
+  homepage's tile in a wrapping grid, `noindex`. Enter in the nav field goes
+  there (Reed's call: a typed query deserves every hit, not the first); an
+  arrow-key pick still goes to its row.
+- **The foot of the page is the newest boost rows**, the detail pages' own
+  two-sided `boost-list.js` row with the reaction bar attached by
+  `discover.js`; the whole feed with its controls is the Members tab.
 - **Still to build here**: the Recommended rail's endpoint over the
   collector's `show_similar` table (the signed-in slot says so honestly
   meanwhile), New and Noteworthy over `first_boost_ts`, Movers, Podcasters
-  Recommend (podroll), Because You Boosted X, and the boost-note feed at the
-  foot (a link to the Members tab for now). Most Favorited is held: 15 lists
-  on the whole network on 2026-10-17.
+  Recommend (podroll), Because You Boosted X, and boost messages on the
+  results page. Most Favorited is held: 15 lists on the whole network on
+  2026-10-17.
 
 ## Site map
 
@@ -242,11 +257,16 @@ visible is **CSS off `body[data-active-feed]`**, not JS: feeds hydrate once and
 keep their controls forever, so an imperative swap is the version that can leave
 a feed you come back to showing another feed's controls, or none.
 
-**Each panel leads with two slots, both shipped empty and `hidden`**: a
-`[data-feed-note]` line and, under it, the `[data-feed-search]` box. Both are
-filled by the renderer and stay hidden until one does, so a feed showing "sign
-in" or an error grows neither. They're inside the panel rather than the bar, so
-they scroll away with the cards they describe.
+**Each panel leads with one slot, shipped empty and `hidden`**: the
+`[data-feed-note]` line, filled by the renderer and hidden until it is, so a
+feed showing "sign in" or an error grows nothing. It is inside the panel
+rather than the bar, so it scrolls away with the cards it describes. **The
+`[data-feed-search]` box beside it, and the member lookup on the Members tab,
+were removed on 2026-10-17** (Reed's call): the nav bar's site search is on
+every page and `/search` is the results page, so three per-feed boxes restated
+one control. `feed-search.js` and its test went with them; the ranked
+endpoints' `q=` paths stay for the API, and the renderers' pick/query state is
+unreachable but still in place.
 
 **The note slot is on the four ranked feeds only** (`mountFeedNote` and
 `viewNote` in `feed-note.js`). Since 2026-08-31 the line is composed from the
@@ -463,7 +483,7 @@ node scripts/stamp-assets.js --check   # verify; non-zero exit if anything is st
 **Order matters.** `sync-partials` injects markup into the page files; anything
 it injects has to be stamped afterwards.
 
-Thirty-two test scripts, all plain `node scripts/<name>.mjs` with no runner.
+Thirty-one test scripts, all plain `node scripts/<name>.mjs` with no runner.
 **`docs/tests.md` is the per-test reference** — one row each, saying what it
 covers and what it was confirmed red against. What follows here is only what a
 change elsewhere would break.
@@ -473,10 +493,10 @@ THAT GOES UNRUN.** Its header carries the `curl` that produces the capture; take
 a fresh one rather than reusing an old file, since it is also the size
 measurement. It asserted `cards are numbered 1..N with no gaps` — the *ordinal*
 scheme's invariant — until competition ranking shipped on 2026-08-18, and it
-would have been merged red had it not been run. **Run all thirty-two before a
+would have been merged red had it not been run. **Run all thirty-one before a
 merge**, and treat this one as the guard on the ranking scheme rather than only
 on weight. *(That number has been wrong before — it lagged from twelve to twenty-eight, a
-test at a time, while the table beside it grew; thirty-one became thirty-two on 2026-10-17. `git log -S "before a\nmerge" -- CLAUDE.md` has every value it has held. **Bump it and `docs/tests.md`
+test at a time, while the table beside it grew; it was thirty-two for an afternoon on 2026-10-17 (`test-discover-home.mjs` in) and thirty-one again by evening (`test-feed-search.mjs` out). `git log -S "before a\nmerge" -- CLAUDE.md` has every value it has held. **Bump it and `docs/tests.md`
 together.**)*
 
 **⚠️ AND ITS `curl` CHANGED WITH THE LANDING FEED.** It captures
@@ -1530,6 +1550,10 @@ file:
   is a well-formed subtag matching zero rows, so `ob-live.js` sends the parameter
   only when the key is not `all`. The menu is **fetched** from
   `GET /api/v1/languages`, never declared, and is medium-aware.
+- **The per-feed search box is gone since 2026-10-17** (see the slot
+  paragraph under The Three Tabs); the two bullets after this one describe
+  the API behaviour its removal left in place, and the `onSubmit` rule is
+  history.
 - **⚠️ `onSubmit` IS WHAT FLIPS THE SEARCH BOX'S ENTER BEHAVIOUR.** Typing
   suggests, picking filters, **Enter submits the whole query** (2026-08-27, Reed's
   ask) — and with `onSubmit` present suggestions are **not** auto-highlighted. The

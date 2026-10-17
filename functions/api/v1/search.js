@@ -6,6 +6,7 @@
 import { json, preflight, BOOST_SELECT, boostRecord, clampLimit, ftsMatch } from "./_common.js";
 
 import { headOf } from "../../_shared/head.js";
+import { searchAll } from "../../_shared/search-all.js";
 export async function onRequestOptions({ request }) { return preflight(request); }
 
 export async function onRequestGet({ request, env }) {
@@ -26,38 +27,14 @@ export async function onRequestGet({ request, env }) {
   const matchEpisodes = ftsMatch(q, ["title", "show"]);
   const matchPodcasts = ftsMatch(q, ["title", "author"]);
 
-  /* type=all — THE NAV BAR'S TYPEAHEAD (assets/js/nav-search.js, 2026-10-17).
-   * Shows, episodes and artists in one answer, a handful of each, ordered by
-   * sats within each group; members come from /api/v1/members?q= in the same
-   * breath, since that endpoint owns the publisher exclusion and the npub.
-   * Title and author only, like the other two types: a show-notes hit
-   * outranking the title hit a typed query means is the wrong menu. The
-   * artists group reads publishers_fts, which the collector's --apply-schema
-   * creates; until that has run on the remote the group is simply empty. */
+  /* type=all — THE NAV BAR'S TYPEAHEAD (assets/js/nav-search.js) and the
+   * /search page share functions/_shared/search-all.js: shows, episodes and
+   * artists, a handful of each here, ordered by sats within each group.
+   * Members come from /api/v1/members?q= in the same breath. */
   if (type === "all") {
     const each = clampLimit(u.searchParams.get("limit"), 5, 10);
-    const rows = (stmt) => stmt.all().then((r) => r.results).catch((e) => { console.warn("[search all]", e?.message); return []; });
-    const [shows, episodes, artists] = await Promise.all([
-      rows(env.DB.prepare(
-        `SELECT p.podcast_guid, p.title, p.image, p.author, p.medium
-           FROM podcasts_fts f JOIN podcasts p ON p.podcast_guid = f.podcast_guid
-          WHERE podcasts_fts MATCH ? ORDER BY p.total_sats DESC LIMIT ?`).bind(matchPodcasts, each)),
-      rows(env.DB.prepare(
-        `SELECT e.item_guid, e.title, e.image, e.podcast_guid, p.title AS p_title, p.image AS p_image
-           FROM episodes_fts f JOIN episodes e ON e.item_guid = f.item_guid
-           LEFT JOIN podcasts p ON p.podcast_guid = e.podcast_guid
-          WHERE episodes_fts MATCH ? ORDER BY e.total_sats DESC LIMIT ?`).bind(matchEpisodes, each)),
-      rows(env.DB.prepare(
-        `SELECT pub.publisher_guid, pub.title, pub.image
-           FROM publishers_fts f JOIN publishers pub ON pub.publisher_guid = f.publisher_guid
-          WHERE publishers_fts MATCH ? LIMIT ?`).bind(match, each)),
-    ]);
-    return json(request, {
-      type, q,
-      shows: shows.map((r) => ({ guid: r.podcast_guid, title: r.title, img: r.image, author: r.author, medium: r.medium })),
-      episodes: episodes.map((r) => ({ guid: r.item_guid, title: r.title, img: r.image || r.p_image, show: { guid: r.podcast_guid, title: r.p_title, img: r.p_image } })),
-      artists: artists.map((r) => ({ guid: r.publisher_guid, title: r.title, img: r.image })),
-    });
+    const all = await searchAll(env, q, each);
+    return json(request, { type, q, ...all });
   }
 
   if (type === "episodes") {

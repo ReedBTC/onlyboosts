@@ -11,8 +11,9 @@
  *    recommendations endpoint lands, an honest line in the Recommended slot.
  *    Re-run on lb:session-change and on the storage event, like feeds.js.
  */
-import { railListHtml, showTile, albumTile, episodeTile, artistTile } from '/assets/js/rail-tile.js?v=ob-v219'
-import { boardHtml, weekSpan } from '/assets/js/hpw-board.js?v=ob-v219'
+import { railListHtml, showTile, albumTile, episodeTile, artistTile, memberTile } from '/assets/js/rail-tile.js?v=ob-v219'
+import { rowsFromRecords } from '/assets/js/boost-list.js?v=ob-v219'
+import { initBoostNoteActions, wireBoostNotes } from '/assets/js/boost-note-actions.js?v=ob-v219'
 import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v219'
 import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v219'
 
@@ -58,10 +59,22 @@ async function fillRail(section) {
   try {
     if (key === 'hpw-week') {
       const j = await getJson('/api/v1/members/hours?range=week')
-      track.innerHTML = boardHtml({
-        title: 'This Week', sub: weekSpan(j.week_start), members: (j.members || []).slice(0, TILES),
-        goal: j.goal_hours, empty: 'No qualifying boosts yet this week.', board: 'week',
-      })
+      track.innerHTML = railListHtml((j.members || []).slice(0, TILES).map((m, i) => memberTile(m, i, j.goal_hours)), { empty: 'No qualifying boosts yet this week.' })
+      wireArt(track)
+      return
+    }
+    if (key === 'boosts-latest') {
+      /* The boost row's client half: records through the shape layer the
+         detail pages' repaint uses, then the same row renderer. The names
+         map is empty here (a mention chip then shows the npub until
+         hydrateProfiles fills it). */
+      const j = await getJson('/api/v1/boosts?limit=12')
+      const { boostRows } = await import('/assets/js/boost-list.js?v=ob-v219')
+      const rows = rowsFromRecords(j.boosts || [])
+      track.innerHTML = rows.length
+        ? `<ul class="boost-list ob-boost-list" data-bs-list>${boostRows(rows, new Map(), { noun: 'episode', showTarget: true, linkBooster: true, showShow: true })}</ul>`
+        : '<p class="rail-empty">No boosts yet.</p>'
+      await wireBoosts(track)
       return
     }
     const src = SOURCES[key]
@@ -138,9 +151,25 @@ document.addEventListener('click', async (e) => {
   } catch (err) { console.error('[discover] login widget', err) }
 })
 
+/* ── The boost rows' verbs: the reaction bar, and the mention chips' names ── */
+async function wireBoosts(root) {
+  try {
+    await wireBoostNotes(root)
+    const { hydrateProfiles } = await import('/assets/js/detail-page.js?v=ob-v219')
+    hydrateProfiles(root)
+  } catch (e) { console.warn('[discover] boost rows', e) }
+}
+
 /* ── Boot ──────────────────────────────────────────────────────────────── */
 wireArt(document)
 for (const s of document.querySelectorAll('[data-rail]:not([data-rail-personal])')) fillRail(s)
+initBoostNoteActions()
+{
+  const boosts = document.querySelector('[data-rail="boosts-latest"] [data-boost-section]')
+  if (boosts && !boosts.querySelector('.rail-placeholder')) {
+    import('/assets/js/detail-page.js?v=ob-v219').then((m) => m.hydrateProfiles(boosts)).catch(() => {})
+  }
+}
 paintPersonal()
 window.addEventListener('lb:session-change', paintPersonal)
 window.addEventListener('storage', (e) => { if (e.key === 'lb_nostr_session') paintPersonal() })

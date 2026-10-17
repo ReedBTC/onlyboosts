@@ -28,11 +28,14 @@ import { weekBoard } from "./api/v1/charts/[[path]].js";
 import { readParams as podcastParams, globalPodcasts } from "./api/v1/podcasts.js";
 import { readParams as episodeParams, globalEpisodes } from "./api/v1/episodes.js";
 import { hoursBoard } from "./api/v1/members/hours.js";
-import { boardHtml as hpwBoardHtml, weekSpan } from "../assets/js/hpw-board.js";
-import { railListHtml, showTile, albumTile, episodeTile, artistTile } from "../assets/js/rail-tile.js";
+import { railListHtml, showTile, albumTile, episodeTile, artistTile, memberTile } from "../assets/js/rail-tile.js";
+import { boostRows } from "../assets/js/boost-list.js";
+import { BOOST_SELECT } from "./api/v1/_common.js";
+import { lookupMentionNames } from "./_shared/detail-page.js";
 import { headOf } from "./_shared/head.js";
 
 const TILES = 10;
+const BOOSTS = 12;
 
 /* ── The rails, keyed by the marker in index.html ───────────────────────── */
 
@@ -60,16 +63,11 @@ export const RAILS = {
     const rows = await rankedPodcasts(env, `medium=music&sort=chart&range=1m&limit=${TILES}`);
     return railListHtml(rows.map(albumTile), { empty: "No albums boosted yet this month." });
   },
+  /* The #40HPW week as a rail of faces, not the board: Reed's call,
+     2026-10-17, every rail the same shape. Gold past the goal. */
   "hpw-week": async (env) => {
     const { body } = await hoursBoard(env, { range: "week", limit: TILES });
-    return hpwBoardHtml({
-      title: "This Week",
-      sub: weekSpan(body.week_start),
-      members: body.members,
-      goal: body.goal_hours,
-      empty: "No qualifying boosts yet this week.",
-      board: "week",
-    });
+    return railListHtml(body.members.map((m, i) => memberTile(m, i, body.goal_hours)), { empty: "No qualifying boosts yet this week." });
   },
   "episodes-year": async (env) => {
     const rows = await rankedEpisodes(env, `not_medium=music&sort=chart&range=1y&limit=${TILES}`);
@@ -82,6 +80,18 @@ export const RAILS = {
   "artists-week": async (env) => {
     const { body } = await weekBoard(env, { kind: "artists", limit: TILES });
     return railListHtml(body.rows.map(artistTile), { empty: "No artists boosted yet this week." });
+  },
+  /* The boost firehose's newest rows, the same two-sided boost row every
+     detail page's #boosts list renders (boost-list.js), facts at the edge
+     and the reaction bar attached by discover.js. The Members tab holds
+     the whole feed with its range, sort and paging; this is the foot of
+     the front door. */
+  "boosts-latest": async (env) => {
+    const { results } = await env.DB.prepare(`${BOOST_SELECT} ORDER BY b.created_at DESC, b.event_id DESC LIMIT ?`).bind(BOOSTS).all();
+    const rows = results || [];
+    if (!rows.length) return `<p class="rail-empty">No boosts yet.</p>`;
+    const names = await lookupMentionNames(env, rows.map((r) => r.message));
+    return `<ul class="boost-list ob-boost-list" data-bs-list>${boostRows(rows, names, { noun: "episode", showTarget: true, linkBooster: true, showShow: true })}</ul>`;
   },
 };
 

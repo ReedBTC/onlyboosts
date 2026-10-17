@@ -598,6 +598,14 @@ view and the address.
 
 ### Search
 
+**⚠️ THE PER-FEED SEARCH BOX THIS SECTION DESCRIBES WAS REMOVED ON
+2026-10-17** (Reed's call): the nav bar's site search is on every page and
+`/search?q=` is the results page, so the three boxes restated one control.
+`feed-search.js` and `test-feed-search.mjs` are deleted; the `q=` paths on
+the ranked endpoints and their rank-retention rule stay as API behaviour, and
+the renderers' pick/query state is still in place, unreachable. What follows
+is the design record of the box as it was.
+
 `assets/js/feed-search.js` is the typeahead at the head of every panel, above
 the shell whose lid holds the range and sort (Reed's ask, 2026-09-03; it sat
 under the bar while the bar was sticky chrome): a search is a thing you do at

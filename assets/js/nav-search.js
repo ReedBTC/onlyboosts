@@ -2,10 +2,10 @@
  *
  * Typing two or more characters asks `/api/v1/search?type=all` (shows,
  * episodes and artists in one answer) and `/api/v1/members?q=` (people) and
- * paints a grouped menu under the field. Enter visits the highlighted row, or
- * the first row when nothing is highlighted; Escape closes; the arrow keys
- * move. Every row is a real link, so the menu works with a mouse, a keyboard
- * or a screen reader without any of this.
+ * paints a grouped menu under the field. Enter opens the full results page
+ * (/search?q=), or the highlighted row when the arrow keys have picked one;
+ * Escape closes. Every row is a real link, so the menu works with a mouse, a
+ * keyboard or a screen reader without any of this.
  *
  * Loaded on every page by nav.js (a dynamic import, like favorites-ui.js),
  * because the bar is on every page. It mounts nothing until the field exists.
@@ -78,9 +78,10 @@ function menuHtml(rows) {
     }
     html += '</div>'
   }
-  if (!n) return '<p class="nsm-empty">Nothing matches.</p>'
+  if (!n) return '<p class="nsm-empty">Nothing matches here. Press Enter for the full search.</p>'
   return html
 }
+function allHref(q) { return '/search?q=' + encodeURIComponent(q) }
 
 function mount(form) {
   const input = form.querySelector('input[type="search"]')
@@ -120,7 +121,8 @@ function mount(form) {
         fetch(`/api/v1/members?q=${enc}&limit=4`, { signal }).then((r) => r.ok ? r.json() : null).catch(() => null),
       ])
       if (my !== seq) return
-      menu.innerHTML = menuHtml(rowsOf(all, members))
+      menu.innerHTML = menuHtml(rowsOf(all, members)) +
+        `<a class="nsm-all" href="${esc(allHref(q))}">See all results for “${esc(q)}” →</a>`
       open()
       highlight(-1)
     } catch (e) {
@@ -150,13 +152,15 @@ function mount(form) {
     else if (e.key === 'ArrowUp') { e.preventDefault(); highlight(active - 1) }
     else if (e.key === 'Escape') { close() }
   })
+  /* Enter is the full results page (Reed's call, 2026-10-17: a typed query
+     deserves every hit, not the first), unless the reader has walked the
+     arrow keys onto a row, in which case it is that row. */
   form.addEventListener('submit', (e) => {
     e.preventDefault()
     const list = items()
-    const pick = active >= 0 ? list[active] : list[0]
-    if (pick) { location.href = pick.getAttribute('href'); return }
+    if (active >= 0 && list[active]) { location.href = list[active].getAttribute('href'); return }
     const q = input.value.trim()
-    if (q.length >= MIN && menu.hidden) search(q)
+    if (q.length >= MIN) location.href = allHref(q)
   })
   // A click lands on the row's own link; closing on blur has to wait for it.
   input.addEventListener('blur', () => { setTimeout(close, 180) })

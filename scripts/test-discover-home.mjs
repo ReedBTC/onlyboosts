@@ -163,6 +163,59 @@ console.log('\nThe injection and the Function:')
   void okRails
 }
 
+console.log('\nThe search page:')
+{
+  const { onRequestGet: searchGet, resultsHtml } = await import('../functions/search.js')
+  const shell = read('search.html')
+  const ASSETS = { fetch: async () => new Response(shell, { status: 200, headers: { 'Content-Type': 'text/html' } }) }
+  const dead = { prepare: () => ({ bind: () => ({ all: async () => { throw new Error('no db') }, first: async () => { throw new Error('no db') } }), all: async () => { throw new Error('no db') }, first: async () => { throw new Error('no db') } }) }
+  check('resultsHtml groups the hits and carries no rank badge', () => {
+    const h = resultsHtml('bit', {
+      shows: [{ guid: 'g1', title: 'A Pod', img: '', medium: 'podcast' }, { guid: 'g2', title: 'An Album', img: '', medium: 'music' }],
+      episodes: [{ guid: 'e1', title: 'Ep One', show: { guid: 'g1', title: 'A Pod' } }],
+      artists: [{ guid: 'p1', title: 'Artist' }],
+      members: [{ npub: 'npub1x', pk: 'ab', name: 'Reed', boosts: 3, sats: 1200 }],
+    })
+    assert.ok(h.includes('<q>bit</q>'))
+    for (const id of ['shows', 'albums', 'episodes', 'artists', 'members']) assert.ok(h.includes(`id="${id}"`), id)
+    assert.ok(!h.includes('rt-rank'), 'no rank on a search hit')
+    assert.ok(h.includes('rail-list rail-list--wrap'))
+    assert.ok(h.includes('3 boosts · 1.2k sats'))
+  })
+  check('an empty answer says so', () => {
+    assert.match(resultsHtml('zzz', {}), /Nothing matched/)
+  })
+  await checkAsync('no query serves the shell untouched; a query with a dead DB still answers 200', async () => {
+    const warn = console.warn; console.warn = () => {}
+    try {
+      const r0 = await searchGet({ request: new Request('https://ob.invalid/search'), env: { ASSETS, DB: dead } })
+      assert.equal(r0.status, 200)
+      assert.ok((await r0.text()).includes('<!--OB:SEARCH-->'))
+      const r1 = await searchGet({ request: new Request('https://ob.invalid/search?q=bitcoin'), env: { ASSETS, DB: dead } })
+      assert.equal(r1.status, 200)
+      const html = await r1.text()
+      assert.ok(html.includes('value="bitcoin"'), 'the query is back in the field')
+      assert.ok(html.includes('<title>bitcoin — Search — OnlyBoosts</title>'))
+    } finally { console.warn = warn }
+  })
+  check('the nav form submits to /search and the charts page carries no feed search box', () => {
+    assert.ok(read('partials/nav.html').includes('action="/search"'))
+    assert.ok(!charts.includes('data-feed-search'))
+    assert.ok(!charts.includes('members-find'))
+  })
+  check('a member tile: gold past the goal, the HPW line', () => {
+    const h = tile.memberTile({ npub: 'npub1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq', pk: 'ab', name: 'Reed', seconds: 41 * 3600, episodes: 26 }, 0, 40)
+    assert.ok(h.includes('rt-rank--gold') && h.includes('41.0 HPW · 26 episodes') && h.includes('href="/booster/npub1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq"'))
+    const h2 = tile.memberTile({ npub: 'npub1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq', pk: 'ab', name: 'Reed', seconds: 2 * 3600, episodes: 1 }, 3, 40)
+    assert.ok(!h2.includes('rt-rank--gold') && h2.includes('2.0 HPW · 1 episode'))
+  })
+  check('a charted tile carries the triplet, an uncharted one the figures', () => {
+    assert.ok(tile.showTile({ guid: 'g', title: 'T', r_sats: 3, r_boosters: 1, r_boosts: 2 }, 0).includes('>3/1/2<'))
+    assert.ok(tile.showTile({ guid: 'g', title: 'T', chart: { sats: 5, boosters: 4, boosts: 6 } }, 0).includes('>5/4/6<'))
+    assert.ok(tile.showTile({ guid: 'g', title: 'T', boosters: 7, sats: 38849 }, 0).includes('7 boosters · 38.8k sats'))
+  })
+}
+
 console.log('\nThe charts page kept its address book:')
 {
   check('charts.html declares /charts as its own address', () => {

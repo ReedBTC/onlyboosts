@@ -61,7 +61,12 @@
   <link rel="preload" href="/assets/fonts/outfit.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v219" />
   <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v219" />
-  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v219" />
+  <!-- The boost rows at the foot are the detail pages' rows and wear their
+       sheets: the card, the thread chrome and the reaction bar. -->
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v219" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v219" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v219" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v219" />
   <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v219" />
   <!-- theme.css last among the shared sheets: the palette, the fonts, and
        the base body/a/img rules every shared stylesheet reads off :root. -->
@@ -158,9 +163,9 @@
       <a href="/charts#members">Members</a>
     </nav>
     <!-- The site search. nav-search.js turns typing into a grouped menu
-         (shows, episodes, artists, members) and Enter into a visit to the
-         first match; with no script the form lands on the charts page. -->
-    <form class="nav-search" role="search" action="/charts" method="get" data-nav-search autocomplete="off">
+         (shows, episodes, artists, members); Enter, or the form with no
+         script, lands on /search?q=, the full results page. -->
+    <form class="nav-search" role="search" action="/search" method="get" data-nav-search autocomplete="off">
       <svg class="nav-search-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
       <label class="nav-sr-only" for="nav-search-q">Search OnlyBoosts</label>
       <input id="nav-search-q" type="search" name="q" placeholder="Search shows, episodes, artists, members" autocomplete="off" spellcheck="false" />
@@ -229,8 +234,8 @@
       <h2 id="rail-hpw-week"><a href="/charts#members">Nostr Gang #40HPW Challenge</a></h2>
       <a class="rail-more" href="/charts#members">The boards and the rules →</a>
     </div>
-    <p class="rail-note">Share boosts for 40 hours of podcasts in a week. This week so far:</p>
-    <div class="rail-track rail-box"><!--OB:RAIL:hpw-week--><p class="rail-placeholder">Loading this week's board…</p><!--/OB:RAIL:hpw-week--></div>
+    <p class="rail-note">Share boosts for 40 hours of podcasts in a week. This week so far, hours of podcasts boosted and the episodes that counted:</p>
+    <div class="rail-track"><!--OB:RAIL:hpw-week--><p class="rail-placeholder">Loading this week's board…</p><!--/OB:RAIL:hpw-week--></div>
   </section>
 
   <section class="rail" data-rail="recommended" data-rail-personal aria-labelledby="rail-recommended">
@@ -319,12 +324,15 @@
     <div class="rail-track"><!--OB:RAIL:artists-week--><p class="rail-placeholder">Loading this week's artists…</p><!--/OB:RAIL:artists-week--></div>
   </section>
 
-  <section class="rail" aria-labelledby="rail-boosts">
+  <!-- The foot of the page: the newest boost notes, the same row the detail
+       pages' #boosts lists render, with the reaction bar. The whole feed,
+       with its range, sort and paging, is the Members tab. -->
+  <section class="rail rail--boosts" data-rail="boosts-latest" aria-labelledby="rail-boosts">
     <div class="rail-head">
       <h2 id="rail-boosts"><a href="/charts#members">Latest Boosts</a></h2>
-      <a class="rail-more" href="/charts#members">The boost feed →</a>
+      <a class="rail-more" href="/charts#members">The whole feed →</a>
     </div>
-    <p class="rail-note">Every boost note as it is published, with replies, likes and zaps, on the Members tab of the charts page.</p>
+    <div class="rail-track" data-boost-section><!--OB:RAIL:boosts-latest--><p class="rail-placeholder">Loading the latest boosts…</p><!--/OB:RAIL:boosts-latest--></div>
   </section>
 
 </main>

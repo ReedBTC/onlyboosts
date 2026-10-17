@@ -28,7 +28,6 @@ import { mountFeedNote, resetFeedNote, viewNote, CHART_INFO } from '/assets/js/f
 import {
   LANG_ALL, languageOptions, langControl, langNote, langNoMatchText, langLabelFor,
 } from '/assets/js/feed-lang.js?v=ob-v219'
-import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v219'
 import { competitionRanks, rankLabel, markSliceTies } from '/assets/js/rank.js?v=ob-v219'
 import {
   COPY, toCard, publisherCardHtml, publisherRankValue,
@@ -103,7 +102,6 @@ export async function renderArtists({ panel, list, scope = 'global', lang = null
   const copy = COPY
   // Numerals are withheld on Follows — the shows-feed.js rule, same reason.
   const showRanks = scope !== 'follows'
-  resetFeedSearch(panel)
   resetFeedNote(panel)
 
   // The follows resolution, mirrored from shows-feed.js / feeds-podcasts.js.
@@ -438,39 +436,5 @@ export async function renderArtists({ panel, list, scope = 'global', lang = null
       : copy.searchNoneRange
   }
 
-  search = mountFeedSearch(panel, {
-    placeholder: copy.searchPlaceholder,
-    label: copy.searchLabel,
-    noun: copy.searchNoun,
-    minChars: SEARCH_MIN_CHARS,
-    onPick: (entry) => {
-      if (query) { query = ''; artists = []; nextOffset = 0 }
-      picked = entry
-      resolvePick()
-    },
-    onSubmit: (q) => {
-      query = q
-      pickSeq++
-      picked = null
-      pickedItem = null
-      pickLoading = false
-      requery()
-    },
-    searchRemote: async (qText, { signal }) => {
-      const records = await searchPublishers({
-        follows,
-        q: qText, sort: sortKey, range: rangeKey, lang: langKey, signal,
-      })
-      return records.map((r) => ({
-        key: r.guid,
-        label: r.title || copy.unidentified,
-        sub: `${plural(num(r.boosts), 'boost', 'boosts')} · ${fmtSats(num(r.sats))} sats`,
-        img: r.img,
-        query: qText,
-      }))
-    },
-    noMatchText: noMatch,
-  })
-
-  rebuild()
+rebuild()
 }

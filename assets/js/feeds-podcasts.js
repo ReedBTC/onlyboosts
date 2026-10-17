@@ -61,7 +61,6 @@ import { mountFeedNote, resetFeedNote, viewNote, CHART_INFO } from '/assets/js/f
 import {
   LANG_ALL, languageOptions, langControl, langNote, langNoMatchText, langLabelFor,
 } from '/assets/js/feed-lang.js?v=ob-v219'
-import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v219'
 // The card, and the card's verbs. One definition each, shared with the edge.
 import {
   COPY, HOME_CARD_PARTS, buildEpisodes, renderEpisodeCards, RANKED_SORTS, SORT_OPTIONS,
@@ -257,7 +256,6 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
   // A re-render (account switch) may end on a placeholder, so clear any box a
   // previous run left behind before deciding whether this one gets one. The
   // scope line above it takes the same treatment for the same reason.
-  resetFeedSearch(panel)
   resetFeedNote(panel)
   // Follows scoping applies to the raw boost rows, BEFORE the episode rollup:
   // an episode should only appear if someone you follow boosted it, and its
@@ -948,93 +946,7 @@ export async function renderPodcasts({ panel, list, scope = 'global', medium = '
   // because episode titles repeat across shows far more than they collide
   // within one ("Episode 42", "Weekly Roundup"), so the show is what tells two
   // hits apart.
-  search = mountFeedSearch(panel, {
-    placeholder: copy.searchPlaceholder,
-    label: copy.searchLabel,
-    noun: copy.searchNoun,
-    minChars: SEARCH_MIN_CHARS,
-    onPick: (entry) => {
-      /* Leaving query mode by any route resets the corpus: `items` holds the
-       * RESULTS while a query is active, and refetchUnfiltered's "still in
-       * hand" shortcut would otherwise repaint them as the feed. */
-      if (query) { query = ''; items = []; nextOffset = 0 }
-      picked = entry
-      resolvePick()
-    },
-    /* Enter (or the menu's footer row): the feed becomes the full result list.
-     * A query is a filter over the same ranked view the feed pages, so it runs
-     * the ordinary pipeline with `q=` attached — the server applies the active
-     * medium, range, sort, language AND scope, pages as usual, and stamps each
-     * row's rank over the whole ordering, which is what rank retention means
-     * here. */
-    onSubmit: (q) => {
-      // No same-query no-op guard: this requery is refused outright while one
-      // is loading, and Enter again is the reader's retry.
-      query = q
-      // Retire any pick resolve still in flight, the way resolvePick itself
-      // would, so a late reply cannot repaint over the results.
-      pickSeq++
-      picked = null
-      pickedItem = null
-      pickLoading = false
-      requery()
-    },
-    /* ⚠️ SEARCHES THE WHOLE INDEX, not the loaded pages, and that is the half of
-     * the server-side ranking move that was missing.
-     *
-     * The in-memory index this replaces read `items`, which was the entire
-     * corpus while the rollup happened in the browser and became a PREFIX of it
-     * the moment the endpoint started paging a ranked list. A show sitting at
-     * #300 was then unfindable until the reader had pressed "load more" nine
-     * times, which is the opposite of what a search is for.
-     *
-     * The show name is still matched as well as the episode title, because "no
-     * agenda" has to find that show's episodes whatever their own titles are.
-     * That match now happens in `episodes_fts`, whose `show` column exists for
-     * this: title alone returned 2 hits for "UNGOVERNABLE" against the show's
-     * own 135 episodes, all 2 belonging to other shows.
-     */
-    // `qText`, not `query` — that name is the renderer's own submitted-filter
-    // state now, and shadowing it here invites reading one as the other.
-    searchRemote: async (qText, { signal }) => {
-      const records = await searchEpisodes({
-        // Same 'music'|null the data layer takes everywhere else. Passing this
-        // feed's own 'other' would happen to work, since anything that isn't
-        // 'music' becomes not_medium=music, but only by accident.
-        q: qText, medium: medium === 'music' ? 'music' : null,
-        // ⚠️ THE LANGUAGE HAS TO TRAVEL WITH THE SEARCH, for the same reason the
-        // medium and the scope do: a suggestion the feed would then filter away
-        // to nothing is the documented failure that keeps /api/v1/search off
-        // these feeds. Rank still comes from the server and is a position in
-        // the FILTERED ordering, which is the ordering the reader is looking at.
-        lang: langKey,
-        sort: sortKey, range: rangeKey, follows, signal,
-      })
-      return records.map((r) => ({
-        key: r.guid,
-        label: r.title || copy.untitled,
-        // Shown, not matched. Episode titles repeat across shows far more than
-        // they collide within one ("Episode 42", "Weekly Roundup"), so the show
-        // is what tells two hits apart.
-        sub: r.show?.title || '',
-        img: r.img,
-        // The query that produced this hit, carried so the pick can re-issue it
-        // and land on the same row with its notes attached.
-        query: qText,
-      }))
-    },
-    // What a miss MEANS depends on where the reader is standing: on All/Global
-    // the search has seen the whole index, so there is no wider view to send
-    // them to and the old "in this view" was pointing at one.
-    //
-    // The language is tested FIRST because it is the narrowest of the filters
-    // and the only one whose fix is a single press — under Follows + German,
-    // "switch to Global" sends the reader past the filter that is actually
-    // hiding their show. See langNoMatchText.
-    noMatchText: noMatch,
-  })
-
-  // One definition of what a miss means, read by the menu's no-hit line and by
+// One definition of what a miss means, read by the menu's no-hit line and by
   // the feed placeholder a submitted query paints.
   function noMatch() {
     return langKey !== LANG_ALL ? langNoMatchText(langKey, langLabel, langNoun)

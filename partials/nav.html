@@ -86,9 +86,9 @@
       <a href="/charts#members">Members</a>
     </nav>
     <!-- The site search. nav-search.js turns typing into a grouped menu
-         (shows, episodes, artists, members) and Enter into a visit to the
-         first match; with no script the form lands on the charts page. -->
-    <form class="nav-search" role="search" action="/charts" method="get" data-nav-search autocomplete="off">
+         (shows, episodes, artists, members); Enter, or the form with no
+         script, lands on /search?q=, the full results page. -->
+    <form class="nav-search" role="search" action="/search" method="get" data-nav-search autocomplete="off">
       <svg class="nav-search-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
       <label class="nav-sr-only" for="nav-search-q">Search OnlyBoosts</label>
       <input id="nav-search-q" type="search" name="q" placeholder="Search shows, episodes, artists, members" autocomplete="off" spellcheck="false" />

@@ -66,7 +66,6 @@ import { mountFeedNote, resetFeedNote, viewNote, CHART_INFO } from '/assets/js/f
 import {
   LANG_ALL, languageOptions, langControl, langNote, langNoMatchText, langLabelFor,
 } from '/assets/js/feed-lang.js?v=ob-v219'
-import { mountFeedSearch, resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v219'
 import { competitionRanks, rankLabel, markSliceTies } from '/assets/js/rank.js?v=ob-v219'
 /* ⚠️ THE CARD ITSELF IS NOT IN THIS FILE ANY MORE. show-card.js emits it as an
  * HTML string and show-card-actions.js attaches its verbs, which is what lets
@@ -213,7 +212,6 @@ export async function renderShows({ panel, list, scope = 'global', medium = 'oth
   const showRanks = scope !== 'follows'
   // An account switch re-renders the Follows feeds, so clear any box a
   // previous run left behind before deciding whether this one gets one.
-  resetFeedSearch(panel)
   resetFeedNote(panel)
 
   /* Follows scoping applies to the raw boosts BEFORE the show rollup, server-
@@ -840,79 +838,7 @@ export async function renderShows({ panel, list, scope = 'global', medium = 'oth
       : copy.searchNoneRange
   }
 
-  search = mountFeedSearch(panel, {
-    placeholder: copy.searchPlaceholder,
-    label: copy.searchLabel,
-    noun: copy.searchNoun,
-    minChars: SEARCH_MIN_CHARS,
-    onPick: (entry) => {
-      /* Leaving query mode by any route resets the corpus: `shows` holds the
-       * RESULTS while a query is active, and refetchUnfiltered's "still in
-       * hand" shortcut would otherwise repaint them as the feed. */
-      if (query) { query = ''; shows = []; nextOffset = 0 }
-      picked = entry
-      resolvePick()
-    },
-    /* Enter (or the menu's footer row): the feed becomes the full result list.
-     * A query is a filter over the same ranked view the feed pages, so it runs
-     * the ordinary pipeline with `q=` attached — the server applies the active
-     * medium, range, sort and language, pages as usual, and stamps each row's
-     * rank over the WHOLE ordering, which is what rank retention means here. */
-    onSubmit: (q) => {
-      // No same-query no-op guard: a requery can be dropped or fail, and Enter
-      // again is the reader's retry. The worst repeat costs one coalesced fetch.
-      query = q
-      // Retire any pick resolve still in flight, the way resolvePick itself
-      // would, so a late reply cannot repaint over the results.
-      pickSeq++
-      picked = null
-      pickedItem = null
-      pickLoading = false
-      requery()
-    },
-    /* ⚠️ SEARCHES THE WHOLE INDEX, not the pages loaded. The in-memory index
-     * this replaces read the full range, which was true only while the browser
-     * downloaded every show; now the feed pages a ranked list and those pages
-     * are a prefix of it.
-     *
-     * The guid and the author are still matched: the guid is the only handle on
-     * the 33% of shows with no title, and an author lets a host or artist find
-     * their own work. Both happen server-side now — the author through
-     * `podcasts_fts`, which indexes it beside the title, and the guid as an
-     * equality, since FTS5 does not index it and a pasted one is all hyphens.
-     */
-    // `qText`, not `query` — that name is the renderer's own submitted-filter
-    // state now, and shadowing it here invites reading one as the other.
-    searchRemote: async (qText, { signal }) => {
-      const records = await searchShows({
-        follows,
-        q: qText, medium: wantMusic ? 'music' : null,
-        // ⚠️ THE LANGUAGE HAS TO TRAVEL WITH THE SEARCH, like the medium: a
-        // suggestion the feed would then filter away to nothing is the
-        // documented failure that keeps /api/v1/search off these feeds.
-        sort: sortKey, range: rangeKey, lang: langKey, signal,
-      })
-      return records.map((r) => ({
-        key: r.guid,
-        label: r.title || copy.unidentified,
-        // The show's own numbers, so two similarly-named feeds are told apart
-        // by their size rather than by a guid nobody recognises — except on the
-        // untitled ones, where the guid is the only handle there is.
-        sub: r.title
-          ? `${plural(num(r.boosts), 'boost', 'boosts')} · ${fmtSats(num(r.sats))} sats`
-          : r.guid,
-        img: r.img,
-        query: qText,
-      }))
-    },
-    // The language is tested FIRST because it is the narrowest of the two
-    // filters and the only one whose fix is a single press. It also outranks
-    // the All case, where the line would otherwise call a coverage boundary on
-    // a show that is in the index and merely in another language.
-    noMatchText: noMatch,
-  })
-
-  // The server's cards are complete markup and still need their verbs: the
+// The server's cards are complete markup and still need their verbs: the
   // boost pill, the drawer, and the relative time over each "last boost" date.
   // wireShowCards is idempotent by a marker attribute, so the paint below can
   // run over them again for nothing.

@@ -116,13 +116,18 @@
   z-index: 120;
   max-height: min(70vh, 520px);
   overflow-y: auto;
-  background: var(--white);
+  /* ⚠️ --surface, NOT --white: theme.css re-supplies --cream/--cream-d/--white
+     under #top-nav in dark mode as the bar's LIGHT TEXT tokens, so a fill
+     that reads them inside the bar paints white under light text. The menu
+     is a card, and --surface is the one token that is a card in both themes. */
+  background: var(--surface, #ffffff);
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: 12px;
   box-shadow: 0 12px 32px rgba(0,0,0,0.22);
   padding: 0.4rem 0;
   text-align: left;
+  font-family: var(--font-body);
 }
 .nsm-group + .nsm-group { border-top: 1px solid var(--border); margin-top: 0.3rem; padding-top: 0.3rem; }
 .nsm-head {
@@ -144,10 +149,10 @@
   text-decoration: none;
 }
 .nsm-item:hover,
-.nsm-item.is-active { background: var(--cream-d); color: var(--text); }
+.nsm-item.is-active { background: var(--brand-tint, rgba(0,175,240,0.12)); color: var(--text); }
 .nsm-img {
   width: 34px; height: 34px; border-radius: 6px; flex-shrink: 0;
-  object-fit: cover; background: var(--cream-d); display: block;
+  object-fit: cover; background: var(--border); display: block;
 }
 .nsm-text { display: flex; flex-direction: column; min-width: 0; }
 .nsm-title {
@@ -157,6 +162,19 @@
 }
 .nsm-sub { font-size: 0.8rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nsm-empty { margin: 0; padding: 0.7rem 0.9rem; font-size: 0.9rem; color: var(--muted); }
+.nsm-all {
+  display: block;
+  margin-top: 0.3rem;
+  padding: 0.55rem 0.9rem;
+  border-top: 1px solid var(--border);
+  font-family: var(--font-sans);
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--brand-dd);
+  text-decoration: none;
+}
+:root[data-theme="dark"] .nsm-all { color: var(--brand-d); }
+.nsm-all:hover, .nsm-all.is-active { background: var(--brand-tint, rgba(0,175,240,0.12)); }
 
 /* ── The site menu (hamburger + full-screen overlay). Phone only; on a
    desktop the links are inline and this is hidden. ── */

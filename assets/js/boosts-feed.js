@@ -47,7 +47,6 @@ import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v219'
 import { boosterLabel } from '/assets/js/ob-data.js?v=ob-v219'
 import { clientLabel, hasClientLabel } from '/assets/js/client-label.js?v=ob-v219'
 import { followsBoostReader, globalBoostReader } from '/assets/js/ob-live.js?v=ob-v219'
-import { resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v219'
 import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls,
   RANGE_OPTIONS,
@@ -391,7 +390,6 @@ export async function renderBoosts({ panel, list, scope = 'global' }) {
      cached module that mounted a box into this panel's host. Clearing it is one
      call and the alternative is a dead search box over a feed that no longer
      reads it. */
-  resetFeedSearch(panel)
 
   // Resolve the audience first — a signed-out Follows tab should say so
   // without touching the network, and the query below can't be built at all

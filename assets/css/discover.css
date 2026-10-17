@@ -72,6 +72,10 @@
 @media (min-width: 1100px) {
   .rail-list { grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 0.8rem; }
 }
+/* The search page's groups wrap instead of scrolling: every hit on screen. */
+.rail-list--wrap,
+.rail-list--wrap { grid-auto-flow: row; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); overflow: visible; }
+@media (min-width: 1100px) { .rail-list--wrap { grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); } }
 .rail-tile { min-width: 0; scroll-snap-align: start; }
 .rt {
   display: flex;
@@ -115,6 +119,22 @@
 :root[data-theme="dark"] .rt-rank { background: rgba(0, 0, 0, 0.72); }
 .rt-rank[data-tied="1"] { letter-spacing: 0.02em; }
 .rail-tile:first-child .rt-rank { background: var(--brand-dd); }
+/* A #40HPW member who has cleared the goal this week: the board's gold. */
+.rt-rank--gold { background: #b8860b; color: #ffffff; }
+.rail-tile:first-child .rt-rank--gold { background: #b8860b; }
+/* The rank triplet under a charted tile: rank in sats / boosters / boosts,
+   the chart view's own figure. Tabular so the slashes line up down a rail. */
+.rt-ranks { font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
+.search-page h1 {
+  margin: 0 0 0.25rem;
+  font-family: var(--font-sans);
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.search-page h1 q { quotes: "\201C" "\201D"; }
+.search-lead { margin: 0 0 0.5rem; color: var(--muted); }
+.rail-head h2 small { font-size: 0.85rem; font-weight: 600; color: var(--muted); margin-left: 0.4rem; }
 .rt-title {
   font-family: var(--font-sans);
   font-size: 0.88rem;
