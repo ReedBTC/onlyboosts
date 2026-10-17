@@ -28,11 +28,11 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
-const html = readFileSync(join(ROOT, 'index.html'), 'utf8')
+const html = readFileSync(join(ROOT, 'charts.html'), 'utf8')
 
 // ── Pull the controller out of index.html ────────────────────────────
 const marker = html.indexOf('FEED BAR CONTROLLER')
-if (marker < 0) throw new Error('index.html no longer contains the FEED BAR CONTROLLER block')
+if (marker < 0) throw new Error('charts.html no longer contains the FEED BAR CONTROLLER block')
 const open = html.indexOf('<script>', marker)
 const close = html.indexOf('</script>', open)
 if (open < 0 || close < 0) throw new Error('could not delimit the controller <script>')
@@ -181,7 +181,7 @@ const sortByFeed = Object.create(null)
    trip a test of the shipped mapping. */
 const grabConst = (name) => {
   const m = new RegExp(`^\\s*const ${name} = [^;]+;`, 'm').exec(SRC)
-  if (!m) throw new Error(`index.html no longer declares ${name}`)
+  if (!m) throw new Error(`charts.html no longer declares ${name}`)
   return m[0]
 }
 const HASH_MAPS = [

@@ -354,16 +354,16 @@ function renderArtistPage({ pub, albums, totals, community, supporters, boosts, 
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v218" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v218" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v218" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v218" />
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v218" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v218" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v219" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v219" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v219" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v219" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v219" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v219" />
   <!-- The boost note card and its reaction bar, for #boosts — the same
        .note-card every other detail page's list paints. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v218" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v218" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v219" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v219" />
 </head>
 <body data-artist-guid="${htmlEscape(pub.publisher_guid)}">
 
@@ -372,7 +372,17 @@ function renderArtistPage({ pub, albums, totals, community, supporters, boosts, 
      SHARED NAV — single source of truth. Do NOT edit the copies inside the
      page files; edit THIS file, then run scripts/sync-partials.js to
      push it into every page (between the NAV:START / NAV:END markers).
-     Styles live in /assets/css/nav.css; behavior in /assets/js/nav.js. -->
+     Styles live in /assets/css/nav.css; behavior in /assets/js/nav.js and
+     /assets/js/nav-search.js.
+
+     THE BAR, SINCE 2026-10-17 (Reed's pick, direction A of the discovery
+     homepage mockups): logo and wordmark, the four sections as plain links,
+     the site search in the middle, then the theme toggle, Donate and the
+     account control. On a phone the links fold into the hamburger's overlay
+     (the Explore menu, which is also the site map the footer mirrors) and
+     the search drops to its own full-width row under the bar. The desktop
+     links and the overlay's Feeds group name the same four places; change
+     them together. -->
 <!-- Theme boot. Runs before the nav (the first visible element) is parsed,
      so a returning dark-mode visitor never sees a light flash. The choice is
      per-browser (localStorage key ob-theme); absence means light, which is what
@@ -392,71 +402,68 @@ function renderArtistPage({ pub, albums, totals, community, supporters, boosts, 
 </script>
 <header id="top-nav">
   <div class="nav-inner">
+    <!-- The site map behind one trigger: a hamburger and a full-screen
+         overlay on a phone, hidden on a desktop where the links are inline.
+         The Feeds group mirrors the footer's; they are regrouped together
+         or not at all. -->
+    <details class="nav-explore">
+      <summary aria-label="Open the site menu">
+        <span class="nav-explore-glyph" aria-hidden="true">☰</span>
+      </summary>
+      <div class="nav-explore-panel">
+        <div class="nav-explore-head">
+          <span>OnlyBoosts</span>
+          <button type="button" class="nav-explore-close" aria-label="Close menu">✕</button>
+        </div>
+        <a class="nav-explore-home" href="/"><span aria-hidden="true">🏠</span> Home</a>
+        <div class="nav-explore-groups">
+          <!-- ⚠️ ONE ENTRY PER TAB OF THE CHARTS PAGE, PLUS THE PAGE ITSELF.
+               Reed's call, 2026-08-23, for the tabs: each entry lands on that
+               tab's DEFAULT sub-feed (TAB_DEFAULT in charts.html's controller),
+               so Podcasts opens Shows, Music opens Artists and Members opens
+               Boosts. Those three hrefs and TAB_DEFAULT move together. The
+               Global vs Follows axis stays absent: it is a control on the page. -->
+          <div class="nav-explore-group">
+            <h4>Charts</h4>
+            <a href="/charts"><span aria-hidden="true">📈</span> Charts</a>
+            <a href="/charts#shows"><span aria-hidden="true">🎙</span> Podcasts</a>
+            <a href="/charts#artists"><span aria-hidden="true">🎵</span> Music</a>
+            <a href="/charts#members"><span aria-hidden="true">👥</span> Members</a>
+          </div>
+          <!-- Stats: the aggregate view over the same data. A coming-soon
+               page for now (noindex, out of the sitemap). -->
+          <div class="nav-explore-group">
+            <h4>Stats</h4>
+            <a href="/stats"><span aria-hidden="true">📊</span> Boost Stats</a>
+          </div>
+          <div class="nav-explore-group">
+            <h4>More</h4>
+            <a href="/about"><span aria-hidden="true">ℹ️</span> About</a>
+            <a href="https://github.com/ReedBTC/onlyboosts" target="_blank" rel="noopener"><span aria-hidden="true">💻</span> Source</a>
+            <a href="#" data-lb-bug-trigger><span aria-hidden="true">🐞</span> Report a bug</a>
+          </div>
+        </div>
+      </div>
+    </details>
     <a class="nav-logo" href="/" aria-label="OnlyBoosts home">
       <img src="/assets/onlyboosts_pfp.png" alt="" />
     </a>
     <a class="nav-site-name" href="/">OnlyBoosts</a>
-    <nav aria-label="Main navigation">
-      <!-- Single "Explore" menu = the whole site map. Grouped dropdown on
-           desktop, full-screen overlay on mobile. -->
-      <details class="nav-explore">
-        <summary aria-label="Explore the site">
-          <span class="nav-explore-glyph" aria-hidden="true">🧭</span>
-          <span class="nav-explore-text">Explore</span>
-          <span class="caret" aria-hidden="true">▾</span>
-        </summary>
-        <div class="nav-explore-panel">
-          <div class="nav-explore-head">
-            <span>Explore</span>
-            <button type="button" class="nav-explore-close" aria-label="Close menu">✕</button>
-          </div>
-          <a class="nav-explore-home" href="/"><span aria-hidden="true">🏠</span> Home</a>
-          <div class="nav-explore-groups">
-            <!-- ⚠️ FEEDS IS ONE ENTRY PER TAB, NOT PER FEED. Reed's call,
-                 2026-08-23. It listed all five sub-feeds, which was right while
-                 the homepage hid them behind a dropdown and wrong the moment
-                 the tabs put them on screen: the nav then restated a control
-                 the page carries, in a different order, using different words
-                 for the same things. Each entry lands on that tab's DEFAULT
-                 sub-feed — TAB_DEFAULT in the index.html controller — so
-                 Podcasts opens Shows (Episodes until 2026-09-03), Music opens
-                 Artists and Members opens Boosts. **Those three hrefs and
-                 TAB_DEFAULT move together.**
-
-                 The Global vs Follows axis stays deliberately absent: it is the
-                 second dropdown on the page itself, and listing both scopes
-                 here made the nav a grid restating a control the page has. -->
-            <div class="nav-explore-group">
-              <h4>Feeds</h4>
-              <a href="/#shows"><span aria-hidden="true">🎙</span> Podcasts</a>
-              <a href="/#artists"><span aria-hidden="true">🎵</span> Music</a>
-              <a href="/#members"><span aria-hidden="true">👥</span> Members</a>
-            </div>
-            <!-- Stats: the aggregate view over the same data. A coming-soon
-                 page for now (noindex, out of the sitemap).
-
-                 ⚠️ /boosters (Community) WAS THE SECOND ENTRY AND THE PAGE IS
-                 DELETED, not redirected. Reed's call, 2026-08-23: the Members
-                 tab now answers what it promised — the member lookup, the
-                 top-members wall and the #40HPW boards — so leaving a
-                 placeholder here pointed a reader at a promise for content that
-                 exists one tab over. It was never linked from anywhere but this
-                 menu and the footer, was noindex and out of the sitemap, so it
-                 has no inbound links to preserve and gets no redirect. -->
-            <div class="nav-explore-group">
-              <h4>Stats</h4>
-              <a href="/stats"><span aria-hidden="true">📊</span> Boost Stats</a>
-            </div>
-            <div class="nav-explore-group">
-              <h4>More</h4>
-              <a href="/about"><span aria-hidden="true">ℹ️</span> About</a>
-              <a href="https://github.com/ReedBTC/onlyboosts" target="_blank" rel="noopener"><span aria-hidden="true">💻</span> Source</a>
-              <a href="#" data-lb-bug-trigger><span aria-hidden="true">🐞</span> Report a bug</a>
-            </div>
-          </div>
-        </div>
-      </details>
+    <nav class="nav-links" aria-label="Main navigation">
+      <a href="/charts">Charts</a>
+      <a href="/charts#shows">Podcasts</a>
+      <a href="/charts#artists">Music</a>
+      <a href="/charts#members">Members</a>
     </nav>
+    <!-- The site search. nav-search.js turns typing into a grouped menu
+         (shows, episodes, artists, members) and Enter into a visit to the
+         first match; with no script the form lands on the charts page. -->
+    <form class="nav-search" role="search" action="/charts" method="get" data-nav-search autocomplete="off">
+      <svg class="nav-search-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+      <label class="nav-sr-only" for="nav-search-q">Search OnlyBoosts</label>
+      <input id="nav-search-q" type="search" name="q" placeholder="Search shows, episodes, artists, members" autocomplete="off" spellcheck="false" />
+      <div class="nav-search-menu" role="listbox" aria-label="Search results" hidden></div>
+    </form>
     <!-- Dark-mode toggle. Shows the theme you would SWITCH TO (moon in
          light, sun in dark); nav.js owns the click, the storage write and
          the aria-label, and keeps other open tabs in step via the storage event. -->
@@ -489,7 +496,7 @@ function renderArtistPage({ pub, albums, totals, community, supporters, boosts, 
 
 <main class="show-main">
 
-  <a class="show-back" href="/#artists" data-show-back>
+  <a class="show-back" href="/charts#artists" data-show-back>
     <span class="show-back-arrow" aria-hidden="true">←</span><span data-back-label>All Artists</span>
   </a>
 
@@ -541,11 +548,12 @@ function renderArtistPage({ pub, albums, totals, community, supporters, boosts, 
       <!-- ⚠️ ONE ENTRY PER TAB, and it mirrors the nav's Explore menu exactly.
            The two are the site map and are regrouped together or not at all;
            each lands on that tab's default sub-feed. See partials/nav.html. -->
-      <h3>Feeds</h3>
+      <h3>Charts</h3>
       <ul>
-        <li><a href="/#shows">🎙 Podcasts</a></li>
-        <li><a href="/#artists">🎵 Music</a></li>
-        <li><a href="/#members">👥 Members</a></li>
+        <li><a href="/charts">📈 Charts</a></li>
+        <li><a href="/charts#shows">🎙 Podcasts</a></li>
+        <li><a href="/charts#artists">🎵 Music</a></li>
+        <li><a href="/charts#members">👥 Members</a></li>
       </ul>
     </div>
 
@@ -578,12 +586,12 @@ function renderArtistPage({ pub, albums, totals, community, supporters, boosts, 
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav.js?v=ob-v218" defer></script>
-<script src="/assets/js/artist-page.js?v=ob-v218" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v219" defer></script>
+<script src="/assets/js/artist-page.js?v=ob-v219" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v218"></script>
-<script src="/assets/js/sw-register.js?v=ob-v218" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v219"></script>
+<script src="/assets/js/sw-register.js?v=ob-v219" defer></script>
 </body>
 </html>`;
 }
@@ -624,7 +632,7 @@ function renderHeader(pub, art, art2, title, albumCount, totals, stats, ranks) {
     <h2 class="show-stats-title">
       <a href="/about#keysend">Nostr Boost</a> Stats
     </h2>
-    ${renderStatTiles(stats, ranks, { rankFeed: "Artists", backHref: "/#artists" })}
+    ${renderStatTiles(stats, ranks, { rankFeed: "Artists", backHref: "/charts#artists" })}
   </header>`;
 }
 
@@ -773,10 +781,10 @@ function notFound(guid) {
   <meta name="robots" content="noindex" />
   <title>Artist not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v218" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v218" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v218" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v218" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v219" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v219" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v219" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v219" />
 </head>
 <body>
 <section class="page-header">
@@ -790,11 +798,11 @@ function notFound(guid) {
       <p>This page exists for artists whose albums carry at least one Nostr
          boost, linked through the feed's own <code>podcast:publisher</code>
          tag. An artist nobody has boosted has nothing to show here.</p>
-      <p><a href="/#artists">Browse all artists →</a></p>
+      <p><a href="/charts#artists">Browse all artists →</a></p>
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v218" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v219" defer></script>
 </body>
 </html>`;
   return new Response(html, {

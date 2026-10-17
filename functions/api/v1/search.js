@@ -1,4 +1,4 @@
-// GET /api/v1/search?q=&type=boosts|podcasts|episodes — FTS5 search over
+// GET /api/v1/search?q=&type=boosts|podcasts|episodes|all — FTS5 search over
 // boostagram text, podcast titles/authors, or episode titles. Descriptions and
 // show notes are in the FTS tables too (2026-10-17) and deliberately NOT
 // matched here; the ordering is sats, so a show-notes hit would outrank the
@@ -12,7 +12,7 @@ export async function onRequestGet({ request, env }) {
   const u = new URL(request.url);
   const q = (u.searchParams.get("q") || "").trim();
   if (q.length < 2) return json(request, { error: "q must be >= 2 chars" }, { status: 400 });
-  const TYPES = new Set(["boosts", "podcasts", "episodes"]);
+  const TYPES = new Set(["boosts", "podcasts", "episodes", "all"]);
   const asked = u.searchParams.get("type");
   const type = TYPES.has(asked) ? asked : "boosts";
   const limit = clampLimit(u.searchParams.get("limit"), 30, 100);
@@ -25,6 +25,40 @@ export async function onRequestGet({ request, env }) {
   // Column-scoped forms for the two tables that carry `description`.
   const matchEpisodes = ftsMatch(q, ["title", "show"]);
   const matchPodcasts = ftsMatch(q, ["title", "author"]);
+
+  /* type=all — THE NAV BAR'S TYPEAHEAD (assets/js/nav-search.js, 2026-10-17).
+   * Shows, episodes and artists in one answer, a handful of each, ordered by
+   * sats within each group; members come from /api/v1/members?q= in the same
+   * breath, since that endpoint owns the publisher exclusion and the npub.
+   * Title and author only, like the other two types: a show-notes hit
+   * outranking the title hit a typed query means is the wrong menu. The
+   * artists group reads publishers_fts, which the collector's --apply-schema
+   * creates; until that has run on the remote the group is simply empty. */
+  if (type === "all") {
+    const each = clampLimit(u.searchParams.get("limit"), 5, 10);
+    const rows = (stmt) => stmt.all().then((r) => r.results).catch((e) => { console.warn("[search all]", e?.message); return []; });
+    const [shows, episodes, artists] = await Promise.all([
+      rows(env.DB.prepare(
+        `SELECT p.podcast_guid, p.title, p.image, p.author, p.medium
+           FROM podcasts_fts f JOIN podcasts p ON p.podcast_guid = f.podcast_guid
+          WHERE podcasts_fts MATCH ? ORDER BY p.total_sats DESC LIMIT ?`).bind(matchPodcasts, each)),
+      rows(env.DB.prepare(
+        `SELECT e.item_guid, e.title, e.image, e.podcast_guid, p.title AS p_title, p.image AS p_image
+           FROM episodes_fts f JOIN episodes e ON e.item_guid = f.item_guid
+           LEFT JOIN podcasts p ON p.podcast_guid = e.podcast_guid
+          WHERE episodes_fts MATCH ? ORDER BY e.total_sats DESC LIMIT ?`).bind(matchEpisodes, each)),
+      rows(env.DB.prepare(
+        `SELECT pub.publisher_guid, pub.title, pub.image
+           FROM publishers_fts f JOIN publishers pub ON pub.publisher_guid = f.publisher_guid
+          WHERE publishers_fts MATCH ? LIMIT ?`).bind(match, each)),
+    ]);
+    return json(request, {
+      type, q,
+      shows: shows.map((r) => ({ guid: r.podcast_guid, title: r.title, img: r.image, author: r.author, medium: r.medium })),
+      episodes: episodes.map((r) => ({ guid: r.item_guid, title: r.title, img: r.image || r.p_image, show: { guid: r.podcast_guid, title: r.p_title, img: r.p_image } })),
+      artists: artists.map((r) => ({ guid: r.publisher_guid, title: r.title, img: r.image })),
+    });
+  }
 
   if (type === "episodes") {
     // Flat relevance-ordered lookup. The ranked, sort-aware version lives on

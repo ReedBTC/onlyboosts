@@ -34,6 +34,7 @@ import { memberOnesBoardHtml, boardHtml, weekRowHtml, onesRowHtml, weekLabel, we
 import { weekBoard, onesBoard } from "../api/v1/charts/[[path]].js";
 import { competitionRanks } from "../../assets/js/rank.js";
 import { cardHtml } from "../_shared/card-frame.js";
+import { renderChartsPage } from "../_shared/charts-page.js";
 
 const ROWS = 10;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -44,8 +45,8 @@ const ONES_CARD_KINDS = new Set(["shows", "artists", "members"]);
 // ⚠️ A PATH SEGMENT IN THE WILD: the collector's bot screenshots the literal,
 // on the /hpw/high-scores rule. It does not move.
 export const ONES_KEY = "weeks-at-1";
-// Where the torn-down page's URLs land.
-const HOME = "/#shows";
+// Where a dated /charts/<date> URL lands: the Shows feed on the charts page.
+const HOME = "/charts#shows";
 
 export async function onRequestGet({ request, env, params }) {
   let segs = params.path;
@@ -55,6 +56,11 @@ export async function onRequestGet({ request, env, params }) {
 
   /* Anything that is not a card frame is the old page's address, or garbage
      under it: the Shows feed, where the boards are now. */
+  /* The bare /charts IS the charts page since 2026-10-17: the feed experience
+     that was the homepage (charts.html, rendered by _shared/charts-page.js).
+     Reed's call, with the discovery homepage: the old front door is named
+     Charts and keeps every hash route it had. */
+  if (segs.length === 0) return renderChartsPage({ request, env });
   const card = segs.length === 3 && segs[1] === "card";
   if (!card) return redirect(request, HOME, 60);
   const key = segs[0];
@@ -145,9 +151,9 @@ function unavailable() {
    the stepper's .hpw-nav grammar, the members board is .hpw-* rows in a
    .cb-board shell. Written here so scripts/stamp-assets.js sees an href it
    can restamp. */
-const CARD_LINKS = `  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v218" />
-  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v218" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v218" />`;
+const CARD_LINKS = `  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v219" />
+  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v219" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v219" />`;
 
 /* The rows sized to the frame. ⚠️ MEASURED BY THE BOT, 2026-09-03: the weekly
    cards' list box is 296.9 → 829 (the column head costs 27.4px), ceiling
@@ -174,7 +180,7 @@ const CARD_CSS = `
     .card .hpw-hours { font-size: 1.05rem; }`;
 
 /* The footer names the tab the board lives on — the share note's link. */
-const TAB_OF = { shows: "/#shows", artists: "/#artists", members: "/#members" };
+const TAB_OF = { shows: "/charts#shows", artists: "/charts#artists", members: "/charts#members" };
 
 export function renderWeekCard({ kind, ws, isCurrent, rows }) {
   const heading = COPY.sections[kind].heading;

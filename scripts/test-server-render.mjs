@@ -72,11 +72,11 @@ const painted = Math.min(SHOW_CARDS_PER_PAGE, cards.length)
 // ── The injection, run against the real index.html ──────────────────────────
 const OPEN = '<!--OB:SSR-SHOWS-->'
 const CLOSE = '<!--/OB:SSR-SHOWS-->'
-const shell = readFileSync(new URL('../index.html', import.meta.url), 'utf8')
+const shell = readFileSync(new URL('../charts.html', import.meta.url), 'utf8')
 
 console.log('\nThe homepage injection:')
 
-check('index.html still carries both markers, in order', () => {
+check('charts.html still carries both markers, in order', () => {
   const a = shell.indexOf(OPEN)
   const b = shell.indexOf(CLOSE)
   assert.ok(a !== -1, 'opening marker missing')

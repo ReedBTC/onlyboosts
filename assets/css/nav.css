@@ -1,8 +1,14 @@
 /* Shared site nav styles — the single source of truth for the top nav on
- * every page (paired with /partials/nav.html + /assets/js/nav.js). Linked
- * after each page's inline <style> so it wins over any stale inline nav
- * rules left over from before unification. Uses the page-level CSS vars
- * (--navy, --cream, etc.) defined in each page's :root. */
+ * every page (paired with /partials/nav.html + /assets/js/nav.js +
+ * /assets/js/nav-search.js). Linked after each page's inline <style> so it
+ * wins over any stale inline nav rules. Uses the page-level CSS vars
+ * (--navy, --cream, --font-sans …) defined in theme.css.
+ *
+ * THE BAR SINCE 2026-10-17 (Reed's pick, direction A of the discovery
+ * homepage mockups): logo + wordmark, four section links, the site search
+ * in the middle, then the theme toggle, Donate and the account control.
+ * Under 760px the links fold into the hamburger's overlay and the search
+ * takes its own full-width row under the bar. */
 
 /* ── Bar ── */
 #top-nav {
@@ -13,123 +19,230 @@
   box-shadow: 0 2px 12px rgba(0,0,0,0.25);
 }
 .nav-inner {
-  max-width: 1100px;
+  max-width: 1240px;
   margin: 0 auto;
   padding: 0 1.5rem;
   height: 64px;
   display: flex;
   align-items: center;
-  gap: 1.25rem;
+  gap: 1rem;
 }
 .nav-logo {
   flex-shrink: 0;
-  width: 44px;
-  height: 44px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   overflow: hidden;
-  border: 2px solid var(--green-d);
 }
-.nav-logo img { width: 100%; height: 100%; object-fit: cover; }
+.nav-logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .nav-site-name {
-  font-family: 'Playfair Display', Georgia, serif;
-  font-size: 1.15rem;
+  font-family: var(--font-sans);
+  font-size: 1.3rem;
   font-weight: 700;
-  color: var(--cream);
-  letter-spacing: 0.02em;
+  color: #ffffff;
+  letter-spacing: -0.01em;
   text-decoration: none;
-  flex: 1;
+  flex-shrink: 0;
+  margin-left: -0.35rem;
 }
-.nav-site-name:hover { color: var(--green-d); }
+.nav-site-name:hover { color: var(--brand); }
 
-/* ── "Explore" menu — the whole site map behind one trigger.
-   Grouped dropdown on desktop; full-screen overlay on mobile. ── */
-.nav-explore { position: relative; }
+/* ── Section links ── */
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  margin-left: 0.5rem;
+  flex-shrink: 0;
+}
+.nav-links a {
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #ffffff;
+  text-decoration: none;
+  padding: 0.3rem 0;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+}
+.nav-links a:hover,
+.nav-links a:focus-visible { color: var(--brand); outline: none; }
+.nav-links a[aria-current="page"] { border-bottom-color: var(--brand); }
+
+/* ── Site search ── */
+.nav-search {
+  position: relative;
+  flex: 1 1 auto;
+  max-width: 480px;
+  min-width: 0;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  height: 40px;
+  padding: 0 0.9rem;
+  box-sizing: border-box;
+  background: #ffffff;
+  border-radius: 20px;
+  color: var(--muted);
+}
+:root[data-theme="dark"] .nav-search { background: var(--surface); border: 1px solid var(--border); }
+.nav-search:focus-within { box-shadow: 0 0 0 3px var(--brand-ring, rgba(0,175,240,0.4)); }
+.nav-search-glyph { width: 18px; height: 18px; flex-shrink: 0; }
+.nav-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font: inherit;
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  color: var(--text);
+}
+.nav-search input::placeholder { color: var(--muted); }
+.nav-search input::-webkit-search-decoration { display: none; }
+.nav-sr-only {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap;
+}
+/* The grouped menu. Real links, so a click, a tab stop or a screen reader
+   all land on the same place; nav-search.js only adds the keyboard walk. */
+.nav-search-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 120;
+  max-height: min(70vh, 520px);
+  overflow-y: auto;
+  background: var(--white);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.22);
+  padding: 0.4rem 0;
+  text-align: left;
+}
+.nsm-group + .nsm-group { border-top: 1px solid var(--border); margin-top: 0.3rem; padding-top: 0.3rem; }
+.nsm-head {
+  margin: 0;
+  padding: 0.35rem 0.9rem 0.2rem;
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.nsm-item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.4rem 0.9rem;
+  color: var(--text);
+  text-decoration: none;
+}
+.nsm-item:hover,
+.nsm-item.is-active { background: var(--cream-d); color: var(--text); }
+.nsm-img {
+  width: 34px; height: 34px; border-radius: 6px; flex-shrink: 0;
+  object-fit: cover; background: var(--cream-d); display: block;
+}
+.nsm-text { display: flex; flex-direction: column; min-width: 0; }
+.nsm-title {
+  font-family: var(--font-sans);
+  font-size: 0.92rem; font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.nsm-sub { font-size: 0.8rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nsm-empty { margin: 0; padding: 0.7rem 0.9rem; font-size: 0.9rem; color: var(--muted); }
+
+/* ── The site menu (hamburger + full-screen overlay). Phone only; on a
+   desktop the links are inline and this is hidden. ── */
+.nav-explore { position: relative; display: none; }
 .nav-explore > summary {
   list-style: none;
   cursor: pointer;
   user-select: none;
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-  color: var(--cream-d);
-  font-size: 0.9rem;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  padding: 0.4rem 0.85rem;
-  border: 1px solid rgba(255,255,255,0.18);
-  border-radius: 7px;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin-left: -0.5rem;
+  color: #ffffff;
+  font-size: 1.25rem;
+  line-height: 1;
+  border-radius: 8px;
 }
 .nav-explore > summary::-webkit-details-marker { display: none; }
 .nav-explore > summary::marker { content: ''; }
 .nav-explore > summary:hover,
-.nav-explore[open] > summary {
-  background: rgba(94,125,58,0.18);
-  color: var(--green-d);
-  border-color: var(--green);
-}
-.nav-explore-glyph { font-size: 0.95em; line-height: 1; }
-.nav-explore .caret { font-size: 0.7em; transition: transform 0.15s; }
-.nav-explore[open] .caret { transform: rotate(180deg); }
+.nav-explore[open] > summary { background: rgba(255,255,255,0.10); }
+.nav-explore[open] .nav-explore-glyph { font-size: 0; }
+.nav-explore[open] .nav-explore-glyph::before { content: '\2715'; font-size: 1.1rem; }
 
 .nav-explore-panel {
-  position: absolute;
-  top: calc(100% + 0.4rem);
-  right: 0;
-  z-index: 60;
+  position: fixed;
+  inset: 0;
+  z-index: 200;
   background: var(--navy);
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 10px;
-  box-shadow: 0 12px 32px rgba(0,0,0,0.3);
-  padding: 1.1rem 1.3rem 1.2rem;
+  padding: 1.1rem 1.4rem 2.5rem;
+  overflow-y: auto;
 }
-.nav-explore-head { display: none; } /* mobile-overlay only */
+.nav-explore-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+}
+.nav-explore-head span {
+  font-family: var(--font-sans);
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #ffffff;
+}
 .nav-explore-home {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  color: var(--cream);
+  color: #ffffff;
   text-decoration: none;
+  font-family: var(--font-sans);
   font-weight: 700;
-  font-size: 0.92rem;
-  padding-bottom: 0.75rem;
-  margin-bottom: 0.75rem;
+  font-size: 1.05rem;
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
   border-bottom: 1px solid rgba(255,255,255,0.12);
   width: 100%;
-  transition: color 0.15s;
 }
-.nav-explore-home:hover { color: var(--green-d); }
-.nav-explore-groups {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(140px, 1fr));
-  gap: 1.4rem;
-}
+.nav-explore-home:hover { color: var(--brand); }
+.nav-explore-groups { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
 .nav-explore-group h4 {
-  font-family: 'Playfair Display', Georgia, serif;
-  font-size: 0.72rem;
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--orange);
-  margin-bottom: 0.5rem;
+  color: var(--brand);
+  margin: 0 0 0.65rem;
 }
 .nav-explore-group a {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: var(--cream-d);
+  color: rgba(255,255,255,0.88);
   text-decoration: none;
-  font-size: 0.9rem;
+  font-size: 1.05rem;
   font-weight: 500;
-  padding: 0.4rem 0;
-  transition: color 0.12s;
+  padding: 0.55rem 0;
 }
 .nav-explore-group a span { width: 1.2rem; text-align: center; flex-shrink: 0; }
-.nav-explore-group a:hover { color: var(--green-d); }
+.nav-explore-group a:hover { color: var(--brand); }
 .nav-explore-close {
   background: rgba(255,255,255,0.08);
-  color: var(--cream);
+  color: #ffffff;
   border: none;
   width: 34px; height: 34px;
   border-radius: 50%;
@@ -137,6 +250,7 @@
   cursor: pointer;
 }
 .nav-explore-close:hover { background: rgba(255,255,255,0.18); }
+body.nav-explore-open { overflow: hidden; }
 
 /* ── Boost slot + identity slot ── */
 #lb-boost-slot,
@@ -194,14 +308,13 @@
   100% { background-position: -100% 0; }
 }
 /* ── Dark-mode toggle ── */
-/* Same chrome family as the Explore trigger: white-alpha border on the
-   navy bar. Shows the theme you would switch TO — moon in light, sun in
-   dark; the pair of spans swaps on the <html> data-theme attribute so the
-   icon is right even before nav.js runs. */
+/* Shows the theme you would switch TO — moon in light, sun in dark; the
+   pair of spans swaps on the <html> data-theme attribute so the icon is
+   right even before nav.js runs. */
 .nav-theme-toggle {
   flex-shrink: 0;
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -224,23 +337,24 @@
 [data-theme="dark"] .nav-theme-toggle .ntt-sun { display: inline; }
 
 .lb-boost-placeholder {
-  background: var(--orange);
+  background: transparent;
   color: #ffffff;
-  border: none;
+  border: 1px solid rgba(255,255,255,0.35);
   cursor: pointer;
   font: inherit;
-  font-size: 0.78rem;
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
   font-weight: 600;
-  padding: 0.3rem 0.65rem;
-  border-radius: 5px;
+  padding: 0.4rem 0.8rem;
+  border-radius: 18px;
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  transition: background 0.15s;
+  transition: background 0.15s, border-color 0.15s;
 }
-.lb-boost-placeholder:hover { background: var(--orange-d); }
+.lb-boost-placeholder:hover { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.6); }
 
-/* ── Cart icon ── */
+/* ── Cart icon (unused since the strip; kept for the widget's class) ── */
 .nav-cart {
   position: relative;
   flex-shrink: 0;
@@ -279,69 +393,38 @@
 .lb-boost-placeholder svg { width: 11px; height: 11px; flex-shrink: 0; }
 .lb-boost-placeholder .lb-label-long { display: inline; }
 .lb-boost-placeholder .lb-label-short { display: none; }
-@media (max-width: 640px) {
-  .lb-boost-placeholder .lb-label-long { display: none; }
-  .lb-boost-placeholder .lb-label-short { display: inline; }
+
+/* ── Tablet: keep one row, drop the Donate word to its glyph. ── */
+@media (max-width: 980px) {
+  .nav-links { gap: 0.9rem; }
+  .nav-links a { font-size: 0.9rem; }
+  .nav-search { max-width: 320px; }
 }
 
-/* ── Mobile: single-row bar + full-screen Explore overlay ── */
+/* ── Phone: hamburger + wordmark + controls on one row, the search on its
+   own full-width row under them. The links live in the overlay. ── */
 @media (max-width: 760px) {
   .nav-inner {
     gap: 0.5rem;
     flex-wrap: wrap;
     height: auto;
-    padding: 0.6rem 1rem;
+    padding: 0.55rem 1rem 0.7rem;
   }
-  /* Drop the wordmark on mobile (the logo carries the brand). */
-  .nav-site-name { display: none; }
-  nav { margin-right: auto; }   /* push Boost + identity to the right edge */
-  .nav-explore .caret { display: none; }
-  /* The word goes too (Reed's call, 2026-08-27): a bare hamburger is the
-     established affordance, and the freed width is what keeps Log in on
-     the same line as everything else instead of wrapping under it. The
-     summary keeps its aria-label, so nothing is lost to a screen reader. */
-  .nav-explore-text { display: none; }
-  #lb-boost-slot { flex-shrink: 0; }
-  /* Swap the compass for a hamburger so it clearly reads as a menu, not a
-     link. It morphs to ✕ while the full-screen overlay is open. The 🧭 emoji
-     in the markup is hidden and replaced via a pseudo-element (CSS-only so it
-     applies to every page's inlined nav at once). */
-  .nav-explore-glyph { font-size: 0; }
-  .nav-explore-glyph::before {
-    content: '\2630';   /* ☰ */
-    font-size: 1.15rem;
-    line-height: 1;
+  .nav-explore { display: block; }
+  .nav-links { display: none; }
+  .nav-site-name { font-size: 1.2rem; margin-left: 0; }
+  .nav-search {
+    order: 10;
+    flex: 1 1 100%;
+    max-width: none;
+    height: 42px;
+    margin: 0.15rem 0 0;
   }
-  .nav-explore[open] .nav-explore-glyph::before { content: '\2715'; }  /* ✕ */
-
-  .nav-explore-panel {
-    position: fixed;
-    inset: 0;
-    z-index: 200;
-    border: none;
-    border-radius: 0;
-    padding: 1.1rem 1.4rem 2.5rem;
-    overflow-y: auto;
-  }
-  .nav-explore-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 1.25rem;
-  }
-  .nav-explore-head span {
-    font-family: 'Playfair Display', Georgia, serif;
-    font-size: 1.4rem;
-    font-weight: 700;
-    color: var(--cream);
-  }
-  .nav-explore-home { font-size: 1.05rem; padding-bottom: 1rem; margin-bottom: 1rem; }
-  .nav-explore-groups { grid-template-columns: 1fr; gap: 1.5rem; }
-  .nav-explore-group h4 { font-size: 0.8rem; margin-bottom: 0.65rem; }
-  .nav-explore-group a { font-size: 1.05rem; padding: 0.55rem 0; }
-  body.nav-explore-open { overflow: hidden; }
+  .nav-theme-toggle { margin-left: auto; }
+  .lb-boost-placeholder .lb-label-long { display: none; }
+  .lb-boost-placeholder .lb-label-short { display: inline; }
 }
 @media (max-width: 420px) {
-  .nav-logo { width: 36px; height: 36px; }
-  .nav-site-name { font-size: 0.92rem; }
+  .nav-logo { width: 34px; height: 34px; }
+  .nav-site-name { font-size: 1.1rem; }
 }
