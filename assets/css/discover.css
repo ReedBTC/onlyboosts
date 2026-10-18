@@ -122,6 +122,16 @@
 /* A #40HPW member who has cleared the goal this week: the board's gold. */
 .rt-rank--gold { background: #b8860b; color: #ffffff; }
 .rail-tile:first-child .rt-rank--gold { background: #b8860b; }
+
+/* A PERSON is a circle, content is a square (Reed's call, 2026-10-18): the
+   #40HPW faces read as individuals, not as shows. The media box keeps its
+   overflow visible so the rank badge sits on the circle's shoulder rather
+   than being clipped off at the corner; the image itself is what rounds. */
+.rail-tile--person .rt-media { border-radius: 50%; overflow: visible; }
+.rail-tile--person .rt-media img { border-radius: 50%; }
+.rail-tile--person .rt-media .rt-rank { left: 0; top: 0; }
+.rail-tile--person .rt-title { text-align: center; }
+.rail-tile--person .rt-sub { text-align: center; }
 /* The rank triplet under a charted tile: rank in sats / boosters / boosts,
    the chart view's own figure. Tabular so the slashes line up down a rail. */
 .rt-ranks { font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
@@ -233,4 +243,53 @@ a.rt:hover .rt-title { color: var(--brand-dd); }
 .rail-locked-card .ob-cta:hover { background: var(--brand-ddd); }
 @media (max-width: 640px) {
   .rail-locked-card > div { flex-direction: column; text-align: center; padding: 1rem; }
+}
+
+/* ── The search results page: a LIST, like the charts page ──────────────
+   (Reed's call, 2026-10-18). Each group is a rail heading over the charts
+   page's own .pcast-list of cards, at .show-main's track width; the tile
+   rail is the homepage's shape only. The count sits beside the heading. */
+.search-group { margin: 0 0 2.25rem; }
+.search-group .rail-head h2 small { font-size: 0.85rem; font-weight: 600; color: var(--muted); margin-left: 0.35rem; }
+.search-wall .show-section-head h2 {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 1.45rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* ── The way into the boost feed from the front door ─────────────────────
+   One strip at the foot of the rails (the Latest Boosts rows left on
+   2026-10-18, Reed's call: the personal rails took the room). One click,
+   the whole firehose. */
+.rail-cta { margin: 0.5rem 0 0; }
+.rail-cta a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface, var(--cream));
+  color: var(--text);
+  text-decoration: none;
+  font-family: var(--font-sans);
+}
+.rail-cta a:hover { border-color: var(--brand-dd); }
+.rail-cta strong { font-size: 1.05rem; font-weight: 700; }
+.rail-cta span { color: var(--muted); font-size: 0.92rem; }
+.rail-cta b { color: var(--brand-dd); white-space: nowrap; font-weight: 700; }
+@media (max-width: 640px) {
+  .rail-cta a { flex-direction: column; align-items: flex-start; gap: 0.3rem; }
+}
+
+/* The personal rails' one-line explanations, with their link to the method. */
+.rail-head .rail-sub { font-family: var(--font-sans); font-size: 0.9rem; font-weight: 500; color: var(--muted); text-align: right; }
+.rail-head .rail-sub a { color: var(--brand-dd); text-decoration: none; white-space: nowrap; }
+.rail-head .rail-sub a:hover { text-decoration: underline; }
+@media (max-width: 640px) {
+  .rail-head { flex-wrap: wrap; }
+  .rail-head .rail-sub { text-align: left; flex-basis: 100%; }
 }

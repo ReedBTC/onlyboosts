@@ -48,12 +48,12 @@
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v220" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v220" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v221" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v221" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v220" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v220" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v221" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v221" />
 </head>
 <body>
 
@@ -205,6 +205,7 @@
         <li><a href="#pipeline">How the Index Is Built</a></li>
         <li><a href="#amounts">How Amounts Are Determined</a></li>
         <li><a href="#charts">The OnlyBoosts Charts</a></li>
+        <li><a href="#recommendations">How the Homepage Rails Are Built</a></li>
         <li><a href="#limits">Limitations and Disclaimers</a></li>
         <li><a href="#faq">Frequently Asked Questions</a></li>
       </ol>
@@ -427,6 +428,46 @@
         <p>The components behind every position are printed on the row itself, so any placement can be checked by hand against the three figures it summarizes. As with every number on this site, the inputs are indexed Nostr boosts and nothing else; see <a href="#limits">Limitations and Disclaimers</a>.</p>
       </section>
 
+      <section id="recommendations">
+        <h2>How the Homepage Rails Are Built</h2>
+        <p>The front page is a set of rails, each a row of ten. Every rail is listed here with the exact rule that orders it, since a recommendation whose method is hidden is an opinion and one whose method is stated is a measurement. Every input is an indexed Nostr boost and nothing else; see <a href="#limits">Limitations and Disclaimers</a> for what that excludes. Nothing about a visitor is stored by any of them.</p>
+
+        <h3>The Chart Rails</h3>
+        <p>Top Shows This Week, Top Albums This Month, Top Episodes This Year, Top Songs This Year and Top Artists This Week are the <a href="#charts">OnlyBoosts Charts</a> computed over that window of boost time. A week runs Monday 00:00 to Sunday night, US Pacific; a month and a year are the trailing 30 and 365 days. The ten tiles are the chart&rsquo;s first ten places, and the line under each tile prints the three component ranks (sats / boosters / boosts) that produced the place, so any tile can be checked against the chart view it links to.</p>
+
+        <h3>Nostr Gang #40HPW Challenge</h3>
+        <p>The week&rsquo;s ten members by hours of podcasts boosted, counted exactly as the Members tab counts them: the published duration of every episode the member boosted this week, each episode once. A member past forty hours wears a gold badge. The rules dialog on the Members tab states the counting rules in full.</p>
+
+        <h3>Recommended For You and Recommended Music</h3>
+        <p>These two rails are built from audience overlap, in five steps.</p>
+        <ol>
+          <li><strong>Similar shows.</strong> Once a day the indexer takes every show with at least three distinct boosters and finds its twenty most similar shows. Similarity is the overlap between the two shows&rsquo; sets of boosters, measured as cosine similarity: the number of members who boosted both, divided by the square root of the product of the two booster counts. Two shows boosted by exactly the same people score 1; two shows with no booster in common score 0. Podcasts are compared with podcasts and albums with albums.</li>
+          <li><strong>Relay bots are not boosters.</strong> <a href="#bots">Accounts that publish on behalf of other people</a> are left out of the booster sets. One such key relaying hundreds of boosts would otherwise read as a single person who boosts everything, and would manufacture overlap between every show it touched.</li>
+          <li><strong>Your seeds.</strong> When you are logged in, the shows you have boosted under your key are your seeds, together with the feeds on your PC 2.0 favorites list if your browser passes them. Each candidate show&rsquo;s similarity to every one of your seeds is summed; a show you have already boosted or favorited is never a candidate.</li>
+          <li><strong>The floor.</strong> A candidate ranks only if it is reached from two or more of your seeds, or shares two or more boosters with one of them. Measured on 2026-10-17, half of all similar-show pairs share exactly one booster, which is one person&rsquo;s taste rather than an audience&rsquo;s, so a single shared booster is not enough.</li>
+          <li><strong>Two lists.</strong> Podcasts and music are ranked separately. The overlap on the music side runs about three times the podcast side&rsquo;s, so one combined list would be all music.</li>
+        </ol>
+        <p>The result is computed from the index when the page loads and is not kept. Nothing about you is written anywhere; the only thing read is the set of boosts already published to Nostr under your key.</p>
+
+        <h3>Because You Boosted</h3>
+        <p>One rail per show, for up to five of the shows you have boosted most often. Each rail is that show&rsquo;s own similar-show list from step one, keeping only the neighbours that share two or more boosters with it, minus anything you have already boosted. A show appears on the first rail that reaches it and on no other, and a show whose neighbours were all taken by an earlier rail is skipped for the next.</p>
+
+        <h3>Top Shows From Your Follows</h3>
+        <p>The Shows chart computed over the boosts published by the accounts on your Nostr follow list, which is the same Follows scope the charts page offers on every ranked feed. Your own boosts count, since you are on your own list.</p>
+
+        <h3>New and Noteworthy</h3>
+        <p>Shows whose first indexed boost landed within the last 90 days and that have at least two distinct boosters, ordered by boosters and then sats. An all-time chart cannot show a debut; this rail exists for that reason.</p>
+
+        <h3>Movers</h3>
+        <p>This week&rsquo;s Shows chart against last week&rsquo;s, read to 100 places. Climbers come first, by places climbed, and this week&rsquo;s debuts follow in chart order. The line under each tile states the climb and last week&rsquo;s place.</p>
+
+        <h3>Podcasters Recommend</h3>
+        <p>The shows most often listed on other shows&rsquo; podrolls, the <code>&lt;podcast:podroll&gt;</code> tag publishers write themselves and the one editorial signal in the index. The count is the number of distinct shows listing it. A listed show the index holds no page for is shown as a figure and not linked.</p>
+
+        <h3>What the Recommendations Cannot See</h3>
+        <p>Similarity is computed over indexed Nostr boosts only, so a show with many keysend listeners and few Nostr boosters has thin neighbours however popular it is. Your seeds are the boosts published under your key; boosts sent anonymously, privately or through an application that never publishes to Nostr contribute nothing. A new member with one or two boosts will usually see the empty state until the floor in step four is met, and a member whose boosts are all to shows nobody else has boosted will see it for longer.</p>
+      </section>
+
       <section id="limits">
         <h2>Limitations and Disclaimers</h2>
         <p>The constraints below are material to how the figures on this site should be interpreted, and they are worth reading in full.</p>
@@ -552,6 +593,27 @@
             </div>
           </details>
 
+          <details>
+            <summary>How are the recommendations on the homepage chosen?</summary>
+            <div class="faq-body">
+              <p>By audience overlap, with the method stated in full under <a href="#recommendations">How the Homepage Rails Are Built</a>. In brief: the shows you have boosted are your seeds; every other show is scored by how many of its boosters also boost your seeds, with relay bots excluded and shows you already boosted removed; and a show ranks only when that overlap is more than one person. Podcasts and music are ranked separately.</p>
+            </div>
+          </details>
+
+          <details>
+            <summary>Why does Recommended For You show nothing for me?</summary>
+            <div class="faq-body">
+              <p>The rail needs boosts published to Nostr under your key, and it needs other members to have boosted the same shows. A candidate ranks only when it is reached from two of your shows or shares two boosters with one of them, so a member with one or two boosts, or whose boosts are to shows nobody else has boosted, meets the empty state until that changes. Boosts sent through an application that never publishes to Nostr contribute nothing, for the same reason they are absent from every other number on this site.</p>
+            </div>
+          </details>
+
+          <details>
+            <summary>Does OnlyBoosts track what I listen to?</summary>
+            <div class="faq-body">
+              <p>No. The only input to any personal rail is the set of boosts already published to Nostr under your key, together with your public PC 2.0 favorites list if your browser passes it. The recommendations are computed from the index when the page loads and are not stored; there is no listening history, no profile and no record of the request.</p>
+            </div>
+          </details>
+
         </div>
       </section>
 
@@ -663,15 +725,15 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v220"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v221"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v220" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v221" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v220" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v221" defer></script>
 
-<script src="/assets/js/nav.js?v=ob-v220" defer></script>
+<script src="/assets/js/nav.js?v=ob-v221" defer></script>
 
 </body>
 </html>

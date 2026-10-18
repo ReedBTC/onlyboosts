@@ -170,18 +170,27 @@ console.log('\nThe search page:')
   const shell = read('search.html')
   const ASSETS = { fetch: async () => new Response(shell, { status: 200, headers: { 'Content-Type': 'text/html' } }) }
   const dead = { prepare: () => ({ bind: () => ({ all: async () => { throw new Error('no db') }, first: async () => { throw new Error('no db') } }), all: async () => { throw new Error('no db') }, first: async () => { throw new Error('no db') } }) }
-  check('resultsHtml groups the hits and carries no rank badge', () => {
+  check('resultsHtml is a LIST of the charts page\'s own cards, each wearing its chart rank', () => {
+    const NPUB = 'npub1' + 'q'.repeat(58)
     const h = resultsHtml('bit', {
-      shows: [{ guid: 'g1', title: 'A Pod', img: '', medium: 'podcast' }, { guid: 'g2', title: 'An Album', img: '', medium: 'music' }],
-      episodes: [{ guid: 'e1', title: 'Ep One', show: { guid: 'g1', title: 'A Pod' } }],
-      artists: [{ guid: 'p1', title: 'Artist' }],
-      members: [{ npub: 'npub1x', pk: 'ab', name: 'Reed', boosts: 3, sats: 1200 }],
+      shows: [{ guid: 'g1', title: 'A Pod', img: '', boosts: 4, sats: 900, boosters: 2, rank: 7, tied: false }],
+      albums: [{ guid: 'g2', title: 'An Album', img: '', boosts: 1, sats: 50, boosters: 1, rank: 3, tied: true }],
+      episodes: [{ guid: 'e1', title: 'Ep One', boosts: 1, sats: 21, boosters: 1, latest: 1700000000, rank: 12,
+        show: { guid: 'g1', title: 'A Pod' },
+        boosts_inline: [{ id: 'ev1', ts: 1700000000, sats: 21, msg: 'hi', booster: { pk: 'ab', npub: NPUB, name: 'Reed', pic: null } }] }],
+      songs: [],
+      artists: [{ guid: 'p1', title: 'Artist', boosts: 2, sats: 100, boosters: 2, albums: 1, rank: 1 }],
+      members: [{ npub: NPUB, pk: 'ab', name: 'Reed', boosts: 3, sats: 1200, shows: 2 }],
     })
     assert.ok(h.includes('<q>bit</q>'))
     for (const id of ['shows', 'albums', 'episodes', 'artists', 'members']) assert.ok(h.includes(`id="${id}"`), id)
-    assert.ok(!h.includes('rt-rank'), 'no rank on a search hit')
-    assert.ok(h.includes('rail-list rail-list--wrap'))
-    assert.ok(h.includes('3 boosts · 1.2k sats'))
+    assert.ok(!h.includes('id="songs"'), 'an empty group is not rendered')
+    assert.ok(!h.includes('rail-list'), 'no tile rail on the results page: it is a list')
+    assert.ok(h.includes('data-show-card') && h.includes('data-episode-card') && h.includes('data-publisher-card'), 'the charts page\'s cards')
+    assert.ok(h.includes('sup-podium'), 'the Members tab\'s wall')
+    assert.ok(h.includes('class="pcast-list"'), 'the charts page\'s list box')
+    assert.ok(/#7\b|>7</.test(h) && /T3/.test(h), 'the server\'s rank and tie label on the card')
+    assert.ok(h.includes('href="/charts#shows"') && h.includes('href="/charts#albums"') && h.includes('href="/charts#episodes-global"') && h.includes('href="/charts#artists"'), 'each group links its chart')
   })
   check('an empty answer says so', () => {
     assert.match(resultsHtml('zzz', {}), /Nothing matched/)
@@ -208,6 +217,8 @@ console.log('\nThe search page:')
   check('a member tile: gold past the goal, the HPW line', () => {
     const h = tile.memberTile({ npub: 'npub1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq', pk: 'ab', name: 'Reed', seconds: 41 * 3600, episodes: 26 }, 0, 40)
     assert.ok(h.includes('rt-rank--gold') && h.includes('41.0 HPW · 26 episodes') && h.includes('href="/booster/npub1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq"'))
+    assert.ok(h.includes('rail-tile--person'), 'a member is a person tile (round)')
+    assert.ok(!tile.showTile({ guid: 'g', title: 'T' }, 0).includes('rail-tile--person'), 'a show is not')
     const h2 = tile.memberTile({ npub: 'npub1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq', pk: 'ab', name: 'Reed', seconds: 2 * 3600, episodes: 1 }, 3, 40)
     assert.ok(!h2.includes('rt-rank--gold') && h2.includes('2.0 HPW · 1 episode'))
   })
@@ -267,12 +278,22 @@ console.log('\nThe recommendations and the data rails, over the real schema:')
     assert.ok(!pods.includes('show-D'), 'one booster from one seed is under the floor')
     assert.ok(!pods.includes('album-A'), 'music stays on the music side')
     assert.deepEqual(j.music.map((x) => x.guid), ['album-A'])
-    assert.equal(j.because.seed.guid, 'show-1')
-    assert.deepEqual(j.because.rows.map((x) => x.guid), ['show-A'])
+    // show-2's neighbours (show-B, show-D) each share one booster: no rail for it.
+    // album-1 shares two with album-A, so it has one; most-boosted seed first.
+    assert.deepEqual(j.because.map((b) => b.seed.guid), ['show-1', 'album-1'])
+    assert.deepEqual(j.because.map((b) => b.rows.map((x) => x.guid)), [['show-A'], ['album-A']])
+    assert.equal(j.because[1].seed.medium, 'music', 'the seed carries its medium, for the tile')
+  })
+  await checkAsync('Because rails: one per most-boosted seed, a show on the first rail that reaches it only', async () => {
+    sim.run('show-2', 'show-A', 0.5, 2, 3)   // show-2 now reaches show-A too, but show-1 already shows it
+    sim.run('show-2', 'show-C', 0.2, 2, 4)
+    const j = await (await post({ pubkey: ME })).json()
+    assert.deepEqual(j.because.map((b) => b.seed.guid), ['show-1', 'album-1', 'show-2'], 'by boosts, then the most recent boost')
+    assert.deepEqual(j.because.map((b) => b.rows.map((x) => x.guid)), [['show-A'], ['album-A'], ['show-C']])
   })
   await checkAsync('a member with no boosts gets empty lists, a bad pubkey a 400, a publisher key nothing', async () => {
     const j = await (await post({ pubkey: 'd'.repeat(64) })).json()
-    assert.deepEqual([j.seeds, j.podcasts, j.music, j.because], [0, [], [], null])
+    assert.deepEqual([j.seeds, j.podcasts, j.music, j.because], [0, [], [], []])
     assert.equal((await post({ pubkey: 'nope' })).status, 400)
     const { PUBLISHERS } = await import('../functions/api/v1/_common.js')
     const p = await (await post({ pubkey: PUBLISHERS[0] })).json()
@@ -283,7 +304,7 @@ console.log('\nThe recommendations and the data rails, over the real schema:')
     assert.equal(j.seeds, 1)
     // show-2 is a candidate HERE: this member never boosted it, so it is not a seed.
     assert.deepEqual(j.podcasts.map((x) => x.guid).sort(), ['show-2', 'show-A'])
-    assert.equal(j.because, null, 'because needs a BOOSTED seed')
+    assert.deepEqual(j.because, [], 'because needs a BOOSTED seed')
   })
   await checkAsync('New and Noteworthy: first boost within 90 days and two boosters, newest debuts after the better-backed', async () => {
     const html = await RAILS['new-shows'](env)

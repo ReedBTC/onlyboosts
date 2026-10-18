@@ -59,18 +59,14 @@
   <meta name="twitter:card" content="summary_large_image" />
 
   <link rel="preload" href="/assets/fonts/outfit.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v220" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v220" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v221" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v221" />
   <!-- The boost rows at the foot are the detail pages' rows and wear their
        sheets: the card, the thread chrome and the reaction bar. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v220" />
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v220" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v220" />
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v220" />
-  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v220" />
+  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v221" />
   <!-- theme.css last among the shared sheets: the palette, the fonts, and
        the base body/a/img rules every shared stylesheet reads off :root. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v220" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v221" />
 </head>
 <body>
 
@@ -241,7 +237,7 @@
   <section class="rail" data-rail="recommended" data-rail-personal aria-labelledby="rail-recommended">
     <div class="rail-head">
       <h2 id="rail-recommended">Recommended For You</h2>
-      <span class="rail-more" style="color: var(--muted); font-weight: 500;">Based on what you boost and favorite</span>
+      <span class="rail-sub">Shows boosted by the members who boost the same shows you do · <a href="/about#recommendations">How this works</a></span>
     </div>
     <div class="rail-track rail-locked" data-locked>
       <ol class="rail-list" aria-hidden="true">
@@ -261,7 +257,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>
           <div>
             <h3>Log in to see your recommendations</h3>
-            <p>Shows the people who boost what you boost are listening to, and you have not boosted or favorited yet. The boosts you publish to Nostr are what build it.</p>
+            <p>Other members boost some of the same shows you do. This rail is what else those members boost, minus anything you have already boosted or favorited. The boosts you publish to Nostr are what build it.</p>
           </div>
           <button type="button" class="ob-cta" data-lb-login-trigger>Log in</button>
         </div>
@@ -272,7 +268,7 @@
   <section class="rail" data-rail="recommended-music" data-rail-personal aria-labelledby="rail-recommended-music">
     <div class="rail-head">
       <h2 id="rail-recommended-music">Recommended Music</h2>
-      <span class="rail-more" style="color: var(--muted); font-weight: 500;">Albums the people who boost what you boost are into</span>
+      <span class="rail-sub">Albums boosted by the members who boost the same albums you do · <a href="/about#recommendations">How this works</a></span>
     </div>
     <div class="rail-track rail-locked" data-locked>
       <ol class="rail-list" aria-hidden="true">
@@ -332,10 +328,14 @@
   </section>
 
   <!-- Filled for a signed-in member with a seed show; stays hidden otherwise. -->
+  <!-- BECAUSE YOU BOOSTED X, one rail per show: the prototype stays hidden
+       and assets/js/discover.js clones it for each of the member's five
+       most-boosted shows with neighbours (Reed's ask, 2026-10-18), in this
+       position. Every show appears on one of them at most. -->
   <section class="rail" data-rail="because" data-rail-personal aria-labelledby="rail-because" hidden>
     <div class="rail-head">
       <h2 id="rail-because">Because you boosted <a href="#" data-because-seed></a></h2>
-      <span class="rail-more" style="color: var(--muted); font-weight: 500;">Shows its boosters also boost</span>
+      <span class="rail-sub"><span data-because-sub></span> · <a href="/about#recommendations">How this works</a></span>
     </div>
     <div class="rail-track"></div>
   </section>
@@ -388,15 +388,16 @@
     <div class="rail-track"><!--OB:RAIL:podroll--><p class="rail-placeholder">Loading the podrolls…</p><!--/OB:RAIL:podroll--></div>
   </section>
 
-  <!-- The foot of the page: the newest boost notes, the same row the detail
-       pages' #boosts lists render, with the reaction bar. The whole feed,
-       with its range, sort and paging, is the Members tab. -->
-  <section class="rail rail--boosts" data-rail="boosts-latest" aria-labelledby="rail-boosts">
-    <div class="rail-head">
-      <h2 id="rail-boosts"><a href="/charts#members">Latest Boosts</a></h2>
-      <a class="rail-more" href="/charts#members">The whole feed →</a>
-    </div>
-    <div class="rail-track" data-boost-section><!--OB:RAIL:boosts-latest--><p class="rail-placeholder">Loading the latest boosts…</p><!--/OB:RAIL:boosts-latest--></div>
+  <!-- The foot of the page: ONE CLICK INTO THE BOOST FEED. The newest boost
+       rows sat here until 2026-10-18 (Reed's call: the Because rails took the
+       room); the whole firehose, with its range, sort and paging, is the
+       Members tab of the charts page. -->
+  <section class="rail rail-cta" aria-label="The boost feed">
+    <a href="/charts#members">
+      <strong>⚡ The boost feed</strong>
+      <span>Every boost as it lands on Nostr, newest first, with replies, likes, reposts and zaps.</span>
+      <b>Open the feed →</b>
+    </a>
   </section>
 
 </main>
@@ -461,12 +462,12 @@
 <!-- FOOTER:END -->
 
 <!-- Lazy widget bootstrap (Donate + identity slot) -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v220"></script>
-<script src="/assets/js/sw-register.js?v=ob-v220" defer></script>
-<script src="/assets/widgets/pwa-install.js?v=ob-v220" defer></script>
-<script src="/assets/js/nav.js?v=ob-v220" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v221"></script>
+<script src="/assets/js/sw-register.js?v=ob-v221" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v221" defer></script>
+<script src="/assets/js/nav.js?v=ob-v221" defer></script>
 <!-- The verbs: artwork fallback, the rails the edge could not fill, and the
      personal rails for a signed-in member. -->
-<script type="module" src="/assets/js/discover.js?v=ob-v220"></script>
+<script type="module" src="/assets/js/discover.js?v=ob-v221"></script>
 </body>
 </html>

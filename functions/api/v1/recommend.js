@@ -1,7 +1,7 @@
 // POST /api/v1/recommend — RECOMMENDED FOR YOU, and BECAUSE YOU BOOSTED X.
 //
 //   body  { pubkey: <hex|npub>, favorites?: [feedGuid], limit?: n }
-//   200   { seeds, podcasts: [row], music: [row], because: { seed, rows } | null }
+//   200   { seeds, podcasts: [row], music: [row], because: [{ seed, rows }] }  (up to five)
 //
 // The homepage's personal rails (2026-10-17). The collector computes, for
 // every show with three or more distinct boosters, its twenty most similar
@@ -10,7 +10,8 @@
 // sums those scores over a member's SEEDS — the shows they have boosted, plus
 // the feeds on their PC 2.0 favorites list when the browser hands them over,
 // since that list is a Nostr event only the browser reads — and ranks the
-// candidates that are not already a seed. Partitioned by medium side, like
+// candidates that are not already a seed. `because` is one rail per
+// most-boosted seed (up to five, 2026-10-18). Partitioned by medium side, like
 // the table itself: a podcast's neighbours are podcasts and an album's are
 // albums, and the two scores are not comparable (music's median overlap is
 // nearly three times a podcast's), so they are two lists, never one.
@@ -52,7 +53,7 @@ async function seedsOf(env, hex, favorites) {
   const { results } = await env.DB.prepare(
     `SELECT podcast_guid AS guid, COUNT(*) AS n FROM boosts
       WHERE booster_pubkey = ? AND podcast_guid IS NOT NULL
-      GROUP BY podcast_guid ORDER BY n DESC`
+      GROUP BY podcast_guid ORDER BY n DESC, MAX(created_at) DESC`
   ).bind(hex).all();
   const boosted = (results || []).map((r) => r.guid);
   const set = new Set(boosted);
@@ -80,19 +81,29 @@ async function recommendFor(env, seedsJson, music, limit) {
   return (results || []).map(record);
 }
 
-/** Because you boosted X: the member's most-boosted show that has neighbours,
- *  and those neighbours sharing two or more boosters, minus the seeds. */
+/** Because you boosted X: up to BECAUSE_MAX of the member's most-boosted
+ *  shows that have neighbours, each with its neighbours sharing two or more
+ *  boosters, minus the seeds. Reed's call, 2026-10-18: five of these rails,
+ *  one per show, in place of the boost rows the homepage's foot carried.
+ *
+ *  ⚠️ A SHOW APPEARS ON ONE RAIL ONLY. The member's top shows share an
+ *  audience, so their neighbour lists overlap heavily; a neighbour is shown
+ *  under the first (most-boosted) seed that reaches it and dropped from the
+ *  rest, and a seed left with nothing after that is skipped for the next
+ *  candidate. BECAUSE_POOL seeds are read so the skips still fill five. */
+const BECAUSE_MAX = 5;
+const BECAUSE_POOL = 8;
 async function becauseOf(env, hex, seedsJson, boosted, limit) {
-  if (!boosted.length) return null;
+  if (!boosted.length) return [];
   const { results: seeded } = await env.DB.prepare(
     `WITH mine AS (SELECT value AS guid, key AS ord FROM json_each(?1))
      SELECT mine.guid, mine.ord FROM mine
       WHERE EXISTS (SELECT 1 FROM show_similar s WHERE s.podcast_guid = mine.guid AND s.shared_boosters >= 2)
-      ORDER BY mine.ord LIMIT 1`
-  ).bind(JSON.stringify(boosted.slice(0, 50))).all();
-  const seed = seeded?.[0]?.guid;
-  if (!seed) return null;
-  const [{ results: rows }, { results: seedRow }] = await Promise.all([
+      ORDER BY mine.ord LIMIT ?2`
+  ).bind(JSON.stringify(boosted.slice(0, 50)), BECAUSE_POOL).all();
+  const seedGuids = (seeded || []).map((r) => r.guid);
+  if (!seedGuids.length) return [];
+  const perSeed = await Promise.all(seedGuids.map((seed) => Promise.all([
     env.DB.prepare(
       `WITH seeds AS (SELECT value AS guid FROM json_each(?1))
        SELECT ${TILE_COLS}, s.score AS score, s.shared_boosters AS shared
@@ -103,9 +114,18 @@ async function becauseOf(env, hex, seedsJson, boosted, limit) {
         ORDER BY s.rank LIMIT ?3`
     ).bind(seedsJson, seed, limit).all(),
     env.DB.prepare(`SELECT ${TILE_COLS} FROM podcasts p WHERE p.podcast_guid = ?`).bind(seed).all(),
-  ]);
-  if (!rows?.length || !seedRow?.length) return null;
-  return { seed: record(seedRow[0]), rows: rows.map(record) };
+  ])));
+  const shown = new Set();
+  const out = [];
+  for (const [{ results: rows }, { results: seedRow }] of perSeed) {
+    if (out.length >= BECAUSE_MAX) break;
+    if (!seedRow?.length) continue;
+    const fresh = (rows || []).filter((r) => !shown.has(r.guid));
+    if (!fresh.length) continue;
+    for (const r of fresh) shown.add(r.guid);
+    out.push({ seed: record(seedRow[0]), rows: fresh.map(record) });
+  }
+  return out;
 }
 
 export async function onRequestPost({ request, env }) {
@@ -120,17 +140,17 @@ export async function onRequestPost({ request, env }) {
     : [];
 
   if (PUBLISHERS.includes(hex)) {
-    return json(request, { seeds: 0, podcasts: [], music: [], because: null }, { cache: 0 });
+    return json(request, { seeds: 0, podcasts: [], music: [], because: [] }, { cache: 0 });
   }
 
   const { seeds, boosted } = await seedsOf(env, hex, favorites);
-  if (!seeds.length) return json(request, { seeds: 0, podcasts: [], music: [], because: null }, { cache: 0 });
+  if (!seeds.length) return json(request, { seeds: 0, podcasts: [], music: [], because: [] }, { cache: 0 });
 
   const seedsJson = JSON.stringify(seeds);
   const [podcasts, music, because] = await Promise.all([
     recommendFor(env, seedsJson, false, limit),
     recommendFor(env, seedsJson, true, limit),
-    becauseOf(env, hex, seedsJson, boosted, limit).catch((e) => { console.warn("[recommend] because", e?.message); return null; }),
+    becauseOf(env, hex, seedsJson, boosted, limit).catch((e) => { console.warn("[recommend] because", e?.message); return []; }),
   ]);
   return json(request, { seeds: seeds.length, podcasts, music, because }, { cache: 0 });
 }

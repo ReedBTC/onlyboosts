@@ -32,13 +32,9 @@ import { readParams as episodeParams, globalEpisodes } from "./api/v1/episodes.j
 import { hoursBoard } from "./api/v1/members/hours.js";
 import { railListHtml, tileHtml, showTile, albumTile, episodeTile, artistTile, memberTile } from "../assets/js/rail-tile.js";
 import { showPageHref } from "../assets/js/show-link.js";
-import { boostRows } from "../assets/js/boost-list.js";
-import { BOOST_SELECT } from "./api/v1/_common.js";
-import { lookupMentionNames } from "./_shared/detail-page.js";
 import { headOf } from "./_shared/head.js";
 
 const TILES = 10;
-const BOOSTS = 12;
 
 /* ── The rails, keyed by the marker in index.html ───────────────────────── */
 
@@ -148,18 +144,6 @@ export const RAILS = {
       subTitle: "How many shows list it on their podroll",
       img: r.image, art2: r.artwork, glyph: (r.medium === "music" ? "🎵" : "🎙"),
     })), { empty: "No podroll in the index yet." });
-  },
-  /* The boost firehose's newest rows, the same two-sided boost row every
-     detail page's #boosts list renders (boost-list.js), facts at the edge
-     and the reaction bar attached by discover.js. The Members tab holds
-     the whole feed with its range, sort and paging; this is the foot of
-     the front door. */
-  "boosts-latest": async (env) => {
-    const { results } = await env.DB.prepare(`${BOOST_SELECT} ORDER BY b.created_at DESC, b.event_id DESC LIMIT ?`).bind(BOOSTS).all();
-    const rows = results || [];
-    if (!rows.length) return `<p class="rail-empty">No boosts yet.</p>`;
-    const names = await lookupMentionNames(env, rows.map((r) => r.message));
-    return `<ul class="boost-list ob-boost-list" data-bs-list>${boostRows(rows, names, { noun: "episode", showTarget: true, linkBooster: true, showShow: true })}</ul>`;
   },
 };
 

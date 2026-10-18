@@ -106,16 +106,31 @@ was picked from is in the session memory; direction A won, with the sans.
   boosts, the chart view's own figure, `rankTriplet` in `rail-tile.js`);
   Reed's call after seeing "7 boosters · 38.8k sats" at tile size. The #40HPW
   rail is tiles too (face, name, "34.3 HPW · 26 episodes", gold past the
-  goal), not the board: every rail the same shape.
-- **`/search?q=` is the results page** (`search.html` + `functions/search.js`
-  + `functions/_shared/search-all.js`, shared with the typeahead): every hit
-  grouped as shows, albums, episodes and songs, artists, members, each the
-  homepage's tile in a wrapping grid, `noindex`. Enter in the nav field goes
-  there (Reed's call: a typed query deserves every hit, not the first); an
-  arrow-key pick still goes to its row.
-- **The foot of the page is the newest boost rows**, the detail pages' own
-  two-sided `boost-list.js` row with the reaction bar attached by
-  `discover.js`; the whole feed with its controls is the Members tab.
+  goal), not the board: every rail the same shape. **A person's tile is
+  ROUND** (`person: true` → `.rail-tile--person`, Reed's call 2026-10-18: a
+  circle reads as an individual, a square as content); the two member
+  mappers set it and nothing else does.
+- **`/search?q=` is the results page, AND IT IS A LIST, NOT RAILS**
+  (`search.html` + `functions/search.js` + `assets/js/search-page.js`).
+  Reed's rule, 2026-10-18: the sideways tile rail is the HOMEPAGE's shape;
+  anything deeper (a search, the full charts, research) is a list like the
+  charts page. So every hit is the charts page's own card (show-card,
+  episode-card with the lazy drawer, publisher-card, and the Members tab's
+  wall for members), rendered at the edge through the three ranked
+  endpoints' own `q=` paths in process, so **a hit wears the chart rank it
+  holds on the unfiltered all-time chart**, and `search-page.js` attaches
+  the same verbs the feeds attach. Groups: shows, albums, episodes, songs,
+  artists, members, each linking its chart. `noindex`. Enter in the nav
+  field goes there (Reed's call: a typed query deserves every hit, not the
+  first); an arrow-key pick still goes to its row. `_shared/search-all.js`
+  is the typeahead's alone now.
+- **The foot of the page is ONE STRIP INTO THE BOOST FEED** (`.rail-cta`,
+  `/charts#members`), not boost rows. The newest twelve rows sat there from
+  the 2026-10-17 feedback round until 2026-10-18, when Reed traded them for
+  the Because rails; the whole feed with its controls is the Members tab,
+  and the nav's Members link already lands on it. Ideas for a stronger
+  one-click (a Live pill in the nav bar, a ticker of the newest boost) are
+  open with Reed.
 - **The personal rails are `POST /api/v1/recommend`** (`{pubkey,
   favorites?}` → `{seeds, podcasts, music, because}`): the member's boosted
   shows, plus the favorites the browser hands over, are the seeds; the
@@ -124,8 +139,14 @@ was picked from is in the session memory; direction A won, with the sans.
   reached from two seeds or two boosters shared with one** (half of all
   pairs share exactly one booster, measured 2026-10-17). Two lists, never
   one: the music side's overlap runs nearly three times the podcast side's.
-  `because` is the most-boosted seed with neighbours over the floor. Nothing
-  is stored per member. **Favorites are not yet handed over**: `favorites-ui.js`
+  **`because` is up to FIVE rails, one per most-boosted seed with neighbours
+  over the floor** (Reed's ask, 2026-10-18; a show appears under the first
+  seed that reaches it only, and a seed emptied by that is skipped), cloned
+  by `discover.js` from the hidden prototype section. Nothing is stored per
+  member. **The method is public: `/about#recommendations`** states every
+  rail's rule, Reed's data-transparency call, and the three personal rails'
+  one-liners link it; `docs/about-and-faq-source.md` is the factual backing
+  and is corrected first. **Favorites are not yet handed over**: `favorites-ui.js`
   exposes no accessor for the current list; the endpoint accepts them.
 - **Three more fact rails off the new columns**: New and Noteworthy
   (`first_boost_ts` within 90 days and two boosters; the collector measured
@@ -134,7 +155,8 @@ was picked from is in the session memory; direction A won, with the sans.
   targets by how many sources list them; an unindexed target is a figure,
   not a link).
 - **Still to build here**: boost messages on the results page, favorites as
-  seeds. Most Favorited is held: 15 lists on the whole network on
+  seeds, a stronger one-click into the boost feed if the foot strip is not
+  enough. Most Favorited is held: 15 lists on the whole network on
   2026-10-17.
 
 ## Site map
@@ -2431,7 +2453,8 @@ would. Never remove an entry** — those links are in the wild.
 | `boosts-thread.js` / `boost-actions.js` | the content tokenizer and reply / like / repost / zap |
 | `functions/index.js` | **the discovery homepage's fact rails**, rendered at the edge (2026-10-17) |
 | `functions/_shared/charts-page.js` | the charts page's opening feed — **Shows**, rendered at the edge; it was `functions/index.js` until the front door moved |
-| `rail-tile.js` + `discover.js` | **the** rail tile, facts and verbs, shared by the edge and the browser; the personal rails and the SSR fallback |
+| `rail-tile.js` + `discover.js` | **the** rail tile, facts and verbs, shared by the edge and the browser; the personal rails (Because ×5) and the SSR fallback |
+| `functions/search.js` + `search-page.js` | the results page: the charts page's cards in a list, each wearing its chart rank, through the ranked endpoints' `q=` paths in process |
 | `nav-search.js` + `/api/v1/search?type=all` | the nav bar's grouped typeahead: shows, episodes, artists and members |
 | `functions/{show,episode,booster,artist}/…` | the four edge-rendered detail pages |
 | `functions/charts/[[path]].js` + `_shared/week-charts.js` + **two-sided** `assets/js/chart-board.js` | the five chart share-card frames (the Charts page they came from was torn down 2026-09-04) |

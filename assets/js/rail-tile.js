@@ -11,10 +11,10 @@
  * rewrites the version), no clock reads, no unpinned locale, nothing from the
  * DOM. Verbs (the artwork fallback walk) are attached by discover.js.
  */
-import { coverChain } from './cover-art.js?v=ob-v220'
-import { rankLabel } from './rank.js?v=ob-v220'
-import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v220'
-import { boosterPageHref } from './booster-link.js?v=ob-v220'
+import { coverChain } from './cover-art.js?v=ob-v221'
+import { rankLabel } from './rank.js?v=ob-v221'
+import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v221'
+import { boosterPageHref } from './booster-link.js?v=ob-v221'
 
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => (
@@ -62,7 +62,7 @@ export const TRIPLET_TITLE = 'Rank in sats / boosters / boosts'
  * is the one line under the title; `subTitle` its tooltip; `gold` marks the
  * rank badge (a #40HPW member over the goal).
  */
-export function tileHtml({ rank = null, tied = false, href = null, title, sub = '', subTitle = '', subClass = '', img = null, art2 = null, glyph = '🎙', gold = false }) {
+export function tileHtml({ rank = null, tied = false, href = null, title, sub = '', subTitle = '', subClass = '', img = null, art2 = null, glyph = '🎙', gold = false, person = false }) {
   const chain = coverChain(img, art2)
   const media = chain.length
     ? `<img alt="" loading="lazy" referrerpolicy="no-referrer" src="${esc(chain[0])}"${attr('data-art2', chain[1])} />`
@@ -74,9 +74,13 @@ export function tileHtml({ rank = null, tied = false, href = null, title, sub = 
     `<span class="rt-media${chain.length ? '' : ' rt-media--none'}">${media}${badge}</span>` +
     `<span class="rt-title">${esc(title || 'Untitled')}</span>` +
     (sub ? `<span class="rt-sub${subClass ? ' ' + subClass : ''}"${attr('title', subTitle)}>${esc(sub)}</span>` : '')
+  /* A PERSON'S tile is round (Reed's call, 2026-10-18): a face in a circle
+     reads as an individual where a square reads as content. The class is
+     the only difference; discover.css does the rest. */
+  const li = `<li class="rail-tile${person ? ' rail-tile--person' : ''}">`
   return href
-    ? `<li class="rail-tile"><a class="rt" href="${esc(href)}">${inner}</a></li>`
-    : `<li class="rail-tile"><span class="rt">${inner}</span></li>`
+    ? `${li}<a class="rt" href="${esc(href)}">${inner}</a></li>`
+    : `${li}<span class="rt">${inner}</span></li>`
 }
 
 /** The row. An empty list renders the rail's own empty line, never nothing. */
@@ -143,7 +147,7 @@ export function memberTile(m, i, goalHours = 40) {
     title: m.name || (m.npub ? m.npub.slice(0, 12) + '…' : 'Unknown'),
     sub: `${h.toFixed(1)} HPW · ${eps} episode${eps === 1 ? '' : 's'}`,
     subTitle: 'Hours of podcasts boosted this week · episodes that counted',
-    img: m.pic, glyph: '👤', gold: h >= goalHours,
+    img: m.pic, glyph: '👤', gold: h >= goalHours, person: true,
   })
 }
 
@@ -153,6 +157,6 @@ export function memberSearchTile(m) {
     href: boosterPageHref(m.npub, m.pk),
     title: m.name || (m.npub ? m.npub.slice(0, 12) + '…' : 'Unknown'),
     sub: statsLine({ boosters: null, sats: m.sats }).replace(/^/, m.boosts != null ? `${Number(m.boosts)} boost${Number(m.boosts) === 1 ? '' : 's'} · ` : ''),
-    img: m.pic, glyph: '👤',
+    img: m.pic, glyph: '👤', person: true,
   })
 }

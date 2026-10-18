@@ -7,15 +7,16 @@
  *    tile module, so it is byte-identical to what the edge would have sent.
  * 3. The PERSONAL rails. A signed-out visitor keeps the locked card (Reed's
  *    call, 2026-10-17: the carrot). A signed-in member gets their follows
- *    rail from the same POST the Shows · Follows feed makes, and, until the
- *    recommendations endpoint lands, an honest line in the Recommended slot.
- *    Re-run on lb:session-change and on the storage event, like feeds.js.
+ *    rail from the same POST the Shows · Follows feed makes, and the three
+ *    recommendation shapes off one POST to /api/v1/recommend: Recommended
+ *    For You, Recommended Music, and up to five Because You Boosted X rails
+ *    (one per most-boosted show; Reed's ask, 2026-10-18), cloned from the
+ *    hidden prototype in index.html. Re-run on lb:session-change and on the
+ *    storage event, like feeds.js.
  */
-import { railListHtml, showTile, albumTile, episodeTile, artistTile, memberTile } from '/assets/js/rail-tile.js?v=ob-v220'
-import { rowsFromRecords } from '/assets/js/boost-list.js?v=ob-v220'
-import { initBoostNoteActions, wireBoostNotes } from '/assets/js/boost-note-actions.js?v=ob-v220'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v220'
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v220'
+import { railListHtml, showTile, albumTile, episodeTile, artistTile, memberTile } from '/assets/js/rail-tile.js?v=ob-v221'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v221'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v221'
 
 const TILES = 10
 
@@ -61,20 +62,6 @@ async function fillRail(section) {
       const j = await getJson('/api/v1/members/hours?range=week')
       track.innerHTML = railListHtml((j.members || []).slice(0, TILES).map((m, i) => memberTile(m, i, j.goal_hours)), { empty: 'No qualifying boosts yet this week.' })
       wireArt(track)
-      return
-    }
-    if (key === 'boosts-latest') {
-      /* The boost row's client half: records through the shape layer the
-         detail pages' repaint uses, then the same row renderer. The names
-         map is empty here (a mention chip then shows the npub until
-         hydrateProfiles fills it). */
-      const j = await getJson('/api/v1/boosts?limit=12')
-      const { boostRows } = await import('/assets/js/boost-list.js?v=ob-v220')
-      const rows = rowsFromRecords(j.boosts || [])
-      track.innerHTML = rows.length
-        ? `<ul class="boost-list ob-boost-list" data-bs-list>${boostRows(rows, new Map(), { noun: 'episode', showTarget: true, linkBooster: true, showShow: true })}</ul>`
-        : '<p class="rail-empty">No boosts yet.</p>'
-      await wireBoosts(track)
       return
     }
     const src = SOURCES[key]
@@ -128,10 +115,35 @@ function unlock(section, html) {
   wireArt(track)
 }
 
-/* Recommended For You, Recommended Music and Because You Boosted X, all off
-   one POST: the member's boosted shows are the seeds (favorites join them
-   once the favorites list has an accessor here), and the endpoint sums the
-   collector's similarity scores over them. */
+/* The Because rails: the hidden prototype cloned once per entry, in order,
+   just above the prototype (so they sit where Reed placed the rail). A
+   re-run (sign-out, account switch) removes the previous clones first. */
+function paintBecause(proto, entries) {
+  for (const old of document.querySelectorAll('[data-rail^="because-"]')) old.remove()
+  if (!proto) return
+  entries.forEach((b, i) => {
+    const sec = proto.cloneNode(true)
+    sec.hidden = false
+    sec.dataset.rail = `because-${i}`
+    sec.setAttribute('aria-labelledby', `rail-because-${i}`)
+    const h2 = sec.querySelector('h2')
+    if (h2) h2.id = `rail-because-${i}`
+    const a = sec.querySelector('[data-because-seed]')
+    if (a) { a.textContent = b.seed.title || 'this show'; a.href = `/show/${encodeURIComponent(b.seed.guid)}` }
+    const sub = sec.querySelector('[data-because-sub]')
+    if (sub) sub.textContent = `What the other boosters of ${b.seed.title || 'this show'} also boost`
+    const track = sec.querySelector('.rail-track')
+    if (track) track.innerHTML = railListHtml(b.rows.map(b.seed.medium === 'music' ? albumTile : showTile))
+    proto.before(sec)
+    wireArt(sec)
+  })
+}
+
+/* Recommended For You, Recommended Music and the Because rails, all off one
+   POST: the member's boosted shows are the seeds (favorites join them once
+   the favorites list has an accessor here), and the endpoint sums the
+   collector's similarity scores over them. /about#recommendations is the
+   method in full. */
 async function paintRecommended(sections, pubkey) {
   const rec = sections.find((s) => s.dataset.rail === 'recommended')
   const music = sections.find((s) => s.dataset.rail === 'recommended-music')
@@ -140,22 +152,16 @@ async function paintRecommended(sections, pubkey) {
     const j = await getJson('/api/v1/recommend', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pubkey, limit: TILES }),
     })
-    const none = (what) => `Boost a few ${what} and the shows their boosters also boost will rank here.`
+    const none = (what) => `Boost a few ${what} and the ${what} their other boosters boost will rank here.`
     if (rec) {
       if (j.podcasts?.length) unlock(rec, railListHtml(j.podcasts.map(showTile)))
-      else lockedCardNote(rec, j.seeds ? 'Nothing to recommend yet' : 'No boosts from this account yet', j.seeds ? 'The shows you boost have no neighbours the index can vouch for yet; it grows with every boost.' : none('shows'))
+      else lockedCardNote(rec, j.seeds ? 'Nothing to recommend yet' : 'No boosts from this account yet', j.seeds ? 'Too few other members have boosted the shows you boost for the overlap to mean anything yet; it grows with every boost.' : none('shows'))
     }
     if (music) {
       if (j.music?.length) unlock(music, railListHtml(j.music.map(albumTile)))
-      else lockedCardNote(music, j.seeds ? 'Nothing to recommend yet' : 'No music boosts from this account yet', j.seeds ? 'The albums you boost have no neighbours the index can vouch for yet.' : none('albums'))
+      else lockedCardNote(music, j.seeds ? 'Nothing to recommend yet' : 'No music boosts from this account yet', j.seeds ? 'Too few other members have boosted the albums you boost for the overlap to mean anything yet.' : none('albums'))
     }
-    if (because && j.because?.rows?.length) {
-      const a = because.querySelector('[data-because-seed]')
-      if (a) { a.textContent = j.because.seed.title || 'this show'; a.href = `/show/${encodeURIComponent(j.because.seed.guid)}` }
-      const track = because.querySelector('.rail-track')
-      if (track) { track.innerHTML = railListHtml(j.because.rows.map(showTile)); wireArt(track) }
-      because.hidden = false
-    }
+    paintBecause(because, Array.isArray(j.because) ? j.because.filter((b) => b?.seed && b.rows?.length) : [])
   } catch (e) {
     console.warn('[discover] recommend', e)
     for (const s of [rec, music]) if (s) lockedCardNote(s, 'Your recommendations could not be loaded', 'Reload to try again.')
@@ -169,7 +175,7 @@ async function paintPersonal() {
   if (!sections.length) return
   const res = await resolveFollows()
   if (my !== personalRun) return
-  if (res.status === 'signed-out') return // the locked cards stay: the carrot
+  if (res.status === 'signed-out') { paintBecause(null, []); return } // the locked cards stay: the carrot
   for (const s of sections) {
     if (s.dataset.rail !== 'follows') continue
     if (res.status === 'ok') paintFollows(s, res.follows)
@@ -190,25 +196,9 @@ document.addEventListener('click', async (e) => {
   } catch (err) { console.error('[discover] login widget', err) }
 })
 
-/* ── The boost rows' verbs: the reaction bar, and the mention chips' names ── */
-async function wireBoosts(root) {
-  try {
-    await wireBoostNotes(root)
-    const { hydrateProfiles } = await import('/assets/js/detail-page.js?v=ob-v220')
-    hydrateProfiles(root)
-  } catch (e) { console.warn('[discover] boost rows', e) }
-}
-
 /* ── Boot ──────────────────────────────────────────────────────────────── */
 wireArt(document)
 for (const s of document.querySelectorAll('[data-rail]:not([data-rail-personal])')) fillRail(s)
-initBoostNoteActions()
-{
-  const boosts = document.querySelector('[data-rail="boosts-latest"] [data-boost-section]')
-  if (boosts && !boosts.querySelector('.rail-placeholder')) {
-    import('/assets/js/detail-page.js?v=ob-v220').then((m) => m.hydrateProfiles(boosts)).catch(() => {})
-  }
-}
 paintPersonal()
 window.addEventListener('lb:session-change', paintPersonal)
 window.addEventListener('storage', (e) => { if (e.key === 'lb_nostr_session') paintPersonal() })

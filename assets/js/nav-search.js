@@ -14,7 +14,7 @@
  * whether a show, an episode or an artist has a page here. A row the rule
  * declines gets no link and is not shown, rather than a dead click.
  */
-import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v220'
+import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v221'
 
 const MIN = 2
 const LIMIT = 5
