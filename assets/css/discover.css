@@ -126,9 +126,13 @@
 /* A PERSON is a circle, content is a square (Reed's call, 2026-10-18): the
    #40HPW faces read as individuals, not as shows. The media box keeps its
    overflow visible so the rank badge sits on the circle's shoulder rather
-   than being clipped off at the corner; the image itself is what rounds. */
+   than being clipped off at the corner; the image itself is what rounds.
+   ⚠️ THE IMAGE IS ABSOLUTE, NOT IN FLOW. With overflow visible an aspect-ratio
+   box takes the taller of the ratio and its content, so a portrait avatar
+   grew the box past square and the circle became a tall ellipse (Reed saw it
+   on the #40HPW rail, 2026-10-19). Out of flow it cannot size the box. */
 .rail-tile--person .rt-media { border-radius: 50%; overflow: visible; }
-.rail-tile--person .rt-media img { border-radius: 50%; }
+.rail-tile--person .rt-media img { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 50%; }
 .rail-tile--person .rt-media .rt-rank { left: 0; top: 0; }
 .rail-tile--person .rt-title { text-align: center; }
 .rail-tile--person .rt-sub { text-align: center; }
