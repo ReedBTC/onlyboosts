@@ -293,3 +293,224 @@ a.rt:hover .rt-title { color: var(--brand-dd); }
   .rail-head { flex-wrap: wrap; }
   .rail-head .rail-sub { text-align: left; flex-basis: 100%; }
 }
+
+/* ── The featured carousel (Reed's call, 2026-10-19) ──────────────────────
+   One slide per generic rail, that rail's first place, above the rails.
+   Fountain's shape, since podcast art is square: the artwork blurred and
+   darkened as the backdrop, the square art at left, the eyebrow (the rail's
+   rule), the title, the figures, two lines of description, Open and Boost.
+   The backdrop is an IMAGE, not a surface colour, so the dark band is the
+   same in both themes and the one-ground grammar holds. The slides are a
+   scroll-snap strip; discover.js adds the arrows, the dots and the
+   seven-second rotation (paused on hover and focus, off under reduced
+   motion), and on a phone the swipe is the native one. */
+.hero {
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: #0b3a52;
+  color: #ffffff;
+  font-family: var(--font-sans);
+}
+.hero-slides {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 100%;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+.hero-slides::-webkit-scrollbar { display: none; }
+.hero-slide {
+  position: relative;
+  min-width: 0;
+  min-height: 340px;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  isolation: isolate;
+  display: flex;
+}
+.hero-bg {
+  position: absolute;
+  inset: -12%;
+  width: 124%;
+  height: 124%;
+  object-fit: cover;
+  filter: blur(26px) saturate(1.15) brightness(0.5);
+  z-index: 0;
+  pointer-events: none;
+}
+.hero-slide::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(90deg, rgba(5, 20, 30, 0.72) 0%, rgba(5, 20, 30, 0.45) 55%, rgba(5, 20, 30, 0.2) 100%);
+  pointer-events: none;
+}
+.hero-body {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 1.75rem;
+  width: 100%;
+  padding: 2rem 4.5rem 2.6rem 2.25rem;
+  box-sizing: border-box;
+}
+.hero-art-link { flex-shrink: 0; display: block; line-height: 0; }
+.hero-art {
+  width: 220px;
+  height: 220px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  object-fit: cover;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  background: rgba(255, 255, 255, 0.08);
+  display: block;
+}
+.hero-art--none {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 4rem;
+  line-height: 1;
+}
+.hero-slide--person .hero-art { border-radius: 50%; }
+.hero-slide--gold .hero-eyebrow { color: #f2c75c; }
+.hero-text { min-width: 0; flex: 1; }
+.hero-eyebrow {
+  margin: 0 0 0.35rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #7fdcff;
+}
+.hero-title {
+  margin: 0 0 0.3rem;
+  font-size: clamp(1.5rem, 3vw, 2.1rem);
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  line-height: 1.12;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.hero-title a { color: inherit; text-decoration: none; }
+.hero-title a:hover { text-decoration: underline; }
+.hero-from { margin: 0 0 0.25rem; font-size: 0.98rem; font-weight: 600; color: rgba(255, 255, 255, 0.88); }
+.hero-from a { color: inherit; text-decoration: none; }
+.hero-from a:hover { text-decoration: underline; }
+.hero-line {
+  margin: 0 0 0.6rem;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.78);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: baseline;
+}
+.hero-ranks { font-variant-numeric: tabular-nums; letter-spacing: 0.02em; font-weight: 700; color: #ffffff; }
+.hero-desc {
+  margin: 0 0 1rem;
+  font-family: var(--font-body, inherit);
+  font-size: 0.98rem;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.86);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-width: 44rem;
+}
+.hero-actions { display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; }
+.hero-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.5rem 1.1rem;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #0b3a52;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.hero-btn:hover { background: #e6f7ff; }
+.hero .ob-boost-pill.hero-boost { margin-left: 0; padding: 0.45rem 1rem; font-size: 0.85rem; }
+
+/* The arrows: over the edges, shown when the page can drive them. */
+.hero-arrow {
+  position: absolute;
+  top: 50%;
+  z-index: 3;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(5, 20, 30, 0.55);
+  color: #ffffff;
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0 3px;
+  opacity: 0.75;
+  transition: opacity 0.12s, background 0.12s;
+}
+.hero-arrow[hidden] { display: none; }
+.hero-arrow:hover { opacity: 1; background: rgba(5, 20, 30, 0.8); }
+.hero-arrow:focus-visible { outline: 2px solid #7fdcff; outline-offset: 2px; opacity: 1; }
+.hero-arrow--prev { left: 12px; }
+.hero-arrow--next { right: 12px; }
+
+/* The dots: bottom centre, the current one wide. */
+.hero-dots {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 12px;
+  z-index: 3;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+.hero-dots[hidden] { display: none; }
+.hero-dots button {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.45);
+  cursor: pointer;
+  transition: width 0.15s, background 0.15s;
+}
+.hero-dots button[aria-current="true"] { width: 22px; background: #ffffff; }
+.hero-dots button:focus-visible { outline: 2px solid #7fdcff; outline-offset: 2px; }
+
+@media (max-width: 640px) {
+  .hero { border-radius: 12px; }
+  .hero-slide { min-height: 0; }
+  .hero-body {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.9rem;
+    padding: 1.1rem 1.1rem 2.1rem;
+  }
+  .hero-art { width: 112px; height: 112px; border-radius: 10px; }
+  .hero-art--none { font-size: 2.4rem; }
+  .hero-title { font-size: 1.35rem; }
+  .hero-desc { -webkit-line-clamp: 3; font-size: 0.92rem; }
+  .hero-arrow { display: none; }
+}

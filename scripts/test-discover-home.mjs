@@ -10,7 +10,11 @@
  *     its siblings imported relatively;
  *   - injectRail swaps exactly the marked block and nothing around it;
  *   - the Function renders the page from the asset shell with every rail
- *     filled, and a failing rail leaves its placeholder for the browser.
+ *     filled, and a failing rail leaves its placeholder for the browser;
+ *   - the featured carousel (2026-10-19) is one slide per generic rail, that
+ *     rail's first place, in the page's rail order, described by one lookup
+ *     each that may fail; hero.js is two-sided; with nothing to show the
+ *     marker stays for the browser.
  *
  * Run: node scripts/test-discover-home.mjs
  */
@@ -34,8 +38,9 @@ async function checkAsync(name, fn) {
 
 const index = read('index.html')
 const charts = read('charts.html')
-const { RAILS, injectRail, onRequestGet } = await import('../functions/index.js')
+const { RAILS, injectRail, onRequestGet, buildHero, blurb, railOrder, injectHero } = await import('../functions/index.js')
 const tile = await import('../assets/js/rail-tile.js?v=test')
+const heroMod = await import('../assets/js/hero.js?v=test')
 
 console.log('\nThe markers and the renderers agree:')
 {
@@ -154,6 +159,8 @@ console.log('\nThe injection and the Function:')
     assert.equal(calls[0], '/', 'the shell is fetched as / never /index.html')
     for (const k of Object.keys(RAILS)) assert.ok(html.includes(`<!--OB:RAIL:${k}-->`), `${k} placeholder kept`)
     assert.ok(html.includes('class="rail-placeholder"'))
+    assert.ok(html.includes('<!--OB:HERO--><!--/OB:HERO-->'), 'no slides: the hero marker stays for the browser')
+    assert.ok(!html.includes('data-hero'), 'no empty carousel')
   })
   await checkAsync('a redirect from the asset server is never passed through', async () => {
     const error = console.error; console.error = () => {}
@@ -226,6 +233,125 @@ console.log('\nThe search page:')
     assert.ok(tile.showTile({ guid: 'g', title: 'T', r_sats: 3, r_boosters: 1, r_boosts: 2 }, 0).includes('>3/1/2<'))
     assert.ok(tile.showTile({ guid: 'g', title: 'T', chart: { sats: 5, boosters: 4, boosts: 6 } }, 0).includes('>5/4/6<'))
     assert.ok(tile.showTile({ guid: 'g', title: 'T', boosters: 7, sats: 38849 }, 0).includes('7 boosters · 38.8k sats'))
+  })
+}
+
+console.log('\nThe featured carousel:')
+{
+  const src = read('assets/js/hero.js')
+  check('hero.js is two-sided: no Date.now(), no unpinned locale, siblings relative and stamped', () => {
+    assert.ok(!/Date\.now\(/.test(src))
+    assert.ok(!/toLocale(Date|Time)?String\(\)/.test(src))
+    for (const m of src.matchAll(/from '([^']+)'/g)) assert.match(m[1], /^\.\/[a-z-]+\.js\?v=/)
+  })
+  check('the hero marker sits in index.html above the first rail', () => {
+    const at = index.indexOf('<!--OB:HERO--><!--/OB:HERO-->')
+    assert.ok(at > 0)
+    assert.ok(at < index.indexOf('data-rail="shows-week"'))
+  })
+  check('railOrder reads the generic rails in page order and skips the personal ones', () => {
+    const order = railOrder(index)
+    assert.deepEqual(order.slice(0, 3), ['shows-week', 'albums-month', 'hpw-week'])
+    assert.deepEqual([...order].sort(), Object.keys(RAILS).sort(), 'every generic rail, nothing else')
+    assert.ok(!order.includes('recommended') && !order.includes('because'))
+  })
+  check('injectHero swaps exactly the marked block', () => {
+    assert.equal(injectHero('a<!--OB:HERO-->x<!--/OB:HERO-->b', 'H'), 'aHb')
+    assert.throws(() => injectHero('ab', 'H'), /marker/)
+  })
+  check('blurb strips tags and entities and clips at a word', () => {
+    assert.equal(blurb('<p>Hello &amp; <b>welcome</b></p>\n\n  to the  show'), 'Hello & welcome to the show')
+    const long = blurb('word '.repeat(80), 60)
+    assert.ok(long.length <= 61 && long.endsWith('…') && !long.endsWith(' …'), long)
+    assert.equal(blurb(null), '')
+  })
+  check('the show mapper: eyebrow, triplet, Open, a Boost pill off the guid', () => {
+    const s = heroMod.showSlide('shows-week', { guid: 'g-1', title: 'A <Show>', image: 'http://a/x.jpg', artwork: 'https://a/y.jpg', booster_count: 7, total_sats: 38849, r_sats: 1, r_boosters: 2, r_boosts: 1 }, { medium: 'podcast' })
+    assert.equal(s.kind, 'show'); assert.equal(s.eyebrow, '#1 Show This Week'); assert.equal(s.ranks, '1/2/1')
+    const h = heroMod.slideHtml(s, 0, 3)
+    assert.ok(h.includes('data-slide="shows-week"') && h.includes('data-kind="show"'))
+    assert.ok(h.includes('data-guid="g-1"') && h.includes('data-noun="show"') && h.includes('data-title="A &lt;Show&gt;"'), 'the show card\'s attributes for its boost handler')
+    assert.ok(h.includes('class="ob-boost-pill hero-boost" data-hero-boost hidden'), 'the pill ships hidden')
+    assert.ok(h.includes('>Open the show</a>') && h.includes('href="/show/g-1"'))
+    assert.ok(h.includes('class="hero-bg"') && h.includes('src="https://a/x.jpg"') && h.includes('data-art2="https://a/y.jpg"'))
+    assert.ok(h.includes('fetchpriority="high"') && !h.includes('loading="lazy"'), 'the first slide loads eagerly')
+    assert.ok(heroMod.slideHtml(s, 1, 3).includes('loading="lazy"'), 'later slides lazily')
+    assert.ok(h.includes('aria-label="1 of 3: #1 Show This Week"'))
+  })
+  check('an album slide says album; the unlinked podroll target has no Open and no Boost', () => {
+    const a = heroMod.showSlide('albums-month', { guid: 'g-2', title: 'LP', author: 'Band', medium: 'music', boosters: 3, sats: 100 })
+    assert.equal(a.kind, 'album'); assert.equal(a.boost.noun, 'album'); assert.equal(a.from.title, 'Band')
+    const u = heroMod.showSlide('podroll', { guid: 'g-3', title: 'Elsewhere' }, { href: null, line: 'On 4 podrolls' })
+    assert.equal(u.boost, null)
+    const h = heroMod.slideHtml(u)
+    assert.ok(!h.includes('hero-btn') && !h.includes('data-hero-boost') && h.includes('On 4 podrolls'))
+  })
+  check('an episode slide carries the episode card\'s attributes and its note link', () => {
+    const e = heroMod.episodeSlide('episodes-year', { guid: 'ep/1', title: 'Ep One', img: 'https://a/e.jpg', show: { guid: 'g-1', title: 'A Show', feed: 'https://a/feed.xml', medium: 'podcast' }, boosters: 2, sats: 50, chart: { sats: 1, boosters: 1, boosts: 2 } })
+    assert.equal(e.kind, 'episode')
+    const h = heroMod.slideHtml(e)
+    assert.ok(h.includes('data-guid="ep/1"') && h.includes('data-show-guid="g-1"') && h.includes('data-feed-url="https://a/feed.xml"') && h.includes('data-noun="episode"'))
+    assert.ok(h.includes('data-boost-url="https://onlyboosts.social/episode/ep%2F1"'), 'episode-link.js\'s answer')
+    assert.ok(h.includes('href="/episode/ep%2F1"') && h.includes('>A Show</a>') && h.includes('>1/1/2<'))
+    const song = heroMod.episodeSlide('songs-year', { guid: 's1', title: 'Song', show: { guid: 'g-2', title: 'LP', medium: 'music' } })
+    assert.equal(song.kind, 'song'); assert.equal(song.boost.noun, 'song')
+  })
+  check('an artist slide has no boost; a member slide is a person, gold past the goal', () => {
+    const ar = heroMod.artistSlide('artists-week', { guid: 'pub-1', title: 'Band', booster_count: 4, total_sats: 900 })
+    assert.equal(ar.boost, null)
+    assert.ok(heroMod.slideHtml(ar).includes('href="/artist/pub-1"'))
+    const m = heroMod.memberSlide('hpw-week', { pk: 'f'.repeat(64), npub: 'npub1' + 'q'.repeat(58), name: 'Reed', pic: 'https://a/p.jpg', seconds: 41 * 3600, episodes: 26 }, 40)
+    assert.ok(m.person && m.gold && m.pk === 'f'.repeat(64))
+    const h = heroMod.slideHtml(m)
+    assert.ok(h.includes('hero-slide--person') && h.includes('hero-slide--gold') && h.includes('41.0 hours of podcasts boosted this week · 26 episodes'))
+    assert.ok(!h.includes('data-hero-boost'))
+  })
+  check('heroHtml renders the slides in the order given with a dot each; nothing for no slides', () => {
+    const a = heroMod.showSlide('shows-week', { guid: 'g-1', title: 'One' }), b = heroMod.showSlide('movers', { guid: 'g-2', title: 'Two' })
+    const h = heroMod.heroHtml([a, b])
+    assert.ok(h.indexOf('data-slide="shows-week"') < h.indexOf('data-slide="movers"'))
+    assert.equal((h.match(/data-hero-to="/g) || []).length, 2)
+    assert.ok(h.includes('data-hero-slides') && h.includes('data-hero-dir="-1"') && h.includes('aria-roledescription="carousel"'))
+    assert.equal(heroMod.heroHtml([]), '')
+  })
+  check('the two boost handlers the hero reuses are exported', () => {
+    assert.ok(/export async function onShowBoost\(card, btn\)/.test(read('assets/js/show-card-actions.js')))
+    assert.ok(/export async function onBoostClick\(card, btn\)/.test(read('assets/js/episode-card-actions.js')))
+  })
+
+  const db = new DatabaseSync(':memory:')
+  db.exec(read('bots/global-boost-scan/d1/schema.sql'))
+  db.prepare('INSERT INTO podcasts(podcast_guid,title,description,feed_url) VALUES(?,?,?,?)').run('g-1', 'A Show', '<p>Long &amp; <i>rich</i> notes</p> ' + 'more words '.repeat(60), 'https://a/feed.xml')
+  db.prepare('INSERT INTO episodes(item_guid,podcast_guid,title,description) VALUES(?,?,?,?)').run('ep/1', 'g-1', 'Ep One', '<b>Shownotes</b> here')
+  db.prepare('INSERT INTO publishers(publisher_guid,title,description) VALUES(?,?,?)').run('pub-1', 'Band', 'A band bio')
+  db.prepare('INSERT INTO profiles(pubkey,name,about) VALUES(?,?,?)').run('f'.repeat(64), 'Reed', 'Boosts a lot')
+  const env = { DB: { prepare: (sql) => ({ bind: (...a) => ({ all: async () => ({ results: db.prepare(sql).all(...a) }), first: async () => db.prepare(sql).get(...a) ?? null }) }) } }
+  await checkAsync('buildHero orders the slides by the page and describes each by one lookup', async () => {
+    const leads = {
+      'movers': heroMod.showSlide('movers', { guid: 'g-9', title: 'Nowhere' }, { medium: 'podcast' }),
+      'hpw-week': heroMod.memberSlide('hpw-week', { pk: 'f'.repeat(64), npub: 'npub1' + 'q'.repeat(58), name: 'Reed', seconds: 3600, episodes: 1 }),
+      'artists-week': heroMod.artistSlide('artists-week', { guid: 'pub-1', title: 'Band' }),
+      'episodes-year': heroMod.episodeSlide('episodes-year', { guid: 'ep/1', title: 'Ep One', show: { guid: 'g-1', title: 'A Show' } }),
+      'shows-week': heroMod.showSlide('shows-week', { guid: 'g-1', title: 'A Show' }, { medium: 'podcast' }),
+    }
+    const slides = await buildHero(env, leads, railOrder(index))
+    assert.deepEqual(slides.map((s) => s.key), ['shows-week', 'hpw-week', 'movers', 'episodes-year', 'artists-week'])
+    const by = Object.fromEntries(slides.map((s) => [s.key, s]))
+    assert.ok(by['shows-week'].desc.startsWith('Long & rich notes more words') && by['shows-week'].desc.endsWith('…') && by['shows-week'].desc.length <= 221)
+    assert.equal(by['shows-week'].boost.feed, 'https://a/feed.xml', 'the feed URL the weekly rows do not carry')
+    assert.equal(by['episodes-year'].desc, 'Shownotes here')
+    assert.equal(by['artists-week'].desc, 'A band bio')
+    assert.equal(by['hpw-week'].desc, 'Boosts a lot')
+    assert.equal(by['movers'].desc, undefined, 'an unknown guid: no description, the slide stays')
+  })
+  await checkAsync('a failing lookup leaves the slide in place', async () => {
+    const warn = console.warn; console.warn = () => {}
+    let slides
+    try {
+      slides = await buildHero({ DB: { prepare: () => ({ bind: () => ({ first: async () => { throw new Error('no db') } }) }) } },
+        { 'shows-week': heroMod.showSlide('shows-week', { guid: 'g-1', title: 'A Show' }) }, ['shows-week'])
+    } finally { console.warn = warn }
+    assert.equal(slides.length, 1); assert.equal(slides[0].desc, undefined)
   })
 }
 
@@ -307,19 +433,23 @@ console.log('\nThe recommendations and the data rails, over the real schema:')
     assert.deepEqual(j.because, [], 'because needs a BOOSTED seed')
   })
   await checkAsync('New and Noteworthy: first boost within 90 days and two boosters, newest debuts after the better-backed', async () => {
-    const html = await RAILS['new-shows'](env)
+    const { html, lead } = await RAILS['new-shows'](env)
     assert.ok(html.includes('Brand New') && !html.includes('Lonely Debut') && !html.includes('Seed One'))
     assert.match(html, /First boost [A-Z][a-z]{2} \d{1,2}/)
+    assert.equal(lead.key, 'new-shows'); assert.equal(lead.title, 'Brand New'); assert.match(lead.line, /^First boost .* · \d+ boosters since$/)
   })
   await checkAsync('Podcasters Recommend: ranked by how many podrolls list a show; an unindexed target is a figure, not a link', async () => {
-    const html = await RAILS.podroll(env)
+    const { html, lead } = await RAILS.podroll(env)
     assert.ok(html.indexOf('Neighbour A') < html.indexOf('Somewhere Else'))
     assert.ok(html.includes('On 2 podrolls') && html.includes('On 1 podroll<'))
     assert.ok(html.includes('href="/show/show-A"') && !html.includes('href="/show/ext-1"'))
+    assert.equal(lead.title, 'Neighbour A'); assert.equal(lead.href, '/show/show-A'); assert.equal(lead.line, 'On 2 podrolls, more than any other show')
   })
   await checkAsync('Movers: a show on this week\'s chart and not last week\'s is a debut', async () => {
-    const html = await RAILS.movers(env)
+    const { html, lead } = await RAILS.movers(env)
     assert.ok(html.includes('Seed One') && html.includes('New this week'))
+    assert.equal(lead.eyebrow, 'New on the Chart This Week', 'a debut leads: the eyebrow says so')
+    assert.match(lead.line, /not on last week's chart$/)
   })
 }
 

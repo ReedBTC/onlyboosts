@@ -330,6 +330,11 @@ The front page (`/`, since 2026-10-17) is a set of rails. `/about#recommendation
 states every rail's rule; this is the factual backing. Every input is an
 indexed Nostr boost; nothing about a visitor is stored.
 
+- **The featured carousel** (2026-10-19): one slide per generic rail, that
+  rail's first place, in the page's rail order; the same for every visitor,
+  edge-rendered from the rails' own rows. The description is the subject's
+  own (`podcasts.description`, `episodes.description`, `publishers.description`,
+  `profiles.about`), cut to about 220 characters. No editorial picks.
 - **The chart rails** (Top Shows This Week, Top Albums This Month, Top
   Episodes / Songs This Year, Top Artists This Week): the OnlyBoosts Charts
   over that window of boost time. A week is Monday 00:00 to Sunday night US

@@ -80,6 +80,33 @@ was picked from is in the session memory; direction A won, with the sans.
   Follows, then the year's episodes and songs and the week's artists.
   `test-discover-home.mjs` pins the first three and the personal rails'
   position.
+- **THE FEATURED CAROUSEL SITS ABOVE THE RAILS AND IS THE FIRST PLACE OF
+  EACH GENERIC RAIL, IN THE PAGE'S RAIL ORDER** (Reed's call, 2026-10-19,
+  after the heroes on Rotten Tomatoes, IMDb and Fountain's discovery tab;
+  he had turned the idea down on 2026-10-17 and asked for it two days
+  later). Nothing editorial, nothing personal: the same nine slides for
+  every visitor, so it is facts and the Function renders it. Each `RAILS`
+  entry answers `{ html, lead }`, the lead being its first row as a slide
+  spec from the two-sided `assets/js/hero.js` (`showSlide`, `episodeSlide`,
+  `artistSlide`, `memberSlide`, `EYEBROWS`), so the hero costs no chart
+  query; `buildHero` adds the one thing the rails do not carry, a
+  description by primary key (`blurb` strips and clips it), allowed to fail
+  per slide; `railOrder` reads the order off the shell; `injectHero` fills
+  `<!--OB:HERO-->`, left in place when there is nothing to show. The shape
+  is Fountain's, since the art is square: the artwork blurred as the
+  backdrop, the art at left, the eyebrow (the rail's rule), title, figures,
+  two lines of description, Open and Boost. **The Boost pill reuses the
+  cards' own handlers**: the slide carries the same data attributes a show
+  card or an episode card does and `discover.js` hands a click to the
+  exported `onShowBoost` / `onBoostClick`, loaded on first use. The rotation
+  (seven seconds, paused on hover, focus and touch, off under reduced
+  motion and off screen), the arrows, the dots and the artwork fallback are
+  `discover.js`; a rail the browser filled gets its slide added with the
+  same mappers (no description: the endpoints do not carry one). Two
+  trade-offs Reed accepted: the hero pushes the first rail down, most of a
+  phone's first screen; and slide one repeats the first tile under it. The
+  rails still start at #1. `/about#recommendations` says it is not an
+  editorial pick.
 - **A personal rail shows a signed-out visitor the LOCKED CARD, never a
   blank** ("Log in to see your recommendations"): Reed wants the carrot, the
   sense of missing out on what logging in and publishing boosts to Nostr
@@ -2454,6 +2481,7 @@ would. Never remove an entry** — those links are in the wild.
 | `functions/index.js` | **the discovery homepage's fact rails**, rendered at the edge (2026-10-17) |
 | `functions/_shared/charts-page.js` | the charts page's opening feed — **Shows**, rendered at the edge; it was `functions/index.js` until the front door moved |
 | `rail-tile.js` + `discover.js` | **the** rail tile, facts and verbs, shared by the edge and the browser; the personal rails (Because ×5) and the SSR fallback |
+| `hero.js` | **the** featured carousel's slide, two-sided: the first place of each generic rail, rendered by `functions/index.js` from the rails' own rows; `discover.js` rotates it and wires its Boost to the cards' handlers |
 | `functions/search.js` + `search-page.js` | the results page: the charts page's cards in a list, each wearing its chart rank, through the ranked endpoints' `q=` paths in process |
 | `nav-search.js` + `/api/v1/search?type=all` | the nav bar's grouped typeahead: shows, episodes, artists and members |
 | `functions/{show,episode,booster,artist}/…` | the four edge-rendered detail pages |

@@ -48,12 +48,12 @@
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v221" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v221" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v222" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v222" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v221" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v221" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v222" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v222" />
 </head>
 <body>
 
@@ -432,6 +432,9 @@
         <h2>How the Homepage Rails Are Built</h2>
         <p>The front page is a set of rails, each a row of ten. Every rail is listed here with the exact rule that orders it, since a recommendation whose method is hidden is an opinion and one whose method is stated is a measurement. Every input is an indexed Nostr boost and nothing else; see <a href="#limits">Limitations and Disclaimers</a> for what that excludes. Nothing about a visitor is stored by any of them.</p>
 
+        <h3>The Featured Carousel</h3>
+        <p>The rotating panel at the top of the front page is not an editorial pick. Each slide is the first place of one of the rails below it, in the order the rails appear: this week&rsquo;s top show, this month&rsquo;s top album, the member leading the #40HPW week, the newest noteworthy show, the week&rsquo;s biggest climber, the year&rsquo;s top episode and song, the week&rsquo;s top artist, and the show most often recommended by other podcasters. The slides are the same for every visitor, signed in or not, and change only when the rails change. The description on a slide is the one the show, episode, artist or member published themselves.</p>
+
         <h3>The Chart Rails</h3>
         <p>Top Shows This Week, Top Albums This Month, Top Episodes This Year, Top Songs This Year and Top Artists This Week are the <a href="#charts">OnlyBoosts Charts</a> computed over that window of boost time. A week runs Monday 00:00 to Sunday night, US Pacific; a month and a year are the trailing 30 and 365 days. The ten tiles are the chart&rsquo;s first ten places, and the line under each tile prints the three component ranks (sats / boosters / boosts) that produced the place, so any tile can be checked against the chart view it links to.</p>
 
@@ -725,15 +728,15 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v221"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v222"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v221" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v222" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v221" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v222" defer></script>
 
-<script src="/assets/js/nav.js?v=ob-v221" defer></script>
+<script src="/assets/js/nav.js?v=ob-v222" defer></script>
 
 </body>
 </html>

@@ -59,14 +59,14 @@
   <meta name="twitter:card" content="summary_large_image" />
 
   <link rel="preload" href="/assets/fonts/outfit.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v221" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v221" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v222" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v222" />
   <!-- The boost rows at the foot are the detail pages' rows and wear their
        sheets: the card, the thread chrome and the reaction bar. -->
-  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v221" />
+  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v222" />
   <!-- theme.css last among the shared sheets: the palette, the fonts, and
        the base body/a/img rules every shared stylesheet reads off :root. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v221" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v222" />
 </head>
 <body>
 
@@ -208,6 +208,13 @@
      publishing boosts to Nostr. ⚠️ THE ORDER IS REED'S: nothing a visitor
      cannot see signed out comes before the fourth rail. -->
 <main class="discover" id="discover">
+
+  <!-- THE FEATURED CAROUSEL (Reed's call, 2026-10-19): one slide per generic
+       rail, that rail's first place, in the rails' order below; the same for
+       every visitor. functions/index.js renders it here from the rails' own
+       rows with assets/js/hero.js; with nothing to show the marker stays and
+       assets/js/discover.js builds what it can from the rails it fetches. -->
+  <!--OB:HERO--><!--/OB:HERO-->
 
   <section class="rail" data-rail="shows-week" aria-labelledby="rail-shows-week">
     <div class="rail-head">
@@ -462,12 +469,12 @@
 <!-- FOOTER:END -->
 
 <!-- Lazy widget bootstrap (Donate + identity slot) -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v221"></script>
-<script src="/assets/js/sw-register.js?v=ob-v221" defer></script>
-<script src="/assets/widgets/pwa-install.js?v=ob-v221" defer></script>
-<script src="/assets/js/nav.js?v=ob-v221" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v222"></script>
+<script src="/assets/js/sw-register.js?v=ob-v222" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v222" defer></script>
+<script src="/assets/js/nav.js?v=ob-v222" defer></script>
 <!-- The verbs: artwork fallback, the rails the edge could not fill, and the
      personal rails for a signed-in member. -->
-<script type="module" src="/assets/js/discover.js?v=ob-v221"></script>
+<script type="module" src="/assets/js/discover.js?v=ob-v222"></script>
 </body>
 </html>

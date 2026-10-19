@@ -19,6 +19,15 @@
 // ⚠️ THE TILE IS TWO-SIDED (assets/js/rail-tile.js): the edge renders it, and
 // a rail the browser rebuilds is byte-identical by construction.
 //
+// THE FEATURED CAROUSEL (Reed's call, 2026-10-19) sits above the rails: one
+// slide per generic rail, the rail's FIRST PLACE, in the page's rail order.
+// Each rail hands back its first row beside its HTML, so the hero costs no
+// chart query; the one thing it adds is a description per slide (the one
+// column the rails do not carry), looked up by primary key and allowed to
+// fail quietly. The slide is assets/js/hero.js, two-sided like the tile. A
+// rail with no rows has no slide, and with no slides at all the marker is
+// left for the browser, like a rail's placeholder.
+//
 // WHAT IT COSTS. The weekly charts are the same windowed queries
 // /api/v1/charts answers; the month, year and #40HPW rails are the ranked
 // endpoints' own functions with the same arguments the links beside each
@@ -32,6 +41,7 @@ import { readParams as episodeParams, globalEpisodes } from "./api/v1/episodes.j
 import { hoursBoard } from "./api/v1/members/hours.js";
 import { railListHtml, tileHtml, showTile, albumTile, episodeTile, artistTile, memberTile } from "../assets/js/rail-tile.js";
 import { showPageHref } from "../assets/js/show-link.js";
+import { heroHtml, showSlide, episodeSlide, artistSlide, memberSlide, EYEBROWS } from "../assets/js/hero.js";
 import { headOf } from "./_shared/head.js";
 
 const TILES = 10;
@@ -53,32 +63,42 @@ async function rankedEpisodes(env, query) {
   return res?.episodes || res?.items || [];
 }
 
+/** A rail's answer: its HTML and, for the hero, its first row as a slide
+ *  spec (null when the rail is empty). */
+const rail = (html, lead) => ({ html, lead: lead || null });
+
 export const RAILS = {
   "shows-week": async (env) => {
     const { body } = await weekBoard(env, { kind: "shows", limit: TILES });
-    return railListHtml(body.rows.map(showTile), { empty: "No shows boosted yet this week." });
+    return rail(railListHtml(body.rows.map(showTile), { empty: "No shows boosted yet this week." }),
+      body.rows[0] && showSlide("shows-week", body.rows[0], { medium: "podcast" }));
   },
   "albums-month": async (env) => {
     const rows = await rankedPodcasts(env, `medium=music&sort=chart&range=1m&limit=${TILES}`);
-    return railListHtml(rows.map(albumTile), { empty: "No albums boosted yet this month." });
+    return rail(railListHtml(rows.map(albumTile), { empty: "No albums boosted yet this month." }),
+      rows[0] && showSlide("albums-month", rows[0], { medium: "music" }));
   },
   /* The #40HPW week as a rail of faces, not the board: Reed's call,
      2026-10-17, every rail the same shape. Gold past the goal. */
   "hpw-week": async (env) => {
     const { body } = await hoursBoard(env, { range: "week", limit: TILES });
-    return railListHtml(body.members.map((m, i) => memberTile(m, i, body.goal_hours)), { empty: "No qualifying boosts yet this week." });
+    return rail(railListHtml(body.members.map((m, i) => memberTile(m, i, body.goal_hours)), { empty: "No qualifying boosts yet this week." }),
+      body.members[0] && memberSlide("hpw-week", body.members[0], body.goal_hours));
   },
   "episodes-year": async (env) => {
     const rows = await rankedEpisodes(env, `not_medium=music&sort=chart&range=1y&limit=${TILES}`);
-    return railListHtml(rows.map((r, i) => episodeTile(r, i, "🎙")), { empty: "No episodes boosted this year." });
+    return rail(railListHtml(rows.map((r, i) => episodeTile(r, i, "🎙")), { empty: "No episodes boosted this year." }),
+      rows[0] && episodeSlide("episodes-year", rows[0]));
   },
   "songs-year": async (env) => {
     const rows = await rankedEpisodes(env, `medium=music&sort=chart&range=1y&limit=${TILES}`);
-    return railListHtml(rows.map((r, i) => episodeTile(r, i, "🎵")), { empty: "No songs boosted this year." });
+    return rail(railListHtml(rows.map((r, i) => episodeTile(r, i, "🎵")), { empty: "No songs boosted this year." }),
+      rows[0] && episodeSlide("songs-year", rows[0]));
   },
   "artists-week": async (env) => {
     const { body } = await weekBoard(env, { kind: "artists", limit: TILES });
-    return railListHtml(body.rows.map(artistTile), { empty: "No artists boosted yet this week." });
+    return rail(railListHtml(body.rows.map(artistTile), { empty: "No artists boosted yet this week." }),
+      body.rows[0] && artistSlide("artists-week", body.rows[0]));
   },
   /* NEW AND NOTEWORTHY: shows whose FIRST boost ever landed in the last 90
      days, two or more distinct boosters, by boosters then sats. The all-time
@@ -94,12 +114,14 @@ export const RAILS = {
         ORDER BY booster_count DESC, total_sats DESC, first_boost_ts DESC LIMIT ?`
     ).bind(since, TILES).all();
     const rows = results || [];
-    return railListHtml(rows.map((r, i) => tileHtml({
+    const firstBoost = (r) => "First boost " + new Date(r.first_boost_ts * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+    return rail(railListHtml(rows.map((r, i) => tileHtml({
       rank: i + 1, href: showPageHref(r.guid), title: r.title,
-      sub: "First boost " + new Date(r.first_boost_ts * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }),
+      sub: firstBoost(r),
       subTitle: `${r.booster_count} boosters since its first boost`,
       img: r.image, art2: r.artwork, glyph: (r.medium === "music" ? "🎵" : "🎙"),
-    })), { empty: "No show had its first boost in the last 90 days." });
+    })), { empty: "No show had its first boost in the last 90 days." }),
+      rows[0] && showSlide("new-shows", rows[0], { line: `${firstBoost(rows[0])} · ${rows[0].booster_count} boosters since` }));
   },
   /* MOVERS: the biggest climbs on this week's Shows chart against last
      week's, then this week's debuts in chart order. Both weeks are the
@@ -117,12 +139,20 @@ export const RAILS = {
       .sort((a, b) => b.climb - a.climb || a.r.rank - b.r.rank);
     const debuts = now.filter((r) => !was.has(r.guid)).map((r) => ({ r, climb: null }));
     const picks = [...climbers, ...debuts].slice(0, TILES);
-    return railListHtml(picks.map(({ r, climb }) => tileHtml({
+    const top = picks[0];
+    return rail(railListHtml(picks.map(({ r, climb }) => tileHtml({
       rank: r.rank, tied: !!r.tied, href: showPageHref(r.guid), title: r.title,
       sub: climb != null ? `▲ ${climb} · was #${was.get(r.guid)}` : "New this week",
       subTitle: climb != null ? "Places climbed since last week's chart" : "Not on last week's chart",
       img: r.image, art2: r.artwork, glyph: "🎙",
-    })), { empty: "Nothing has moved yet this week." });
+    })), { empty: "Nothing has moved yet this week." }),
+      top && showSlide("movers", top.r, {
+        medium: "podcast",
+        eyebrow: top.climb != null ? EYEBROWS.movers : "New on the Chart This Week",
+        line: top.climb != null
+          ? `Up ${top.climb} place${top.climb === 1 ? "" : "s"} to #${top.r.rank}, from #${was.get(top.r.guid)} last week`
+          : `#${top.r.rank} this week, not on last week's chart`,
+      }));
   },
   /* PODCASTERS RECOMMEND: the shows most often listed on other shows'
      podrolls, the one editorial signal publishers wrote themselves. A
@@ -138,14 +168,76 @@ export const RAILS = {
         ORDER BY n DESC, title ASC LIMIT ?`
     ).bind(TILES).all();
     const rows = results || [];
-    return railListHtml(rows.map((r, i) => tileHtml({
+    const onN = (r) => `On ${r.n} podroll${Number(r.n) === 1 ? "" : "s"}`;
+    return rail(railListHtml(rows.map((r, i) => tileHtml({
       rank: i + 1, href: Number(r.linked) ? showPageHref(r.guid) : null, title: r.title,
-      sub: `On ${r.n} podroll${Number(r.n) === 1 ? "" : "s"}`,
+      sub: onN(r),
       subTitle: "How many shows list it on their podroll",
       img: r.image, art2: r.artwork, glyph: (r.medium === "music" ? "🎵" : "🎙"),
-    })), { empty: "No podroll in the index yet." });
+    })), { empty: "No podroll in the index yet." }),
+      rows[0] && showSlide("podroll", rows[0], {
+        href: Number(rows[0].linked) ? showPageHref(rows[0].guid) : null,
+        line: `${onN(rows[0])}, more than any other show`,
+      }));
   },
 };
+
+/* ── The hero ────────────────────────────────────────────────────────────── */
+
+/** A description cut for a slide: tags off, entities decoded, whitespace
+ *  collapsed, clipped at a word boundary. The podcasts column is stored
+ *  stripped; an episode's shownotes are not, and a publisher's bio and a
+ *  member's about field can be anything. */
+export function blurb(text, max = 220) {
+  let t = String(text ?? '').replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#0*39;|&apos;/g, "'")
+    .replace(/\s+/g, ' ').trim();
+  if (t.length <= max) return t;
+  const cut = t.lastIndexOf(' ', max);
+  return t.slice(0, cut > max * 0.6 ? cut : max).replace(/[\s,;:.]+$/, '') + '…';
+}
+
+/* The one lookup a slide adds: the subject's description by primary key.
+   A show slide also picks up the feed URL, which the weekly chart's rows
+   do not carry and the boost pill prefers. Any failure leaves the slide as
+   it was. */
+const DESCRIBE = {
+  show:    (env, s) => env.DB.prepare(`SELECT description AS d, feed_url AS feed FROM podcasts WHERE podcast_guid = ?`).bind(s.guid || '').first(),
+  album:   (env, s) => DESCRIBE.show(env, s),
+  episode: (env, s) => env.DB.prepare(`SELECT description AS d FROM episodes WHERE item_guid = ?`).bind(s.guid || '').first(),
+  song:    (env, s) => DESCRIBE.episode(env, s),
+  artist:  (env, s) => env.DB.prepare(`SELECT description AS d FROM publishers WHERE publisher_guid = ?`).bind(s.guid || '').first(),
+  member:  (env, s) => env.DB.prepare(`SELECT about AS d FROM profiles WHERE pubkey = ?`).bind(s.pk || '').first(),
+};
+
+/** The slides in `order` (the page's rail order), each described. */
+export async function buildHero(env, leads, order) {
+  const slides = order.map((k) => leads[k]).filter(Boolean);
+  await Promise.all(slides.map(async (s) => {
+    try {
+      const row = await DESCRIBE[s.kind]?.(env, s);
+      if (!row) return;
+      const d = blurb(row.d);
+      if (d) s.desc = d;
+      if (row.feed && s.boost && !s.boost.feed) s.boost.feed = row.feed;
+    } catch (e) { console.warn(`[home] slide ${s.key} not described`, e?.message); }
+  }));
+  return slides;
+}
+
+/** The page's rail order, read off the shell so the slides follow the
+ *  sections as Reed placed them, personal rails skipped. */
+export function railOrder(html) {
+  return [...html.matchAll(/<section[^>]*data-rail="([a-z-]+)"(?![^>]*data-rail-personal)/g)].map((m) => m[1]);
+}
+
+export function injectHero(html, block) {
+  const open = "<!--OB:HERO-->", close = "<!--/OB:HERO-->";
+  const start = html.indexOf(open), end = html.indexOf(close);
+  if (start === -1 || end === -1 || end < start) throw new Error("hero marker not found");
+  return html.slice(0, start) + block + html.slice(end + close.length);
+}
 
 /* ── The injection ───────────────────────────────────────────────────────── */
 
@@ -179,11 +271,19 @@ export async function onRequestGet(context) {
   let html = await shell.text();
   const keys = Object.keys(RAILS);
   const settled = await Promise.allSettled(keys.map((k) => RAILS[k](env)));
+  const leads = {};
   settled.forEach((s, i) => {
     if (s.status !== "fulfilled") { console.warn(`[home] rail ${keys[i]} not rendered`, s.reason); return; }
-    try { html = injectRail(html, keys[i], s.value); }
+    const v = typeof s.value === "string" ? { html: s.value, lead: null } : s.value;
+    try { html = injectRail(html, keys[i], v.html); leads[keys[i]] = v.lead; }
     catch (err) { console.warn(`[home] rail ${keys[i]} not injected`, err); }
   });
+
+  // The hero, from the rails' first rows; nothing rendered leaves the marker.
+  try {
+    const slides = await buildHero(env, leads, railOrder(html));
+    if (slides.length) html = injectHero(html, heroHtml(slides));
+  } catch (err) { console.warn("[home] hero not rendered", err); }
 
   return new Response(html, {
     status: 200,

@@ -13,10 +13,18 @@
  *    (one per most-boosted show; Reed's ask, 2026-10-18), cloned from the
  *    hidden prototype in index.html. Re-run on lb:session-change and on the
  *    storage event, like feeds.js.
+ * 4. The FEATURED CAROUSEL at the top (Reed's call, 2026-10-19): the edge
+ *    rendered it from the rails' first rows with the two-sided hero.js; this
+ *    runs the rotation (seven seconds, paused on hover and focus, off under
+ *    reduced motion and while the hero is off screen), the arrows and dots,
+ *    the artwork fallback, and the Boost pill, which hands a click to the
+ *    feed cards' own handlers. A rail the edge could not fill gets its slide
+ *    rebuilt here from the rows fetched for the rail, with the same mappers.
  */
-import { railListHtml, showTile, albumTile, episodeTile, artistTile, memberTile } from '/assets/js/rail-tile.js?v=ob-v221'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v221'
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v221'
+import { railListHtml, showTile, albumTile, episodeTile, artistTile, memberTile } from '/assets/js/rail-tile.js?v=ob-v222'
+import { heroHtml, slideHtml, showSlide, episodeSlide, artistSlide, memberSlide } from '/assets/js/hero.js?v=ob-v222'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v222'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v222'
 
 const TILES = 10
 
@@ -40,11 +48,11 @@ function wireArt(root) {
 
 /* ── 2. Rails the edge did not fill ────────────────────────────────────── */
 const SOURCES = {
-  'shows-week':    { url: '/api/v1/charts/shows', rows: (j) => j.rows, tile: showTile },
-  'artists-week':  { url: '/api/v1/charts/artists', rows: (j) => j.rows, tile: artistTile },
-  'albums-month':  { url: `/api/v1/podcasts?medium=music&sort=chart&range=1m&limit=${TILES}`, rows: (j) => j.podcasts, tile: albumTile },
-  'episodes-year': { url: `/api/v1/episodes?not_medium=music&sort=chart&range=1y&limit=${TILES}`, rows: (j) => j.episodes, tile: (r, i) => episodeTile(r, i, '🎙') },
-  'songs-year':    { url: `/api/v1/episodes?medium=music&sort=chart&range=1y&limit=${TILES}`, rows: (j) => j.episodes, tile: (r, i) => episodeTile(r, i, '🎵') },
+  'shows-week':    { url: '/api/v1/charts/shows', rows: (j) => j.rows, tile: showTile, slide: (r) => showSlide('shows-week', r, { medium: 'podcast' }) },
+  'artists-week':  { url: '/api/v1/charts/artists', rows: (j) => j.rows, tile: artistTile, slide: (r) => artistSlide('artists-week', r) },
+  'albums-month':  { url: `/api/v1/podcasts?medium=music&sort=chart&range=1m&limit=${TILES}`, rows: (j) => j.podcasts, tile: albumTile, slide: (r) => showSlide('albums-month', r, { medium: 'music' }) },
+  'episodes-year': { url: `/api/v1/episodes?not_medium=music&sort=chart&range=1y&limit=${TILES}`, rows: (j) => j.episodes, tile: (r, i) => episodeTile(r, i, '🎙'), slide: (r) => episodeSlide('episodes-year', r) },
+  'songs-year':    { url: `/api/v1/episodes?medium=music&sort=chart&range=1y&limit=${TILES}`, rows: (j) => j.episodes, tile: (r, i) => episodeTile(r, i, '🎵'), slide: (r) => episodeSlide('songs-year', r) },
 }
 
 async function getJson(url, init) {
@@ -53,26 +61,203 @@ async function getJson(url, init) {
   return r.json()
 }
 
+/** Fills a rail the edge left a placeholder in. Resolves to the rail's first
+ *  row as a hero slide spec (or null), so the hero can gain the slide too. */
 async function fillRail(section) {
   const key = section.dataset.rail
   const track = section.querySelector('.rail-track')
-  if (!track || !track.querySelector('.rail-placeholder')) return
+  if (!track || !track.querySelector('.rail-placeholder')) return null
   try {
     if (key === 'hpw-week') {
       const j = await getJson('/api/v1/members/hours?range=week')
-      track.innerHTML = railListHtml((j.members || []).slice(0, TILES).map((m, i) => memberTile(m, i, j.goal_hours)), { empty: 'No qualifying boosts yet this week.' })
+      const members = (j.members || []).slice(0, TILES)
+      track.innerHTML = railListHtml(members.map((m, i) => memberTile(m, i, j.goal_hours)), { empty: 'No qualifying boosts yet this week.' })
       wireArt(track)
-      return
+      return members[0] ? memberSlide('hpw-week', members[0], j.goal_hours) : null
     }
     const src = SOURCES[key]
-    if (!src) { track.innerHTML = '<p class="rail-empty">Unavailable right now.</p>'; return }
+    if (!src) { track.innerHTML = '<p class="rail-empty">Unavailable right now.</p>'; return null }
     const rows = src.rows(await getJson(src.url)) || []
     track.innerHTML = railListHtml(rows.slice(0, TILES).map(src.tile), { empty: 'Nothing here yet.' })
     wireArt(track)
+    return rows[0] ? src.slide(rows[0]) : null
   } catch (e) {
     console.warn('[discover] rail', key, e)
     track.innerHTML = '<p class="rail-empty">This rail could not load. Reload to try again.</p>'
+    return null
   }
+}
+
+/* ── 4. The featured carousel ──────────────────────────────────────────── */
+const HERO_MS = 7000
+
+function wireHeroArt(root) {
+  for (const img of root.querySelectorAll('.hero-art:not([data-art-wired])')) {
+    img.dataset.artWired = '1'
+    const chain = coverChain(img.dataset.art2).filter((u) => u !== img.getAttribute('src'))
+    const exhausted = () => {
+      const glyph = img.closest('.hero-slide')?.dataset.kind === 'member' ? '👤' : '🎙'
+      img.replaceWith(Object.assign(document.createElement('span'), { className: 'hero-art hero-art--none', textContent: glyph }))
+    }
+    const fail = () => { if (chain.length) wireCoverFallback(img, chain, exhausted); else exhausted() }
+    if (img.complete && img.naturalWidth === 0) { fail(); continue }
+    img.onerror = () => { img.onerror = null; fail() }
+  }
+  for (const bg of root.querySelectorAll('.hero-bg:not([data-art-wired])')) {
+    bg.dataset.artWired = '1'
+    if (bg.complete && bg.naturalWidth === 0) { bg.remove(); continue }
+    bg.onerror = () => bg.remove()
+  }
+}
+
+/* The Boost pill: revealed here, and a click goes to the feed cards' own
+   handlers (the show card's for a show or album, the episode card's for an
+   episode or song), which read the subject off the slide's attributes
+   exactly as off a card. Loaded on first use: the homepage's first view
+   does not carry the cards' modules otherwise. */
+function wireHeroBoost(hero) {
+  for (const b of hero.querySelectorAll('[data-hero-boost]')) b.hidden = false
+  if (hero.dataset.boostWired) return
+  hero.dataset.boostWired = '1'
+  hero.addEventListener('click', async (e) => {
+    const btn = e.target?.closest?.('[data-hero-boost]')
+    if (!btn || btn.disabled) return
+    e.preventDefault()
+    const slide = btn.closest('.hero-slide')
+    if (!slide) return
+    btn.disabled = true
+    try {
+      const kind = slide.dataset.kind
+      if (kind === 'episode' || kind === 'song') {
+        const m = await import('/assets/js/episode-card-actions.js?v=ob-v222')
+        btn.disabled = false
+        await m.onBoostClick(slide, btn)
+      } else {
+        const m = await import('/assets/js/show-card-actions.js?v=ob-v222')
+        btn.disabled = false
+        await m.onShowBoost(slide, btn)
+      }
+    } catch (err) {
+      console.warn('[discover] hero boost', err)
+      btn.disabled = false
+    }
+  })
+}
+
+const hero = { el: null, timer: null, paused: false, visible: true, reduced: false }
+
+function heroSlides() { return hero.el ? Array.from(hero.el.querySelectorAll('.hero-slide')) : [] }
+function heroIndex() {
+  const strip = hero.el?.querySelector('[data-hero-slides]')
+  if (!strip || !strip.clientWidth) return 0
+  return Math.round(strip.scrollLeft / strip.clientWidth)
+}
+function heroGo(i, smooth = true) {
+  const strip = hero.el?.querySelector('[data-hero-slides]')
+  const n = heroSlides().length
+  if (!strip || !n) return
+  const to = ((i % n) + n) % n
+  strip.scrollTo({ left: to * strip.clientWidth, behavior: smooth && !hero.reduced ? 'smooth' : 'auto' })
+  markHeroDot(to)
+}
+function markHeroDot(i) {
+  for (const b of hero.el?.querySelectorAll('[data-hero-to]') || []) {
+    if (Number(b.dataset.heroTo) === i) b.setAttribute('aria-current', 'true')
+    else b.removeAttribute('aria-current')
+  }
+}
+function heroTick() {
+  clearInterval(hero.timer)
+  hero.timer = null
+  if (hero.reduced || hero.paused || !hero.visible || document.hidden || heroSlides().length < 2) return
+  hero.timer = setInterval(() => heroGo(heroIndex() + 1), HERO_MS)
+}
+
+/* The dots follow the slides: rebuilt after a slide is added. */
+function syncHeroChrome() {
+  const el = hero.el
+  if (!el) return
+  const slides = heroSlides()
+  const n = slides.length
+  slides.forEach((s, i) => s.setAttribute('aria-label', `${i + 1} of ${n}: ${s.querySelector('.hero-eyebrow')?.textContent || ''}`))
+  const dots = el.querySelector('[data-hero-dots]')
+  if (dots) {
+    dots.innerHTML = slides.map((s, i) =>
+      `<li><button type="button" data-hero-to="${i}" aria-label="Slide ${i + 1} of ${n}"></button></li>`).join('')
+    for (const b of dots.querySelectorAll('button')) b.setAttribute('aria-label', `Slide ${Number(b.dataset.heroTo) + 1} of ${n}: ${slides[Number(b.dataset.heroTo)].querySelector('.hero-eyebrow')?.textContent || ''}`)
+    dots.hidden = n < 2
+  }
+  for (const a of el.querySelectorAll('[data-hero-dir]')) a.hidden = n < 2
+  markHeroDot(heroIndex())
+  wireHeroArt(el)
+  wireHeroBoost(el)
+  heroTick()
+}
+
+function initHero() {
+  const el = document.querySelector('[data-hero]')
+  if (!el || el.dataset.heroWired) { if (el) syncHeroChrome(); return }
+  el.dataset.heroWired = '1'
+  hero.el = el
+  hero.reduced = !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  const strip = el.querySelector('[data-hero-slides]')
+  el.addEventListener('click', (e) => {
+    const dir = e.target?.closest?.('[data-hero-dir]')
+    if (dir) { heroGo(heroIndex() + Number(dir.dataset.heroDir)); heroTick(); return }
+    const to = e.target?.closest?.('[data-hero-to]')
+    if (to) { heroGo(Number(to.dataset.heroTo)); heroTick() }
+  })
+  el.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft') { heroGo(heroIndex() - 1); heroTick() }
+    else if (e.key === 'ArrowRight') { heroGo(heroIndex() + 1); heroTick() }
+  })
+  const pause = () => { hero.paused = true; heroTick() }
+  const resume = () => { hero.paused = false; heroTick() }
+  el.addEventListener('mouseenter', pause)
+  el.addEventListener('mouseleave', resume)
+  el.addEventListener('focusin', pause)
+  el.addEventListener('focusout', (e) => { if (!el.contains(e.relatedTarget)) resume() })
+  el.addEventListener('touchstart', pause, { passive: true })
+  let scrollT = null
+  strip?.addEventListener('scroll', () => {
+    clearTimeout(scrollT)
+    scrollT = setTimeout(() => markHeroDot(heroIndex()), 80)
+  }, { passive: true })
+  document.addEventListener('visibilitychange', heroTick)
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver((entries) => { hero.visible = entries.some((x) => x.isIntersecting); heroTick() }, { threshold: 0.3 }).observe(el)
+  }
+  // A resize changes the slide width; stay on the same slide.
+  let resizeT = null
+  window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => heroGo(heroIndex(), false), 120) })
+  syncHeroChrome()
+}
+
+/* Slides for the rails the browser filled: added to the hero in the page's
+   rail order, or the whole hero built if the edge rendered none. */
+function patchHero(specs) {
+  const fresh = specs.filter(Boolean)
+  if (!fresh.length) return
+  const order = Array.from(document.querySelectorAll('[data-rail]:not([data-rail-personal])')).map((s) => s.dataset.rail)
+  fresh.sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key))
+  let el = document.querySelector('[data-hero]')
+  if (!el) {
+    const first = document.querySelector('#discover .rail')
+    if (!first) return
+    first.insertAdjacentHTML('beforebegin', heroHtml(fresh))
+    initHero()
+    return
+  }
+  const strip = el.querySelector('[data-hero-slides]')
+  if (!strip) return
+  for (const spec of fresh) {
+    if (strip.querySelector(`[data-slide="${CSS.escape(spec.key)}"]`)) continue
+    const after = Array.from(strip.querySelectorAll('.hero-slide')).find((s) => order.indexOf(s.dataset.slide) > order.indexOf(spec.key))
+    const html = slideHtml(spec, 1, 1)
+    if (after) after.insertAdjacentHTML('beforebegin', html)
+    else strip.insertAdjacentHTML('beforeend', html)
+  }
+  syncHeroChrome()
 }
 
 /* ── 3. Personal rails ─────────────────────────────────────────────────── */
@@ -198,7 +383,10 @@ document.addEventListener('click', async (e) => {
 
 /* ── Boot ──────────────────────────────────────────────────────────────── */
 wireArt(document)
-for (const s of document.querySelectorAll('[data-rail]:not([data-rail-personal])')) fillRail(s)
+initHero()
+Promise.all(Array.from(document.querySelectorAll('[data-rail]:not([data-rail-personal])')).map(fillRail))
+  .then(patchHero)
+  .catch((e) => console.warn('[discover] hero patch', e))
 paintPersonal()
 window.addEventListener('lb:session-change', paintPersonal)
 window.addEventListener('storage', (e) => { if (e.key === 'lb_nostr_session') paintPersonal() })
