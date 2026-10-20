@@ -166,7 +166,16 @@ from nostr_utils import npub_to_hex          # noqa: E402
 # reconstruction as Boostr_Bot). Measured on the collector: the dry run
 # marked exactly those five and nothing else. Its v4vmusic.com autoboost
 # notes name no sender and have no partner to find, and stand.
-RELAY_PUBLISHERS = {"chadf-boostbot", "localbitcoiners", "boostr-bot", "msp-2-0"}
+# candr-boost (candr_boost_bot, Chad's watcher on the Chad and Reed node)
+# joined 2026-10-20. It reports the full amount, so the hard key holds, and
+# names no sender, so the prose tiers do the pairing: the body restates the
+# donor's message and the `app` tag names the app, chadf-boostbot's shape.
+# Measured on registration: 2 of its first 30 notes restated a BoostMeBitch
+# note 14-17s earlier (111 sats each, tier msg+app); the other 28 came
+# through apps that publish no note (The Split Kit, v4vmusic-com, CurioCaster,
+# PodcastGuru) or had no partner within the window, and stand.
+RELAY_PUBLISHERS = {"chadf-boostbot", "localbitcoiners", "boostr-bot", "msp-2-0",
+                    "candr-boost"}
 
 MSG_WINDOW = 30 * 60      # strong message corroboration: generous
 APP_WINDOW = 10 * 60      # app-identity corroboration: tight

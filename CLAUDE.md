@@ -1343,6 +1343,11 @@ Bowl After Bowl, 25,265 sats); the pass runs every incremental cycle over a
   **MSP_bot (`msp-2-0`, registered 2026-10-02) is the second bot on this
   tier**: the same 1%-leg shape for musicsideproject.com feeds, the same
   `sender` tag, and five of its first nine notes paired by it.
+  **candr_boost_bot (`candr-boost`, registered 2026-10-20) is NOT on this
+  tier**: Chad's watcher on the Chad and Reed node reports the full amount
+  and names no sender, so the prose tiers pair it (2 of its first 30 notes,
+  both against BoostMeBitch, tier `msg+app`); it is excluded from the
+  boards, unlike chadf-boostbot, because it relays other listeners' boosts.
 - **⚠️ ONE-TO-ONE HAS ONE EXCEPTION, ON THE RELAY SIDE.** `chadf-boostbot`
   signs one receipt and one note **per keysend leg**, so a multi-leg boost is
   2–3 identical bot notes and the claim used to block the second from the
