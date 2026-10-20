@@ -44,6 +44,11 @@ const DISPLAY = {
   // where the slug comes from; the label follows its profile name, the way
   // Boostr_Bot's does, because the chip names the publisher.
   "msp-2-0": "MSP Bot",
+  // candr_boost_bot, Chad's node-watching bot for Chad and Reed's show,
+  // registered as a publisher on 2026-10-20. Its notes carry
+  // `["client","candr-boost"]`, the slug itself; chadf-boostbot's shape with
+  // Boostr_Bot's tags, the listener's app in `app`.
+  "candr-boost": "CandR Boost Bot",
   // Carried over from the Boosts feed's own map, which read the raw client tag
   // and is now deleted. No boost in the index currently classifies to this slug;
   // it costs a line and saves the label if one ever does.
