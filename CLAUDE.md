@@ -119,13 +119,41 @@ was picked from is in the session memory; direction A won, with the sans.
   paints it with the same two-sided `assets/js/rail-tile.js`. The #40HPW rail
   renders the two-sided `hpw-board.js` board, not tiles.
 - **The nav bar is direction A on every page** (`partials/nav.html`): logo and
-  wordmark, Charts · Podcasts · Music · Members as plain links, the site
-  search in the middle (`assets/js/nav-search.js`, loaded by `nav.js`,
-  asking `/api/v1/search?type=all` and `/api/v1/members?q=`), the theme
-  toggle, Donate, the account control. On a phone the links fold into the
+  wordmark, the sections, the site search in the middle
+  (`assets/js/nav-search.js`, loaded by `nav.js`, asking
+  `/api/v1/search?type=all` and `/api/v1/members?q=`), the theme toggle,
+  Donate, the account control. On a phone the links fold into the
   hamburger's overlay and the search takes its own row. **The overlay's
   Charts group, the inline links and the footer's Charts group name the same
-  four places; change them together.**
+  places; change them together.**
+- **THE SECTIONS ARE RIBBONS SINCE 2026-10-20: Podcasts · Music · Members
+  each open a panel under the bar, then #40HPW and Boosts as plain links,
+  and Charts is OFF the bar** (Reed's call, after Rotten Tomatoes' section
+  menus; Charts and Podcasts opened the same page on the same tab). A
+  ribbon is two top-five lists (Shows This Week + Shows This Year; Albums
+  This Month + Songs This Year; #40HPW This Week + Largest Boosts This
+  Week), a **Discover** column of that side's rails minus the two listed
+  (the personal rails named, so a signed-out visitor sees what logging in
+  unlocks), and the first list's #1 at the right. Each is a `<details>` so
+  the caret opens it with no script; `assets/js/nav-ribbons.js` (loaded by
+  `nav.js` like the search) adds hover, Escape and outside-click, and
+  **fills the lists on first open from the chart endpoints**: the nav is a
+  partial on static pages too, so the lists are never edge-rendered.
+  `SOURCES` there is keyed by the partial's `data-ribbon-list` slots. The
+  Members ribbon's second list is `/api/v1/boosts?sort=sats&range=1w`, the
+  one ordering that endpoint has besides time (no cursor in it). On a phone
+  the overlay's three section rows are accordions: the row opens the page,
+  the chevron opens the Discover links. **Reed's wording rule: the boost
+  feed's link is "Boosts", never "Live"**, which means something else in
+  podcasting. **`/charts#boosts` is the boost feed's own address** (the
+  nav's Boosts link, the footer, the ribbon): an `ALIASES` entry resolving
+  to the Members tab, rewritten to `#members`, plus a scroll to the Boosts
+  section that re-runs on `lb:members-painted` once the boards above it
+  have their height; `index.html`'s head forward carries it. The Discover
+  links to homepage rails are `/#rail-<key>`, the rails' heading ids, under
+  a `scroll-margin-top` for the sticky bar. `test-discover-home.mjs` pins
+  the bar, the slots against `SOURCES`, the Discover columns, the overlay
+  and footer in step, the forward and the alias, and the sats ordering.
 - **`--font-sans` is Outfit** (`assets/fonts/outfit.woff2`, OFL, a variable
   file), used by the bar and the rails. The two serifs are still the display
   and body faces everywhere else; the typography item below is still open.
@@ -193,7 +221,7 @@ order. They are the site map, so **they're regrouped together or not at all**:
 
 | Group | Items |
 |---|---|
-| **Charts** | Charts `/charts` · Podcasts `/charts#shows` · Music `/charts#artists` · Members `/charts#members` — *Feeds* until 2026-10-17, when the page moved and gained its own entry |
+| **Charts** | Podcasts `/charts#shows` · Music `/charts#artists` · Members `/charts#members` · #40HPW `/charts#members` · Boosts `/charts#boosts` — *Feeds* until 2026-10-17, when the page moved and gained a Charts entry; that entry came off again on 2026-10-20 with the ribbons (it duplicated Podcasts) and the two quick links joined |
 | **Stats** | Boost Stats `/stats` — coming soon |
 
 **⚠️ `/boosters` (Community) WAS THE SECOND STATS ENTRY AND THE PAGE IS DELETED,
@@ -2484,6 +2512,7 @@ would. Never remove an entry** — those links are in the wild.
 | `hero.js` | **the** featured carousel's slide, two-sided: the first place of each generic rail, rendered by `functions/index.js` from the rails' own rows; `discover.js` rotates it and wires its Boost to the cards' handlers |
 | `functions/search.js` + `search-page.js` | the results page: the charts page's cards in a list, each wearing its chart rank, through the ranked endpoints' `q=` paths in process |
 | `nav-search.js` + `/api/v1/search?type=all` | the nav bar's grouped typeahead: shows, episodes, artists and members |
+| `nav-ribbons.js` | the bar's three section ribbons (2026-10-20): hover and close rules, the top-five lists fetched on first open, the featured #1 |
 | `functions/{show,episode,booster,artist}/…` | the four edge-rendered detail pages |
 | `functions/charts/[[path]].js` + `_shared/week-charts.js` + **two-sided** `assets/js/chart-board.js` | the five chart share-card frames (the Charts page they came from was torn down 2026-09-04) |
 | `assets/js/charts-block.js` + `functions/api/v1/charts/[[path]].js` | **the chart boards on the Shows and Artists feeds** (2026-09-03): the week's Top 10 with the picker in its title beside Weeks at #1, from JSON; `assets/js/week-picker.js` is the picker's markup and delegate, shared with the Members tab |

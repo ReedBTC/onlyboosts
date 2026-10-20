@@ -453,6 +453,84 @@ console.log('\nThe recommendations and the data rails, over the real schema:')
   })
 }
 
+console.log('\nThe nav bar: three ribbons, two plain links, Charts gone (2026-10-20):')
+{
+  const nav = read('partials/nav.html')
+  const foot = read('partials/footer.html')
+  const links = nav.slice(nav.indexOf('<nav class="nav-links"'), nav.indexOf('</nav>'))
+  check('the bar is Podcasts, Music and Members as ribbons, then #40HPW and Boosts', () => {
+    assert.deepStrictEqual([...links.matchAll(/<details class="nav-ribbon" data-ribbon="([a-z]+)"/g)].map((m) => m[1]), ['podcasts', 'music', 'members'])
+    assert.ok(links.includes('<a href="/charts#members">#40HPW</a>') && links.includes('<a href="/charts#boosts">Boosts</a>'))
+    assert.ok(!/href="\/charts">Charts</.test(nav), 'Charts came off the bar: it and Podcasts opened the same page on the same tab')
+  })
+  check('each ribbon is two list slots nav-ribbons.js can fill, a Discover column and a featured block', () => {
+    const slots = [...links.matchAll(/data-ribbon-list="([a-z-]+)"/g)].map((m) => m[1])
+    assert.deepStrictEqual(slots, ['shows-week', 'shows-year', 'albums-month', 'songs-year', 'hpw-week', 'boosts-week'])
+    const src = read('assets/js/nav-ribbons.js')
+    for (const k of slots) assert.ok(src.includes(`'${k}': {`), `nav-ribbons.js has a source for ${k}`)
+    assert.strictEqual((links.match(/<h4>Discover<\/h4>/g) || []).length, 3)
+    assert.deepStrictEqual([...links.matchAll(/data-ribbon-feat="([a-z-]+)"/g)].map((m) => m[1]), ['shows-week', 'albums-month', 'hpw-week'])
+  })
+  check("the Podcasts ribbon's Discover column is the rails not already in its lists, plus the personal ones", () => {
+    const pod = links.slice(links.indexOf('data-ribbon="podcasts"'), links.indexOf('data-ribbon="music"'))
+    const disc = pod.slice(pod.indexOf('<h4>Discover</h4>'), pod.indexOf('nav-ribbon-feat'))
+    for (const t of ['Top Episodes This Year', 'New and Noteworthy', 'Movers This Week', 'Podcasters Recommend', 'Recommended For You', 'Top Shows From Your Follows']) assert.ok(disc.includes(`>${t}</a>`), t)
+    assert.ok(!disc.includes('Shows Chart') && !disc.includes('Top Shows This Week'))
+  })
+  check('the Members ribbon lists #40HPW and the largest boosts, and its Discover is the three Reed named', () => {
+    const mem = links.slice(links.indexOf('data-ribbon="members"'))
+    assert.ok(mem.includes('<h4>#40HPW This Week') && mem.includes('<h4>Largest Boosts This Week'))
+    const disc = mem.slice(mem.indexOf('<h4>Discover</h4>'), mem.indexOf('nav-ribbon-feat'))
+    assert.deepStrictEqual([...disc.matchAll(/>([^<]+)<\/a>/g)].map((m) => m[1]), ['#40HPW Challenge', 'Top Members', 'Boost Feed'])
+    assert.ok(!mem.includes('Live'), 'Live means something else in podcasting')
+  })
+  check("every Discover link lands on a homepage rail id or a charts view, and the rail ids exist", () => {
+    for (const m of links.matchAll(/href="\/#([a-z-]+)"/g)) assert.ok(index.includes(`id="${m[1]}"`), `index.html has #${m[1]}`)
+  })
+  check('the overlay and the footer name the same places', () => {
+    const overlay = nav.slice(nav.indexOf('nav-explore-sections'), nav.indexOf('nav-explore-group">\n            <h4>Stats'))
+    assert.strictEqual((overlay.match(/<details class="nav-explore-acc">/g) || []).length, 3)
+    for (const h of ['/charts#shows', '/charts#artists', '/charts#members', '/charts#boosts']) assert.ok(overlay.includes(`href="${h}"`) && foot.includes(`href="${h}"`), h)
+    assert.ok(!foot.includes('href="/charts">'))
+  })
+  check('/charts#boosts forwards from / and resolves on the charts page', () => {
+    const a = index.indexOf('/^#('), b = index.indexOf('$/', a)
+    assert.ok(a > 0 && b > a && new RegExp(index.slice(a + 1, b + 1)).test('#boosts'), 'the head forward carries #boosts')
+    assert.ok(charts.includes("'boosts':           'members-global'"))
+    assert.ok(charts.includes("if (raw === 'boosts') scrollToBoosts();"))
+    assert.ok(read('assets/js/members-board.js').includes("new CustomEvent('lb:members-painted')"))
+  })
+}
+
+console.log('\nThe boost feed ordered by sats over a window (the Members ribbon):')
+{
+  const db = new DatabaseSync(':memory:')
+  db.exec(read('bots/global-boost-scan/d1/schema.sql'))
+  const now = Math.floor(Date.now() / 1000)
+  const ins = db.prepare('INSERT INTO boosts(event_id,booster_pubkey,created_at,sats,podcast_guid,item_guid) VALUES(?,?,?,?,?,?)')
+  ins.run('big-old', 'a'.repeat(64), now - 40 * 86400, 100000, 'show-1', null)  // outside the week
+  ins.run('small', 'b'.repeat(64), now - 100, 21, 'show-1', null)
+  ins.run('mid', 'c'.repeat(64), now - 200, 500, 'show-1', null)
+  ins.run('big', 'd'.repeat(64), now - 3 * 86400, 5000, 'show-1', null)
+  const env = { DB: { prepare: (sql) => ({ bind: (...a) => ({ all: async () => ({ results: db.prepare(sql).all(...a) }) }) }) } }
+  const { onRequestGet: boosts } = await import('../functions/api/v1/boosts.js')
+  const get = (q) => boosts({ request: new Request('https://ob.invalid/api/v1/boosts?' + q), env }).then((r) => r.json())
+  await checkAsync('sort=sats&range=1w is the week\'s boosts, biggest first, with no cursor', async () => {
+    const d = await get('sort=sats&range=1w&limit=5')
+    assert.deepStrictEqual(d.boosts.map((b) => b.id), ['big', 'mid', 'small'])
+    assert.strictEqual(d.next_cursor, null)
+  })
+  await checkAsync('the default order is untouched: newest first, cursor-paged', async () => {
+    const d = await get('limit=2')
+    assert.deepStrictEqual(d.boosts.map((b) => b.id), ['small', 'mid'])
+    assert.ok(d.next_cursor)
+  })
+  await checkAsync('a bad range answers 400', async () => {
+    const r = await boosts({ request: new Request('https://ob.invalid/api/v1/boosts?range=2w'), env })
+    assert.strictEqual(r.status, 400)
+  })
+}
+
 console.log('\nThe charts page kept its address book:')
 {
   check('charts.html declares /charts as its own address', () => {

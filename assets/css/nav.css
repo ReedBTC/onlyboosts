@@ -69,6 +69,106 @@
 .nav-links a:focus-visible { color: var(--brand); outline: none; }
 .nav-links a[aria-current="page"] { border-bottom-color: var(--brand); }
 
+/* ── The section ribbons (2026-10-20): Podcasts, Music and Members are each a
+   <details> whose summary is the bar link plus a caret, and whose panel is a
+   full-width band under the bar. #top-nav is the positioned ancestor (it is
+   sticky), so the band spans the viewport, and its inner grid takes the
+   bar's own 1240px measure. nav-ribbons.js opens them on hover and fills the
+   lists; without it the caret still opens the panel.
+   ⚠️ --surface AND --text, NOT --white/--cream: the bar re-supplies those as
+   its light text tokens in dark mode (see .nav-search-menu). ── */
+details.nav-ribbon { position: static; }
+.nav-ribbon > summary {
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  cursor: pointer;
+  user-select: none;
+}
+.nav-ribbon > summary::-webkit-details-marker { display: none; }
+.nav-ribbon > summary::marker { content: ''; }
+.nav-ribbon-caret { color: rgba(255,255,255,0.7); font-size: 0.7rem; transition: transform 0.15s; }
+.nav-ribbon[open] .nav-ribbon-caret { transform: rotate(180deg); color: var(--brand); }
+.nav-ribbon[open] > summary a { border-bottom-color: var(--brand); }
+.nav-ribbon-panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  z-index: 110;
+  background: var(--surface, #ffffff);
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 14px 30px rgba(0,0,0,0.18);
+  font-family: var(--font-sans);
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.2fr) minmax(0, 0.8fr) auto;
+  gap: 1.5rem 2rem;
+  box-sizing: border-box;
+  /* The band spans the viewport; its side padding centres the grid on the
+     bar's own 1240px measure (the same arithmetic as .nav-inner's margin). */
+  padding: 1rem max(1.5rem, calc((100% - 1240px) / 2 + 1.5rem)) 1.25rem;
+}
+.nav-ribbon-panel > * { min-width: 0; }
+.nav-ribbon-col h4 {
+  margin: 0 0 0.55rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+.nav-ribbon-col h4 a { font-size: 0.7rem; letter-spacing: 0.06em; color: var(--brand-dd); text-decoration: none; white-space: nowrap; }
+:root[data-theme="dark"] .nav-ribbon-col h4 a { color: var(--brand-d); }
+.nav-ribbon-col h4 a:hover { text-decoration: underline; }
+.nav-ribbon-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; }
+.nav-ribbon-list li { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; min-width: 0; min-height: 26px; }
+.nav-ribbon-list li a, .nav-ribbon-list li > span:not(.nav-ribbon-rank):not(.nav-ribbon-fig):not(.nav-ribbon-thumb) {
+  color: var(--text); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1 1 auto;
+}
+.nav-ribbon-list li a:hover { color: var(--brand-dd); }
+:root[data-theme="dark"] .nav-ribbon-list li a:hover { color: var(--brand-d); }
+.nav-ribbon-sub { color: var(--muted); font-weight: 400; }
+.nav-ribbon-rank {
+  width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0;
+  background: var(--navy); color: #ffffff;
+  font-size: 0.68rem; font-weight: 700; display: grid; place-items: center;
+}
+:root[data-theme="dark"] .nav-ribbon-rank { background: var(--border); color: var(--text); }
+.nav-ribbon-row--gold .nav-ribbon-rank { background: #d9a520; color: #1a1a1a; }
+.nav-ribbon-thumb {
+  width: 26px; height: 26px; border-radius: 5px; flex-shrink: 0; object-fit: cover;
+  background: var(--cream-d, #e3edf3); display: grid; place-items: center; font-size: 0.8rem;
+}
+.nav-ribbon-row--person .nav-ribbon-thumb { border-radius: 50%; }
+.nav-ribbon-fig { margin-left: auto; flex-shrink: 0; color: var(--muted); font-size: 0.76rem; font-variant-numeric: tabular-nums; }
+.nav-ribbon-empty { color: var(--muted); font-size: 0.85rem; }
+.nav-ribbon-discover a {
+  display: block; color: var(--text); text-decoration: none; font-size: 0.9rem; font-weight: 500; padding: 0.2rem 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.nav-ribbon-discover a:hover { color: var(--brand-dd); }
+:root[data-theme="dark"] .nav-ribbon-discover a:hover { color: var(--brand-d); }
+.nav-ribbon-feat { display: grid; gap: 0.35rem; justify-items: start; width: 150px; }
+.nav-ribbon-feat[hidden] { display: none; }
+.nav-ribbon-eyebrow { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--brand-dd); }
+:root[data-theme="dark"] .nav-ribbon-eyebrow { color: var(--brand-d); }
+.nav-ribbon-feat--gold .nav-ribbon-eyebrow { color: #b8860b; }
+.nav-ribbon-feat-art { display: block; width: 120px; height: 120px; }
+.nav-ribbon-feat-img {
+  width: 120px; height: 120px; border-radius: 10px; object-fit: cover; display: grid; place-items: center;
+  background: var(--cream-d, #e3edf3); box-shadow: 0 6px 18px rgba(0,0,0,0.2); font-size: 2.4rem;
+}
+.nav-ribbon-feat--person .nav-ribbon-feat-img { border-radius: 50%; }
+.nav-ribbon-feat-title { color: var(--text); text-decoration: none; font-weight: 600; font-size: 0.92rem; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.nav-ribbon-feat-title:hover { color: var(--brand-dd); }
+.nav-ribbon-feat-line { color: var(--muted); font-size: 0.76rem; }
+
 /* ── Site search ── */
 .nav-search {
   position: relative;
@@ -258,6 +358,24 @@
 }
 .nav-explore-group a span { width: 1.2rem; text-align: center; flex-shrink: 0; }
 .nav-explore-group a:hover { color: var(--brand); }
+/* The overlay's section rows are accordions (2026-10-20, Rotten Tomatoes'
+   app): the row's link opens the section, the chevron opens that side's
+   Discover links under it. */
+.nav-explore-acc > summary {
+  list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+}
+.nav-explore-acc > summary::-webkit-details-marker { display: none; }
+.nav-explore-acc > summary::marker { content: ''; }
+.nav-explore-acc > summary a { flex: 1 1 auto; }
+.nav-explore-chev {
+  width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+  background: rgba(255,255,255,0.08); color: #ffffff;
+  display: grid; place-items: center; font-size: 1.15rem; line-height: 1;
+  transition: transform 0.15s;
+}
+.nav-explore-acc[open] .nav-explore-chev { transform: rotate(180deg); background: rgba(255,255,255,0.16); }
+.nav-explore-sub { display: grid; padding: 0 0 0.6rem 1.7rem; }
+.nav-explore-sub a { font-size: 0.95rem; font-weight: 400; color: rgba(255,255,255,0.8); padding: 0.38rem 0; }
 .nav-explore-close {
   background: rgba(255,255,255,0.08);
   color: #ffffff;
@@ -417,6 +535,8 @@ body.nav-explore-open { overflow: hidden; }
   .nav-links { gap: 0.9rem; }
   .nav-links a { font-size: 0.9rem; }
   .nav-search { max-width: 320px; }
+  .nav-ribbon-panel { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.8fr); }
+  .nav-ribbon-feat { display: none; }
 }
 
 /* ── Phone: hamburger + wordmark + controls on one row, the search on its

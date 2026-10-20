@@ -15,6 +15,7 @@
 
 /* ── A rail ── */
 .rail { min-width: 0; }
+.rail [id] { scroll-margin-top: 5rem; } /* the nav's Discover links land on a rail heading under the sticky bar */
 .rail-head {
   display: flex;
   align-items: baseline;

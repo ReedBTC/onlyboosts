@@ -322,6 +322,12 @@ console.log('\n⚠️ The Members feed is addressed as #members, not #members-gl
   old = boot('#boosts-follows', { signedIn: true })
   eq('⚠️ #boosts-follows too', old.body.dataset.activeFeed, 'members-follows')
   eq('  and upgrades to #members-follows', old.location.hash, '#members-follows')
+  /* `#boosts` is the boost feed's own address since 2026-10-20 (the nav's
+     Boosts link): the Members tab, rewritten to #members, plus a scroll to
+     the Boosts section that this harness has no DOM for. */
+  old = boot('#boosts')
+  eq('#boosts lands on the members feed', old.body.dataset.activeFeed, 'members-global')
+  eq('  and rewrites to #members', old.location.hash, '#members')
 }
 
 // ── 2. The boot sequence, which is where both bugs lived ─────────────
