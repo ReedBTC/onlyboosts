@@ -275,6 +275,7 @@ export const PUBLISHERS = [
   "3820f4ff8587747530c7feafe47c1e592e3ce0fd2929b4f907e40714bd26f408", // BoostMeBitch's site account
   "adab4ccd313996520304a5b1ec6c4076bc271bc6a3236702321c5811009d0649", // Boostr_Bot
   "ffff6a7af32ea2239cb71548f476eec0dd9ae56673abda536bef5c241276fc3e", // MSP_bot
+  "978bbd44d918cc998c21f63150171046ae1173bbea1b7d1c6500d82b1063ed36", // candr_boost_bot (Chad and Reed's show, 2026-10-20)
 ];
 
 /* ⚠️ BOOSTMEBITCH IS IN BOTH LISTS AND THAT IS NOT A CONTRADICTION. The app

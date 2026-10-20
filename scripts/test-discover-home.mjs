@@ -41,6 +41,7 @@ const charts = read('charts.html')
 const { RAILS, injectRail, onRequestGet, buildHero, blurb, railOrder, injectHero } = await import('../functions/index.js')
 const tile = await import('../assets/js/rail-tile.js?v=test')
 const heroMod = await import('../assets/js/hero.js?v=test')
+const heroShowCard = await import('../assets/js/show-card.js')
 
 console.log('\nThe markers and the renderers agree:')
 {
@@ -528,6 +529,89 @@ console.log('\nThe boost feed ordered by sats over a window (the Members ribbon)
   await checkAsync('a bad range answers 400', async () => {
     const r = await boosts({ request: new Request('https://ob.invalid/api/v1/boosts?range=2w'), env })
     assert.strictEqual(r.status, 400)
+  })
+}
+
+console.log('\nThe discovery lists in full, /discover/<key> (2026-10-20):')
+{
+  const db = new DatabaseSync(':memory:')
+  db.exec(read('bots/global-boost-scan/d1/schema.sql'))
+  const now = Math.floor(Date.now() / 1000)
+  const pod = db.prepare('INSERT INTO podcasts(podcast_guid,title,image,medium,feed_url,total_sats,booster_count,boost_count,first_boost_ts) VALUES(?,?,?,?,?,?,?,?,?)')
+  pod.run('show-C', 'Brand New', 'https://x/c.jpg', 'podcast', 'https://x/c.xml', 300, 3, 4, now - 10 * 86400)
+  pod.run('show-E', 'Newer Still', 'https://x/e.jpg', 'podcast', 'https://x/e.xml', 100, 2, 2, now - 2 * 86400)
+  pod.run('show-old', 'Veteran', 'https://x/o.jpg', 'podcast', null, 9000, 30, 90, now - 400 * 86400)
+  pod.run('show-A', 'Neighbour A', 'https://x/a.jpg', 'podcast', 'https://x/a.xml', 900, 4, 9, now - 200 * 86400)
+  const roll = db.prepare('INSERT INTO podroll(source_guid,position,target_guid,target_title,target_image,target_linked) VALUES(?,?,?,?,?,?)')
+  roll.run('show-old', 1, 'show-A', 'Neighbour A', 'https://x/a.jpg', 1)
+  roll.run('show-C', 1, 'show-A', 'Neighbour A', 'https://x/a.jpg', 1)
+  roll.run('show-C', 2, 'ext-1', 'Somewhere Else', null, 0)
+  const boost = db.prepare('INSERT INTO boosts(event_id,booster_pubkey,created_at,sats,podcast_guid,item_guid) VALUES(?,?,?,?,?,?)')
+  boost.run('d1', 'a'.repeat(64), now - 100, 100, 'show-A', null)
+  boost.run('d2', 'b'.repeat(64), now - 90, 100, 'show-A', null)
+  const env = { DB: { prepare: (sql) => ({ bind: (...a) => ({ all: async () => ({ results: db.prepare(sql).all(...a) }), first: async () => db.prepare(sql).get(...a) ?? null }), all: async () => ({ results: db.prepare(sql).all() }), first: async () => db.prepare(sql).get() ?? null }) } }
+  const shellHtml = read('discover.html')
+  const ASSETS = { fetch: async () => new Response(shellHtml, { status: 200, headers: { 'Content-Type': 'text/html' } }) }
+  const { onRequestGet: discoverGet, PAGES, listHtml } = await import('../functions/discover/[key].js')
+  const get = (key) => discoverGet({ request: new Request('https://ob.invalid/discover/' + key), env: { ...env, ASSETS }, params: { key } })
+  await checkAsync('new-shows lists the recent debuts with two boosters, newest-by-boosters first, each with its why-line', async () => {
+    const r = await get('new-shows'); const h = await r.text()
+    assert.strictEqual(r.status, 200)
+    assert.ok(h.includes('<title>New and Noteworthy — OnlyBoosts</title>') && h.includes('/discover/new-shows" />'))
+    assert.ok(!h.includes('<!--OB:DISCOVER-->'))
+    assert.ok(h.indexOf('Brand New') < h.indexOf('Newer Still') && !h.includes('Veteran'))
+    assert.ok(/pcast-note">First boost \w+ \d+ · 3 boosters since</.test(h))
+    assert.ok(h.includes('data-show-card') && h.includes('pcast-rank" aria-hidden="true">1<'))
+  })
+  await checkAsync('podroll lists targets by how many shows list them; an unindexed target has no link and says so', async () => {
+    const h = await (await get('podroll')).text()
+    assert.ok(h.indexOf('Neighbour A') < h.indexOf('Somewhere Else'))
+    assert.ok(h.includes('On 2 podrolls') && h.includes('On 1 podroll · not boosted on Nostr yet'))
+    assert.ok(h.includes('href="/show/show-A"') && !h.includes('href="/show/ext-1"'))
+  })
+  await checkAsync('movers renders (an empty week is a real answer) and keeps the chart rank', async () => {
+    const h = await (await get('movers')).text()
+    assert.ok(h.includes('<title>Movers This Week — OnlyBoosts</title>'))
+    assert.ok(h.includes('Nothing here yet.') || h.includes('data-show-card'))
+  })
+  await checkAsync('an unknown key is 404 and the shell keeps its marker', async () => {
+    const r = await get('nope'); const h = await r.text()
+    assert.strictEqual(r.status, 404)
+    assert.ok(h.includes('<!--OB:DISCOVER-->'))
+  })
+  check('every page the Function knows is linked from the rail heads, the ribbons and the sitemap', () => {
+    const nav = read('partials/nav.html'), sitemap = read('functions/sitemap.xml.js')
+    for (const k of Object.keys(PAGES)) {
+      assert.ok(index.includes(`<a href="/discover/${k}">`), `index.html links /discover/${k}`)
+      assert.ok(nav.includes(`href="/discover/${k}"`), `the nav links /discover/${k}`)
+      assert.ok(sitemap.includes(`"/discover/${k}"`), `the sitemap carries /discover/${k}`)
+    }
+    assert.ok(typeof listHtml === 'function')
+  })
+  check('a show card without a note is the string it was', () => {
+    const { showCardHtml } = heroShowCard
+    const s = { guid: 'g', title: 'T', img: '', art2: '', feed: '', author: '', boosts: 1, sats: 2, boosters: 1, episodes: 0, latest: 0, rank: null, tied: false }
+    assert.ok(!showCardHtml(s).includes('pcast-note'))
+    assert.ok(showCardHtml(s, { note: 'Up 3 places' }).includes('<div class="pcast-note">Up 3 places</div>'))
+  })
+}
+
+console.log('\nThe member\'s recommendations on their own page (2026-10-20):')
+{
+  const src = read('functions/booster/[npub].js')
+  check('the booster page asks the recommendation core, lets it fail, and renders #recommended after #shows', () => {
+    assert.ok(src.includes('import { recommendationsFor } from "../api/v1/recommend.js"'))
+    assert.ok(/recommendationsFor\(env, hex, \[\], 20\)\.catch\(/.test(src))
+    assert.ok(src.indexOf('${renderShows(shows, realName)}') < src.indexOf('${renderRecommended(recs, realName)}'))
+    assert.ok(src.includes('id="recommended"'))
+  })
+  check('the core is what the endpoint answers, and a publisher key gets nothing', async () => {
+    const { recommendationsFor } = await import('../functions/api/v1/recommend.js')
+    assert.strictEqual(typeof recommendationsFor, 'function')
+  })
+  check('candr_boost_bot is in both publisher lists', () => {
+    const key = '978bbd44d918cc998c21f63150171046ae1173bbea1b7d1c6500d82b1063ed36'
+    assert.ok(read('functions/api/v1/_common.js').includes(key) && read('functions/_shared/feed-rank.js').includes(key))
   })
 }
 

@@ -42,6 +42,7 @@ import { feedRanks, renderStatTiles, chartCacheOf } from "../_shared/feed-rank.j
 // The drawers open on the chart formula over their own rows (2026-09-03).
 import { chartRanks, rankLabel } from "../../assets/js/rank.js";
 import { fetchBoosterCorpus } from "../api/v1/boosters/[npub].js";
+import { recommendationsFor } from "../api/v1/recommend.js";
 import { COPY as CARD_COPY } from "../../assets/js/episode-card.js";
 
 import { headOf } from "../_shared/head.js";
@@ -109,6 +110,12 @@ export async function onRequestGet(context) {
    * renders exactly as it did. The measured heaviest booster has 975 boosts
    * against a 2,000 cap, so this is one indexed scan through idx_boosts_booster
    * rather than the fan-out /episode pays. */
+  /* The member's recommendations (2026-10-20, Reed's ask): the homepage's
+     Recommended For You and Recommended Music, as this page's #recommended
+     section. The same call /api/v1/recommend makes, without the favorites
+     the browser alone can read. Allowed to fail: it is a rollup below the
+     fold and never costs a reader the page they came for. */
+  const recsP = recommendationsFor(env, hex, [], 20).catch((e) => { console.warn("[booster] recommendations", e?.message); return null; });
   const [prof, totals, shows, boosts, corpus] = await Promise.all([
     // ⚠️ COLUMNS NAMED, never SELECT *. The five beyond the original set landed
     // on 2026-08-13 and are nullable at very different rates: about 54%,
@@ -249,6 +256,7 @@ export async function onRequestGet(context) {
     bioProfiles,
     ranks,
     corpus,
+    recs: await recsP,
   });
 
   return new Response(html, {
@@ -291,7 +299,7 @@ function toHexPubkey(s) {
 
 // ── the page ─────────────────────────────────────────────────────────────────
 
-function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioProfiles, ranks, corpus }) {
+function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioProfiles, ranks, corpus, recs = null }) {
   const realName = prof?.display_name || prof?.name || null;
   const label = realName || shortId(npub, hex);
   const pageUrl = `${SITE_ORIGIN}/booster/${encodeURIComponent(npub || hex)}`;
@@ -424,23 +432,23 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v224" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v224" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v224" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v224" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v225" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v225" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v225" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v225" />
   <!-- The hero, the drawers and the boost list are the show page's, so this
        page links its stylesheet and adds only the deltas. -->
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v224" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v224" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v225" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v225" />
   <!-- The episode card, for the #episodes rollup: the same chrome
        feeds-podcasts.js paints on the homepage. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v224" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v225" />
   <!-- The boost thread inside a card's drawer, and its reply / like / repost /
        zap bar, both reached through that same card. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v224" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v224" />
-  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v224" />
-  <link rel="stylesheet" href="/assets/css/booster-page.css?v=ob-v224" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v225" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v225" />
+  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v225" />
+  <link rel="stylesheet" href="/assets/css/booster-page.css?v=ob-v225" />
 </head>
 <body data-booster-pk="${htmlEscape(hex)}"${npub ? ` data-booster-npub="${htmlEscape(npub)}"` : ""}>
 
@@ -525,11 +533,12 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
                 <a href="/charts#shows?range=1w">Top Shows This Week</a>
                 <a href="/charts#shows?range=1y">Top Shows This Year</a>
                 <a href="/charts#episodes-global?range=1y">Top Episodes This Year</a>
-                <a href="/#rail-new-shows">New and Noteworthy</a>
-                <a href="/#rail-movers">Movers This Week</a>
-                <a href="/#rail-podroll">Podcasters Recommend</a>
+                <a href="/discover/new-shows">New and Noteworthy</a>
+                <a href="/discover/movers">Movers This Week</a>
+                <a href="/discover/podroll">Podcasters Recommend</a>
                 <a href="/#rail-recommended">Recommended For You</a>
                 <a href="/#rail-follows">Top Shows From Your Follows</a>
+                <a href="/#rail-because">Because You Boosted</a>
               </div>
             </details>
             <details class="nav-explore-acc">
@@ -539,6 +548,7 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
                 <a href="/charts#songs-global?range=1y">Top Songs This Year</a>
                 <a href="/charts#artists">Top Artists This Week</a>
                 <a href="/#rail-recommended-music">Recommended Music</a>
+                <a href="/#rail-because">Because You Boosted</a>
               </div>
             </details>
             <details class="nav-explore-acc">
@@ -586,11 +596,12 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
           <div class="nav-ribbon-col nav-ribbon-discover">
             <h4>Discover</h4>
             <a href="/charts#episodes-global?range=1y">Top Episodes This Year</a>
-            <a href="/#rail-new-shows">New and Noteworthy</a>
-            <a href="/#rail-movers">Movers This Week</a>
-            <a href="/#rail-podroll">Podcasters Recommend</a>
+            <a href="/discover/new-shows">New and Noteworthy</a>
+            <a href="/discover/movers">Movers This Week</a>
+            <a href="/discover/podroll">Podcasters Recommend</a>
             <a href="/#rail-recommended">Recommended For You</a>
             <a href="/#rail-follows">Top Shows From Your Follows</a>
+            <a href="/#rail-because">Because You Boosted</a>
           </div>
           <div class="nav-ribbon-feat" data-ribbon-feat="shows-week" hidden>
             <span class="nav-ribbon-eyebrow">#1 Show This Week</span>
@@ -616,6 +627,7 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
             <a href="/charts#artists">Top Artists This Week</a>
             <a href="/#rail-recommended-music">Recommended Music</a>
             <a href="/#rail-follows">Top Shows From Your Follows</a>
+            <a href="/#rail-because">Because You Boosted</a>
           </div>
           <div class="nav-ribbon-feat" data-ribbon-feat="albums-month" hidden>
             <span class="nav-ribbon-eyebrow">#1 Album This Month</span>
@@ -707,6 +719,7 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
 
   ${renderFavorites()}
   ${renderShows(shows, realName)}
+  ${renderRecommended(recs, realName)}
 
   ${renderEpisodes(corpus)}
 
@@ -801,12 +814,12 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav.js?v=ob-v224" defer></script>
-<script src="/assets/js/booster-page.js?v=ob-v224" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v225" defer></script>
+<script src="/assets/js/booster-page.js?v=ob-v225" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v224"></script>
-<script src="/assets/js/sw-register.js?v=ob-v224" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v225"></script>
+<script src="/assets/js/sw-register.js?v=ob-v225" defer></script>
 </body>
 </html>`;
 }
@@ -1037,6 +1050,58 @@ function renderShows(rows, realName) {
       <p class="cs-empty" data-bs-shows-empty hidden></p>
     </details>
   </section>`;
+}
+
+/* ── Recommended ──────────────────────────────────────────────────────────────
+ *
+ * The homepage's two personal rails for THIS member, as a section of their
+ * own page (2026-10-20, Reed's ask): the shows the other boosters of the
+ * shows they boost also boost, podcasts and music apart, the collector's
+ * similarity scores summed over every show they have boosted (see
+ * /about#recommendations). Facts about a public boost history, so rendered
+ * here like the rollups above it; the favorites a member keeps on Nostr are
+ * not read at the edge, so this list can differ from the homepage's by them.
+ * Omitted when there is nothing to recommend: an empty section would only say
+ * the member has boosted too little, which the tiles above already show. */
+function renderRecommended(recs, realName) {
+  if (!recs || (!recs.podcasts?.length && !recs.music?.length)) return "";
+  const who = realName || "this member";
+  const list = (rows, title, sub) => rows.length ? `
+    <details class="ep-drawer cs-drawer" open>
+      <summary>
+        <span class="cs-head">
+          <span class="cs-head-title">${htmlEscape(title)}</span>
+          <span class="cs-head-sub">${htmlEscape(sub)}</span>
+        </span>
+        <span class="drawer-hint" aria-hidden="true"></span>
+      </summary>
+      <ul class="ep-list cs-list">
+        ${rows.map((r, i) => recRow(r, i + 1)).join("\n        ")}
+      </ul>
+    </details>` : "";
+  return `<section class="show-section show-section--bare" id="recommended">
+    ${list(recs.podcasts || [], "Recommended Podcasts", `What the other boosters of the shows ${who} boosts also boost`)}
+    ${list(recs.music || [], "Recommended Music", `What the other boosters of the albums ${who} boosts also boost`)}
+    <p class="cs-note">Ranked by audience overlap over every show ${htmlEscape(who)} has boosted; <a href="/about#recommendations">how the recommendations work</a>.</p>
+  </section>`;
+}
+
+function recRow(r, rank) {
+  const art = isSafeUrl(r.img) ? r.img : null;
+  const art2 = isSafeUrl(r.art2) && r.art2 !== art ? r.art2 : null;
+  const title = truncate(r.title || "Unidentified show", 120);
+  const n = (v) => Number(v || 0);
+  const meta = `${num(n(r.boosters))} booster${n(r.boosters) === 1 ? "" : "s"} · ${compact(n(r.sats))} sats` +
+    (r.shared ? ` · ${num(n(r.shared))} shared` : "");
+  const inner = `<span class="cs-rank" aria-hidden="true">${rank}</span>
+      ${art
+        ? `<img class="cs-art" src="${htmlEscape(art)}"${art2 ? ` data-art2="${htmlEscape(art2)}"` : ""} alt="" width="44" height="44" loading="lazy" referrerpolicy="no-referrer" />`
+        : `<span class="cs-art cs-art--blank" aria-hidden="true">${r.medium === "music" ? "💿" : "🎙️"}</span>`}
+      <span class="cs-main">
+        <span class="cs-title">${htmlEscape(title)}</span>
+        <span class="cs-meta">${htmlEscape(meta)}</span>
+      </span>`;
+  return `<li class="cs-row"><a class="cs-link" href="/show/${encodeURIComponent(r.guid)}">${inner}</a></li>`;
 }
 
 function showRow(r, rank, realName) {
@@ -1274,10 +1339,10 @@ function notFound(raw) {
   <meta name="robots" content="noindex" />
   <title>Booster not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v224" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v224" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v224" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v224" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v225" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v225" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v225" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v225" />
 </head>
 <body>
 <section class="page-header">
@@ -1295,7 +1360,7 @@ function notFound(raw) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v224" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v225" defer></script>
 </body>
 </html>`;
   return new Response(html, {

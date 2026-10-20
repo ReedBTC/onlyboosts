@@ -21,10 +21,11 @@
  *    feed cards' own handlers. A rail the edge could not fill gets its slide
  *    rebuilt here from the rows fetched for the rail, with the same mappers.
  */
-import { railListHtml, showTile, albumTile, episodeTile, artistTile, memberTile } from '/assets/js/rail-tile.js?v=ob-v224'
-import { heroHtml, slideHtml, showSlide, episodeSlide, artistSlide, memberSlide } from '/assets/js/hero.js?v=ob-v224'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v224'
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v224'
+import { railListHtml, showTile, albumTile, episodeTile, artistTile, memberTile } from '/assets/js/rail-tile.js?v=ob-v225'
+import { heroHtml, slideHtml, showSlide, episodeSlide, artistSlide, memberSlide } from '/assets/js/hero.js?v=ob-v225'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v225'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v225'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v225'
 
 const TILES = 10
 
@@ -129,11 +130,11 @@ function wireHeroBoost(hero) {
     try {
       const kind = slide.dataset.kind
       if (kind === 'episode' || kind === 'song') {
-        const m = await import('/assets/js/episode-card-actions.js?v=ob-v224')
+        const m = await import('/assets/js/episode-card-actions.js?v=ob-v225')
         btn.disabled = false
         await m.onBoostClick(slide, btn)
       } else {
-        const m = await import('/assets/js/show-card-actions.js?v=ob-v224')
+        const m = await import('/assets/js/show-card-actions.js?v=ob-v225')
         btn.disabled = false
         await m.onShowBoost(slide, btn)
       }
@@ -306,13 +307,18 @@ function unlock(section, html) {
 function paintBecause(proto, entries) {
   for (const old of document.querySelectorAll('[data-rail^="because-"]')) old.remove()
   if (!proto) return
+  /* The nav's "Because You Boosted" link is /#rail-because, so the FIRST
+     clone keeps that id and the hidden prototype gives it up. */
+  const protoH2 = proto.querySelector('h2')
+  if (protoH2) { protoH2.id = 'rail-because-proto'; proto.setAttribute('aria-labelledby', 'rail-because-proto') }
   entries.forEach((b, i) => {
     const sec = proto.cloneNode(true)
     sec.hidden = false
     sec.dataset.rail = `because-${i}`
-    sec.setAttribute('aria-labelledby', `rail-because-${i}`)
+    const id = i === 0 ? 'rail-because' : `rail-because-${i}`
+    sec.setAttribute('aria-labelledby', id)
     const h2 = sec.querySelector('h2')
-    if (h2) h2.id = `rail-because-${i}`
+    if (h2) h2.id = id
     const a = sec.querySelector('[data-because-seed]')
     if (a) { a.textContent = b.seed.title || 'this show'; a.href = `/show/${encodeURIComponent(b.seed.guid)}` }
     const sub = sec.querySelector('[data-because-sub]')
@@ -322,6 +328,21 @@ function paintBecause(proto, entries) {
     proto.before(sec)
     wireArt(sec)
   })
+  // A link into a rail that has just been painted lands on it now.
+  if (location.hash === '#rail-because') document.getElementById('rail-because')?.scrollIntoView({ block: 'start' })
+}
+
+/* The member's own page carries the full lists (#recommended, 2026-10-20);
+   each recommendation rail's head gets the link once the rail is painted. */
+function linkFullList(section, pubkey) {
+  const head = section?.querySelector('.rail-head')
+  if (!head || !pubkey || head.querySelector('[data-rec-full]')) return
+  const a = document.createElement('a')
+  a.className = 'rail-more'
+  a.dataset.recFull = '1'
+  a.href = `${boosterPageHref(null, pubkey)}#recommended`
+  a.textContent = 'Your full list →'
+  head.appendChild(a)
 }
 
 /* Recommended For You, Recommended Music and the Because rails, all off one
@@ -339,7 +360,7 @@ async function paintRecommended(sections, pubkey) {
     })
     const none = (what) => `Boost a few ${what} and the ${what} their other boosters boost will rank here.`
     if (rec) {
-      if (j.podcasts?.length) unlock(rec, railListHtml(j.podcasts.map(showTile)))
+      if (j.podcasts?.length) { unlock(rec, railListHtml(j.podcasts.map(showTile))); linkFullList(rec, pubkey) }
       else lockedCardNote(rec, j.seeds ? 'Nothing to recommend yet' : 'No boosts from this account yet', j.seeds ? 'Too few other members have boosted the shows you boost for the overlap to mean anything yet; it grows with every boost.' : none('shows'))
     }
     if (music) {
@@ -360,7 +381,12 @@ async function paintPersonal() {
   if (!sections.length) return
   const res = await resolveFollows()
   if (my !== personalRun) return
-  if (res.status === 'signed-out') { paintBecause(null, []); return } // the locked cards stay: the carrot
+  if (res.status === 'signed-out') {
+    paintBecause(null, [])
+    // The nav's Because link, signed out: the carrot is the locked rail above it.
+    if (location.hash === '#rail-because') document.getElementById('rail-recommended')?.scrollIntoView({ block: 'start' })
+    return // the locked cards stay: the carrot
+  }
   for (const s of sections) {
     if (s.dataset.rail !== 'follows') continue
     if (res.status === 'ok') paintFollows(s, res.follows)

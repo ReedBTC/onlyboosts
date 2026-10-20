@@ -64,6 +64,10 @@ const MAX_EPISODES = 20000;
 const STATIC_URLS = [
   { loc: "/", changefreq: "hourly", priority: "1.0" },
   { loc: "/about", changefreq: "monthly", priority: "0.6" },
+  // The three discovery lists (2026-10-20): the homepage's rails in full.
+  { loc: "/discover/new-shows", changefreq: "daily", priority: "0.7" },
+  { loc: "/discover/movers", changefreq: "daily", priority: "0.7" },
+  { loc: "/discover/podroll", changefreq: "weekly", priority: "0.6" },
 ];
 
 export async function onRequest({ env }) {

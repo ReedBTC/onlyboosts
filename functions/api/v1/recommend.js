@@ -128,6 +128,25 @@ async function becauseOf(env, hex, seedsJson, boosted, limit) {
   return out;
 }
 
+/** The whole answer for one member, the shape the endpoint returns. Also
+ *  what /booster/<npub> renders as its #recommended section (2026-10-20,
+ *  Reed's ask: a member with recommendations has a page here already, so
+ *  the recommendations belong on it). `favorites` is empty there: the list
+ *  is a Nostr event only the browser reads. */
+export async function recommendationsFor(env, hex, favorites = [], limit = 10) {
+  const empty = { seeds: 0, podcasts: [], music: [], because: [] };
+  if (PUBLISHERS.includes(hex)) return empty;
+  const { seeds, boosted } = await seedsOf(env, hex, favorites);
+  if (!seeds.length) return empty;
+  const seedsJson = JSON.stringify(seeds);
+  const [podcasts, music, because] = await Promise.all([
+    recommendFor(env, seedsJson, false, limit),
+    recommendFor(env, seedsJson, true, limit),
+    becauseOf(env, hex, seedsJson, boosted, limit).catch((e) => { console.warn("[recommend] because", e?.message); return []; }),
+  ]);
+  return { seeds: seeds.length, podcasts, music, because };
+}
+
 export async function onRequestPost({ request, env }) {
   let body;
   try { body = await request.json(); }
@@ -138,19 +157,5 @@ export async function onRequestPost({ request, env }) {
   const favorites = Array.isArray(body?.favorites)
     ? body.favorites.filter((g) => typeof g === "string" && GUID.test(g)).slice(0, MAX_FAVORITES)
     : [];
-
-  if (PUBLISHERS.includes(hex)) {
-    return json(request, { seeds: 0, podcasts: [], music: [], because: [] }, { cache: 0 });
-  }
-
-  const { seeds, boosted } = await seedsOf(env, hex, favorites);
-  if (!seeds.length) return json(request, { seeds: 0, podcasts: [], music: [], because: [] }, { cache: 0 });
-
-  const seedsJson = JSON.stringify(seeds);
-  const [podcasts, music, because] = await Promise.all([
-    recommendFor(env, seedsJson, false, limit),
-    recommendFor(env, seedsJson, true, limit),
-    becauseOf(env, hex, seedsJson, boosted, limit).catch((e) => { console.warn("[recommend] because", e?.message); return []; }),
-  ]);
-  return json(request, { seeds: seeds.length, podcasts, music, because }, { cache: 0 });
+  return json(request, await recommendationsFor(env, hex, favorites, limit), { cache: 0 });
 }

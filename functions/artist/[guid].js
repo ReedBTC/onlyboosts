@@ -354,16 +354,16 @@ function renderArtistPage({ pub, albums, totals, community, supporters, boosts, 
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v224" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v224" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v224" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v224" />
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v224" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v224" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v225" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v225" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v225" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v225" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v225" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v225" />
   <!-- The boost note card and its reaction bar, for #boosts — the same
        .note-card every other detail page's list paints. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v224" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v224" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v225" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v225" />
 </head>
 <body data-artist-guid="${htmlEscape(pub.publisher_guid)}">
 
@@ -448,11 +448,12 @@ function renderArtistPage({ pub, albums, totals, community, supporters, boosts, 
                 <a href="/charts#shows?range=1w">Top Shows This Week</a>
                 <a href="/charts#shows?range=1y">Top Shows This Year</a>
                 <a href="/charts#episodes-global?range=1y">Top Episodes This Year</a>
-                <a href="/#rail-new-shows">New and Noteworthy</a>
-                <a href="/#rail-movers">Movers This Week</a>
-                <a href="/#rail-podroll">Podcasters Recommend</a>
+                <a href="/discover/new-shows">New and Noteworthy</a>
+                <a href="/discover/movers">Movers This Week</a>
+                <a href="/discover/podroll">Podcasters Recommend</a>
                 <a href="/#rail-recommended">Recommended For You</a>
                 <a href="/#rail-follows">Top Shows From Your Follows</a>
+                <a href="/#rail-because">Because You Boosted</a>
               </div>
             </details>
             <details class="nav-explore-acc">
@@ -462,6 +463,7 @@ function renderArtistPage({ pub, albums, totals, community, supporters, boosts, 
                 <a href="/charts#songs-global?range=1y">Top Songs This Year</a>
                 <a href="/charts#artists">Top Artists This Week</a>
                 <a href="/#rail-recommended-music">Recommended Music</a>
+                <a href="/#rail-because">Because You Boosted</a>
               </div>
             </details>
             <details class="nav-explore-acc">
@@ -509,11 +511,12 @@ function renderArtistPage({ pub, albums, totals, community, supporters, boosts, 
           <div class="nav-ribbon-col nav-ribbon-discover">
             <h4>Discover</h4>
             <a href="/charts#episodes-global?range=1y">Top Episodes This Year</a>
-            <a href="/#rail-new-shows">New and Noteworthy</a>
-            <a href="/#rail-movers">Movers This Week</a>
-            <a href="/#rail-podroll">Podcasters Recommend</a>
+            <a href="/discover/new-shows">New and Noteworthy</a>
+            <a href="/discover/movers">Movers This Week</a>
+            <a href="/discover/podroll">Podcasters Recommend</a>
             <a href="/#rail-recommended">Recommended For You</a>
             <a href="/#rail-follows">Top Shows From Your Follows</a>
+            <a href="/#rail-because">Because You Boosted</a>
           </div>
           <div class="nav-ribbon-feat" data-ribbon-feat="shows-week" hidden>
             <span class="nav-ribbon-eyebrow">#1 Show This Week</span>
@@ -539,6 +542,7 @@ function renderArtistPage({ pub, albums, totals, community, supporters, boosts, 
             <a href="/charts#artists">Top Artists This Week</a>
             <a href="/#rail-recommended-music">Recommended Music</a>
             <a href="/#rail-follows">Top Shows From Your Follows</a>
+            <a href="/#rail-because">Because You Boosted</a>
           </div>
           <div class="nav-ribbon-feat" data-ribbon-feat="albums-month" hidden>
             <span class="nav-ribbon-eyebrow">#1 Album This Month</span>
@@ -708,12 +712,12 @@ function renderArtistPage({ pub, albums, totals, community, supporters, boosts, 
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav.js?v=ob-v224" defer></script>
-<script src="/assets/js/artist-page.js?v=ob-v224" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v225" defer></script>
+<script src="/assets/js/artist-page.js?v=ob-v225" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v224"></script>
-<script src="/assets/js/sw-register.js?v=ob-v224" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v225"></script>
+<script src="/assets/js/sw-register.js?v=ob-v225" defer></script>
 </body>
 </html>`;
 }
@@ -903,10 +907,10 @@ function notFound(guid) {
   <meta name="robots" content="noindex" />
   <title>Artist not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v224" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v224" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v224" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v224" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v225" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v225" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v225" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v225" />
 </head>
 <body>
 <section class="page-header">
@@ -924,7 +928,7 @@ function notFound(guid) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v224" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v225" defer></script>
 </body>
 </html>`;
   return new Response(html, {

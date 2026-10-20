@@ -52,6 +52,7 @@ rules a change elsewhere would break.
 | `/booster/<npub>` | one person, edge-rendered |
 | `/artist/<guid>` | one artist (publisher), edge-rendered — see the detail pages section |
 | `/search?q=` | the site search's results page, edge-rendered, `noindex` (2026-10-17) |
+| `/discover/<key>` | **the whole list behind a discovery rail** (2026-10-20, Reed's ask: ten tiles lived nowhere else): `new-shows`, `movers`, `podroll`, each a list of the charts page's show cards with one extra line saying why the card is there, rendered by `functions/discover/[key].js` from the same row fetchers `functions/index.js` exports for the rails (`newShowsRows`, `moversRows`, `podrollRows`), in the `discover.html` shell. In the sitemap. The rail headings and the ribbons' Discover columns link them |
 | `/about` | the project's own explanation of what the data is and isn't |
 | `/stats` | a coming-soon placeholder: nav + header + soon-card, `noindex`, out of the sitemap. `/boosters` was the second one and was **deleted** on 2026-08-23 — see the Stats row of the site map |
 | `/404.html` | see the ⚠️ under LB conventions |
@@ -209,10 +210,33 @@ was picked from is in the session memory; direction A won, with the sans.
   places, climbers by places then debuts), Podcasters Recommend (podroll
   targets by how many sources list them; an unindexed target is a figure,
   not a link).
+- **A member's recommendations are on THEIR OWN PAGE too: `/booster/<npub>#recommended`**
+  (2026-10-20, Reed's ask: a member with recommendations has a page here
+  already). `recommendationsFor` in `recommend.js` is the endpoint's core,
+  exported; the booster Function calls it without favorites (a Nostr event
+  only the browser reads, so the two lists can differ by them), allowed to
+  fail, and renders Recommended Podcasts and Recommended Music as rows in
+  the page's own drawer chrome, omitted when both are empty. The homepage's
+  Recommended rails gain a "Your full list →" link to it once painted. A
+  signed-in member with no boosts sees the rail's "No boosts from this
+  account yet" card, which is the empty state Reed asked for.
+- **⚠️ A HASH THAT NAMES A VIEW LANDS ON THE LIST, AND A LANDING SCROLL IS
+  PINNED** (`pinScroll` in the `charts.html` controller, 2026-10-20). The
+  chart blocks sit above the feed shell on Shows, Albums and Artists, so
+  `#shows?range=1y` from a "View all" link was landing on the week's board;
+  now any hash carrying a range, sort or language scrolls to the active
+  panel's `.feed-shell`, and `#boosts` to the Members tab's Boosts section.
+  The scroll is re-made on every change of the document's height for six
+  seconds (the blocks, boards, wall and bots all grow the page after the
+  first paint; a one-shot scroll drifted onto the boards) and stops at the
+  reader's first wheel, touch or key. The bare `#shows` still lands at the
+  top.
 - **Still to build here**: boost messages on the results page, favorites as
-  seeds, a stronger one-click into the boost feed if the foot strip is not
-  enough. Most Favorited is held: 15 lists on the whole network on
-  2026-10-17.
+  seeds, New Music and Album Movers as music-side discovery rails (the
+  Music ribbon's Discover column is three lines because the movers, new
+  and podroll instruments are podcast-side today; `newShowsRows` already
+  takes both media). Most Favorited is held: 15 lists on the whole network
+  on 2026-10-17.
 
 ## Site map
 
@@ -1890,7 +1914,7 @@ What a change elsewhere would break:
 - **⚠️ THE SECTION IDS ARE URLS AND THEY ARE FROZEN.** `/show`: `#episodes`
   `#community` `#community-shows` `#podroll` `#reverse-podroll` `#boosts`.
   `/episode`: `#community` `#community-episodes` `#boosts`. `/booster`: `#shows`
-  `#episodes` `#favorites` `#boosts`. Ids are reused across pages on purpose where they name the
+  `#recommended` (2026-10-20) `#episodes` `#favorites` `#boosts`. Ids are reused across pages on purpose where they name the
   same kind of section. `HASH_ALIASES` holds one permanent entry
   (`#inverse-podroll`) and **is the repair for a rename that already happened, not
   a licence for the next one** — it needs the module to have run, so a rename is

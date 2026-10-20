@@ -155,6 +155,20 @@ is a call not made here.
 others" is a display name read off a payment, and the same rule as the `P`
 tag below applies: text, never an identity.
 
+### candr_boost_bot Publishes For Chad and Reed's Show
+
+Registered 2026-10-20 (Reed spotted it ranking on the Members tab: 30
+boosts, 155,224 sats, one show). Chad's node-watching bot for Chad and
+Reed's podcast (candr.space), the same shape as `chadf-boostbot`: a relay of
+listeners' boosts. Pubkey `978bbd44…ed36`, npub
+`npub1j79m63xerrxfnrpp7cc4q9csg6hpzuamagdh68r9qrvzkyrra5mqkza4y9`. On the
+site it is in `PUBLISHERS` and `RANK_PUBLISHERS`, so it ranks nowhere and
+seeds no recommendation; the collector-side registration (slug, dedupe
+tier) was handed to the collector agent the same day and is theirs to
+confirm. It is excluded from ranking, unlike `chadf-boostbot`, because it
+carries listeners' boosts rather than Chad's own; flip it if its notes say
+otherwise.
+
 ### MSP_bot Publishes For Music Side Project Feeds
 
 Registered 2026-10-02, on Reed's instruction. `ffff6a7a…fc3e`

@@ -50,20 +50,20 @@
 
   <!-- Shared note / card styles (.note-card, .embed-note) — the boosts
        feeds render through the same kind-1 card as boosts-thread.js. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v224" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v225" />
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v224" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v225" />
   <!-- The episode card and its drawer, extracted from the inline block below
        when /episode/<guid> pages needed the same cards. See the file header. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v224" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v224" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v225" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v225" />
   <!-- The 40 HPW boards on the Members tab; shared with the /hpw/<week> pages. -->
-  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v224" />
+  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v225" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. Must stay last
        among the stylesheets so the inline block below still wins. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v224" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v225" />
 
   <style>
     :root {
@@ -1170,12 +1170,12 @@
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
     }
   </style>
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v224" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v224" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v225" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v225" />
   <!-- The chart boards on the Shows and Artists feeds (charts-block.js) wear
        the Charts page's .cb-* grammar; hpw-board.css above dresses their
        week picker and the members' Weeks at #1 rows. -->
-  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v224" />
+  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v225" />
 </head>
 <body data-active-feed="shows-global">
 
@@ -1260,11 +1260,12 @@
                 <a href="/charts#shows?range=1w">Top Shows This Week</a>
                 <a href="/charts#shows?range=1y">Top Shows This Year</a>
                 <a href="/charts#episodes-global?range=1y">Top Episodes This Year</a>
-                <a href="/#rail-new-shows">New and Noteworthy</a>
-                <a href="/#rail-movers">Movers This Week</a>
-                <a href="/#rail-podroll">Podcasters Recommend</a>
+                <a href="/discover/new-shows">New and Noteworthy</a>
+                <a href="/discover/movers">Movers This Week</a>
+                <a href="/discover/podroll">Podcasters Recommend</a>
                 <a href="/#rail-recommended">Recommended For You</a>
                 <a href="/#rail-follows">Top Shows From Your Follows</a>
+                <a href="/#rail-because">Because You Boosted</a>
               </div>
             </details>
             <details class="nav-explore-acc">
@@ -1274,6 +1275,7 @@
                 <a href="/charts#songs-global?range=1y">Top Songs This Year</a>
                 <a href="/charts#artists">Top Artists This Week</a>
                 <a href="/#rail-recommended-music">Recommended Music</a>
+                <a href="/#rail-because">Because You Boosted</a>
               </div>
             </details>
             <details class="nav-explore-acc">
@@ -1321,11 +1323,12 @@
           <div class="nav-ribbon-col nav-ribbon-discover">
             <h4>Discover</h4>
             <a href="/charts#episodes-global?range=1y">Top Episodes This Year</a>
-            <a href="/#rail-new-shows">New and Noteworthy</a>
-            <a href="/#rail-movers">Movers This Week</a>
-            <a href="/#rail-podroll">Podcasters Recommend</a>
+            <a href="/discover/new-shows">New and Noteworthy</a>
+            <a href="/discover/movers">Movers This Week</a>
+            <a href="/discover/podroll">Podcasters Recommend</a>
             <a href="/#rail-recommended">Recommended For You</a>
             <a href="/#rail-follows">Top Shows From Your Follows</a>
+            <a href="/#rail-because">Because You Boosted</a>
           </div>
           <div class="nav-ribbon-feat" data-ribbon-feat="shows-week" hidden>
             <span class="nav-ribbon-eyebrow">#1 Show This Week</span>
@@ -1351,6 +1354,7 @@
             <a href="/charts#artists">Top Artists This Week</a>
             <a href="/#rail-recommended-music">Recommended Music</a>
             <a href="/#rail-follows">Top Shows From Your Follows</a>
+            <a href="/#rail-because">Because You Boosted</a>
           </div>
           <div class="nav-ribbon-feat" data-ribbon-feat="albums-month" hidden>
             <span class="nav-ribbon-eyebrow">#1 Album This Month</span>
@@ -2483,16 +2487,54 @@
     return { feed: feed, langChanged: langChanged, viewChanged: viewChanged };
   }
 
-  /* Scroll the Members tab to its Boosts section, now and again once the
-     boards above it have painted (they grow the page as they land, which
-     would leave a scroll made before them pointing at the wrong place). */
-  function scrollToBoosts() {
+  /* ⚠️ A LANDING SCROLL IS PINNED, NOT MADE ONCE. Everything above a target
+     on this page grows after the first paint: the chart blocks hydrate from
+     JSON, the Members tab's boards, wall and bots paint in turn. A single
+     scrollIntoView made at boot lands right and then drifts a screen as each
+     of them arrives (Reed saw #boosts land on the boards, 2026-10-20). So the
+     scroll is re-made on every change of the document's height for a few
+     seconds, and stops the moment the reader scrolls, touches or presses a
+     key, since from then on the position is theirs. `offset` keeps the
+     target under the sticky bar and the sticky tab box. */
+  function pinScroll(getTarget, { ms = 6000 } = {}) {
+    if (typeof window === 'undefined' || !document.body) return;
+    let done = false;
+    const stop = () => { done = true; try { ro && ro.disconnect(); } catch (e) { /* no observer */ } };
     const go = () => {
-      const el = document.querySelector('.members-boosts');
-      if (el) el.scrollIntoView({ block: 'start' });
+      if (done) return;
+      const el = getTarget();
+      if (!el) return;
+      const wrap = document.querySelector('.feed-bar-wrap');
+      const offset = 64 + (wrap ? wrap.getBoundingClientRect().height : 0) + 8;
+      const top = el.getBoundingClientRect().top + window.scrollY - offset;
+      window.scrollTo({ top: Math.max(0, top), behavior: 'auto' });
     };
+    let ro = null;
     if (typeof requestAnimationFrame === 'function') requestAnimationFrame(go); else go();
-    document.addEventListener('lb:members-painted', go, { once: true });
+    if (typeof ResizeObserver === 'function') {
+      ro = new ResizeObserver(go);
+      ro.observe(document.body);
+    }
+    for (const ev of ['wheel', 'touchstart', 'keydown', 'pointerdown']) {
+      window.addEventListener(ev, stop, { once: true, passive: true });
+    }
+    setTimeout(stop, ms);
+  }
+  /* `#boosts`: the Members tab, scrolled to the Boosts section at its foot. */
+  function scrollToBoosts() {
+    pinScroll(() => document.querySelector('.members-boosts'));
+  }
+  /* A hash that names a VIEW (a range, a sort or a language) is asking for
+     the filtered list, which sits under the chart blocks on Shows, Albums
+     and Artists; it lands on the active panel's feed shell rather than on
+     the top of the page (Reed's call, 2026-10-20: the nav's "View all" links
+     were landing on the week's board instead of the list they named). The
+     bare `#shows` still lands at the top, where the boards are. */
+  function scrollToView() {
+    pinScroll(() => {
+      const panel = document.querySelector('.feed-panel.is-active') || document.querySelector('.feed-panel:not([hidden])');
+      return panel && panel.querySelector('.feed-shell');
+    });
   }
 
   function fromHash(updateHash) {
@@ -2513,6 +2555,7 @@
       lang: parsed.lang, range: parsed.range, sort: parsed.sort,
     });
     if (raw === 'boosts') scrollToBoosts();
+    else if (parsed.range || parsed.sort || parsed.lang) scrollToView();
     /* ⚠️ A HASH CHANGE ON AN ALREADY-HYDRATED FEED NEEDS A SECOND SIGNAL. The
        activate event above is a no-op once feeds.js has loaded a feed, so a URL
        pasted into an open tab would move the hash and leave the cards alone —
@@ -2657,17 +2700,17 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v224"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v225"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v224" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v225" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v224" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v225" defer></script>
 
 <!-- Feed hydration — lazily loads the active feed on first view. -->
-<script type="module" src="/assets/js/feeds.js?v=ob-v224"></script>
-<script src="/assets/js/nav.js?v=ob-v224" defer></script>
+<script type="module" src="/assets/js/feeds.js?v=ob-v225"></script>
+<script src="/assets/js/nav.js?v=ob-v225" defer></script>
 
 </body>
 </html>

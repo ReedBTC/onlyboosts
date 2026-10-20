@@ -67,6 +67,61 @@ async function rankedEpisodes(env, query) {
  *  spec (null when the rail is empty). */
 const rail = (html, lead) => ({ html, lead: lead || null });
 
+/* ── The three discovery rails' rows, shared with /discover/<key>, which
+   lists them in full (2026-10-20, Reed's ask: ten tiles is the homepage's
+   shape; the whole list is a page). Each takes the row count. ── */
+
+/** NEW AND NOTEWORTHY: shows whose FIRST boost landed in the last 90 days,
+ *  two or more distinct boosters, by boosters then sats. */
+export async function newShowsRows(env, limit) {
+  const since = Math.floor(Date.now() / 1000) - 90 * 86400;
+  const { results } = await env.DB.prepare(
+    `SELECT podcast_guid AS guid, title, image, artwork, author, medium, feed_url AS feed,
+            total_sats, booster_count, boost_count, first_boost_ts
+       FROM podcasts
+      WHERE first_boost_ts >= ? AND booster_count >= 2 AND COALESCE(title, '') <> ''
+      ORDER BY booster_count DESC, total_sats DESC, first_boost_ts DESC LIMIT ?`
+  ).bind(since, limit).all();
+  return results || [];
+}
+export const firstBoost = (r) => "First boost " + new Date(r.first_boost_ts * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+
+/** MOVERS: this week's Shows chart against last week's, to 100 places:
+ *  climbers by places climbed, then this week's debuts in chart order.
+ *  Answers the picks and last week's places. */
+export async function moversRows(env, limit) {
+  const live = pacificWeekStart(Math.floor(Date.now() / 1000));
+  const last = prevWeek(live);
+  const [now, before] = await Promise.all([
+    weeklyChart(env, "shows", live, nextWeek(live), 100),
+    weeklyChart(env, "shows", last, live, 100),
+  ]);
+  const was = new Map(before.map((r) => [r.guid, r.rank]));
+  const climbers = now.filter((r) => was.has(r.guid) && was.get(r.guid) > r.rank)
+    .map((r) => ({ r, climb: was.get(r.guid) - r.rank }))
+    .sort((a, b) => b.climb - a.climb || a.r.rank - b.r.rank);
+  const debuts = now.filter((r) => !was.has(r.guid)).map((r) => ({ r, climb: null }));
+  return { picks: [...climbers, ...debuts].slice(0, limit), was };
+}
+
+/** PODCASTERS RECOMMEND: podroll targets by how many shows list them. An
+ *  unindexed target (`linked` 0) has no page and no figures. */
+export async function podrollRows(env, limit) {
+  const { results } = await env.DB.prepare(
+    `SELECT r.target_guid AS guid, MAX(r.target_title) AS title, MAX(r.target_image) AS image,
+            MAX(r.target_artwork) AS artwork, MAX(r.target_linked) AS linked, MAX(r.target_medium) AS medium,
+            COUNT(DISTINCT r.source_guid) AS n,
+            MAX(p.total_sats) AS total_sats, MAX(p.booster_count) AS booster_count, MAX(p.boost_count) AS boost_count,
+            MAX(p.feed_url) AS feed
+       FROM podroll r LEFT JOIN podcasts p ON p.podcast_guid = r.target_guid
+      WHERE r.target_guid IS NOT NULL AND COALESCE(r.target_title, '') <> ''
+      GROUP BY r.target_guid
+      ORDER BY n DESC, title ASC LIMIT ?`
+  ).bind(limit).all();
+  return results || [];
+}
+export const onN = (r) => `On ${r.n} podroll${Number(r.n) === 1 ? "" : "s"}`;
+
 export const RAILS = {
   "shows-week": async (env) => {
     const { body } = await weekBoard(env, { kind: "shows", limit: TILES });
@@ -106,15 +161,7 @@ export const RAILS = {
      floor are the collector's measurement (2026-10-17: 41 debuts in 30 days,
      3 of them with three boosters; 21 in 90 days with two). */
   "new-shows": async (env) => {
-    const since = Math.floor(Date.now() / 1000) - 90 * 86400;
-    const { results } = await env.DB.prepare(
-      `SELECT podcast_guid AS guid, title, image, artwork, author, medium, total_sats, booster_count, first_boost_ts
-         FROM podcasts
-        WHERE first_boost_ts >= ? AND booster_count >= 2 AND COALESCE(title, '') <> ''
-        ORDER BY booster_count DESC, total_sats DESC, first_boost_ts DESC LIMIT ?`
-    ).bind(since, TILES).all();
-    const rows = results || [];
-    const firstBoost = (r) => "First boost " + new Date(r.first_boost_ts * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+    const rows = await newShowsRows(env, TILES);
     return rail(railListHtml(rows.map((r, i) => tileHtml({
       rank: i + 1, href: showPageHref(r.guid), title: r.title,
       sub: firstBoost(r),
@@ -127,18 +174,7 @@ export const RAILS = {
      week's, then this week's debuts in chart order. Both weeks are the
      same query /api/v1/charts answers, read to 100 places. */
   "movers": async (env) => {
-    const live = pacificWeekStart(Math.floor(Date.now() / 1000));
-    const last = prevWeek(live);
-    const [now, before] = await Promise.all([
-      weeklyChart(env, "shows", live, nextWeek(live), 100),
-      weeklyChart(env, "shows", last, live, 100),
-    ]);
-    const was = new Map(before.map((r) => [r.guid, r.rank]));
-    const climbers = now.filter((r) => was.has(r.guid) && was.get(r.guid) > r.rank)
-      .map((r) => ({ r, climb: was.get(r.guid) - r.rank }))
-      .sort((a, b) => b.climb - a.climb || a.r.rank - b.r.rank);
-    const debuts = now.filter((r) => !was.has(r.guid)).map((r) => ({ r, climb: null }));
-    const picks = [...climbers, ...debuts].slice(0, TILES);
+    const { picks, was } = await moversRows(env, TILES);
     const top = picks[0];
     return rail(railListHtml(picks.map(({ r, climb }) => tileHtml({
       rank: r.rank, tied: !!r.tied, href: showPageHref(r.guid), title: r.title,
@@ -158,17 +194,7 @@ export const RAILS = {
      podrolls, the one editorial signal publishers wrote themselves. A
      target the index has no page for is a figure, not a link. */
   "podroll": async (env) => {
-    const { results } = await env.DB.prepare(
-      `SELECT target_guid AS guid, MAX(target_title) AS title, MAX(target_image) AS image,
-              MAX(target_artwork) AS artwork, MAX(target_linked) AS linked, MAX(target_medium) AS medium,
-              COUNT(DISTINCT source_guid) AS n
-         FROM podroll
-        WHERE target_guid IS NOT NULL AND COALESCE(target_title, '') <> ''
-        GROUP BY target_guid
-        ORDER BY n DESC, title ASC LIMIT ?`
-    ).bind(TILES).all();
-    const rows = results || [];
-    const onN = (r) => `On ${r.n} podroll${Number(r.n) === 1 ? "" : "s"}`;
+    const rows = await podrollRows(env, TILES);
     return rail(railListHtml(rows.map((r, i) => tileHtml({
       rank: i + 1, href: Number(r.linked) ? showPageHref(r.guid) : null, title: r.title,
       sub: onN(r),
