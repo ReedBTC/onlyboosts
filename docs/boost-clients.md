@@ -238,7 +238,10 @@ label is "CandR Boost Bot", on ChadF Boost Bot's pattern.
 **It is excluded from the member boards, unlike chadf-boostbot.** That bot
 carries Chad's own boosts from his node, so it ranks as a member; this one
 relays other listeners' payments, the same arrangement as Boostr_Bot and
-MSP_bot, and a listing that counted it would rank a node under one name.
+MSP_bot, and a listing that counted it would rank a node under one name. On
+the site it is in `PUBLISHERS` and `RANK_PUBLISHERS` (OB-web, the same day),
+so it ranks nowhere and seeds no recommendation; the chip label and the
+Boost Bots intro line went in with it.
 
 **It duplicates, and the prose tiers catch it.** There is no `sender` tag,
 so tier 0 does not apply; the note reports the full amount, so the hard key
