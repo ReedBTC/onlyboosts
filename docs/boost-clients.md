@@ -214,6 +214,43 @@ a complete backfill reads such a note never. `rescan-publishers` in
 inserted exactly the 195; the other six keys had nothing late). The data
 feed section of CLAUDE.md carries the rule.
 
+### candr_boost_bot Publishes For The Chad And Reed Node
+
+Registered 2026-10-20, after Reed saw it on the Members tab ranking as a
+member with 30 boosts and 155,224 sats to one show. `978bbd44…ed36`
+(`npub1j79m63x…kza4y9`) is the **eighth** entry in `PUBLISHER_PUBKEYS` and
+the seventh in the site's `PUBLISHERS`. It is Chad's watcher on the Chad and
+Reed node, chadf-boostbot's shape with Boostr_Bot's tags: one note per boost
+the node receives, whichever app sent it, the body naming the sender
+("Sir Libre boosted 3333 sats saying "Jorfest" via The Split Kit") and the
+origin app riding an `["app", <name>]` tag. Every one of its first 30 notes
+is to Pixel Palace (Thunder Road Media, medium music), the Jorfest 2026 live
+stream, through six apps: The Split Kit 15, v4vmusic-com 8, BoostMeBitch 3,
+Fountain 2, CurioCaster 1, PodcastGuru 1. Its profile carries the display
+name alone; no about, no Lightning address.
+
+**Slug `candr-boost`, the one its own `["client","candr-boost"]` tag already
+slugified to**, so registering the key moves `client_src` (client-tag to
+publisher-pubkey) on its rows and `client_id` on none; what it gains is
+`client_via` off the `app` tag, which the client-tag path never reads. The
+label is "CandR Boost Bot", on ChadF Boost Bot's pattern.
+
+**It is excluded from the member boards, unlike chadf-boostbot.** That bot
+carries Chad's own boosts from his node, so it ranks as a member; this one
+relays other listeners' payments, the same arrangement as Boostr_Bot and
+MSP_bot, and a listing that counted it would rank a node under one name.
+
+**It duplicates, and the prose tiers catch it.** There is no `sender` tag,
+so tier 0 does not apply; the note reports the full amount, so the hard key
+holds, and the body restates the donor's own message. Measured on the
+collector the day it was registered: 2 of the 30 notes restated a BoostMeBitch
+note 14 and 17 seconds earlier (111 sats each, tier `msg+app`, 222 sats
+over-counted); a third BoostMeBitch note six minutes from a 123-sat note was
+correctly not paired, the amounts differing. The other 28 came through apps
+that publish no note of their own or had no partner in the window, and
+stand. Each note also quotes the bot's own kind-9735 receipt in a `q` tag;
+nothing here reads it.
+
 ### OnlyBoosts Publishes On Behalf Of Its Own Donors
 
 Registered 2026-08-20. `3a87a19c…84d9` is the **fourth** entry in
