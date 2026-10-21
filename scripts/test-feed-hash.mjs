@@ -392,6 +392,18 @@ console.log('\nThe shell ships one head per page and the Shows panel active:')
     [...html.matchAll(/<section class="feed-panel( is-active)?" id="(panel-[^"]+)"[^>]*?( hidden)?>/g)].map((m) => [m[2], !!m[1], !!m[3]]).filter(([, a, h]) => a || !h),
     [['panel-shows', true, false]])
   eq('no tab banner and no sub-row survive in the shell', /feed-tabs|feed-subs|feed-chrome|feed-bar-wrap/.test(html), false)
+  /* ⚠️ The three board pairs are hidden by `.charts-page > …` rules, so a
+     pair that sits OUTSIDE the wrapper is on every page. The Music boards
+     shipped that way on 2026-10-21 and read "OnlyBoosts Music Charts" under
+     the Podcast Charts head. */
+  {
+    const wrap = html.slice(html.indexOf('<div class="charts-page" data-charts-page>'), html.indexOf('<div class="members-page" data-members-page>'))
+    const inside = (re) => [...wrap.matchAll(re)].length
+    eq('both board blocks sit INSIDE the Charts page wrapper', [inside(/data-charts-block="shows"/g), inside(/data-charts-block="artists"/g), inside(/<section[^>]*data-hpw>/g)], [1, 1, 1])
+    eq('and nowhere else in the shell', [...html.matchAll(/<section[^>]*data-charts-block="/g)].length, 2)
+    const wall = html.slice(html.indexOf('<div class="members-page" data-members-page>'))
+    eq('the wall and the bots sit inside the Members page wrapper', [/data-members-wall/.test(wall), /data-members-bots/.test(wall)], [true, true])
+  }
   eq('the hash router is gone: no hashchange listener, no ALIASES table', /hashchange|ALIASES|HASH_OF|parseHash/.test(SRC), false)
 }
 
