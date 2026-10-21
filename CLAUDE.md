@@ -983,6 +983,14 @@ What a change would break:
   money endpoints, `/api/lnurl` and `/api/keysend`, are the allowlist on
   purpose**: their GET asks a third party for an invoice or a node record,
   which a link checker's HEAD must not do.
+  **⚠️ AND A PAGE FUNCTION FETCHES ITS SHELL WITH `assetGet(request, path)`
+  FROM `head.js`, NEVER WITH THE INCOMING REQUEST AS INIT** (2026-10-21):
+  that init copies the method, a HEAD fetched the shell as a HEAD, the empty
+  body made the fill throw, and thirteen chart-family routes answered 500 to
+  `curl -I` on the preview while GET was 200. The scan was green because it
+  only checks the handler exists; it now also refuses the pattern and runs
+  a HEAD through the real chart-page renderer against a method-faithful
+  asset stub.
 - **CORS origin allowlists are exact-match `Set` lookups**, never `startsWith` —
   a prefix check lets a lookalike origin get reflected into
   `Access-Control-Allow-Origin`.

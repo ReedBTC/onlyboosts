@@ -42,7 +42,7 @@ import { hoursBoard } from "./api/v1/members/hours.js";
 import { railListHtml, tileHtml, showTile, albumTile, episodeTile, memberTile } from "../assets/js/rail-tile.js";
 import { showPageHref } from "../assets/js/show-link.js";
 import { heroHtml, showSlide, episodeSlide, memberSlide, EYEBROWS } from "../assets/js/hero.js";
-import { headOf } from "./_shared/head.js";
+import { headOf, assetGet } from "./_shared/head.js";
 
 const TILES = 10;
 
@@ -278,7 +278,7 @@ export function injectRail(html, key, block) {
  * Functions routing, and the guard below is the belt to that brace. */
 export async function onRequestGet(context) {
   const { request, env } = context;
-  const shell = await env.ASSETS.fetch(new Request(new URL("/", request.url), request));
+  const shell = await env.ASSETS.fetch(assetGet(request, "/"));
 
   if (shell.status >= 300 && shell.status < 400) {
     console.error("[home] asset server redirected / to", shell.headers.get("location"));

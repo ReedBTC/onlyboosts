@@ -42,7 +42,7 @@ import { COPY as PUBLISHER_COPY, toCard as toPublisherCard, publisherCardHtml } 
 import { renderSupporters } from "../assets/js/supporter-wall.js";
 import { episodeApiToBoosts } from "../assets/js/ob-data.js";
 import { rankLabel } from "../assets/js/rank.js";
-import { headOf } from "./_shared/head.js";
+import { headOf, assetGet } from "./_shared/head.js";
 
 export const EACH = 50;
 const MAX_Q = 120;
@@ -196,7 +196,7 @@ export async function onRequestGet(context) {
   const url = new URL(request.url);
   const q = (url.searchParams.get("q") || "").trim().slice(0, MAX_Q);
 
-  const shell = await env.ASSETS.fetch(new Request(new URL("/search", request.url), request));
+  const shell = await env.ASSETS.fetch(assetGet(request, "/search"));
   if (shell.status >= 300 && shell.status < 400) {
     console.error("[search] asset server redirected /search to", shell.headers.get("location"));
     return new Response("Search is temporarily unavailable.", { status: 503, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });

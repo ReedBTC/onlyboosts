@@ -42,6 +42,7 @@
 import { readParams, globalPodcasts } from "../api/v1/podcasts.js";
 import { cardsFromPodcasts, renderShowCardPage, SHOW_CARDS_PER_PAGE } from "./show-cards.js";
 import { COPY } from "../../assets/js/show-card.js";
+import { assetGet } from "./head.js";
 
 const SITE = "https://onlyboosts.social";
 
@@ -101,7 +102,7 @@ export function resolveRoute(page, view) {
  * page was `/`. The guard below is the belt to that brace. */
 export async function fetchShell(context) {
   const { request, env } = context;
-  const shell = await env.ASSETS.fetch(new Request(new URL("/charts", request.url), request));
+  const shell = await env.ASSETS.fetch(assetGet(request, "/charts"));
   if (shell.status >= 300 && shell.status < 400) {
     console.error("[shell] asset server redirected /charts to", shell.headers.get("location"));
     return { error: new Response("The page is temporarily unavailable.", { status: 503, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } }) };
@@ -148,7 +149,7 @@ export async function notFoundPage(context) {
   const { request, env } = context;
   let body = null;
   try {
-    const r = await env.ASSETS.fetch(new Request(new URL("/404", request.url), request));
+    const r = await env.ASSETS.fetch(assetGet(request, "/404"));
     if (r.ok) body = await r.text();
   } catch { /* the plain answer below */ }
   return new Response(body || "Not found", {

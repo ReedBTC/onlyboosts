@@ -24,7 +24,7 @@ import { newShowsRows, moversRows, podrollRows, firstBoost, onN } from "../index
 import { cardsFromPodcasts } from "../_shared/show-cards.js";
 import { COPY as SHOW_COPY, renderShowCards } from "../../assets/js/show-card.js";
 import { rankLabel } from "../../assets/js/rank.js";
-import { headOf } from "../_shared/head.js";
+import { headOf, assetGet } from "../_shared/head.js";
 
 const OPEN = "<!--OB:DISCOVER-->";
 const CLOSE = "<!--/OB:DISCOVER-->";
@@ -96,7 +96,7 @@ export async function onRequestGet(context) {
   const { request, env, params } = context;
   const key = String(params?.key || "");
   const page = PAGES[key];
-  const shell = await env.ASSETS.fetch(new Request(new URL("/discover", request.url), request));
+  const shell = await env.ASSETS.fetch(assetGet(request, "/discover"));
   if (shell.status >= 300 && shell.status < 400) {
     console.error("[discover] asset server redirected /discover to", shell.headers.get("location"));
     return new Response("Discover is temporarily unavailable.", { status: 503, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });

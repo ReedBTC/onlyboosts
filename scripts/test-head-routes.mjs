@@ -89,4 +89,42 @@ console.log('\nThe shared helper:')
   })
 }
 
+/* ⚠️ A SHELL FETCHED WITH THE INCOMING REQUEST AS INIT IS A HEAD ON A HEAD,
+ * and an empty shell makes the fill throw: thirteen routes answered 500 to
+ * curl -I on 2026-10-21 while every GET was 200, and the scan above was
+ * green because it only checks the handler exists. Two guards: the source
+ * must go through assetGet, and the real renderer must answer a HEAD. */
+console.log('\nA shell is fetched with GET whatever the incoming method:')
+check('no Function passes the incoming request as the init of an ASSETS fetch', () => {
+  const bad = []
+  for (const f of walk(FUNCTIONS)) {
+    const src = readFileSync(f, 'utf8')
+    if (/ASSETS\.fetch\(new Request\([^)]*\),\s*request\)/.test(src) || /ASSETS\.fetch\(request\)/.test(src)) bad.push(relative(FUNCTIONS, f))
+  }
+  assert.deepEqual(bad, [])
+})
+{
+  const { renderShellPage, resolveRoute, notFoundPage } = await import('../functions/_shared/charts-page.js')
+  const shell = readFileSync(join(ROOT, 'charts.html'), 'utf8')
+  const asked = []
+  // Method-faithful, as Pages' asset server is: a HEAD gets no body.
+  const ASSETS = { fetch: async (req) => { asked.push(req.method); return new Response(req.method === 'HEAD' ? null : (req.url.endsWith('/404') ? '<html>404</html>' : shell), { status: req.url.endsWith('/404') ? 404 : 200 }) } }
+  const env = { ASSETS }
+  const ctx = (path, method) => ({ request: new Request(`https://ob.invalid${path}`, { method }), env, params: {} })
+  const head = headOf((c) => renderShellPage(c, resolveRoute('podcasts', 'shows')))
+  const r = await head(ctx('/podcasts/shows', 'HEAD'))
+  check('HEAD /podcasts/shows answers the GET\'s 200 through the real renderer', () => {
+    assert.equal(r.status, 200)
+    assert.equal(r.headers.get('content-type'), 'text/html; charset=utf-8')
+    assert.equal(r.body, null)
+  })
+  check('and the shell was fetched with GET', () => { assert.deepEqual([...new Set(asked)], ['GET']) })
+  asked.length = 0
+  const r404 = await headOf(notFoundPage)(ctx('/podcasts/videos', 'HEAD'))
+  check('HEAD on an unknown view is the 404 page\'s 404, its shell fetched with GET', () => {
+    assert.equal(r404.status, 404)
+    assert.deepEqual([...new Set(asked)], ['GET'])
+  })
+}
+
 console.log(`\n${failed ? `${failed} FAILED, ` : ''}${passed} passed`)

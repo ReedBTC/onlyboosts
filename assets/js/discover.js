@@ -21,11 +21,11 @@
  *    feed cards' own handlers. A rail the edge could not fill gets its slide
  *    rebuilt here from the rows fetched for the rail, with the same mappers.
  */
-import { railListHtml, showTile, albumTile, episodeTile, memberTile } from '/assets/js/rail-tile.js?v=ob-v231'
-import { heroHtml, slideHtml, showSlide, episodeSlide, memberSlide } from '/assets/js/hero.js?v=ob-v231'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v231'
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v231'
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v231'
+import { railListHtml, showTile, albumTile, episodeTile, memberTile } from '/assets/js/rail-tile.js?v=ob-v232'
+import { heroHtml, slideHtml, showSlide, episodeSlide, memberSlide } from '/assets/js/hero.js?v=ob-v232'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v232'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v232'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v232'
 
 const TILES = 10
 
@@ -129,11 +129,11 @@ function wireHeroBoost(hero) {
     try {
       const kind = slide.dataset.kind
       if (kind === 'episode' || kind === 'song') {
-        const m = await import('/assets/js/episode-card-actions.js?v=ob-v231')
+        const m = await import('/assets/js/episode-card-actions.js?v=ob-v232')
         btn.disabled = false
         await m.onBoostClick(slide, btn)
       } else {
-        const m = await import('/assets/js/show-card-actions.js?v=ob-v231')
+        const m = await import('/assets/js/show-card-actions.js?v=ob-v232')
         btn.disabled = false
         await m.onShowBoost(slide, btn)
       }
