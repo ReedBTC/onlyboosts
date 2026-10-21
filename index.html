@@ -68,14 +68,14 @@
   <meta name="twitter:card" content="summary_large_image" />
 
   <link rel="preload" href="/assets/fonts/outfit.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v230" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v230" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v231" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v231" />
   <!-- The boost rows at the foot are the detail pages' rows and wear their
        sheets: the card, the thread chrome and the reaction bar. -->
-  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v230" />
+  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v231" />
   <!-- theme.css last among the shared sheets: the palette, the fonts, and
        the base body/a/img rules every shared stylesheet reads off :root. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v230" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v231" />
 </head>
 <body>
 
@@ -170,7 +170,7 @@
                 <a href="/discover/new-shows">New and Noteworthy</a>
                 <a href="/discover/movers">Movers This Week</a>
                 <a href="/discover/podroll">Podcasters Recommend</a>
-                <a href="/#rail-recommended">Recommended For You</a>
+                <a href="/#rail-recommended">Podcasts Recommended For You</a>
                 <a href="/#rail-follows">Top Shows From Your Follows</a>
                 <a href="/#rail-because">Because You Boosted</a>
               </div>
@@ -181,7 +181,7 @@
                 <a href="/music/albums?range=1m">Top Albums This Month</a>
                 <a href="/music/songs?range=1y">Top Songs This Year</a>
                 <a href="/charts/music">Top Artists This Week</a>
-                <a href="/#rail-recommended-music">Recommended Music</a>
+                <a href="/#rail-recommended-music">Music Recommended For You</a>
                 <a href="/#rail-because">Because You Boosted</a>
               </div>
             </details>
@@ -233,7 +233,7 @@
             <a href="/discover/new-shows">New and Noteworthy</a>
             <a href="/discover/movers">Movers This Week</a>
             <a href="/discover/podroll">Podcasters Recommend</a>
-            <a href="/#rail-recommended">Recommended For You</a>
+            <a href="/#rail-recommended">Podcasts Recommended For You</a>
             <a href="/#rail-follows">Top Shows From Your Follows</a>
             <a href="/#rail-because">Because You Boosted</a>
           </div>
@@ -259,7 +259,7 @@
           <div class="nav-ribbon-col nav-ribbon-discover">
             <h4>Discover</h4>
             <a href="/charts/music">Top Artists This Week</a>
-            <a href="/#rail-recommended-music">Recommended Music</a>
+            <a href="/#rail-recommended-music">Music Recommended For You</a>
             <a href="/#rail-follows">Top Shows From Your Follows</a>
             <a href="/#rail-because">Because You Boosted</a>
           </div>
@@ -347,7 +347,11 @@
      built in the browser only, and shows the locked card to a signed-out
      visitor: Reed's call, 2026-10-17, the carrot for logging in and for
      publishing boosts to Nostr. ⚠️ THE ORDER IS REED'S: nothing a visitor
-     cannot see signed out comes before the fourth rail. -->
+     cannot see signed out comes before the fourth rail. Since the evening
+     of 2026-10-21 the three discovery instruments (New and Noteworthy,
+     Movers, Podcasters Recommend) follow the follows rail, the Because
+     rails come after them, and the year's episodes and songs close the
+     page; Top Artists This Week came off ("we got a lot of stuff here"). -->
 <main class="discover" id="discover">
 
   <!-- THE FEATURED CAROUSEL (Reed's call, 2026-10-19): one slide per generic
@@ -384,7 +388,7 @@
 
   <section class="rail" data-rail="recommended" data-rail-personal aria-labelledby="rail-recommended">
     <div class="rail-head">
-      <h2 id="rail-recommended">Recommended For You</h2>
+      <h2 id="rail-recommended">Podcasts Recommended For You</h2>
       <span class="rail-sub">Shows boosted by the members who boost the same shows you do · <a href="/about#recommendations">How this works</a></span>
     </div>
     <div class="rail-track rail-locked" data-locked>
@@ -415,7 +419,7 @@
 
   <section class="rail" data-rail="recommended-music" data-rail-personal aria-labelledby="rail-recommended-music">
     <div class="rail-head">
-      <h2 id="rail-recommended-music">Recommended Music</h2>
+      <h2 id="rail-recommended-music">Music Recommended For You</h2>
       <span class="rail-sub">Albums boosted by the members who boost the same albums you do · <a href="/about#recommendations">How this works</a></span>
     </div>
     <div class="rail-track rail-locked" data-locked>
@@ -475,19 +479,6 @@
     </div>
   </section>
 
-  <!-- Filled for a signed-in member with a seed show; stays hidden otherwise. -->
-  <!-- BECAUSE YOU BOOSTED X, one rail per show: the prototype stays hidden
-       and assets/js/discover.js clones it for each of the member's five
-       most-boosted shows with neighbours (Reed's ask, 2026-10-18), in this
-       position. Every show appears on one of them at most. -->
-  <section class="rail" data-rail="because" data-rail-personal aria-labelledby="rail-because" hidden>
-    <div class="rail-head">
-      <h2 id="rail-because">Because you boosted <a href="#" data-because-seed></a></h2>
-      <span class="rail-sub"><span data-because-sub></span> · <a href="/about#recommendations">How this works</a></span>
-    </div>
-    <div class="rail-track"></div>
-  </section>
-
   <section class="rail" data-rail="new-shows" aria-labelledby="rail-new-shows">
     <div class="rail-head">
       <h2 id="rail-new-shows"><a href="/discover/new-shows">New and Noteworthy</a></h2>
@@ -504,6 +495,27 @@
     <div class="rail-track"><!--OB:RAIL:movers--><p class="rail-placeholder">Loading this week's climbers…</p><!--/OB:RAIL:movers--></div>
   </section>
 
+  <section class="rail" data-rail="podroll" aria-labelledby="rail-podroll">
+    <div class="rail-head">
+      <h2 id="rail-podroll"><a href="/discover/podroll">Podcasters Recommend</a></h2>
+      <span class="rail-more" style="color: var(--muted); font-weight: 500;">The shows most often on other shows' podrolls</span>
+    </div>
+    <div class="rail-track"><!--OB:RAIL:podroll--><p class="rail-placeholder">Loading the podrolls…</p><!--/OB:RAIL:podroll--></div>
+  </section>
+
+  <!-- Filled for a signed-in member with a seed show; stays hidden otherwise. -->
+  <!-- BECAUSE YOU BOOSTED X, one rail per show: the prototype stays hidden
+       and assets/js/discover.js clones it for each of the member's five
+       most-boosted shows with neighbours (Reed's ask, 2026-10-18), in this
+       position. Every show appears on one of them at most. -->
+  <section class="rail" data-rail="because" data-rail-personal aria-labelledby="rail-because" hidden>
+    <div class="rail-head">
+      <h2 id="rail-because">Because you boosted <a href="#" data-because-seed></a></h2>
+      <span class="rail-sub"><span data-because-sub></span> · <a href="/about#recommendations">How this works</a></span>
+    </div>
+    <div class="rail-track"></div>
+  </section>
+
   <section class="rail" data-rail="episodes-year" aria-labelledby="rail-episodes-year">
     <div class="rail-head">
       <h2 id="rail-episodes-year"><a href="/podcasts/episodes?range=1y">Top Episodes This Year</a></h2>
@@ -518,22 +530,6 @@
       <a class="rail-more" href="/music/songs?range=1y">View the chart →</a>
     </div>
     <div class="rail-track"><!--OB:RAIL:songs-year--><p class="rail-placeholder">Loading this year's songs…</p><!--/OB:RAIL:songs-year--></div>
-  </section>
-
-  <section class="rail" data-rail="artists-week" aria-labelledby="rail-artists-week">
-    <div class="rail-head">
-      <h2 id="rail-artists-week"><a href="/charts/music">Top Artists This Week</a></h2>
-      <a class="rail-more" href="/charts/music">View the chart →</a>
-    </div>
-    <div class="rail-track"><!--OB:RAIL:artists-week--><p class="rail-placeholder">Loading this week's artists…</p><!--/OB:RAIL:artists-week--></div>
-  </section>
-
-  <section class="rail" data-rail="podroll" aria-labelledby="rail-podroll">
-    <div class="rail-head">
-      <h2 id="rail-podroll"><a href="/discover/podroll">Podcasters Recommend</a></h2>
-      <span class="rail-more" style="color: var(--muted); font-weight: 500;">The shows most often on other shows' podrolls</span>
-    </div>
-    <div class="rail-track"><!--OB:RAIL:podroll--><p class="rail-placeholder">Loading the podrolls…</p><!--/OB:RAIL:podroll--></div>
   </section>
 
   <!-- The foot of the page: ONE CLICK INTO THE BOOST FEED. The newest boost
@@ -612,12 +608,12 @@
 <!-- FOOTER:END -->
 
 <!-- Lazy widget bootstrap (Donate + identity slot) -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v230"></script>
-<script src="/assets/js/sw-register.js?v=ob-v230" defer></script>
-<script src="/assets/widgets/pwa-install.js?v=ob-v230" defer></script>
-<script src="/assets/js/nav.js?v=ob-v230" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v231"></script>
+<script src="/assets/js/sw-register.js?v=ob-v231" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v231" defer></script>
+<script src="/assets/js/nav.js?v=ob-v231" defer></script>
 <!-- The verbs: artwork fallback, the rails the edge could not fill, and the
      personal rails for a signed-in member. -->
-<script type="module" src="/assets/js/discover.js?v=ob-v230"></script>
+<script type="module" src="/assets/js/discover.js?v=ob-v231"></script>
 </body>
 </html>

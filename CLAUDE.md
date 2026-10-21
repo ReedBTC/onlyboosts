@@ -166,10 +166,18 @@ was picked from is in the session memory; direction A won, with the sans.
 
 - **⚠️ THE RAIL ORDER IS REED'S AND NOTHING A SIGNED-OUT VISITOR CANNOT SEE
   COMES BEFORE THE FOURTH RAIL.** Top Shows This Week, Top Albums This
-  Month, the #40HPW week, THEN Recommended For You and Top Shows From Your
-  Follows, then the year's episodes and songs and the week's artists.
-  `test-discover-home.mjs` pins the first three and the personal rails'
-  position.
+  Month, the #40HPW week, THEN Podcasts Recommended For You, Music
+  Recommended For You and Top Shows From Your Follows, then New and
+  Noteworthy, Movers and Podcasters Recommend, then the Because rails, then
+  the year's episodes and songs. That is the evening-of-2026-10-21 order
+  (Reed's final pass: the three discovery instruments moved up under the
+  follows rail, the Because rails slid down, and **Top Artists This Week
+  came off the page**, its renderer and fallback deleted; the Music ribbon's
+  Discover column still links `/charts/music` under that name). The two
+  recommendation rails were "Recommended For You" and "Recommended Music"
+  until the same pass, and both carry the "Your full list" link now.
+  `test-discover-home.mjs` pins the first three, the personal rails'
+  position, and the generic order.
 - **THE FEATURED CAROUSEL SITS ABOVE THE RAILS AND IS THE FIRST PLACE OF
   EACH GENERIC RAIL, IN THE PAGE'S RAIL ORDER** (Reed's call, 2026-10-19,
   after the heroes on Rotten Tomatoes, IMDb and Fountain's discovery tab;

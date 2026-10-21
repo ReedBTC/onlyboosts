@@ -262,7 +262,7 @@ export function renderPage(view) {
     body,
     canonical: pageUrl,
     og: { title: d.ogTitle, description: d.lead, image, url: pageUrl },
-    scripts: `<script src="/assets/js/hpw-page.js?v=ob-v230" type="module"></script>`,
+    scripts: `<script src="/assets/js/hpw-page.js?v=ob-v231" type="module"></script>`,
     extraCss: `
     /* The tab supplies the accent family off body[data-active-feed]; this page
        has no active feed and supplies the brand, as .show-main does. */
@@ -300,8 +300,8 @@ export function renderCard(view) {
     kickerSub: COPY.intro,
     board,
     footer: "onlyboosts.social/charts/hpw",
-    links: `  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v230" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v230" />`,
+    links: `  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v231" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v231" />`,
     css: `
     .card .hpw-board { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0.7rem 1.1rem 0.6rem; }
     .card .hpw-title { margin-bottom: 0.4rem; flex: none; font-size: 1.1rem; }
@@ -377,16 +377,16 @@ ${og ? `
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v230" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v230" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v231" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v231" />
   <!-- feed-cards.css for the share pill and its menu; boost-actions.css for
        the composer behind Post to Nostr. Both are the same chrome the tab
        already has. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v230" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v230" />
-  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v230" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v230" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v230" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v231" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v231" />
+  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v231" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v231" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v231" />
   ${extraCss ? `<style>${extraCss}\n  </style>` : ""}
 </head>
 <body>
@@ -482,7 +482,7 @@ ${og ? `
                 <a href="/discover/new-shows">New and Noteworthy</a>
                 <a href="/discover/movers">Movers This Week</a>
                 <a href="/discover/podroll">Podcasters Recommend</a>
-                <a href="/#rail-recommended">Recommended For You</a>
+                <a href="/#rail-recommended">Podcasts Recommended For You</a>
                 <a href="/#rail-follows">Top Shows From Your Follows</a>
                 <a href="/#rail-because">Because You Boosted</a>
               </div>
@@ -493,7 +493,7 @@ ${og ? `
                 <a href="/music/albums?range=1m">Top Albums This Month</a>
                 <a href="/music/songs?range=1y">Top Songs This Year</a>
                 <a href="/charts/music">Top Artists This Week</a>
-                <a href="/#rail-recommended-music">Recommended Music</a>
+                <a href="/#rail-recommended-music">Music Recommended For You</a>
                 <a href="/#rail-because">Because You Boosted</a>
               </div>
             </details>
@@ -545,7 +545,7 @@ ${og ? `
             <a href="/discover/new-shows">New and Noteworthy</a>
             <a href="/discover/movers">Movers This Week</a>
             <a href="/discover/podroll">Podcasters Recommend</a>
-            <a href="/#rail-recommended">Recommended For You</a>
+            <a href="/#rail-recommended">Podcasts Recommended For You</a>
             <a href="/#rail-follows">Top Shows From Your Follows</a>
             <a href="/#rail-because">Because You Boosted</a>
           </div>
@@ -571,7 +571,7 @@ ${og ? `
           <div class="nav-ribbon-col nav-ribbon-discover">
             <h4>Discover</h4>
             <a href="/charts/music">Top Artists This Week</a>
-            <a href="/#rail-recommended-music">Recommended Music</a>
+            <a href="/#rail-recommended-music">Music Recommended For You</a>
             <a href="/#rail-follows">Top Shows From Your Follows</a>
             <a href="/#rail-because">Because You Boosted</a>
           </div>
@@ -723,10 +723,10 @@ ${body}
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav.js?v=ob-v230" defer></script>
+<script src="/assets/js/nav.js?v=ob-v231" defer></script>
 ${scripts}
-<script src="/assets/js/nav-widget-boot.js?v=ob-v230"></script>
-<script src="/assets/js/sw-register.js?v=ob-v230" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v231"></script>
+<script src="/assets/js/sw-register.js?v=ob-v231" defer></script>
 </body>
 </html>`;
 }

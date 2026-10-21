@@ -60,6 +60,9 @@ console.log('\nThe markers and the renderers agree:')
     const personal = [...index.matchAll(/data-rail="([a-z-]+)"[^>]*data-rail-personal/g)].map((m) => m[1])
     assert.ok(personal.length >= 1, 'there is at least one personal rail')
     for (const p of personal) assert.ok(order.indexOf(p) >= 3, `${p} is the fourth rail or later`)
+    assert.deepEqual(order, ['shows-week', 'albums-month', 'hpw-week', 'recommended', 'recommended-music', 'follows', 'new-shows', 'movers', 'podroll', 'because', 'episodes-year', 'songs-year'], "Reed's order of 2026-10-21: the instruments under the follows rail, Because after them, the year's lists last, no artists rail")
+    assert.ok(!index.includes('artists-week') && !Object.keys(RAILS).includes('artists-week'), 'Top Artists This Week came off the page')
+    assert.ok(index.includes('<h2 id="rail-recommended">Podcasts Recommended For You</h2>') && index.includes('<h2 id="rail-recommended-music">Music Recommended For You</h2>'), 'both recommendation rails say what they recommend')
   })
 }
 
@@ -353,17 +356,15 @@ console.log('\nThe featured carousel:')
     const leads = {
       'movers': heroMod.showSlide('movers', { guid: 'g-9', title: 'Nowhere' }, { medium: 'podcast' }),
       'hpw-week': heroMod.memberSlide('hpw-week', { pk: 'f'.repeat(64), npub: 'npub1' + 'q'.repeat(58), name: 'Reed', seconds: 3600, episodes: 1 }),
-      'artists-week': heroMod.artistSlide('artists-week', { guid: 'pub-1', title: 'Band' }),
       'episodes-year': heroMod.episodeSlide('episodes-year', { guid: 'ep/1', title: 'Ep One', show: { guid: 'g-1', title: 'A Show' } }),
       'shows-week': heroMod.showSlide('shows-week', { guid: 'g-1', title: 'A Show' }, { medium: 'podcast' }),
     }
     const slides = await buildHero(env, leads, railOrder(index))
-    assert.deepEqual(slides.map((s) => s.key), ['shows-week', 'hpw-week', 'movers', 'episodes-year', 'artists-week'])
+    assert.deepEqual(slides.map((s) => s.key), ['shows-week', 'hpw-week', 'movers', 'episodes-year'])
     const by = Object.fromEntries(slides.map((s) => [s.key, s]))
     assert.ok(by['shows-week'].desc.startsWith('Long & rich notes more words') && by['shows-week'].desc.endsWith('…') && by['shows-week'].desc.length <= 221)
     assert.equal(by['shows-week'].boost.feed, 'https://a/feed.xml', 'the feed URL the weekly rows do not carry')
     assert.equal(by['episodes-year'].desc, 'Shownotes here')
-    assert.equal(by['artists-week'].desc, 'A band bio')
     assert.equal(by['hpw-week'].desc, 'Boosts a lot')
     assert.equal(by['movers'].desc, undefined, 'an unknown guid: no description, the slide stays')
   })
@@ -502,7 +503,7 @@ console.log('\nThe nav bar: three ribbons, then Charts and Boosts as plain links
   check("the Podcasts ribbon's Discover column is the rails not already in its lists, plus the personal ones", () => {
     const pod = links.slice(links.indexOf('data-ribbon="podcasts"'), links.indexOf('data-ribbon="music"'))
     const disc = pod.slice(pod.indexOf('<h4>Discover</h4>'), pod.indexOf('nav-ribbon-feat'))
-    for (const t of ['Top Episodes This Year', 'New and Noteworthy', 'Movers This Week', 'Podcasters Recommend', 'Recommended For You', 'Top Shows From Your Follows']) assert.ok(disc.includes(`>${t}</a>`), t)
+    for (const t of ['Top Episodes This Year', 'New and Noteworthy', 'Movers This Week', 'Podcasters Recommend', 'Podcasts Recommended For You', 'Top Shows From Your Follows']) assert.ok(disc.includes(`>${t}</a>`), t)
     assert.ok(!disc.includes('Shows Chart') && !disc.includes('Top Shows This Week'))
   })
   check('the #40HPW ribbon lists #40HPW and the largest boosts, and its Discover is the three Reed named (Top Members still among them)', () => {

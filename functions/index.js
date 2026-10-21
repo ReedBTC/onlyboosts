@@ -39,9 +39,9 @@ import { pacificWeekStart, prevWeek, nextWeek } from "../assets/js/pacific-week.
 import { readParams as podcastParams, globalPodcasts } from "./api/v1/podcasts.js";
 import { readParams as episodeParams, globalEpisodes } from "./api/v1/episodes.js";
 import { hoursBoard } from "./api/v1/members/hours.js";
-import { railListHtml, tileHtml, showTile, albumTile, episodeTile, artistTile, memberTile } from "../assets/js/rail-tile.js";
+import { railListHtml, tileHtml, showTile, albumTile, episodeTile, memberTile } from "../assets/js/rail-tile.js";
 import { showPageHref } from "../assets/js/show-link.js";
-import { heroHtml, showSlide, episodeSlide, artistSlide, memberSlide, EYEBROWS } from "../assets/js/hero.js";
+import { heroHtml, showSlide, episodeSlide, memberSlide, EYEBROWS } from "../assets/js/hero.js";
 import { headOf } from "./_shared/head.js";
 
 const TILES = 10;
@@ -149,11 +149,6 @@ export const RAILS = {
     const rows = await rankedEpisodes(env, `medium=music&sort=chart&range=1y&limit=${TILES}`);
     return rail(railListHtml(rows.map((r, i) => episodeTile(r, i, "🎵")), { empty: "No songs boosted this year." }),
       rows[0] && episodeSlide("songs-year", rows[0]));
-  },
-  "artists-week": async (env) => {
-    const { body } = await weekBoard(env, { kind: "artists", limit: TILES });
-    return rail(railListHtml(body.rows.map(artistTile), { empty: "No artists boosted yet this week." }),
-      body.rows[0] && artistSlide("artists-week", body.rows[0]));
   },
   /* NEW AND NOTEWORTHY: shows whose FIRST boost ever landed in the last 90
      days, two or more distinct boosters, by boosters then sats. The all-time

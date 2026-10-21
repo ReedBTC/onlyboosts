@@ -8,8 +8,8 @@
  * 3. The PERSONAL rails. A signed-out visitor keeps the locked card (Reed's
  *    call, 2026-10-17: the carrot). A signed-in member gets their follows
  *    rail from the same POST the Shows · Follows feed makes, and the three
- *    recommendation shapes off one POST to /api/v1/recommend: Recommended
- *    For You, Recommended Music, and up to five Because You Boosted X rails
+ *    recommendation shapes off one POST to /api/v1/recommend: Podcasts
+ *    Recommended For You, Music Recommended For You, and up to five Because You Boosted X rails
  *    (one per most-boosted show; Reed's ask, 2026-10-18), cloned from the
  *    hidden prototype in index.html. Re-run on lb:session-change and on the
  *    storage event, like feeds.js.
@@ -21,11 +21,11 @@
  *    feed cards' own handlers. A rail the edge could not fill gets its slide
  *    rebuilt here from the rows fetched for the rail, with the same mappers.
  */
-import { railListHtml, showTile, albumTile, episodeTile, artistTile, memberTile } from '/assets/js/rail-tile.js?v=ob-v230'
-import { heroHtml, slideHtml, showSlide, episodeSlide, artistSlide, memberSlide } from '/assets/js/hero.js?v=ob-v230'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v230'
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v230'
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v230'
+import { railListHtml, showTile, albumTile, episodeTile, memberTile } from '/assets/js/rail-tile.js?v=ob-v231'
+import { heroHtml, slideHtml, showSlide, episodeSlide, memberSlide } from '/assets/js/hero.js?v=ob-v231'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v231'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v231'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v231'
 
 const TILES = 10
 
@@ -50,7 +50,6 @@ function wireArt(root) {
 /* ── 2. Rails the edge did not fill ────────────────────────────────────── */
 const SOURCES = {
   'shows-week':    { url: '/api/v1/charts/shows', rows: (j) => j.rows, tile: showTile, slide: (r) => showSlide('shows-week', r, { medium: 'podcast' }) },
-  'artists-week':  { url: '/api/v1/charts/artists', rows: (j) => j.rows, tile: artistTile, slide: (r) => artistSlide('artists-week', r) },
   'albums-month':  { url: `/api/v1/podcasts?medium=music&sort=chart&range=1m&limit=${TILES}`, rows: (j) => j.podcasts, tile: albumTile, slide: (r) => showSlide('albums-month', r, { medium: 'music' }) },
   'episodes-year': { url: `/api/v1/episodes?not_medium=music&sort=chart&range=1y&limit=${TILES}`, rows: (j) => j.episodes, tile: (r, i) => episodeTile(r, i, '🎙'), slide: (r) => episodeSlide('episodes-year', r) },
   'songs-year':    { url: `/api/v1/episodes?medium=music&sort=chart&range=1y&limit=${TILES}`, rows: (j) => j.episodes, tile: (r, i) => episodeTile(r, i, '🎵'), slide: (r) => episodeSlide('songs-year', r) },
@@ -130,11 +129,11 @@ function wireHeroBoost(hero) {
     try {
       const kind = slide.dataset.kind
       if (kind === 'episode' || kind === 'song') {
-        const m = await import('/assets/js/episode-card-actions.js?v=ob-v230')
+        const m = await import('/assets/js/episode-card-actions.js?v=ob-v231')
         btn.disabled = false
         await m.onBoostClick(slide, btn)
       } else {
-        const m = await import('/assets/js/show-card-actions.js?v=ob-v230')
+        const m = await import('/assets/js/show-card-actions.js?v=ob-v231')
         btn.disabled = false
         await m.onShowBoost(slide, btn)
       }
@@ -345,7 +344,7 @@ function linkFullList(section, pubkey) {
   head.appendChild(a)
 }
 
-/* Recommended For You, Recommended Music and the Because rails, all off one
+/* Podcasts Recommended For You, Music Recommended For You and the Because rails, all off one
    POST: the member's boosted shows are the seeds (favorites join them once
    the favorites list has an accessor here), and the endpoint sums the
    collector's similarity scores over them. /about#recommendations is the
@@ -364,7 +363,7 @@ async function paintRecommended(sections, pubkey) {
       else lockedCardNote(rec, j.seeds ? 'Nothing to recommend yet' : 'No boosts from this account yet', j.seeds ? 'Too few other members have boosted the shows you boost for the overlap to mean anything yet; it grows with every boost.' : none('shows'))
     }
     if (music) {
-      if (j.music?.length) unlock(music, railListHtml(j.music.map(albumTile)))
+      if (j.music?.length) { unlock(music, railListHtml(j.music.map(albumTile))); linkFullList(music, pubkey) }
       else lockedCardNote(music, j.seeds ? 'Nothing to recommend yet' : 'No music boosts from this account yet', j.seeds ? 'Too few other members have boosted the albums you boost for the overlap to mean anything yet.' : none('albums'))
     }
     paintBecause(because, Array.isArray(j.because) ? j.because.filter((b) => b?.seed && b.rows?.length) : [])

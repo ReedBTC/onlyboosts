@@ -432,23 +432,23 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v230" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v230" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v230" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v230" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v231" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v231" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v231" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v231" />
   <!-- The hero, the drawers and the boost list are the show page's, so this
        page links its stylesheet and adds only the deltas. -->
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v230" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v230" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v231" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v231" />
   <!-- The episode card, for the #episodes rollup: the same chrome
        feeds-podcasts.js paints on the homepage. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v230" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v231" />
   <!-- The boost thread inside a card's drawer, and its reply / like / repost /
        zap bar, both reached through that same card. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v230" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v230" />
-  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v230" />
-  <link rel="stylesheet" href="/assets/css/booster-page.css?v=ob-v230" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v231" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v231" />
+  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v231" />
+  <link rel="stylesheet" href="/assets/css/booster-page.css?v=ob-v231" />
 </head>
 <body data-booster-pk="${htmlEscape(hex)}"${npub ? ` data-booster-npub="${htmlEscape(npub)}"` : ""}>
 
@@ -543,7 +543,7 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
                 <a href="/discover/new-shows">New and Noteworthy</a>
                 <a href="/discover/movers">Movers This Week</a>
                 <a href="/discover/podroll">Podcasters Recommend</a>
-                <a href="/#rail-recommended">Recommended For You</a>
+                <a href="/#rail-recommended">Podcasts Recommended For You</a>
                 <a href="/#rail-follows">Top Shows From Your Follows</a>
                 <a href="/#rail-because">Because You Boosted</a>
               </div>
@@ -554,7 +554,7 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
                 <a href="/music/albums?range=1m">Top Albums This Month</a>
                 <a href="/music/songs?range=1y">Top Songs This Year</a>
                 <a href="/charts/music">Top Artists This Week</a>
-                <a href="/#rail-recommended-music">Recommended Music</a>
+                <a href="/#rail-recommended-music">Music Recommended For You</a>
                 <a href="/#rail-because">Because You Boosted</a>
               </div>
             </details>
@@ -606,7 +606,7 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
             <a href="/discover/new-shows">New and Noteworthy</a>
             <a href="/discover/movers">Movers This Week</a>
             <a href="/discover/podroll">Podcasters Recommend</a>
-            <a href="/#rail-recommended">Recommended For You</a>
+            <a href="/#rail-recommended">Podcasts Recommended For You</a>
             <a href="/#rail-follows">Top Shows From Your Follows</a>
             <a href="/#rail-because">Because You Boosted</a>
           </div>
@@ -632,7 +632,7 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
           <div class="nav-ribbon-col nav-ribbon-discover">
             <h4>Discover</h4>
             <a href="/charts/music">Top Artists This Week</a>
-            <a href="/#rail-recommended-music">Recommended Music</a>
+            <a href="/#rail-recommended-music">Music Recommended For You</a>
             <a href="/#rail-follows">Top Shows From Your Follows</a>
             <a href="/#rail-because">Because You Boosted</a>
           </div>
@@ -822,12 +822,12 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav.js?v=ob-v230" defer></script>
-<script src="/assets/js/booster-page.js?v=ob-v230" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v231" defer></script>
+<script src="/assets/js/booster-page.js?v=ob-v231" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v230"></script>
-<script src="/assets/js/sw-register.js?v=ob-v230" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v231"></script>
+<script src="/assets/js/sw-register.js?v=ob-v231" defer></script>
 </body>
 </html>`;
 }
@@ -1347,10 +1347,10 @@ function notFound(raw) {
   <meta name="robots" content="noindex" />
   <title>Booster not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v230" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v230" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v230" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v230" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v231" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v231" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v231" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v231" />
 </head>
 <body>
 <section class="page-header">
@@ -1368,7 +1368,7 @@ function notFound(raw) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v230" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v231" defer></script>
 </body>
 </html>`;
   return new Response(html, {

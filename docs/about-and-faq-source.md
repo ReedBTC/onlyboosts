@@ -337,13 +337,14 @@ indexed Nostr boost; nothing about a visitor is stored.
   own (`podcasts.description`, `episodes.description`, `publishers.description`,
   `profiles.about`), cut to about 220 characters. No editorial picks.
 - **The chart rails** (Top Shows This Week, Top Albums This Month, Top
-  Episodes / Songs This Year, Top Artists This Week): the OnlyBoosts Charts
+  Episodes / Songs This Year; Top Artists This Week until 2026-10-21): the OnlyBoosts Charts
   over that window of boost time. A week is Monday 00:00 to Sunday night US
   Pacific; a month and a year are trailing 30 and 365 days. The tile's line is
   the three component ranks (sats / boosters / boosts).
 - **#40HPW**: the week's ten members by hours of podcasts boosted, as the
   Members tab counts them; gold past forty hours.
-- **Recommended For You / Recommended Music**, five steps:
+- **Podcasts Recommended For You / Music Recommended For You** (named
+  Recommended For You / Recommended Music until 2026-10-21), five steps:
   1. Daily, for every show with >= 3 distinct boosters, the collector finds its
      20 most similar shows: cosine similarity over the booster sets (members who
      boosted both / sqrt(boosters_a * boosters_b)). Podcasts against podcasts,
