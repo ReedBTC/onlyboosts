@@ -543,19 +543,19 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v229" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v229" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v229" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v229" />
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v229" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v229" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v230" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v230" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v230" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v230" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v230" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v230" />
   <!-- The boost note card and its reaction bar. Added when the boost list at
        the foot of this page became the same .note-card the homepage Boosts
        feed paints; this page linked neither before, which is why show-page.css
        restates .nostr-mention. That restatement is now redundant rather than
        load-bearing, and is left in place rather than removed in the same pass. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v229" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v229" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v230" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v230" />
 </head>
 <body data-show-guid="${htmlEscape(show.podcast_guid)}">
 
@@ -575,7 +575,7 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
      its own full-width row under the bar.
 
      THE RIBBONS, SINCE 2026-10-20 (Reed's call, after Rotten Tomatoes' section
-     menus): Podcasts, Music and Members each open a ribbon under the bar with
+     menus): Podcasts, Music and #40HPW each open a ribbon under the bar with
      two top-five lists, a Discover column of that side's rails, and the first
      list's #1 at the right. Each ribbon is a <details>, so it opens with no
      script; /assets/js/nav-ribbons.js adds hover, Escape, outside-click and
@@ -586,7 +586,12 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
      link of 2026-10-20 landed once the boards moved there, and the boost
      feed's own page, the two places people kept asking for. Every section
      is a PAGE since 2026-10-21 (/podcasts, /music, /members, /charts,
-     /boosts); the hash-routed charts page is forwarded. The desktop links,
+     /boosts); the hash-routed charts page is forwarded. THE THIRD RIBBON IS
+     NAMED #40HPW AND OPENS /charts/hpw SINCE 2026-10-21 (Reed's call: the
+     challenge is what people open that ribbon for, and its board is the
+     ribbon's first list); it was Members for one day. Its key stays
+     data-ribbon="members", its Discover column still carries Top Members,
+     and the footer keeps the Members entry, /members being a page. The desktop links,
      the overlay's groups and the footer's Browse group name the same
      places; change them together.
      ⚠️ A RIBBON'S LIST SLOT IS data-ribbon-list="<key>" AND THE KEYS ARE
@@ -661,7 +666,7 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
               </div>
             </details>
             <details class="nav-explore-acc">
-              <summary><a href="/members"><span aria-hidden="true">👥</span> Members</a><span class="nav-explore-chev" aria-hidden="true">⌄</span></summary>
+              <summary><a href="/charts/hpw"><span aria-hidden="true">👥</span> #40HPW</a><span class="nav-explore-chev" aria-hidden="true">⌄</span></summary>
               <div class="nav-explore-sub">
                 <a href="/charts/hpw">#40HPW Challenge</a>
                 <a href="/members">Top Members</a>
@@ -747,7 +752,7 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
         </div>
       </details>
       <details class="nav-ribbon" data-ribbon="members">
-        <summary><a href="/members">Members</a><span class="nav-ribbon-caret" aria-hidden="true">▾</span></summary>
+        <summary><a href="/charts/hpw">#40HPW</a><span class="nav-ribbon-caret" aria-hidden="true">▾</span></summary>
         <div class="nav-ribbon-panel">
           <div class="nav-ribbon-col">
             <h4>#40HPW This Week <a href="/charts/hpw">View all</a></h4>
@@ -924,12 +929,12 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
 
 <script type="application/json" id="show-boost-payload">${jsonForScript(boostPayload)}</script>
 
-<script src="/assets/js/nav.js?v=ob-v229" defer></script>
-<script src="/assets/js/show-page.js?v=ob-v229" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v230" defer></script>
+<script src="/assets/js/show-page.js?v=ob-v230" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v229"></script>
-<script src="/assets/js/sw-register.js?v=ob-v229" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v230"></script>
+<script src="/assets/js/sw-register.js?v=ob-v230" defer></script>
 </body>
 </html>`;
 }
@@ -1501,10 +1506,10 @@ function notFound(guid) {
   <meta name="robots" content="noindex" />
   <title>Show not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v229" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v229" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v229" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v229" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v230" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v230" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v230" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v230" />
 </head>
 <body>
 <section class="page-header">
@@ -1523,7 +1528,7 @@ function notFound(guid) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v229" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v230" defer></script>
 </body>
 </html>`;
   return new Response(html, {

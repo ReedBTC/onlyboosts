@@ -481,11 +481,13 @@ console.log('\nThe nav bar: three ribbons, then Charts and Boosts as plain links
   const nav = read('partials/nav.html')
   const foot = read('partials/footer.html')
   const links = nav.slice(nav.indexOf('<nav class="nav-links"'), nav.indexOf('</nav>'))
-  check('the bar is Podcasts, Music and Members as ribbons, then Charts and Boosts', () => {
+  check('the bar is Podcasts, Music and #40HPW as ribbons, then Charts and Boosts', () => {
     assert.deepStrictEqual([...links.matchAll(/<details class="nav-ribbon" data-ribbon="([a-z]+)"/g)].map((m) => m[1]), ['podcasts', 'music', 'members'])
     assert.ok(links.includes('<a href="/charts">Charts</a>') && links.includes('<a href="/boosts">Boosts</a>'))
-    assert.ok(!links.includes('>#40HPW</a>'), 'the #40HPW link folded into Charts, where both its boards are')
-    for (const [ribbon, href] of [['podcasts', '/podcasts'], ['music', '/music'], ['members', '/members']]) {
+    assert.ok(!/^\s*<a href="\/charts\/hpw">#40HPW<\/a>/m.test(links), 'the #40HPW plain link of 2026-10-20 is gone; #40HPW is the third ribbon')
+    assert.ok(links.includes('<summary><a href="/charts/hpw">#40HPW</a>'), 'the third ribbon is named #40HPW and opens the boards (Reed, 2026-10-21)')
+    assert.ok(!links.includes('<summary><a href="/members">'), 'no ribbon is named Members any more')
+    for (const [ribbon, href] of [['podcasts', '/podcasts'], ['music', '/music'], ['members', '/charts/hpw']]) {
       assert.ok(links.includes(`data-ribbon="${ribbon}">\n        <summary><a href="${href}">`), `${ribbon} opens ${href}`)
     }
   })
@@ -503,7 +505,7 @@ console.log('\nThe nav bar: three ribbons, then Charts and Boosts as plain links
     for (const t of ['Top Episodes This Year', 'New and Noteworthy', 'Movers This Week', 'Podcasters Recommend', 'Recommended For You', 'Top Shows From Your Follows']) assert.ok(disc.includes(`>${t}</a>`), t)
     assert.ok(!disc.includes('Shows Chart') && !disc.includes('Top Shows This Week'))
   })
-  check('the Members ribbon lists #40HPW and the largest boosts, and its Discover is the three Reed named', () => {
+  check('the #40HPW ribbon lists #40HPW and the largest boosts, and its Discover is the three Reed named (Top Members still among them)', () => {
     const mem = links.slice(links.indexOf('data-ribbon="members"'))
     assert.ok(mem.includes('<h4>#40HPW This Week') && mem.includes('<h4>Largest Boosts This Week'))
     const disc = mem.slice(mem.indexOf('<h4>Discover</h4>'), mem.indexOf('nav-ribbon-feat'))
@@ -517,6 +519,7 @@ console.log('\nThe nav bar: three ribbons, then Charts and Boosts as plain links
   check('the overlay and the footer name the same places', () => {
     const overlay = nav.slice(nav.indexOf('nav-explore-sections'), nav.indexOf('nav-explore-group">\n            <h4>Stats'))
     assert.strictEqual((overlay.match(/<details class="nav-explore-acc">/g) || []).length, 3)
+    assert.ok(overlay.includes('<summary><a href="/charts/hpw"><span aria-hidden="true">👥</span> #40HPW</a>'), "the overlay's third row is #40HPW like the ribbon")
     for (const h of ['/podcasts', '/music', '/members', '/charts', '/boosts']) assert.ok(overlay.includes(`href="${h}"`) && foot.includes(`href="${h}"`), h)
     assert.ok(overlay.includes('<h4>Browse</h4>') && foot.includes('<h3>Browse</h3>'), 'the group is Browse: it holds a Charts entry now')
   })

@@ -143,10 +143,14 @@ named Charts).
   2026-10-21). **A missing `data-active-feed` hydrates nothing**; the old
   `|| 'episodes-global'` fallback would have painted Episodes under the
   Members page.
-- **The nav bar is Podcasts ▾ · Music ▾ · Members ▾ · Charts · Boosts.** The
+- **The nav bar is Podcasts ▾ · Music ▾ · #40HPW ▾ · Charts · Boosts.** The
   #40HPW plain link of 2026-10-20 folded into Charts, where both its boards
-  are; the overlay's and the footer's group is **Browse** (it holds a Charts
-  entry now). The ribbons' View all links: the weekly lists go to the
+  are, and the same evening Reed renamed the third ribbon from Members to
+  #40HPW, opening `/charts/hpw` ("that's the only thing people go to that
+  members thing for"); its key is still `data-ribbon="members"`, its
+  Discover column still lists Top Members, and the footer keeps Members,
+  `/members` being a page. The overlay's and the footer's group is
+  **Browse** (it holds a Charts entry now). The ribbons' View all links: the weekly lists go to the
   Charts page, the year and month lists to the chart pages with the range.
 - **What went with the tabs**: the masthead (the banner and tagline above
   the tabs; the nav bar carries the brand), `pinScroll` and the `#boosts`
@@ -212,8 +216,9 @@ was picked from is in the session memory; direction A won, with the sans.
   hamburger's overlay and the search takes its own row. **The overlay's
   Charts group, the inline links and the footer's Charts group name the same
   places; change them together.**
-- **THE SECTIONS ARE RIBBONS SINCE 2026-10-20: Podcasts · Music · Members
-  each open a panel under the bar, then two plain links** (Reed's call,
+- **THE SECTIONS ARE RIBBONS SINCE 2026-10-20: Podcasts · Music · #40HPW
+  (Members until the evening of 2026-10-21, see The Chart Pages) each open a
+  panel under the bar, then two plain links** (Reed's call,
   after Rotten Tomatoes' section menus). The plain links were #40HPW and
   Boosts for one day and are **Charts and Boosts since 2026-10-21**, when
   the boards got their own page under that name; see **The Chart Pages**. A

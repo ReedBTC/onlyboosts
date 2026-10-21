@@ -1,5 +1,6 @@
 /* The nav bar's section ribbons (2026-10-20, Reed's call after Rotten
- * Tomatoes' section menus): Podcasts, Music and Members each open a panel
+ * Tomatoes' section menus): Podcasts, Music and #40HPW (Members until
+ * 2026-10-21; the key stays `members`) each open a panel
  * under the bar with two top-five lists, a Discover column of that side's
  * rails, and the first list's #1 at the right.
  *
@@ -20,9 +21,9 @@
  * links is the cards' rule (show-link.js, booster-link.js), so a row the
  * rule declines is printed without a link rather than with a dead one.
  */
-import { showPageHref, episodePageHref } from '/assets/js/show-link.js?v=ob-v229'
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v229'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v229'
+import { showPageHref, episodePageHref } from '/assets/js/show-link.js?v=ob-v230'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v230'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v230'
 
 const HOVER_OPEN_MS = 120
 const HOVER_CLOSE_MS = 220
