@@ -29,7 +29,7 @@
       "name": "Global Podcasts",
       "short_name": "Podcasts",
       "description": "The global podcast feed",
-      "url": "/#podcasts-global"
+      "url": "/podcasts/shows"
     }
   ]
 }

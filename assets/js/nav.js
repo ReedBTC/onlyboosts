@@ -112,7 +112,7 @@
         return
       }
       var s = document.createElement('script')
-      s.src = '/assets/widgets/login-widget.js?v=ob-v219'
+      s.src = '/assets/widgets/login-widget.js?v=ob-v232'
       s.async = true
       s.onload = function () { Promise.resolve().then(resolve) }
       s.onerror = function () { window.__lbWidgetLoad = null; reject(new Error('widget load failed')) }
@@ -134,5 +134,11 @@
   // controller (assets/js/favorites-ui.js), and the menu is on every page, so
   // the controller is too. A dynamic import so a page with no hearts pays for
   // the module and no relay read; the stamper rewrites this URL like any other.
-  try { import('/assets/js/favorites-ui.js?v=ob-v219').catch(function () {}) } catch (e) {}
+  try { import('/assets/js/favorites-ui.js?v=ob-v232').catch(function () {}) } catch (e) {}
+  // The nav bar's search typeahead (2026-10-17), the same way: the field is
+  // on every page and works as a plain form until this lands.
+  try { import('/assets/js/nav-search.js?v=ob-v232').catch(function () {}) } catch (e) {}
+  // The section ribbons (2026-10-20): hover, close rules and the lists'
+  // fetch. The caret opens a ribbon before this lands; it is a <details>.
+  try { import('/assets/js/nav-ribbons.js?v=ob-v232').catch(function () {}) } catch (e) {}
 })()

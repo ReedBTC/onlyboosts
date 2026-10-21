@@ -1,0 +1,521 @@
+/* The discovery homepage: the rails, their tiles, and the locked card a
+ * personal rail shows a signed-out visitor. Reads the theme's tokens only
+ * (one ground, hairlines, one accent — see docs/dark-mode.md), so dark mode
+ * is free. The tile markup is assets/js/rail-tile.js, two-sided. */
+
+.discover {
+  max-width: var(--feed-track, 60rem);
+  margin: 0 auto;
+  padding: 1.6rem 1rem 3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2.2rem;
+}
+@media (min-width: 1100px) { .discover { max-width: 72rem; } }
+
+/* ── A rail ── */
+.rail { min-width: 0; }
+.rail [id] { scroll-margin-top: 5rem; } /* the nav's Discover links land on a rail heading under the sticky bar */
+.rail-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0 0 0.75rem;
+}
+.rail-head h2 {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 1.45rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+.rail-head h2 a { color: inherit; text-decoration: none; }
+.rail-head h2 a:hover { color: var(--brand-dd); }
+.rail-more {
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--brand-dd);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.rail-more:hover { text-decoration: underline; }
+.rail-note {
+  margin: -0.35rem 0 0.75rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+/* The track: a sideways scroller on a phone, a grid of ten on a desktop. */
+.rail-track { min-width: 0; }
+.rail-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(118px, 1fr);
+  gap: 0.9rem;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  padding-bottom: 0.35rem;
+  scrollbar-width: thin;
+}
+@media (min-width: 900px) {
+  .rail-list {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    overflow: visible;
+  }
+}
+@media (min-width: 1100px) {
+  .rail-list { grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 0.8rem; }
+}
+/* The search page's groups wrap instead of scrolling: every hit on screen. */
+.rail-list--wrap,
+.rail-list--wrap { grid-auto-flow: row; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); overflow: visible; }
+@media (min-width: 1100px) { .rail-list--wrap { grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); } }
+.rail-tile { min-width: 0; scroll-snap-align: start; }
+.rt {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  color: var(--text);
+  text-decoration: none;
+  min-width: 0;
+}
+.rt-media {
+  position: relative;
+  display: block;
+  aspect-ratio: 1 / 1;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--cream-d);
+  border: 1px solid var(--border);
+}
+.rt-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.rt-media--none { display: flex; align-items: center; justify-content: center; }
+.rt-glyph { font-size: 2rem; line-height: 1; }
+.rt-rank {
+  position: absolute;
+  left: 6px;
+  top: 6px;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  background: rgba(11, 58, 82, 0.86);
+  color: #ffffff;
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+}
+:root[data-theme="dark"] .rt-rank { background: rgba(0, 0, 0, 0.72); }
+.rt-rank[data-tied="1"] { letter-spacing: 0.02em; }
+.rail-tile:first-child .rt-rank { background: var(--brand-dd); }
+/* A #40HPW member who has cleared the goal this week: the board's gold. */
+.rt-rank--gold { background: #b8860b; color: #ffffff; }
+.rail-tile:first-child .rt-rank--gold { background: #b8860b; }
+
+/* A PERSON is a circle, content is a square (Reed's call, 2026-10-18): the
+   #40HPW faces read as individuals, not as shows. The media box keeps its
+   overflow visible so the rank badge sits on the circle's shoulder rather
+   than being clipped off at the corner; the image itself is what rounds.
+   ⚠️ THE IMAGE IS ABSOLUTE, NOT IN FLOW. With overflow visible an aspect-ratio
+   box takes the taller of the ratio and its content, so a portrait avatar
+   grew the box past square and the circle became a tall ellipse (Reed saw it
+   on the #40HPW rail, 2026-10-19). Out of flow it cannot size the box. */
+.rail-tile--person .rt-media { border-radius: 50%; overflow: visible; }
+.rail-tile--person .rt-media img { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 50%; }
+.rail-tile--person .rt-media .rt-rank { left: 0; top: 0; }
+.rail-tile--person .rt-title { text-align: center; }
+.rail-tile--person .rt-sub { text-align: center; }
+/* The rank triplet under a charted tile: rank in sats / boosters / boosts,
+   the chart view's own figure. Tabular so the slashes line up down a rail. */
+.rt-ranks { font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
+.search-page h1 {
+  margin: 0 0 0.25rem;
+  font-family: var(--font-sans);
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.search-page h1 q { quotes: "\201C" "\201D"; }
+.search-lead { margin: 0 0 0.5rem; color: var(--muted); }
+.rail-head h2 small { font-size: 0.85rem; font-weight: 600; color: var(--muted); margin-left: 0.4rem; }
+.rt-title {
+  font-family: var(--font-sans);
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+a.rt:hover .rt-title { color: var(--brand-dd); }
+.rt-sub {
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rail-empty,
+.rail-placeholder {
+  margin: 0;
+  padding: 1.1rem 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+/* ── A board rail (the #40HPW week) sits in the detail pages' box ── */
+.rail-box {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.9rem 1.1rem 0.6rem;
+}
+.rail-box .hpw-board { margin: 0; }
+
+/* ── A personal rail, signed out: the carrot ── */
+.rail-locked {
+  position: relative;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem;
+  overflow: hidden;
+}
+.rail-locked .rail-list { opacity: 0.28; filter: grayscale(1); pointer-events: none; }
+.rail-locked .rt-media { background: var(--border); border: 0; }
+.rail-locked-ph {
+  display: block;
+  height: 0.7rem;
+  border-radius: 0.35rem;
+  background: var(--border);
+}
+.rail-locked-card {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+.rail-locked-card > div {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  max-width: 620px;
+  padding: 1rem 1.4rem;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 28px rgba(11, 58, 82, 0.14);
+}
+:root[data-theme="dark"] .rail-locked-card > div { box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5); }
+.rail-locked-card svg { width: 32px; height: 32px; flex-shrink: 0; color: var(--brand-dd); }
+.rail-locked-card h3 {
+  margin: 0 0 0.2rem;
+  font-family: var(--font-sans);
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+.rail-locked-card p { margin: 0; font-size: 0.9rem; color: var(--muted); line-height: 1.4; }
+.rail-locked-card .ob-cta {
+  flex-shrink: 0;
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #ffffff;
+  background: var(--brand-dd);
+  border: 0;
+  border-radius: 18px;
+  padding: 0.55rem 1.1rem;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.rail-locked-card .ob-cta:hover { background: var(--brand-ddd); }
+@media (max-width: 640px) {
+  .rail-locked-card > div { flex-direction: column; text-align: center; padding: 1rem; }
+}
+
+/* ── The search results page: a LIST, like the charts page ──────────────
+   (Reed's call, 2026-10-18). Each group is a rail heading over the charts
+   page's own .pcast-list of cards, at .show-main's track width; the tile
+   rail is the homepage's shape only. The count sits beside the heading. */
+.search-group { margin: 0 0 2.25rem; }
+.search-group .rail-head h2 small { font-size: 0.85rem; font-weight: 600; color: var(--muted); margin-left: 0.35rem; }
+.search-wall .show-section-head h2 {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 1.45rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* ── The way into the boost feed from the front door ─────────────────────
+   One strip at the foot of the rails (the Latest Boosts rows left on
+   2026-10-18, Reed's call: the personal rails took the room). One click,
+   the whole firehose. */
+.rail-cta { margin: 0.5rem 0 0; }
+.rail-cta a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface, var(--cream));
+  color: var(--text);
+  text-decoration: none;
+  font-family: var(--font-sans);
+}
+.rail-cta a:hover { border-color: var(--brand-dd); }
+.rail-cta strong { font-size: 1.05rem; font-weight: 700; }
+.rail-cta span { color: var(--muted); font-size: 0.92rem; }
+.rail-cta b { color: var(--brand-dd); white-space: nowrap; font-weight: 700; }
+@media (max-width: 640px) {
+  .rail-cta a { flex-direction: column; align-items: flex-start; gap: 0.3rem; }
+}
+
+/* The personal rails' one-line explanations, with their link to the method. */
+.rail-head .rail-sub { font-family: var(--font-sans); font-size: 0.9rem; font-weight: 500; color: var(--muted); text-align: right; }
+.rail-head .rail-sub a { color: var(--brand-dd); text-decoration: none; white-space: nowrap; }
+.rail-head .rail-sub a:hover { text-decoration: underline; }
+@media (max-width: 640px) {
+  .rail-head { flex-wrap: wrap; }
+  .rail-head .rail-sub { text-align: left; flex-basis: 100%; }
+}
+
+/* ── The featured carousel (Reed's call, 2026-10-19) ──────────────────────
+   One slide per generic rail, that rail's first place, above the rails.
+   Fountain's shape, since podcast art is square: the artwork blurred and
+   darkened as the backdrop, the square art at left, the eyebrow (the rail's
+   rule), the title, the figures, two lines of description, Open and Boost.
+   The backdrop is an IMAGE, not a surface colour, so the dark band is the
+   same in both themes and the one-ground grammar holds. The slides are a
+   scroll-snap strip; discover.js adds the arrows, the dots and the
+   seven-second rotation (paused on hover and focus, off under reduced
+   motion), and on a phone the swipe is the native one. */
+.hero {
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: #0b3a52;
+  color: #ffffff;
+  font-family: var(--font-sans);
+}
+.hero-slides {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 100%;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+.hero-slides::-webkit-scrollbar { display: none; }
+.hero-slide {
+  position: relative;
+  min-width: 0;
+  min-height: 340px;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  isolation: isolate;
+  display: flex;
+}
+.hero-bg {
+  position: absolute;
+  inset: -12%;
+  width: 124%;
+  height: 124%;
+  object-fit: cover;
+  filter: blur(26px) saturate(1.15) brightness(0.5);
+  z-index: 0;
+  pointer-events: none;
+}
+.hero-slide::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(90deg, rgba(5, 20, 30, 0.72) 0%, rgba(5, 20, 30, 0.45) 55%, rgba(5, 20, 30, 0.2) 100%);
+  pointer-events: none;
+}
+.hero-body {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 1.75rem;
+  width: 100%;
+  padding: 2rem 4.5rem 2.6rem 2.25rem;
+  box-sizing: border-box;
+}
+.hero-art-link { flex-shrink: 0; display: block; line-height: 0; }
+.hero-art {
+  width: 220px;
+  height: 220px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  object-fit: cover;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  background: rgba(255, 255, 255, 0.08);
+  display: block;
+}
+.hero-art--none {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 4rem;
+  line-height: 1;
+}
+.hero-slide--person .hero-art { border-radius: 50%; }
+.hero-slide--gold .hero-eyebrow { color: #f2c75c; }
+.hero-text { min-width: 0; flex: 1; }
+.hero-eyebrow {
+  margin: 0 0 0.35rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #7fdcff;
+}
+.hero-title {
+  margin: 0 0 0.3rem;
+  font-size: clamp(1.5rem, 3vw, 2.1rem);
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  line-height: 1.12;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.hero-title a { color: inherit; text-decoration: none; }
+.hero-title a:hover { text-decoration: underline; }
+.hero-from { margin: 0 0 0.25rem; font-size: 0.98rem; font-weight: 600; color: rgba(255, 255, 255, 0.88); }
+.hero-from a { color: inherit; text-decoration: none; }
+.hero-from a:hover { text-decoration: underline; }
+.hero-line {
+  margin: 0 0 0.6rem;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.78);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: baseline;
+}
+.hero-ranks { font-variant-numeric: tabular-nums; letter-spacing: 0.02em; font-weight: 700; color: #ffffff; }
+.hero-desc {
+  margin: 0 0 1rem;
+  font-family: var(--font-body, inherit);
+  font-size: 0.98rem;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.86);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-width: 44rem;
+}
+.hero-actions { display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; }
+.hero-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.5rem 1.1rem;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #0b3a52;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.hero-btn:hover { background: #e6f7ff; }
+.hero .ob-boost-pill.hero-boost { margin-left: 0; padding: 0.45rem 1rem; font-size: 0.85rem; }
+
+/* The arrows: over the edges, shown when the page can drive them. */
+.hero-arrow {
+  position: absolute;
+  top: 50%;
+  z-index: 3;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(5, 20, 30, 0.55);
+  color: #ffffff;
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0 3px;
+  opacity: 0.75;
+  transition: opacity 0.12s, background 0.12s;
+}
+.hero-arrow[hidden] { display: none; }
+.hero-arrow:hover { opacity: 1; background: rgba(5, 20, 30, 0.8); }
+.hero-arrow:focus-visible { outline: 2px solid #7fdcff; outline-offset: 2px; opacity: 1; }
+.hero-arrow--prev { left: 12px; }
+.hero-arrow--next { right: 12px; }
+
+/* The dots: bottom centre, the current one wide. */
+.hero-dots {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 12px;
+  z-index: 3;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+.hero-dots[hidden] { display: none; }
+.hero-dots button {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.45);
+  cursor: pointer;
+  transition: width 0.15s, background 0.15s;
+}
+.hero-dots button[aria-current="true"] { width: 22px; background: #ffffff; }
+.hero-dots button:focus-visible { outline: 2px solid #7fdcff; outline-offset: 2px; }
+
+@media (max-width: 640px) {
+  .hero { border-radius: 12px; }
+  .hero-slide { min-height: 0; }
+  .hero-body {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.9rem;
+    padding: 1.1rem 1.1rem 2.1rem;
+  }
+  .hero-art { width: 112px; height: 112px; border-radius: 10px; }
+  .hero-art--none { font-size: 2.4rem; }
+  .hero-title { font-size: 1.35rem; }
+  .hero-desc { -webkit-line-clamp: 3; font-size: 0.92rem; }
+  .hero-arrow { display: none; }
+}

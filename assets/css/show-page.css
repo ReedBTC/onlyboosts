@@ -1137,6 +1137,8 @@ a.boost-who:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px
 
 .cs-title,
 .cs-meta { display: block; }
+/* The method line under /booster's #recommended lists (2026-10-20). */
+.cs-note { margin: 0.6rem 0 0; font-size: 0.85rem; color: var(--muted); }
 
 /* Deliberately the same size as .ep-title in the episode drawer above — these
    are two lists of the same kind in the same box, and the page reads as one

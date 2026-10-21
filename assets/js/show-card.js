@@ -45,10 +45,10 @@
  * All three are now en-US in UTC, which is what episode-card.js and
  * functions/_shared/detail-page.js already do. The site has one date format.
  */
-import { showPageHref, episodePageHref } from './show-link.js?v=ob-v219'
-import { favoriteButtonHtml } from './favorite-button.js?v=ob-v219'
-import { coverChain } from './cover-art.js?v=ob-v219'
-import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v219'
+import { showPageHref, episodePageHref } from './show-link.js?v=ob-v232'
+import { favoriteButtonHtml } from './favorite-button.js?v=ob-v232'
+import { coverChain } from './cover-art.js?v=ob-v232'
+import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v232'
 
 const esc = htmlEscape
 
@@ -263,7 +263,7 @@ export function toCard(p) {
  *                         rank.js#rankLabel. Null on a chronological sort.
  * @param {object} copy    COPY.other or COPY.music
  */
-export function showCardHtml(s, { rank = null, copy = COPY.other } = {}) {
+export function showCardHtml(s, { rank = null, copy = COPY.other, note = null } = {}) {
   /* 462 of the 1,384 shows in the index (33%) have no title and no art: the
    * collector holds a boost tagged with their guid but Podcast Index doesn't
    * know the feed, so there is nothing to enrich from. They're the long tail —
@@ -351,8 +351,13 @@ export function showCardHtml(s, { rank = null, copy = COPY.other } = {}) {
   const rankEl = rank == null ? ''
     : `<div class="pcast-rank" aria-hidden="true">${esc(String(rank))}</div>`
 
+  /* An optional line under the figures saying WHY the card is in this list:
+   * the /discover pages' climb, first boost or podroll count (2026-10-20).
+   * The feeds pass none; the card is otherwise the same string. */
+  const noteEl = note ? `<div class="pcast-note">${esc(note)}</div>` : ''
+
   const head = `<div class="pcast-card-head">${rankEl}${media}` +
-    `<div class="pcast-card-body">${titleEl}${guidEl}${stats}${latestEl}</div></div>`
+    `<div class="pcast-card-body">${titleEl}${guidEl}${stats}${latestEl}${noteEl}</div></div>`
 
   /* No drawer when there's nothing to put in it. A show can legitimately have
    * boosts and no episodes: the index reports 0 for shows whose boosts never
@@ -470,6 +475,6 @@ export function sortEpisodeRows(eps) {
  * scheme: the edge stamps a competition rank over a prefix from offset 0, and
  * shows-feed.js re-stamps after every append. See rank.js.
  */
-export function renderShowCards(cards, { copy = COPY.other, rankOf = () => null } = {}) {
-  return cards.map((s, i) => showCardHtml(s, { rank: rankOf(s, i), copy })).join('')
+export function renderShowCards(cards, { copy = COPY.other, rankOf = () => null, noteOf = () => null } = {}) {
+  return cards.map((s, i) => showCardHtml(s, { rank: rankOf(s, i), copy, note: noteOf(s, i) })).join('')
 }

@@ -325,6 +325,58 @@ raw scores are not comparable across views or weeks. The components behind
 every position are printed on the row itself, so a placement can be checked by
 hand.
 
+## The homepage rails and the recommendations (2026-10-18)
+
+The front page (`/`, since 2026-10-17) is a set of rails. `/about#recommendations`
+states every rail's rule; this is the factual backing. Every input is an
+indexed Nostr boost; nothing about a visitor is stored.
+
+- **The featured carousel** (2026-10-19): one slide per generic rail, that
+  rail's first place, in the page's rail order; the same for every visitor,
+  edge-rendered from the rails' own rows. The description is the subject's
+  own (`podcasts.description`, `episodes.description`, `publishers.description`,
+  `profiles.about`), cut to about 220 characters. No editorial picks.
+- **The chart rails** (Top Shows This Week, Top Albums This Month, Top
+  Episodes / Songs This Year; Top Artists This Week until 2026-10-21): the OnlyBoosts Charts
+  over that window of boost time. A week is Monday 00:00 to Sunday night US
+  Pacific; a month and a year are trailing 30 and 365 days. The tile's line is
+  the three component ranks (sats / boosters / boosts).
+- **#40HPW**: the week's ten members by hours of podcasts boosted, as the
+  Members tab counts them; gold past forty hours.
+- **Podcasts Recommended For You / Music Recommended For You** (named
+  Recommended For You / Recommended Music until 2026-10-21), five steps:
+  1. Daily, for every show with >= 3 distinct boosters, the collector finds its
+     20 most similar shows: cosine similarity over the booster sets (members who
+     boosted both / sqrt(boosters_a * boosters_b)). Podcasts against podcasts,
+     albums against albums. `bots/global-boost-scan/similar.py`, table
+     `show_similar`.
+  2. Relay-bot publisher keys are not boosters in the sets (one key relaying
+     hundreds of donors would manufacture overlap). Measured: 6,627 music pairs
+     with them in, 4,354 without.
+  3. Seeds = the shows the member boosted under their key, plus the feeds on
+     their PC 2.0 favorites list if the browser passes them (it does not yet).
+     Candidate score = sum of similarity to every seed; seeds excluded.
+  4. Floor: reached from >= 2 seeds, or >= 2 shared boosters with one seed. Half
+     of all pairs share exactly one booster (measured 2026-10-17).
+  5. Podcasts and music ranked separately: music overlap runs ~3x the podcast
+     side's.
+  Computed per request from D1 (`POST /api/v1/recommend`), nothing stored.
+- **Because You Boosted X**: up to five rails, one per most-boosted seed with
+  neighbours over the floor; each rail is that show's own top-20 list at
+  `shared_boosters >= 2`, minus the member's seeds; a show appears on the first
+  rail that reaches it only; a seed left empty by that is skipped.
+- **Top Shows From Your Follows**: the Shows chart over the boosts of the
+  member's kind-3 contacts (the Follows scope); the member's own boosts count.
+- **New and Noteworthy**: `first_boost_ts` within 90 days and >= 2 boosters, by
+  boosters then sats.
+- **Movers**: this week's Shows chart against last week's to 100 places;
+  climbers by places climbed, then debuts in chart order.
+- **Podcasters Recommend**: podroll targets by the number of distinct listing
+  shows; an unindexed target is shown, not linked.
+- **Limits**: similarity sees Nostr boosts only; anonymous, private and
+  never-published boosts contribute no seeds; a member with one or two boosts
+  meets the floor's empty state.
+
 ---
 
 ## FAQ (seed questions — expand/trim as you like)

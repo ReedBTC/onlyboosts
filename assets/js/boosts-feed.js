@@ -30,8 +30,8 @@
  * need only id + pubkey. The object handed to buildActionBar below is a
  * projection, not a verified event; don't pass it anywhere that assumes one.
  */
-import { nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v219'
-import { buildActionBar, configureBoostActions } from '/assets/js/boost-actions.js?v=ob-v219'
+import { nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v232'
+import { buildActionBar, configureBoostActions } from '/assets/js/boost-actions.js?v=ob-v232'
 // ⚠️ wireNpubCopy WAS IMPORTED HERE and is not any more. The avatar and the name
 // were its only two callers on this feed, and both are now links to
 // /booster/<npub>. Unlike the Episodes drawer — where the per-boost ⋮ menu
@@ -39,22 +39,21 @@ import { buildActionBar, configureBoostActions } from '/assets/js/boost-actions.
 // from this feed means opening their page, which leads with the button.
 // Its own module rather than a third export from show-link.js; see the note at
 // the head of booster-link.js and the ob-v53 entry in CLAUDE.md.
-import { boosterPageHref, markBoosterLink } from '/assets/js/booster-link.js?v=ob-v219'
-import { parseSegments, renderSegmentsInto, setCachedProfile } from '/assets/js/boosts-thread.js?v=ob-v219'
-import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v219'
-import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v219'
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v219'
-import { boosterLabel } from '/assets/js/ob-data.js?v=ob-v219'
-import { clientLabel, hasClientLabel } from '/assets/js/client-label.js?v=ob-v219'
-import { followsBoostReader, globalBoostReader } from '/assets/js/ob-live.js?v=ob-v219'
-import { resetFeedSearch } from '/assets/js/feed-search.js?v=ob-v219'
+import { boosterPageHref, markBoosterLink } from '/assets/js/booster-link.js?v=ob-v232'
+import { parseSegments, renderSegmentsInto, setCachedProfile } from '/assets/js/boosts-thread.js?v=ob-v232'
+import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v232'
+import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v232'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v232'
+import { boosterLabel } from '/assets/js/ob-data.js?v=ob-v232'
+import { clientLabel, hasClientLabel } from '/assets/js/client-label.js?v=ob-v232'
+import { followsBoostReader, globalBoostReader } from '/assets/js/ob-live.js?v=ob-v232'
 import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls,
   RANGE_OPTIONS,
-} from '/assets/js/feed-controls.js?v=ob-v219'
+} from '/assets/js/feed-controls.js?v=ob-v232'
 
-import { showPageHref, episodePageHref } from '/assets/js/show-link.js?v=ob-v219'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v219'
+import { showPageHref, episodePageHref } from '/assets/js/show-link.js?v=ob-v232'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v232'
 
 const PAGE_SIZE = 30
 
@@ -391,7 +390,6 @@ export async function renderBoosts({ panel, list, scope = 'global' }) {
      cached module that mounted a box into this panel's host. Clearing it is one
      call and the alternative is a dead search box over a feed that no longer
      reads it. */
-  resetFeedSearch(panel)
 
   // Resolve the audience first — a signed-out Follows tab should say so
   // without touching the network, and the query below can't be built at all

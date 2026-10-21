@@ -34,6 +34,7 @@ import { memberOnesBoardHtml, boardHtml, weekRowHtml, onesRowHtml, weekLabel, we
 import { weekBoard, onesBoard } from "../api/v1/charts/[[path]].js";
 import { competitionRanks } from "../../assets/js/rank.js";
 import { cardHtml } from "../_shared/card-frame.js";
+import { renderShellPage, resolveRoute } from "../_shared/charts-page.js";
 
 const ROWS = 10;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -44,8 +45,9 @@ const ONES_CARD_KINDS = new Set(["shows", "artists", "members"]);
 // ⚠️ A PATH SEGMENT IN THE WILD: the collector's bot screenshots the literal,
 // on the /hpw/high-scores rule. It does not move.
 export const ONES_KEY = "weeks-at-1";
-// Where the torn-down page's URLs land.
-const HOME = "/#shows";
+// Where a dated /charts/<date> URL lands: the Podcasts boards, which carry
+// the week picker that reaches every past week.
+const HOME = "/charts/podcasts";
 
 export async function onRequestGet({ request, env, params }) {
   let segs = params.path;
@@ -53,8 +55,21 @@ export async function onRequestGet({ request, env, params }) {
   if (!Array.isArray(segs)) segs = [segs];
   segs = segs.filter((s) => s !== "");
 
-  /* Anything that is not a card frame is the old page's address, or garbage
-     under it: the Shows feed, where the boards are now. */
+  /* THE BARE /charts AND /charts/<view> ARE THE CHARTS PAGE SINCE 2026-10-21:
+     the weekly boards in three pairs (Podcasts, Music, #40HPW), one pair per
+     view, in the shell every chart page shares (_shared/charts-page.js).
+     Reed's call: the boards are a different thing from the live charts
+     they sat above, and a Month and a Year can join the Week here. The
+     bare path opens on Podcasts. The name stayed: /charts was the
+     hash-routed feed page from 2026-10-17 to 2026-10-21 (the homepage
+     before that), and its hash addresses are forwarded by the shell's head
+     script. Anything else that is not a card frame is the old dated
+     page's address, or garbage under it, and lands on the boards. */
+  if (segs.length === 0) return renderShellPage({ request, env }, resolveRoute("charts"));
+  if (segs.length === 1) {
+    const route = resolveRoute("charts", segs[0]);
+    if (route) return renderShellPage({ request, env }, route);
+  }
   const card = segs.length === 3 && segs[1] === "card";
   if (!card) return redirect(request, HOME, 60);
   const key = segs[0];
@@ -145,9 +160,9 @@ function unavailable() {
    the stepper's .hpw-nav grammar, the members board is .hpw-* rows in a
    .cb-board shell. Written here so scripts/stamp-assets.js sees an href it
    can restamp. */
-const CARD_LINKS = `  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v219" />
-  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v219" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v219" />`;
+const CARD_LINKS = `  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v232" />
+  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v232" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v232" />`;
 
 /* The rows sized to the frame. ⚠️ MEASURED BY THE BOT, 2026-09-03: the weekly
    cards' list box is 296.9 → 829 (the column head costs 27.4px), ceiling
@@ -173,8 +188,9 @@ const CARD_CSS = `
     .card .hpw-week, .card .hpw-week-jump { font-size: 0.62rem; }
     .card .hpw-hours { font-size: 1.05rem; }`;
 
-/* The footer names the tab the board lives on — the share note's link. */
-const TAB_OF = { shows: "/#shows", artists: "/#artists", members: "/#members" };
+/* The footer names the Charts page view the board lives on (2026-10-21; the
+   feed tab before that), which is the share note's link. */
+const TAB_OF = { shows: "/charts/podcasts", artists: "/charts/music", members: "/charts/hpw" };
 
 export function renderWeekCard({ kind, ws, isCurrent, rows }) {
   const heading = COPY.sections[kind].heading;

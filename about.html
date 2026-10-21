@@ -48,12 +48,12 @@
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v219" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v219" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v232" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v232" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v219" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v219" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v232" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v232" />
 </head>
 <body>
 
@@ -62,7 +62,38 @@
      SHARED NAV — single source of truth. Do NOT edit the copies inside the
      page files; edit THIS file, then run scripts/sync-partials.js to
      push it into every page (between the NAV:START / NAV:END markers).
-     Styles live in /assets/css/nav.css; behavior in /assets/js/nav.js. -->
+     Styles live in /assets/css/nav.css; behavior in /assets/js/nav.js and
+     /assets/js/nav-search.js.
+
+     THE BAR, SINCE 2026-10-17 (Reed's pick, direction A of the discovery
+     homepage mockups): logo and wordmark, the sections, the site search in
+     the middle, then the theme toggle, Donate and the account control. On a
+     phone the links fold into the hamburger's overlay (the Explore menu,
+     which is also the site map the footer mirrors) and the search drops to
+     its own full-width row under the bar.
+
+     THE RIBBONS, SINCE 2026-10-20 (Reed's call, after Rotten Tomatoes' section
+     menus): Podcasts, Music and #40HPW each open a ribbon under the bar with
+     two top-five lists, a Discover column of that side's rails, and the first
+     list's #1 at the right. Each ribbon is a <details>, so it opens with no
+     script; /assets/js/nav-ribbons.js adds hover, Escape, outside-click and
+     fills the lists from the chart endpoints the first time a ribbon opens
+     (the lists are data and the nav is a partial on every page, static ones
+     included, so they are never rendered at the edge). Charts and Boosts are
+     plain links (2026-10-21): the weekly boards' own page, where the #40HPW
+     link of 2026-10-20 landed once the boards moved there, and the boost
+     feed's own page, the two places people kept asking for. Every section
+     is a PAGE since 2026-10-21 (/podcasts, /music, /members, /charts,
+     /boosts); the hash-routed charts page is forwarded. THE THIRD RIBBON IS
+     NAMED #40HPW AND OPENS /charts/hpw SINCE 2026-10-21 (Reed's call: the
+     challenge is what people open that ribbon for, and its board is the
+     ribbon's first list); it was Members for one day. Its key stays
+     data-ribbon="members", its Discover column still carries Top Members,
+     and the footer keeps the Members entry, /members being a page. The desktop links,
+     the overlay's groups and the footer's Browse group name the same
+     places; change them together.
+     ⚠️ A RIBBON'S LIST SLOT IS data-ribbon-list="<key>" AND THE KEYS ARE
+     nav-ribbons.js's SOURCES. The Discover links are static. -->
 <!-- Theme boot. Runs before the nav (the first visible element) is parsed,
      so a returning dark-mode visitor never sees a light flash. The choice is
      per-browser (localStorage key ob-theme); absence means light, which is what
@@ -82,71 +113,179 @@
 </script>
 <header id="top-nav">
   <div class="nav-inner">
+    <!-- The site map behind one trigger: a hamburger and a full-screen
+         overlay on a phone, hidden on a desktop where the links are inline.
+         The Feeds group mirrors the footer's; they are regrouped together
+         or not at all. -->
+    <details class="nav-explore">
+      <summary aria-label="Open the site menu">
+        <span class="nav-explore-glyph" aria-hidden="true">☰</span>
+      </summary>
+      <div class="nav-explore-panel">
+        <div class="nav-explore-head">
+          <span>OnlyBoosts</span>
+          <button type="button" class="nav-explore-close" aria-label="Close menu">✕</button>
+        </div>
+        <a class="nav-explore-home" href="/"><span aria-hidden="true">🏠</span> Home</a>
+        <div class="nav-explore-groups">
+          <!-- ⚠️ ONE ENTRY PER PAGE. Each section is a page since 2026-10-21
+               and its bare path opens on its first chart (PAGES in
+               charts.html's controller): /podcasts on Shows (Reed, 2026-09-03),
+               /music on Artists (2026-08-31), /charts on the Podcasts boards.
+               The Global vs Follows axis stays absent: it is a control on the page. -->
+          <!-- The three sections are accordions on a phone (Rotten Tomatoes'
+               app pattern, Reed's pick 2026-10-20): the row itself opens the
+               section's page; the chevron opens that side's Discover links,
+               the same links the desktop ribbon's Discover column carries. -->
+          <div class="nav-explore-group nav-explore-sections">
+            <h4>Browse</h4>
+            <details class="nav-explore-acc">
+              <summary><a href="/podcasts"><span aria-hidden="true">🎙</span> Podcasts</a><span class="nav-explore-chev" aria-hidden="true">⌄</span></summary>
+              <div class="nav-explore-sub">
+                <a href="/charts/podcasts">Top Shows This Week</a>
+                <a href="/podcasts/shows?range=1y">Top Shows This Year</a>
+                <a href="/podcasts/episodes?range=1y">Top Episodes This Year</a>
+                <a href="/discover/new-shows">New and Noteworthy</a>
+                <a href="/discover/movers">Movers This Week</a>
+                <a href="/discover/podroll">Podcasters Recommend</a>
+                <a href="/#rail-recommended">Podcasts Recommended For You</a>
+                <a href="/#rail-follows">Top Shows From Your Follows</a>
+                <a href="/#rail-because">Because You Boosted</a>
+              </div>
+            </details>
+            <details class="nav-explore-acc">
+              <summary><a href="/music"><span aria-hidden="true">🎵</span> Music</a><span class="nav-explore-chev" aria-hidden="true">⌄</span></summary>
+              <div class="nav-explore-sub">
+                <a href="/music/albums?range=1m">Top Albums This Month</a>
+                <a href="/music/songs?range=1y">Top Songs This Year</a>
+                <a href="/charts/music">Top Artists This Week</a>
+                <a href="/#rail-recommended-music">Music Recommended For You</a>
+                <a href="/#rail-because">Because You Boosted</a>
+              </div>
+            </details>
+            <details class="nav-explore-acc">
+              <summary><a href="/charts/hpw"><span aria-hidden="true">👥</span> #40HPW</a><span class="nav-explore-chev" aria-hidden="true">⌄</span></summary>
+              <div class="nav-explore-sub">
+                <a href="/charts/hpw">#40HPW Challenge</a>
+                <a href="/members">Top Members</a>
+                <a href="/boosts">Boost Feed</a>
+              </div>
+            </details>
+            <a href="/charts"><span aria-hidden="true">📈</span> Charts</a>
+            <a href="/boosts"><span aria-hidden="true">⚡</span> Boosts</a>
+          </div>
+          <!-- Stats: the aggregate view over the same data. A coming-soon
+               page for now (noindex, out of the sitemap). -->
+          <div class="nav-explore-group">
+            <h4>Stats</h4>
+            <a href="/stats"><span aria-hidden="true">📊</span> Boost Stats</a>
+          </div>
+          <div class="nav-explore-group">
+            <h4>More</h4>
+            <a href="/about"><span aria-hidden="true">ℹ️</span> About</a>
+            <a href="https://github.com/ReedBTC/onlyboosts" target="_blank" rel="noopener"><span aria-hidden="true">💻</span> Source</a>
+            <a href="#" data-lb-bug-trigger><span aria-hidden="true">🐞</span> Report a bug</a>
+          </div>
+        </div>
+      </div>
+    </details>
     <a class="nav-logo" href="/" aria-label="OnlyBoosts home">
       <img src="/assets/onlyboosts_pfp.png" alt="" />
     </a>
     <a class="nav-site-name" href="/">OnlyBoosts</a>
-    <nav aria-label="Main navigation">
-      <!-- Single "Explore" menu = the whole site map. Grouped dropdown on
-           desktop, full-screen overlay on mobile. -->
-      <details class="nav-explore">
-        <summary aria-label="Explore the site">
-          <span class="nav-explore-glyph" aria-hidden="true">🧭</span>
-          <span class="nav-explore-text">Explore</span>
-          <span class="caret" aria-hidden="true">▾</span>
-        </summary>
-        <div class="nav-explore-panel">
-          <div class="nav-explore-head">
-            <span>Explore</span>
-            <button type="button" class="nav-explore-close" aria-label="Close menu">✕</button>
+    <nav class="nav-links" aria-label="Main navigation">
+      <details class="nav-ribbon" data-ribbon="podcasts">
+        <summary><a href="/podcasts">Podcasts</a><span class="nav-ribbon-caret" aria-hidden="true">▾</span></summary>
+        <div class="nav-ribbon-panel">
+          <div class="nav-ribbon-col">
+            <h4>Top Shows This Week <a href="/charts/podcasts">View all</a></h4>
+            <ol class="nav-ribbon-list" data-ribbon-list="shows-week"></ol>
           </div>
-          <a class="nav-explore-home" href="/"><span aria-hidden="true">🏠</span> Home</a>
-          <div class="nav-explore-groups">
-            <!-- ⚠️ FEEDS IS ONE ENTRY PER TAB, NOT PER FEED. Reed's call,
-                 2026-08-23. It listed all five sub-feeds, which was right while
-                 the homepage hid them behind a dropdown and wrong the moment
-                 the tabs put them on screen: the nav then restated a control
-                 the page carries, in a different order, using different words
-                 for the same things. Each entry lands on that tab's DEFAULT
-                 sub-feed — TAB_DEFAULT in the index.html controller — so
-                 Podcasts opens Shows (Episodes until 2026-09-03), Music opens
-                 Artists and Members opens Boosts. **Those three hrefs and
-                 TAB_DEFAULT move together.**
-
-                 The Global vs Follows axis stays deliberately absent: it is the
-                 second dropdown on the page itself, and listing both scopes
-                 here made the nav a grid restating a control the page has. -->
-            <div class="nav-explore-group">
-              <h4>Feeds</h4>
-              <a href="/#shows"><span aria-hidden="true">🎙</span> Podcasts</a>
-              <a href="/#artists"><span aria-hidden="true">🎵</span> Music</a>
-              <a href="/#members"><span aria-hidden="true">👥</span> Members</a>
-            </div>
-            <!-- Stats: the aggregate view over the same data. A coming-soon
-                 page for now (noindex, out of the sitemap).
-
-                 ⚠️ /boosters (Community) WAS THE SECOND ENTRY AND THE PAGE IS
-                 DELETED, not redirected. Reed's call, 2026-08-23: the Members
-                 tab now answers what it promised — the member lookup, the
-                 top-members wall and the #40HPW boards — so leaving a
-                 placeholder here pointed a reader at a promise for content that
-                 exists one tab over. It was never linked from anywhere but this
-                 menu and the footer, was noindex and out of the sitemap, so it
-                 has no inbound links to preserve and gets no redirect. -->
-            <div class="nav-explore-group">
-              <h4>Stats</h4>
-              <a href="/stats"><span aria-hidden="true">📊</span> Boost Stats</a>
-            </div>
-            <div class="nav-explore-group">
-              <h4>More</h4>
-              <a href="/about"><span aria-hidden="true">ℹ️</span> About</a>
-              <a href="https://github.com/ReedBTC/onlyboosts" target="_blank" rel="noopener"><span aria-hidden="true">💻</span> Source</a>
-              <a href="#" data-lb-bug-trigger><span aria-hidden="true">🐞</span> Report a bug</a>
-            </div>
+          <div class="nav-ribbon-col">
+            <h4>Top Shows This Year <a href="/podcasts/shows?range=1y">View all</a></h4>
+            <ol class="nav-ribbon-list" data-ribbon-list="shows-year"></ol>
+          </div>
+          <div class="nav-ribbon-col nav-ribbon-discover">
+            <h4>Discover</h4>
+            <a href="/podcasts/episodes?range=1y">Top Episodes This Year</a>
+            <a href="/discover/new-shows">New and Noteworthy</a>
+            <a href="/discover/movers">Movers This Week</a>
+            <a href="/discover/podroll">Podcasters Recommend</a>
+            <a href="/#rail-recommended">Podcasts Recommended For You</a>
+            <a href="/#rail-follows">Top Shows From Your Follows</a>
+            <a href="/#rail-because">Because You Boosted</a>
+          </div>
+          <div class="nav-ribbon-feat" data-ribbon-feat="shows-week" hidden>
+            <span class="nav-ribbon-eyebrow">#1 Show This Week</span>
+            <a class="nav-ribbon-feat-art" data-ribbon-feat-art href="#"></a>
+            <a class="nav-ribbon-feat-title" data-ribbon-feat-title href="#"></a>
+            <span class="nav-ribbon-feat-line" data-ribbon-feat-line></span>
           </div>
         </div>
       </details>
+      <details class="nav-ribbon" data-ribbon="music">
+        <summary><a href="/music">Music</a><span class="nav-ribbon-caret" aria-hidden="true">▾</span></summary>
+        <div class="nav-ribbon-panel">
+          <div class="nav-ribbon-col">
+            <h4>Top Albums This Month <a href="/music/albums?range=1m">View all</a></h4>
+            <ol class="nav-ribbon-list" data-ribbon-list="albums-month"></ol>
+          </div>
+          <div class="nav-ribbon-col">
+            <h4>Top Songs This Year <a href="/music/songs?range=1y">View all</a></h4>
+            <ol class="nav-ribbon-list" data-ribbon-list="songs-year"></ol>
+          </div>
+          <div class="nav-ribbon-col nav-ribbon-discover">
+            <h4>Discover</h4>
+            <a href="/charts/music">Top Artists This Week</a>
+            <a href="/#rail-recommended-music">Music Recommended For You</a>
+            <a href="/#rail-follows">Top Shows From Your Follows</a>
+            <a href="/#rail-because">Because You Boosted</a>
+          </div>
+          <div class="nav-ribbon-feat" data-ribbon-feat="albums-month" hidden>
+            <span class="nav-ribbon-eyebrow">#1 Album This Month</span>
+            <a class="nav-ribbon-feat-art" data-ribbon-feat-art href="#"></a>
+            <a class="nav-ribbon-feat-title" data-ribbon-feat-title href="#"></a>
+            <span class="nav-ribbon-feat-line" data-ribbon-feat-line></span>
+          </div>
+        </div>
+      </details>
+      <details class="nav-ribbon" data-ribbon="members">
+        <summary><a href="/charts/hpw">#40HPW</a><span class="nav-ribbon-caret" aria-hidden="true">▾</span></summary>
+        <div class="nav-ribbon-panel">
+          <div class="nav-ribbon-col">
+            <h4>#40HPW This Week <a href="/charts/hpw">View all</a></h4>
+            <ol class="nav-ribbon-list" data-ribbon-list="hpw-week"></ol>
+          </div>
+          <div class="nav-ribbon-col">
+            <h4>Largest Boosts This Week <a href="/boosts">View all</a></h4>
+            <ol class="nav-ribbon-list" data-ribbon-list="boosts-week"></ol>
+          </div>
+          <div class="nav-ribbon-col nav-ribbon-discover">
+            <h4>Discover</h4>
+            <a href="/charts/hpw">#40HPW Challenge</a>
+            <a href="/members">Top Members</a>
+            <a href="/boosts">Boost Feed</a>
+          </div>
+          <div class="nav-ribbon-feat" data-ribbon-feat="hpw-week" hidden>
+            <span class="nav-ribbon-eyebrow">Leading #40HPW This Week</span>
+            <a class="nav-ribbon-feat-art" data-ribbon-feat-art href="#"></a>
+            <a class="nav-ribbon-feat-title" data-ribbon-feat-title href="#"></a>
+            <span class="nav-ribbon-feat-line" data-ribbon-feat-line></span>
+          </div>
+        </div>
+      </details>
+      <a href="/charts">Charts</a>
+      <a href="/boosts">Boosts</a>
     </nav>
+    <!-- The site search. nav-search.js turns typing into a grouped menu
+         (shows, episodes, artists, members); Enter, or the form with no
+         script, lands on /search?q=, the full results page. -->
+    <form class="nav-search" role="search" action="/search" method="get" data-nav-search autocomplete="off">
+      <svg class="nav-search-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+      <label class="nav-sr-only" for="nav-search-q">Search OnlyBoosts</label>
+      <input id="nav-search-q" type="search" name="q" placeholder="Search shows, episodes, artists, members" autocomplete="off" spellcheck="false" />
+      <div class="nav-search-menu" role="listbox" aria-label="Search results" hidden></div>
+    </form>
     <!-- Dark-mode toggle. Shows the theme you would SWITCH TO (moon in
          light, sun in dark); nav.js owns the click, the storage write and
          the aria-label, and keeps other open tabs in step via the storage event. -->
@@ -198,6 +337,7 @@
         <li><a href="#pipeline">How the Index Is Built</a></li>
         <li><a href="#amounts">How Amounts Are Determined</a></li>
         <li><a href="#charts">The OnlyBoosts Charts</a></li>
+        <li><a href="#recommendations">How the Homepage Rails Are Built</a></li>
         <li><a href="#limits">Limitations and Disclaimers</a></li>
         <li><a href="#faq">Frequently Asked Questions</a></li>
       </ol>
@@ -257,7 +397,7 @@
         <h3>Why the Boost Is Credited to the Key</h3>
         <p>These notes frequently name the person who sent the boost, either in the message or in a sender field. That name is not treated as an identity here and cannot be, because nothing verifies that the person named authorised a note signed by a key they do not hold. The booster credited is therefore the key that signed the note, and the name travels as ordinary text. The same rule is applied to this site&rsquo;s own bot.</p>
         <p>The consequence is worth stating plainly, because it runs in both directions. Every one of these boosts is indexed: it counts toward the sats and boost totals, appears on the show and episode pages, and ranks in the feeds exactly as any other boost does. Nothing about it is second class. What these keys are excluded from is the two surfaces that rank <em>people</em>, being the member wall and the #40HPW boards. A single key carrying a thousand boosts from dozens of different listeners would lead both, on other people&rsquo;s listening, and that is a claim about who the top members are that the data cannot support. They remain findable by search, since a search result is not a ranking, and each has an ordinary booster page.</p>
-        <p>They are listed on the <a href="/#members">Members</a> tab with their totals rather than quietly removed. The role they fill is a real one: they are the only reason a listener who wants no Nostr account is represented on this site at all.</p>
+        <p>They are listed on the <a href="/members">Members</a> page with their totals rather than quietly removed. The role they fill is a real one: they are the only reason a listener who wants no Nostr account is represented on this site at all.</p>
       </section>
 
       <section id="stats">
@@ -420,6 +560,49 @@
         <p>The components behind every position are printed on the row itself, so any placement can be checked by hand against the three figures it summarizes. As with every number on this site, the inputs are indexed Nostr boosts and nothing else; see <a href="#limits">Limitations and Disclaimers</a>.</p>
       </section>
 
+      <section id="recommendations">
+        <h2>How the Homepage Rails Are Built</h2>
+        <p>The front page is a set of rails, each a row of ten. Every rail is listed here with the exact rule that orders it, since a recommendation whose method is hidden is an opinion and one whose method is stated is a measurement. Every input is an indexed Nostr boost and nothing else; see <a href="#limits">Limitations and Disclaimers</a> for what that excludes. Nothing about a visitor is stored by any of them.</p>
+
+        <h3>The Featured Carousel</h3>
+        <p>The rotating panel at the top of the front page is not an editorial pick. Each slide is the first place of one of the rails below it, in the order the rails appear: this week&rsquo;s top show, this month&rsquo;s top album, the member leading the #40HPW week, the newest noteworthy show, the week&rsquo;s biggest climber, the show most often recommended by other podcasters, and the year&rsquo;s top episode and song. The slides are the same for every visitor, signed in or not, and change only when the rails change. The description on a slide is the one the show, episode, artist or member published themselves.</p>
+
+        <h3>The Chart Rails</h3>
+        <p>Top Shows This Week, Top Albums This Month, Top Episodes This Year and Top Songs This Year are the <a href="#charts">OnlyBoosts Charts</a> computed over that window of boost time. A week runs Monday 00:00 to Sunday night, US Pacific; a month and a year are the trailing 30 and 365 days. The ten tiles are the chart&rsquo;s first ten places, and the line under each tile prints the three component ranks (sats / boosters / boosts) that produced the place, so any tile can be checked against the chart view it links to.</p>
+
+        <h3>Nostr Gang #40HPW Challenge</h3>
+        <p>The week&rsquo;s ten members by hours of podcasts boosted, counted exactly as the Members tab counts them: the published duration of every episode the member boosted this week, each episode once. A member past forty hours wears a gold badge. The rules dialog on the Members tab states the counting rules in full.</p>
+
+        <h3>Podcasts Recommended For You and Music Recommended For You</h3>
+        <p>These two rails are built from audience overlap, in five steps.</p>
+        <ol>
+          <li><strong>Similar shows.</strong> Once a day the indexer takes every show with at least three distinct boosters and finds its twenty most similar shows. Similarity is the overlap between the two shows&rsquo; sets of boosters, measured as cosine similarity: the number of members who boosted both, divided by the square root of the product of the two booster counts. Two shows boosted by exactly the same people score 1; two shows with no booster in common score 0. Podcasts are compared with podcasts and albums with albums.</li>
+          <li><strong>Relay bots are not boosters.</strong> <a href="#bots">Accounts that publish on behalf of other people</a> are left out of the booster sets. One such key relaying hundreds of boosts would otherwise read as a single person who boosts everything, and would manufacture overlap between every show it touched.</li>
+          <li><strong>Your seeds.</strong> When you are logged in, the shows you have boosted under your key are your seeds, together with the feeds on your PC 2.0 favorites list if your browser passes them. Each candidate show&rsquo;s similarity to every one of your seeds is summed; a show you have already boosted or favorited is never a candidate.</li>
+          <li><strong>The floor.</strong> A candidate ranks only if it is reached from two or more of your seeds, or shares two or more boosters with one of them. Measured on 2026-10-17, half of all similar-show pairs share exactly one booster, which is one person&rsquo;s taste rather than an audience&rsquo;s, so a single shared booster is not enough.</li>
+          <li><strong>Two lists.</strong> Podcasts and music are ranked separately. The overlap on the music side runs about three times the podcast side&rsquo;s, so one combined list would be all music.</li>
+        </ol>
+        <p>The result is computed from the index when the page loads and is not kept. Nothing about you is written anywhere; the only thing read is the set of boosts already published to Nostr under your key.</p>
+
+        <h3>Because You Boosted</h3>
+        <p>One rail per show, for up to five of the shows you have boosted most often. Each rail is that show&rsquo;s own similar-show list from step one, keeping only the neighbours that share two or more boosters with it, minus anything you have already boosted. A show appears on the first rail that reaches it and on no other, and a show whose neighbours were all taken by an earlier rail is skipped for the next.</p>
+
+        <h3>Top Shows From Your Follows</h3>
+        <p>The Shows chart computed over the boosts published by the accounts on your Nostr follow list, which is the same Follows scope the charts page offers on every ranked feed. Your own boosts count, since you are on your own list.</p>
+
+        <h3>New and Noteworthy</h3>
+        <p>Shows whose first indexed boost landed within the last 90 days and that have at least two distinct boosters, ordered by boosters and then sats. An all-time chart cannot show a debut; this rail exists for that reason.</p>
+
+        <h3>Movers</h3>
+        <p>This week&rsquo;s Shows chart against last week&rsquo;s, read to 100 places. Climbers come first, by places climbed, and this week&rsquo;s debuts follow in chart order. The line under each tile states the climb and last week&rsquo;s place.</p>
+
+        <h3>Podcasters Recommend</h3>
+        <p>The shows most often listed on other shows&rsquo; podrolls, the <code>&lt;podcast:podroll&gt;</code> tag publishers write themselves and the one editorial signal in the index. The count is the number of distinct shows listing it. A listed show the index holds no page for is shown as a figure and not linked.</p>
+
+        <h3>What the Recommendations Cannot See</h3>
+        <p>Similarity is computed over indexed Nostr boosts only, so a show with many keysend listeners and few Nostr boosters has thin neighbours however popular it is. Your seeds are the boosts published under your key; boosts sent anonymously, privately or through an application that never publishes to Nostr contribute nothing. A new member with one or two boosts will usually see the empty state until the floor in step four is met, and a member whose boosts are all to shows nobody else has boosted will see it for longer.</p>
+      </section>
+
       <section id="limits">
         <h2>Limitations and Disclaimers</h2>
         <p>The constraints below are material to how the figures on this site should be interpreted, and they are worth reading in full.</p>
@@ -545,6 +728,27 @@
             </div>
           </details>
 
+          <details>
+            <summary>How are the recommendations on the homepage chosen?</summary>
+            <div class="faq-body">
+              <p>By audience overlap, with the method stated in full under <a href="#recommendations">How the Homepage Rails Are Built</a>. In brief: the shows you have boosted are your seeds; every other show is scored by how many of its boosters also boost your seeds, with relay bots excluded and shows you already boosted removed; and a show ranks only when that overlap is more than one person. Podcasts and music are ranked separately.</p>
+            </div>
+          </details>
+
+          <details>
+            <summary>Why does Podcasts Recommended For You show nothing for me?</summary>
+            <div class="faq-body">
+              <p>The rail needs boosts published to Nostr under your key, and it needs other members to have boosted the same shows. A candidate ranks only when it is reached from two of your shows or shares two boosters with one of them, so a member with one or two boosts, or whose boosts are to shows nobody else has boosted, meets the empty state until that changes. Boosts sent through an application that never publishes to Nostr contribute nothing, for the same reason they are absent from every other number on this site.</p>
+            </div>
+          </details>
+
+          <details>
+            <summary>Does OnlyBoosts track what I listen to?</summary>
+            <div class="faq-body">
+              <p>No. The only input to any personal rail is the set of boosts already published to Nostr under your key, together with your public PC 2.0 favorites list if your browser passes it. The recommendations are computed from the index when the page loads and are not stored; there is no listening history, no profile and no record of the request.</p>
+            </div>
+          </details>
+
         </div>
       </section>
 
@@ -570,14 +774,17 @@
          footer is the nav's site map repeated, so they're regrouped together
          or not at all. -->
     <div class="footer-col">
-      <!-- ⚠️ ONE ENTRY PER TAB, and it mirrors the nav's Explore menu exactly.
+      <!-- ⚠️ ONE ENTRY PER PAGE, and it mirrors the nav's Explore menu exactly.
            The two are the site map and are regrouped together or not at all;
-           each lands on that tab's default sub-feed. See partials/nav.html. -->
-      <h3>Feeds</h3>
+           each section is a page since 2026-10-21 and its bare path opens on
+           its first chart. See partials/nav.html. -->
+      <h3>Browse</h3>
       <ul>
-        <li><a href="/#shows">🎙 Podcasts</a></li>
-        <li><a href="/#artists">🎵 Music</a></li>
-        <li><a href="/#members">👥 Members</a></li>
+        <li><a href="/podcasts">🎙 Podcasts</a></li>
+        <li><a href="/music">🎵 Music</a></li>
+        <li><a href="/members">👥 Members</a></li>
+        <li><a href="/charts">📈 Charts</a></li>
+        <li><a href="/boosts">⚡ Boosts</a></li>
       </ul>
     </div>
 
@@ -655,15 +862,15 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v219"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v232"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v219" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v232" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v219" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v232" defer></script>
 
-<script src="/assets/js/nav.js?v=ob-v219" defer></script>
+<script src="/assets/js/nav.js?v=ob-v232" defer></script>
 
 </body>
 </html>

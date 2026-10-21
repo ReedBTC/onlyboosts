@@ -366,7 +366,7 @@ const COPY = {
     // Where the back link points for a visitor who has nowhere to go back TO
     // (a shared link, a search result). show-page.js swaps it for history.back()
     // when the previous document was ours; see the note over .show-back.
-    backHref: "/#shows",
+    backHref: "/podcasts/shows",
     backLabel: "All Shows",
     // The rank line in each stat tile, and the shared caption under the row,
     // both name this feed and link to backHref. See _shared/feed-rank.js.
@@ -394,7 +394,7 @@ const COPY = {
     noItems: "No tracks with Nostr boosts yet.",
     ldType: "MusicAlbum",
     boostsHeading: "Album Boosts",
-    backHref: "/#albums",
+    backHref: "/music/albums",
     backLabel: "All Albums",
     rankFeed: "Albums",
     // On a music feed <itunes:author> IS the artist, and cleanly so: 97.4% of
@@ -543,19 +543,19 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v219" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v219" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v219" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v219" />
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v219" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v219" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v232" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v232" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v232" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v232" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v232" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v232" />
   <!-- The boost note card and its reaction bar. Added when the boost list at
        the foot of this page became the same .note-card the homepage Boosts
        feed paints; this page linked neither before, which is why show-page.css
        restates .nostr-mention. That restatement is now redundant rather than
        load-bearing, and is left in place rather than removed in the same pass. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v219" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v219" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v232" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v232" />
 </head>
 <body data-show-guid="${htmlEscape(show.podcast_guid)}">
 
@@ -564,7 +564,38 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
      SHARED NAV — single source of truth. Do NOT edit the copies inside the
      page files; edit THIS file, then run scripts/sync-partials.js to
      push it into every page (between the NAV:START / NAV:END markers).
-     Styles live in /assets/css/nav.css; behavior in /assets/js/nav.js. -->
+     Styles live in /assets/css/nav.css; behavior in /assets/js/nav.js and
+     /assets/js/nav-search.js.
+
+     THE BAR, SINCE 2026-10-17 (Reed's pick, direction A of the discovery
+     homepage mockups): logo and wordmark, the sections, the site search in
+     the middle, then the theme toggle, Donate and the account control. On a
+     phone the links fold into the hamburger's overlay (the Explore menu,
+     which is also the site map the footer mirrors) and the search drops to
+     its own full-width row under the bar.
+
+     THE RIBBONS, SINCE 2026-10-20 (Reed's call, after Rotten Tomatoes' section
+     menus): Podcasts, Music and #40HPW each open a ribbon under the bar with
+     two top-five lists, a Discover column of that side's rails, and the first
+     list's #1 at the right. Each ribbon is a <details>, so it opens with no
+     script; /assets/js/nav-ribbons.js adds hover, Escape, outside-click and
+     fills the lists from the chart endpoints the first time a ribbon opens
+     (the lists are data and the nav is a partial on every page, static ones
+     included, so they are never rendered at the edge). Charts and Boosts are
+     plain links (2026-10-21): the weekly boards' own page, where the #40HPW
+     link of 2026-10-20 landed once the boards moved there, and the boost
+     feed's own page, the two places people kept asking for. Every section
+     is a PAGE since 2026-10-21 (/podcasts, /music, /members, /charts,
+     /boosts); the hash-routed charts page is forwarded. THE THIRD RIBBON IS
+     NAMED #40HPW AND OPENS /charts/hpw SINCE 2026-10-21 (Reed's call: the
+     challenge is what people open that ribbon for, and its board is the
+     ribbon's first list); it was Members for one day. Its key stays
+     data-ribbon="members", its Discover column still carries Top Members,
+     and the footer keeps the Members entry, /members being a page. The desktop links,
+     the overlay's groups and the footer's Browse group name the same
+     places; change them together.
+     ⚠️ A RIBBON'S LIST SLOT IS data-ribbon-list="<key>" AND THE KEYS ARE
+     nav-ribbons.js's SOURCES. The Discover links are static. -->
 <!-- Theme boot. Runs before the nav (the first visible element) is parsed,
      so a returning dark-mode visitor never sees a light flash. The choice is
      per-browser (localStorage key ob-theme); absence means light, which is what
@@ -584,71 +615,179 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
 </script>
 <header id="top-nav">
   <div class="nav-inner">
+    <!-- The site map behind one trigger: a hamburger and a full-screen
+         overlay on a phone, hidden on a desktop where the links are inline.
+         The Feeds group mirrors the footer's; they are regrouped together
+         or not at all. -->
+    <details class="nav-explore">
+      <summary aria-label="Open the site menu">
+        <span class="nav-explore-glyph" aria-hidden="true">☰</span>
+      </summary>
+      <div class="nav-explore-panel">
+        <div class="nav-explore-head">
+          <span>OnlyBoosts</span>
+          <button type="button" class="nav-explore-close" aria-label="Close menu">✕</button>
+        </div>
+        <a class="nav-explore-home" href="/"><span aria-hidden="true">🏠</span> Home</a>
+        <div class="nav-explore-groups">
+          <!-- ⚠️ ONE ENTRY PER PAGE. Each section is a page since 2026-10-21
+               and its bare path opens on its first chart (PAGES in
+               charts.html's controller): /podcasts on Shows (Reed, 2026-09-03),
+               /music on Artists (2026-08-31), /charts on the Podcasts boards.
+               The Global vs Follows axis stays absent: it is a control on the page. -->
+          <!-- The three sections are accordions on a phone (Rotten Tomatoes'
+               app pattern, Reed's pick 2026-10-20): the row itself opens the
+               section's page; the chevron opens that side's Discover links,
+               the same links the desktop ribbon's Discover column carries. -->
+          <div class="nav-explore-group nav-explore-sections">
+            <h4>Browse</h4>
+            <details class="nav-explore-acc">
+              <summary><a href="/podcasts"><span aria-hidden="true">🎙</span> Podcasts</a><span class="nav-explore-chev" aria-hidden="true">⌄</span></summary>
+              <div class="nav-explore-sub">
+                <a href="/charts/podcasts">Top Shows This Week</a>
+                <a href="/podcasts/shows?range=1y">Top Shows This Year</a>
+                <a href="/podcasts/episodes?range=1y">Top Episodes This Year</a>
+                <a href="/discover/new-shows">New and Noteworthy</a>
+                <a href="/discover/movers">Movers This Week</a>
+                <a href="/discover/podroll">Podcasters Recommend</a>
+                <a href="/#rail-recommended">Podcasts Recommended For You</a>
+                <a href="/#rail-follows">Top Shows From Your Follows</a>
+                <a href="/#rail-because">Because You Boosted</a>
+              </div>
+            </details>
+            <details class="nav-explore-acc">
+              <summary><a href="/music"><span aria-hidden="true">🎵</span> Music</a><span class="nav-explore-chev" aria-hidden="true">⌄</span></summary>
+              <div class="nav-explore-sub">
+                <a href="/music/albums?range=1m">Top Albums This Month</a>
+                <a href="/music/songs?range=1y">Top Songs This Year</a>
+                <a href="/charts/music">Top Artists This Week</a>
+                <a href="/#rail-recommended-music">Music Recommended For You</a>
+                <a href="/#rail-because">Because You Boosted</a>
+              </div>
+            </details>
+            <details class="nav-explore-acc">
+              <summary><a href="/charts/hpw"><span aria-hidden="true">👥</span> #40HPW</a><span class="nav-explore-chev" aria-hidden="true">⌄</span></summary>
+              <div class="nav-explore-sub">
+                <a href="/charts/hpw">#40HPW Challenge</a>
+                <a href="/members">Top Members</a>
+                <a href="/boosts">Boost Feed</a>
+              </div>
+            </details>
+            <a href="/charts"><span aria-hidden="true">📈</span> Charts</a>
+            <a href="/boosts"><span aria-hidden="true">⚡</span> Boosts</a>
+          </div>
+          <!-- Stats: the aggregate view over the same data. A coming-soon
+               page for now (noindex, out of the sitemap). -->
+          <div class="nav-explore-group">
+            <h4>Stats</h4>
+            <a href="/stats"><span aria-hidden="true">📊</span> Boost Stats</a>
+          </div>
+          <div class="nav-explore-group">
+            <h4>More</h4>
+            <a href="/about"><span aria-hidden="true">ℹ️</span> About</a>
+            <a href="https://github.com/ReedBTC/onlyboosts" target="_blank" rel="noopener"><span aria-hidden="true">💻</span> Source</a>
+            <a href="#" data-lb-bug-trigger><span aria-hidden="true">🐞</span> Report a bug</a>
+          </div>
+        </div>
+      </div>
+    </details>
     <a class="nav-logo" href="/" aria-label="OnlyBoosts home">
       <img src="/assets/onlyboosts_pfp.png" alt="" />
     </a>
     <a class="nav-site-name" href="/">OnlyBoosts</a>
-    <nav aria-label="Main navigation">
-      <!-- Single "Explore" menu = the whole site map. Grouped dropdown on
-           desktop, full-screen overlay on mobile. -->
-      <details class="nav-explore">
-        <summary aria-label="Explore the site">
-          <span class="nav-explore-glyph" aria-hidden="true">🧭</span>
-          <span class="nav-explore-text">Explore</span>
-          <span class="caret" aria-hidden="true">▾</span>
-        </summary>
-        <div class="nav-explore-panel">
-          <div class="nav-explore-head">
-            <span>Explore</span>
-            <button type="button" class="nav-explore-close" aria-label="Close menu">✕</button>
+    <nav class="nav-links" aria-label="Main navigation">
+      <details class="nav-ribbon" data-ribbon="podcasts">
+        <summary><a href="/podcasts">Podcasts</a><span class="nav-ribbon-caret" aria-hidden="true">▾</span></summary>
+        <div class="nav-ribbon-panel">
+          <div class="nav-ribbon-col">
+            <h4>Top Shows This Week <a href="/charts/podcasts">View all</a></h4>
+            <ol class="nav-ribbon-list" data-ribbon-list="shows-week"></ol>
           </div>
-          <a class="nav-explore-home" href="/"><span aria-hidden="true">🏠</span> Home</a>
-          <div class="nav-explore-groups">
-            <!-- ⚠️ FEEDS IS ONE ENTRY PER TAB, NOT PER FEED. Reed's call,
-                 2026-08-23. It listed all five sub-feeds, which was right while
-                 the homepage hid them behind a dropdown and wrong the moment
-                 the tabs put them on screen: the nav then restated a control
-                 the page carries, in a different order, using different words
-                 for the same things. Each entry lands on that tab's DEFAULT
-                 sub-feed — TAB_DEFAULT in the index.html controller — so
-                 Podcasts opens Shows (Episodes until 2026-09-03), Music opens
-                 Artists and Members opens Boosts. **Those three hrefs and
-                 TAB_DEFAULT move together.**
-
-                 The Global vs Follows axis stays deliberately absent: it is the
-                 second dropdown on the page itself, and listing both scopes
-                 here made the nav a grid restating a control the page has. -->
-            <div class="nav-explore-group">
-              <h4>Feeds</h4>
-              <a href="/#shows"><span aria-hidden="true">🎙</span> Podcasts</a>
-              <a href="/#artists"><span aria-hidden="true">🎵</span> Music</a>
-              <a href="/#members"><span aria-hidden="true">👥</span> Members</a>
-            </div>
-            <!-- Stats: the aggregate view over the same data. A coming-soon
-                 page for now (noindex, out of the sitemap).
-
-                 ⚠️ /boosters (Community) WAS THE SECOND ENTRY AND THE PAGE IS
-                 DELETED, not redirected. Reed's call, 2026-08-23: the Members
-                 tab now answers what it promised — the member lookup, the
-                 top-members wall and the #40HPW boards — so leaving a
-                 placeholder here pointed a reader at a promise for content that
-                 exists one tab over. It was never linked from anywhere but this
-                 menu and the footer, was noindex and out of the sitemap, so it
-                 has no inbound links to preserve and gets no redirect. -->
-            <div class="nav-explore-group">
-              <h4>Stats</h4>
-              <a href="/stats"><span aria-hidden="true">📊</span> Boost Stats</a>
-            </div>
-            <div class="nav-explore-group">
-              <h4>More</h4>
-              <a href="/about"><span aria-hidden="true">ℹ️</span> About</a>
-              <a href="https://github.com/ReedBTC/onlyboosts" target="_blank" rel="noopener"><span aria-hidden="true">💻</span> Source</a>
-              <a href="#" data-lb-bug-trigger><span aria-hidden="true">🐞</span> Report a bug</a>
-            </div>
+          <div class="nav-ribbon-col">
+            <h4>Top Shows This Year <a href="/podcasts/shows?range=1y">View all</a></h4>
+            <ol class="nav-ribbon-list" data-ribbon-list="shows-year"></ol>
+          </div>
+          <div class="nav-ribbon-col nav-ribbon-discover">
+            <h4>Discover</h4>
+            <a href="/podcasts/episodes?range=1y">Top Episodes This Year</a>
+            <a href="/discover/new-shows">New and Noteworthy</a>
+            <a href="/discover/movers">Movers This Week</a>
+            <a href="/discover/podroll">Podcasters Recommend</a>
+            <a href="/#rail-recommended">Podcasts Recommended For You</a>
+            <a href="/#rail-follows">Top Shows From Your Follows</a>
+            <a href="/#rail-because">Because You Boosted</a>
+          </div>
+          <div class="nav-ribbon-feat" data-ribbon-feat="shows-week" hidden>
+            <span class="nav-ribbon-eyebrow">#1 Show This Week</span>
+            <a class="nav-ribbon-feat-art" data-ribbon-feat-art href="#"></a>
+            <a class="nav-ribbon-feat-title" data-ribbon-feat-title href="#"></a>
+            <span class="nav-ribbon-feat-line" data-ribbon-feat-line></span>
           </div>
         </div>
       </details>
+      <details class="nav-ribbon" data-ribbon="music">
+        <summary><a href="/music">Music</a><span class="nav-ribbon-caret" aria-hidden="true">▾</span></summary>
+        <div class="nav-ribbon-panel">
+          <div class="nav-ribbon-col">
+            <h4>Top Albums This Month <a href="/music/albums?range=1m">View all</a></h4>
+            <ol class="nav-ribbon-list" data-ribbon-list="albums-month"></ol>
+          </div>
+          <div class="nav-ribbon-col">
+            <h4>Top Songs This Year <a href="/music/songs?range=1y">View all</a></h4>
+            <ol class="nav-ribbon-list" data-ribbon-list="songs-year"></ol>
+          </div>
+          <div class="nav-ribbon-col nav-ribbon-discover">
+            <h4>Discover</h4>
+            <a href="/charts/music">Top Artists This Week</a>
+            <a href="/#rail-recommended-music">Music Recommended For You</a>
+            <a href="/#rail-follows">Top Shows From Your Follows</a>
+            <a href="/#rail-because">Because You Boosted</a>
+          </div>
+          <div class="nav-ribbon-feat" data-ribbon-feat="albums-month" hidden>
+            <span class="nav-ribbon-eyebrow">#1 Album This Month</span>
+            <a class="nav-ribbon-feat-art" data-ribbon-feat-art href="#"></a>
+            <a class="nav-ribbon-feat-title" data-ribbon-feat-title href="#"></a>
+            <span class="nav-ribbon-feat-line" data-ribbon-feat-line></span>
+          </div>
+        </div>
+      </details>
+      <details class="nav-ribbon" data-ribbon="members">
+        <summary><a href="/charts/hpw">#40HPW</a><span class="nav-ribbon-caret" aria-hidden="true">▾</span></summary>
+        <div class="nav-ribbon-panel">
+          <div class="nav-ribbon-col">
+            <h4>#40HPW This Week <a href="/charts/hpw">View all</a></h4>
+            <ol class="nav-ribbon-list" data-ribbon-list="hpw-week"></ol>
+          </div>
+          <div class="nav-ribbon-col">
+            <h4>Largest Boosts This Week <a href="/boosts">View all</a></h4>
+            <ol class="nav-ribbon-list" data-ribbon-list="boosts-week"></ol>
+          </div>
+          <div class="nav-ribbon-col nav-ribbon-discover">
+            <h4>Discover</h4>
+            <a href="/charts/hpw">#40HPW Challenge</a>
+            <a href="/members">Top Members</a>
+            <a href="/boosts">Boost Feed</a>
+          </div>
+          <div class="nav-ribbon-feat" data-ribbon-feat="hpw-week" hidden>
+            <span class="nav-ribbon-eyebrow">Leading #40HPW This Week</span>
+            <a class="nav-ribbon-feat-art" data-ribbon-feat-art href="#"></a>
+            <a class="nav-ribbon-feat-title" data-ribbon-feat-title href="#"></a>
+            <span class="nav-ribbon-feat-line" data-ribbon-feat-line></span>
+          </div>
+        </div>
+      </details>
+      <a href="/charts">Charts</a>
+      <a href="/boosts">Boosts</a>
     </nav>
+    <!-- The site search. nav-search.js turns typing into a grouped menu
+         (shows, episodes, artists, members); Enter, or the form with no
+         script, lands on /search?q=, the full results page. -->
+    <form class="nav-search" role="search" action="/search" method="get" data-nav-search autocomplete="off">
+      <svg class="nav-search-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+      <label class="nav-sr-only" for="nav-search-q">Search OnlyBoosts</label>
+      <input id="nav-search-q" type="search" name="q" placeholder="Search shows, episodes, artists, members" autocomplete="off" spellcheck="false" />
+      <div class="nav-search-menu" role="listbox" aria-label="Search results" hidden></div>
+    </form>
     <!-- Dark-mode toggle. Shows the theme you would SWITCH TO (moon in
          light, sun in dark); nav.js owns the click, the storage write and
          the aria-label, and keeps other open tabs in step via the storage event. -->
@@ -745,14 +884,17 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
          footer is the nav's site map repeated, so they're regrouped together
          or not at all. -->
     <div class="footer-col">
-      <!-- ⚠️ ONE ENTRY PER TAB, and it mirrors the nav's Explore menu exactly.
+      <!-- ⚠️ ONE ENTRY PER PAGE, and it mirrors the nav's Explore menu exactly.
            The two are the site map and are regrouped together or not at all;
-           each lands on that tab's default sub-feed. See partials/nav.html. -->
-      <h3>Feeds</h3>
+           each section is a page since 2026-10-21 and its bare path opens on
+           its first chart. See partials/nav.html. -->
+      <h3>Browse</h3>
       <ul>
-        <li><a href="/#shows">🎙 Podcasts</a></li>
-        <li><a href="/#artists">🎵 Music</a></li>
-        <li><a href="/#members">👥 Members</a></li>
+        <li><a href="/podcasts">🎙 Podcasts</a></li>
+        <li><a href="/music">🎵 Music</a></li>
+        <li><a href="/members">👥 Members</a></li>
+        <li><a href="/charts">📈 Charts</a></li>
+        <li><a href="/boosts">⚡ Boosts</a></li>
       </ul>
     </div>
 
@@ -787,12 +929,12 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
 
 <script type="application/json" id="show-boost-payload">${jsonForScript(boostPayload)}</script>
 
-<script src="/assets/js/nav.js?v=ob-v219" defer></script>
-<script src="/assets/js/show-page.js?v=ob-v219" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v232" defer></script>
+<script src="/assets/js/show-page.js?v=ob-v232" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v219"></script>
-<script src="/assets/js/sw-register.js?v=ob-v219" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v232"></script>
+<script src="/assets/js/sw-register.js?v=ob-v232" defer></script>
 </body>
 </html>`;
 }
@@ -1364,10 +1506,10 @@ function notFound(guid) {
   <meta name="robots" content="noindex" />
   <title>Show not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v219" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v219" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v219" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v219" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v232" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v232" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v232" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v232" />
 </head>
 <body>
 <section class="page-header">
@@ -1382,11 +1524,11 @@ function notFound(guid) {
          doesn't recognise, so the show has no title, artwork or feed and
          therefore no page of its own. Those shows still appear in the Shows
          feed.</p>
-      <p><a href="/#shows">Browse all shows →</a></p>
+      <p><a href="/podcasts/shows">Browse all shows →</a></p>
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v219" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v232" defer></script>
 </body>
 </html>`;
   return new Response(html, {

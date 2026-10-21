@@ -8,6 +8,11 @@ that used to live there.*
 
 ---
 
+> **2026-10-21.** The feeds are pages now (`/podcasts/shows`, `/music/albums`,
+> `/boosts` …) and the view rides the query string, not the hash; see **The
+> Chart Pages** in CLAUDE.md. The sections below describe the mechanism as it
+> was built; the range, sort, rank, language and search rules are unchanged.
+
 ### Range and sort
 
 Every feed carries a range and a sort dropdown, built by
@@ -597,6 +602,14 @@ something the destination cannot show. `langByFeed`, `rangeByFeed` and
 view and the address.
 
 ### Search
+
+**⚠️ THE PER-FEED SEARCH BOX THIS SECTION DESCRIBES WAS REMOVED ON
+2026-10-17** (Reed's call): the nav bar's site search is on every page and
+`/search?q=` is the results page, so the three boxes restated one control.
+`feed-search.js` and `test-feed-search.mjs` are deleted; the `q=` paths on
+the ranked endpoints and their rank-retention rule stay as API behaviour, and
+the renderers' pick/query state is still in place, unreachable. What follows
+is the design record of the box as it was.
 
 `assets/js/feed-search.js` is the typeahead at the head of every panel, above
 the shell whose lid holds the range and sort (Reed's ask, 2026-09-03; it sat

@@ -1,4 +1,4 @@
-// GET /api/v1/search?q=&type=boosts|podcasts|episodes — FTS5 search over
+// GET /api/v1/search?q=&type=boosts|podcasts|episodes|all — FTS5 search over
 // boostagram text, podcast titles/authors, or episode titles. Descriptions and
 // show notes are in the FTS tables too (2026-10-17) and deliberately NOT
 // matched here; the ordering is sats, so a show-notes hit would outrank the
@@ -6,13 +6,14 @@
 import { json, preflight, BOOST_SELECT, boostRecord, clampLimit, ftsMatch } from "./_common.js";
 
 import { headOf } from "../../_shared/head.js";
+import { searchAll } from "../../_shared/search-all.js";
 export async function onRequestOptions({ request }) { return preflight(request); }
 
 export async function onRequestGet({ request, env }) {
   const u = new URL(request.url);
   const q = (u.searchParams.get("q") || "").trim();
   if (q.length < 2) return json(request, { error: "q must be >= 2 chars" }, { status: 400 });
-  const TYPES = new Set(["boosts", "podcasts", "episodes"]);
+  const TYPES = new Set(["boosts", "podcasts", "episodes", "all"]);
   const asked = u.searchParams.get("type");
   const type = TYPES.has(asked) ? asked : "boosts";
   const limit = clampLimit(u.searchParams.get("limit"), 30, 100);
@@ -25,6 +26,16 @@ export async function onRequestGet({ request, env }) {
   // Column-scoped forms for the two tables that carry `description`.
   const matchEpisodes = ftsMatch(q, ["title", "show"]);
   const matchPodcasts = ftsMatch(q, ["title", "author"]);
+
+  /* type=all — THE NAV BAR'S TYPEAHEAD (assets/js/nav-search.js) and the
+   * /search page share functions/_shared/search-all.js: shows, episodes and
+   * artists, a handful of each here, ordered by sats within each group.
+   * Members come from /api/v1/members?q= in the same breath. */
+  if (type === "all") {
+    const each = clampLimit(u.searchParams.get("limit"), 5, 10);
+    const all = await searchAll(env, q, each);
+    return json(request, { type, q, ...all });
+  }
 
   if (type === "episodes") {
     // Flat relevance-ordered lookup. The ranked, sort-aware version lives on

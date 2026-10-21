@@ -45,20 +45,295 @@ rules a change elsewhere would break.
 
 | Path | What |
 |---|---|
-| `/` | the whole feed experience: hash-routed feeds, two dropdowns on two axes |
+| `/` | **the discovery homepage since 2026-10-17**: rails of tiles (this week's shows, this month's albums, the #40HPW week, the personal rails, the year's episodes and songs, the week's artists), the fact rails edge-rendered by `functions/index.js`. See **The Discovery Homepage** below |
+| `/podcasts/shows`, `/podcasts/episodes` | **the Podcast Charts** (2026-10-21): one chart per page, switched by the page head's underlined tabs, the chart box (scope, range, language, sort) under it. The bare `/podcasts` is Shows. See **The Chart Pages** below |
+| `/music/artists`, `/music/albums`, `/music/songs` | **the Music Charts**, the same shape; the bare `/music` is Artists |
+| `/boosts` | **the boost feed on its own page** (2026-10-21, Reed's call: readers treat it as their discovery feed). Global or Follows, newest first |
+| `/members` | the Top Members wall and the Boost Bots section, with the membership line |
+| `/charts`, `/charts/podcasts`, `/charts/music`, `/charts/hpw` | **the weekly boards' own page, named Charts** (2026-10-21): the week's Top 10 beside Weeks at #1 for shows and for artists, and the #40HPW week beside Proof of #40HPW, one pair per view. The bare `/charts` is Podcasts. From 2026-10-17 to 2026-10-21 `/charts` was the hash-routed feed page that was `/` before that; **every `/charts#<feed>` and `/#<feed>` address in the wild is forwarded to its page by the head scripts of `charts.html` and `index.html`**, since a server never sees a hash. All five pages are one shell, `charts.html`, routed by `functions/_shared/charts-page.js` |
 | `/show/<guid>` | one show, edge-rendered |
 | `/episode/<item-guid>` | one episode, edge-rendered |
 | `/booster/<npub>` | one person, edge-rendered |
 | `/artist/<guid>` | one artist (publisher), edge-rendered — see the detail pages section |
+| `/search?q=` | the site search's results page, edge-rendered, `noindex` (2026-10-17) |
+| `/discover/<key>` | **the whole list behind a discovery rail** (2026-10-20, Reed's ask: ten tiles lived nowhere else): `new-shows`, `movers`, `podroll`, each a list of the charts page's show cards with one extra line saying why the card is there, rendered by `functions/discover/[key].js` from the same row fetchers `functions/index.js` exports for the rails (`newShowsRows`, `moversRows`, `podrollRows`), in the `discover.html` shell. In the sitemap. The rail headings and the ribbons' Discover columns link them |
 | `/about` | the project's own explanation of what the data is and isn't |
 | `/stats` | a coming-soon placeholder: nav + header + soon-card, `noindex`, out of the sitemap. `/boosters` was the second one and was **deleted** on 2026-08-23 — see the Stats row of the site map |
 | `/404.html` | see the ⚠️ under LB conventions |
 | `/hpw/<YYYY-MM-DD>`, `/hpw/high-scores` | one 40 HPW board as a page, edge-rendered, the address a shared week has. **⚠️ `high-scores` is a PATH, not the board's name** — that board is **Proof of #40HPW** since 2026-09-01 and the URL deliberately did not move with it. `/hpw/<key>/card` is the 720x900 portrait frame the collector screenshots for `/api/og/hpw/<key>.png`. See **The Share Cards** under the Members tab |
 | `/charts/<key>/card/<kind>` | the five chart share-card frames (`shows`/`artists` per week, `shows`/`artists`/`members` under `weeks-at-1`), 720x900, noindex; the collector's bot screenshots them. **⚠️ THE ONLYBOOSTS CHARTS PAGE THAT LIVED AT `/charts/<YYYY-MM-DD>` WAS TORN DOWN ON 2026-09-04** (Reed's call, two days after it shipped): the same boards live on the Shows and Artists feeds and the Members tab, so `/charts` and `/charts/<date>` 302 to `/#shows`. `week-charts.js` still serves the queries, behind `/api/v1/charts`. **Untitled shows are off these boards and only these** (Reed's call, 2026-09-11; `TITLED` in `week-charts.js`). See **The chart blocks on the feeds** in `docs/feeds.md` |
 
-`/shows` and `/podcasts` are both 301s to `/#shows` now; the Shows feed replaced
-the standalone page. `feeds.html` and `boosts.html` were folded into `/` and
-deleted.
+`/shows` 301s to `/podcasts/shows` (`_redirects`); the `/podcasts` redirect came
+off on 2026-10-21 because the Function serves that path now. `feeds.html` and
+`boosts.html` were folded into the feed page and deleted.
+
+**⚠️ EVERYWHERE THIS FILE SAYS `index.html` ABOUT THE FEED BAR, THE TABS, THE
+CONTROLLER OR THE SSR MARKERS, IT MEANS `charts.html` SINCE 2026-10-17.** The
+file was moved, not rewritten; only the address changed. `test-feed-hash.mjs`
+and `test-server-render.mjs` read `charts.html` now. **AND SINCE 2026-10-21
+`charts.html` IS THE SHELL OF FIVE PAGES, NOT ONE**: the three tabs and the
+sub-row are gone, the hash router became a path router, and the sections
+below that describe the tabs, the sub-row, `TAB_OF`, `TAB_DEFAULT`,
+`ALIASES`, `HASH_OF` and the view in the hash are history kept for the
+decisions they record. **The Chart Pages** below is the current shape.
+
+## The Chart Pages
+
+**One charts page became five pages on 2026-10-21** (Reed's call: readers
+"don't get" a page with three big tabs, and the weekly boards above the
+charts were distracting from the charts themselves). The options he picked
+from are in the session memory (A2, underlined text tabs; the boards page
+named Charts).
+
+| Page | Views | What it holds |
+|---|---|---|
+| `/podcasts` | `shows`, `episodes` | the Podcast Charts, the chart box as it was |
+| `/music` | `artists`, `albums`, `songs` | the Music Charts |
+| `/boosts` | one | the boost feed, Global or Follows |
+| `/members` | none | the Top Members wall, the Boost Bots, the membership line |
+| `/charts` | `podcasts`, `music`, `hpw` | the weekly boards in three pairs, with their week pickers and share buttons |
+
+- **⚠️ ONE SHELL, `charts.html`, SERVES ALL FIVE, AND THE ROUTE IS MARKED
+  INTO IT TWICE.** `routeShell` in `functions/_shared/charts-page.js` sets
+  `body[data-page]`, `body[data-view]` and `body[data-active-feed]` (absent
+  on Members and Charts), un-hides the page's head and underlines its tab
+  (`aria-current="page"`), activates the feed's panel, and rewrites the
+  title, canonical and Open Graph pair; the inline controller re-derives
+  the same route from `location` when it runs. The five route Functions
+  (`functions/podcasts/[[path]].js`, `functions/music/[[path]].js`,
+  `functions/boosts.js`, `functions/members.js`, the bare and one-segment
+  paths of `functions/charts/[[path]].js`) each resolve a path and call
+  `renderShellPage`; an unknown view answers the 404 page. The shell ships
+  routed to `/podcasts/shows` for the no-script read.
+- **⚠️ `PAGES` IS DECLARED TWICE AND PINNED TO THE NAV'S HREFS**: in the
+  controller and in `charts-page.js`, each page's first view being what its
+  bare path opens on (Shows, Artists, the Podcasts boards). `test-feed-hash.mjs`
+  extracts the controller's and checks every feed type is a view of exactly
+  one page.
+- **A tab is a link, so switching charts is a navigation.** The controller
+  rewrites each sibling tab's href with the active feed's view, so Shows at
+  1Y opens Episodes at 1Y. Underlined text tabs (A2), Reed's pick over a
+  segmented switch and over a menu on the lid; the latter was the
+  what-dropdown the tabs replaced in August.
+- **⚠️ THE VIEW IS THE QUERY STRING: `/podcasts/shows?scope=follows&lang=de&range=1m&sort=sats`.**
+  The scope joined the three axes when the hash became a path (it was the
+  feed key's `-follows` suffix). Defaults are elided, so the bare path is
+  the default view's address. The controller normalizes the address on boot
+  only when one of its four parameters was dropped or respelled, and leaves
+  a parameter it does not own alone. `history.replaceState`, never push.
+- **⚠️ THE HASH FORWARD IS TWO IDENTICAL HEAD SCRIPTS**, in `index.html`
+  (for `/#feed`, the address until 2026-10-17) and `charts.html` (for
+  `/charts#feed`, the address until 2026-10-21), mapping every key and alias
+  the old controller resolved: `#shows` → `/podcasts/shows`, `#podcasts-global`
+  → `/podcasts/episodes`, `#members-follows` → `/boosts?scope=follows`,
+  `#boosts` → `/boosts`, the view carried. **A bare `#members` lands on
+  `/charts/hpw`**, because the Members tab opened on the #40HPW boards and
+  the #40HPW share notes link it. `test-discover-home.mjs` runs both shipped
+  scripts against every address. **Change them together.**
+- **⚠️ TWO FEEDS ARE RENDERED AT THE EDGE, EACH ON ITS OWN PAGE**: Shows on
+  `/podcasts/shows` through `<!--OB:SSR-SHOWS-->` and Albums on
+  `/music/albums` through `<!--OB:SSR-ALBUMS-->` (2026-10-21; the same
+  renderer, the music side), both all time by Chart rank, skipped when the
+  query carries a view. Episodes, Songs, Artists and Boosts hydrate in the
+  browser as they always have.
+- **The pages with no feed paint off the body**: `feeds.js` reads
+  `body[data-page]` and `body[data-view]` at boot and calls
+  `loadChartsBlock`, `loadMemberBoards` or `loadMembersWall`
+  (`renderMembersWall` in `members-board.js`, split from the boards on
+  2026-10-21). **A missing `data-active-feed` hydrates nothing**; the old
+  `|| 'episodes-global'` fallback would have painted Episodes under the
+  Members page.
+- **The nav bar is Podcasts ▾ · Music ▾ · #40HPW ▾ · Charts · Boosts.** The
+  #40HPW plain link of 2026-10-20 folded into Charts, where both its boards
+  are, and the same evening Reed renamed the third ribbon from Members to
+  #40HPW, opening `/charts/hpw` ("that's the only thing people go to that
+  members thing for"); its key is still `data-ribbon="members"`, its
+  Discover column still lists Top Members, and the footer keeps Members,
+  `/members` being a page. The overlay's and the footer's group is
+  **Browse** (it holds a Charts entry now). The ribbons' View all links: the weekly lists go to the
+  Charts page, the year and month lists to the chart pages with the range.
+- **What went with the tabs**: the masthead (the banner and tagline above
+  the tabs; the nav bar carries the brand), `pinScroll` and the `#boosts`
+  landing scroll of 2026-10-20 (nothing sits above a feed shell now),
+  `lb:members-painted`, `hashchange`, and the Rules dialog's in-page jump to
+  the bots (a real link to `/members#boost-bots`).
+
+## The Discovery Homepage
+
+**`/` is a page of rails since 2026-10-17** (Reed's project, modelled on
+Rotten Tomatoes: "the PC 2.0 version of those sites"). The mockup canvas it
+was picked from is in the session memory; direction A won, with the sans.
+
+- **⚠️ THE RAIL ORDER IS REED'S AND NOTHING A SIGNED-OUT VISITOR CANNOT SEE
+  COMES BEFORE THE FOURTH RAIL.** Top Shows This Week, Top Albums This
+  Month, the #40HPW week, THEN Podcasts Recommended For You, Music
+  Recommended For You and Top Shows From Your Follows, then New and
+  Noteworthy, Movers and Podcasters Recommend, then the Because rails, then
+  the year's episodes and songs. That is the evening-of-2026-10-21 order
+  (Reed's final pass: the three discovery instruments moved up under the
+  follows rail, the Because rails slid down, and **Top Artists This Week
+  came off the page**, its renderer and fallback deleted; the Music ribbon's
+  Discover column still links `/charts/music` under that name). The two
+  recommendation rails were "Recommended For You" and "Recommended Music"
+  until the same pass, and both carry the "Your full list" link now.
+  `test-discover-home.mjs` pins the first three, the personal rails'
+  position, and the generic order.
+- **THE FEATURED CAROUSEL SITS ABOVE THE RAILS AND IS THE FIRST PLACE OF
+  EACH GENERIC RAIL, IN THE PAGE'S RAIL ORDER** (Reed's call, 2026-10-19,
+  after the heroes on Rotten Tomatoes, IMDb and Fountain's discovery tab;
+  he had turned the idea down on 2026-10-17 and asked for it two days
+  later). Nothing editorial, nothing personal: the same nine slides for
+  every visitor, so it is facts and the Function renders it. Each `RAILS`
+  entry answers `{ html, lead }`, the lead being its first row as a slide
+  spec from the two-sided `assets/js/hero.js` (`showSlide`, `episodeSlide`,
+  `artistSlide`, `memberSlide`, `EYEBROWS`), so the hero costs no chart
+  query; `buildHero` adds the one thing the rails do not carry, a
+  description by primary key (`blurb` strips and clips it), allowed to fail
+  per slide; `railOrder` reads the order off the shell; `injectHero` fills
+  `<!--OB:HERO-->`, left in place when there is nothing to show. The shape
+  is Fountain's, since the art is square: the artwork blurred as the
+  backdrop, the art at left, the eyebrow (the rail's rule), title, figures,
+  two lines of description, Open and Boost. **The Boost pill reuses the
+  cards' own handlers**: the slide carries the same data attributes a show
+  card or an episode card does and `discover.js` hands a click to the
+  exported `onShowBoost` / `onBoostClick`, loaded on first use. The rotation
+  (seven seconds, paused on hover, focus and touch, off under reduced
+  motion and off screen), the arrows, the dots and the artwork fallback are
+  `discover.js`; a rail the browser filled gets its slide added with the
+  same mappers (no description: the endpoints do not carry one). Two
+  trade-offs Reed accepted: the hero pushes the first rail down, most of a
+  phone's first screen; and slide one repeats the first tile under it. The
+  rails still start at #1. `/about#recommendations` says it is not an
+  editorial pick.
+- **A personal rail shows a signed-out visitor the LOCKED CARD, never a
+  blank** ("Log in to see your recommendations"): Reed wants the carrot, the
+  sense of missing out on what logging in and publishing boosts to Nostr
+  unlocks. Revisit if too much ends up locked.
+- **Every language is first class**: no language rail, no language default.
+- **Fact rails are edge-rendered, personal rails are browser-only.** Each
+  fact rail is an `<!--OB:RAIL:<key>-->` marker pair in `index.html` filled
+  by `RAILS[key]` in `functions/index.js`; a rail that fails keeps its
+  placeholder and `assets/js/discover.js` fetches the same endpoint and
+  paints it with the same two-sided `assets/js/rail-tile.js`. The #40HPW rail
+  renders the two-sided `hpw-board.js` board, not tiles.
+- **The nav bar is direction A on every page** (`partials/nav.html`): logo and
+  wordmark, the sections, the site search in the middle
+  (`assets/js/nav-search.js`, loaded by `nav.js`, asking
+  `/api/v1/search?type=all` and `/api/v1/members?q=`), the theme toggle,
+  Donate, the account control. On a phone the links fold into the
+  hamburger's overlay and the search takes its own row. **The overlay's
+  Charts group, the inline links and the footer's Charts group name the same
+  places; change them together.**
+- **THE SECTIONS ARE RIBBONS SINCE 2026-10-20: Podcasts · Music · #40HPW
+  (Members until the evening of 2026-10-21, see The Chart Pages) each open a
+  panel under the bar, then two plain links** (Reed's call,
+  after Rotten Tomatoes' section menus). The plain links were #40HPW and
+  Boosts for one day and are **Charts and Boosts since 2026-10-21**, when
+  the boards got their own page under that name; see **The Chart Pages**. A
+  ribbon is two top-five lists (Shows This Week + Shows This Year; Albums
+  This Month + Songs This Year; #40HPW This Week + Largest Boosts This
+  Week), a **Discover** column of that side's rails minus the two listed
+  (the personal rails named, so a signed-out visitor sees what logging in
+  unlocks), and the first list's #1 at the right. Each is a `<details>` so
+  the caret opens it with no script; `assets/js/nav-ribbons.js` (loaded by
+  `nav.js` like the search) adds hover, Escape and outside-click, and
+  **fills the lists on first open from the chart endpoints**: the nav is a
+  partial on static pages too, so the lists are never edge-rendered.
+  `SOURCES` there is keyed by the partial's `data-ribbon-list` slots. The
+  Members ribbon's second list is `/api/v1/boosts?sort=sats&range=1w`, the
+  one ordering that endpoint has besides time (no cursor in it). On a phone
+  the overlay's three section rows are accordions: the row opens the page,
+  the chevron opens the Discover links. **Reed's wording rule: the boost
+  feed's link is "Boosts", never "Live"**, which means something else in
+  podcasting. **`/boosts` is the boost feed's own address since 2026-10-21**
+  (the nav's Boosts link, the footer, the ribbon); it was `/charts#boosts`,
+  an alias plus a pinned scroll, for one day, and that address forwards. The Discover
+  links to homepage rails are `/#rail-<key>`, the rails' heading ids, under
+  a `scroll-margin-top` for the sticky bar. `test-discover-home.mjs` pins
+  the bar, the slots against `SOURCES`, the Discover columns, the overlay
+  and footer in step, the forward and the alias, and the sats ordering.
+- **`--font-sans` is Outfit** (`assets/fonts/outfit.woff2`, OFL, a variable
+  file), used by the bar and the rails. The two serifs are still the display
+  and body faces everywhere else; the typography item below is still open.
+- **A tile's one line is the chart triplet** (rank in sats / boosters /
+  boosts, the chart view's own figure, `rankTriplet` in `rail-tile.js`);
+  Reed's call after seeing "7 boosters · 38.8k sats" at tile size. The #40HPW
+  rail is tiles too (face, name, "34.3 HPW · 26 episodes", gold past the
+  goal), not the board: every rail the same shape. **A person's tile is
+  ROUND** (`person: true` → `.rail-tile--person`, Reed's call 2026-10-18: a
+  circle reads as an individual, a square as content); the two member
+  mappers set it and nothing else does.
+- **`/search?q=` is the results page, AND IT IS A LIST, NOT RAILS**
+  (`search.html` + `functions/search.js` + `assets/js/search-page.js`).
+  Reed's rule, 2026-10-18: the sideways tile rail is the HOMEPAGE's shape;
+  anything deeper (a search, the full charts, research) is a list like the
+  charts page. So every hit is the charts page's own card (show-card,
+  episode-card with the lazy drawer, publisher-card, and the Members tab's
+  wall for members), rendered at the edge through the three ranked
+  endpoints' own `q=` paths in process, so **a hit wears the chart rank it
+  holds on the unfiltered all-time chart**, and `search-page.js` attaches
+  the same verbs the feeds attach. Groups: shows, albums, episodes, songs,
+  artists, members, each linking its chart. `noindex`. Enter in the nav
+  field goes there (Reed's call: a typed query deserves every hit, not the
+  first); an arrow-key pick still goes to its row. `_shared/search-all.js`
+  is the typeahead's alone now.
+- **The foot of the page is ONE STRIP INTO THE BOOST FEED** (`.rail-cta`,
+  `/charts#members`), not boost rows. The newest twelve rows sat there from
+  the 2026-10-17 feedback round until 2026-10-18, when Reed traded them for
+  the Because rails; the whole feed with its controls is the Members tab,
+  and the nav's Members link already lands on it. Ideas for a stronger
+  one-click (a Live pill in the nav bar, a ticker of the newest boost) are
+  open with Reed.
+- **The personal rails are `POST /api/v1/recommend`** (`{pubkey,
+  favorites?}` → `{seeds, podcasts, music, because}`): the member's boosted
+  shows, plus the favorites the browser hands over, are the seeds; the
+  collector's `show_similar` scores (distinct-booster cosine, top 20 per
+  show, daily full replace) are summed over them, seeds excluded, **floor:
+  reached from two seeds or two boosters shared with one** (half of all
+  pairs share exactly one booster, measured 2026-10-17). Two lists, never
+  one: the music side's overlap runs nearly three times the podcast side's.
+  **`because` is up to FIVE rails, one per most-boosted seed with neighbours
+  over the floor** (Reed's ask, 2026-10-18; a show appears under the first
+  seed that reaches it only, and a seed emptied by that is skipped), cloned
+  by `discover.js` from the hidden prototype section. Nothing is stored per
+  member. **The method is public: `/about#recommendations`** states every
+  rail's rule, Reed's data-transparency call, and the three personal rails'
+  one-liners link it; `docs/about-and-faq-source.md` is the factual backing
+  and is corrected first. **Favorites are not yet handed over**: `favorites-ui.js`
+  exposes no accessor for the current list; the endpoint accepts them.
+- **Three more fact rails off the new columns**: New and Noteworthy
+  (`first_boost_ts` within 90 days and two boosters; the collector measured
+  21 such shows), Movers (this week's Shows chart against last week's to 100
+  places, climbers by places then debuts), Podcasters Recommend (podroll
+  targets by how many sources list them; an unindexed target is a figure,
+  not a link).
+- **A member's recommendations are on THEIR OWN PAGE too: `/booster/<npub>#recommended`**
+  (2026-10-20, Reed's ask: a member with recommendations has a page here
+  already). `recommendationsFor` in `recommend.js` is the endpoint's core,
+  exported; the booster Function calls it without favorites (a Nostr event
+  only the browser reads, so the two lists can differ by them), allowed to
+  fail, and renders Recommended Podcasts and Recommended Music as rows in
+  the page's own drawer chrome, omitted when both are empty. The homepage's
+  Recommended rails gain a "Your full list →" link to it once painted. A
+  signed-in member with no boosts sees the rail's "No boosts from this
+  account yet" card, which is the empty state Reed asked for.
+- **⚠️ A HASH THAT NAMES A VIEW LANDS ON THE LIST, AND A LANDING SCROLL IS
+  PINNED** (`pinScroll` in the `charts.html` controller, 2026-10-20). The
+  chart blocks sit above the feed shell on Shows, Albums and Artists, so
+  `#shows?range=1y` from a "View all" link was landing on the week's board;
+  now any hash carrying a range, sort or language scrolls to the active
+  panel's `.feed-shell`, and `#boosts` to the Members tab's Boosts section.
+  The scroll is re-made on every change of the document's height for six
+  seconds (the blocks, boards, wall and bots all grow the page after the
+  first paint; a one-shot scroll drifted onto the boards) and stops at the
+  reader's first wheel, touch or key. The bare `#shows` still lands at the
+  top.
+- **Still to build here**: boost messages on the results page, favorites as
+  seeds, New Music and Album Movers as music-side discovery rails (the
+  Music ribbon's Discover column is three lines because the movers, new
+  and podroll instruments are podcast-side today; `newShowsRows` already
+  takes both media). Most Favorited is held: 15 lists on the whole network
+  on 2026-10-17.
 
 ## Site map
 
@@ -67,7 +342,7 @@ order. They are the site map, so **they're regrouped together or not at all**:
 
 | Group | Items |
 |---|---|
-| **Feeds** | Podcasts `/#episodes-global` · Music `/#artists` · Members `/#members` |
+| **Browse** | Podcasts `/podcasts` · Music `/music` · Members `/members` · Charts `/charts` · Boosts `/boosts` — *Feeds* until 2026-10-17, *Charts* until 2026-10-21, when every section became a page and the weekly boards took the Charts name |
 | **Stats** | Boost Stats `/stats` — coming soon |
 
 **⚠️ `/boosters` (Community) WAS THE SECOND STATS ENTRY AND THE PAGE IS DELETED,
@@ -80,12 +355,14 @@ search presence. **`/api/v1/boosters/<npub>` and `/booster/<npub>` are different
 paths entirely and are live** — do not confuse the plural page with either.
 | **More** (footer: *Connect*) | About · Source · Report a bug |
 
-**⚠️ FEEDS IS ONE ENTRY PER TAB, NOT PER FEED, AND EACH LANDS ON THAT TAB'S
-DEFAULT SUB-FEED.** *Reed's call, 2026-08-23.* It listed all five sub-feeds,
+**⚠️ BROWSE IS ONE ENTRY PER PAGE, NOT PER CHART, AND EACH BARE PATH OPENS ON
+ITS FIRST CHART** (`PAGES` in the controller and in `charts-page.js`, since
+2026-10-21; `TAB_DEFAULT` before). The paragraph that follows is the tabs-era
+reasoning and still holds. *Reed's call, 2026-08-23.* It listed all five sub-feeds,
 which was right while the homepage hid them behind a dropdown and wrong the
 moment the tabs put them on screen: the nav then restated a control the page
 carries, in a different order, using different words for the same things.
-**Those three hrefs and `TAB_DEFAULT` in the `index.html` controller move
+**Those three hrefs and `TAB_DEFAULT` in the `charts.html` controller move
 together** — Podcasts opens Shows (Episodes until 2026-09-03, Reed's call with the chart blocks: the three default feeds are the charted ones), Music opens Artists (Albums until 2026-08-31, Reed's call with the Chart Positions strip), Members opens Boosts.
 
 **The Global/Follows axis is deliberately not in the nav**: it's the second
@@ -109,6 +386,11 @@ row, the scope menu, which panel is on screen, and the hash, and dispatches
 `lb:feed-activate`; `assets/js/feeds.js` listens and lazily hydrates.
 
 ### The Three Tabs
+
+**⚠️ RETIRED 2026-10-21. The tabs, the sub-row, `TAB_OF`, `TAB_DEFAULT`, the
+chrome box and the phone chips are gone from `charts.html`; each tab is a
+page and each sub-feed a view with an underlined text tab (see The Chart
+Pages). Kept for the decisions it records.**
 
 **Podcasts · Music · Members**, on Local Bitcoiners' `feeds.html` pattern
 (`git show lb/main:feeds.html`): a full-bleed equal-column grid, an icon over
@@ -167,6 +449,12 @@ panel's shell) — so the column no longer narrows by 240px when a reader clicks
 a card through to its detail page. The masthead's logo and subtitle keep their own smaller
 measures; those are typographic, not the track.
 
+**⚠️ THE HASH IS HISTORY SINCE 2026-10-21: the view is the query string of a
+path (`/podcasts/shows?scope=follows&lang=de&range=1m&sort=sats`), the hash
+addresses are forwarded by two head scripts, and `ALIASES`, `HASH_OF` and
+`SCOPELESS`'s companions are gone from the controller.** The paragraphs that
+follow describe the 2026-08-17 to 2026-10-21 shape.
+
 **A hash may carry a view: `#shows?lang=de&range=1m&sort=sats`.** The feed key
 stays intact as the part before the `?`, so `FEEDS` and `ALIASES` look up exactly
 as they did and a retired hash still upgrades. `PARAM_FEEDS` (né `LANG_FEEDS`)
@@ -194,11 +482,16 @@ visible is **CSS off `body[data-active-feed]`**, not JS: feeds hydrate once and
 keep their controls forever, so an imperative swap is the version that can leave
 a feed you come back to showing another feed's controls, or none.
 
-**Each panel leads with two slots, both shipped empty and `hidden`**: a
-`[data-feed-note]` line and, under it, the `[data-feed-search]` box. Both are
-filled by the renderer and stay hidden until one does, so a feed showing "sign
-in" or an error grows neither. They're inside the panel rather than the bar, so
-they scroll away with the cards they describe.
+**Each panel leads with one slot, shipped empty and `hidden`**: the
+`[data-feed-note]` line, filled by the renderer and hidden until it is, so a
+feed showing "sign in" or an error grows nothing. It is inside the panel
+rather than the bar, so it scrolls away with the cards it describes. **The
+`[data-feed-search]` box beside it, and the member lookup on the Members tab,
+were removed on 2026-10-17** (Reed's call): the nav bar's site search is on
+every page and `/search` is the results page, so three per-feed boxes restated
+one control. `feed-search.js` and its test went with them; the ranked
+endpoints' `q=` paths stay for the API, and the renderers' pick/query state is
+unreachable but still in place.
 
 **The note slot is on the four ranked feeds only** (`mountFeedNote` and
 `viewNote` in `feed-note.js`). Since 2026-08-31 the line is composed from the
@@ -213,6 +506,14 @@ rather than about which cards survived. This is deliberately one line and no
 box; don't grow it back into the scope paragraph it replaced.
 
 ### The Landing Feed
+
+**⚠️ "LANDING" MEANS THE PODCASTS PAGE'S OPENING CHART SINCE 2026-10-21**
+(`/podcasts/shows`; the charts page's opening feed from 2026-10-17), not the
+site's front door, which is the discovery homepage above. The three
+declarations below read, since 2026-10-21: `PAGES.podcasts.views[0]` in the
+controller; `is-active` on `#panel-shows` and the marker pair inside it; and
+the `SSR` table and `FEED` in `functions/_shared/charts-page.js`. `DEFAULT_TYPE`
+and `TAB_DEFAULT` are gone.
 
 **The front door opens on Shows / All time / Chart rank.** Two Reed calls:
 Shows on 2026-08-23 (Phase D, idea #18, shipping the last piece of the tabs
@@ -423,7 +724,7 @@ scheme's invariant — until competition ranking shipped on 2026-08-18, and it
 would have been merged red had it not been run. **Run all thirty-one before a
 merge**, and treat this one as the guard on the ranking scheme rather than only
 on weight. *(That number has been wrong before — it lagged from twelve to twenty-eight, a
-test at a time, while the table beside it grew. `git log -S "before a\nmerge" -- CLAUDE.md` has every value it has held. **Bump it and `docs/tests.md`
+test at a time, while the table beside it grew; it was thirty-two for an afternoon on 2026-10-17 (`test-discover-home.mjs` in) and thirty-one again by evening (`test-feed-search.mjs` out). `git log -S "before a\nmerge" -- CLAUDE.md` has every value it has held. **Bump it and `docs/tests.md`
 together.**)*
 
 **⚠️ AND ITS `curl` CHANGED WITH THE LANDING FEED.** It captures
@@ -682,6 +983,14 @@ What a change would break:
   money endpoints, `/api/lnurl` and `/api/keysend`, are the allowlist on
   purpose**: their GET asks a third party for an invoice or a node record,
   which a link checker's HEAD must not do.
+  **⚠️ AND A PAGE FUNCTION FETCHES ITS SHELL WITH `assetGet(request, path)`
+  FROM `head.js`, NEVER WITH THE INCOMING REQUEST AS INIT** (2026-10-21):
+  that init copies the method, a HEAD fetched the shell as a HEAD, the empty
+  body made the fill throw, and thirteen chart-family routes answered 500 to
+  `curl -I` on the preview while GET was 200. The scan was green because it
+  only checks the handler exists; it now also refuses the pattern and runs
+  a HEAD through the real chart-page renderer against a method-faithful
+  asset stub.
 - **CORS origin allowlists are exact-match `Set` lookups**, never `startsWith` —
   a prefix check lets a lookalike origin get reflected into
   `Access-Control-Allow-Origin`.
@@ -1482,6 +1791,10 @@ file:
   is a well-formed subtag matching zero rows, so `ob-live.js` sends the parameter
   only when the key is not `all`. The menu is **fetched** from
   `GET /api/v1/languages`, never declared, and is medium-aware.
+- **The per-feed search box is gone since 2026-10-17** (see the slot
+  paragraph under The Three Tabs); the two bullets after this one describe
+  the API behaviour its removal left in place, and the `onSubmit` rule is
+  history.
 - **⚠️ `onSubmit` IS WHAT FLIPS THE SEARCH BOX'S ENTER BEHAVIOUR.** Typing
   suggests, picking filters, **Enter submits the whole query** (2026-08-27, Reed's
   ask) — and with `onSubmit` present suggestions are **not** auto-highlighted. The
@@ -1498,6 +1811,13 @@ file:
   renumbers the survivor to #1, which answers a different question.
 
 ### The Members Tab
+
+**⚠️ THE TAB IS THREE PAGES SINCE 2026-10-21**: the #40HPW boards are
+`/charts/hpw`, the wall and the Boost Bots are `/members`, the boost feed is
+`/boosts` (see The Chart Pages). `renderMembersBoards` paints the boards and
+`renderMembersWall` the wall and the bots, each off its page's load. The
+section below is the tab-era record; its rules about the boards, the week,
+the wall's orderings and the share cards all still hold.
 
 Three sections above the boost firehose — **#40HPW, Members, Boost Bots,
 Boosts** — all client-rendered by `assets/js/members-board.js` and hydrated on
@@ -1727,7 +2047,7 @@ What a change elsewhere would break:
 - **⚠️ THE SECTION IDS ARE URLS AND THEY ARE FROZEN.** `/show`: `#episodes`
   `#community` `#community-shows` `#podroll` `#reverse-podroll` `#boosts`.
   `/episode`: `#community` `#community-episodes` `#boosts`. `/booster`: `#shows`
-  `#episodes` `#favorites` `#boosts`. Ids are reused across pages on purpose where they name the
+  `#recommended` (2026-10-20) `#episodes` `#favorites` `#boosts`. Ids are reused across pages on purpose where they name the
   same kind of section. `HASH_ALIASES` holds one permanent entry
   (`#inverse-podroll`) and **is the repair for a rename that already happened, not
   a licence for the next one** — it needs the module to have run, so a rename is
@@ -2343,7 +2663,13 @@ would. Never remove an entry** — those links are in the wild.
 | `feed-controls.js` / `feed-search.js` | the range/sort chrome and the per-feed typeahead |
 | `feed-lang.js` | the language menu on the four ranked feeds, and the copy it rewrites |
 | `boosts-thread.js` / `boost-actions.js` | the content tokenizer and reply / like / repost / zap |
-| `functions/index.js` | the homepage's opening feed — **Shows**, rendered at the edge |
+| `functions/index.js` | **the discovery homepage's fact rails**, rendered at the edge (2026-10-17) |
+| `functions/_shared/charts-page.js` | **the five chart pages' shell renderer** (2026-10-21): routes `charts.html` to a page and view, renders Shows and Albums at the edge; it was the charts page's opening feed, and `functions/index.js` before the front door moved |
+| `rail-tile.js` + `discover.js` | **the** rail tile, facts and verbs, shared by the edge and the browser; the personal rails (Because ×5) and the SSR fallback |
+| `hero.js` | **the** featured carousel's slide, two-sided: the first place of each generic rail, rendered by `functions/index.js` from the rails' own rows; `discover.js` rotates it and wires its Boost to the cards' handlers |
+| `functions/search.js` + `search-page.js` | the results page: the charts page's cards in a list, each wearing its chart rank, through the ranked endpoints' `q=` paths in process |
+| `nav-search.js` + `/api/v1/search?type=all` | the nav bar's grouped typeahead: shows, episodes, artists and members |
+| `nav-ribbons.js` | the bar's three section ribbons (2026-10-20): hover and close rules, the top-five lists fetched on first open, the featured #1 |
 | `functions/{show,episode,booster,artist}/…` | the four edge-rendered detail pages |
 | `functions/charts/[[path]].js` + `_shared/week-charts.js` + **two-sided** `assets/js/chart-board.js` | the five chart share-card frames (the Charts page they came from was torn down 2026-09-04) |
 | `assets/js/charts-block.js` + `functions/api/v1/charts/[[path]].js` | **the chart boards on the Shows and Artists feeds** (2026-09-03): the week's Top 10 with the picker in its title beside Weeks at #1, from JSON; `assets/js/week-picker.js` is the picker's markup and delegate, shared with the Members tab |

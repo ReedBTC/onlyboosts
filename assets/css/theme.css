@@ -33,6 +33,17 @@
   font-display: swap;
   src: url('/assets/fonts/source-serif-4.woff2') format('woff2');
 }
+/* Outfit (OFL), a variable weight axis in one file. Reed's pick 2026-10-17
+   for the discovery homepage and the nav: a geometric sans close to the
+   wordmark's. It is `--font-sans`; the two serifs stay the display and body
+   faces everywhere else until the typography item is taken up. */
+@font-face {
+  font-family: 'Outfit';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/assets/fonts/outfit.woff2') format('woff2');
+}
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { overflow-x: hidden; max-width: 100vw; }
@@ -103,6 +114,7 @@ html, body { overflow-x: hidden; max-width: 100vw; }
      it is a different product's UI. */
   --font-display: 'Playfair Display', Georgia, serif;
   --font-body:    'Source Serif 4', Georgia, serif;
+  --font-sans:    'Outfit', system-ui, -apple-system, 'Segoe UI', sans-serif;
 
   /* ── Modal surfaces ───────────────────────────────────────────
      Three steps, because a modal needs a panel, fields sunk into it,

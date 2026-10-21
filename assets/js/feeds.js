@@ -39,7 +39,7 @@
  * when this module first runs).
  */
 // Identity, for keeping the Follows feeds in sync with who's signed in.
-import { getSessionPubkey, clearFollowCache } from '/assets/js/follow-set.js?v=ob-v219'
+import { getSessionPubkey, clearFollowCache } from '/assets/js/follow-set.js?v=ob-v232'
 
 // ── DOM state helpers ────────────────────────────────────────────────
 
@@ -104,10 +104,10 @@ async function hydrate(panelId, mod, scope, medium, view) {
 }
 
 // ── Lazy per-feed dispatch ───────────────────────────────────────────
-const BOOSTS = '/assets/js/boosts-feed.js?v=ob-v219'
-const PODCASTS = '/assets/js/feeds-podcasts.js?v=ob-v219'
-const SHOWS = '/assets/js/shows-feed.js?v=ob-v219'
-const ARTISTS = '/assets/js/artists-feed.js?v=ob-v219'
+const BOOSTS = '/assets/js/boosts-feed.js?v=ob-v232'
+const PODCASTS = '/assets/js/feeds-podcasts.js?v=ob-v232'
+const SHOWS = '/assets/js/shows-feed.js?v=ob-v232'
+const ARTISTS = '/assets/js/artists-feed.js?v=ob-v232'
 // Each module's entry point, by module. Named rather than sniffed out of the
 // path, so adding a feed is one line here instead of another branch.
 const RENDERERS = {
@@ -157,50 +157,63 @@ function viewFromBody() {
   return { lang: ds.feedLang || '', range: ds.feedRange || '', sort: ds.feedSort || '' }
 }
 
-/* The Members tab's own sections, which belong to the TAB rather than to either
- * of the two boosts panels under it. Hydrated off the same activate event, on
- * whichever boosts feed the reader arrives at; renderMembersBoards is
- * idempotent, so the second arrival costs a marker check.
- *
- * ⚠️ IT IS NEVER AWAITED AND NEVER ALLOWED TO THROW. The bottom half of that
- * tab is a working feed, and a board that cannot load must not delay or break
- * it — the same discipline the podroll queries have on /show. */
-const MEMBER_TABS = new Set(['members-global', 'members-follows'])
+/* ── The two pages with no feed ── (2026-10-21)
+ * The Charts page (/charts/podcasts, /charts/music, /charts/hpw) is the
+ * three board pairs, and the Members page (/members) is the wall and the
+ * bots. Neither activates a feed, so they are painted off body[data-page]
+ * and body[data-view] at boot rather than off lb:feed-activate. Each loader
+ * is idempotent, never awaited and never allowed to throw: a board that
+ * cannot load leaves its section saying so and costs the reader nothing
+ * else, the discipline the podroll queries have on /show. */
 let boardsWired = false
 function loadMemberBoards() {
   if (boardsWired) return
   const root = document.querySelector('[data-hpw-boards]')
   if (!root) return
   boardsWired = true
-  import('/assets/js/members-board.js?v=ob-v219')
+  import('/assets/js/members-board.js?v=ob-v232')
     .then((m) => m.renderMembersBoards(root))
     .catch((err) => {
       console.warn('[feeds] member boards failed to load', err)
       boardsWired = false
     })
 }
-
-/* The chart block over the Shows and Artists feeds (charts-block.js), the
- * members boards' twin: the tab's section rather than a panel's, hydrated off
- * the same two entry points, never awaited, never allowed to throw. Keyed by
- * the feed's TYPE, so both scopes fill the same block once. */
-const CHART_FEEDS = {
-  'shows-global': 'shows', 'shows-follows': 'shows',
-  'artists-global': 'artists', 'artists-follows': 'artists',
+let wallWired = false
+function loadMembersWall() {
+  if (wallWired) return
+  if (!document.querySelector('[data-members-wall]')) return
+  wallWired = true
+  import('/assets/js/members-board.js?v=ob-v232')
+    .then((m) => m.renderMembersWall())
+    .catch((err) => {
+      console.warn('[feeds] members wall failed to load', err)
+      wallWired = false
+    })
 }
+
+/* The chart blocks (charts-block.js): the week's Top 10 beside Weeks at #1,
+ * one per kind. Keyed by the Charts page's view. */
+const CHART_VIEWS = { podcasts: 'shows', music: 'artists' }
 const chartsWired = new Set()
-function loadChartsBlock(feed) {
-  const kind = CHART_FEEDS[feed]
+function loadChartsBlock(kind) {
   if (!kind || chartsWired.has(kind)) return
   const root = document.querySelector(`[data-charts-block="${kind}"]`)
   if (!root) return
   chartsWired.add(kind)
-  import('/assets/js/charts-block.js?v=ob-v219')
+  import('/assets/js/charts-block.js?v=ob-v232')
     .then((m) => m.renderChartsBlock(root, kind))
     .catch((err) => {
       console.warn('[feeds] chart block failed to load', err)
       chartsWired.delete(kind)
     })
+}
+function loadPageSections(page, view) {
+  if (page === 'charts') {
+    if (view === 'hpw') loadMemberBoards()
+    else loadChartsBlock(CHART_VIEWS[view])
+  } else if (page === 'members') {
+    loadMembersWall()
+  }
 }
 
 document.addEventListener('lb:feed-activate', (e) => {
@@ -209,8 +222,6 @@ document.addEventListener('lb:feed-activate', (e) => {
   // controls own the view and the controller talks to them through
   // lb:set-feed-lang and lb:set-feed-view.
   if (feed) loadFeed(feed, { lang: e?.detail?.lang, range: e?.detail?.range, sort: e?.detail?.sort })
-  if (feed && MEMBER_TABS.has(feed)) loadMemberBoards()
-  if (feed) loadChartsBlock(feed)
 })
 
 // ── Session-driven refresh ───────────────────────────────────────────
@@ -260,15 +271,12 @@ window.addEventListener('storage', (e) => {
  * and the lb:feed-activate that carried the view fired before this module
  * existed. Taking only the feed here is what made a shared link paint the
  * unfiltered feed while the URL claimed otherwise. */
-const bootFeed = document.body.dataset.activeFeed || 'episodes-global'
-loadFeed(bootFeed, viewFromBody())
-/* ⚠️ AND THE MEMBERS BOARDS TOO, ON THIS PATH AS WELL AS ON THE EVENT. The cold
- * load does not go through the lb:feed-activate listener — the controller fired
- * that during parse, before this module existed, which is the whole reason the
- * line above re-reads the attribute. Hooking only the listener meant the boards
- * rendered when a reader CLICKED to Members and stayed empty on every reload,
- * every shared `#members` link, and every back-navigation onto the tab.
- * Two entry points, one guard: loadMemberBoards is idempotent. */
-if (MEMBER_TABS.has(bootFeed)) loadMemberBoards()
-// And the chart block, on the same two paths for the same reason.
-loadChartsBlock(bootFeed)
+const bootFeed = document.body.dataset.activeFeed || ''
+if (bootFeed) loadFeed(bootFeed, viewFromBody())
+/* ⚠️ AND THE PAGES WITH NO FEED, ON THIS PATH. The Charts and Members pages
+ * set body[data-page] and no data-active-feed (the controller removes it),
+ * so there is no activation to hook; their sections are painted here, off
+ * the page and view the controller wrote during parse. A missing
+ * data-active-feed means a page with no feed, never "episodes by default":
+ * that fallback hydrated the Episodes panel under the Members page. */
+loadPageSections(document.body.dataset.page, document.body.dataset.view)

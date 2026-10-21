@@ -682,41 +682,41 @@ async function call(handler, url, init) {
     chart: { rank: 4, tied: false },
     chartWindows: { '1w': win(3, true), '1m': win(2), '1y': win(4), all: win(4) },
   }
-  const html = renderStatTiles(stats, ranks, { rankFeed: 'Shows', backHref: '/#shows' })
+  const html = renderStatTiles(stats, ranks, { rankFeed: 'Shows', backHref: '/podcasts/shows' })
   check('the strip renders all four windows, each cell linked to its chart view', () => {
     assert.ok(html.includes('OnlyBoosts Chart Positions'))
     // &amp; — the renderer escapes attribute values, so the test expects HTML.
-    assert.ok(html.includes('href="/#shows?sort=chart&amp;range=1w"'))
-    assert.ok(html.includes('href="/#shows?sort=chart&amp;range=1m"'))
-    assert.ok(html.includes('href="/#shows?sort=chart&amp;range=1y"'))
-    assert.ok(html.includes('href="/#shows?sort=chart"'))
+    assert.ok(html.includes('href="/podcasts/shows?sort=chart&amp;range=1w"'))
+    assert.ok(html.includes('href="/podcasts/shows?sort=chart&amp;range=1m"'))
+    assert.ok(html.includes('href="/podcasts/shows?sort=chart&amp;range=1y"'))
+    assert.ok(html.includes('href="/podcasts/shows?sort=chart"'))
   })
   check('a shared place wears the T, and the label links to /about#charts', () => {
     assert.ok(html.includes('T#3'))
     assert.ok(html.includes('href="/about#charts"'))
   })
-  const deepHtml = renderStatTiles(stats, { ...ranks, chartWindows: { ...ranks.chartWindows, '1m': win(101) } }, { rankFeed: 'Shows', backHref: '/#shows' })
+  const deepHtml = renderStatTiles(stats, { ...ranks, chartWindows: { ...ranks.chartWindows, '1m': win(101) } }, { rankFeed: 'Shows', backHref: '/podcasts/shows' })
   check('⚠️ a window past 100 is a dash <span>, not a link — outside wording', () => {
     assert.ok(deepHtml.includes('Outside the top 100 this month'))
-    assert.ok(!deepHtml.includes('href="/#shows?sort=chart&amp;range=1m"'))
+    assert.ok(!deepHtml.includes('href="/podcasts/shows?sort=chart&amp;range=1m"'))
   })
-  const quietHtml = renderStatTiles(stats, { ...ranks, chartWindows: { ...ranks.chartWindows, '1w': null } }, { rankFeed: 'Shows', backHref: '/#shows' })
+  const quietHtml = renderStatTiles(stats, { ...ranks, chartWindows: { ...ranks.chartWindows, '1w': null } }, { rankFeed: 'Shows', backHref: '/podcasts/shows' })
   check('⚠️ a window with no boosts is a dash too — one wording, outside the top 100', () => {
     assert.ok(quietHtml.includes('Outside the top 100 this week'))
-    assert.ok(!quietHtml.includes('href="/#shows?sort=chart&amp;range=1w"'))
+    assert.ok(!quietHtml.includes('href="/podcasts/shows?sort=chart&amp;range=1w"'))
   })
-  const overrideHtml = renderStatTiles(stats, ranks, { rankFeed: 'Members', backHref: '/#members', chartHref: '/#members', chartBreadth: 'shows boosted' })
+  const overrideHtml = renderStatTiles(stats, ranks, { rankFeed: 'Members', backHref: '/members', chartHref: '/members', chartBreadth: 'shows boosted' })
   check('/booster’s overrides reach the strip: wall href on every cell, breadth wording', () => {
-    assert.ok(overrideHtml.includes('href="/#members"'))
+    assert.ok(overrideHtml.includes('href="/members"'))
     assert.ok(overrideHtml.includes('shows boosted'))
     assert.ok(!overrideHtml.includes('?sort=chart'))
   })
   const allDeep = { '1w': win(101), '1m': null, '1y': win(200), all: win(101) }
-  const noneHtml = renderStatTiles(stats, { ...ranks, chart: { rank: 101, tied: false }, chartWindows: allDeep }, { rankFeed: 'Shows', backHref: '/#shows' })
+  const noneHtml = renderStatTiles(stats, { ...ranks, chart: { rank: 101, tied: false }, chartWindows: allDeep }, { rankFeed: 'Shows', backHref: '/podcasts/shows' })
   check('⚠️ no window inside the top 100 still renders the strip — it is the tiles’ selector now', () => {
     assert.ok(noneHtml.includes('OnlyBoosts Chart Positions'))
     assert.equal((noneHtml.match(/show-chart-cell--none/g) || []).length, 4)
-    assert.ok(!noneHtml.includes('href="/#shows?sort=chart'))
+    assert.ok(!noneHtml.includes('href="/podcasts/shows?sort=chart'))
     assert.ok(noneHtml.includes('show-stats'))
   })
 
@@ -727,7 +727,7 @@ async function call(handler, url, init) {
     '1m': null,
     '1y': { sats: 900, boosts: 9, boosters: 2, ranks: { sats: { rank: 2, tied: false }, boosts: { rank: 3, tied: false }, boosters: { rank: 1, tied: false } } },
   }
-  const wHtml = renderStatTiles(stats, { ...ranks, windows }, { rankFeed: 'Shows', backHref: '/#shows' })
+  const wHtml = renderStatTiles(stats, { ...ranks, windows }, { rankFeed: 'Shows', backHref: '/podcasts/shows' })
   const row = (key) => {
     const m = wHtml.match(new RegExp(`<dl class="show-stats" data-window="${key}"([^>]*)>([\\s\\S]*?)</dl>`))
     assert.ok(m, `no row for ${key}`)
@@ -773,7 +773,7 @@ async function call(handler, url, init) {
     assert.ok(!wHtml.includes('show-stats-cap'))
     assert.ok(!wHtml.includes('Rank on the all-time'))
   })
-  const bareHtml = renderStatTiles(stats, { sats: { rank: 2, tied: false }, boosts: { rank: 3, tied: false }, boosters: { rank: 1, tied: false } }, { rankFeed: 'Shows', backHref: '/#shows' })
+  const bareHtml = renderStatTiles(stats, { sats: { rank: 2, tied: false }, boosts: { rank: 3, tied: false }, boosters: { rank: 1, tied: false } }, { rankFeed: 'Shows', backHref: '/podcasts/shows' })
   check('no chart data at all, no strip — the tiles render exactly as before', () => {
     assert.ok(!bareHtml.includes('OnlyBoosts Charts'))
     assert.ok(bareHtml.includes('show-stats'))

@@ -72,11 +72,11 @@ const painted = Math.min(SHOW_CARDS_PER_PAGE, cards.length)
 // ── The injection, run against the real index.html ──────────────────────────
 const OPEN = '<!--OB:SSR-SHOWS-->'
 const CLOSE = '<!--/OB:SSR-SHOWS-->'
-const shell = readFileSync(new URL('../index.html', import.meta.url), 'utf8')
+const shell = readFileSync(new URL('../charts.html', import.meta.url), 'utf8')
 
 console.log('\nThe homepage injection:')
 
-check('index.html still carries both markers, in order', () => {
+check('charts.html still carries both markers, in order', () => {
   const a = shell.indexOf(OPEN)
   const b = shell.indexOf(CLOSE)
   assert.ok(a !== -1, 'opening marker missing')
@@ -117,18 +117,21 @@ check('no other panel ships active, so the markup names one opening feed', () =>
   assert.deepEqual(actives.map((m) => m[1]), ['panel-shows'])
 })
 
-check('the controller lands on the same feed', () => {
-  assert.match(shell, /const DEFAULT_TYPE = 'shows';/)
+check('the controller lands on the same feed: Shows is the Podcasts page\'s first view', () => {
+  assert.match(shell, /podcasts: \{ views: \['shows', 'episodes'\], feed: true \}/)
 })
 
-check('the sub-row ships with the landing feed selected', () => {
-  // syncTabs rewrites this during parse, so it only shows through to a reader
-  // with no JavaScript and to a crawler's first pass — the two who must not be
-  // shown a selected sub-feed that is not the panel below it.
-  const row = shell.slice(shell.indexOf('<div class="feed-sub-group" data-tab="podcasts">'))
-  const group = row.slice(0, row.indexOf('</div>'))
-  const on = [...group.matchAll(/data-value="([^"]+)"\s+aria-selected="true"/g)].map((m) => m[1])
-  assert.deepEqual(on, ['shows'])
+check('the body ships routed to /podcasts/shows', () => {
+  // routeShell rewrites this per page at the edge and the controller
+  // re-derives it from the path, so it only shows through to a reader with
+  // no JavaScript on the raw shell, who must not be shown a page that is
+  // not the panel below it.
+  assert.ok(shell.includes('<body data-page="podcasts" data-view="shows" data-active-feed="shows-global">'))
+})
+
+check('the Albums panel carries the music side\'s marker pair (2026-10-21), in order', () => {
+  const a = shell.indexOf('<!--OB:SSR-ALBUMS-->'), b = shell.indexOf('<!--/OB:SSR-ALBUMS-->')
+  assert.ok(a > shell.indexOf('id="panel-albums"') && b > a)
 })
 
 check('the Episodes panel carries no injection marker of its own', () => {

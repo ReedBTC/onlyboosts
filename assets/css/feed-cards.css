@@ -270,6 +270,8 @@ a.pcast-show-link:hover { text-decoration: underline; }
   display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;
   margin-top: 0.25rem; font-size: 0.78rem; color: var(--muted);
 }
+/* The /discover pages' "why this card is here" line (show-card.js `note`). */
+.pcast-note { margin-top: 0.2rem; font-size: 0.78rem; color: var(--accent-dd, var(--brand-dd)); font-weight: 600; }
 
 /* Shownotes teaser (first ~2 lines) + a links row ("see full description"
    and a compact "Listen on Fountain") beneath it. */

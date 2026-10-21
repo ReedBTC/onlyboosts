@@ -2,8 +2,13 @@ import { headOf } from "../../_shared/head.js";
 // GET /api/v1/boosts — the boost feed, filterable + cursor-paginated (newest first).
 // Query params: id=<event id> podcast=<guid> item=<guid> booster=<npub|hex>
 //               since= until= cursor= limit=
+//               sort=sats range=1w|1m|1y  (the biggest boosts of a window,
+//               2026-10-20, for the nav's Members ribbon; no cursor in that
+//               order, since the cursor encodes the time ordering)
 import { json, preflight, BOOST_SELECT, boostRecord, toHexPubkey,
          encodeCursor, decodeCursor, clampLimit } from "./_common.js";
+
+const RANGE_DAYS = { "1w": 7, "1m": 30, "1y": 365 };
 
 export async function onRequestOptions({ request }) { return preflight(request); }
 
@@ -50,22 +55,30 @@ export async function onRequestGet({ request, env }) {
   const until = parseInt(u.searchParams.get("until"), 10);
   if (Number.isFinite(until)) { where.push("b.created_at <= ?"); args.push(until); }
 
-  const cur = decodeCursor(u.searchParams.get("cursor"));
+  const bySats = u.searchParams.get("sort") === "sats";
+  const range = u.searchParams.get("range");
+  if (range) {
+    const days = RANGE_DAYS[range];
+    if (!days) return json(request, { error: "bad range (1w|1m|1y)" }, { status: 400 });
+    where.push("b.created_at >= ?"); args.push(Math.floor(Date.now() / 1000) - days * 86400);
+  }
+
+  const cur = bySats ? null : decodeCursor(u.searchParams.get("cursor"));
   if (cur) { where.push("(b.created_at < ? OR (b.created_at = ? AND b.event_id < ?))");
              args.push(cur.ts, cur.ts, cur.id); }
 
   const sql = `${BOOST_SELECT}
     ${where.length ? "WHERE " + where.join(" AND ") : ""}
-    ORDER BY b.created_at DESC, b.event_id DESC LIMIT ?`;
+    ORDER BY ${bySats ? "b.sats DESC, b.created_at DESC" : "b.created_at DESC, b.event_id DESC"} LIMIT ?`;
   args.push(limit);
 
   const { results } = await env.DB.prepare(sql).bind(...args).all();
   const boosts = results.map(boostRecord);
   return json(request, {
     count: boosts.length,
-    next_cursor: boosts.length === limit ? encodeCursor(results[results.length - 1]) : null,
+    next_cursor: !bySats && boosts.length === limit ? encodeCursor(results[results.length - 1]) : null,
     boosts,
-  });
+  }, bySats ? { cache: 120 } : {});
 }
 
 // The GET's status and headers, no body — see _shared/head.js.
