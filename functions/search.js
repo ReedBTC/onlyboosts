@@ -116,11 +116,11 @@ function wallRows(members) {
  */
 export function resultsHtml(q, { shows = [], albums = [], episodes = [], songs = [], artists = [], members = [] }) {
   const groups = [
-    showGroup("shows", "Shows", "/charts#shows", shows, SHOW_COPY.other),
-    showGroup("albums", "Albums", "/charts#albums", albums, SHOW_COPY.music),
-    episodeGroup("episodes", "Episodes", "/charts#episodes-global", episodes, EPISODE_COPY.other),
-    episodeGroup("songs", "Songs", "/charts#songs-global", songs, EPISODE_COPY.music),
-    group("artists", "Artists", "/charts#artists", artists.length,
+    showGroup("shows", "Shows", "/podcasts/shows", shows, SHOW_COPY.other),
+    showGroup("albums", "Albums", "/music/albums", albums, SHOW_COPY.music),
+    episodeGroup("episodes", "Episodes", "/podcasts/episodes", episodes, EPISODE_COPY.other),
+    episodeGroup("songs", "Songs", "/music/songs", songs, EPISODE_COPY.music),
+    group("artists", "Artists", "/music/artists", artists.length,
       artists.map(toPublisherCard).map((p) => publisherCardHtml(p, { rank: labelOf(p), copy: PUBLISHER_COPY })).join("")),
     members.length
       ? renderSupporters(wallRows(members), {

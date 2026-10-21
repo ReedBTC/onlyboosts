@@ -1,25 +1,29 @@
-/* Tests the inline feed-bar controller in index.html.
+/* Tests the inline controller in charts.html, the shell five pages share.
  *
  * ⚠️ IT RUNS THE REAL SOURCE. The controller is an inline <script> rather than a
- * module, so it cannot be imported; this extracts it from index.html and
+ * module, so it cannot be imported; this extracts it from charts.html and
  * evaluates it against a stub DOM. That is deliberate and is the whole value: a
  * copy of normLang() in here would pass forever while the shipped one rotted.
  *
- * WHY IT EXISTS. The hash gained a language (`#shows?lang=de`) so a filtered
- * view could be shared, and two bugs shipped that no unit test of the parsing
- * could see, because both live in the BOOT SEQUENCE:
+ * WHY IT EXISTS. The view in the address (`?lang=de` and later range, sort and
+ * scope) is how a filtered list is shared, and two bugs shipped that no unit
+ * test of the parsing could see, because both live in the BOOT SEQUENCE:
  *
  *   1. The language was put in the lb:feed-activate detail and nowhere else.
  *      That event fires from this inline script during parse; feeds.js is a
  *      module and therefore deferred, so on a cold load its listener does not
  *      exist yet, which is exactly why feeds.js re-reads body[data-active-feed]
  *      when it first runs. Every shared link opened UNFILTERED.
- *   2. The language was filed under the feed key the HASH named rather than the
- *      one setFeed RESOLVED to. A signed-out `#episodes-follows?lang=de` coerces
- *      to episodes-global, so the language was recorded against a feed that was
- *      not on screen while the one that was opened unfiltered.
+ *   2. The language was filed under the feed key the URL named rather than the
+ *      one setFeed RESOLVED to. A signed-out follows link coerces to the global
+ *      feed, so the language was recorded against a feed that was not on
+ *      screen while the one that was opened unfiltered.
  *
  * Both are invisible unless you drive the whole boot. Hence the stub.
+ *
+ * THE ADDRESS IS A PATH SINCE 2026-10-21 (`/podcasts/shows?scope=follows&
+ * range=1m`), where it was a hash (`#shows-follows?range=1m`) from 2026-08-17.
+ * The file keeps its name: the tests are the same tests over the new shape.
  *
  * Run: node scripts/test-feed-hash.mjs
  */
@@ -30,7 +34,7 @@ import { dirname, join } from 'node:path'
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const html = readFileSync(join(ROOT, 'charts.html'), 'utf8')
 
-// ── Pull the controller out of index.html ────────────────────────────
+// ── Pull the controller out of charts.html ───────────────────────────
 const marker = html.indexOf('FEED BAR CONTROLLER')
 if (marker < 0) throw new Error('charts.html no longer contains the FEED BAR CONTROLLER block')
 const open = html.indexOf('<script>', marker)
@@ -50,6 +54,16 @@ function grab(name) {
   }
   throw new Error(`unbalanced braces in ${name}()`)
 }
+const grabConst = (name) => {
+  const i = SRC.indexOf(`const ${name} = {`)
+  if (i < 0) throw new Error(`charts.html no longer declares ${name}`)
+  let depth = 0
+  for (let j = i; j < SRC.length; j++) {
+    if (SRC[j] === '{') depth++
+    else if (SRC[j] === '}') { depth--; if (depth === 0) return SRC.slice(i, j + 2) }
+  }
+  throw new Error(`unbalanced braces in ${name}`)
+}
 
 // ── The smallest DOM the controller touches ──────────────────────────
 class El {
@@ -62,6 +76,11 @@ class El {
     const m = /^data-(.+)$/.exec(k)
     if (m) this.dataset[m[1].replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = String(v)
   }
+  removeAttribute(k) {
+    delete this.attrs[k]
+    const m = /^data-(.+)$/.exec(k)
+    if (m) delete this.dataset[m[1].replace(/-([a-z])/g, (_, c) => c.toUpperCase())]
+  }
   getAttribute(k) { return this.attrs[k] ?? null }
   querySelector() { return null }
   querySelectorAll() { return [] }
@@ -72,19 +91,26 @@ class El {
   appendChild(child) { child.parentNode = this; return child }
 }
 
-/** Boot the real controller at `hash` and report what it did. */
-function boot(hash, { signedIn = false } = {}) {
+const FEED_KEYS = ['shows-global', 'shows-follows', 'episodes-global', 'episodes-follows',
+  'albums-global', 'albums-follows', 'songs-global', 'songs-follows',
+  'artists-global', 'artists-follows', 'members-global', 'members-follows']
+/* The five page heads as the shell ships them: which page, and which tab
+   links each carries. Read off charts.html so a head added or a tab renamed
+   there is a test failure here rather than a stub that still believes the
+   old shape. */
+const HEADS = [...html.matchAll(/<header class="page-head" data-page-head="([a-z]+)" hidden>([\s\S]*?)<\/header>/g)]
+  .map((m) => ({ page: m[1], views: [...m[2].matchAll(/data-view="([a-z]+)"/g)].map((x) => x[1]) }))
+
+/** Boot the real controller at `path` + `search` and report what it did. */
+function boot(url, { signedIn = false } = {}) {
+  const [path, search = ''] = url.split('?')
   const body = new El('body')
   const bar = new El('div')
   /* ⚠️ THE BAR STARTS IN THE SHOWS PANEL'S LID, as the markup ships it, and
-     every panel carries a lid of its own (`[data-feed-bar-slot]`) since
-     2026-09-03. `barHome` is captured from `bar.parentNode` at boot, so the
-     stub has to give it one — and giving it the Shows lid rather than a
-     stray wrapper is what makes "a #shows load leaves it put" a real
-     assertion about the shipped shape. */
-  const FEED_KEYS = ['shows-global', 'shows-follows', 'episodes-global', 'episodes-follows',
-    'albums-global', 'albums-follows', 'songs-global', 'songs-follows',
-    'artists-global', 'artists-follows', 'members-global', 'members-follows']
+     every panel carries a lid of its own (`[data-feed-bar-slot]`). `barHome`
+     is captured from `bar.parentNode` at boot, so the stub has to give it
+     one, and giving it the Shows lid rather than a stray wrapper is what
+     makes "a /podcasts/shows load leaves it put" a real assertion. */
   const panelEls = FEED_KEYS.map((key) => {
     const panel = new El('section'); panel.setAttribute('data-feed', key)
     const lid = new El('div'); lid.setAttribute('data-feed-bar-slot', '')
@@ -94,70 +120,54 @@ function boot(hash, { signedIn = false } = {}) {
   })
   const lidOf = (key) => panelEls.find((p) => p.dataset.feed === key).lid
   lidOf('shows-global').appendChild(bar)
-  const mk = (attrs) => { const e = new El('button'); Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, v)); return e }
-  const tabEls = ['podcasts', 'music', 'members'].map((t) => mk({ 'data-tab': t }))
-  /* `data-value` only: `data-tab` moved to the wrapping .feed-sub-group when
-     the sub-feeds became blocks aligned under their tab, and the controller has
-     never read it off a button. Mirroring the real shape here is what keeps
-     this a test of the shipped selector. */
-  const subEls = ['shows', 'episodes', 'albums', 'songs', 'artists', 'members'].map((v) => mk({ 'data-value': v }))
+  const headEls = HEADS.map((h) => {
+    const head = new El('header'); head.setAttribute('data-page-head', h.page); head.hidden = true
+    head.tabs = h.views.map((v) => { const a = new El('a'); a.setAttribute('data-view', v); a.setAttribute('href', `/${h.page}/${v}`); return a })
+    head.querySelectorAll = (s) => (s === '.page-tabs a[data-view]' ? head.tabs : [])
+    return head
+  })
   const listeners = {}
   const events = []
   const doc = {
     body,
-    querySelector: (s) => {
-      if (s === '.feed-bar') return bar
-      return null
-    },
-    /* The tabs and the sub-row live OUTSIDE .feed-bar, so the controller queries
-       them off the document. Returning real elements here is what makes the
-       aria-selected assertions below test the shipped syncTabs() rather than a
-       no-op over an empty list. */
+    querySelector: (s) => (s === '.feed-bar' ? bar : null),
     querySelectorAll: (sel) => {
-      if (sel === '.feed-tab[data-tab]') return tabEls
-      if (sel === '.feed-sub[data-value]') return subEls
       if (sel === '.feed-panel[data-feed]') return panelEls
+      if (sel === '.page-head[data-page-head]') return headEls
       return []
     },
     addEventListener: (t, fn) => { (listeners[t] ||= []).push(fn) },
     removeEventListener: () => {},
     dispatchEvent: (e) => { events.push(e); (listeners[e.type] || []).forEach((f) => f(e)) },
   }
-  const location = { hash }
+  const location = { pathname: path, search: search ? '?' + search : '', hash: '' }
   const history = {
-    replaceState: (a, b, h) => { location.hash = h },
+    replaceState: (a, b, u) => { const [p, q = ''] = u.split('?'); location.pathname = p; location.search = q ? '?' + q : '' },
     // Scrolling and filtering are not navigation. A history entry per control
     // press would bury the page the reader arrived from.
     pushState: () => { throw new Error('the controller must not pushState') },
   }
-  const storage = { getItem: () => (signedIn ? JSON.stringify({ pubkey: 'a'.repeat(64) }) : null) }
+  const isIn = typeof signedIn === 'function' ? signedIn : () => signedIn
+  const storage = { getItem: () => (isIn() ? JSON.stringify({ pubkey: 'a'.repeat(64) }) : null) }
   class CE { constructor(type, init) { this.type = type; this.detail = init && init.detail } }
-  /* ⚠️ THE WINDOW KEEPS ITS LISTENERS NOW. It was `{ addEventListener(){} }`,
-     which silently dropped the controller's `hashchange` handler — so every
-     test here could only ever exercise a COLD load, and anything that happens
-     when a reader moves between tabs was untestable. The feed bar moving back
-     out of the Members tab is exactly that kind of thing, and it is the half
-     that breaks: `.members-block` is display:none off the tab, so a bar left
-     behind would vanish from every other feed. */
   const winListeners = {}
   const win = { addEventListener: (t, fn) => { (winListeners[t] ||= []).push(fn) }, removeEventListener: () => {} }
   new Function('document', 'window', 'location', 'history', 'localStorage', 'CustomEvent', 'console', SRC)(
     doc, win, location, history, storage, CE, console)
-  const selected = (els) => els.filter((e) => e.getAttribute('aria-selected') === 'true')
   return {
     body,
     location,
     events,
-    tab: () => (selected(tabEls)[0] || {}).dataset?.tab ?? null,
-    sub: () => (selected(subEls)[0] || {}).dataset?.value ?? null,
+    url: () => location.pathname + location.search,
+    head: () => headEls.filter((h) => !h.hidden).map((h) => h.dataset.pageHead),
+    current: () => headEls.flatMap((h) => h.tabs).filter((a) => a.getAttribute('aria-current') === 'page').map((a) => a.dataset.view),
+    tabHref: (view) => headEls.flatMap((h) => h.tabs).find((a) => a.dataset.view === view)?.getAttribute('href'),
     /* Which panel's lid holds the bar, by feed key; 'nowhere' if none does. */
     barParent: () => (panelEls.find((p) => p.lid === bar.parentNode) || {}).dataset?.feed ?? 'nowhere',
     activePanels: () => panelEls.filter((p) => !p.hidden).map((p) => p.dataset.feed),
     fire: (type) => (winListeners[type] || []).forEach((f) => f({ type })),
     // A renderer's report, arriving as a document event the way the real ones do.
     dispatch: (type, detail) => doc.dispatchEvent(new CE(type, { detail })),
-    tabsSelected: () => selected(tabEls).length,
-    subsSelected: () => selected(subEls).length,
   }
 }
 
@@ -170,505 +180,254 @@ const eq = (name, got, want) => {
 }
 
 // ── 1. Parsing, against the real functions ───────────────────────────
-const loc = { hash: '' }
-const langByFeed = Object.create(null)
-const rangeByFeed = Object.create(null)
-const sortByFeed = Object.create(null)
-/* ⚠️ THE HASH↔KEY MAPS ARE EXTRACTED, NOT STUBBED. `hashFor` reads HASH_OF and
-   `fromHash` reads KEY_OF, so a copy here would let the shipped table say
-   `#members` while this file still believed `#members-global` and every
-   assertion below would pass. Grabbing the declarations is what makes the round
-   trip a test of the shipped mapping. */
-const grabConst = (name) => {
-  const m = new RegExp(`^\\s*const ${name} = [^;]+;`, 'm').exec(SRC)
-  if (!m) throw new Error(`charts.html no longer declares ${name}`)
-  return m[0]
-}
-const HASH_MAPS = [
-  grabConst('HASH_OF'),
-  grabConst('KEY_OF'),
-  /* KEY_OF is derived from HASH_OF by a loop rather than written out, so the
-     loop has to come across too or the inverse is empty. */
-  /* Matched to the end of its line, not to the first `;` — the callback body
-     contains one, so a `[^;]+` stops inside it and hands back half a call. */
-  /^\s*Object\.keys\(HASH_OF\)\.forEach\(.*$/m.exec(SRC)?.[0] || (() => {
-    throw new Error('the KEY_OF derivation is gone — is the inverse hand-written now?')
-  })(),
-].join('\n')
+/* ⚠️ PAGES IS EXTRACTED, NOT STUBBED: parsePath reads it, so a copy here would
+   let the shipped table open /music on Albums while this file still believed
+   Artists and every assertion below would pass. */
+const { normLang, parsePath, parseQuery, queryFor, PAGES, FEEDS, langByFeed, rangeByFeed, sortByFeed } = new Function(
+  `${grabConst('FEEDS')}
+   ${grabConst('PAGES')}
+   const DEFAULT_PAGE = 'podcasts';
+   const langByFeed = Object.create(null), rangeByFeed = Object.create(null), sortByFeed = Object.create(null);
+   ${[grab('normLang'), grab('normRange'), grab('normSort'), grab('normScope'), grab('parsePath'), grab('parseQuery'), grab('queryFor')].join('\n')}
+   return { normLang, parsePath, parseQuery, queryFor, PAGES, FEEDS, langByFeed, rangeByFeed, sortByFeed }`,
+)()
+const Q = (scope = 'global', lang = '', range = '', sort = '') => ({ scope, lang, range, sort })
 
-const { normLang, parseHash, hashFor, HASH_OF, KEY_OF } = new Function(
-  'location', 'langByFeed', 'rangeByFeed', 'sortByFeed',
-  `${HASH_MAPS}
-   ${[grab('normLang'), grab('normRange'), grab('normSort'), grab('parseHash'), grab('hashFor')].join('\n')}
-   return { normLang, parseHash, hashFor, HASH_OF, KEY_OF }`,
-)(loc, langByFeed, rangeByFeed, sortByFeed)
-const at = (h) => { loc.hash = h; return parseHash() }
-// The full parse shape, defaults empty — the deep-equals below stay legible.
-const P = (key, lang = '', range = '', sort = '') => ({ key, lang, range, sort })
+console.log('\nThe path names the page and the view:')
+eq('/podcasts/shows', parsePath('/podcasts/shows'), { page: 'podcasts', view: 'shows' })
+eq('/podcasts/episodes', parsePath('/podcasts/episodes'), { page: 'podcasts', view: 'episodes' })
+eq('the bare /podcasts opens on Shows (Reed, 2026-09-03)', parsePath('/podcasts'), { page: 'podcasts', view: 'shows' })
+eq('the bare /music opens on Artists (2026-08-31)', parsePath('/music'), { page: 'music', view: 'artists' })
+eq('/music/songs', parsePath('/music/songs'), { page: 'music', view: 'songs' })
+eq('/boosts is the members feed', parsePath('/boosts'), { page: 'boosts', view: 'members' })
+eq('/members has no view', parsePath('/members'), { page: 'members', view: '' })
+eq('the bare /charts opens on the Podcasts boards', parsePath('/charts'), { page: 'charts', view: 'podcasts' })
+eq('/charts/hpw', parsePath('/charts/hpw'), { page: 'charts', view: 'hpw' })
+eq('an unknown view is the page\'s first', parsePath('/music/videos'), { page: 'music', view: 'artists' })
+eq('a trailing slash is nothing', parsePath('/podcasts/episodes/'), { page: 'podcasts', view: 'episodes' })
+eq('an unknown page is the default page', parsePath('/elsewhere'), { page: 'podcasts', view: 'shows' })
+eq('every page\'s first view is what its nav href opens', Object.fromEntries(Object.entries(PAGES).map(([k, v]) => [k, v.views[0] || ''])),
+  { podcasts: 'shows', music: 'artists', boosts: 'members', members: '', charts: 'podcasts' })
+eq('every feed type is a view of exactly one page', Object.values(FEEDS).map((f) => f.type).filter((t, i, a) => a.indexOf(t) === i).sort(),
+  Object.values(PAGES).filter((p) => p.feed).flatMap((p) => p.views).sort())
 
-console.log('\nParsing the shared URL:')
-eq('#shows?lang=de', at('#shows?lang=de'), P('shows', 'de'))
-eq('a bare hash is unchanged', at('#shows'), P('shows'))
-eq('no hash at all', at(''), P(''))
-eq('a retired hash still yields its key', at('#podcasts-global?lang=de').key, 'podcasts-global')
-eq('an unknown param is ignored, not choked on', at('#shows?foo=bar'), P('shows'))
-eq('lang alongside one', at('#shows?foo=bar&lang=de').lang, 'de')
-eq('a bare ?', at('#shows?'), P('shows'))
-eq('the whole view', at('#shows?lang=de&range=1m&sort=sats'), P('shows', 'de', '1m', 'sats'))
-eq('range alone', at('#albums?range=1w'), P('albums', '', '1w'))
-eq('sort alone', at('#episodes-global?sort=count'), P('episodes-global', '', '', 'count'))
+console.log('\nParsing the view in the query:')
+eq('?lang=de', parseQuery('?lang=de'), Q('global', 'de'))
+eq('no query at all', parseQuery(''), Q())
+eq('an unknown param is ignored, not choked on', parseQuery('?foo=bar'), Q())
+eq('lang alongside one', parseQuery('?foo=bar&lang=de').lang, 'de')
+eq('a bare ?', parseQuery('?'), Q())
+eq('the whole view', parseQuery('?scope=follows&lang=de&range=1m&sort=sats'), Q('follows', 'de', '1m', 'sats'))
+eq('range alone', parseQuery('?range=1w'), Q('global', '', '1w'))
+eq('sort alone', parseQuery('?sort=count'), Q('global', '', '', 'count'))
+eq('scope=follows', parseQuery('?scope=follows').scope, 'follows')
+eq('scope=global is the default', parseQuery('?scope=global').scope, 'global')
+eq('an unknown scope is global', parseQuery('?scope=mine').scope, 'global')
+eq('uppercase', parseQuery('?lang=DE').lang, 'de')
+eq('regioned, as an RSS feed writes it', parseQuery('?lang=en-US').lang, 'en')
+eq('underscored', parseQuery('?lang=de_DE').lang, 'de')
+eq('the untagged bucket', parseQuery('?lang=unknown').lang, 'unknown')
+eq('lang=all is NO FILTER, not a 0-row query', parseQuery('?lang=all').lang, '')
+eq('a word is not a subtag', parseQuery('?lang=english').lang, '')
+eq('a digit is not a subtag', parseQuery('?lang=1').lang, '')
+eq('empty', parseQuery('?lang=').lang, '')
+eq('a subtag we hold nothing for still parses', parseQuery('?lang=ko').lang, 'ko')
+eq('range=all is the default, not a filter', parseQuery('?range=all').range, '')
+eq('range is case-folded', parseQuery('?range=1M').range, '1m')
+eq('an unknown range is dropped', parseQuery('?range=2y').range, '')
+eq('a garbage range is dropped', parseQuery('?range=7days').range, '')
+eq('a sort passes through by shape', parseQuery('?sort=boosters').sort, 'boosters')
+eq('and is case-folded', parseQuery('?sort=SATS').sort, 'sats')
+eq('a non-word sort is dropped', parseQuery('?sort=sats;drop').sort, '')
+eq('a one-letter sort is dropped', parseQuery('?sort=x').sort, '')
 
-console.log('\nNormalizing what a human might type or paste:')
-eq('uppercase', at('#shows?lang=DE').lang, 'de')
-eq('regioned, as an RSS feed writes it', at('#shows?lang=en-US').lang, 'en')
-eq('underscored', at('#shows?lang=de_DE').lang, 'de')
-eq('the untagged bucket', at('#shows?lang=unknown').lang, 'unknown')
-// ⚠️ The API validates `lang` by SHAPE, so 'all' is a well-formed three-letter
-// subtag that matches nothing and answers zero rows. Folding it to no filter
-// here is what stops a hand-written hash painting an empty feed.
-eq('lang=all is NO FILTER, not a 0-row query', at('#shows?lang=all').lang, '')
-eq('a word is not a subtag', at('#shows?lang=english').lang, '')
-eq('a digit is not a subtag', at('#shows?lang=1').lang, '')
-eq('empty', at('#shows?lang=').lang, '')
-eq('a subtag we hold nothing for still parses', at('#shows?lang=ko').lang, 'ko')
-
-console.log('\nNormalizing the range and the sort:')
-// ⚠️ 'all' is every ranked feed's default, so it folds to no parameter — the
-// same move lang=all makes: the bare hash IS the default view's address.
-eq('range=all is the default, not a filter', at('#shows?range=all').range, '')
-eq('range is case-folded', at('#shows?range=1M').range, '1m')
-eq('an unknown range is dropped', at('#shows?range=2y').range, '')
-eq('a garbage range is dropped', at('#shows?range=7days').range, '')
-// A sort is validated by SHAPE only: the keys are the renderers' own and
-// differ per feed, so the renderer coerces an unknown one and reports back.
-eq('a sort passes through by shape', at('#shows?sort=boosters').sort, 'boosters')
-eq('and is case-folded', at('#shows?sort=SATS').sort, 'sats')
-eq('a non-word sort is dropped', at('#shows?sort=sats;drop').sort, '')
-eq('a one-letter sort is dropped', at('#shows?sort=x').sort, '')
-
-console.log('\nWriting the hash back:')
-// ⚠️ The key is scoped since 2026-08-31 and the HASH is not: `shows-global`
-// still writes the `#shows` every link in the wild carries, through HASH_OF.
-eq('no filter writes the hash it always wrote', hashFor('shows-global'), '#shows')
+console.log('\nWriting the view back:')
+eq('no filter writes nothing: the bare path is the default view\'s address', queryFor('shows-global'), '')
 langByFeed['shows-global'] = 'de'
-eq('a filter appends it', hashFor('shows-global'), '#shows?lang=de')
-rangeByFeed['shows-global'] = '1m'
-sortByFeed['shows-global'] = 'sats'
-eq('the whole view rides together', hashFor('shows-global'), '#shows?lang=de&range=1m&sort=sats')
+eq('a filter appends it', queryFor('shows-global'), '?lang=de')
+rangeByFeed['shows-global'] = '1m'; sortByFeed['shows-global'] = 'sats'
+eq('the whole view rides together', queryFor('shows-global'), '?lang=de&range=1m&sort=sats')
 langByFeed['shows-global'] = ''
-eq('each param is independent', hashFor('shows-global'), '#shows?range=1m&sort=sats')
-rangeByFeed['shows-global'] = ''
-sortByFeed['shows-global'] = ''
-eq('another feed is unaffected', hashFor('albums-global'), '#albums')
-/* ⚠️ THE ROUND TRIP RESOLVES THROUGH KEY_OF, the way fromHash does. Comparing
-   `back.key` to the feed directly would fail for any feed whose hash is not its
-   key, and "fix" it by dropping that feed from the list — which is how a
-   mapping stops being tested. */
-const keyOf = (raw) => KEY_OF[raw] || raw
-for (const [feed, lang, range, sort] of [
-  ['shows-global', 'de', '1m', 'sats'], ['albums-global', 'en', '', ''], ['songs-follows', 'unknown', '1y', ''],
-  ['episodes-global', 'nb', '', 'count'], ['members-global', '', '', ''], ['members-follows', '', '', ''],
-  ['artists-global', '', '1w', 'sats'], ['shows-follows', '', '', 'chart'],
-]) {
-  langByFeed[feed] = lang
-  rangeByFeed[feed] = range
-  sortByFeed[feed] = sort
-  const h = hashFor(feed)
-  const back = at(h)
-  eq(`${h} survives a round trip`,
-    [keyOf(back.key), back.lang, back.range, back.sort], [feed, lang, range, sort])
-}
-
-console.log('\n⚠️ The Members feed is addressed as #members, not #members-global:')
-{
-  /* Reed's call, 2026-08-23: the tab is Members, the sections above the list
-     are about members, and `#boosts-global` named the smallest part of the
-     page. Only the GLOBAL scope elides — a bare `#members` meaning "whichever
-     scope you were last on" would be an address that does not name a view. */
-  eq('the global feed writes the bare hash', hashFor('members-global'), '#members')
-  eq('#members resolves back to it', keyOf(at('#members').key), 'members-global')
-  eq('⚠️ follows keeps its suffix', hashFor('members-follows'), '#members-follows')
-  eq('and resolves to itself', keyOf(at('#members-follows').key), 'members-follows')
-  /* Compared without the query string: the round-trip loop above leaves a
-     language on several feeds, and this is an assertion about the KEY half of
-     the hash, not about the language riding it. */
-  const bare = (feed) => hashFor(feed).split('?')[0]
-  /* ⚠️ Since 2026-08-31 the three ex-scopeless feeds elide the same way:
-     their bare hash is every link in the wild, so it stays the GLOBAL scope's
-     canonical address. Follows keeps its suffix everywhere, and the
-     episode-level feeds never elide. */
-  eq('⚠️ shows-global still writes #shows', bare('shows-global'), '#shows')
-  eq('  albums-global writes #albums', bare('albums-global'), '#albums')
-  eq('  artists-global writes #artists', bare('artists-global'), '#artists')
-  eq('⚠️ their follows keep the suffix', bare('shows-follows'), '#shows-follows')
-  eq('  episodes never elides', bare('episodes-global'), '#episodes-global')
-  eq('  nor songs', bare('songs-follows'), '#songs-follows')
-  eq('the map has exactly four entries', Object.keys(HASH_OF),
-     ['members-global', 'shows-global', 'albums-global', 'artists-global'])
-  eq('and the derived inverse matches', [KEY_OF.members, KEY_OF.shows, KEY_OF.albums, KEY_OF.artists],
-     ['members-global', 'shows-global', 'albums-global', 'artists-global'])
-
-  /* ⚠️ AND THE RETIRED HASHES STILL RESOLVE. `#boosts-global` and
-     `#boosts-follows` were the shipped addresses of this feed on production
-     until the rename, so they are in the wild and ALIASES may never lose them.
-     Without the entries they fall through to DEFAULT_TYPE — measured landing on
-     Shows, with the hash rewritten to `#shows`, which is a dead link reporting
-     itself as a working one. An aliased hash always forces the rewrite, so an
-     old link upgrades itself the way a 301 would; the global one upgrades twice
-     over, through the alias and then through HASH_OF's elision. */
-  let old = boot('#boosts-global', { signedIn: true })
-  eq('⚠️ #boosts-global still lands on the members feed', old.body.dataset.activeFeed, 'members-global')
-  eq('  and the hash upgrades to #members', old.location.hash, '#members')
-  old = boot('#boosts-follows', { signedIn: true })
-  eq('⚠️ #boosts-follows too', old.body.dataset.activeFeed, 'members-follows')
-  eq('  and upgrades to #members-follows', old.location.hash, '#members-follows')
-  /* `#boosts` is the boost feed's own address since 2026-10-20 (the nav's
-     Boosts link): the Members tab, rewritten to #members, plus a scroll to
-     the Boosts section that this harness has no DOM for. */
-  old = boot('#boosts')
-  eq('#boosts lands on the members feed', old.body.dataset.activeFeed, 'members-global')
-  eq('  and rewrites to #members', old.location.hash, '#members')
+eq('each param is independent', queryFor('shows-global'), '?range=1m&sort=sats')
+eq('another feed is unaffected', queryFor('albums-global'), '')
+eq('⚠️ a follows feed carries its scope first', queryFor('shows-follows'), '?scope=follows')
+rangeByFeed['shows-follows'] = '1y'
+eq('  and the view after it', queryFor('shows-follows'), '?scope=follows&range=1y')
+for (const [feed, q] of [['shows-global', '?range=1m&sort=sats'], ['shows-follows', '?scope=follows&range=1y']]) {
+  const back = parseQuery(q)
+  eq(`${q} survives a round trip`, [FEEDS[feed].scope, back.range, back.sort], [back.scope, rangeByFeed[feed] || '', sortByFeed[feed] || ''])
 }
 
 // ── 2. The boot sequence, which is where both bugs lived ─────────────
 console.log('\n⚠️ The cold load, which is what feeds.js reads when its listener attached too late:')
-let r = boot('#shows?lang=de')
+let r = boot('/podcasts/shows?lang=de')
+eq('body[data-page] and body[data-view]', [r.body.dataset.page, r.body.dataset.view], ['podcasts', 'shows'])
 eq('body[data-active-feed]', r.body.dataset.activeFeed, 'shows-global')
 eq('body[data-feed-lang] carries the language', r.body.dataset.feedLang, 'de')
-eq('the hash is left as it was shared', r.location.hash, '#shows?lang=de')
-r = boot('#episodes-global?lang=de')
-eq('episodes too', [r.body.dataset.activeFeed, r.body.dataset.feedLang], ['episodes-global', 'de'])
-r = boot('#shows')
+eq('the address is left as it was shared', r.url(), '/podcasts/shows?lang=de')
+eq('the Podcasts head is the one shown', r.head(), ['podcasts'])
+eq('and its Shows tab is current', r.current(), ['shows'])
+eq('⚠️ the sibling tab carries the view across', r.tabHref('episodes'), '/podcasts/episodes?lang=de')
+r = boot('/podcasts/episodes?lang=de')
+eq('episodes too', [r.body.dataset.activeFeed, r.body.dataset.feedLang, r.current()], ['episodes-global', 'de', ['episodes']])
+r = boot('/podcasts/shows')
 eq('no language means an empty attribute, not "all"', r.body.dataset.feedLang, '')
-r = boot('#shows?range=1m&sort=sats')
-eq('the range and sort ride the attributes too',
-  [r.body.dataset.feedRange, r.body.dataset.feedSort], ['1m', 'sats'])
-eq('and the hash is left as shared', r.location.hash, '#shows?range=1m&sort=sats')
-r = boot('#shows')
-eq('a bare hash means empty view attributes',
-  [r.body.dataset.feedRange, r.body.dataset.feedSort], ['', ''])
-
-console.log('\nThe event detail agrees with the attribute:')
-r = boot('#albums?lang=en')
-const act = r.events.filter((e) => e.type === 'lb:feed-activate').pop()
-eq('lb:feed-activate fires', !!act, true)
-eq('and carries the same language', act.detail, { feed: 'albums-global', lang: 'en', range: '', sort: '' })
-eq('the attribute matches it', r.body.dataset.feedLang, 'en')
-r = boot('#albums?range=1w&sort=boosts')
-const act2 = r.events.filter((e) => e.type === 'lb:feed-activate').pop()
-eq('and carries the view', act2.detail, { feed: 'albums-global', lang: 'all', range: '1w', sort: 'boosts' })
-
-console.log('\nCoercion, with the hash rewritten to match what is on screen:')
-r = boot('#members?lang=de')
+r = boot('/podcasts/shows?range=1m&sort=sats')
+eq('the range and sort ride the attributes too', [r.body.dataset.feedRange, r.body.dataset.feedSort], ['1m', 'sats'])
+eq('and the address is left as shared', r.url(), '/podcasts/shows?range=1m&sort=sats')
+r = boot('/music/albums')
+eq('a bare path means empty view attributes', [r.body.dataset.feedLang, r.body.dataset.feedRange, r.body.dataset.feedSort], ['', '', ''])
+eq('the bare /podcasts is Shows, the bare /music is Artists, the bare /charts is the Podcasts boards',
+  [boot('/podcasts').body.dataset.activeFeed, boot('/music').body.dataset.activeFeed, boot('/charts').body.dataset.view],
+  ['shows-global', 'artists-global', 'podcasts'])
+{
+  const b = boot('/music/albums?lang=en')
+  const act = b.events.find((e) => e.type === 'lb:feed-activate')
+  eq('lb:feed-activate fires', !!act, true)
+  eq('and carries the same language', act.detail, { feed: 'albums-global', lang: 'en', range: '', sort: '' })
+  const b2 = boot('/music/albums?range=1w&sort=boosts')
+  const act2 = b2.events.find((e) => e.type === 'lb:feed-activate')
+  eq('and carries the view', act2.detail, { feed: 'albums-global', lang: 'all', range: '1w', sort: 'boosts' })
+}
+r = boot('/boosts?lang=de')
 eq('a feed with no language axis drops it', r.body.dataset.feedLang, '')
-eq('and the URL stops claiming it', r.location.hash, '#members')
-// ⚠️ The Members feeds have range and sort CONTROLS but their view is
-// deliberately not shareable (Reed scoped this to the four ranked feeds), so
-// the parameters are stripped the way an inapplicable language is.
-r = boot('#members?range=1w&sort=largest')
-eq('a members view drops its range and sort',
-  [r.body.dataset.feedRange, r.body.dataset.feedSort], ['', ''])
-eq('and the URL stops claiming them', r.location.hash, '#members')
-r = boot('#shows?lang=all')
+eq('and the URL stops claiming it', r.url(), '/boosts')
+r = boot('/boosts?range=1w&sort=sats')
+eq('a members view drops its range and sort', [r.body.dataset.feedRange, r.body.dataset.feedSort], ['', ''])
+eq('and the URL stops claiming them', r.url(), '/boosts')
+eq('/boosts shows the Boosts head and activates the members feed', [r.head(), r.body.dataset.activeFeed], [['boosts'], 'members-global'])
+r = boot('/podcasts/shows?lang=all')
 eq('?lang=all is no filter', r.body.dataset.feedLang, '')
-// Like ?lang=all above, the URL itself is left alone: it resolves to the same
-// view either way, and the rewrite machinery only fires when a feed had to
-// DROP something it was asked for.
-r = boot('#shows?range=all')
+eq('  and comes off the address', r.url(), '/podcasts/shows')
+r = boot('/podcasts/shows?range=all')
 eq('?range=all opens the default view', r.body.dataset.feedRange, '')
-r = boot('#podcasts-global?lang=de')
-eq('a retired hash upgrades AND keeps the language', r.location.hash, '#episodes-global?lang=de')
-eq('and hydrates filtered', [r.body.dataset.activeFeed, r.body.dataset.feedLang], ['episodes-global', 'de'])
-r = boot('#podcasts-global?range=1y&sort=count')
-eq('a retired hash keeps the view too', r.location.hash, '#episodes-global?range=1y&sort=count')
-// ⚠️ Bug 2: setFeed coerces the scope here, so the language must be filed under
-// the key it RESOLVED to, not the one the hash named.
-r = boot('#episodes-follows?lang=de', { signedIn: false })
+
+console.log('\n⚠️ The scope: a follows link signed out, and signed in:')
+r = boot('/podcasts/episodes?scope=follows&lang=de')
 eq('signed out, follows coerces to global and KEEPS the language',
-  [r.body.dataset.activeFeed, r.body.dataset.feedLang], ['episodes-global', 'de'])
-r = boot('#episodes-follows?range=1m', { signedIn: false })
+  [r.body.dataset.activeFeed, r.body.dataset.feedLang, r.url()], ['episodes-global', 'de', '/podcasts/episodes?lang=de'])
+r = boot('/podcasts/episodes?scope=follows&range=1y&sort=count')
 eq('and keeps the view, filed under the resolved key',
-  [r.body.dataset.activeFeed, r.body.dataset.feedRange], ['episodes-global', '1m'])
-r = boot('#episodes-follows?lang=de', { signedIn: true })
+  [r.body.dataset.feedRange, r.body.dataset.feedSort, r.url()], ['1y', 'count', '/podcasts/episodes?range=1y&sort=count'])
+r = boot('/podcasts/episodes?scope=follows&lang=de', { signedIn: true })
 eq('signed in, follows survives with its language',
-  [r.body.dataset.activeFeed, r.body.dataset.feedLang], ['episodes-follows', 'de'])
-/* ⚠️ The show-level feeds joined the axis on 2026-08-31, so the coercions
-   above apply to them now too — and the rewritten hash is the CANONICAL bare
-   one, so a signed-out deep link lands on the address every link already has. */
-r = boot('#shows-follows?lang=de', { signedIn: false })
-eq('signed out, shows-follows coerces to global, hash and language kept',
-  [r.body.dataset.activeFeed, r.location.hash], ['shows-global', '#shows?lang=de'])
-r = boot('#shows-follows', { signedIn: true })
-eq('signed in, Shows · Follows is a real feed now', r.body.dataset.activeFeed, 'shows-follows')
-r = boot('#albums-follows', { signedIn: true })
-eq('Albums · Follows too', r.body.dataset.activeFeed, 'albums-follows')
-r = boot('#artists-follows', { signedIn: true })
-eq('Artists · Follows too', r.body.dataset.activeFeed, 'artists-follows')
-// ⚠️ THE FALLBACK IS DEFAULT_TYPE, WHICH IS SHOWS SINCE PHASE D. The bare
-// `#shows` is the global scope's canonical hash (HASH_OF), so the rewrite is
-// still `#shows` — and the language is dropped because the hash was never
-// understood, not because the feed refused it.
-r = boot('#nonsense?lang=de')
-eq('an unknown hash falls back and drops the language', r.location.hash, '#shows')
-r = boot('#nonsense?range=1m&sort=sats')
-eq('and drops the view with it', r.location.hash, '#shows')
+  [r.body.dataset.activeFeed, r.body.dataset.feedLang, r.url()], ['episodes-follows', 'de', '/podcasts/episodes?scope=follows&lang=de'])
+eq('  and the sibling tab keeps the scope', r.tabHref('shows'), '/podcasts/shows?scope=follows&lang=de')
+for (const [path, feed] of [['/podcasts/shows', 'shows-follows'], ['/music/albums', 'albums-follows'], ['/music/artists', 'artists-follows'], ['/boosts', 'members-follows']]) {
+  r = boot(path + '?scope=follows', { signedIn: true })
+  eq(`signed in, ${path}?scope=follows is ${feed}`, r.body.dataset.activeFeed, feed)
+}
+r = boot('/boosts?scope=follows')
+eq('signed out, /boosts?scope=follows is the global feed and says so', [r.body.dataset.activeFeed, r.url()], ['members-global', '/boosts'])
 
-/* ── The live tab, both directions ─────────────────────────────────────
- * The renderers report control presses through lb:feed-view and the controller
- * writes the hash; a URL pasted into an open tab travels the other way, as one
- * lb:set-feed-view event so the pair costs one requery. Both are boot-sequence
- * behaviour, so they are driven here rather than unit-tested in a copy. */
-console.log('\nA control press writes the hash, and a pasted URL commands the feed:')
+console.log('\nThe pages with no feed:')
+r = boot('/members')
+eq('/members shows its head, activates no feed and takes data-active-feed OFF the body',
+  [r.head(), 'activeFeed' in r.body.dataset, r.body.dataset.page], [['members'], false, 'members'])
+eq('  and dispatches no activation', r.events.filter((e) => e.type === 'lb:feed-activate').length, 0)
+eq('  and hides every panel', r.activePanels(), [])
+r = boot('/charts/music')
+eq('/charts/music shows the Charts head with Music current', [r.head(), r.current(), r.body.dataset.view], [['charts'], ['music'], 'music'])
+eq('  and no feed', 'activeFeed' in r.body.dataset, false)
+r = boot('/charts/hpw?range=1y')
+eq('a query on a board page is left alone', r.url(), '/charts/hpw?range=1y')
+
+console.log('\nA control press writes the query:')
 {
-  const b = boot('#shows')
+  const b = boot('/podcasts/shows')
   b.dispatch('lb:feed-view', { feed: 'shows-global', range: '1m', sort: 'sats' })
-  eq('a reported view lands in the hash', b.location.hash, '#shows?range=1m&sort=sats')
+  eq('a reported view lands in the address', b.url(), '/podcasts/shows?range=1m&sort=sats')
+  eq('  and the sibling tab follows it', b.tabHref('episodes'), '/podcasts/episodes?range=1m&sort=sats')
   b.dispatch('lb:feed-view', { feed: 'shows-global', range: '', sort: '' })
-  eq('reporting the default strips it back out', b.location.hash, '#shows')
+  eq('reporting the default strips it back out', b.url(), '/podcasts/shows')
   // A report from a feed that is not on screen is remembered, not written.
-  b.dispatch('lb:feed-view', { feed: 'albums-global', range: '1w', sort: '' })
-  eq('an inactive feed\'s report leaves the hash alone', b.location.hash, '#shows')
+  b.dispatch('lb:feed-view', { feed: 'albums-global', range: '1w', sort: 'sats' })
+  eq('an inactive feed\'s report leaves the address alone', b.url(), '/podcasts/shows')
   // The members feeds have the controls but not the shareable view.
-  b.dispatch('lb:feed-view', { feed: 'members-global', range: '1w', sort: 'largest' })
-  eq('a members report is refused outright', b.location.hash, '#shows')
+  b.dispatch('lb:feed-view', { feed: 'members-global', range: '1w', sort: 'sats' })
+  eq('a members report is refused outright', b.url(), '/podcasts/shows')
+  b.dispatch('lb:feed-lang', { feed: 'shows-global', lang: 'de' })
+  eq('a language report lands too', b.url(), '/podcasts/shows?lang=de')
+  b.dispatch('lb:feed-lang', { feed: 'shows-global', lang: 'all' })
+  eq('and "all" strips it', b.url(), '/podcasts/shows')
 }
+
+console.log('\nThe session: signing out while on Follows drops to Global:')
 {
-  const b = boot('#shows')
-  b.location.hash = '#shows?range=1m&sort=sats'
-  b.fire('hashchange')
-  const set = b.events.filter((e) => e.type === 'lb:set-feed-view').pop()
-  eq('a pasted URL dispatches lb:set-feed-view', !!set, true)
-  eq('with the whole view', set.detail, { feed: 'shows-global', range: '1m', sort: 'sats' })
-  eq('and the attributes move with it',
-    [b.body.dataset.feedRange, b.body.dataset.feedSort], ['1m', 'sats'])
-  // Pasting the bare hash asks for the default view, not "leave it alone".
-  b.location.hash = '#shows'
-  b.fire('hashchange')
-  const back = b.events.filter((e) => e.type === 'lb:set-feed-view').pop()
-  eq('a bare hash commands the default view', back.detail, { feed: 'shows-global', range: '', sort: '' })
+  let signed = true
+  const b = boot('/podcasts/shows?scope=follows&range=1y', { signedIn: () => signed })
+  eq('on Follows, the bar in its lid', [b.body.dataset.activeFeed, b.barParent()], ['shows-follows', 'shows-follows'])
+  b.fire('lb:session-change')
+  eq('still on Follows while the session stands', b.body.dataset.activeFeed, 'shows-follows')
+  signed = false
+  b.fire('lb:session-change')
+  eq('signed out: the global feed, and the address stops claiming the scope', [b.body.dataset.activeFeed, b.url()], ['shows-global', '/podcasts/shows'])
+  eq('  and the bar moved with it', b.barParent(), 'shows-global')
+  const m = boot('/members', { signedIn: () => signed })
+  m.fire('lb:session-change')
+  eq('a page with no feed takes a session change without activating one', m.events.filter((e) => e.type === 'lb:feed-activate').length, 0)
 }
 
-/* ── Tabs ──────────────────────────────────────────────────────────────
- * ⚠️ THE TAB IS DERIVED FROM THE FEED KEY AND IS NOT IN THE HASH. Every URL in
- * the wild names a feed; which tab is on screen is computed from it. These
- * assertions are what stop somebody "simplifying" that into a tab stored in the
- * hash, which would quietly need an alias for all eight keys and the two
- * retired ones. */
-console.log('\nThe tab a hash lands on:')
-for (const [hash, tab, sub] of [
-  ['#shows', 'podcasts', 'shows'],
-  ['#episodes-global', 'podcasts', 'episodes'],
-  ['#albums', 'music', 'albums'],
-  ['#songs-global', 'music', 'songs'],
-  ['#artists', 'music', 'artists'],
-  ['#members', 'members', 'members'],
-  ['#podcasts-global', 'podcasts', 'episodes'],   // retired hash, still resolves
-  // ⚠️ THE FRONT DOOR LANDS ON SHOWS (Phase D). Both of these read DEFAULT_TYPE,
-  // which is the landing feed — NOT TAB_DEFAULT.podcasts, which is still
-  // 'episodes' and is what pressing the Podcasts tab opens. Two questions, two
-  // constants; a change that makes these two rows agree with the row above has
-  // almost certainly merged them.
-  ['', 'podcasts', 'shows'],                      // no hash at all
-  ['#nonsense', 'podcasts', 'shows'],             // unknown falls back
-]) {
-  const b = boot(hash)
-  eq(`${hash || '(no hash)'} → ${tab} / ${sub}`,
-    [b.body.getAttribute('data-active-tab'), b.tab(), b.sub()], [tab, tab, sub])
-}
-
-console.log('\nExactly one tab and one sub-feed are ever marked selected:')
-{
-  const b = boot('#albums')
-  eq('one tab, one sub', [b.tabsSelected(), b.subsSelected()], [1, 1])
-}
-
-console.log('\nThe tab attribute can never disagree with the feed:')
-for (const hash of ['#shows', '#episodes-follows', '#songs-follows', '#members-follows', '#albums', '#artists']) {
-  const b = boot(hash, { signedIn: true })
-  const feed = b.body.getAttribute('data-active-feed')
-  const type = feed.replace(/-(global|follows)$/, '')
-  const want = { shows: 'podcasts', episodes: 'podcasts', albums: 'music', songs: 'music', artists: 'music', members: 'members' }[type]
-  eq(`${hash} → feed ${feed}, tab ${want}`, b.body.getAttribute('data-active-tab'), want)
-}
-
-/* ── The two grids' boxes ──────────────────────────────────────────────
- * ⚠️ `.feed-subs` PUTS ITS BLOCKS UNDER THE TAB THEY BELONG TO ONLY WHILE IT
- * SHARES `.feed-tabs`' CONTENT BOX. Both are three-column grids; if one takes a
- * horizontal padding or a gap the other does not, every sub-block narrows and
- * the pair slides out from under its tab. It is a few pixels at a time and it
- * looks like nothing, which is why it is asserted rather than eyeballed.
- *
- * A declaration scan, not a render: the rule bodies are read out of index.html
- * and the properties that decide column geometry are compared per scope. */
-console.log('\nThe tab grid and the sub grid line up:')
-{
-  /* All declarations for `sel` in `scope`, later ones winning — an indexOf
-     walk rather than a regex, because a selector is a literal string here and
-     an escaped-dot pattern is one backslash away from silently matching
-     nothing, which is a check that passes by asserting zero times. */
-  const decls = (sel, scope) => {
-    const out = {}
-    let found = false
-    let i = 0
-    for (;;) {
-      i = scope.indexOf(sel + ' {', i)
-      if (i < 0) break
-      // Only a rule that STARTS with this selector; skip `.x .feed-tabs {`.
-      const before = scope[i - 1]
-      if (before !== '\n' && before !== ' ') { i += sel.length; continue }
-      const open = i + sel.length + 2
-      const close = scope.indexOf('}', open)
-      if (close < 0) break
-      found = true
-      /* ⚠️ STRIP COMMENTS FIRST. A `/* … *\/` inside the rule body otherwise
-         becomes part of the next property's NAME, so `padding` reads as
-         undefined — and since the other selector may not declare padding
-         either, the comparison then matches two undefineds and passes while
-         the rule it is guarding is broken. Found by mutation: inserting a
-         1.25rem inset on one grid did not fail this test until this line
-         existed. */
-      const body = scope.slice(open, close).replace(/\/\*[\s\S]*?\*\//g, '')
-      for (const d of body.split(';')) {
-        const c = d.indexOf(':')
-        if (c < 0) continue
-        out[d.slice(0, c).trim()] = d.slice(c + 1).trim()
-      }
-      i = close
-    }
-    return found ? out : null
-  }
-  // Everything before the 640px block is the base scope; inside it is the phone.
-  const cut = html.indexOf('@media (max-width: 640px) {', html.indexOf('.feed-bar-wrap'))
-  const scopes = { desktop: html.slice(0, cut), phone: html.slice(cut) }
-  const xpad = (v) => {
-    if (!v) return '0'
-    const parts = v.split(/\s+/)
-    return parts.length === 1 ? parts[0] : parts[1]   // shorthand: y x [y x]
-  }
-  for (const [name, scope] of Object.entries(scopes)) {
-    const t = decls('.feed-tabs', scope)
-    const u = decls('.feed-subs', scope)
-    if (!t || !u) continue
-    eq(`${name}: same horizontal padding`, xpad(u.padding), xpad(t.padding))
-    eq(`${name}: same column gap`, u.gap ?? '0', t.gap ?? '0')
-    if (name === 'desktop') {
-      eq('desktop: same track width', u['max-width'], t['max-width'])
-      eq('desktop: both are 3 columns', u['grid-template-columns'], t['grid-template-columns'])
-    }
-  }
-
-  /* ⚠️ THE FOUR ELEMENTS OF THE PAGE TRACK MOVE TOGETHER. The tabs, the
-   * sub-row, the control bar and the panels are one column; widening three of
-   * them leaves the fourth as a visible step down the page. They read a single
-   * custom property so this cannot drift, and this asserts the property is what
-   * they read rather than a number that happens to match today.
-   *
-   * The track is 60rem because `.show-main` is — the homepage was 240px
-   * narrower than /show, /episode and /booster, so the column changed width
-   * when a reader clicked through. That is a decision, not an accident, which
-   * is why the value is checked and not just the agreement. */
-  {
-    const base = html.slice(0, cut)
-    /* `.feed-bar` was the fourth until 2026-09-03; it lives inside the panel
-       now, which is inside `.feed-panels-inner`, so it reads no track. */
-    for (const sel of ['.feed-tabs', '.feed-subs', '.feed-panels-inner']) {
-      eq(`${sel} reads the shared track`, decls(sel, base)?.['max-width'], 'var(--feed-track)')
-    }
-    const root = /--feed-track:\s*([^;]+);/.exec(html)
-    eq('the track is the detail pages\' own width', root && root[1].trim(), '60rem')
-    const showMain = readFileSync(join(ROOT, 'assets/css/show-page.css'), 'utf8')
-    const sm = /\.show-main\s*\{[^}]*max-width:\s*([^;]+);/.exec(showMain)
-    eq('and .show-main still is too', sm && sm[1].trim(), '60rem')
-  }
-}
-
-/* ── The two ways a feed gets hydrated ─────────────────────────────────
- * ⚠️ THE COLD LOAD DOES NOT GO THROUGH lb:feed-activate. The inline controller
- * dispatches that during parse, before feeds.js — a deferred module — exists,
- * which is why feeds.js re-reads body[data-active-feed] at the end and calls
- * loadFeed itself. Anything hooked to the event ALONE therefore runs when a
- * reader clicks to a feed and never on a reload, a shared link, or a back
- * navigation onto it.
- *
- * That shipped once: the 40 HPW boards were wired to the listener only, so the
- * Members tab rendered its heading and its caveat with an empty gap between
- * them on every cold load. A source scan rather than a render, because the bug
- * is which call sites exist, not what any of them does. */
-console.log('\nBoth hydration entry points are wired:')
-{
-  const feeds = readFileSync(join(ROOT, 'assets/js/feeds.js'), 'utf8')
-  const listenerAt = feeds.indexOf("document.addEventListener('lb:feed-activate'")
-  eq('feeds.js still has the activate listener', listenerAt > -1, true)
-  // The listener block ends at the first `})` at the start of a line after it.
-  const listenerEnd = feeds.indexOf('\n})', listenerAt)
-  const inListener = feeds.slice(listenerAt, listenerEnd)
-  const afterListener = feeds.slice(listenerEnd)
-  for (const [what, call] of [['the feed itself', 'loadFeed('], ['the members boards', 'loadMemberBoards()'], ['the chart block', 'loadChartsBlock(']]) {
-    eq(`${what}: hydrated from the event`, inListener.includes(call), true)
-    eq(`${what}: AND on the cold load`, afterListener.includes(call), true)
-  }
-}
-
-/* ── Every feed key reaches the CSS that dresses and reveals it ────────
- * ⚠️ TWO INLINE CSS BLOCKS ENUMERATE FEED KEYS BY HAND, and the controller
- * cannot see either: the accent mapping (body[data-active-feed="…"] supplies
- * --accent/--tint, and an unmatched key leaves them UNDEFINED, invalidating
- * every declaration that reads them) and the controls-visibility rule (the
- * matching [data-controls-for] group is the only one displayed, so an
- * unmatched key is a feed with no range, no sort and no language control —
- * they mount and are never shown). The 2026-08-31 key rename shipped exactly
- * that: shows/albums/artists became shows-global etc. in FEEDS and in the
- * panels while both CSS blocks kept the bare names, and every test here
- * stayed green because none of them read the CSS. Reed found it in the
- * browser. This closes the class: every key the controller declares must
- * appear in BOTH blocks. */
+/* ── Every feed key reaches the CSS that dresses and reveals it ──────── */
 console.log('\nEvery FEEDS key has its accent row and its controls rule:')
 {
   const keys = [...SRC.matchAll(/'([a-z]+-[a-z]+)':\s*\{ type:/g)].map((m) => m[1])
   eq('the FEEDS keys were extracted at all', keys.length >= 12, true)
   const escRe = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, (c) => '\\' + c)
   for (const key of keys) {
-    const sel = escRe(`body[data-active-feed="${key}"]`)
-    eq(`${key}: accent row`, new RegExp(`${sel}\\s*\\{ --accent:`).test(html), true)
-    eq(`${key}: controls rule`,
-       new RegExp(`${sel}\\s+\\.feed-bar-controls > \\[data-controls-for="${key}"\\]`).test(html), true)
+    eq(`${key} has an accent row`, new RegExp(`body\\[data-active-feed="${escRe(key)}"\\]\\s*\\{ --accent:`).test(html), true)
+    eq(`${key} has a controls rule`, html.includes(`body[data-active-feed="${key}"]`) && html.includes(`[data-controls-for="${key}"]`), true)
+    eq(`${key} has a panel`, html.includes(`data-feed="${key}"`), true)
   }
+}
+
+/* ── The page heads and the panels the shell ships ──────────────────── */
+console.log('\nThe shell ships one head per page and the Shows panel active:')
+{
+  eq('five heads, one per page, every one hidden until routed', HEADS.map((h) => h.page), ['podcasts', 'music', 'boosts', 'members', 'charts'])
+  eq('each head\'s tabs are its page\'s views, in order', Object.fromEntries(HEADS.map((h) => [h.page, h.views])),
+    Object.fromEntries(Object.entries(PAGES).map(([k, v]) => [k, v.views.length > 1 ? v.views : []])))
+  eq('the body ships routed to /podcasts/shows', /<body data-page="podcasts" data-view="shows" data-active-feed="shows-global">/.test(html), true)
+  eq('the Shows panel ships active and the others hidden',
+    [...html.matchAll(/<section class="feed-panel( is-active)?" id="(panel-[^"]+)"[^>]*?( hidden)?>/g)].map((m) => [m[2], !!m[1], !!m[3]]).filter(([, a, h]) => a || !h),
+    [['panel-shows', true, false]])
+  eq('no tab banner and no sub-row survive in the shell', /feed-tabs|feed-subs|feed-chrome|feed-bar-wrap/.test(html), false)
+  eq('the hash router is gone: no hashchange listener, no ALIASES table', /hashchange|ALIASES|HASH_OF|parseHash/.test(SRC), false)
+}
+
+/* ── The two ways a feed gets hydrated ─────────────────────────────── */
+console.log('\nBoth hydration entry points are wired:')
+{
+  const feeds = readFileSync(join(ROOT, 'assets/js/feeds.js'), 'utf8')
+  const listenerAt = feeds.indexOf("document.addEventListener('lb:feed-activate'")
+  eq('feeds.js still has the activate listener', listenerAt > -1, true)
+  const listenerEnd = feeds.indexOf('\n})', listenerAt)
+  const inListener = feeds.slice(listenerAt, listenerEnd)
+  const afterListener = feeds.slice(listenerEnd)
+  eq('the listener loads the feed', inListener.includes('loadFeed('), true)
+  eq('the cold load reads the feed off the body', afterListener.includes("document.body.dataset.activeFeed || ''"), true)
+  eq('⚠️ and no longer falls back to episodes: a page with no feed must hydrate nothing', afterListener.includes("|| 'episodes-global'"), false)
+  eq('the cold load paints the Charts and Members pages off the body', afterListener.includes('loadPageSections(document.body.dataset.page, document.body.dataset.view)'), true)
+  for (const [what, call] of [['the Podcasts boards', "loadChartsBlock(CHART_VIEWS[view])"], ['the #40HPW boards', 'loadMemberBoards()'], ['the wall', 'loadMembersWall()']]) {
+    eq(`loadPageSections reaches ${what}`, feeds.slice(feeds.indexOf('function loadPageSections')).includes(call), true)
+  }
+  const board = readFileSync(join(ROOT, 'assets/js/members-board.js'), 'utf8')
+  eq('members-board.js exports the wall on its own', board.includes('export async function renderMembersWall()'), true)
+  eq('and the boards no longer paint the wall on their way out', board.slice(board.indexOf('export async function renderMembersBoards'), board.indexOf('export async function renderMembersWall')).includes('paintWall('), false)
 }
 
 console.log('\n⚠️ The feed bar is MOVED into the ACTIVE panel\'s lid, every feed:')
 {
-  /* Every feed is a shell with its controls on the lid since 2026-09-03
-     (Reed's ask, generalizing the Members-tab move of 2026-08-23). Moving one
-     live element is what keeps the twelve mounted [data-controls-for] groups
-     and their listeners intact; a second bar rendered into a panel would be two
-     sets of controls over one feed, which is the failure the declarative
-     body[data-active-feed] rule exists to prevent. */
-  eq('a cold load on #shows leaves the bar where the markup ships it', boot('#shows').barParent(), 'shows-global')
-  eq('#members puts it in the members panel\'s lid', boot('#members').barParent(), 'members-global')
-  eq('#episodes-global', boot('#episodes-global').barParent(), 'episodes-global')
-  eq('#albums', boot('#albums').barParent(), 'albums-global')
-  eq('#artists', boot('#artists').barParent(), 'artists-global')
-  eq('a signed-in #members-follows lands in that panel\'s lid',
-     boot('#members-follows', { signedIn: true }).barParent(), 'members-follows')
-  eq('⚠️ a signed-out #episodes-follows follows the COERCED feed, not the hash',
-     boot('#episodes-follows').barParent(), 'episodes-global')
-  {
-    /* ⚠️ THE BAR IS IN THE PANEL ON SCREEN, EVERY TIME. A panel off screen is
-       `hidden`, so a bar left behind in one takes the scope menu and every
-       feed's range and sort with it, and nothing on screen says why. */
-    const b = boot('#members')
-    eq('  (starts in the members lid)', b.barParent(), 'members-global')
-    b.location.hash = '#shows'
-    b.fire('hashchange')
-    eq('⚠️ switching to Shows moves it into the Shows lid', b.barParent(), 'shows-global')
-    eq('  and that is the one panel on screen', b.activePanels(), ['shows-global'])
-    b.location.hash = '#songs-global'
-    b.fire('hashchange')
-    eq('and on to Songs', b.barParent(), 'songs-global')
-    eq('  the bar\'s panel is the active one', b.activePanels(), [b.barParent()])
-  }
-  eq('the bar is never left parentless', boot('#episodes-global').barParent() !== 'nowhere', true)
+  eq('a cold load on /podcasts/shows leaves the bar where the markup ships it', boot('/podcasts/shows').barParent(), 'shows-global')
+  eq('/boosts puts it in the members panel\'s lid', boot('/boosts').barParent(), 'members-global')
+  eq('/podcasts/episodes', boot('/podcasts/episodes').barParent(), 'episodes-global')
+  eq('/music/albums', boot('/music/albums').barParent(), 'albums-global')
+  eq('/music/artists', boot('/music/artists').barParent(), 'artists-global')
+  eq('a signed-in /boosts?scope=follows lands in that panel\'s lid', boot('/boosts?scope=follows', { signedIn: true }).barParent(), 'members-follows')
+  eq('⚠️ a signed-out follows link follows the COERCED feed, not the URL', boot('/podcasts/episodes?scope=follows').barParent(), 'episodes-global')
+  eq('a page with no feed leaves the bar where it was', boot('/members').barParent(), 'shows-global')
+  eq('the bar is never left parentless', boot('/podcasts/episodes').barParent() !== 'nowhere', true)
 }
 
 console.log(`\n${pass} assertions passed${fail ? `, ${fail} FAILED` : ''}.`)
-process.exit(fail ? 1 : 0)
+if (fail) process.exit(1)

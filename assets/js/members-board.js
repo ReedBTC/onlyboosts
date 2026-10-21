@@ -28,39 +28,39 @@
  * to be authentic to a high-score table; collapsing the repeats is exactly what
  * the rename did, once the repeats stopped being a story and became a backfill.
  */
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v227'
-import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v227'
-import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v227'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v228'
+import { httpsUrl } from '/assets/js/cover-art.js?v=ob-v228'
+import { htmlEscape } from '/assets/js/nostr-text.js?v=ob-v228'
 /* ⚠️ THE SAME WALL /show AND /episode RENDER, not a copy of it. It moved out of
  * functions/_shared/detail-page.js into a two-sided module for exactly this;
  * that file re-exports every name, so both Functions were untouched. A reader
  * who screenshots the wall here and on a show page must not be able to tell
  * them apart. */
-import { renderSupporters, initShowMore, compact } from '/assets/js/supporter-wall.js?v=ob-v227'
+import { renderSupporters, initShowMore, compact } from '/assets/js/supporter-wall.js?v=ob-v228'
 /* ⚠️ EXACT BOOST COUNTS HERE, COMPACT SATS. On the wall a row is one of a
  * hundred and `1k` is plenty; here there are four rows and the count is the
  * disclosure itself — "35 boosts for listeners with no identity" is the claim
  * the section exists to make, and `1k` rounds the evidence away. */
-import { num } from '/assets/js/boost-list.js?v=ob-v227'
-import { rangeControl, sortControl } from '/assets/js/feed-controls.js?v=ob-v227'
+import { num } from '/assets/js/boost-list.js?v=ob-v228'
+import { rangeControl, sortControl } from '/assets/js/feed-controls.js?v=ob-v228'
 /* ⚠️ THE SAME WEEK RULE THE ENDPOINT CUTS ON, not a second copy of it. That
  * module is two-sided for exactly this: the picker steps and enumerates weeks
  * without a round trip per press, and a Pacific week containing a DST
  * transition is 167 or 169 hours, so a client that stepped by a flat 604800
  * would drift an hour past every March and every November while still
  * producing Mondays. */
-import { weekDateString } from '/assets/js/pacific-week.js?v=ob-v227'
-import { weekLabel, boardHtml, initials, COPY } from '/assets/js/hpw-board.js?v=ob-v227'
+import { weekDateString } from '/assets/js/pacific-week.js?v=ob-v228'
+import { weekLabel, boardHtml, initials, COPY } from '/assets/js/hpw-board.js?v=ob-v228'
 /* The picker's markup and delegate moved to week-picker.js on 2026-09-03, when
  * the chart boards on the Shows and Artists feeds needed the same stepper;
  * flipHtml is the same shape over the two stacked all-time boards. */
-import { pickerHtml, flipHtml, wireWeekPicker, steppedWeek } from '/assets/js/week-picker.js?v=ob-v227'
+import { pickerHtml, flipHtml, wireWeekPicker, steppedWeek } from '/assets/js/week-picker.js?v=ob-v228'
 /* The members' Weeks at #1 board — the Charts page's own, two-sided since the
  * same day, stacked behind Proof of #40HPW here. */
-import { memberOnesBoardHtml } from '/assets/js/chart-board.js?v=ob-v227'
+import { memberOnesBoardHtml } from '/assets/js/chart-board.js?v=ob-v228'
 /* The share control: Post to Nostr, Copy link, Share image. A verb, mounted
  * onto each board after it is painted; the same module /hpw/<week> uses. */
-import { mountShare } from '/assets/js/hpw-share.js?v=ob-v227'
+import { mountShare } from '/assets/js/hpw-share.js?v=ob-v228'
 
 const esc = htmlEscape
 const HOURS_API = '/api/v1/members/hours'
@@ -165,7 +165,7 @@ function paintStack(root) {
     mountShare(el, {
       key: 'members-weeks-at-1', title: 'Weeks at #1', isLive: false,
       image: '/api/og/charts/members-weeks-at-1.png',
-      link: 'https://onlyboosts.social/#members',
+      link: 'https://onlyboosts.social/charts/hpw',
       alt: 'OnlyBoosts Charts: Members, Weeks at #1 on the 40 HPW board',
       tag: 'onlyboosts',
       filename: 'onlyboosts-charts-members-weeks-at-1.png',
@@ -551,9 +551,6 @@ export async function renderMembersBoards(root) {
          in index.html). */
       `<div class="hpw-stack" data-hpw-stack></div>`
     paintStack(root)
-    /* The charts page's `#boosts` landing scrolls past these boards once
-       they have their height (2026-10-20). */
-    document.dispatchEvent(new CustomEvent('lb:members-painted'))
     /* After the first paint, and once: the arrows and the menu live inside
        markup this line just wrote, and the listener is delegated so it survives
        every repaint after it. The jump buttons on Proof AND on Weeks at #1
@@ -573,30 +570,40 @@ export async function renderMembersBoards(root) {
     const weekEl = root.querySelector('[data-hpw-board="week"]')
     if (weekEl && shownWeek) mountShare(weekEl, { key: weekDateString(shownWeek), title: `Week of ${weekLabel(shownWeek)}`, isLive: !liveWeek || shownWeek >= liveWeek })
     root.dataset.hpwState = 'done'
-    /* The wall goes below the boards, in its own container, and is fetched
-       alongside them. It fails independently: a wall that cannot load leaves
-       the boards standing, and vice versa. */
-    const wallRoot = document.querySelector('[data-members-wall]')
-    if (wallRoot) {
-      /* Built before the first paint, so the controls are on screen while the
-         first query is in flight rather than appearing under the reader's
-         cursor when it lands. */
-      const host = wallRoot.querySelector('[data-members-controls]')
-      if (host) mountWallControls(host, () => paintWall(wallRoot))
-      await paintWall(wallRoot)
-    }
-    /* Below the wall, and started after it: this section explains what is
-       missing from the wall, so it must never be the thing that delays it.
-       Not awaited — the boards are 'done' either way, and a bots section that
-       never lands must not leave the tab looking unfinished. */
-    const botsRoot = document.querySelector('[data-members-bots]')
-    if (botsRoot) paintBots(botsRoot)
   } catch (err) {
     console.warn('[hpw] boards failed', err)
     root.innerHTML = '<p class="hpw-empty">The boards are unavailable right now.</p>'
-    // Not 'done': approaching the tab again retries.
+    // Not 'done': approaching the page again retries.
     root.dataset.hpwState = ''
   }
+}
+
+/**
+ * Fill the Members page: the wall, then the bots. Its own entry point since
+ * 2026-10-21, when the #40HPW boards went to the Charts page and the wall
+ * stayed on /members; until then the boards painted both on their way out.
+ * The two fail independently: a wall that cannot load leaves the bots to
+ * paint, and the bots are never awaited, since the section explains what is
+ * missing from the wall and must never be the thing that delays it.
+ */
+export async function renderMembersWall() {
+  const wallRoot = document.querySelector('[data-members-wall]')
+  if (wallRoot && wallRoot.dataset.wallState !== 'done') {
+    wallRoot.dataset.wallState = 'done'
+    try {
+      /* Built before the first paint, so the controls are on screen while
+         the first query is in flight rather than appearing under the
+         reader's cursor when it lands. */
+      const host = wallRoot.querySelector('[data-members-controls]')
+      if (host) mountWallControls(host, () => paintWall(wallRoot))
+      await paintWall(wallRoot)
+    } catch (err) {
+      console.warn('[members] wall failed', err)
+      wallRoot.dataset.wallState = ''
+    }
+  }
+  const botsRoot = document.querySelector('[data-members-bots]')
+  if (botsRoot) paintBots(botsRoot)
 }
 
 /* ⚠️ EVERY REPAINT IS A QUERY, exactly as the ranked feeds' range and sort are.
@@ -626,7 +633,7 @@ async function paintWall(wallRoot) {
           // One component, two words, deliberately: the protocol is not the
           // greeting, and a reader who has drilled into a show has chosen to
           // go deeper than one who just landed. See supporter-wall.js.
-          heading: 'Members',
+          heading: 'Top Members',
           id: 'members-wall',
           sectionClass: 'members-wall-section',
           metric: wallView,

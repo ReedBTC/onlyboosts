@@ -282,7 +282,7 @@ const hpwFigs = (frag) => [...frag.matchAll(/class="hpw-hours">([^<]*)</g)].map(
 
 const loc = (resp) => new URL(resp.headers.get('location')).pathname
 
-console.log('\nRouting — the bare /charts is the charts page (2026-10-17), a dated URL 302s, the card frames stay:')
+console.log('\nRouting — /charts and /charts/<view> are the boards page (2026-10-21), a dated URL 302s, the card frames stay:')
 {
   /* The bare path renders charts.html (née index.html) through the asset
      binding, the way `/` did until the discovery homepage took the front
@@ -291,17 +291,28 @@ console.log('\nRouting — the bare /charts is the charts page (2026-10-17), a d
   const envWithAssets = { ...env, ASSETS: { fetch: async () => new Response(shell, { status: 200, headers: { 'Content-Type': 'text/html' } }) } }
   const page = await onRequestGet({ request: new Request('https://ob.invalid/charts'), env: envWithAssets, params: { path: [] } })
   const pageHtml = await page.text()
-  check('/charts answers 200 with the charts page', () => {
+  check('/charts answers 200 with the shell routed to the Podcasts boards', () => {
     assert.equal(page.status, 200)
     assert.ok(pageHtml.includes('FEED BAR CONTROLLER'), 'the inline controller is in the page')
-    assert.ok(pageHtml.includes('id="panel-shows"'), 'the Shows panel is in the page')
+    assert.ok(pageHtml.includes('<body data-page="charts" data-view="podcasts">'), 'routed, with no feed')
+    assert.ok(pageHtml.includes('data-view="podcasts" aria-current="page"'), 'the Podcasts tab underlined')
+    assert.ok(!pageHtml.includes('class="feed-panel is-active"'), 'no panel is active on a boards page')
   })
+  for (const [view, kind] of [['music', 'artists'], ['hpw', 'hpw']]) {
+    const r = await onRequestGet({ request: new Request(`https://ob.invalid/charts/${view}`), env: envWithAssets, params: { path: [view] } })
+    const h = await r.text()
+    check(`/charts/${view} is the ${kind} boards`, () => {
+      assert.equal(r.status, 200)
+      assert.ok(h.includes(`<body data-page="charts" data-view="${view}">`))
+      assert.ok(h.includes(`<title>Charts: ${view === 'hpw' ? '#40HPW Challenge' : 'Music'} — OnlyBoosts</title>`))
+    })
+  }
   for (const p of [`/charts/${weekDateString(W1)}`, `/charts/${weekDateString(W1 + 2 * 86400)}`, '/charts/not-a-date', `/charts/${weekDateString(W1)}/card`, `/charts/${ONES_KEY}`]) {
     const r = await get(p)
-    check(`${p} 302s to the Shows feed, where the boards live now`, () => {
+    check(`${p} 302s to the Podcasts boards, whose picker reaches every week`, () => {
       assert.equal(r.status, 302)
       const u = new URL(r.headers.get('location'))
-      assert.equal(u.pathname + u.hash, '/charts#shows')
+      assert.equal(u.pathname + u.hash, '/charts/podcasts')
     })
   }
   const h = await onRequestHead({ request: new Request('https://ob.invalid/charts', { method: 'HEAD' }), env: envWithAssets, params: { path: [] } })
@@ -512,12 +523,12 @@ console.log('\nThe card frames (/charts/<key>/card/<kind>):')
     assert.deepEqual(triplets(card), expect.map(triplet))
     assert.ok(card.includes('Shows Top 10'))
     assert.doesNotMatch(card, /This Week/)
-    assert.match(card, /<footer class="card-foot">onlyboosts\.social\/charts#shows<\/footer>/)
+    assert.match(card, /<footer class="card-foot">onlyboosts\.social\/charts\/podcasts<\/footer>/)
   })
   const liveCard = await (await get(`/charts/${weekDateString(W0)}/card/artists`)).text()
   check('the live week card says In progress and links the artists tab', () => {
     assert.match(liveCard, /In progress\./)
-    assert.match(liveCard, /onlyboosts\.social\/charts#artists/)
+    assert.match(liveCard, /onlyboosts\.social\/charts\/music/)
   })
   const wed = await get(`/charts/${weekDateString(W1 + 2 * 86400)}/card/artists`)
   check('a mid-week card 302s to the Monday, keeping /card/<kind>', () => {
@@ -531,7 +542,7 @@ console.log('\nThe card frames (/charts/<key>/card/<kind>):')
     assert.match(ones, /<ol class="cb-list" data-card-list>/)
     assert.ok(ones.includes('Shows: Weeks at #1'))
     assert.ok(figs(ones).length > 0)
-    assert.match(ones, /onlyboosts\.social\/charts#shows/)
+    assert.match(ones, /onlyboosts\.social\/charts\/podcasts/)
   })
   const mr = await get(`/charts/${ONES_KEY}/card/members`)
   const mem = await mr.text()
@@ -540,7 +551,7 @@ console.log('\nThe card frames (/charts/<key>/card/<kind>):')
     assert.match(mem, /<ol class="hpw-list" data-card-list>/)
     assert.ok(!mem.includes(WHO[BOT]))
     assert.ok(hpwNames(mem).length > 0)
-    assert.match(mem, /onlyboosts\.social\/charts#members/)
+    assert.match(mem, /onlyboosts\.social\/charts\/hpw/)
   })
   // (`/charts/${ONES_KEY}` and `/charts/${ONES_KEY}/card` are not card frames
   // and 302 to the Shows feed with the rest of the old page's URLs — above.)

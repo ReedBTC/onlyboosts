@@ -63,34 +63,56 @@ console.log('\nThe markers and the renderers agree:')
   })
 }
 
-console.log('\nThe legacy hash forward covers every feed address:')
+console.log('\nThe legacy hash forward covers every feed address, on / and on /charts:')
 {
-  const m = index.match(/if \((\/\^#.*?\/)\.test\(h\)\)/)
-  assert.ok(m, 'the forward regex is in index.html')
-  const re = new Function('return ' + m[1])()
-  // Every hash the controller resolves: the FEEDS keys, the ALIASES keys,
-  // and the HASH_OF shorthands, read out of charts.html's controller.
-  const ctl = charts.slice(charts.indexOf('FEED BAR CONTROLLER'))
-  const keys = new Set()
-  for (const mm of ctl.matchAll(/'((?:shows|albums|artists|episodes|songs|members|podcasts)(?:-(?:global|follows))?)'/g)) keys.add(mm[1])
-  check('the controller declares the feed keys this test expects', () => {
-    assert.ok(keys.size >= 12, `found ${keys.size}`)
-    for (const k of ['shows', 'albums', 'artists', 'members', 'episodes-global', 'songs-follows', 'podcasts-global']) assert.ok(keys.has(k), k)
-  })
-  check('every key forwards, bare and with a view', () => {
-    for (const k of keys) {
-      assert.ok(re.test('#' + k), '#' + k)
-      assert.ok(re.test(`#${k}?lang=de&range=1m&sort=sats`), `#${k}?…`)
+  /* The forward is an inline IIFE in both heads; run the SHIPPED one against
+     a stub location and read where it sent the reader. The two copies must
+     agree, since a /#feed link and a /charts#feed link name the same view. */
+  const forwardOf = (src, name) => {
+    const a = src.indexOf('THE LEGACY HASH FORWARD')
+    const o = src.indexOf('<script>', a), c = src.indexOf('</script>', o)
+    assert.ok(a > 0 && o > a && c > o, `${name} carries the forward`)
+    const body = src.slice(o + 8, c)
+    return (hash) => {
+      let to = null
+      new Function('location', body)({ hash, replace: (u) => { to = u } })
+      return to
     }
-  })
-  check('a section id on the new page does not forward', () => {
-    for (const h of ['#discover', '#rail-shows-week', '#top', '', '#shows-x-y', '#showsx']) assert.equal(re.test(h), false, h || '(empty)')
+  }
+  const fwd = { 'index.html': forwardOf(index, 'index.html'), 'charts.html': forwardOf(charts, 'charts.html') }
+  // Every address the hash router ever resolved: the FEEDS keys, the bare
+  // canonical hashes, the retired aliases, and #boosts, each with and
+  // without a view.
+  const WANT = {
+    '#shows': '/podcasts/shows', '#shows-global': '/podcasts/shows', '#shows-follows': '/podcasts/shows?scope=follows',
+    '#episodes-global': '/podcasts/episodes', '#episodes-follows': '/podcasts/episodes?scope=follows',
+    '#podcasts-global': '/podcasts/episodes', '#podcasts-follows': '/podcasts/episodes?scope=follows',
+    '#albums': '/music/albums', '#albums-follows': '/music/albums?scope=follows',
+    '#artists': '/music/artists', '#artists-global': '/music/artists', '#artists-follows': '/music/artists?scope=follows',
+    '#songs-global': '/music/songs', '#songs-follows': '/music/songs?scope=follows',
+    '#members': '/charts/hpw', '#members-global': '/boosts', '#members-follows': '/boosts?scope=follows',
+    '#boosts': '/boosts', '#boosts-global': '/boosts', '#boosts-follows': '/boosts?scope=follows',
+    '#shows?lang=de&range=1m&sort=sats': '/podcasts/shows?lang=de&range=1m&sort=sats',
+    '#episodes-follows?range=1y': '/podcasts/episodes?scope=follows&range=1y',
+    '#shows?': '/podcasts/shows',
+  }
+  for (const [name, f] of Object.entries(fwd)) {
+    check(`${name}: every hash address lands on its page`, () => {
+      for (const [h, to] of Object.entries(WANT)) assert.equal(f(h), to, h)
+    })
+    check(`${name}: a section id or nothing does not forward`, () => {
+      for (const h of ['#discover', '#rail-shows-week', '#top', '', '#shows-x-y', '#showsx', '#recommended']) assert.equal(f(h), null, h || '(empty)')
+    })
+  }
+  check('the controller resolves every feed type the forward names', () => {
+    const ctl = charts.slice(charts.indexOf('FEED BAR CONTROLLER'))
+    for (const t of ['shows', 'episodes', 'albums', 'songs', 'artists', 'members']) assert.ok(ctl.includes(`'${t}-global':`), t)
   })
 }
 
-console.log('\nNo site file still links a feed as /#…:')
+console.log('\nNo site file still links a feed as /#… or /charts#…:')
 {
-  const skip = new Set(['node_modules', 'login-widget', 'docs', '.git', 'bots', 'data', 'preview-snapshot'])
+  const skip = new Set(['node_modules', 'login-widget', 'docs', '.git', '.claude', 'bots', 'data', 'preview-snapshot'])
   const files = []
   const walk = (d) => {
     for (const f of readdirSync(d)) {
@@ -101,11 +123,11 @@ console.log('\nNo site file still links a feed as /#…:')
     }
   }
   walk(ROOT)
-  check('every feed link is /charts#… (the address since 2026-10-17)', () => {
+  check('every feed link is a page (the addresses since 2026-10-21)', () => {
     const bad = []
     for (const p of files) {
       const s = readFileSync(p, 'utf8')
-      if (/["'`(]\/#(shows|albums|artists|episodes|songs|members|podcasts)/.test(s)) bad.push(p.slice(ROOT.length))
+      if (/["'`(]\/(charts)?#(shows|albums|artists|episodes|songs|members|podcasts|boosts)/.test(s)) bad.push(p.slice(ROOT.length))
     }
     assert.deepEqual(bad, [])
   })
@@ -198,7 +220,7 @@ console.log('\nThe search page:')
     assert.ok(h.includes('sup-podium'), 'the Members tab\'s wall')
     assert.ok(h.includes('class="pcast-list"'), 'the charts page\'s list box')
     assert.ok(/#7\b|>7</.test(h) && /T3/.test(h), 'the server\'s rank and tie label on the card')
-    assert.ok(h.includes('href="/charts#shows"') && h.includes('href="/charts#albums"') && h.includes('href="/charts#episodes-global"') && h.includes('href="/charts#artists"'), 'each group links its chart')
+    assert.ok(h.includes('href="/podcasts/shows"') && h.includes('href="/music/albums"') && h.includes('href="/podcasts/episodes"') && h.includes('href="/music/artists"'), 'each group links its chart')
   })
   check('an empty answer says so', () => {
     assert.match(resultsHtml('zzz', {}), /Nothing matched/)
@@ -454,15 +476,18 @@ console.log('\nThe recommendations and the data rails, over the real schema:')
   })
 }
 
-console.log('\nThe nav bar: three ribbons, two plain links, Charts gone (2026-10-20):')
+console.log('\nThe nav bar: three ribbons, then Charts and Boosts as plain links (2026-10-21):')
 {
   const nav = read('partials/nav.html')
   const foot = read('partials/footer.html')
   const links = nav.slice(nav.indexOf('<nav class="nav-links"'), nav.indexOf('</nav>'))
-  check('the bar is Podcasts, Music and Members as ribbons, then #40HPW and Boosts', () => {
+  check('the bar is Podcasts, Music and Members as ribbons, then Charts and Boosts', () => {
     assert.deepStrictEqual([...links.matchAll(/<details class="nav-ribbon" data-ribbon="([a-z]+)"/g)].map((m) => m[1]), ['podcasts', 'music', 'members'])
-    assert.ok(links.includes('<a href="/charts#members">#40HPW</a>') && links.includes('<a href="/charts#boosts">Boosts</a>'))
-    assert.ok(!/href="\/charts">Charts</.test(nav), 'Charts came off the bar: it and Podcasts opened the same page on the same tab')
+    assert.ok(links.includes('<a href="/charts">Charts</a>') && links.includes('<a href="/boosts">Boosts</a>'))
+    assert.ok(!links.includes('>#40HPW</a>'), 'the #40HPW link folded into Charts, where both its boards are')
+    for (const [ribbon, href] of [['podcasts', '/podcasts'], ['music', '/music'], ['members', '/members']]) {
+      assert.ok(links.includes(`data-ribbon="${ribbon}">\n        <summary><a href="${href}">`), `${ribbon} opens ${href}`)
+    }
   })
   check('each ribbon is two list slots nav-ribbons.js can fill, a Discover column and a featured block', () => {
     const slots = [...links.matchAll(/data-ribbon-list="([a-z-]+)"/g)].map((m) => m[1])
@@ -483,6 +508,7 @@ console.log('\nThe nav bar: three ribbons, two plain links, Charts gone (2026-10
     assert.ok(mem.includes('<h4>#40HPW This Week') && mem.includes('<h4>Largest Boosts This Week'))
     const disc = mem.slice(mem.indexOf('<h4>Discover</h4>'), mem.indexOf('nav-ribbon-feat'))
     assert.deepStrictEqual([...disc.matchAll(/>([^<]+)<\/a>/g)].map((m) => m[1]), ['#40HPW Challenge', 'Top Members', 'Boost Feed'])
+    assert.deepStrictEqual([...disc.matchAll(/href="([^"]+)"/g)].map((m) => m[1]), ['/charts/hpw', '/members', '/boosts'])
     assert.ok(!mem.includes('Live'), 'Live means something else in podcasting')
   })
   check("every Discover link lands on a homepage rail id or a charts view, and the rail ids exist", () => {
@@ -491,15 +517,14 @@ console.log('\nThe nav bar: three ribbons, two plain links, Charts gone (2026-10
   check('the overlay and the footer name the same places', () => {
     const overlay = nav.slice(nav.indexOf('nav-explore-sections'), nav.indexOf('nav-explore-group">\n            <h4>Stats'))
     assert.strictEqual((overlay.match(/<details class="nav-explore-acc">/g) || []).length, 3)
-    for (const h of ['/charts#shows', '/charts#artists', '/charts#members', '/charts#boosts']) assert.ok(overlay.includes(`href="${h}"`) && foot.includes(`href="${h}"`), h)
-    assert.ok(!foot.includes('href="/charts">'))
+    for (const h of ['/podcasts', '/music', '/members', '/charts', '/boosts']) assert.ok(overlay.includes(`href="${h}"`) && foot.includes(`href="${h}"`), h)
+    assert.ok(overlay.includes('<h4>Browse</h4>') && foot.includes('<h3>Browse</h3>'), 'the group is Browse: it holds a Charts entry now')
   })
-  check('/charts#boosts forwards from / and resolves on the charts page', () => {
-    const a = index.indexOf('/^#('), b = index.indexOf('$/', a)
-    assert.ok(a > 0 && b > a && new RegExp(index.slice(a + 1, b + 1)).test('#boosts'), 'the head forward carries #boosts')
-    assert.ok(charts.includes("'boosts':           'members-global'"))
-    assert.ok(charts.includes("if (raw === 'boosts') scrollToBoosts();"))
-    assert.ok(read('assets/js/members-board.js').includes("new CustomEvent('lb:members-painted')"))
+  check('every page the bar names has a Function, and each answers HEAD', () => {
+    for (const f of ['functions/podcasts/[[path]].js', 'functions/music/[[path]].js', 'functions/boosts.js', 'functions/members.js', 'functions/charts/[[path]].js']) {
+      const s = read(f)
+      assert.ok(s.includes('renderShellPage(') && s.includes('onRequestHead'), f)
+    }
   })
 }
 
@@ -615,11 +640,11 @@ console.log('\nThe member\'s recommendations on their own page (2026-10-20):')
   })
 }
 
-console.log('\nThe charts page kept its address book:')
+console.log('\nThe shell kept its address book:')
 {
-  check('charts.html declares /charts as its own address', () => {
+  check('charts.html declares /charts as its own address and carries both marker pairs', () => {
     assert.ok(charts.includes('<link rel="canonical" href="https://onlyboosts.social/charts" />'))
-    assert.ok(charts.includes('<!--OB:SSR-SHOWS-->'))
+    assert.ok(charts.includes('<!--OB:SSR-SHOWS-->') && charts.includes('<!--OB:SSR-ALBUMS-->'))
   })
   check('index.html is the discovery page and names /', () => {
     assert.ok(index.includes('<link rel="canonical" href="https://onlyboosts.social/" />'))

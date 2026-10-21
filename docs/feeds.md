@@ -8,6 +8,11 @@ that used to live there.*
 
 ---
 
+> **2026-10-21.** The feeds are pages now (`/podcasts/shows`, `/music/albums`,
+> `/boosts` …) and the view rides the query string, not the hash; see **The
+> Chart Pages** in CLAUDE.md. The sections below describe the mechanism as it
+> was built; the range, sort, rank, language and search rules are unchanged.
+
 ### Range and sort
 
 Every feed carries a range and a sort dropdown, built by

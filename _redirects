@@ -1,11 +1,8 @@
 # Cloudflare Pages redirects. Add entries here as pages move.
 
-# The show directory lived at /podcasts, then at /shows as a standalone page.
-# The Shows *feed* on the homepage replaced both, so each now lands on the feed
-# itself rather than chaining /podcasts -> /shows -> nothing. Only the site page
-# moves; the /api/v1/podcasts endpoints are a different path, unaffected.
-#
-# Both targets carry the fragment deliberately: the feed bar's controller reads
-# the hash to pick which panel is on screen, so /#shows is the whole address.
-/podcasts /#shows 301
-/shows /#shows 301
+# The show directory lived at /podcasts, then at /shows as a standalone page,
+# then as the Shows feed of the hash-routed homepage (/#shows, then
+# /charts#shows). Since 2026-10-21 the Shows chart is a page again, at
+# /podcasts/shows (functions/podcasts/[[path]].js serves /podcasts itself), so
+# /shows lands there. The /api/v1/podcasts endpoints are a different path.
+/shows /podcasts/shows 301

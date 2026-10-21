@@ -8,6 +8,10 @@ that used to live there.*
 
 ---
 
+> **2026-10-21.** The tab is three pages: the #40HPW boards at `/charts/hpw`,
+> the wall and the bots at `/members`, the boost feed at `/boosts`; see **The
+> Chart Pages** in CLAUDE.md. The rules below are unchanged.
+
 ### The Members Tab
 
 Three sections above the boost firehose, all client-rendered by

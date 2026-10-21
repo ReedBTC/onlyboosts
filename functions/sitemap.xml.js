@@ -64,6 +64,18 @@ const MAX_EPISODES = 20000;
 const STATIC_URLS = [
   { loc: "/", changefreq: "hourly", priority: "1.0" },
   { loc: "/about", changefreq: "monthly", priority: "0.6" },
+  // The chart pages (2026-10-21): the feeds the hash-routed /charts held,
+  // one page per chart, and the weekly boards' three views.
+  { loc: "/podcasts/shows", changefreq: "hourly", priority: "0.9" },
+  { loc: "/podcasts/episodes", changefreq: "hourly", priority: "0.8" },
+  { loc: "/music/artists", changefreq: "hourly", priority: "0.8" },
+  { loc: "/music/albums", changefreq: "hourly", priority: "0.8" },
+  { loc: "/music/songs", changefreq: "hourly", priority: "0.8" },
+  { loc: "/boosts", changefreq: "hourly", priority: "0.8" },
+  { loc: "/members", changefreq: "daily", priority: "0.7" },
+  { loc: "/charts/podcasts", changefreq: "daily", priority: "0.8" },
+  { loc: "/charts/music", changefreq: "daily", priority: "0.7" },
+  { loc: "/charts/hpw", changefreq: "daily", priority: "0.7" },
   // The three discovery lists (2026-10-20): the homepage's rails in full.
   { loc: "/discover/new-shows", changefreq: "daily", priority: "0.7" },
   { loc: "/discover/movers", changefreq: "daily", priority: "0.7" },

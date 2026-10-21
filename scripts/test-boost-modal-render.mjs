@@ -392,7 +392,7 @@ console.log('\nThe themed classes emit real CSS:')
       s = next
     }
     return {
-      a: (s.match(/charts#[\w-]+/g) || []).length,
+      a: (s.match(/#[\w-]+/g) || []).length,
       b: (s.match(/\.[\w-]+/g) || []).length + (s.match(/\[/g) || []).length,
     }
   }

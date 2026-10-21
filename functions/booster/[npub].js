@@ -432,23 +432,23 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v227" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v227" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v227" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v227" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v228" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v228" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v228" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v228" />
   <!-- The hero, the drawers and the boost list are the show page's, so this
        page links its stylesheet and adds only the deltas. -->
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v227" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v227" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v228" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v228" />
   <!-- The episode card, for the #episodes rollup: the same chrome
        feeds-podcasts.js paints on the homepage. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v227" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v228" />
   <!-- The boost thread inside a card's drawer, and its reply / like / repost /
        zap bar, both reached through that same card. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v227" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v227" />
-  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v227" />
-  <link rel="stylesheet" href="/assets/css/booster-page.css?v=ob-v227" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v228" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v228" />
+  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v228" />
+  <link rel="stylesheet" href="/assets/css/booster-page.css?v=ob-v228" />
 </head>
 <body data-booster-pk="${htmlEscape(hex)}"${npub ? ` data-booster-npub="${htmlEscape(npub)}"` : ""}>
 
@@ -474,11 +474,14 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
      script; /assets/js/nav-ribbons.js adds hover, Escape, outside-click and
      fills the lists from the chart endpoints the first time a ribbon opens
      (the lists are data and the nav is a partial on every page, static ones
-     included, so they are never rendered at the edge). #40HPW and Boosts are
-     plain links: the two places people kept asking for. Charts came off the
-     bar the same day: it and Podcasts opened the same page on the same tab.
-     The desktop links, the overlay's groups and the footer's Charts group
-     name the same places; change them together.
+     included, so they are never rendered at the edge). Charts and Boosts are
+     plain links (2026-10-21): the weekly boards' own page, where the #40HPW
+     link of 2026-10-20 landed once the boards moved there, and the boost
+     feed's own page, the two places people kept asking for. Every section
+     is a PAGE since 2026-10-21 (/podcasts, /music, /members, /charts,
+     /boosts); the hash-routed charts page is forwarded. The desktop links,
+     the overlay's groups and the footer's Browse group name the same
+     places; change them together.
      ⚠️ A RIBBON'S LIST SLOT IS data-ribbon-list="<key>" AND THE KEYS ARE
      nav-ribbons.js's SOURCES. The Discover links are static. -->
 <!-- Theme boot. Runs before the nav (the first visible element) is parsed,
@@ -515,24 +518,23 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
         </div>
         <a class="nav-explore-home" href="/"><span aria-hidden="true">🏠</span> Home</a>
         <div class="nav-explore-groups">
-          <!-- ⚠️ ONE ENTRY PER TAB OF THE CHARTS PAGE, PLUS THE PAGE ITSELF.
-               Reed's call, 2026-08-23, for the tabs: each entry lands on that
-               tab's DEFAULT sub-feed (TAB_DEFAULT in charts.html's controller),
-               so Podcasts opens Shows, Music opens Artists and Members opens
-               Boosts. Those three hrefs and TAB_DEFAULT move together. The
-               Global vs Follows axis stays absent: it is a control on the page. -->
+          <!-- ⚠️ ONE ENTRY PER PAGE. Each section is a page since 2026-10-21
+               and its bare path opens on its first chart (PAGES in
+               charts.html's controller): /podcasts on Shows (Reed, 2026-09-03),
+               /music on Artists (2026-08-31), /charts on the Podcasts boards.
+               The Global vs Follows axis stays absent: it is a control on the page. -->
           <!-- The three sections are accordions on a phone (Rotten Tomatoes'
                app pattern, Reed's pick 2026-10-20): the row itself opens the
                section's page; the chevron opens that side's Discover links,
                the same links the desktop ribbon's Discover column carries. -->
           <div class="nav-explore-group nav-explore-sections">
-            <h4>Charts</h4>
+            <h4>Browse</h4>
             <details class="nav-explore-acc">
-              <summary><a href="/charts#shows"><span aria-hidden="true">🎙</span> Podcasts</a><span class="nav-explore-chev" aria-hidden="true">⌄</span></summary>
+              <summary><a href="/podcasts"><span aria-hidden="true">🎙</span> Podcasts</a><span class="nav-explore-chev" aria-hidden="true">⌄</span></summary>
               <div class="nav-explore-sub">
-                <a href="/charts#shows?range=1w">Top Shows This Week</a>
-                <a href="/charts#shows?range=1y">Top Shows This Year</a>
-                <a href="/charts#episodes-global?range=1y">Top Episodes This Year</a>
+                <a href="/charts/podcasts">Top Shows This Week</a>
+                <a href="/podcasts/shows?range=1y">Top Shows This Year</a>
+                <a href="/podcasts/episodes?range=1y">Top Episodes This Year</a>
                 <a href="/discover/new-shows">New and Noteworthy</a>
                 <a href="/discover/movers">Movers This Week</a>
                 <a href="/discover/podroll">Podcasters Recommend</a>
@@ -542,25 +544,25 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
               </div>
             </details>
             <details class="nav-explore-acc">
-              <summary><a href="/charts#artists"><span aria-hidden="true">🎵</span> Music</a><span class="nav-explore-chev" aria-hidden="true">⌄</span></summary>
+              <summary><a href="/music"><span aria-hidden="true">🎵</span> Music</a><span class="nav-explore-chev" aria-hidden="true">⌄</span></summary>
               <div class="nav-explore-sub">
-                <a href="/charts#albums?range=1m">Top Albums This Month</a>
-                <a href="/charts#songs-global?range=1y">Top Songs This Year</a>
-                <a href="/charts#artists">Top Artists This Week</a>
+                <a href="/music/albums?range=1m">Top Albums This Month</a>
+                <a href="/music/songs?range=1y">Top Songs This Year</a>
+                <a href="/charts/music">Top Artists This Week</a>
                 <a href="/#rail-recommended-music">Recommended Music</a>
                 <a href="/#rail-because">Because You Boosted</a>
               </div>
             </details>
             <details class="nav-explore-acc">
-              <summary><a href="/charts#members"><span aria-hidden="true">👥</span> Members</a><span class="nav-explore-chev" aria-hidden="true">⌄</span></summary>
+              <summary><a href="/members"><span aria-hidden="true">👥</span> Members</a><span class="nav-explore-chev" aria-hidden="true">⌄</span></summary>
               <div class="nav-explore-sub">
-                <a href="/charts#members">#40HPW Challenge</a>
-                <a href="/charts#members">Top Members</a>
-                <a href="/charts#boosts">Boost Feed</a>
+                <a href="/charts/hpw">#40HPW Challenge</a>
+                <a href="/members">Top Members</a>
+                <a href="/boosts">Boost Feed</a>
               </div>
             </details>
-            <a href="/charts#members"><span aria-hidden="true">🏆</span> #40HPW</a>
-            <a href="/charts#boosts"><span aria-hidden="true">⚡</span> Boosts</a>
+            <a href="/charts"><span aria-hidden="true">📈</span> Charts</a>
+            <a href="/boosts"><span aria-hidden="true">⚡</span> Boosts</a>
           </div>
           <!-- Stats: the aggregate view over the same data. A coming-soon
                page for now (noindex, out of the sitemap). -->
@@ -583,19 +585,19 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
     <a class="nav-site-name" href="/">OnlyBoosts</a>
     <nav class="nav-links" aria-label="Main navigation">
       <details class="nav-ribbon" data-ribbon="podcasts">
-        <summary><a href="/charts#shows">Podcasts</a><span class="nav-ribbon-caret" aria-hidden="true">▾</span></summary>
+        <summary><a href="/podcasts">Podcasts</a><span class="nav-ribbon-caret" aria-hidden="true">▾</span></summary>
         <div class="nav-ribbon-panel">
           <div class="nav-ribbon-col">
-            <h4>Top Shows This Week <a href="/charts#shows?range=1w">View all</a></h4>
+            <h4>Top Shows This Week <a href="/charts/podcasts">View all</a></h4>
             <ol class="nav-ribbon-list" data-ribbon-list="shows-week"></ol>
           </div>
           <div class="nav-ribbon-col">
-            <h4>Top Shows This Year <a href="/charts#shows?range=1y">View all</a></h4>
+            <h4>Top Shows This Year <a href="/podcasts/shows?range=1y">View all</a></h4>
             <ol class="nav-ribbon-list" data-ribbon-list="shows-year"></ol>
           </div>
           <div class="nav-ribbon-col nav-ribbon-discover">
             <h4>Discover</h4>
-            <a href="/charts#episodes-global?range=1y">Top Episodes This Year</a>
+            <a href="/podcasts/episodes?range=1y">Top Episodes This Year</a>
             <a href="/discover/new-shows">New and Noteworthy</a>
             <a href="/discover/movers">Movers This Week</a>
             <a href="/discover/podroll">Podcasters Recommend</a>
@@ -612,19 +614,19 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
         </div>
       </details>
       <details class="nav-ribbon" data-ribbon="music">
-        <summary><a href="/charts#artists">Music</a><span class="nav-ribbon-caret" aria-hidden="true">▾</span></summary>
+        <summary><a href="/music">Music</a><span class="nav-ribbon-caret" aria-hidden="true">▾</span></summary>
         <div class="nav-ribbon-panel">
           <div class="nav-ribbon-col">
-            <h4>Top Albums This Month <a href="/charts#albums?range=1m">View all</a></h4>
+            <h4>Top Albums This Month <a href="/music/albums?range=1m">View all</a></h4>
             <ol class="nav-ribbon-list" data-ribbon-list="albums-month"></ol>
           </div>
           <div class="nav-ribbon-col">
-            <h4>Top Songs This Year <a href="/charts#songs-global?range=1y">View all</a></h4>
+            <h4>Top Songs This Year <a href="/music/songs?range=1y">View all</a></h4>
             <ol class="nav-ribbon-list" data-ribbon-list="songs-year"></ol>
           </div>
           <div class="nav-ribbon-col nav-ribbon-discover">
             <h4>Discover</h4>
-            <a href="/charts#artists">Top Artists This Week</a>
+            <a href="/charts/music">Top Artists This Week</a>
             <a href="/#rail-recommended-music">Recommended Music</a>
             <a href="/#rail-follows">Top Shows From Your Follows</a>
             <a href="/#rail-because">Because You Boosted</a>
@@ -638,21 +640,21 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
         </div>
       </details>
       <details class="nav-ribbon" data-ribbon="members">
-        <summary><a href="/charts#members">Members</a><span class="nav-ribbon-caret" aria-hidden="true">▾</span></summary>
+        <summary><a href="/members">Members</a><span class="nav-ribbon-caret" aria-hidden="true">▾</span></summary>
         <div class="nav-ribbon-panel">
           <div class="nav-ribbon-col">
-            <h4>#40HPW This Week <a href="/charts#members">View all</a></h4>
+            <h4>#40HPW This Week <a href="/charts/hpw">View all</a></h4>
             <ol class="nav-ribbon-list" data-ribbon-list="hpw-week"></ol>
           </div>
           <div class="nav-ribbon-col">
-            <h4>Largest Boosts This Week <a href="/charts#boosts">View all</a></h4>
+            <h4>Largest Boosts This Week <a href="/boosts">View all</a></h4>
             <ol class="nav-ribbon-list" data-ribbon-list="boosts-week"></ol>
           </div>
           <div class="nav-ribbon-col nav-ribbon-discover">
             <h4>Discover</h4>
-            <a href="/charts#members">#40HPW Challenge</a>
-            <a href="/charts#members">Top Members</a>
-            <a href="/charts#boosts">Boost Feed</a>
+            <a href="/charts/hpw">#40HPW Challenge</a>
+            <a href="/members">Top Members</a>
+            <a href="/boosts">Boost Feed</a>
           </div>
           <div class="nav-ribbon-feat" data-ribbon-feat="hpw-week" hidden>
             <span class="nav-ribbon-eyebrow">Leading #40HPW This Week</span>
@@ -662,8 +664,8 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
           </div>
         </div>
       </details>
-      <a href="/charts#members">#40HPW</a>
-      <a href="/charts#boosts">Boosts</a>
+      <a href="/charts">Charts</a>
+      <a href="/boosts">Boosts</a>
     </nav>
     <!-- The site search. nav-search.js turns typing into a grouped menu
          (shows, episodes, artists, members); Enter, or the form with no
@@ -711,7 +713,7 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
        history.back() when the previous document was one of ours. /boosters is
        deliberately NOT the target: it is still a coming-soon placeholder, so a
        reader with nowhere to go back to would land on a page that says nothing. -->
-  <a class="show-back" href="/charts#members" data-show-back>
+  <a class="show-back" href="/members" data-show-back>
     <span class="show-back-arrow" aria-hidden="true">←</span><span data-back-label>All Boosts</span>
   </a>
 
@@ -772,16 +774,17 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
          footer is the nav's site map repeated, so they're regrouped together
          or not at all. -->
     <div class="footer-col">
-      <!-- ⚠️ ONE ENTRY PER TAB, and it mirrors the nav's Explore menu exactly.
+      <!-- ⚠️ ONE ENTRY PER PAGE, and it mirrors the nav's Explore menu exactly.
            The two are the site map and are regrouped together or not at all;
-           each lands on that tab's default sub-feed. See partials/nav.html. -->
-      <h3>Charts</h3>
+           each section is a page since 2026-10-21 and its bare path opens on
+           its first chart. See partials/nav.html. -->
+      <h3>Browse</h3>
       <ul>
-        <li><a href="/charts#shows">🎙 Podcasts</a></li>
-        <li><a href="/charts#artists">🎵 Music</a></li>
-        <li><a href="/charts#members">👥 Members</a></li>
-        <li><a href="/charts#members">🏆 #40HPW</a></li>
-        <li><a href="/charts#boosts">⚡ Boosts</a></li>
+        <li><a href="/podcasts">🎙 Podcasts</a></li>
+        <li><a href="/music">🎵 Music</a></li>
+        <li><a href="/members">👥 Members</a></li>
+        <li><a href="/charts">📈 Charts</a></li>
+        <li><a href="/boosts">⚡ Boosts</a></li>
       </ul>
     </div>
 
@@ -814,12 +817,12 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav.js?v=ob-v227" defer></script>
-<script src="/assets/js/booster-page.js?v=ob-v227" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v228" defer></script>
+<script src="/assets/js/booster-page.js?v=ob-v228" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v227"></script>
-<script src="/assets/js/sw-register.js?v=ob-v227" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v228"></script>
+<script src="/assets/js/sw-register.js?v=ob-v228" defer></script>
 </body>
 </html>`;
 }
@@ -914,16 +917,16 @@ function renderHeader({ hex, npub, prof, label, realName, pic, banner, stats, ra
     </h2>
     ${renderStatTiles(stats, ranks, {
       rankFeed: "Members",
-      /* The wall, not this page's back link. `/charts#members` is where those three
+      /* The wall, not this page's back link. `/members` is where those three
          orderings live and where a reader can go and find the row; the back
          link above points at the same place, which is a coincidence of this
          page rather than something to rely on. */
-      backHref: "/charts#members",
+      backHref: "/members",
       /* The Charts line links the wall too: the Members hash drops query
          parameters (PARAM_FEEDS excludes it), so `?sort=chart` would be dead
          weight — and the wall now OPENS on Chart rank anyway. The breadth key
          in a member's formula is shows boosted, not boosters. */
-      chartHref: "/charts#members",
+      chartHref: "/members",
       chartBreadth: "shows boosted",
     })}
   </header>`;
@@ -1339,10 +1342,10 @@ function notFound(raw) {
   <meta name="robots" content="noindex" />
   <title>Booster not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v227" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v227" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v227" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v227" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v228" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v228" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v228" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v228" />
 </head>
 <body>
 <section class="page-header">
@@ -1356,11 +1359,11 @@ function notFound(raw) {
       <p>This page exists for people who have published a boost to Nostr. An
          npub that has never boosted, or one this index has not seen, has
          nothing to show here.</p>
-      <p><a href="/charts#members">Browse all boosts →</a></p>
+      <p><a href="/members">Browse all boosts →</a></p>
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v227" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v228" defer></script>
 </body>
 </html>`;
   return new Response(html, {
