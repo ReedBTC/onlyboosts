@@ -45,7 +45,7 @@ rules a change elsewhere would break.
 
 | Path | What |
 |---|---|
-| `/` | **the discovery homepage since 2026-10-17**: rails of tiles (this week's shows, this month's albums, the #40HPW week, the personal rails, the year's episodes and songs, the week's artists), the fact rails edge-rendered by `functions/index.js`. See **The Discovery Homepage** below |
+| `/` | **the discovery homepage since 2026-10-17**: rails of tiles (this week's shows, this month's albums, the #40HPW week, the personal rails, the three discovery instruments, the Because rails, the year's episodes and songs; the week's artists came off on 2026-10-21), the fact rails edge-rendered by `functions/index.js`. See **The Discovery Homepage** below |
 | `/podcasts/shows`, `/podcasts/episodes` | **the Podcast Charts** (2026-10-21): one chart per page, switched by the page head's underlined tabs, the chart box (scope, range, language, sort) under it. The bare `/podcasts` is Shows. See **The Chart Pages** below |
 | `/music/artists`, `/music/albums`, `/music/songs` | **the Music Charts**, the same shape; the bare `/music` is Artists |
 | `/boosts` | **the boost feed on its own page** (2026-10-21, Reed's call: readers treat it as their discovery feed). Global or Follows, newest first |
@@ -278,10 +278,11 @@ was picked from is in the session memory; direction A won, with the sans.
   first); an arrow-key pick still goes to its row. `_shared/search-all.js`
   is the typeahead's alone now.
 - **The foot of the page is ONE STRIP INTO THE BOOST FEED** (`.rail-cta`,
-  `/charts#members`), not boost rows. The newest twelve rows sat there from
+  `/boosts` since 2026-10-21; `/charts#members` before, which forwards), not
+  boost rows. The newest twelve rows sat there from
   the 2026-10-17 feedback round until 2026-10-18, when Reed traded them for
-  the Because rails; the whole feed with its controls is the Members tab,
-  and the nav's Members link already lands on it. Ideas for a stronger
+  the Because rails; the whole feed with its controls is the Boosts page,
+  and the nav's Boosts link already lands on it. Ideas for a stronger
   one-click (a Live pill in the nav bar, a ticker of the newest boost) are
   open with Reed.
 - **The personal rails are `POST /api/v1/recommend`** (`{pubkey,
@@ -317,8 +318,11 @@ was picked from is in the session memory; direction A won, with the sans.
   Recommended rails gain a "Your full list →" link to it once painted. A
   signed-in member with no boosts sees the rail's "No boosts from this
   account yet" card, which is the empty state Reed asked for.
-- **⚠️ A HASH THAT NAMES A VIEW LANDS ON THE LIST, AND A LANDING SCROLL IS
-  PINNED** (`pinScroll` in the `charts.html` controller, 2026-10-20). The
+- **⚠️ RETIRED 2026-10-21 WITH THE TABS: `pinScroll` is gone from
+  `charts.html`, since a view is a page of its own and nothing sits above a
+  feed shell any more (see The Chart Pages). Kept for the decision it
+  records.** A HASH THAT NAMES A VIEW LANDS ON THE LIST, AND A LANDING
+  SCROLL IS PINNED (`pinScroll` in the `charts.html` controller, 2026-10-20). The
   chart blocks sit above the feed shell on Shows, Albums and Artists, so
   `#shows?range=1y` from a "View all" link was landing on the week's board;
   now any hash carrying a range, sort or language scrolls to the active
