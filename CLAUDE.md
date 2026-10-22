@@ -1353,6 +1353,10 @@ ask, on mynostr's shape. What a change elsewhere would break:
   sent spaceless and narrowed locally, and each picker hands the trigger its
   own map so a made mention does not re-open the menu. **The Trigger** in
   `docs/mentions.md` has the measurements.
+- **`:)` becomes 🙂 in every composer** (Reed's ask, 2026-10-22):
+  `emoticonAt` in `mention-search.js`, run by the picker's input listener
+  and by the boost modal's `onChange`; only the emoticon just typed, on its
+  own, and nothing but `:)` / `:-)`. **The Smiley** in `docs/mentions.md`.
 - **⚠️ `mention-search.js` IMPORTS NOTHING.** The widget inlines it by
   relative path (`../../../assets/js/`) and the site loads it stamped; a
   `./sibling.js?v=` import is read differently by Vite and the stamper.

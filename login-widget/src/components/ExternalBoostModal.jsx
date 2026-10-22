@@ -55,7 +55,7 @@ import { fireConfetti } from '../lib/confetti.js'
 import ConfirmLeaveOverlay from './ConfirmLeaveOverlay.jsx'
 import LoginButton from './LoginButton.jsx'
 import MentionAutocomplete from './MentionAutocomplete.jsx'
-import { createMentionMap, insertMention, mentionedPubkeys } from '../../../assets/js/mention-search.js'
+import { createMentionMap, insertMention, mentionedPubkeys, emoticonAt } from '../../../assets/js/mention-search.js'
 
 // ⚠️ WHAT A BOOST IS "FROM" WHEN NOBODY TYPED ANYTHING. It fills the
 // boostagram's `sender_name` only — the field a podcaster's Helipad prints —
@@ -322,8 +322,17 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
   const messageBytes = useMemo(() => utf8Bytes(expandedMessage), [expandedMessage])
   const mentionPubkeys = useMemo(() => mentionedPubkeys(expandedMessage), [expandedMessage])
   function onMessageChange(e) {
-    const next = e.target.value
-    setCaret(e.target.selectionStart)
+    let next = e.target.value
+    let at = e.target.selectionStart
+    // A just-typed `:)` becomes 🙂 (mention-search.js#emoticonAt, Reed's ask
+    // 2026-10-22); the caret is put back after React repaints the field.
+    const sw = emoticonAt(next, at)
+    if (sw) {
+      next = sw.text
+      at = sw.caret
+      requestAnimationFrame(() => messageRef.current?.setSelectionRange(at, at))
+    }
+    setCaret(at)
     if (next.length < message.length || utf8Bytes(mentionMapRef.current.expand(next).trim()) <= MAX_MESSAGE_BYTES) {
       setMessage(next)
       setMentionNotice('')

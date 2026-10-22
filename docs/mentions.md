@@ -148,6 +148,22 @@ Two mentions in one boost message leave 162 bytes for words. That is the cost
 of the onion, not of this feature, and it is the same cost every other client
 pays.
 
+## The Smiley
+
+Reed's ask, 2026-10-22, "an Easter egg for some people": `:)` or `:-)` typed
+on its own (at the start of the text or after whitespace) becomes 🙂 the
+moment the `)` lands, in all four composers. The rule is `emoticonAt(text,
+caret)` in `mention-search.js`, pure like the rest of that module, so the
+three plain textareas (the picker's input listener) and the boost modal (its
+`onChange`, which also puts the caret back after React repaints) run the same
+function. Only the emoticon just completed is read, so a typist who wants
+the characters can move the caret away and keep them; `:(`, `;)` and the
+rest are deliberately not read. 🙂 is U+1F642, two UTF-16 units like `:)`,
+which is what keeps the caret arithmetic simple; on the wire it is four
+bytes against two, so the swap counts against the 300-byte cap like any
+emoji and the modal's guard refuses the `)` when it would not fit.
+`test-mentions.mjs` holds the rule and the two call sites.
+
 ## What Is Deliberately Not Built
 
 - **Docking the menu above a phone's soft keyboard.** mynostr does this with

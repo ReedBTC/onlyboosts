@@ -455,3 +455,31 @@ export function pubkeyFromNpub(id) {
   }
   return null
 }
+
+/* ── The smiley (Reed's ask, 2026-10-22: "an Easter egg for some people") ──
+ *
+ * `:)` or `:-)` typed on its own (at the start of the text or after a space)
+ * becomes 🙂 the moment the `)` lands, in every composer: the three plain
+ * textareas through mention-picker.js and the boost modal through its
+ * onChange. Pure: hands back the text and the caret after the swap, or
+ * null when the text before the caret does not end in a smiley. Only the
+ * emoticon just completed is touched, never one earlier in the text, so a
+ * typist who wants the characters can put the caret elsewhere and keep
+ * them; `:(`, `;)` and the rest are deliberately not read.
+ *
+ * 🙂 is U+1F642, two UTF-16 units, which is what keeps the caret arithmetic
+ * honest below: `:)` and the emoji are the same length in the field.
+ */
+export const SMILEY = '\u{1F642}'
+const SMILEY_AT_END = /(^|\s):-?\)$/
+
+export function emoticonAt(text, caret) {
+  text = String(text ?? '')
+  if (typeof caret !== 'number' || caret < 2 || caret > text.length) return null
+  const before = text.slice(0, caret)
+  const m = SMILEY_AT_END.exec(before)
+  if (!m) return null
+  const start = caret - (m[0].length - m[1].length)
+  const next = text.slice(0, start) + SMILEY + text.slice(caret)
+  return { text: next, caret: start + SMILEY.length }
+}
