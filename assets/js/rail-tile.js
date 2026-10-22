@@ -11,10 +11,11 @@
  * rewrites the version), no clock reads, no unpinned locale, nothing from the
  * DOM. Verbs (the artwork fallback walk) are attached by discover.js.
  */
-import { coverChain } from './cover-art.js?v=ob-v232'
-import { rankLabel } from './rank.js?v=ob-v232'
-import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v232'
-import { boosterPageHref } from './booster-link.js?v=ob-v232'
+import { coverChain } from './cover-art.js?v=ob-v235'
+import { rankLabel } from './rank.js?v=ob-v235'
+import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v235'
+import { boosterPageHref } from './booster-link.js?v=ob-v235'
+import { languageName } from './lang-name.js?v=ob-v235'
 
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => (
@@ -159,4 +160,25 @@ export function memberSearchTile(m) {
     sub: statsLine({ boosters: null, sats: m.sats }).replace(/^/, m.boosts != null ? `${Number(m.boosts)} boost${Number(m.boosts) === 1 ? '' : 's'} · ` : ''),
     img: m.pic, glyph: '👤', person: true,
   })
+}
+
+/* ── A LANGUAGE RAIL, head and track together (2026-10-22, Reed's ask: the
+ * year's top podcasts in each of the three largest non-English languages).
+ * The heading names the language, so the whole inside of the <section> is
+ * rendered here rather than the track alone: functions/index.js fills the
+ * section's marker pair with this and discover.js rebuilds it with the same
+ * call when the edge could not. `n` is the slot (1..3), which is the
+ * heading's id (`rail-lang-<n>`), the address the nav's Discover column
+ * links. ── */
+export function langChartHref(lang) {
+  return `/podcasts/shows?range=1y&lang=${encodeURIComponent(lang)}`
+}
+export function langRailTitle(lang) {
+  return `Top ${languageName(lang)} Podcasts This Year`
+}
+export function langRailHtml(n, lang, rows) {
+  const href = langChartHref(lang)
+  return `<div class="rail-head"><h2 id="rail-lang-${Number(n)}"><a href="${esc(href)}">${esc(langRailTitle(lang))}</a></h2>` +
+    `<a class="rail-more" href="${esc(href)}">View the chart →</a></div>` +
+    `<div class="rail-track">${railListHtml(rows.map(showTile), { empty: `No ${languageName(lang)}-language podcasts boosted this year.` })}</div>`
 }

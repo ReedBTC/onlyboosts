@@ -45,8 +45,8 @@ const heroShowCard = await import('../assets/js/show-card.js')
 
 console.log('\nThe markers and the renderers agree:')
 {
-  const markers = [...index.matchAll(/<!--OB:RAIL:([a-z-]+)-->/g)].map((m) => m[1])
-  const closers = [...index.matchAll(/<!--\/OB:RAIL:([a-z-]+)-->/g)].map((m) => m[1])
+  const markers = [...index.matchAll(/<!--OB:RAIL:([a-z0-9-]+)-->/g)].map((m) => m[1])
+  const closers = [...index.matchAll(/<!--\/OB:RAIL:([a-z0-9-]+)-->/g)].map((m) => m[1])
   check('every marker has a closer, in order', () => {
     assert.deepEqual(markers, closers)
     for (const k of markers) assert.ok(index.indexOf(`<!--OB:RAIL:${k}-->`) < index.indexOf(`<!--/OB:RAIL:${k}-->`))
@@ -55,12 +55,17 @@ console.log('\nThe markers and the renderers agree:')
     assert.deepEqual([...markers].sort(), Object.keys(RAILS).sort())
   })
   check('the first three rails need no login; the personal rails come after', () => {
-    const order = [...index.matchAll(/data-rail="([a-z-]+)"/g)].map((m) => m[1])
+    const order = [...index.matchAll(/data-rail="([a-z0-9-]+)"/g)].map((m) => m[1])
     assert.deepEqual(order.slice(0, 3), ['shows-week', 'albums-month', 'hpw-week'])
-    const personal = [...index.matchAll(/data-rail="([a-z-]+)"[^>]*data-rail-personal/g)].map((m) => m[1])
+    const personal = [...index.matchAll(/data-rail="([a-z0-9-]+)"[^>]*data-rail-personal/g)].map((m) => m[1])
     assert.ok(personal.length >= 1, 'there is at least one personal rail')
     for (const p of personal) assert.ok(order.indexOf(p) >= 3, `${p} is the fourth rail or later`)
-    assert.deepEqual(order, ['shows-week', 'albums-month', 'hpw-week', 'recommended', 'recommended-music', 'follows', 'new-shows', 'movers', 'podroll', 'because', 'episodes-year', 'songs-year'], "Reed's order of 2026-10-21: the instruments under the follows rail, Because after them, the year's lists last, no artists rail")
+    assert.deepEqual(order, ['shows-week', 'albums-month', 'hpw-week', 'recommended', 'recommended-music', 'follows', 'new-shows', 'movers', 'podroll',
+      'lang-1', 'lang-2', 'lang-3', 'because',
+      'episodes-week', 'episodes-month', 'episodes-year', 'shows-month', 'shows-year', 'songs-week', 'songs-month', 'songs-year', 'albums-week', 'albums-year'],
+      "Reed's order of 2026-10-21 with the 2026-10-22 additions: the language rails under Podcasters Recommend, the window rails at the foot, podcasts before music")
+    for (const n of [1, 2, 3]) assert.match(index, new RegExp(`<section class="rail" data-rail="lang-${n}"[^>]*><!--OB:RAIL:lang-${n}-->`), `lang-${n}'s marker is tight against its section (so .rail:empty hides an empty slot)`)
+    assert.ok(read('assets/css/discover.css').includes('.rail:empty { display: none; }'), 'an empty rail takes no room')
     assert.ok(!index.includes('artists-week') && !Object.keys(RAILS).includes('artists-week'), 'Top Artists This Week came off the page')
     assert.ok(index.includes('<h2 id="rail-recommended">Podcasts Recommended For You</h2>') && index.includes('<h2 id="rail-recommended-music">Music Recommended For You</h2>'), 'both recommendation rails say what they recommend')
   })
@@ -428,18 +433,32 @@ console.log('\nThe recommendations and the data rails, over the real schema:')
     assert.ok(!pods.includes('show-D'), 'one booster from one seed is under the floor')
     assert.ok(!pods.includes('album-A'), 'music stays on the music side')
     assert.deepEqual(j.music.map((x) => x.guid), ['album-A'])
-    // show-2's neighbours (show-B, show-D) each share one booster: no rail for it.
-    // album-1 shares two with album-A, so it has one; most-boosted seed first.
-    assert.deepEqual(j.because.map((b) => b.seed.guid), ['show-1', 'album-1'])
-    assert.deepEqual(j.because.map((b) => b.rows.map((x) => x.guid)), [['show-A'], ['album-A']])
-    assert.equal(j.because[1].seed.medium, 'music', 'the seed carries its medium, for the tile')
+    // show-1 reaches show-A alone over the floor and album-1 reaches
+    // album-A: one tile each, under the four-tile floor of 2026-10-22.
+    assert.deepEqual(j.because, [], 'a Because rail with fewer than four tiles is not shown')
   })
-  await checkAsync('Because rails: one per most-boosted seed, a show on the first rail that reaches it only', async () => {
-    sim.run('show-2', 'show-A', 0.5, 2, 3)   // show-2 now reaches show-A too, but show-1 already shows it
-    sim.run('show-2', 'show-C', 0.2, 2, 4)
+  await checkAsync('Because rails (2026-10-22): the seed with the most to show first, a show on one rail only, under four tiles no rail', async () => {
+    for (const k of ['E', 'F', 'G', 'H', 'I', 'J', 'K']) pod.run(`show-${k}`, `Neighbour ${k}`, null, 'podcast', 100, 2, 2, now - 100 * 86400)
+    pod.run('album-B', 'Neighbour Album B', null, 'music', 100, 2, 2, now - 100 * 86400)
+    pod.run('album-C', 'Neighbour Album C', null, 'music', 100, 2, 2, now - 100 * 86400)
+    // show-2 (boosted once) reaches five shows; show-1 (boosted twice) five
+    // too, one of them show-A, which show-2 reaches as well.
+    let r = 3
+    for (const k of ['A', 'C', 'E', 'F', 'G']) sim.run('show-2', `show-${k}`, 0.4, 2, r++)
+    r = 4
+    for (const k of ['H', 'I', 'J', 'K']) sim.run('show-1', `show-${k}`, 0.3, 2, r++)
+    // album-1 reaches three albums: under the floor.
+    sim.run('album-1', 'album-B', 0.3, 2, 2)
+    sim.run('album-1', 'album-C', 0.3, 2, 3)
     const j = await (await post({ pubkey: ME })).json()
-    assert.deepEqual(j.because.map((b) => b.seed.guid), ['show-1', 'album-1', 'show-2'], 'by boosts, then the most recent boost')
-    assert.deepEqual(j.because.map((b) => b.rows.map((x) => x.guid)), [['show-A'], ['album-A'], ['show-C']])
+    assert.deepEqual(j.because.map((b) => b.seed.guid), ['show-1', 'show-2'], 'five and five: the tie goes to the more-boosted seed; album-1 at three tiles is out')
+    assert.deepEqual(j.because[0].rows.map((x) => x.guid), ['show-A', 'show-H', 'show-I', 'show-J', 'show-K'], 'in the collector\'s rank order')
+    assert.deepEqual(j.because[1].rows.map((x) => x.guid), ['show-C', 'show-E', 'show-F', 'show-G'], 'show-A is on the first rail only; four left is exactly the floor')
+    assert.equal(j.because[0].seed.medium, 'podcast', 'the seed carries its medium, for the tile')
+    // Take show-1's own neighbours down to four and show-2 is the bigger rail and goes first.
+    db.prepare("DELETE FROM show_similar WHERE podcast_guid = 'show-1' AND other_guid = 'show-K'").run()
+    const j2 = await (await post({ pubkey: ME })).json()
+    assert.deepEqual(j2.because.map((b) => b.seed.guid), ['show-2'], 'show-2 first with five; show-1 is left with three (A taken) and is dropped')
   })
   await checkAsync('a member with no boosts gets empty lists, a bad pubkey a 400, a publisher key nothing', async () => {
     const j = await (await post({ pubkey: 'd'.repeat(64) })).json()
@@ -453,7 +472,7 @@ console.log('\nThe recommendations and the data rails, over the real schema:')
     const j = await (await post({ pubkey: 'd'.repeat(64), favorites: ['show-1', 'bad guid with spaces'] })).json()
     assert.equal(j.seeds, 1)
     // show-2 is a candidate HERE: this member never boosted it, so it is not a seed.
-    assert.deepEqual(j.podcasts.map((x) => x.guid).sort(), ['show-2', 'show-A'])
+    assert.deepEqual(j.podcasts.map((x) => x.guid).sort(), ['show-2', 'show-A', 'show-H', 'show-I', 'show-J'], 'show-1\'s neighbours over the floor (H, I, J joined the fixture above)')
     assert.deepEqual(j.because, [], 'because needs a BOOSTED seed')
   })
   await checkAsync('New and Noteworthy: first boost within 90 days and two boosters, newest debuts after the better-backed', async () => {
@@ -474,6 +493,62 @@ console.log('\nThe recommendations and the data rails, over the real schema:')
     assert.ok(html.includes('Seed One') && html.includes('New this week'))
     assert.equal(lead.eyebrow, 'New on the Chart This Week', 'a debut leads: the eyebrow says so')
     assert.match(lead.line, /not on last week's chart$/)
+  })
+  await checkAsync('the window rails (2026-10-22): each chart over each window, ten tiles, no hero slide', async () => {
+    const { WINDOWS } = await import('../functions/index.js')
+    assert.deepEqual(Object.keys(WINDOWS), ['1w', '1m', '1y'])
+    const { html, lead } = await RAILS['shows-year'](env)
+    assert.ok(html.includes('Seed One') && html.includes('href="/show/show-1"'), 'the year\'s shows chart')
+    assert.equal(lead, null, 'no slide: the same show tops a week, a month and a year')
+    const songs = await RAILS['songs-week'](env)
+    assert.ok(songs.html.includes('class="rail-empty"') || songs.html.includes('rail-list'), 'a chart with nothing in the window says so')
+    for (const k of ['episodes-week', 'episodes-month', 'songs-month', 'albums-week', 'albums-year', 'shows-month']) {
+      const r = await RAILS[k](env)
+      assert.equal(typeof r.html, 'string'); assert.equal(r.lead, null, `${k} leads no slide`)
+    }
+    const dsrc = read('assets/js/discover.js')
+    for (const k of ['episodes-week', 'songs-month', 'albums-year', 'shows-month']) assert.ok(dsrc.includes(`'${k.split('-')[0]}:`) || dsrc.includes('WINDOW_KINDS'), k)
+  })
+  await checkAsync('the language rails (2026-10-22): the largest non-English languages, a slot needs five rows, the heading names the language', async () => {
+    const { languageRails, languageCandidates, LANG_RAILS, LANG_MIN_ROWS } = await import('../functions/index.js')
+    assert.equal(LANG_RAILS, 3); assert.equal(LANG_MIN_ROWS, 5)
+    const lp = db.prepare('INSERT INTO podcasts(podcast_guid,title,image,medium,language,total_sats,booster_count,boost_count) VALUES(?,?,?,?,?,?,?,?)')
+    lp.run('de-1', 'Münzweg', null, 'podcast', 'de', 900, 3, 9)
+    lp.run('de-2', 'Nodesignal', null, 'podcast', 'de', 800, 2, 8)
+    lp.run('de-3', 'Einundzwanzig', null, 'podcast', 'de', 700, 2, 7)
+    lp.run('de-4', 'Blocktrainer', null, 'podcast', 'de', 600, 2, 6)
+    lp.run('de-5', 'Bitcoin verstehen', null, 'podcast', 'de', 500, 2, 5)
+    lp.run('es-1', 'Lunaticoin', null, 'podcast', 'es', 600, 2, 6)
+    lp.run('es-2', 'Kapital', null, 'podcast', 'es', 100, 1, 1)
+    lp.run('es-3', 'Bitcoinismo', null, 'podcast', 'es', 100, 1, 1)
+    lp.run('es-4', 'CriptoMonedas TV', null, 'podcast', 'es', 100, 1, 1)
+    lp.run('de-music', 'Ein Album', null, 'music', 'de', 5000, 9, 99) // the music side does not count
+    lp.run('en-1', 'An English Show', null, 'podcast', 'en', 9000, 9, 99)
+    let n = 100
+    for (const [g, k] of [['de-1', 3], ['de-2', 2], ['de-3', 2], ['de-4', 2], ['de-5', 1], ['es-1', 2], ['es-2', 1], ['es-3', 1], ['es-4', 1], ['en-1', 4]]) {
+      for (let i = 0; i < k; i++) boost.run(`lb-${n}`, String.fromCharCode(97 + i).repeat(64), now - (n++) * 60, 100, g, null)
+    }
+    assert.deepEqual(await languageCandidates(env), ['de', 'es'], 'by boosts on the podcast side, English and untagged out')
+    const rails = await languageRails(env)
+    assert.deepEqual(rails.map((r) => [r.lang, r.rows.length]), [['de', 5]], 'Spanish has four shows this year: under the floor of five')
+    const ctx = {}
+    const one = await RAILS['lang-1'](env, ctx)
+    assert.ok(one.html.includes('<h2 id="rail-lang-1"><a href="/podcasts/shows?range=1y&amp;lang=de">Top German Podcasts This Year</a></h2>'), one.html.slice(0, 200))
+    assert.ok(one.html.includes('View the chart →') && one.html.includes('Münzweg') && one.html.includes('Nodesignal'))
+    assert.equal(one.lead.eyebrow, '#1 German Podcast This Year'); assert.equal(one.lead.title, 'Münzweg')
+    const two = await RAILS['lang-2'](env, ctx)
+    assert.equal(two.html, ''); assert.equal(two.lead, null, 'an empty slot renders empty, which the CSS hides')
+    // One answer per request: the three slots share ctx.
+    let asked = 0
+    const counting = { DB: { prepare: (sql) => { if (/GROUP BY language/.test(sql)) asked++; return env.DB.prepare(sql) } } }
+    const c2 = {}
+    await Promise.all([1, 2, 3].map((i) => RAILS[`lang-${i}`](counting, c2)))
+    assert.equal(asked, 1, 'the candidates are read once for the three slots')
+    const { langRailHtml } = tile
+    assert.equal(langRailHtml(2, 'es', []), '<div class="rail-head"><h2 id="rail-lang-2"><a href="/podcasts/shows?range=1y&amp;lang=es">Top Spanish Podcasts This Year</a></h2><a class="rail-more" href="/podcasts/shows?range=1y&amp;lang=es">View the chart →</a></div><div class="rail-track"><p class="rail-empty">No Spanish-language podcasts boosted this year.</p></div>')
+    const ln = read('assets/js/lang-name.js')
+    assert.ok(!/Date\.now\(/.test(ln) && !ln.includes('import '), 'lang-name.js is two-sided and imports nothing')
+    assert.ok(read('assets/js/feed-lang.js').includes("from '/assets/js/lang-name.js?v="), 'feed-lang.js reads the same name')
   })
 }
 
@@ -503,7 +578,7 @@ console.log('\nThe nav bar: three ribbons, then Charts and Boosts as plain links
   check("the Podcasts ribbon's Discover column is the rails not already in its lists, plus the personal ones", () => {
     const pod = links.slice(links.indexOf('data-ribbon="podcasts"'), links.indexOf('data-ribbon="music"'))
     const disc = pod.slice(pod.indexOf('<h4>Discover</h4>'), pod.indexOf('nav-ribbon-feat'))
-    for (const t of ['Top Episodes This Year', 'New and Noteworthy', 'Movers This Week', 'Podcasters Recommend', 'Podcasts Recommended For You', 'Top Shows From Your Follows']) assert.ok(disc.includes(`>${t}</a>`), t)
+    for (const t of ['Top Episodes This Year', 'New and Noteworthy', 'Movers This Week', 'Podcasters Recommend', 'Top Podcasts by Language', 'Podcasts Recommended For You', 'Top Shows From Your Follows']) assert.ok(disc.includes(`>${t}</a>`), t)
     assert.ok(!disc.includes('Shows Chart') && !disc.includes('Top Shows This Week'))
   })
   check('the #40HPW ribbon lists #40HPW and the largest boosts, and its Discover is the three Reed named (Top Members still among them)', () => {
@@ -515,7 +590,7 @@ console.log('\nThe nav bar: three ribbons, then Charts and Boosts as plain links
     assert.ok(!mem.includes('Live'), 'Live means something else in podcasting')
   })
   check("every Discover link lands on a homepage rail id or a charts view, and the rail ids exist", () => {
-    for (const m of links.matchAll(/href="\/#([a-z-]+)"/g)) assert.ok(index.includes(`id="${m[1]}"`), `index.html has #${m[1]}`)
+    for (const m of links.matchAll(/href="\/#([a-z0-9-]+)"/g)) assert.ok(index.includes(`id="${m[1]}"`), `index.html has #${m[1]}`)
   })
   check('the overlay and the footer name the same places', () => {
     const overlay = nav.slice(nav.indexOf('nav-explore-sections'), nav.indexOf('nav-explore-group">\n            <h4>Stats'))
@@ -641,6 +716,34 @@ console.log('\nThe member\'s recommendations on their own page (2026-10-20):')
   check('candr_boost_bot is in both publisher lists', () => {
     const key = '978bbd44d918cc998c21f63150171046ae1173bbea1b7d1c6500d82b1063ed36'
     assert.ok(read('functions/api/v1/_common.js').includes(key) && read('functions/_shared/feed-rank.js').includes(key))
+  })
+}
+
+console.log('\nA pasted npub is a member lookup (2026-10-22):')
+{
+  const { pubkeyQuery, resultsHtml } = await import('../functions/search.js')
+  const NP = 'npub1xgyjasdztryl9sg6nfdm2wcj0j3qjs03sq7a0an32pg0lr5l6yaqxhgu7s'
+  const HEX = '32092ec1a258c9f2c11a9a5bb53b127ca20941f1803dd7f6715050ff8e9fd13a'
+  check('pubkeyQuery takes an npub, a nostr: npub and a hex pubkey, and nothing else', () => {
+    assert.equal(pubkeyQuery(NP), NP)
+    assert.equal(pubkeyQuery(' nostr:' + NP + ' '), NP)
+    assert.equal(pubkeyQuery(HEX.toUpperCase()), HEX.toUpperCase())
+    for (const q of ['npub1short', 'bitcoin', NP + 'x', HEX.slice(1), '']) assert.equal(pubkeyQuery(q), null, q)
+  })
+  check('the results page: a found key is the member wall, a miss says the account is not in the index', () => {
+    const hit = resultsHtml(NP, { members: [{ pk: HEX, npub: NP, name: 'Reed', pic: null, sats: 1, boosts: 1, shows: 1 }] })
+    assert.ok(hit.includes('id="members"') && hit.includes('This account is in the index'), hit.slice(0, 300))
+    assert.ok(!hit.includes('Shows</h2>'), 'no empty chart groups for a key')
+    const miss = resultsHtml(NP, { members: [] })
+    assert.ok(miss.includes('is not in the index') && miss.includes('npub1xgyjasd…xhgu7s') && !miss.includes('Nothing matched'), miss)
+  })
+  check('the typeahead carries the same rule and asks the member endpoint alone', () => {
+    const src = read('assets/js/nav-search.js')
+    assert.ok(src.includes('export function pubkeyQuery(q)') && src.includes("replace(/^nostr:/i, '')"))
+    assert.ok(src.includes('const key = pubkeyQuery(q)') && src.includes('is not in the index'))
+    assert.ok(src.includes('highlight(0) // Enter opens the member'), 'Enter on a found member opens their page')
+    const f = read('functions/search.js')
+    assert.ok(f.includes('if (key) return { shows: [], albums: [], episodes: [], songs: [], artists: [], members: await findMembers(env, request, key) };'), 'the Function skips the FTS paths for a key')
   })
 }
 

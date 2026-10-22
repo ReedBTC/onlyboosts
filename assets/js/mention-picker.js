@@ -30,8 +30,12 @@
  *
  * Styled by the `.ob-mention-*` rules in boost-actions.css, which every page
  * with a composer links.
+ *
+ * The same input listener swaps a just-typed `:)` for 🙂 (`emoticonAt` in
+ * mention-search.js, 2026-10-22), so every textarea with a people menu has
+ * the smiley too; the boost modal does the same in its onChange.
  */
-import { searchUsers, mentionQueryAt, insertMention, createMentionMap, mentionedPubkeys, formatFollowers, isSafeUrl } from '/assets/js/mention-search.js?v=ob-v232'
+import { searchUsers, mentionQueryAt, insertMention, createMentionMap, mentionedPubkeys, formatFollowers, isSafeUrl, emoticonAt } from '/assets/js/mention-search.js?v=ob-v235'
 
 const DEBOUNCE_MS = 250
 const AVATAR_FALLBACK = '/assets/avatar-fallback.svg'
@@ -159,7 +163,15 @@ export function attachMentionPicker(textarea, { limit } = {}) {
   }
   function onBlur() { setTimeout(() => { if (document.activeElement !== textarea) close() }, 0) }
 
-  textarea.addEventListener('input', update)
+  function onInput() {
+    const sw = emoticonAt(textarea.value, textarea.selectionStart)
+    if (sw) {
+      textarea.value = sw.text
+      textarea.setSelectionRange(sw.caret, sw.caret)
+    }
+    update()
+  }
+  textarea.addEventListener('input', onInput)
   textarea.addEventListener('click', update)
   const onKeyup = (e) => { if (/^(ArrowLeft|ArrowRight|Home|End)$/.test(e.key)) update() }
   textarea.addEventListener('keyup', onKeyup)

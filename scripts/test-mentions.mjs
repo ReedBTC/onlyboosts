@@ -28,7 +28,7 @@ import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import {
   npubEncode, pubkeyFromNpub, mentionQueryAt, insertMention, mentionLabel, createMentionMap,
-  normaliseNpubs, mentionedPubkeys, rankSearchEvents, formatFollowers, matchesSpacedQuery, SEARCH_LIMIT,
+  normaliseNpubs, mentionedPubkeys, rankSearchEvents, formatFollowers, matchesSpacedQuery, SEARCH_LIMIT, emoticonAt,
 } from '../assets/js/mention-search.js'
 import { nip19 } from '../functions/_shared/nostr-sign.js'
 import { buildExternalNoteTemplate, buildDonationNoteTemplate, buildBoostagram, buildLnurlComment, clipMessage, utf8Bytes, MAX_MESSAGE_BYTES } from '../login-widget/src/lib/externalBoostagram.js'
@@ -303,6 +303,31 @@ ok('a mentioned pubkey becomes a `p` tag after the imeta; none by default', () =
   const tags = buildShareTags({ ...base, mentionPubkeys: [SITE_HEX.toUpperCase(), 'junk'] })
   assert.deepEqual(tags.filter((t) => t[0] === 'p'), [['p', SITE_HEX]])
   assert.equal(tags.at(-1)[0], 'p')
+})
+
+console.log('\nthe smiley:')
+ok('`:)` and `:-)` just typed on their own become 🙂, the caret after it', () => {
+  assert.deepEqual(emoticonAt(':)', 2), { text: '🙂', caret: 2 })
+  assert.deepEqual(emoticonAt('great show :)', 13), { text: 'great show 🙂', caret: 13 })
+  assert.deepEqual(emoticonAt('great show :-)', 14), { text: 'great show 🙂', caret: 13 })
+  assert.deepEqual(emoticonAt('yes :) and more', 6), { text: 'yes 🙂 and more', caret: 6 }, 'typed mid-text: the tail is kept')
+  assert.deepEqual(emoticonAt('line\n:)', 7), { text: 'line\n🙂', caret: 7 }, 'after a newline counts as on its own')
+})
+ok('nothing else is read', () => {
+  assert.equal(emoticonAt('f(x:)', 5), null, 'glued to a word: left alone')
+  assert.equal(emoticonAt('great show :) ', 14), null, 'only the emoticon just completed')
+  assert.equal(emoticonAt('great show :)', 11), null, 'the caret is before it')
+  assert.equal(emoticonAt(':(', 2), null)
+  assert.equal(emoticonAt(';)', 2), null)
+  assert.equal(emoticonAt(':', 1), null)
+  assert.equal(emoticonAt('', 0), null)
+  assert.equal(emoticonAt('great show 🙂', 12), null, 'the emoji itself is not re-read')
+})
+ok('every composer runs it: the picker on input, the modal in onChange', () => {
+  const picker = readFileSync(join(ROOT, 'assets/js/mention-picker.js'), 'utf8')
+  const modal = readFileSync(join(ROOT, 'login-widget/src/components/ExternalBoostModal.jsx'), 'utf8')
+  assert.ok(picker.includes('const sw = emoticonAt(textarea.value, textarea.selectionStart)') && picker.includes("textarea.addEventListener('input', onInput)"))
+  assert.ok(modal.includes('const sw = emoticonAt(next, at)') && modal.includes('setSelectionRange(at, at)'))
 })
 
 console.log('\nwiring, by text scan:')
