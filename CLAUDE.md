@@ -180,7 +180,8 @@ was picked from is in the session memory; direction A won, with the sans.
   LANGUAGE RAILS sit between Podcasters Recommend and the Because rails,
   and the foot is ten WINDOW RAILS**: Episodes, Songs, Albums and Shows
   over the week, the month and the year, the two already at the head
-  (Shows This Week, Albums This Month) not repeated; `windowRail` in
+  (Shows This Week, Albums This Month) not repeated, **podcasts before
+  music** (episodes, shows, then songs, albums; Reed's order); `windowRail` in
   `functions/index.js`, trailing windows (`range=1w|1m|1y`, the window the
   link opens), no hero slide for any but the two year rails (the same
   subject tops all three windows). **The language rails are three SLOTS,
@@ -189,10 +190,11 @@ was picked from is in the session memory; direction A won, with the sans.
   `langRailHtml` in `rail-tile.js` renders head and track; an empty slot
   renders empty and `.rail:empty` hides it): `languageRails` takes the
   podcast side's non-English languages by boosts, `en` and NULL out, the
-  first three whose year chart has `LANG_MIN_ROWS` (3) rows, memoized per
+  first three whose year chart has `LANG_MIN_ROWS` (5; Reed's floor, set
+  the same day a three-tile Italian rail went up at 3) rows, memoized per
   request on the `ctx` every rail now receives; `lang-1` leads a slide
-  ("#1 German Podcast This Year"). German, Spanish and Italian on
-  2026-10-22. `assets/js/lang-name.js` is the two-sided subtag → English
+  ("#1 German Podcast This Year"). German and Spanish on 2026-10-22, the
+  third slot empty until a language reaches five. `assets/js/lang-name.js` is the two-sided subtag → English
   name (`feed-lang.js` reads it too). The Podcasts ribbon's Discover column
   links `/#rail-lang-1` as "Top Podcasts by Language".
   `test-discover-home.mjs` pins the first three, the personal rails'

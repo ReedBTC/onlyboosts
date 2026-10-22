@@ -348,10 +348,13 @@ indexed Nostr boost; nothing about a visitor is stored.
 - **Top Podcasts by Language** (2026-10-22): three rails, the year's Shows
   chart filtered to each of the three largest non-English languages: the
   podcast side's languages by indexed boosts, `en` and NULL out, the first
-  three whose year chart has >= 3 rows. `languageRails` in
-  `functions/index.js`. 2026-10-22: German (49 shows, 5,070 boosts), Spanish
-  (15, 656), Italian (5, 195); French (5 shows, 56 boosts, 4 in the year
-  chart) and Dutch next.
+  three whose year chart has >= 5 rows (Reed's floor; it was 3 for a few
+  hours and seated a three-tile Italian rail). `languageRails` in
+  `functions/index.js`. 2026-10-22: German (49 shows, 5,070 boosts, 10 in
+  the year chart) and Spanish (15, 656, 7) qualify; Italian (3 in the year
+  chart), French (4) and Dutch (3) do not, so the third slot is empty.
+- **The window rails' order** is podcasts then music: episodes (week,
+  month, year), shows (month, year), then songs and albums.
 - **#40HPW**: the week's ten members by hours of podcasts boosted, as the
   Members tab counts them; gold past forty hours.
 - **Podcasts Recommended For You / Music Recommended For You** (named

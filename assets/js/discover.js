@@ -24,12 +24,12 @@
  *    feed cards' own handlers. A rail the edge could not fill gets its slide
  *    rebuilt here from the rows fetched for the rail, with the same mappers.
  */
-import { railListHtml, showTile, albumTile, episodeTile, memberTile, langRailHtml } from '/assets/js/rail-tile.js?v=ob-v233'
-import { heroHtml, slideHtml, showSlide, episodeSlide, memberSlide } from '/assets/js/hero.js?v=ob-v233'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v233'
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v233'
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v233'
-import { languageName } from '/assets/js/lang-name.js?v=ob-v233'
+import { railListHtml, showTile, albumTile, episodeTile, memberTile, langRailHtml } from '/assets/js/rail-tile.js?v=ob-v234'
+import { heroHtml, slideHtml, showSlide, episodeSlide, memberSlide } from '/assets/js/hero.js?v=ob-v234'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v234'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v234'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v234'
+import { languageName } from '/assets/js/lang-name.js?v=ob-v234'
 
 const TILES = 10
 
@@ -76,10 +76,10 @@ for (const [kind, k] of Object.entries(WINDOW_KINDS)) {
 /* The language rails (2026-10-22), the edge's rule rebuilt here when a slot
    kept its placeholder: the podcast side's non-English languages by boosts
    (the facet /api/v1/languages answers, the untagged bucket out), each
-   kept when its year chart has three or more rows, the first three. One
+   kept when its year chart has five or more rows, the first three. One
    answer shared by the three slots. */
 const LANG_RAILS = 3
-const LANG_MIN_ROWS = 3
+const LANG_MIN_ROWS = 5
 let langRailsP = null
 function languageRails() {
   return langRailsP ??= (async () => {
@@ -182,11 +182,11 @@ function wireHeroBoost(hero) {
     try {
       const kind = slide.dataset.kind
       if (kind === 'episode' || kind === 'song') {
-        const m = await import('/assets/js/episode-card-actions.js?v=ob-v233')
+        const m = await import('/assets/js/episode-card-actions.js?v=ob-v234')
         btn.disabled = false
         await m.onBoostClick(slide, btn)
       } else {
-        const m = await import('/assets/js/show-card-actions.js?v=ob-v233')
+        const m = await import('/assets/js/show-card-actions.js?v=ob-v234')
         btn.disabled = false
         await m.onShowBoost(slide, btn)
       }

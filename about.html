@@ -48,12 +48,12 @@
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v233" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v233" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v234" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v234" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v233" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v233" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v234" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v234" />
 </head>
 <body>
 
@@ -573,7 +573,7 @@
         <p>Top Shows This Week and Top Albums This Month at the head of the page, and the run of Top Episodes, Top Songs, Top Albums and Top Shows over the week, the month and the year at its foot, are the <a href="#charts">OnlyBoosts Charts</a> computed over that window of boost time. Top Shows This Week is the week of the Charts page, Monday 00:00 to Sunday night US Pacific; every other window is trailing, the last 7, 30 or 365 days, which is the window of the chart view each rail links to. The ten tiles are the chart&rsquo;s first ten places, and the line under each tile prints the three component ranks (sats / boosters / boosts) that produced the place, so any tile can be checked against the chart view it links to.</p>
 
         <h3>Top Podcasts by Language</h3>
-        <p>Three rails, one for each of the three largest non-English languages in the index, each the year&rsquo;s Shows chart filtered to that language. The three are chosen by the index, not by hand: the podcast side&rsquo;s languages ranked by indexed boosts, with English left out, taking the first three whose year chart holds at least three shows. On 2026-10-22 that was German, Spanish and Italian. A show&rsquo;s language is the one its own feed declares; a feed that declares none is not treated as English and is on no language rail.</p>
+        <p>Three rails, one for each of the three largest non-English languages in the index, each the year&rsquo;s Shows chart filtered to that language. The three are chosen by the index, not by hand: the podcast side&rsquo;s languages ranked by indexed boosts, with English left out, taking the first three whose year chart holds at least five shows. On 2026-10-22 that was German and Spanish, with the third place empty until another language reaches five. A show&rsquo;s language is the one its own feed declares; a feed that declares none is not treated as English and is on no language rail.</p>
 
         <h3>Nostr Gang #40HPW Challenge</h3>
         <p>The week&rsquo;s ten members by hours of podcasts boosted, counted exactly as the Members tab counts them: the published duration of every episode the member boosted this week, each episode once. A member past forty hours wears a gold badge. The rules dialog on the Members tab states the counting rules in full.</p>
@@ -867,15 +867,15 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v233"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v234"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v233" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v234" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v233" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v234" defer></script>
 
-<script src="/assets/js/nav.js?v=ob-v233" defer></script>
+<script src="/assets/js/nav.js?v=ob-v234" defer></script>
 
 </body>
 </html>

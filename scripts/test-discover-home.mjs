@@ -62,8 +62,8 @@ console.log('\nThe markers and the renderers agree:')
     for (const p of personal) assert.ok(order.indexOf(p) >= 3, `${p} is the fourth rail or later`)
     assert.deepEqual(order, ['shows-week', 'albums-month', 'hpw-week', 'recommended', 'recommended-music', 'follows', 'new-shows', 'movers', 'podroll',
       'lang-1', 'lang-2', 'lang-3', 'because',
-      'episodes-week', 'episodes-month', 'episodes-year', 'songs-week', 'songs-month', 'songs-year', 'albums-week', 'albums-year', 'shows-month', 'shows-year'],
-      "Reed's order of 2026-10-21 with the 2026-10-22 additions: the language rails under Podcasters Recommend, the window rails at the foot")
+      'episodes-week', 'episodes-month', 'episodes-year', 'shows-month', 'shows-year', 'songs-week', 'songs-month', 'songs-year', 'albums-week', 'albums-year'],
+      "Reed's order of 2026-10-21 with the 2026-10-22 additions: the language rails under Podcasters Recommend, the window rails at the foot, podcasts before music")
     for (const n of [1, 2, 3]) assert.match(index, new RegExp(`<section class="rail" data-rail="lang-${n}"[^>]*><!--OB:RAIL:lang-${n}-->`), `lang-${n}'s marker is tight against its section (so .rail:empty hides an empty slot)`)
     assert.ok(read('assets/css/discover.css').includes('.rail:empty { display: none; }'), 'an empty rail takes no room')
     assert.ok(!index.includes('artists-week') && !Object.keys(RAILS).includes('artists-week'), 'Top Artists This Week came off the page')
@@ -509,24 +509,28 @@ console.log('\nThe recommendations and the data rails, over the real schema:')
     const dsrc = read('assets/js/discover.js')
     for (const k of ['episodes-week', 'songs-month', 'albums-year', 'shows-month']) assert.ok(dsrc.includes(`'${k.split('-')[0]}:`) || dsrc.includes('WINDOW_KINDS'), k)
   })
-  await checkAsync('the language rails (2026-10-22): the largest non-English languages, a slot needs three rows, the heading names the language', async () => {
+  await checkAsync('the language rails (2026-10-22): the largest non-English languages, a slot needs five rows, the heading names the language', async () => {
     const { languageRails, languageCandidates, LANG_RAILS, LANG_MIN_ROWS } = await import('../functions/index.js')
-    assert.equal(LANG_RAILS, 3); assert.equal(LANG_MIN_ROWS, 3)
+    assert.equal(LANG_RAILS, 3); assert.equal(LANG_MIN_ROWS, 5)
     const lp = db.prepare('INSERT INTO podcasts(podcast_guid,title,image,medium,language,total_sats,booster_count,boost_count) VALUES(?,?,?,?,?,?,?,?)')
     lp.run('de-1', 'Münzweg', null, 'podcast', 'de', 900, 3, 9)
     lp.run('de-2', 'Nodesignal', null, 'podcast', 'de', 800, 2, 8)
     lp.run('de-3', 'Einundzwanzig', null, 'podcast', 'de', 700, 2, 7)
+    lp.run('de-4', 'Blocktrainer', null, 'podcast', 'de', 600, 2, 6)
+    lp.run('de-5', 'Bitcoin verstehen', null, 'podcast', 'de', 500, 2, 5)
     lp.run('es-1', 'Lunaticoin', null, 'podcast', 'es', 600, 2, 6)
     lp.run('es-2', 'Kapital', null, 'podcast', 'es', 100, 1, 1)
+    lp.run('es-3', 'Bitcoinismo', null, 'podcast', 'es', 100, 1, 1)
+    lp.run('es-4', 'CriptoMonedas TV', null, 'podcast', 'es', 100, 1, 1)
     lp.run('de-music', 'Ein Album', null, 'music', 'de', 5000, 9, 99) // the music side does not count
     lp.run('en-1', 'An English Show', null, 'podcast', 'en', 9000, 9, 99)
     let n = 100
-    for (const [g, k] of [['de-1', 3], ['de-2', 2], ['de-3', 2], ['es-1', 2], ['es-2', 1], ['en-1', 4]]) {
+    for (const [g, k] of [['de-1', 3], ['de-2', 2], ['de-3', 2], ['de-4', 2], ['de-5', 1], ['es-1', 2], ['es-2', 1], ['es-3', 1], ['es-4', 1], ['en-1', 4]]) {
       for (let i = 0; i < k; i++) boost.run(`lb-${n}`, String.fromCharCode(97 + i).repeat(64), now - (n++) * 60, 100, g, null)
     }
     assert.deepEqual(await languageCandidates(env), ['de', 'es'], 'by boosts on the podcast side, English and untagged out')
     const rails = await languageRails(env)
-    assert.deepEqual(rails.map((r) => [r.lang, r.rows.length]), [['de', 3]], 'Spanish has two shows this year: under the floor')
+    assert.deepEqual(rails.map((r) => [r.lang, r.rows.length]), [['de', 5]], 'Spanish has four shows this year: under the floor of five')
     const ctx = {}
     const one = await RAILS['lang-1'](env, ctx)
     assert.ok(one.html.includes('<h2 id="rail-lang-1"><a href="/podcasts/shows?range=1y&amp;lang=de">Top German Podcasts This Year</a></h2>'), one.html.slice(0, 200))

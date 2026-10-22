@@ -68,14 +68,14 @@
   <meta name="twitter:card" content="summary_large_image" />
 
   <link rel="preload" href="/assets/fonts/outfit.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v233" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v233" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v234" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v234" />
   <!-- The boost rows at the foot are the detail pages' rows and wear their
        sheets: the card, the thread chrome and the reaction bar. -->
-  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v233" />
+  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v234" />
   <!-- theme.css last among the shared sheets: the palette, the fonts, and
        the base body/a/img rules every shared stylesheet reads off :root. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v233" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v234" />
 </head>
 <body>
 
@@ -536,8 +536,10 @@
        scrolling): each chart over the week, the month and the year, ten
        tiles each, the ranked endpoint's own query with the arguments the
        link opens. Shows This Week and Albums This Month are at the top of
-       the page already, so this run carries the other two windows of each.
-       Only the two year rails lead a hero slide; see functions/index.js. -->
+       the page already, so this run carries the other two windows of each:
+       episodes, then shows, then the music (songs, albums) closes the page
+       (Reed's order, 2026-10-22). Only the two year rails lead a hero
+       slide; see functions/index.js. -->
   <section class="rail" data-rail="episodes-week" aria-labelledby="rail-episodes-week">
     <div class="rail-head">
       <h2 id="rail-episodes-week"><a href="/podcasts/episodes?range=1w">Top Episodes This Week</a></h2>
@@ -560,6 +562,22 @@
       <a class="rail-more" href="/podcasts/episodes?range=1y">View the chart →</a>
     </div>
     <div class="rail-track"><!--OB:RAIL:episodes-year--><p class="rail-placeholder">Loading this year's episodes…</p><!--/OB:RAIL:episodes-year--></div>
+  </section>
+
+  <section class="rail" data-rail="shows-month" aria-labelledby="rail-shows-month">
+    <div class="rail-head">
+      <h2 id="rail-shows-month"><a href="/podcasts/shows?range=1m">Top Shows This Month</a></h2>
+      <a class="rail-more" href="/podcasts/shows?range=1m">View the chart →</a>
+    </div>
+    <div class="rail-track"><!--OB:RAIL:shows-month--><p class="rail-placeholder">Loading this month's shows…</p><!--/OB:RAIL:shows-month--></div>
+  </section>
+
+  <section class="rail" data-rail="shows-year" aria-labelledby="rail-shows-year">
+    <div class="rail-head">
+      <h2 id="rail-shows-year"><a href="/podcasts/shows?range=1y">Top Shows This Year</a></h2>
+      <a class="rail-more" href="/podcasts/shows?range=1y">View the chart →</a>
+    </div>
+    <div class="rail-track"><!--OB:RAIL:shows-year--><p class="rail-placeholder">Loading this year's shows…</p><!--/OB:RAIL:shows-year--></div>
   </section>
 
   <section class="rail" data-rail="songs-week" aria-labelledby="rail-songs-week">
@@ -600,22 +618,6 @@
       <a class="rail-more" href="/music/albums?range=1y">View the chart →</a>
     </div>
     <div class="rail-track"><!--OB:RAIL:albums-year--><p class="rail-placeholder">Loading this year's albums…</p><!--/OB:RAIL:albums-year--></div>
-  </section>
-
-  <section class="rail" data-rail="shows-month" aria-labelledby="rail-shows-month">
-    <div class="rail-head">
-      <h2 id="rail-shows-month"><a href="/podcasts/shows?range=1m">Top Shows This Month</a></h2>
-      <a class="rail-more" href="/podcasts/shows?range=1m">View the chart →</a>
-    </div>
-    <div class="rail-track"><!--OB:RAIL:shows-month--><p class="rail-placeholder">Loading this month's shows…</p><!--/OB:RAIL:shows-month--></div>
-  </section>
-
-  <section class="rail" data-rail="shows-year" aria-labelledby="rail-shows-year">
-    <div class="rail-head">
-      <h2 id="rail-shows-year"><a href="/podcasts/shows?range=1y">Top Shows This Year</a></h2>
-      <a class="rail-more" href="/podcasts/shows?range=1y">View the chart →</a>
-    </div>
-    <div class="rail-track"><!--OB:RAIL:shows-year--><p class="rail-placeholder">Loading this year's shows…</p><!--/OB:RAIL:shows-year--></div>
   </section>
 
   <!-- The foot of the page: ONE CLICK INTO THE BOOST FEED. The newest boost
@@ -694,12 +696,12 @@
 <!-- FOOTER:END -->
 
 <!-- Lazy widget bootstrap (Donate + identity slot) -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v233"></script>
-<script src="/assets/js/sw-register.js?v=ob-v233" defer></script>
-<script src="/assets/widgets/pwa-install.js?v=ob-v233" defer></script>
-<script src="/assets/js/nav.js?v=ob-v233" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v234"></script>
+<script src="/assets/js/sw-register.js?v=ob-v234" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v234" defer></script>
+<script src="/assets/js/nav.js?v=ob-v234" defer></script>
 <!-- The verbs: artwork fallback, the rails the edge could not fill, and the
      personal rails for a signed-in member. -->
-<script type="module" src="/assets/js/discover.js?v=ob-v233"></script>
+<script type="module" src="/assets/js/discover.js?v=ob-v234"></script>
 </body>
 </html>

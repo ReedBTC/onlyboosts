@@ -41,8 +41,10 @@
 // under Podcasters Recommend. Which three is the index's answer, not a
 // list: the podcast side's languages by boosts, English and the untagged
 // bucket skipped, each kept only if its year chart has LANG_MIN_ROWS rows
-// (a rail of one tile is not a rail). Measured 2026-10-22: German, Spanish
-// and Italian, with French (4 shows) and Dutch (3) next. The three sections
+// (Reed's floor, five: Italian's three-tile rail came off the same day it
+// went up). Measured 2026-10-22: German (10) and Spanish (7) qualify; Italian
+// (3), French (4) and Dutch (3) do not, so the third slot is empty until a
+// language grows into it. The three sections
 // are slots, `lang-1` to `lang-3`, whose marker pair wraps the HEADING too,
 // since the heading names the language; a slot with no language renders
 // empty and discover.css hides an empty rail.
@@ -158,7 +160,7 @@ async function windowRail(env, kind, range) {
 
 /* ── The language rails ──────────────────────────────────────────────────── */
 export const LANG_RAILS = 3;
-export const LANG_MIN_ROWS = 3;
+export const LANG_MIN_ROWS = 5;
 const LANG_CANDIDATES = 8;
 
 /** The podcast side's non-English languages by boosts, largest first, the
