@@ -10,8 +10,9 @@
 // sums those scores over a member's SEEDS — the shows they have boosted, plus
 // the feeds on their PC 2.0 favorites list when the browser hands them over,
 // since that list is a Nostr event only the browser reads — and ranks the
-// candidates that are not already a seed. `because` is one rail per
-// most-boosted seed (up to five, 2026-10-18). Partitioned by medium side, like
+// candidates that are not already a seed. `because` is one rail per seed,
+// the seeds with the most neighbours to show first (up to five, 2026-10-18;
+// biggest first and a floor of four since 2026-10-22). Partitioned by medium side, like
 // the table itself: a podcast's neighbours are podcasts and an album's are
 // albums, and the two scores are not comparable (music's median overlap is
 // nearly three times a podcast's), so they are two lists, never one.
@@ -81,18 +82,27 @@ async function recommendFor(env, seedsJson, music, limit) {
   return (results || []).map(record);
 }
 
-/** Because you boosted X: up to BECAUSE_MAX of the member's most-boosted
- *  shows that have neighbours, each with its neighbours sharing two or more
- *  boosters, minus the seeds. Reed's call, 2026-10-18: five of these rails,
- *  one per show, in place of the boost rows the homepage's foot carried.
+/** Because you boosted X: up to BECAUSE_MAX rails, one per seed, each the
+ *  seed's neighbours sharing two or more boosters with it, minus the
+ *  member's seeds. Reed's call, 2026-10-18: five of these rails, one per
+ *  show, in place of the boost rows the homepage's foot carried.
  *
- *  ⚠️ A SHOW APPEARS ON ONE RAIL ONLY. The member's top shows share an
- *  audience, so their neighbour lists overlap heavily; a neighbour is shown
- *  under the first (most-boosted) seed that reaches it and dropped from the
- *  rest, and a seed left with nothing after that is skipped for the next
- *  candidate. BECAUSE_POOL seeds are read so the skips still fill five. */
+ *  ⚠️ THE SEEDS ARE THE MEMBER'S SHOWS WITH THE MOST TO RECOMMEND, NOT THE
+ *  MOST BOOSTED (Reed's call, 2026-10-22: "we should pick the biggest ones").
+ *  Until then the rails were the five most-boosted seeds in boost order,
+ *  which put a two-tile rail on the page beside a ten-tile one and left Reed
+ *  asking why those five. Now the BECAUSE_POOL most-boosted seeds with
+ *  neighbours are read, and the rails are picked greedily: the seed with
+ *  the most neighbours not yet shown first, then the next, until five or
+ *  until no seed has BECAUSE_MIN left. A rail under the floor is not shown.
+ *
+ *  ⚠️ A SHOW APPEARS ON ONE RAIL ONLY. The member's shows share an audience,
+ *  so their neighbour lists overlap heavily; a neighbour is shown under the
+ *  rail picked first and dropped from the rest, which is why the pick is
+ *  re-counted after every rail rather than ordered once. */
 const BECAUSE_MAX = 5;
-const BECAUSE_POOL = 8;
+const BECAUSE_MIN = 4;
+const BECAUSE_POOL = 12;
 async function becauseOf(env, hex, seedsJson, boosted, limit) {
   if (!boosted.length) return [];
   const { results: seeded } = await env.DB.prepare(
@@ -115,15 +125,20 @@ async function becauseOf(env, hex, seedsJson, boosted, limit) {
     ).bind(seedsJson, seed, limit).all(),
     env.DB.prepare(`SELECT ${TILE_COLS} FROM podcasts p WHERE p.podcast_guid = ?`).bind(seed).all(),
   ])));
+  const pool = perSeed
+    .map(([{ results: rows }, { results: seedRow }], ord) => ({ ord, seed: seedRow?.[0], rows: rows || [] }))
+    .filter((c) => c.seed);
   const shown = new Set();
   const out = [];
-  for (const [{ results: rows }, { results: seedRow }] of perSeed) {
-    if (out.length >= BECAUSE_MAX) break;
-    if (!seedRow?.length) continue;
-    const fresh = (rows || []).filter((r) => !shown.has(r.guid));
-    if (!fresh.length) continue;
-    for (const r of fresh) shown.add(r.guid);
-    out.push({ seed: record(seedRow[0]), rows: fresh.map(record) });
+  while (out.length < BECAUSE_MAX && pool.length) {
+    // The biggest rail left, counted against what earlier rails took; a tie
+    // goes to the seed the member boosted more.
+    for (const c of pool) c.fresh = c.rows.filter((r) => !shown.has(r.guid));
+    pool.sort((a, b) => b.fresh.length - a.fresh.length || a.ord - b.ord);
+    const pick = pool.shift();
+    if (pick.fresh.length < BECAUSE_MIN) break;
+    for (const r of pick.fresh) shown.add(r.guid);
+    out.push({ seed: record(pick.seed), rows: pick.fresh.map(record) });
   }
   return out;
 }

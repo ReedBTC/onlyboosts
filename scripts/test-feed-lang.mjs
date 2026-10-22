@@ -27,12 +27,15 @@ import { tmpdir } from 'node:os'
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 /* feed-lang.js imports its siblings by ABSOLUTE, version-stamped URL, which node
- * cannot resolve. Rewrite those two imports to local stubs and load the result.
- * Everything else in the file is the shipped source. */
+ * cannot resolve. Rewrite the two dependency imports to local stubs, and the
+ * language-name import (two-sided, dependency-free since 2026-10-22) to the
+ * shipped file itself, and load the result. Everything else in the file is
+ * the shipped source. */
 const dir = mkdtempSync(join(tmpdir(), 'ob-lang-'))
 const src = readFileSync(join(ROOT, 'assets/js/feed-lang.js'), 'utf8')
   .replace(/from '\/assets\/js\/feed-controls\.js[^']*'/, "from './feed-controls.js'")
   .replace(/from '\/assets\/js\/ob-live\.js[^']*'/, "from './ob-live.js'")
+  .replace(/from '\/assets\/js\/lang-name\.js[^']*'/, `from '${pathToFileURL(join(ROOT, 'assets/js/lang-name.js')).href}'`)
 
 writeFileSync(join(dir, 'feed-controls.js'), `
 /* Only what langControl uses: a wrap element carrying a button and a menu. */

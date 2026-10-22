@@ -15,6 +15,9 @@
 
 /* ── A rail ── */
 .rail { min-width: 0; }
+/* A language slot the edge found no language for renders empty (its marker
+   pair is tight against the section); it takes no room. */
+.rail:empty { display: none; }
 .rail [id] { scroll-margin-top: 5rem; } /* the nav's Discover links land on a rail heading under the sticky bar */
 .rail-head {
   display: flex;

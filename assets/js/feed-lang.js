@@ -43,8 +43,9 @@
  * scrolls it (feed-cards.css). That is the real constraint; a floor would have
  * been a cap on the data to avoid solving it.
  */
-import { sortControl } from '/assets/js/feed-controls.js?v=ob-v232'
-import { getLanguages } from '/assets/js/ob-live.js?v=ob-v232'
+import { sortControl } from '/assets/js/feed-controls.js?v=ob-v233'
+import { getLanguages } from '/assets/js/ob-live.js?v=ob-v233'
+import { languageName } from '/assets/js/lang-name.js?v=ob-v233'
 
 /** No filter. The opening state of every feed, and never sent to the API. */
 export const LANG_ALL = 'all'
@@ -52,29 +53,9 @@ export const LANG_ALL = 'all'
 /** The shows whose feed declares no `<language>` at all. */
 export const LANG_UNKNOWN = 'unknown'
 
-/* Subtag → English name. Deliberately English rather than the reader's locale
- * or the endonym ("Deutsch"), on two counts: the site's chrome is one language
- * the way its dates are one format, and this is a CONTENT filter rather than a
- * UI-language picker — an English-speaking reader narrowing the feed to German
- * podcasts wants the word "German", which is also the word the feed note has to
- * use in an English sentence below.
- *
- * Intl.DisplayNames returns the input unchanged for a subtag it doesn't know, so
- * that case falls through to the same uppercase fallback as a thrown one.
- */
-let displayNames = null
-function languageName(subtag) {
-  if (displayNames === null) {
-    try { displayNames = new Intl.DisplayNames(['en'], { type: 'language' }) } catch { displayNames = false }
-  }
-  if (displayNames) {
-    try {
-      const name = displayNames.of(subtag)
-      if (name && name.toLowerCase() !== subtag.toLowerCase()) return name
-    } catch { /* fall through */ }
-  }
-  return subtag.toUpperCase()
-}
+/* Subtag → English name is lang-name.js, two-sided since 2026-10-22 so the
+ * homepage's language rails print the same word at the edge; the reasoning
+ * for English over the endonym is in that file. */
 
 /**
  * The label for a key, without waiting for the menu.

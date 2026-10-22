@@ -48,12 +48,12 @@
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v232" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v232" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v233" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v233" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v232" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v232" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v233" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v233" />
 </head>
 <body>
 
@@ -148,6 +148,7 @@
                 <a href="/discover/new-shows">New and Noteworthy</a>
                 <a href="/discover/movers">Movers This Week</a>
                 <a href="/discover/podroll">Podcasters Recommend</a>
+                <a href="/#rail-lang-1">Top Podcasts by Language</a>
                 <a href="/#rail-recommended">Podcasts Recommended For You</a>
                 <a href="/#rail-follows">Top Shows From Your Follows</a>
                 <a href="/#rail-because">Because You Boosted</a>
@@ -211,6 +212,7 @@
             <a href="/discover/new-shows">New and Noteworthy</a>
             <a href="/discover/movers">Movers This Week</a>
             <a href="/discover/podroll">Podcasters Recommend</a>
+            <a href="/#rail-lang-1">Top Podcasts by Language</a>
             <a href="/#rail-recommended">Podcasts Recommended For You</a>
             <a href="/#rail-follows">Top Shows From Your Follows</a>
             <a href="/#rail-because">Because You Boosted</a>
@@ -565,10 +567,13 @@
         <p>The front page is a set of rails, each a row of ten. Every rail is listed here with the exact rule that orders it, since a recommendation whose method is hidden is an opinion and one whose method is stated is a measurement. Every input is an indexed Nostr boost and nothing else; see <a href="#limits">Limitations and Disclaimers</a> for what that excludes. Nothing about a visitor is stored by any of them.</p>
 
         <h3>The Featured Carousel</h3>
-        <p>The rotating panel at the top of the front page is not an editorial pick. Each slide is the first place of one of the rails below it, in the order the rails appear: this week&rsquo;s top show, this month&rsquo;s top album, the member leading the #40HPW week, the newest noteworthy show, the week&rsquo;s biggest climber, the show most often recommended by other podcasters, and the year&rsquo;s top episode and song. The slides are the same for every visitor, signed in or not, and change only when the rails change. The description on a slide is the one the show, episode, artist or member published themselves.</p>
+        <p>The rotating panel at the top of the front page is not an editorial pick. Each slide is the first place of one of the rails below it, in the order the rails appear: this week&rsquo;s top show, this month&rsquo;s top album, the member leading the #40HPW week, the newest noteworthy show, the week&rsquo;s biggest climber, the show most often recommended by other podcasters, the top podcast in the largest non-English language, and the year&rsquo;s top episode and song. The week and month rails at the foot of the page contribute no slide, since the same show or episode usually leads all three windows. The slides are the same for every visitor, signed in or not, and change only when the rails change. The description on a slide is the one the show, episode, artist or member published themselves.</p>
 
         <h3>The Chart Rails</h3>
-        <p>Top Shows This Week, Top Albums This Month, Top Episodes This Year and Top Songs This Year are the <a href="#charts">OnlyBoosts Charts</a> computed over that window of boost time. A week runs Monday 00:00 to Sunday night, US Pacific; a month and a year are the trailing 30 and 365 days. The ten tiles are the chart&rsquo;s first ten places, and the line under each tile prints the three component ranks (sats / boosters / boosts) that produced the place, so any tile can be checked against the chart view it links to.</p>
+        <p>Top Shows This Week and Top Albums This Month at the head of the page, and the run of Top Episodes, Top Songs, Top Albums and Top Shows over the week, the month and the year at its foot, are the <a href="#charts">OnlyBoosts Charts</a> computed over that window of boost time. Top Shows This Week is the week of the Charts page, Monday 00:00 to Sunday night US Pacific; every other window is trailing, the last 7, 30 or 365 days, which is the window of the chart view each rail links to. The ten tiles are the chart&rsquo;s first ten places, and the line under each tile prints the three component ranks (sats / boosters / boosts) that produced the place, so any tile can be checked against the chart view it links to.</p>
+
+        <h3>Top Podcasts by Language</h3>
+        <p>Three rails, one for each of the three largest non-English languages in the index, each the year&rsquo;s Shows chart filtered to that language. The three are chosen by the index, not by hand: the podcast side&rsquo;s languages ranked by indexed boosts, with English left out, taking the first three whose year chart holds at least three shows. On 2026-10-22 that was German, Spanish and Italian. A show&rsquo;s language is the one its own feed declares; a feed that declares none is not treated as English and is on no language rail.</p>
 
         <h3>Nostr Gang #40HPW Challenge</h3>
         <p>The week&rsquo;s ten members by hours of podcasts boosted, counted exactly as the Members tab counts them: the published duration of every episode the member boosted this week, each episode once. A member past forty hours wears a gold badge. The rules dialog on the Members tab states the counting rules in full.</p>
@@ -585,7 +590,7 @@
         <p>The result is computed from the index when the page loads and is not kept. Nothing about you is written anywhere; the only thing read is the set of boosts already published to Nostr under your key.</p>
 
         <h3>Because You Boosted</h3>
-        <p>One rail per show, for up to five of the shows you have boosted most often. Each rail is that show&rsquo;s own similar-show list from step one, keeping only the neighbours that share two or more boosters with it, minus anything you have already boosted. A show appears on the first rail that reaches it and on no other, and a show whose neighbours were all taken by an earlier rail is skipped for the next.</p>
+        <p>One rail per show, for up to five of the shows you have boosted. Each rail is that show&rsquo;s own similar-show list from step one, keeping only the neighbours that share two or more boosters with it, minus anything you have already boosted. The five are the shows with the most to recommend: of your twelve most-boosted shows that have such neighbours, the one with the largest list is shown first, then the largest of what remains, and so on. A show appears on the first rail that reaches it and on no other, so each later rail is counted after the earlier ones have taken their shows, and a rail that would hold fewer than four shows is not shown.</p>
 
         <h3>Top Shows From Your Follows</h3>
         <p>The Shows chart computed over the boosts published by the accounts on your Nostr follow list, which is the same Follows scope the charts page offers on every ranked feed. Your own boosts count, since you are on your own list.</p>
@@ -862,15 +867,15 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v232"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v233"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v232" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v233" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v232" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v233" defer></script>
 
-<script src="/assets/js/nav.js?v=ob-v232" defer></script>
+<script src="/assets/js/nav.js?v=ob-v233" defer></script>
 
 </body>
 </html>

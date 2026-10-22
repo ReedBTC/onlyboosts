@@ -5,6 +5,9 @@
  * 2. A rail the edge could not fill (its placeholder is still in the track)
  *    is fetched from the same endpoint and painted with the same two-sided
  *    tile module, so it is byte-identical to what the edge would have sent.
+ *    The window rails (2026-10-22) are the same four charts over the week,
+ *    the month and the year; a language slot (`lang-1`..`lang-3`) is the
+ *    whole section, heading included, since the heading names the language.
  * 3. The PERSONAL rails. A signed-out visitor keeps the locked card (Reed's
  *    call, 2026-10-17: the carrot). A signed-in member gets their follows
  *    rail from the same POST the Shows · Follows feed makes, and the three
@@ -21,11 +24,12 @@
  *    feed cards' own handlers. A rail the edge could not fill gets its slide
  *    rebuilt here from the rows fetched for the rail, with the same mappers.
  */
-import { railListHtml, showTile, albumTile, episodeTile, memberTile } from '/assets/js/rail-tile.js?v=ob-v232'
-import { heroHtml, slideHtml, showSlide, episodeSlide, memberSlide } from '/assets/js/hero.js?v=ob-v232'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v232'
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v232'
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v232'
+import { railListHtml, showTile, albumTile, episodeTile, memberTile, langRailHtml } from '/assets/js/rail-tile.js?v=ob-v233'
+import { heroHtml, slideHtml, showSlide, episodeSlide, memberSlide } from '/assets/js/hero.js?v=ob-v233'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v233'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v233'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v233'
+import { languageName } from '/assets/js/lang-name.js?v=ob-v233'
 
 const TILES = 10
 
@@ -54,6 +58,53 @@ const SOURCES = {
   'episodes-year': { url: `/api/v1/episodes?not_medium=music&sort=chart&range=1y&limit=${TILES}`, rows: (j) => j.episodes, tile: (r, i) => episodeTile(r, i, '🎙'), slide: (r) => episodeSlide('episodes-year', r) },
   'songs-year':    { url: `/api/v1/episodes?medium=music&sort=chart&range=1y&limit=${TILES}`, rows: (j) => j.episodes, tile: (r, i) => episodeTile(r, i, '🎵'), slide: (r) => episodeSlide('songs-year', r) },
 }
+/* The window rails (2026-10-22): the same four charts over the other
+   windows, no hero slide, the same rule as functions/index.js. */
+const WINDOW_KINDS = {
+  episodes: { url: (r) => `/api/v1/episodes?not_medium=music&sort=chart&range=${r}&limit=${TILES}`, rows: (j) => j.episodes, tile: (r, i) => episodeTile(r, i, '🎙') },
+  songs:    { url: (r) => `/api/v1/episodes?medium=music&sort=chart&range=${r}&limit=${TILES}`, rows: (j) => j.episodes, tile: (r, i) => episodeTile(r, i, '🎵') },
+  albums:   { url: (r) => `/api/v1/podcasts?medium=music&sort=chart&range=${r}&limit=${TILES}`, rows: (j) => j.podcasts, tile: albumTile },
+  shows:    { url: (r) => `/api/v1/podcasts?not_medium=music&sort=chart&range=${r}&limit=${TILES}`, rows: (j) => j.podcasts, tile: showTile },
+}
+for (const [kind, k] of Object.entries(WINDOW_KINDS)) {
+  for (const [w, range] of [['week', '1w'], ['month', '1m'], ['year', '1y']]) {
+    const key = `${kind}-${w}`
+    if (!SOURCES[key]) SOURCES[key] = { url: k.url(range), rows: k.rows, tile: k.tile, slide: () => null }
+  }
+}
+
+/* The language rails (2026-10-22), the edge's rule rebuilt here when a slot
+   kept its placeholder: the podcast side's non-English languages by boosts
+   (the facet /api/v1/languages answers, the untagged bucket out), each
+   kept when its year chart has three or more rows, the first three. One
+   answer shared by the three slots. */
+const LANG_RAILS = 3
+const LANG_MIN_ROWS = 3
+let langRailsP = null
+function languageRails() {
+  return langRailsP ??= (async () => {
+    const j = await getJson('/api/v1/languages?not_medium=music')
+    const langs = (j.languages || []).filter((r) => r.lang && r.lang !== 'en' && r.lang !== 'unknown')
+      .sort((a, b) => Number(b.boosts) - Number(a.boosts) || Number(b.shows) - Number(a.shows)).map((r) => r.lang).slice(0, 8)
+    const out = []
+    for (const lang of langs) {
+      if (out.length >= LANG_RAILS) break
+      const c = await getJson(`/api/v1/podcasts?not_medium=music&sort=chart&range=1y&limit=${TILES}&lang=${encodeURIComponent(lang)}`)
+      const rows = c.podcasts || []
+      if (rows.length >= LANG_MIN_ROWS) out.push({ lang, rows })
+    }
+    return out
+  })()
+}
+async function fillLangRail(section, n) {
+  const one = (await languageRails())[n - 1]
+  if (!one) { section.innerHTML = ''; return null }
+  section.innerHTML = langRailHtml(n, one.lang, one.rows)
+  wireArt(section)
+  return n === 1 && one.rows[0]
+    ? showSlide('lang-1', one.rows[0], { medium: 'podcast', eyebrow: `#1 ${languageName(one.lang)} Podcast This Year` })
+    : null
+}
 
 async function getJson(url, init) {
   const r = await fetch(url, init)
@@ -68,6 +119,8 @@ async function fillRail(section) {
   const track = section.querySelector('.rail-track')
   if (!track || !track.querySelector('.rail-placeholder')) return null
   try {
+    const slot = /^lang-([1-9])$/.exec(key)
+    if (slot) return await fillLangRail(section, Number(slot[1]))
     if (key === 'hpw-week') {
       const j = await getJson('/api/v1/members/hours?range=week')
       const members = (j.members || []).slice(0, TILES)
@@ -129,11 +182,11 @@ function wireHeroBoost(hero) {
     try {
       const kind = slide.dataset.kind
       if (kind === 'episode' || kind === 'song') {
-        const m = await import('/assets/js/episode-card-actions.js?v=ob-v232')
+        const m = await import('/assets/js/episode-card-actions.js?v=ob-v233')
         btn.disabled = false
         await m.onBoostClick(slide, btn)
       } else {
-        const m = await import('/assets/js/show-card-actions.js?v=ob-v232')
+        const m = await import('/assets/js/show-card-actions.js?v=ob-v233')
         btn.disabled = false
         await m.onShowBoost(slide, btn)
       }

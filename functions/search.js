@@ -114,7 +114,30 @@ function wallRows(members) {
  * /api/v1/episodes?q=&include=boosts, `artists` from /api/v1/publishers?q=,
  * `members` from /api/v1/members?q=).
  */
+/* A pasted key (an npub, a `nostr:npub…`, a 64-hex pubkey) is a member
+   lookup, not a search (Reed's ask, 2026-10-22): the FTS tables cannot
+   match one, so only the member endpoint is asked, and a miss says what it
+   means rather than "Nothing matched". Mirrors pubkeyQuery in nav-search.js. */
+const NPUB = /^npub1[02-9ac-hj-np-z]{58}$/i;
+const HEX64 = /^[0-9a-f]{64}$/i;
+export function pubkeyQuery(q) {
+  const s = String(q || "").trim().replace(/^nostr:/i, "");
+  return NPUB.test(s) || HEX64.test(s) ? s : null;
+}
+
 export function resultsHtml(q, { shows = [], albums = [], episodes = [], songs = [], artists = [], members = [] }) {
+  const key = pubkeyQuery(q);
+  if (key) {
+    const short = key.length > 20 ? key.slice(0, 12) + "…" + key.slice(-6) : key;
+    const lead = members.length
+      ? `This account is in the index. A member here is any account with at least one boost published to Nostr; the page linked below carries every boost indexed under it.`
+      : `<strong>${esc(short)}</strong> is not in the index: no boost published to Nostr under this account has been indexed yet. A member here is any account with at least one indexed boost, so the account may exist on Nostr and still have no page.`;
+    return `<h1>Results for <q>${esc(short)}</q></h1><p class="search-lead">${lead}</p>` +
+      (members.length ? renderSupporters(wallRows(members), {
+        heading: "Members", id: "members", sectionClass: "rail search-group search-wall", metric: "sats",
+        sub: "The account the key names.",
+      }) : "");
+  }
   const groups = [
     showGroup("shows", "Shows", "/podcasts/shows", shows, SHOW_COPY.other),
     showGroup("albums", "Albums", "/music/albums", albums, SHOW_COPY.music),
@@ -180,6 +203,8 @@ function publishersQ(env, q) {
 }
 
 export async function searchEverything(env, request, q) {
+  const key = pubkeyQuery(q);
+  if (key) return { shows: [], albums: [], episodes: [], songs: [], artists: [], members: await findMembers(env, request, key) };
   const [shows, albums, episodes, songs, artists, members] = await Promise.all([
     quiet("shows", podcastsQ(env, q, "not_medium=music")),
     quiet("albums", podcastsQ(env, q, "medium=music")),

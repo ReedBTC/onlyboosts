@@ -176,6 +176,25 @@ was picked from is in the session memory; direction A won, with the sans.
   Discover column still links `/charts/music` under that name). The two
   recommendation rails were "Recommended For You" and "Recommended Music"
   until the same pass, and both carry the "Your full list" link now.
+  **Since 2026-10-22 (Reed's ask, "let people scroll and scroll") three
+  LANGUAGE RAILS sit between Podcasters Recommend and the Because rails,
+  and the foot is ten WINDOW RAILS**: Episodes, Songs, Albums and Shows
+  over the week, the month and the year, the two already at the head
+  (Shows This Week, Albums This Month) not repeated; `windowRail` in
+  `functions/index.js`, trailing windows (`range=1w|1m|1y`, the window the
+  link opens), no hero slide for any but the two year rails (the same
+  subject tops all three windows). **The language rails are three SLOTS,
+  `lang-1`..`lang-3`, whose marker pair wraps the heading too and sits
+  tight against the `<section>`** (the heading names the language;
+  `langRailHtml` in `rail-tile.js` renders head and track; an empty slot
+  renders empty and `.rail:empty` hides it): `languageRails` takes the
+  podcast side's non-English languages by boosts, `en` and NULL out, the
+  first three whose year chart has `LANG_MIN_ROWS` (3) rows, memoized per
+  request on the `ctx` every rail now receives; `lang-1` leads a slide
+  ("#1 German Podcast This Year"). German, Spanish and Italian on
+  2026-10-22. `assets/js/lang-name.js` is the two-sided subtag → English
+  name (`feed-lang.js` reads it too). The Podcasts ribbon's Discover column
+  links `/#rail-lang-1` as "Top Podcasts by Language".
   `test-discover-home.mjs` pins the first three, the personal rails'
   position, and the generic order.
 - **THE FEATURED CAROUSEL SITS ABOVE THE RAILS AND IS THE FIRST PLACE OF
@@ -220,7 +239,13 @@ was picked from is in the session memory; direction A won, with the sans.
   wordmark, the sections, the site search in the middle
   (`assets/js/nav-search.js`, loaded by `nav.js`, asking
   `/api/v1/search?type=all` and `/api/v1/members?q=`), the theme toggle,
-  Donate, the account control. On a phone the links fold into the
+  Donate, the account control. **A pasted npub, `nostr:npub…` or 64-hex
+  pubkey is a MEMBER LOOKUP, not a search** (Reed's ask, 2026-10-22):
+  `pubkeyQuery` in `nav-search.js` and again in `functions/search.js`
+  (the two must agree) sends it to the member endpoint alone, the
+  typeahead answers the member's row (Enter opens their page) or a "not in
+  the index" line named through Primal's cache when it can be, and the
+  results page says the same instead of "Nothing matched". On a phone the links fold into the
   hamburger's overlay and the search takes its own row. **The overlay's
   Charts group, the inline links and the footer's Charts group name the same
   places; change them together.**
@@ -293,10 +318,17 @@ was picked from is in the session memory; direction A won, with the sans.
   reached from two seeds or two boosters shared with one** (half of all
   pairs share exactly one booster, measured 2026-10-17). Two lists, never
   one: the music side's overlap runs nearly three times the podcast side's.
-  **`because` is up to FIVE rails, one per most-boosted seed with neighbours
-  over the floor** (Reed's ask, 2026-10-18; a show appears under the first
-  seed that reaches it only, and a seed emptied by that is skipped), cloned
-  by `discover.js` from the hidden prototype section. Nothing is stored per
+  **`because` is up to FIVE rails, one per seed, THE SEEDS WITH THE MOST TO
+  SHOW FIRST AND NONE UNDER FOUR TILES** (Reed's ask, 2026-10-18 for the
+  rails; 2026-10-22 for the pick: "we should pick the biggest ones", after
+  a two-tile rail beside a ten-tile one and the question why those five).
+  `becauseOf` reads the `BECAUSE_POOL` (12) most-boosted seeds with
+  neighbours over the floor, then picks greedily: the seed with the most
+  neighbours not yet shown, re-counted after every pick since a show
+  appears under one rail only, until five or until no seed has
+  `BECAUSE_MIN` (4) left. Until 2026-10-22 it was the five most-boosted
+  seeds in boost order, any size. Cloned by `discover.js` from the hidden
+  prototype section. Nothing is stored per
   member. **The method is public: `/about#recommendations`** states every
   rail's rule, Reed's data-transparency call, and the three personal rails'
   one-liners link it; `docs/about-and-faq-source.md` is the factual backing

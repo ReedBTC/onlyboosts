@@ -28,6 +28,25 @@
 // rail with no rows has no slide, and with no slides at all the marker is
 // left for the browser, like a rail's placeholder.
 //
+// THE WINDOW RAILS (2026-10-22, Reed's ask: "let people scroll and scroll"):
+// after the Because rails the page runs the year's, the month's and the
+// week's chart for episodes, songs, albums and shows, ten tiles each, every
+// one the ranked endpoint's own query with the arguments the link beside it
+// opens. Of these only the two year rails lead a hero slide: the same show
+// or episode tops a week, a month and a year more often than not, and the
+// carousel was nine slides already.
+//
+// THE LANGUAGE RAILS (2026-10-22, Reed's ask): the year's top podcasts in
+// each of the three largest non-English languages, one rail per language,
+// under Podcasters Recommend. Which three is the index's answer, not a
+// list: the podcast side's languages by boosts, English and the untagged
+// bucket skipped, each kept only if its year chart has LANG_MIN_ROWS rows
+// (a rail of one tile is not a rail). Measured 2026-10-22: German, Spanish
+// and Italian, with French (4 shows) and Dutch (3) next. The three sections
+// are slots, `lang-1` to `lang-3`, whose marker pair wraps the HEADING too,
+// since the heading names the language; a slot with no language renders
+// empty and discover.css hides an empty rail.
+//
 // WHAT IT COSTS. The weekly charts are the same windowed queries
 // /api/v1/charts answers; the month, year and #40HPW rails are the ranked
 // endpoints' own functions with the same arguments the links beside each
@@ -39,7 +58,8 @@ import { pacificWeekStart, prevWeek, nextWeek } from "../assets/js/pacific-week.
 import { readParams as podcastParams, globalPodcasts } from "./api/v1/podcasts.js";
 import { readParams as episodeParams, globalEpisodes } from "./api/v1/episodes.js";
 import { hoursBoard } from "./api/v1/members/hours.js";
-import { railListHtml, tileHtml, showTile, albumTile, episodeTile, memberTile } from "../assets/js/rail-tile.js";
+import { railListHtml, tileHtml, showTile, albumTile, episodeTile, memberTile, langRailHtml } from "../assets/js/rail-tile.js";
+import { languageName } from "../assets/js/lang-name.js";
 import { showPageHref } from "../assets/js/show-link.js";
 import { heroHtml, showSlide, episodeSlide, memberSlide, EYEBROWS } from "../assets/js/hero.js";
 import { headOf, assetGet } from "./_shared/head.js";
@@ -122,6 +142,63 @@ export async function podrollRows(env, limit) {
 }
 export const onN = (r) => `On ${r.n} podroll${Number(r.n) === 1 ? "" : "s"}`;
 
+/* ── The window rails: one chart, one window, ten tiles, no slide ──────── */
+export const WINDOWS = { "1w": "this week", "1m": "this month", "1y": "this year" };
+const WINDOW_KINDS = {
+  episodes: { side: "not_medium=music", fetch: rankedEpisodes, tile: (r, i) => episodeTile(r, i, "🎙"), noun: "episodes" },
+  songs:    { side: "medium=music",     fetch: rankedEpisodes, tile: (r, i) => episodeTile(r, i, "🎵"), noun: "songs" },
+  albums:   { side: "medium=music",     fetch: rankedPodcasts, tile: albumTile, noun: "albums" },
+  shows:    { side: "not_medium=music", fetch: rankedPodcasts, tile: showTile, noun: "shows" },
+};
+async function windowRail(env, kind, range) {
+  const k = WINDOW_KINDS[kind];
+  const rows = await k.fetch(env, `${k.side}&sort=chart&range=${range}&limit=${TILES}`);
+  return rail(railListHtml(rows.map(k.tile), { empty: `No ${k.noun} boosted ${WINDOWS[range]}.` }), null);
+}
+
+/* ── The language rails ──────────────────────────────────────────────────── */
+export const LANG_RAILS = 3;
+export const LANG_MIN_ROWS = 3;
+const LANG_CANDIDATES = 8;
+
+/** The podcast side's non-English languages by boosts, largest first, the
+ *  untagged bucket out: the same aggregate /api/v1/languages answers. */
+export async function languageCandidates(env, limit = LANG_CANDIDATES) {
+  const { results } = await env.DB.prepare(
+    `SELECT language AS lang, COALESCE(SUM(boost_count), 0) AS boosts, COUNT(*) AS shows
+       FROM podcasts
+      WHERE COALESCE(medium, 'podcast') <> 'music' AND language IS NOT NULL AND language <> 'en'
+      GROUP BY language ORDER BY boosts DESC, shows DESC, lang LIMIT ?`
+  ).bind(limit).all();
+  return (results || []).map((r) => r.lang);
+}
+
+/** The rails: the first LANG_RAILS candidates whose year chart has at least
+ *  LANG_MIN_ROWS rows, each `{ lang, rows }`. One query per candidate, read
+ *  in order and stopped at the third that qualifies. */
+export async function languageRails(env) {
+  const out = [];
+  for (const lang of await languageCandidates(env)) {
+    if (out.length >= LANG_RAILS) break;
+    const rows = await rankedPodcasts(env, `not_medium=music&sort=chart&range=1y&limit=${TILES}&lang=${encodeURIComponent(lang)}`);
+    if (rows.length >= LANG_MIN_ROWS) out.push({ lang, rows });
+  }
+  return out;
+}
+
+/* The three slots share one answer per request: `ctx` is the per-request
+   memo onRequestGet hands every rail (tests may pass none). */
+async function langRail(env, ctx, n) {
+  ctx = ctx || {};
+  ctx.langRails ??= languageRails(env);
+  const one = (await ctx.langRails)[n - 1];
+  if (!one) return rail("", null);
+  const lead = n === 1 && one.rows[0]
+    ? showSlide(`lang-${n}`, one.rows[0], { medium: "podcast", eyebrow: `#1 ${languageName(one.lang)} Podcast This Year` })
+    : null;
+  return rail(langRailHtml(n, one.lang, one.rows), lead);
+}
+
 export const RAILS = {
   "shows-week": async (env) => {
     const { body } = await weekBoard(env, { kind: "shows", limit: TILES });
@@ -150,6 +227,19 @@ export const RAILS = {
     return rail(railListHtml(rows.map((r, i) => episodeTile(r, i, "🎵")), { empty: "No songs boosted this year." }),
       rows[0] && episodeSlide("songs-year", rows[0]));
   },
+  /* The rest of the window rails: no hero slide (see the header). */
+  "episodes-week":  (env) => windowRail(env, "episodes", "1w"),
+  "episodes-month": (env) => windowRail(env, "episodes", "1m"),
+  "songs-week":     (env) => windowRail(env, "songs", "1w"),
+  "songs-month":    (env) => windowRail(env, "songs", "1m"),
+  "albums-week":    (env) => windowRail(env, "albums", "1w"),
+  "albums-year":    (env) => windowRail(env, "albums", "1y"),
+  "shows-month":    (env) => windowRail(env, "shows", "1m"),
+  "shows-year":     (env) => windowRail(env, "shows", "1y"),
+  /* The three language slots. The first carries the hero slide. */
+  "lang-1": (env, ctx) => langRail(env, ctx, 1),
+  "lang-2": (env, ctx) => langRail(env, ctx, 2),
+  "lang-3": (env, ctx) => langRail(env, ctx, 3),
   /* NEW AND NOTEWORTHY: shows whose FIRST boost ever landed in the last 90
      days, two or more distinct boosters, by boosters then sats. The all-time
      charts bury a debut; this is the Billboard instrument. 90 days and the
@@ -250,7 +340,7 @@ export async function buildHero(env, leads, order) {
 /** The page's rail order, read off the shell so the slides follow the
  *  sections as Reed placed them, personal rails skipped. */
 export function railOrder(html) {
-  return [...html.matchAll(/<section[^>]*data-rail="([a-z-]+)"(?![^>]*data-rail-personal)/g)].map((m) => m[1]);
+  return [...html.matchAll(/<section[^>]*data-rail="([a-z0-9-]+)"(?![^>]*data-rail-personal)/g)].map((m) => m[1]);
 }
 
 export function injectHero(html, block) {
@@ -291,7 +381,8 @@ export async function onRequestGet(context) {
 
   let html = await shell.text();
   const keys = Object.keys(RAILS);
-  const settled = await Promise.allSettled(keys.map((k) => RAILS[k](env)));
+  const ctx = {}; // the per-request memo the language slots share
+  const settled = await Promise.allSettled(keys.map((k) => RAILS[k](env, ctx)));
   const leads = {};
   settled.forEach((s, i) => {
     if (s.status !== "fulfilled") { console.warn(`[home] rail ${keys[i]} not rendered`, s.reason); return; }

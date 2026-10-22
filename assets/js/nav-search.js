@@ -13,8 +13,16 @@
  * ⚠️ WHERE A ROW LINKS IS THE SAME RULE THE CARDS USE: show-link.js decides
  * whether a show, an episode or an artist has a page here. A row the rule
  * declines gets no link and is not shown, rather than a dead click.
+ *
+ * A PASTED NPUB IS A LOOKUP, NOT A SEARCH (Reed's ask, 2026-10-22: "drop an
+ * npub in the search window and it will search for the person who that
+ * is"). An npub, a `nostr:npub…` or a 64-hex pubkey asks the member
+ * endpoint alone (the FTS tables cannot match one) and the menu answers
+ * one of two things: the member's row, or a line saying the account has
+ * no boosts in the index, named through Primal's cache when it can be.
+ * Enter on a found member opens their page; on a miss, the results page.
  */
-import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v232'
+import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v233'
 
 const MIN = 2
 const LIMIT = 5
@@ -83,6 +91,46 @@ function menuHtml(rows) {
 }
 function allHref(q) { return '/search?q=' + encodeURIComponent(q) }
 
+/* ── The npub lookup ─────────────────────────────────────────────────── */
+const NPUB = /^npub1[02-9ac-hj-np-z]{58}$/i
+const HEX64 = /^[0-9a-f]{64}$/i
+/** The pasted key with a `nostr:` prefix and whitespace off, or null when
+ *  the query is not a key. */
+export function pubkeyQuery(q) {
+  const s = String(q || '').trim().replace(/^nostr:/i, '')
+  return NPUB.test(s) || HEX64.test(s) ? s : null
+}
+/* npub → hex for the Primal lookup; bech32 as the mention picker writes it
+   out, so this module stays free of the nostr-tools bundle. */
+const B32 = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l'
+async function npubToHex(npub) {
+  try {
+    const data = npub.toLowerCase().slice(5, -6).split('').map((c) => B32.indexOf(c))
+    if (data.some((v) => v < 0)) return null
+    let acc = 0, bits = 0
+    const out = []
+    for (const v of data) {
+      acc = (acc << 5) | v; bits += 5
+      while (bits >= 8) { bits -= 8; out.push((acc >> bits) & 0xff) }
+    }
+    return out.length === 32 ? out.map((b) => b.toString(16).padStart(2, '0')).join('') : null
+  } catch { return null }
+}
+let primalP = null
+async function primalName(pk) {
+  try {
+    primalP ??= import('./primal-profiles.js?v=ob-v233')
+    const { fetchProfiles } = await primalP
+    const prof = (await fetchProfiles([pk])).get(pk)
+    return prof?.display_name || prof?.name || ''
+  } catch { return '' }
+}
+function missHtml(key, name) {
+  const short = key.length > 20 ? key.slice(0, 12) + '…' + key.slice(-6) : key
+  return `<div class="nsm-group"><h4 class="nsm-head">Members</h4>` +
+    `<p class="nsm-empty nsm-miss">${name ? `<strong>${esc(name)}</strong> (${esc(short)})` : `<strong>${esc(short)}</strong>`} is not in the index: no boost published to Nostr under this account has been indexed yet.</p></div>`
+}
+
 function mount(form) {
   const input = form.querySelector('input[type="search"]')
   const menu = form.querySelector('.nav-search-menu')
@@ -116,6 +164,24 @@ function mount(form) {
     const { signal } = ctrl
     const enc = encodeURIComponent(q)
     try {
+      const key = pubkeyQuery(q)
+      if (key) {
+        const members = await fetch(`/api/v1/members?q=${encodeURIComponent(key)}&limit=1`, { signal }).then((r) => r.ok ? r.json() : null).catch(() => null)
+        if (my !== seq) return
+        const rows = rowsOf(null, members)
+        if (rows.members.length) {
+          menu.innerHTML = menuHtml(rows)
+          open(); highlight(0) // Enter opens the member's page
+          return
+        }
+        menu.innerHTML = missHtml(key, '')
+        open(); highlight(-1)
+        // Best-effort: Primal's cache names the account the reader pasted.
+        const pk = members?.members?.[0]?.pk || (HEX64.test(key) ? key.toLowerCase() : null)
+        const name = await primalName(pk || await npubToHex(key))
+        if (my === seq && name) menu.innerHTML = missHtml(key, name)
+        return
+      }
       const [all, members] = await Promise.all([
         fetch(`/api/v1/search?type=all&q=${enc}&limit=${LIMIT}`, { signal }).then((r) => r.ok ? r.json() : null).catch(() => null),
         fetch(`/api/v1/members?q=${enc}&limit=4`, { signal }).then((r) => r.ok ? r.json() : null).catch(() => null),
@@ -160,7 +226,7 @@ function mount(form) {
     const list = items()
     if (active >= 0 && list[active]) { location.href = list[active].getAttribute('href'); return }
     const q = input.value.trim()
-    if (q.length >= MIN) location.href = allHref(q)
+    if (q.length >= MIN) location.href = allHref(pubkeyQuery(q) || q)
   })
   // A click lands on the row's own link; closing on blur has to wait for it.
   input.addEventListener('blur', () => { setTimeout(close, 180) })
