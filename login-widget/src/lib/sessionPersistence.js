@@ -3,6 +3,7 @@ import { nip19 } from 'nostr-tools'
 import { getNDK, resetNDK, connectAndWait, ensureUserWriteRelays } from './ndk.js'
 import { withTimeout } from './utils.js'
 import { restoreFromSession } from './nip46Signer.js'
+import { storeSecret, readSecret, dropSecret } from './secretAtRest.js'
 
 function isHex64(s) {
   return typeof s === 'string' && /^[0-9a-f]{64}$/i.test(s)
@@ -16,24 +17,35 @@ function isHex64(s) {
 // Record shape by method:
 //   extension — { method, pubkey, npub }
 //   nip46     — { method, pubkey, npub, bunkerPointer, userPubkey }   (in localStorage)
-//             + { clientSecret }                                      (in sessionStorage only)
+//             + { clientSecret }                                      (sessionStorage, and
+//                                                                      wrapped at rest since
+//                                                                      2026-10-29)
 //
 // Why split: clientSecret is the local NIP-46 client identity's hex private
 // key — a bearer credential that, combined with bunkerPointer, lets anyone
 // reconnect to the user's bunker and request signatures forever. Putting
-// it in localStorage made it readable by any same-origin script (XSS, hostile
-// extension, supply-chain compromise of any vendor JS). Moving it to
-// sessionStorage means an exfiltrated localStorage dump is useless on its
-// own, and the secret only persists for the lifetime of the browser tab.
-// Cost: closing the browser forces a NIP-46 re-handshake on next visit
-// (same UX as most NIP-46 clients ship by default).
+// it in localStorage in the clear made it readable by any same-origin
+// script (XSS, hostile extension, supply-chain compromise of any vendor
+// JS). Keeping it in sessionStorage alone meant an exfiltrated localStorage
+// dump was useless on its own, and the secret lived only as long as the tab.
 //
-// NB: this can't be fixed by encrypting clientSecret with selfEncrypt —
-// for nip46 sessions the signer IS the bunker, which requires clientSecret
-// to talk to. Chicken-and-egg. WebCrypto-wrapped non-extractable keys in
-// IndexedDB would buy back persistence but only defend against offline
-// dumps, not active XSS — the asymmetric improvement isn't worth the
-// complexity until we have a concrete need.
+// ⚠️ THAT COST FELL ON PHONES, AND IT SIGNED REED OUT ON EVERY RETURN
+// (2026-10-29). A phone browser drops sessionStorage whenever it evicts the
+// tab, which is most of the time the site is not on screen; every open then
+// found the record without its secret, restoreSession answered 'permanent',
+// and the boot path signed the member out and opened the login modal
+// unasked. So the secret also has an at-rest copy now (lib/secretAtRest.js):
+// AES-GCM under a NON-EXTRACTABLE WebCrypto key held in IndexedDB, the
+// ciphertext in localStorage. A dump of either store is still useless on
+// its own; a script running live on the origin can unwrap it, which was
+// already true of the sessionStorage copy for the life of the tab. The
+// concrete need the earlier note waited for arrived. sessionStorage stays
+// the fast path; restoreSession falls back to the at-rest copy only when
+// the tab's copy is gone, and re-seeds sessionStorage from it.
+//
+// NB: this can't be done with selfEncrypt — for nip46 sessions the signer
+// IS the bunker, which requires clientSecret to talk to. Chicken-and-egg,
+// which is why the wrapping key is the browser's and not the user's.
 //
 // nsec logins are deliberately NOT persisted — the LoginScreen warns the key
 // is in-memory only. The site's "no npub-only mode" choice means there is no
@@ -68,6 +80,8 @@ export function saveSession(record) {
     const { clientSecret, ...stripped } = record
     try { sessionStorage.setItem(NIP46_SECRET_KEY, clientSecret) } catch {}
     try { localStorage.setItem(SESSION_KEY, JSON.stringify(stripped)) } catch {}
+    // The at-rest copy, so the session outlives the tab. Best effort.
+    storeSecret(clientSecret).catch(() => {})
     return
   }
   try { localStorage.setItem(SESSION_KEY, JSON.stringify(record)) } catch {}
@@ -99,6 +113,7 @@ export function loadSession() {
 export function clearSession() {
   try { localStorage.removeItem(SESSION_KEY) } catch {}
   try { sessionStorage.removeItem(NIP46_SECRET_KEY) } catch {}
+  dropSecret()
 }
 
 /**
@@ -259,9 +274,18 @@ export async function restoreSession(record) {
   }
 
   if (record.method === 'nip46') {
-    const { clientSecret, bunkerPointer, userPubkey } = record
+    let { clientSecret } = record
+    const { bunkerPointer, userPubkey } = record
     if (!isHex64(userPubkey)) return { kind: 'permanent' }
-    if (typeof clientSecret !== 'string' || !/^[0-9a-f]{64}$/i.test(clientSecret)) return { kind: 'permanent' }
+    if (!isHex64(clientSecret)) {
+      // The tab's copy is gone (a phone evicted the tab, the browser was
+      // closed): the at-rest copy is the session. Re-seed sessionStorage
+      // so the next loadSession in this tab has it without a second
+      // IndexedDB round trip.
+      clientSecret = await readSecret()
+      if (!isHex64(clientSecret)) return { kind: 'permanent' }
+      try { sessionStorage.setItem(NIP46_SECRET_KEY, clientSecret) } catch {}
+    }
     if (!bunkerPointer || !isHex64(bunkerPointer.pubkey)) return { kind: 'permanent' }
     const safeRelays = sanitizeRelayUrls(bunkerPointer.relays)
     if (safeRelays.length === 0) return { kind: 'permanent' }
