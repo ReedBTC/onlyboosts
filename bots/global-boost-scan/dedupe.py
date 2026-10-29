@@ -77,8 +77,10 @@ relay note to a partner the tiers already matched. What it deliberately is
 NOT: a partnerless "identical siblings are one payment" rule. 233 same-author,
 same-key, identical-text pairs within 300s exist among REAL notes (150 with
 empty text — live-stream repeats), so identical text is not proof of one
-payment; the 77 partnerless bot clusters (~51k sats) stay, by Reed's call,
-and a second note never adds hours on #40HPW (DISTINCT booster+episode). The tiers are EVIDENCE SOURCES,
+payment; the 77 partnerless bot clusters (~51k sats) stayed, by Reed's call,
+and a second note never adds hours on #40HPW (DISTINCT booster+episode).
+SINCE 2026-10-29 THE ONES THAT CARRY A COMMENT ARE MARKED: see TWINS above
+`apply` — Reed ruled on all 62 standing pairs, and the comment is the line. The tiers are EVIDENCE SOURCES,
 not conventions the bots are trusted to follow: a bot whose note format we
 have never seen simply produces no evidence, and a pair with no evidence is
 LET THROUGH (Reed's call, 2026-08-24: a duplicate slipping through is far
@@ -640,7 +642,7 @@ def find_duplicates(conn, since=None):
             if slot not in chosen or gap < chosen[slot][2]:
                 chosen[slot] = (o, tier, gap)
         if not chosen:
-            hit = _sibling_match(conn, b, marked_by)
+            hit = _sibling_match(conn, b, marked_by) or _twin_match(conn, b, absorbed)
             if hit is not None:
                 o, tier, gap = hit
                 absorbed.add(b["event_id"])
@@ -712,6 +714,72 @@ def _sibling_match(conn, b, marked_by):
         return None
     o = conn.execute("SELECT * FROM boosts WHERE event_id = ?", (best[0],)).fetchone()
     return (o, "sibling", best[1]) if o is not None else None
+
+
+# TWINS (2026-10-29, Reed's verdicts on all 62 standing pairs). One bot, two
+# notes seconds apart, same sats, same show and episode, identical text once
+# nostr:/URL tokens are stripped, and no partner for either: chadf-boostbot's
+# per-leg notes, mostly. Reed read every pair with the bot's neighbours on the
+# show and ruled on one thing: whether the note CARRIES A COMMENT. "The note is
+# 100% identical and there is a comment from the booster" marked 42 as one
+# payment; "hard to tell when there's no comment" left 20 standing. A comment
+# is anything the booster's app put in the message field — words, an emoji, a
+# gif link, the literal "No message" — i.e. whatever is left of the note once
+# the bot's own template is removed. The bare template ("⚡ 333 sats / 📱 via
+# Castamatic / <podcastindex link> / <quoted receipt>") is what two different
+# listeners' boosts look like too, so it is not proof of one payment and both
+# notes stay. Gaps on the marked pairs ran 0-30s; TWIN_WINDOW is 30.
+TWIN_WINDOW = 30
+
+# Lines a bot's template writes about any boost; what remains is the comment.
+_TEMPLATE_LINE = re.compile(
+    r"^\s*(?:"
+    r"\N{HIGH VOLTAGE SIGN}\s*[\d,]+\s*sats\b.*"                     # ⚡ 333 sats
+    r"|\N{MOBILE PHONE}\s*via\b.*"                                     # 📱 via App
+    r"|\N{HIGH VOLTAGE SIGN}\s*Boost\s*\N{HIGH VOLTAGE SIGN}"          # ⚡ Boost ⚡
+    r"|\N{HIGH VOLTAGE SIGN}\s*New boost on .*"                        # LB's header
+    r"|.{1,80}?\s+boosted\s+\u200b?[\d,]+\s+sats\b.*"               # <name> boosted N sats →
+    r"|\N{RADIO}.*|\N{HEADPHONE}.*|\N{MUSICAL NOTE}.*"                 # 📻 episode, 🎧 Find it on, 🎵
+    r"|\[[^\]]+\]\s*(?:\[[^\]]+\]\s*)?.*boosted.*"                # [Show] [Episode] <name> boosted
+    r"|https?://(?:podcastindex\.org|tardbox\.com|app\.podcastguru\.io|lnbeats\.com/album)\S*"
+    r")\s*$", re.MULTILINE | re.UNICODE)
+
+
+def _comment(row):
+    """What the booster's app put in the message field, as the bot restated
+    it: the note with the bot's template lines and nostr: tokens removed.
+    Empty for the bare template."""
+    msg = _MENTION.sub(" ", row["message"] or "")
+    msg = re.sub(r"nostr:\S+", " ", msg)
+    msg = _TEMPLATE_LINE.sub("", msg)
+    return " ".join(msg.split())
+
+
+def _twin_match(conn, b, absorbed):
+    """The same publisher's identical, unmarked note within TWIN_WINDOW before
+    this one, when the note carries a comment. Returns (earlier, "twin", gap)
+    or None."""
+    if not _comment(b):
+        return None
+    egb = db.effective_guid("b")
+    key = _prose_key(b["message"])
+    best = None
+    for s in conn.execute(
+            f"""SELECT * FROM boosts b
+                WHERE b.client_id = ? AND b.sats = ? AND b.created_at BETWEEN ? AND ?
+                  AND COALESCE(b.item_guid,'') = ? AND COALESCE({egb},'') = ?
+                  AND b.excluded = 0 AND b.dup_of IS NULL AND b.event_id != ?""",
+            [b["client_id"], b["sats"], b["created_at"] - TWIN_WINDOW, b["created_at"],
+             b["item_guid"] or "", b["canonical_guid"] or b["podcast_guid"] or "",
+             b["event_id"]]):
+        if s["event_id"] in absorbed or _prose_key(s["message"]) != key:
+            continue
+        if s["created_at"] == b["created_at"] and s["event_id"] > b["event_id"]:
+            continue              # same second: the lower event id is the one kept
+        gap = b["created_at"] - s["created_at"]
+        if best is None or gap < best[2]:
+            best = (s, "twin", gap)
+    return best
 
 
 def apply(conn, pairs):

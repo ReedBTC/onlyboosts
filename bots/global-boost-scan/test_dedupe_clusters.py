@@ -201,6 +201,37 @@ dedupe.apply(conn, pairs)
 rows = dict(conn.execute("SELECT event_id, dup_of FROM boosts"))
 check(rows == {"b1": "d1", "c1": "d1", "d1": None}, "one keeper, two marked, no chain")
 
+print("twins: one bot, two identical notes seconds apart, no partner")
+conn = fresh([
+    chadf("f1", T0, 333, "were LIT", "BoostMeBitch", item=ITEM),
+    chadf("f2", T0 + 9, 333, "were LIT", "BoostMeBitch", item=ITEM),
+])
+p = pairs_of(conn)
+check(p.get("f2") is not None and p["f2"][0] == "f1" and p["f2"][1] == "twin", "the later note with a comment is a twin of the earlier")
+conn = fresh([
+    chadf("f1", T0, 333, "", "Castamatic", item=ITEM),
+    chadf("f2", T0 + 9, 333, "", "Castamatic", item=ITEM),
+])
+check(pairs_of(conn) == {}, "the bare template twice is not proof of one payment: both stand (Reed's call)")
+conn = fresh([
+    chadf("f1", T0, 100, "https://media.giphy.com/media/sbHeENxBcatck/giphy.gif", "BoostMeBitch", item=ITEM),
+    chadf("f2", T0 + 0, 100, "https://media.giphy.com/media/sbHeENxBcatck/giphy.gif", "BoostMeBitch", item=ITEM),
+])
+check(pairs_of(conn).get("f2", (None, None))[1] == "twin", "a gif link is a comment")
+conn = fresh([
+    chadf("f1", T0, 333, "were LIT", "BoostMeBitch", item=ITEM),
+    chadf("f2", T0 + 45, 333, "were LIT", "BoostMeBitch", item=ITEM),
+])
+check(pairs_of(conn) == {}, "outside TWIN_WINDOW both stand")
+conn = fresh([
+    chadf("f1", T0, 333, "were LIT", "BoostMeBitch", item=ITEM),
+    chadf("f2", T0 + 9, 333, "were LIT!!", "BoostMeBitch", item=ITEM),
+])
+check(pairs_of(conn) == {}, "different text is two payments")
+check(dedupe._comment({"message": "⚡ 333 sats\n📱 via Castamatic\n\nhttps://podcastindex.org/podcast/6611624\n\nnostr:nevent1abc"}) == "", "bare chadf template has no comment")
+check(dedupe._comment({"message": "⚡ Boost ⚡\n\nNo message\n\nericpp boosted 3333 sats → Homegrown Hits\n📻 Episode 152\n\nhttps://tardbox.com/og/boost.png"}) == "No message", "Boostr's literal No message is a comment")
+check(dedupe._comment({"message": "⚡ New boost on Local Bitcoiners! 💰 322 sats 📱 via Fountain 👤 nostr:npub1abc 💬 Thank you gentlemen"}) == "" or "Thank you gentlemen" in dedupe._comment({"message": "⚡ New boost on Local Bitcoiners! 💰 322 sats 📱 via Fountain 👤 nostr:npub1abc\n💬 Thank you gentlemen"}), "LB's 💬 comment survives on its own line")
+
 print("scope: a non-relay note is never the marked side")
 conn = fresh([
     note("d1", DONOR, T0, 100, "Culture comes first", "fountain"),

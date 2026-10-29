@@ -1538,7 +1538,14 @@ Bowl After Bowl, 25,265 sats); the pass runs every incremental cycle over a
   non-relay note. **It is deliberately not a partnerless "identical siblings"
   rule** — Reed's call, 2026-08-30: 233 real same-author identical-text pairs
   within 300s exist, and #40HPW hours are `DISTINCT (booster, episode)` so a
-  second note never adds hours anyway. The 77 partnerless bot clusters stay.
+  second note never adds hours anyway. The 77 partnerless bot clusters stayed
+  until **2026-10-29, when Reed ruled on all 62 standing twin pairs** (one
+  bot, identical notes within 30s, no partner): the ones carrying a COMMENT
+  (anything the booster's app put in the message field, a gif link or "No
+  message" included) are one payment and the later note is marked `twin`;
+  the bare "⚡ 333 sats / 📱 via App" template twice is not proof and both
+  stand. 42 marked, 20 kept; `dedupe._comment` is the line, `TWIN_WINDOW`
+  30s, pinned in `test_dedupe_clusters.py`.
 - **A new republisher bot is out of scope until registered**: its pubkey in
   `clients.py#PUBLISHER_PUBKEYS` (the member wall already forces this) and its
   slug in `RELAY_PUBLISHERS` — relay bots only; the first-party publisher keys
