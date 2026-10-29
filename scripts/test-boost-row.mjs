@@ -17,6 +17,8 @@
  * Run: node scripts/test-boost-row.mjs
  */
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { renderMessage, stripNoteRefs } from '../assets/js/nostr-text.js'
 import {
   renderBoosts, boostRows, rowsFromRecords, sortBoostRows, filterBoostRows,
   searchBoostRows, filterBoostShow, BOOST_SORTERS, CONTROLS_MIN,
@@ -453,6 +455,53 @@ check('a </script> inside the state cannot close the element early', () => {
   const body = html.match(/data-boost-state>(.*?)<\/script>/s)[1]
   assert.doesNotMatch(body, /<\/script>/)
   assert.match(body, /\\u003c\/script>/)
+})
+
+// ── The quoted receipt is not shown (2026-10-29) ───────────────────────────
+// Most boost notes end in `nostr:nevent1…`, the zap receipt the note quotes
+// so Fountain draws the figure. Reed: meaningless to a reader. Every card
+// drops note references; people stay chips; a receipt-only message gets no
+// body at all.
+const NEVENT = 'nostr:nevent1qvzqqqpxqupzpwrxeemtukuzv62esqjgxg4cmaxrs9sgl7j6tdrufuaturv0wea9qqsgp2l6kd4fkme2vmdt82ak2use8rjulx99q74hs4wm4gj92d3e8sq3w7lvk'
+
+check('a trailing receipt reference comes off the rendered message', () => {
+  const out = renderMessage('Great tune\n\n' + NEVENT, names)
+  assert.equal(out, 'Great tune')
+})
+
+check('a reference anywhere comes off, people stay chips, URLs stay links', () => {
+  const out = renderMessage(NEVENT + ' see https://example.com/x and hi nostr:' + NPUB_A + ' ' + NEVENT, names)
+  assert.doesNotMatch(out, /nevent1/)
+  assert.match(out, /^see <a href="https:\/\/example\.com\/x"/)
+  assert.match(out, /class="nostr-mention"[^>]*>@Alice</)
+  const note1 = renderMessage('x nostr:note1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq y', names)
+  assert.equal(note1, 'x y')
+})
+
+check('a message with no reference renders byte for byte as before', () => {
+  const msg = 'top\n\nbottom  '
+  assert.equal(renderMessage(msg, names), renderMessage(msg, names))
+  assert.equal(stripNoteRefs(msg), msg)
+})
+
+check('a receipt-only message renders empty and the row emits no body', () => {
+  assert.equal(renderMessage('\n' + NEVENT, names), '')
+  const row = { ...dbRows[2], event_id: 'e'.repeat(64), message: NEVENT }
+  const html = boostRows([row], names, SURFACES.show)
+  assert.doesNotMatch(html, /note-body/)
+  assert.doesNotMatch(html, /nevent1/)
+  const withText = boostRows([{ ...row, message: 'hi ' + NEVENT }], names, SURFACES.show)
+  assert.match(withText, /<div class="note-body">hi<\/div>/)
+})
+
+check('the Boosts page and the episode drawer apply the same strip', () => {
+  const feed = readFileSync(new URL('../assets/js/boosts-feed.js', import.meta.url), 'utf8')
+  assert.match(feed, /import \{ stripNoteRefs \} from '\/assets\/js\/nostr-text\.js\?v=/)
+  assert.match(feed, /const msgText = stripNoteRefs\(b\.msg\)\s*\n\s*if \(msgText\) \{/)
+  assert.match(feed, /parseSegments\(msgText\)/)
+  assert.doesNotMatch(feed, /parseSegments\(b\.msg\)/)
+  const card = readFileSync(new URL('../assets/js/episode-card.js', import.meta.url), 'utf8')
+  assert.match(card, /const msgHtml = renderMessage\(\(b\.message \|\| ''\)\.trim\(\), names\)\s*\n\s*const msgEl = msgHtml \?/)
 })
 
 console.log(`\n${passed} assertions passed.`)

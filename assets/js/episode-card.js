@@ -42,13 +42,13 @@
  * what functions/_shared/detail-page.js has always done, so the site now has one
  * date format rather than one for the feeds and another for the detail pages.
  */
-import { showPageHref, episodePageHref, isSyntheticGuid } from './show-link.js?v=ob-v237'
-import { favoriteButtonHtml } from './favorite-button.js?v=ob-v237'
-import { episodeBoostLink } from './episode-link.js?v=ob-v237'
-import { boosterPageHref, boosterLinkAttrs } from './booster-link.js?v=ob-v237'
-import { coverChain, httpsUrl } from './cover-art.js?v=ob-v237'
-import { htmlEscape, isSafeUrl, renderMessage } from './nostr-text.js?v=ob-v237'
-import { chartRanks, competitionRanks } from './rank.js?v=ob-v237'
+import { showPageHref, episodePageHref, isSyntheticGuid } from './show-link.js?v=ob-v238'
+import { favoriteButtonHtml } from './favorite-button.js?v=ob-v238'
+import { episodeBoostLink } from './episode-link.js?v=ob-v238'
+import { boosterPageHref, boosterLinkAttrs } from './booster-link.js?v=ob-v238'
+import { coverChain, httpsUrl } from './cover-art.js?v=ob-v238'
+import { htmlEscape, isSafeUrl, renderMessage } from './nostr-text.js?v=ob-v238'
+import { chartRanks, competitionRanks } from './rank.js?v=ob-v238'
 
 const esc = htmlEscape
 
@@ -898,8 +898,10 @@ function boostRowHtml(b, profiles, names) {
     moreMenuHtml() +
     `</div>`
 
-  const msg = (b.message || '').trim()
-  const msgEl = msg ? `<div class="pcast-boost-msg">${renderMessage(msg, names)}</div>` : ''
+  // Gated on the RENDERED message: a body that was only the quoted receipt
+  // renders to nothing and gets no element.
+  const msgHtml = renderMessage((b.message || '').trim(), names)
+  const msgEl = msgHtml ? `<div class="pcast-boost-msg">${msgHtml}</div>` : ''
 
   /* ⚠️ THE ROW IS THE `[data-boost-note]` ELEMENT, the same contract
    * functions/_shared/detail-page.js#boostRow declares on the .note-card it

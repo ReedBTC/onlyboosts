@@ -29,10 +29,24 @@
  * string is exactly the drift the rendering rule exists to prevent, and this is
  * the one of the two that can run in both places — parseSegments needs 102KB of
  * nostr-tools and a DOM. One visible consequence: a `nostr:note1…` or
- * `nostr:nevent1…` inside a boost message is now a chip linking to njump on the
+ * `nostr:nevent1…` inside a boost message became a chip linking to njump on the
  * homepage as it already was on /show and /episode, rather than a quoted-note
- * chip. That is a convergence onto the behaviour three of the four surfaces
+ * chip. That was a convergence onto the behaviour three of the four surfaces
  * already had.
+ *
+ * ⚠️ A NOTE REFERENCE IS NOT SHOWN AT ALL SINCE 2026-10-29 (Reed's ask). The
+ * boost note quotes its zap receipt in the body as a final `nostr:nevent1…`
+ * because Fountain draws the sats figure off the first quoted receipt and
+ * nothing else (see *The Note Quotes One Receipt* in docs/money-paths.md);
+ * Fountain, Boost Me Buddy, the relay bots and this site all write it, and
+ * on the 200 newest boosts 55 messages ended in one. Rendered as
+ * `@nevent1qvz…` it meant nothing to a reader, so `stripNoteRefs` drops
+ * every note, nevent and naddr reference, with the whitespace before it,
+ * before the message is tokenized; people (npub, nprofile) stay chips. The
+ * Boosts page's cards apply the same strip ahead of their own tokenizer. A
+ * message that was only the reference renders empty, and the callers emit
+ * no body for it. The note itself is untouched: this is only how a message
+ * looks here.
  */
 
 export function htmlEscape(s) {
@@ -131,6 +145,19 @@ function pubkeyFromBech32(id) {
 
 const NOSTR_URI_RE = /nostr:((?:npub|nprofile|note|nevent|naddr)1[023456789acdefghjklmnpqrstuvwxyz]+)/gi;
 const URL_RE = /https?:\/\/[^\s<>"']+/gi;
+// A reference to a NOTE (not a person), with the whitespace run before it.
+const NOTE_REF_RE = /\s*nostr:(?:note|nevent|naddr)1[023456789acdefghjklmnpqrstuvwxyz]+/gi;
+
+/* A boost message with its note references removed: the quoted zap receipt
+ * at the foot of most boost notes, and any other note1/nevent1/naddr1 token,
+ * which no card here can render as anything a reader can use. Only when
+ * something was removed is the result trimmed, so a message with no
+ * reference renders byte for byte as before. */
+export function stripNoteRefs(text) {
+  const src = String(text == null ? "" : text);
+  const out = src.replace(NOTE_REF_RE, "");
+  return out === src ? src : out.trim();
+}
 
 // Every pubkey mentioned across a set of boost messages, for the name lookup.
 export function mentionedPubkeys(messages) {
@@ -332,7 +359,7 @@ function capMessage(s, n) {
  * renders the same way in both places.
  */
 export function renderMessage(text, names) {
-  const src = capMessage(text, MESSAGE_MAX);
+  const src = capMessage(stripNoteRefs(text), MESSAGE_MAX);
   const spans = scanSpans(src);
 
   let out = "", cursor = 0;
