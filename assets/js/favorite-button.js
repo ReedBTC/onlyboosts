@@ -71,6 +71,14 @@ export function favoriteButtonHtml({ kind, guid, itemGuid = null, medium = null,
     `<span class="ob-fav-icon" aria-hidden="true">${HEART_OFF}</span><span class="ob-fav-word">Favorite</span></button>`
 }
 
+/* ⚠️ THE WORD CHANGES WITH THE STATE, NOT ONLY THE HEART (Reed, 2026-10-29:
+ * an outline heart against a filled one was not enough to tell whether a
+ * show was already a favorite). Off reads "Favorite", on reads "Favorited"
+ * on a tinted pill, and a click in flight reads "Saving…". */
+export const WORD_OFF = 'Favorite'
+export const WORD_ON = 'Favorited'
+export const WORD_BUSY = 'Saving…'
+
 /** Paint one button's state. `on` is true, false, or null for "not known". */
 export function setFavoriteState(btn, on) {
   if (!btn) return
@@ -80,6 +88,8 @@ export function setFavoriteState(btn, on) {
   btn.classList.toggle('is-unknown', !known)
   const icon = btn.querySelector('.ob-fav-icon')
   if (icon) icon.textContent = on === true ? HEART_ON : HEART_OFF
+  const word = btn.querySelector('.ob-fav-word')
+  if (word) word.textContent = on === true ? WORD_ON : WORD_OFF
   const label = btn.getAttribute('aria-label') || ''
   const base = label.replace(/^(Favorite|Unfavorite) /, '')
   const verb = on === true ? 'Unfavorite' : 'Favorite'

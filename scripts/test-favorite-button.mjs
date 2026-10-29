@@ -26,6 +26,7 @@ const el = (html) => {
   const attrs = Object.fromEntries([...html.matchAll(/ ([a-z-]+)="([^"]*)"/g)].map((m) => [m[1], m[2].replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&')]))
   const classes = new Set((attrs.class || '').split(/\s+/).filter(Boolean))
   const icon = { textContent: html.includes('♥') ? '♥' : '♡' }
+  const word = { textContent: (html.match(/class="ob-fav-word">([^<]*)</) || [])[1] || '' }
   const dataset = {}
   for (const [k, v] of Object.entries(attrs)) if (k.startsWith('data-')) dataset[k.slice(5).replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = v
   return {
@@ -34,7 +35,7 @@ const el = (html) => {
     getAttribute: (k) => attrs[k] ?? null,
     setAttribute: (k, v) => { attrs[k] = String(v) },
     classList: { toggle: (c, on) => { on ? classes.add(c) : classes.delete(c) }, contains: (c) => classes.has(c) },
-    querySelector: (sel) => (sel === '.ob-fav-icon' ? icon : null),
+    querySelector: (sel) => (sel === '.ob-fav-icon' ? icon : sel === '.ob-fav-word' ? word : null),
   }
 }
 
@@ -80,7 +81,9 @@ check('setFavoriteState: on fills the heart and flips the verb; unknown is neith
   assert.equal(b.getAttribute('aria-label'), 'Unfavorite My Show')
   assert.equal(b.title, 'Unfavorite My Show')
   assert.equal(b.classList.contains('is-on'), true)
+  assert.equal(b.querySelector('.ob-fav-word').textContent, 'Favorited', 'the word says it is on (2026-10-29)')
   F.setFavoriteState(b, false)
+  assert.equal(b.querySelector('.ob-fav-word').textContent, 'Favorite')
   assert.equal(b.getAttribute('aria-label'), 'Favorite My Show')
   assert.equal(b.classList.contains('is-on'), false)
   F.setFavoriteState(b, null)
@@ -125,6 +128,17 @@ check('every renderer of the heart imports it two-sided-safely', () => {
     assert.match(s, /from "\.\.\/\.\.\/assets\/js\/favorite-button\.js"/, `${f} imports the heart by relative path`)
     assert.match(s, /favoriteButtonHtml\(\{ kind: "(show|episode|artist)"/, `${f} renders it`)
   }
+})
+check('a click waits for the real signer and decides add-or-remove after the full read (2026-10-29)', () => {
+  const body = uiSrc.slice(uiSrc.indexOf('async function onClick('))
+  const at = (re) => { const m = body.search(re); assert.ok(m > 0, String(re)); return m }
+  const wait = at(/await waitForSession\(\)/)
+  const read = at(/await reload\(\{ withWidget: true \}\)/)
+  const decide = at(/const wasOn = known/)
+  assert.ok(wait < read && read < decide, 'wait, then read, then decide')
+  assert.doesNotMatch(body.slice(0, decide), /getAttribute\('aria-pressed'\)/, 'never off the painted button')
+  assert.match(uiSrc, /Already in your favorites/, 'an unchanged answer is spoken')
+  assert.match(uiSrc, /return state\.privateUnread \? null : false/, 'an unopened private half is unknown, not off')
 })
 check('the controller reveals all three kinds (the migration gate lifted 2026-10-03) and never reaches NIP-04', () => {
   assert.doesNotMatch(strip(uiSrc), /ITEMS_ALLOWED|itemsAllowed/, 'the gate is gone, not merely open')

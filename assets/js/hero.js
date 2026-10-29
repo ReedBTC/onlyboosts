@@ -26,11 +26,11 @@
  * episode or song), which read the show off the slide's own data attributes
  * exactly as they read a card's. Those attribute names are their contract.
  */
-import { coverChain } from './cover-art.js?v=ob-v238'
-import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v238'
-import { boosterPageHref } from './booster-link.js?v=ob-v238'
-import { episodeBoostLink } from './episode-link.js?v=ob-v238'
-import { statsLine, rankTriplet, TRIPLET_TITLE } from './rail-tile.js?v=ob-v238'
+import { coverChain } from './cover-art.js?v=ob-v239'
+import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v239'
+import { boosterPageHref } from './booster-link.js?v=ob-v239'
+import { episodeBoostLink } from './episode-link.js?v=ob-v239'
+import { statsLine, rankTripletHtml } from './rail-tile.js?v=ob-v239'
 
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => (
@@ -65,7 +65,7 @@ export function showSlide(key, r, { eyebrow = EYEBROWS[key], line = null, href =
   return {
     key, kind: album ? 'album' : 'show', eyebrow, guid: r.guid, title: r.title, href,
     img: r.image ?? r.img, art2: r.artwork ?? r.art2, glyph: album ? '🎵' : '🎙',
-    ranks: rankTriplet(r),
+    ranks: rankTripletHtml(r),
     line: line ?? statsLine({ boosters: r.booster_count ?? r.boosters, sats: r.total_sats ?? r.sats }),
     from: album && r.author ? { title: r.author, href: null } : null,
     cta: album ? 'Open the album' : 'Open the show',
@@ -81,7 +81,7 @@ export function episodeSlide(key, r, { eyebrow = EYEBROWS[key] } = {}) {
     key, kind: song ? 'song' : 'episode', eyebrow, guid: r.guid, title: r.title,
     href: episodePageHref(r.guid, r.title),
     img: r.img || show.img, art2: show.art2, glyph: song ? '🎵' : '🎙',
-    ranks: rankTriplet(r),
+    ranks: rankTripletHtml(r),
     line: statsLine({ boosters: r.boosters, sats: r.sats }),
     from: show.title ? { title: show.title, href: show.guid ? showPageHref(show.guid) : null } : null,
     cta: song ? 'Open the song' : 'Open the episode',
@@ -99,7 +99,7 @@ export function artistSlide(key, r, { eyebrow = EYEBROWS[key] } = {}) {
   return {
     key, kind: 'artist', eyebrow, guid: r.guid, title: r.title, href: publisherPageHref(r.guid),
     img: r.image ?? r.img, art2: r.artwork ?? r.art2, glyph: '🎤',
-    ranks: rankTriplet(r),
+    ranks: rankTripletHtml(r),
     line: statsLine({ boosters: r.booster_count ?? r.boosters, sats: r.total_sats ?? r.sats }),
     from: null, cta: 'Open the artist', boost: null,
   }
@@ -149,7 +149,7 @@ export function slideHtml(s, i = 0, n = 1) {
     ? `<p class="hero-from">${s.from.href ? `<a href="${esc(s.from.href)}">${esc(s.from.title)}</a>` : esc(s.from.title)}</p>`
     : ''
   const line = (s.ranks || s.line)
-    ? `<p class="hero-line">${s.ranks ? `<span class="hero-ranks" title="${esc(TRIPLET_TITLE)}">${esc(s.ranks)}</span>` : ''}${s.ranks && s.line ? '<span class="hero-dot" aria-hidden="true">·</span>' : ''}${s.line ? `<span>${esc(s.line)}</span>` : ''}</p>`
+    ? `<p class="hero-line">${s.ranks ? `<span class="hero-ranks rt-ranks">${s.ranks}</span>` : ''}${s.ranks && s.line ? '<span class="hero-dot" aria-hidden="true">·</span>' : ''}${s.line ? `<span>${esc(s.line)}</span>` : ''}</p>`
     : ''
   const desc = s.desc ? `<p class="hero-desc">${esc(s.desc)}</p>` : ''
   const open = s.href ? `<a class="hero-btn" href="${esc(s.href)}">${esc(s.cta || 'Open')}</a>` : ''

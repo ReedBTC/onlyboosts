@@ -19,7 +19,7 @@
  *     level, since week-charts.js still serves them;
  *   - the weekly Top 10s against the brute-forced chart: order, T# on a
  *     genuinely shared place, and the per-row COMPONENT-RANK triplet under
- *     the sats/boosters/boosts column head, component ties computed over the
+ *     the sats/boosts/boosters column head, component ties computed over the
  *     whole week's corpus;
  *   - the medium partition (an album never on the Shows chart, video on it);
  *   - the title rule (2026-09-11): a show the index cannot name is on no
@@ -180,7 +180,7 @@ const lbl = (rank, tied) => `${tied ? 'T' : ''}${rank}`
 // The component form wears the # — the detail tiles' chip notation, because
 // these standings are not positions in the visible list.
 const hlbl = (rank, tied) => `${tied ? 'T' : ''}#${rank}`
-const triplet = (r) => `${hlbl(r.rSats, r.tSats)}/${hlbl(r.rBoosters, r.tBoosters)}/${hlbl(r.rBoosts, r.tBoosts)}`
+const triplet = (r) => `${hlbl(r.rSats, r.tSats)}/${hlbl(r.rBoosts, r.tBoosts)}/${hlbl(r.rBoosters, r.tBoosters)}`
 
 /* One content category's corpus for [ws, we) out of LOG — the query's WHERE
  * clauses, re-derived rather than copied. */
@@ -339,7 +339,7 @@ for (const [kind, html] of [['shows', showsCard], ['artists', artistsCard]]) {
   })
 }
 check('the column head says these are ranks, and links the formula', () => {
-  assert.ok(showsCard.includes('rank in sats/boosters/boosts'))
+  assert.ok(showsCard.includes('rank in sats/boosts/boosters'))
   const head = showsCard.slice(showsCard.indexOf('cb-colhead'), showsCard.indexOf('<ol'))
   assert.ok(head.includes('href="/about#charts"'))
 })

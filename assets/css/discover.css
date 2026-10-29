@@ -122,6 +122,17 @@
 }
 :root[data-theme="dark"] .rt-rank { background: rgba(0, 0, 0, 0.72); }
 .rt-rank[data-tied="1"] { letter-spacing: 0.02em; }
+/* The medium badge (rail-tile.js mediumBadge): a microphone or a music note
+   in the artwork's top-right corner, on the rank badge's own dark chip. */
+.rt-medium {
+  position: absolute; right: 6px; top: 6px;
+  width: 24px; height: 24px; border-radius: 12px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(11, 58, 82, 0.86); color: #ffffff;
+  pointer-events: auto;
+}
+.rt-medium .rt-ico { width: 13px; height: 13px; opacity: 1; }
+:root[data-theme="dark"] .rt-medium { background: rgba(0, 0, 0, 0.72); }
 .rail-tile:first-child .rt-rank { background: var(--brand-dd); }
 /* A #40HPW member who has cleared the goal this week: the board's gold. */
 .rt-rank--gold { background: #b8860b; color: #ffffff; }
@@ -140,9 +151,17 @@
 .rail-tile--person .rt-media .rt-rank { left: 0; top: 0; }
 .rail-tile--person .rt-title { text-align: center; }
 .rail-tile--person .rt-sub { text-align: center; }
-/* The rank triplet under a charted tile: rank in sats / boosters / boosts,
-   the chart view's own figure. Tabular so the slashes line up down a rail. */
-.rt-ranks { font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
+/* The rank triplet under a charted tile: rank in sats / boosts / boosters,
+   the chart formula's order, each figure behind its icon (rail-tile.js
+   FIGURE_ICONS: Bitcoin sign, speech bubble, person). Tabular figures. */
+.rt-ranks { font-variant-numeric: tabular-nums; }
+.rt-ranks .rt-fig { display: inline-flex; align-items: center; gap: 0.18em; margin-right: 0.6em; }
+.rt-ranks .rt-fig:last-child { margin-right: 0; }
+.rt-ico { flex: none; width: 0.95em; height: 0.95em; opacity: 0.8; }
+.rt-sr {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
 .search-page h1 {
   margin: 0 0 0.25rem;
   font-family: var(--font-sans);

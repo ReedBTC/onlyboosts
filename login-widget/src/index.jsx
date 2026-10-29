@@ -636,6 +636,14 @@ const api = {
   /** Currently logged-in NDKUser, or null. */
   getUser() { return currentUser || null },
 
+  /**
+   * True once the session is a real signer-backed user, not the stub the
+   * page boots with from the profile cache. A caller that is about to sign
+   * (the Favorite heart, favorites-ui.js) waits on this rather than acting
+   * on a stub, whose sign throws "Session still restoring".
+   */
+  isSessionReady() { return !!currentUser && !isStubUser(currentUser) },
+
   /** Subscribe to login/logout. Returns an unsubscribe fn. */
   onChange(fn) {
     listeners.add(fn)

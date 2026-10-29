@@ -48,12 +48,12 @@
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v238" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v238" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v239" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v239" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v238" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v238" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v239" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v239" />
 </head>
 <body>
 
@@ -570,7 +570,7 @@
         <p>The rotating panel at the top of the front page is not an editorial pick. Each slide is the first place of one of the rails below it, in the order the rails appear: this week&rsquo;s top show, this month&rsquo;s top album, the member leading the #40HPW week, the newest noteworthy show, the week&rsquo;s biggest climber, the show most often recommended by other podcasters, the top podcast in the largest non-English language, and the year&rsquo;s top episode and song. The week and month rails at the foot of the page contribute no slide, since the same show or episode usually leads all three windows. The slides are the same for every visitor, signed in or not, and change only when the rails change. The description on a slide is the one the show, episode, artist or member published themselves.</p>
 
         <h3>The Chart Rails</h3>
-        <p>Top Shows This Week and Top Albums This Month at the head of the page, and the run of Top Episodes, Top Songs, Top Albums and Top Shows over the week, the month and the year at its foot, are the <a href="#charts">OnlyBoosts Charts</a> computed over that window of boost time. Top Shows This Week is the week of the Charts page, Monday 00:00 to Sunday night US Pacific; every other window is trailing, the last 7, 30 or 365 days, which is the window of the chart view each rail links to. The ten tiles are the chart&rsquo;s first ten places, and the line under each tile prints the three component ranks (sats / boosters / boosts) that produced the place, so any tile can be checked against the chart view it links to.</p>
+        <p>Top Shows This Week and Top Albums This Month at the head of the page, and the run of Top Episodes, Top Songs, Top Albums and Top Shows over the week, the month and the year at its foot, are the <a href="#charts">OnlyBoosts Charts</a> computed over that window of boost time. Top Shows This Week is the week of the Charts page, Monday 00:00 to Sunday night US Pacific; every other window is trailing, the last 7, 30 or 365 days, which is the window of the chart view each rail links to. The ten tiles are the chart&rsquo;s first ten places, and the line under each tile prints the three component ranks (sats, boosts and boosters, each marked by its icon: a Bitcoin sign, a speech bubble and a person) that produced the place, so any tile can be checked against the chart view it links to.</p>
 
         <h3>Top Podcasts by Language</h3>
         <p>Three rails, one for each of the three largest non-English languages in the index, each the year&rsquo;s Shows chart filtered to that language. The three are chosen by the index, not by hand: the podcast side&rsquo;s languages ranked by indexed boosts, with English left out, taking the first three whose year chart holds at least five shows. On 2026-10-22 that was German and Spanish, with the third place empty until another language reaches five. A show&rsquo;s language is the one its own feed declares; a feed that declares none is not treated as English and is on no language rail.</p>
@@ -579,13 +579,14 @@
         <p>The week&rsquo;s ten members by hours of podcasts boosted, counted exactly as the Members tab counts them: the published duration of every episode the member boosted this week, each episode once. A member past forty hours wears a gold badge. The rules dialog on the Members tab states the counting rules in full.</p>
 
         <h3>Podcasts Recommended For You and Music Recommended For You</h3>
-        <p>These two rails are built from audience overlap, in five steps.</p>
+        <p>These two rails are built from audience overlap, in six steps.</p>
         <ol>
           <li><strong>Similar shows.</strong> Once a day the indexer takes every show with at least three distinct boosters and finds its twenty most similar shows. Similarity is the overlap between the two shows&rsquo; sets of boosters, measured as cosine similarity: the number of members who boosted both, divided by the square root of the product of the two booster counts. Two shows boosted by exactly the same people score 1; two shows with no booster in common score 0. Podcasts are compared with podcasts and albums with albums.</li>
           <li><strong>Relay bots are not boosters.</strong> <a href="#bots">Accounts that publish on behalf of other people</a> are left out of the booster sets. One such key relaying hundreds of boosts would otherwise read as a single person who boosts everything, and would manufacture overlap between every show it touched.</li>
           <li><strong>Your seeds.</strong> When you are logged in, the shows you have boosted under your key are your seeds, together with the feeds on your PC 2.0 favorites list if your browser passes them. Each candidate show&rsquo;s similarity to every one of your seeds is summed; a show you have already boosted or favorited is never a candidate.</li>
           <li><strong>The floor.</strong> A candidate ranks only if it is reached from two or more of your seeds, or shares two or more boosters with one of them. Measured on 2026-10-17, half of all similar-show pairs share exactly one booster, which is one person&rsquo;s taste rather than an audience&rsquo;s, so a single shared booster is not enough.</li>
           <li><strong>Two lists.</strong> Podcasts and music are ranked separately. The overlap on the music side runs about three times the podcast side&rsquo;s, so one combined list would be all music.</li>
+          <li><strong>Active podcasts only.</strong> A podcast whose newest episode is more than six months old is left off Podcasts Recommended For You. The date is the newest episode Podcast Index lists for the feed, boosted or not; a show with no date on record is kept. Albums are exempt, since a finished album does not go stale.</li>
         </ol>
         <p>The result is computed from the index when the page loads and is not kept. Nothing about you is written anywhere; the only thing read is the set of boosts already published to Nostr under your key.</p>
 
@@ -867,15 +868,15 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v238"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v239"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v238" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v239" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v238" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v239" defer></script>
 
-<script src="/assets/js/nav.js?v=ob-v238" defer></script>
+<script src="/assets/js/nav.js?v=ob-v239" defer></script>
 
 </body>
 </html>

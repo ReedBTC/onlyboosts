@@ -41,20 +41,21 @@
  * after which the list is re-read with NIP-44 and the hearts fill. That is a
  * known cost of not loading 1MB to draw an outline.
  */
-import { fetchFavorites, syncFavorites, widgetDeps, saveMode, loadMode } from '/assets/js/favorites-sync.js?v=ob-v238'
-import { statedVisibility } from '/assets/js/favorites-merge.js?v=ob-v238'
-import { setFavoriteState, changeFor, keyFor } from '/assets/js/favorite-button.js?v=ob-v238'
-import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v238'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v238'
-import { initAccountSettings, noteSettingsChange } from '/assets/js/account-settings.js?v=ob-v238'
+import { fetchFavorites, syncFavorites, widgetDeps, saveMode, loadMode } from '/assets/js/favorites-sync.js?v=ob-v239'
+import { statedVisibility } from '/assets/js/favorites-merge.js?v=ob-v239'
+import { setFavoriteState, changeFor, keyFor, WORD_BUSY } from '/assets/js/favorite-button.js?v=ob-v239'
+import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v239'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v239'
+import { initAccountSettings, noteSettingsChange } from '/assets/js/account-settings.js?v=ob-v239'
 
-const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v238'
+const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v239'
 
 const state = {
   pubkey: null,
   keys: new Set(),     // what the member's list holds, as favorites-merge keys
   trusted: false,
   privateOpened: false,
+  privateUnread: false, // the list has an encrypted half this read could not open
   loading: null,
   everRead: false,     // the lazy read: a page with no hearts never reads
 }
@@ -76,7 +77,18 @@ function paint(btn) {
   if (!state.everRead && !state.loading) reload()
   btn.hidden = false
   const key = keyFor(btn)
-  setFavoriteState(btn, state.trusted ? state.keys.has(key) : null)
+  setFavoriteState(btn, knownState(key))
+}
+
+/* What the list says about one key: true, false, or null for "cannot say".
+ * ⚠️ A KEY ABSENT FROM THE PUBLIC HALF IS NOT "OFF" WHILE A PRIVATE HALF
+ * SITS UNOPENED: the page reads without the signer (no prompt on page
+ * load), so a private favorite is invisible until the first click opens the
+ * half. Painting it off is what made a favorited show look unfavorited. */
+function knownState(key) {
+  if (!state.trusted) return null
+  if (state.keys.has(key)) return true
+  return state.privateUnread ? null : false
 }
 
 function paintAll(root = document) {
@@ -101,7 +113,7 @@ async function load({ withWidget = false } = {}) {
   state.pubkey = pubkey
   state.everRead = true
   if (!pubkey) {
-    state.keys = new Set(); state.trusted = false; state.privateOpened = false
+    state.keys = new Set(); state.trusted = false; state.privateOpened = false; state.privateUnread = false
     paintAll()
     return
   }
@@ -116,6 +128,7 @@ async function load({ withWidget = false } = {}) {
     if (r.trusted) {
       state.keys = keysOf(r.entries)
       state.privateOpened = r.parsedPrivate !== null
+      state.privateUnread = !!r.read?.content && r.parsedPrivate === null
     }
   } catch (err) {
     console.warn('[favorites] read failed', err)
@@ -266,19 +279,67 @@ const MESSAGES = {
   'bad-change': 'This one can’t be favorited.',
 }
 
+/* ⚠️ A CLICK CAN LAND BEFORE THE SIGNER IS BACK. The widget boots on a STUB
+ * user built from the profile cache and restores the real signer behind it
+ * (a NIP-46 reconnect takes seconds), and a stub cannot sign or decrypt: the
+ * click used to proceed anyway, read without the private half and fail or
+ * misreport. So the click waits for the real session, up to SIGNER_WAIT_MS.
+ * `isSessionReady` is the widget's own answer; an older bundle without it
+ * falls back to the presence of a signer. */
+const SIGNER_WAIT_MS = 20_000
+function sessionReady() {
+  const w = window.LBLogin
+  if (!w) return false
+  if (typeof w.isSessionReady === 'function') return w.isSessionReady()
+  return !!w.getUser?.()?.pubkey && !!w.getNDK?.()?.signer
+}
+async function waitForSession() {
+  const started = Date.now()
+  while (!sessionReady()) {
+    if (Date.now() - started > SIGNER_WAIT_MS) return false
+    await new Promise((r) => setTimeout(r, 150))
+  }
+  return true
+}
+
+function setBusy(btn, on) {
+  btn.disabled = on
+  btn.classList.toggle('is-busy', on)
+  const word = btn.querySelector('.ob-fav-word')
+  if (on && word) word.textContent = WORD_BUSY
+  if (!on) paint(btn)
+}
+
 async function onClick(btn) {
   if (btn.disabled) return
-  const wasOn = btn.getAttribute('aria-pressed') === 'true'
-  btn.disabled = true
-  btn.classList.add('is-busy')
+  setBusy(btn, true)
   try {
     await ensureWidget()
     const user = window.LBLogin?.getUser?.()
     if (!user?.pubkey) { window.LBLogin?.requestLogin?.(); return }
+    if (!await waitForSession()) {
+      showToast('Your signer is still connecting. Try again in a moment.', true)
+      return
+    }
 
-    // The widget is here now: if the private half was never opened, open it
+    // The signer is here now: if the private half was never opened, open it
     // before deciding anything, or an entry hidden in it reads as absent.
     if (!state.privateOpened || state.pubkey !== user.pubkey) await reload({ withWidget: true })
+
+    /* ⚠️ ADD OR REMOVE IS DECIDED HERE, AFTER THE FULL READ, never off the
+     * button as it was painted before the click. A favorite in the private
+     * half painted as off, so the click asked to ADD what the list already
+     * held, the sync answered `unchanged`, nothing was signed, and the page
+     * said nothing at all (Reed, 2026-10-29). */
+    const key = keyFor(btn)
+    const known = knownState(key)
+    if (known === null) {
+      showToast(state.trusted && state.privateUnread
+        ? 'Your signer couldn’t open your private favorites list, so nothing was changed.'
+        : MESSAGES.degraded, true)
+      return
+    }
+    const wasOn = known
 
     const deps = await widgetDeps(window.LBLogin)
     const base = { ...deps, store: window.localStorage }
@@ -294,11 +355,14 @@ async function onClick(btn) {
     }
 
     if (r.status === 'published' || r.status === 'unchanged') {
-      const key = keyFor(btn)
       if (wasOn) state.keys.delete(key); else state.keys.add(key)
       state.trusted = true
       for (const b of buttons()) if (keyFor(b) === key) paint(b)
-      if (r.status === 'published') showToast(wasOn ? 'Removed from your favorites' : 'Added to your favorites')
+      // Every outcome says something: an `unchanged` answer is the list
+      // already agreeing, which the reader is owed as much as a publish.
+      showToast(r.status === 'published'
+        ? (wasOn ? 'Removed from your favorites' : 'Added to your favorites')
+        : (wasOn ? 'Not in your favorites' : 'Already in your favorites'))
       return
     }
     showToast(MESSAGES[r.status] || 'Couldn’t update your favorites.', true)
@@ -307,8 +371,7 @@ async function onClick(btn) {
     console.warn('[favorites] click failed', err)
     showToast('Couldn’t update your favorites.', true)
   } finally {
-    btn.disabled = false
-    btn.classList.remove('is-busy')
+    setBusy(btn, false)
   }
 }
 

@@ -251,9 +251,12 @@ export const RAILS = {
     const rows = await newShowsRows(env, TILES);
     return rail(railListHtml(rows.map((r, i) => tileHtml({
       rank: i + 1, href: showPageHref(r.guid), title: r.title,
-      sub: firstBoost(r),
-      subTitle: `${r.booster_count} boosters since its first boost`,
-      img: r.image, art2: r.artwork, glyph: (r.medium === "music" ? "🎵" : "🎙"),
+      /* The medium, not the date (Reed's ask, 2026-10-29): this rail mixes
+         podcasts and albums, and the debut date is the rail's premise rather
+         than news about one tile. The date stays in the tooltip. */
+      sub: r.medium === "music" ? "Album" : "Podcast",
+      subTitle: `${firstBoost(r)} · ${r.booster_count} boosters since`,
+      img: r.image, art2: r.artwork, glyph: (r.medium === "music" ? "🎵" : "🎙"), medium: r.medium,
     })), { empty: "No show had its first boost in the last 90 days." }),
       rows[0] && showSlide("new-shows", rows[0], { line: `${firstBoost(rows[0])} · ${rows[0].booster_count} boosters since` }));
   },
@@ -267,7 +270,7 @@ export const RAILS = {
       rank: r.rank, tied: !!r.tied, href: showPageHref(r.guid), title: r.title,
       sub: climb != null ? `▲ ${climb} · was #${was.get(r.guid)}` : "New this week",
       subTitle: climb != null ? "Places climbed since last week's chart" : "Not on last week's chart",
-      img: r.image, art2: r.artwork, glyph: "🎙",
+      img: r.image, art2: r.artwork, glyph: "🎙", medium: "podcast",
     })), { empty: "Nothing has moved yet this week." }),
       top && showSlide("movers", top.r, {
         medium: "podcast",
@@ -286,7 +289,7 @@ export const RAILS = {
       rank: i + 1, href: Number(r.linked) ? showPageHref(r.guid) : null, title: r.title,
       sub: onN(r),
       subTitle: "How many shows list it on their podroll",
-      img: r.image, art2: r.artwork, glyph: (r.medium === "music" ? "🎵" : "🎙"),
+      img: r.image, art2: r.artwork, glyph: (r.medium === "music" ? "🎵" : "🎙"), medium: r.medium,
     })), { empty: "No podroll in the index yet." }),
       rows[0] && showSlide("podroll", rows[0], {
         href: Number(rows[0].linked) ? showPageHref(rows[0].guid) : null,

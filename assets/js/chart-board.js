@@ -23,19 +23,19 @@
 // classes outright, so a member row here and on the tab are one grammar.
 //
 // ⚠️ THE WEEKLY ROWS PRINT COMPONENT RANKS, NOT RAW FIGURES (Reed's ask,
-// 2026-08-31): a `sats/boosters/boosts` column head on the board, and each
+// 2026-08-31): a `sats/boosts/boosters` column head on the board, and each
 // row's standing in the three components as `3/5/T9` — the formula in the
 // open at the row, where the raw figures took too much room. A component T
 // is computed over the whole week's corpus (peers_* from week-charts.js),
 // never over the visible ten.
 
-import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v238';
-import { httpsUrl } from './cover-art.js?v=ob-v238';
-import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v238';
-import { boosterPageHref } from './booster-link.js?v=ob-v238';
-import { rankLabel, competitionRanks } from './rank.js?v=ob-v238';
-import { weekDateString } from './pacific-week.js?v=ob-v238';
-import { initials } from './hpw-board.js?v=ob-v238';
+import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v239';
+import { httpsUrl } from './cover-art.js?v=ob-v239';
+import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v239';
+import { boosterPageHref } from './booster-link.js?v=ob-v239';
+import { rankLabel, competitionRanks } from './rank.js?v=ob-v239';
+import { weekDateString } from './pacific-week.js?v=ob-v239';
+import { initials } from './hpw-board.js?v=ob-v239';
 
 const esc = htmlEscape;
 
@@ -115,7 +115,8 @@ function who(kind, r, subline) {
 /* One weekly-chart row. The position is the SERVER's rank and tie flag — a
  * tuple standing the renderer must never renumber (docs/feeds.md, the Charts
  * section) — and the triplet is the row's standing in each component, in the
- * column head's order: sats / boosters / boosts. */
+ * column head's order: sats / boosts / boosters, the chart formula's own
+ * (Reed's call, 2026-10-29: one order for the three figures site-wide). */
 export function weekRowHtml(kind, r) {
   const w = who(kind, r);
   /* `#2`, or `T#9` when the component place is shared — the detail tiles'
@@ -128,8 +129,8 @@ export function weekRowHtml(kind, r) {
     `<span class="cb-pos">${esc(rankLabel(r.rank, r.tied))}</span>` +
     art(r, w.glyph) +
     w.html +
-    `<span class="cb-ranks" title="This week's rank in sats / boosters / boosts">` +
-      `${esc(c(r.r_sats, r.peers_sats))}/${esc(c(r.r_boosters, r.peers_boosters))}/${esc(c(r.r_boosts, r.peers_boosts))}` +
+    `<span class="cb-ranks" title="This week's rank in sats / boosts / boosters">` +
+      `${esc(c(r.r_sats, r.peers_sats))}/${esc(c(r.r_boosts, r.peers_boosts))}/${esc(c(r.r_boosters, r.peers_boosters))}` +
     `</span>` +
     `</li>`;
 }
@@ -173,7 +174,7 @@ export function boardHtml({ title, titleHtml, sub, rows, empty, board, colhead =
    * without it); the ⓘ is the feed note's own explainer link, same target,
    * same new-tab call — a reader mid-browse gets the formula beside the
    * board, not over it. */
-  const head = `<div class="cb-colhead">rank in sats/boosters/boosts ` +
+  const head = `<div class="cb-colhead">rank in sats/boosts/boosters ` +
     `<a class="cb-colhead-info" href="/about#charts" target="_blank" rel="noopener"` +
     ` title="How the OnlyBoosts Charts work" aria-label="How the OnlyBoosts Charts work">ⓘ</a></div>`;
   return `<section class="cb-board"${board ? ` data-cb-board="${esc(board)}"` : ""}>` +

@@ -282,8 +282,18 @@ was picked from is in the session memory; direction A won, with the sans.
 - **`--font-sans` is Outfit** (`assets/fonts/outfit.woff2`, OFL, a variable
   file), used by the bar and the rails. The two serifs are still the display
   and body faces everywhere else; the typography item below is still open.
-- **A tile's one line is the chart triplet** (rank in sats / boosters /
-  boosts, the chart view's own figure, `rankTriplet` in `rail-tile.js`);
+- **⚠️ THE THREE FIGURES HAVE ONE ORDER SITE-WIDE: SATS, BOOSTS, BOOSTERS**
+  (Reed's call, 2026-10-29): the chart formula's order and the detail
+  pages' stat tiles. The rail triplet, the weekly boards' triplet and
+  column head, the card stats lines and every sort menu follow it (chart
+  rank and the chronological sorts keep their places).
+- **A tile's one line is the chart triplet** (rank in sats / boosts /
+  boosters, each behind its icon since 2026-10-29: a Bitcoin sign, a speech
+  bubble, a person, `rankTripletHtml` in `rail-tile.js`; Reed's ask, the
+  words do not fit). **Every content tile carries a MEDIUM BADGE** on its
+  artwork's top-right corner, a microphone or a music note (`mediumBadge`;
+  a person's tile none), and New and Noteworthy's line under a tile is the
+  medium ("Podcast", "Album"), its first-boost date in the tooltip;
   Reed's call after seeing "7 boosters · 38.8k sats" at tile size. The #40HPW
   rail is tiles too (face, name, "34.3 HPW · 26 episodes", gold past the
   goal), not the board: every rail the same shape. **A person's tile is
@@ -331,7 +341,11 @@ was picked from is in the session memory; direction A won, with the sans.
   `BECAUSE_MIN` (4) left. Until 2026-10-22 it was the five most-boosted
   seeds in boost order, any size. Cloned by `discover.js` from the hidden
   prototype section. Nothing is stored per
-  member. **The method is public: `/about#recommendations`** states every
+  member. **A podcast whose newest episode is over 183 days old is not
+  recommended** (Reed's call, 2026-10-29; podcast side only, NULL kept),
+  off `podcasts.newest_item_ts`, Podcast Index's newestItemPubdate, a
+  collector column briefed to OB-back the same day; until it exists the
+  query falls back to unfiltered on "no such column". **The method is public: `/about#recommendations`** states every
   rail's rule, Reed's data-transparency call, and the three personal rails'
   one-liners link it; `docs/about-and-faq-source.md` is the factual backing
   and is corrected first. **Favorites are not yet handed over**: `favorites-ui.js`
@@ -2500,6 +2514,11 @@ is a publish target (theforest refuses the write and is deliberately out).**
   mode per list; Reed takes NIP-51's per-entry model up with Chad first, and
   nothing goes to GitHub on it before that.
 
+- **⚠️ A HEART CLICK WAITS FOR THE REAL SIGNER AND DECIDES ADD OR REMOVE
+  AFTER THE FULL READ** (2026-10-29, Reed's report that a click did nothing):
+  the widget boots on a stub user, so `onClick` waits on the widget's
+  `isSessionReady()`; an unopened private half paints a heart UNKNOWN, not
+  off; `unchanged` gets a toast too; on reads "Favorited" on a tinted pill.
 - **⚠️ THE HEART SHIPS `hidden` AND `favorites-ui.js` REVEALS IT FOR A
   SIGNED-IN MEMBER ONLY** (Reed: signed out gets nothing). `favorite-button.js`
   is two-sided chrome on the boost-button pattern, rendered by both cards and

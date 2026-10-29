@@ -43,8 +43,8 @@
 //   shows / artists / members weeks-at-1   list 269.5 → 829, ceiling 56.0px, 5.8px in hand
 //   shows / artists weekly Top 10          list 296.9 → 829, ceiling 53.3px, 3.1px in hand
 //
-// ⚠️ THE WEEKLY CHART CARDS ARE THE TIGHT ONES: the `rank in sats/boosters/
-// boosts` column head costs 27.4px of the list box, so a weekly row may grow
+// ⚠️ THE WEEKLY CHART CARDS ARE THE TIGHT ONES: the `rank in sats/boosts/
+// boosters` column head costs 27.4px of the list box, so a weekly row may grow
 // 3.1px before the tenth show drops off the card. The rank triplet itself
 // does not make a row taller. Change a number in any card's css and have the
 // bot re-measure (`bots/hpw-cards/test-clip-guard.py <origin>` reads every
