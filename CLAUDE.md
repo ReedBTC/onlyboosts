@@ -343,7 +343,7 @@ was picked from is in the session memory; direction A won, with the sans.
   prototype section. Nothing is stored per
   member. **A podcast whose newest episode is over 183 days old is not
   recommended** (Reed's call, 2026-10-29; podcast side only, NULL kept),
-  off `podcasts.newest_item_ts`, Podcast Index's newestItemPubdate, a
+  off `podcasts.newest_item_ts`, the newest item's datePublished from PI episodes/byfeedid, a
   collector column briefed to OB-back the same day; until it exists the
   query falls back to unfiltered on "no such column". **The method is public: `/about#recommendations`** states every
   rail's rule, Reed's data-transparency call, and the three personal rails'

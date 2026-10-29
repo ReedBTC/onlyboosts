@@ -65,7 +65,8 @@ async function seedsOf(env, hex, favorites) {
 /* ⚠️ A PODCAST WITH NO NEW EPISODE IN SIX MONTHS IS NOT RECOMMENDED (Reed's
  * call, 2026-10-29), on the podcast side only: an album is finished work and
  * never goes stale. `podcasts.newest_item_ts` is Podcast Index's
- * newestItemPubdate, stored by the collector; it is the show's newest
+ * episodes/byfeedid newest item's datePublished (byguid carries no
+ * newestItemPubdate, measured by the collector), stored by the collector; it is the show's newest
  * episode, boosted or not, which nothing else in D1 knows (`latest_ts` is the
  * newest BOOST, and `episodes` holds boosted episodes only). NULL is kept:
  * a date we do not have is not a dormant show.

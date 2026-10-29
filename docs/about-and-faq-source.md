@@ -377,7 +377,7 @@ indexed Nostr boost; nothing about a visitor is stored.
      side's.
   6. Podcast side only: a show whose newest episode is over 183 days old is
      dropped (Reed's call, 2026-10-29). The date is `podcasts.newest_item_ts`,
-     Podcast Index's newestItemPubdate, so an unboosted new episode counts;
+     the newest item's datePublished from Podcast Index's episodes/byfeedid (byguid carries no newestItemPubdate), so an unboosted new episode counts;
      NULL is kept. Music is exempt.
   Computed per request from D1 (`POST /api/v1/recommend`), nothing stored.
 - **Because You Boosted X**: up to five rails, one per seed; each rail is
