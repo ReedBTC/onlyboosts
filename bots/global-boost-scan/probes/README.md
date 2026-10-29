@@ -46,3 +46,19 @@ index held 41,617 rows; 134 of them no relay returned. Unindexed candidates:
 
 Relays: damus and primal contributed 1 and 0 unindexed boosts respectively.
 BoostMeBitch's relay set is not where the gap is.
+
+## Actions taken, 2026-10-03 (Reed's calls)
+
+1. `relay.wavlake.com` added to `RECEIPT_RELAYS` (relays.py).
+2. `backfill --force --floor 1719792000` run under the pipeline lock, every
+   shape, every core relay — the k-free backfill of 2026-09-03 had stopped at
+   2025-06-01.
+3. `backfill_once.py --apply`: 384 "⚡ N sats" notes (18,285 sats) and 210 LB
+   publisher standalones (1,478,316 sats) written with `amount_source='content'`.
+   A ONE-TIME pass; the classifier is unchanged. Ids in
+   `data/probes/backfill-once-2026-10-03.json`; reversal is one DELETE on them
+   plus their `d1_boosts_synced` markers, and D1 heals on the next delta.
+4. Comment-only notes: **held**. `value_block_probe.py` measured 2,107 shows
+   with no value block carrying 5,479 Fountain comments; the open questions are
+   where comments live (a `comments` table, not `boosts`) and what happens when
+   a show later gains a value block.
