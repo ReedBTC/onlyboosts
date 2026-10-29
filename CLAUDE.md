@@ -2219,6 +2219,7 @@ design record for the first**; the D1 shapes are commented in `d1/schema.sql`.
 | `show_similar` | per show with **>= 3 distinct boosters**, its **top 20** same-medium-side shows by cosine over the booster sets, `(podcast_guid, other_guid, score, shared_boosters, rank)`. Recomputed whole by `onlyboosts_globalscan.py similar` on the daily podroll run, replaced wholesale by `d1_sync.py --remote-similar`. 12,186 rows at build (454 podcast + 222 music seeds). |
 | `podcasts.first_boost_ts`, `episodes.first_boost_ts` | `MIN(created_at)` of the row's live boosts, on every projection path. Stored raw; the New and Noteworthy rail picks its window (measured: 41 shows first boosted in 30 days, 98 in 90, 3 of the 41 with three boosters). |
 | `podcasts.description` | the channel `<description>` off PI's byguid answer, HTML-stripped, via `enrich._show_from_feed`; `backfill_description.py` fills existing rows and bumps `updated_at` so the drift pass carries them. |
+| `podcasts.newest_item_ts` | the newest episode's `datePublished` off PI `episodes/byfeedid` (byguid carries no newest-item field, measured), unix seconds, podcasts only, NULL for music and when PI lists no item (2026-10-29, OB-web's spec, Reed's call: a PODCAST whose newest episode is over 183 days old is not recommended; albums never go stale). One extra PI call per podcast refresh; `backfill_newest.py` fills boosted podcasts serially; a failed lookup keeps the stored date. |
 
 What a change elsewhere would break:
 

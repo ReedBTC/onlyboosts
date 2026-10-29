@@ -60,6 +60,13 @@ CREATE TABLE IF NOT EXISTS podcasts (
   -- of the 41 had three boosters, so the rail wants 90 days and a boosters floor.
   description   TEXT,
   first_boost_ts INTEGER,
+  -- ⚠️ ADDED OUT-OF-BAND (2026-10-29): ALTER TABLE podcasts ADD COLUMN newest_item_ts INTEGER;
+  -- The newest episode's datePublished off PI episodes/byfeedid (byguid carries
+  -- no such field), unix seconds; NULL when PI lists no item and on the music
+  -- side, which is never asked. The recommendation rails skip a PODCAST whose
+  -- newest episode is over 183 days old (Reed's call); albums are never
+  -- filtered on it. Kept fresh by the collector's show refresh gate.
+  newest_item_ts INTEGER,
   boost_count   INTEGER,
   total_sats    INTEGER,
   booster_count INTEGER,

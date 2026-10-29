@@ -94,6 +94,11 @@ def _show_from_feed(feed, podcast_guid=None):
         # it just repeats the title). NOT a podcast:person credit; PI exposes no
         # channel-level person data, and it's present on only ~6% of feeds anyway.
         "author":    (feed.get("author") or "").strip() or None,
+        # When the feed's newest item was published, unix seconds. NOT on the
+        # byguid answer (measured 2026-10-29: byguid and byfeedid carry only
+        # lastUpdateTime, which moves on any feed edit); resolve_show fills it
+        # with one episodes/byfeedid call, podcasts only. See newest_item_ts().
+        "newest_item_ts": None,
         # RSS channel <language>, normalized to the primary subtag. Rides the
         # byguid call we already make, so it costs no extra request. Coverage is
         # split hard by medium — 99% of podcasts, 48% of music, because Wavlake
@@ -176,10 +181,35 @@ def resolve_show(podcast_guid, key, secret):
                 .get("feed") or {})
         if feed and not feed_answers(feed):
             feed = live_sibling(feed, key, secret) or feed
-        return _show_from_feed(feed, podcast_guid)
+        show = _show_from_feed(feed, podcast_guid)
     except Exception as e:
         print(f"  [warn] PI show lookup failed for {podcast_guid}: {e}")
         return None
+    if show and show.get("feed_id") and (show.get("medium") or "podcast") != "music":
+        show["newest_item_ts"] = newest_item_ts(show["feed_id"], key, secret)
+    return show
+
+
+def newest_item_ts(feed_id, key, secret):
+    """When the feed's newest item was published, off `episodes/byfeedid` with
+    max=1 (PI orders newest first), unix seconds; None when PI lists no item
+    or the call fails. The recommendation rails read it to pass over a
+    podcast whose newest episode is over six months old (Reed's call,
+    2026-10-29; podcasts only, so resolve_show asks for the not-music side
+    alone and albums never go stale). One extra request per podcast refresh,
+    ~0.2s measured; the show refresh gate's cadence (daily for a show with a
+    recent episode, monthly for a dormant one) is what keeps it moving.
+    A failed call returns None and upsert_show keeps the value it had."""
+    try:
+        items = (pi_get("episodes/byfeedid", {"id": feed_id, "max": 1}, key, secret)
+                 .get("items") or [])
+    except Exception as e:
+        print(f"  [warn] PI newest-item lookup failed for feed {feed_id}: {e}")
+        return None
+    if not items:
+        return None
+    ts = items[0].get("datePublished")
+    return int(ts) if ts else None
 
 
 def resolve_feed_by_id(feed_id, key, secret):

@@ -171,7 +171,7 @@ def build_full_sql(conn):
                COUNT(DISTINCT b.item_guid) AS episode_count,
                MAX(b.created_at) AS latest_ts, MIN(b.created_at) AS first_boost_ts,
                s.title, s.image, s.artwork, s.feed_url, s.medium, s.author, s.language,
-               s.publisher_guid, s.description
+               s.publisher_guid, s.description, s.newest_item_ts
         FROM boosts b LEFT JOIN shows s ON s.podcast_guid={eg}
         WHERE {eg} IS NOT NULL AND {db.not_excluded('b')} GROUP BY {eg}""").fetchall():
         # `artwork` is the second-chance art URL (<itunes:image> when it differs
@@ -180,11 +180,11 @@ def build_full_sql(conn):
         # so it's projected here and in the --remote-delta path below.
         out.append(
             "INSERT INTO podcasts (podcast_guid,title,image,artwork,feed_url,medium,author,language,"
-            "publisher_guid,description,boost_count,total_sats,booster_count,episode_count,"
+            "publisher_guid,description,newest_item_ts,boost_count,total_sats,booster_count,episode_count,"
             "latest_ts,first_boost_ts) VALUES ("
             f"{q(a['guid'])},{q(a['title'])},{q(a['image'])},{q(a['artwork'])},{q(a['feed_url'])},"
             f"{q(a['medium'])},{q(a['author'])},{q(a['language'])},{q(a['publisher_guid'])},"
-            f"{q(a['description'])},{q(a['boost_count'])},{q(a['total_sats'])},"
+            f"{q(a['description'])},{q(a['newest_item_ts'])},{q(a['boost_count'])},{q(a['total_sats'])},"
             f"{q(a['booster_count'])},{q(a['episode_count'])},{q(a['latest_ts'])},"
             f"{q(a['first_boost_ts'])});")
         if a["title"] or a["author"] or a["description"]:
@@ -268,7 +268,7 @@ def _podcast_upsert_sql(conn, guid):
                   COUNT(DISTINCT b.item_guid) AS episode_count,
                   MAX(b.created_at) AS latest_ts, MIN(b.created_at) AS first_boost_ts,
                   s.title, s.image, s.artwork, s.feed_url, s.medium, s.author, s.language,
-                  s.publisher_guid, s.description
+                  s.publisher_guid, s.description, s.newest_item_ts
            FROM boosts b LEFT JOIN shows s ON s.podcast_guid={eg}
            WHERE {eg}=? AND {db.not_excluded('b')} GROUP BY {eg}""", (guid,)).fetchone()
     if not a:
@@ -276,11 +276,11 @@ def _podcast_upsert_sql(conn, guid):
     # `artwork` (second-chance art URL) is projected here and in the full load;
     # the remote D1 column exists.
     out = ["INSERT OR REPLACE INTO podcasts (podcast_guid,title,image,artwork,feed_url,medium,author,language,"
-           "publisher_guid,description,boost_count,total_sats,booster_count,episode_count,"
+           "publisher_guid,description,newest_item_ts,boost_count,total_sats,booster_count,episode_count,"
            "latest_ts,first_boost_ts) VALUES ("
            f"{q(a['guid'])},{q(a['title'])},{q(a['image'])},{q(a['artwork'])},{q(a['feed_url'])},"
            f"{q(a['medium'])},{q(a['author'])},{q(a['language'])},{q(a['publisher_guid'])},"
-           f"{q(a['description'])},{q(a['boost_count'])},{q(a['total_sats'])},"
+           f"{q(a['description'])},{q(a['newest_item_ts'])},{q(a['boost_count'])},{q(a['total_sats'])},"
            f"{q(a['booster_count'])},{q(a['episode_count'])},{q(a['latest_ts'])},"
            f"{q(a['first_boost_ts'])});",
            f"DELETE FROM podcasts_fts WHERE podcast_guid={q(guid)};"]

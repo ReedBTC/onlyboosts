@@ -116,6 +116,10 @@ with tempfile.TemporaryDirectory() as tmp:
     first = conn.execute("SELECT MIN(created_at) FROM boosts WHERE COALESCE(canonical_guid,podcast_guid)='A' "
                          "AND excluded=0 AND dup_of IS NULL").fetchone()[0]
     check(f",{first});" in stmt and "'About A'" in stmt, "first_boost_ts = oldest live boost; description rides")
+    conn.execute("UPDATE shows SET newest_item_ts=1790000000 WHERE podcast_guid='A'")
+    stmt = d1_sync._podcast_upsert_sql(conn, "A")[0]
+    check("newest_item_ts" in stmt.split("VALUES")[0] and "'About A',1790000000," in stmt,
+          "newest_item_ts rides the podcast projection, after description")
     fts = d1_sync._podcast_upsert_sql(conn, "A")[2]
     check(fts.startswith("INSERT INTO podcasts_fts (podcast_guid,title,author,description)") and "'About A'" in fts,
           "podcasts_fts gets the description")
