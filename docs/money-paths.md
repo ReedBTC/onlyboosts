@@ -356,6 +356,50 @@ It opens `openSiteDonation` instead, and the whole `openShowBoost` chain was
 **deleted on 2026-08-23**, so the wrong call is no longer available to make.
 `_ensureWalletForPay` (the merch checkout) keeps its gate.
 
+### The Signer Session Survives The Tab
+
+A remote-signer login (Amber, nsec.app, any NIP-46 bunker) is stored as two
+halves: the bunker pointer and the user's pubkey in localStorage, and the
+local client's hex private key, which from the fork until 2026-10-29 lived in
+sessionStorage only. The split was a deliberate defence: a dump of
+localStorage could not reconnect to the bunker without the secret, and the
+secret died with the tab.
+
+**⚠️ THAT COST FELL ENTIRELY ON PHONES, AND IT SIGNED THE MEMBER OUT ON
+EVERY RETURN.** A phone browser drops sessionStorage whenever it evicts the
+tab, which is most of the time the site is not on screen. Every open then
+found the record without its secret, `restoreSession` answered
+`permanent`, and the boot path cleared the session and opened the login
+modal unasked. Reed's report, 2026-10-29: "constantly asking me to log in,
+bam, right in your face". The asset version bumps were suspected and are
+not involved; localStorage is per origin and knows nothing of asset URLs.
+
+**Since 2026-10-29 the secret has an at-rest copy** (`login-widget/src/lib/
+secretAtRest.js`): AES-GCM under a key that WebCrypto generates
+non-extractable and that IndexedDB holds, the one store a browser will keep
+a `CryptoKey` in without ever handing its bytes to script; the ciphertext
+sits in localStorage beside the record. `saveSession` writes it,
+`clearSession` drops it, and `restoreSession` reads it only when the tab's
+own copy is gone, re-seeding sessionStorage from it. What the wrapping buys
+is stated plainly in the module header: a dump of either store is still
+useless on its own, and a script running live on the origin can unwrap it,
+which was already true of the sessionStorage copy for the life of the tab.
+A browser that refuses either store (an old WebView, a private window)
+leaves the behaviour exactly as it was. An extension login never had this
+problem (its record holds no secret) and an nsec login is still never
+persisted at all.
+
+**⚠️ AND THE LOGIN MODAL OPENS BEHIND A TAP, NEVER ON PAGE LOAD.** The
+same report asked for less insistence: a visitor who is not signed in can
+read every chart and boost with a wallet, and Sign in is in the bar when
+they want their recommendations or a signed note. `forceLogoutWithMessage`
+takes `openLogin`; the ambient restore at boot passes `false` and shows a
+toast ("Your sign-in ended. Use Sign in at the top when you need it."),
+while the callers that reach it from a gesture (a boost or a wallet unlock
+finding the session dead, a signer found on another account) still open the
+modal. `test-session-secret.mjs` holds the codec, the wiring and the boot
+path.
+
 ### The Boost Modal Declares What Happens To The Note
 
 **Two controls in the form, four outcomes, and one automatic publish.** Shipped

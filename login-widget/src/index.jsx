@@ -172,7 +172,14 @@ let signerVerified = false
 // can no longer be honored (permanent restore failure, signer/account
 // mismatch). Mirrors api.logout()'s teardown plus a user-facing toast
 // and re-opens the login modal so the next step is obvious.
-function forceLogoutWithMessage(message) {
+// ⚠️ THE LOGIN MODAL OPENS BEHIND A TAP, NEVER ON PAGE LOAD (Reed,
+// 2026-10-29: "tone down the aggressiveness on asking people to log in"; a
+// phone that had dropped its signer session was greeted by the modal on
+// every open). The callers that reach this from a gesture (a boost or a
+// wallet unlock finding the session dead, a signer on another account)
+// keep `openLogin`; the ambient restore at boot passes false, and the
+// member sees a toast and the Sign in pill, which is right there.
+function forceLogoutWithMessage(message, { openLogin = true } = {}) {
   // HARD disconnect — not lockOnLogout. lockOnLogout is the "user
   // clicked Sign Out and might log back in as the same npub" path,
   // which deliberately preserves at-rest credentials. forceLogout
@@ -189,9 +196,9 @@ function forceLogoutWithMessage(message) {
   signerVerified = false
   setUser(null)
   if (message) {
-    try { pushToast({ kind: 'error', message }) } catch {}
+    try { pushToast({ kind: openLogin ? 'error' : 'info', message }) } catch {}
   }
-  setLoginOpen(true)
+  if (openLogin) setLoginOpen(true)
 }
 
 // On-demand restore. Called when a user-initiated action (boost, wallet
@@ -602,16 +609,18 @@ const api = {
           // 'transient' → keep the stub; a later action will retry via
           //               ensureRealRestore (capped to avoid loops) and
           //               eventually force re-auth if it never lands
-          // 'permanent' → saved record is structurally bad; clear it
-          //               and surface the login modal so the user
-          //               isn't stuck staring at a phantom identity
+          // 'permanent' → saved record is unusable; clear it so the
+          //               user isn't left with a phantom identity, say
+          //               so in a toast, and OPEN NO MODAL: nobody
+          //               asked to log in, and the Sign in pill is in
+          //               the bar when they need it (Reed, 2026-10-29)
           if (result?.kind === 'ok' && result.user) {
             setUser(result.user)
             // Pre-warm wallet — see the equivalent call in
             // ensureRealRestore for the rationale.
             wallet.prewarm(result.user).catch(() => {})
           } else if (result?.kind === 'permanent') {
-            forceLogoutWithMessage('Saved session was invalid — please sign in again.')
+            forceLogoutWithMessage('Your sign-in ended. Use Sign in at the top when you need it.', { openLogin: false })
           }
           consumePendingAction()
         })
