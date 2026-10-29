@@ -11,11 +11,11 @@
  * rewrites the version), no clock reads, no unpinned locale, nothing from the
  * DOM. Verbs (the artwork fallback walk) are attached by discover.js.
  */
-import { coverChain } from './cover-art.js?v=ob-v239'
-import { rankLabel } from './rank.js?v=ob-v239'
-import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v239'
-import { boosterPageHref } from './booster-link.js?v=ob-v239'
-import { languageName } from './lang-name.js?v=ob-v239'
+import { coverChain } from './cover-art.js?v=ob-v240'
+import { rankLabel } from './rank.js?v=ob-v240'
+import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v240'
+import { boosterPageHref } from './booster-link.js?v=ob-v240'
+import { languageName } from './lang-name.js?v=ob-v240'
 
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => (
@@ -74,16 +74,24 @@ export const TRIPLET_TITLE = 'Rank in sats / boosts / boosters'
  * from assistive tech, the tooltip's words being the label. */
 const SVG = (d) => `<svg class="rt-ico" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${d}</svg>`
 export const FIGURE_ICONS = {
-  sats: SVG('<path d="M11.767 19.089c4.924.868 6.14-6.025 1.216-6.894m-1.216 6.894L5.86 18.047m5.908 1.042-.347 1.97m1.563-8.864c4.924.869 6.14-6.025 1.215-6.893m-1.215 6.893-3.94-.694m5.155-6.2L8.29 4.26m5.908 1.042.348-1.97M7.48 20.364l3.126-17.727"/>'),
+  /* Drawn here rather than Lucide's: Lucide's sign is tilted and its two
+     bowls the same size, which read upside down at 12px (Reed, 2026-10-29).
+     Upright, the lower bowl wider and taller than the upper, as the sign is
+     set in type, with the two strokes through top and bottom. */
+  sats: SVG('<path d="M6 5h7a3.25 3.25 0 0 1 0 6.5H8"/><path d="M8 11.5h6a3.75 3.75 0 0 1 0 7.5H6"/><path d="M8 5v14"/><path d="M10 3v2M13.5 3v2M10 19v2M13.5 19v2"/>'),
   boosts: SVG('<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>'),
   boosters: SVG('<circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/>'),
 }
 /* ⚠️ THE MEDIUM BADGE ON THE ARTWORK (Reed's ask, 2026-10-29): a rail can
  * mix the two sides (New and Noteworthy, Podcasters Recommend), and a reader
  * who opens an album expecting a show is surprised, so every content tile
- * says which side it is on, a microphone or a music note in the artwork's
- * top-right corner, opposite the rank. The partition rule applies: anything
- * not `music` is the podcast side. A person's tile carries none. */
+ * says which side it is on: a LABEL, icon and word ("Podcast", "Music"), on
+ * a light chip in the artwork's bottom-right corner. It was an icon on the
+ * rank's own dark circle in the top-right for one round, and Reed read the
+ * pair as one statement ("#4 and a microphone?"); the word, the light
+ * chip and the far corner keep it from looking like a figure. The
+ * partition rule applies: anything not `music` is the podcast side. A
+ * person's tile carries none. */
 const MEDIUM_BADGE = {
   podcast: { word: 'Podcast', svg: SVG('<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/>') },
   music: { word: 'Music', svg: SVG('<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>') },
@@ -91,16 +99,22 @@ const MEDIUM_BADGE = {
 export const mediumSide = (m) => (m === 'music' ? 'music' : 'podcast')
 function mediumBadge(medium) {
   const b = medium && MEDIUM_BADGE[mediumSide(medium)]
-  return b ? `<span class="rt-medium rt-medium--${mediumSide(medium)}" title="${b.word}"><span class="rt-sr">${b.word}: </span>${b.svg}</span>` : ''
+  return b ? `<span class="rt-medium rt-medium--${mediumSide(medium)}">${b.svg}${b.word}</span>` : ''
 }
 
 const FIGURE_WORD = { sats: 'sats', boosts: 'boosts', boosters: 'boosters' }
 export function rankTripletHtml(r) {
   const t = tripletOf(r)
   if (!t) return null
-  return ['sats', 'boosts', 'boosters'].map((k) =>
-    `<span class="rt-fig" title="#${esc(t[k])} in ${FIGURE_WORD[k]}">${FIGURE_ICONS[k]}<span class="rt-sr">Rank in ${FIGURE_WORD[k]}: </span>${esc(t[k])}</span>`
-  ).join('')
+  /* "#6 / #2 / #3", each behind its icon: without the number sign the
+     figures read as counts ("2 comments"), not places (Reed, 2026-10-29).
+     `rt-d<n>` is the triplet's digit count, which discover.css sizes the
+     line by so the longest triplet still fits the artwork's width. */
+  const ks = ['sats', 'boosts', 'boosters']
+  const digits = ks.reduce((n, k) => n + String(t[k]).length, 0)
+  return `<span class="rt-trip rt-d${Math.min(Math.max(digits, 3), 9)}">` + ks.map((k) =>
+    `<span class="rt-fig" title="#${esc(t[k])} in ${FIGURE_WORD[k]}">${FIGURE_ICONS[k]}<span class="rt-sr">Rank in ${FIGURE_WORD[k]}: </span><span class="rt-hash">#</span>${esc(t[k])}</span>`
+  ).join('<span class="rt-slash" aria-hidden="true">/</span>') + '</span>'
 }
 
 /**
@@ -137,12 +151,21 @@ export function railListHtml(tiles, { empty = 'Nothing here yet.' } = {}) {
   return `<ol class="rail-list">${tiles.join('')}</ol>`
 }
 
+/* ⚠️ THE FIGURE LINE IS FOR RANKED RAILS ONLY (Reed's call, 2026-10-29):
+ * the triplet says why a tile holds its place on a chart, and a personal
+ * rail (the two Recommended rails, Top Shows From Your Follows, the Because
+ * rails) is not that chart, so its tiles carry the title alone. `bare(tile)`
+ * wraps any mapper below; the row is flagged, never mutated. */
+const BARE = Symbol('bare')
+export const bare = (tile) => (r, i) => tile({ ...r, [BARE]: true }, i)
+
 /* ── Row → tile, one mapper per subject, so the edge and the browser agree
  * on what a tile says. Each takes the row shape its endpoint answers:
  * the weekly chart's (`image`/`artwork`/`booster_count`) or the ranked
  * endpoints' records (`img`/`art2`/`boosters`); both are accepted so a rail
  * can be rebuilt from either source. `rank`/`tied` are the server's. ── */
 function subOf(r, fallback) {
+  if (r && r[BARE]) return {}
   const t = rankTripletHtml(r)
   return t ? { subHtml: t, subClass: 'rt-ranks' } : { sub: fallback }
 }
@@ -185,17 +208,18 @@ export function artistTile(r, i) {
 }
 
 /** A #40HPW row (the hours endpoint's member shape) as a tile: the face, the
- *  name, "34.3 HPW · 26 episodes", gold past the goal. Reed's call,
- *  2026-10-17: the rail looks like every other rail, not like the board. */
+ *  name, "34.3 HPW", gold past the goal. Reed's call, 2026-10-17: the rail
+ *  looks like every other rail, not like the board. The episode count came
+ *  off the line on 2026-10-29 (Reed: it ran off the tile unread); the board
+ *  and the Charts page still carry it. */
 export function memberTile(m, i, goalHours = 40) {
   const h = Number(m.seconds) / 3600
-  const eps = Number(m.episodes) || 0
   return tileHtml({
     rank: i + 1,
     href: boosterPageHref(m.npub, m.pk),
     title: m.name || (m.npub ? m.npub.slice(0, 12) + '…' : 'Unknown'),
-    sub: `${h.toFixed(1)} HPW · ${eps} episode${eps === 1 ? '' : 's'}`,
-    subTitle: 'Hours of podcasts boosted this week · episodes that counted',
+    sub: `${h.toFixed(1)} HPW`,
+    subTitle: 'Hours of podcasts boosted this week',
     img: m.pic, glyph: '👤', gold: h >= goalHours, person: true,
   })
 }

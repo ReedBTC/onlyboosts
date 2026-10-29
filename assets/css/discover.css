@@ -122,17 +122,20 @@
 }
 :root[data-theme="dark"] .rt-rank { background: rgba(0, 0, 0, 0.72); }
 .rt-rank[data-tied="1"] { letter-spacing: 0.02em; }
-/* The medium badge (rail-tile.js mediumBadge): a microphone or a music note
-   in the artwork's top-right corner, on the rank badge's own dark chip. */
+/* The medium badge (rail-tile.js mediumBadge): icon and word on a LIGHT
+   chip in the artwork's bottom-right corner, so it reads as a label and not
+   as a second figure beside the dark rank badge (Reed, 2026-10-29). The
+   same chip in both themes: it sits on artwork, not on the page's ground. */
 .rt-medium {
-  position: absolute; right: 6px; top: 6px;
-  width: 24px; height: 24px; border-radius: 12px;
-  display: inline-flex; align-items: center; justify-content: center;
-  background: rgba(11, 58, 82, 0.86); color: #ffffff;
-  pointer-events: auto;
+  position: absolute; right: 5px; bottom: 5px;
+  display: inline-flex; align-items: center; gap: 3px;
+  height: 17px; padding: 0 5px 0 4px; border-radius: 4px;
+  background: rgba(255, 255, 255, 0.9); color: #0b3a52;
+  font-family: var(--font-sans); font-size: 0.6rem; font-weight: 700;
+  letter-spacing: 0.04em; text-transform: uppercase; line-height: 1;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
 }
-.rt-medium .rt-ico { width: 13px; height: 13px; opacity: 1; }
-:root[data-theme="dark"] .rt-medium { background: rgba(0, 0, 0, 0.72); }
+.rt-medium .rt-ico { width: 10px; height: 10px; opacity: 1; }
 .rail-tile:first-child .rt-rank { background: var(--brand-dd); }
 /* A #40HPW member who has cleared the goal this week: the board's gold. */
 .rt-rank--gold { background: #b8860b; color: #ffffff; }
@@ -151,13 +154,29 @@
 .rail-tile--person .rt-media .rt-rank { left: 0; top: 0; }
 .rail-tile--person .rt-title { text-align: center; }
 .rail-tile--person .rt-sub { text-align: center; }
-/* The rank triplet under a charted tile: rank in sats / boosts / boosters,
-   the chart formula's order, each figure behind its icon (rail-tile.js
-   FIGURE_ICONS: Bitcoin sign, speech bubble, person). Tabular figures. */
-.rt-ranks { font-variant-numeric: tabular-nums; }
-.rt-ranks .rt-fig { display: inline-flex; align-items: center; gap: 0.18em; margin-right: 0.6em; }
-.rt-ranks .rt-fig:last-child { margin-right: 0; }
+/* The rank triplet under a charted tile: "#6 / #2 / #3" in sats / boosts
+   / boosters, the chart formula's order, each figure behind its icon
+   (rail-tile.js FIGURE_ICONS). ⚠️ IT MAY NOT RUN WIDER THAN THE ARTWORK
+   (Reed, 2026-10-29), and a tile is ~103px on a wide desktop's ten-up row.
+   So the line is sized off the tile's own width (the .rt container) by its
+   digit count, rt-d3..rt-d9: the fewer the digits, the larger it may be,
+   never above the sub line's own size. Tabular figures, tight gaps, the
+   number sign and the slashes muted so the places carry the line. */
+.rt { container-type: inline-size; }
+.rt-ranks { font-variant-numeric: tabular-nums; text-overflow: clip; }
+.rt-trip { display: inline-flex; align-items: center; white-space: nowrap; font-family: var(--font-sans); font-weight: 600; letter-spacing: -0.01em; }
+.rt-trip .rt-fig { display: inline-flex; align-items: center; gap: 0.08em; }
+.rt-trip .rt-ico { width: 0.88em; height: 0.88em; }
+.rt-trip .rt-hash { opacity: 0.6; font-weight: 500; font-size: 0.86em; }
+.rt-trip .rt-slash { opacity: 0.4; margin: 0 0.12em; font-weight: 400; }
 .rt-ico { flex: none; width: 0.95em; height: 0.95em; opacity: 0.8; }
+.rt-sub .rt-trip { font-size: min(0.8rem, 12.4cqi); }
+.rt-sub .rt-trip.rt-d4 { font-size: min(0.8rem, 11.5cqi); }
+.rt-sub .rt-trip.rt-d5 { font-size: min(0.8rem, 10.9cqi); }
+.rt-sub .rt-trip.rt-d6 { font-size: min(0.8rem, 10.1cqi); }
+.rt-sub .rt-trip.rt-d7 { font-size: min(0.8rem, 9.6cqi); }
+.rt-sub .rt-trip.rt-d8 { font-size: min(0.8rem, 8.9cqi); }
+.rt-sub .rt-trip.rt-d9 { font-size: min(0.8rem, 8.4cqi); }
 .rt-sr {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;

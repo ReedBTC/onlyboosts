@@ -24,12 +24,12 @@
  *    feed cards' own handlers. A rail the edge could not fill gets its slide
  *    rebuilt here from the rows fetched for the rail, with the same mappers.
  */
-import { railListHtml, showTile, albumTile, episodeTile, memberTile, langRailHtml } from '/assets/js/rail-tile.js?v=ob-v239'
-import { heroHtml, slideHtml, showSlide, episodeSlide, memberSlide } from '/assets/js/hero.js?v=ob-v239'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v239'
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v239'
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v239'
-import { languageName } from '/assets/js/lang-name.js?v=ob-v239'
+import { railListHtml, showTile, albumTile, episodeTile, memberTile, langRailHtml, bare } from '/assets/js/rail-tile.js?v=ob-v240'
+import { heroHtml, slideHtml, showSlide, episodeSlide, memberSlide } from '/assets/js/hero.js?v=ob-v240'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v240'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v240'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v240'
+import { languageName } from '/assets/js/lang-name.js?v=ob-v240'
 
 const TILES = 10
 
@@ -182,11 +182,11 @@ function wireHeroBoost(hero) {
     try {
       const kind = slide.dataset.kind
       if (kind === 'episode' || kind === 'song') {
-        const m = await import('/assets/js/episode-card-actions.js?v=ob-v239')
+        const m = await import('/assets/js/episode-card-actions.js?v=ob-v240')
         btn.disabled = false
         await m.onBoostClick(slide, btn)
       } else {
-        const m = await import('/assets/js/show-card-actions.js?v=ob-v239')
+        const m = await import('/assets/js/show-card-actions.js?v=ob-v240')
         btn.disabled = false
         await m.onShowBoost(slide, btn)
       }
@@ -332,7 +332,7 @@ async function paintFollows(section, follows) {
     const rows = j.podcasts || []
     track.classList.remove('rail-locked')
     track.removeAttribute('data-locked')
-    track.innerHTML = railListHtml(rows.slice(0, TILES).map(showTile), {
+    track.innerHTML = railListHtml(rows.slice(0, TILES).map(bare(showTile)), {
       empty: 'Nobody you follow has boosted a show yet. Follow a few boosters on the Members tab.',
     })
     wireArt(track)
@@ -376,7 +376,7 @@ function paintBecause(proto, entries) {
     const sub = sec.querySelector('[data-because-sub]')
     if (sub) sub.textContent = `What the other boosters of ${b.seed.title || 'this show'} also boost`
     const track = sec.querySelector('.rail-track')
-    if (track) track.innerHTML = railListHtml(b.rows.map(b.seed.medium === 'music' ? albumTile : showTile))
+    if (track) track.innerHTML = railListHtml(b.rows.map(bare(b.seed.medium === 'music' ? albumTile : showTile)))
     proto.before(sec)
     wireArt(sec)
   })
@@ -412,11 +412,11 @@ async function paintRecommended(sections, pubkey) {
     })
     const none = (what) => `Boost a few ${what} and the ${what} their other boosters boost will rank here.`
     if (rec) {
-      if (j.podcasts?.length) { unlock(rec, railListHtml(j.podcasts.map(showTile))); linkFullList(rec, pubkey) }
+      if (j.podcasts?.length) { unlock(rec, railListHtml(j.podcasts.map(bare(showTile)))); linkFullList(rec, pubkey) }
       else lockedCardNote(rec, j.seeds ? 'Nothing to recommend yet' : 'No boosts from this account yet', j.seeds ? 'Too few other members have boosted the shows you boost for the overlap to mean anything yet; it grows with every boost.' : none('shows'))
     }
     if (music) {
-      if (j.music?.length) { unlock(music, railListHtml(j.music.map(albumTile))); linkFullList(music, pubkey) }
+      if (j.music?.length) { unlock(music, railListHtml(j.music.map(bare(albumTile)))); linkFullList(music, pubkey) }
       else lockedCardNote(music, j.seeds ? 'Nothing to recommend yet' : 'No music boosts from this account yet', j.seeds ? 'Too few other members have boosted the albums you boost for the overlap to mean anything yet.' : none('albums'))
     }
     paintBecause(because, Array.isArray(j.because) ? j.because.filter((b) => b?.seed && b.rows?.length) : [])

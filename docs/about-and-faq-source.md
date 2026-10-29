@@ -344,7 +344,7 @@ indexed Nostr boost; nothing about a visitor is stored.
   over that window of boost time. Top Shows This Week is the Pacific week
   (Monday 00:00 to Sunday night); every other window is trailing (7 / 30 /
   365 days), the window of the chart view the rail links. The tile's line is
-  the three component ranks (sats / boosts / boosters, each behind its icon). The week and month
+  the three component ranks (sats / boosts / boosters, printed "#6 / #2 / #3", each behind its icon; the personal rails print no line). The week and month
   rails lead no hero slide.
 - **Top Podcasts by Language** (2026-10-22): three rails, the year's Shows
   chart filtered to each of the three largest non-English languages: the

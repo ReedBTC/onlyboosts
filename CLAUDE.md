@@ -290,12 +290,21 @@ was picked from is in the session memory; direction A won, with the sans.
 - **A tile's one line is the chart triplet** (rank in sats / boosts /
   boosters, each behind its icon since 2026-10-29: a Bitcoin sign, a speech
   bubble, a person, `rankTripletHtml` in `rail-tile.js`; Reed's ask, the
-  words do not fit). **Every content tile carries a MEDIUM BADGE** on its
-  artwork's top-right corner, a microphone or a music note (`mediumBadge`;
-  a person's tile none), and New and Noteworthy's line under a tile is the
+  words do not fit), printed "#6 / #2 / #3" (the number sign marks a
+  place, not a count) and **never wider than the artwork**: the line is
+  sized off the tile's width by its digit count (`rt-d3`..`rt-d9`,
+  container units, measured in Chromium at 96 to 180px). **Every content
+  tile carries a MEDIUM BADGE**, a light chip with an icon and the word
+  ("Podcast", "Music") in the artwork's bottom-right corner (`mediumBadge`;
+  a person's tile none; an icon on the rank's dark circle top-right read
+  as part of the rank, 2026-10-29). **Only a ranked rail prints the line**:
+  the two Recommended rails, Top Shows From Your Follows and the Because
+  rails map through `bare()` and show the title alone (Reed's call,
+  2026-10-29), and the #40HPW tile reads "34.3 HPW", no episode count.
+  New and Noteworthy's line under a tile is the
   medium ("Podcast", "Album"), its first-boost date in the tooltip;
   Reed's call after seeing "7 boosters · 38.8k sats" at tile size. The #40HPW
-  rail is tiles too (face, name, "34.3 HPW · 26 episodes", gold past the
+  rail is tiles too (face, name, "34.3 HPW", gold past the
   goal), not the board: every rail the same shape. **A person's tile is
   ROUND** (`person: true` → `.rail-tile--person`, Reed's call 2026-10-18: a
   circle reads as an individual, a square as content); the two member
