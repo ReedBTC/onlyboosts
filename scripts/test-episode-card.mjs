@@ -475,4 +475,12 @@ check('a bare npub with a bad checksum stays text', () => {
   assert.doesNotMatch(out, /bs-mention/)
 })
 
+// The quoted receipt is not shown (2026-10-29): the drawer's message is the
+// same renderMessage, so the reference comes off here too.
+check('a trailing receipt reference is not rendered', () => {
+  const out = renderMessage('nice one\n\nnostr:nevent1qvzqqqpxqupzpwrxeemtukuzv62esqjgxg4cmaxrs9sgl7j6tdrufuaturv0wea9qqsgp2l6kd4fkme2vmdt82ak2use8rjulx99q74hs4wm4gj92d3e8sq3w7lvk', new Map())
+  assert.equal(out, 'nice one')
+  assert.equal(renderMessage('nostr:nevent1qvzqqqpxqupzpwrxeemtukuzv62esqjgxg4cmaxrs9sgl7j6tdrufuaturv0wea9qqsgp2l6kd4fkme2vmdt82ak2use8rjulx99q74hs4wm4gj92d3e8sq3w7lvk', new Map()), '')
+})
+
 console.log(`\n${passed} assertions passed${process.exitCode ? ' (with failures above)' : ''}.`)

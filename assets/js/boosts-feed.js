@@ -30,8 +30,8 @@
  * need only id + pubkey. The object handed to buildActionBar below is a
  * projection, not a verified event; don't pass it anywhere that assumes one.
  */
-import { nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v237'
-import { buildActionBar, configureBoostActions } from '/assets/js/boost-actions.js?v=ob-v237'
+import { nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v238'
+import { buildActionBar, configureBoostActions } from '/assets/js/boost-actions.js?v=ob-v238'
 // ⚠️ wireNpubCopy WAS IMPORTED HERE and is not any more. The avatar and the name
 // were its only two callers on this feed, and both are now links to
 // /booster/<npub>. Unlike the Episodes drawer — where the per-boost ⋮ menu
@@ -39,21 +39,22 @@ import { buildActionBar, configureBoostActions } from '/assets/js/boost-actions.
 // from this feed means opening their page, which leads with the button.
 // Its own module rather than a third export from show-link.js; see the note at
 // the head of booster-link.js and the ob-v53 entry in CLAUDE.md.
-import { boosterPageHref, markBoosterLink } from '/assets/js/booster-link.js?v=ob-v237'
-import { parseSegments, renderSegmentsInto, setCachedProfile } from '/assets/js/boosts-thread.js?v=ob-v237'
-import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v237'
-import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v237'
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v237'
-import { boosterLabel } from '/assets/js/ob-data.js?v=ob-v237'
-import { clientLabel, hasClientLabel } from '/assets/js/client-label.js?v=ob-v237'
-import { followsBoostReader, globalBoostReader } from '/assets/js/ob-live.js?v=ob-v237'
+import { boosterPageHref, markBoosterLink } from '/assets/js/booster-link.js?v=ob-v238'
+import { parseSegments, renderSegmentsInto, setCachedProfile } from '/assets/js/boosts-thread.js?v=ob-v238'
+import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v238'
+import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v238'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v238'
+import { boosterLabel } from '/assets/js/ob-data.js?v=ob-v238'
+import { clientLabel, hasClientLabel } from '/assets/js/client-label.js?v=ob-v238'
+import { followsBoostReader, globalBoostReader } from '/assets/js/ob-live.js?v=ob-v238'
 import {
   rangeDays, rangeCutoff, rangeControl, sortControl, mountFeedControls,
   RANGE_OPTIONS,
-} from '/assets/js/feed-controls.js?v=ob-v237'
+} from '/assets/js/feed-controls.js?v=ob-v238'
 
-import { showPageHref, episodePageHref } from '/assets/js/show-link.js?v=ob-v237'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v237'
+import { showPageHref, episodePageHref } from '/assets/js/show-link.js?v=ob-v238'
+import { stripNoteRefs } from '/assets/js/nostr-text.js?v=ob-v238'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v238'
 
 const PAGE_SIZE = 30
 
@@ -299,13 +300,17 @@ function renderBoostCard(b) {
   }
   if (bits.length) card.appendChild(h('div', { class: 'ob-boost-meta' }, bits))
 
-  if (b.msg) {
+  // The quoted receipt and any other note reference come off first (the
+  // same strip renderMessage applies on every other card, 2026-10-29); a
+  // message that was only the receipt gets no body.
+  const msgText = stripNoteRefs(b.msg)
+  if (msgText) {
     const body = h('div', { class: 'note-body' })
     // Shared tokenizer: nostr: mentions → chips, URLs → links, rest as text.
     // msg is verbatim from the boosting client and routinely contains both.
     // inEmbed keeps a quoted note as a chip rather than firing an embed fetch
     // for every card on the page.
-    renderSegmentsInto(body, parseSegments(b.msg), { inEmbed: true })
+    renderSegmentsInto(body, parseSegments(msgText), { inEmbed: true })
     card.appendChild(body)
   }
 

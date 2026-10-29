@@ -1048,6 +1048,18 @@ measurement is of its own site key; nothing in Fountain's reader is known to
 distinguish the two, but it has not been measured for this one. Nothing
 Fountain does with the receipt changes what the collector indexes.
 
+**The site does not show the reference** (Reed's ask, 2026-10-29: the
+`@nevent1…` chip at the foot of nearly every card was "pretty meaningless to
+a human reader"). Measured on the 200 newest boosts, 60 messages carried a
+note reference and 55 of those ended in exactly one, written by Fountain,
+Boost Me Buddy, the relay bots and this site alike. `stripNoteRefs` in
+`nostr-text.js` removes every `note1`, `nevent1` and `naddr1` reference,
+with the whitespace before it, before a message is tokenized; `renderMessage`
+applies it on the boost rows and the episode drawer, and the Boosts page's
+cards apply it ahead of their own tokenizer. People stay chips. A message
+that was only the receipt renders empty and gets no body. The note as
+published is unchanged, so Fountain still reads the receipt off it.
+
 ### The one boost button
 
 Boosting a SHOW (as opposed to an episode) pays the **feed-level** value block —

@@ -30,17 +30,17 @@
  */
 import {
   htmlEscape, isSafeUrl, truncate, renderMessage,
-} from './nostr-text.js?v=ob-v237';
-import { episodePageHref, showPageHref } from './show-link.js?v=ob-v237';
+} from './nostr-text.js?v=ob-v238';
+import { episodePageHref, showPageHref } from './show-link.js?v=ob-v238';
 /* ⚠️ THE REAL MODULE, NOT A FOURTH COPY OF THE RULE. booster-link.js has been
  * dependency-free since it was written, so esbuild inlines it here exactly as it
  * does nostr-text.js, and the boost rows link a booster by the same test every
  * feed surface uses rather than by a transcription of it. This is the collapse
  * that functions/_shared/detail-page.js#boosterPageUrl said was available; that
  * name is now an alias for this function rather than a second copy of it. */
-import { boosterPageHref } from './booster-link.js?v=ob-v237';
-import { httpsUrl } from './cover-art.js?v=ob-v237';
-import { clientLabel, hasClientLabel } from './client-label.js?v=ob-v237';
+import { boosterPageHref } from './booster-link.js?v=ob-v238';
+import { httpsUrl } from './cover-art.js?v=ob-v238';
+import { clientLabel, hasClientLabel } from './client-label.js?v=ob-v238';
 
 // ── The formatters the row needs ─────────────────────────────────────────────
 //
@@ -513,6 +513,8 @@ function boostRow(r, names, { noun, showTarget, linkBooster = true, showShow = f
    * The message is deliberately NOT carried in a data attribute. A reply quotes
    * it, and the projection reads it back out of `.note-body` at attach time —
    * one copy of a string that can be 420 characters, on up to 500 cards. */
+  // The receipt reference is stripped, so a message can render to nothing.
+  const bodyHtml = r.message ? renderMessage(r.message, names) : "";
   return `<li${missing ? ` data-pk="${htmlEscape(r.booster_pubkey)}" data-missing="${missing}"` : ""}>
         <article class="note-card" data-boost-note data-event-id="${htmlEscape(r.event_id || "")}" data-pubkey="${htmlEscape(r.booster_pubkey || "")}" data-ts="${ts}">
           <div class="note-author">
@@ -523,7 +525,7 @@ function boostRow(r, names, { noun, showTarget, linkBooster = true, showShow = f
           ${meta ? `<div class="ob-boost-meta">
             ${meta}
           </div>` : ""}
-          ${r.message ? `<div class="note-body">${renderMessage(r.message, names)}</div>` : ""}
+          ${bodyHtml ? `<div class="note-body">${bodyHtml}</div>` : ""}
         </article>
       </li>`;
 }
