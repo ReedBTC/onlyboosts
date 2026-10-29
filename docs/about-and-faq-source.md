@@ -185,6 +185,7 @@ cost of getting it wrong is leaving a real person off a leaderboard.
 |---|---|---|---|
 | BoostMeBitch (site account) | 35 | 114,753 | Publishes for a boostmebitch.com listener who connected no identity. ⚠️ **The app is ALSO in the members list above** — it signs under the donor's own key when they have one, under this account when they do not. Added 2026-08-23 on Reed's instruction |
 | Boostr_Bot | 6 | 611 | Publishes a note for every boost received by a value-block split naming `boostr@getalby.com`, whichever app sent it; the origin app rides an `app` tag. Live since 2026-09-10 on Chad and Reed's Podcast, an alpha by its own profile. Added 2026-09-10 on Reed's instruction |
+| BoostAfterBoost | 44 | 69,179 | candr_boost_bot's software on the Homegrown Hits / Bowl After Bowl node: a note for every boost the node receives, whichever app sent it, naming the listener and their app. Added 2026-10-29 out of the duplicate survey |
 | candr_boost_bot | 30 | 155,224 | Chad's watcher on the Chad and Reed node: publishes a note for every boost the node receives, whichever app sent it; the origin app rides an `app` tag and the body names the sender. Every note so far is to Pixel Palace (Jorfest 2026). Added 2026-10-20 after Reed saw it ranking on the Members tab |
 | lnaddress music | 31 | 0 | Boosts sent to music feeds through a Lightning address |
 | Local Bitcoiners (show account) | ~8 over 14 days | — | Publishes for a donor to that show who produced no note themselves |

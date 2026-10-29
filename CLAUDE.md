@@ -1490,6 +1490,21 @@ Bowl After Bowl, 25,265 sats); the pass runs every incremental cycle over a
   let through, and contradicted prose blocks even a same-app match** — Reed's
   call, 2026-08-24: a duplicate slipping through beats a real boost filtered
   out. Don't tighten toward recall.
+- **⚠️ THE FILTER CLUSTERS A PAYMENT'S NOTES SINCE 2026-10-29; IT NO LONGER
+  PAIRS ONE RELAY NOTE WITH ONE NON-RELAY PARTNER.** *Reed's report:* Chad
+  and Reed's show had three relay bots per payment (Boostr_Bot, chadf-boostbot,
+  candr_boost_bot) and listeners on apps that publish no note, so two or
+  three bot notes stood for every boost. A relay note now joins a cluster
+  with the donor's note AND other bots' notes (one note per publisher, the
+  donor's note the keeper, else the bot note with the episode); `same sats`
+  is ±1/±3% plus the leg bots' x100 rounding; a missing episode is a
+  wildcard; what a template prints (sender name, titles as printed, a bot's
+  mentions and hashtags) is a fact, not prose. Only bot-signed notes are
+  ever marked, still. Full history on the day: 118 notes, 95,483 sats. The
+  design record is the PAYMENT CLUSTERS section of `dedupe.py`'s docstring;
+  `test_dedupe_clusters.py`. **BoostAfterBoost (`boostafterboost`, the same
+  software as candr_boost_bot on the Homegrown Hits / Bowl After Bowl node)
+  was found by the same survey and registered the same day.**
 - **⚠️ `SAME SATS` HAS ONE EXCEPTION, AND IT IS THE NAMED SENDER (tier 0,
   2026-09-24).** `Boostr_Bot` reconstructs the amount from its own 1% leg
   (100 for a 123-sat boost; 11 of its first 25 partnered notes disagreed), so

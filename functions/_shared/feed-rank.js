@@ -86,6 +86,7 @@ const RANK_PUBLISHERS = [
   "adab4ccd313996520304a5b1ec6c4076bc271bc6a3236702321c5811009d0649",
   "ffff6a7af32ea2239cb71548f476eec0dd9ae56673abda536bef5c241276fc3e",
   "978bbd44d918cc998c21f63150171046ae1173bbea1b7d1c6500d82b1063ed36",
+  "48b9a2a96255f6b253f2fedffbeeaac1bdce5051daa546b198f800cb5535e80e",
 ];
 
 /* ⚠️ THE ONLYBOOSTS CHARTS POSITION — rank in sats + rank in boosts + rank in

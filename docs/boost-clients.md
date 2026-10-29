@@ -254,6 +254,23 @@ that publish no note of their own or had no partner in the window, and
 stand. Each note also quotes the bot's own kind-9735 receipt in a `q` tag;
 nothing here reads it.
 
+### BoostAfterBoost Publishes For The Homegrown Hits Node
+
+Registered 2026-10-29, out of the duplicate survey behind Reed's report on
+Chad and Reed's show. `48b9a2a9…5e80e` is the **ninth** entry in
+`PUBLISHER_PUBKEYS` and the eighth in the site's `PUBLISHERS`: the same
+software as candr_boost_bot (the `["client", …]` tag, the `["app", <name>]`
+tag, the quoted-receipt `q`, the body "<sender> boosted N sats saying "…"
+@h:mm:ss via <App>", signed off with #bowlafterbowl #bowloftrust), watching
+the node behind Homegrown Hits and Bowl After Bowl. 44 notes since
+2026-09-12 across four shows, 69,179 sats, counted as a member and never
+droppable until the registration; Homegrown Hits was the second-worst show
+in the survey for standing copies (29 in 90 days) for that reason. Slug
+`boostafterboost`, its own tag's; label "BoostAfterBoost"; in
+`RELAY_PUBLISHERS` the same day, where the prose tiers pair it (it prints
+the full message and the sender; the node-received amount runs up to 2%
+over the donor's, 426 and 429 for 420, which is where the ±3% came from).
+
 ### OnlyBoosts Publishes On Behalf Of Its Own Donors
 
 Registered 2026-08-20. `3a87a19c…84d9` is the **fourth** entry in

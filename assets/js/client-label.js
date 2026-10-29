@@ -49,6 +49,10 @@ const DISPLAY = {
   // `["client","candr-boost"]`, the slug itself; chadf-boostbot's shape with
   // Boostr_Bot's tags, the listener's app in `app`.
   "candr-boost": "CandR Boost Bot",
+  // BoostAfterBoost, the same software as candr_boost_bot on the Homegrown
+  // Hits / Bowl After Bowl node, registered 2026-10-29 out of the duplicate
+  // survey. Its notes carry `["client","BoostAfterBoost"]`, the slug itself.
+  "boostafterboost": "BoostAfterBoost",
   // Carried over from the Boosts feed's own map, which read the raw client tag
   // and is now deleted. No boost in the index currently classifies to this slug;
   // it costs a line and saves the label if one ever does.

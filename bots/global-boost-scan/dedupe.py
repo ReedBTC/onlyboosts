@@ -20,6 +20,48 @@ one-to-one (two same-amount boosts in one live-show hour keep both notes) —
 AND one tier of corroborating evidence holds. Tier 0 below is the one
 exception to `same sats`, and it is the strongest evidence of the four.
 
+PAYMENT CLUSTERS REPLACED ONE-TO-ONE PAIRING ON 2026-10-29 (Reed's report:
+Chad and Reed's show read as "almost every single one has a duplicate").
+Three relay bots were restating every payment on that show — Boostr_Bot on
+the 1% split, chadf-boostbot on Chad's node, candr_boost_bot on the show's
+node — and most listeners boost from apps that publish no note of their own
+(PodcastGuru, The Split Kit, v4vmusic-com), so the pairing above had nothing
+non-relay to pair with and let two or three bot notes stand per payment.
+Measured over 90 days before the change: 145 standing copies, 121,444 sats,
+30 of them on that show. What changed, each against a measured failure:
+
+  * A relay note's partner may be ANOTHER RELAY BOT'S note. A cluster holds
+    at most one note per publisher (each bot publishes once per payment it
+    sees) and at most one donor note; its keeper is the donor's note when
+    there is one, else the bot note carrying the most of the payment (an
+    episode, a sender name), else the earliest. A keeper may later be joined
+    by a publisher its cluster does not hold, and a donor note arriving
+    after two bots were paired takes the keeper's place (`repoint`), so the
+    pass converges across ticks and across the scan order. 37 relay-only
+    payments stood as two or three notes.
+  * `same sats` is ±1 or ±3%, and a leg bot's x100 rounding (LEG_PUBLISHERS):
+    candr prints what the node received (6,564 for 6,565; 100 for 101),
+    BoostAfterBoost 426 and 429 for 420, Boostr 6,600 for 6,565. The exact
+    key missed 18 donor-plus-bot pairs; it also hid 28 Local Bitcoiners
+    publisher notes a sat off their Fountain partners over the whole corpus.
+  * A missing episode on one side is a wildcard (chadf-boostbot's notes
+    carry the show alone); two different episodes still never pair.
+  * Evidence between two bot notes is read both ways: the sparser template's
+    prose must sit inside the richer one's, and two bots printing the same
+    sender name ("<name> boosted N sats") is a tier of its own (`name`). A
+    donor note is still read one way: the bot's prose must sit inside it.
+  * What a template prints is a fact, not prose: the sender's name, the show
+    and episode titles AS PRINTED (a renamed episode's old title read as
+    three shared words), a bot's `nostr:npub` mentions and hashtags unless
+    the partner shares the word, "saying", "No message".
+
+  Two bots naming two different senders are two payments, whatever else
+  agrees. Only a relay-signed note is ever marked, as before. Full-history
+  dry run on the day: 118 notes, 95,483 sats, 0 false pairs on inspection;
+  what remains is same-publisher twins (identical prose, same sats, seconds
+  apart: 62 within 30s, 54 of them chadf-boostbot's per-leg notes), which
+  Reed's 2026-08-30 call below keeps. `test_dedupe_clusters.py`.
+
 ONE-TO-ONE HAS ONE EXCEPTION, AND IT IS ON THE RELAY SIDE (2026-08-30).
 chadf-boostbot signs one kind-9735 receipt and one note PER KEYSEND LEG, so a
 multi-leg boost is two or three bot notes, identical except for the quoted
@@ -175,7 +217,7 @@ from nostr_utils import npub_to_hex          # noqa: E402
 # through apps that publish no note (The Split Kit, v4vmusic-com, CurioCaster,
 # PodcastGuru) or had no partner within the window, and stand.
 RELAY_PUBLISHERS = {"chadf-boostbot", "localbitcoiners", "boostr-bot", "msp-2-0",
-                    "candr-boost"}
+                    "candr-boost", "boostafterboost"}
 
 MSG_WINDOW = 30 * 60      # strong message corroboration: generous
 APP_WINDOW = 10 * 60      # app-identity corroboration: tight
@@ -189,13 +231,14 @@ APP_DOMAINS = {
     "boostmebitch":  "boostmebitch.com",
     "stablekraft":   "stablekraft.app",
     "bowlafterbowl": "bowlafterbowl.com",
+    "v4vmusic-com":  "via v4vmusic-com",   # its own notes: no client tag, "… via v4vmusic-com 🎵 …"
 }
 
 # Words both sides' templates restate about ANY boost; sharing them proves
 # nothing. Lowercase, matched against normalized words.
 TEMPLATE_VOCAB = set("""boost boosts boosted boostagram sats sat via user users
 episode ep show podcast live stream to the a an and of for on by from with
-this is at in zap zapped sent""".split())
+this is at in zap zapped sent saying no message""".split())
 
 _TOKEN = re.compile(r"(?:nostr:\S+|https?://\S+)")
 _WORD = re.compile(r"[^\W_]+", re.UNICODE)
@@ -260,6 +303,28 @@ def _app_words(row):
         words.update(_words(app.replace("-", " ")))
     m = _VIA_LINE.search(row["message"] or "")
     if m:
+        words.update(_words(m.group(1)))
+    return words
+
+
+# What a bot template prints about the boost besides the message: the show
+# and episode titles in leading `[...]` groups (candr, BoostAfterBoost,
+# BoostMeBuddy's own) and on a `📻`/`🎵` line (Boostr, MSP, Bowl After Bowl's
+# own). The index's CURRENT titles are already facts (`_known_facts`); these
+# are the titles AS PRINTED, which differ once a publisher renames an episode
+# ("011. Full speed ahead" became "011. Leading with culture", and the old
+# title read as three shared words of donor prose, 2026-10-29).
+_BRACKET = re.compile(r"\[([^\]]{1,120})\]")
+_FACT_LINE = re.compile("^[\N{RADIO}\N{MUSICAL NOTE}]\\s*(.+)$", re.MULTILINE)
+
+
+def _template_facts(row):
+    msg = row["message"] or ""
+    words = set()
+    first = msg.split("\n", 1)[0]
+    for m in _BRACKET.finditer(first):
+        words.update(_words(m.group(1)))
+    for m in _FACT_LINE.finditer(msg):
         words.update(_words(m.group(1)))
     return words
 
@@ -329,40 +394,6 @@ def note_app(row):
     return None
 
 
-def _match(conn, b, cands, claimed):
-    """The evidence tiers, against one relay note. Returns (partner, tier, gap)
-    or None. `cands` already satisfy the hard key within MSG_WINDOW.
-
-    Both texts arrive mention-resolved (`_resolve_mentions`) and with every
-    note's own app name neutralised (`_app_words`); both are corrections, and
-    each has its reason where it is defined."""
-    known = _known_facts(conn, b) | _app_words(b)
-    for o in cands:
-        known |= _app_words(o)
-    bw = _words(_resolve_mentions(conn, b["message"]))
-    b_prose = set(_distinctive(bw, known))
-    b_app = note_app(b)
-    best = None
-    for o in cands:
-        if o["event_id"] in claimed:
-            continue
-        gap = abs(o["created_at"] - b["created_at"])
-        ow = _words(_resolve_mentions(conn, o["message"]))
-        run = _overlap_run(bw, ow, known)
-        apps_agree = b_app is not None and note_app(o) == b_app
-        if run >= STRONG_OVERLAP:
-            tier = "msg"
-        elif b_prose and b_prose <= set(ow) and apps_agree and gap <= APP_WINDOW:
-            tier = "msg+app"
-        elif not b_prose and apps_agree and gap <= APP_WINDOW:
-            tier = "app"
-        else:
-            continue          # no evidence, or contradicted prose: let it through
-        if best is None or gap < best[2]:
-            best = (o, tier, gap)
-    return best
-
-
 def _sender_pubkey(row):
     """The donor a relay note names in its `["sender", npub]` tag, as hex —
     or None when there is no such tag, it does not decode, or it names the
@@ -407,12 +438,140 @@ def _sender_match(conn, b, sender, claimed):
     return best
 
 
-def find_duplicates(conn, since=None):
-    """Pair unmarked relay-publisher notes against partner notes. Read-only.
 
-    Returns [(relay_row, partner_row, tier, gap_seconds)], partner-claims
-    one-to-one against both prior runs (dup_of already set) and this one.
-    """
+# Relay bots that rebuild the TOTAL from their own 1% leg, so the amount they
+# print is the split's rounding of the donor's (6,600 for 6,565; 300 for 333;
+# 100 for 123). `_sats_close` admits that rounding for them alone.
+LEG_PUBLISHERS = {"boostr-bot", "msp-2-0"}
+
+# `<name> boosted <n> sats`: the sender's display name as the Boostr/MSP and
+# candr/BoostAfterBoost templates (and BoostMeBitch's own) print it. Two notes
+# that both print one are two statements about the same payment only if the
+# names agree; a note that prints none says nothing.
+_SENDER_LINE = re.compile(r"(?:^|\]\s*|\n)\s*([^\n\]]{1,80}?)\s+boosted\s+\u200b?[\d,]+\s+sats",
+                          re.UNICODE)
+
+
+def _sender_name(row):
+    m = _SENDER_LINE.search(row["message"] or "")
+    if not m:
+        return None
+    name = " ".join(m.group(1).split()).lower().lstrip("\u26a1\u2728\U0001f48b ").strip()
+    return name or None
+
+
+_HASHTAG = re.compile(r"#(\w+)", re.UNICODE)
+
+
+def _bot_tokens(conn, row):
+    """Words a relay note's mentions resolve to, plus its hashtags."""
+    msg = row["message"] or ""
+    words = set()
+    for m in _MENTION.finditer(msg):
+        words.update(_words(_mention_name(conn, m.group(1))))
+    for m in _HASHTAG.finditer(msg):
+        words.update(_words(m.group(1)))
+    return words
+
+
+def _sats_close(b, o):
+    """The hard key's `same sats`, loosened to what the bots measurably do:
+    candr reports what the node received (6,564 for 6,565; 100 for 101) and
+    BoostAfterBoost 426 and 429 for a donor's 420, so ±1 sat or ±3%; a leg bot prints the 1% leg x100 (see LEG_PUBLISHERS)."""
+    x, y = b["sats"], o["sats"]
+    if x is None or y is None:
+        return False
+    if abs(x - y) <= max(1, 0.03 * max(x, y)):
+        return True
+    for leg, other in ((b, o), (o, b)):
+        if leg["client_id"] in LEG_PUBLISHERS and leg["sats"] == round(other["sats"] / 100) * 100:
+            return True
+    return False
+
+
+def _episode_compatible(b, o):
+    """Equal item guids, or one side names no episode (chadf-boostbot's notes
+    carry the show alone)."""
+    return (not b["item_guid"] or not o["item_guid"] or b["item_guid"] == o["item_guid"])
+
+
+def _evidence(conn, b, o):
+    """The evidence tiers between a relay note `b` and a candidate `o`, which
+    may be the donor's own note or ANOTHER relay bot's. Returns a tier name or
+    None (no evidence, or contradicted prose: let through).
+
+    Direction matters on the donor side and not between bots. A donor's note
+    is the payment's own record, so the bot's prose must sit inside it; two
+    bots restate the same payment with different templates (chadf-boostbot
+    prints the message and no sender, candr prints sender and message), so
+    the sparser one's prose must sit inside the richer one's."""
+    gap = abs(o["created_at"] - b["created_at"])
+    o_relay = o["client_id"] in RELAY_PUBLISHERS
+    if gap > (APP_WINDOW if o_relay else MSG_WINDOW):
+        return None
+    known = (_known_facts(conn, b) | _app_words(b) | _app_words(o)
+             | _template_facts(b) | _template_facts(o))
+    nb, no = _sender_name(b), _sender_name(o)
+    for name in (nb, no):
+        if name:
+            known.update(_words(name))   # the sender's name is a fact, not prose
+    bw = _words(_resolve_mentions(conn, b["message"]))
+    ow = _words(_resolve_mentions(conn, o["message"]))
+    # A bot's mentions and hashtags are its template naming the sender, the
+    # show, the recipient (chadf-boostbot prints the donor's npub, resolved
+    # above to a name the donor's own note never contains; BoostAfterBoost
+    # signs off with #bowlafterbowl #bowloftrust). They are facts unless the
+    # partner shares the word, in which case they are the same evidence a
+    # restated "@Name" has always been.
+    known |= _bot_tokens(conn, b) - set(ow)
+    if o_relay:
+        known |= _bot_tokens(conn, o) - set(bw)
+    b_prose = set(_distinctive(bw, known))
+    o_prose = set(_distinctive(ow, known))
+    if o_relay and nb and no and nb != no:
+        return None                       # two bots naming two donors
+    if _overlap_run(bw, ow, known) >= STRONG_OVERLAP:
+        return "msg"
+    if gap > APP_WINDOW:
+        return None
+    if o_relay:
+        contained = b_prose <= set(ow) or o_prose <= set(bw)
+    else:
+        contained = b_prose <= set(ow)
+    if not contained:
+        return None                       # contradicted prose beats agreement
+    if o_relay and nb and no and nb == no:
+        return "name"
+    b_app = note_app(b)
+    if b_app is None or note_app(o) != b_app:
+        return None
+    return "msg+app" if (b_prose or (o_relay and o_prose)) else "app"
+
+
+def _keeper(members):
+    """Which note of a cluster is the record. The donor's own note always;
+    among bot notes alone, the one carrying the most of the payment (an
+    episode, a sender name), then the earliest."""
+    own = [m for m in members if m["client_id"] not in RELAY_PUBLISHERS]
+    if own:
+        return min(own, key=lambda m: m["created_at"])
+    return min(members, key=lambda m: (0 if m["item_guid"] else 1,
+                                       0 if _sender_name(m) else 1,
+                                       m["created_at"]))
+
+
+def find_duplicates(conn, since=None):
+    """Cluster relay-publisher notes with the other notes of the same payment.
+    Read-only. Returns [(note, keeper, tier, gap_seconds)] for every note
+    that is to be marked `dup_of keeper`; tier `repoint` is a note already
+    marked whose cluster gained a better keeper (a donor note arriving after
+    two bots had already been paired with each other).
+
+    A cluster holds at most ONE note per publisher (each bot publishes once
+    per payment it sees; the per-leg sibling rule is the exception) and at
+    most one donor note. A note joins at most one cluster; a keeper may still
+    be joined by a publisher its cluster does not hold yet, which is how a
+    third bot's note lands on a pair marked in an earlier run."""
     ph = ",".join("?" * len(RELAY_PUBLISHERS))
     since_sql = "AND created_at >= ?" if since else ""
     args = list(RELAY_PUBLISHERS) + ([since] if since else [])
@@ -424,43 +583,97 @@ def find_duplicates(conn, since=None):
     if not bots:
         return []
 
-    claimed = {r[0] for r in conn.execute(
-        "SELECT dup_of FROM boosts WHERE dup_of IS NOT NULL")}
-    marked_by = {}            # relay event_id -> partner, for THIS run's pairs
+    # keeper -> publishers already in its cluster (from prior runs)
+    members = {}
+    for keeper, cid in conn.execute(
+            "SELECT dup_of, client_id FROM boosts WHERE dup_of IS NOT NULL"):
+        members.setdefault(keeper, set()).add(cid)
+    for keeper in list(members):
+        row = conn.execute("SELECT client_id FROM boosts WHERE event_id=?",
+                           (keeper,)).fetchone()
+        if row:
+            members[keeper].add(row["client_id"])
+    absorbed = set()          # notes marked or re-pointed in THIS run
+    marked_by = {}            # relay event_id -> keeper, for the sibling rule
 
     egb = db.effective_guid("b")
     pairs = []
     for b in bots:
+        if b["event_id"] in absorbed:
+            continue
+        own_pubs = members.get(b["event_id"], {b["client_id"]})
         sender = _sender_pubkey(b)
+        chosen = {}           # slot -> (note, tier, gap); slot = "own" or a relay slug
         if sender:
             # Tier 0: a named donor is their own note or nothing (docstring).
-            hit = _sender_match(conn, b, sender, claimed)
-            if hit is None:
-                hit = _sibling_match(conn, b, marked_by)
+            hit = _sender_match(conn, b, sender, absorbed)
             if hit is not None:
-                o, tier, gap = hit
-                claimed.add(o["event_id"])
-                marked_by[b["event_id"]] = o["event_id"]
-                pairs.append((b, o, tier, gap))
-            continue
+                chosen["own"] = hit
         cands = conn.execute(
             f"""SELECT * FROM boosts b
-                WHERE b.sats = ? AND b.created_at BETWEEN ? AND ?
-                  AND COALESCE(b.item_guid,'') = ? AND COALESCE({egb},'') = ?
-                  AND (b.client_id IS NULL OR b.client_id NOT IN ({ph}))
-                  AND b.excluded = 0 AND b.dup_of IS NULL AND b.event_id != ?""",
-            [b["sats"], b["created_at"] - MSG_WINDOW, b["created_at"] + MSG_WINDOW,
-             b["item_guid"] or "",
-             b["canonical_guid"] or b["podcast_guid"] or ""]
-            + list(RELAY_PUBLISHERS) + [b["event_id"]]).fetchall()
-        hit = _match(conn, b, cands, claimed)
-        if hit is None:
+                WHERE b.created_at BETWEEN ? AND ? AND COALESCE({egb},'') = ?
+                  AND b.excluded = 0 AND b.dup_of IS NULL AND b.event_id != ?
+                  AND b.sats IS NOT NULL""",
+            [b["created_at"] - MSG_WINDOW, b["created_at"] + MSG_WINDOW,
+             b["canonical_guid"] or b["podcast_guid"] or "", b["event_id"]]).fetchall()
+        for o in cands:
+            if o["event_id"] in absorbed or not _episode_compatible(b, o) or not _sats_close(b, o):
+                continue
+            o_relay = o["client_id"] in RELAY_PUBLISHERS
+            if o_relay:
+                if o["client_id"] in own_pubs:
+                    continue          # one note per publisher per payment
+                o_pubs = members.get(o["event_id"], {o["client_id"]})
+                if o_pubs & own_pubs:
+                    continue
+                slot = o["client_id"]
+            else:
+                if sender:
+                    continue          # tier 0 owns the donor slot
+                if "own" in own_pubs or any(p not in RELAY_PUBLISHERS for p in own_pubs):
+                    continue
+                slot = "own"
+            tier = _evidence(conn, b, o)
+            if tier is None:
+                continue
+            gap = abs(o["created_at"] - b["created_at"])
+            if slot not in chosen or gap < chosen[slot][2]:
+                chosen[slot] = (o, tier, gap)
+        if not chosen:
             hit = _sibling_match(conn, b, marked_by)
-        if hit is not None:
-            o, tier, gap = hit
-            claimed.add(o["event_id"])
-            marked_by[b["event_id"]] = o["event_id"]
-            pairs.append((b, o, tier, gap))
+            if hit is not None:
+                o, tier, gap = hit
+                absorbed.add(b["event_id"])
+                marked_by[b["event_id"]] = o["event_id"]
+                members.setdefault(o["event_id"], {o["client_id"]}).add(b["client_id"])
+                pairs.append((b, o, tier, gap))
+            continue
+        cluster = [b] + [v[0] for v in chosen.values()]
+        keeper = _keeper(cluster)
+        pubs = set()
+        for m in cluster:
+            pubs |= members.get(m["event_id"], {m["client_id"]})
+        members[keeper["event_id"]] = pubs
+        for m in cluster:
+            if m["event_id"] == keeper["event_id"]:
+                continue
+            tier, gap = ("self", 0)
+            for v in chosen.values():
+                if v[0]["event_id"] == m["event_id"]:
+                    tier, gap = v[1], v[2]
+            if m["event_id"] == b["event_id"]:
+                # b joins: its tier is the strongest evidence that pulled it in
+                best = min(chosen.values(), key=lambda v: v[2])
+                tier, gap = best[1], best[2]
+            absorbed.add(m["event_id"])
+            marked_by[m["event_id"]] = keeper["event_id"]
+            pairs.append((m, keeper, tier, gap))
+            if m["event_id"] in members:
+                # m kept a cluster of its own: its members follow it
+                for old in conn.execute("SELECT * FROM boosts WHERE dup_of=?",
+                                        (m["event_id"],)):
+                    pairs.append((old, keeper, "repoint", 0))
+                del members[m["event_id"]]
     return pairs
 
 
@@ -507,9 +720,11 @@ def apply(conn, pairs):
     an unmarked row would re-insert via the ordinary delta) and queue the boost
     delete plus the show/episode/profile recounts."""
     queue = []
-    for b, o, _tier, _gap in pairs:
+    for b, o, tier, _gap in pairs:
         conn.execute("UPDATE boosts SET dup_of=? WHERE event_id=?",
                      (o["event_id"], b["event_id"]))
+        if tier == "repoint":
+            continue              # already out of D1; only its keeper moved
         conn.execute("DELETE FROM d1_boosts_synced WHERE event_id=?",
                      (b["event_id"],))
         queue.append(("boost", b["event_id"]))
@@ -532,11 +747,12 @@ def run(conn, days=7, dry_run=False):
     if not pairs:
         print(f"[dedupe] {scope}: no new duplicates")
         return 0
-    sats = sum(b["sats"] or 0 for b, *_ in pairs)
-    print(f"[dedupe] {scope}: {len(pairs)} duplicate note(s), {sats:,} over-counted sats"
+    new = [p for p in pairs if p[2] != "repoint"]
+    sats = sum(b["sats"] or 0 for b, *_ in new)
+    print(f"[dedupe] {scope}: {len(new)} duplicate note(s), {sats:,} over-counted sats"
           + (" (dry run — nothing marked)" if dry_run else ""))
     for b, o, tier, gap in pairs:
-        print(f"  [{tier}] {b['event_id'][:12]} (bot, via {b['client_via'] or '?'}) "
+        print(f"  [{tier}] {b['event_id'][:12]} ({b['client_id']}, via {b['client_via'] or '?'}) "
               f"= {o['event_id'][:12]} ({o['client_id'] or 'unclassified'}), "
               f"{b['sats']} sats, gap {gap}s")
     if not dry_run:
