@@ -293,16 +293,24 @@ was picked from is in the session memory; direction A won, with the sans.
   words do not fit), printed "#6 / #2 / #3" (the number sign marks a
   place, not a count) and **never wider than the artwork**: the line is
   sized off the tile's width by its digit count (`rt-d3`..`rt-d9`,
-  container units, measured in Chromium at 96 to 180px). **Every content
-  tile carries a MEDIUM BADGE**, a light chip with an icon and the word
-  ("Podcast", "Music") in the artwork's bottom-right corner (`mediumBadge`;
-  a person's tile none; an icon on the rank's dark circle top-right read
-  as part of the rank, 2026-10-29). **Only a ranked rail prints the line**:
+  container units, measured in Chromium at 96 to 180px). **A MIXED RAIL'S
+  tiles carry a MEDIUM BADGE** (New and Noteworthy, Podcasters Recommend;
+  Movers is the Shows chart, one side): a light chip with an icon and the
+  word ("Podcast", "Music") in the artwork's bottom-right corner
+  (`mediumBadge`, printed only when the caller passes `medium`; the tile
+  mappers pass none). Every other rail is one side and its HEADING says
+  which: **"Podcasts", never "Shows", in the homepage's rail names and the
+  ribbons** (Top Podcasts This Week, Top Podcasts From Your Follows, #1
+  Podcast This Week; Reed's call, 2026-10-30), New and Noteworthy's heading
+  reading "New and Noteworthy Podcasts and Music". The chart pages' Shows
+  view keeps its name. **Only a ranked rail prints the line**:
   the two Recommended rails, Top Shows From Your Follows and the Because
   rails map through `bare()` and show the title alone (Reed's call,
   2026-10-29), and the #40HPW tile reads "34.3 HPW", no episode count.
-  New and Noteworthy's line under a tile is the
-  medium ("Podcast", "Album"), its first-boost date in the tooltip;
+  New and Noteworthy's tiles print no line (the badge says the medium);
+  **a superlative names its population** ("more than any other show in the
+  index"; Reed, 2026-10-30: the site's figures are this index's, never the
+  world's);
   Reed's call after seeing "7 boosters · 38.8k sats" at tile size. The #40HPW
   rail is tiles too (face, name, "34.3 HPW", gold past the
   goal), not the board: every rail the same shape. **A person's tile is

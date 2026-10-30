@@ -337,11 +337,11 @@ indexed Nostr boost; nothing about a visitor is stored.
   edge-rendered from the rails' own rows. The description is the subject's
   own (`podcasts.description`, `episodes.description`, `publishers.description`,
   `profiles.about`), cut to about 220 characters. No editorial picks.
-- **The chart rails** (Top Shows This Week, Top Albums This Month, and since
+- **The chart rails** (Top Podcasts This Week, Top Albums This Month, and since
   2026-10-22 the window rails at the foot: Episodes, Songs, Albums and Shows
   over the week, the month and the year, the two already at the head not
   repeated; Top Artists This Week until 2026-10-21): the OnlyBoosts Charts
-  over that window of boost time. Top Shows This Week is the Pacific week
+  over that window of boost time. Top Podcasts This Week is the Pacific week
   (Monday 00:00 to Sunday night); every other window is trailing (7 / 30 /
   365 days), the window of the chart view the rail links. The tile's line is
   the three component ranks (sats / boosts / boosters, printed "#6 / #2 / #3", each behind its icon; the personal rails print no line). The week and month
@@ -388,7 +388,7 @@ indexed Nostr boost; nothing about a visitor is stored.
   pick (a show appears on the first rail that reaches it only), and a rail
   under four shows is not shown. Until then: the five most-boosted seeds in
   boost order, any size.
-- **Top Shows From Your Follows**: the Shows chart over the boosts of the
+- **Top Podcasts From Your Follows**: the Shows chart over the boosts of the
   member's kind-3 contacts (the Follows scope); the member's own boosts count.
 - **New and Noteworthy**: `first_boost_ts` within 90 days and >= 2 boosters, by
   boosters then sats.

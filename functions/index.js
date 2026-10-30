@@ -251,11 +251,10 @@ export const RAILS = {
     const rows = await newShowsRows(env, TILES);
     return rail(railListHtml(rows.map((r, i) => tileHtml({
       rank: i + 1, href: showPageHref(r.guid), title: r.title,
-      /* The medium, not the date (Reed's ask, 2026-10-29): this rail mixes
-         podcasts and albums, and the debut date is the rail's premise rather
-         than news about one tile. The date stays in the tooltip. */
-      sub: r.medium === "music" ? "Album" : "Podcast",
-      subTitle: `${firstBoost(r)} · ${r.booster_count} boosters since`,
+      /* No line under the tile (Reed's call, 2026-10-30): the rail mixes
+         podcasts and albums, so the artwork carries the medium badge, and
+         the debut date is the rail's premise rather than news about one
+         tile. It was "Podcast"/"Album" for a day, which the badge restated. */
       img: r.image, art2: r.artwork, glyph: (r.medium === "music" ? "🎵" : "🎙"), medium: r.medium,
     })), { empty: "No show had its first boost in the last 90 days." }),
       rows[0] && showSlide("new-shows", rows[0], { line: `${firstBoost(rows[0])} · ${rows[0].booster_count} boosters since` }));
@@ -270,7 +269,7 @@ export const RAILS = {
       rank: r.rank, tied: !!r.tied, href: showPageHref(r.guid), title: r.title,
       sub: climb != null ? `▲ ${climb} · was #${was.get(r.guid)}` : "New this week",
       subTitle: climb != null ? "Places climbed since last week's chart" : "Not on last week's chart",
-      img: r.image, art2: r.artwork, glyph: "🎙", medium: "podcast",
+      img: r.image, art2: r.artwork, glyph: "🎙",
     })), { empty: "Nothing has moved yet this week." }),
       top && showSlide("movers", top.r, {
         medium: "podcast",
@@ -293,7 +292,7 @@ export const RAILS = {
     })), { empty: "No podroll in the index yet." }),
       rows[0] && showSlide("podroll", rows[0], {
         href: Number(rows[0].linked) ? showPageHref(rows[0].guid) : null,
-        line: `${onN(rows[0])}, more than any other show`,
+        line: `${onN(rows[0])}, more than any other show in the index`,
       }));
   },
 };

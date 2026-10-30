@@ -11,11 +11,11 @@
  * rewrites the version), no clock reads, no unpinned locale, nothing from the
  * DOM. Verbs (the artwork fallback walk) are attached by discover.js.
  */
-import { coverChain } from './cover-art.js?v=ob-v240'
-import { rankLabel } from './rank.js?v=ob-v240'
-import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v240'
-import { boosterPageHref } from './booster-link.js?v=ob-v240'
-import { languageName } from './lang-name.js?v=ob-v240'
+import { coverChain } from './cover-art.js?v=ob-v241'
+import { rankLabel } from './rank.js?v=ob-v241'
+import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v241'
+import { boosterPageHref } from './booster-link.js?v=ob-v241'
+import { languageName } from './lang-name.js?v=ob-v241'
 
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => (
@@ -82,10 +82,12 @@ export const FIGURE_ICONS = {
   boosts: SVG('<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>'),
   boosters: SVG('<circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/>'),
 }
-/* ⚠️ THE MEDIUM BADGE ON THE ARTWORK (Reed's ask, 2026-10-29): a rail can
- * mix the two sides (New and Noteworthy, Podcasters Recommend), and a reader
- * who opens an album expecting a show is surprised, so every content tile
- * says which side it is on: a LABEL, icon and word ("Podcast", "Music"), on
+/* ⚠️ THE MEDIUM BADGE ON THE ARTWORK, ON A MIXED RAIL ONLY (Reed's ask,
+ * 2026-10-29; mixed rails only since 2026-10-30): New and Noteworthy and
+ * Podcasters Recommend mix the two sides, and a reader who opens an album
+ * expecting a show is surprised. Every other rail is one side and its
+ * heading says which ("Top Podcasts This Week"), so the mappers below pass
+ * no medium and only a caller that sets `medium` gets the badge: a LABEL, icon and word ("Podcast", "Music"), on
  * a light chip in the artwork's bottom-right corner. It was an icon on the
  * rank's own dark circle in the top-right for one round, and Reed read the
  * pair as one statement ("#4 and a microphone?"); the word, the light
@@ -175,7 +177,7 @@ export function showTile(r, i) {
     href: showPageHref(r.guid),
     title: r.title,
     ...subOf(r, statsLine({ boosters: r.booster_count ?? r.boosters, sats: r.total_sats ?? r.sats })),
-    img: r.image ?? r.img, art2: r.artwork ?? r.art2, glyph: '🎙', medium: r.medium || 'podcast',
+    img: r.image ?? r.img, art2: r.artwork ?? r.art2, glyph: '🎙',
   })
 }
 export function albumTile(r, i) {
@@ -184,7 +186,7 @@ export function albumTile(r, i) {
     href: showPageHref(r.guid),
     title: r.title,
     ...subOf(r, r.author || statsLine({ boosters: r.booster_count ?? r.boosters, sats: r.total_sats ?? r.sats })),
-    img: r.image ?? r.img, art2: r.artwork ?? r.art2, glyph: '🎵', medium: 'music',
+    img: r.image ?? r.img, art2: r.artwork ?? r.art2, glyph: '🎵',
   })
 }
 export function episodeTile(r, i, glyph = '🎙') {
@@ -194,7 +196,6 @@ export function episodeTile(r, i, glyph = '🎙') {
     title: r.title,
     ...subOf(r, r.show?.title || statsLine({ boosters: r.boosters, sats: r.sats })),
     img: r.img || r.show?.img, art2: r.show?.art2, glyph,
-    medium: r.show?.medium || (glyph === '🎵' ? 'music' : 'podcast'),
   })
 }
 export function artistTile(r, i) {
@@ -203,7 +204,7 @@ export function artistTile(r, i) {
     href: publisherPageHref(r.guid),
     title: r.title,
     ...subOf(r, statsLine({ boosters: r.booster_count ?? r.boosters, sats: r.total_sats ?? r.sats })),
-    img: r.image ?? r.img, art2: r.artwork ?? r.art2, glyph: '🎤', medium: 'music',
+    img: r.image ?? r.img, art2: r.artwork ?? r.art2, glyph: '🎤',
   })
 }
 

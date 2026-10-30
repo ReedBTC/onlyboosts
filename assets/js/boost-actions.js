@@ -19,9 +19,9 @@ import {
   getCachedProfile,
   setCachedProfile,
   registerEvent,
-} from '/assets/js/boosts-thread.js?v=ob-v240'
-import { nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v240'
-import { attachMentionPicker } from '/assets/js/mention-picker.js?v=ob-v240'
+} from '/assets/js/boosts-thread.js?v=ob-v241'
+import { nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v241'
+import { attachMentionPicker } from '/assets/js/mention-picker.js?v=ob-v241'
 
 // ── Module state ─────────────────────────────────────────────────────
 const state = {

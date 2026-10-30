@@ -24,12 +24,12 @@
  *    feed cards' own handlers. A rail the edge could not fill gets its slide
  *    rebuilt here from the rows fetched for the rail, with the same mappers.
  */
-import { railListHtml, showTile, albumTile, episodeTile, memberTile, langRailHtml, bare } from '/assets/js/rail-tile.js?v=ob-v240'
-import { heroHtml, slideHtml, showSlide, episodeSlide, memberSlide } from '/assets/js/hero.js?v=ob-v240'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v240'
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v240'
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v240'
-import { languageName } from '/assets/js/lang-name.js?v=ob-v240'
+import { railListHtml, showTile, albumTile, episodeTile, memberTile, langRailHtml, bare } from '/assets/js/rail-tile.js?v=ob-v241'
+import { heroHtml, slideHtml, showSlide, episodeSlide, memberSlide } from '/assets/js/hero.js?v=ob-v241'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v241'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v241'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v241'
+import { languageName } from '/assets/js/lang-name.js?v=ob-v241'
 
 const TILES = 10
 
@@ -182,11 +182,11 @@ function wireHeroBoost(hero) {
     try {
       const kind = slide.dataset.kind
       if (kind === 'episode' || kind === 'song') {
-        const m = await import('/assets/js/episode-card-actions.js?v=ob-v240')
+        const m = await import('/assets/js/episode-card-actions.js?v=ob-v241')
         btn.disabled = false
         await m.onBoostClick(slide, btn)
       } else {
-        const m = await import('/assets/js/show-card-actions.js?v=ob-v240')
+        const m = await import('/assets/js/show-card-actions.js?v=ob-v241')
         btn.disabled = false
         await m.onShowBoost(slide, btn)
       }

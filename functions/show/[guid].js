@@ -543,19 +543,19 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v240" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v240" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v240" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v240" />
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v240" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v240" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v241" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v241" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v241" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v241" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v241" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v241" />
   <!-- The boost note card and its reaction bar. Added when the boost list at
        the foot of this page became the same .note-card the homepage Boosts
        feed paints; this page linked neither before, which is why show-page.css
        restates .nostr-mention. That restatement is now redundant rather than
        load-bearing, and is left in place rather than removed in the same pass. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v240" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v240" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v241" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v241" />
 </head>
 <body data-show-guid="${htmlEscape(show.podcast_guid)}">
 
@@ -644,15 +644,15 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
             <details class="nav-explore-acc">
               <summary><a href="/podcasts"><span aria-hidden="true">🎙</span> Podcasts</a><span class="nav-explore-chev" aria-hidden="true">⌄</span></summary>
               <div class="nav-explore-sub">
-                <a href="/charts/podcasts">Top Shows This Week</a>
-                <a href="/podcasts/shows?range=1y">Top Shows This Year</a>
+                <a href="/charts/podcasts">Top Podcasts This Week</a>
+                <a href="/podcasts/shows?range=1y">Top Podcasts This Year</a>
                 <a href="/podcasts/episodes?range=1y">Top Episodes This Year</a>
                 <a href="/discover/new-shows">New and Noteworthy</a>
                 <a href="/discover/movers">Movers This Week</a>
                 <a href="/discover/podroll">Podcasters Recommend</a>
                 <a href="/#rail-lang-1">Top Podcasts by Language</a>
                 <a href="/#rail-recommended">Podcasts Recommended For You</a>
-                <a href="/#rail-follows">Top Shows From Your Follows</a>
+                <a href="/#rail-follows">Top Podcasts From Your Follows</a>
                 <a href="/#rail-because">Because You Boosted</a>
               </div>
             </details>
@@ -701,11 +701,11 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
         <summary><a href="/podcasts">Podcasts</a><span class="nav-ribbon-caret" aria-hidden="true">▾</span></summary>
         <div class="nav-ribbon-panel">
           <div class="nav-ribbon-col">
-            <h4>Top Shows This Week <a href="/charts/podcasts">View all</a></h4>
+            <h4>Top Podcasts This Week <a href="/charts/podcasts">View all</a></h4>
             <ol class="nav-ribbon-list" data-ribbon-list="shows-week"></ol>
           </div>
           <div class="nav-ribbon-col">
-            <h4>Top Shows This Year <a href="/podcasts/shows?range=1y">View all</a></h4>
+            <h4>Top Podcasts This Year <a href="/podcasts/shows?range=1y">View all</a></h4>
             <ol class="nav-ribbon-list" data-ribbon-list="shows-year"></ol>
           </div>
           <div class="nav-ribbon-col nav-ribbon-discover">
@@ -716,11 +716,11 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
             <a href="/discover/podroll">Podcasters Recommend</a>
             <a href="/#rail-lang-1">Top Podcasts by Language</a>
             <a href="/#rail-recommended">Podcasts Recommended For You</a>
-            <a href="/#rail-follows">Top Shows From Your Follows</a>
+            <a href="/#rail-follows">Top Podcasts From Your Follows</a>
             <a href="/#rail-because">Because You Boosted</a>
           </div>
           <div class="nav-ribbon-feat" data-ribbon-feat="shows-week" hidden>
-            <span class="nav-ribbon-eyebrow">#1 Show This Week</span>
+            <span class="nav-ribbon-eyebrow">#1 Podcast This Week</span>
             <a class="nav-ribbon-feat-art" data-ribbon-feat-art href="#"></a>
             <a class="nav-ribbon-feat-title" data-ribbon-feat-title href="#"></a>
             <span class="nav-ribbon-feat-line" data-ribbon-feat-line></span>
@@ -742,7 +742,7 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
             <h4>Discover</h4>
             <a href="/charts/music">Top Artists This Week</a>
             <a href="/#rail-recommended-music">Music Recommended For You</a>
-            <a href="/#rail-follows">Top Shows From Your Follows</a>
+            <a href="/#rail-follows">Top Podcasts From Your Follows</a>
             <a href="/#rail-because">Because You Boosted</a>
           </div>
           <div class="nav-ribbon-feat" data-ribbon-feat="albums-month" hidden>
@@ -931,12 +931,12 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
 
 <script type="application/json" id="show-boost-payload">${jsonForScript(boostPayload)}</script>
 
-<script src="/assets/js/nav.js?v=ob-v240" defer></script>
-<script src="/assets/js/show-page.js?v=ob-v240" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v241" defer></script>
+<script src="/assets/js/show-page.js?v=ob-v241" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v240"></script>
-<script src="/assets/js/sw-register.js?v=ob-v240" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v241"></script>
+<script src="/assets/js/sw-register.js?v=ob-v241" defer></script>
 </body>
 </html>`;
 }
@@ -1508,10 +1508,10 @@ function notFound(guid) {
   <meta name="robots" content="noindex" />
   <title>Show not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v240" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v240" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v240" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v240" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v241" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v241" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v241" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v241" />
 </head>
 <body>
 <section class="page-header">
@@ -1530,7 +1530,7 @@ function notFound(guid) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v240" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v241" defer></script>
 </body>
 </html>`;
   return new Response(html, {
