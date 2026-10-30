@@ -42,13 +42,13 @@
  * what functions/_shared/detail-page.js has always done, so the site now has one
  * date format rather than one for the feeds and another for the detail pages.
  */
-import { showPageHref, episodePageHref, isSyntheticGuid } from './show-link.js?v=ob-v238'
-import { favoriteButtonHtml } from './favorite-button.js?v=ob-v238'
-import { episodeBoostLink } from './episode-link.js?v=ob-v238'
-import { boosterPageHref, boosterLinkAttrs } from './booster-link.js?v=ob-v238'
-import { coverChain, httpsUrl } from './cover-art.js?v=ob-v238'
-import { htmlEscape, isSafeUrl, renderMessage } from './nostr-text.js?v=ob-v238'
-import { chartRanks, competitionRanks } from './rank.js?v=ob-v238'
+import { showPageHref, episodePageHref, isSyntheticGuid } from './show-link.js?v=ob-v244'
+import { favoriteButtonHtml } from './favorite-button.js?v=ob-v244'
+import { episodeBoostLink } from './episode-link.js?v=ob-v244'
+import { boosterPageHref, boosterLinkAttrs } from './booster-link.js?v=ob-v244'
+import { coverChain, httpsUrl } from './cover-art.js?v=ob-v244'
+import { htmlEscape, isSafeUrl, renderMessage } from './nostr-text.js?v=ob-v244'
+import { chartRanks, competitionRanks } from './rank.js?v=ob-v244'
 
 const esc = htmlEscape
 
@@ -360,9 +360,9 @@ export const SORT_OPTIONS = [
   ['chart', 'Chart rank'],
   ['recent', 'Latest boost'],
   ['episode', 'Latest episode'],
-  ['count', 'Most boosters'],
-  ['boosts', 'Most boosts'],
   ['sats', 'Most sats'],
+  ['boosts', 'Most boosts'],
+  ['count', 'Most boosters'],
 ]
 
 export function sortEpisodeItems(items, key, fallback = 'recent') {
@@ -733,9 +733,9 @@ export function episodeCardHtml(item, {
 
   const figures = showStats
     ? `<span class="ob-stats-label">Nostr Stats:</span>` +
-      `<span>${esc(nBoosters.toLocaleString('en-US'))} booster${nBoosters === 1 ? '' : 's'}</span>` +
+      `<span>${esc(nBoosts.toLocaleString('en-US'))} boost${nBoosts === 1 ? '' : 's'}</span>` +
       `<span class="pcast-dot" aria-hidden="true">·</span>` +
-      `<span>${esc(nBoosts.toLocaleString('en-US'))} boost${nBoosts === 1 ? '' : 's'}</span>`
+      `<span>${esc(nBoosters.toLocaleString('en-US'))} booster${nBoosters === 1 ? '' : 's'}</span>`
     : ''
 
   // ⚠️ NEVER AN EMPTY .pcast-meta. It carries a top margin, so a row with nothing

@@ -35,7 +35,7 @@
  * mention-search.js, 2026-10-22), so every textarea with a people menu has
  * the smiley too; the boost modal does the same in its onChange.
  */
-import { searchUsers, mentionQueryAt, insertMention, createMentionMap, mentionedPubkeys, formatFollowers, isSafeUrl, emoticonAt } from '/assets/js/mention-search.js?v=ob-v238'
+import { searchUsers, mentionQueryAt, insertMention, createMentionMap, mentionedPubkeys, formatFollowers, isSafeUrl, emoticonAt } from '/assets/js/mention-search.js?v=ob-v244'
 
 const DEBOUNCE_MS = 250
 const AVATAR_FALLBACK = '/assets/avatar-fallback.svg'

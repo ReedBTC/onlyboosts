@@ -343,7 +343,7 @@ check('the feed layout — pill on the stats line, ⋮ present, no player', () =
   assert.match(html, /pcast-cardmenu/)
   assert.doesNotMatch(html, /pcast-card-rail/)
   // The pill closes the stats row rather than standing alone.
-  assert.match(html, /3 boosts<\/span>(<button type="button" class="ob-fav-pill"[^>]*>.*?<\/button>)?<button type="button" class="ob-boost-pill"/)
+  assert.match(html, /3 boosts<\/span><span class="pcast-dot" aria-hidden="true">·<\/span><span>2 boosters<\/span>(<button type="button" class="ob-fav-pill"[^>]*>.*?<\/button>)?<button type="button" class="ob-boost-pill"/)
 })
 
 // The homepage's variant: the whole card, the drawer's rows fetched on open.

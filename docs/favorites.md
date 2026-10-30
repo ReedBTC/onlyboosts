@@ -345,6 +345,16 @@ shipped module against scripted sockets; the live smoke on 2026-09-08 read
 Chad's list from five relays in under a second, with primal now holding the
 current copy too.
 
+**Damus left the read set on 2026-10-30.** It opened the socket and answered
+nothing, to any REQ, so by the rule above every read was untrusted after the
+full six seconds: the hearts painted unknown and a click changed nothing, or
+took the second try (Reed's report: "I have to click it twice", "20+
+seconds"). Measured against Reed's own list the same day: untrusted at 6.0s
+with damus `hung`, trusted at 0.6s without it. It stays a publish target, and
+**a publish now returns 1.5s after the first `OK true`** (`PUBLISH_GRACE_MS`)
+instead of waiting out a hung relay's eight seconds; a straggler is reported
+`pending` and its socket finishes on its own timer.
+
 **Publish** (step three) goes to nos.lol, damus, primal, ditto and snort
 plus the NIP-65 write relays. **Snort joined on 2026-10-03**: it is one of
 StableKraft's five defaults (nos.lol, snort, primal, theforest, damus, plus

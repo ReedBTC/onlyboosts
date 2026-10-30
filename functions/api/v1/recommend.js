@@ -62,9 +62,23 @@ async function seedsOf(env, hex, favorites) {
   return { seeds: [...set], boosted };
 }
 
-async function recommendFor(env, seedsJson, music, limit) {
+/* ⚠️ A PODCAST WITH NO NEW EPISODE IN SIX MONTHS IS NOT RECOMMENDED (Reed's
+ * call, 2026-10-29), on the podcast side only: an album is finished work and
+ * never goes stale. `podcasts.newest_item_ts` is Podcast Index's
+ * episodes/byfeedid newest item's datePublished (byguid carries no
+ * newestItemPubdate, measured by the collector), stored by the collector; it is the show's newest
+ * episode, boosted or not, which nothing else in D1 knows (`latest_ts` is the
+ * newest BOOST, and `episodes` holds boosted episodes only). NULL is kept:
+ * a date we do not have is not a dormant show.
+ *
+ * ⚠️ THE COLUMN IS ADDED OUT-OF-BAND ON THE REMOTE, so until it exists the
+ * query falls back to the unfiltered form rather than answering 500; the
+ * fallback is keyed on SQLite's own "no such column" and nothing else. */
+export const STALE_PODCAST_DAYS = 183;
+async function recommendFor(env, seedsJson, music, limit, now = Date.now()) {
   const side = music ? "= 'music'" : "<> 'music'";
-  const { results } = await env.DB.prepare(
+  const fresh = !music;
+  const run = (withFresh) => env.DB.prepare(
     `WITH seeds AS (SELECT value AS guid FROM json_each(?1))
      SELECT ${TILE_COLS},
             SUM(s.score) AS score, MAX(s.shared_boosters) AS shared, COUNT(*) AS via
@@ -74,12 +88,19 @@ async function recommendFor(env, seedsJson, music, limit) {
       WHERE s.other_guid NOT IN (SELECT guid FROM seeds)
         AND COALESCE(p.medium, 'podcast') ${side}
         AND COALESCE(p.title, '') <> ''
+        ${withFresh ? "AND (p.newest_item_ts IS NULL OR p.newest_item_ts >= ?3)" : ""}
       GROUP BY s.other_guid
      HAVING COUNT(*) >= 2 OR MAX(s.shared_boosters) >= 2
       ORDER BY score DESC, via DESC, p.total_sats DESC
       LIMIT ?2`
-  ).bind(seedsJson, limit).all();
-  return (results || []).map(record);
+  ).bind(seedsJson, limit, ...(withFresh ? [Math.floor(now / 1000) - STALE_PODCAST_DAYS * 86400] : [])).all();
+  let res;
+  try { res = await run(fresh); }
+  catch (e) {
+    if (!fresh || !/no such column/i.test(String(e?.message))) throw e;
+    res = await run(false);
+  }
+  return (res.results || []).map(record);
 }
 
 /** Because you boosted X: up to BECAUSE_MAX rails, one per seed, each the

@@ -329,7 +329,7 @@ Top 10s on the chart rule, and the **Members 40 HPW board** — each beside a
 - **⚠️ A WEEKLY ROW PRINTS COMPONENT RANKS, NOT RAW FIGURES.** *Reed's ask,
   2026-08-31*: the sats and booster figures took too much of the row, so each
   row carries its standing in the three components as `#3/#5/T#9` under a
-  `rank in sats/boosters/boosts` column head (`.cb-colhead` / `.cb-ranks`),
+  `rank in sats/boosts/boosters` column head (`.cb-colhead` / `.cb-ranks`),
   the head carrying the feed note's ⓘ to `/about#charts`. The `#` is the
   detail tiles' chip form, on the site's own bare-vs-# line (`rank.js`):
   these are standings in orderings that are not on screen, where the left

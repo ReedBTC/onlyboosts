@@ -201,7 +201,7 @@ Measured 2026-09-03 on the `misc-updates` preview, 720x900 at scale 1
 | shows / artists / members weeks-at-1 | 269.5 → 829 | 560px | 49.2–50.2px | **56.0px** | 5.8px |
 | shows / artists weekly | 296.9 → 829 | 532.6px | 49.2–50.2px | **53.3px** | 3.1px |
 
-The weekly chart cards are the tight ones: the `rank in sats/boosters/boosts`
+The weekly chart cards are the tight ones: the `rank in sats/boosts/boosters`
 column head costs 27.4px of the list box and the rank triplet does not make the
 row any taller. A row on those cards may grow **3.1px**, an hpw row 5.8px.
 

@@ -337,14 +337,14 @@ indexed Nostr boost; nothing about a visitor is stored.
   edge-rendered from the rails' own rows. The description is the subject's
   own (`podcasts.description`, `episodes.description`, `publishers.description`,
   `profiles.about`), cut to about 220 characters. No editorial picks.
-- **The chart rails** (Top Shows This Week, Top Albums This Month, and since
+- **The chart rails** (Top Podcasts This Week, Top Albums This Month, and since
   2026-10-22 the window rails at the foot: Episodes, Songs, Albums and Shows
   over the week, the month and the year, the two already at the head not
   repeated; Top Artists This Week until 2026-10-21): the OnlyBoosts Charts
-  over that window of boost time. Top Shows This Week is the Pacific week
+  over that window of boost time. Top Podcasts This Week is the Pacific week
   (Monday 00:00 to Sunday night); every other window is trailing (7 / 30 /
   365 days), the window of the chart view the rail links. The tile's line is
-  the three component ranks (sats / boosters / boosts). The week and month
+  the three component ranks (sats / boosts / boosters, printed "#6 / #2 / #3", each behind its icon; the personal rails print no line). The week and month
   rails lead no hero slide.
 - **Top Podcasts by Language** (2026-10-22): three rails, the year's Shows
   chart filtered to each of the three largest non-English languages: the
@@ -359,7 +359,7 @@ indexed Nostr boost; nothing about a visitor is stored.
 - **#40HPW**: the week's ten members by hours of podcasts boosted, as the
   Members tab counts them; gold past forty hours.
 - **Podcasts Recommended For You / Music Recommended For You** (named
-  Recommended For You / Recommended Music until 2026-10-21), five steps:
+  Recommended For You / Recommended Music until 2026-10-21), six steps:
   1. Daily, for every show with >= 3 distinct boosters, the collector finds its
      20 most similar shows: cosine similarity over the booster sets (members who
      boosted both / sqrt(boosters_a * boosters_b)). Podcasts against podcasts,
@@ -375,6 +375,10 @@ indexed Nostr boost; nothing about a visitor is stored.
      of all pairs share exactly one booster (measured 2026-10-17).
   5. Podcasts and music ranked separately: music overlap runs ~3x the podcast
      side's.
+  6. Podcast side only: a show whose newest episode is over 183 days old is
+     dropped (Reed's call, 2026-10-29). The date is `podcasts.newest_item_ts`,
+     the newest item's datePublished from Podcast Index's episodes/byfeedid (byguid carries no newestItemPubdate), so an unboosted new episode counts;
+     NULL is kept. Music is exempt.
   Computed per request from D1 (`POST /api/v1/recommend`), nothing stored.
 - **Because You Boosted X**: up to five rails, one per seed; each rail is
   that show's own top-20 list at `shared_boosters >= 2`, minus the member's
@@ -384,7 +388,7 @@ indexed Nostr boost; nothing about a visitor is stored.
   pick (a show appears on the first rail that reaches it only), and a rail
   under four shows is not shown. Until then: the five most-boosted seeds in
   boost order, any size.
-- **Top Shows From Your Follows**: the Shows chart over the boosts of the
+- **Top Podcasts From Your Follows**: the Shows chart over the boosts of the
   member's kind-3 contacts (the Follows scope); the member's own boosts count.
 - **New and Noteworthy**: `first_boost_ts` within 90 days and >= 2 boosters, by
   boosters then sats.

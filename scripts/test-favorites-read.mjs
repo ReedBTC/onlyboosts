@@ -259,8 +259,11 @@ await check('the timeout bounds a hung relay', async () => {
 })
 
 await check('the default set is the measured relays, BMB\'s readable ones included, and none that refuse', () => {
-  assert.deepEqual([...R.READ_RELAYS], ['wss://nos.lol', 'wss://relay.damus.io', 'wss://relay.primal.net', 'wss://relay.ditto.pub', 'wss://relay.mostr.pub'])
-  for (const url of ['wss://relay.damus.io', 'wss://relay.primal.net', 'wss://nos.lol']) assert.ok(R.READ_RELAYS.includes(url), `${url}: a relay BMB reads`)
+  assert.deepEqual([...R.READ_RELAYS], ['wss://nos.lol', 'wss://relay.primal.net', 'wss://relay.ditto.pub', 'wss://relay.mostr.pub'])
+  for (const url of ['wss://relay.primal.net', 'wss://nos.lol']) assert.ok(R.READ_RELAYS.includes(url), `${url}: a relay BMB reads`)
+  // damus opened and answered nothing on 2026-10-30, which degrades every read
+  // (a hung relay is reached, not answered); it is a publish target only.
+  assert.ok(!R.READ_RELAYS.includes('wss://relay.damus.io'))
   assert.ok(!R.READ_RELAYS.includes('wss://relay.fountain.fm'))
 })
 

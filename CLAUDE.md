@@ -282,10 +282,42 @@ was picked from is in the session memory; direction A won, with the sans.
 - **`--font-sans` is Outfit** (`assets/fonts/outfit.woff2`, OFL, a variable
   file), used by the bar and the rails. The two serifs are still the display
   and body faces everywhere else; the typography item below is still open.
-- **A tile's one line is the chart triplet** (rank in sats / boosters /
-  boosts, the chart view's own figure, `rankTriplet` in `rail-tile.js`);
+- **⚠️ THE THREE FIGURES HAVE ONE ORDER SITE-WIDE: SATS, BOOSTS, BOOSTERS**
+  (Reed's call, 2026-10-29): the chart formula's order and the detail
+  pages' stat tiles. The rail triplet, the weekly boards' triplet and
+  column head, the card stats lines and every sort menu follow it (chart
+  rank and the chronological sorts keep their places).
+- **A tile's one line is the chart triplet** (rank in sats / boosts /
+  boosters, each behind its icon since 2026-10-29: a Bitcoin sign, a speech
+  bubble, a person, `rankTripletHtml` in `rail-tile.js`; Reed's ask, the
+  words do not fit), printed "#6 / #2 / #3" (the number sign marks a
+  place, not a count) and **never wider than the artwork**: the line is
+  sized off the tile's width by its digit count (`rt-d3`..`rt-d9`,
+  container units, measured in Chromium at 96 to 180px). **Each figure is pressable** (Reed's ask,
+  2026-10-30): a click opens a small note, not the tile's link ("Ranked
+  5th in sats this week", in the rail's own window and noun; `railScope`
+  in `discover.js`, the explainer, caught in the capture phase). A new
+  ranked rail key needs an entry there or its figures explain nothing. **A MIXED RAIL'S
+  tiles carry a MEDIUM BADGE** (New and Noteworthy, Podcasters Recommend;
+  Movers is the Shows chart, one side): a light chip with an icon and the
+  word ("Podcast", "Music") in the artwork's bottom-right corner
+  (`mediumBadge`, printed only when the caller passes `medium`; the tile
+  mappers pass none). Every other rail is one side and its HEADING says
+  which: **"Podcasts", never "Shows", in the homepage's rail names and the
+  ribbons** (Top Podcasts This Week, Top Podcasts From Your Follows, #1
+  Podcast This Week; Reed's call, 2026-10-30), New and Noteworthy's heading
+  reading "New and Noteworthy Podcasts and Music". The chart pages' Shows
+  view keeps its name. **Only a ranked rail prints the line**:
+  the two Recommended rails, Top Shows From Your Follows and the Because
+  rails map through `bare()` and show the title alone (Reed's call,
+  2026-10-29), and the #40HPW tile reads "34.3 HPW", no episode count.
+  New and Noteworthy's tiles print no line (the badge says the medium);
+  New and Noteworthy and Movers explain themselves in the rail head (`.rail-more--note`) rather than linking a chart (Movers has none of its own);
+  **a superlative names its population** ("more than any other show in the
+  index"; Reed, 2026-10-30: the site's figures are this index's, never the
+  world's);
   Reed's call after seeing "7 boosters · 38.8k sats" at tile size. The #40HPW
-  rail is tiles too (face, name, "34.3 HPW · 26 episodes", gold past the
+  rail is tiles too (face, name, "34.3 HPW", gold past the
   goal), not the board: every rail the same shape. **A person's tile is
   ROUND** (`person: true` → `.rail-tile--person`, Reed's call 2026-10-18: a
   circle reads as an individual, a square as content); the two member
@@ -331,7 +363,11 @@ was picked from is in the session memory; direction A won, with the sans.
   `BECAUSE_MIN` (4) left. Until 2026-10-22 it was the five most-boosted
   seeds in boost order, any size. Cloned by `discover.js` from the hidden
   prototype section. Nothing is stored per
-  member. **The method is public: `/about#recommendations`** states every
+  member. **A podcast whose newest episode is over 183 days old is not
+  recommended** (Reed's call, 2026-10-29; podcast side only, NULL kept),
+  off `podcasts.newest_item_ts`, the newest item's datePublished from PI episodes/byfeedid, a
+  collector column briefed to OB-back the same day; until it exists the
+  query falls back to unfiltered on "no such column". **The Because rails are deliberately NOT filtered** (Reed's call, 2026-10-30, after seeing the cut: 223 of 639 podcast-side shows at 183 days); `becauseOf` carries no date clause. **The method is public: `/about#recommendations`** states every
   rail's rule, Reed's data-transparency call, and the three personal rails'
   one-liners link it; `docs/about-and-faq-source.md` is the factual backing
   and is corrected first. **Favorites are not yet handed over**: `favorites-ui.js`
@@ -1397,7 +1433,9 @@ that a change elsewhere would break:
 - **⚠️ `relay.damus.io` answers a WebSocket connect with HTTP 503 and must not come
   back** — it was first in every browser-side list. *(Measured 2026-08-12; the
   favorites work reached it fine in ~300ms on 2026-09-08, so this one wants
-  re-measuring before it is trusted either way.)*
+  re-measuring before it is trusted either way.)* **On 2026-10-30 it opened and
+  answered nothing, which degraded every favorites read, so it is off the
+  favorites READ set** (a publish target still); see `docs/favorites.md`.
 - **⚠️ `relay.getalby.com` is NWC transport, not a relay.** Both it and `/v1` answer
   *every* REQ with `blocked: Request rejected`, so a note published there can never
   be read. NWC is unaffected: the wallet's relay comes from the connection string.
@@ -2501,6 +2539,11 @@ is a publish target (theforest refuses the write and is deliberately out).**
   mode per list; Reed takes NIP-51's per-entry model up with Chad first, and
   nothing goes to GitHub on it before that.
 
+- **⚠️ A HEART CLICK WAITS FOR THE REAL SIGNER AND DECIDES ADD OR REMOVE
+  AFTER THE FULL READ** (2026-10-29, Reed's report that a click did nothing):
+  the widget boots on a stub user, so `onClick` waits on the widget's
+  `isSessionReady()`; an unopened private half paints a heart UNKNOWN, not
+  off; `unchanged` gets a toast too; on reads "Favorited" on a tinted pill.
 - **⚠️ THE HEART SHIPS `hidden` AND `favorites-ui.js` REVEALS IT FOR A
   SIGNED-IN MEMBER ONLY** (Reed: signed out gets nothing). `favorite-button.js`
   is two-sided chrome on the boost-button pattern, rendered by both cards and

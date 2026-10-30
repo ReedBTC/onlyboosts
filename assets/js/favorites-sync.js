@@ -41,10 +41,10 @@
  * shipped cycle against scripted relays, a stand-in codec and a real key.
  * Nothing here is reached signed out; the bot cannot hold favorites.
  */
-import { readFavorites, readWriteRelays, relaySet, acceptsEvent } from '/assets/js/favorites-read.js?v=ob-v238'
+import { readFavorites, readWriteRelays, relaySet, acceptsEvent } from '/assets/js/favorites-read.js?v=ob-v244'
 import {
   KIND, plan, parse, parseTags, statedVisibility, decodePlaintext, kindOf, feedIdOf, feedGuidOf,
-} from '/assets/js/favorites-merge.js?v=ob-v238'
+} from '/assets/js/favorites-merge.js?v=ob-v244'
 
 /**
  * Where a list is published. The read set less relay.mostr.pub, which held a
@@ -77,6 +77,12 @@ export const PUBLISH_RELAYS = Object.freeze([
 ])
 
 export const PUBLISH_TIMEOUT_MS = 8000
+/* Once one relay has said OK the publish has landed (rule 2), so the member
+ * waits this much longer for the rest and no more. A relay still pending is
+ * reported `pending` and its socket is left to finish on its own timer, so a
+ * slow relay still gets the event. Before this a hung relay (damus, 2026-10-30)
+ * held every heart click for the full eight seconds. */
+export const PUBLISH_GRACE_MS = 1500
 const BASELINE_PREFIX = 'ob-fav-baseline:'
 const MODE_PREFIX = 'ob-fav-mode:'
 const EMPTY_BASELINE = Object.freeze({ public: [], private: [] })
@@ -229,8 +235,12 @@ export function validateChange(change) {
 export function publishEvent(signed, relays, {
   connect = (url) => new WebSocket(url),
   timeoutMs = PUBLISH_TIMEOUT_MS,
+  graceMs = PUBLISH_GRACE_MS,
   now = () => Date.now(),
 } = {}) {
+  const rows = new Map()
+  let release = null
+  let grace = null
   const one = (url) => new Promise((resolve) => {
     const t0 = now()
     let settled = false
@@ -241,7 +251,10 @@ export function publishEvent(signed, relays, {
       settled = true
       clearTimeout(timer)
       try { ws?.close?.() } catch {}
-      resolve({ url, status, ms: now() - t0, ...(reason ? { reason } : {}) })
+      const row = { url, status, ms: now() - t0, ...(reason ? { reason } : {}) }
+      rows.set(url, row)
+      if (status === 'ok' && !grace && release) grace = setTimeout(release, graceMs)
+      resolve(row)
     }
     const timer = setTimeout(() => finish(opened ? 'timeout' : 'unreachable'), timeoutMs)
     try { ws = connect(url) } catch { finish('unreachable'); return }
@@ -259,10 +272,15 @@ export function publishEvent(signed, relays, {
     ws.addEventListener('error', () => finish(opened ? 'timeout' : 'unreachable'))
     ws.addEventListener('close', () => finish(opened ? 'timeout' : 'unreachable'))
   })
-  return Promise.all(relays.map(one)).then((rows) => ({
-    landed: rows.some((r) => r.status === 'ok'),
-    relays: rows,
-  }))
+  const report = () => {
+    clearTimeout(grace)
+    const out = relays.map((url) => rows.get(url) ?? { url, status: 'pending', ms: now() - started })
+    return { landed: out.some((r) => r.status === 'ok'), relays: out }
+  }
+  const started = now()
+  const early = new Promise((resolve) => { release = () => resolve(report()) })
+  const all = Promise.all(relays.map(one)).then(report)
+  return Promise.race([all, early])
 }
 
 // ---------------------------------------------------------------------------

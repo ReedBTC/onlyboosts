@@ -22,7 +22,7 @@
  * no boosts in the index, named through Primal's cache when it can be.
  * Enter on a found member opens their page; on a miss, the results page.
  */
-import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v238'
+import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v244'
 
 const MIN = 2
 const LIMIT = 5
@@ -119,7 +119,7 @@ async function npubToHex(npub) {
 let primalP = null
 async function primalName(pk) {
   try {
-    primalP ??= import('./primal-profiles.js?v=ob-v238')
+    primalP ??= import('./primal-profiles.js?v=ob-v244')
     const { fetchProfiles } = await primalP
     const prof = (await fetchProfiles([pk])).get(pk)
     return prof?.display_name || prof?.name || ''
