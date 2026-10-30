@@ -330,7 +330,7 @@ three weeks stale; `relay.primal.net`, `relay.snort.social` and
 damus, ditto and mostr plus the member's NIP-65 write relays through
 `extraRelays`, one raw socket each, and counts for itself: a relay is
 *reached* when its socket opened and has *answered* when it sent EOSE inside
-the window (6s). The read is trusted only when **every reached relay answered
+the window (6s). Until 2026-10-30 the read was trusted only when **every reached relay answered
 and at least two did**; a relay that never connected is out of both counts, so
 a dead default does not degrade every read forever, and a relay that connected
 and hung is a genuine unknown, so it does. A CLOSED (fountain's "kinds not
@@ -355,13 +355,24 @@ with damus `hung`, trusted at 0.6s without it. It stays a publish target, and
 instead of waiting out a hung relay's eight seconds; a straggler is reported
 `pending` and its socket finishes on its own timer.
 
+**The rule became a quorum on 2026-10-30** (Reed's call, the same day):
+a read is trusted once two relays have answered, and the rest get
+`QUORUM_GRACE_MS` (1.5s) to answer too, a newer copy among them still
+winning; a relay still silent then counts as hung and no longer degrades the
+read. The cost Reed accepted: an edit made in another app that reached ONLY
+the silent relay is not seen, and the next click here writes over it, which
+the several-relay publishing every app does makes rare. Measured against
+Reed's list with damus added back as a test: trusted in 2.1s, damus `hung`.
+Damus stays out of the read set anyway (it would cost every read the grace).
+
 **Publish** (step three) goes to nos.lol, damus, primal, ditto and snort
 plus the NIP-65 write relays. **Snort joined on 2026-10-03**: it is one of
 StableKraft's five defaults (nos.lol, snort, primal, theforest, damus, plus
 the member's own), it answered a kind-10333 REQ with EOSE that day, and it
 held Reed's list after his first publish from the branch. A publish target
 only, on the same reasoning as primal below; deliberately not in the read
-set, where every reached relay must answer before a read is trusted.
+set, where (until the quorum of 2026-10-30) every reached relay had to
+answer before a read was trusted.
 **Theforest (`theforest.nostr1.com`), the fifth, was added and dropped the
 same day** (Reed's call): it answers a read but held nothing after the
 publish, a members-only relay refusing the write, so the socket bought

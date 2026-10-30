@@ -32,7 +32,7 @@
  * `connect` and `verify` are injectable so the test can script relays that
  * hang, refuse, forge and disagree; production takes the defaults.
  */
-import { verifyEvent } from '/assets/widgets/nostr-tools.js?v=ob-v247'
+import { verifyEvent } from '/assets/widgets/nostr-tools.js?v=ob-v248'
 
 export const FAVORITES_KIND = 10333
 export const RELAY_LIST_KIND = 10002
@@ -67,6 +67,8 @@ export const READ_RELAYS = Object.freeze([
 
 export const DEFAULT_TIMEOUT_MS = 6000
 export const MIN_ANSWERS = 2
+/* Once MIN_ANSWERS relays have answered, the rest get this long and no more. */
+export const QUORUM_GRACE_MS = 1500
 
 /** `wss://Relay.Example/` → `wss://relay.example`; anything not ws(s) is dropped. */
 export function normalizeRelayUrl(url) {
@@ -99,14 +101,22 @@ export function relaySet(base, extra = []) {
  *   reached   relays whose socket opened and were not refusals
  *   answered  of those, the ones that sent EOSE inside the window
  *
- * Every reached relay answered, and enough of them did. `>=` on the second
- * clause so a miscount fails open on the arithmetic rather than wedging every
- * read at degraded; `minAnswers` is clamped to the set size so a one-relay
- * set (a test, a private relay) is not untrustworthy by construction.
+ * ⚠️ A QUORUM, SINCE 2026-10-30 (Reed's call): enough relays answered, and a
+ * relay that opened and stayed silent no longer degrades the read. Until then
+ * every reached relay had to answer (BMB's read-trust rule), so one relay
+ * that accepts a socket and never replies made every read untrusted after the
+ * full window: relay.damus.io did exactly that on 2026-10-30 and the hearts
+ * stopped working until it was dropped by hand. The accepted cost: if the
+ * silent relay was the ONLY one holding a newer copy (an edit made in
+ * another app that reached it alone), we read the older list and the next
+ * click here writes over that edit. Every app writing the list publishes to
+ * several relays, which is what makes that rare. `minAnswers` is clamped to
+ * the set size so a one-relay set (a test, a private relay) is not
+ * untrustworthy by construction.
  */
 export function readIsTrustworthy({ reached, answered, minAnswers = MIN_ANSWERS, relayCount }) {
   const need = Math.max(1, Math.min(minAnswers, relayCount ?? minAnswers))
-  return reached > 0 && answered >= reached && answered >= need
+  return reached > 0 && answered >= need
 }
 
 /** The one event this read is allowed to believe: right kind, right author, real signature. */
@@ -132,8 +142,9 @@ export function newest(events) {
   return best
 }
 
-/** One relay, one REQ, one verdict. Never throws. */
-function readOne(url, pubkey, kind, { connect, verify, timeoutMs, now, dTag = null }) {
+/** One relay, one REQ, one verdict. Never throws. `stops` collects a way to
+ *  end the wait early (the quorum's grace running out). */
+function readOne(url, pubkey, kind, { connect, verify, timeoutMs, now, dTag = null, stops = null, onAnswer = null }) {
   return new Promise((resolve) => {
     const t0 = now()
     const subId = 'fav-' + Math.random().toString(36).slice(2, 10)
@@ -146,8 +157,10 @@ function readOne(url, pubkey, kind, { connect, verify, timeoutMs, now, dTag = nu
       settled = true
       clearTimeout(timer)
       try { ws?.close?.() } catch {}
+      if (status === 'answered') onAnswer?.()
       resolve({ url, status, events, ms: now() - t0, ...extra })
     }
+    stops?.push(() => finish(opened ? 'hung' : 'unreachable'))
     // 'hung' is a relay that opened and never said EOSE: reached, not answered.
     // 'unreachable' is one that never opened: out of both counts.
     const timer = setTimeout(() => finish(opened ? 'hung' : 'unreachable'), timeoutMs)
@@ -224,14 +237,25 @@ export async function readNewestEvent(pubkey, kind, {
   extraRelays = [],
   timeoutMs = DEFAULT_TIMEOUT_MS,
   minAnswers = MIN_ANSWERS,
+  graceMs = QUORUM_GRACE_MS,
   connect = (url) => new WebSocket(url),
   verify = verifyEvent,
   now = () => Date.now(),
   dTag = null,
 } = {}) {
   const urls = relaySet(relays, extraRelays)
-  const opts = { connect, verify, timeoutMs, now, dTag }
+  /* The quorum: once enough relays have answered, the rest get `graceMs`
+     to answer too (a newer copy there still wins), then count as hung. */
+  const need = Math.max(1, Math.min(minAnswers, urls.length))
+  const stops = []
+  let answers = 0
+  let grace = null
+  const onAnswer = () => {
+    if (++answers === need && !grace) grace = setTimeout(() => { for (const stop of stops) stop() }, graceMs)
+  }
+  const opts = { connect, verify, timeoutMs, now, dTag, stops, onAnswer }
   const rows = await Promise.all(urls.map((url) => readOne(url, pubkey, kind, opts)))
+  clearTimeout(grace)
 
   const candidates = rows.flatMap((r) => r.events)
   const event = newest(candidates)

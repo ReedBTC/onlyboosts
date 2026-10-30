@@ -56,7 +56,8 @@ class FakeSocket {
   send(s) { this.sent.push(JSON.parse(s)) }
   close() { this.closed = true }
   run() {
-    const { mode, steps = [] } = this.script
+    const { mode, steps = [], delayMs = 0 } = this.script
+    if (delayMs && !this.waited) { this.waited = true; setTimeout(() => this.run(), delayMs); return }
     if (mode === 'unreachable') { this.emit('error', {}); this.emit('close', {}); return }
     if (mode === 'throw') return
     this.emit('open', {})
@@ -85,9 +86,10 @@ const read = (scripts, opts = {}) =>
 const status = (r) => Object.fromEntries(r.relays.map((x) => [x.url, x.status]))
 
 // ---- the pure parts
-await check('readIsTrustworthy: every reached relay answered, and enough of them', () => {
+await check('readIsTrustworthy: a quorum answered (2026-10-30: a silent relay no longer degrades)', () => {
   assert.equal(R.readIsTrustworthy({ reached: 2, answered: 2, relayCount: 4 }), true)
-  assert.equal(R.readIsTrustworthy({ reached: 2, answered: 1, relayCount: 4 }), false, 'a hung relay degrades')
+  assert.equal(R.readIsTrustworthy({ reached: 3, answered: 2, relayCount: 4 }), true, 'two answers and a hung relay: trusted')
+  assert.equal(R.readIsTrustworthy({ reached: 2, answered: 1, relayCount: 4 }), false, 'one answer is not a quorum')
   assert.equal(R.readIsTrustworthy({ reached: 1, answered: 1, relayCount: 4 }), false, 'one answer is not enough in a four-relay set')
   assert.equal(R.readIsTrustworthy({ reached: 1, answered: 1, relayCount: 1 }), true, 'a one-relay set is not untrustworthy by construction')
   assert.equal(R.readIsTrustworthy({ reached: 0, answered: 0, relayCount: 4 }), false, 'offline is not an empty library')
@@ -144,15 +146,39 @@ await check('a relay that connects and hangs degrades the read: read is NULL, no
   assert.deepEqual(status(r), { 'wss://a': 'answered', 'wss://b': 'hung' })
 })
 
-await check('enough answers do not excuse a hung relay: three relays, two answer, one hangs', async () => {
+await check('a quorum excuses a hung relay: three relays, two answer, one hangs (2026-10-30)', async () => {
   const r = await read({
     'wss://a': { steps: [['event', NEW], ['eose']] },
     'wss://b': { steps: [['eose']] },
     'wss://c': { steps: [['hang']] },
   })
-  assert.equal(r.trusted, false, 'the hung relay may hold a newer copy')
+  assert.equal(r.trusted, true, 'Reed\'s call: a silent relay must not break the hearts')
+  assert.equal(r.event.id, NEW.id)
   assert.equal(r.reached, 3)
   assert.equal(r.answered, 2)
+  assert.equal(status(r)['wss://c'], 'hung')
+})
+
+await check('a newer copy on a slower relay still wins inside the grace', async () => {
+  const r = await read({
+    'wss://a': { steps: [['event', OLD], ['eose']] },
+    'wss://b': { steps: [['event', OLD], ['eose']] },
+    'wss://c': { delayMs: 40, steps: [['event', NEW], ['eose']] },
+  }, { timeoutMs: 2000, graceMs: 400 })
+  assert.equal(r.trusted, true)
+  assert.equal(r.event.id, NEW.id, 'the grace is what lets the late newer copy count')
+})
+
+await check('the quorum does not wait out the timeout for a hung relay, only the grace', async () => {
+  const t0 = Date.now()
+  const r = await read({
+    'wss://a': { steps: [['eose']] },
+    'wss://b': { steps: [['eose']] },
+    'wss://c': { steps: [['hang']] },
+  }, { timeoutMs: 5000, graceMs: 30 })
+  const took = Date.now() - t0
+  assert.ok(took < 1000, `resolved in ${took}ms, not the 5s timeout`)
+  assert.equal(r.trusted, true)
 })
 
 await check('nothing reachable is not an empty library', async () => {
