@@ -60,7 +60,7 @@ console.log('\nThe markers and the renderers agree:')
     const personal = [...index.matchAll(/data-rail="([a-z0-9-]+)"[^>]*data-rail-personal/g)].map((m) => m[1])
     assert.ok(personal.length >= 1, 'there is at least one personal rail')
     for (const p of personal) assert.ok(order.indexOf(p) >= 3, `${p} is the fourth rail or later`)
-    assert.deepEqual(order, ['shows-week', 'albums-month', 'hpw-week', 'recommended', 'recommended-music', 'follows', 'new-shows', 'new-music', 'movers', 'podroll',
+    assert.deepEqual(order, ['shows-week', 'albums-month', 'hpw-week', 'recommended', 'recommended-music', 'follows', 'follows-songs', 'new-shows', 'new-music', 'movers', 'podroll',
       'lang-1', 'lang-2', 'lang-3', 'because',
       'episodes-week', 'episodes-month', 'episodes-year', 'shows-month', 'shows-year', 'songs-week', 'songs-month', 'songs-year', 'albums-week', 'albums-year'],
       "Reed's order of 2026-10-21 with the 2026-10-22 additions: the language rails under Podcasters Recommend, the window rails at the foot, podcasts before music; New and Noteworthy split by medium on 2026-10-30")

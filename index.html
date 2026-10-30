@@ -68,14 +68,14 @@
   <meta name="twitter:card" content="summary_large_image" />
 
   <link rel="preload" href="/assets/fonts/outfit.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v245" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v245" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v246" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v246" />
   <!-- The boost rows at the foot are the detail pages' rows and wear their
        sheets: the card, the thread chrome and the reaction bar. -->
-  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v245" />
+  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v246" />
   <!-- theme.css last among the shared sheets: the palette, the fonts, and
        the base body/a/img rules every shared stylesheet reads off :root. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v245" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v246" />
 </head>
 <body>
 
@@ -184,6 +184,7 @@
                 <a href="/charts/music">Top Artists This Week</a>
                 <a href="/discover/new-music">New and Noteworthy</a>
                 <a href="/#rail-recommended-music">Music Recommended For You</a>
+                <a href="/#rail-follows-songs">Top Songs From Your Follows</a>
                 <a href="/#rail-because">Because You Boosted</a>
               </div>
             </details>
@@ -264,7 +265,7 @@
             <a href="/charts/music">Top Artists This Week</a>
             <a href="/discover/new-music">New and Noteworthy</a>
             <a href="/#rail-recommended-music">Music Recommended For You</a>
-            <a href="/#rail-follows">Top Podcasts From Your Follows</a>
+            <a href="/#rail-follows-songs">Top Songs From Your Follows</a>
             <a href="/#rail-because">Because You Boosted</a>
           </div>
           <div class="nav-ribbon-feat" data-ribbon-feat="albums-month" hidden>
@@ -479,6 +480,37 @@
           <div>
             <h3>Log in to see what your follows boost</h3>
             <p>The shows ranked over the boosts of the accounts you follow on Nostr, the same chart with your own crowd as the corpus.</p>
+          </div>
+          <button type="button" class="ob-cta" data-lb-login-trigger>Log in</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="rail" data-rail="follows-songs" data-rail-personal aria-labelledby="rail-follows-songs">
+    <div class="rail-head">
+      <h2 id="rail-follows-songs">Top Songs From Your Follows</h2>
+      <a class="rail-more" href="/music/songs?scope=follows" hidden data-follows-link>View the feed →</a>
+    </div>
+    <div class="rail-track rail-locked" data-locked>
+      <ol class="rail-list" aria-hidden="true">
+        <li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: 80%"></span><span class="rail-locked-ph" style="width: 50%"></span></span></li>
+        <li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: 70%"></span><span class="rail-locked-ph" style="width: 45%"></span></span></li>
+        <li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: 85%"></span><span class="rail-locked-ph" style="width: 55%"></span></span></li>
+        <li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: 65%"></span><span class="rail-locked-ph" style="width: 40%"></span></span></li>
+        <li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: 75%"></span><span class="rail-locked-ph" style="width: 50%"></span></span></li>
+        <li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: 80%"></span><span class="rail-locked-ph" style="width: 45%"></span></span></li>
+        <li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: 60%"></span><span class="rail-locked-ph" style="width: 55%"></span></span></li>
+        <li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: 85%"></span><span class="rail-locked-ph" style="width: 40%"></span></span></li>
+        <li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: 70%"></span><span class="rail-locked-ph" style="width: 50%"></span></span></li>
+        <li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: 75%"></span><span class="rail-locked-ph" style="width: 45%"></span></span></li>
+      </ol>
+      <div class="rail-locked-card">
+        <div>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>
+          <div>
+            <h3>Log in to see what your follows boost</h3>
+            <p>The songs ranked over the boosts of the accounts you follow on Nostr, the same chart with your own crowd as the corpus.</p>
           </div>
           <button type="button" class="ob-cta" data-lb-login-trigger>Log in</button>
         </div>
@@ -706,12 +738,12 @@
 <!-- FOOTER:END -->
 
 <!-- Lazy widget bootstrap (Donate + identity slot) -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v245"></script>
-<script src="/assets/js/sw-register.js?v=ob-v245" defer></script>
-<script src="/assets/widgets/pwa-install.js?v=ob-v245" defer></script>
-<script src="/assets/js/nav.js?v=ob-v245" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v246"></script>
+<script src="/assets/js/sw-register.js?v=ob-v246" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v246" defer></script>
+<script src="/assets/js/nav.js?v=ob-v246" defer></script>
 <!-- The verbs: artwork fallback, the rails the edge could not fill, and the
      personal rails for a signed-in member. -->
-<script type="module" src="/assets/js/discover.js?v=ob-v245"></script>
+<script type="module" src="/assets/js/discover.js?v=ob-v246"></script>
 </body>
 </html>

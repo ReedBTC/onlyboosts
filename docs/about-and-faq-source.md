@@ -388,7 +388,8 @@ indexed Nostr boost; nothing about a visitor is stored.
   pick (a show appears on the first rail that reaches it only), and a rail
   under four shows is not shown. Until then: the five most-boosted seeds in
   boost order, any size.
-- **Top Podcasts From Your Follows**: the Shows chart over the boosts of the
+- **Top Podcasts From Your Follows** and **Top Songs From Your Follows**
+  (2026-10-30): the Shows chart and the Songs chart over the boosts of the
   member's kind-3 contacts (the Follows scope); the member's own boosts count.
 - **New and Noteworthy Podcasts / Music**: two rails, one per side of the
   medium split (2026-10-30); `first_boost_ts` within 90 days and >= 2

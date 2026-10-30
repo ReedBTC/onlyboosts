@@ -48,12 +48,12 @@
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v245" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v245" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v246" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v246" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v245" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v245" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v246" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v246" />
 </head>
 <body>
 
@@ -162,6 +162,7 @@
                 <a href="/charts/music">Top Artists This Week</a>
                 <a href="/discover/new-music">New and Noteworthy</a>
                 <a href="/#rail-recommended-music">Music Recommended For You</a>
+                <a href="/#rail-follows-songs">Top Songs From Your Follows</a>
                 <a href="/#rail-because">Because You Boosted</a>
               </div>
             </details>
@@ -242,7 +243,7 @@
             <a href="/charts/music">Top Artists This Week</a>
             <a href="/discover/new-music">New and Noteworthy</a>
             <a href="/#rail-recommended-music">Music Recommended For You</a>
-            <a href="/#rail-follows">Top Podcasts From Your Follows</a>
+            <a href="/#rail-follows-songs">Top Songs From Your Follows</a>
             <a href="/#rail-because">Because You Boosted</a>
           </div>
           <div class="nav-ribbon-feat" data-ribbon-feat="albums-month" hidden>
@@ -595,8 +596,8 @@
         <h3>Because You Boosted</h3>
         <p>One rail per show, for up to five of the shows you have boosted. Each rail is that show&rsquo;s own similar-show list from step one, keeping only the neighbours that share two or more boosters with it, minus anything you have already boosted. The five are the shows with the most to recommend: of your twelve most-boosted shows that have such neighbours, the one with the largest list is shown first, then the largest of what remains, and so on. A show appears on the first rail that reaches it and on no other, so each later rail is counted after the earlier ones have taken their shows, and a rail that would hold fewer than four shows is not shown.</p>
 
-        <h3>Top Podcasts From Your Follows</h3>
-        <p>The Shows chart computed over the boosts published by the accounts on your Nostr follow list, which is the same Follows scope the charts page offers on every ranked feed. Your own boosts count, since you are on your own list.</p>
+        <h3>Top Podcasts and Top Songs From Your Follows</h3>
+        <p>The Shows chart and the Songs chart, each computed over the boosts published by the accounts on your Nostr follow list, which is the same Follows scope the charts page offers on every ranked feed. Your own boosts count, since you are on your own list.</p>
 
         <h3>New and Noteworthy</h3>
         <p>Two rails, one for podcasts and one for music, each listing the shows or albums whose first indexed boost landed within the last 90 days and that have at least two distinct boosters, ordered by boosters and then sats. An all-time chart cannot show a debut; these rails exist for that reason.</p>
@@ -870,15 +871,15 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v245"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v246"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v245" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v246" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v245" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v246" defer></script>
 
-<script src="/assets/js/nav.js?v=ob-v245" defer></script>
+<script src="/assets/js/nav.js?v=ob-v246" defer></script>
 
 </body>
 </html>

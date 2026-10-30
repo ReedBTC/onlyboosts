@@ -29,12 +29,12 @@
  *    sats this week") instead of following the tile's link. One note at a
  *    time; a click elsewhere, Escape or a scroll closes it.
  */
-import { railListHtml, showTile, albumTile, episodeTile, memberTile, langRailHtml, bare } from '/assets/js/rail-tile.js?v=ob-v245'
-import { heroHtml, slideHtml, showSlide, episodeSlide, memberSlide } from '/assets/js/hero.js?v=ob-v245'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v245'
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v245'
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v245'
-import { languageName } from '/assets/js/lang-name.js?v=ob-v245'
+import { railListHtml, showTile, albumTile, episodeTile, memberTile, langRailHtml, bare } from '/assets/js/rail-tile.js?v=ob-v246'
+import { heroHtml, slideHtml, showSlide, episodeSlide, memberSlide } from '/assets/js/hero.js?v=ob-v246'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v246'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v246'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v246'
+import { languageName } from '/assets/js/lang-name.js?v=ob-v246'
 
 const TILES = 10
 
@@ -187,11 +187,11 @@ function wireHeroBoost(hero) {
     try {
       const kind = slide.dataset.kind
       if (kind === 'episode' || kind === 'song') {
-        const m = await import('/assets/js/episode-card-actions.js?v=ob-v245')
+        const m = await import('/assets/js/episode-card-actions.js?v=ob-v246')
         btn.disabled = false
         await m.onBoostClick(slide, btn)
       } else {
-        const m = await import('/assets/js/show-card-actions.js?v=ob-v245')
+        const m = await import('/assets/js/show-card-actions.js?v=ob-v246')
         btn.disabled = false
         await m.onShowBoost(slide, btn)
       }
@@ -327,19 +327,32 @@ function lockedCardNote(section, title, text) {
   card.querySelector('p').textContent = text
 }
 
+/* The two follows rails: the Shows chart and the Songs chart over the
+   accounts the member follows (songs since 2026-10-30, Reed's ask). Both are
+   bare, like every personal rail. */
+const FOLLOWS = {
+  'follows': {
+    url: `/api/v1/podcasts?not_medium=music&sort=chart&range=all&limit=${TILES}`, rows: (j) => j.podcasts, tile: bare(showTile),
+    empty: 'Nobody you follow has boosted a show yet. Follow a few boosters on the Members tab.',
+  },
+  'follows-songs': {
+    url: `/api/v1/episodes?medium=music&sort=chart&range=all&limit=${TILES}`, rows: (j) => j.episodes, tile: bare((r, i) => episodeTile(r, i, '🎵')),
+    empty: 'Nobody you follow has boosted a song yet. Follow a few boosters on the Members tab.',
+  },
+}
+
 async function paintFollows(section, follows) {
   const track = section.querySelector('.rail-track')
-  if (!track) return
+  const spec = FOLLOWS[section.dataset.rail]
+  if (!track || !spec) return
   try {
-    const j = await getJson(`/api/v1/podcasts?not_medium=music&sort=chart&range=all&limit=${TILES}`, {
+    const j = await getJson(spec.url, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ follows }),
     })
-    const rows = j.podcasts || []
+    const rows = spec.rows(j) || []
     track.classList.remove('rail-locked')
     track.removeAttribute('data-locked')
-    track.innerHTML = railListHtml(rows.slice(0, TILES).map(bare(showTile)), {
-      empty: 'Nobody you follow has boosted a show yet. Follow a few boosters on the Members tab.',
-    })
+    track.innerHTML = railListHtml(rows.slice(0, TILES).map(spec.tile), { empty: spec.empty })
     wireArt(track)
     const link = section.querySelector('[data-follows-link]')
     if (link) link.hidden = false
@@ -445,9 +458,9 @@ async function paintPersonal() {
     return // the locked cards stay: the carrot
   }
   for (const s of sections) {
-    if (s.dataset.rail !== 'follows') continue
+    if (!FOLLOWS[s.dataset.rail]) continue
     if (res.status === 'ok') paintFollows(s, res.follows)
-    else if (res.status === 'empty') lockedCardNote(s, 'You follow nobody yet', 'Follow a few boosters on the Members tab and their shows will rank here.')
+    else if (res.status === 'empty') lockedCardNote(s, 'You follow nobody yet', `Follow a few boosters on the Members tab and their ${s.dataset.rail === 'follows' ? 'shows' : 'songs'} will rank here.`)
     else lockedCardNote(s, 'Your follow list could not be read', 'The relays did not answer. Reload to try again.')
   }
   if (res.pubkey) paintRecommended(sections, res.pubkey)

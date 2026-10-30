@@ -167,7 +167,8 @@ was picked from is in the session memory; direction A won, with the sans.
 - **⚠️ THE RAIL ORDER IS REED'S AND NOTHING A SIGNED-OUT VISITOR CANNOT SEE
   COMES BEFORE THE FOURTH RAIL.** Top Shows This Week, Top Albums This
   Month, the #40HPW week, THEN Podcasts Recommended For You, Music
-  Recommended For You and Top Shows From Your Follows, then New and
+  Recommended For You, Top Shows From Your Follows and (2026-10-30, Reed's
+  ask) Top Songs From Your Follows, `follows-songs`, then New and
   Noteworthy, Movers and Podcasters Recommend, then the Because rails, then
   the year's episodes and songs. That is the evening-of-2026-10-21 order
   (Reed's final pass: the three discovery instruments moved up under the
