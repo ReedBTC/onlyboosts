@@ -15,10 +15,10 @@
  * Nothing here renders: a results page with this module missing is the same
  * list, readable, with its links working and its verbs absent.
  */
-import { wireShowCards } from '/assets/js/show-card-actions.js?v=ob-v243'
-import { wireEpisodeCards, hydrateCardProfiles, prewarmBoosting } from '/assets/js/episode-card-actions.js?v=ob-v243'
-import { wirePublisherCards } from '/assets/js/publisher-card-actions.js?v=ob-v243'
-import { initShowMore } from '/assets/js/supporter-wall.js?v=ob-v243'
+import { wireShowCards } from '/assets/js/show-card-actions.js?v=ob-v244'
+import { wireEpisodeCards, hydrateCardProfiles, prewarmBoosting } from '/assets/js/episode-card-actions.js?v=ob-v244'
+import { wirePublisherCards } from '/assets/js/publisher-card-actions.js?v=ob-v244'
+import { initShowMore } from '/assets/js/supporter-wall.js?v=ob-v244'
 
 // The /discover pages are the same list of the same cards (2026-10-20).
 const main = document.getElementById('search') || document.getElementById('discover') || document

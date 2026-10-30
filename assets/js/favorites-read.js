@@ -32,7 +32,7 @@
  * `connect` and `verify` are injectable so the test can script relays that
  * hang, refuse, forge and disagree; production takes the defaults.
  */
-import { verifyEvent } from '/assets/widgets/nostr-tools.js?v=ob-v243'
+import { verifyEvent } from '/assets/widgets/nostr-tools.js?v=ob-v244'
 
 export const FAVORITES_KIND = 10333
 export const RELAY_LIST_KIND = 10002
@@ -48,10 +48,18 @@ export const RELAY_LIST_KIND = 10002
  * /show did not reach BMB until re-made). The writer unions the member's own
  * NIP-65 write relays through `extraRelays`. Not `relay.fountain.fm`, which
  * refuses the kind.
+ *
+ * ⚠️ NOT `relay.damus.io` SINCE 2026-10-30. It opened the socket and answered
+ * nothing, to any REQ (kinds 0, 1 and 10333 alike, 10s each), and a relay that
+ * opens and hangs is "reached, not answered", which degrades the read by the
+ * rule below. So every read waited the full window and came back untrusted:
+ * the hearts painted unknown and a click changed nothing (Reed's report: "I
+ * have to click it twice", "20+ seconds"). Primal and nos.lol carry what BMB
+ * reads there. It stays a PUBLISH target, where a hang costs nothing. Re-measure
+ * before bringing it back.
  */
 export const READ_RELAYS = Object.freeze([
   'wss://nos.lol',
-  'wss://relay.damus.io',
   'wss://relay.primal.net',
   'wss://relay.ditto.pub',
   'wss://relay.mostr.pub',

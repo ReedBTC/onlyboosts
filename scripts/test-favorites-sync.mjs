@@ -354,6 +354,26 @@ await check('adoptLocal: feeds, artists and items become groups; a legacy item w
   const both = S.adoptLocal(parsed, M.parseTags([['medium', 'podcast'], ['i', FEED]]))
   assert.deepEqual(both.map((g) => g.id), [ARTIST, FEED2, FEED], 'the private half is adopted beside the public one')
 })
+await check('a hung relay does not hold a landed publish: the rest get a grace period, then pending', async () => {
+  // damus on 2026-10-30: opened, never answered. The click waited the full
+  // publish timeout for it after nos.lol and primal had already said OK.
+  const w = world({ 'wss://a': new FakeRelay({ mode: 'hang-publish' }), 'wss://b': new FakeRelay() })
+  const ev = list([['i', FEED]])
+  const t0 = Date.now()
+  const r = await S.publishEvent(ev, ['wss://a', 'wss://b'], { connect: w.connect, timeoutMs: 5000, graceMs: 30 })
+  const took = Date.now() - t0
+  assert.ok(took < 1000, `resolved in ${took}ms, not the 5s timeout`)
+  assert.equal(r.landed, true)
+  assert.deepEqual(r.relays.map((x) => x.url + ':' + x.status), ['wss://a:pending', 'wss://b:ok'])
+})
+
+await check('with no OK the publish still waits for every relay', async () => {
+  const w = world({ 'wss://a': new FakeRelay({ mode: 'hang-publish' }), 'wss://b': new FakeRelay({ reject: 'no' }) })
+  const r = await S.publishEvent(list([['i', FEED]]), ['wss://a', 'wss://b'], { connect: w.connect, timeoutMs: 60, graceMs: 10 })
+  assert.equal(r.landed, false)
+  assert.deepEqual(r.relays.map((x) => x.status), ['timeout', 'rejected'])
+})
+
 await check('applyChange: add and remove, feeds and items, never mutating the input', () => {
   const base = [{ id: FEED, medium: 'podcast', items: [ITEM], favorited: true }]
   const a = S.applyChange(base, removeFeed(FEED))

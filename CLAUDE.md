@@ -1433,7 +1433,9 @@ that a change elsewhere would break:
 - **⚠️ `relay.damus.io` answers a WebSocket connect with HTTP 503 and must not come
   back** — it was first in every browser-side list. *(Measured 2026-08-12; the
   favorites work reached it fine in ~300ms on 2026-09-08, so this one wants
-  re-measuring before it is trusted either way.)*
+  re-measuring before it is trusted either way.)* **On 2026-10-30 it opened and
+  answered nothing, which degraded every favorites read, so it is off the
+  favorites READ set** (a publish target still); see `docs/favorites.md`.
 - **⚠️ `relay.getalby.com` is NWC transport, not a relay.** Both it and `/v1` answer
   *every* REQ with `blocked: Request rejected`, so a note published there can never
   be read. NWC is unaffected: the wallet's relay comes from the connection string.
