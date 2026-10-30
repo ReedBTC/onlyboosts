@@ -89,19 +89,37 @@ async function rankedEpisodes(env, query) {
  *  spec (null when the rail is empty). */
 const rail = (html, lead) => ({ html, lead: lead || null });
 
+/* NEW AND NOTEWORTHY, one rail per side of the medium split (2026-10-30).
+   No line under a tile (Reed's call, 2026-10-30): the debut date is the
+   rail's premise rather than news about one tile, and the heading names the
+   medium, so no badge either. */
+async function newRail(env, key, side) {
+  const rows = await newShowsRows(env, TILES, side);
+  const glyph = side === "music" ? "🎵" : "🎙";
+  return rail(railListHtml(rows.map((r, i) => tileHtml({
+    rank: i + 1, href: showPageHref(r.guid), title: r.title,
+    img: r.image, art2: r.artwork, glyph,
+  })), { empty: side === "music" ? "No album had its first boost in the last 90 days." : "No podcast had its first boost in the last 90 days." }),
+    rows[0] && showSlide(key, rows[0], { medium: side, line: `${firstBoost(rows[0])} · ${rows[0].booster_count} boosters since` }));
+}
+
 /* ── The three discovery rails' rows, shared with /discover/<key>, which
    lists them in full (2026-10-20, Reed's ask: ten tiles is the homepage's
    shape; the whole list is a page). Each takes the row count. ── */
 
 /** NEW AND NOTEWORTHY: shows whose FIRST boost landed in the last 90 days,
- *  two or more distinct boosters, by boosters then sats. */
-export async function newShowsRows(env, limit) {
+ *  two or more distinct boosters, by boosters then sats. One side of the
+ *  medium split per rail since 2026-10-30 (Reed's call: two rails, Podcasts
+ *  and Music, rather than one mixed rail wearing badges); `side` is
+ *  'podcast' (everything not music, the partition rule) or 'music'. */
+export async function newShowsRows(env, limit, side) {
   const since = Math.floor(Date.now() / 1000) - 90 * 86400;
+  const medium = side === "music" ? "AND medium = 'music'" : "AND COALESCE(medium, 'podcast') <> 'music'";
   const { results } = await env.DB.prepare(
     `SELECT podcast_guid AS guid, title, image, artwork, author, medium, feed_url AS feed,
             total_sats, booster_count, boost_count, first_boost_ts
        FROM podcasts
-      WHERE first_boost_ts >= ? AND booster_count >= 2 AND COALESCE(title, '') <> ''
+      WHERE first_boost_ts >= ? AND booster_count >= 2 AND COALESCE(title, '') <> '' ${medium}
       ORDER BY booster_count DESC, total_sats DESC, first_boost_ts DESC LIMIT ?`
   ).bind(since, limit).all();
   return results || [];
@@ -247,18 +265,8 @@ export const RAILS = {
      charts bury a debut; this is the Billboard instrument. 90 days and the
      floor are the collector's measurement (2026-10-17: 41 debuts in 30 days,
      3 of them with three boosters; 21 in 90 days with two). */
-  "new-shows": async (env) => {
-    const rows = await newShowsRows(env, TILES);
-    return rail(railListHtml(rows.map((r, i) => tileHtml({
-      rank: i + 1, href: showPageHref(r.guid), title: r.title,
-      /* No line under the tile (Reed's call, 2026-10-30): the rail mixes
-         podcasts and albums, so the artwork carries the medium badge, and
-         the debut date is the rail's premise rather than news about one
-         tile. It was "Podcast"/"Album" for a day, which the badge restated. */
-      img: r.image, art2: r.artwork, glyph: (r.medium === "music" ? "🎵" : "🎙"), medium: r.medium,
-    })), { empty: "No show had its first boost in the last 90 days." }),
-      rows[0] && showSlide("new-shows", rows[0], { line: `${firstBoost(rows[0])} · ${rows[0].booster_count} boosters since` }));
-  },
+  "new-shows": (env) => newRail(env, "new-shows", "podcast"),
+  "new-music": (env) => newRail(env, "new-music", "music"),
   /* MOVERS: the biggest climbs on this week's Shows chart against last
      week's, then this week's debuts in chart order. Both weeks are the
      same query /api/v1/charts answers, read to 100 places. */

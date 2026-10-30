@@ -390,9 +390,10 @@ indexed Nostr boost; nothing about a visitor is stored.
   boost order, any size.
 - **Top Podcasts From Your Follows**: the Shows chart over the boosts of the
   member's kind-3 contacts (the Follows scope); the member's own boosts count.
-- **New and Noteworthy**: `first_boost_ts` within 90 days and >= 2 boosters, by
-  boosters then sats.
-- **Movers**: this week's Shows chart against last week's to 100 places;
+- **New and Noteworthy Podcasts / Music**: two rails, one per side of the
+  medium split (2026-10-30); `first_boost_ts` within 90 days and >= 2
+  boosters, by boosters then sats.
+- **Podcast Movers**: this week's Shows chart against last week's to 100 places;
   climbers by places climbed, then debuts in chart order.
 - **Podcasters Recommend**: podroll targets by the number of distinct listing
   shows; an unindexed target is shown, not linked.

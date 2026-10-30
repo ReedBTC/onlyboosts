@@ -47,9 +47,19 @@ function record(r, { linked = true } = {}) {
 
 export const PAGES = {
   "new-shows": {
-    title: "New and Noteworthy",
-    lead: "Shows whose first boost on Nostr landed in the last 90 days and that two or more members have boosted since, by boosters then sats. The all-time charts bury a debut; this is where one shows.",
-    rows: (env) => newShowsRows(env, 100),
+    title: "New and Noteworthy Podcasts",
+    lead: "Podcasts whose first boost on Nostr landed in the last 90 days and that two or more members have boosted since, by boosters then sats. The all-time charts bury a debut; this is where one shows.",
+    rows: (env) => newShowsRows(env, 100, "podcast"),
+    cards: (rows) => ({
+      records: rows.map((r) => record(r)),
+      rankOf: (s, i) => rankLabel(i + 1, false),
+      noteOf: (s, i) => `${firstBoost(rows[i])} · ${rows[i].booster_count} boosters since`,
+    }),
+  },
+  "new-music": {
+    title: "New and Noteworthy Music",
+    lead: "Albums whose first boost on Nostr landed in the last 90 days and that two or more members have boosted since, by boosters then sats. The all-time charts bury a debut; this is where one shows.",
+    rows: (env) => newShowsRows(env, 100, "music"),
     cards: (rows) => ({
       records: rows.map((r) => record(r)),
       rankOf: (s, i) => rankLabel(i + 1, false),
@@ -57,7 +67,7 @@ export const PAGES = {
     }),
   },
   "movers": {
-    title: "Movers This Week",
+    title: "Podcast Movers This Week",
     lead: "This week's Shows chart against last week's, to 100 places: the biggest climbs first, then the shows that are on the chart this week and were not last week. The rank is the show's place on this week's chart.",
     rows: (env) => moversRows(env, 100),
     cards: ({ picks, was }) => ({

@@ -48,12 +48,12 @@
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v244" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v244" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v245" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v245" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v244" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v244" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v245" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v245" />
 </head>
 <body>
 
@@ -160,6 +160,7 @@
                 <a href="/music/albums?range=1m">Top Albums This Month</a>
                 <a href="/music/songs?range=1y">Top Songs This Year</a>
                 <a href="/charts/music">Top Artists This Week</a>
+                <a href="/discover/new-music">New and Noteworthy</a>
                 <a href="/#rail-recommended-music">Music Recommended For You</a>
                 <a href="/#rail-because">Because You Boosted</a>
               </div>
@@ -239,6 +240,7 @@
           <div class="nav-ribbon-col nav-ribbon-discover">
             <h4>Discover</h4>
             <a href="/charts/music">Top Artists This Week</a>
+            <a href="/discover/new-music">New and Noteworthy</a>
             <a href="/#rail-recommended-music">Music Recommended For You</a>
             <a href="/#rail-follows">Top Podcasts From Your Follows</a>
             <a href="/#rail-because">Because You Boosted</a>
@@ -597,9 +599,9 @@
         <p>The Shows chart computed over the boosts published by the accounts on your Nostr follow list, which is the same Follows scope the charts page offers on every ranked feed. Your own boosts count, since you are on your own list.</p>
 
         <h3>New and Noteworthy</h3>
-        <p>Shows whose first indexed boost landed within the last 90 days and that have at least two distinct boosters, ordered by boosters and then sats. An all-time chart cannot show a debut; this rail exists for that reason.</p>
+        <p>Two rails, one for podcasts and one for music, each listing the shows or albums whose first indexed boost landed within the last 90 days and that have at least two distinct boosters, ordered by boosters and then sats. An all-time chart cannot show a debut; these rails exist for that reason.</p>
 
-        <h3>Movers</h3>
+        <h3>Podcast Movers</h3>
         <p>This week&rsquo;s Shows chart against last week&rsquo;s, read to 100 places. Climbers come first, by places climbed, and this week&rsquo;s debuts follow in chart order. The line under each tile states the climb and last week&rsquo;s place.</p>
 
         <h3>Podcasters Recommend</h3>
@@ -868,15 +870,15 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v244"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v245"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v244" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v245" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v244" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v245" defer></script>
 
-<script src="/assets/js/nav.js?v=ob-v244" defer></script>
+<script src="/assets/js/nav.js?v=ob-v245" defer></script>
 
 </body>
 </html>

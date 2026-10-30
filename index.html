@@ -68,14 +68,14 @@
   <meta name="twitter:card" content="summary_large_image" />
 
   <link rel="preload" href="/assets/fonts/outfit.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v244" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v244" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v245" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v245" />
   <!-- The boost rows at the foot are the detail pages' rows and wear their
        sheets: the card, the thread chrome and the reaction bar. -->
-  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v244" />
+  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v245" />
   <!-- theme.css last among the shared sheets: the palette, the fonts, and
        the base body/a/img rules every shared stylesheet reads off :root. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v244" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v245" />
 </head>
 <body>
 
@@ -182,6 +182,7 @@
                 <a href="/music/albums?range=1m">Top Albums This Month</a>
                 <a href="/music/songs?range=1y">Top Songs This Year</a>
                 <a href="/charts/music">Top Artists This Week</a>
+                <a href="/discover/new-music">New and Noteworthy</a>
                 <a href="/#rail-recommended-music">Music Recommended For You</a>
                 <a href="/#rail-because">Because You Boosted</a>
               </div>
@@ -261,6 +262,7 @@
           <div class="nav-ribbon-col nav-ribbon-discover">
             <h4>Discover</h4>
             <a href="/charts/music">Top Artists This Week</a>
+            <a href="/discover/new-music">New and Noteworthy</a>
             <a href="/#rail-recommended-music">Music Recommended For You</a>
             <a href="/#rail-follows">Top Podcasts From Your Follows</a>
             <a href="/#rail-because">Because You Boosted</a>
@@ -486,15 +488,23 @@
 
   <section class="rail" data-rail="new-shows" aria-labelledby="rail-new-shows">
     <div class="rail-head">
-      <h2 id="rail-new-shows"><a href="/discover/new-shows">New and Noteworthy Podcasts and Music</a></h2>
+      <h2 id="rail-new-shows"><a href="/discover/new-shows">New and Noteworthy Podcasts</a></h2>
       <span class="rail-more rail-more--note">First boosted in the last 90 days</span>
     </div>
     <div class="rail-track"><!--OB:RAIL:new-shows--><p class="rail-placeholder">Loading the debuts…</p><!--/OB:RAIL:new-shows--></div>
   </section>
 
+  <section class="rail" data-rail="new-music" aria-labelledby="rail-new-music">
+    <div class="rail-head">
+      <h2 id="rail-new-music"><a href="/discover/new-music">New and Noteworthy Music</a></h2>
+      <span class="rail-more rail-more--note">First boosted in the last 90 days</span>
+    </div>
+    <div class="rail-track"><!--OB:RAIL:new-music--><p class="rail-placeholder">Loading the debuts…</p><!--/OB:RAIL:new-music--></div>
+  </section>
+
   <section class="rail" data-rail="movers" aria-labelledby="rail-movers">
     <div class="rail-head">
-      <h2 id="rail-movers"><a href="/discover/movers">Movers</a></h2>
+      <h2 id="rail-movers"><a href="/discover/movers">Podcast Movers</a></h2>
       <span class="rail-more rail-more--note">Podcasts that climbed the most places in this week's top 100, then new entries</span>
     </div>
     <div class="rail-track"><!--OB:RAIL:movers--><p class="rail-placeholder">Loading this week's climbers…</p><!--/OB:RAIL:movers--></div>
@@ -696,12 +706,12 @@
 <!-- FOOTER:END -->
 
 <!-- Lazy widget bootstrap (Donate + identity slot) -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v244"></script>
-<script src="/assets/js/sw-register.js?v=ob-v244" defer></script>
-<script src="/assets/widgets/pwa-install.js?v=ob-v244" defer></script>
-<script src="/assets/js/nav.js?v=ob-v244" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v245"></script>
+<script src="/assets/js/sw-register.js?v=ob-v245" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v245" defer></script>
+<script src="/assets/js/nav.js?v=ob-v245" defer></script>
 <!-- The verbs: artwork fallback, the rails the edge could not fill, and the
      personal rails for a signed-in member. -->
-<script type="module" src="/assets/js/discover.js?v=ob-v244"></script>
+<script type="module" src="/assets/js/discover.js?v=ob-v245"></script>
 </body>
 </html>
