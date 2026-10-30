@@ -488,9 +488,9 @@ console.log('\nThe recommendations and the data rails, over the real schema:')
     assert.deepEqual(j.because, [], 'a Because rail with fewer than four tiles is not shown')
   })
   await checkAsync('a podcast with no new episode in six months is not recommended; music and an unknown date are (2026-10-29)', async () => {
-    // Before the collector's column exists the endpoint answers unfiltered
-    // (the check above ran on exactly that schema). Now add it.
-    db.exec('ALTER TABLE podcasts ADD COLUMN newest_item_ts INTEGER')
+    // schema.sql carries the column since bd319b4 (all NULL until set, which
+    // the endpoint keeps); an older schema gets it here.
+    try { db.exec('ALTER TABLE podcasts ADD COLUMN newest_item_ts INTEGER') } catch (e) { if (!/duplicate column/.test(e.message)) throw e }
     db.prepare("UPDATE podcasts SET newest_item_ts = ? WHERE podcast_guid = 'show-A'").run(now - 200 * 86400)
     db.prepare("UPDATE podcasts SET newest_item_ts = ? WHERE podcast_guid = 'album-A'").run(now - 900 * 86400)
     const j = await (await post({ pubkey: ME })).json()
