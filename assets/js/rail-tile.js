@@ -11,11 +11,11 @@
  * rewrites the version), no clock reads, no unpinned locale, nothing from the
  * DOM. Verbs (the artwork fallback walk) are attached by discover.js.
  */
-import { coverChain } from './cover-art.js?v=ob-v241'
-import { rankLabel } from './rank.js?v=ob-v241'
-import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v241'
-import { boosterPageHref } from './booster-link.js?v=ob-v241'
-import { languageName } from './lang-name.js?v=ob-v241'
+import { coverChain } from './cover-art.js?v=ob-v242'
+import { rankLabel } from './rank.js?v=ob-v242'
+import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v242'
+import { boosterPageHref } from './booster-link.js?v=ob-v242'
+import { languageName } from './lang-name.js?v=ob-v242'
 
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => (
@@ -115,7 +115,7 @@ export function rankTripletHtml(r) {
   const ks = ['sats', 'boosts', 'boosters']
   const digits = ks.reduce((n, k) => n + String(t[k]).length, 0)
   return `<span class="rt-trip rt-d${Math.min(Math.max(digits, 3), 9)}">` + ks.map((k) =>
-    `<span class="rt-fig" title="#${esc(t[k])} in ${FIGURE_WORD[k]}">${FIGURE_ICONS[k]}<span class="rt-sr">Rank in ${FIGURE_WORD[k]}: </span><span class="rt-hash">#</span>${esc(t[k])}</span>`
+    `<span class="rt-fig" data-fig="${k}" data-place="${esc(t[k])}" title="#${esc(t[k])} in ${FIGURE_WORD[k]}">${FIGURE_ICONS[k]}<span class="rt-sr">Rank in ${FIGURE_WORD[k]}: </span><span class="rt-hash">#</span>${esc(t[k])}</span>`
   ).join('<span class="rt-slash" aria-hidden="true">/</span>') + '</span>'
 }
 

@@ -293,7 +293,11 @@ was picked from is in the session memory; direction A won, with the sans.
   words do not fit), printed "#6 / #2 / #3" (the number sign marks a
   place, not a count) and **never wider than the artwork**: the line is
   sized off the tile's width by its digit count (`rt-d3`..`rt-d9`,
-  container units, measured in Chromium at 96 to 180px). **A MIXED RAIL'S
+  container units, measured in Chromium at 96 to 180px). **Each figure is pressable** (Reed's ask,
+  2026-10-30): a click opens a small note, not the tile's link ("Ranked
+  5th in sats this week", in the rail's own window and noun; `railScope`
+  in `discover.js`, the explainer, caught in the capture phase). A new
+  ranked rail key needs an entry there or its figures explain nothing. **A MIXED RAIL'S
   tiles carry a MEDIUM BADGE** (New and Noteworthy, Podcasters Recommend;
   Movers is the Shows chart, one side): a light chip with an icon and the
   word ("Podcast", "Music") in the artwork's bottom-right corner
@@ -308,6 +312,7 @@ was picked from is in the session memory; direction A won, with the sans.
   rails map through `bare()` and show the title alone (Reed's call,
   2026-10-29), and the #40HPW tile reads "34.3 HPW", no episode count.
   New and Noteworthy's tiles print no line (the badge says the medium);
+  New and Noteworthy and Movers explain themselves in the rail head (`.rail-more--note`) rather than linking a chart (Movers has none of its own);
   **a superlative names its population** ("more than any other show in the
   index"; Reed, 2026-10-30: the site's figures are this index's, never the
   world's);

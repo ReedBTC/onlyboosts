@@ -23,13 +23,18 @@
  *    the artwork fallback, and the Boost pill, which hands a click to the
  *    feed cards' own handlers. A rail the edge could not fill gets its slide
  *    rebuilt here from the rows fetched for the rail, with the same mappers.
+ * 5. THE RANK EXPLAINER (Reed's ask, 2026-10-30): a figure of the triplet
+ *    under a tile ("₿ #5") looks pressable, so a click on one opens a small
+ *    note saying what it means in that rail's own window ("Ranked 5th in
+ *    sats this week") instead of following the tile's link. One note at a
+ *    time; a click elsewhere, Escape or a scroll closes it.
  */
-import { railListHtml, showTile, albumTile, episodeTile, memberTile, langRailHtml, bare } from '/assets/js/rail-tile.js?v=ob-v241'
-import { heroHtml, slideHtml, showSlide, episodeSlide, memberSlide } from '/assets/js/hero.js?v=ob-v241'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v241'
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v241'
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v241'
-import { languageName } from '/assets/js/lang-name.js?v=ob-v241'
+import { railListHtml, showTile, albumTile, episodeTile, memberTile, langRailHtml, bare } from '/assets/js/rail-tile.js?v=ob-v242'
+import { heroHtml, slideHtml, showSlide, episodeSlide, memberSlide } from '/assets/js/hero.js?v=ob-v242'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v242'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v242'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v242'
+import { languageName } from '/assets/js/lang-name.js?v=ob-v242'
 
 const TILES = 10
 
@@ -182,11 +187,11 @@ function wireHeroBoost(hero) {
     try {
       const kind = slide.dataset.kind
       if (kind === 'episode' || kind === 'song') {
-        const m = await import('/assets/js/episode-card-actions.js?v=ob-v241')
+        const m = await import('/assets/js/episode-card-actions.js?v=ob-v242')
         btn.disabled = false
         await m.onBoostClick(slide, btn)
       } else {
-        const m = await import('/assets/js/show-card-actions.js?v=ob-v241')
+        const m = await import('/assets/js/show-card-actions.js?v=ob-v242')
         btn.disabled = false
         await m.onShowBoost(slide, btn)
       }
@@ -466,5 +471,66 @@ Promise.all(Array.from(document.querySelectorAll('[data-rail]:not([data-rail-per
   .then(patchHero)
   .catch((e) => console.warn('[discover] hero patch', e))
 paintPersonal()
+/* ── 5. The rank explainer ─────────────────────────────────────────────── */
+/* What each ranked rail ranks, and over which window. The keys are the
+   rails' (and their hero slides') own; a lang slot is the year's podcasts
+   in one language. The weekly chart is the Pacific week; every other
+   window is trailing, which is what the rail's chart link opens. */
+const NOUN = { shows: 'podcast', albums: 'album', episodes: 'podcast episode', songs: 'song' }
+const WINDOW = {
+  week: ['this week', 'in the last 7 days'],
+  month: ['this month', 'in the last 30 days'],
+  year: ['this year', 'in the last 365 days'],
+}
+function railScope(key, el) {
+  if (key === 'shows-week') return { noun: 'podcast', when: 'this week', span: 'since Monday, US Pacific time' }
+  const lang = /^lang-\d$/.test(key) && el.closest('[data-rail]')?.querySelector('h2')?.textContent.match(/^Top (.+) Podcasts/)
+  if (/^lang-\d$/.test(key)) return { noun: `${lang ? lang[1] + ' ' : ''}podcast`, when: WINDOW.year[0], span: WINDOW.year[1] }
+  const m = /^(shows|albums|episodes|songs)-(week|month|year)$/.exec(key)
+  return m ? { noun: NOUN[m[1]], when: WINDOW[m[2]][0], span: WINDOW[m[2]][1] } : null
+}
+const ordinal = (n) => {
+  const v = n % 100
+  return n + (v >= 11 && v <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th'))
+}
+const FIG_WHAT = { sats: 'sats', boosts: 'boosts', boosters: 'boosters (different people boosting)' }
+let openNote = null
+function closeNote() { openNote?.note.remove(); openNote = null }
+function explain(fig) {
+  if (openNote?.fig === fig) { closeNote(); return }
+  closeNote()
+  const key = fig.closest('[data-rail]')?.dataset.rail || fig.closest('[data-slide]')?.dataset.slide
+  const scope = railScope(key || '', fig)
+  const k = fig.dataset.fig
+  const n = Number(fig.dataset.place)
+  if (!scope || !FIG_WHAT[k] || !(n > 0)) return
+  const note = document.createElement('div')
+  note.className = 'rt-note'
+  note.setAttribute('role', 'tooltip')
+  const head = Object.assign(document.createElement('strong'), { textContent: `Ranked ${ordinal(n)} in ${k} ${scope.when}` })
+  const body = Object.assign(document.createElement('p'), {
+    textContent: `Of every ${scope.noun} boosted ${scope.when} (${scope.span}), it received ${n === 1 ? 'the most' : `the ${ordinal(n)} most`} ${FIG_WHAT[k]} in the index. Its chart place adds its ranks in sats, boosts and boosters.`,
+  })
+  const more = Object.assign(document.createElement('a'), { href: '/about#charts', textContent: 'How the chart works' })
+  note.append(head, body, more)
+  document.body.append(note)
+  const r = fig.getBoundingClientRect()
+  const w = note.offsetWidth
+  const left = Math.max(8, Math.min(r.left + r.width / 2 - w / 2, document.documentElement.clientWidth - w - 8))
+  const below = r.bottom + 8 + note.offsetHeight < window.innerHeight
+  note.style.left = `${left + window.scrollX}px`
+  note.style.top = `${(below ? r.bottom + 6 : r.top - note.offsetHeight - 6) + window.scrollY}px`
+  fig.setAttribute('aria-expanded', 'true')
+  openNote = { fig, note }
+}
+document.addEventListener('click', (e) => {
+  const fig = e.target.closest?.('.rt-ranks .rt-fig')
+  if (fig) { e.preventDefault(); e.stopPropagation(); explain(fig); return }
+  if (openNote && !openNote.note.contains(e.target)) closeNote()
+}, true)
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeNote() })
+document.addEventListener('scroll', () => closeNote(), { capture: true, passive: true })
+window.addEventListener('resize', closeNote)
+
 window.addEventListener('lb:session-change', paintPersonal)
 window.addEventListener('storage', (e) => { if (e.key === 'lb_nostr_session') paintPersonal() })
