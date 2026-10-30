@@ -428,22 +428,22 @@ function renderEpisodePage({ ep, supporters, boosts, boosterCount, latestTs, nam
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v244" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v244" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v244" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v244" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v247" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v247" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v247" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v247" />
   <!-- The hero, the community wall and the boost list are the show page's, so
        this page links its stylesheet and adds only the deltas. -->
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v244" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v244" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v247" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v247" />
   <!-- The episode card, for the community-episodes section: the same chrome
        feeds-podcasts.js paints on the homepage. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v244" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v247" />
   <!-- The boost thread inside a card's drawer, and its reply / like / repost /
        zap bar. Only this page's community section needs them; /show does not. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v244" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v244" />
-  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v244" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v247" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v247" />
+  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v247" />
 </head>
 <body data-episode-guid="${htmlEscape(ep.item_guid)}"${ep.podcast_guid ? ` data-show-guid="${htmlEscape(ep.podcast_guid)}"` : ""}>
 
@@ -550,7 +550,9 @@ function renderEpisodePage({ ep, supporters, boosts, boosterCount, latestTs, nam
                 <a href="/music/albums?range=1m">Top Albums This Month</a>
                 <a href="/music/songs?range=1y">Top Songs This Year</a>
                 <a href="/charts/music">Top Artists This Week</a>
+                <a href="/discover/new-music">New and Noteworthy</a>
                 <a href="/#rail-recommended-music">Music Recommended For You</a>
+                <a href="/#rail-follows-songs">Top Songs From Your Follows</a>
                 <a href="/#rail-because">Because You Boosted</a>
               </div>
             </details>
@@ -629,8 +631,9 @@ function renderEpisodePage({ ep, supporters, boosts, boosterCount, latestTs, nam
           <div class="nav-ribbon-col nav-ribbon-discover">
             <h4>Discover</h4>
             <a href="/charts/music">Top Artists This Week</a>
+            <a href="/discover/new-music">New and Noteworthy</a>
             <a href="/#rail-recommended-music">Music Recommended For You</a>
-            <a href="/#rail-follows">Top Podcasts From Your Follows</a>
+            <a href="/#rail-follows-songs">Top Songs From Your Follows</a>
             <a href="/#rail-because">Because You Boosted</a>
           </div>
           <div class="nav-ribbon-feat" data-ribbon-feat="albums-month" hidden>
@@ -810,12 +813,12 @@ function renderEpisodePage({ ep, supporters, boosts, boosterCount, latestTs, nam
 
 <script type="application/json" id="episode-boost-payload">${jsonForScript(boostPayload)}</script>
 
-<script src="/assets/js/nav.js?v=ob-v244" defer></script>
-<script src="/assets/js/episode-page.js?v=ob-v244" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v247" defer></script>
+<script src="/assets/js/episode-page.js?v=ob-v247" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v244"></script>
-<script src="/assets/js/sw-register.js?v=ob-v244" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v247"></script>
+<script src="/assets/js/sw-register.js?v=ob-v247" defer></script>
 </body>
 </html>`;
 }
@@ -1201,10 +1204,10 @@ function notFound(guid) {
   <meta name="robots" content="noindex" />
   <title>Episode not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v244" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v244" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v244" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v244" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v247" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v247" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v247" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v247" />
 </head>
 <body>
 <section class="page-header">
@@ -1222,7 +1225,7 @@ function notFound(guid) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v244" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v247" defer></script>
 </body>
 </html>`;
   return new Response(html, {

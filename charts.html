@@ -75,20 +75,20 @@
 
   <!-- Shared note / card styles (.note-card, .embed-note) — the boosts
        feeds render through the same kind-1 card as boosts-thread.js. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v244" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v247" />
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v244" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v247" />
   <!-- The episode card and its drawer, extracted from the inline block below
        when /episode/<guid> pages needed the same cards. See the file header. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v244" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v244" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v247" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v247" />
   <!-- The 40 HPW boards on the Members tab; shared with the /hpw/<week> pages. -->
-  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v244" />
+  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v247" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. Must stay last
        among the stylesheets so the inline block below still wins. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v244" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v247" />
 
   <style>
     :root {
@@ -893,12 +893,12 @@
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
     }
   </style>
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v244" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v244" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v247" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v247" />
   <!-- The chart boards on the Shows and Artists feeds (charts-block.js) wear
        the Charts page's .cb-* grammar; hpw-board.css above dresses their
        week picker and the members' Weeks at #1 rows. -->
-  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v244" />
+  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v247" />
 </head>
 <body data-page="podcasts" data-view="shows" data-active-feed="shows-global">
 
@@ -1005,7 +1005,9 @@
                 <a href="/music/albums?range=1m">Top Albums This Month</a>
                 <a href="/music/songs?range=1y">Top Songs This Year</a>
                 <a href="/charts/music">Top Artists This Week</a>
+                <a href="/discover/new-music">New and Noteworthy</a>
                 <a href="/#rail-recommended-music">Music Recommended For You</a>
+                <a href="/#rail-follows-songs">Top Songs From Your Follows</a>
                 <a href="/#rail-because">Because You Boosted</a>
               </div>
             </details>
@@ -1084,8 +1086,9 @@
           <div class="nav-ribbon-col nav-ribbon-discover">
             <h4>Discover</h4>
             <a href="/charts/music">Top Artists This Week</a>
+            <a href="/discover/new-music">New and Noteworthy</a>
             <a href="/#rail-recommended-music">Music Recommended For You</a>
-            <a href="/#rail-follows">Top Podcasts From Your Follows</a>
+            <a href="/#rail-follows-songs">Top Songs From Your Follows</a>
             <a href="/#rail-because">Because You Boosted</a>
           </div>
           <div class="nav-ribbon-feat" data-ribbon-feat="albums-month" hidden>
@@ -2140,17 +2143,17 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v244"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v247"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v244" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v247" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v244" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v247" defer></script>
 
 <!-- Feed hydration — lazily loads the active feed on first view. -->
-<script type="module" src="/assets/js/feeds.js?v=ob-v244"></script>
-<script src="/assets/js/nav.js?v=ob-v244" defer></script>
+<script type="module" src="/assets/js/feeds.js?v=ob-v247"></script>
+<script src="/assets/js/nav.js?v=ob-v247" defer></script>
 
 </body>
 </html>

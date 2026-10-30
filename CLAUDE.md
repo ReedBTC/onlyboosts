@@ -56,7 +56,7 @@ rules a change elsewhere would break.
 | `/booster/<npub>` | one person, edge-rendered |
 | `/artist/<guid>` | one artist (publisher), edge-rendered — see the detail pages section |
 | `/search?q=` | the site search's results page, edge-rendered, `noindex` (2026-10-17) |
-| `/discover/<key>` | **the whole list behind a discovery rail** (2026-10-20, Reed's ask: ten tiles lived nowhere else): `new-shows`, `movers`, `podroll`, each a list of the charts page's show cards with one extra line saying why the card is there, rendered by `functions/discover/[key].js` from the same row fetchers `functions/index.js` exports for the rails (`newShowsRows`, `moversRows`, `podrollRows`), in the `discover.html` shell. In the sitemap. The rail headings and the ribbons' Discover columns link them |
+| `/discover/<key>` | **the whole list behind a discovery rail** (2026-10-20, Reed's ask: ten tiles lived nowhere else): `new-shows`, `new-music`, `movers`, `podroll`, each a list of the charts page's show cards with one extra line saying why the card is there, rendered by `functions/discover/[key].js` from the same row fetchers `functions/index.js` exports for the rails (`newShowsRows`, `moversRows`, `podrollRows`), in the `discover.html` shell. In the sitemap. The rail headings and the ribbons' Discover columns link them |
 | `/about` | the project's own explanation of what the data is and isn't |
 | `/stats` | a coming-soon placeholder: nav + header + soon-card, `noindex`, out of the sitemap. `/boosters` was the second one and was **deleted** on 2026-08-23 — see the Stats row of the site map |
 | `/404.html` | see the ⚠️ under LB conventions |
@@ -167,7 +167,8 @@ was picked from is in the session memory; direction A won, with the sans.
 - **⚠️ THE RAIL ORDER IS REED'S AND NOTHING A SIGNED-OUT VISITOR CANNOT SEE
   COMES BEFORE THE FOURTH RAIL.** Top Shows This Week, Top Albums This
   Month, the #40HPW week, THEN Podcasts Recommended For You, Music
-  Recommended For You and Top Shows From Your Follows, then New and
+  Recommended For You, Top Shows From Your Follows and (2026-10-30, Reed's
+  ask) Top Songs From Your Follows, `follows-songs`, then New and
   Noteworthy, Movers and Podcasters Recommend, then the Because rails, then
   the year's episodes and songs. That is the evening-of-2026-10-21 order
   (Reed's final pass: the three discovery instruments moved up under the
@@ -298,15 +299,18 @@ was picked from is in the session memory; direction A won, with the sans.
   5th in sats this week", in the rail's own window and noun; `railScope`
   in `discover.js`, the explainer, caught in the capture phase). A new
   ranked rail key needs an entry there or its figures explain nothing. **A MIXED RAIL'S
-  tiles carry a MEDIUM BADGE** (New and Noteworthy, Podcasters Recommend;
-  Movers is the Shows chart, one side): a light chip with an icon and the
+  tiles carry a MEDIUM BADGE** (Podcasters Recommend, the one mixed rail
+  since 2026-10-30, when Reed split New and Noteworthy into New and
+  Noteworthy Podcasts and New and Noteworthy Music, `new-shows` and
+  `new-music`, `/discover/new-music` the second's page; Movers is the Shows
+  chart, one side, and is headed "Podcast Movers"): a light chip with an icon and the
   word ("Podcast", "Music") in the artwork's bottom-right corner
   (`mediumBadge`, printed only when the caller passes `medium`; the tile
   mappers pass none). Every other rail is one side and its HEADING says
   which: **"Podcasts", never "Shows", in the homepage's rail names and the
   ribbons** (Top Podcasts This Week, Top Podcasts From Your Follows, #1
-  Podcast This Week; Reed's call, 2026-10-30), New and Noteworthy's heading
-  reading "New and Noteworthy Podcasts and Music". The chart pages' Shows
+  Podcast This Week; Reed's call, 2026-10-30), the two New and Noteworthy
+  rails reading "New and Noteworthy Podcasts" and "New and Noteworthy Music". The chart pages' Shows
   view keeps its name. **Only a ranked rail prints the line**:
   the two Recommended rails, Top Shows From Your Follows and the Because
   rails map through `bare()` and show the title alone (Reed's call,
@@ -374,7 +378,11 @@ was picked from is in the session memory; direction A won, with the sans.
   exposes no accessor for the current list; the endpoint accepts them.
 - **Three more fact rails off the new columns**: New and Noteworthy
   (`first_boost_ts` within 90 days and two boosters; the collector measured
-  21 such shows), Movers (this week's Shows chart against last week's to 100
+  21 such shows; **since 2026-10-30 two rails, and the podcast one adds
+  COMEBACKS**, Reed's call after it held five tiles: boosted in 90 days after
+  180+ days with no boost, one non-bot booster, the six-month dormant rule
+  applied, about 21 tiles on OB-back's measurement; `newShowsRows`, `whyNew`
+  in `functions/index.js`; music stays debuts only), Movers (this week's Shows chart against last week's to 100
   places, climbers by places then debuts), Podcasters Recommend (podroll
   targets by how many sources list them; an unindexed target is a figure,
   not a link).

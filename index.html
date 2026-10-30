@@ -68,14 +68,14 @@
   <meta name="twitter:card" content="summary_large_image" />
 
   <link rel="preload" href="/assets/fonts/outfit.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v244" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v244" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v247" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v247" />
   <!-- The boost rows at the foot are the detail pages' rows and wear their
        sheets: the card, the thread chrome and the reaction bar. -->
-  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v244" />
+  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v247" />
   <!-- theme.css last among the shared sheets: the palette, the fonts, and
        the base body/a/img rules every shared stylesheet reads off :root. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v244" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v247" />
 </head>
 <body>
 
@@ -182,7 +182,9 @@
                 <a href="/music/albums?range=1m">Top Albums This Month</a>
                 <a href="/music/songs?range=1y">Top Songs This Year</a>
                 <a href="/charts/music">Top Artists This Week</a>
+                <a href="/discover/new-music">New and Noteworthy</a>
                 <a href="/#rail-recommended-music">Music Recommended For You</a>
+                <a href="/#rail-follows-songs">Top Songs From Your Follows</a>
                 <a href="/#rail-because">Because You Boosted</a>
               </div>
             </details>
@@ -261,8 +263,9 @@
           <div class="nav-ribbon-col nav-ribbon-discover">
             <h4>Discover</h4>
             <a href="/charts/music">Top Artists This Week</a>
+            <a href="/discover/new-music">New and Noteworthy</a>
             <a href="/#rail-recommended-music">Music Recommended For You</a>
-            <a href="/#rail-follows">Top Podcasts From Your Follows</a>
+            <a href="/#rail-follows-songs">Top Songs From Your Follows</a>
             <a href="/#rail-because">Because You Boosted</a>
           </div>
           <div class="nav-ribbon-feat" data-ribbon-feat="albums-month" hidden>
@@ -484,17 +487,56 @@
     </div>
   </section>
 
+  <section class="rail" data-rail="follows-songs" data-rail-personal aria-labelledby="rail-follows-songs">
+    <div class="rail-head">
+      <h2 id="rail-follows-songs">Top Songs From Your Follows</h2>
+      <a class="rail-more" href="/music/songs?scope=follows" hidden data-follows-link>View the feed →</a>
+    </div>
+    <div class="rail-track rail-locked" data-locked>
+      <ol class="rail-list" aria-hidden="true">
+        <li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: 80%"></span><span class="rail-locked-ph" style="width: 50%"></span></span></li>
+        <li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: 70%"></span><span class="rail-locked-ph" style="width: 45%"></span></span></li>
+        <li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: 85%"></span><span class="rail-locked-ph" style="width: 55%"></span></span></li>
+        <li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: 65%"></span><span class="rail-locked-ph" style="width: 40%"></span></span></li>
+        <li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: 75%"></span><span class="rail-locked-ph" style="width: 50%"></span></span></li>
+        <li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: 80%"></span><span class="rail-locked-ph" style="width: 45%"></span></span></li>
+        <li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: 60%"></span><span class="rail-locked-ph" style="width: 55%"></span></span></li>
+        <li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: 85%"></span><span class="rail-locked-ph" style="width: 40%"></span></span></li>
+        <li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: 70%"></span><span class="rail-locked-ph" style="width: 50%"></span></span></li>
+        <li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: 75%"></span><span class="rail-locked-ph" style="width: 45%"></span></span></li>
+      </ol>
+      <div class="rail-locked-card">
+        <div>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>
+          <div>
+            <h3>Log in to see what your follows boost</h3>
+            <p>The songs ranked over the boosts of the accounts you follow on Nostr, the same chart with your own crowd as the corpus.</p>
+          </div>
+          <button type="button" class="ob-cta" data-lb-login-trigger>Log in</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section class="rail" data-rail="new-shows" aria-labelledby="rail-new-shows">
     <div class="rail-head">
-      <h2 id="rail-new-shows"><a href="/discover/new-shows">New and Noteworthy Podcasts and Music</a></h2>
-      <span class="rail-more rail-more--note">First boosted in the last 90 days</span>
+      <h2 id="rail-new-shows"><a href="/discover/new-shows">New and Noteworthy Podcasts</a></h2>
+      <span class="rail-more rail-more--note">First boosted, or boosted again after six months without one, in the last 90 days</span>
     </div>
     <div class="rail-track"><!--OB:RAIL:new-shows--><p class="rail-placeholder">Loading the debuts…</p><!--/OB:RAIL:new-shows--></div>
   </section>
 
+  <section class="rail" data-rail="new-music" aria-labelledby="rail-new-music">
+    <div class="rail-head">
+      <h2 id="rail-new-music"><a href="/discover/new-music">New and Noteworthy Music</a></h2>
+      <span class="rail-more rail-more--note">First boosted in the last 90 days</span>
+    </div>
+    <div class="rail-track"><!--OB:RAIL:new-music--><p class="rail-placeholder">Loading the debuts…</p><!--/OB:RAIL:new-music--></div>
+  </section>
+
   <section class="rail" data-rail="movers" aria-labelledby="rail-movers">
     <div class="rail-head">
-      <h2 id="rail-movers"><a href="/discover/movers">Movers</a></h2>
+      <h2 id="rail-movers"><a href="/discover/movers">Podcast Movers</a></h2>
       <span class="rail-more rail-more--note">Podcasts that climbed the most places in this week's top 100, then new entries</span>
     </div>
     <div class="rail-track"><!--OB:RAIL:movers--><p class="rail-placeholder">Loading this week's climbers…</p><!--/OB:RAIL:movers--></div>
@@ -696,12 +738,12 @@
 <!-- FOOTER:END -->
 
 <!-- Lazy widget bootstrap (Donate + identity slot) -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v244"></script>
-<script src="/assets/js/sw-register.js?v=ob-v244" defer></script>
-<script src="/assets/widgets/pwa-install.js?v=ob-v244" defer></script>
-<script src="/assets/js/nav.js?v=ob-v244" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v247"></script>
+<script src="/assets/js/sw-register.js?v=ob-v247" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v247" defer></script>
+<script src="/assets/js/nav.js?v=ob-v247" defer></script>
 <!-- The verbs: artwork fallback, the rails the edge could not fill, and the
      personal rails for a signed-in member. -->
-<script type="module" src="/assets/js/discover.js?v=ob-v244"></script>
+<script type="module" src="/assets/js/discover.js?v=ob-v247"></script>
 </body>
 </html>

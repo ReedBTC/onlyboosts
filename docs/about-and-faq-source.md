@@ -388,11 +388,17 @@ indexed Nostr boost; nothing about a visitor is stored.
   pick (a show appears on the first rail that reaches it only), and a rail
   under four shows is not shown. Until then: the five most-boosted seeds in
   boost order, any size.
-- **Top Podcasts From Your Follows**: the Shows chart over the boosts of the
+- **Top Podcasts From Your Follows** and **Top Songs From Your Follows**
+  (2026-10-30): the Shows chart and the Songs chart over the boosts of the
   member's kind-3 contacts (the Follows scope); the member's own boosts count.
-- **New and Noteworthy**: `first_boost_ts` within 90 days and >= 2 boosters, by
-  boosters then sats.
-- **Movers**: this week's Shows chart against last week's to 100 places;
+- **New and Noteworthy Podcasts / Music**: two rails, one per side of the
+  medium split (2026-10-30); debuts are `first_boost_ts` within 90 days and
+  >= 2 boosters. The podcast rail adds comebacks (2026-10-30): boosted within
+  90 days, the previous boost 180+ days before the first of those, >= 1
+  booster in the window, relay-bot publisher keys not counted; a podcast
+  with no episode in 183 days is out. Ordered by boosters, then sats, in the
+  window. Music is debuts only.
+- **Podcast Movers**: this week's Shows chart against last week's to 100 places;
   climbers by places climbed, then debuts in chart order.
 - **Podcasters Recommend**: podroll targets by the number of distinct listing
   shows; an unindexed target is shown, not linked.
