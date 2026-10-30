@@ -367,7 +367,7 @@ was picked from is in the session memory; direction A won, with the sans.
   recommended** (Reed's call, 2026-10-29; podcast side only, NULL kept),
   off `podcasts.newest_item_ts`, the newest item's datePublished from PI episodes/byfeedid, a
   collector column briefed to OB-back the same day; until it exists the
-  query falls back to unfiltered on "no such column". **The method is public: `/about#recommendations`** states every
+  query falls back to unfiltered on "no such column". **The Because rails are deliberately NOT filtered** (Reed's call, 2026-10-30, after seeing the cut: 223 of 639 podcast-side shows at 183 days); `becauseOf` carries no date clause. **The method is public: `/about#recommendations`** states every
   rail's rule, Reed's data-transparency call, and the three personal rails'
   one-liners link it; `docs/about-and-faq-source.md` is the factual backing
   and is corrected first. **Favorites are not yet handed over**: `favorites-ui.js`
