@@ -2588,9 +2588,12 @@ is a publish target (theforest refuses the write and is deliberately out).**
   publish, as vector 27 requires (2026-10-03).
 - **⚠️ `relay.fountain.fm` REFUSES THE KIND, AND ONE RELAY HELD A STALE
   PRIVATE-MODE COPY WITH ZERO PUBLIC TAGS.** `favorites-read.js` counts per
-  relay on raw sockets, never a pool's aggregate EOSE: trusted only when
-  every reached relay answered and at least two did; newest wins; an
-  untrusted read is `null`, which is not an empty list.
+  relay on raw sockets, never a pool's aggregate EOSE: **trusted on a
+  QUORUM since 2026-10-30** (Reed's call): two answers, plus a 1.5s grace for
+  the rest, and a relay that opens and stays silent no longer degrades the
+  read (until then every reached relay had to answer, and one silent relay,
+  damus, broke every heart); newest wins; an untrusted read is `null`, which
+  is not an empty list. See `docs/favorites.md`.
 - **⚠️ EVERY RELAY ANOTHER APP READS THAT ACCEPTS THE KIND IS IN
   `PUBLISH_RELAYS`.** BMB believes the newest copy it hears within 1.5s of
   the first; primal was in its read set and not in our publish set, and a

@@ -29,12 +29,12 @@
  *    sats this week") instead of following the tile's link. One note at a
  *    time; a click elsewhere, Escape or a scroll closes it.
  */
-import { railListHtml, showTile, albumTile, episodeTile, memberTile, langRailHtml, bare } from '/assets/js/rail-tile.js?v=ob-v247'
-import { heroHtml, slideHtml, showSlide, episodeSlide, memberSlide } from '/assets/js/hero.js?v=ob-v247'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v247'
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v247'
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v247'
-import { languageName } from '/assets/js/lang-name.js?v=ob-v247'
+import { railListHtml, showTile, albumTile, episodeTile, memberTile, langRailHtml, bare } from '/assets/js/rail-tile.js?v=ob-v248'
+import { heroHtml, slideHtml, showSlide, episodeSlide, memberSlide } from '/assets/js/hero.js?v=ob-v248'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v248'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v248'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v248'
+import { languageName } from '/assets/js/lang-name.js?v=ob-v248'
 
 const TILES = 10
 
@@ -187,11 +187,11 @@ function wireHeroBoost(hero) {
     try {
       const kind = slide.dataset.kind
       if (kind === 'episode' || kind === 'song') {
-        const m = await import('/assets/js/episode-card-actions.js?v=ob-v247')
+        const m = await import('/assets/js/episode-card-actions.js?v=ob-v248')
         btn.disabled = false
         await m.onBoostClick(slide, btn)
       } else {
-        const m = await import('/assets/js/show-card-actions.js?v=ob-v247')
+        const m = await import('/assets/js/show-card-actions.js?v=ob-v248')
         btn.disabled = false
         await m.onShowBoost(slide, btn)
       }

@@ -41,10 +41,10 @@
  * shipped cycle against scripted relays, a stand-in codec and a real key.
  * Nothing here is reached signed out; the bot cannot hold favorites.
  */
-import { readFavorites, readWriteRelays, relaySet, acceptsEvent } from '/assets/js/favorites-read.js?v=ob-v247'
+import { readFavorites, readWriteRelays, relaySet, acceptsEvent } from '/assets/js/favorites-read.js?v=ob-v248'
 import {
   KIND, plan, parse, parseTags, statedVisibility, decodePlaintext, kindOf, feedIdOf, feedGuidOf,
-} from '/assets/js/favorites-merge.js?v=ob-v247'
+} from '/assets/js/favorites-merge.js?v=ob-v248'
 
 /**
  * Where a list is published. The read set less relay.mostr.pub, which held a
@@ -61,8 +61,9 @@ import {
  * reads nos.lol, snort, primal, theforest and damus (plus the member's own
  * relays); snort joined on 2026-10-03, answering a kind-10333 REQ with EOSE
  * that day and holding Reed's list after his first publish. A publish target
- * only: the read set trusts a read only when every reached relay answers,
- * and one more relay there is one more way for a read to degrade.
+ * only: until 2026-10-30 the read set trusted a read only when every reached
+ * relay answered, and one more relay there was one more way for a read to
+ * degrade (a quorum of two since; see favorites-read.js).
  *
  * theforest.nostr1.com, StableKraft's fifth, was added the same day and
  * dropped the same day (Reed's call): it answers a read but took nothing on
