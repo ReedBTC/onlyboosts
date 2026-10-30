@@ -221,7 +221,12 @@
   overflow: hidden;
 }
 a.rt:hover .rt-title { color: var(--brand-dd); }
+/* ⚠️ POSITIONED, because the triplet's visually-hidden .rt-sr spans are
+   absolute: with nothing positioned between them and <body> they escaped the
+   rail's scroller and widened a phone's page to 1295px (the Coordinator's
+   pre-merge sweep, 2026-10-30). */
 .rt-sub {
+  position: relative;
   font-size: 0.78rem;
   color: var(--muted);
   line-height: 1.3;
@@ -479,7 +484,7 @@ a.rt:hover .rt-title { color: var(--brand-dd); }
   gap: 0.45rem;
   align-items: baseline;
 }
-.hero-ranks { font-variant-numeric: tabular-nums; letter-spacing: 0.02em; font-weight: 700; color: #ffffff; }
+.hero-ranks { position: relative; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; font-weight: 700; color: #ffffff; }
 .hero-desc {
   margin: 0 0 1rem;
   font-family: var(--font-body, inherit);

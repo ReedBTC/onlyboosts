@@ -41,14 +41,14 @@
  * after which the list is re-read with NIP-44 and the hearts fill. That is a
  * known cost of not loading 1MB to draw an outline.
  */
-import { fetchFavorites, syncFavorites, widgetDeps, saveMode, loadMode } from '/assets/js/favorites-sync.js?v=ob-v242'
-import { statedVisibility } from '/assets/js/favorites-merge.js?v=ob-v242'
-import { setFavoriteState, changeFor, keyFor, WORD_BUSY } from '/assets/js/favorite-button.js?v=ob-v242'
-import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v242'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v242'
-import { initAccountSettings, noteSettingsChange } from '/assets/js/account-settings.js?v=ob-v242'
+import { fetchFavorites, syncFavorites, widgetDeps, saveMode, loadMode } from '/assets/js/favorites-sync.js?v=ob-v243'
+import { statedVisibility } from '/assets/js/favorites-merge.js?v=ob-v243'
+import { setFavoriteState, changeFor, keyFor, WORD_BUSY, WORD_WAIT } from '/assets/js/favorite-button.js?v=ob-v243'
+import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v243'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v243'
+import { initAccountSettings, noteSettingsChange } from '/assets/js/account-settings.js?v=ob-v243'
 
-const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v242'
+const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v243'
 
 const state = {
   pubkey: null,
@@ -306,13 +306,15 @@ function setBusy(btn, on) {
   btn.disabled = on
   btn.classList.toggle('is-busy', on)
   const word = btn.querySelector('.ob-fav-word')
-  if (on && word) word.textContent = WORD_BUSY
+  if (on && word) word.textContent = on === 'wait' ? WORD_WAIT : WORD_BUSY
   if (!on) paint(btn)
 }
 
 async function onClick(btn) {
   if (btn.disabled) return
-  setBusy(btn, true)
+  /* "Connecting…" until the signer is here, "Saving…" only once a write
+     can actually happen (the Coordinator's review, 2026-10-30). */
+  setBusy(btn, 'wait')
   try {
     await ensureWidget()
     const user = window.LBLogin?.getUser?.()
@@ -321,6 +323,7 @@ async function onClick(btn) {
       showToast('Your signer is still connecting. Try again in a moment.', true)
       return
     }
+    setBusy(btn, true)
 
     // The signer is here now: if the private half was never opened, open it
     // before deciding anything, or an entry hidden in it reads as absent.

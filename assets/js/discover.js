@@ -29,12 +29,12 @@
  *    sats this week") instead of following the tile's link. One note at a
  *    time; a click elsewhere, Escape or a scroll closes it.
  */
-import { railListHtml, showTile, albumTile, episodeTile, memberTile, langRailHtml, bare } from '/assets/js/rail-tile.js?v=ob-v242'
-import { heroHtml, slideHtml, showSlide, episodeSlide, memberSlide } from '/assets/js/hero.js?v=ob-v242'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v242'
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v242'
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v242'
-import { languageName } from '/assets/js/lang-name.js?v=ob-v242'
+import { railListHtml, showTile, albumTile, episodeTile, memberTile, langRailHtml, bare } from '/assets/js/rail-tile.js?v=ob-v243'
+import { heroHtml, slideHtml, showSlide, episodeSlide, memberSlide } from '/assets/js/hero.js?v=ob-v243'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v243'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v243'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v243'
+import { languageName } from '/assets/js/lang-name.js?v=ob-v243'
 
 const TILES = 10
 
@@ -187,11 +187,11 @@ function wireHeroBoost(hero) {
     try {
       const kind = slide.dataset.kind
       if (kind === 'episode' || kind === 'song') {
-        const m = await import('/assets/js/episode-card-actions.js?v=ob-v242')
+        const m = await import('/assets/js/episode-card-actions.js?v=ob-v243')
         btn.disabled = false
         await m.onBoostClick(slide, btn)
       } else {
-        const m = await import('/assets/js/show-card-actions.js?v=ob-v242')
+        const m = await import('/assets/js/show-card-actions.js?v=ob-v243')
         btn.disabled = false
         await m.onShowBoost(slide, btn)
       }
@@ -483,9 +483,12 @@ const WINDOW = {
   year: ['this year', 'in the last 365 days'],
 }
 function railScope(key, el) {
-  if (key === 'shows-week') return { noun: 'podcast', when: 'this week', span: 'since Monday, US Pacific time' }
-  const lang = /^lang-\d$/.test(key) && el.closest('[data-rail]')?.querySelector('h2')?.textContent.match(/^Top (.+) Podcasts/)
-  if (/^lang-\d$/.test(key)) return { noun: `${lang ? lang[1] + ' ' : ''}podcast`, when: WINDOW.year[0], span: WINDOW.year[1] }
+  /* Movers' hero slide prints the show's place on this week's chart. */
+  if (key === 'shows-week' || key === 'movers') return { noun: 'podcast', when: 'this week', span: 'since Monday, US Pacific time' }
+  if (/^lang-\d$/.test(key)) {
+    const lang = document.querySelector(`[data-rail="${key}"] h2[data-lang]`)?.dataset.lang
+    return { noun: `${lang ? languageName(lang) + ' ' : ''}podcast`, when: WINDOW.year[0], span: WINDOW.year[1] }
+  }
   const m = /^(shows|albums|episodes|songs)-(week|month|year)$/.exec(key)
   return m ? { noun: NOUN[m[1]], when: WINDOW[m[2]][0], span: WINDOW[m[2]][1] } : null
 }
@@ -495,18 +498,18 @@ const ordinal = (n) => {
 }
 const FIG_WHAT = { sats: 'sats', boosts: 'boosts', boosters: 'boosters (different people boosting)' }
 let openNote = null
-function closeNote() { openNote?.note.remove(); openNote = null }
+function closeNote() { openNote?.fig.removeAttribute('aria-expanded'); openNote?.note.remove(); openNote = null }
 function explain(fig) {
   if (openNote?.fig === fig) { closeNote(); return }
   closeNote()
-  const key = fig.closest('[data-rail]')?.dataset.rail || fig.closest('[data-slide]')?.dataset.slide
-  const scope = railScope(key || '', fig)
-  const k = fig.dataset.fig
-  const n = Number(fig.dataset.place)
-  if (!scope || !FIG_WHAT[k] || !(n > 0)) return
+  const what = scopeOf(fig)
+  if (!what) return
+  const { scope, k, n } = what
   const note = document.createElement('div')
   note.className = 'rt-note'
-  note.setAttribute('role', 'tooltip')
+  note.id = 'rt-note'
+  note.setAttribute('role', 'dialog')
+  note.setAttribute('aria-label', `Ranked ${ordinal(n)} in ${k} ${scope.when}`)
   const head = Object.assign(document.createElement('strong'), { textContent: `Ranked ${ordinal(n)} in ${k} ${scope.when}` })
   const body = Object.assign(document.createElement('p'), {
     textContent: `Of every ${scope.noun} boosted ${scope.when} (${scope.span}), it received ${n === 1 ? 'the most' : `the ${ordinal(n)} most`} ${FIG_WHAT[k]} in the index. Its chart place adds its ranks in sats, boosts and boosters.`,
@@ -521,15 +524,37 @@ function explain(fig) {
   note.style.left = `${left + window.scrollX}px`
   note.style.top = `${(below ? r.bottom + 6 : r.top - note.offsetHeight - 6) + window.scrollY}px`
   fig.setAttribute('aria-expanded', 'true')
-  openNote = { fig, note }
+  fig.setAttribute('aria-controls', note.id)
+  /* Where the page and the figure's rail stood at opening: a scroll closes
+     the note only once it has really moved, so a rail still gliding after
+     a flick on a phone does not close it the instant it opens. */
+  const track = fig.closest('.rail-list')
+  openNote = { fig, note, y: window.scrollY, x: track?.scrollLeft ?? 0, track }
+}
+/* The figure's place and its rail's window, or null when there is nothing
+   to explain; then the click is left alone and follows the tile's link. */
+function scopeOf(fig) {
+  const key = fig.closest('[data-rail]')?.dataset.rail || fig.closest('[data-slide]')?.dataset.slide
+  const scope = railScope(key || '', fig)
+  const k = fig.dataset.fig
+  const n = Number(fig.dataset.place)
+  return scope && FIG_WHAT[k] && n > 0 ? { scope, k, n } : null
 }
 document.addEventListener('click', (e) => {
   const fig = e.target.closest?.('.rt-ranks .rt-fig')
-  if (fig) { e.preventDefault(); e.stopPropagation(); explain(fig); return }
+  if (fig && scopeOf(fig)) { e.preventDefault(); e.stopPropagation(); explain(fig); return }
   if (openNote && !openNote.note.contains(e.target)) closeNote()
 }, true)
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeNote() })
-document.addEventListener('scroll', () => closeNote(), { capture: true, passive: true })
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { const f = openNote?.fig; closeNote(); f?.focus(); return }
+  const fig = (e.key === 'Enter' || e.key === ' ') && e.target.closest?.('.rt-ranks .rt-fig')
+  if (fig && scopeOf(fig)) { e.preventDefault(); e.stopPropagation(); explain(fig) }
+}, true)
+document.addEventListener('scroll', () => {
+  if (!openNote) return
+  const moved = Math.abs(window.scrollY - openNote.y) + Math.abs((openNote.track?.scrollLeft ?? 0) - openNote.x)
+  if (moved > 24) closeNote()
+}, { capture: true, passive: true })
 window.addEventListener('resize', closeNote)
 
 window.addEventListener('lb:session-change', paintPersonal)

@@ -11,11 +11,11 @@
  * rewrites the version), no clock reads, no unpinned locale, nothing from the
  * DOM. Verbs (the artwork fallback walk) are attached by discover.js.
  */
-import { coverChain } from './cover-art.js?v=ob-v242'
-import { rankLabel } from './rank.js?v=ob-v242'
-import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v242'
-import { boosterPageHref } from './booster-link.js?v=ob-v242'
-import { languageName } from './lang-name.js?v=ob-v242'
+import { coverChain } from './cover-art.js?v=ob-v243'
+import { rankLabel } from './rank.js?v=ob-v243'
+import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v243'
+import { boosterPageHref } from './booster-link.js?v=ob-v243'
+import { languageName } from './lang-name.js?v=ob-v243'
 
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => (
@@ -56,8 +56,8 @@ export function statsLine({ boosters, sats }) {
  */
 function tripletOf(r) {
   const c = r && r.chart
-  if (c && c.sats != null) return { sats: c.sats, boosts: c.boosts, boosters: c.boosters }
-  if (r && r.r_sats != null) return { sats: r.r_sats, boosts: r.r_boosts, boosters: r.r_boosters }
+  if (c && c.sats != null && c.boosts != null && c.boosters != null) return { sats: c.sats, boosts: c.boosts, boosters: c.boosters }
+  if (r && r.r_sats != null && r.r_boosts != null && r.r_boosters != null) return { sats: r.r_sats, boosts: r.r_boosts, boosters: r.r_boosters }
   return null
 }
 export function rankTriplet(r) {
@@ -115,7 +115,7 @@ export function rankTripletHtml(r) {
   const ks = ['sats', 'boosts', 'boosters']
   const digits = ks.reduce((n, k) => n + String(t[k]).length, 0)
   return `<span class="rt-trip rt-d${Math.min(Math.max(digits, 3), 9)}">` + ks.map((k) =>
-    `<span class="rt-fig" data-fig="${k}" data-place="${esc(t[k])}" title="#${esc(t[k])} in ${FIGURE_WORD[k]}">${FIGURE_ICONS[k]}<span class="rt-sr">Rank in ${FIGURE_WORD[k]}: </span><span class="rt-hash">#</span>${esc(t[k])}</span>`
+    `<span class="rt-fig" role="button" tabindex="0" aria-haspopup="dialog" data-fig="${k}" data-place="${esc(t[k])}" title="#${esc(t[k])} in ${FIGURE_WORD[k]}">${FIGURE_ICONS[k]}<span class="rt-sr">Rank in ${FIGURE_WORD[k]}: </span><span class="rt-hash">#</span>${esc(t[k])}</span>`
   ).join('<span class="rt-slash" aria-hidden="true">/</span>') + '</span>'
 }
 
@@ -251,7 +251,7 @@ export function langRailTitle(lang) {
 }
 export function langRailHtml(n, lang, rows) {
   const href = langChartHref(lang)
-  return `<div class="rail-head"><h2 id="rail-lang-${Number(n)}"><a href="${esc(href)}">${esc(langRailTitle(lang))}</a></h2>` +
+  return `<div class="rail-head"><h2 id="rail-lang-${Number(n)}" data-lang="${esc(lang)}"><a href="${esc(href)}">${esc(langRailTitle(lang))}</a></h2>` +
     `<a class="rail-more" href="${esc(href)}">View the chart →</a></div>` +
     `<div class="rail-track">${railListHtml(rows.map(showTile), { empty: `No ${languageName(lang)}-language podcasts boosted this year.` })}</div>`
 }

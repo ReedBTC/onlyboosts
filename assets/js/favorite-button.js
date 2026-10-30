@@ -78,6 +78,7 @@ export function favoriteButtonHtml({ kind, guid, itemGuid = null, medium = null,
 export const WORD_OFF = 'Favorite'
 export const WORD_ON = 'Favorited'
 export const WORD_BUSY = 'Saving…'
+export const WORD_WAIT = 'Connecting…'
 
 /** Paint one button's state. `on` is true, false, or null for "not known". */
 export function setFavoriteState(btn, on) {
