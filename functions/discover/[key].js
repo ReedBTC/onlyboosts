@@ -20,7 +20,7 @@
 //
 // An unindexed podroll target has no page and no figures; its card carries
 // no link and says so in its line. Cached 5 minutes, like the homepage.
-import { newShowsRows, moversRows, podrollRows, firstBoost, onN } from "../index.js";
+import { newShowsRows, moversRows, podrollRows, whyNew, onN } from "../index.js";
 import { cardsFromPodcasts } from "../_shared/show-cards.js";
 import { COPY as SHOW_COPY, renderShowCards } from "../../assets/js/show-card.js";
 import { rankLabel } from "../../assets/js/rank.js";
@@ -48,12 +48,12 @@ function record(r, { linked = true } = {}) {
 export const PAGES = {
   "new-shows": {
     title: "New and Noteworthy Podcasts",
-    lead: "Podcasts whose first boost on Nostr landed in the last 90 days and that two or more members have boosted since, by boosters then sats. The all-time charts bury a debut; this is where one shows.",
+    lead: "Podcasts boosted on Nostr for the first time in the last 90 days, by two or more members, and podcasts boosted again in that time after six months or more without a boost, ordered by boosters and then sats within those 90 days. A podcast with no new episode in six months is left out. The all-time charts bury a debut and a comeback; this is where they show.",
     rows: (env) => newShowsRows(env, 100, "podcast"),
     cards: (rows) => ({
       records: rows.map((r) => record(r)),
       rankOf: (s, i) => rankLabel(i + 1, false),
-      noteOf: (s, i) => `${firstBoost(rows[i])} · ${rows[i].booster_count} boosters since`,
+      noteOf: (s, i) => whyNew(rows[i]),
     }),
   },
   "new-music": {
@@ -63,7 +63,7 @@ export const PAGES = {
     cards: (rows) => ({
       records: rows.map((r) => record(r)),
       rankOf: (s, i) => rankLabel(i + 1, false),
-      noteOf: (s, i) => `${firstBoost(rows[i])} · ${rows[i].booster_count} boosters since`,
+      noteOf: (s, i) => whyNew(rows[i]),
     }),
   },
   "movers": {

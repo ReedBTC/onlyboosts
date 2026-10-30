@@ -48,12 +48,12 @@
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v246" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v246" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v247" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v247" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v246" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v246" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v247" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v247" />
 </head>
 <body>
 
@@ -600,7 +600,7 @@
         <p>The Shows chart and the Songs chart, each computed over the boosts published by the accounts on your Nostr follow list, which is the same Follows scope the charts page offers on every ranked feed. Your own boosts count, since you are on your own list.</p>
 
         <h3>New and Noteworthy</h3>
-        <p>Two rails, one for podcasts and one for music, each listing the shows or albums whose first indexed boost landed within the last 90 days and that have at least two distinct boosters, ordered by boosters and then sats. An all-time chart cannot show a debut; these rails exist for that reason.</p>
+        <p>Two rails, one for podcasts and one for music. Each lists the shows or albums whose first indexed boost landed within the last 90 days and that have at least two distinct boosters. The podcast rail also lists comebacks: podcasts boosted within the last 90 days after six months or more with no indexed boost, where one booster is enough, since the show already has a history. The boost accounts that relay other listeners&rsquo; payments do not count as boosters, and a podcast with no new episode in six months is left out, as it is from the recommendations. Both rails are ordered by boosters and then sats within those 90 days. An all-time chart cannot show a debut or a comeback; these rails exist for that reason.</p>
 
         <h3>Podcast Movers</h3>
         <p>This week&rsquo;s Shows chart against last week&rsquo;s, read to 100 places. Climbers come first, by places climbed, and this week&rsquo;s debuts follow in chart order. The line under each tile states the climb and last week&rsquo;s place.</p>
@@ -871,15 +871,15 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v246"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v247"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v246" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v247" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v246" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v247" defer></script>
 
-<script src="/assets/js/nav.js?v=ob-v246" defer></script>
+<script src="/assets/js/nav.js?v=ob-v247" defer></script>
 
 </body>
 </html>

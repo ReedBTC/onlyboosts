@@ -378,7 +378,11 @@ was picked from is in the session memory; direction A won, with the sans.
   exposes no accessor for the current list; the endpoint accepts them.
 - **Three more fact rails off the new columns**: New and Noteworthy
   (`first_boost_ts` within 90 days and two boosters; the collector measured
-  21 such shows), Movers (this week's Shows chart against last week's to 100
+  21 such shows; **since 2026-10-30 two rails, and the podcast one adds
+  COMEBACKS**, Reed's call after it held five tiles: boosted in 90 days after
+  180+ days with no boost, one non-bot booster, the six-month dormant rule
+  applied, about 21 tiles on OB-back's measurement; `newShowsRows`, `whyNew`
+  in `functions/index.js`; music stays debuts only), Movers (this week's Shows chart against last week's to 100
   places, climbers by places then debuts), Podcasters Recommend (podroll
   targets by how many sources list them; an unindexed target is a figure,
   not a link).
