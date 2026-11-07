@@ -34,6 +34,7 @@ import { feedRanks, renderStatTiles, chartCacheOf } from "../_shared/feed-rank.j
 // The two drawers open on the chart formula over their own rows (2026-09-03).
 import { chartRanks, rankLabel } from "../../assets/js/rank.js";
 import { favoriteButtonHtml } from "../../assets/js/favorite-button.js";
+import { tileHtml, railListHtml } from "../../assets/js/rail-tile.js";
 
 import { headOf } from "../_shared/head.js";
 const SITE_ORIGIN = "https://onlyboosts.social";
@@ -78,13 +79,10 @@ const BOOSTS_SHOWN = 24;
 // around 50KB rather than 200KB.
 const COMMUNITY_SHOWS_LIMIT = 150;
 
-// How many podroll tiles paint before the toggle: two desktop rows of five.
-// Measured over the 371 live edges, the median podroll is 4 and the reverse
-// direction's biggest fan-in is 15, so this only bites on the head of the
-// distribution — one page (Before The Sch3m3s, 63 entries) and two of the
-// reverse lists. Nothing is dropped; the rest ship hidden behind the same
-// .show-more button the community wall uses.
-const PODROLL_VISIBLE = 10;
+// The podroll paints every tile in one sideways rail since 2026-11-07 (the
+// homepage's shape, Reed's ask); until then ten tiles stood in a grid before
+// a "Show N more" toggle (median podroll 4, biggest reverse fan-in 15, one
+// page with 63).
 
 export async function onRequestGet(context) {
   const { request, env, params } = context;
@@ -543,19 +541,20 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v253" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v253" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v253" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v253" />
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v253" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v253" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v254" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v254" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v254" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v254" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v254" />
+  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v254" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v254" />
   <!-- The boost note card and its reaction bar. Added when the boost list at
        the foot of this page became the same .note-card the homepage Boosts
        feed paints; this page linked neither before, which is why show-page.css
        restates .nostr-mention. That restatement is now redundant rather than
        load-bearing, and is left in place rather than removed in the same pass. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v253" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v253" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v254" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v254" />
 </head>
 <body data-show-guid="${htmlEscape(show.podcast_guid)}">
 
@@ -934,12 +933,12 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
 
 <script type="application/json" id="show-boost-payload">${jsonForScript(boostPayload)}</script>
 
-<script src="/assets/js/nav.js?v=ob-v253" defer></script>
-<script src="/assets/js/show-page.js?v=ob-v253" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v254" defer></script>
+<script src="/assets/js/show-page.js?v=ob-v254" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v253"></script>
-<script src="/assets/js/sw-register.js?v=ob-v253" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v254"></script>
+<script src="/assets/js/sw-register.js?v=ob-v254" defer></script>
 </body>
 </html>`;
 }
@@ -1298,27 +1297,22 @@ function episodePageUrl(itemGuid, title) {
 // live edges carry a guid at both ends, so BMB can always resolve the show even
 // where we have nothing indexed for it, and an unlinked tile in a section whose
 // entire purpose is discovery would be dead weight.
-function podrollTile(c, hidden) {
+//
+// THE TILE IS THE HOMEPAGE'S (rail-tile.js, two-sided) since 2026-11-07,
+// Reed's ask: the same artwork-and-title tile the rails use, in one row that
+// scrolls sideways, so a podroll looks like every other row of shows on the
+// site. No rank badge (a podroll is a list in the publisher's order, not a
+// chart) and no figure line (see above). The second-chance artwork rides as
+// data-art2 and show-page.js wires it, as the rails' pages do.
+function podrollTile(c) {
   const title = truncate(c.title, 120);
   const art = isSafeUrl(c.image) ? c.image : null;
-  // Same second-chance URL as the hero and the community rows, on the same
-  // terms: an attribute, wired through cover-art.js by show-page.js, never an
-  // inline onerror. 8 of the 371 live edges carry one.
   const art2 = isSafeUrl(c.artwork) && c.artwork !== art ? c.artwork : null;
   const ours = Number(c.linked) === 1;
   const href = ours ? `/show/${encodeURIComponent(c.guid)}` : bmbShowUrl(c.guid);
   // Off-site tiles open in a new tab; ours navigate in place, the way every
   // other internal link on the page does.
-  const away = ours ? "" : ` target="_blank" rel="noopener"`;
-
-  return `<li class="pr-tile"${hidden ? " hidden data-overflow" : ""}>
-        <a class="pr-link" href="${htmlEscape(href)}"${away} title="${htmlEscape(title)}">
-          ${art
-            ? `<img class="pr-art" src="${htmlEscape(art)}"${art2 ? ` data-art2="${htmlEscape(art2)}"` : ""} alt="" loading="lazy" referrerpolicy="no-referrer" />`
-            : `<span class="pr-art pr-art--blank" aria-hidden="true">🎙️</span>`}
-          <span class="pr-title">${htmlEscape(title)}</span>
-        </a>
-      </li>`;
+  return tileHtml({ rank: null, href, title, img: art, art2, glyph: "🎙", external: !ours });
 }
 
 // NEITHER HEADING CARRIES A COUNT, and neither may gain one. Both figures are
@@ -1383,19 +1377,12 @@ function renderPodroll(rows, direction, copy, show) {
   }
   if (!cards.length) return "";
 
-  const hidden = Math.max(0, cards.length - PODROLL_VISIBLE);
-
   return `<section class="show-section" id="${meta.id}">
     <div class="show-section-head">
       <h2>${htmlEscape(meta.heading(copy, show))}</h2>
       <p class="show-section-sub">${htmlEscape(meta.sub(copy))}</p>
     </div>
-    <ul class="pr-grid">
-      ${cards.map((c, i) => podrollTile(c, i >= PODROLL_VISIBLE)).join("\n      ")}
-    </ul>
-    ${hidden > 0 ? `<button type="button" class="btn btn-quiet show-more" data-show-more="${meta.id}">
-      Show ${num(hidden)} more
-    </button>` : ""}
+    <div class="rail-track">${railListHtml(cards.map((c) => podrollTile(c)))}</div>
   </section>`;
 }
 
@@ -1511,10 +1498,10 @@ function notFound(guid) {
   <meta name="robots" content="noindex" />
   <title>Show not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v253" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v253" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v253" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v253" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v254" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v254" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v254" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v254" />
 </head>
 <body>
 <section class="page-header">
@@ -1533,7 +1520,7 @@ function notFound(guid) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v253" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v254" defer></script>
 </body>
 </html>`;
   return new Response(html, {

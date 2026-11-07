@@ -11,11 +11,11 @@
  * rewrites the version), no clock reads, no unpinned locale, nothing from the
  * DOM. Verbs (the artwork fallback walk) are attached by discover.js.
  */
-import { coverChain } from './cover-art.js?v=ob-v253'
-import { rankLabel } from './rank.js?v=ob-v253'
-import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v253'
-import { boosterPageHref } from './booster-link.js?v=ob-v253'
-import { languageName } from './lang-name.js?v=ob-v253'
+import { coverChain } from './cover-art.js?v=ob-v254'
+import { rankLabel } from './rank.js?v=ob-v254'
+import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v254'
+import { boosterPageHref } from './booster-link.js?v=ob-v254'
+import { languageName } from './lang-name.js?v=ob-v254'
 
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => (
@@ -126,7 +126,9 @@ export function rankTripletHtml(r) {
  * is the one line under the title; `subTitle` its tooltip; `gold` marks the
  * rank badge (a #40HPW member over the goal).
  */
-export function tileHtml({ rank = null, tied = false, href = null, title, sub = '', subHtml = '', subTitle = '', subClass = '', img = null, art2 = null, glyph = '🎙', gold = false, person = false, medium = null }) {
+/* `external` opens the link in a new tab (the /show podroll's tiles for a
+ * show this site has no page for point at BoostMeBitch, 2026-11-07). */
+export function tileHtml({ rank = null, tied = false, href = null, title, sub = '', subHtml = '', subTitle = '', subClass = '', img = null, art2 = null, glyph = '🎙', gold = false, person = false, medium = null, external = false }) {
   const chain = coverChain(img, art2)
   const media = chain.length
     ? `<img alt="" loading="lazy" referrerpolicy="no-referrer" src="${esc(chain[0])}"${attr('data-art2', chain[1])} />`
@@ -143,7 +145,7 @@ export function tileHtml({ rank = null, tied = false, href = null, title, sub = 
      the only difference; discover.css does the rest. */
   const li = `<li class="rail-tile${person ? ' rail-tile--person' : ''}">`
   return href
-    ? `${li}<a class="rt" href="${esc(href)}">${inner}</a></li>`
+    ? `${li}<a class="rt" href="${esc(href)}"${external ? ' target="_blank" rel="noopener"' : ''}>${inner}</a></li>`
     : `${li}<span class="rt">${inner}</span></li>`
 }
 

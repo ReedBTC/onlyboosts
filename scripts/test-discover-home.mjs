@@ -602,6 +602,15 @@ console.log('\nThe recommendations and the data rails, over the real schema:')
     assert.ok(!html.includes('rt-ranks') && !html.includes('sats'), 'bare tiles')
     assert.equal(recommendRailsHtml({ podcasts: [], music: [], because: [] }), '')
   })
+  check('the /show podroll is a rail of the homepage\'s tiles, every tile painted, off-site ones in a new tab (2026-11-07)', () => {
+    const fn = read('functions/show/[guid].js')
+    assert.ok(fn.includes('from "../../assets/js/rail-tile.js"') && fn.includes('<div class="rail-track">${railListHtml(cards.map((c) => podrollTile(c)))}</div>'))
+    assert.ok(fn.includes('external: !ours') && fn.includes('rank: null, href'), 'no rank badge; BMB tiles open away')
+    assert.ok(!fn.includes('pr-grid') && !fn.includes('PODROLL_VISIBLE'), 'the grid and the toggle are gone')
+    assert.ok(/<link rel="stylesheet" href="\/assets\/css\/discover\.css\?v=/.test(fn), 'the rail styles are linked')
+    assert.ok(!read('assets/css/show-page.css').includes('.pr-grid {'), 'the grid rules are gone')
+    assert.ok(read('assets/js/show-page.js').includes(".rail-tile .rt-media img"), 'the art2 chain is wired on the tiles')
+  })
   check('feedGuidsOf hands the recommendations BARE guids: a feed entry\'s id is the whole podcast:guid: identifier (2026-11-07)', () => {
     // The shipped function, run with the merge module's real feedGuidOf. The
     // first paint sent the identifier and no followed show ever left the rails.

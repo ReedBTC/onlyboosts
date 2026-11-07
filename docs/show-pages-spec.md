@@ -453,17 +453,19 @@ empty and read as a ranked list that had lost its ranking, and inventing a figur
 to fill the gap would misrepresent what a podroll is.
 
 So: **square artwork at tile size, the show's name beneath it, and nothing
-else.** Five across on desktop, two on a phone. Bowl After Bowl's own roll-call
-page is the reference, and the artwork earns the space because it is the only
-content.
+else.** Since 2026-11-07 the tile is the homepage's rail tile (`rail-tile.js`,
+two-sided, `discover.css` linked for it) and the list is one sideways row,
+ten across on a desktop and scrolling for the rest (Reed's ask, after every
+page took the homepage's 72rem track: the podroll should look like every
+other row of shows on the site). No rank badge, since a podroll is the
+publisher's order and not a chart. Every tile paints; the "Show N more"
+toggle went with the grid.
 
-The column counts are fixed rather than `auto-fill`, which is the opposite of the
-choice the community wall makes above. The difference is that a circular avatar
-has a natural size and the count can follow it, where a tile is as wide as a
-fifth of the column: here the count is the design and the width follows from it.
-
-Ten tiles paint before a "Show N more" toggle. The median podroll is 4, so this
-bites on one page in the corpus (63 entries) and on two of the reverse lists.
+From 2026-07-30 until then it was a grid of big square tiles, five across on
+a desktop and two on a phone, fixed counts rather than `auto-fill` (a tile has
+no natural size the way the wall's avatars do), with ten tiles before the
+toggle (median podroll 4; one page with 63 entries). Bowl After Bowl's own
+roll-call page was the reference. `git log -S pr-grid` has it.
 
 ### Where a Tile Points
 
