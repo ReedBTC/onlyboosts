@@ -266,6 +266,31 @@ body {
 a { color: var(--green-d); text-decoration: underline; text-underline-offset: 3px; }
 img { display: block; max-width: 100%; }
 
+/* A picture inside a boost message (2026-11-07, Reed's ask: a shared GIF
+   should show as the GIF). Rendered by nostr-text.js#renderMessage at the
+   edge and by boosts-thread.js on the Boosts page; here because the three
+   message containers (.boost-msg, .pcast-boost-msg, .note-body) live in three
+   stylesheets and every page links this one. The box is the point: the same
+   idea came out on 2026-08-21 for making the cards too big, so the picture
+   never exceeds 200px tall or 280px wide, whatever its own size. */
+a.msg-media {
+  display: block;
+  width: fit-content;
+  max-width: min(100%, 280px);
+  margin: 0.4rem 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  line-height: 0;
+}
+a.msg-media img {
+  display: block;
+  max-width: 100%;
+  max-height: 200px;
+  width: auto;
+  height: auto;
+}
+
 @keyframes skeleton-shimmer {
   0% { background-position: 100% 0; }
   100% { background-position: -100% 0; }

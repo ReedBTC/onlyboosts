@@ -496,8 +496,13 @@ check('a receipt-only message renders empty and the row emits no body', () => {
 
 check('the Boosts page and the episode drawer apply the same strip', () => {
   const feed = readFileSync(new URL('../assets/js/boosts-feed.js', import.meta.url), 'utf8')
-  assert.match(feed, /import \{ stripNoteRefs \} from '\/assets\/js\/nostr-text\.js\?v=/)
-  assert.match(feed, /const msgText = stripNoteRefs\(b\.msg\)\s*\n\s*if \(msgText\) \{/)
+  assert.match(feed, /import \{ tidyBoostMessage \} from '\/assets\/js\/nostr-text\.js\?v=/)
+  assert.match(feed, /const msgText = tidyBoostMessage\(b\.msg\)\s*\n\s*if \(msgText\) \{/)
+  // and the Boosts page's tokenizer gives a URL the edge's two treatments
+  const thread = readFileSync(new URL('../assets/js/boosts-thread.js', import.meta.url), 'utf8')
+  assert.match(thread, /import \{ isImageUrl, linkLabel \} from '\/assets\/js\/nostr-text\.js\?v=/)
+  assert.match(thread, /if \(isImageUrl\(url\)\) \{\s*\n\s*a\.className = 'msg-media'/)
+  assert.match(thread, /a\.textContent = linkLabel\(url\)/)
   assert.match(feed, /parseSegments\(msgText\)/)
   assert.doesNotMatch(feed, /parseSegments\(b\.msg\)/)
   const card = readFileSync(new URL('../assets/js/episode-card.js', import.meta.url), 'utf8')
