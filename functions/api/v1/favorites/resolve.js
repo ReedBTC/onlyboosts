@@ -10,7 +10,8 @@
  *   body   { feeds: [guid], items: [[feedGuid, itemGuid]], publishers: [guid] }
  *   200    { feeds: {guid: row}, items: {"feedGuid|itemGuid": row}, publishers: {guid: row} }
  *
- * A row is { title, image, artwork, medium, href, indexed }. `href` is the
+ * A row is { title, image, artwork, medium, feed, href, indexed } (`feed`,
+ * the feed URL, since 2026-11-07, for the OPML export). `href` is the
  * page here when there is one, BoostMeBitch's address for a show the index
  * cannot name (the podroll tiles' rule), or null. `indexed` says which side
  * answered. A guid nobody could name is simply absent from the answer, and
@@ -59,7 +60,7 @@ export async function onRequestPost({ request, env }) {
 
   if (feedSet.length) {
     const { results } = await env.DB.prepare(
-      `SELECT podcast_guid, title, image, artwork, medium, author
+      `SELECT podcast_guid, title, image, artwork, medium, author, feed_url
        FROM podcasts WHERE podcast_guid IN (SELECT value FROM json_each(?))`,
     ).bind(JSON.stringify(feedSet)).all();
     for (const r of results ?? []) {
@@ -115,6 +116,7 @@ export async function onRequestPost({ request, env }) {
         podcast_guid: guid, title: f.title, image: f.image || f.artwork || null,
         artwork: f.artwork && f.artwork !== f.image ? f.artwork : null,
         medium: typeof f.medium === "string" && f.medium ? f.medium : null, author: f.author || null,
+        feed_url: typeof f.url === "string" && f.url ? f.url : null,
       }, false);
     }
 
@@ -145,6 +147,7 @@ function feedRow(r, indexed) {
     artwork: r.artwork || null,
     medium: r.medium || null,
     author: r.author || null,
+    feed: r.feed_url || null,
     // A show with a page here links here; one the index cannot name links to
     // BMB, the podroll tiles' rule for a show we have no page for.
     href: indexed && title

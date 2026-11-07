@@ -41,10 +41,10 @@
  * shipped cycle against scripted relays, a stand-in codec and a real key.
  * Nothing here is reached signed out; the bot cannot hold favorites.
  */
-import { readFavorites, readWriteRelays, relaySet, acceptsEvent } from '/assets/js/favorites-read.js?v=ob-v254'
+import { readFavorites, readWriteRelays, relaySet, acceptsEvent } from '/assets/js/favorites-read.js?v=ob-v255'
 import {
   KIND, plan, parse, parseTags, statedVisibility, decodePlaintext, kindOf, feedIdOf, feedGuidOf,
-} from '/assets/js/favorites-merge.js?v=ob-v254'
+} from '/assets/js/favorites-merge.js?v=ob-v255'
 
 /**
  * Where a list is published. The read set less relay.mostr.pub, which held a
@@ -367,8 +367,11 @@ export async function fetchFavorites(pubkey, deps = {}) {
 export async function syncFavorites(change, deps) {
   const { pubkey, store } = deps ?? {}
   if (!pubkey) return { status: 'signed-out' }
-  if (change) {
-    const why = validateChange(change)
+  // One change, or an array of them applied in order and published ONCE (the
+  // OPML import, 2026-11-07: a 54-show file is one event, not 54).
+  const changes = Array.isArray(change) ? change : change ? [change] : []
+  for (const c of changes) {
+    const why = validateChange(c)
     if (why) return { status: 'bad-change', reason: why }
   }
 
@@ -403,12 +406,12 @@ export async function syncFavorites(change, deps) {
     baseline = hydrate.baselineIfLanded
     saveBaseline(store, pubkey, baseline)
   }
-  if (!change) {
+  if (!changes.length) {
     if (hydrate.publish === null) return { status: 'unchanged', event: r.event }
     // The list itself wants a rewrite (a legacy tag, a migration). Publish it.
   }
 
-  const local = change ? applyChange(adopted, change) : adopted
+  const local = changes.reduce((acc, c) => applyChange(acc, c), adopted)
   const result = plan({ ...common, local, baseline })
   if (result.publish === null) {
     saveBaseline(store, pubkey, result.baselineIfLanded)

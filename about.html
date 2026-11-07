@@ -48,12 +48,12 @@
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v254" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v254" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v255" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v255" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v254" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v254" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v255" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v255" />
 </head>
 <body>
 
@@ -586,7 +586,7 @@
         <ol>
           <li><strong>Similar shows.</strong> Once a day the indexer takes every show with at least three distinct boosters and finds its twenty most similar shows. Similarity is the overlap between the two shows&rsquo; sets of boosters, measured as cosine similarity: the number of members who boosted both, divided by the square root of the product of the two booster counts. Two shows boosted by exactly the same people score 1; two shows with no booster in common score 0. Podcasts are compared with podcasts and albums with albums.</li>
           <li><strong>Relay bots are not boosters.</strong> <a href="#bots">Accounts that publish on behalf of other people</a> are left out of the booster sets. One such key relaying hundreds of boosts would otherwise read as a single person who boosts everything, and would manufacture overlap between every show it touched.</li>
-          <li><strong>Your seeds.</strong> When you are logged in, the shows you have boosted under your key are your seeds, together with the podcasts you follow and the albums you have favorited: your PC 2.0 favorites list, which your browser reads from your relays and passes along once it has it, so the rails repaint a moment after the page loads. Each candidate show&rsquo;s similarity to every one of your seeds is summed; a show you have already boosted, followed or favorited is never a candidate, which is why following a show takes it off these rails.</li>
+          <li><strong>Your seeds.</strong> When you are logged in, the shows you have boosted under your key are your seeds, together with the podcasts you follow and the albums you have favorited: your PC 2.0 favorites list, which your browser reads from your relays and passes along once it has it, so the rails repaint a moment after the page loads. Each candidate show&rsquo;s similarity to every one of your seeds is summed; a show you have already boosted, followed or favorited is never a candidate, which is why following a show takes it off these rails. Without an account, you can import the subscription list (an OPML file) from your current podcast app instead: the shows it lists are kept in your browser alone and are your seeds, so these rails and the Because rails paint for you too; the rails built from your Nostr follows need an account.</li>
           <li><strong>The floor.</strong> A candidate ranks only if it is reached from two or more of your seeds, or shares two or more boosters with one of them. Measured on 2026-10-17, half of all similar-show pairs share exactly one booster, which is one person&rsquo;s taste rather than an audience&rsquo;s, so a single shared booster is not enough.</li>
           <li><strong>Two lists.</strong> Podcasts and music are ranked separately. The overlap on the music side runs about three times the podcast side&rsquo;s, so one combined list would be all music.</li>
           <li><strong>Active podcasts only.</strong> A podcast whose newest episode is more than six months old is left off Podcasts Recommended For You. The date is the newest episode Podcast Index lists for the feed, boosted or not; a show with no date on record is kept. Albums are exempt, since a finished album does not go stale.</li>
@@ -871,15 +871,15 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v254"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v255"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v254" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v255" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v254" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v255" defer></script>
 
-<script src="/assets/js/nav.js?v=ob-v254" defer></script>
+<script src="/assets/js/nav.js?v=ob-v255" defer></script>
 
 </body>
 </html>

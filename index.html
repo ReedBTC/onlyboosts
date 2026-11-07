@@ -68,14 +68,14 @@
   <meta name="twitter:card" content="summary_large_image" />
 
   <link rel="preload" href="/assets/fonts/outfit.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v254" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v254" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v255" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v255" />
   <!-- The boost rows at the foot are the detail pages' rows and wear their
        sheets: the card, the thread chrome and the reaction bar. -->
-  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v254" />
+  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v255" />
   <!-- theme.css last among the shared sheets: the palette, the fonts, and
        the base body/a/img rules every shared stylesheet reads off :root. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v254" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v255" />
 </head>
 <body>
 
@@ -416,10 +416,10 @@
         <div>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>
           <div>
-            <h3>Log in to see your recommendations</h3>
-            <p>Other members boost some of the same shows you do. This rail is what else those members boost, minus anything you have already boosted or favorited. The boosts you publish to Nostr are what build it.</p>
+            <h3>Log in or import your OPML</h3>
+            <p>Other members boost some of the same shows you do. This rail is what else those members boost, minus anything you already boost or follow. Log in and your Nostr boosts build it; or import the subscription list from your current podcast app, and the shows you follow seed it instead.</p>
           </div>
-          <button type="button" class="ob-cta" data-lb-login-trigger>Log in</button>
+          <span class="rail-locked-actions"><button type="button" class="ob-cta" data-lb-login-trigger>Log in</button><button type="button" class="ob-cta ob-cta--quiet" data-opml-import>Import OPML</button></span>
         </div>
       </div>
     </div>
@@ -447,10 +447,10 @@
         <div>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>
           <div>
-            <h3>Log in to see your music recommendations</h3>
-            <p>Albums ranked by how much their boosters overlap with the music you boost and favorite.</p>
+            <h3>Log in or import your OPML</h3>
+            <p>Albums ranked by how much their boosters overlap with the music you boost and favorite. An imported subscription list counts too.</p>
           </div>
-          <button type="button" class="ob-cta" data-lb-login-trigger>Log in</button>
+          <span class="rail-locked-actions"><button type="button" class="ob-cta" data-lb-login-trigger>Log in</button><button type="button" class="ob-cta ob-cta--quiet" data-opml-import>Import OPML</button></span>
         </div>
       </div>
     </div>
@@ -738,12 +738,12 @@
 <!-- FOOTER:END -->
 
 <!-- Lazy widget bootstrap (Donate + identity slot) -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v254"></script>
-<script src="/assets/js/sw-register.js?v=ob-v254" defer></script>
-<script src="/assets/widgets/pwa-install.js?v=ob-v254" defer></script>
-<script src="/assets/js/nav.js?v=ob-v254" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v255"></script>
+<script src="/assets/js/sw-register.js?v=ob-v255" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v255" defer></script>
+<script src="/assets/js/nav.js?v=ob-v255" defer></script>
 <!-- The verbs: artwork fallback, the rails the edge could not fill, and the
      personal rails for a signed-in member. -->
-<script type="module" src="/assets/js/discover.js?v=ob-v254"></script>
+<script type="module" src="/assets/js/discover.js?v=ob-v255"></script>
 </body>
 </html>

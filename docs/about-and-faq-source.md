@@ -375,7 +375,11 @@ indexed Nostr boost; nothing about a visitor is stored.
      fires `ob:favorites-read`, `discover.js` asks the endpoint again with the
      feeds; on `/booster` the Favorites section hands them over and the rails
      repaint. Candidate score = sum of similarity to every seed; seeds
-     excluded, so following a show takes it off the rails.
+     excluded, so following a show takes it off the rails. A visitor with no
+     Nostr account can import an OPML file (2026-11-07): the followed shows
+     are kept in that browser alone and are the whole seed set (the endpoint
+     takes `favorites` with no pubkey), so the two Recommended rails and the
+     Because rails paint for them too; the follows rails stay locked.
   4. Floor: reached from >= 2 seeds, or >= 2 shared boosters with one seed. Half
      of all pairs share exactly one booster (measured 2026-10-17).
   5. Podcasts and music ranked separately: music overlap runs ~3x the podcast

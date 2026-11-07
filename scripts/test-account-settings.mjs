@@ -164,7 +164,7 @@ await check('round trip: what one device pushes, another device pulls and applie
 await check('the controller wires it: restore on login, push on the theme toggle and on a mode choice', () => {
   const ui = readFileSync(path.join(root, 'assets/js/favorites-ui.js'), 'utf8')
   assert.match(ui, /initAccountSettings\(\)/)
-  assert.equal((ui.match(/noteSettingsChange\(\)/g) || []).length, 2, 'the first-favorite choice and setMode both note a change')
+  assert.equal((ui.match(/noteSettingsChange\(\)/g) || []).length, 3, 'the first-favorite choice, the OPML import\'s first choice (2026-11-07) and setMode all note a change')
   assert.match(src, /window\.addEventListener\('lb:session-change', \(\) => \{ restoreSettings\(\) \}\)/)
   assert.match(src, /closest\?\.\('\.nav-theme-toggle'\)\) noteSettingsChange\(\)/)
   assert.doesNotMatch(src.split('\n').filter((l) => !/^\s*(\*|\/\/|\/\*)/.test(l)).join('\n'), /nip04/i)

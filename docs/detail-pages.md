@@ -519,6 +519,10 @@ hands the list over (bare guids) and repaints once it is read. The headings say
 The page asks for twenty per rail; the rail scrolls sideways past the ten it
 shows, on every page, since the same day.
 
+The owner's Follows and Favorites band carries **Import OPML / Export OPML**
+since 2026-11-07 (shown over an empty list too); see **OPML Import And
+Export** in `docs/favorites.md`.
+
 The header runs its **own** Primal backfill rather than `hydrateProfiles()`; see
 the note in `booster-page.js`.
 

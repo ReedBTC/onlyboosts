@@ -22,11 +22,11 @@
  * Nothing on the list is dropped for being unresolvable: an entry nobody can
  * name renders its guid, since it is still somebody's favorite.
  */
-import { fetchFavorites, widgetDeps } from '/assets/js/favorites-sync.js?v=ob-v254'
-import { favoriteButtonHtml } from '/assets/js/favorite-button.js?v=ob-v254'
-import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v254'
-import { isSafeUrl } from '/assets/js/nostr-text.js?v=ob-v254'
-import { sortControl } from '/assets/js/feed-controls.js?v=ob-v254'
+import { fetchFavorites, widgetDeps } from '/assets/js/favorites-sync.js?v=ob-v255'
+import { favoriteButtonHtml } from '/assets/js/favorite-button.js?v=ob-v255'
+import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v255'
+import { isSafeUrl } from '/assets/js/nostr-text.js?v=ob-v255'
+import { sortControl } from '/assets/js/feed-controls.js?v=ob-v255'
 
 const RESOLVE_URL = '/api/v1/favorites/resolve'
 
@@ -262,6 +262,7 @@ export function initFavoritesSection({ pubkey, root, onEntries = null }) {
     const mine = ++run
     const viewer = getSessionPubkey()
     const owner = !!viewer && viewer === pubkey
+    mountOpml(owner)
     const deps = owner && window.LBLogin ? await widgetDeps(window.LBLogin) : {}
     let r
     try { r = await fetchFavorites(pubkey, { ...deps, pubkey }) } catch (err) {
@@ -303,6 +304,30 @@ export function initFavoritesSection({ pubkey, root, onEntries = null }) {
     shown = { groups: groupEntries(entries, resolved), owner }
     render()
     if (ctrlEl) ctrlEl.hidden = false
+  }
+
+  /* The owner's Import OPML / Export OPML, on the controls band beside the
+   * group menu (2026-11-07, one of the import's three doors; the others are
+   * the homepage's locked card and the account menu). Shown to the owner
+   * even over an empty list, since importing is how an empty list fills. */
+  function mountOpml(owner) {
+    if (!ctrlEl) return
+    let box = ctrlEl.querySelector('[data-fav-opml]')
+    if (!owner) { if (box) box.remove(); return }
+    if (!box) {
+      box = document.createElement('span')
+      box.className = 'fav-opml'
+      box.setAttribute('data-fav-opml', '')
+      box.innerHTML = '<button type="button" class="btn btn-quiet btn-sm" data-opml="import">Import OPML</button><button type="button" class="btn btn-quiet btn-sm" data-opml="export">Export OPML</button>'
+      box.addEventListener('click', (e) => {
+        const b = e.target.closest?.('[data-opml]')
+        if (!b) return
+        if (b.dataset.opml === 'import') window.OBFavorites?.importOpml?.()
+        else window.OBFavorites?.exportOpml?.()
+      })
+      ctrlEl.appendChild(box)
+    }
+    ctrlEl.hidden = false
   }
 
   paint()

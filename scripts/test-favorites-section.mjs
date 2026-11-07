@@ -78,7 +78,7 @@ await check('indexed feed, item pair and publisher resolve from D1 with pages he
   piCalls.length = 0
   const { status, body } = await post({ feeds: ['show-1', 'album-1'], items: [['show-1', 'ep-1']], publishers: ['pub-1'] })
   assert.equal(status, 200)
-  assert.deepEqual(body.feeds['show-1'], { title: 'A Podcast', image: 'https://x/a.jpg', artwork: 'https://x/a2.jpg', medium: 'podcast', author: 'Host', href: '/show/show-1', indexed: true })
+  assert.deepEqual(body.feeds['show-1'], { title: 'A Podcast', image: 'https://x/a.jpg', artwork: 'https://x/a2.jpg', medium: 'podcast', author: 'Host', feed: null, href: '/show/show-1', indexed: true })
   assert.equal(body.feeds['album-1'].medium, 'music')
   assert.deepEqual(body.items['show-1|ep-1'], { title: 'Episode One', image: 'https://x/e.jpg', href: '/episode/ep-1', indexed: true })
   assert.deepEqual(body.publishers['pub-1'], { title: 'The Artist', image: 'https://x/p.jpg', artwork: null, medium: 'publisher', href: '/artist/pub-1', indexed: true })
@@ -99,7 +99,7 @@ await check('an untitled indexed show links to BMB, not to a page here', async (
 await check('an unknown feed and item pair go to Podcast Index, bounded, and link to BMB', async () => {
   piCalls.length = 0
   const { body } = await post({ feeds: ['pi-show', 'dead', 'nobody'], items: [['pi-show', 'pi-ep']] })
-  assert.deepEqual(body.feeds['pi-show'], { title: 'PI Show', image: 'https://pi/i.jpg', artwork: 'https://pi/a.jpg', medium: 'music', author: 'PI Artist', href: 'https://boostmebitch.com/?podcast=pi-show', indexed: false })
+  assert.deepEqual(body.feeds['pi-show'], { title: 'PI Show', image: 'https://pi/i.jpg', artwork: 'https://pi/a.jpg', medium: 'music', author: 'PI Artist', feed: null, href: 'https://boostmebitch.com/?podcast=pi-show', indexed: false })
   assert.equal(body.feeds['dead'], undefined, 'a PI miss is simply absent')
   assert.equal(body.feeds['nobody'], undefined)
   assert.deepEqual(body.items['pi-show|pi-ep'], { title: 'PI Episode', image: 'https://pi/e.jpg', href: 'https://boostmebitch.com/?podcast=pi-show&episode=pi-ep', indexed: false })

@@ -420,6 +420,31 @@ function SettingsRows({ signedOut }) {
                     ? 'Your list is in both states at once; pick one to settle it.'
                     : 'Not chosen yet. You will be asked at your first favorite.'}
           </p>
+          {/* OPML (2026-11-07): the import panel and the export, both the
+              site controller's; an older controller without them shows nothing. */}
+          {typeof api.importOpml === 'function' && (
+            <div className="flex items-center justify-between gap-3 pt-1">
+              <span className="text-xs text-[var(--ink,#0f2733)]">Podcast list (OPML)</span>
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => api.importOpml()}
+                  className="px-2 py-1 rounded-md text-[11px] font-medium border border-[var(--modal-line,#b9d4e6)] text-[var(--ink,#0f2733)] hover:bg-[var(--modal-inset,#e6f1f9)]"
+                >
+                  Import
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => api.exportOpml()}
+                  className="px-2 py-1 rounded-md text-[11px] font-medium border border-[var(--modal-line,#b9d4e6)] text-[var(--ink,#0f2733)] hover:bg-[var(--modal-inset,#e6f1f9)]"
+                >
+                  Export
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -805,7 +805,7 @@ node scripts/stamp-assets.js --check   # verify; non-zero exit if anything is st
 **Order matters.** `sync-partials` injects markup into the page files; anything
 it injects has to be stamped afterwards.
 
-Thirty-two test scripts, all plain `node scripts/<name>.mjs` with no runner.
+Thirty-three test scripts, all plain `node scripts/<name>.mjs` with no runner.
 **`docs/tests.md` is the per-test reference** — one row each, saying what it
 covers and what it was confirmed red against. What follows here is only what a
 change elsewhere would break.
@@ -815,10 +815,10 @@ THAT GOES UNRUN.** Its header carries the `curl` that produces the capture; take
 a fresh one rather than reusing an old file, since it is also the size
 measurement. It asserted `cards are numbered 1..N with no gaps` — the *ordinal*
 scheme's invariant — until competition ranking shipped on 2026-08-18, and it
-would have been merged red had it not been run. **Run all thirty-two before a
+would have been merged red had it not been run. **Run all thirty-three before a
 merge**, and treat this one as the guard on the ranking scheme rather than only
 on weight. *(That number has been wrong before — it lagged from twelve to twenty-eight, a
-test at a time, while the table beside it grew; it was thirty-two for an afternoon on 2026-10-17 (`test-discover-home.mjs` in) and thirty-one again by evening (`test-feed-search.mjs` out); thirty-two since 2026-10-29 (`test-session-secret.mjs` in). `git log -S "before a\nmerge" -- CLAUDE.md` has every value it has held. **Bump it and `docs/tests.md`
+test at a time, while the table beside it grew; it was thirty-two for an afternoon on 2026-10-17 (`test-discover-home.mjs` in) and thirty-one again by evening (`test-feed-search.mjs` out); thirty-two since 2026-10-29 (`test-session-secret.mjs` in); thirty-three since 2026-11-07 (`test-opml.mjs` in). `git log -S "before a\nmerge" -- CLAUDE.md` has every value it has held. **Bump it and `docs/tests.md`
 together.**)*
 
 **⚠️ AND ITS `curl` CHANGED WITH THE LANDING FEED.** It captures
@@ -2574,6 +2574,19 @@ is a publish target (theforest refuses the write and is deliberately out).**
   glyph only, the kind 10333 event is unchanged. The list is **Follows and
   Favorites** on every surface that names it. See **The Heart** in
   `docs/favorites.md`.
+- **⚠️ OPML IMPORT ADDS AND NEVER REMOVES, A PRIVATE FEED ADDRESS NEVER
+  LEAVES THE DEVICE, AND A VISITOR WITH NO ACCOUNT CAN IMPORT** (2026-11-07,
+  Reed's asks; BMB's rules in `assets/js/opml.js`, two-sided and
+  dependency-free). `POST /api/v1/feeds/resolve` turns feed URLs into guids
+  (D1 `feed_url` first, PI `byfeedurl` for the rest, `PI_MAX` a request;
+  three states, ABSENT is never "not found"); `POST /api/v1/opml/link` reads
+  a pasted link server-side and answers outlines only; a signed-out import
+  lives in `ob_local_follows` in that browser, seeds the homepage's
+  Recommended and Because rails through the endpoint's favorites-only form,
+  and is offered to the Nostr list on login; `syncFavorites` takes a batch
+  and publishes once. Three doors: the homepage's locked cards, the account
+  menu, the owner's `/booster` band. **OPML Import And Export** in
+  `docs/favorites.md`; `test-opml.mjs`.
 - **⚠️ THE HEART SHIPS `hidden` AND `favorites-ui.js` REVEALS IT FOR A
   SIGNED-IN MEMBER ONLY** (Reed: signed out gets nothing). `favorite-button.js`
   is two-sided chrome on the boost-button pattern, rendered by both cards and

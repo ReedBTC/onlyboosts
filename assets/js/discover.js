@@ -29,13 +29,13 @@
  *    sats this week") instead of following the tile's link. One note at a
  *    time; a click elsewhere, Escape or a scroll closes it.
  */
-import { railListHtml, showTile, albumTile, episodeTile, memberTile, langRailHtml, bare } from '/assets/js/rail-tile.js?v=ob-v254'
-import { heroHtml, slideHtml, showSlide, episodeSlide, memberSlide } from '/assets/js/hero.js?v=ob-v254'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v254'
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v254'
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v254'
-import { becauseVerb } from '/assets/js/recommend-rails.js?v=ob-v254'
-import { languageName } from '/assets/js/lang-name.js?v=ob-v254'
+import { railListHtml, showTile, albumTile, episodeTile, memberTile, langRailHtml, bare } from '/assets/js/rail-tile.js?v=ob-v255'
+import { heroHtml, slideHtml, showSlide, episodeSlide, memberSlide } from '/assets/js/hero.js?v=ob-v255'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v255'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v255'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v255'
+import { becauseVerb } from '/assets/js/recommend-rails.js?v=ob-v255'
+import { languageName } from '/assets/js/lang-name.js?v=ob-v255'
 
 const TILES = 10
 
@@ -188,11 +188,11 @@ function wireHeroBoost(hero) {
     try {
       const kind = slide.dataset.kind
       if (kind === 'episode' || kind === 'song') {
-        const m = await import('/assets/js/episode-card-actions.js?v=ob-v254')
+        const m = await import('/assets/js/episode-card-actions.js?v=ob-v255')
         btn.disabled = false
         await m.onBoostClick(slide, btn)
       } else {
-        const m = await import('/assets/js/show-card-actions.js?v=ob-v254')
+        const m = await import('/assets/js/show-card-actions.js?v=ob-v255')
         btn.disabled = false
         await m.onShowBoost(slide, btn)
       }
@@ -427,6 +427,18 @@ function linkFullList(section, pubkey) {
    scores over them. A seed is never recommended, so following a show takes
    it off the rails. /about#recommendations is the method in full. */
 let lastRecommend = { sections: null, pubkey: null, feeds: '' }
+/* A rail seeded by a list imported without an account says so, and opens the
+   list (the panel's manage view) from its head. */
+function importedNote(section) {
+  const head = section.querySelector('.rail-head')
+  if (!head || head.querySelector('[data-opml-manage]')) return
+  const b = document.createElement('button')
+  b.type = 'button'
+  b.className = 'rail-more rail-more--btn'
+  b.setAttribute('data-opml-manage', '')
+  b.textContent = 'From your imported OPML · Manage'
+  head.appendChild(b)
+}
 async function paintRecommended(sections, pubkey, favorites = []) {
   lastRecommend = { sections, pubkey, feeds: favorites.join(',') }
   const rec = sections.find((s) => s.dataset.rail === 'recommended')
@@ -435,16 +447,16 @@ async function paintRecommended(sections, pubkey, favorites = []) {
   try {
     const j = await getJson('/api/v1/recommend', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pubkey, limit: TILES, ...(favorites.length ? { favorites } : {}) }),
+      body: JSON.stringify({ ...(pubkey ? { pubkey } : {}), limit: TILES, ...(favorites.length ? { favorites } : {}) }),
     })
-    if (lastRecommend.pubkey !== pubkey) return
+    if (lastRecommend.pubkey !== pubkey || lastRecommend.sections !== sections) return
     const none = (what) => `Boost a few ${what} and the ${what} their other boosters boost will rank here.`
     if (rec) {
-      if (j.podcasts?.length) { unlock(rec, railListHtml(j.podcasts.map(bare(showTile)))); linkFullList(rec, pubkey) }
+      if (j.podcasts?.length) { unlock(rec, railListHtml(j.podcasts.map(bare(showTile)))); if (pubkey) linkFullList(rec, pubkey); else importedNote(rec) }
       else lockedCardNote(rec, j.seeds ? 'Nothing to recommend yet' : 'No boosts from this account yet', j.seeds ? 'Too few other members have boosted the shows you boost for the overlap to mean anything yet; it grows with every boost.' : none('shows'))
     }
     if (music) {
-      if (j.music?.length) { unlock(music, railListHtml(j.music.map(bare(albumTile)))); linkFullList(music, pubkey) }
+      if (j.music?.length) { unlock(music, railListHtml(j.music.map(bare(albumTile)))); if (pubkey) linkFullList(music, pubkey); else importedNote(music) }
       else lockedCardNote(music, j.seeds ? 'Nothing to recommend yet' : 'No music boosts from this account yet', j.seeds ? 'Too few other members have boosted the albums you boost for the overlap to mean anything yet.' : none('albums'))
     }
     paintBecause(because, Array.isArray(j.because) ? j.because.filter((b) => b?.seed && b.rows?.length) : [])
@@ -465,7 +477,16 @@ async function paintPersonal() {
     paintBecause(null, [])
     // The nav's Because link, signed out: the carrot is the locked rail above it.
     if (location.hash === '#rail-because') document.getElementById('rail-recommended')?.scrollIntoView({ block: 'start' })
-    return // the locked cards stay: the carrot
+    // A list imported from OPML without an account seeds the two Recommended
+    // rails and the Because rails on its own (2026-11-07); the follows rails
+    // stay locked, since they need a Nostr follow list. The locked cards stay
+    // otherwise: the carrot.
+    lastRecommend = { sections, pubkey: null, feeds: '' }
+    const api = await favoritesApi()
+    const local = api ? await api.ensureRead().catch(() => []) : []
+    if (my !== personalRun) return
+    if (local.length) paintRecommended(sections, null, local)
+    return
   }
   for (const s of sections) {
     if (!FOLLOWS[s.dataset.rail]) continue
@@ -474,10 +495,12 @@ async function paintPersonal() {
     else lockedCardNote(s, 'Your follow list could not be read', 'The relays did not answer. Reload to try again.')
   }
   if (res.pubkey) {
-    paintRecommended(sections, res.pubkey, window.OBFavorites?.feeds?.() || [])
+    const api = await favoritesApi()
+    if (my !== personalRun) return
+    paintRecommended(sections, res.pubkey, api?.feeds?.() || [])
     // The list is read lazily and only where a heart is on the page; this
     // page has none, so ask. The answer arrives as ob:favorites-read.
-    window.OBFavorites?.ensureRead?.()
+    api?.ensureRead?.()
   }
 }
 
@@ -488,12 +511,33 @@ async function paintPersonal() {
 function onFavoritesRead(e) {
   const d = e.detail || {}
   const { sections, pubkey } = lastRecommend
-  if (!sections || !pubkey || !d.trusted || d.pubkey !== pubkey) return
+  if (!sections) return
+  // Signed in: this account's trusted read. Signed out: the imported list.
+  const mine = pubkey ? (d.trusted && d.pubkey === pubkey) : (d.local && !d.pubkey)
+  if (!mine) return
   const feeds = Array.isArray(d.feeds) ? d.feeds : []
   if (!feeds.length || feeds.join(',') === lastRecommend.feeds) return
   paintRecommended(sections, pubkey, feeds)
 }
 window.addEventListener('ob:favorites-read', onFavoritesRead)
+
+/* The favorites controller, which nav.js loads lazily; awaited here so an
+   early click or an early paint never finds window.OBFavorites missing. The
+   same module URL, so the same instance. */
+async function favoritesApi() {
+  try { await import('/assets/js/favorites-ui.js?v=ob-v255') } catch {}
+  return window.OBFavorites || null
+}
+
+/* The Import OPML button on the locked cards, and the Manage link a rail
+   painted from an imported list carries (2026-11-07). */
+document.addEventListener('click', async (e) => {
+  const b = e.target && e.target.closest && e.target.closest('[data-opml-import], [data-opml-manage]')
+  if (!b) return
+  e.preventDefault()
+  const api = await favoritesApi()
+  if (b.hasAttribute('data-opml-manage')) api?.manageOpml?.(); else api?.importOpml?.()
+})
 
 /* The Log in buttons on the locked cards: the nav's own login, lazily. */
 document.addEventListener('click', async (e) => {

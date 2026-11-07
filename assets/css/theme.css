@@ -445,6 +445,47 @@ a.msg-media img {
 }
 .ob-fav-ask-cancel:hover { opacity: 1; text-decoration: underline; }
 @media (max-width: 480px) { .ob-fav-ask-row { grid-template-columns: 1fr; } }
+
+/* The OPML import panel (opml-import.js), on the ask dialog's chrome. */
+.ob-opml-card { width: min(34rem, 100%); max-height: calc(100vh - 2rem); overflow: auto; }
+.ob-opml-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.ob-opml-x { font: inherit; font-size: 1.4rem; line-height: 1; padding: 0 0.2rem; background: none; border: 0; color: var(--ink); cursor: pointer; opacity: 0.7; }
+.ob-opml-x:hover { opacity: 1; }
+.ob-opml-note { padding: 0.5rem 0.7rem; border-radius: 8px; background: var(--cream-d, transparent); border: 1px solid var(--border); font-size: 0.88rem; }
+.ob-opml-drop {
+  display: flex; flex-direction: column; align-items: center; gap: 0.2rem;
+  padding: 1.2rem 1rem; margin: 0 0 0.8rem;
+  border: 2px dashed var(--border); border-radius: 12px; cursor: pointer; text-align: center;
+}
+.ob-opml-drop:hover, .ob-opml-drop.is-over { border-color: var(--brand); }
+.ob-opml-drop strong { color: var(--brand-dd); }
+.ob-opml-drop span { font-size: 0.82rem; opacity: 0.75; }
+.ob-opml-link { display: flex; gap: 0.5rem; margin: 0 0 0.8rem; }
+.ob-opml-link input { flex: 1; min-width: 0; font: inherit; font-size: 0.9rem; padding: 0.45rem 0.6rem; border: 1px solid var(--border); border-radius: 8px; background: var(--surface, var(--white)); color: var(--ink); }
+.ob-opml-link input:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+.ob-opml-fine { font-size: 0.82rem; opacity: 0.8; margin: 0.4rem 0 0; }
+.ob-opml-linkbtn { font: inherit; font-size: inherit; padding: 0; background: none; border: 0; color: var(--brand-dd); text-decoration: underline; cursor: pointer; }
+.ob-opml-progress { font-size: 0.95rem; }
+.ob-opml-adds { list-style: none; margin: 0 0 0.8rem; padding: 0.3rem 0; max-height: 14rem; overflow: auto; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+.ob-opml-adds li { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.3rem 0.2rem; }
+.ob-opml-adds label { display: flex; align-items: center; gap: 0.5rem; min-width: 0; cursor: pointer; }
+.ob-opml-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ob-opml-tag { flex-shrink: 0; font-size: 0.72rem; padding: 0.05rem 0.4rem; border: 1px solid var(--border); border-radius: 999px; opacity: 0.8; }
+.ob-opml-lines { margin: 0.8rem 0 0; font-size: 0.86rem; }
+.ob-opml-line summary { cursor: pointer; padding: 0.15rem 0; }
+.ob-opml-line ul { margin: 0.2rem 0 0.4rem 1.2rem; padding: 0; opacity: 0.85; max-height: 8rem; overflow: auto; }
+.ob-opml-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-top: 0.8rem; }
+.ob-opml-btn { flex-direction: row; padding: 0.4rem 0.7rem; font-size: 0.88rem; }
+.ob-opml .ob-cta { font: inherit; font-weight: 600; padding: 0.5rem 0.9rem; border-radius: 999px; border: 0; background: var(--brand-dd); color: #fff; cursor: pointer; }
+.ob-opml .ob-cta:hover { background: var(--brand-ddd, var(--brand-dd)); }
+/* The locked card's second door (index.html): Log in, or Import OPML. */
+.rail-locked-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; }
+.rail-locked-card .ob-cta--quiet { background: transparent; color: var(--brand-dd); border: 1px solid var(--brand-dd); }
+.rail-locked-card .ob-cta--quiet:hover { background: var(--cream-d, transparent); }
+/* The imported-list note on a rail head (discover.js#importedNote). */
+.rail-more--btn { font: inherit; background: none; border: 0; cursor: pointer; }
+/* The owner's Import / Export on /booster's Follows and Favorites band. */
+.fav-opml { display: inline-flex; gap: 0.4rem; }
 /* Held while /api/value resolves and the widget's gate chain runs, which can
    take seconds on a cold bundle. Without it the button looks inert. */
 .ob-boost-pill.is-busy { animation: ob-boost-pulse 1s ease-in-out infinite; }

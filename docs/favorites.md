@@ -434,6 +434,76 @@ beyond the markup.
 - A signer without NIP-44 is read-and-carry only, with a line on screen. The
   NIP-04 fallback in `selfEncrypt.js` is forbidden here.
 
+## OPML Import And Export
+
+Built 2026-11-07 (Reed's ask, after BoostMeBitch shipped the same in #508 and
+#518; Chad's rules are lifted whole). OPML is the subscription list every
+podcast app writes and reads; here a subscription is a followed podcast, or
+a favorited album when the file lists a music feed, so an import adds feed
+entries to the kind 10333 list and an export writes them out. Episodes and
+songs have no place in the format.
+
+**The rules are one dependency-free module, `assets/js/opml.js`**, served to
+the browser, inlined into the link-fetching Function and run as shipped by
+`test-opml.mjs`: the reader (`parseOpml`, a quote-honouring scanner rather
+than DOMParser, so one copy serves both sides and a stray `&` in a title
+does not lose the list), what may leave the device (`planOpmlImport`,
+`opmlLinkVerdict`), what each lookup answer means (`sortOpmlAnswers`) and
+the bytes an export writes (`buildOpml`).
+
+- **⚠️ AN IMPORT ADDS AND NEVER REMOVES** (Reed's rule). The review shows what
+  will be added, what is already on the list, what Podcast Index does not
+  hold, and what could not be asked; nothing is written before the press,
+  and the press is ONE publish: `syncFavorites` takes an array of changes
+  since the same day and applies them in order into one event.
+- **⚠️ A PRIVATE FEED ADDRESS IS A CREDENTIAL AND NEVER LEAVES THE DEVICE.**
+  Patreon, Supercast, Supporting Cast, Memberful and Glow hosts, a `/private/`
+  path, userinfo, and a query parameter named like a key (`auth`, `key`,
+  `token`, `sig`, `session`…) are planned out before the first request and
+  shown by host only. The resolve endpoint applies the same test again and
+  never binds or sends such an address, because a route must not depend on
+  who is calling it. A pasted link gets the same two tests before it is
+  sent to the link route; no `https://` is guessed for a bare paste, so a
+  pasted secret key is not turned into a hostname.
+- **The lookup is `POST /api/v1/feeds/resolve { urls }`**: D1's
+  `podcasts.feed_url` on the address's spellings (either scheme, with or
+  without the trailing slash) first, then Podcast Index `podcasts/byfeedurl`
+  for the rest, `PI_MAX` a request, a few at a time. Reed's own Fountain
+  export measured 71 feeds: 55 matched the index by feed URL, 3 more are
+  shows the index holds under a different URL, 13 unknown; that is why PI
+  is the authority and the index the fast path. **⚠️ THREE STATES**: a row,
+  `null` (both sides answered: no such feed), or ABSENT (not asked, or the
+  ask failed). The browser asks again for the absent and never calls one
+  "not found". `no-store`, since a subscription list is personal.
+- **A pasted link is read by `POST /api/v1/opml/link { url }`**, on the
+  server because most hosts send no CORS header: POST not `?url=`, no-store,
+  an IP literal or a local name refused outright, 8 seconds, 16MB streamed,
+  and ONLY OUTLINES COME BACK, never the body, so it is not a proxy.
+- **⚠️ A VISITOR WITH NO NOSTR ACCOUNT CAN IMPORT.** Reed's call: the
+  recommendations are the carrot, and a subscription list is enough to seed
+  them. The list lives in that browser alone (`ob_local_follows`, rows the
+  resolve endpoint answered), durable across sessions, is what
+  `OBFavorites.feeds()` reports and `ob:favorites-read` carries (`local:
+  true`) while signed out, and seeds the two Recommended rails and the
+  Because rails on the homepage through the endpoint's favorites-only form;
+  the follows rails stay locked. The panel's manage view removes one,
+  forgets all, or exports. On the first trusted read after a login the
+  controller offers the list for saving to the Nostr list (one publish),
+  then clears it; "Later" asks again next page. Hearts stay hidden signed
+  out, as before.
+- **Three doors**: the homepage's two Recommended locked cards ("Log in or
+  import your OPML"), the account menu's Podcast list row (Import / Export),
+  and the owner's Import OPML / Export OPML on `/booster`'s Follows and
+  Favorites band, shown over an empty list too. The panel itself is
+  `assets/js/opml-import.js`, loaded on first use.
+- **The export** is every feed entry on the list, named and addressed
+  through `/api/v1/favorites/resolve` (whose rows carry `feed` since the same
+  day) or the local list, written as OPML 2.0 with every value escaped (an
+  unescaped `&` is a document the next app rejects whole), downloaded as a
+  `data:` URL (the CSP admits no `blob:`), named
+  `onlyboosts-podcasts-<date>.opml`. A feed the index has no address for is
+  counted and left out.
+
 ## What Is Next
 
 1. ~~The relay reader~~ built 2026-09-08.
@@ -446,6 +516,7 @@ beyond the markup.
    pending Reed's conversation with Chad; a spec change, not a site change.
 7. Later, and the real reason to do it: the collector indexes public lists and
    "favorited by N members" becomes a show stat or chart component.
+9. ~~OPML import and export~~ built 2026-11-07; the section above.
 8. ~~The list as recommendation seeds~~ built 2026-11-07 (Reed's report that
    a followed show stayed recommended): `favorites-ui.js` keeps the list's
    feed guids (`feedGuidsOf`: feed entries and the feed of each item entry,

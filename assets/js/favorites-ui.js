@@ -41,14 +41,15 @@
  * after which the list is re-read with NIP-44 and the hearts fill. That is a
  * known cost of not loading 1MB to draw an outline.
  */
-import { fetchFavorites, syncFavorites, widgetDeps, saveMode, loadMode } from '/assets/js/favorites-sync.js?v=ob-v254'
-import { statedVisibility, feedGuidOf } from '/assets/js/favorites-merge.js?v=ob-v254'
-import { setFavoriteState, changeFor, keyFor, isFollow, WORD_BUSY, WORD_WAIT } from '/assets/js/favorite-button.js?v=ob-v254'
-import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v254'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v254'
-import { initAccountSettings, noteSettingsChange } from '/assets/js/account-settings.js?v=ob-v254'
+import { fetchFavorites, syncFavorites, widgetDeps, saveMode, loadMode } from '/assets/js/favorites-sync.js?v=ob-v255'
+import { statedVisibility, feedGuidOf } from '/assets/js/favorites-merge.js?v=ob-v255'
+import { setFavoriteState, changeFor, keyFor, isFollow, WORD_BUSY, WORD_WAIT } from '/assets/js/favorite-button.js?v=ob-v255'
+import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v255'
+import { buildOpml, opmlFilename } from '/assets/js/opml.js?v=ob-v255'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v255'
+import { initAccountSettings, noteSettingsChange } from '/assets/js/account-settings.js?v=ob-v255'
 
-const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v254'
+const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v255'
 
 const state = {
   pubkey: null,
@@ -59,6 +60,48 @@ const state = {
   privateUnread: false, // the list has an encrypted half this read could not open
   loading: null,
   everRead: false,     // the lazy read: a page with no hearts never reads
+  local: false,        // signed out, with a list imported from OPML in this browser (see below)
+}
+
+/* ------------------------------------------------------------------------ */
+/* The local list: an OPML import with no account                            */
+
+/* ⚠️ A VISITOR WITH NO NOSTR ACCOUNT CAN IMPORT THEIR OPML (Reed's ask,
+ * 2026-11-07: the recommendations are the carrot, and a subscription list is
+ * enough to seed them). The list lives in THIS BROWSER ONLY, under
+ * LOCAL_KEY, as rows { guid, title, medium, image, feed }: it is what the
+ * resolve endpoint answered, nothing the person typed. It is durable across
+ * sessions (Reed: fine, it is not sensitive), it is the feeds `OBFavorites`
+ * reports while signed out, and it is offered for saving to the Nostr list
+ * on the first trusted read after a login (`offerLocalMerge`), then cleared.
+ * Hearts stay hidden signed out as before; the panel is where the list is
+ * managed (Forget, remove one, Export). */
+const LOCAL_KEY = 'ob_local_follows'
+function loadLocal() {
+  try {
+    const raw = localStorage.getItem(LOCAL_KEY)
+    const rows = raw ? JSON.parse(raw)?.rows : null
+    return Array.isArray(rows) ? rows.filter((r) => r && typeof r.guid === 'string' && r.guid) : []
+  } catch { return [] }
+}
+function saveLocal(rows) {
+  try {
+    if (!rows.length) localStorage.removeItem(LOCAL_KEY)
+    else localStorage.setItem(LOCAL_KEY, JSON.stringify({ v: 1, at: Date.now(), rows }))
+  } catch {}
+}
+function addLocal(rows) {
+  const have = loadLocal()
+  const seen = new Set(have.map((r) => r.guid))
+  let added = 0
+  for (const r of rows) {
+    if (!r?.guid || seen.has(r.guid)) continue
+    seen.add(r.guid)
+    have.push({ guid: r.guid, title: r.title ?? null, medium: r.medium ?? null, image: r.image ?? null, feed: r.feed ?? null })
+    added++
+  }
+  saveLocal(have)
+  return added
 }
 
 /* ------------------------------------------------------------------------ */
@@ -135,7 +178,7 @@ export function feedGuidsOf(entries) {
 function announce() {
   try {
     window.dispatchEvent(new CustomEvent('ob:favorites-read', {
-      detail: { pubkey: state.pubkey, trusted: state.trusted, feeds: state.trusted ? state.feeds.slice() : [] },
+      detail: { pubkey: state.pubkey, trusted: state.trusted, local: state.local, feeds: state.trusted || state.local ? state.feeds.slice() : [] },
     }))
   } catch (err) { console.warn('[favorites] announce', err) }
 }
@@ -145,11 +188,15 @@ async function load({ withWidget = false } = {}) {
   state.pubkey = pubkey
   state.everRead = true
   if (!pubkey) {
-    state.keys = new Set(); state.feeds = []; state.trusted = false; state.privateOpened = false; state.privateUnread = false
+    const local = loadLocal()
+    state.keys = new Set(); state.trusted = false; state.privateOpened = false; state.privateUnread = false
+    state.local = local.length > 0
+    state.feeds = local.map((r) => r.guid)
     paintAll()
     announce()
     return
   }
+  state.local = false
   // Paint the outlines at once; the fill follows the read.
   paintAll()
   const deps = withWidget && window.LBLogin ? await widgetDeps(window.LBLogin) : { pubkey }
@@ -170,6 +217,7 @@ async function load({ withWidget = false } = {}) {
   }
   paintAll()
   announce()
+  if (state.trusted && state.pubkey === pubkey && loadLocal().length) offerLocalMerge(pubkey)
 }
 
 function reload(opts) {
@@ -419,6 +467,171 @@ async function onClick(btn) {
 }
 
 /* ------------------------------------------------------------------------ */
+/* OPML: import, export, the local list                                      */
+
+const FEED_PREFIX = 'podcast:guid:'
+let mergeOffered = null
+
+/**
+ * Add a batch of feeds to the list, ONE publish (the OPML import's Add).
+ * `rows` are the resolve endpoint's { guid, title, medium, … }. Signed out,
+ * they go to the local list. Resolves to { status, added }: `status` is the
+ * sync's, or 'local'. Rows already on the list are left as they are; an
+ * import never removes (Reed's rule).
+ */
+async function importFeeds(rows) {
+  const user = window.LBLogin?.getUser?.()
+  if (!user?.pubkey && !getSessionPubkey()) {
+    const added = addLocal(rows)
+    await reload()
+    return { status: 'local', added }
+  }
+  await ensureWidget()
+  if (!window.LBLogin?.getUser?.()?.pubkey) { window.LBLogin?.requestLogin?.(); return { status: 'signed-out', added: 0 } }
+  if (!await waitForSession()) return { status: 'signer-wait', added: 0 }
+  const me = window.LBLogin.getUser().pubkey
+  if (!state.privateOpened || state.pubkey !== me) await reload({ withWidget: true })
+  if (!state.trusted) return { status: 'degraded', added: 0 }
+  const changes = []
+  for (const r of rows) {
+    if (!r?.guid) continue
+    const id = FEED_PREFIX + r.guid
+    if (state.keys.has(id)) continue
+    changes.push({ op: 'add', kind: 'feed', id, medium: r.medium === 'music' ? 'music' : (r.medium || null) })
+  }
+  if (!changes.length) return { status: 'unchanged', added: 0 }
+  const deps = await widgetDeps(window.LBLogin)
+  const base = { ...deps, store: window.localStorage }
+  let r = await syncFavorites(changes, base)
+  if (r.status === 'needs-mode') {
+    const mode = await askMode()
+    if (!mode) return { status: 'cancelled', added: 0 }
+    saveMode(window.localStorage, deps.pubkey, mode)
+    noteSettingsChange()
+    r = await syncFavorites(changes, { ...base, mode, userChose: true })
+  }
+  if (r.status === 'published' || r.status === 'unchanged') {
+    for (const c of changes) state.keys.add(c.id)
+    await reload({ withWidget: true })
+    return { status: r.status, added: changes.length }
+  }
+  console.warn('[favorites] import', r)
+  return { status: r.status, added: 0 }
+}
+
+/**
+ * The list as an OPML file: every FEED entry (followed podcasts and
+ * favorited albums; episodes and songs have no place in the format), named
+ * and addressed through /api/v1/favorites/resolve, or the local list. A
+ * download, built on the device; nothing is uploaded.
+ */
+async function exportOpml() {
+  let shows = []
+  let missing = 0
+  try {
+    const pubkey = getSessionPubkey()
+    if (pubkey) {
+      const deps = window.LBLogin ? await widgetDeps(window.LBLogin) : {}
+      const r = await fetchFavorites(pubkey, { ...deps, pubkey })
+      if (!r.trusted) { showToast(MESSAGES.degraded, true); return { status: 'degraded' } }
+      const guids = [...new Set(r.entries.filter((e) => e.kind === 'podcast:guid').map((e) => feedGuidOf(e.id)).filter(Boolean))]
+      if (!guids.length) { showToast('Nothing to export yet: follow a podcast first.', true); return { status: 'empty' } }
+      const resp = await fetch('/api/v1/favorites/resolve', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ feeds: guids }),
+      })
+      const named = resp.ok ? (await resp.json())?.feeds || {} : {}
+      for (const g of guids) {
+        const row = named[g]
+        if (row?.feed) shows.push({ url: row.feed, title: row.title || g })
+        else missing++
+      }
+    } else {
+      const local = loadLocal()
+      if (!local.length) { showToast('Nothing to export yet: import an OPML file or log in.', true); return { status: 'empty' } }
+      for (const r of local) { if (r.feed) shows.push({ url: r.feed, title: r.title || r.guid }); else missing++ }
+    }
+    const created = new Date()
+    const { xml, written } = buildOpml(shows, { title: 'OnlyBoosts podcasts', created })
+    if (!written) { showToast('None of these feeds has an address the index knows yet, so there is nothing to write.', true); return { status: 'empty' } }
+    const a = document.createElement('a')
+    a.href = 'data:text/x-opml;charset=utf-8,' + encodeURIComponent(xml)
+    a.download = opmlFilename(created)
+    document.body.appendChild(a); a.click(); a.remove()
+    showToast(missing ? `Exported ${written} podcasts; ${missing} had no feed address yet and were left out.` : `Exported ${written} podcasts.`)
+    return { status: 'ok', written, missing }
+  } catch (err) {
+    console.warn('[favorites] export', err)
+    showToast('Couldn’t build the export.', true)
+    return { status: 'error' }
+  }
+}
+
+/** The import / manage panel, loaded on first use (opml-import.js). */
+async function openOpml(view) {
+  try {
+    const { openOpmlPanel } = await import('/assets/js/opml-import.js?v=ob-v255')
+    if (!state.everRead) await reload()
+    const pubkey = getSessionPubkey()
+    openOpmlPanel({
+      view,
+      signedIn: !!pubkey,
+      isFollowed: (guid) => state.feeds.includes(guid) || state.keys.has(FEED_PREFIX + guid),
+      local: () => loadLocal(),
+      addRows: importFeeds,
+      removeLocal: (guid) => { saveLocal(loadLocal().filter((r) => r.guid !== guid)); return reload() },
+      forgetLocal: () => { saveLocal([]); return reload() },
+      exportOpml,
+      requestLogin: async () => { await ensureWidget(); window.LBLogin?.requestLogin?.() },
+    })
+  } catch (err) {
+    console.warn('[favorites] opml panel', err)
+    showToast('Couldn’t open the import.', true)
+  }
+}
+
+/**
+ * Signed in with a list imported before logging in: offer it to the Nostr
+ * list once per account per page, then clear it on a save or a forget.
+ * "Later" leaves it, and asks again on the next page.
+ */
+function offerLocalMerge(pubkey) {
+  if (mergeOffered === pubkey) return
+  mergeOffered = pubkey
+  const local = loadLocal()
+  const n = local.length
+  const wrap = document.createElement('div')
+  wrap.className = 'ob-fav-ask'
+  wrap.setAttribute('role', 'dialog')
+  wrap.setAttribute('aria-modal', 'true')
+  wrap.innerHTML =
+    `<div class="ob-fav-ask-card">` +
+      `<h2>Save your imported podcasts?</h2>` +
+      `<p>You imported ${n} podcast${n === 1 ? '' : 's'} from an OPML file before logging in. Save them to your Nostr follows and favorites, so every Podcasting 2.0 app that reads your list sees them too? Nothing already on your list is removed.</p>` +
+      `<div class="ob-fav-ask-row">` +
+        `<button type="button" class="ob-fav-ask-btn" data-do="save"><strong>Save to my list</strong><span>One signed update, published to your relays</span></button>` +
+        `<button type="button" class="ob-fav-ask-btn" data-do="forget"><strong>Forget them</strong><span>Clear the imported list from this browser</span></button>` +
+      `</div>` +
+      `<button type="button" class="ob-fav-ask-cancel" data-cancel>Later</button>` +
+    `</div>`
+  const done = () => { wrap.remove(); document.removeEventListener('keydown', onKey) }
+  const onKey = (e) => { if (e.key === 'Escape') done() }
+  wrap.addEventListener('click', async (e) => {
+    const b = e.target.closest?.('[data-do]')
+    if (b) {
+      done()
+      if (b.dataset.do === 'forget') { saveLocal([]); showToast('Imported list forgotten'); return }
+      const r = await importFeeds(local)
+      if (r.status === 'published' || r.status === 'unchanged') { saveLocal([]); showToast(r.added ? `Saved ${r.added} podcasts to your list` : 'Your list already had them all') }
+      else showToast(MESSAGES[r.status] || 'Couldn’t save them; the imported list is still here.', true)
+      return
+    }
+    if (e.target.closest?.('[data-cancel]') || e.target === wrap) done()
+  })
+  document.addEventListener('keydown', onKey)
+  document.body.appendChild(wrap)
+}
+
+/* ------------------------------------------------------------------------ */
 /* The account menu's API                                                    */
 
 /**
@@ -488,12 +701,18 @@ function boot() {
     /* The current list's feed guids, and a read on demand: the homepage's
      * rails carry no hearts, so nothing else would trigger the lazy read
      * there. `ensureRead` resolves to the feeds once a read has happened. */
-    feeds: () => (state.trusted ? state.feeds.slice() : []),
+    feeds: () => (state.trusted || state.local ? state.feeds.slice() : []),
     ensureRead: async () => {
       if (!state.everRead && !state.loading) reload()
       if (state.loading) await state.loading.catch(() => {})
-      return state.trusted ? state.feeds.slice() : []
+      return state.trusted || state.local ? state.feeds.slice() : []
     },
+    /* OPML (2026-11-07): the import panel, the export, and the local list a
+     * signed-out visitor imported. The panel module loads on first use. */
+    importOpml: () => openOpml('import'),
+    manageOpml: () => openOpml(loadLocal().length ? 'manage' : 'import'),
+    exportOpml,
+    localFollows: () => loadLocal(),
   }
   // The account menu's settings follow the account (account-settings.js):
   // restored on login, pushed on change.
