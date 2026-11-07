@@ -153,7 +153,7 @@ check('the controller is loaded on every page by nav.js, lazily, and nowhere els
     assert.doesNotMatch(readFileSync(path.join(root, f), 'utf8'), /favorites-ui\.js/, `${f} no longer imports it`)
   }
   assert.match(uiSrc, /if \(buttons\(\)\.length\) reload\(\)/, 'a page with no hearts reads nothing')
-  assert.match(uiSrc, /window\.OBFavorites = \{ getMode, setMode, reload/, 'the menu\'s API is exposed')
+  assert.match(uiSrc, /window\.OBFavorites = \{\s*getMode, setMode, reload/, 'the menu\'s API is exposed')
   assert.match(uiSrc, /syncFavorites\(null, \{ \.\.\.deps, store: window\.localStorage, mode, userChose: true \}\)/, 'a mode change is a userChose cycle')
 })
 

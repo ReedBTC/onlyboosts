@@ -428,3 +428,13 @@ beyond the markup.
    pending Reed's conversation with Chad; a spec change, not a site change.
 7. Later, and the real reason to do it: the collector indexes public lists and
    "favorited by N members" becomes a show stat or chart component.
+8. ~~The list as recommendation seeds~~ built 2026-11-07 (Reed's report that
+   a followed show stayed recommended): `favorites-ui.js` keeps the list's
+   feed guids (`feedGuidsOf`: feed entries and the feed of each item entry,
+   artists out), fires `ob:favorites-read` on `window` after every read, and
+   exposes `OBFavorites.feeds()` / `ensureRead()`; `discover.js` asks
+   `/api/v1/recommend` again with them, and on `/booster` the section's
+   `onEntries` hands them to `booster-page.js`, which repaints the rails with
+   the two-sided `recommend-rails.js`. A seed is never recommended, so the
+   heart takes a show off the rails. The event fires trusted or not, with an
+   empty list when untrusted, so a listener can tell no list from no read.

@@ -231,7 +231,7 @@ async function resolveAll(entries) {
   }
 }
 
-export function initFavoritesSection({ pubkey, root }) {
+export function initFavoritesSection({ pubkey, root, onEntries = null }) {
   if (!root || !pubkey) return
   const groupsEl = root.querySelector('[data-fav-groups]')
   const emptyEl = root.querySelector('[data-fav-empty]')
@@ -282,6 +282,10 @@ export function initFavoritesSection({ pubkey, root }) {
       return
     }
     const entries = r.entries ?? []
+    // The page's other readers of this list (the recommendation rails hand
+    // the feeds to /api/v1/recommend, 2026-11-07). A trusted read only, so an
+    // unreachable relay set never tells the caller the list is empty.
+    try { onEntries?.(entries, { owner }) } catch (err) { console.warn('[favorites] onEntries', err) }
     if (!entries.length) {
       emptyEl.textContent = owner
         ? (r.parsedPrivate === null && r.read?.content

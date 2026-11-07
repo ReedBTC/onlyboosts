@@ -1,7 +1,13 @@
 // POST /api/v1/recommend — RECOMMENDED FOR YOU, and BECAUSE YOU BOOSTED X.
 //
-//   body  { pubkey: <hex|npub>, favorites?: [feedGuid], limit?: n }
-//   200   { seeds, podcasts: [row], music: [row], because: [{ seed, rows }] }  (up to five)
+//   body  { pubkey?: <hex|npub>, favorites?: [feedGuid], limit?: n }   (one of the two)
+//   200   { seeds, podcasts: [row], music: [row], because: [{ seed, rows, why }] }  (up to five)
+//
+// `pubkey` is optional since 2026-11-07 (Reed's ask): a visitor with no
+// Nostr account can hand over the feeds of an imported OPML file alone and
+// get the two lists, the favorites being the whole seed set. `why` on a
+// Because rail is 'boosted' or 'follow' (the seed came from the favorites
+// list), which decides the heading's verb.
 //
 // The homepage's personal rails (2026-10-17). The collector computes, for
 // every show with three or more distinct boosters, its twenty most similar
@@ -51,11 +57,11 @@ function record(r) {
  *  browser handed over. Publisher keys (relay bots) have no taste of their own
  *  and get nothing, which the member wall already decided. */
 async function seedsOf(env, hex, favorites) {
-  const { results } = await env.DB.prepare(
+  const { results } = hex ? await env.DB.prepare(
     `SELECT podcast_guid AS guid, COUNT(*) AS n FROM boosts
       WHERE booster_pubkey = ? AND podcast_guid IS NOT NULL
       GROUP BY podcast_guid ORDER BY n DESC, MAX(created_at) DESC`
-  ).bind(hex).all();
+  ).bind(hex).all() : { results: [] };
   const boosted = (results || []).map((r) => r.guid);
   const set = new Set(boosted);
   for (const g of favorites) set.add(g);
@@ -124,14 +130,22 @@ async function recommendFor(env, seedsJson, music, limit, now = Date.now()) {
 const BECAUSE_MAX = 5;
 const BECAUSE_MIN = 4;
 const BECAUSE_POOL = 12;
-async function becauseOf(env, hex, seedsJson, boosted, limit) {
-  if (!boosted.length) return [];
+async function becauseOf(env, hex, seedsJson, boosted, favorites, limit) {
+  /* Two pools, the boosted seeds first (most boosted first) and then the
+   * favorites not already among them (list order), each remembering which
+   * it came from: the heading reads "Because you boosted X" or "Because you
+   * follow X" (2026-11-07). The greedy pick below is blind to the pool; a
+   * followed show with the most to show goes first. */
+  const mine = [...boosted.slice(0, 50)];
+  const whyOf = new Map(mine.map((g) => [g, "boosted"]));
+  for (const g of favorites) if (!whyOf.has(g) && mine.length < 100) { mine.push(g); whyOf.set(g, "follow"); }
+  if (!mine.length) return [];
   const { results: seeded } = await env.DB.prepare(
     `WITH mine AS (SELECT value AS guid, key AS ord FROM json_each(?1))
      SELECT mine.guid, mine.ord FROM mine
       WHERE EXISTS (SELECT 1 FROM show_similar s WHERE s.podcast_guid = mine.guid AND s.shared_boosters >= 2)
       ORDER BY mine.ord LIMIT ?2`
-  ).bind(JSON.stringify(boosted.slice(0, 50)), BECAUSE_POOL).all();
+  ).bind(JSON.stringify(mine), BECAUSE_POOL).all();
   const seedGuids = (seeded || []).map((r) => r.guid);
   if (!seedGuids.length) return [];
   const perSeed = await Promise.all(seedGuids.map((seed) => Promise.all([
@@ -159,7 +173,7 @@ async function becauseOf(env, hex, seedsJson, boosted, limit) {
     const pick = pool.shift();
     if (pick.fresh.length < BECAUSE_MIN) break;
     for (const r of pick.fresh) shown.add(r.guid);
-    out.push({ seed: record(pick.seed), rows: pick.fresh.map(record) });
+    out.push({ seed: record(pick.seed), rows: pick.fresh.map(record), why: whyOf.get(pick.seed.guid) || "boosted" });
   }
   return out;
 }
@@ -168,17 +182,18 @@ async function becauseOf(env, hex, seedsJson, boosted, limit) {
  *  what /booster/<npub> renders as its #recommended section (2026-10-20,
  *  Reed's ask: a member with recommendations has a page here already, so
  *  the recommendations belong on it). `favorites` is empty there: the list
- *  is a Nostr event only the browser reads. */
+ *  is a Nostr event only the browser reads, and booster-page.js asks again
+ *  with it. `hex` may be null for a favorites-only visitor (2026-11-07). */
 export async function recommendationsFor(env, hex, favorites = [], limit = 10) {
   const empty = { seeds: 0, podcasts: [], music: [], because: [] };
-  if (PUBLISHERS.includes(hex)) return empty;
+  if (hex && PUBLISHERS.includes(hex)) return empty;
   const { seeds, boosted } = await seedsOf(env, hex, favorites);
   if (!seeds.length) return empty;
   const seedsJson = JSON.stringify(seeds);
   const [podcasts, music, because] = await Promise.all([
     recommendFor(env, seedsJson, false, limit),
     recommendFor(env, seedsJson, true, limit),
-    becauseOf(env, hex, seedsJson, boosted, limit).catch((e) => { console.warn("[recommend] because", e?.message); return []; }),
+    becauseOf(env, hex, seedsJson, boosted, favorites, limit).catch((e) => { console.warn("[recommend] because", e?.message); return []; }),
   ]);
   return { seeds: seeds.length, podcasts, music, because };
 }
@@ -187,11 +202,13 @@ export async function onRequestPost({ request, env }) {
   let body;
   try { body = await request.json(); }
   catch { return json(request, { error: "body must be JSON" }, { status: 400, cache: 0 }); }
-  const hex = toHexPubkey(typeof body?.pubkey === "string" ? body.pubkey : "");
-  if (!hex) return json(request, { error: "pubkey must be a hex pubkey or npub" }, { status: 400, cache: 0 });
+  const hex = typeof body?.pubkey === "string" && body.pubkey ? toHexPubkey(body.pubkey) : null;
+  if (typeof body?.pubkey === "string" && body.pubkey && !hex) return json(request, { error: "pubkey must be a hex pubkey or npub" }, { status: 400, cache: 0 });
   const limit = clampLimit(body?.limit, 10, 50);
   const favorites = Array.isArray(body?.favorites)
     ? body.favorites.filter((g) => typeof g === "string" && GUID.test(g)).slice(0, MAX_FAVORITES)
     : [];
+  // A visitor with no key and no list has nothing to seed with.
+  if (!hex && !favorites.length) return json(request, { error: "pubkey or favorites required" }, { status: 400, cache: 0 });
   return json(request, await recommendationsFor(env, hex, favorites, limit), { cache: 0 });
 }

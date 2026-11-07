@@ -369,8 +369,13 @@ indexed Nostr boost; nothing about a visitor is stored.
      hundreds of donors would manufacture overlap). Measured: 6,627 music pairs
      with them in, 4,354 without.
   3. Seeds = the shows the member boosted under their key, plus the feeds on
-     their PC 2.0 favorites list if the browser passes them (it does not yet).
-     Candidate score = sum of similarity to every seed; seeds excluded.
+     their PC 2.0 favorites list (the podcasts they follow and the albums they
+     favorited; the feed of a favorited episode counts for its show), which the
+     browser passes since 2026-11-07: `favorites-ui.js` reads the list and
+     fires `ob:favorites-read`, `discover.js` asks the endpoint again with the
+     feeds; on `/booster` the Favorites section hands them over and the rails
+     repaint. Candidate score = sum of similarity to every seed; seeds
+     excluded, so following a show takes it off the rails.
   4. Floor: reached from >= 2 seeds, or >= 2 shared boosters with one seed. Half
      of all pairs share exactly one booster (measured 2026-10-17).
   5. Podcasts and music ranked separately: music overlap runs ~3x the podcast
@@ -380,9 +385,12 @@ indexed Nostr boost; nothing about a visitor is stored.
      the newest item's datePublished from Podcast Index's episodes/byfeedid (byguid carries no newestItemPubdate), so an unboosted new episode counts;
      NULL is kept. Music is exempt.
   Computed per request from D1 (`POST /api/v1/recommend`), nothing stored.
-- **Because You Boosted X**: up to five rails, one per seed; each rail is
-  that show's own top-20 list at `shared_boosters >= 2`, minus the member's
-  seeds. Since 2026-10-22 the seeds are picked by size, not by boost count:
+- **Because You Boosted X / Because You Follow X**: up to five rails, one per
+  seed; each rail is that show's own top-20 list at `shared_boosters >= 2`,
+  minus the member's seeds. Since 2026-11-07 the pool is the boosted seeds
+  (most boosted first) followed by the favorites-list feeds; the answer's
+  `why` ('boosted' | 'follow') sets the heading's verb, "favorited" for an
+  album. Since 2026-10-22 the seeds are picked by size, not by boost count:
   of the member's twelve most-boosted shows with such neighbours, the one
   with the most neighbours not yet shown goes first, re-counted after every
   pick (a show appears on the first rail that reaches it only), and a rail

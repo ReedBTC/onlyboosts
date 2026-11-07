@@ -53,6 +53,7 @@ const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v250'
 const state = {
   pubkey: null,
   keys: new Set(),     // what the member's list holds, as favorites-merge keys
+  feeds: [],           // the feed guids on it (feeds, and the feeds of item entries), for the recommendations
   trusted: false,
   privateOpened: false,
   privateUnread: false, // the list has an encrypted half this read could not open
@@ -108,13 +109,39 @@ function keysOf(entries) {
   return keys
 }
 
+/* The feed guids a list names: every feed entry, and the feed of every item
+ * entry (a favorited episode is a signal about its show). Artists are not
+ * feeds and are left out. What the recommendations take as seeds. */
+export function feedGuidsOf(entries) {
+  const out = new Set()
+  for (const e of entries ?? []) {
+    if (e.kind === 'podcast:guid' && e.id) out.add(e.id)
+    else if (e.kind === 'podcast:item:guid' && e.feed) out.add(e.feed)
+  }
+  return [...out]
+}
+
+/* ⚠️ THE LIST REACHES THE RECOMMENDATIONS THROUGH THIS EVENT (2026-11-07).
+ * discover.js listens on window and asks /api/v1/recommend again with the
+ * feeds, so a followed show leaves the rails and starts seeding them (the
+ * endpoint always took `favorites`; nothing sent them). Fired after every
+ * read, trusted or not, so a listener can tell "no list" from "no read". */
+function announce() {
+  try {
+    window.dispatchEvent(new CustomEvent('ob:favorites-read', {
+      detail: { pubkey: state.pubkey, trusted: state.trusted, feeds: state.trusted ? state.feeds.slice() : [] },
+    }))
+  } catch (err) { console.warn('[favorites] announce', err) }
+}
+
 async function load({ withWidget = false } = {}) {
   const pubkey = getSessionPubkey()
   state.pubkey = pubkey
   state.everRead = true
   if (!pubkey) {
-    state.keys = new Set(); state.trusted = false; state.privateOpened = false; state.privateUnread = false
+    state.keys = new Set(); state.feeds = []; state.trusted = false; state.privateOpened = false; state.privateUnread = false
     paintAll()
+    announce()
     return
   }
   // Paint the outlines at once; the fill follows the read.
@@ -127,6 +154,7 @@ async function load({ withWidget = false } = {}) {
     state.trusted = r.trusted
     if (r.trusted) {
       state.keys = keysOf(r.entries)
+      state.feeds = feedGuidsOf(r.entries)
       state.privateOpened = r.parsedPrivate !== null
       state.privateUnread = !!r.read?.content && r.parsedPrivate === null
     }
@@ -135,6 +163,7 @@ async function load({ withWidget = false } = {}) {
     state.trusted = false
   }
   paintAll()
+  announce()
 }
 
 function reload(opts) {
@@ -443,7 +472,18 @@ async function setMode(mode) {
 /* Boot                                                                      */
 
 function boot() {
-  window.OBFavorites = { getMode, setMode, reload: () => reload({ withWidget: true }) }
+  window.OBFavorites = {
+    getMode, setMode, reload: () => reload({ withWidget: true }),
+    /* The current list's feed guids, and a read on demand: the homepage's
+     * rails carry no hearts, so nothing else would trigger the lazy read
+     * there. `ensureRead` resolves to the feeds once a read has happened. */
+    feeds: () => (state.trusted ? state.feeds.slice() : []),
+    ensureRead: async () => {
+      if (!state.everRead && !state.loading) reload()
+      if (state.loading) await state.loading.catch(() => {})
+      return state.trusted ? state.feeds.slice() : []
+    },
+  }
   // The account menu's settings follow the account (account-settings.js):
   // restored on login, pushed on change.
   initAccountSettings()

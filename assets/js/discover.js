@@ -34,6 +34,7 @@ import { heroHtml, slideHtml, showSlide, episodeSlide, memberSlide } from '/asse
 import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v250'
 import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v250'
 import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v250'
+import { becauseVerb } from '/assets/js/recommend-rails.js?v=ob-v250'
 import { languageName } from '/assets/js/lang-name.js?v=ob-v250'
 
 const TILES = 10
@@ -391,6 +392,10 @@ function paintBecause(proto, entries) {
     if (h2) h2.id = id
     const a = sec.querySelector('[data-because-seed]')
     if (a) { a.textContent = b.seed.title || 'this show'; a.href = `/show/${encodeURIComponent(b.seed.guid)}` }
+    // "you boosted", "you follow" (a podcast on the favorites list) or "you
+    // favorited" (an album there): the seed's pool, off the endpoint's `why`.
+    const verb = sec.querySelector('[data-because-verb]')
+    if (verb) verb.textContent = `you ${becauseVerb(b.seed, b.why)}`
     const sub = sec.querySelector('[data-because-sub]')
     if (sub) sub.textContent = `What the other boosters of ${b.seed.title || 'this show'} also boost`
     const track = sec.querySelector('.rail-track')
@@ -416,18 +421,23 @@ function linkFullList(section, pubkey) {
 }
 
 /* Podcasts Recommended For You, Music Recommended For You and the Because rails, all off one
-   POST: the member's boosted shows are the seeds (favorites join them once
-   the favorites list has an accessor here), and the endpoint sums the
-   collector's similarity scores over them. /about#recommendations is the
-   method in full. */
-async function paintRecommended(sections, pubkey) {
+   POST: the member's boosted shows are the seeds, and the feeds on their
+   favorites list once favorites-ui.js has read it (2026-11-07; see
+   onFavoritesRead below), and the endpoint sums the collector's similarity
+   scores over them. A seed is never recommended, so following a show takes
+   it off the rails. /about#recommendations is the method in full. */
+let lastRecommend = { sections: null, pubkey: null, feeds: '' }
+async function paintRecommended(sections, pubkey, favorites = []) {
+  lastRecommend = { sections, pubkey, feeds: favorites.join(',') }
   const rec = sections.find((s) => s.dataset.rail === 'recommended')
   const music = sections.find((s) => s.dataset.rail === 'recommended-music')
   const because = sections.find((s) => s.dataset.rail === 'because')
   try {
     const j = await getJson('/api/v1/recommend', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pubkey, limit: TILES }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pubkey, limit: TILES, ...(favorites.length ? { favorites } : {}) }),
     })
+    if (lastRecommend.pubkey !== pubkey) return
     const none = (what) => `Boost a few ${what} and the ${what} their other boosters boost will rank here.`
     if (rec) {
       if (j.podcasts?.length) { unlock(rec, railListHtml(j.podcasts.map(bare(showTile)))); linkFullList(rec, pubkey) }
@@ -463,8 +473,27 @@ async function paintPersonal() {
     else if (res.status === 'empty') lockedCardNote(s, 'You follow nobody yet', `Follow a few boosters on the Members tab and their ${s.dataset.rail === 'follows' ? 'shows' : 'songs'} will rank here.`)
     else lockedCardNote(s, 'Your follow list could not be read', 'The relays did not answer. Reload to try again.')
   }
-  if (res.pubkey) paintRecommended(sections, res.pubkey)
+  if (res.pubkey) {
+    paintRecommended(sections, res.pubkey, window.OBFavorites?.feeds?.() || [])
+    // The list is read lazily and only where a heart is on the page; this
+    // page has none, so ask. The answer arrives as ob:favorites-read.
+    window.OBFavorites?.ensureRead?.()
+  }
 }
+
+/* The favorites list, read: repaint the recommendations with it as seeds
+   when it names feeds the last request did not carry. Also fires on a
+   favorite made on this page (favorites-ui reloads after a publish), so the
+   rails follow a heart press. */
+function onFavoritesRead(e) {
+  const d = e.detail || {}
+  const { sections, pubkey } = lastRecommend
+  if (!sections || !pubkey || !d.trusted || d.pubkey !== pubkey) return
+  const feeds = Array.isArray(d.feeds) ? d.feeds : []
+  if (!feeds.length || feeds.join(',') === lastRecommend.feeds) return
+  paintRecommended(sections, pubkey, feeds)
+}
+window.addEventListener('ob:favorites-read', onFavoritesRead)
 
 /* The Log in buttons on the locked cards: the nav's own login, lazily. */
 document.addEventListener('click', async (e) => {

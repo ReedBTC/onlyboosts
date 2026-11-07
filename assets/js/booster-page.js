@@ -29,6 +29,8 @@ import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v250'
 import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v250'
 import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v250'
 import { initFavoritesSection } from '/assets/js/favorites-section.js?v=ob-v250'
+import { feedGuidsOf } from '/assets/js/favorites-ui.js?v=ob-v250'
+import { recommendRailsHtml } from '/assets/js/recommend-rails.js?v=ob-v250'
 
 const PK = document.body.dataset.boosterPk || ''
 const NPUB = document.body.dataset.boosterNpub || PK
@@ -396,4 +398,57 @@ if (boostsSection) hydrateProfiles(boostsSection)
 
 // The Favorites section (docs/favorites.md): the member's kind-10333 list,
 // read off the relays and resolved through /api/v1/favorites/resolve.
-initFavoritesSection({ pubkey: PK, root: document.querySelector('[data-booster-favorites]') })
+//
+// ⚠️ THE RECOMMENDATION RAILS FOLLOW IT (2026-11-07). The Function renders
+// #recommended off the member's boosts alone (the list is a Nostr event only
+// the browser reads); once this section has read the list, its feeds go to
+// /api/v1/recommend as favorites and the rails are repainted with the same
+// two-sided recommendRailsHtml the edge used, so a followed show leaves the
+// rails and starts seeding them. The public half for any viewer, the private
+// half too when the viewer is the member. A section the edge omitted (no
+// recommendations off the boosts) is created after Favorites when the list
+// produces some. Allowed to fail: the edge's rails stay.
+initFavoritesSection({
+  pubkey: PK,
+  root: document.querySelector('[data-booster-favorites]'),
+  onEntries: (entries) => { repaintRecommended(feedGuidsOf(entries)).catch((err) => console.warn('[booster] recommend', err)) },
+})
+
+async function repaintRecommended(favorites) {
+  if (!favorites.length) return
+  const resp = await fetch('/api/v1/recommend', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ pubkey: PK, favorites, limit: 20 }),
+  })
+  if (!resp.ok) throw new Error(`recommend: HTTP ${resp.status}`)
+  const rails = recommendRailsHtml(await resp.json(), document.body.dataset.boosterName || null)
+  let section = document.querySelector('[data-booster-recommended]')
+  if (!rails) { section?.remove(); return }
+  if (!section) {
+    section = document.createElement('section')
+    section.className = 'show-section show-section--bare'
+    section.id = 'recommended'
+    section.dataset.boosterRecommended = ''
+    section.innerHTML = '<div class="bs-rails"></div>'
+    const fav = document.querySelector('[data-booster-favorites]')
+    if (fav) fav.after(section); else return
+  }
+  section.querySelector('.bs-rails').innerHTML = rails
+  wireRailArt(section)
+}
+
+/* A rail tile's artwork falls back like the homepage's (discover.js#wireArt):
+ * the art2 chain, then a glyph in place of the image. Run over the edge's
+ * rails at boot and over every repaint. */
+function wireRailArt(root) {
+  for (const img of root.querySelectorAll('.rt-media img:not([data-art-wired])')) {
+    img.dataset.artWired = '1'
+    const media = img.closest('.rt-media')
+    wireArt2(img, () => {
+      if (!media) return
+      media.classList.add('rt-media--none')
+      img.replaceWith(Object.assign(document.createElement('span'), { className: 'rt-glyph', textContent: '🎙' }))
+    })
+  }
+}
+wireRailArt(document)

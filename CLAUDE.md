@@ -374,8 +374,14 @@ was picked from is in the session memory; direction A won, with the sans.
   query falls back to unfiltered on "no such column". **The Because rails are deliberately NOT filtered** (Reed's call, 2026-10-30, after seeing the cut: 223 of 639 podcast-side shows at 183 days); `becauseOf` carries no date clause. **The method is public: `/about#recommendations`** states every
   rail's rule, Reed's data-transparency call, and the three personal rails'
   one-liners link it; `docs/about-and-faq-source.md` is the factual backing
-  and is corrected first. **Favorites are not yet handed over**: `favorites-ui.js`
-  exposes no accessor for the current list; the endpoint accepts them.
+  and is corrected first. **Favorites ARE handed over since 2026-11-07** (Reed's report
+  that a followed show stayed recommended): `favorites-ui.js` fires
+  `ob:favorites-read` on `window` after every read and exposes
+  `OBFavorites.feeds()` / `ensureRead()`; `discover.js` re-asks the endpoint
+  with the feeds, `/booster` repaints its rails through the two-sided
+  `recommend-rails.js`; `because[].why` ('boosted' | 'follow') picks the
+  heading's verb. `pubkey` is optional on the endpoint when `favorites` is
+  sent (for the OPML path). See `docs/favorites.md` item 8.
 - **Three more fact rails off the new columns**: New and Noteworthy
   (`first_boost_ts` within 90 days and two boosters; the collector measured
   21 such shows; **since 2026-10-30 two rails, and the podcast one adds
