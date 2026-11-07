@@ -36,10 +36,10 @@
 import {
   boostRows, rowsFromRecords, sortBoostRows,
   filterBoostRows, filterBoostShow, searchBoostRows,
-} from '/assets/js/boost-list.js?v=ob-v249'
-import { rangeControl, sortControl, rangeDays, rangeCutoff } from '/assets/js/feed-controls.js?v=ob-v249'
-import { wireBoostNotes } from '/assets/js/boost-note-actions.js?v=ob-v249'
-import { hydrateProfiles } from '/assets/js/detail-page.js?v=ob-v249'
+} from '/assets/js/boost-list.js?v=ob-v250'
+import { rangeControl, sortControl, rangeDays, rangeCutoff } from '/assets/js/feed-controls.js?v=ob-v250'
+import { wireBoostNotes } from '/assets/js/boost-note-actions.js?v=ob-v250'
+import { hydrateProfiles } from '/assets/js/detail-page.js?v=ob-v250'
 
 /* The sort menu, taken from boosts-feed.js#SORT_OPTIONS so the wording matches
  * the feed the reader was sent here from.
@@ -85,6 +85,13 @@ export function initBoostSection({
   sortTitle = 'Sort boosts',
   emptyText = 'Nothing was boosted in this time range — try a wider one.',
   truncatedNote = '',
+  /* /booster passes all three (2026-11-07). `showMenu` mounts the By show
+   * menu on the band; `searchFields` is handed to boost-list.js#searchBoostRows
+   * (the message alone by default); `searchPlaceholder` names what the box
+   * reads. See the note over mountShowMenu. */
+  showMenu = false,
+  searchFields = ['message'],
+  searchPlaceholder = 'Search boost messages…',
 }) {
   const section = document.querySelector('[data-boost-section]')
   if (!section) return          // the server renders nothing when there is nothing
@@ -120,7 +127,7 @@ export function initBoostSection({
    * every other page is permanently in — see setShow. */
   let showGuid = null
   let showLabel = ''
-  let chip = null
+  let showMenuEl = null
   let mounted = false
 
   /* How many rows a page holds, declared by the Function.
@@ -149,17 +156,16 @@ export function initBoostSection({
     paintMore()
   })
 
-  /* What a caller can drive from outside. Only /booster uses it; see setShow.
-   *
-   * `canFilter` reports whether there is a band to put a chip on at all. Below
-   * boost-list.js#CONTROLS_MIN the server ships none, and a picker that led to a
-   * list with no visible filter and no way to clear it would be a trap — so the
-   * caller hides its own affordance rather than this silently doing nothing. */
-  return { setShow, canFilter: Boolean(ctrlSlot) }
+  /* What a caller can drive from outside. Nothing does today: the By show menu
+   * is the way in since 2026-11-07 (the Shows rollup was until then), and it
+   * lives on this band. Kept so a future picker elsewhere on a page is one
+   * call rather than a re-derivation. */
+  return { setShow }
 
   // ── Controls ───────────────────────────────────────────────────────
   /* Three controls on one band, in reading order: the search box, then the
-   * range, then the sort.
+   * range, then the sort; on /booster a fourth, the By show menu, at the left
+   * of the knobs' row (see mountShowMenu).
    *
    * ⚠️ THE RANGE AND THE SORT SIT TOGETHER AT THE RIGHT END, in their own
    * `.bs-knobs` group. `.cs-controls` pins a lone sort to the far end with
@@ -194,56 +200,117 @@ export function initBoostSection({
       }),
     )
     // Order is the layout: the search takes a full row of its own (see
-    // `.bs-search`), then the chip sits at the left of the second row and the
-    // knobs hold its right end.
-    ctrlSlot.append(mountSearch(), mountChip(), knobs)
+    // `.bs-search`), then the show menu sits at the left of the second row and
+    // the knobs hold its right end.
+    ctrlSlot.append(mountSearch(), ...(showMenu ? [mountShowMenu()] : []), knobs)
     ctrlSlot.hidden = false
   }
 
-  /* The picked show, as a clearable chip.
+  /* The By show menu (2026-11-07, Reed's ask).
    *
-   * ⚠️ A CHIP RATHER THAN A FOURTH DROPDOWN, and the difference is what the band
-   * costs when nobody is using the feature — which is most of the time. A "Show:
-   * All shows ▾" menu is a permanent fourth control on a band that already
-   * carries three, on a page whose phone layout is already two rows. A chip is
-   * absent until something is picked and gone again the moment it is cleared, so
-   * the default band is exactly the one /show and /episode carry.
+   * Every show this person has boosted, most boosts first, with the count, on
+   * the sort pill's own chrome; "All shows" at the top is the way back. It
+   * replaced two things at once: the Shows and Albums rollup four sections up,
+   * which was the only way to pick a show, and the clearable chip that showed
+   * the pick here. The chip's note argued against a fourth dropdown on a band
+   * that already carries three; with the rollup gone the menu is the whole
+   * affordance, and its label carries the pick, so the chip would say the same
+   * thing twice.
    *
-   * Clearing is the only thing it does. CHANGING the show means going back to the
-   * rollup, which is one more gesture and is the right one: the rollup is the
-   * ranked list of the person's shows, and choosing from it is the whole reason
-   * there is no menu here. */
-  function mountChip() {
-    chip = document.createElement('span')
-    chip.className = 'bs-chip'
-    chip.hidden = true
-    const label = document.createElement('span')
-    label.className = 'bs-chip-label'
-    const clear = document.createElement('button')
-    clear.type = 'button'
-    clear.className = 'bs-chip-clear'
-    clear.setAttribute('aria-label', 'Show boosts to every show again')
-    clear.textContent = '✕'
-    clear.addEventListener('click', () => setShow(null))
-    chip.append(label, clear)
-    chip._label = label
-    return chip
+   * ⚠️ THE OPTIONS COME FROM THE CORPUS, so the list is built on first open,
+   * after ensureCorpus. Until then the menu holds "All shows" alone. A heavy
+   * booster has boosted 188 distinct shows (measured 2026-08-16), which is why
+   * the menu scrolls (`.bs-show-menu`); the count beside each title is what
+   * makes a long list scannable. Rows with no show guid are counted under
+   * nothing: boost-list.js#filterBoostShow cannot pick them either. */
+  function mountShowMenu() {
+    const wrap = document.createElement('div')
+    wrap.className = 'pcast-sort bs-show-menu'
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.className = 'pcast-sort-btn'
+    btn.setAttribute('aria-haspopup', 'true')
+    btn.setAttribute('aria-expanded', 'false')
+    btn.title = 'Only the boosts sent to one show'
+    const tag = document.createElement('span'); tag.className = 'pcast-sort-tag'; tag.textContent = 'Show: '
+    const cur = document.createElement('span'); cur.className = 'pcast-sort-cur'; cur.textContent = 'All shows'
+    const caret = document.createElement('span'); caret.className = 'pcast-sort-caret'; caret.setAttribute('aria-hidden', 'true'); caret.textContent = '▾'
+    btn.append(tag, cur, caret)
+    const menu = document.createElement('div')
+    menu.className = 'pcast-sort-menu'
+    menu.hidden = true
+    wrap.append(btn, menu)
+    wrap._cur = cur
+    showMenuEl = wrap
+
+    let built = false
+    const item = (label, guid, title) => {
+      const b = document.createElement('button')
+      b.type = 'button'
+      b.className = 'pcast-sort-item'
+      b.textContent = label
+      b.dataset.guid = guid || ''
+      b.addEventListener('click', () => { close(); setShow(guid, title) })
+      return b
+    }
+    function build() {
+      menu.textContent = ''
+      menu.appendChild(item('All shows', null, ''))
+      const counts = new Map()
+      for (const r of rows || []) {
+        if (!r.podcast_guid) continue
+        const c = counts.get(r.podcast_guid) || { n: 0, title: '' }
+        c.n += 1
+        if (!c.title && r.p_title) c.title = r.p_title
+        counts.set(r.podcast_guid, c)
+      }
+      const list = [...counts.entries()].sort((a, b) => (b[1].n - a[1].n) || a[1].title.localeCompare(b[1].title))
+      for (const [guid, c] of list) {
+        const title = c.title || 'Unidentified show'
+        menu.appendChild(item(`${title} (${c.n.toLocaleString('en-US')})`, guid, title))
+      }
+      built = true
+    }
+    function refreshActive() {
+      for (const el of menu.children) el.classList.toggle('is-active', (el.dataset.guid || null) === showGuid)
+    }
+    function onDoc(e) { if (!wrap.contains(e.target)) close() }
+    function onKey(e) { if (e.key === 'Escape') close() }
+    async function open() {
+      if (!built) {
+        btn.setAttribute('aria-busy', 'true')
+        try { await ensureCorpus() } finally { btn.removeAttribute('aria-busy') }
+        if (!rows) return
+        build()
+      }
+      refreshActive()
+      menu.hidden = false; btn.setAttribute('aria-expanded', 'true')
+      document.addEventListener('click', onDoc, true)
+      document.addEventListener('keydown', onKey)
+    }
+    function close() {
+      menu.hidden = true; btn.setAttribute('aria-expanded', 'false')
+      document.removeEventListener('click', onDoc, true)
+      document.removeEventListener('keydown', onKey)
+    }
+    btn.addEventListener('click', () => { if (menu.hidden) open(); else close() })
+    return wrap
   }
 
-  function paintChip() {
-    if (!chip) return
-    chip.hidden = !showGuid
-    if (showGuid) chip._label.textContent = showLabel || 'This show'
+  /* The menu's label carries the pick; nothing else on the band shows it. */
+  function paintShowMenu() {
+    if (!showMenuEl) return
+    showMenuEl._cur.textContent = showGuid ? (showLabel || 'This show') : 'All shows'
+    showMenuEl.classList.toggle('is-filtered', Boolean(showGuid))
   }
 
   /* Narrow the list to one show, or back to all of them.
    *
-   * ⚠️ THE ONLY WAY IN IS THE ROLLUP, on /booster. Nothing here reads the DOM to
-   * find a picker: booster-page.js owns the wiring, because it is the one page
-   * with a section that can pick. /show and /episode never call this and grow no
-   * chip, which is why the filter costs those two pages nothing at all — a boost
-   * list about one show cannot be filtered by show, and a fourth control that can
-   * only ever be a no-op is worse than none.
+   * ⚠️ THE ONLY WAY IN IS THE BY SHOW MENU, on /booster (the Shows rollup was,
+   * until 2026-11-07). /show and /episode mount no menu and never call this,
+   * which is why the filter costs those two pages nothing at all — a boost list
+   * about one show cannot be filtered by show, and a control that can only
+   * ever be a no-op is worse than none.
    */
   async function setShow(guid, labelText = '') {
     const next = guid || null
@@ -256,17 +323,17 @@ export function initBoostSection({
     const prevLabel = showLabel
     showGuid = next
     showLabel = labelText
-    paintChip()
+    paintShowMenu()
     await onControlChange()
 
-    // ⚠️ THE CHIP MUST NOT OUTLIVE A FAILED FETCH. onControlChange gives up
+    // ⚠️ THE LABEL MUST NOT OUTLIVE A FAILED FETCH. onControlChange gives up
     // quietly when the corpus never arrives, leaving the server's rows on
-    // screen — so a chip left showing would be the page claiming a filter that
+    // screen — so a menu naming a show would be the page claiming a filter that
     // is not applied, over a list that contradicts it.
     if (!rows) {
       showGuid = prevGuid
       showLabel = prevLabel
-      paintChip()
+      paintShowMenu()
       return
     }
     if (next) scrollHere()
@@ -281,9 +348,10 @@ export function initBoostSection({
 
   /* The search box.
    *
-   * ⚠️ IT SEARCHES THE BOOST MESSAGE AND NOTHING ELSE, and it is a SUBSTRING
-   * match rather than FTS5. Both decisions, and why, are on
-   * boost-list.js#searchBoostRows, which is where the matching lives.
+   * ⚠️ IT SEARCHES THE BOOST MESSAGE, and on /booster the show and episode
+   * titles too (`searchFields`), as a SUBSTRING match rather than FTS5. Both
+   * decisions, and why, are on boost-list.js#searchBoostRows, which is where
+   * the matching lives.
    *
    * ⚠️ IT IS NOT THE TYPEAHEAD THE FEEDS CARRY. feed-search.js suggests entries
    * and filters to a PICK, which is right where the question is "where does my
@@ -302,8 +370,8 @@ export function initBoostSection({
     const input = document.createElement('input')
     input.type = 'search'
     input.className = 'bs-search-input'
-    input.placeholder = 'Search boost messages…'
-    input.setAttribute('aria-label', 'Search boost messages')
+    input.placeholder = searchPlaceholder
+    input.setAttribute('aria-label', searchPlaceholder.replace(/…$/, ''))
     input.autocomplete = 'off'
     let timer = null
     const run = () => {
@@ -385,7 +453,7 @@ export function initBoostSection({
     view = sortBoostRows(
       searchBoostRows(
         filterBoostRows(filterBoostShow(rows, showGuid), rangeCutoff(rangeKey)),
-        query),
+        query, searchFields),
       sortKey)
     total = view.length
   }
@@ -400,12 +468,17 @@ export function initBoostSection({
     // The show filter is the narrowest of the three, so it is the likeliest
     // reason a list is empty and the one worth naming first.
     if (showGuid && !query) {
-      return `Nothing sent to ${showLabel || 'this show'} in this time range — try a wider one, or clear the show filter.`
+      return `Nothing sent to ${showLabel || 'this show'} in this time range — try a wider one, or pick All shows.`
     }
+    // The wider search (titles too) is never "none carries a message".
+    const wide = searchFields.length > 1
     if (showGuid && query) {
-      return `No boost message to ${showLabel || 'this show'} contains “${query}”. Try fewer words, a wider date range, or clear the show filter.`
+      return wide
+        ? `No boost to ${showLabel || 'this show'} matches “${query}”. Try fewer words, a wider date range, or pick All shows.`
+        : `No boost message to ${showLabel || 'this show'} contains “${query}”. Try fewer words, a wider date range, or clear the show filter.`
     }
     if (!query) return emptyText
+    if (wide) return `No boost here matches “${query}” in its message, show or episode. Try fewer words, or a wider date range.`
     const anyText = (rows || []).some((r) => r.message)
     return anyText
       ? `No boost message here contains “${query}”. Try fewer words, or a wider date range.`

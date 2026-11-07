@@ -581,53 +581,35 @@ a.show-chart-cell:focus-visible .show-chart-rank { text-decoration: underline; t
   gap: 0.5rem 0.75rem;
 }
 
-/* The picked show, on /booster only — see boost-section.js#mountChip.
- *
- * It holds the LEFT end of the knobs' row, where it reads as a statement about
- * what is below rather than as another control: the three real controls are all
- * to its right, and the only thing on the chip that can be pressed is the ✕.
- *
- * Brand-tinted rather than bordered like the pills beside it, because it is not
- * one of them. A chip that matched the sort pill would invite a press expecting a
- * menu; this one says "a filter is on" and offers to take it off. */
-.bs-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  max-width: 100%;
-  padding: 0.28rem 0.35rem 0.28rem 0.7rem;
-  border: 1px solid var(--accent);
-  border-radius: 999px;
-  background: var(--tint);
-  font: 600 0.78rem/1.3 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  color: var(--accent-d);
-}
-.bs-chip[hidden] { display: none; }
-/* A show title runs to any length; the row must not be pushed sideways by one. */
-.bs-chip-label {
+/* The By show menu, /booster only (2026-11-07; the clearable show chip until
+ * then). The sort pill's chrome, with two differences: its LENGTH IS DATA (a
+ * heavy booster has boosted 188 distinct shows, measured 2026-08-16), so the
+ * menu scrolls like the language menu's; and a show title runs to any length,
+ * so the pill's label truncates rather than pushing the knobs off the row. It
+ * sits at the left of the knobs' row; `.bs-knobs` keeps the right end. */
+.bs-show-menu { max-width: 100%; min-width: 0; }
+.bs-show-menu .pcast-sort-btn { max-width: 100%; }
+.bs-show-menu .pcast-sort-cur {
   min-width: 0;
+  max-width: min(18rem, 55vw);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.bs-chip-clear {
-  flex-shrink: 0;
-  display: grid;
-  place-items: center;
-  width: 1.15rem;
-  height: 1.15rem;
-  padding: 0;
-  font: inherit;
-  font-size: 0.7rem;
-  line-height: 1;
-  color: var(--accent-d);
-  background: transparent;
-  border: 0;
-  border-radius: 999px;
-  cursor: pointer;
+.bs-show-menu .pcast-sort-menu {
+  left: 0;
+  right: auto;
+  min-width: min(22rem, calc(100vw - 2rem));
+  max-height: min(60vh, 24rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
-.bs-chip-clear:hover { background: var(--accent); color: var(--white); }
-.bs-chip-clear:focus-visible { outline: 2px solid var(--accent-d); outline-offset: 1px; }
+.bs-show-menu .pcast-sort-item {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bs-show-menu .pcast-sort-btn[aria-busy='true'] { opacity: 0.55; }
 
 /* ⚠️ THE RANGE AND THE SORT ARE ONE GROUP AT THE RIGHT END, matching the feeds.
  * `.cs-controls .pcast-sort` pins a lone sort to the far end with an auto

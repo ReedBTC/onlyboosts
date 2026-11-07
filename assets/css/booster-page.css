@@ -260,51 +260,17 @@ a.bs-mention { text-decoration: none; }
 }
 .bs-chip-glyph { flex: none; opacity: 0.8; }
 
-/* ── The Shows and Albums drawer ───────────────────────────────────────────
+
+/* ── The recommendation rails (2026-11-07) ─────────────────────────────────
  *
- * The rows, the lid and the scroll container are all show-page.css's .cs-* and
- * .ep-list, unchanged. Two additions only.
- *
- * An UNIDENTIFIED show has no page, so its row is a <div> carrying .cs-link
- * rather than an <a>. It must not look clickable: no pointer, no hover, and the
- * title dimmed so the row reads as a record with a gap in it rather than as a
- * link that failed. 33% of the shows in the index are in this state, and they
- * are kept here (where the show page's community drawer drops them) because this
- * is one person's history and dropping a third of it would under-report what the
- * stat tile above already counted. */
-/* ⚠️ WITHOUT THIS THE RANGE FILTER DOES NOTHING. `.cs-row` is `display: flex` in
-   show-page.css, and an author `display` declaration beats the user-agent's
-   `[hidden] { display: none }`, so setting el.hidden on a row leaves it on
-   screen. The show page never needed the pair because its community drawer only
-   ever re-orders rows; this page hides them, so it has to say so. `.cs-controls`
-   two hundred lines up in that same file carries exactly this rule for exactly
-   this reason. */
-.cs-row[hidden] { display: none; }
-
-.cs-link--dead {
-  cursor: default;
-  color: inherit;
-}
-.cs-link--dead:hover { background: none; }
-.cs-link--dead .cs-title {
-  color: var(--muted);
-  font-style: italic;
-}
-
-/* ⚠️ RESTATED FROM episode-page.css, which scopes the same rule to
-   .show-main--episode. The cards inside .ce-scroll are a grid of their own
-   inside a .show-section, which has no list-reset to inherit from; without this
-   the first card sits flush against the container's lid. Scoping it there rather
-   than leaving it bare was right for that file — this page simply has to say so
-   too, which is the same arrangement .pcast-sort has between index.html and
-   show-page.css. */
-.show-main--booster .pcast-list {
-  margin-top: 0.4rem;
-}
-
-/* Painted when a range empties the list. Half of all boosters have sent nothing
-   in the last 7 days, so this is an ordinary answer rather than an error, and it
-   is worded as one. */
+ * The homepage's rails inside a .show-section: discover.css styles the rail,
+ * the head and the tiles; this only stacks them and keeps a rail's sideways
+ * scroll from widening the page's column. A bare section with no lid, since a
+ * rail carries its own heading. */
+.bs-rails { display: grid; gap: 1.6rem; min-width: 0; }
+.bs-rails .rail { min-width: 0; }
+/* The Favorites section's foot line (favorites-section.js). It was the Shows
+   drawer's "nothing in this range" line too until 2026-11-07. */
 .cs-empty {
   margin: 0;
   padding: 1.25rem 1rem;

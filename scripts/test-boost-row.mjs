@@ -24,7 +24,6 @@ import {
   searchBoostRows, filterBoostShow, BOOST_SORTERS, CONTROLS_MIN,
 } from '../assets/js/boost-list.js'
 import { boostRecord } from '../functions/api/v1/_common.js'
-import { showFilterLabel } from '../functions/booster/[npub].js'
 
 let passed = 0
 function check(name, fn) {
@@ -281,37 +280,9 @@ check('the range filters on when the boost was SENT, not when the episode aired'
   assert.equal(filterBoostRows(dbRows, null).length, 3, 'a null cutoff is unbounded')
 })
 
-// ── The show-filter button's label ──────────────────────────────────────────
+// The show-filter button's label tests went with the Shows rollup on
+// 2026-11-07; the By show menu on #boosts carries the show's own title.
 
-check('the button names the booster, in the phrase the site already uses', () => {
-  const { label, full } = showFilterLabel('ChadF', 'Bitcoin And')
-  // "Boosts by X", not "X's Boosts": the former is already on every boost row's
-  // author link and every community-wall card, and it has no possessive to get
-  // wrong on a name ending in s.
-  assert.equal(label, 'Boosts by ChadF')
-  assert.equal(full, 'Boosts by ChadF to Bitcoin And')
-  assert.equal(showFilterLabel('Silas Thornbrook', 'X').label, 'Boosts by Silas Thornbrook')
-})
-
-check('a long display name is capped, and the full one survives in the tooltip', () => {
-  // A real value from the index. Display names carry campaign text, so the cap
-  // is about strangeness as much as width.
-  const { label, full } = showFilterLabel('btconboard #LNHANCE or #CTV', 'Bitcoin And')
-  assert.equal(label, 'Boosts by btconboard #LNH…')
-  assert.ok(label.length <= 26, 'the visible label is bounded')
-  assert.equal(full, 'Boosts by btconboard #LNHANCE or #CTV to Bitcoin And')
-})
-
-check('a booster with no kind-0 gets a name-free label, not a hex fragment', () => {
-  // 51 boosters in the index have no profile on any relay tested. Their page
-  // label is a truncated identifier, and "dbd1ba83b0…ecbd Boosts" is worse than
-  // saying nothing about whose.
-  for (const none of [null, undefined, '', '   ']) {
-    assert.equal(showFilterLabel(none, 'Bitcoin And').label, 'Read these')
-  }
-  assert.equal(showFilterLabel(null, 'Bitcoin And').full,
-    "Read this booster's boosts to Bitcoin And")
-})
 
 check('the show filter is an equality on the guid, never on the title', () => {
   assert.deepEqual(filterBoostShow(dbRows, 'show-guid-1').map((r) => r.event_id[0]), ['a'])
@@ -370,6 +341,25 @@ check('search matches the message only, never the show or episode title', () => 
   // everything.
   assert.deepEqual(searchBoostRows(dbRows, 'track'), [])
   assert.deepEqual(searchBoostRows(dbRows, 'another show'), [])
+})
+
+check('/booster widens the search to the show and episode titles by naming the fields (2026-11-07)', () => {
+  const WIDE = ['message', 'p_title', 'e_title']
+  const hits = (q) => searchBoostRows(dbRows, q, WIDE).map((r) => r.event_id[0])
+  assert.deepEqual(hits('track'), ['d'], 'the episode title')
+  assert.deepEqual(hits('another show'), ['d'], 'the show title, both terms')
+  assert.deepEqual(hits('great'), ['a'], 'the message still')
+  // Every term must land somewhere, not all in one field.
+  assert.deepEqual(hits('another track'), ['d'])
+  assert.deepEqual(hits('another missing'), [])
+  assert.deepEqual(searchBoostRows(dbRows, 'track', ['message']), [], 'the default is the message alone')
+  // The page passes exactly those fields and nothing on /show or /episode does.
+  const page = readFileSync(new URL('../assets/js/booster-page.js', import.meta.url), 'utf8')
+  assert.ok(page.includes("searchFields: ['message', 'p_title', 'e_title']") && page.includes('showMenu: true'))
+  for (const f of ['show-page.js', 'episode-page.js', 'artist-page.js']) {
+    const src = readFileSync(new URL('../assets/js/' + f, import.meta.url), 'utf8')
+    assert.ok(!src.includes('searchFields') && !src.includes('showMenu'), f)
+  }
 })
 
 check('an empty or whitespace query is not a filter', () => {

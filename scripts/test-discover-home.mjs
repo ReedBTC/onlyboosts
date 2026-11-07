@@ -802,11 +802,18 @@ console.log('\nThe discovery lists in full, /discover/<key> (2026-10-20):')
 console.log('\nThe member\'s recommendations on their own page (2026-10-20):')
 {
   const src = read('functions/booster/[npub].js')
-  check('the booster page asks the recommendation core, lets it fail, and renders #recommended after #shows', () => {
+  check('the booster page asks the recommendation core, lets it fail, and renders #recommended as rails after Favorites (2026-11-07)', () => {
     assert.ok(src.includes('import { recommendationsFor } from "../api/v1/recommend.js"'))
     assert.ok(/recommendationsFor\(env, hex, \[\], 20\)\.catch\(/.test(src))
-    assert.ok(src.indexOf('${renderShows(shows, realName)}') < src.indexOf('${renderRecommended(recs, realName)}'))
+    assert.ok(src.indexOf('${renderFavorites()}') < src.indexOf('${renderRecommended(recs, realName)}'))
     assert.ok(src.includes('id="recommended"'))
+    // The homepage's tiles, two-sided, bare (title alone), with the Because rails.
+    assert.ok(src.includes('from "../../assets/js/rail-tile.js"') && src.includes('bare(showTile)') && src.includes('bare(albumTile)'))
+    assert.ok(src.includes('rail("recommended", "Recommended Podcasts"') && src.includes('rail("recommended-music", "Recommended Music"') && src.includes('rail(`because-${i}`'))
+    assert.ok(src.includes('/assets/css/discover.css'), 'the rails need their stylesheet')
+    // The two rollups are gone (Reed's call, 2026-11-07); their ids alias to #boosts.
+    assert.ok(!src.includes('renderShows(') && !src.includes('renderEpisodes('))
+    assert.ok(read('assets/js/booster-page.js').includes("HASH_ALIASES = { shows: 'boosts', episodes: 'boosts' }"))
   })
   check('the core is what the endpoint answers, and a publisher key gets nothing', async () => {
     const { recommendationsFor } = await import('../functions/api/v1/recommend.js')

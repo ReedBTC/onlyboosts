@@ -19,35 +19,34 @@
  * `episode-section.js` attaches the controls and the verbs and nothing else.
  * That module is shared with the identical section on /episode/<guid>.
  */
-import { copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v249'
-import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v249'
-import { rangeControl, sortControl, rangeDays } from '/assets/js/feed-controls.js?v=ob-v249'
-import { initEpisodeSection } from '/assets/js/episode-section.js?v=ob-v249'
+import { copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v250'
+import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v250'
 import {
   initCopyNpub, initShowMore, initShare, initBackLink,
   initHashRouting, initHashSpy, initArt2, wireArt2, hydrateProfiles, initStatWindows,
-} from '/assets/js/detail-page.js?v=ob-v249'
-// The drawers' chart standing, the same function the Function ordered them by.
-import { chartRanks, rankLabel } from '/assets/js/rank.js?v=ob-v249'
-import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v249'
-import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v249'
-import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v249'
-import { initFavoritesSection } from '/assets/js/favorites-section.js?v=ob-v249'
+} from '/assets/js/detail-page.js?v=ob-v250'
+import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v250'
+import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v250'
+import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v250'
+import { initFavoritesSection } from '/assets/js/favorites-section.js?v=ob-v250'
 
 const PK = document.body.dataset.boosterPk || ''
 const NPUB = document.body.dataset.boosterNpub || PK
 
 // ── Shared detail-page chrome ─────────────────────────
 //
-// Identical on /show/<guid> and /episode/<guid>; see detail-page.js. No
-// HASH_ALIASES: none of this page's three section ids has ever been renamed, and
-// that map is a repair for a rename that already happened rather than a licence
-// for the next one.
+// Identical on /show/<guid> and /episode/<guid>; see detail-page.js.
+// HASH_ALIASES: #shows and #episodes were the two rollups until 2026-11-07
+// (Reed's call: #boosts answers both, with its By show menu and a search that
+// reads the titles); the ids are in the wild, so each lands on the list. The
+// map is a repair for a rename that already happened, never a licence for the
+// next one.
+const HASH_ALIASES = { shows: 'boosts', episodes: 'boosts' }
 initCopyNpub()
 initShowMore()
 initShare()
 initBackLink()
-const revealHashTarget = initHashRouting()
+const revealHashTarget = initHashRouting(HASH_ALIASES)
 initHashSpy()
 initStatWindows()
 initBoostNoteActions()
@@ -316,169 +315,16 @@ async function hydrateHeader() {
 
 hydrateHeader()
 
-// ── Shows and Albums ─────────────────────────────────────────────────
-//
-// ⚠️ NO FETCH, EVER. Every row shipped four windows of figures packed into one
-// `data-bs` attribute (see showRow in functions/booster/[npub].js), so a range
-// change and a re-sort are both a re-read of an attribute, a re-order of nodes
-// already in the DOM, and a relabel of the meta line. The show page's community
-// drawer does the same thing for one window and a sort; this is that pattern
-// with the range added, which is affordable only because a booster's whole
-// history is one bounded set the server can aggregate in a single pass.
-//
-// ⚠️ THE META LINE IS RELABELLED ON EVERY REPAINT, unlike the show page's, whose
-// text is fixed at render time. The figures on a row are the SELECTED WINDOW's,
-// so a row reading "12 boosts" under 1W and "418 boosts" under All is the same
-// row telling the truth twice. Leaving the server's all-time text in place while
-// the ranking moved would be the worst of both.
-//
-// THE RANGE IS BOOST TIME, which is the same axis /api/v1/podcasts uses and the
-// opposite of the Episodes rollup below it. A show is in the 1W view because
-// this person boosted it this week; an episode is in the 1W view because it
-// AIRED this week. Both are deliberate; see the warning in CLAUDE.md against
-// unifying them.
-// Chart rank first and default (Reed's ask, 2026-09-03): the chart formula over
-// these rows, with EPISODES as the breadth component — a person's boosts to
-// one show spread across its episodes are the breadth that boosters are for a
-// show. It was Most Boosts until then.
-const SHOW_SORTS = [
-  ['chart', 'Overall'],
-  ['sats', 'Most Sats'],
-  ['boosts', 'Most Boosts'],
-  ['eps', 'Most Episodes'],
-  ['recent', 'Recently Boosted'],
-]
-
-// Offsets into the packed attribute, by range key. Three figures per window, in
-// RANGE_OPTIONS order, then the latest timestamp at 12.
-const WINDOW_AT = { '1w': 0, '1m': 3, '1y': 6, all: 9 }
-const LATEST_AT = 12
-
-function initShows() {
-  const root = document.querySelector('[data-booster-shows]')
-  if (!root) return
-  const list = root.querySelector('[data-bs-shows-list]')
-  const slot = root.querySelector('[data-bs-shows-controls]')
-  const emptyEl = root.querySelector('[data-bs-shows-empty]')
-  if (!list || !slot) return
-
-  const rows = Array.from(list.querySelectorAll('.cs-row')).map((el) => ({
-    el,
-    rankEl: el.querySelector('.cs-rank'),
-    metaEl: el.querySelector('[data-bs-meta]'),
-    nums: String(el.dataset.bs || '').split(',').map(Number),
-  }))
-  // ⚠️ NO `rows.length < 2` GUARD, deliberately, and it is a divergence from
-  // initEpisodeSort on /show. 36.3% of boosters in the index have exactly one
-  // boost, so a one-row drawer is not an edge case here — it is over a third of
-  // every page of this type. A control that disappears on a third of pages is a
-  // worse rule than one that is always there, and the range control is still
-  // meaningful on a single row: it answers whether that boost was this week.
-  if (!rows.length) return
-
-  let sort = 'chart'
-  let range = 'all'
-
-  const figure = (r, i) => r.nums[WINDOW_AT[range] + i] || 0
-  const boostsOf = (r) => figure(r, 0)
-  const satsOf = (r) => figure(r, 1)
-  const epsOf = (r) => figure(r, 2)
-  const latestOf = (r) => r.nums[LATEST_AT] || 0
-
-  function fmtSats(n) {
-    const v = Number(n || 0)
-    if (v >= 1e9) return (v / 1e9).toFixed(v >= 1e10 ? 0 : 1).replace(/\.0$/, '') + 'B'
-    if (v >= 1e6) return (v / 1e6).toFixed(v >= 1e7 ? 0 : 1).replace(/\.0$/, '') + 'M'
-    if (v >= 1e4) return Math.round(v / 1e3) + 'k'
-    if (v >= 1e3) return (v / 1e3).toFixed(1).replace(/\.0$/, '') + 'k'
-    return String(v)
-  }
-  const plural = (n, one, many) => `${n.toLocaleString('en-US')} ${n === 1 ? one : many}`
-
-  function paint() {
-    // A row with no boosts inside the window is not in the window. That is the
-    // filter, and it is why the packed figures carry a boost count per window
-    // rather than only sats: a zero-sat boost is still a boost.
-    const inWindow = range === 'all' ? rows : rows.filter((r) => boostsOf(r) > 0)
-
-    const keep = new Set(inWindow)
-    for (const r of rows) r.el.hidden = !keep.has(r)
-
-    if (!inWindow.length) {
-      if (emptyEl) {
-        emptyEl.textContent = `Nothing boosted in the last ${rangeDays(range)} days — try a wider range.`
-        emptyEl.hidden = false
-      }
-      return
-    }
-    if (emptyEl) emptyEl.hidden = true
-
-    /* The chart is a standing over the window's rows (rank.js#chartRanks),
-       so its label is the tuple's competition rank, T-marked; the single-axis
-       sorts keep their positions. */
-    const charted = sort === 'chart'
-      ? chartRanks(inWindow, { sats: satsOf, boosts: boostsOf, breadth: epsOf })
-      : null
-    const order = charted ? charted.map((e) => e.row) : inWindow.slice().sort((a, b) => {
-      if (sort === 'sats') return satsOf(b) - satsOf(a) || boostsOf(b) - boostsOf(a)
-      if (sort === 'eps') return epsOf(b) - epsOf(a) || satsOf(b) - satsOf(a)
-      if (sort === 'recent') return latestOf(b) - latestOf(a) || satsOf(b) - satsOf(a)
-      return boostsOf(b) - boostsOf(a) || satsOf(b) - satsOf(a)
-    })
-
-    const frag = document.createDocumentFragment()
-    order.forEach((r, i) => {
-      // Rank is recomputed per view rather than retained. That differs from the
-      // feeds' search contract, where filtering to one row has to preserve its
-      // standing in the full list; here the range IS the list, so a row's
-      // position under the current view is its rank.
-      if (r.rankEl) r.rankEl.textContent = charted ? rankLabel(charted[i].rank, charted[i].tied) : String(i + 1)
-      if (r.metaEl) {
-        r.metaEl.textContent =
-          `${plural(boostsOf(r), 'boost', 'boosts')} · ${fmtSats(satsOf(r))} sats · ` +
-          `${plural(epsOf(r), 'episode', 'episodes')}`
-      }
-      frag.appendChild(r.el)
-    })
-    list.appendChild(frag)
-  }
-
-  // Range and sort ride together at the RIGHT end of the band, the
-  // .bs-knobs group the Boosts section already uses (Reed, 2026-09-09: the
-  // range buttons sat at the far left here and beside the sort everywhere
-  // else). .cs-controls pins a lone sort right by its own auto margin; the
-  // group carries that margin instead so the pair moves as one.
-  const knobs = document.createElement('div')
-  knobs.className = 'bs-knobs'
-  knobs.append(
-    rangeControl(range, (key) => { if (key !== range) { range = key; paint() } }, {
-      label: 'Filter by when the show was boosted',
-      titleFor: (key, label) => (rangeDays(key) ? `Boosted in the last ${rangeDays(key)} days` : label),
-    }),
-    sortControl(SHOW_SORTS, sort, (key) => { if (key !== sort) { sort = key; paint() } }, {
-      tag: 'Sort: ',
-      title: 'Change how these shows are ranked',
-    }),
-  )
-  slot.append(knobs)
-  slot.hidden = false
-  paint()
-}
-
-initShows()
-
 /* This person's whole boost history, fetched at most once.
  *
- * ⚠️ TWO SECTIONS ON THIS PAGE WANT THE SAME 2,000 ROWS: the Episodes and Songs
- * rollup below, which groups them by episode, and #boosts at the foot, which
- * orders them as notes. They are lazy and gesture-gated independently, so a
- * reader who uses both would otherwise make the same request twice — and the
- * response carries this person's entire history, which on the heaviest booster in
- * the index is 975 rows. One promise, shared, and whichever section is touched
- * first pays for both.
+ * One consumer since 2026-11-07, #boosts at the foot (the Episodes and Songs
+ * rollup shared it until then); the promise stays memoised because every
+ * control on that band (the By show menu, the search, the range, the sort)
+ * asks for it, and the response is this person's entire history, 975 rows on
+ * the heaviest booster in the index.
  *
- * A failure is not cached: the promise is cleared so the other section, or a
- * second press, can try again rather than inheriting a rejection it never made.
+ * A failure is not cached: the promise is cleared so a second press can try
+ * again rather than inheriting a rejection it never made.
  */
 let corpusPromise = null
 function boosterCorpus() {
@@ -494,59 +340,22 @@ function boosterCorpus() {
   return corpusPromise
 }
 
-// ── Episodes and Songs ───────────────────────────────────────────────
-//
-// Everything this person has boosted at the episode level, painted as the
-// Episodes feed's own card. Structurally the same section as
-// #community-episodes on /episode/<guid> — same drawer, same controls, same
-// cards — so both go through episode-section.js and this is a copy table.
-//
-// ⚠️ IT IS SERVER-RENDERED, as every other section on this page already was.
-// The Function fetches the corpus, ranks it and paints the first thirty cards;
-// everything here is verbs.
-//
-// TWO DIFFERENCES FROM THE TWIN. The figures are this person's own rather than
-// community-scoped, so the sort is tagged plainly "Sort:". And it opens on Most
-// sats rather than Most boosts: every card here is one person's giving to one
-// episode and the median booster has two boosts in total, so a boost-count
-// ranking is mostly ties.
-//
-// "Most boosters" is absent from the menu and that is not an omission: a card
-// here aggregates ONE person's boosts, so the distinct-booster count is 1 on
-// every row and sorting by it would be a no-op that looked like a ranking. Same
-// reasoning that keeps it off the Boosts note feed.
-initEpisodeSection({
-  selector: '[data-booster-episodes]',
-  prefix: 'be',
-  sorts: [
-    // Chart rank since 2026-09-03 (Reed's ask): sats + boosts, the breadth
-    // component being 1 on every one-person row. Most Sats until then.
-    ['chart', 'Overall'],
-    ['sats', 'Most Sats'],
-    ['boosts', 'Most Boosts'],
-    ['recent', 'Latest Boost'],
-    ['episode', 'Latest Episode'],
-  ],
-  rankedSorts: new Set(['chart', 'sats', 'boosts']),
-  sortTag: 'Sort: ',
-  sortTitle: 'Change how these episodes are ranked',
-  fetchCorpus: async () => (await boosterCorpus()).boosts || [],
-  // The cap is 2,000 against a measured heaviest booster of 975, so this line is
-  // unreachable today. It is here because a ranking over a prefix must never
-  // pose as a ranking over everything.
-  truncatedNote:
-    'Ranked over this booster\u2019s 2,000 most recent boosts. They have sent more than that, so an episode boosted only long ago may be missing.',
-  emptyTitle: 'Nothing in this window',
-  emptyBody: 'Nothing this booster sent sats to aired or was released in this time range \u2014 try a wider one.',
-})
-
 // ── Boosts Sent ──────────────────────────────────────────────────────
 //
 // The same section, the same module and the same controls as on /show and
 // /episode. It opens on the newest 24 and holds this person's whole history once
 // a control moves, over the corpus the rollup above already fetches.
-const boostSection = initBoostSection({
+initBoostSection({
   fetchCorpus: boosterCorpus,
+  /* THIS PAGE ONLY (2026-11-07, Reed's ask, with the two rollups removed):
+   * the band gains a By show menu, every show this person has boosted by how
+   * often, and the search reads the show and episode titles beside the
+   * message, so "what did this person send to X" is answered here. /show and
+   * /episode keep neither: every row there is the same show, so a show menu
+   * is a no-op and a title match returns everything (boost-list.js). */
+  showMenu: true,
+  searchFields: ['message', 'p_title', 'e_title'],
+  searchPlaceholder: 'Search messages, shows and episodes…',
   sortTitle: 'Sort the boosts this booster has sent',
   emptyText: 'This booster sent nothing in this time range \u2014 try a wider one.',
   // The cap is 2,000 against a measured heaviest booster of 975, so this line is
@@ -555,54 +364,6 @@ const boostSection = initBoostSection({
   truncatedNote:
     'Sorted over this booster\u2019s 2,000 most recent boosts. They have sent more than that, so an older boost may be missing.',
 })
-
-/* ── The Shows rollup is the show picker for #boosts ──────────────────
- *
- * "What did this person say about THIS show" is a different question from the
- * per-episode one #episodes answers, and it is the one a podcaster reading their
- * own boosters actually has. The filter itself lives on #boosts, where the range,
- * the sort and the message search already are and compose with it; what lives
- * here is only the way in.
- *
- * ⚠️ THE ROLLUP IS THE PICKER RATHER THAN A DROPDOWN ON THAT BAND, and the data
- * decided it. Sampled over 30 active boosters on 2026-08-16, the median has
- * boosted 10 distinct shows, the mean 27 and the heaviest 188. A menu of 188
- * entries is not a dropdown; this list already is one, ranked by what the person
- * gave, scrollable, carrying the artwork and its own range and sort. And the pick
- * happens where the question is asked — beside "40.1k sats across 38 episodes".
- *
- * ⚠️ /booster ONLY, and structurally so rather than by a flag. The picker is a
- * section no other page has, so /show and /episode never call setShow, never grow
- * a chip and pay nothing. A boost list about one show cannot be filtered by show.
- *
- * Delegated from the rollup rather than bound per row: the list can hold 188 of
- * them and booster-page.js#initShows hides and reveals rows as the range changes.
- */
-function initShowFilterPicker() {
-  // No band to put the chip on means no picker: below boost-list.js#CONTROLS_MIN
-  // the server ships no controls at all, and a button leading to a filtered list
-  // with no visible filter and no way to clear it is a trap.
-  if (!boostSection?.canFilter) return
-  const rollup = document.querySelector('[data-booster-shows]')
-  if (!rollup) return
-
-  const btns = rollup.querySelectorAll('[data-bs-show-filter]')
-  // One show is the whole history, so filtering to it is a no-op that looks like
-  // a control. Two is the first count at which the question has an answer.
-  if (btns.length < 2) return
-  for (const btn of btns) btn.hidden = false
-
-  // No preventDefault and no stopPropagation: the button is a SIBLING of the
-  // row's link rather than nested inside it, and type="button" submits nothing,
-  // so there is no default to cancel and nothing above this listening.
-  rollup.addEventListener('click', (e) => {
-    const btn = e.target.closest?.('[data-bs-show-filter]')
-    if (!btn) return
-    boostSection.setShow(btn.dataset.bsShowFilter, btn.dataset.bsShowLabel || '')
-  })
-}
-
-initShowFilterPicker()
 
 /* ── The Primal fallback over the boost list ──────────────────────────
  *
@@ -624,9 +385,7 @@ initShowFilterPicker()
  * backfill, racing it, would then select nothing and the bio mention would never
  * resolve. Fixing one gap by opening another.
  *
- * The other two regions are already covered and must not be double-handled:
- * #episodes goes through episode-section.js → hydrateCardProfiles, and #shows
- * carries no identities at all.
+ * The recommendation rails above carry no identities at all.
  *
  * Post-paint and best-effort, like every other use of it: the section is
  * complete and readable as rendered, this is one WebSocket to a cache with a 6s

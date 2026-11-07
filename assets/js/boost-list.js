@@ -30,17 +30,17 @@
  */
 import {
   htmlEscape, isSafeUrl, truncate, renderMessage,
-} from './nostr-text.js?v=ob-v249';
-import { episodePageHref, showPageHref } from './show-link.js?v=ob-v249';
+} from './nostr-text.js?v=ob-v250';
+import { episodePageHref, showPageHref } from './show-link.js?v=ob-v250';
 /* ⚠️ THE REAL MODULE, NOT A FOURTH COPY OF THE RULE. booster-link.js has been
  * dependency-free since it was written, so esbuild inlines it here exactly as it
  * does nostr-text.js, and the boost rows link a booster by the same test every
  * feed surface uses rather than by a transcription of it. This is the collapse
  * that functions/_shared/detail-page.js#boosterPageUrl said was available; that
  * name is now an alias for this function rather than a second copy of it. */
-import { boosterPageHref } from './booster-link.js?v=ob-v249';
-import { httpsUrl } from './cover-art.js?v=ob-v249';
-import { clientLabel, hasClientLabel } from './client-label.js?v=ob-v249';
+import { boosterPageHref } from './booster-link.js?v=ob-v250';
+import { httpsUrl } from './cover-art.js?v=ob-v250';
+import { clientLabel, hasClientLabel } from './client-label.js?v=ob-v250';
 
 // ── The formatters the row needs ─────────────────────────────────────────────
 //
@@ -217,31 +217,30 @@ export function filterBoostShow(rows, guid) {
 
 /* Rows whose MESSAGE contains every term in `query`, in any order.
  *
- * ⚠️ THE MESSAGE AND NOTHING ELSE, which is worth being strict about. Matching
- * the show or episode title beside it sounds friendlier and is not: on /show
- * every row belongs to the same show, so a query naming it returns everything,
- * and on any page a search for "bitcoin" would surface every boost sent to a
- * show with Bitcoin in its title rather than every boost that SAYS bitcoin. The
- * Shows feed learned the same lesson from its sub-line; see the `label` /
- * `extra` split in feed-search.js.
+ * ⚠️ THE MESSAGE AND NOTHING ELSE BY DEFAULT, which is worth being strict about.
+ * Matching the show or episode title beside it sounds friendlier and is not: on
+ * /show every row belongs to the same show, so a query naming it returns
+ * everything, and on any page a search for "bitcoin" would surface every boost
+ * sent to a show with Bitcoin in its title rather than every boost that SAYS
+ * bitcoin. The Shows feed learned the same lesson from its sub-line; see the
+ * `label` / `extra` split in feed-search.js.
  *
- * ⚠️ SUBSTRING, NOT FTS5, AND DELIBERATELY SO. `boosts_fts` exists and
- * /api/v1/search?type=boosts already reads it, but MATCH is token-based with a
- * prefix wildcard — "rabbit" does not find "rabbithole" — and it is a GLOBAL
- * index with no way to scope to one show, episode or booster without new
- * plumbing. The section already holds its subject's whole corpus in memory the
- * moment any control is touched, so this is both cheaper and a closer match to
- * what someone typing into a box over their own boost inbox means.
+ * ⚠️ ONE PAGE WIDENS IT, BY PASSING `fields` (2026-11-07, Reed's ask): /booster
+ * reads `p_title` and `e_title` too, because there every row is a DIFFERENT
+ * show and "what did this person send to X" is the question a podcaster
+ * reading their own boosters has; the Shows and Albums rollup that used to
+ * answer it came off the same day. A term matches if ANY of the fields holds
+ * it, every term must match somewhere. /show and /episode pass nothing.
  *
- * A row with no message can never match. That is not a bug and is worth knowing:
- * only ~16% of indexed boosts carry one, which is why the empty state says so.
- */
-export function searchBoostRows(rows, query) {
+ * A SUBSTRING match rather than FTS5: the corpus is already in the browser
+ * (one bounded response), the question is "what did people say", and a
+ * reader typing "lnhance" wants #LNHANCE back. */
+export function searchBoostRows(rows, query, fields = ["message"]) {
   const terms = String(query || "").toLowerCase().split(/\s+/).filter(Boolean);
   if (!terms.length) return rows;
   return rows.filter((r) => {
-    const hay = String(r.message || "").toLowerCase();
-    return hay ? terms.every((t) => hay.includes(t)) : false;
+    const hays = fields.map((f) => String(r[f] || "").toLowerCase()).filter(Boolean);
+    return hays.length ? terms.every((t) => hays.some((h) => h.includes(t))) : false;
   });
 }
 

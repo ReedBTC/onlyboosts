@@ -213,7 +213,7 @@ Every section is addressable so a podcaster can share one part of their page.
 |---|---|
 | `/show` | `#episodes` `#community` `#community-shows` `#podroll` `#reverse-podroll` `#boosts` |
 | `/episode` | `#community` `#community-episodes` `#boosts` |
-| `/booster` | `#shows` `#episodes` `#boosts` |
+| `/booster` | `#favorites` `#recommended` `#boosts` — `#shows` and `#episodes` were its rollups until 2026-11-07 and alias to `#boosts` |
 
 Ids are **reused across pages on purpose** where they name the same kind of
 section, so a reader who has learned one URL has learned the others.
@@ -477,14 +477,44 @@ mentioned npub need never have boosted anything — most have not, so
 `/booster/<npub>` would 404 for the common case. njump resolves any npub, which
 is what that chip needs and this page cannot promise.
 
-**Not split on medium**, so the headings read "Shows and Albums" and "Episodes and
-Songs" and there is no `COPY` table on this page at all. Splitting would file the
-same person under two half-histories.
+**Not split on medium**: one person's podcasts and music are one history, so
+the `#boosts` list holds both and there is no `COPY` table on this page at all.
+Splitting would file the same person under two half-histories.
 
-The `#episodes` rollup is the Episodes-feed card with `stats` off, since every
-card aggregates one person's boosts and the booster count is 1 by construction.
-`episode-section.js` attaches its controls and verbs, shared with the identical
-section on `/episode`. The `#shows` drawer's range and sort need no fetch.
+**⚠️ THE TWO ROLLUPS CAME OFF ON 2026-11-07.** *Reed's call.* "Shows and Albums
+Boosted" (ranked, four windows of figures packed on each row so the range and
+sort needed no fetch) and "Episodes and Songs Boosted" (the Episodes-feed card
+with `stats` off) sat between the header and the boost list from 2026-08-16.
+Three things replaced them, all on `#boosts`:
+
+- **The By show menu** (`showMenu: true` in `initBoostSection`): every show
+  this person has boosted, most boosts first with the count, on the sort pill's
+  chrome, built from the corpus on first open; "All shows" clears. It drives the
+  same `setShow` and `filterBoostShow` the rollup's per-row button did. The
+  clearable chip went with the rollup: the menu's label carries the pick. The
+  2026-08-16 note arguing a 188-entry dropdown is not a dropdown still holds
+  as a measurement; the menu scrolls (`.bs-show-menu`), and Reed chose it
+  over the rollup it would have duplicated.
+- **The search reads the titles** (`searchFields: ['message', 'p_title',
+  'e_title']`): a term matches in the message, the show title or the episode
+  title. `/show` and `/episode` keep the message-only search, for the reason
+  on `boost-list.js#searchBoostRows`: there every row is the same show.
+- **The recommendations are rails** (see below), where they were two row
+  lists.
+
+`#shows` and `#episodes` are in the wild and `HASH_ALIASES` in
+`booster-page.js` lands both on `#boosts`. The Function no longer fetches the
+booster's corpus (`fetchBoosterCorpus`) or the per-show windowed aggregate;
+`#boosts` fetches the corpus in the browser on the first gesture, as it
+always did. `git log -S renderShows -- functions/booster` has the removed code.
+
+**`#recommended` is the homepage's rails since 2026-11-07** (rows in the
+drawer chrome from 2026-10-20 until then): Recommended Podcasts, Recommended
+Music and one Because rail per seed, rendered at the edge with the two-sided
+`rail-tile.js` (tiles bare, the homepage's rule for the personal rails) inside
+`.bs-rails`, with `discover.css` linked for them. `recommendationsFor` is
+called with no favorites (a Nostr event only the browser reads); the browser
+hands the list over and repaints once it is read.
 
 The header runs its **own** Primal backfill rather than `hydrateProfiles()`; see
 the note in `booster-page.js`.

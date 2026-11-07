@@ -2107,7 +2107,7 @@ differs is the subject and which sections apply.
 |---|---|---|---|
 | Hero | show art, "Boost this Show" | a **player card**: art, audio, chapters + show-notes drawers, eyebrow links the show | the person: avatar, banner, bio, lightning address |
 | Stats | show totals | that episode's | that person's |
-| Rollup | `#community-shows` | `#community-episodes` | `#shows` + `#episodes` |
+| Rollup | `#community-shows` | `#community-episodes` | none since 2026-11-07 (`#shows` + `#episodes` until then; the Recommended rails and the `#boosts` By show menu took their place) |
 | Community wall | `#community` | `#community` | — |
 | Podroll | both directions | — show-level tag | — |
 | Boosts | `#boosts`, opens on 24 | `#boosts`, all of them | `#boosts`, opens on 24 |
@@ -2157,10 +2157,13 @@ What a change elsewhere would break:
 
 - **⚠️ THE SECTION IDS ARE URLS AND THEY ARE FROZEN.** `/show`: `#episodes`
   `#community` `#community-shows` `#podroll` `#reverse-podroll` `#boosts`.
-  `/episode`: `#community` `#community-episodes` `#boosts`. `/booster`: `#shows`
-  `#recommended` (2026-10-20) `#episodes` `#favorites` `#boosts`. Ids are reused across pages on purpose where they name the
-  same kind of section. `HASH_ALIASES` holds one permanent entry
-  (`#inverse-podroll`) and **is the repair for a rename that already happened, not
+  `/episode`: `#community` `#community-episodes` `#boosts`. `/booster`:
+  `#favorites` `#recommended` (2026-10-20) `#boosts`; **`#shows` and `#episodes`
+  were its two rollups until 2026-11-07** (Reed's call: the `#boosts` list
+  answers both, with a By show menu and a search over the show and episode
+  titles, and the recommendations became rails) and alias to `#boosts`. Ids are reused across pages on purpose where they name the
+  same kind of section. `HASH_ALIASES` holds one permanent entry on `/show`
+  (`#inverse-podroll`) and two on `/booster`, and **is the repair for a rename that already happened, not
   a licence for the next one** — it needs the module to have run, so a rename is
   still a dead link for anything resolving the URL without a browser.
 - **Four pieces hold those ids up, in four files**: the ids on the `<section>`

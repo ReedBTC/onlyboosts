@@ -22,12 +22,17 @@
 // and everything below it is unaffected. A pubkey with no boosts at all has
 // nothing to render and 404s.
 //
-// ⚠️ NOT SPLIT ON MEDIUM, which every rollup on the feeds is. This is the same
-// call renderCommunityShows and renderCommunityEpisodes make on the other two
-// pages, and for the same reason: what one person listens to ACROSS podcasts and
-// music is the interesting half of the finding, and splitting it would file the
-// same person under two half-histories. So the headings read "Shows and Albums"
-// and "Episodes and Songs" and there is no COPY table on this page at all.
+// ⚠️ NOT SPLIT ON MEDIUM, which every rollup on the feeds is: what one person
+// listens to ACROSS podcasts and music is one history, and splitting it would
+// file the same person under two half-histories. So the #boosts list holds
+// podcasts and music together and there is no COPY table on this page at all.
+//
+// ⚠️ THE TWO ROLLUPS ("Shows and Albums Boosted", "Episodes and Songs Boosted")
+// CAME OFF ON 2026-11-07, Reed's call: the #boosts list answers both with its
+// By show menu and a search that reads the show and episode titles, and the
+// recommendation rails took their place. `git log -S renderShows -- functions/booster`
+// has them. The ids #shows and #episodes are in the wild and alias to #boosts
+// in booster-page.js.
 //
 // NAV/FOOTER markup between the marker comments is GENERATED — edit
 // partials/nav.html or partials/footer.html and run scripts/sync-partials.js.
@@ -37,13 +42,10 @@ import {
   truncate, shortId, lookupMentionNames, lookupMentionProfiles, renderBioText,
   renderBoosts,
 } from "../_shared/detail-page.js";
-import { itemsFromBoosts, renderCardPage, CARDS_PER_PAGE } from "../_shared/episode-cards.js";
 import { feedRanks, renderStatTiles, chartCacheOf } from "../_shared/feed-rank.js";
-// The drawers open on the chart formula over their own rows (2026-09-03).
-import { chartRanks, rankLabel } from "../../assets/js/rank.js";
-import { fetchBoosterCorpus } from "../api/v1/boosters/[npub].js";
+// The recommendation rails are the homepage's tiles, two-sided (2026-11-07).
+import { railListHtml, showTile, albumTile, bare } from "../../assets/js/rail-tile.js";
 import { recommendationsFor } from "../api/v1/recommend.js";
-import { COPY as CARD_COPY } from "../../assets/js/episode-card.js";
 
 import { headOf } from "../_shared/head.js";
 const SITE_ORIGIN = "https://onlyboosts.social";
@@ -74,10 +76,6 @@ const OG_FALLBACK = `${SITE_ORIGIN}/assets/onlyboosts_banner.png`;
 // values, so it needs none of that page's decoding care.
 const NPUB_MAX = 200;
 
-// Distinct shows per booster runs to a measured maximum of 185, so this never
-// bites today. It is the same kind of guard as the episode page's BOOSTS_CAP.
-const SHOWS_CAP = 400;
-
 // The boost list at the foot. 24 is what /show/<guid> shows, and the same
 // reasoning applies: this is the "recent" list, and the whole history is what
 // the two rollups above it are for.
@@ -95,28 +93,14 @@ export async function onRequestGet(context) {
 
   // The four queries in one round of parallelism, the same shape both other
   // pages use. Every one of them is served by idx_boosts_booster.
-  const now = Math.floor(Date.now() / 1000);
-  const cut1w = now - 7 * 86400;
-  const cut1m = now - 30 * 86400;
-  const cut1y = now - 365 * 86400;
 
-  /* ⚠️ THE CORPUS IS FETCHED HERE NOW, because #episodes is SERVER-RENDERED.
-   * It was the second of the rendering rule's two exceptions and closed with the
-   * first — the card is one shared definition (assets/js/episode-card.js) that
-   * runs at the edge and in the browser, so there is no second implementation to
-   * drift. See the note over renderCommunityEpisodes in functions/episode/[guid].js.
-   *
-   * It never rejects: a failure costs this one section and the rest of the page
-   * renders exactly as it did. The measured heaviest booster has 975 boosts
-   * against a 2,000 cap, so this is one indexed scan through idx_boosts_booster
-   * rather than the fan-out /episode pays. */
   /* The member's recommendations (2026-10-20, Reed's ask): the homepage's
      Recommended For You and Recommended Music, as this page's #recommended
      section. The same call /api/v1/recommend makes, without the favorites
      the browser alone can read. Allowed to fail: it is a rollup below the
      fold and never costs a reader the page they came for. */
   const recsP = recommendationsFor(env, hex, [], 20).catch((e) => { console.warn("[booster] recommendations", e?.message); return null; });
-  const [prof, totals, shows, boosts, corpus] = await Promise.all([
+  const [prof, totals, boosts] = await Promise.all([
     // ⚠️ COLUMNS NAMED, never SELECT *. The five beyond the original set landed
     // on 2026-08-13 and are nullable at very different rates: about 54%,
     // lud16 65%, lud06 4.4%, website 19%, banner 43%. Every one of them is
@@ -140,55 +124,6 @@ export async function onRequestGet(context) {
        FROM boosts WHERE booster_pubkey = ?`
     ).bind(hex).first(),
 
-    // ── The shows rollup, with all four range windows precomputed ────────────
-    //
-    // ⚠️ THE FOUR WINDOWS ARE WHY THIS SECTION NEEDS NO FETCH AND NO SECOND
-    // QUERY. The range control on the feeds is a query parameter because those
-    // feeds page a ranked list off the server; here the whole corpus is one
-    // person's history — a measured maximum of 185 distinct shows — so every
-    // window can be aggregated in the SAME pass and shipped on the row. Sorting
-    // and range-filtering then cost nothing at all, and the section still
-    // renders ranked, at All, with JavaScript off.
-    //
-    // Conditional aggregates rather than four queries: SQLite evaluates all
-    // twelve in the one GROUP BY, and the scan is the same rows either way.
-    //
-    // ⚠️ PLAIN `?` PLACEHOLDERS, REPEATED, never `?1`-style numbered ones. Each
-    // cutoff is bound three times because it appears three times, and the bind
-    // list below is in the order the placeholders appear in the TEXT — the nine
-    // window cutoffs, then the pubkey in the WHERE, then the limit. Numbered
-    // parameters would express this more tidily and are not what any other query
-    // in this repo uses; see the repeated `.bind(guid, guid)` in
-    // functions/show/[guid].js. Ordinal binding is the one form D1 documents
-    // without qualification, and a query this shape is a bad place to find out.
-    env.DB.prepare(
-      `SELECT b.podcast_guid, p.title, p.image, p.artwork, p.medium,
-              COUNT(*)                                  AS boosts,
-              COALESCE(SUM(b.sats), 0)                  AS sats,
-              COUNT(DISTINCT b.item_guid)               AS eps,
-              MAX(b.created_at)                         AS latest,
-              SUM(CASE WHEN b.created_at >= ? THEN 1 ELSE 0 END)                AS b1w,
-              COALESCE(SUM(CASE WHEN b.created_at >= ? THEN b.sats END), 0)     AS s1w,
-              COUNT(DISTINCT CASE WHEN b.created_at >= ? THEN b.item_guid END)  AS e1w,
-              SUM(CASE WHEN b.created_at >= ? THEN 1 ELSE 0 END)                AS b1m,
-              COALESCE(SUM(CASE WHEN b.created_at >= ? THEN b.sats END), 0)     AS s1m,
-              COUNT(DISTINCT CASE WHEN b.created_at >= ? THEN b.item_guid END)  AS e1m,
-              SUM(CASE WHEN b.created_at >= ? THEN 1 ELSE 0 END)                AS b1y,
-              COALESCE(SUM(CASE WHEN b.created_at >= ? THEN b.sats END), 0)     AS s1y,
-              COUNT(DISTINCT CASE WHEN b.created_at >= ? THEN b.item_guid END)  AS e1y
-       FROM boosts b
-       LEFT JOIN podcasts p ON p.podcast_guid = b.podcast_guid
-       WHERE b.booster_pubkey = ? AND b.podcast_guid IS NOT NULL
-       GROUP BY b.podcast_guid
-       ORDER BY sats DESC, boosts DESC, b.podcast_guid
-       LIMIT ?`
-    ).bind(
-      cut1w, cut1w, cut1w,
-      cut1m, cut1m, cut1m,
-      cut1y, cut1y, cut1y,
-      hex, SHOWS_CAP,
-    ).all(),
-
     env.DB.prepare(
       // ⚠️ THE SHOW IS SELECTED HERE AND ON NEITHER OTHER PAGE. A boost row names
       // the show beside the episode only where the show is new information, which
@@ -208,11 +143,6 @@ export async function onRequestGet(context) {
        WHERE b.booster_pubkey = ?
        ORDER BY b.created_at DESC, b.event_id DESC LIMIT ?`
     ).bind(hex, BOOSTS_SHOWN).all(),
-
-    fetchBoosterCorpus(env, hex).catch((err) => {
-      console.warn("[booster] episode corpus unavailable", err);
-      return null;
-    }),
   ]);
 
   // The qualifying rule, and the whole of it. A pubkey nobody has a boost for
@@ -250,12 +180,10 @@ export async function onRequestGet(context) {
     npub: totals.npub || (raw.startsWith("npub") ? raw : null),
     prof: prof || null,
     totals,
-    shows: shows.results || [],
     boosts: boostRows,
     names,
     bioProfiles,
     ranks,
-    corpus,
     recs: await recsP,
   });
 
@@ -299,7 +227,7 @@ function toHexPubkey(s) {
 
 // ── the page ─────────────────────────────────────────────────────────────────
 
-function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioProfiles, ranks, corpus, recs = null }) {
+function renderBoosterPage({ hex, npub, prof, totals, boosts, names, bioProfiles, ranks, recs = null }) {
   const realName = prof?.display_name || prof?.name || null;
   const label = realName || shortId(npub, hex);
   const pageUrl = `${SITE_ORIGIN}/booster/${encodeURIComponent(npub || hex)}`;
@@ -432,23 +360,25 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v249" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v249" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v249" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v249" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v250" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v250" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v250" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v250" />
   <!-- The hero, the drawers and the boost list are the show page's, so this
        page links its stylesheet and adds only the deltas. -->
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v249" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v249" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v250" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v250" />
   <!-- The episode card, for the #episodes rollup: the same chrome
        feeds-podcasts.js paints on the homepage. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v249" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v250" />
   <!-- The boost thread inside a card's drawer, and its reply / like / repost /
        zap bar, both reached through that same card. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v249" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v249" />
-  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v249" />
-  <link rel="stylesheet" href="/assets/css/booster-page.css?v=ob-v249" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v250" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v250" />
+  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v250" />
+  <link rel="stylesheet" href="/assets/css/booster-page.css?v=ob-v250" />
+  <!-- The recommendation rails are the homepage's (rail-tile.js); this is their stylesheet. -->
+  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v250" />
 </head>
 <body data-booster-pk="${htmlEscape(hex)}"${npub ? ` data-booster-npub="${htmlEscape(npub)}"` : ""}>
 
@@ -730,10 +660,7 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
   ${renderHeader({ hex, npub, prof, label, realName, pic, banner, stats, ranks, totals, bioProfiles })}
 
   ${renderFavorites()}
-  ${renderShows(shows, realName)}
   ${renderRecommended(recs, realName)}
-
-  ${renderEpisodes(corpus)}
 
   ${renderBoosts(boosts, names, {
     // "Boosts Sent" rather than "Recent Boosts", for the same reason as on
@@ -827,12 +754,12 @@ function renderBoosterPage({ hex, npub, prof, totals, shows, boosts, names, bioP
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav.js?v=ob-v249" defer></script>
-<script src="/assets/js/booster-page.js?v=ob-v249" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v250" defer></script>
+<script src="/assets/js/booster-page.js?v=ob-v250" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v249"></script>
-<script src="/assets/js/sw-register.js?v=ob-v249" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v250"></script>
+<script src="/assets/js/sw-register.js?v=ob-v250" defer></script>
 </body>
 </html>`;
 }
@@ -1009,258 +936,54 @@ function renderContact({ lud16, lud06, website }) {
   return `<div class="bs-contact" data-bs-contact${chips.length ? "" : " hidden"}>${chips.join("\n            ")}</div>`;
 }
 
-// ── Shows and Albums ─────────────────────────────────────────────────────────
-//
-// Every show and album this person has boosted, ranked, in the same drawer the
-// show page's community rollup uses — an .ep-drawer whose <summary> is the
-// heading, the range and sort band on the shared .cs-controls inside the lid,
-// and the rows beneath in a scroll container.
-//
-// ⚠️ EVERY ROW SHIPS FOUR WINDOWS OF FIGURES IN ONE `data-bs` ATTRIBUTE, which
-// is what makes both controls free. The show page's version packs three numbers
-// for one window and offers a sort only; this packs three for each of 1W, 1M, 1Y
-// and All, so range-filtering is a re-read of an attribute rather than a fetch.
-// The reason the show page cannot do this is not cost — it is that "which shows
-// does this audience overlap with" is a standing fact and a window is the wrong
-// question of it. "What has this person boosted lately" is exactly the right
-// question, so the range earns its place here where it did not there.
-//
-// ⚠️ UNTITLED SHOWS ARE KEPT, which is the opposite of the call the show page's
-// community drawer makes. That drawer is a discovery list, so a row that cannot
-// be clicked is dead weight; this is one person's history, and 33% of the shows
-// in the index have no title, so dropping them would silently under-report a
-// third of what someone has boosted while the stat tile above counted them. They
-// render as "Unidentified show" with the guid — the same treatment the Shows
-// feed gives them — and are not links.
-//
-// NO BOOST BUTTON, unlike the show page's community rows. Those exist to let a
-// reader support a show they have just discovered; this list is a record of what
-// someone else has already boosted, and each row links to that show's own page,
-// which carries the button. Keeping the money paths off this page is deliberate.
-function renderShows(rows, realName) {
-  if (!rows.length) return "";
-
-  return `<section class="show-section show-section--bare" id="shows">
-    <details class="ep-drawer cs-drawer" open data-booster-shows>
-      <summary>
-        <span class="cs-head">
-          <span class="cs-head-title">Shows and Albums Boosted</span>
-          <span class="cs-head-sub">Every show and album this booster has sent sats to on Nostr</span>
-        </span>
-        <span class="drawer-hint" aria-hidden="true"></span>
-      </summary>
-      <!-- Ships hidden and stays hidden without JavaScript: controls that cannot
-           control are worse than none, and the list below is already ranked at
-           All, which is the view they would land on. -->
-      <div class="cs-controls" data-bs-shows-controls hidden></div>
-      <ul class="ep-list cs-list" data-bs-shows-list>
-        ${chartRanks(rows, { sats: (r) => r.sats, boosts: (r) => r.boosts, breadth: (r) => r.eps })
-          .map((e) => showRow(e.row, rankLabel(e.rank, e.tied), realName)).join("\n        ")}
-      </ul>
-      <!-- Painted by booster-page.js when a range empties the list. A window
-           with nothing in it is a real answer here — half of all boosters have
-           sent nothing in the last 7 days. -->
-      <p class="cs-empty" data-bs-shows-empty hidden></p>
-    </details>
-  </section>`;
-}
 
 /* ── Recommended ──────────────────────────────────────────────────────────────
  *
- * The homepage's two personal rails for THIS member, as a section of their
- * own page (2026-10-20, Reed's ask): the shows the other boosters of the
- * shows they boost also boost, podcasts and music apart, the collector's
- * similarity scores summed over every show they have boosted (see
- * /about#recommendations). Facts about a public boost history, so rendered
- * here like the rollups above it; the favorites a member keeps on Nostr are
- * not read at the edge, so this list can differ from the homepage's by them.
- * Omitted when there is nothing to recommend: an empty section would only say
- * the member has boosted too little, which the tiles above already show. */
+ * The homepage's personal rails for THIS member, as a section of their own
+ * page (2026-10-20, Reed's ask; rails since 2026-11-07, Reed's ask: the same
+ * sideways shape the homepage uses for everything a signed-in member sees):
+ * Recommended Podcasts, Recommended Music, then one Because rail per seed,
+ * the collector's similarity scores summed over every show they have boosted
+ * (see /about#recommendations). Facts about a public boost history, so
+ * rendered here with the two-sided rail-tile.js, the tiles bare (title alone,
+ * the homepage's rule for the personal rails). The favorites a member keeps
+ * on Nostr are not read at the edge; booster-page.js hands them over and
+ * repaints once the list is read. Omitted when there is nothing to recommend:
+ * an empty section would only say the member has boosted too little, which
+ * the tiles above already show. */
 function renderRecommended(recs, realName) {
-  if (!recs || (!recs.podcasts?.length && !recs.music?.length)) return "";
-  const who = realName || "this member";
-  const list = (rows, title, sub) => rows.length ? `
-    <details class="ep-drawer cs-drawer" open>
-      <summary>
-        <span class="cs-head">
-          <span class="cs-head-title">${htmlEscape(title)}</span>
-          <span class="cs-head-sub">${htmlEscape(sub)}</span>
-        </span>
-        <span class="drawer-hint" aria-hidden="true"></span>
-      </summary>
-      <ul class="ep-list cs-list">
-        ${rows.map((r, i) => recRow(r, i + 1)).join("\n        ")}
-      </ul>
-    </details>` : "";
-  return `<section class="show-section show-section--bare" id="recommended">
-    ${list(recs.podcasts || [], "Recommended Podcasts", `What the other boosters of the shows ${who} boosts also boost`)}
-    ${list(recs.music || [], "Recommended Music", `What the other boosters of the albums ${who} boosts also boost`)}
-    <p class="cs-note">Ranked by audience overlap over every show ${htmlEscape(who)} has boosted; <a href="/about#recommendations">how the recommendations work</a>.</p>
+  const pods = recs?.podcasts || [];
+  const music = recs?.music || [];
+  const because = (recs?.because || []).filter((b) => b?.seed?.guid && b.rows?.length);
+  if (!pods.length && !music.length && !because.length) return "";
+  const who = htmlEscape(realName || "this member");
+  const how = `<a href="/about#recommendations">How this works</a>`;
+  const rail = (key, title, sub, list) => `
+    <section class="rail" data-rail="${key}" aria-labelledby="rail-${key}">
+      <div class="rail-head">
+        <h2 id="rail-${key}">${title}</h2>
+        <span class="rail-sub">${sub} · ${how}</span>
+      </div>
+      <div class="rail-track">${list}</div>
+    </section>`;
+  const seedTile = (seed) => bare(seed.medium === "music" ? albumTile : showTile);
+  return `<section class="show-section show-section--bare" id="recommended" data-booster-recommended>
+    <div class="bs-rails">
+      ${pods.length ? rail("recommended", "Recommended Podcasts",
+        `Podcasts boosted by the members who boost the same podcasts ${who} does`, railListHtml(pods.map(bare(showTile)))) : ""}
+      ${music.length ? rail("recommended-music", "Recommended Music",
+        `Music boosted by the members who boost the same albums ${who} does`, railListHtml(music.map(bare(albumTile)))) : ""}
+      ${because.map((b, i) => {
+        const t = htmlEscape(truncate(b.seed.title || "this show", 80));
+        return rail(`because-${i}`,
+          `Because ${who} boosted <a href="/show/${encodeURIComponent(b.seed.guid)}">${t}</a>`,
+          `What the other boosters of ${t} also boost`, railListHtml(b.rows.map(seedTile(b.seed))));
+      }).join("")}
+    </div>
   </section>`;
 }
 
-function recRow(r, rank) {
-  const art = isSafeUrl(r.img) ? r.img : null;
-  const art2 = isSafeUrl(r.art2) && r.art2 !== art ? r.art2 : null;
-  const title = truncate(r.title || "Unidentified show", 120);
-  const n = (v) => Number(v || 0);
-  const meta = `${num(n(r.boosters))} booster${n(r.boosters) === 1 ? "" : "s"} · ${compact(n(r.sats))} sats` +
-    (r.shared ? ` · ${num(n(r.shared))} shared` : "");
-  const inner = `<span class="cs-rank" aria-hidden="true">${rank}</span>
-      ${art
-        ? `<img class="cs-art" src="${htmlEscape(art)}"${art2 ? ` data-art2="${htmlEscape(art2)}"` : ""} alt="" width="44" height="44" loading="lazy" referrerpolicy="no-referrer" />`
-        : `<span class="cs-art cs-art--blank" aria-hidden="true">${r.medium === "music" ? "💿" : "🎙️"}</span>`}
-      <span class="cs-main">
-        <span class="cs-title">${htmlEscape(title)}</span>
-        <span class="cs-meta">${htmlEscape(meta)}</span>
-      </span>`;
-  return `<li class="cs-row"><a class="cs-link" href="/show/${encodeURIComponent(r.guid)}">${inner}</a></li>`;
-}
 
-function showRow(r, rank, realName) {
-  const art = isSafeUrl(r.image) ? r.image : null;
-  // The same second-chance URL every other surface carries, on the same terms.
-  const art2 = isSafeUrl(r.artwork) && r.artwork !== art ? r.artwork : null;
-  const titled = Boolean(String(r.title || "").trim());
-  const title = titled ? truncate(r.title, 120) : "Unidentified show";
-
-  const n = (v) => Number(v || 0);
-  // boosts,sats,episodes per window, in RANGE_OPTIONS order (1w, 1m, 1y, all),
-  // then the newest boost's timestamp for the "Recently boosted" sort. Read by
-  // booster-page.js; the shape is the contract between the two files.
-  const packed = [
-    n(r.b1w), n(r.s1w), n(r.e1w),
-    n(r.b1m), n(r.s1m), n(r.e1m),
-    n(r.b1y), n(r.s1y), n(r.e1y),
-    n(r.boosts), n(r.sats), n(r.eps),
-    n(r.latest),
-  ].join(",");
-
-  const inner = `<span class="cs-rank" aria-hidden="true">${rank}</span>
-      ${art
-        ? `<img class="cs-art" src="${htmlEscape(art)}"${art2 ? ` data-art2="${htmlEscape(art2)}"` : ""} alt="" width="44" height="44" loading="lazy" referrerpolicy="no-referrer" />`
-        : `<span class="cs-art cs-art--blank" aria-hidden="true">${r.medium === "music" ? "💿" : "🎙️"}</span>`}
-      <span class="cs-main">
-        <span class="cs-title">${htmlEscape(title)}</span>
-        <span class="cs-meta" data-bs-meta>${htmlEscape(showMeta(n(r.boosts), n(r.sats), n(r.eps)))}</span>
-      </span>`;
-
-  // An unidentified show has no page to link to, so the row is a <div> carrying
-  // the same class rather than a dead anchor. The guid goes in the title
-  // attribute — it is the only handle that show has, and it is what someone
-  // reporting a gap would quote.
-  const body = titled
-    ? `<a class="cs-link" href="/show/${encodeURIComponent(r.podcast_guid)}">${inner}</a>`
-    : `<div class="cs-link cs-link--dead" title="${htmlEscape(r.podcast_guid || "")}">${inner}</div>`;
-
-  /* ⚠️ THIS ROLLUP IS THE SHOW PICKER FOR #boosts, and this button is the whole
-   * of the affordance. Pressing it filters the boost list at the foot of the page
-   * to this show and scrolls there — "what did this person say about THIS show",
-   * which is a different question from the per-episode one #episodes answers.
-   *
-   * ⚠️ IT IS THE PICKER RATHER THAN A DROPDOWN ON THAT BAND, and the data is the
-   * reason. Sampled over 30 active boosters, the median has boosted 10 distinct
-   * shows, the mean 27 and the heaviest 188 — a menu holding 188 entries is not a
-   * dropdown, it is a list, and this is already a better one: ranked by what the
-   * person actually gave, scrollable, with its own range and sort, and carrying
-   * the artwork. The pick also happens where the question is asked, next to
-   * "40.1k sats across 38 episodes".
-   *
-   * ⚠️ A VERB, SO IT SHIPS `hidden`. It does nothing without JavaScript, and a
-   * control that cannot act is worse than no control — the same discipline as the
-   * two control bands on this page. booster-page.js reveals it, and only when
-   * there is more than one show to choose between and a band to put the chip on.
-   * OUTSIDE the anchor, never inside it: a button nested in a link is neither.
-   *
-   * The label is the row's, so an unidentified show reads "Unidentified show"
-   * here as it does above. It still gets a button — a show Podcast Index cannot
-   * name still has boosts worth reading. */
-  /* ⚠️ THE LABEL NAMES THE BOOSTER, and a bare "Boosts →" is what it replaced.
-   * On a row whose subject is a SHOW, that read as "this show's boosts" — every
-   * boost anyone has ever sent it — when what the button opens is one person's.
-   * The page's <h1> says whose, but a reader twenty rows down cannot see it.
-   *
-   * "Boosts by X" rather than "X's Boosts" because it is already the site's
-   * phrase for this: `title="Boosts by ${name}"` is on every boost row's author
-   * link and on every community-wall card. It also sidesteps the possessive on a
-   * name ending in s.
-   *
-   * ⚠️ CAPPED AT 16, because the name is third-party text and is not always a
-   * name. Measured over 45 boosters: median 11 characters, mean 11, max 27, and
-   * only 5 above 16 — but the tail is "btconboard #LNHANCE or #CTV" and "ChadF
-   * and 33 others", so the cap is about strangeness as much as width. The full
-   * string is in `title` and `aria-label`, where length costs nothing.
-   *
-   * ⚠️ AND IT FALLS BACK WHEN THERE IS NO NAME. 51 boosters in the index have no
-   * kind-0 on any profile relay, and for them `label` is a truncated identifier —
-   * "dbd1ba83b0…ecbd Boosts" is worse than saying nothing about whose. Those rows
-   * point at the figures beside them instead. Same call the rows above make in
-   * printing "Unidentified show" rather than a guid dressed as a title. */
-  const { label: byline, full } = showFilterLabel(realName, title);
-
-  const filter = `<button type="button" class="cs-boosts-btn"
-        data-bs-show-filter="${htmlEscape(r.podcast_guid || "")}"
-        data-bs-show-label="${htmlEscape(title)}"
-        title="${htmlEscape(full)}" aria-label="${htmlEscape(full)}" hidden>${
-        htmlEscape(byline)} <span aria-hidden="true">&rarr;</span></button>`;
-
-  return `<li class="cs-row" data-bs="${packed}">${body}${filter}</li>`;
-}
-
-/* The show-filter button's two strings: what it shows, and what it says in full.
- *
- * Exported for scripts/test-boost-row.mjs — the cap and the fallback are exactly
- * the kind of decision that regresses silently, and neither is visible from the
- * rendered page without a D1 stub. Only onRequest* is routed, so an extra export
- * here costs nothing.
- *
- * @param {string|null} realName  the booster's kind-0 name, or null if they have
- *   none. NOT the page's `label`, which falls back to a truncated identifier —
- *   "dbd1ba83b0…ecbd Boosts" is worse than saying nothing about whose.
- * @param {string} showTitle  the row's own title, already truncated and already
- *   "Unidentified show" where there is none.
- */
-export function showFilterLabel(realName, showTitle) {
-  const name = String(realName || "").trim();
-  return name
-    ? { label: `Boosts by ${truncate(name, LABEL_NAME_MAX)}`, full: `Boosts by ${name} to ${showTitle}` }
-    : { label: "Read these", full: `Read this booster's boosts to ${showTitle}` };
-}
-
-/* Measured over 45 boosters on 2026-08-16: median name 11 characters, mean 11,
- * max 27, and only 5 above this. The cap is about strangeness as much as width —
- * the tail is "btconboard #LNHANCE or #CTV" and "ChadF and 33 others", which are
- * campaign text rather than names. The full string is in `title` and
- * `aria-label`, where length costs nothing. */
-const LABEL_NAME_MAX = 16;
-
-function showMeta(boosts, sats, eps) {
-  return `${num(boosts)} boost${boosts === 1 ? "" : "s"} · ` +
-    `${compact(sats)} sats · ${num(eps)} episode${eps === 1 ? "" : "s"}`;
-}
-
-// ── Episodes and Songs ───────────────────────────────────────────────────────
-//
-// Everything this person has boosted at the episode level, painted as the
-// Episodes feed's own card. Structurally identical to #community-episodes on
-// /episode/<guid> — the same drawer, the same controls, the same shared card —
-// so see the long note over renderCommunityEpisodes there for the whole
-// argument.
-//
-// ⚠️ SERVER-RENDERED, like every other section on this page. It and its twin on
-// /episode were the rendering rule's two standing exceptions, tolerated only
-// because the card existed as JavaScript alone; assets/js/episode-card.js is an
-// HTML-string builder now and runs at the edge, so both are closed.
-//
-// ONE DIFFERENCE FROM THE TWIN worth naming: the figures here are NOT
-// community-scoped, they are this person's own. So the sort is tagged plainly
-// "Sort:" rather than "Community Sort:" — a card's boosts and sats are what this
-// booster sent that episode, which is exactly what the section claims.
-//
-// AND ONE MORE: it opens on Most sats rather than Most boosts. Every card here
-// is one person's giving to one episode and the median booster has two boosts
-// in total, so a boost-count ranking is mostly ties; sats is the axis that
-// actually orders a single person's history.
 // The member's PC 2.0 Favorites (kind 10333). A written exception to the
 // rendering rule: the list lives on relays, not in D1, and its private half is
 // ciphertext only the member's own signer can open, so the edge can render the
@@ -1291,49 +1014,6 @@ function renderFavorites() {
   </section>`;
 }
 
-function renderEpisodes(corpus) {
-  // A booster whose every boost carries no item guid has no episode-level
-  // history at all, and no section. A failed corpus fetch takes the same exit.
-  // Chart rank since 2026-09-03 (Reed's ask); Most sats until then. Every card
-  // here is one person's, so the breadth component is 1 on every row and the
-  // standing is effectively rank in sats + rank in boosts.
-  const { items, profiles } = itemsFromBoosts(corpus?.boosts, { sort: "chart" });
-  if (!items.length) return "";
-
-  return `<section class="show-section show-section--bare" id="episodes" data-booster-episodes${
-      corpus?.truncated ? " data-truncated" : ""}>
-    <details class="ep-drawer" open data-be-body>
-      <summary>
-        <span class="cs-head">
-          <span class="cs-head-title">Episodes and Songs Boosted</span>
-          <span class="cs-head-sub">Every episode and track this booster has sent sats to, ranked</span>
-        </span>
-        <span class="drawer-hint" aria-hidden="true"></span>
-      </summary>
-      <div class="cs-controls ce-controls" data-be-controls hidden></div>
-      <div class="ce-scroll" data-be-scroll tabindex="0" role="region"
-           aria-label="Episodes and songs this booster has boosted">
-        <div class="pcast-list" data-be-list>${renderCardPage(items, {
-          // Not split on medium — see the page header. One person's podcasts and
-          // music are one history, and the cards read correctly either way.
-          copy: CARD_COPY.other,
-          profiles,
-          sort: "chart",
-          range: "all",
-          limit: CARDS_PER_PAGE,
-          // The figures go too, unlike the twin on /episode: every card here
-          // aggregates ONE person's boosts, so "1 booster · 3 boosts" restates the
-          // page's own subject on every row and the booster count is 1 by
-          // construction — CLAUDE.md names this case verbatim under what may
-          // legitimately differ.
-          parts: { stats: false, layout: "compact" },
-          state: { surface: "booster-episodes", truncated: !!corpus?.truncated },
-        })}</div>
-        <div data-be-more></div>
-      </div>
-    </details>
-  </section>`;
-}
 
 // A pubkey with no boosts. A real 404 rather than a page of zeroes: `profiles`
 // holds anyone the collector has resolved a kind-0 for, which is not the same
@@ -1352,10 +1032,10 @@ function notFound(raw) {
   <meta name="robots" content="noindex" />
   <title>Booster not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v249" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v249" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v249" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v249" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v250" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v250" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v250" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v250" />
 </head>
 <body>
 <section class="page-header">
@@ -1373,7 +1053,7 @@ function notFound(raw) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v249" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v250" defer></script>
 </body>
 </html>`;
   return new Response(html, {
