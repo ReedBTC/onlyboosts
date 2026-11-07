@@ -17,7 +17,7 @@ import {
   CARD_PARTS, HOME_CARD_PARTS, boostRowsHtml, namesFrom,
 }
   from '../assets/js/episode-card.js'
-import { renderMessage, renderBioText } from '../assets/js/nostr-text.js'
+import { renderMessage, renderBioText, tidyBoostMessage, linkLabel, isImageUrl } from '../assets/js/nostr-text.js'
 import { toEpisodeShape, normalizeBoosts, episodeApiToBoosts } from '../assets/js/ob-data.js'
 
 let passed = 0
@@ -423,23 +423,71 @@ const NOTE = [
 ].join('\n')
 
 check('the author\u2019s line breaks survive', () => {
+  // The banner and the episode link are app boilerplate and come off
+  // (2026-11-07), so four lines remain with three breaks between them.
   const out = renderMessage(NOTE, new Map())
-  assert.equal((out.match(/\n/g) || []).length, 5, 'newlines were collapsed')
+  assert.equal((out.match(/\n/g) || []).length, 3, 'newlines were collapsed')
 })
 
-check('⚠️ an image URL is a LINK, never an <img>', () => {
-  // Tried the other way on 2026-08-21 and reverted the same day: an inline
-  // picture turns a dense list row into a post. See the note above `linkOut`.
-  // This asserts the revert stayed, because re-adding it is a two-line change
-  // that looks like an improvement.
-  const out = renderMessage(NOTE, new Map())
-  assert.doesNotMatch(out, /<img/)
-  assert.match(out, /<a href="https:\/\/i\.nostr\.build\/[^"]+"[^>]*>https/)
+// ⚠️ REVERSED 2026-11-07, Reed's ask: a shared GIF shows as the GIF, in a
+// bounded box (`a.msg-media` in theme.css). It was a link from 2026-08-21.
+const GIF_NOTE = [
+  '⚡ Boost ⚡',
+  '',
+  'J-dog me to boost. Just following instructions.',
+  'https://media.giphy.com/media/igsvLnrCpT6NQftbBd/giphy.gif',
+  '',
+  'Matt Finlay boosted 210 sats → Chad and Reeds Podcast',
+  '📻 013. Leveling up',
+  '',
+  'https://podcastindex.org/podcast/7968805',
+  'https://www.boostmebuddy.com/?podcast=7c6f7875-2b73-491e-b32c-e2c8d6e91d53&episode=4fe8a3be',
+  '',
+  'https://www.boostmebuddy.com/api/og/boost.png?art=https%3A%2F%2Fx.jpg&title=Chad&sats=210',
+  '',
+  'nostr:nevent1qvzqqqpxqupzqr6fdqf83w28d9z6k7rq7trsp960s7xwnwq4ttvfx33nx6q3ww0gqy28wumn8ghj7un9d3shjtnyv9k',
+].join('\n')
+
+check('an image URL the booster chose renders as the picture, in the media box', () => {
+  const out = renderMessage(GIF_NOTE, new Map())
+  assert.match(out, /<a class="msg-media" href="https:\/\/media\.giphy\.com\/[^"]+giphy\.gif"[^>]*><img src="https:\/\/media\.giphy\.com\/[^"]+" alt="" loading="lazy"/)
+  // The block swallows one break on either side, so no empty line opens up.
+  assert.match(out, /instructions\.<a class="msg-media"/)
+  assert.match(out, /<\/a>\nMatt Finlay/)
 })
 
-check('every URL is a link, image-shaped or not', () => {
-  const out = renderMessage(NOTE, new Map())
-  assert.match(out, /<a href="https:\/\/onlyboosts\.social\/episode\/2c0b0505"[^>]*>https/)
+check('app boilerplate comes off: share card, banner, listen links, the Find-it line', () => {
+  const out = renderMessage(GIF_NOTE, new Map())
+  assert.doesNotMatch(out, /podcastindex|boostmebuddy|og\/boost\.png|nevent/)
+  assert.ok(out.endsWith('📻 013. Leveling up'), out.slice(-60))
+  assert.doesNotMatch(renderMessage(NOTE, new Map()), /<img|nostr\.build|onlyboosts\.social\/episode/)
+  const bot = tidyBoostMessage('hi\n\nX boosted 1 sats → S\n📻 E\n🎧 Find it on Castamatic\nhttps://castamatic.com/guid/31e6\n\nhttps://tardbox.com/og/boost.png?art=a')
+  assert.equal(bot, 'hi\n\nX boosted 1 sats → S\n📻 E')
+  assert.equal(tidyBoostMessage('🔗 https://fountain.fm/show/Q48W\n\n#LB'), '#LB')
+})
+
+check('a listen link inside the booster\u2019s own sentence stays', () => {
+  const msg = 'listen to https://fountain.fm/episode/abc it is great'
+  assert.equal(tidyBoostMessage(msg), msg)
+  assert.match(renderMessage(msg, new Map()), /<a href="https:\/\/fountain\.fm\/episode\/abc"[^>]*>fountain\.fm\/episode\/abc<\/a>/)
+})
+
+check('a message with nothing to strip is returned as the same string', () => {
+  const msg = 'plain https://example.com/a  text\n\n\n\nend'
+  assert.equal(tidyBoostMessage(msg), msg)
+})
+
+check('a link reads as its host and path, the full URL in href and title', () => {
+  const out = renderMessage('see https://www.youtube.com/@AI-archwizard.', new Map())
+  assert.match(out, /<a href="https:\/\/www\.youtube\.com\/@AI-archwizard" title="https:\/\/www\.youtube\.com\/@AI-archwizard"[^>]*>youtube\.com\/@AI-archwizard<\/a>\.$/)
+  assert.equal(linkLabel('https://example.com/'), 'example.com')
+  assert.ok(linkLabel('https://example.com/' + 'a'.repeat(100)).length <= 48)
+})
+
+check('an image is decided by the path, never by a query string', () => {
+  assert.ok(isImageUrl('https://x.test/a.GIF'))
+  assert.ok(!isImageUrl('https://x.test/page?img=a.gif'))
+  assert.ok(!isImageUrl('javascript:alert(1).gif'))
 })
 
 check('⚠️ a javascript: or data: URL still reaches no href', () => {

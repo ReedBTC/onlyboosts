@@ -47,6 +47,10 @@
  * message that was only the reference renders empty, and the callers emit
  * no body for it. The note itself is untouched: this is only how a message
  * looks here.
+ *
+ * SINCE 2026-11-07 APP BOILERPLATE GOES THE SAME WAY, AND AN IMAGE URL IS
+ * THE PICTURE: see `stripBoilerplate` and `isImageUrl` below. Every renderer
+ * calls `tidyBoostMessage`, which is both strips in order.
  */
 
 export function htmlEscape(s) {
@@ -226,13 +230,15 @@ function scanSpans(src, mentionRe = NOSTR_URI_RE) {
  * this function — the same defect was live on every message carrying a
  * sentence-final URL.
  */
-function linkOut(url) {
+function linkOut(url, media = false) {
   const raw = String(url).replace(/[.,;:!?)\]]+$/, "");
   const tail = String(url).slice(raw.length);
-  const body = isSafeUrl(raw)
-    ? `<a href="${htmlEscape(raw)}" target="_blank" rel="noopener noreferrer">${htmlEscape(truncate(raw, 60))}</a>`
-    : htmlEscape(raw);
-  return body + htmlEscape(tail);
+  if (!isSafeUrl(raw)) return htmlEscape(raw) + htmlEscape(tail);
+  if (media && isImageUrl(raw)) {
+    return `<a class="msg-media" href="${htmlEscape(raw)}" target="_blank" rel="noopener noreferrer">` +
+      `<img src="${htmlEscape(raw)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" /></a>` + htmlEscape(tail);
+  }
+  return `<a href="${htmlEscape(raw)}" title="${htmlEscape(raw)}" target="_blank" rel="noopener noreferrer">${htmlEscape(linkLabel(raw))}</a>` + htmlEscape(tail);
 }
 
 /* A booster's kind-0 `about` as HTML, for the header on /booster/<npub>.
@@ -338,17 +344,115 @@ function capMessage(s, n) {
   return t.length <= n ? t : t.slice(0, n - 1).trimEnd() + "\u2026";
 }
 
-/* ⚠️ A BARE IMAGE URL IS LEFT AS A LINK, AND THIS WAS TRIED THE OTHER WAY.
- * Rendering an `<img>` for a URL ending in an image extension shipped on
- * 2026-08-21 and came straight back out: **it makes the notes way too big**
- * (Reed's call, same day). A boost card is a dense row in a long list, and one
- * picture in a message turns it into a post — several to a screen instead of a
- * dozen. That the height was capped is beside the point; the objection is to
- * the block existing at all, so **don't re-propose it as a thumbnail either.**
+/* ⚠️ A BARE IMAGE URL RENDERS AS THE PICTURE SINCE 2026-11-07, AND THIS
+ * REVERSES A CALL. Rendering an `<img>` for an image URL shipped on
+ * 2026-08-21 and came straight back out the same day: it made the notes too
+ * big. Reed asked for it back on 2026-11-07, because sharing a GIF in a boost
+ * has caught on (36 giphy links in the 2,000 newest boosts) and a GIF shown
+ * as its URL is a line of blue text that says nothing. What answers the old
+ * objection is the size: the picture is bounded to a 200px box (`.msg-media`
+ * in theme.css), about what other clients show, and the app boilerplate that
+ * made most image URLs a restatement of the card is stripped first (below),
+ * so a picture on a card is one the booster chose.
  *
- * Nothing is lost: the URL still links out, and clients that DO render the
- * picture inline are unaffected. This is only how a message looks here.
- */
+ * Decided by the URL alone, never by a fetch: the path ends in an image
+ * extension. A link to a page that merely contains a picture stays a link. */
+const IMAGE_PATH_RE = /\.(?:gif|png|jpe?g|webp|avif)$/i;
+
+export function isImageUrl(url) {
+  if (!isSafeUrl(url)) return false;
+  try { return IMAGE_PATH_RE.test(new URL(url).pathname); } catch { return false; }
+}
+
+/* ⚠️ APP BOILERPLATE IS STRIPPED FROM A MESSAGE BEFORE IT IS RENDERED, SINCE
+ * 2026-11-07 (Reed's ask: "all that block of blue text"). Measured on the
+ * 2,000 newest boosts: 668 messages carry a URL, and nearly every one is
+ * something the boosting app appends to every note, restating what the card
+ * already shows beside it:
+ *
+ *   - a SHARE-CARD IMAGE, a picture of the boost itself (`/og/boost.png` on
+ *     tardbox, BoostMeBuddy and BoostMeBitch; 346 of them);
+ *   - an APP BANNER, the brand image a publisher opens its notes with (this
+ *     site's own two, `BOOST_BANNER_URL` and `DONATION_BANNER_URL` in
+ *     externalBoostagram.js, and Local Bitcoiners' bot);
+ *   - a LISTEN LINK to the boosted show or episode in some app (Podcast Index,
+ *     Fountain, pod.link, BoostMeBuddy's `?podcast=`, Castamatic, Podcast
+ *     Guru, Podhome, Wavlake, this site's own episode page); the card links
+ *     the show and the episode already.
+ *
+ * A share card or banner goes wherever it sits. A listen link goes only when
+ * it is ALONE ON ITS LINE (an emoji in front allowed, `🔗 https://…`), which
+ * is how every template writes it; one inside the booster's own sentence is
+ * their prose and stays. The "🎧 Find it on <app>" line the relay bots write
+ * above their link goes with it. Matching by host is a judgement about what
+ * an app appends, not a guarantee: a booster pasting a Fountain link on its
+ * own line to some other episode loses it here, and keeps it on Nostr. The
+ * note itself is untouched; this is only how a message looks here. */
+const SHARE_CARD_PATH_RE = /\/og\/boost\.png$/i;
+const APP_BANNERS = new Set([
+  "https://i.nostr.build/iQ4vHJ88xTrGZ36eey9lWJ.png", // OnlyBoosts, a boost
+  "https://i.nostr.build/QoXlTuDurz3b4EqNefAzoC.png", // OnlyBoosts, a donation
+  "https://i.nostr.build/a6G5FkkfTlSyfJ7z.png",       // Local Bitcoiners' bot
+]);
+const LISTEN_LINK_RE = new RegExp("^https?://(?:www\\.)?(?:" + [
+  "podcastindex\\.org/podcast/",
+  "fountain\\.fm/(?:show|episode|track|album|artist)/",
+  "boostmebuddy\\.com/\\?podcast=",
+  "boostmebitch\\.com/\\?podcast=",
+  "pod\\.link/",
+  "castamatic\\.com/guid/",
+  "app\\.podcastguru\\.io/podcast/",
+  "serve\\.podhome\\.fm/episodepage/",
+  "wavlake\\.com/(?:track|album)/",
+  "onlyboosts\\.social/(?:episode|show)/",
+].join("|") + ")", "i");
+// A line that is nothing but a URL, with at most a symbol or emoji before it.
+const LINK_LINE_RE = /^[^\p{L}\p{N}\s]*\s*(https?:\/\/\S+)\s*$/u;
+const FIND_IT_RE = /^\s*\S*\s*Find it on\b/i;
+
+function isBoilerplateImage(url) {
+  if (APP_BANNERS.has(url)) return true;
+  try { return SHARE_CARD_PATH_RE.test(new URL(url).pathname); } catch { return false; }
+}
+
+export function stripBoilerplate(text) {
+  const src = String(text == null ? "" : text);
+  if (!/https?:\/\//i.test(src)) return src;
+  const lines = src.replace(/\r\n?/g, "\n").split("\n");
+  const keep = [];
+  let changed = false;
+  for (const line of lines) {
+    const m = line.match(LINK_LINE_RE);
+    if (m && (LISTEN_LINK_RE.test(m[1]) || isBoilerplateImage(m[1]))) {
+      if (keep.length && FIND_IT_RE.test(keep[keep.length - 1])) keep.pop();
+      changed = true;
+      continue;
+    }
+    keep.push(line);
+  }
+  let out = keep.join("\n");
+  // A share card or banner mid-line (rare) goes too, with the space before it.
+  out = out.replace(URL_RE, (u) => (isBoilerplateImage(u) ? ((changed = true), "") : u));
+  return changed ? out.replace(/\n[ \t]*(?:\n[ \t]*){2,}/g, "\n\n").trim() : src;
+}
+
+/* Everything a boost message loses before it is tokenized: note references
+ * (`stripNoteRefs`) and app boilerplate (`stripBoilerplate`). Every boost
+ * renderer calls this, the Boosts page's cards included, so a message reads
+ * the same on every surface. */
+export function tidyBoostMessage(text) {
+  return stripBoilerplate(stripNoteRefs(text));
+}
+
+/* What a link reads as: the host (no scheme, no `www.`) and as much of the
+ * path as fits. The full URL stays in the href and the title. */
+export function linkLabel(url, n = 48) {
+  try {
+    const u = new URL(url);
+    const rest = (u.pathname === "/" ? "" : u.pathname) + u.search;
+    return truncate(u.host.replace(/^www\./i, "") + rest, n);
+  } catch { return truncate(url, n); }
+}
 
 /* A boost message as HTML: nostr: URIs become @Name chips, bare URLs become
  * links, everything else is escaped text.
@@ -359,12 +463,21 @@ function capMessage(s, n) {
  * renders the same way in both places.
  */
 export function renderMessage(text, names) {
-  const src = capMessage(stripNoteRefs(text), MESSAGE_MAX);
+  const src = capMessage(tidyBoostMessage(text), MESSAGE_MAX);
   const spans = scanSpans(src);
 
   let out = "", cursor = 0;
   for (const s of spans) {
     if (s.start < cursor) continue;
+    if (s.kind === "url" && isImageUrl(s.id.replace(/[.,;:!?)\]]+$/, ""))) {
+      // The picture is a block, so the line breaks around its URL would
+      // each add an empty line: one on either side is swallowed.
+      const before = src.slice(cursor, s.start).replace(/\n$/, "");
+      out += htmlEscape(before);
+      out += linkOut(s.id, true);
+      cursor = src[s.end] === "\n" ? s.end + 1 : s.end;
+      continue;
+    }
     out += htmlEscape(src.slice(cursor, s.start));
     cursor = s.end;
     if (s.kind === "url") { out += linkOut(s.id); continue; }

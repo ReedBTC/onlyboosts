@@ -15,10 +15,11 @@
  * already-fetched profile data, and so the same DOM nodes get reused across
  * mutating repaints.
  */
-import { nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v248'
+import { nip19 } from '/assets/widgets/nostr-tools.js?v=ob-v249'
 // Primal profile lookup lives in its own module so /show pages can use it
 // without importing this one. See primal-profiles.js.
-import { fetchProfilesFromPrimal } from '/assets/js/primal-profiles.js?v=ob-v248'
+import { fetchProfilesFromPrimal } from '/assets/js/primal-profiles.js?v=ob-v249'
+import { isImageUrl, linkLabel } from '/assets/js/nostr-text.js?v=ob-v249'
 /* ⚠️ THE TWO NIP-52 KINDS, INLINED, AND THAT IS THE WHOLE OF WHAT IS LEFT OF
  * THE CALENDAR PATH. This module used to import four things from
  * calendar-events.js and render a rich card for a calendar event quoted inside
@@ -195,17 +196,39 @@ function parseSegments(content) {
 }
 
 function renderSegmentsInto(el, segments, opts = {}) {
+  let afterMedia = false
   for (const seg of segments) {
     if (seg.type === 'text') {
-      el.appendChild(document.createTextNode(seg.value))
+      const v = afterMedia ? seg.value.replace(/^\n/, '') : seg.value
+      afterMedia = false
+      el.appendChild(document.createTextNode(v))
     } else if (seg.type === 'link') {
       const url = seg.data?.url || seg.value
       if (isSafeUrl(url)) {
         const a = document.createElement('a')
         a.href = url
-        a.textContent = url
         a.target = '_blank'
         a.rel = 'noopener noreferrer'
+        // The same two treatments nostr-text.js#renderMessage gives a URL
+        // (2026-11-07): an image URL is the picture in a bounded box, any
+        // other link reads as its host and path rather than the whole URL.
+        if (isImageUrl(url)) {
+          a.className = 'msg-media'
+          const img = document.createElement('img')
+          img.src = url
+          img.alt = ''
+          img.loading = 'lazy'
+          img.decoding = 'async'
+          img.referrerPolicy = 'no-referrer'
+          a.appendChild(img)
+          // A block swallows one line break on either side, as at the edge.
+          const prev = el.lastChild
+          if (prev && prev.nodeType === 3) prev.nodeValue = prev.nodeValue.replace(/\n$/, '')
+          afterMedia = true
+        } else {
+          a.textContent = linkLabel(url)
+          a.title = url
+        }
         el.appendChild(a)
       } else {
         el.appendChild(document.createTextNode(url))
