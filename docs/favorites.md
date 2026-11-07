@@ -456,3 +456,8 @@ beyond the markup.
    the two-sided `recommend-rails.js`. A seed is never recommended, so the
    heart takes a show off the rails. The event fires trusted or not, with an
    empty list when untrusted, so a listener can tell no list from no read.
+   **⚠️ The guids are BARE**, the form D1 stores: a feed entry's `id` is the
+   whole `podcast:guid:` identifier and `feedGuidsOf` strips it through the
+   merge module's `feedGuidOf`. The first paint sent the identifier, nothing
+   matched a seed, and Reed saw three followed shows still recommended the
+   same day; `test-discover-home.mjs` runs the shipped function.

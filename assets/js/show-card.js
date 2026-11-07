@@ -45,10 +45,10 @@
  * All three are now en-US in UTC, which is what episode-card.js and
  * functions/_shared/detail-page.js already do. The site has one date format.
  */
-import { showPageHref, episodePageHref } from './show-link.js?v=ob-v251'
-import { favoriteButtonHtml } from './favorite-button.js?v=ob-v251'
-import { coverChain } from './cover-art.js?v=ob-v251'
-import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v251'
+import { showPageHref, episodePageHref } from './show-link.js?v=ob-v252'
+import { favoriteButtonHtml } from './favorite-button.js?v=ob-v252'
+import { coverChain } from './cover-art.js?v=ob-v252'
+import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v252'
 
 const esc = htmlEscape
 

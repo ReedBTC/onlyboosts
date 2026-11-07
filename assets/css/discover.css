@@ -3,15 +3,17 @@
  * (one ground, hairlines, one accent — see docs/dark-mode.md), so dark mode
  * is free. The tile markup is assets/js/rail-tile.js, two-sided. */
 
+/* The page track is theme.css's --page-track, one width for every page
+   (2026-11-07, Reed's ask: the homepage sat at 72rem beside 60rem detail
+   pages, so the same rail drew smaller tiles on /booster). */
 .discover {
-  max-width: var(--feed-track, 60rem);
+  max-width: var(--page-track, 60rem);
   margin: 0 auto;
   padding: 1.6rem 1rem 3rem;
   display: flex;
   flex-direction: column;
   gap: 2.2rem;
 }
-@media (min-width: 1100px) { .discover { max-width: 72rem; } }
 
 /* ── A rail ── */
 .rail { min-width: 0; }
@@ -55,16 +57,23 @@
   color: var(--muted);
 }
 
-/* The track: a sideways scroller on a phone, a grid of ten on a desktop. */
+/* The track: a sideways scroller at every width. A phone shows what fits;
+   a desktop shows exactly five, then ten, across the track and scrolls for
+   the rest (2026-11-07, Reed's ask: a rail of twenty on /booster wrapped to
+   two rows of ten; now every rail is one row, however long). The column is
+   sized off the track so ten tiles fill it edge to edge, which is what the
+   ten-column grid did before. */
 .rail-track { min-width: 0; }
 .rail-list {
+  --rail-cols: 1;
+  --rail-gap: 0.9rem;
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: minmax(118px, 1fr);
-  gap: 0.9rem;
+  gap: var(--rail-gap);
   overflow-x: auto;
   scroll-snap-type: x proximity;
   padding-bottom: 0.35rem;
@@ -72,13 +81,12 @@
 }
 @media (min-width: 900px) {
   .rail-list {
-    grid-auto-flow: row;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    overflow: visible;
+    --rail-cols: 5;
+    grid-auto-columns: calc((100% - (var(--rail-cols) - 1) * var(--rail-gap)) / var(--rail-cols));
   }
 }
 @media (min-width: 1100px) {
-  .rail-list { grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 0.8rem; }
+  .rail-list { --rail-cols: 10; --rail-gap: 0.8rem; }
 }
 /* The search page's groups wrap instead of scrolling: every hit on screen. */
 .rail-list--wrap,

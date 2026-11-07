@@ -380,8 +380,12 @@ was picked from is in the session memory; direction A won, with the sans.
   `OBFavorites.feeds()` / `ensureRead()`; `discover.js` re-asks the endpoint
   with the feeds, `/booster` repaints its rails through the two-sided
   `recommend-rails.js`; `because[].why` ('boosted' | 'follow') picks the
-  heading's verb. `pubkey` is optional on the endpoint when `favorites` is
-  sent (for the OPML path). See `docs/favorites.md` item 8.
+  heading's verb, and **the rails say "you" on `/booster` too** (Reed's call
+  the same day, over "Because Reed boosted"). `pubkey` is optional on the
+  endpoint when `favorites` is sent (for the OPML path). **The feeds are
+  BARE guids**: a list entry's id is the whole `podcast:guid:` identifier,
+  and the first paint sent that, so nothing matched. See `docs/favorites.md`
+  item 8.
 - **Three more fact rails off the new columns**: New and Noteworthy
   (`first_boost_ts` within 90 days and two boosters; the collector measured
   21 such shows; **since 2026-10-30 two rails, and the podcast one adds
@@ -530,7 +534,9 @@ because four tabs and four words do not fit; three do, and a reorganization that
 exists because visitors cannot tell what the site shows them must not open with
 three unlabelled glyphs.
 
-**⚠️ The page track is `--feed-track: 60rem`, which is `.show-main`'s width.**
+**⚠️ The page track is `--feed-track`, which is `.show-main`'s width; both read
+`--page-track` in `theme.css` since 2026-11-07 (60rem, 72rem from 1100px up,
+the homepage's width; Reed's ask: every page the same width on a desktop).**
 Three elements read it — the tabs, the sub-row and the panels (the control bar
 was the fourth until 2026-09-03, when it became the lid inside the active
 panel's shell) — so the column no longer narrows by 240px when a reader clicks

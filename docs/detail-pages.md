@@ -514,7 +514,10 @@ Music and one Because rail per seed, rendered at the edge with the two-sided
 `rail-tile.js` (tiles bare, the homepage's rule for the personal rails) inside
 `.bs-rails`, with `discover.css` linked for them. `recommendationsFor` is
 called with no favorites (a Nostr event only the browser reads); the browser
-hands the list over and repaints once it is read.
+hands the list over (bare guids) and repaints once it is read. The headings say
+"you", the homepage's wording, whoever is looking (Reed's call, 2026-11-07).
+The page asks for twenty per rail; the rail scrolls sideways past the ten it
+shows, on every page, since the same day.
 
 The header runs its **own** Primal backfill rather than `hydrateProfiles()`; see
 the note in `booster-page.js`.

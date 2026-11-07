@@ -41,14 +41,14 @@
  * after which the list is re-read with NIP-44 and the hearts fill. That is a
  * known cost of not loading 1MB to draw an outline.
  */
-import { fetchFavorites, syncFavorites, widgetDeps, saveMode, loadMode } from '/assets/js/favorites-sync.js?v=ob-v251'
-import { statedVisibility } from '/assets/js/favorites-merge.js?v=ob-v251'
-import { setFavoriteState, changeFor, keyFor, isFollow, WORD_BUSY, WORD_WAIT } from '/assets/js/favorite-button.js?v=ob-v251'
-import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v251'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v251'
-import { initAccountSettings, noteSettingsChange } from '/assets/js/account-settings.js?v=ob-v251'
+import { fetchFavorites, syncFavorites, widgetDeps, saveMode, loadMode } from '/assets/js/favorites-sync.js?v=ob-v252'
+import { statedVisibility, feedGuidOf } from '/assets/js/favorites-merge.js?v=ob-v252'
+import { setFavoriteState, changeFor, keyFor, isFollow, WORD_BUSY, WORD_WAIT } from '/assets/js/favorite-button.js?v=ob-v252'
+import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v252'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v252'
+import { initAccountSettings, noteSettingsChange } from '/assets/js/account-settings.js?v=ob-v252'
 
-const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v251'
+const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v252'
 
 const state = {
   pubkey: null,
@@ -111,11 +111,17 @@ function keysOf(entries) {
 
 /* The feed guids a list names: every feed entry, and the feed of every item
  * entry (a favorited episode is a signal about its show). Artists are not
- * feeds and are left out. What the recommendations take as seeds. */
+ * feeds and are left out. What the recommendations take as seeds.
+ *
+ * ⚠️ BARE GUIDS, THE FORM D1 STORES. A feed entry's `id` is the whole
+ * `podcast:guid:<guid>` identifier and an item entry's `feed` is already bare
+ * (parse() strips it); the first paint of this sent the identifier, nothing
+ * matched a seed, and every followed show stayed recommended (Reed's report,
+ * 2026-11-07). */
 export function feedGuidsOf(entries) {
   const out = new Set()
   for (const e of entries ?? []) {
-    if (e.kind === 'podcast:guid' && e.id) out.add(e.id)
+    if (e.kind === 'podcast:guid') { const g = feedGuidOf(e.id); if (g) out.add(g) }
     else if (e.kind === 'podcast:item:guid' && e.feed) out.add(e.feed)
   }
   return [...out]

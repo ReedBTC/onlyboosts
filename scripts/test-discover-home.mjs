@@ -593,13 +593,32 @@ console.log('\nThe recommendations and the data rails, over the real schema:')
     assert.equal(becauseVerb({ medium: 'podcast' }, 'follow'), 'follow')
     assert.equal(becauseVerb({ medium: 'music' }, 'follow'), 'favorited')
     const row = (g, t, m) => ({ guid: g, title: t, img: null, medium: m, sats: 1, boosters: 2, boosts: 3 })
-    const html = recommendRailsHtml({ podcasts: [row('p1', 'Pod <1>', 'podcast')], music: [], because: [{ seed: { guid: 's1', title: 'Seed', medium: 'podcast' }, rows: [row('p2', 'Pod 2', 'podcast')], why: 'follow' }] }, 'Reed')
+    const html = recommendRailsHtml({ podcasts: [row('p1', 'Pod <1>', 'podcast')], music: [], because: [{ seed: { guid: 's1', title: 'Seed', medium: 'podcast' }, rows: [row('p2', 'Pod 2', 'podcast')], why: 'follow' }] })
     assert.ok(html.includes('<h2 id="rail-recommended">Recommended Podcasts</h2>') && html.includes('Pod &lt;1&gt;'))
-    assert.ok(html.includes('Because Reed follow <a href="/show/s1">Seed</a>'), html)
+    // "you" on every page, the homepage's wording (Reed's call, 2026-11-07, over "Because Reed boosted").
+    assert.ok(html.includes('Because you follow <a href="/show/s1">Seed</a>'), html)
+    assert.ok(html.includes('the same podcasts you do'), 'the viewer is addressed')
     assert.ok(!html.includes('rail-recommended-music'), 'an empty list is no rail')
     assert.ok(!html.includes('rt-ranks') && !html.includes('sats'), 'bare tiles')
-    assert.equal(recommendRailsHtml({ podcasts: [], music: [], because: [] }, 'Reed'), '')
-    assert.ok(recommendRailsHtml({ podcasts: [row('p1', 'P', 'podcast')] }, 'you').includes('you do'), 'the viewer is addressed')
+    assert.equal(recommendRailsHtml({ podcasts: [], music: [], because: [] }), '')
+  })
+  check('feedGuidsOf hands the recommendations BARE guids: a feed entry\'s id is the whole podcast:guid: identifier (2026-11-07)', () => {
+    // The shipped function, run with the merge module's real feedGuidOf. The
+    // first paint sent the identifier and no followed show ever left the rails.
+    const ui = read('assets/js/favorites-ui.js')
+    const m = ui.match(/export function feedGuidsOf\(entries\) \{[\s\S]*?\n\}/)
+    assert.ok(m, 'feedGuidsOf is in favorites-ui.js')
+    assert.ok(/import \{[^}]*\bfeedGuidOf\b[^}]*\} from '\/assets\/js\/favorites-merge\.js/.test(ui), 'imports the merge module\'s feedGuidOf')
+    const feedGuidOf = (id) => (typeof id === 'string' && id.startsWith('podcast:guid:') ? id.slice('podcast:guid:'.length) : null)
+    const feedGuidsOf = new Function('feedGuidOf', m[0].replace('export function', 'return function'))(feedGuidOf)
+    const got = feedGuidsOf([
+      { kind: 'podcast:guid', id: 'podcast:guid:aaa' },
+      { kind: 'podcast:item:guid', id: 'podcast:item:guid:ep1', feed: 'bbb' },
+      { kind: 'podcast:item:guid', id: 'podcast:item:guid:ep2', feed: 'aaa' },
+      { kind: 'podcast:publisher:guid', id: 'podcast:publisher:guid:ccc' },
+      { kind: 'podcast:guid', id: 'not-an-identifier' },
+    ])
+    assert.deepEqual(got, ['aaa', 'bbb'])
   })
 
   await checkAsync('New and Noteworthy: first boost within 90 days and two boosters, newest debuts after the better-backed', async () => {
@@ -850,10 +869,10 @@ console.log('\nThe member\'s recommendations on their own page (2026-10-20):')
   check('the booster page asks the recommendation core, lets it fail, and renders #recommended as rails after Favorites (2026-11-07)', () => {
     assert.ok(src.includes('import { recommendationsFor } from "../api/v1/recommend.js"'))
     assert.ok(/recommendationsFor\(env, hex, \[\], 20\)\.catch\(/.test(src))
-    assert.ok(src.indexOf('${renderFavorites()}') < src.indexOf('${renderRecommended(recs, realName)}'))
+    assert.ok(src.indexOf('${renderFavorites()}') < src.indexOf('${renderRecommended(recs)}'))
     assert.ok(src.includes('id="recommended"'))
     // The homepage's tiles, two-sided, bare (title alone), with the Because rails.
-    assert.ok(src.includes('from "../../assets/js/recommend-rails.js"') && src.includes('recommendRailsHtml(recs, realName || null)'))
+    assert.ok(src.includes('from "../../assets/js/recommend-rails.js"') && src.includes('recommendRailsHtml(recs)'))
     const rails = read('assets/js/recommend-rails.js')
     assert.ok(rails.includes("rail('recommended', 'Recommended Podcasts'") && rails.includes("rail('recommended-music', 'Recommended Music'") && rails.includes('rail(`because-${i}`'))
     assert.ok(rails.includes("from './rail-tile.js?v=") && rails.includes('bare(showTile)') && rails.includes('bare(albumTile)'), 'two-sided, bare tiles')
