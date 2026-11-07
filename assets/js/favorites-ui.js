@@ -41,14 +41,14 @@
  * after which the list is re-read with NIP-44 and the hearts fill. That is a
  * known cost of not loading 1MB to draw an outline.
  */
-import { fetchFavorites, syncFavorites, widgetDeps, saveMode, loadMode } from '/assets/js/favorites-sync.js?v=ob-v252'
-import { statedVisibility, feedGuidOf } from '/assets/js/favorites-merge.js?v=ob-v252'
-import { setFavoriteState, changeFor, keyFor, isFollow, WORD_BUSY, WORD_WAIT } from '/assets/js/favorite-button.js?v=ob-v252'
-import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v252'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v252'
-import { initAccountSettings, noteSettingsChange } from '/assets/js/account-settings.js?v=ob-v252'
+import { fetchFavorites, syncFavorites, widgetDeps, saveMode, loadMode } from '/assets/js/favorites-sync.js?v=ob-v253'
+import { statedVisibility, feedGuidOf } from '/assets/js/favorites-merge.js?v=ob-v253'
+import { setFavoriteState, changeFor, keyFor, isFollow, WORD_BUSY, WORD_WAIT } from '/assets/js/favorite-button.js?v=ob-v253'
+import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v253'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v253'
+import { initAccountSettings, noteSettingsChange } from '/assets/js/account-settings.js?v=ob-v253'
 
-const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v252'
+const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v253'
 
 const state = {
   pubkey: null,
