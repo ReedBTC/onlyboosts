@@ -41,14 +41,14 @@
  * after which the list is re-read with NIP-44 and the hearts fill. That is a
  * known cost of not loading 1MB to draw an outline.
  */
-import { fetchFavorites, syncFavorites, widgetDeps, saveMode, loadMode } from '/assets/js/favorites-sync.js?v=ob-v250'
-import { statedVisibility } from '/assets/js/favorites-merge.js?v=ob-v250'
-import { setFavoriteState, changeFor, keyFor, WORD_BUSY, WORD_WAIT } from '/assets/js/favorite-button.js?v=ob-v250'
-import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v250'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v250'
-import { initAccountSettings, noteSettingsChange } from '/assets/js/account-settings.js?v=ob-v250'
+import { fetchFavorites, syncFavorites, widgetDeps, saveMode, loadMode } from '/assets/js/favorites-sync.js?v=ob-v251'
+import { statedVisibility } from '/assets/js/favorites-merge.js?v=ob-v251'
+import { setFavoriteState, changeFor, keyFor, isFollow, WORD_BUSY, WORD_WAIT } from '/assets/js/favorite-button.js?v=ob-v251'
+import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v251'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v251'
+import { initAccountSettings, noteSettingsChange } from '/assets/js/account-settings.js?v=ob-v251'
 
-const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v250'
+const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v251'
 
 const state = {
   pubkey: null,
@@ -276,10 +276,10 @@ function askMode() {
     wrap.setAttribute('aria-labelledby', 'ob-fav-ask-title')
     wrap.innerHTML =
       `<div class="ob-fav-ask-card">` +
-        `<h2 id="ob-fav-ask-title">Who can see your favorites?</h2>` +
-        `<p>Your favorites are saved to your Nostr account so other podcast apps can show them too. Choose once; you can change it later in the account menu.</p>` +
+        `<h2 id="ob-fav-ask-title">Who can see your follows and favorites?</h2>` +
+        `<p>The podcasts you follow and the music you favorite are saved to your Nostr account as one list, so other podcast apps can show them too. Choose once; you can change it later in the account menu.</p>` +
         `<div class="ob-fav-ask-row">` +
-          `<button type="button" class="ob-fav-ask-btn" data-mode="public"><strong>Public</strong><span>Anyone can see what you favorite</span></button>` +
+          `<button type="button" class="ob-fav-ask-btn" data-mode="public"><strong>Public</strong><span>Anyone can see what you follow and favorite</span></button>` +
           `<button type="button" class="ob-fav-ask-btn" data-mode="private"><strong>Private</strong><span>Encrypted so only you can read the list</span></button>` +
         `</div>` +
         `<button type="button" class="ob-fav-ask-cancel" data-cancel>Not now</button>` +
@@ -392,9 +392,14 @@ async function onClick(btn) {
       for (const b of buttons()) if (keyFor(b) === key) paint(b)
       // Every outcome says something: an `unchanged` answer is the list
       // already agreeing, which the reader is owed as much as a publish.
-      showToast(r.status === 'published'
-        ? (wasOn ? 'Removed from your favorites' : 'Added to your favorites')
-        : (wasOn ? 'Not in your favorites' : 'Already in your favorites'))
+      // A podcast show is followed, everything else favorited (Reed, 2026-11-07).
+      showToast(isFollow(btn)
+        ? (r.status === 'published'
+            ? (wasOn ? 'Unfollowed' : 'Following this podcast')
+            : (wasOn ? 'You were not following it' : 'Already following'))
+        : (r.status === 'published'
+            ? (wasOn ? 'Removed from your favorites' : 'Added to your favorites')
+            : (wasOn ? 'Not in your favorites' : 'Already in your favorites')))
       return
     }
     showToast(MESSAGES[r.status] || 'Couldn’t update your favorites.', true)
@@ -454,7 +459,7 @@ async function setMode(mode) {
     if (r.status === 'published' || r.status === 'unchanged') {
       noteSettingsChange()
       await reload({ withWidget: true })
-      showToast(mode === 'private' ? 'Your favorites are private now' : 'Your favorites are public now')
+      showToast(mode === 'private' ? 'Your follows and favorites are private now' : 'Your follows and favorites are public now')
       return r
     }
     saveMode(window.localStorage, deps.pubkey, previous)

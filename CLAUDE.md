@@ -2561,6 +2561,13 @@ is a publish target (theforest refuses the write and is deliberately out).**
   the widget boots on a stub user, so `onClick` waits on the widget's
   `isSessionReady()`; an unopened private half paints a heart UNKNOWN, not
   off; `unchanged` gets a toast too; on reads "Favorited" on a tinted pill.
+- **⚠️ A PODCAST SHOW IS FOLLOWED, EVERYTHING ELSE IS FAVORITED** (Reed's
+  call, 2026-11-07): the show-level button on the podcast side reads Follow /
+  Following, plus → check; episodes, albums, songs and artists keep Favorite
+  and the heart. `wordsFor` / `isFollow` in `favorite-button.js`; wording and
+  glyph only, the kind 10333 event is unchanged. The list is **Follows and
+  Favorites** on every surface that names it. See **The Heart** in
+  `docs/favorites.md`.
 - **⚠️ THE HEART SHIPS `hidden` AND `favorites-ui.js` REVEALS IT FOR A
   SIGNED-IN MEMBER ONLY** (Reed: signed out gets nothing). `favorite-button.js`
   is two-sided chrome on the boost-button pattern, rendered by both cards and

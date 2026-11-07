@@ -376,6 +376,10 @@ a.msg-media img {
 .ob-fav-pill + .ob-boost-pill { margin-left: 0.4rem; }
 .ob-fav-pill[hidden] { display: none; }
 .ob-fav-pill .ob-fav-icon { font-size: 1.05em; line-height: 1; }
+/* A podcast show's button reads Follow with a plus that becomes a check
+   (Reed, 2026-11-07); the heart stays on everything else. The glyphs are
+   text, bolder than the word so they read at pill size. */
+.ob-fav-pill--follow .ob-fav-icon { font-size: 1.1em; font-weight: 800; }
 .ob-fav-pill.is-on {
   background: rgba(0, 175, 240, 0.14);
   border-color: var(--brand-d);

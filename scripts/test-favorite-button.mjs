@@ -25,7 +25,7 @@ const check = (name, fn) => {
 const el = (html) => {
   const attrs = Object.fromEntries([...html.matchAll(/ ([a-z-]+)="([^"]*)"/g)].map((m) => [m[1], m[2].replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&')]))
   const classes = new Set((attrs.class || '').split(/\s+/).filter(Boolean))
-  const icon = { textContent: html.includes('♥') ? '♥' : '♡' }
+  const icon = { textContent: (html.match(/class="ob-fav-icon" aria-hidden="true">([^<]*)</) || [])[1] || '' }
   const word = { textContent: (html.match(/class="ob-fav-word">([^<]*)</) || [])[1] || '' }
   const dataset = {}
   for (const [k, v] of Object.entries(attrs)) if (k.startsWith('data-')) dataset[k.slice(5).replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = v
@@ -70,25 +70,64 @@ check('nothing to name, nothing rendered', () => {
 })
 
 check('the hero variant adds the row\'s button class', () => {
-  assert.match(F.favoriteButtonHtml({ kind: 'show', guid: GUID, label: 'x', extraClass: 'btn' }), /class="ob-fav-pill btn"/)
+  assert.match(F.favoriteButtonHtml({ kind: 'show', guid: GUID, medium: 'music', label: 'x', extraClass: 'btn' }), /class="ob-fav-pill btn"/)
+  assert.match(F.favoriteButtonHtml({ kind: 'show', guid: GUID, label: 'x', extraClass: 'btn' }), /class="ob-fav-pill ob-fav-pill--follow btn"/, 'a podcast show\'s hero button is a Follow button')
 })
 
 check('setFavoriteState: on fills the heart and flips the verb; unknown is neither', () => {
-  const b = el(F.favoriteButtonHtml({ kind: 'show', guid: GUID, label: 'My Show' }))
+  const b = el(F.favoriteButtonHtml({ kind: 'show', guid: GUID, medium: 'music', label: 'My Album' }))
   F.setFavoriteState(b, true)
   assert.equal(b.getAttribute('aria-pressed'), 'true')
   assert.equal(b.querySelector('.ob-fav-icon').textContent, '♥')
-  assert.equal(b.getAttribute('aria-label'), 'Unfavorite My Show')
-  assert.equal(b.title, 'Unfavorite My Show')
+  assert.equal(b.getAttribute('aria-label'), 'Unfavorite My Album')
+  assert.equal(b.title, 'Unfavorite My Album')
   assert.equal(b.classList.contains('is-on'), true)
   assert.equal(b.querySelector('.ob-fav-word').textContent, 'Favorited', 'the word says it is on (2026-10-29)')
   F.setFavoriteState(b, false)
   assert.equal(b.querySelector('.ob-fav-word').textContent, 'Favorite')
-  assert.equal(b.getAttribute('aria-label'), 'Favorite My Show')
+  assert.equal(b.getAttribute('aria-label'), 'Favorite My Album')
   assert.equal(b.classList.contains('is-on'), false)
   F.setFavoriteState(b, null)
   assert.equal(b.classList.contains('is-unknown'), true)
   assert.equal(b.getAttribute('aria-pressed'), 'false')
+})
+
+check('a podcast SHOW is followed, everything else favorited (Reed, 2026-11-07): the word and glyph, not the event', () => {
+  // Show-level, podcast side (declared, or undeclared: the partition rule).
+  for (const medium of ['podcast', null, 'video']) {
+    const html = F.favoriteButtonHtml({ kind: 'show', guid: GUID, medium, label: 'My Show' })
+    assert.match(html, /^<button type="button" class="ob-fav-pill ob-fav-pill--follow"/, String(medium))
+    const b = el(html)
+    assert.equal(b.querySelector('.ob-fav-word').textContent, 'Follow')
+    assert.equal(b.querySelector('.ob-fav-icon').textContent, '+')
+    assert.equal(b.getAttribute('aria-label'), 'Follow My Show')
+    assert.equal(F.isFollow(b), true)
+    F.setFavoriteState(b, true)
+    assert.equal(b.querySelector('.ob-fav-word').textContent, 'Following')
+    assert.equal(b.querySelector('.ob-fav-icon').textContent, '✓')
+    assert.equal(b.getAttribute('aria-label'), 'Unfollow My Show')
+    F.setFavoriteState(b, false)
+    assert.equal(b.getAttribute('aria-label'), 'Follow My Show')
+    // The change it asks for is the same feed favorite as ever.
+    assert.deepEqual(F.changeFor(b, false), { op: 'add', kind: 'feed', id: 'podcast:guid:' + GUID, medium })
+  }
+  // An album, a podcast episode, a song and an artist keep the heart.
+  for (const args of [
+    { kind: 'show', medium: 'music' }, { kind: 'episode', itemGuid: ITEM, medium: 'podcast' },
+    { kind: 'episode', itemGuid: ITEM, medium: 'music' }, { kind: 'artist' },
+  ]) {
+    const html = F.favoriteButtonHtml({ guid: GUID, label: 'x', ...args })
+    assert.match(html, /^<button type="button" class="ob-fav-pill"/, JSON.stringify(args))
+    const b = el(html)
+    assert.equal(b.querySelector('.ob-fav-word').textContent, 'Favorite')
+    assert.equal(b.querySelector('.ob-fav-icon').textContent, '♡')
+    assert.equal(F.isFollow(b), false)
+  }
+  // The toasts follow the same rule, and the section's podcast-side group is "Following".
+  const ui = readFileSync(new URL('../assets/js/favorites-ui.js', import.meta.url), 'utf8')
+  assert.ok(ui.includes('isFollow(btn)') && ui.includes("'Following this podcast'") && ui.includes("'Unfollowed'"))
+  const sec = readFileSync(new URL('../assets/js/favorites-section.js', import.meta.url), 'utf8')
+  assert.ok(sec.includes("{ key: 'shows', title: 'Following', kind: 'feed', music: false }") && sec.includes("['shows', 'Following']"))
 })
 
 check('changeFor: the press asks for the opposite of the state, with the full identifiers', () => {

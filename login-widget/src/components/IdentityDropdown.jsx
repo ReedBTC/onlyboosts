@@ -400,7 +400,7 @@ function SettingsRows({ signedOut }) {
       {!signedOut && api && (
         <div className="space-y-1">
           <div className="flex items-center justify-between gap-3">
-            <span className="text-xs text-[var(--ink,#0f2733)]">Favorites</span>
+            <span className="text-xs text-[var(--ink,#0f2733)]">Follows and Favorites</span>
             <div
               className="inline-flex w-[132px] rounded-lg border border-[var(--modal-line,#b9d4e6)] p-0.5"
               aria-busy={favBusy}
@@ -415,7 +415,7 @@ function SettingsRows({ signedOut }) {
               : fav.mode === 'private'
                 ? 'Encrypted so only you can read the list.'
                 : fav.mode === 'public'
-                  ? 'Anyone can see what you favorite, in any app that reads them.'
+                  ? 'Anyone can see what you follow and favorite, in any app that reads them.'
                   : fav.source === 'ambiguous'
                     ? 'Your list is in both states at once; pick one to settle it.'
                     : 'Not chosen yet. You will be asked at your first favorite.'}

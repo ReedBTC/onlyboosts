@@ -66,34 +66,63 @@ export function favoriteButtonHtml({ kind, guid, itemGuid = null, medium = null,
   const item = kind === 'episode' ? ` data-fav-item="${esc(ITEM_PREFIX + itemGuid)}"` : ''
   const med = typeof medium === 'string' && medium.trim() ? ` data-fav-medium="${esc(medium.trim())}"` : ''
   const cls = extraClass ? ` ${esc(extraClass)}` : ''
-  return `<button type="button" class="ob-fav-pill${cls}" hidden data-fav="${kind}" data-fav-id="${esc(id)}"${item}${med}` +
-    ` aria-pressed="false" title="Favorite ${esc(label)}" aria-label="Favorite ${esc(label)}">` +
-    `<span class="ob-fav-icon" aria-hidden="true">${HEART_OFF}</span><span class="ob-fav-word">Favorite</span></button>`
+  const w = wordsFor(kind, medium)
+  return `<button type="button" class="ob-fav-pill${w.follow ? ' ob-fav-pill--follow' : ''}${cls}" hidden data-fav="${kind}" data-fav-id="${esc(id)}"${item}${med}` +
+    ` aria-pressed="false" title="${w.verbOff} ${esc(label)}" aria-label="${w.verbOff} ${esc(label)}">` +
+    `<span class="ob-fav-icon" aria-hidden="true">${w.iconOff}</span><span class="ob-fav-word">${w.off}</span></button>`
 }
 
-/* ⚠️ THE WORD CHANGES WITH THE STATE, NOT ONLY THE HEART (Reed, 2026-10-29:
+/* ⚠️ THE WORD CHANGES WITH THE STATE, NOT ONLY THE GLYPH (Reed, 2026-10-29:
  * an outline heart against a filled one was not enough to tell whether a
  * show was already a favorite). Off reads "Favorite", on reads "Favorited"
- * on a tinted pill, and a click in flight reads "Saving…". */
+ * on a tinted pill, and a click in flight reads "Saving…".
+ *
+ * ⚠️ A PODCAST SHOW IS FOLLOWED, EVERYTHING ELSE IS FAVORITED (Reed's call,
+ * 2026-11-07): the show-level button on the podcast side reads Follow /
+ * Following with a plus that becomes a check (Apple Podcasts' convention;
+ * Pocket Casts is "+ Subscribe" → check), and podcast episodes, albums,
+ * songs and artists keep Favorite / Favorited with the heart. Wording and
+ * glyph only: the event underneath is Chad's kind 10333 either way, and
+ * `changeFor` is untouched. A feed that declares no medium is on the podcast
+ * side, the partition rule the Shows feed uses (CLAUDE.md, the medium
+ * split). `isFollow(btn)` reads the same rule off the element so
+ * favorites-ui.js's toasts agree. */
 export const WORD_OFF = 'Favorite'
 export const WORD_ON = 'Favorited'
+export const FOLLOW_OFF = 'Follow'
+export const FOLLOW_ON = 'Following'
 export const WORD_BUSY = 'Saving…'
 export const WORD_WAIT = 'Connecting…'
+export const PLUS = '+'
+export const CHECK = '✓'
+
+export function wordsFor(kind, medium) {
+  const follow = kind === 'show' && String(medium || '').trim() !== 'music'
+  return follow
+    ? { follow, off: FOLLOW_OFF, on: FOLLOW_ON, verbOff: 'Follow', verbOn: 'Unfollow', iconOff: PLUS, iconOn: CHECK }
+    : { follow, off: WORD_OFF, on: WORD_ON, verbOff: 'Favorite', verbOn: 'Unfavorite', iconOff: HEART_OFF, iconOn: HEART_ON }
+}
+
+/** Whether a rendered button is a Follow button (a podcast show) or a heart. */
+export function isFollow(btn) {
+  return wordsFor(btn?.dataset?.fav, btn?.dataset?.favMedium).follow
+}
 
 /** Paint one button's state. `on` is true, false, or null for "not known". */
 export function setFavoriteState(btn, on) {
   if (!btn) return
   const known = on === true || on === false
+  const w = wordsFor(btn.dataset.fav, btn.dataset.favMedium)
   btn.setAttribute('aria-pressed', on === true ? 'true' : 'false')
   btn.classList.toggle('is-on', on === true)
   btn.classList.toggle('is-unknown', !known)
   const icon = btn.querySelector('.ob-fav-icon')
-  if (icon) icon.textContent = on === true ? HEART_ON : HEART_OFF
+  if (icon) icon.textContent = on === true ? w.iconOn : w.iconOff
   const word = btn.querySelector('.ob-fav-word')
-  if (word) word.textContent = on === true ? WORD_ON : WORD_OFF
+  if (word) word.textContent = on === true ? w.on : w.off
   const label = btn.getAttribute('aria-label') || ''
-  const base = label.replace(/^(Favorite|Unfavorite) /, '')
-  const verb = on === true ? 'Unfavorite' : 'Favorite'
+  const base = label.replace(/^(Favorite|Unfavorite|Follow|Unfollow) /, '')
+  const verb = on === true ? w.verbOn : w.verbOff
   btn.setAttribute('aria-label', `${verb} ${base}`)
   btn.title = `${verb} ${base}`
 }

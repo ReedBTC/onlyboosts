@@ -176,6 +176,24 @@ re-vendor rule in `PROVENANCE` is unchanged, but the SHA to take is main's.
 
 ## The Heart
 
+**⚠️ A PODCAST SHOW IS FOLLOWED, EVERYTHING ELSE IS FAVORITED, SINCE
+2026-11-07.** *Reed's call.* The show-level button on the podcast side
+(declared `podcast`, `video`, or no medium at all: the Shows feed's partition
+rule) reads **Follow / Following** with a plus that becomes a check, the
+podcast-app convention (Apple Podcasts: a circled plus → check; Pocket Casts:
+"+ Subscribe" → check; Spotify, X and Instagram use a text pill with no
+icon). Podcast episodes, albums, songs and artists keep **Favorite /
+Favorited** with the heart. `wordsFor(kind, medium)` in `favorite-button.js`
+is the rule, `isFollow(btn)` reads it off a rendered button for
+favorites-ui.js's toasts ("Following this podcast" / "Unfollowed"), and the
+pill carries `.ob-fav-pill--follow`. **Wording and glyph only**: the event is
+Chad's kind 10333 byte for byte, `changeFor` is untouched, and the other apps
+see a feed favorite. The list's name on the site is **Follows and Favorites**
+(the `/booster` section, the account menu's row, the public/private dialog);
+the section's podcast-side group is headed **Following** (its key is still
+`shows`). Reed has not decided the section's deeper shape; "a list of
+everything, easy to unfollow, every row linking to its page" is the brief.
+
 `favorite-button.js` is chrome on the boost-button.js pattern: two-sided and
 dependency-free, because the two cards and the /show and /episode Functions
 render it at the edge and a card rebuilt in the browser must match byte for

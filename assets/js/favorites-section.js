@@ -22,11 +22,11 @@
  * Nothing on the list is dropped for being unresolvable: an entry nobody can
  * name renders its guid, since it is still somebody's favorite.
  */
-import { fetchFavorites, widgetDeps } from '/assets/js/favorites-sync.js?v=ob-v250'
-import { favoriteButtonHtml } from '/assets/js/favorite-button.js?v=ob-v250'
-import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v250'
-import { isSafeUrl } from '/assets/js/nostr-text.js?v=ob-v250'
-import { sortControl } from '/assets/js/feed-controls.js?v=ob-v250'
+import { fetchFavorites, widgetDeps } from '/assets/js/favorites-sync.js?v=ob-v251'
+import { favoriteButtonHtml } from '/assets/js/favorite-button.js?v=ob-v251'
+import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v251'
+import { isSafeUrl } from '/assets/js/nostr-text.js?v=ob-v251'
+import { sortControl } from '/assets/js/feed-controls.js?v=ob-v251'
 
 const RESOLVE_URL = '/api/v1/favorites/resolve'
 
@@ -45,7 +45,7 @@ const bare = (id, prefix) => (typeof id === 'string' && id.startsWith(prefix) ? 
 /* Grouping — pure, so the test can hold it                                  */
 
 export const GROUPS = [
-  { key: 'shows', title: 'Shows', kind: 'feed', music: false },
+  { key: 'shows', title: 'Following', kind: 'feed', music: false },   // podcast shows are FOLLOWED (Reed, 2026-11-07); the key keeps its name
   { key: 'episodes', title: 'Episodes', kind: 'item', music: false },
   { key: 'albums', title: 'Albums', kind: 'feed', music: true },
   { key: 'songs', title: 'Songs', kind: 'item', music: true },
@@ -60,7 +60,7 @@ export const GROUPS = [
  */
 export const GROUP_OPTIONS = [
   ['all', 'All'],
-  ['shows', 'Shows'],
+  ['shows', 'Following'],
   ['episodes', 'Episodes'],
   ['artists', 'Artists'],
   ['albums', 'Albums'],
@@ -276,8 +276,8 @@ export function initFavoritesSection({ pubkey, root, onEntries = null }) {
     if (!r.trusted) {
       // Could not read enough relays to say anything — never "empty".
       emptyEl.textContent = owner
-        ? 'Couldn’t reach enough relays to read your favorites right now.'
-        : 'Couldn’t reach enough relays to read this member’s favorites right now.'
+        ? 'Couldn’t reach enough relays to read your follows and favorites right now.'
+        : 'Couldn’t reach enough relays to read this member’s follows and favorites right now.'
       emptyEl.hidden = false
       return
     }
@@ -290,10 +290,10 @@ export function initFavoritesSection({ pubkey, root, onEntries = null }) {
       emptyEl.textContent = owner
         ? (r.parsedPrivate === null && r.read?.content
             ? 'Your favorites are private. Log in with a signer that can decrypt them to see them here.'
-            : 'Nothing favorited yet. Press the heart on any show to start a list other Podcasting 2.0 apps can read too.')
+            : 'Nothing followed or favorited yet. Press Follow on a podcast, or the heart on an album, to start a list other Podcasting 2.0 apps can read too.')
         : (r.read?.content
-            ? 'This member keeps their favorites private.'
-            : 'No favorites yet.')
+            ? 'This member keeps their follows and favorites private.'
+            : 'Nothing followed or favorited yet.')
       emptyEl.hidden = false
       groupsEl.innerHTML = ''
       return

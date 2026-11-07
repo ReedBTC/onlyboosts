@@ -201,7 +201,7 @@ await check('rows: page links here, BMB links out, a nameless entry shows its gu
   assert.match(unknown, /<span class="fav-guid">unknown-x<\/span>/)
   assert.match(unknown, /Not in the index yet/)
   const owned = S.rowHtml(shows.rows[0], shows, { owner: true })
-  assert.match(owned, /<button type="button" class="ob-fav-pill" hidden data-fav="show" data-fav-id="podcast:guid:show-1" data-fav-medium="podcast"/, 'the owner\'s row carries the heart, a sibling of the link')
+  assert.match(owned, /<button type="button" class="ob-fav-pill ob-fav-pill--follow" hidden data-fav="show" data-fav-id="podcast:guid:show-1" data-fav-medium="podcast"/, 'the owner\'s row carries the Follow button (a podcast show, 2026-11-07), a sibling of the link')
   assert.match(owned, /<\/a><button/, 'never inside the anchor')
   const episodes = groups.find((g) => g.key === 'episodes')
   const ep = S.rowHtml(episodes.rows[0], episodes, { owner: true })
@@ -217,7 +217,7 @@ await check('rows: page links here, BMB links out, a nameless entry shows its gu
 
 await check('the dropdown: All by default, then the five groups in Reed\'s order; a pick filters, an unknown key shows everything', () => {
   assert.deepEqual(S.GROUP_OPTIONS.map(([k]) => k), ['all', 'shows', 'episodes', 'artists', 'albums', 'songs'])
-  assert.deepEqual(S.GROUP_OPTIONS.map(([, l]) => l), ['All', 'Shows', 'Episodes', 'Artists', 'Albums', 'Songs'])
+  assert.deepEqual(S.GROUP_OPTIONS.map(([, l]) => l), ['All', 'Following', 'Episodes', 'Artists', 'Albums', 'Songs'], 'podcast shows are followed (2026-11-07)')
   const groups = S.groupEntries(entries, resolved)
   assert.equal(S.visibleGroups(groups, 'all').length, groups.length)
   assert.deepEqual(S.visibleGroups(groups, 'songs').map((g) => g.key), ['songs'])
