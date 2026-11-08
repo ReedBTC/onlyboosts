@@ -530,7 +530,10 @@ shows, on every page, since the same day.
 
 The owner's Follows and Favorites band carries **Import OPML / Export OPML**
 since 2026-11-07 (shown over an empty list too); see **OPML Import And
-Export** in `docs/favorites.md`.
+Export** in `docs/favorites.md`. **`#favorites` is three drawers since
+2026-11-08**: Podcasts You Follow (where that band lives now), Favorite
+Podcast Episodes, Favorite Music (Artists / Albums / Songs under the Show
+menu); Reed's call, each kind of entry its own home.
 
 The header runs its **own** Primal backfill rather than `hydrateProfiles()`; see
 the note in `booster-page.js`.

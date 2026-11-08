@@ -19,14 +19,22 @@
  *      here or to BoostMeBitch when there is none, and, for the owner, carrying
  *      the Favorite heart that favorites-ui.js paints and handles.
  *
+ * ⚠️ THREE DRAWERS, NOT ONE, SINCE 2026-11-08 (Reed's call: "I don't want to
+ * see my favorite podcast episodes in the same list as my favorite songs"):
+ * Podcasts You Follow (the Import OPML / Export OPML band, since an OPML is
+ * podcast subscriptions and nothing else), Favorite Podcast Episodes, and
+ * Favorite Music, which keeps the grouped shape (Artists, Albums, Songs under
+ * their headings) and the Show menu. `DRAWERS` is the table; the Function
+ * ships one `<details data-fav-drawer>` per row and this module fills each.
+ *
  * Nothing on the list is dropped for being unresolvable: an entry nobody can
  * name renders its guid, since it is still somebody's favorite.
  */
-import { fetchFavorites, widgetDeps } from '/assets/js/favorites-sync.js?v=ob-v264'
-import { favoriteButtonHtml } from '/assets/js/favorite-button.js?v=ob-v264'
-import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v264'
-import { isSafeUrl } from '/assets/js/nostr-text.js?v=ob-v264'
-import { sortControl } from '/assets/js/feed-controls.js?v=ob-v264'
+import { fetchFavorites, widgetDeps } from '/assets/js/favorites-sync.js?v=ob-v265'
+import { favoriteButtonHtml } from '/assets/js/favorite-button.js?v=ob-v265'
+import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v265'
+import { isSafeUrl } from '/assets/js/nostr-text.js?v=ob-v265'
+import { sortControl } from '/assets/js/feed-controls.js?v=ob-v265'
 
 const RESOLVE_URL = '/api/v1/favorites/resolve'
 
@@ -47,21 +55,32 @@ const bare = (id, prefix) => (typeof id === 'string' && id.startsWith(prefix) ? 
 export const GROUPS = [
   { key: 'shows', title: 'Following', kind: 'feed', music: false },   // podcast shows are FOLLOWED (Reed, 2026-11-07); the key keeps its name
   { key: 'episodes', title: 'Episodes', kind: 'item', music: false },
+  { key: 'artists', title: 'Artists', kind: 'artist', music: true },
   { key: 'albums', title: 'Albums', kind: 'feed', music: true },
   { key: 'songs', title: 'Songs', kind: 'item', music: true },
-  { key: 'artists', title: 'Artists', kind: 'artist', music: true },
+]
+
+/** The three drawers (2026-11-08) and which groups each holds. `titles`
+ *  prints the group headings (one drawer, one group needs none); `menu` is
+ *  the Show dropdown; `opml` the owner's Import / Export band. The empty
+ *  lines name what fills the drawer, for the owner and for a visitor. */
+export const DRAWERS = [
+  { key: 'follows', title: 'Podcasts You Follow', groups: ['shows'], titles: false, menu: false, opml: true,
+    empty: { owner: 'You don’t follow any podcasts yet. Press Follow on a podcast, or import your podcast app’s OPML, to start a list other Podcasting 2.0 apps can read too.', visitor: 'No podcasts followed yet.' } },
+  { key: 'episodes', title: 'Favorite Podcast Episodes', groups: ['episodes'], titles: false, menu: false, opml: false,
+    empty: { owner: 'No favorite episodes yet. Press the heart on an episode to keep it here.', visitor: 'No favorite episodes yet.' } },
+  { key: 'music', title: 'Favorite Music', groups: ['artists', 'albums', 'songs'], titles: true, menu: true, opml: false,
+    empty: { owner: 'No favorite music yet. Press the heart on an artist, an album or a song to keep it here.', visitor: 'No favorite music yet.' } },
 ]
 
 /**
- * The drawer's dropdown (Reed, 2026-09-09), on the sort pill's chrome: which
- * group to show. `all` is the default so a member whose favorites are all
- * songs does not open on an empty Shows view; the five groups follow, in the
- * order Reed listed them.
+ * The Favorite Music drawer's dropdown (Reed, 2026-09-09; the music drawer's
+ * alone since 2026-11-08), on the sort pill's chrome: which group to show.
+ * `all` is the default so a member whose favorites are all songs does not
+ * open on an empty Artists view.
  */
 export const GROUP_OPTIONS = [
   ['all', 'All'],
-  ['shows', 'Following'],
-  ['episodes', 'Episodes'],
   ['artists', 'Artists'],
   ['albums', 'Albums'],
   ['songs', 'Songs'],
@@ -205,9 +224,9 @@ export function rowHtml(row, group, { owner = false } = {}) {
   return `<li class="cs-row" data-fav-row="${esc(row.key)}">${link}${heart}</li>`
 }
 
-export function groupsHtml(groups, { owner = false } = {}) {
+export function groupsHtml(groups, { owner = false, titles = true } = {}) {
   return groups.map((g) =>
-    `<h3 class="fav-group-title">${esc(g.title)}</h3>` +
+    (titles ? `<h3 class="fav-group-title">${esc(g.title)}</h3>` : '') +
     `<ul class="ep-list cs-list">${g.rows.map((r) => rowHtml(r, g, { owner })).join('')}</ul>`,
   ).join('')
 }
@@ -237,29 +256,43 @@ async function resolveAll(entries) {
  * /booster, 2026-11-08). `onEntries` fires on a trusted read only. */
 export function initFavoritesSection({ pubkey, root, onEntries = null, onStart = null, onFail = null }) {
   if (!root || !pubkey) return
-  const groupsEl = root.querySelector('[data-fav-groups]')
-  const emptyEl = root.querySelector('[data-fav-empty]')
-  const ctrlEl = root.querySelector('[data-fav-controls]')
-  if (!groupsEl || !emptyEl) return
+  const drawers = DRAWERS.map((d) => {
+    const el = root.querySelector(`[data-fav-drawer="${d.key}"]`)
+    if (!el) return null
+    const groupsEl = el.querySelector('[data-fav-groups]')
+    const emptyEl = el.querySelector('[data-fav-empty]')
+    if (!groupsEl || !emptyEl) return null
+    return { ...d, el, groupsEl, emptyEl, ctrlEl: el.querySelector('[data-fav-controls]'), filter: 'all' }
+  }).filter(Boolean)
+  if (!drawers.length) return
   let run = 0
-  let filter = 'all'
   let shown = { groups: [], owner: false }
 
-  function render() {
-    const visible = visibleGroups(shown.groups, filter)
-    groupsEl.innerHTML = groupsHtml(visible, { owner: shown.owner })
-    if (!visible.length && shown.groups.length) {
-      const label = (GROUP_OPTIONS.find(([k]) => k === filter) || [])[1] || 'that'
-      emptyEl.textContent = `No ${label.toLowerCase()} on this list.`
-      emptyEl.hidden = false
-    } else emptyEl.hidden = true
+  /* One line under every drawer (loading, a failed read, a private list). */
+  function foot(text) {
+    for (const d of drawers) { d.emptyEl.textContent = text; d.emptyEl.hidden = false; d.groupsEl.innerHTML = '' }
   }
 
-  if (ctrlEl && !ctrlEl.childElementCount) {
-    ctrlEl.append(sortControl(GROUP_OPTIONS, filter, (key) => { if (key !== filter) { filter = key; render() } }, {
-      tag: 'Show: ',
-      title: 'Which favorites to show',
-    }))
+  function render() {
+    for (const d of drawers) {
+      const mine = shown.groups.filter((g) => d.groups.includes(g.key))
+      const visible = d.menu ? visibleGroups(mine, d.filter) : mine
+      d.groupsEl.innerHTML = groupsHtml(visible, { owner: shown.owner, titles: d.titles })
+      if (!visible.length) {
+        const label = (GROUP_OPTIONS.find(([k]) => k === d.filter) || [])[1] || 'that'
+        d.emptyEl.textContent = mine.length ? `No ${label.toLowerCase()} on this list.` : d.empty[shown.owner ? 'owner' : 'visitor']
+        d.emptyEl.hidden = false
+      } else d.emptyEl.hidden = true
+      if (d.menu && d.ctrlEl) {
+        if (!d.ctrlEl.querySelector('.pcast-sort')) {
+          d.ctrlEl.append(sortControl(GROUP_OPTIONS, d.filter, (key) => { if (key !== d.filter) { d.filter = key; render() } }, {
+            tag: 'Show: ',
+            title: 'Which favorites to show',
+          }))
+        }
+        d.ctrlEl.hidden = !mine.length
+      }
+    }
   }
 
   async function paint() {
@@ -272,20 +305,18 @@ export function initFavoritesSection({ pubkey, root, onEntries = null, onStart =
     let r
     try { r = await fetchFavorites(pubkey, { ...deps, pubkey }) } catch (err) {
       console.warn('[favorites] read failed', err)
-      emptyEl.textContent = 'Couldn’t read favorites right now.'
-      emptyEl.hidden = false
+      foot('Couldn’t read follows and favorites right now.')
       try { onFail?.({ owner }) } catch (e2) { console.warn('[favorites] onFail', e2) }
       return
     }
     if (mine !== run) return
-    // The section is on screen from the first paint (the Function renders it
-    // with a "loading" foot); every outcome below only changes the foot.
+    // The drawers are on screen from the first paint (the Function renders
+    // them with a "loading" foot); every outcome below only changes the feet.
     if (!r.trusted) {
       // Could not read enough relays to say anything — never "empty".
-      emptyEl.textContent = owner
+      foot(owner
         ? 'Couldn’t reach enough relays to read your follows and favorites right now.'
-        : 'Couldn’t reach enough relays to read this member’s follows and favorites right now.'
-      emptyEl.hidden = false
+        : 'Couldn’t reach enough relays to read this member’s follows and favorites right now.')
       try { onFail?.({ owner }) } catch (e2) { console.warn('[favorites] onFail', e2) }
       return
     }
@@ -294,30 +325,28 @@ export function initFavoritesSection({ pubkey, root, onEntries = null, onStart =
     // the feeds to /api/v1/recommend, 2026-11-07). A trusted read only, so an
     // unreachable relay set never tells the caller the list is empty.
     try { onEntries?.(entries, { owner }) } catch (err) { console.warn('[favorites] onEntries', err) }
-    if (!entries.length) {
-      emptyEl.textContent = owner
-        ? (r.parsedPrivate === null && r.read?.content
-            ? 'Your favorites are private. Log in with a signer that can decrypt them to see them here.'
-            : 'Nothing followed or favorited yet. Press Follow on a podcast, or the heart on an album, to start a list other Podcasting 2.0 apps can read too.')
-        : (r.read?.content
-            ? 'This member keeps their follows and favorites private.'
-            : 'Nothing followed or favorited yet.')
-      emptyEl.hidden = false
-      groupsEl.innerHTML = ''
+    // A list nobody here can open says so under every drawer; an empty one
+    // lets each drawer say what fills it.
+    if (!entries.length && r.read?.content && (owner ? r.parsedPrivate === null : true)) {
+      foot(owner
+        ? 'Your follows and favorites are private. Log in with a signer that can decrypt them to see them here.'
+        : 'This member keeps their follows and favorites private.')
       return
     }
-    const resolved = await resolveAll(entries)
+    const resolved = entries.length ? await resolveAll(entries) : { feeds: {}, items: {}, publishers: {} }
     if (mine !== run) return
     shown = { groups: groupEntries(entries, resolved), owner }
     render()
-    if (ctrlEl) ctrlEl.hidden = false
   }
 
-  /* The owner's Import OPML / Export OPML, on the controls band beside the
-   * group menu (2026-11-07, one of the import's three doors; the others are
-   * the homepage's locked card and the account menu). Shown to the owner
-   * even over an empty list, since importing is how an empty list fills. */
+  /* The owner's Import OPML / Export OPML, on the Podcasts You Follow
+   * drawer's controls band (2026-11-07, one of the import's three doors; the
+   * others are the homepage's locked card and the account menu; the follows
+   * drawer's alone since 2026-11-08, an OPML being podcast subscriptions).
+   * Shown to the owner even over an empty list, since importing is how an
+   * empty list fills. */
   function mountOpml(owner) {
+    const ctrlEl = drawers.find((d) => d.opml)?.ctrlEl
     if (!ctrlEl) return
     let box = ctrlEl.querySelector('[data-fav-opml]')
     if (!owner) { if (box) box.remove(); return }

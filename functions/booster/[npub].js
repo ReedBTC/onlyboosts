@@ -377,25 +377,25 @@ function renderBoosterPage({ hex, npub, prof, totals, boosts, names, bioProfiles
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v264" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v264" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v264" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v264" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v265" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v265" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v265" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v265" />
   <!-- The hero, the drawers and the boost list are the show page's, so this
        page links its stylesheet and adds only the deltas. -->
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v264" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v264" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v265" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v265" />
   <!-- The episode card, for the #episodes rollup: the same chrome
        feeds-podcasts.js paints on the homepage. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v264" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v265" />
   <!-- The boost thread inside a card's drawer, and its reply / like / repost /
        zap bar, both reached through that same card. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v264" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v264" />
-  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v264" />
-  <link rel="stylesheet" href="/assets/css/booster-page.css?v=ob-v264" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v265" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v265" />
+  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v265" />
+  <link rel="stylesheet" href="/assets/css/booster-page.css?v=ob-v265" />
   <!-- The recommendation rails are the homepage's (rail-tile.js); this is their stylesheet. -->
-  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v264" />
+  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v265" />
 </head>
 <body data-booster-pk="${htmlEscape(hex)}"${npub ? ` data-booster-npub="${htmlEscape(npub)}"` : ""}>
 
@@ -773,12 +773,12 @@ function renderBoosterPage({ hex, npub, prof, totals, boosts, names, bioProfiles
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav.js?v=ob-v264" defer></script>
-<script src="/assets/js/booster-page.js?v=ob-v264" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v265" defer></script>
+<script src="/assets/js/booster-page.js?v=ob-v265" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v264"></script>
-<script src="/assets/js/sw-register.js?v=ob-v264" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v265"></script>
+<script src="/assets/js/sw-register.js?v=ob-v265" defer></script>
 </body>
 </html>`;
 }
@@ -1002,22 +1002,33 @@ function renderBoosted(shows, episodes) {
 // 2026-09-09): a relay read takes seconds, and a drawer that appears late
 // reads as a page that changed under the reader. Until the read answers the
 // foot says so; a list with nothing on it says that instead of vanishing.
+// ⚠️ THREE DRAWERS SINCE 2026-11-08 (Reed's call: each kind of entry gets
+// its own home): Podcasts You Follow, with the owner's Import / Export OPML
+// on its controls band; Favorite Podcast Episodes; Favorite Music, grouped
+// Artists / Albums / Songs under the Show menu. One section, the frozen
+// `#favorites`; favorites-section.js#DRAWERS names the keys and fills each.
+const FAV_DRAWERS = [
+  ["follows", "Podcasts You Follow", "The podcasts on this member’s follows list, from any Podcasting 2.0 app"],
+  ["episodes", "Favorite Podcast Episodes", "The podcast episodes this member favorited"],
+  ["music", "Favorite Music", "The artists, albums and songs this member favorited"],
+];
 function renderFavorites() {
-  return `<section class="show-section show-section--bare" id="favorites" data-booster-favorites>
-    <details class="ep-drawer cs-drawer">
+  const drawers = FAV_DRAWERS.map(([key, title, sub]) => `
+    <details class="ep-drawer cs-drawer" data-fav-drawer="${key}">
       <summary>
         <span class="cs-head">
-          <span class="cs-head-title">Follows and Favorites</span>
-          <span class="cs-head-sub">The podcasts this member follows and the episodes, albums and songs they favorited, in any Podcasting 2.0 app</span>
+          <span class="cs-head-title">${title}</span>
+          <span class="cs-head-sub">${sub}</span>
         </span>
         <span class="drawer-hint" aria-hidden="true"></span>
       </summary>
-      <!-- The group dropdown (All / Following / Episodes / Artists / Albums / Songs),
-           on the sort pill's chrome. Filled and revealed by favorites-section.js. -->
+      <!-- The controls band: the owner's OPML buttons (follows), the Show
+           menu (music). Filled and revealed by favorites-section.js. -->
       <div class="cs-controls" data-fav-controls hidden></div>
       <div class="fav-groups" data-fav-groups></div>
-      <p class="cs-empty" data-fav-empty>Loading favorites from Nostr…</p>
-    </details>
+      <p class="cs-empty" data-fav-empty>Loading from Nostr…</p>
+    </details>`).join("");
+  return `<section class="show-section show-section--bare" id="favorites" data-booster-favorites>${drawers}
   </section>`;
 }
 
@@ -1039,10 +1050,10 @@ function notFound(raw) {
   <meta name="robots" content="noindex" />
   <title>Booster not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v264" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v264" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v264" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v264" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v265" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v265" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v265" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v265" />
 </head>
 <body>
 <section class="page-header">
@@ -1060,7 +1071,7 @@ function notFound(raw) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v264" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v265" defer></script>
 </body>
 </html>`;
   return new Response(html, {

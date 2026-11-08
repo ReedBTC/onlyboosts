@@ -189,10 +189,15 @@ favorites-ui.js's toasts ("Following this podcast" / "Unfollowed"), and the
 pill carries `.ob-fav-pill--follow`. **Wording and glyph only**: the event is
 Chad's kind 10333 byte for byte, `changeFor` is untouched, and the other apps
 see a feed favorite. The list's name on the site is **Follows and Favorites**
-(the `/booster` section, the account menu's row, the public/private dialog);
-the section's podcast-side group is headed **Following** (its key is still
-`shows`). Reed has not decided the section's deeper shape; "a list of
-everything, easy to unfollow, every row linking to its page" is the brief.
+(the account menu's row, the public/private dialog). **On `/booster` the
+section is THREE DRAWERS since 2026-11-08** (Reed's call: "I don't want to
+see my favorite podcast episodes in the same list as my favorite songs"):
+**Podcasts You Follow** (the owner's Import / Export OPML band, since an
+OPML is podcast subscriptions and nothing else), **Favorite Podcast
+Episodes**, and **Favorite Music**, which keeps the grouped shape (Artists,
+Albums, Songs under their headings) and the Show menu. `DRAWERS` in
+`favorites-section.js` is the table and the Function ships one `<details
+data-fav-drawer>` per row; the `shows` group key keeps its name.
 
 `favorite-button.js` is chrome on the boost-button.js pattern: two-sided and
 dependency-free, because the two cards and the /show and /episode Functions
@@ -263,7 +268,9 @@ between Episodes and Boosts. The Function ships the shell hidden and
 private half too when the viewer is the member and the widget is loaded),
 every guid resolved through **`POST /api/v1/favorites/resolve`**, and the
 rows grouped by the RESOLVED medium into the site's words — Shows, Episodes,
-Albums, Songs, and Artists when the list carries any. The lookup wins over the
+Albums, Songs, and Artists when the list carries any — and dealt into the
+three drawers (Podcasts You Follow; Favorite Podcast Episodes; Favorite
+Music, the three music groups under their headings) since 2026-11-08. The lookup wins over the
 list's hint, the spec's rule, and a feed with no known medium files on the
 podcast side, the Shows feed's rule. Rows are on the community-row vocabulary
 (`.cs-row`), link to the page here or to BoostMeBitch when there is none (the

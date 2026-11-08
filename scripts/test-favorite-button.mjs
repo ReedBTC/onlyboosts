@@ -123,11 +123,11 @@ check('a podcast SHOW is followed, everything else favorited (Reed, 2026-11-07):
     assert.equal(b.querySelector('.ob-fav-icon').textContent, '♡')
     assert.equal(F.isFollow(b), false)
   }
-  // The toasts follow the same rule, and the section's podcast-side group is "Following".
+  // The toasts follow the same rule, and the section's podcast-side drawer is "Podcasts You Follow" (three drawers since 2026-11-08).
   const ui = readFileSync(new URL('../assets/js/favorites-ui.js', import.meta.url), 'utf8')
   assert.ok(ui.includes('isFollow(btn)') && ui.includes("'Following this podcast'") && ui.includes("'Unfollowed'"))
   const sec = readFileSync(new URL('../assets/js/favorites-section.js', import.meta.url), 'utf8')
-  assert.ok(sec.includes("{ key: 'shows', title: 'Following', kind: 'feed', music: false }") && sec.includes("['shows', 'Following']"))
+  assert.ok(sec.includes("{ key: 'shows', title: 'Following', kind: 'feed', music: false }") && sec.includes("title: 'Podcasts You Follow', groups: ['shows']"))
 })
 
 check('changeFor: the press asks for the opposite of the state, with the full identifiers', () => {

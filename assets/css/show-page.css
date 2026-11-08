@@ -1153,6 +1153,8 @@ a.boost-who:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px
    no rank column. The owner's rows carry the Favorite heart on the right, on
    the same terms as a community row's boost pill: a sibling of the link, never
    a child. */
+/* The three Follows and Favorites drawers stack (2026-11-08). */
+.cs-drawer + .cs-drawer { margin-top: 0.9rem; }
 .fav-groups { display: flex; flex-direction: column; gap: 0.25rem; }
 .fav-group-title {
   margin: 0.9rem 0.6rem 0.25rem;

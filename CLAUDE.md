@@ -2637,8 +2637,11 @@ is a publish target (theforest refuses the write and is deliberately out).**
   Following, plus → check; episodes, albums, songs and artists keep Favorite
   and the heart. `wordsFor` / `isFollow` in `favorite-button.js`; wording and
   glyph only, the kind 10333 event is unchanged. The list is **Follows and
-  Favorites** on every surface that names it. See **The Heart** in
-  `docs/favorites.md`.
+  Favorites** on every surface that names it, **and on `/booster` it is
+  THREE DRAWERS since 2026-11-08** (Reed's call): Podcasts You Follow (the
+  OPML band), Favorite Podcast Episodes, Favorite Music (Artists / Albums /
+  Songs under the Show menu); `DRAWERS` in `favorites-section.js`. See
+  **The Heart** in `docs/favorites.md`.
 - **⚠️ OPML IMPORT ADDS AND NEVER REMOVES, A PRIVATE FEED ADDRESS NEVER
   LEAVES THE DEVICE, AND A VISITOR WITH NO ACCOUNT CAN IMPORT** (2026-11-07,
   Reed's asks; BMB's rules in `assets/js/opml.js`, two-sided and

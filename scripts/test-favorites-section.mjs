@@ -185,7 +185,7 @@ await check('grouping: the resolved medium wins, the hint fills in, unknown file
   assert.deepEqual(by.episodes, ['podcast:item:guid:ep-1 @ show-1', 'podcast:item:guid:orphan'])
   assert.deepEqual(by.songs, ['podcast:item:guid:track-9 @ album-1'], 'the LOOKUP (album-1 is music) beats the hint (podcast)')
   assert.deepEqual(by.artists, ['podcast:publisher:guid:pub-1'])
-  assert.deepEqual(groups.map((g) => g.key), ['shows', 'episodes', 'albums', 'songs', 'artists'], 'GROUPS order, empty groups omitted')
+  assert.deepEqual(groups.map((g) => g.key), ['shows', 'episodes', 'artists', 'albums', 'songs'], 'GROUPS order (the music drawer\'s Artists, Albums, Songs), empty groups omitted')
   assert.deepEqual(S.groupEntries([], resolved), [])
 })
 
@@ -215,22 +215,35 @@ await check('rows: page links here, BMB links out, a nameless entry shows its gu
   assert.doesNotMatch(xss, /javascript:/)
 })
 
-await check('the dropdown: All by default, then the five groups in Reed\'s order; a pick filters, an unknown key shows everything', () => {
-  assert.deepEqual(S.GROUP_OPTIONS.map(([k]) => k), ['all', 'shows', 'episodes', 'artists', 'albums', 'songs'])
-  assert.deepEqual(S.GROUP_OPTIONS.map(([, l]) => l), ['All', 'Following', 'Episodes', 'Artists', 'Albums', 'Songs'], 'podcast shows are followed (2026-11-07)')
+await check('three drawers (2026-11-08): Podcasts You Follow with the OPML band, Favorite Podcast Episodes, Favorite Music with the Show menu over Artists / Albums / Songs', () => {
+  assert.deepEqual(S.DRAWERS.map((d) => [d.key, d.title, d.groups.join('+'), d.menu, d.opml, d.titles]), [
+    ['follows', 'Podcasts You Follow', 'shows', false, true, false],
+    ['episodes', 'Favorite Podcast Episodes', 'episodes', false, false, false],
+    ['music', 'Favorite Music', 'artists+albums+songs', true, false, true],
+  ])
+  for (const d of S.DRAWERS) assert.ok(d.empty.owner && d.empty.visitor, `${d.key} says what fills it`)
+  assert.deepEqual(S.GROUP_OPTIONS.map(([k]) => k), ['all', 'artists', 'albums', 'songs'], 'the music drawer\'s menu')
   const groups = S.groupEntries(entries, resolved)
   assert.equal(S.visibleGroups(groups, 'all').length, groups.length)
   assert.deepEqual(S.visibleGroups(groups, 'songs').map((g) => g.key), ['songs'])
   assert.deepEqual(S.visibleGroups(groups, 'playlists').map((g) => g.key), groups.map((g) => g.key))
+  assert.doesNotMatch(S.groupsHtml(groups.filter((g) => g.key === 'shows'), { titles: false }), /fav-group-title/, 'a one-group drawer prints no heading')
+  assert.match(S.groupsHtml(groups.filter((g) => g.key === 'albums')), /<h3 class="fav-group-title">Albums<\/h3>/, 'the music drawer keeps its headings')
   const src = readFileSync(join(ROOT, 'assets/js/favorites-section.js'), 'utf8')
-  assert.match(src, /sortControl\(GROUP_OPTIONS, filter/, 'built on the sort pill\'s chrome')
-  assert.match(readFileSync(join(ROOT, 'functions/booster/[npub].js'), 'utf8'), /<div class="cs-controls" data-fav-controls hidden><\/div>/, 'the shell carries the controls band')
+  assert.match(src, /sortControl\(GROUP_OPTIONS, d\.filter/, 'built on the sort pill\'s chrome, per drawer')
+  assert.match(src, /const ctrlEl = drawers\.find\(\(d\) => d\.opml\)\?\.ctrlEl/, 'the OPML band is the follows drawer\'s')
+  const fn = readFileSync(join(ROOT, 'functions/booster/[npub].js'), 'utf8')
+  assert.match(fn, /<details class="ep-drawer cs-drawer" data-fav-drawer="\$\{key\}">/, 'one <details> per FAV_DRAWERS row')
+  assert.match(fn, /\["follows", "Podcasts You Follow"/)
+  assert.match(fn, /\["episodes", "Favorite Podcast Episodes"/)
+  assert.match(fn, /\["music", "Favorite Music"/)
+  assert.match(fn, /<div class="cs-controls" data-fav-controls hidden><\/div>/, 'each shell carries the controls band')
 })
 
 await check('the booster page ships the hidden shell with the frozen id, and imports the module', () => {
   const fn = readFileSync(join(ROOT, 'functions/booster/[npub].js'), 'utf8')
   assert.match(fn, /<section class="show-section show-section--bare" id="favorites" data-booster-favorites>/, 'on screen from the first paint')
-  assert.match(fn, /<p class="cs-empty" data-fav-empty>Loading favorites from Nostr…<\/p>/, 'the foot says loading until the read answers')
+  assert.match(fn, /<p class="cs-empty" data-fav-empty>Loading from Nostr…<\/p>/, 'the foot says loading until the read answers')
   assert.match(fn, /\$\{renderFavorites\(\)\}/)
   const page = readFileSync(join(ROOT, 'assets/js/booster-page.js'), 'utf8')
   assert.match(page, /import \{ initFavoritesSection \} from '\/assets\/js\/favorites-section\.js\?v=ob-v\d+'/)
