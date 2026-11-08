@@ -1644,7 +1644,7 @@ Bowl After Bowl, 25,265 sats); the pass runs every incremental cycle over a
   the full amount, so the prose tiers paired it (2 of its first 30 notes,
   both against BoostMeBitch, tier `msg+app`). Since then it, BoostAfterBoost
   and libre-relay-bot write `["sender", npub]` when they know the payer, and
-  chadf-boostbot will on every boost Chad's node sends; see "Chad's Relay
+  chadf-boostbot does on every boost Chad's node sends; see "Chad's Relay
   Bots Name The Payer" in `docs/boost-clients.md`. It is excluded from the
   boards, unlike chadf-boostbot, because it relays other listeners' boosts.
 - **⚠️ ONE-TO-ONE HAS ONE EXCEPTION, ON THE RELAY SIDE.** `chadf-boostbot`

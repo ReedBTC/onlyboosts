@@ -285,7 +285,7 @@ it off rather than guess.
 | candr_boost_bot (`candr-boost`) | `978bbd44…ed36` | the boostagram's `sender_npub` (any app), or BoostMeBitch/BoostMeBuddy's hex `sender_id`; else a Fountain sender (below) | 2026-11-08 15:05Z |
 | BoostAfterBoost (`boostafterboost`) | `48b9a2a9…5e80e` | a Fountain sender only: it reads the `#BowlAfterBowl` IRC announcer, whose line carries no key | 2026-11-08 15:05Z |
 | libre-relay-bot (**not registered**, no slug) | `f051ceb67c01d65e6d6168f9bb4d76222c4450e85757c93931ad2bc316cbc1cb` | a Fountain sender only: it reads the `#SirLibre` IRC announcer (below) | 2026-11-08 15:05Z |
-| chadf-boostbot (`chadf-boostbot`) | `f3bd42a9…8e65` | a key the boostagram states; else, on a boost Chad's node SENT, Chad himself (`npub177fz…aaq7`), so his PodcastGuru and Castamatic boosts carry it too | merged (Helipad-to-Nostr-BoostBot #22), not yet on its host |
+| chadf-boostbot (`chadf-boostbot`) | `f3bd42a9…8e65` | a key the boostagram states; else, on a boost Chad's node SENT, Chad himself (`npub177fz…aaq7`), so his PodcastGuru and Castamatic boosts carry it too | 2026-11-08 16:22Z (Helipad-to-Nostr-BoostBot #22) |
 | Boostr_Bot (`boostr-bot`), MSP_bot (`msp-2-0`) | as registered | unchanged: `sender_npub`, or a hex `sender_id` | since launch |
 
 - **libre-relay-bot is the Nostr side of `#SirLibre`.** Two things share the
@@ -327,7 +327,7 @@ payment clusters:
   uuids (`e89405d7…`/`e441d435…` on 2026-10-27, `8dfe0ac6…`/`7ebb4a7d…` on
   2026-11-07). A second payment of the same boost (same app, sender id, episode,
   position, total and message) within 2 min now gets no note.
-- **chadf-boostbot** (Helipad-to-Nostr-BoostBot #23, ships with #22): a boost
+- **chadf-boostbot** (Helipad-to-Nostr-BoostBot #23, 16:22Z): a boost
   whose legs fell on either side of a 2-minute bucket edge was posted twice
   (2026-10-30 12:56Z, 407 + 13 sats for one 420-sat boost). It is now one note.
 
