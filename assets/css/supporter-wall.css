@@ -38,6 +38,21 @@
   gap: 1.4rem 0.75rem;
 }
 
+/* ⚠️ EIGHT PER ROW ABOVE A PHONE, AS A FIXED FRACTION LIKE THE PODIUM'S FIVE.
+   The grid auto-filled 92px columns until 2026-11-08, which came to eight on
+   the 60rem track by arithmetic alone; the 72rem desktop track of 2026-11-07
+   fit ten, so the 16 cards under the podium left four empty slots on every
+   wall (Reed's report). The count is the design — 5 + 8 + 8 is the 21 the
+   server shows — so the columns are declared, and the avatar grows into the
+   wider column (capped, so the 60rem and 72rem tracks draw the same wall)
+   rather than more cards being shown. One stylesheet, so /show, /episode,
+   /artist and /members all move together. The phone block below keeps its
+   auto-fill: three podium cards over however many fit. */
+@media (min-width: 641px) {
+  .sup-grid { grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 1.5rem 0.75rem; }
+  .sup-grid .sup-avatar { width: min(84px, 100%); height: auto; aspect-ratio: 1 / 1; }
+}
+
 .sup-card {
   display: flex;
   flex-direction: column;

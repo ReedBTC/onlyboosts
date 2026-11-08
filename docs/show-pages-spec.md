@@ -22,7 +22,7 @@ Locked for the first pass:
 | URL | The bare `podcast:guid`. No slugs. |
 | Community ranking | All time only. No range control. |
 | Community crossover | Own drawer above the wall, all-time, sort only. |
-| Community layout | Top five highlighted (three on mobile), rest by sats; 21 shown, no numerals. |
+| Community layout | Top five highlighted (three on mobile), rest by sats in rows of eight (a fixed fraction since 2026-11-08, when the wider page track fit ten and left empty slots); 21 shown, no numerals. |
 | Show-level boost | Yes, alongside the per-episode buttons. |
 
 Episode pages and per-npub pages are both expected later. The shapes below are
