@@ -274,6 +274,11 @@ a.rt:hover .rt-title { color: var(--brand-dd); }
   overflow: hidden;
 }
 .rail-locked > * { grid-area: 1 / 1; min-width: 0; }
+/* Signed in, while the follow list and the favorites are read: the
+   placeholders breathe (the carrot's `loading` state in discover.js). */
+.rail-locked.is-loading .rail-list { animation: rail-loading 1.4s ease-in-out infinite; }
+@keyframes rail-loading { 0%, 100% { opacity: 0.28; } 50% { opacity: 0.55; } }
+@media (prefers-reduced-motion: reduce) { .rail-locked.is-loading .rail-list { animation: none; } }
 .rail-locked .rail-list { opacity: 0.28; filter: grayscale(1); pointer-events: none; }
 .rail-locked .rt-media { background: var(--border); border: 0; }
 .rail-locked-ph {

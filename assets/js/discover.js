@@ -29,13 +29,13 @@
  *    sats this week") instead of following the tile's link. One note at a
  *    time; a click elsewhere, Escape or a scroll closes it.
  */
-import { railListHtml, showTile, albumTile, episodeTile, memberTile, langRailHtml, bare } from '/assets/js/rail-tile.js?v=ob-v257'
-import { heroHtml, slideHtml, showSlide, episodeSlide, memberSlide } from '/assets/js/hero.js?v=ob-v257'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v257'
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v257'
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v257'
-import { becauseVerb } from '/assets/js/recommend-rails.js?v=ob-v257'
-import { languageName } from '/assets/js/lang-name.js?v=ob-v257'
+import { railListHtml, showTile, albumTile, episodeTile, memberTile, langRailHtml, bare } from '/assets/js/rail-tile.js?v=ob-v258'
+import { heroHtml, slideHtml, showSlide, episodeSlide, memberSlide } from '/assets/js/hero.js?v=ob-v258'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v258'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v258'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v258'
+import { becauseVerb } from '/assets/js/recommend-rails.js?v=ob-v258'
+import { languageName } from '/assets/js/lang-name.js?v=ob-v258'
 
 const TILES = 10
 
@@ -188,11 +188,11 @@ function wireHeroBoost(hero) {
     try {
       const kind = slide.dataset.kind
       if (kind === 'episode' || kind === 'song') {
-        const m = await import('/assets/js/episode-card-actions.js?v=ob-v257')
+        const m = await import('/assets/js/episode-card-actions.js?v=ob-v258')
         btn.disabled = false
         await m.onBoostClick(slide, btn)
       } else {
-        const m = await import('/assets/js/show-card-actions.js?v=ob-v257')
+        const m = await import('/assets/js/show-card-actions.js?v=ob-v258')
         btn.disabled = false
         await m.onShowBoost(slide, btn)
       }
@@ -352,6 +352,12 @@ const LOGIN_BTN = '<button type="button" class="ob-cta" data-lb-login-trigger>Lo
 const IMPORT_BTN = '<button type="button" class="ob-cta ob-cta--quiet" data-opml-import>Import OPML</button>'
 const browse = (href, text) => `<a class="ob-cta ob-cta--quiet" href="${href}">${text}</a>`
 const CARROT = {
+  'loading': {
+    h2: 'Recommended For You',
+    h3: 'Loading your follows and favorites…',
+    p: 'Your Nostr follow list and your follows and favorites are being read from the relays. Your rails appear here as they arrive.',
+    actions: '',
+  },
   'signed-out': {
     h2: 'Recommended For You',
     h3: 'Log in or import your OPML for personalized recommendations',
@@ -395,10 +401,11 @@ function setCarrot(sections, state) {
   card.querySelector('h3').textContent = c.h3
   card.querySelector('p').textContent = c.p
   card.querySelector('.rail-locked-actions').innerHTML = c.actions
+  carrot.querySelector('.rail-track')?.classList.toggle('is-loading', state === 'loading')
   // Leads the block when it is the block; follows it otherwise.
   const last = railOf(sections, 'follows-songs')
   const first = railOf(sections, 'recommended')
-  const atEnd = state !== 'signed-out'
+  const atEnd = state !== 'signed-out' && state !== 'loading'
   if (atEnd && last && last.nextElementSibling !== carrot) last.after(carrot)
   else if (!atEnd && first && carrot.nextElementSibling !== first) first.before(carrot)
   carrot.hidden = false
@@ -584,6 +591,7 @@ async function paintRecommended(sections, pubkey, favorites = []) {
   }
 }
 
+const FAVORITES_WAIT_MS = 8000
 let personalRun = 0
 async function paintPersonal() {
   const my = ++personalRun
@@ -608,8 +616,10 @@ async function paintPersonal() {
     if (local.length) paintRecommended(sections, null, local)
     return
   }
-  // Signed in: no carrot, and each rail appears as it is painted.
-  showCarrot(sections, false)
+  // Signed in: the carrot says the lists are loading, and each rail appears
+  // as it is painted (Reed, 2026-11-08: a "boost or follow" card that flipped
+  // once the read landed looked like the site forgetting his follow).
+  setCarrot(sections, 'loading')
   for (const k of PERSONAL) conceal(railOf(sections, k))
   for (const s of sections) {
     if (!FOLLOWS[s.dataset.rail]) continue
@@ -620,10 +630,18 @@ async function paintPersonal() {
   if (res.pubkey) {
     const api = await favoritesApi()
     if (my !== personalRun) return
-    paintRecommended(sections, res.pubkey, api?.feeds?.() || [])
     // The list is read lazily and only where a heart is on the page; this
-    // page has none, so ask. The answer arrives as ob:favorites-read.
-    api?.ensureRead?.()
+    // page has none, so ask, and wait for it (bounded) so the first answer
+    // carries the follows: painted off the boosts alone, a new member's
+    // carrot said "boost or follow a podcast" for the seconds the read
+    // took. A read that outlasts the wait still lands through
+    // ob:favorites-read.
+    let feeds = api?.feeds?.() || []
+    if (api?.ensureRead) {
+      feeds = await Promise.race([api.ensureRead().catch(() => feeds), new Promise((r) => setTimeout(() => r(null), FAVORITES_WAIT_MS))]) ?? (api.feeds?.() || [])
+    }
+    if (my !== personalRun) return
+    paintRecommended(sections, res.pubkey, feeds)
   }
 }
 
@@ -648,7 +666,7 @@ window.addEventListener('ob:favorites-read', onFavoritesRead)
    early click or an early paint never finds window.OBFavorites missing. The
    same module URL, so the same instance. */
 async function favoritesApi() {
-  try { await import('/assets/js/favorites-ui.js?v=ob-v257') } catch {}
+  try { await import('/assets/js/favorites-ui.js?v=ob-v258') } catch {}
   return window.OBFavorites || null
 }
 

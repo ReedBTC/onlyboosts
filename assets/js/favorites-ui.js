@@ -41,15 +41,15 @@
  * after which the list is re-read with NIP-44 and the hearts fill. That is a
  * known cost of not loading 1MB to draw an outline.
  */
-import { fetchFavorites, syncFavorites, widgetDeps, saveMode, loadMode } from '/assets/js/favorites-sync.js?v=ob-v257'
-import { statedVisibility, feedGuidOf } from '/assets/js/favorites-merge.js?v=ob-v257'
-import { setFavoriteState, changeFor, keyFor, isFollow, WORD_BUSY, WORD_WAIT } from '/assets/js/favorite-button.js?v=ob-v257'
-import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v257'
-import { buildOpml, opmlFilename } from '/assets/js/opml.js?v=ob-v257'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v257'
-import { initAccountSettings, noteSettingsChange } from '/assets/js/account-settings.js?v=ob-v257'
+import { fetchFavorites, syncFavorites, widgetDeps, saveMode, loadMode } from '/assets/js/favorites-sync.js?v=ob-v258'
+import { statedVisibility, feedGuidOf } from '/assets/js/favorites-merge.js?v=ob-v258'
+import { setFavoriteState, changeFor, keyFor, isFollow, WORD_BUSY, WORD_WAIT } from '/assets/js/favorite-button.js?v=ob-v258'
+import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v258'
+import { buildOpml, opmlFilename } from '/assets/js/opml.js?v=ob-v258'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v258'
+import { initAccountSettings, noteSettingsChange } from '/assets/js/account-settings.js?v=ob-v258'
 
-const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v257'
+const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v258'
 
 const state = {
   pubkey: null,
@@ -120,6 +120,11 @@ function paint(btn) {
   if (!state.pubkey || !allowed(btn)) { btn.hidden = true; return }
   if (!state.everRead && !state.loading) reload()
   btn.hidden = false
+  /* ⚠️ A BUTTON IN FLIGHT KEEPS ITS WORD. A click re-reads the list before
+   * deciding (below), and that read's first paintAll wrote "Follow" over
+   * "Saving…" for the whole wait, so the press looked ignored for twenty
+   * seconds (Reed, 2026-11-08). setBusy(btn, false) repaints it at the end. */
+  if (btn.classList.contains('is-busy')) return
   const key = keyFor(btn)
   setFavoriteState(btn, knownState(key))
 }
@@ -208,7 +213,9 @@ async function load({ withWidget = false } = {}) {
     if (r.trusted) {
       state.keys = keysOf(r.entries)
       state.feeds = feedGuidsOf(r.entries)
-      state.privateOpened = r.parsedPrivate !== null
+      // No private content on the list, nothing to open: a click need not
+      // read the list again (a new member's every press did, 2026-11-08).
+      state.privateOpened = r.parsedPrivate !== null || !r.read?.content
       state.privateUnread = !!r.read?.content && r.parsedPrivate === null
     }
   } catch (err) {
@@ -569,7 +576,7 @@ async function exportOpml() {
 /** The import / manage panel, loaded on first use (opml-import.js). */
 async function openOpml(view) {
   try {
-    const { openOpmlPanel } = await import('/assets/js/opml-import.js?v=ob-v257')
+    const { openOpmlPanel } = await import('/assets/js/opml-import.js?v=ob-v258')
     if (!state.everRead) await reload()
     const pubkey = getSessionPubkey()
     openOpmlPanel({

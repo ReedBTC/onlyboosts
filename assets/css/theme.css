@@ -400,7 +400,8 @@ a.msg-media img {
 .ob-fav-pill.is-unknown { border-style: dashed; }
 .ob-fav-pill:hover:not(:disabled) { background: var(--bg-tint, transparent); border-color: var(--brand-d); }
 .ob-fav-pill:disabled { opacity: 0.55; cursor: default; }
-.ob-fav-pill.is-busy { opacity: 0.7; }
+.ob-fav-pill.is-busy { animation: ob-boost-pulse 1s ease-in-out infinite; cursor: progress; }
+@media (prefers-reduced-motion: reduce) { .ob-fav-pill.is-busy { animation: none; opacity: 0.7; } }
 .ob-fav-pill:focus-visible { outline: 2px solid var(--brand-d); outline-offset: 2px; }
 /* In a hero's .show-actions row it takes the row's button size through `btn`
    and keeps only its own colours. */
