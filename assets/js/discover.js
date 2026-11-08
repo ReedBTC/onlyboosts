@@ -29,13 +29,13 @@
  *    sats this week") instead of following the tile's link. One note at a
  *    time; a click elsewhere, Escape or a scroll closes it.
  */
-import { railListHtml, showTile, albumTile, episodeTile, memberTile, langRailHtml, bare } from '/assets/js/rail-tile.js?v=ob-v258'
-import { heroHtml, slideHtml, showSlide, episodeSlide, memberSlide } from '/assets/js/hero.js?v=ob-v258'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v258'
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v258'
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v258'
-import { becauseVerb } from '/assets/js/recommend-rails.js?v=ob-v258'
-import { languageName } from '/assets/js/lang-name.js?v=ob-v258'
+import { railListHtml, showTile, albumTile, episodeTile, memberTile, langRailHtml, bare } from '/assets/js/rail-tile.js?v=ob-v259'
+import { heroHtml, slideHtml, showSlide, episodeSlide, memberSlide } from '/assets/js/hero.js?v=ob-v259'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v259'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v259'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v259'
+import { becauseVerb } from '/assets/js/recommend-rails.js?v=ob-v259'
+import { languageName } from '/assets/js/lang-name.js?v=ob-v259'
 
 const TILES = 10
 
@@ -188,11 +188,11 @@ function wireHeroBoost(hero) {
     try {
       const kind = slide.dataset.kind
       if (kind === 'episode' || kind === 'song') {
-        const m = await import('/assets/js/episode-card-actions.js?v=ob-v258')
+        const m = await import('/assets/js/episode-card-actions.js?v=ob-v259')
         btn.disabled = false
         await m.onBoostClick(slide, btn)
       } else {
-        const m = await import('/assets/js/show-card-actions.js?v=ob-v258')
+        const m = await import('/assets/js/show-card-actions.js?v=ob-v259')
         btn.disabled = false
         await m.onShowBoost(slide, btn)
       }
@@ -376,6 +376,12 @@ const CARROT = {
     p: 'Podcasts Recommended For You is built from the podcasts you boost and follow, Music Recommended For You from the albums you boost and favorite: what else their boosters boost, minus what you already have. Your podcast app\'s OPML counts too.',
     actions: IMPORT_BTN + browse('/podcasts/shows', 'Browse podcasts'),
   },
+  'no-list': {
+    h2: 'More Recommendations',
+    h3: 'You haven\'t followed or favorited anything yet',
+    p: 'Your boosts seed these rails. Follow the podcasts you listen to and favorite the albums you like: each one adds to the recommendations, and the list goes with you to every Podcasting 2.0 app that reads it. Importing your podcast app\'s OPML follows them all at once.',
+    actions: IMPORT_BTN + browse('/podcasts/shows', 'Browse podcasts') + browse('/music/albums', 'Browse albums'),
+  },
   'no-podcasts': {
     h2: 'More Recommendations',
     h3: 'You haven\'t boosted or followed a podcast yet',
@@ -414,10 +420,10 @@ function showCarrot(sections, on) {
   setCarrot(sections, on ? 'signed-out' : null)
   if (on) for (const k of PERSONAL) conceal(railOf(sections, k))
 }
-function lockedCardNote(section, title, text) {
+function lockedCardNote(section, title, text, actions = '') {
   const card = section.querySelector('.rail-locked-card > div')
   if (!card) return
-  card.innerHTML = `<div><h3></h3><p></p></div>`
+  card.innerHTML = `<div><h3></h3><p></p></div>${actions ? `<span class="rail-locked-actions">${actions}</span>` : ''}`
   card.querySelector('h3').textContent = title
   card.querySelector('p').textContent = text
   reveal(section)
@@ -565,21 +571,30 @@ async function paintRecommended(sections, pubkey, favorites = []) {
     const sides = j.sides && typeof j.sides === 'object' ? j.sides : { podcast: pods ? 1 : 0, music: albums ? 1 : 0 }
     const hasPod = sides.podcast > 0 || !!pods
     const hasMusic = sides.music > 0 || !!albums
-    setCarrot(sections, !pubkey ? 'imported' : !hasPod && !hasMusic ? 'no-seeds' : !hasPod ? 'no-podcasts' : !hasMusic ? 'no-music' : null)
+    // A member whose list is empty (no follows, no favorites, nothing
+    // imported) is asked for them even with boosts to seed from (Reed,
+    // 2026-11-08: a boosted-once account saw only "no music yet").
+    const listEmpty = !favorites.length
+    setCarrot(sections, !pubkey ? 'imported' : !hasPod && !hasMusic ? 'no-seeds' : listEmpty ? 'no-list' : !hasPod ? 'no-podcasts' : !hasMusic ? 'no-music' : null)
+    // An empty rail is a hook, not a shrug (Reed, the same day): no seed on
+    // the side, it says what makes one; seeds but no overlap, it says the
+    // overlap grows with use.
     if (rec) {
       if (pods) { unlock(rec, railListHtml(pods.map(bare(showTile)))); if (pubkey) linkFullList(rec, pubkey); else importedNote(rec) }
+      else if (pubkey && !hasPod) lockedCardNote(rec, 'No podcasts to recommend from yet', 'Boost or follow a podcast and the podcasts its other boosters boost will rank here. Your podcast app\'s OPML counts too.', IMPORT_BTN + browse('/podcasts/shows', 'Browse podcasts'))
       else if (pubkey || !albums) {
         lockedCardNote(rec, 'Nothing to recommend yet', pubkey
-          ? 'Too few other members have boosted the shows you boost for the overlap to mean anything yet; it grows with every boost.'
-          : 'Too few other members have boosted the podcasts you imported for the overlap to mean anything yet.')
+          ? 'Too few other members have boosted the podcasts you boost and follow for the overlap to mean anything yet. Every boost and follow grows it.'
+          : 'Too few other members have boosted the podcasts you imported for the overlap to mean anything yet.', pubkey ? browse('/podcasts/shows', 'Browse podcasts') : '')
         if (!pubkey) importedNote(rec)
       } else conceal(rec)
     }
     if (music) {
       if (albums) { unlock(music, railListHtml(albums.map(bare(albumTile)))); if (pubkey) linkFullList(music, pubkey); else importedNote(music) }
       // An imported list rarely holds music, so an empty music side is no
-      // rail for it; a member's own empty side says so.
-      else if (pubkey) lockedCardNote(music, 'Nothing to recommend yet', 'Too few other members have boosted the albums you boost for the overlap to mean anything yet.')
+      // rail for it; a member's own empty side is the hook.
+      else if (pubkey && !hasMusic) lockedCardNote(music, 'No music to recommend from yet', 'Boost a song or favorite an album and the albums its other boosters boost will rank here.', browse('/music/albums', 'Browse albums'))
+      else if (pubkey) lockedCardNote(music, 'Nothing to recommend yet', 'Too few other members have boosted the albums you boost and favorite for the overlap to mean anything yet. Every boost and favorite grows it.', browse('/music/albums', 'Browse albums'))
       else conceal(music)
     }
     paintBecause(because, Array.isArray(j.because) ? j.because.filter((b) => b?.seed && b.rows?.length) : [])
@@ -666,7 +681,7 @@ window.addEventListener('ob:favorites-read', onFavoritesRead)
    early click or an early paint never finds window.OBFavorites missing. The
    same module URL, so the same instance. */
 async function favoritesApi() {
-  try { await import('/assets/js/favorites-ui.js?v=ob-v258') } catch {}
+  try { await import('/assets/js/favorites-ui.js?v=ob-v259') } catch {}
   return window.OBFavorites || null
 }
 

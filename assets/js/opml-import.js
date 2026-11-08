@@ -15,7 +15,7 @@
 import {
   OPML_MAX_BYTES, OPML_LOOKUP_PER_RUN, OPML_FILE_ACCEPT,
   parseOpml, planOpmlImport, opmlLinkVerdict, opmlLinkName, sortOpmlAnswers,
-} from '/assets/js/opml.js?v=ob-v258'
+} from '/assets/js/opml.js?v=ob-v259'
 
 const RESOLVE_URL = '/api/v1/feeds/resolve'
 const LINK_URL = '/api/v1/opml/link'
@@ -218,7 +218,7 @@ export function openOpmlPanel(ctx) {
       <div class="ob-opml-actions">
         ${r.status === 'local' ? `<button type="button" class="ob-cta" data-login>Log in to save it to Nostr</button><button type="button" class="ob-cta ob-cta--quiet" data-manage>See the list</button>` : ''}
         ${!ok ? `<button type="button" class="ob-cta" data-again>Try again</button>` : ''}
-        <button type="button" class="${ok && r.status !== 'local' ? 'ob-cta' : 'ob-fav-ask-cancel ob-opml-end'}" data-close2>Done</button>
+        <button type="button" class="${ok && r.status !== 'local' ? 'ob-cta' : 'ob-fav-ask-cancel ob-opml-end'}" data-close2>${r.status === 'local' ? 'Later' : 'Done'}</button>
       </div>
     `)
     card.querySelector('[data-close2]').onclick = close

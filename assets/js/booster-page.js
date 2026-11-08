@@ -19,18 +19,18 @@
  * `episode-section.js` attaches the controls and the verbs and nothing else.
  * That module is shared with the identical section on /episode/<guid>.
  */
-import { copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v258'
-import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v258'
+import { copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v259'
+import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v259'
 import {
   initCopyNpub, initShowMore, initShare, initBackLink,
   initHashRouting, initHashSpy, initArt2, wireArt2, hydrateProfiles, initStatWindows,
-} from '/assets/js/detail-page.js?v=ob-v258'
-import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v258'
-import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v258'
-import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v258'
-import { initFavoritesSection } from '/assets/js/favorites-section.js?v=ob-v258'
-import { feedGuidsOf } from '/assets/js/favorites-ui.js?v=ob-v258'
-import { recommendRailsHtml } from '/assets/js/recommend-rails.js?v=ob-v258'
+} from '/assets/js/detail-page.js?v=ob-v259'
+import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v259'
+import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v259'
+import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v259'
+import { initFavoritesSection } from '/assets/js/favorites-section.js?v=ob-v259'
+import { feedGuidsOf } from '/assets/js/favorites-ui.js?v=ob-v259'
+import { recommendRailsHtml } from '/assets/js/recommend-rails.js?v=ob-v259'
 
 const PK = document.body.dataset.boosterPk || ''
 const NPUB = document.body.dataset.boosterNpub || PK

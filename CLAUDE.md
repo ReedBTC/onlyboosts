@@ -244,10 +244,14 @@ was picked from is in the session memory; direction A won, with the sans.
   are empty. **AND THE CARROT STAYS UP UNTIL THE MEMBER HAS A SEED ON BOTH
   SIDES, SAYING WHAT IS MISSING** (Reed's second ask the same day:
   "advertising space to explain what the site is doing"): `CARROT` in
-  `discover.js` holds five states (signed out; an imported list, what
-  logging in adds; no seeds; no podcast seed, "boost or follow a podcast";
-  no music seed, "favorite an album"), read off the endpoint's `sides`
-  (`sidesOf` in `recommend.js`, the seeds counted per medium side); it
+  `discover.js` holds the states (loading; signed out; an imported list,
+  what logging in adds; no seeds; an empty list with boosts to seed from,
+  "follow or favorite", Reed's boosted-once account; no podcast seed,
+  "boost or follow a podcast"; no music seed, "favorite an album"), read
+  off the endpoint's `sides` (`sidesOf` in `recommend.js`, the seeds
+  counted per medium side) and the feeds the browser sent; **an empty
+  Recommended rail is a hook with a button, never a shrug** ("No music to
+  recommend from yet · Browse albums"); it
   leads the personal block when nothing personal is painted and follows it
   otherwise (`setCarrot` moves the section). The ribbons' Discover links to
   a hidden personal rail land on it. The locked track is a grid whose
