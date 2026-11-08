@@ -29,13 +29,13 @@
  *    sats this week") instead of following the tile's link. One note at a
  *    time; a click elsewhere, Escape or a scroll closes it.
  */
-import { railListHtml, showTile, albumTile, episodeTile, memberTile, langRailHtml, bare } from '/assets/js/rail-tile.js?v=ob-v255'
-import { heroHtml, slideHtml, showSlide, episodeSlide, memberSlide } from '/assets/js/hero.js?v=ob-v255'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v255'
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v255'
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v255'
-import { becauseVerb } from '/assets/js/recommend-rails.js?v=ob-v255'
-import { languageName } from '/assets/js/lang-name.js?v=ob-v255'
+import { railListHtml, showTile, albumTile, episodeTile, memberTile, langRailHtml, bare } from '/assets/js/rail-tile.js?v=ob-v256'
+import { heroHtml, slideHtml, showSlide, episodeSlide, memberSlide } from '/assets/js/hero.js?v=ob-v256'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v256'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v256'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v256'
+import { becauseVerb } from '/assets/js/recommend-rails.js?v=ob-v256'
+import { languageName } from '/assets/js/lang-name.js?v=ob-v256'
 
 const TILES = 10
 
@@ -188,11 +188,11 @@ function wireHeroBoost(hero) {
     try {
       const kind = slide.dataset.kind
       if (kind === 'episode' || kind === 'song') {
-        const m = await import('/assets/js/episode-card-actions.js?v=ob-v255')
+        const m = await import('/assets/js/episode-card-actions.js?v=ob-v256')
         btn.disabled = false
         await m.onBoostClick(slide, btn)
       } else {
-        const m = await import('/assets/js/show-card-actions.js?v=ob-v255')
+        const m = await import('/assets/js/show-card-actions.js?v=ob-v256')
         btn.disabled = false
         await m.onShowBoost(slide, btn)
       }
@@ -320,12 +320,37 @@ function patchHero(specs) {
 }
 
 /* ── 3. Personal rails ─────────────────────────────────────────────────── */
+/* ⚠️ A PERSONAL RAIL IS HIDDEN UNTIL IT HAS SOMETHING TO SHOW, AND A VISITOR
+   WITH NO ACCOUNT AND NO IMPORTED LIST SEES ONE RAIL, THE CARROT (Reed's
+   call, 2026-11-08: four locked cards in a row, "boom, boom, boom, boom",
+   pushed everything a signed-out reader can see below them). index.html
+   ships the four `hidden` and the carrot (`data-rail="personal"`) shown, so
+   the no-script read is the signed-out state. Who sees what:
+     signed out, nothing imported   the carrot alone
+     signed out, an imported list   Podcasts / Music Recommended, each side
+                                    that has rows (the podcast side with a
+                                    note when both are empty); no follows
+     signed in, no seeds            the two Follows rails alone
+     signed in, with seeds          all four
+   A seed is a boosted show or an entry on the member's list. `reveal` is
+   the one place a rail un-hides. */
+const PERSONAL = ['recommended', 'recommended-music', 'follows', 'follows-songs']
+function railOf(sections, key) { return sections.find((s) => s.dataset.rail === key) }
+function reveal(section) { if (section) section.hidden = false }
+function conceal(section) { if (section) section.hidden = true }
+function showCarrot(sections, on) {
+  const carrot = railOf(sections, 'personal')
+  if (!carrot) return
+  carrot.hidden = !on
+  if (on) for (const k of PERSONAL) conceal(railOf(sections, k))
+}
 function lockedCardNote(section, title, text) {
   const card = section.querySelector('.rail-locked-card > div')
   if (!card) return
   card.innerHTML = `<div><h3></h3><p></p></div>`
   card.querySelector('h3').textContent = title
   card.querySelector('p').textContent = text
+  reveal(section)
 }
 
 /* The two follows rails: the Shows chart and the Songs chart over the
@@ -355,6 +380,7 @@ async function paintFollows(section, follows) {
     track.removeAttribute('data-locked')
     track.innerHTML = railListHtml(rows.slice(0, TILES).map(spec.tile), { empty: spec.empty })
     wireArt(track)
+    reveal(section)
     const link = section.querySelector('[data-follows-link]')
     if (link) link.hidden = false
   } catch (e) {
@@ -370,6 +396,7 @@ function unlock(section, html) {
   track.removeAttribute('data-locked')
   track.innerHTML = html
   wireArt(track)
+  reveal(section)
 }
 
 /* The Because rails: the hidden prototype cloned once per entry, in order,
@@ -417,7 +444,17 @@ function linkFullList(section, pubkey) {
   a.dataset.recFull = '1'
   a.href = `${boosterPageHref(null, pubkey)}#recommended`
   a.textContent = 'Your full list →'
-  head.appendChild(a)
+  headExtra(head, a)
+}
+/* A rail head's extra (the full-list link, the imported-list note) joins the
+   `.rail-sub` line after a separator rather than standing as a third flex
+   item, which shrank the heading onto two lines (Reed's screenshot,
+   2026-11-08). `.rail-sub` wraps as one right-aligned block. */
+function headExtra(head, ...nodes) {
+  const sub = head.querySelector('.rail-sub')
+  if (!sub) { for (const n of nodes) head.appendChild(n); return }
+  sub.appendChild(document.createTextNode(' · '))
+  for (const n of nodes) sub.appendChild(n)
 }
 
 /* Podcasts Recommended For You, Music Recommended For You and the Because rails, all off one
@@ -436,8 +473,8 @@ function importedNote(section) {
   b.type = 'button'
   b.className = 'rail-more rail-more--btn'
   b.setAttribute('data-opml-manage', '')
-  b.textContent = 'From your imported OPML · Manage'
-  head.appendChild(b)
+  b.textContent = 'Manage'
+  headExtra(head, document.createTextNode('From your imported OPML · '), b)
 }
 async function paintRecommended(sections, pubkey, favorites = []) {
   lastRecommend = { sections, pubkey, feeds: favorites.join(',') }
@@ -450,19 +487,34 @@ async function paintRecommended(sections, pubkey, favorites = []) {
       body: JSON.stringify({ ...(pubkey ? { pubkey } : {}), limit: TILES, ...(favorites.length ? { favorites } : {}) }),
     })
     if (lastRecommend.pubkey !== pubkey || lastRecommend.sections !== sections) return
-    const none = (what) => `Boost a few ${what} and the ${what} their other boosters boost will rank here.`
+    const pods = j.podcasts?.length ? j.podcasts : null
+    const albums = j.music?.length ? j.music : null
+    // No seeds, nothing to recommend from: the rails stay hidden (a signed-in
+    // member with no boosts and no list sees the Follows rails alone).
+    if (!j.seeds && !pods && !albums) { conceal(rec); conceal(music); paintBecause(because, []); return }
+    showCarrot(sections, false)
     if (rec) {
-      if (j.podcasts?.length) { unlock(rec, railListHtml(j.podcasts.map(bare(showTile)))); if (pubkey) linkFullList(rec, pubkey); else importedNote(rec) }
-      else lockedCardNote(rec, j.seeds ? 'Nothing to recommend yet' : 'No boosts from this account yet', j.seeds ? 'Too few other members have boosted the shows you boost for the overlap to mean anything yet; it grows with every boost.' : none('shows'))
+      if (pods) { unlock(rec, railListHtml(pods.map(bare(showTile)))); if (pubkey) linkFullList(rec, pubkey); else importedNote(rec) }
+      else if (pubkey || !albums) {
+        lockedCardNote(rec, 'Nothing to recommend yet', pubkey
+          ? 'Too few other members have boosted the shows you boost for the overlap to mean anything yet; it grows with every boost.'
+          : 'Too few other members have boosted the podcasts you imported for the overlap to mean anything yet.')
+        if (!pubkey) importedNote(rec)
+      } else conceal(rec)
     }
     if (music) {
-      if (j.music?.length) { unlock(music, railListHtml(j.music.map(bare(albumTile)))); if (pubkey) linkFullList(music, pubkey); else importedNote(music) }
-      else lockedCardNote(music, j.seeds ? 'Nothing to recommend yet' : 'No music boosts from this account yet', j.seeds ? 'Too few other members have boosted the albums you boost for the overlap to mean anything yet.' : none('albums'))
+      if (albums) { unlock(music, railListHtml(albums.map(bare(albumTile)))); if (pubkey) linkFullList(music, pubkey); else importedNote(music) }
+      // An imported list rarely holds music, so an empty music side is no
+      // rail for it; a member's own empty side says so.
+      else if (pubkey) lockedCardNote(music, 'Nothing to recommend yet', 'Too few other members have boosted the albums you boost for the overlap to mean anything yet.')
+      else conceal(music)
     }
     paintBecause(because, Array.isArray(j.because) ? j.because.filter((b) => b?.seed && b.rows?.length) : [])
   } catch (e) {
     console.warn('[discover] recommend', e)
-    for (const s of [rec, music]) if (s) lockedCardNote(s, 'Your recommendations could not be loaded', 'Reload to try again.')
+    showCarrot(sections, false)
+    if (rec) lockedCardNote(rec, 'Your recommendations could not be loaded', 'Reload to try again.')
+    conceal(music)
   }
 }
 
@@ -475,12 +527,14 @@ async function paintPersonal() {
   if (my !== personalRun) return
   if (res.status === 'signed-out') {
     paintBecause(null, [])
-    // The nav's Because link, signed out: the carrot is the locked rail above it.
-    if (location.hash === '#rail-because') document.getElementById('rail-recommended')?.scrollIntoView({ block: 'start' })
+    // Signed out, the four personal rails are one: the carrot. The nav's
+    // Discover links to any of them land on it.
+    showCarrot(sections, true)
+    if (/^#rail-(recommended|recommended-music|follows|follows-songs|because)$/.test(location.hash)) document.getElementById('rail-personal')?.scrollIntoView({ block: 'start' })
     // A list imported from OPML without an account seeds the two Recommended
-    // rails and the Because rails on its own (2026-11-07); the follows rails
-    // stay locked, since they need a Nostr follow list. The locked cards stay
-    // otherwise: the carrot.
+    // rails and the Because rails on its own (2026-11-07), and they take the
+    // carrot's place once painted; the follows rails need a Nostr follow
+    // list and stay hidden.
     lastRecommend = { sections, pubkey: null, feeds: '' }
     const api = await favoritesApi()
     const local = api ? await api.ensureRead().catch(() => []) : []
@@ -488,6 +542,9 @@ async function paintPersonal() {
     if (local.length) paintRecommended(sections, null, local)
     return
   }
+  // Signed in: no carrot, and each rail appears as it is painted.
+  showCarrot(sections, false)
+  for (const k of PERSONAL) conceal(railOf(sections, k))
   for (const s of sections) {
     if (!FOLLOWS[s.dataset.rail]) continue
     if (res.status === 'ok') paintFollows(s, res.follows)
@@ -525,7 +582,7 @@ window.addEventListener('ob:favorites-read', onFavoritesRead)
    early click or an early paint never finds window.OBFavorites missing. The
    same module URL, so the same instance. */
 async function favoritesApi() {
-  try { await import('/assets/js/favorites-ui.js?v=ob-v255') } catch {}
+  try { await import('/assets/js/favorites-ui.js?v=ob-v256') } catch {}
   return window.OBFavorites || null
 }
 

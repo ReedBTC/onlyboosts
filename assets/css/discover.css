@@ -30,6 +30,7 @@
 }
 .rail-head h2 {
   margin: 0;
+  flex-shrink: 0; /* the explanation beside it wraps; the heading never does (Reed, 2026-11-08) */
   font-family: var(--font-sans);
   font-size: 1.45rem;
   font-weight: 700;
@@ -47,6 +48,9 @@
   white-space: nowrap;
 }
 .rail-more:hover { text-decoration: underline; }
+/* The same link as a button (the imported list's Manage): no `font: inherit`,
+   which would take the body serif over .rail-more's sans. */
+.rail-more--btn { padding: 0; background: none; border: 0; cursor: pointer; }
 /* A rail whose head explains it rather than linking a chart (New and
    Noteworthy, Movers): muted, and allowed to wrap on a phone. */
 .rail-more--note { color: var(--muted); font-weight: 500; white-space: normal; text-align: right; font-size: 0.85rem; }
@@ -367,6 +371,7 @@ a.rt:hover .rt-title { color: var(--brand-dd); }
 .rail-head .rail-sub { font-family: var(--font-sans); font-size: 0.9rem; font-weight: 500; color: var(--muted); text-align: right; }
 .rail-head .rail-sub a { color: var(--brand-dd); text-decoration: none; white-space: nowrap; }
 .rail-head .rail-sub a:hover { text-decoration: underline; }
+.rail-head .rail-sub .rail-more { white-space: nowrap; }
 @media (max-width: 640px) {
   .rail-head { flex-wrap: wrap; }
   .rail-head .rail-sub { text-align: left; flex-basis: 100%; }

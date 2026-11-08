@@ -227,10 +227,24 @@ was picked from is in the session memory; direction A won, with the sans.
   phone's first screen; and slide one repeats the first tile under it. The
   rails still start at #1. `/about#recommendations` says it is not an
   editorial pick.
-- **A personal rail shows a signed-out visitor the LOCKED CARD, never a
-  blank** ("Log in to see your recommendations"): Reed wants the carrot, the
-  sense of missing out on what logging in and publishing boosts to Nostr
-  unlocks. Revisit if too much ends up locked.
+- **A signed-out visitor with nothing imported sees ONE LOCKED RAIL, THE
+  CARROT, in place of the four personal rails** (`data-rail="personal"`,
+  "Log in or import your OPML for personalized recommendations"; Reed's
+  call, 2026-11-08, after four locked cards in a row pushed everything a
+  signed-out reader can see below them; from 2026-10-17 to then every
+  personal rail showed its own locked card, the carrot being the sense of
+  missing out on what logging in unlocks). **A personal rail is `hidden`
+  until it has something to show** (`reveal` in `discover.js`, the one
+  place a rail un-hides; the four ship `hidden` in `index.html`, so the
+  no-script read is the signed-out state): the two Follows rails for any
+  signed-in member, the two Recommended rails once the member has seeds
+  (boosted shows or list entries; a member with neither sees the Follows
+  rails alone), and for an imported list without an account each
+  Recommended side that has rows, the podcast side with a note when both
+  are empty. The ribbons' Discover links to a hidden personal rail land on
+  the carrot. The rail head's extras (the full-list link, the imported
+  list's Manage) ride the `.rail-sub` line, never a third flex item, so the
+  heading never wraps.
 - **Every language is first class**: no language rail, no language default.
 - **Fact rails are edge-rendered, personal rails are browser-only.** Each
   fact rail is an `<!--OB:RAIL:<key>-->` marker pair in `index.html` filled

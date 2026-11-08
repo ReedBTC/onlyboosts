@@ -474,16 +474,22 @@ a.msg-media img {
 .ob-opml-lines { margin: 0.8rem 0 0; font-size: 0.86rem; }
 .ob-opml-line summary { cursor: pointer; padding: 0.15rem 0; }
 .ob-opml-line ul { margin: 0.2rem 0 0.4rem 1.2rem; padding: 0; opacity: 0.85; max-height: 8rem; overflow: auto; }
+/* One row of pills: the primary first, quiet pills beside it, and a text
+   action (Forget all, Cancel) at the row's end; no Done, the × closes
+   (Reed, 2026-11-08: five mismatched buttons). */
 .ob-opml-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-top: 0.8rem; }
-.ob-opml-btn { flex-direction: row; padding: 0.4rem 0.7rem; font-size: 0.88rem; }
-.ob-opml .ob-cta { font: inherit; font-weight: 600; padding: 0.5rem 0.9rem; border-radius: 999px; border: 0; background: var(--brand-dd); color: #fff; cursor: pointer; }
-.ob-opml .ob-cta:hover { background: var(--brand-ddd, var(--brand-dd)); }
+.ob-opml-actions .ob-fav-ask-cancel { margin-top: 0; padding: 0.5rem 0.3rem; }
+.ob-opml-actions .ob-opml-end { margin-left: auto; }
+.ob-opml-forget { color: var(--danger); opacity: 0.85; }
+.ob-opml .ob-cta { font: inherit; font-size: 0.92rem; font-weight: 600; padding: 0.5rem 0.9rem; border-radius: 999px; border: 1px solid var(--brand-dd); background: var(--brand-dd); color: #fff; cursor: pointer; white-space: nowrap; }
+.ob-opml .ob-cta:hover { background: var(--brand-ddd, var(--brand-dd)); border-color: var(--brand-ddd, var(--brand-dd)); }
+.ob-opml .ob-cta--quiet { background: transparent; color: var(--brand-dd); }
+.ob-opml .ob-cta--quiet:hover { background: var(--cream-d, transparent); border-color: var(--brand-dd); }
 /* The locked card's second door (index.html): Log in, or Import OPML. */
 .rail-locked-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; }
 .rail-locked-card .ob-cta--quiet { background: transparent; color: var(--brand-dd); border: 1px solid var(--brand-dd); }
 .rail-locked-card .ob-cta--quiet:hover { background: var(--cream-d, transparent); }
 /* The imported-list note on a rail head (discover.js#importedNote). */
-.rail-more--btn { font: inherit; background: none; border: 0; cursor: pointer; }
 /* The owner's Import / Export on /booster's Follows and Favorites band. */
 .fav-opml { display: inline-flex; gap: 0.4rem; }
 /* Held while /api/value resolves and the widget's gate chain runs, which can

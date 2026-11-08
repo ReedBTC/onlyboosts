@@ -60,10 +60,10 @@ console.log('\nThe markers and the renderers agree:')
     const personal = [...index.matchAll(/data-rail="([a-z0-9-]+)"[^>]*data-rail-personal/g)].map((m) => m[1])
     assert.ok(personal.length >= 1, 'there is at least one personal rail')
     for (const p of personal) assert.ok(order.indexOf(p) >= 3, `${p} is the fourth rail or later`)
-    assert.deepEqual(order, ['shows-week', 'albums-month', 'hpw-week', 'recommended', 'recommended-music', 'follows', 'follows-songs', 'new-shows', 'new-music', 'movers', 'podroll',
+    assert.deepEqual(order, ['shows-week', 'albums-month', 'hpw-week', 'personal', 'recommended', 'recommended-music', 'follows', 'follows-songs', 'new-shows', 'new-music', 'movers', 'podroll',
       'lang-1', 'lang-2', 'lang-3', 'because',
       'episodes-week', 'episodes-month', 'episodes-year', 'shows-month', 'shows-year', 'songs-week', 'songs-month', 'songs-year', 'albums-week', 'albums-year'],
-      "Reed's order of 2026-10-21 with the 2026-10-22 additions: the language rails under Podcasters Recommend, the window rails at the foot, podcasts before music; New and Noteworthy split by medium on 2026-10-30")
+      "Reed's order of 2026-10-21 with the 2026-10-22 additions: the language rails under Podcasters Recommend, the window rails at the foot, podcasts before music; New and Noteworthy split by medium on 2026-10-30; the signed-out carrot ahead of the four personal rails on 2026-11-08")
     for (const n of [1, 2, 3]) assert.match(index, new RegExp(`<section class="rail" data-rail="lang-${n}"[^>]*><!--OB:RAIL:lang-${n}-->`), `lang-${n}'s marker is tight against its section (so .rail:empty hides an empty slot)`)
     assert.ok(read('assets/css/discover.css').includes('.rail:empty { display: none; }'), 'an empty rail takes no room')
     assert.ok(!index.includes('artists-week') && !Object.keys(RAILS).includes('artists-week'), 'Top Artists This Week came off the page')

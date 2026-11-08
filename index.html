@@ -68,14 +68,14 @@
   <meta name="twitter:card" content="summary_large_image" />
 
   <link rel="preload" href="/assets/fonts/outfit.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v255" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v255" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v256" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v256" />
   <!-- The boost rows at the foot are the detail pages' rows and wear their
        sheets: the card, the thread chrome and the reaction bar. -->
-  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v255" />
+  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v256" />
   <!-- theme.css last among the shared sheets: the palette, the fonts, and
        the base body/a/img rules every shared stylesheet reads off :root. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v255" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v256" />
 </head>
 <body>
 
@@ -394,7 +394,43 @@
     <div class="rail-track"><!--OB:RAIL:hpw-week--><p class="rail-placeholder">Loading this week's board…</p><!--/OB:RAIL:hpw-week--></div>
   </section>
 
-  <section class="rail" data-rail="recommended" data-rail-personal aria-labelledby="rail-recommended">
+  <!-- Signed out with nothing imported, the four personal rails below are one
+       rail: the carrot (Reed's call, 2026-11-08, after four locked cards in a
+       row). discover.js hides it and reveals each rail as it has something to
+       show: the two Recommended rails once the member has seeds (boosts, a
+       list, an import), the two Follows rails for any signed-in member. -->
+  <section class="rail" data-rail="personal" data-rail-personal aria-labelledby="rail-personal">
+    <div class="rail-head">
+      <h2 id="rail-personal">Recommended For You</h2>
+      <span class="rail-sub">Podcasts and music from your boosts, your follows and your podcast app's subscriptions · <a href="/about#recommendations">How this works</a></span>
+    </div>
+    <div class="rail-track rail-locked" data-locked>
+      <ol class="rail-list" aria-hidden="true">
+        <li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: 80%"></span><span class="rail-locked-ph" style="width: 50%"></span></span></li>
+        <li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: 70%"></span><span class="rail-locked-ph" style="width: 45%"></span></span></li>
+        <li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: 85%"></span><span class="rail-locked-ph" style="width: 55%"></span></span></li>
+        <li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: 65%"></span><span class="rail-locked-ph" style="width: 40%"></span></span></li>
+        <li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: 75%"></span><span class="rail-locked-ph" style="width: 50%"></span></span></li>
+        <li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: 80%"></span><span class="rail-locked-ph" style="width: 45%"></span></span></li>
+        <li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: 60%"></span><span class="rail-locked-ph" style="width: 55%"></span></span></li>
+        <li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: 85%"></span><span class="rail-locked-ph" style="width: 40%"></span></span></li>
+        <li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: 70%"></span><span class="rail-locked-ph" style="width: 50%"></span></span></li>
+        <li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: 75%"></span><span class="rail-locked-ph" style="width: 45%"></span></span></li>
+      </ol>
+      <div class="rail-locked-card">
+        <div>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>
+          <div>
+            <h3>Log in or import your OPML for personalized recommendations</h3>
+            <p>Log in with Nostr and four rails take this one's place: podcasts and music recommended from what you boost, and the top podcasts and songs from the accounts you follow. No account? Import the subscription list from your podcast app and the podcasts you follow seed the recommendations instead.</p>
+          </div>
+          <span class="rail-locked-actions"><button type="button" class="ob-cta" data-lb-login-trigger>Log in</button><button type="button" class="ob-cta ob-cta--quiet" data-opml-import>Import OPML</button></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="rail" data-rail="recommended" data-rail-personal aria-labelledby="rail-recommended" hidden>
     <div class="rail-head">
       <h2 id="rail-recommended">Podcasts Recommended For You</h2>
       <span class="rail-sub">Podcasts boosted by the members who boost the same podcasts you do · <a href="/about#recommendations">How this works</a></span>
@@ -416,16 +452,15 @@
         <div>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>
           <div>
-            <h3>Log in or import your OPML</h3>
-            <p>Other members boost some of the same shows you do. This rail is what else those members boost, minus anything you already boost or follow. Log in and your Nostr boosts build it; or import the subscription list from your current podcast app, and the shows you follow seed it instead.</p>
+            <h3>Your recommendations</h3>
+            <p>Podcasts boosted by the members who boost the same podcasts you do, minus anything you already boost or follow.</p>
           </div>
-          <span class="rail-locked-actions"><button type="button" class="ob-cta" data-lb-login-trigger>Log in</button><button type="button" class="ob-cta ob-cta--quiet" data-opml-import>Import OPML</button></span>
         </div>
       </div>
     </div>
   </section>
 
-  <section class="rail" data-rail="recommended-music" data-rail-personal aria-labelledby="rail-recommended-music">
+  <section class="rail" data-rail="recommended-music" data-rail-personal aria-labelledby="rail-recommended-music" hidden>
     <div class="rail-head">
       <h2 id="rail-recommended-music">Music Recommended For You</h2>
       <span class="rail-sub">Albums boosted by the members who boost the same albums you do · <a href="/about#recommendations">How this works</a></span>
@@ -447,16 +482,15 @@
         <div>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>
           <div>
-            <h3>Log in or import your OPML</h3>
-            <p>Albums ranked by how much their boosters overlap with the music you boost and favorite. An imported subscription list counts too.</p>
+            <h3>Your recommendations</h3>
+            <p>Albums ranked by how much their boosters overlap with the music you boost and favorite.</p>
           </div>
-          <span class="rail-locked-actions"><button type="button" class="ob-cta" data-lb-login-trigger>Log in</button><button type="button" class="ob-cta ob-cta--quiet" data-opml-import>Import OPML</button></span>
         </div>
       </div>
     </div>
   </section>
 
-  <section class="rail" data-rail="follows" data-rail-personal aria-labelledby="rail-follows">
+  <section class="rail" data-rail="follows" data-rail-personal aria-labelledby="rail-follows" hidden>
     <div class="rail-head">
       <h2 id="rail-follows">Top Podcasts From Your Follows</h2>
       <a class="rail-more" href="/podcasts/shows?scope=follows" hidden data-follows-link>View the feed →</a>
@@ -487,7 +521,7 @@
     </div>
   </section>
 
-  <section class="rail" data-rail="follows-songs" data-rail-personal aria-labelledby="rail-follows-songs">
+  <section class="rail" data-rail="follows-songs" data-rail-personal aria-labelledby="rail-follows-songs" hidden>
     <div class="rail-head">
       <h2 id="rail-follows-songs">Top Songs From Your Follows</h2>
       <a class="rail-more" href="/music/songs?scope=follows" hidden data-follows-link>View the feed →</a>
@@ -738,12 +772,12 @@
 <!-- FOOTER:END -->
 
 <!-- Lazy widget bootstrap (Donate + identity slot) -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v255"></script>
-<script src="/assets/js/sw-register.js?v=ob-v255" defer></script>
-<script src="/assets/widgets/pwa-install.js?v=ob-v255" defer></script>
-<script src="/assets/js/nav.js?v=ob-v255" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v256"></script>
+<script src="/assets/js/sw-register.js?v=ob-v256" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v256" defer></script>
+<script src="/assets/js/nav.js?v=ob-v256" defer></script>
 <!-- The verbs: artwork fallback, the rails the edge could not fill, and the
      personal rails for a signed-in member. -->
-<script type="module" src="/assets/js/discover.js?v=ob-v255"></script>
+<script type="module" src="/assets/js/discover.js?v=ob-v256"></script>
 </body>
 </html>

@@ -280,8 +280,10 @@ await check('the writer publishes a batch once; the controller keeps a local lis
   assert.ok(panel.includes("import {") && /from '\/assets\/js\/opml\.js\?v=/.test(panel))
   // The three doors.
   const home = read('index.html')
-  assert.equal((home.match(/data-opml-import/g) || []).length, 2, 'both Recommended locked cards')
-  assert.equal((home.match(/<h3>Log in or import your OPML<\/h3>/g) || []).length, 2)
+  assert.equal((home.match(/data-opml-import/g) || []).length, 1, 'the one carrot rail carries the import door (2026-11-08: four locked rails became one)')
+  assert.ok(home.includes('<h3>Log in or import your OPML for personalized recommendations</h3>'))
+  for (const k of ['recommended', 'recommended-music', 'follows', 'follows-songs']) assert.ok(home.includes(`data-rail="${k}" data-rail-personal aria-labelledby="rail-${k}" hidden>`), `${k} ships hidden`)
+  assert.ok(home.includes('data-rail="personal" data-rail-personal aria-labelledby="rail-personal">'), 'the carrot ships shown')
   const sec = read('assets/js/favorites-section.js')
   assert.ok(sec.includes('function mountOpml(owner)') && sec.includes('data-opml="import"') && sec.includes('data-opml="export"'))
   const widget = read('assets/widgets/login-widget.js')
@@ -293,6 +295,8 @@ await check('the writer publishes a batch once; the controller keeps a local lis
   assert.ok(disc.includes('if (local.length) paintRecommended(sections, null, local)'))
   assert.ok(disc.includes("...(pubkey ? { pubkey } : {}), limit: TILES"), 'the endpoint is asked with favorites alone')
   assert.ok(disc.includes("(d.local && !d.pubkey)"), 'the listener accepts the local list')
+  assert.ok(disc.includes("const PERSONAL = ['recommended', 'recommended-music', 'follows', 'follows-songs']") && disc.includes('function showCarrot(') && disc.includes("if (!j.seeds && !pods && !albums) { conceal(rec); conceal(music)"), 'a personal rail is hidden until it has something to show; no seeds, no Recommended rails')
+  assert.ok(disc.includes("b.textContent = 'Manage'") && disc.includes("headExtra(head, document.createTextNode('From your imported OPML · '), b)"), 'the imported note rides the rail-sub line')
   // The favorites resolver carries the feed URL now, for the export.
   assert.ok(read('functions/api/v1/favorites/resolve.js').includes('feed: r.feed_url || null'))
 })

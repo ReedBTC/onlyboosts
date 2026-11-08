@@ -15,7 +15,7 @@
 import {
   OPML_MAX_BYTES, OPML_LOOKUP_PER_RUN, OPML_FILE_ACCEPT,
   parseOpml, planOpmlImport, opmlLinkVerdict, opmlLinkName, sortOpmlAnswers,
-} from '/assets/js/opml.js?v=ob-v255'
+} from '/assets/js/opml.js?v=ob-v256'
 
 const RESOLVE_URL = '/api/v1/feeds/resolve'
 const LINK_URL = '/api/v1/opml/link'
@@ -216,9 +216,9 @@ export function openOpmlPanel(ctx) {
     frame(ok ? 'Imported' : 'Not saved', `
       <p>${esc(text)}</p>
       <div class="ob-opml-actions">
-        ${r.status === 'local' ? `<button type="button" class="ob-cta" data-login>Log in to save it to Nostr</button><button type="button" class="ob-fav-ask-cancel" data-manage>See the list</button>` : ''}
+        ${r.status === 'local' ? `<button type="button" class="ob-cta" data-login>Log in to save it to Nostr</button><button type="button" class="ob-cta ob-cta--quiet" data-manage>See the list</button>` : ''}
         ${!ok ? `<button type="button" class="ob-cta" data-again>Try again</button>` : ''}
-        <button type="button" class="ob-fav-ask-cancel" data-close2>Done</button>
+        <button type="button" class="${ok && r.status !== 'local' ? 'ob-cta' : 'ob-fav-ask-cancel ob-opml-end'}" data-close2>Done</button>
       </div>
     `)
     card.querySelector('[data-close2]').onclick = close
@@ -237,13 +237,11 @@ export function openOpmlPanel(ctx) {
       </ul>
       <div class="ob-opml-actions">
         <button type="button" class="ob-cta" data-login>Log in to save to Nostr</button>
-        <button type="button" class="ob-fav-ask-btn ob-opml-btn" data-import>Import more</button>
-        <button type="button" class="ob-fav-ask-btn ob-opml-btn" data-export>Export as OPML</button>
-        <button type="button" class="ob-fav-ask-btn ob-opml-btn" data-forget>Forget all</button>
-        <button type="button" class="ob-fav-ask-cancel" data-close2>Done</button>
+        <button type="button" class="ob-cta ob-cta--quiet" data-import>Import more</button>
+        <button type="button" class="ob-cta ob-cta--quiet" data-export>Export as OPML</button>
+        <button type="button" class="ob-fav-ask-cancel ob-opml-end ob-opml-forget" data-forget>Forget all</button>
       </div>
     `)
-    card.querySelector('[data-close2]').onclick = close
     card.querySelector('[data-import]').onclick = () => viewPick()
     card.querySelector('[data-export]').onclick = () => ctx.exportOpml()
     card.querySelector('[data-login]').onclick = () => { close(); ctx.requestLogin() }

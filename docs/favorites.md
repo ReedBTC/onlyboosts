@@ -491,8 +491,11 @@ the bytes an export writes (`buildOpml`).
   controller offers the list for saving to the Nostr list (one publish),
   then clears it; "Later" asks again next page. Hearts stay hidden signed
   out, as before.
-- **Three doors**: the homepage's two Recommended locked cards ("Log in or
-  import your OPML"), the account menu's Podcast list row (Import / Export),
+- **Three doors**: the homepage's one signed-out carrot rail ("Log in or
+  import your OPML for personalized recommendations"; the two Recommended
+  rails' own locked cards carried the door for a day, until the four
+  personal rails became one for a signed-out visitor on 2026-11-08), the
+  account menu's Podcast list row (Import / Export),
   and the owner's Import OPML / Export OPML on `/booster`'s Follows and
   Favorites band, shown over an empty list too. The panel itself is
   `assets/js/opml-import.js`, loaded on first use.
