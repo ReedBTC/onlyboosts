@@ -535,3 +535,7 @@ the bytes an export writes (`buildOpml`).
    merge module's `feedGuidOf`. The first paint sent the identifier, nothing
    matched a seed, and Reed saw three followed shows still recommended the
    same day; `test-discover-home.mjs` runs the shipped function.
+
+## A Button In Flight Keeps Its Word
+
+A click reads the list again before it decides add or remove, and that read's first `paintAll` painted every button from the list, the pressed one included, so "Saving…" became "Follow" again for as long as the relays took (Reed, 2026-11-08: a press that looked ignored for twenty seconds). `paint` in `favorites-ui.js` leaves an `is-busy` button alone; `setBusy(btn, false)` repaints it when the cycle ends. The pill pulses while busy. A list with no private content counts as opened on the first read, so a new member's click no longer re-reads the list before writing.

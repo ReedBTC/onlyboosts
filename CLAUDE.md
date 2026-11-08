@@ -2591,6 +2591,11 @@ is a publish target (theforest refuses the write and is deliberately out).**
   the widget boots on a stub user, so `onClick` waits on the widget's
   `isSessionReady()`; an unopened private half paints a heart UNKNOWN, not
   off; `unchanged` gets a toast too; on reads "Favorited" on a tinted pill.
+  **A button in flight keeps its word** (2026-11-08, Reed: a press looked
+  ignored for twenty seconds): the click's own re-read ran `paintAll`,
+  which wrote "Follow" over "Saving…"; `paint` skips an `is-busy` button,
+  the pill pulses, and a list with no private content is `privateOpened`
+  on the first read so a click does not read it again.
 - **⚠️ A PODCAST SHOW IS FOLLOWED, EVERYTHING ELSE IS FAVORITED** (Reed's
   call, 2026-11-07): the show-level button on the podcast side reads Follow /
   Following, plus → check; episodes, albums, songs and artists keep Favorite
