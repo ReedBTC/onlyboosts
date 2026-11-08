@@ -20,7 +20,7 @@
  * ⚠️ IMPORTS ITS SIBLING AS './rail-tile.js?v=…' like every two-sided module;
  * the Function reaches it by relative path and esbuild inlines it. No
  * Date.now(), no locale. */
-import { railListHtml, showTile, albumTile, bare } from './rail-tile.js?v=ob-v256'
+import { railListHtml, showTile, albumTile, bare } from './rail-tile.js?v=ob-v257'
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
 const clip = (s, n) => (s.length > n ? s.slice(0, n - 1).trimEnd() + '…' : s)

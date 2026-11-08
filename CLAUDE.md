@@ -241,10 +241,20 @@ was picked from is in the session memory; direction A won, with the sans.
   (boosted shows or list entries; a member with neither sees the Follows
   rails alone), and for an imported list without an account each
   Recommended side that has rows, the podcast side with a note when both
-  are empty. The ribbons' Discover links to a hidden personal rail land on
-  the carrot. The rail head's extras (the full-list link, the imported
-  list's Manage) ride the `.rail-sub` line, never a third flex item, so the
-  heading never wraps.
+  are empty. **AND THE CARROT STAYS UP UNTIL THE MEMBER HAS A SEED ON BOTH
+  SIDES, SAYING WHAT IS MISSING** (Reed's second ask the same day:
+  "advertising space to explain what the site is doing"): `CARROT` in
+  `discover.js` holds five states (signed out; an imported list, what
+  logging in adds; no seeds; no podcast seed, "boost or follow a podcast";
+  no music seed, "favorite an album"), read off the endpoint's `sides`
+  (`sidesOf` in `recommend.js`, the seeds counted per medium side); it
+  leads the personal block when nothing personal is painted and follows it
+  otherwise (`setCarrot` moves the section). The ribbons' Discover links to
+  a hidden personal rail land on it. The locked track is a grid whose
+  placeholder tiles and card share one cell, so the card sizes the track.
+  The rail head's extras (the full-list link, the imported list's Manage)
+  ride the `.rail-sub` line, never a third flex item, so the heading never
+  wraps.
 - **Every language is first class**: no language rail, no language default.
 - **Fact rails are edge-rendered, personal rails are browser-only.** Each
   fact rail is an `<!--OB:RAIL:<key>-->` marker pair in `index.html` filled

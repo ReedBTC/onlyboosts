@@ -266,12 +266,14 @@ a.rt:hover .rt-title { color: var(--brand-dd); }
 /* ── A personal rail, signed out: the carrot ── */
 .rail-locked {
   position: relative;
+  display: grid; /* the placeholder tiles and the card share one cell, so the track is as tall as the taller (the card overflowed it, Reed's screenshot 2026-11-08) */
   background: var(--white);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 1rem;
   overflow: hidden;
 }
+.rail-locked > * { grid-area: 1 / 1; min-width: 0; }
 .rail-locked .rail-list { opacity: 0.28; filter: grayscale(1); pointer-events: none; }
 .rail-locked .rt-media { background: var(--border); border: 0; }
 .rail-locked-ph {
@@ -281,12 +283,11 @@ a.rt:hover .rt-title { color: var(--brand-dd); }
   background: var(--border);
 }
 .rail-locked-card {
-  position: absolute;
-  inset: 0;
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
+  padding: 0;
 }
 .rail-locked-card > div {
   display: flex;

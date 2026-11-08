@@ -29,13 +29,13 @@
  *    sats this week") instead of following the tile's link. One note at a
  *    time; a click elsewhere, Escape or a scroll closes it.
  */
-import { railListHtml, showTile, albumTile, episodeTile, memberTile, langRailHtml, bare } from '/assets/js/rail-tile.js?v=ob-v256'
-import { heroHtml, slideHtml, showSlide, episodeSlide, memberSlide } from '/assets/js/hero.js?v=ob-v256'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v256'
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v256'
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v256'
-import { becauseVerb } from '/assets/js/recommend-rails.js?v=ob-v256'
-import { languageName } from '/assets/js/lang-name.js?v=ob-v256'
+import { railListHtml, showTile, albumTile, episodeTile, memberTile, langRailHtml, bare } from '/assets/js/rail-tile.js?v=ob-v257'
+import { heroHtml, slideHtml, showSlide, episodeSlide, memberSlide } from '/assets/js/hero.js?v=ob-v257'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v257'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v257'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v257'
+import { becauseVerb } from '/assets/js/recommend-rails.js?v=ob-v257'
+import { languageName } from '/assets/js/lang-name.js?v=ob-v257'
 
 const TILES = 10
 
@@ -188,11 +188,11 @@ function wireHeroBoost(hero) {
     try {
       const kind = slide.dataset.kind
       if (kind === 'episode' || kind === 'song') {
-        const m = await import('/assets/js/episode-card-actions.js?v=ob-v256')
+        const m = await import('/assets/js/episode-card-actions.js?v=ob-v257')
         btn.disabled = false
         await m.onBoostClick(slide, btn)
       } else {
-        const m = await import('/assets/js/show-card-actions.js?v=ob-v256')
+        const m = await import('/assets/js/show-card-actions.js?v=ob-v257')
         btn.disabled = false
         await m.onShowBoost(slide, btn)
       }
@@ -338,10 +338,73 @@ const PERSONAL = ['recommended', 'recommended-music', 'follows', 'follows-songs'
 function railOf(sections, key) { return sections.find((s) => s.dataset.rail === key) }
 function reveal(section) { if (section) section.hidden = false }
 function conceal(section) { if (section) section.hidden = true }
-function showCarrot(sections, on) {
+
+/* ⚠️ THE CARROT STAYS UP UNTIL THE MEMBER HAS EVERYTHING, AND SAYS WHAT IS
+   MISSING (Reed's ask, 2026-11-08: "advertising space to explain what the
+   site is doing and why it's a good idea"). One rail, its copy by state:
+   signed out and nothing imported, the two doors; an imported list, what
+   logging in adds; signed in, whichever side has no seed (the endpoint's
+   `sides`). It leads the personal block when nothing personal is painted
+   and follows the block otherwise. Hidden only for a member with a seed on
+   both sides. The login and import buttons are delegated (see the click
+   handlers below), so a rewritten card needs no wiring. */
+const LOGIN_BTN = '<button type="button" class="ob-cta" data-lb-login-trigger>Log in</button>'
+const IMPORT_BTN = '<button type="button" class="ob-cta ob-cta--quiet" data-opml-import>Import OPML</button>'
+const browse = (href, text) => `<a class="ob-cta ob-cta--quiet" href="${href}">${text}</a>`
+const CARROT = {
+  'signed-out': {
+    h2: 'Recommended For You',
+    h3: 'Log in or import your OPML for personalized recommendations',
+    p: 'Podcasts and music recommended from what you boost and follow, and the top podcasts and songs from the accounts you follow on Nostr. No account? Import your podcast app\'s subscription list instead.',
+    actions: LOGIN_BTN + IMPORT_BTN,
+  },
+  'imported': {
+    h2: 'More Recommendations',
+    h3: 'Log in with Nostr to see what your follows boost',
+    p: 'Your imported list lives in this browser. Log in and it is saved to your Nostr follows and favorites, and two more rails appear: the top podcasts and songs from the accounts you follow.',
+    actions: LOGIN_BTN,
+  },
+  'no-seeds': {
+    h2: 'More Recommendations',
+    h3: 'Boost or follow a podcast, or favorite an album, for personalized recommendations',
+    p: 'Podcasts Recommended For You is built from the podcasts you boost and follow, Music Recommended For You from the albums you boost and favorite: what else their boosters boost, minus what you already have. Your podcast app\'s OPML counts too.',
+    actions: IMPORT_BTN + browse('/podcasts/shows', 'Browse podcasts'),
+  },
+  'no-podcasts': {
+    h2: 'More Recommendations',
+    h3: 'You haven\'t boosted or followed a podcast yet',
+    p: 'Boost or follow one and Podcasts Recommended For You appears here: the podcasts boosted by the members who boost the same podcasts you do. Your podcast app\'s OPML counts too.',
+    actions: IMPORT_BTN + browse('/podcasts/shows', 'Browse podcasts'),
+  },
+  'no-music': {
+    h2: 'More Recommendations',
+    h3: 'You haven\'t favorited any music yet',
+    p: 'Favorite an album or boost a song and Music Recommended For You appears here: the albums boosted by the members who boost the same music you do.',
+    actions: browse('/music/albums', 'Browse albums'),
+  },
+}
+function setCarrot(sections, state) {
   const carrot = railOf(sections, 'personal')
   if (!carrot) return
-  carrot.hidden = !on
+  if (!state) { carrot.hidden = true; return }
+  const c = CARROT[state]
+  const card = carrot.querySelector('.rail-locked-card > div')
+  const h2 = carrot.querySelector('h2')
+  if (!c || !card || !h2) return
+  h2.textContent = c.h2
+  card.querySelector('h3').textContent = c.h3
+  card.querySelector('p').textContent = c.p
+  card.querySelector('.rail-locked-actions').innerHTML = c.actions
+  // Leads the block when it is the block; follows it otherwise.
+  const last = railOf(sections, 'follows-songs')
+  const first = railOf(sections, 'recommended')
+  const atEnd = state !== 'signed-out'
+  if (atEnd && last && last.nextElementSibling !== carrot) last.after(carrot)
+  else if (!atEnd && first && carrot.nextElementSibling !== first) first.before(carrot)
+  carrot.hidden = false
+}
+function showCarrot(sections, on) {
+  setCarrot(sections, on ? 'signed-out' : null)
   if (on) for (const k of PERSONAL) conceal(railOf(sections, k))
 }
 function lockedCardNote(section, title, text) {
@@ -490,9 +553,12 @@ async function paintRecommended(sections, pubkey, favorites = []) {
     const pods = j.podcasts?.length ? j.podcasts : null
     const albums = j.music?.length ? j.music : null
     // No seeds, nothing to recommend from: the rails stay hidden (a signed-in
-    // member with no boosts and no list sees the Follows rails alone).
-    if (!j.seeds && !pods && !albums) { conceal(rec); conceal(music); paintBecause(because, []); return }
-    showCarrot(sections, false)
+    // member with no boosts and no list sees the Follows rails and the carrot).
+    if (!j.seeds && !pods && !albums) { conceal(rec); conceal(music); paintBecause(because, []); setCarrot(sections, pubkey ? 'no-seeds' : 'signed-out'); return }
+    const sides = j.sides && typeof j.sides === 'object' ? j.sides : { podcast: pods ? 1 : 0, music: albums ? 1 : 0 }
+    const hasPod = sides.podcast > 0 || !!pods
+    const hasMusic = sides.music > 0 || !!albums
+    setCarrot(sections, !pubkey ? 'imported' : !hasPod && !hasMusic ? 'no-seeds' : !hasPod ? 'no-podcasts' : !hasMusic ? 'no-music' : null)
     if (rec) {
       if (pods) { unlock(rec, railListHtml(pods.map(bare(showTile)))); if (pubkey) linkFullList(rec, pubkey); else importedNote(rec) }
       else if (pubkey || !albums) {
@@ -512,7 +578,7 @@ async function paintRecommended(sections, pubkey, favorites = []) {
     paintBecause(because, Array.isArray(j.because) ? j.because.filter((b) => b?.seed && b.rows?.length) : [])
   } catch (e) {
     console.warn('[discover] recommend', e)
-    showCarrot(sections, false)
+    setCarrot(sections, pubkey ? null : 'imported')
     if (rec) lockedCardNote(rec, 'Your recommendations could not be loaded', 'Reload to try again.')
     conceal(music)
   }
@@ -582,7 +648,7 @@ window.addEventListener('ob:favorites-read', onFavoritesRead)
    early click or an early paint never finds window.OBFavorites missing. The
    same module URL, so the same instance. */
 async function favoritesApi() {
-  try { await import('/assets/js/favorites-ui.js?v=ob-v256') } catch {}
+  try { await import('/assets/js/favorites-ui.js?v=ob-v257') } catch {}
   return window.OBFavorites || null
 }
 

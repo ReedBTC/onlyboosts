@@ -295,7 +295,10 @@ await check('the writer publishes a batch once; the controller keeps a local lis
   assert.ok(disc.includes('if (local.length) paintRecommended(sections, null, local)'))
   assert.ok(disc.includes("...(pubkey ? { pubkey } : {}), limit: TILES"), 'the endpoint is asked with favorites alone')
   assert.ok(disc.includes("(d.local && !d.pubkey)"), 'the listener accepts the local list')
-  assert.ok(disc.includes("const PERSONAL = ['recommended', 'recommended-music', 'follows', 'follows-songs']") && disc.includes('function showCarrot(') && disc.includes("if (!j.seeds && !pods && !albums) { conceal(rec); conceal(music)"), 'a personal rail is hidden until it has something to show; no seeds, no Recommended rails')
+  assert.ok(disc.includes("const PERSONAL = ['recommended', 'recommended-music', 'follows', 'follows-songs']") && disc.includes('function setCarrot(') && disc.includes("if (!j.seeds && !pods && !albums) { conceal(rec); conceal(music)"), 'a personal rail is hidden until it has something to show; no seeds, no Recommended rails')
+  for (const k of ['signed-out', 'imported', 'no-seeds', 'no-podcasts', 'no-music']) assert.ok(disc.includes(`'${k}': {`), `the carrot has a ${k} state`)
+  assert.ok(disc.includes("setCarrot(sections, !pubkey ? 'imported' : !hasPod && !hasMusic ? 'no-seeds' : !hasPod ? 'no-podcasts' : !hasMusic ? 'no-music' : null)"), 'the carrot stays up until the member has a seed on both sides')
+  assert.ok(home.includes("<p>Podcasts and music recommended from what you boost and follow, and the top podcasts and songs from the accounts you follow on Nostr. No account? Import your podcast app's subscription list instead.</p>"), 'the shipped card is the signed-out state\'s copy')
   assert.ok(disc.includes("b.textContent = 'Manage'") && disc.includes("headExtra(head, document.createTextNode('From your imported OPML · '), b)"), 'the imported note rides the rail-sub line')
   // The favorites resolver carries the feed URL now, for the export.
   assert.ok(read('functions/api/v1/favorites/resolve.js').includes('feed: r.feed_url || null'))

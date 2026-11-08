@@ -382,8 +382,10 @@ indexed Nostr boost; nothing about a visitor is stored.
      Because rails paint for them too; the follows rails need a Nostr follow
      list and stay hidden. Signed out with nothing imported, the four
      personal rails are one locked rail, the carrot (2026-11-08); a personal
-     rail is hidden until it has something to show, so a member with no
-     boosts and no list sees the two Follows rails alone.
+     rail is hidden until it has something to show, and the carrot stays up
+     until the member has a seed on both sides, naming what is missing (log
+     in; boost or follow a podcast; favorite an album). The endpoint's
+     `sides` counts the seeds per medium side for it.
   4. Floor: reached from >= 2 seeds, or >= 2 shared boosters with one seed. Half
      of all pairs share exactly one booster (measured 2026-10-17).
   5. Podcasts and music ranked separately: music overlap runs ~3x the podcast

@@ -1,7 +1,7 @@
 // POST /api/v1/recommend — RECOMMENDED FOR YOU, and BECAUSE YOU BOOSTED X.
 //
 //   body  { pubkey?: <hex|npub>, favorites?: [feedGuid], limit?: n }   (one of the two)
-//   200   { seeds, podcasts: [row], music: [row], because: [{ seed, rows, why }] }  (up to five)
+//   200   { seeds, sides: { podcast, music }, podcasts: [row], music: [row], because: [{ seed, rows, why }] }  (up to five)
 //
 // `pubkey` is optional since 2026-11-07 (Reed's ask): a visitor with no
 // Nostr account can hand over the feeds of an imported OPML file alone and
@@ -185,17 +185,33 @@ async function becauseOf(env, hex, seedsJson, boosted, favorites, limit) {
  *  is a Nostr event only the browser reads, and booster-page.js asks again
  *  with it. `hex` may be null for a favorites-only visitor (2026-11-07). */
 export async function recommendationsFor(env, hex, favorites = [], limit = 10) {
-  const empty = { seeds: 0, podcasts: [], music: [], because: [] };
+  const empty = { seeds: 0, sides: { podcast: 0, music: 0 }, podcasts: [], music: [], because: [] };
   if (hex && PUBLISHERS.includes(hex)) return empty;
   const { seeds, boosted } = await seedsOf(env, hex, favorites);
   if (!seeds.length) return empty;
   const seedsJson = JSON.stringify(seeds);
-  const [podcasts, music, because] = await Promise.all([
+  const [podcasts, music, because, sides] = await Promise.all([
     recommendFor(env, seedsJson, false, limit),
     recommendFor(env, seedsJson, true, limit),
     becauseOf(env, hex, seedsJson, boosted, favorites, limit).catch((e) => { console.warn("[recommend] because", e?.message); return []; }),
+    sidesOf(env, seedsJson).catch((e) => { console.warn("[recommend] sides", e?.message); return { podcast: 0, music: 0 }; }),
   ]);
-  return { seeds: seeds.length, podcasts, music, because };
+  return { seeds: seeds.length, sides, podcasts, music, because };
+}
+
+/** How many seeds sit on each side of the medium split (the index's rows
+ *  only; a guid the index does not hold counts nowhere). The homepage's
+ *  carrot rail reads it to say what the member has not done yet: no podcast
+ *  seed, "boost or follow a podcast"; no music seed, "favorite an album"
+ *  (Reed's ask, 2026-11-08). */
+async function sidesOf(env, seedsJson) {
+  const { results } = await env.DB.prepare(
+    `SELECT CASE WHEN COALESCE(medium, 'podcast') = 'music' THEN 'music' ELSE 'podcast' END AS side, COUNT(*) AS n
+       FROM podcasts WHERE podcast_guid IN (SELECT value FROM json_each(?1)) GROUP BY side`,
+  ).bind(seedsJson).all();
+  const sides = { podcast: 0, music: 0 };
+  for (const r of results ?? []) sides[r.side] = Number(r.n) || 0;
+  return sides;
 }
 
 export async function onRequestPost({ request, env }) {
