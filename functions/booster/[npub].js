@@ -50,6 +50,7 @@ import { feedRanks, renderStatTiles, chartCacheOf } from "../_shared/feed-rank.j
 import { boostedShowRailsHtml, boostedEpisodeRailsHtml } from "../../assets/js/boosted-rails.js";
 
 import { headOf } from "../_shared/head.js";
+import { npubEncode } from "../../assets/js/mention-search.js";
 const SITE_ORIGIN = "https://onlyboosts.social";
 const OG_FALLBACK = `${SITE_ORIGIN}/assets/onlyboosts_banner.png`;
 
@@ -93,6 +94,17 @@ export async function onRequestGet(context) {
 
   const hex = toHexPubkey(raw);
   if (!hex) return notFound(raw);
+
+  // ⚠️ THE ADDRESS IS THE NPUB (Reed's call, 2026-11-08: "no one really uses
+  // hex"). A hex form still resolves, since it is in the wild (the homepage's
+  // full-list link emitted one until this day), but it is forwarded to the
+  // npub form rather than served under it, so the bar and every share of it
+  // carry one address. 301: the two were always the same page. The fragment
+  // (#latest, #recommended) survives a redirect in every browser.
+  if (!/^npub1/i.test(raw)) {
+    const npub = npubEncode(hex);
+    if (npub) return Response.redirect(`${new URL(context.request.url).origin}/booster/${npub}`, 301); // the request's own host, so a preview forwards within itself
+  }
 
   // The four queries in one round of parallelism, the same shape both other
   // pages use. Every one of them is served by idx_boosts_booster.
@@ -377,25 +389,25 @@ function renderBoosterPage({ hex, npub, prof, totals, boosts, names, bioProfiles
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v266" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v266" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v266" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v266" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v267" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v267" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v267" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v267" />
   <!-- The hero, the drawers and the boost list are the show page's, so this
        page links its stylesheet and adds only the deltas. -->
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v266" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v266" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v267" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v267" />
   <!-- The episode card, for the #episodes rollup: the same chrome
        feeds-podcasts.js paints on the homepage. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v266" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v267" />
   <!-- The boost thread inside a card's drawer, and its reply / like / repost /
        zap bar, both reached through that same card. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v266" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v266" />
-  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v266" />
-  <link rel="stylesheet" href="/assets/css/booster-page.css?v=ob-v266" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v267" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v267" />
+  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v267" />
+  <link rel="stylesheet" href="/assets/css/booster-page.css?v=ob-v267" />
   <!-- The recommendation rails are the homepage's (rail-tile.js); this is their stylesheet. -->
-  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v266" />
+  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v267" />
 </head>
 <body data-booster-pk="${htmlEscape(hex)}"${npub ? ` data-booster-npub="${htmlEscape(npub)}"` : ""}>
 
@@ -773,12 +785,12 @@ function renderBoosterPage({ hex, npub, prof, totals, boosts, names, bioProfiles
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav.js?v=ob-v266" defer></script>
-<script src="/assets/js/booster-page.js?v=ob-v266" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v267" defer></script>
+<script src="/assets/js/booster-page.js?v=ob-v267" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v266"></script>
-<script src="/assets/js/sw-register.js?v=ob-v266" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v267"></script>
+<script src="/assets/js/sw-register.js?v=ob-v267" defer></script>
 </body>
 </html>`;
 }
@@ -1050,10 +1062,10 @@ function notFound(raw) {
   <meta name="robots" content="noindex" />
   <title>Booster not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v266" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v266" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v266" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v266" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v267" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v267" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v267" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v267" />
 </head>
 <body>
 <section class="page-header">
@@ -1071,7 +1083,7 @@ function notFound(raw) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v266" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v267" defer></script>
 </body>
 </html>`;
   return new Response(html, {

@@ -53,7 +53,7 @@ rules a change elsewhere would break.
 | `/charts`, `/charts/podcasts`, `/charts/music`, `/charts/hpw` | **the weekly boards' own page, named Charts** (2026-10-21): the week's Top 10 beside Weeks at #1 for shows and for artists, and the #40HPW week beside Proof of #40HPW, one pair per view. The bare `/charts` is Podcasts. From 2026-10-17 to 2026-10-21 `/charts` was the hash-routed feed page that was `/` before that; **every `/charts#<feed>` and `/#<feed>` address in the wild is forwarded to its page by the head scripts of `charts.html` and `index.html`**, since a server never sees a hash. All five pages are one shell, `charts.html`, routed by `functions/_shared/charts-page.js` |
 | `/show/<guid>` | one show, edge-rendered |
 | `/episode/<item-guid>` | one episode, edge-rendered |
-| `/booster/<npub>` | one person, edge-rendered |
+| `/booster/<npub>` | one person, edge-rendered. **The address is the npub**: a hex pubkey in its place 301s to the npub form (Reed's call, 2026-11-08; the homepage's full-list link had emitted hex) |
 | `/artist/<guid>` | one artist (publisher), edge-rendered — see the detail pages section |
 | `/search?q=` | the site search's results page, edge-rendered, `noindex` (2026-10-17) |
 | `/discover/<key>` | **the whole list behind a discovery rail** (2026-10-20, Reed's ask: ten tiles lived nowhere else): `new-shows`, `new-music`, `movers`, `podroll`, each a list of the charts page's show cards with one extra line saying why the card is there, rendered by `functions/discover/[key].js` from the same row fetchers `functions/index.js` exports for the rails (`newShowsRows`, `moversRows`, `podrollRows`), in the `discover.html` shell. In the sitemap. The rail headings and the ribbons' Discover columns link them |

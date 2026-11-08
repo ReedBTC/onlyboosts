@@ -630,6 +630,13 @@ console.log('\nThe recommendations and the data rails, over the real schema:')
     assert.ok(read('assets/js/rail-tile.js').includes('export function latestTile('))
     // Ten on the homepage, linking the owner's long rail; View more there, up to the endpoint's cap (Reed, 2026-11-08).
     assert.ok(disc.includes('const LATEST_LIMIT = 10') && disc.includes("linkFullList(section, pubkey, '#latest')"), 'the homepage draws ten and links /booster#latest')
+    assert.ok(disc.includes('boosterPageHref(npubEncode(pubkey), pubkey)') && !disc.includes('boosterPageHref(null'), 'the full-list link is the npub address, never hex (Reed, 2026-11-08)')
+    // A hex /booster address forwards to the npub one.
+    const { onRequestGet: boosterGet } = await import('../functions/booster/[npub].js')
+    const hexPk = 'f7922a0adb3fa4dda5eecaa62f6f7ee6159f7f55e08036686c68e08382c34788'
+    const fwd = await boosterGet({ request: new Request(`https://onlyboosts.social/booster/${hexPk}`), env: {}, params: { npub: hexPk } })
+    assert.equal(fwd.status, 301)
+    assert.equal(fwd.headers.get('Location'), 'https://onlyboosts.social/booster/npub177fz5zkm87jdmf0we2nz7mm7uc2e7l64uzqrv6rvdrsg8qkrg7yqx0aaq7')
     const { LIMIT_MAX } = await import('../functions/api/v1/follows/latest.js')
     assert.equal(LIMIT_MAX, 100)
     assert.equal((await (await postL({ feeds: ['show-1', 'show-2'], limit: 1 })).json()).episodes.length, 1, 'limit is honoured')
