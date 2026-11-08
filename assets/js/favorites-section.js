@@ -22,11 +22,11 @@
  * Nothing on the list is dropped for being unresolvable: an entry nobody can
  * name renders its guid, since it is still somebody's favorite.
  */
-import { fetchFavorites, widgetDeps } from '/assets/js/favorites-sync.js?v=ob-v263'
-import { favoriteButtonHtml } from '/assets/js/favorite-button.js?v=ob-v263'
-import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v263'
-import { isSafeUrl } from '/assets/js/nostr-text.js?v=ob-v263'
-import { sortControl } from '/assets/js/feed-controls.js?v=ob-v263'
+import { fetchFavorites, widgetDeps } from '/assets/js/favorites-sync.js?v=ob-v264'
+import { favoriteButtonHtml } from '/assets/js/favorite-button.js?v=ob-v264'
+import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v264'
+import { isSafeUrl } from '/assets/js/nostr-text.js?v=ob-v264'
+import { sortControl } from '/assets/js/feed-controls.js?v=ob-v264'
 
 const RESOLVE_URL = '/api/v1/favorites/resolve'
 
@@ -231,7 +231,11 @@ async function resolveAll(entries) {
   }
 }
 
-export function initFavoritesSection({ pubkey, root, onEntries = null }) {
+/* `onStart({ owner })` fires as each read begins and `onFail({ owner })` when
+ * it ends without a trusted list, so the page can hold a loading state over
+ * what the list will replace and let go of it on failure (the owner's
+ * /booster, 2026-11-08). `onEntries` fires on a trusted read only. */
+export function initFavoritesSection({ pubkey, root, onEntries = null, onStart = null, onFail = null }) {
   if (!root || !pubkey) return
   const groupsEl = root.querySelector('[data-fav-groups]')
   const emptyEl = root.querySelector('[data-fav-empty]')
@@ -263,12 +267,14 @@ export function initFavoritesSection({ pubkey, root, onEntries = null }) {
     const viewer = getSessionPubkey()
     const owner = !!viewer && viewer === pubkey
     mountOpml(owner)
+    try { onStart?.({ owner }) } catch (err) { console.warn('[favorites] onStart', err) }
     const deps = owner && window.LBLogin ? await widgetDeps(window.LBLogin) : {}
     let r
     try { r = await fetchFavorites(pubkey, { ...deps, pubkey }) } catch (err) {
       console.warn('[favorites] read failed', err)
       emptyEl.textContent = 'Couldn’t read favorites right now.'
       emptyEl.hidden = false
+      try { onFail?.({ owner }) } catch (e2) { console.warn('[favorites] onFail', e2) }
       return
     }
     if (mine !== run) return
@@ -280,6 +286,7 @@ export function initFavoritesSection({ pubkey, root, onEntries = null }) {
         ? 'Couldn’t reach enough relays to read your follows and favorites right now.'
         : 'Couldn’t reach enough relays to read this member’s follows and favorites right now.'
       emptyEl.hidden = false
+      try { onFail?.({ owner }) } catch (e2) { console.warn('[favorites] onFail', e2) }
       return
     }
     const entries = r.entries ?? []

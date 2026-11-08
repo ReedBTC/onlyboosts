@@ -19,19 +19,19 @@
  * `episode-section.js` attaches the controls and the verbs and nothing else.
  * That module is shared with the identical section on /episode/<guid>.
  */
-import { copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v263'
-import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v263'
+import { copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v264'
+import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v264'
 import {
   initCopyNpub, initShowMore, initShare, initBackLink,
   initHashRouting, initHashSpy, initArt2, wireArt2, hydrateProfiles, initStatWindows,
-} from '/assets/js/detail-page.js?v=ob-v263'
-import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v263'
-import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v263'
-import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v263'
-import { initFavoritesSection } from '/assets/js/favorites-section.js?v=ob-v263'
-import { feedGuidsOf } from '/assets/js/favorites-ui.js?v=ob-v263'
-import { recommendRailsHtml, latestRailHtml } from '/assets/js/recommend-rails.js?v=ob-v263'
-import { latestTile } from '/assets/js/rail-tile.js?v=ob-v263'
+} from '/assets/js/detail-page.js?v=ob-v264'
+import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v264'
+import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v264'
+import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v264'
+import { initFavoritesSection } from '/assets/js/favorites-section.js?v=ob-v264'
+import { feedGuidsOf } from '/assets/js/favorites-ui.js?v=ob-v264'
+import { recommendRailsHtml, latestRailHtml, carrotRailHtml } from '/assets/js/recommend-rails.js?v=ob-v264'
+import { latestTile } from '/assets/js/rail-tile.js?v=ob-v264'
 
 const PK = document.body.dataset.boosterPk || ''
 const NPUB = document.body.dataset.boosterNpub || PK
@@ -415,9 +415,52 @@ initFavoritesSection({
   onEntries: (entries, { owner } = {}) => {
     const feeds = feedGuidsOf(entries)
     repaintLatest(feeds, !!owner).catch((err) => console.warn('[booster] latest', err))
-    repaintRecommended(feeds, !!owner).catch((err) => console.warn('[booster] recommend', err))
+    repaintRecommended(feeds, !!owner).catch((err) => { console.warn('[booster] recommend', err); personalLoading(false, true) })
   },
+  onStart: ({ owner } = {}) => { if (owner) personalLoading(true) },
+  onFail: ({ owner } = {}) => { if (owner) personalLoading(false, true) },
 })
+
+// THE OWNER'S PAGE SAYS IT IS LOADING (Reed's ask, 2026-11-08, the
+// homepage's card): the moment the Favorites read starts for the owner, the
+// boosted rails go and the homepage's "Loading your follows and favorites…"
+// card stands where #recommended will be painted, pulsing, so the page does
+// not show a visitor's view for the seconds the relays take and then swap
+// it. A read that ends with no trusted list (or a recommend call that
+// fails) takes the card down and gives the boosted rails back; a re-read
+// over rails already painted (a Follow press) leaves them alone.
+function personalLoading(on, restore = false) {
+  let section = document.querySelector('[data-booster-recommended]')
+  if (on) {
+    for (const s of document.querySelectorAll('[data-booster-boosted]')) s.hidden = true
+    if (section && !section.dataset.personalLoading) return
+    if (!section) {
+      section = personalSection('recommended', 'boosterRecommended')
+      if (!section) return
+    }
+    section.dataset.personalLoading = '1'
+    section.querySelector('.bs-rails').innerHTML = carrotRailHtml('loading')
+    section.querySelector('.rail-locked')?.classList.add('is-loading')
+    return
+  }
+  if (section?.dataset.personalLoading) section.remove()
+  if (restore) for (const s of document.querySelectorAll('[data-booster-boosted]')) s.hidden = false
+}
+/* A browser-made section of the owner's block: #latest right after
+   Favorites, #recommended after #latest when it exists, the homepage's order. */
+function personalSection(id, key) {
+  const section = document.createElement('section')
+  section.className = 'show-section show-section--bare'
+  section.id = id
+  section.dataset[key] = ''
+  section.innerHTML = '<div class="bs-rails"></div>'
+  const before = id === 'latest'
+    ? document.querySelector('[data-booster-favorites]')
+    : (document.querySelector('[data-booster-latest]') || document.querySelector('[data-booster-favorites]'))
+  if (!before) return null
+  before.after(section)
+  return section
+}
 
 // ⚠️ LATEST FROM PODCASTS YOU FOLLOW IS THE OWNER'S TOO, AND THIS IS THE LONG
 // RAIL (Reed's ask, 2026-11-08): the homepage draws ten tiles like every
@@ -449,13 +492,8 @@ async function repaintLatest(feeds, owner = false) {
   const episodes = j.episodes || []
   if (!episodes.length) { section?.remove(); return }
   if (!section) {
-    section = document.createElement('section')
-    section.className = 'show-section show-section--bare'
-    section.id = 'latest'
-    section.dataset.boosterLatest = ''
-    section.innerHTML = '<div class="bs-rails"></div>'
-    const fav = document.querySelector('[data-booster-favorites]')
-    if (fav) fav.after(section); else return
+    section = personalSection('latest', 'boosterLatest')
+    if (!section) return
   }
   latestShown.clear()
   for (const e of episodes) latestShown.add(e.guid)
@@ -505,14 +543,10 @@ async function repaintRecommended(favorites, owner = false) {
   let section = document.querySelector('[data-booster-recommended]')
   if (!rails) { section?.remove(); return }
   if (!section) {
-    section = document.createElement('section')
-    section.className = 'show-section show-section--bare'
-    section.id = 'recommended'
-    section.dataset.boosterRecommended = ''
-    section.innerHTML = '<div class="bs-rails"></div>'
-    const before = document.querySelector('[data-booster-latest]') || document.querySelector('[data-booster-favorites]')
-    if (before) before.after(section); else return
+    section = personalSection('recommended', 'boosterRecommended')
+    if (!section) return
   }
+  delete section.dataset.personalLoading
   section.querySelector('.bs-rails').innerHTML = rails
   wireRailArt(section)
 }
@@ -523,7 +557,7 @@ document.addEventListener('click', async (e) => {
   const b = e.target.closest?.('[data-opml-import]')
   if (!b) return
   e.preventDefault()
-  if (!window.OBFavorites) await import('/assets/js/favorites-ui.js?v=ob-v263').catch(() => null)
+  if (!window.OBFavorites) await import('/assets/js/favorites-ui.js?v=ob-v264').catch(() => null)
   window.OBFavorites?.importOpml?.()
 })
 

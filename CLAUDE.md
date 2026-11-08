@@ -435,7 +435,10 @@ was picked from is in the session memory; direction A won, with the sans.
   `booster-page.js` asks `/api/v1/recommend` with the list once the
   Favorites section has read it, for the owner only, paints the rails
   through the two-sided `recommend-rails.js` with the homepage's hooks and
-  carrot, and hides the boosted rails for them. The homepage's Recommended
+  carrot, and hides the boosted rails for them; **from the moment the read
+  starts the owner sees the homepage's loading card in their place**
+  (`personalLoading`, off the section's `onStart`/`onFail`; Reed's ask,
+  2026-11-08), and a read that fails gives the boosted rails back. The homepage's Recommended
   rails gain a "Your full list →" link to it once painted.
 - **⚠️ RETIRED 2026-10-21 WITH THE TABS: `pinScroll` is gone from
   `charts.html`, since a view is a page of its own and nothing sits above a
