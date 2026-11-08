@@ -41,15 +41,15 @@
  * after which the list is re-read with NIP-44 and the hearts fill. That is a
  * known cost of not loading 1MB to draw an outline.
  */
-import { fetchFavorites, syncFavorites, widgetDeps, saveMode, loadMode } from '/assets/js/favorites-sync.js?v=ob-v265'
-import { statedVisibility, feedGuidOf } from '/assets/js/favorites-merge.js?v=ob-v265'
-import { setFavoriteState, changeFor, keyFor, isFollow, WORD_BUSY, WORD_WAIT } from '/assets/js/favorite-button.js?v=ob-v265'
-import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v265'
-import { buildOpml, opmlFilename } from '/assets/js/opml.js?v=ob-v265'
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v265'
-import { initAccountSettings, noteSettingsChange } from '/assets/js/account-settings.js?v=ob-v265'
+import { fetchFavorites, syncFavorites, widgetDeps, saveMode, loadMode } from '/assets/js/favorites-sync.js?v=ob-v266'
+import { statedVisibility, feedGuidOf } from '/assets/js/favorites-merge.js?v=ob-v266'
+import { setFavoriteState, changeFor, keyFor, isFollow, WORD_BUSY, WORD_WAIT } from '/assets/js/favorite-button.js?v=ob-v266'
+import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v266'
+import { buildOpml, opmlFilename } from '/assets/js/opml.js?v=ob-v266'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v266'
+import { initAccountSettings, noteSettingsChange } from '/assets/js/account-settings.js?v=ob-v266'
 
-const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v265'
+const WIDGET_SRC = '/assets/widgets/login-widget.js?v=ob-v266'
 
 const state = {
   pubkey: null,
@@ -117,8 +117,17 @@ function allowed(btn) {
 }
 
 function paint(btn) {
-  if (!state.pubkey || !allowed(btn)) { btn.hidden = true; return }
+  if (!allowed(btn)) { btn.hidden = true; return }
+  /* ⚠️ THE FIRST BUTTON ON A PAGE STARTS THE READ, BEFORE THE SIGNED-IN
+   * GATE. The read is what learns the session (`state.pubkey`), so with the
+   * gate first a button that arrived before any read was hidden and the read
+   * never asked for: /booster's rows are made after the list is read, the
+   * page has no other heart, and the owner's Follow buttons stayed hidden
+   * (Reed's phone, 2026-11-08; a desktop passed on timing alone). reload()
+   * sets the pubkey and paints every button synchronously before its first
+   * await, so the fall-through below sees the fresh state. */
   if (!state.everRead && !state.loading) reload()
+  if (!state.pubkey) { btn.hidden = true; return }
   btn.hidden = false
   /* ⚠️ A BUTTON IN FLIGHT KEEPS ITS WORD. A click re-reads the list before
    * deciding (below), and that read's first paintAll wrote "Follow" over
@@ -576,7 +585,7 @@ async function exportOpml() {
 /** The import / manage panel, loaded on first use (opml-import.js). */
 async function openOpml(view) {
   try {
-    const { openOpmlPanel } = await import('/assets/js/opml-import.js?v=ob-v265')
+    const { openOpmlPanel } = await import('/assets/js/opml-import.js?v=ob-v266')
     if (!state.everRead) await reload()
     const pubkey = getSessionPubkey()
     openOpmlPanel({

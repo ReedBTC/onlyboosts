@@ -260,6 +260,16 @@ menu (step six). An empty list never asks (public by rule, 2026-10-03). Every
 outcome that is not a quiet success is a toast; a degraded read or a publish
 no relay accepted changes nothing and says so.
 
+### The First Button Starts The Read
+
+`favorites-ui.js` reads the list lazily, when a page has a heart to paint.
+On `/booster` the only buttons are the rows' own, made after the section has
+read the list, so the first paint of such a button has to START the read;
+until 2026-11-08 the signed-in gate came first, and a button that arrived
+before any read was hidden with no read ever asked for. The owner's Follow
+buttons stayed hidden on Reed's phone (a desktop passed on timing). `paint`
+now asks for the read before it reads the gate.
+
 ## The Section On `/booster`
 
 `#favorites` (a frozen id, like every section id on the detail pages) sits
