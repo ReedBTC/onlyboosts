@@ -29,13 +29,14 @@
  *    sats this week") instead of following the tile's link. One note at a
  *    time; a click elsewhere, Escape or a scroll closes it.
  */
-import { railListHtml, showTile, albumTile, episodeTile, memberTile, langRailHtml, bare } from '/assets/js/rail-tile.js?v=ob-v259'
-import { heroHtml, slideHtml, showSlide, episodeSlide, memberSlide } from '/assets/js/hero.js?v=ob-v259'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v259'
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v259'
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v259'
-import { becauseVerb } from '/assets/js/recommend-rails.js?v=ob-v259'
-import { languageName } from '/assets/js/lang-name.js?v=ob-v259'
+import { railListHtml, showTile, albumTile, episodeTile, latestTile, memberTile, langRailHtml, bare } from '/assets/js/rail-tile.js?v=ob-v260'
+import { CARROT, carrotState, HOOKS } from '/assets/js/recommend-rails.js?v=ob-v260'
+import { heroHtml, slideHtml, showSlide, episodeSlide, memberSlide } from '/assets/js/hero.js?v=ob-v260'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v260'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v260'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v260'
+import { becauseVerb } from '/assets/js/recommend-rails.js?v=ob-v260'
+import { languageName } from '/assets/js/lang-name.js?v=ob-v260'
 
 const TILES = 10
 
@@ -188,11 +189,11 @@ function wireHeroBoost(hero) {
     try {
       const kind = slide.dataset.kind
       if (kind === 'episode' || kind === 'song') {
-        const m = await import('/assets/js/episode-card-actions.js?v=ob-v259')
+        const m = await import('/assets/js/episode-card-actions.js?v=ob-v260')
         btn.disabled = false
         await m.onBoostClick(slide, btn)
       } else {
-        const m = await import('/assets/js/show-card-actions.js?v=ob-v259')
+        const m = await import('/assets/js/show-card-actions.js?v=ob-v260')
         btn.disabled = false
         await m.onShowBoost(slide, btn)
       }
@@ -334,7 +335,7 @@ function patchHero(specs) {
      signed in, with seeds          all four
    A seed is a boosted show or an entry on the member's list. `reveal` is
    the one place a rail un-hides. */
-const PERSONAL = ['recommended', 'recommended-music', 'follows', 'follows-songs']
+const PERSONAL = ['follows-latest', 'recommended', 'recommended-music', 'follows', 'follows-songs']
 function railOf(sections, key) { return sections.find((s) => s.dataset.rail === key) }
 function reveal(section) { if (section) section.hidden = false }
 function conceal(section) { if (section) section.hidden = true }
@@ -346,55 +347,9 @@ function conceal(section) { if (section) section.hidden = true }
    logging in adds; signed in, whichever side has no seed (the endpoint's
    `sides`). It leads the personal block when nothing personal is painted
    and follows the block otherwise. Hidden only for a member with a seed on
-   both sides. The login and import buttons are delegated (see the click
-   handlers below), so a rewritten card needs no wiring. */
-const LOGIN_BTN = '<button type="button" class="ob-cta" data-lb-login-trigger>Log in</button>'
-const IMPORT_BTN = '<button type="button" class="ob-cta ob-cta--quiet" data-opml-import>Import OPML</button>'
-const browse = (href, text) => `<a class="ob-cta ob-cta--quiet" href="${href}">${text}</a>`
-const CARROT = {
-  'loading': {
-    h2: 'Recommended For You',
-    h3: 'Loading your follows and favorites…',
-    p: 'Your Nostr follow list and your follows and favorites are being read from the relays. Your rails appear here as they arrive.',
-    actions: '',
-  },
-  'signed-out': {
-    h2: 'Recommended For You',
-    h3: 'Log in or import your OPML for personalized recommendations',
-    p: 'Podcasts and music recommended from what you boost and follow, and the top podcasts and songs from the accounts you follow on Nostr. No account? Import your podcast app\'s subscription list instead.',
-    actions: LOGIN_BTN + IMPORT_BTN,
-  },
-  'imported': {
-    h2: 'More Recommendations',
-    h3: 'Log in with Nostr to see what your follows boost',
-    p: 'Your imported list lives in this browser. Log in and it is saved to your Nostr follows and favorites, and two more rails appear: the top podcasts and songs from the accounts you follow.',
-    actions: LOGIN_BTN,
-  },
-  'no-seeds': {
-    h2: 'More Recommendations',
-    h3: 'Boost or follow a podcast, or favorite an album, for personalized recommendations',
-    p: 'Podcasts Recommended For You is built from the podcasts you boost and follow, Music Recommended For You from the albums you boost and favorite: what else their boosters boost, minus what you already have. Your podcast app\'s OPML counts too.',
-    actions: IMPORT_BTN + browse('/podcasts/shows', 'Browse podcasts'),
-  },
-  'no-list': {
-    h2: 'More Recommendations',
-    h3: 'You haven\'t followed or favorited anything yet',
-    p: 'Your boosts seed these rails. Follow the podcasts you listen to and favorite the albums you like: each one adds to the recommendations, and the list goes with you to every Podcasting 2.0 app that reads it. Importing your podcast app\'s OPML follows them all at once.',
-    actions: IMPORT_BTN + browse('/podcasts/shows', 'Browse podcasts') + browse('/music/albums', 'Browse albums'),
-  },
-  'no-podcasts': {
-    h2: 'More Recommendations',
-    h3: 'You haven\'t boosted or followed a podcast yet',
-    p: 'Boost or follow one and Podcasts Recommended For You appears here: the podcasts boosted by the members who boost the same podcasts you do. Your podcast app\'s OPML counts too.',
-    actions: IMPORT_BTN + browse('/podcasts/shows', 'Browse podcasts'),
-  },
-  'no-music': {
-    h2: 'More Recommendations',
-    h3: 'You haven\'t favorited any music yet',
-    p: 'Favorite an album or boost a song and Music Recommended For You appears here: the albums boosted by the members who boost the same music you do.',
-    actions: browse('/music/albums', 'Browse albums'),
-  },
-}
+   both sides. The copy is CARROT in recommend-rails.js, shared with the
+   owner's /booster. The login and import buttons are delegated (see the
+   click handlers below), so a rewritten card needs no wiring. */
 function setCarrot(sections, state) {
   const carrot = railOf(sections, 'personal')
   if (!carrot) return
@@ -410,7 +365,7 @@ function setCarrot(sections, state) {
   carrot.querySelector('.rail-track')?.classList.toggle('is-loading', state === 'loading')
   // Leads the block when it is the block; follows it otherwise.
   const last = railOf(sections, 'follows-songs')
-  const first = railOf(sections, 'recommended')
+  const first = railOf(sections, 'follows-latest') || railOf(sections, 'recommended')
   const atEnd = state !== 'signed-out' && state !== 'loading'
   if (atEnd && last && last.nextElementSibling !== carrot) last.after(carrot)
   else if (!atEnd && first && carrot.nextElementSibling !== first) first.before(carrot)
@@ -574,27 +529,25 @@ async function paintRecommended(sections, pubkey, favorites = []) {
     // A member whose list is empty (no follows, no favorites, nothing
     // imported) is asked for them even with boosts to seed from (Reed,
     // 2026-11-08: a boosted-once account saw only "no music yet").
-    const listEmpty = !favorites.length
-    setCarrot(sections, !pubkey ? 'imported' : !hasPod && !hasMusic ? 'no-seeds' : listEmpty ? 'no-list' : !hasPod ? 'no-podcasts' : !hasMusic ? 'no-music' : null)
+    setCarrot(sections, carrotState({ signedIn: !!pubkey, imported: true, sides: j.sides, pods: pods?.length || 0, albums: albums?.length || 0, listEmpty: !favorites.length }))
     // An empty rail is a hook, not a shrug (Reed, the same day): no seed on
     // the side, it says what makes one; seeds but no overlap, it says the
     // overlap grows with use.
     if (rec) {
       if (pods) { unlock(rec, railListHtml(pods.map(bare(showTile)))); if (pubkey) linkFullList(rec, pubkey); else importedNote(rec) }
-      else if (pubkey && !hasPod) lockedCardNote(rec, 'No podcasts to recommend from yet', 'Boost or follow a podcast and the podcasts its other boosters boost will rank here. Your podcast app\'s OPML counts too.', IMPORT_BTN + browse('/podcasts/shows', 'Browse podcasts'))
-      else if (pubkey || !albums) {
-        lockedCardNote(rec, 'Nothing to recommend yet', pubkey
-          ? 'Too few other members have boosted the podcasts you boost and follow for the overlap to mean anything yet. Every boost and follow grows it.'
-          : 'Too few other members have boosted the podcasts you imported for the overlap to mean anything yet.', pubkey ? browse('/podcasts/shows', 'Browse podcasts') : '')
-        if (!pubkey) importedNote(rec)
+      else if (pubkey && !hasPod) lockedCardNote(rec, HOOKS.podcastsNone.title, HOOKS.podcastsNone.text, HOOKS.podcastsNone.actions)
+      else if (pubkey) lockedCardNote(rec, HOOKS.podcastsThin.title, HOOKS.podcastsThin.text, HOOKS.podcastsThin.actions)
+      else if (!albums) {
+        lockedCardNote(rec, 'Nothing to recommend yet', 'Too few other members have boosted the podcasts you imported for the overlap to mean anything yet.')
+        importedNote(rec)
       } else conceal(rec)
     }
     if (music) {
       if (albums) { unlock(music, railListHtml(albums.map(bare(albumTile)))); if (pubkey) linkFullList(music, pubkey); else importedNote(music) }
       // An imported list rarely holds music, so an empty music side is no
       // rail for it; a member's own empty side is the hook.
-      else if (pubkey && !hasMusic) lockedCardNote(music, 'No music to recommend from yet', 'Boost a song or favorite an album and the albums its other boosters boost will rank here.', browse('/music/albums', 'Browse albums'))
-      else if (pubkey) lockedCardNote(music, 'Nothing to recommend yet', 'Too few other members have boosted the albums you boost and favorite for the overlap to mean anything yet. Every boost and favorite grows it.', browse('/music/albums', 'Browse albums'))
+      else if (pubkey && !hasMusic) lockedCardNote(music, HOOKS.musicNone.title, HOOKS.musicNone.text, HOOKS.musicNone.actions)
+      else if (pubkey) lockedCardNote(music, HOOKS.musicThin.title, HOOKS.musicThin.text, HOOKS.musicThin.actions)
       else conceal(music)
     }
     paintBecause(because, Array.isArray(j.because) ? j.because.filter((b) => b?.seed && b.rows?.length) : [])
@@ -606,12 +559,42 @@ async function paintRecommended(sections, pubkey, favorites = []) {
   }
 }
 
+/* Latest From Podcasts You Follow (2026-11-08, Reed's ask: follows were the
+   input the dropped followed-podcasts feed was missing): the list's podcast
+   feed guids to /api/v1/follows/latest, which asks Podcast Index for their
+   newest episodes (D1 holds boosted episodes only). Painted for a signed-in
+   member and for an imported list alike; hidden with nothing followed. */
+const LATEST_LIMIT = 20
+async function paintLatest(sections, feeds, { local = false } = {}) {
+  const section = railOf(sections, 'follows-latest')
+  if (!section) return
+  if (!feeds.length) { conceal(section); return }
+  const key = feeds.join(',')
+  if (section.dataset.latestFor === key) return
+  section.dataset.latestFor = key
+  try {
+    const j = await getJson('/api/v1/follows/latest', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ feeds, limit: LATEST_LIMIT }),
+    })
+    if (section.dataset.latestFor !== key) return
+    if (j.episodes?.length) { unlock(section, railListHtml(j.episodes.map(latestTile))); if (local) importedNote(section) }
+    else if (j.shows) lockedCardNote(section, 'Nothing new to show just now', 'The newest episodes of the podcasts you follow could not be read from Podcast Index. Reload to try again.')
+    else lockedCardNote(section, 'None of the podcasts you follow are in the index yet', 'A podcast joins the index with its first Nostr boost. Boost one of yours and its new episodes will show here.')
+  } catch (e) {
+    console.warn('[discover] latest', e)
+    section.dataset.latestFor = ''
+    lockedCardNote(section, 'Your latest episodes could not be loaded', 'Reload to try again.')
+  }
+}
+
 const FAVORITES_WAIT_MS = 8000
 let personalRun = 0
 async function paintPersonal() {
   const my = ++personalRun
   const sections = Array.from(document.querySelectorAll('[data-rail-personal]'))
   if (!sections.length) return
+  const latest = railOf(sections, 'follows-latest')
+  if (latest) latest.dataset.latestFor = ''
   const res = await resolveFollows()
   if (my !== personalRun) return
   if (res.status === 'signed-out') {
@@ -619,7 +602,7 @@ async function paintPersonal() {
     // Signed out, the four personal rails are one: the carrot. The nav's
     // Discover links to any of them land on it.
     showCarrot(sections, true)
-    if (/^#rail-(recommended|recommended-music|follows|follows-songs|because)$/.test(location.hash)) document.getElementById('rail-personal')?.scrollIntoView({ block: 'start' })
+    if (/^#rail-(follows-latest|recommended|recommended-music|follows|follows-songs|because)$/.test(location.hash)) document.getElementById('rail-personal')?.scrollIntoView({ block: 'start' })
     // A list imported from OPML without an account seeds the two Recommended
     // rails and the Because rails on its own (2026-11-07), and they take the
     // carrot's place once painted; the follows rails need a Nostr follow
@@ -628,7 +611,7 @@ async function paintPersonal() {
     const api = await favoritesApi()
     const local = api ? await api.ensureRead().catch(() => []) : []
     if (my !== personalRun) return
-    if (local.length) paintRecommended(sections, null, local)
+    if (local.length) { paintRecommended(sections, null, local); paintLatest(sections, local, { local: true }) }
     return
   }
   // Signed in: the carrot says the lists are loading, and each rail appears
@@ -657,6 +640,7 @@ async function paintPersonal() {
     }
     if (my !== personalRun) return
     paintRecommended(sections, res.pubkey, feeds)
+    paintLatest(sections, feeds)
   }
 }
 
@@ -674,6 +658,7 @@ function onFavoritesRead(e) {
   const feeds = Array.isArray(d.feeds) ? d.feeds : []
   if (!feeds.length || feeds.join(',') === lastRecommend.feeds) return
   paintRecommended(sections, pubkey, feeds)
+  paintLatest(sections, feeds, { local: !pubkey })
 }
 window.addEventListener('ob:favorites-read', onFavoritesRead)
 
@@ -681,7 +666,7 @@ window.addEventListener('ob:favorites-read', onFavoritesRead)
    early click or an early paint never finds window.OBFavorites missing. The
    same module URL, so the same instance. */
 async function favoritesApi() {
-  try { await import('/assets/js/favorites-ui.js?v=ob-v259') } catch {}
+  try { await import('/assets/js/favorites-ui.js?v=ob-v260') } catch {}
   return window.OBFavorites || null
 }
 

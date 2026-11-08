@@ -11,11 +11,11 @@
  * rewrites the version), no clock reads, no unpinned locale, nothing from the
  * DOM. Verbs (the artwork fallback walk) are attached by discover.js.
  */
-import { coverChain } from './cover-art.js?v=ob-v259'
-import { rankLabel } from './rank.js?v=ob-v259'
-import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v259'
-import { boosterPageHref } from './booster-link.js?v=ob-v259'
-import { languageName } from './lang-name.js?v=ob-v259'
+import { coverChain } from './cover-art.js?v=ob-v260'
+import { rankLabel } from './rank.js?v=ob-v260'
+import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v260'
+import { boosterPageHref } from './booster-link.js?v=ob-v260'
+import { languageName } from './lang-name.js?v=ob-v260'
 
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => (
@@ -200,6 +200,30 @@ export function episodeTile(r, i, glyph = '🎙') {
     img: r.img || r.show?.img, art2: r.show?.art2, glyph,
   })
 }
+/** An episode of a followed podcast, for Latest From Podcasts You Follow
+ *  (2026-11-08): no place applies, so the show's name sits under the title.
+ *  The row is /api/v1/follows/latest's. */
+export function latestTile(r) {
+  return tileHtml({
+    rank: null,
+    href: episodePageHref(r.guid, r.title),
+    title: r.title,
+    sub: r.show?.title || '',
+    img: r.img || r.show?.img, art2: r.show?.art2, glyph: '🎙',
+  })
+}
+
+/** A locked rail's track: the dim placeholder tiles with a card over them,
+ *  the homepage's shape (index.html ships it static; recommend-rails.js
+ *  renders it for the owner's hooks on /booster). */
+export function lockedRailHtml({ title, text, actions = '' }) {
+  const w1 = [80, 70, 85, 65, 75, 80, 60, 85, 70, 75]
+  const w2 = [50, 45, 55, 40, 50, 45, 55, 40, 50, 45]
+  const ph = w1.map((w, i) => `<li class="rail-tile"><span class="rt"><span class="rt-media"></span><span class="rail-locked-ph" style="width: ${w}%"></span><span class="rail-locked-ph" style="width: ${w2[i]}%"></span></span></li>`).join('')
+  return `<div class="rail-track rail-locked" data-locked><ol class="rail-list" aria-hidden="true">${ph}</ol>` +
+    `<div class="rail-locked-card"><div><div><h3>${esc(title)}</h3><p>${esc(text)}</p></div>${actions ? `<span class="rail-locked-actions">${actions}</span>` : ''}</div></div></div>`
+}
+
 export function artistTile(r, i) {
   return tileHtml({
     rank: r.rank ?? i + 1, tied: !!r.tied,

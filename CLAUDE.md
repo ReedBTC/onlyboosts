@@ -168,7 +168,9 @@ was picked from is in the session memory; direction A won, with the sans.
   COMES BEFORE THE FOURTH RAIL.** Top Shows This Week, Top Albums This
   Month, the #40HPW week, THEN Podcasts Recommended For You, Music
   Recommended For You, Top Shows From Your Follows and (2026-10-30, Reed's
-  ask) Top Songs From Your Follows, `follows-songs`, then New and
+  ask) Top Songs From Your Follows, `follows-songs` (since 2026-11-08 Latest
+  From Podcasts You Follow, `follows-latest`, leads those four, behind the
+  signed-out carrot), then New and
   Noteworthy, Movers and Podcasters Recommend, then the Because rails, then
   the year's episodes and songs. That is the evening-of-2026-10-21 order
   (Reed's final pass: the three discovery instruments moved up under the
@@ -448,8 +450,25 @@ was picked from is in the session memory; direction A won, with the sans.
   first paint; a one-shot scroll drifted onto the boards) and stops at the
   reader's first wheel, touch or key. The bare `#shows` still lands at the
   top.
-- **Still to build here**: boost messages on the results page, favorites as
-  seeds, New Music and Album Movers as music-side discovery rails (the
+- **Latest From Podcasts You Follow** (2026-11-08, Reed's ask: follows were
+  the input the dropped followed-podcasts feed was missing) leads the
+  personal block: `POST /api/v1/follows/latest {feeds}` takes the list's
+  podcast guids (an imported list's too), and **asks Podcast Index, since
+  D1 holds boosted episodes only**: one `byfeedurl` (or `byguid`) per show
+  for the feed id, cached a week, then ONE `episodes/byfeedid?id=a,b,c`
+  for the lot, cached ten minutes; at most `SHOWS_MAX` (40) shows a
+  request, newest `newest_item_ts` first; the index's own newest boosted
+  episodes when PI is absent or silent (`source: 'index'`). `latestTile`
+  puts the show's name under the title. A PI feed-id column on D1
+  `podcasts` would make it one D1 query and one PI call; OB-back's, if
+  wanted.
+- **The owner's `/booster` carries the homepage's hooks and carrot**
+  (2026-11-08): `recommendRailsHtml(recs, { owner, feeds })` renders an
+  empty side's hook and the carrot rail after the rails; the copy is one
+  table, `CARROT` / `HOOKS` in `recommend-rails.js`, which `discover.js`
+  imports. A visitor to another member's page sees the rails alone.
+- **Still to build here**: boost messages on the results page, New Music
+  and Album Movers as music-side discovery rails (the
   Music ribbon's Discover column is three lines because the movers, new
   and podroll instruments are podcast-side today; `newShowsRows` already
   takes both media). Most Favorited is held: 15 lists on the whole network

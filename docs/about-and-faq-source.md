@@ -406,6 +406,12 @@ indexed Nostr boost; nothing about a visitor is stored.
   pick (a show appears on the first rail that reaches it only), and a rail
   under four shows is not shown. Until then: the five most-boosted seeds in
   boost order, any size.
+- **Latest From Podcasts You Follow** (2026-11-08): the newest episodes of
+  the list's podcast entries (an imported list's too), from Podcast Index
+  at draw time (D1 holds boosted episodes only): one feed-id lookup per show
+  cached a week, then one `episodes/byfeedid` for up to 40 shows, newest
+  `newest_item_ts` first; the index's newest boosted episodes when PI is
+  absent. `POST /api/v1/follows/latest`.
 - **Top Podcasts From Your Follows** and **Top Songs From Your Follows**
   (2026-10-30): the Shows chart and the Songs chart over the boosts of the
   member's kind-3 contacts (the Follows scope); the member's own boosts count.

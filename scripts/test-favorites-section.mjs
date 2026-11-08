@@ -236,7 +236,7 @@ await check('the booster page ships the hidden shell with the frozen id, and imp
   assert.match(page, /import \{ initFavoritesSection \} from '\/assets\/js\/favorites-section\.js\?v=ob-v\d+'/)
   assert.match(page, /initFavoritesSection\(\{\s*pubkey: PK,\s*root: document\.querySelector\('\[data-booster-favorites\]'\),/)
   // Since 2026-11-07 the section hands the list to the recommendation rails.
-  assert.match(page, /onEntries: \(entries\) => \{ repaintRecommended\(feedGuidsOf\(entries\)\)/)
+  assert.match(page, /onEntries: \(entries, \{ owner \} = \{\}\) => \{ repaintRecommended\(feedGuidsOf\(entries\), !!owner\)/)
 })
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')

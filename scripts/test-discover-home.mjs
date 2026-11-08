@@ -60,10 +60,10 @@ console.log('\nThe markers and the renderers agree:')
     const personal = [...index.matchAll(/data-rail="([a-z0-9-]+)"[^>]*data-rail-personal/g)].map((m) => m[1])
     assert.ok(personal.length >= 1, 'there is at least one personal rail')
     for (const p of personal) assert.ok(order.indexOf(p) >= 3, `${p} is the fourth rail or later`)
-    assert.deepEqual(order, ['shows-week', 'albums-month', 'hpw-week', 'personal', 'recommended', 'recommended-music', 'follows', 'follows-songs', 'new-shows', 'new-music', 'movers', 'podroll',
+    assert.deepEqual(order, ['shows-week', 'albums-month', 'hpw-week', 'personal', 'follows-latest', 'recommended', 'recommended-music', 'follows', 'follows-songs', 'new-shows', 'new-music', 'movers', 'podroll',
       'lang-1', 'lang-2', 'lang-3', 'because',
       'episodes-week', 'episodes-month', 'episodes-year', 'shows-month', 'shows-year', 'songs-week', 'songs-month', 'songs-year', 'albums-week', 'albums-year'],
-      "Reed's order of 2026-10-21 with the 2026-10-22 additions: the language rails under Podcasters Recommend, the window rails at the foot, podcasts before music; New and Noteworthy split by medium on 2026-10-30; the signed-out carrot ahead of the four personal rails on 2026-11-08")
+      "Reed's order of 2026-10-21 with the 2026-10-22 additions: the language rails under Podcasters Recommend, the window rails at the foot, podcasts before music; New and Noteworthy split by medium on 2026-10-30; the signed-out carrot ahead of the personal rails and Latest From Podcasts You Follow first among them on 2026-11-08")
     for (const n of [1, 2, 3]) assert.match(index, new RegExp(`<section class="rail" data-rail="lang-${n}"[^>]*><!--OB:RAIL:lang-${n}-->`), `lang-${n}'s marker is tight against its section (so .rail:empty hides an empty slot)`)
     assert.ok(read('assets/css/discover.css').includes('.rail:empty { display: none; }'), 'an empty rail takes no room')
     assert.ok(!index.includes('artists-week') && !Object.keys(RAILS).includes('artists-week'), 'Top Artists This Week came off the page')
@@ -578,6 +578,57 @@ console.log('\nThe recommendations and the data rails, over the real schema:')
     assert.equal((await post({})).status, 400)
     assert.equal((await post({ pubkey: 'nope', favorites: ['show-1'] })).status, 400)
   })
+  await checkAsync('Latest From Podcasts You Follow (2026-11-08): the followed podcasts, newest first, from Podcast Index in one episodes call, the index when PI is absent', async () => {
+    const { onRequestPost: latest } = await import('../functions/api/v1/follows/latest.js')
+    const postL = (body, e = env) => latest({ request: new Request('https://ob.invalid/api/v1/follows/latest', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }), env: e })
+    db.prepare("UPDATE podcasts SET feed_url = 'https://x/1.xml' WHERE podcast_guid = 'show-1'").run()
+    const ep = db.prepare('INSERT INTO episodes(item_guid,podcast_guid,title,image,published) VALUES(?,?,?,?,?)')
+    ep.run('ep-old', 'show-1', 'Old Boosted One', null, now - 50 * 86400)
+    ep.run('ep-new', 'show-2', 'Newer Boosted Two', null, now - 5 * 86400)
+    // No PI keys: the index's boosted episodes of the followed podcasts, newest first; the album is no podcast.
+    let r = await postL({ feeds: ['show-1', 'show-2', 'album-1', 'nope'] })
+    assert.equal(r.status, 200)
+    assert.equal(r.headers.get('Cache-Control'), 'no-store')
+    let j = await r.json()
+    assert.equal(j.source, 'index')
+    assert.equal(j.shows, 2, 'podcasts the index knows; the album and the unknown guid are not counted')
+    assert.deepEqual(j.episodes.map((e) => e.guid), ['ep-new', 'ep-old'])
+    assert.equal(j.episodes[0].show.title, 'Seed Two')
+    assert.deepEqual(await (await postL({ feeds: [] })).json(), { episodes: [], shows: 0, source: 'index' }, 'nothing followed is empty, never an error')
+    assert.equal((await postL({})).status, 400)
+    // PI keys: one byfeedurl (byguid without a stored URL) per show, cached a week, then ONE episodes/byfeedid for the lot.
+    const calls = []
+    const realFetch = globalThis.fetch
+    globalThis.fetch = async (url) => {
+      const u = String(url)
+      calls.push(u)
+      const ok = (b) => new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      if (u.includes('/podcasts/byfeedurl?url=')) return ok({ feed: { id: 11 } })
+      if (u.includes('/podcasts/byguid?guid=show-2')) return ok({ feed: { id: 22 } })
+      if (u.includes('/episodes/byfeedid?id=')) return ok({ items: [
+        { id: 1, guid: 'pi-a', title: 'Fresh From One', datePublished: now - 100, feedId: 11, image: 'https://x/pa.jpg' },
+        { id: 2, guid: 'pi-b', title: 'Fresh From Two', datePublished: now - 50, feedId: 22, feedImage: 'https://x/pb.jpg' },
+        { id: 3, guid: 'pi-x', title: 'Not Followed', datePublished: now - 10, feedId: 99 },
+      ] })
+      return new Response('nope', { status: 404 })
+    }
+    try {
+      j = await (await postL({ feeds: ['show-1', 'show-2', 'album-1'], limit: 5 }, { ...env, PODCAST_INDEX_KEY: 'k', PODCAST_INDEX_SECRET: 's' })).json()
+    } finally { globalThis.fetch = realFetch }
+    assert.equal(j.source, 'pi')
+    assert.deepEqual(j.episodes.map((e) => e.guid), ['pi-b', 'pi-a'], 'newest first; an item of a feed not followed is dropped')
+    assert.equal(j.episodes[0].img, 'https://x/pb.jpg')
+    assert.equal(j.episodes[1].show.guid, 'show-1')
+    const idCalls = calls.filter((u) => u.includes('/episodes/byfeedid'))
+    assert.equal(idCalls.length, 1, 'one episodes call for every followed show')
+    assert.ok(/id=(11,22|22,11)&/.test(idCalls[0]), idCalls[0])
+    assert.ok(calls.some((u) => u.includes('byfeedurl?url=' + encodeURIComponent('https://x/1.xml'))) && calls.some((u) => u.includes('byguid?guid=show-2')), 'the stored URL resolves the id; the guid when there is none')
+    assert.ok(!calls.some((u) => u.includes('album-1')), 'music is never asked')
+    // The homepage and the tile.
+    const disc = read('assets/js/discover.js')
+    assert.ok(disc.includes("getJson('/api/v1/follows/latest'") && disc.includes('paintLatest(sections, local, { local: true })') && disc.includes('paintLatest(sections, feeds)'), 'painted for a member and for an imported list')
+    assert.ok(read('assets/js/rail-tile.js').includes('export function latestTile('))
+  })
   check('the list reaches the rails: favorites-ui announces every read, the homepage and the booster page listen, the Because verb is a slot', () => {
     const ui = read('assets/js/favorites-ui.js')
     assert.ok(ui.includes("new CustomEvent('ob:favorites-read'") && ui.includes('export function feedGuidsOf') && ui.includes('ensureRead'))
@@ -585,7 +636,7 @@ console.log('\nThe recommendations and the data rails, over the real schema:')
     assert.ok(disc.includes("window.addEventListener('ob:favorites-read', onFavoritesRead)") && disc.includes('favorites.length ? { favorites }'))
     assert.ok(read('index.html').includes('<span data-because-verb>you boosted</span>'))
     const bp = read('assets/js/booster-page.js')
-    assert.ok(bp.includes('onEntries:') && bp.includes('recommendRailsHtml(') && bp.includes('favorites, limit: 20'))
+    assert.ok(bp.includes('onEntries:') && bp.includes('recommendRailsHtml(') && bp.includes('...(favorites.length ? { favorites } : {}), limit: 20'))
     assert.ok(read('functions/booster/[npub].js').includes('from "../../assets/js/recommend-rails.js"'), 'the edge renders through the same module')
   })
   await checkAsync('recommend-rails.js renders both paints from one function, with the verb by pool and medium', async () => {
@@ -745,7 +796,7 @@ console.log('\nThe nav bar: three ribbons, then Charts and Boosts as plain links
   check("the Podcasts ribbon's Discover column is the rails not already in its lists, plus the personal ones", () => {
     const pod = links.slice(links.indexOf('data-ribbon="podcasts"'), links.indexOf('data-ribbon="music"'))
     const disc = pod.slice(pod.indexOf('<h4>Discover</h4>'), pod.indexOf('nav-ribbon-feat'))
-    for (const t of ['Top Episodes This Year', 'New and Noteworthy', 'Movers This Week', 'Podcasters Recommend', 'Top Podcasts by Language', 'Podcasts Recommended For You', 'Top Podcasts From Your Follows']) assert.ok(disc.includes(`>${t}</a>`), t)
+    for (const t of ['Top Episodes This Year', 'New and Noteworthy', 'Movers This Week', 'Podcasters Recommend', 'Top Podcasts by Language', 'Latest From Podcasts You Follow', 'Podcasts Recommended For You', 'Top Podcasts From Your Follows']) assert.ok(disc.includes(`>${t}</a>`), t)
     assert.ok(!disc.includes('Shows Chart') && !disc.includes('Top Podcasts This Week'))
   })
   check('the #40HPW ribbon lists #40HPW and the largest boosts, and its Discover is the three Reed named (Top Members still among them)', () => {

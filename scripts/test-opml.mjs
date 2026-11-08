@@ -265,7 +265,7 @@ await check('link: outlines come back and never the body; a page is 422, a faili
 
 /* ── The wiring ───────────────────────────────────────────────────────── */
 
-await check('the writer publishes a batch once; the controller keeps a local list, offers it on login, and opens the panel from three doors', () => {
+await check('the writer publishes a batch once; the controller keeps a local list, offers it on login, and opens the panel from three doors', async () => {
   const sync = read('assets/js/favorites-sync.js')
   assert.ok(sync.includes('const changes = Array.isArray(change) ? change : change ? [change] : []') && sync.includes('changes.reduce((acc, c) => applyChange(acc, c), adopted)'))
   const ui = read('assets/js/favorites-ui.js')
@@ -292,18 +292,28 @@ await check('the writer publishes a batch once; the controller keeps a local lis
   // The homepage: an imported list seeds the rails without a key.
   const disc = read('assets/js/discover.js')
   assert.ok(disc.includes('async function favoritesApi()') && disc.includes("closest('[data-opml-import], [data-opml-manage]')"))
-  assert.ok(disc.includes('if (local.length) paintRecommended(sections, null, local)'))
+  assert.ok(disc.includes('if (local.length) { paintRecommended(sections, null, local); paintLatest(sections, local, { local: true }) }'))
   assert.ok(disc.includes("...(pubkey ? { pubkey } : {}), limit: TILES"), 'the endpoint is asked with favorites alone')
   assert.ok(disc.includes("(d.local && !d.pubkey)"), 'the listener accepts the local list')
-  assert.ok(disc.includes("const PERSONAL = ['recommended', 'recommended-music', 'follows', 'follows-songs']") && disc.includes('function setCarrot(') && disc.includes("if (!j.seeds && !pods && !albums) { conceal(rec); conceal(music)"), 'a personal rail is hidden until it has something to show; no seeds, no Recommended rails')
-  for (const k of ['loading', 'signed-out', 'imported', 'no-seeds', 'no-list', 'no-podcasts', 'no-music']) assert.ok(disc.includes(`'${k}': {`), `the carrot has a ${k} state`)
-  assert.ok(disc.includes("lockedCardNote(music, 'No music to recommend from yet'") && disc.includes("lockedCardNote(rec, 'No podcasts to recommend from yet'"), 'an empty Recommended rail is a hook with a button')
+  assert.ok(disc.includes("const PERSONAL = ['follows-latest', 'recommended', 'recommended-music', 'follows', 'follows-songs']") && disc.includes('function setCarrot(') && disc.includes("if (!j.seeds && !pods && !albums) { conceal(rec); conceal(music)"), 'a personal rail is hidden until it has something to show; no seeds, no Recommended rails')
+  const rr = read('assets/js/recommend-rails.js')
+  for (const k of ['loading', 'signed-out', 'imported', 'no-seeds', 'no-list', 'no-podcasts', 'no-music']) assert.ok(rr.includes(`'${k}': {`), `the carrot has a ${k} state`)
+  assert.ok(disc.includes("import { CARROT, carrotState, HOOKS } from '/assets/js/recommend-rails.js?v=") && disc.includes('HOOKS.musicNone') && disc.includes('HOOKS.podcastsNone'), 'an empty Recommended rail is a hook with a button, the copy shared with /booster')
+  assert.ok(rr.includes('export function recommendRailsHtml(recs, { owner = false, feeds = [] } = {})') && rr.includes('if (owner) out.push(carrotRailHtml(carrotState({ signedIn: true') && read('assets/js/booster-page.js').includes('recommendRailsHtml(await resp.json(), { owner, feeds: favorites })'), "the owner's /booster carries the hooks and the carrot")
   assert.ok(read('assets/js/opml-import.js').includes("${r.status === 'local' ? 'Later' : 'Done'}"), 'the local import closes with Later')
   assert.ok(disc.includes("setCarrot(sections, 'loading')") && disc.includes('FAVORITES_WAIT_MS'), 'signed in, the carrot says the lists are loading and the first paint waits (bounded) for the favorites read')
   const favui = read('assets/js/favorites-ui.js')
   assert.ok(favui.includes("if (btn.classList.contains('is-busy')) return"), 'a read in flight never paints over a busy button')
-  assert.ok(disc.includes("setCarrot(sections, !pubkey ? 'imported' : !hasPod && !hasMusic ? 'no-seeds' : listEmpty ? 'no-list' : !hasPod ? 'no-podcasts' : !hasMusic ? 'no-music' : null)"), 'the carrot stays up until the member has a seed on both sides and a list')
-  assert.ok(home.includes("<p>Podcasts and music recommended from what you boost and follow, and the top podcasts and songs from the accounts you follow on Nostr. No account? Import your podcast app's subscription list instead.</p>"), 'the shipped card is the signed-out state\'s copy')
+  assert.ok(disc.includes("setCarrot(sections, carrotState({ signedIn: !!pubkey, imported: true, sides: j.sides, pods: pods?.length || 0, albums: albums?.length || 0, listEmpty: !favorites.length }))"), 'the carrot stays up until the member has a seed on both sides and a list')
+  const { carrotState } = await import('../assets/js/recommend-rails.js')
+  assert.equal(carrotState({ signedIn: false }), 'signed-out')
+  assert.equal(carrotState({ signedIn: false, imported: true }), 'imported')
+  assert.equal(carrotState({ signedIn: true, sides: { podcast: 0, music: 0 } }), 'no-seeds')
+  assert.equal(carrotState({ signedIn: true, sides: { podcast: 1, music: 0 }, listEmpty: true }), 'no-list', "Reed's boosted-once account")
+  assert.equal(carrotState({ signedIn: true, sides: { podcast: 1, music: 0 }, listEmpty: false }), 'no-music')
+  assert.equal(carrotState({ signedIn: true, sides: { podcast: 0, music: 1 }, listEmpty: false }), 'no-podcasts')
+  assert.equal(carrotState({ signedIn: true, sides: { podcast: 1, music: 1 }, listEmpty: false }), null)
+  assert.ok(home.includes("<p>The newest episodes of the podcasts you follow, podcasts and music recommended from what you boost, and the top podcasts and songs from the accounts you follow on Nostr. No account? Import your podcast app's subscription list instead.</p>"), 'the shipped card is the signed-out state\'s copy')
   assert.ok(disc.includes("b.textContent = 'Manage'") && disc.includes("headExtra(head, document.createTextNode('From your imported OPML · '), b)"), 'the imported note rides the rail-sub line')
   // The favorites resolver carries the feed URL now, for the export.
   assert.ok(read('functions/api/v1/favorites/resolve.js').includes('feed: r.feed_url || null'))

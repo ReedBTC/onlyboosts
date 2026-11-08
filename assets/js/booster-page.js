@@ -19,18 +19,18 @@
  * `episode-section.js` attaches the controls and the verbs and nothing else.
  * That module is shared with the identical section on /episode/<guid>.
  */
-import { copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v259'
-import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v259'
+import { copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v260'
+import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v260'
 import {
   initCopyNpub, initShowMore, initShare, initBackLink,
   initHashRouting, initHashSpy, initArt2, wireArt2, hydrateProfiles, initStatWindows,
-} from '/assets/js/detail-page.js?v=ob-v259'
-import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v259'
-import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v259'
-import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v259'
-import { initFavoritesSection } from '/assets/js/favorites-section.js?v=ob-v259'
-import { feedGuidsOf } from '/assets/js/favorites-ui.js?v=ob-v259'
-import { recommendRailsHtml } from '/assets/js/recommend-rails.js?v=ob-v259'
+} from '/assets/js/detail-page.js?v=ob-v260'
+import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v260'
+import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v260'
+import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v260'
+import { initFavoritesSection } from '/assets/js/favorites-section.js?v=ob-v260'
+import { feedGuidsOf } from '/assets/js/favorites-ui.js?v=ob-v260'
+import { recommendRailsHtml } from '/assets/js/recommend-rails.js?v=ob-v260'
 
 const PK = document.body.dataset.boosterPk || ''
 const NPUB = document.body.dataset.boosterNpub || PK
@@ -411,17 +411,21 @@ if (boostsSection) hydrateProfiles(boostsSection)
 initFavoritesSection({
   pubkey: PK,
   root: document.querySelector('[data-booster-favorites]'),
-  onEntries: (entries) => { repaintRecommended(feedGuidsOf(entries)).catch((err) => console.warn('[booster] recommend', err)) },
+  onEntries: (entries, { owner } = {}) => { repaintRecommended(feedGuidsOf(entries), !!owner).catch((err) => console.warn('[booster] recommend', err)) },
 })
 
-async function repaintRecommended(favorites) {
-  if (!favorites.length) return
+// For the OWNER the rails carry the homepage's hooks and carrot (2026-11-08,
+// Reed's ask): an empty side says what makes a seed, and a rail under them
+// says what is still missing (recommend-rails.js#CARROT). A visitor to
+// another member's page sees the rails alone, as the edge rendered them.
+async function repaintRecommended(favorites, owner = false) {
+  if (!favorites.length && !owner) return
   const resp = await fetch('/api/v1/recommend', {
     method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ pubkey: PK, favorites, limit: 20 }),
+    body: JSON.stringify({ pubkey: PK, ...(favorites.length ? { favorites } : {}), limit: 20 }),
   })
   if (!resp.ok) throw new Error(`recommend: HTTP ${resp.status}`)
-  const rails = recommendRailsHtml(await resp.json())
+  const rails = recommendRailsHtml(await resp.json(), { owner, feeds: favorites })
   let section = document.querySelector('[data-booster-recommended]')
   if (!rails) { section?.remove(); return }
   if (!section) {
@@ -436,6 +440,16 @@ async function repaintRecommended(favorites) {
   section.querySelector('.bs-rails').innerHTML = rails
   wireRailArt(section)
 }
+
+// The carrot's Import OPML button opens the panel (favorites-ui.js is loaded
+// by nav.js lazily; ask for it if it has not arrived).
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest?.('[data-opml-import]')
+  if (!b) return
+  e.preventDefault()
+  if (!window.OBFavorites) await import('/assets/js/favorites-ui.js?v=ob-v260').catch(() => null)
+  window.OBFavorites?.importOpml?.()
+})
 
 /* A rail tile's artwork falls back like the homepage's (discover.js#wireArt):
  * the art2 chain, then a glyph in place of the image. Run over the edge's

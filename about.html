@@ -48,12 +48,12 @@
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v259" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v259" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v260" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v260" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v259" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v259" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v260" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v260" />
 </head>
 <body>
 
@@ -149,6 +149,7 @@
                 <a href="/discover/movers">Movers This Week</a>
                 <a href="/discover/podroll">Podcasters Recommend</a>
                 <a href="/#rail-lang-1">Top Podcasts by Language</a>
+                <a href="/#rail-follows-latest">Latest From Podcasts You Follow</a>
                 <a href="/#rail-recommended">Podcasts Recommended For You</a>
                 <a href="/#rail-follows">Top Podcasts From Your Follows</a>
                 <a href="/#rail-because">Because You Boosted</a>
@@ -215,6 +216,7 @@
             <a href="/discover/movers">Movers This Week</a>
             <a href="/discover/podroll">Podcasters Recommend</a>
             <a href="/#rail-lang-1">Top Podcasts by Language</a>
+            <a href="/#rail-follows-latest">Latest From Podcasts You Follow</a>
             <a href="/#rail-recommended">Podcasts Recommended For You</a>
             <a href="/#rail-follows">Top Podcasts From Your Follows</a>
             <a href="/#rail-because">Because You Boosted</a>
@@ -596,6 +598,9 @@
         <h3>Because You Boosted, Because You Follow</h3>
         <p>One rail per show, for up to five of the shows you have boosted or follow. Each rail is that show&rsquo;s own similar-show list from step one, keeping only the neighbours that share two or more boosters with it, minus anything among your seeds. The heading says which kind of seed the show is: &ldquo;Because you boosted&rdquo; for a show you boosted, &ldquo;Because you follow&rdquo; for a podcast on your favorites list and &ldquo;Because you favorited&rdquo; for an album there. The five are the shows with the most to recommend: of your twelve most-boosted shows and the shows you follow that have such neighbours, the one with the largest list is shown first, then the largest of what remains, and so on. A show appears on the first rail that reaches it and on no other, so each later rail is counted after the earlier ones have taken their shows, and a rail that would hold fewer than four shows is not shown.</p>
 
+        <h3>Latest From Podcasts You Follow</h3>
+        <p>The newest episodes of the podcasts on your follows list, newest first, read from Podcast Index when the rail is drawn, since this index holds only episodes that have been boosted. A list imported from your podcast app without an account feeds it the same way. Up to forty of the podcasts you follow are asked about at a time, the ones with the newest episode first.</p>
+
         <h3>Top Podcasts and Top Songs From Your Follows</h3>
         <p>The Shows chart and the Songs chart, each computed over the boosts published by the accounts on your Nostr follow list, which is the same Follows scope the charts page offers on every ranked feed. Your own boosts count, since you are on your own list.</p>
 
@@ -871,15 +876,15 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v259"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v260"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v259" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v260" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v259" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v260" defer></script>
 
-<script src="/assets/js/nav.js?v=ob-v259" defer></script>
+<script src="/assets/js/nav.js?v=ob-v260" defer></script>
 
 </body>
 </html>
