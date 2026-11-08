@@ -426,16 +426,17 @@ was picked from is in the session memory; direction A won, with the sans.
   places, climbers by places then debuts), Podcasters Recommend (podroll
   targets by how many sources list them; an unindexed target is a figure,
   not a link).
-- **A member's recommendations are on THEIR OWN PAGE too: `/booster/<npub>#recommended`**
-  (2026-10-20, Reed's ask: a member with recommendations has a page here
-  already). `recommendationsFor` in `recommend.js` is the endpoint's core,
-  exported; the booster Function calls it without favorites (a Nostr event
-  only the browser reads, so the two lists can differ by them), allowed to
-  fail, and renders Recommended Podcasts and Recommended Music as rows in
-  the page's own drawer chrome, omitted when both are empty. The homepage's
-  Recommended rails gain a "Your full list →" link to it once painted. A
-  signed-in member with no boosts sees the rail's "No boosts from this
-  account yet" card, which is the empty state Reed asked for.
+- **A member's recommendations are on THEIR OWN PAGE too: `/booster/<npub>#recommended`,
+  AND SINCE 2026-11-08 FOR THE OWNER ALONE** (2026-10-20, Reed's ask: a
+  member with recommendations has a page here already; 2026-11-08, Reed's
+  call: "you" was always the member, so a visitor to another member's page
+  gets what that member boosts instead, the four boosted rails). Nothing is
+  edge-rendered for it now (`recommendationsFor` stays the endpoint's core):
+  `booster-page.js` asks `/api/v1/recommend` with the list once the
+  Favorites section has read it, for the owner only, paints the rails
+  through the two-sided `recommend-rails.js` with the homepage's hooks and
+  carrot, and hides the boosted rails for them. The homepage's Recommended
+  rails gain a "Your full list →" link to it once painted.
 - **⚠️ RETIRED 2026-10-21 WITH THE TABS: `pinScroll` is gone from
   `charts.html`, since a view is a page of its own and nothing sits above a
   feed shell any more (see The Chart Pages). Kept for the decision it
@@ -778,9 +779,11 @@ heading**, never this list widened again under a narrower name.
 
 **Two rollups are still deliberately unsplit, for different reasons.** The
 **podroll** is the publisher's own list, written by them, so filtering it would
-misreport what they wrote. The **booster page** would file one person under two
-half-histories, so its headings still read "Shows and Albums" and "Episodes and
-Songs" and it carries no `COPY` table at all. `episode-section.js`'s range
+misreport what they wrote. The **booster page** was the other until 2026-11-08,
+on the argument that splitting files one person under two half-histories;
+**Reed split it that day** (Podcasts Boosted, Albums Boosted, Episodes
+Boosted, Songs Boosted, `boosted-rails.js`); its `#boosts` list is still
+unsplit and the page carries no `COPY` table. `episode-section.js`'s range
 tooltip reads "Boosted in the last N days" — one reading of `range`
 site-wide since 2026-08-31 — which also serves the booster page's unsplit
 rollup with no medium-neutral dance.
@@ -2166,7 +2169,7 @@ differs is the subject and which sections apply.
 |---|---|---|---|
 | Hero | show art, "Boost this Show" | a **player card**: art, audio, chapters + show-notes drawers, eyebrow links the show | the person: avatar, banner, bio, lightning address |
 | Stats | show totals | that episode's | that person's |
-| Rollup | `#community-shows` | `#community-episodes` | none since 2026-11-07 (`#shows` + `#episodes` until then; the Recommended rails and the `#boosts` By show menu took their place) |
+| Rollup | `#community-shows` | `#community-episodes` | four rails since 2026-11-08, `#shows` (Podcasts Boosted, Albums Boosted) and `#episodes` (Episodes Boosted, Songs Boosted), split on the medium at last; the owner sees `#recommended` in their place (none for a day on 2026-11-07, drawers before) |
 | Community wall | `#community` | `#community` | — |
 | Podroll | both directions | — show-level tag | — |
 | Boosts | `#boosts`, opens on 24 | `#boosts`, all of them | `#boosts`, opens on 24 |
@@ -2218,7 +2221,8 @@ What a change elsewhere would break:
   `#community` `#community-shows` `#podroll` `#reverse-podroll` `#boosts`.
   `/episode`: `#community` `#community-episodes` `#boosts`. `/booster`:
   `#favorites` `#recommended` (2026-10-20) `#boosts`; **`#shows` and `#episodes`
-  were its two rollups until 2026-11-07** (Reed's call: the `#boosts` list
+  were its two rollups until 2026-11-07 and ARE ITS FOUR BOOSTED RAILS
+  SINCE 2026-11-08** (for a day they aliased to `#boosts`; Reed's call of the 7th: the `#boosts` list
   answers both, with a By show menu and a search over the show and episode
   titles, and the recommendations became rails) and alias to `#boosts`. Ids are reused across pages on purpose where they name the
   same kind of section. `HASH_ALIASES` holds one permanent entry on `/show`

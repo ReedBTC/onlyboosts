@@ -213,7 +213,7 @@ Every section is addressable so a podcaster can share one part of their page.
 |---|---|
 | `/show` | `#episodes` `#community` `#community-shows` `#podroll` `#reverse-podroll` `#boosts` |
 | `/episode` | `#community` `#community-episodes` `#boosts` |
-| `/booster` | `#favorites` `#recommended` `#boosts` — `#shows` and `#episodes` were its rollups until 2026-11-07 and alias to `#boosts` |
+| `/booster` | `#favorites` `#shows` `#episodes` `#recommended` `#boosts` — `#shows` and `#episodes` are the four boosted rails since 2026-11-08 (the drawer rollups until 2026-11-07, aliases to `#boosts` for a day); `#recommended` is the owner's alone |
 
 Ids are **reused across pages on purpose** where they name the same kind of
 section, so a reader who has learned one URL has learned the others.
@@ -477,9 +477,15 @@ mentioned npub need never have boosted anything — most have not, so
 `/booster/<npub>` would 404 for the common case. njump resolves any npub, which
 is what that chip needs and this page cannot promise.
 
-**Not split on medium**: one person's podcasts and music are one history, so
-the `#boosts` list holds both and there is no `COPY` table on this page at all.
-Splitting would file the same person under two half-histories.
+**The `#boosts` list is not split on medium**: one person's podcasts and music
+are one history, so it holds both and there is no `COPY` table on this page.
+The four boosted rails above it ARE split, since 2026-11-08 (Reed's call):
+Podcasts Boosted and Albums Boosted in `#shows`, Episodes Boosted and Songs
+Boosted in `#episodes`, each ranked by the sats this member sent with the
+figure under the title, rendered at the edge by the two-sided
+`assets/js/boosted-rails.js` from two GROUP BY queries (`ROLLUP_CAP` 80 rows
+before the split, twenty a rail). The owner's page hides them behind
+`#recommended`.
 
 **⚠️ THE TWO ROLLUPS CAME OFF ON 2026-11-07.** *Reed's call.* "Shows and Albums
 Boosted" (ranked, four windows of figures packed on each row so the range and
@@ -508,14 +514,17 @@ booster's corpus (`fetchBoosterCorpus`) or the per-show windowed aggregate;
 `#boosts` fetches the corpus in the browser on the first gesture, as it
 always did. `git log -S renderShows -- functions/booster` has the removed code.
 
-**`#recommended` is the homepage's rails since 2026-11-07** (rows in the
-drawer chrome from 2026-10-20 until then): Recommended Podcasts, Recommended
-Music and one Because rail per seed, rendered at the edge with the two-sided
-`rail-tile.js` (tiles bare, the homepage's rule for the personal rails) inside
-`.bs-rails`, with `discover.css` linked for them. `recommendationsFor` is
-called with no favorites (a Nostr event only the browser reads); the browser
-hands the list over (bare guids) and repaints once it is read. The headings say
-"you", the homepage's wording, whoever is looking (Reed's call, 2026-11-07).
+**`#recommended` is the homepage's rails since 2026-11-07, and the OWNER'S
+VIEW ALONE since 2026-11-08** (rows in the drawer chrome from 2026-10-20 until
+the 7th; edge-rendered for every reader for a day): Recommended Podcasts,
+Recommended Music and one Because rail per seed, painted by `booster-page.js`
+through the two-sided `recommend-rails.js` (tiles bare, the homepage's rule
+for the personal rails) inside `.bs-rails`, with `discover.css` linked for
+them, once the Favorites section has read the member's list and only when the
+viewer is the member; the four boosted rails are hidden for them. An empty
+side is its hook and the carrot rail follows, the homepage's copy. The
+headings say "you" because the reader is the member (Reed's call, 2026-11-08,
+which is what the 2026-11-07 wording was reaching for).
 The page asks for twenty per rail; the rail scrolls sideways past the ten it
 shows, on every page, since the same day.
 

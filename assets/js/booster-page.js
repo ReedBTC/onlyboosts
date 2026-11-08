@@ -19,18 +19,18 @@
  * `episode-section.js` attaches the controls and the verbs and nothing else.
  * That module is shared with the identical section on /episode/<guid>.
  */
-import { copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v260'
-import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v260'
+import { copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v261'
+import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v261'
 import {
   initCopyNpub, initShowMore, initShare, initBackLink,
   initHashRouting, initHashSpy, initArt2, wireArt2, hydrateProfiles, initStatWindows,
-} from '/assets/js/detail-page.js?v=ob-v260'
-import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v260'
-import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v260'
-import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v260'
-import { initFavoritesSection } from '/assets/js/favorites-section.js?v=ob-v260'
-import { feedGuidsOf } from '/assets/js/favorites-ui.js?v=ob-v260'
-import { recommendRailsHtml } from '/assets/js/recommend-rails.js?v=ob-v260'
+} from '/assets/js/detail-page.js?v=ob-v261'
+import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v261'
+import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v261'
+import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v261'
+import { initFavoritesSection } from '/assets/js/favorites-section.js?v=ob-v261'
+import { feedGuidsOf } from '/assets/js/favorites-ui.js?v=ob-v261'
+import { recommendRailsHtml } from '/assets/js/recommend-rails.js?v=ob-v261'
 
 const PK = document.body.dataset.boosterPk || ''
 const NPUB = document.body.dataset.boosterNpub || PK
@@ -38,12 +38,12 @@ const NPUB = document.body.dataset.boosterNpub || PK
 // ── Shared detail-page chrome ─────────────────────────
 //
 // Identical on /show/<guid> and /episode/<guid>; see detail-page.js.
-// HASH_ALIASES: #shows and #episodes were the two rollups until 2026-11-07
-// (Reed's call: #boosts answers both, with its By show menu and a search that
-// reads the titles); the ids are in the wild, so each lands on the list. The
-// map is a repair for a rename that already happened, never a licence for the
+// HASH_ALIASES: empty since 2026-11-08, when #shows and #episodes came back as
+// the boosted rails' sections (they aliased to #boosts for a day, 2026-11-07,
+// after the drawer rollups came off). Kept so a future rename has somewhere
+// to go; the map is a repair for a rename that already happened, never a licence for the
 // next one.
-const HASH_ALIASES = { shows: 'boosts', episodes: 'boosts' }
+const HASH_ALIASES = {}
 initCopyNpub()
 initShowMore()
 initShare()
@@ -414,12 +414,15 @@ initFavoritesSection({
   onEntries: (entries, { owner } = {}) => { repaintRecommended(feedGuidsOf(entries), !!owner).catch((err) => console.warn('[booster] recommend', err)) },
 })
 
-// For the OWNER the rails carry the homepage's hooks and carrot (2026-11-08,
-// Reed's ask): an empty side says what makes a seed, and a rail under them
-// says what is still missing (recommend-rails.js#CARROT). A visitor to
-// another member's page sees the rails alone, as the edge rendered them.
+// ⚠️ THE RECOMMENDATIONS ARE THE MEMBER'S OWN VIEW (Reed's call, 2026-11-08):
+// painted for the OWNER alone, with the homepage's hooks and carrot (an empty
+// side says what makes a seed; a rail under them says what is still missing,
+// recommend-rails.js#CARROT), in place of the four boosted rails the edge
+// rendered, which every other reader keeps. Nothing here is edge-rendered: it
+// needs an identity.
 async function repaintRecommended(favorites, owner = false) {
-  if (!favorites.length && !owner) return
+  if (!owner) return
+  for (const s of document.querySelectorAll('[data-booster-boosted]')) s.hidden = true
   const resp = await fetch('/api/v1/recommend', {
     method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({ pubkey: PK, ...(favorites.length ? { favorites } : {}), limit: 20 }),
@@ -447,7 +450,7 @@ document.addEventListener('click', async (e) => {
   const b = e.target.closest?.('[data-opml-import]')
   if (!b) return
   e.preventDefault()
-  if (!window.OBFavorites) await import('/assets/js/favorites-ui.js?v=ob-v260').catch(() => null)
+  if (!window.OBFavorites) await import('/assets/js/favorites-ui.js?v=ob-v261').catch(() => null)
   window.OBFavorites?.importOpml?.()
 })
 

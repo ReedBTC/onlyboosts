@@ -637,7 +637,7 @@ console.log('\nThe recommendations and the data rails, over the real schema:')
     assert.ok(read('index.html').includes('<span data-because-verb>you boosted</span>'))
     const bp = read('assets/js/booster-page.js')
     assert.ok(bp.includes('onEntries:') && bp.includes('recommendRailsHtml(') && bp.includes('...(favorites.length ? { favorites } : {}), limit: 20'))
-    assert.ok(read('functions/booster/[npub].js').includes('from "../../assets/js/recommend-rails.js"'), 'the edge renders through the same module')
+    assert.ok(bp.includes("from '/assets/js/recommend-rails.js?v=") && read('functions/booster/[npub].js').includes('from "../../assets/js/boosted-rails.js"'), 'the owner\'s rails and the boosted rails each come out of one two-sided module')
   })
   await checkAsync('recommend-rails.js renders both paints from one function, with the verb by pool and medium', async () => {
     const { recommendRailsHtml, becauseVerb } = await import('../assets/js/recommend-rails.js')
@@ -927,20 +927,23 @@ console.log('\nThe discovery lists in full, /discover/<key> (2026-10-20):')
 console.log('\nThe member\'s recommendations on their own page (2026-10-20):')
 {
   const src = read('functions/booster/[npub].js')
-  check('the booster page asks the recommendation core, lets it fail, and renders #recommended as rails after Favorites (2026-11-07)', () => {
-    assert.ok(src.includes('import { recommendationsFor } from "../api/v1/recommend.js"'))
-    assert.ok(/recommendationsFor\(env, hex, \[\], 20\)\.catch\(/.test(src))
-    assert.ok(src.indexOf('${renderFavorites()}') < src.indexOf('${renderRecommended(recs)}'))
-    assert.ok(src.includes('id="recommended"'))
+  check('the booster page renders the four boosted rails after Favorites for every reader, and the recommendations are the owner\'s view alone (2026-11-08)', () => {
+    assert.ok(!src.includes('from "../api/v1/recommend.js"') && !src.includes('from "../../assets/js/recommend-rails.js"'), 'the edge renders no recommendations: they need an identity')
+    assert.ok(src.indexOf('${renderFavorites()}') < src.indexOf('${renderBoosted(shows, episodes)}'))
+    assert.ok(src.includes('id="shows" data-booster-boosted') && src.includes('id="episodes" data-booster-boosted'), 'the frozen ids are real sections again')
+    assert.ok(src.includes('from "../../assets/js/boosted-rails.js"'))
+    const br = read('assets/js/boosted-rails.js')
+    assert.ok(br.includes("from './rail-tile.js?v=") && br.includes("'Podcasts Boosted'") && br.includes("'Albums Boosted'") && br.includes("'Episodes Boosted'") && br.includes("'Songs Boosted'"), 'two-sided; four rails, split on the medium (Reed, 2026-11-08)')
+    const bp = read('assets/js/booster-page.js')
+    assert.ok(bp.includes('if (!owner) return') && bp.includes("document.querySelectorAll('[data-booster-boosted]')) s.hidden = true") && bp.includes("section.id = 'recommended'"), 'the owner gets #recommended in place of the boosted rails')
     // The homepage's tiles, two-sided, bare (title alone), with the Because rails.
-    assert.ok(src.includes('from "../../assets/js/recommend-rails.js"') && src.includes('recommendRailsHtml(recs)'))
     const rails = read('assets/js/recommend-rails.js')
     assert.ok(rails.includes("rail('recommended', 'Recommended Podcasts'") && rails.includes("rail('recommended-music', 'Recommended Music'") && rails.includes('rail(`because-${i}`'))
     assert.ok(rails.includes("from './rail-tile.js?v=") && rails.includes('bare(showTile)') && rails.includes('bare(albumTile)'), 'two-sided, bare tiles')
     assert.ok(src.includes('/assets/css/discover.css'), 'the rails need their stylesheet')
-    // The two rollups are gone (Reed's call, 2026-11-07); their ids alias to #boosts.
+    // The drawer-era rollups are gone (2026-11-07); the ids are sections again, so no aliases.
     assert.ok(!src.includes('renderShows(') && !src.includes('renderEpisodes('))
-    assert.ok(read('assets/js/booster-page.js').includes("HASH_ALIASES = { shows: 'boosts', episodes: 'boosts' }"))
+    assert.ok(read('assets/js/booster-page.js').includes('const HASH_ALIASES = {}'))
   })
   check('the core is what the endpoint answers, and a publisher key gets nothing', async () => {
     const { recommendationsFor } = await import('../functions/api/v1/recommend.js')

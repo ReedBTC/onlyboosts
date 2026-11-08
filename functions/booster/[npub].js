@@ -28,11 +28,14 @@
 // podcasts and music together and there is no COPY table on this page at all.
 //
 // ⚠️ THE TWO ROLLUPS ("Shows and Albums Boosted", "Episodes and Songs Boosted")
-// CAME OFF ON 2026-11-07, Reed's call: the #boosts list answers both with its
-// By show menu and a search that reads the show and episode titles, and the
-// recommendation rails took their place. `git log -S renderShows -- functions/booster`
-// has them. The ids #shows and #episodes are in the wild and alias to #boosts
-// in booster-page.js.
+// CAME OFF ON 2026-11-07 and CAME BACK AS FOUR RAILS ON 2026-11-08, split on
+// the medium after all (Reed's call: Podcasts Boosted, Albums Boosted,
+// Episodes Boosted, Songs Boosted, the homepage's shape, ranked by the sats
+// this member sent). #shows holds the first two and #episodes the second two,
+// both edge-rendered for every reader. The recommendation rails are the
+// MEMBER'S OWN VIEW: booster-page.js paints #recommended for the owner alone
+// and hides these for them. `git log -S renderShows -- functions/booster` has
+// the drawer-era rollups.
 //
 // NAV/FOOTER markup between the marker comments is GENERATED — edit
 // partials/nav.html or partials/footer.html and run scripts/sync-partials.js.
@@ -43,9 +46,8 @@ import {
   renderBoosts,
 } from "../_shared/detail-page.js";
 import { feedRanks, renderStatTiles, chartCacheOf } from "../_shared/feed-rank.js";
-// The recommendation rails are the homepage's tiles, two-sided (2026-11-07).
-import { recommendRailsHtml } from "../../assets/js/recommend-rails.js";
-import { recommendationsFor } from "../api/v1/recommend.js";
+// The four boosted rails are the homepage's tiles, two-sided (2026-11-08).
+import { boostedShowRailsHtml, boostedEpisodeRailsHtml } from "../../assets/js/boosted-rails.js";
 
 import { headOf } from "../_shared/head.js";
 const SITE_ORIGIN = "https://onlyboosts.social";
@@ -66,9 +68,8 @@ const OG_FALLBACK = `${SITE_ORIGIN}/assets/onlyboosts_banner.png`;
 // initHashSpy() in detail-page.js are what make them land correctly; see the
 // note in functions/show/[guid].js.
 //
-// ⚠️ ONE HONEST GAP, and it is the same one /episode has: #episodes here is
-// CLIENT-RENDERED, so with JavaScript off there is nothing for that anchor to
-// resolve to. #shows and #boosts are server-rendered and resolve either way.
+// All three are server-rendered since 2026-11-08 (#episodes was client-
+// rendered in the drawer era) and resolve with JavaScript off.
 
 // An npub is 63 characters. The cap is slack for the hex form and nothing more —
 // this is a guard against a kilobyte string reaching a bound query, not a real
@@ -80,6 +81,8 @@ const NPUB_MAX = 200;
 // reasoning applies: this is the "recent" list, and the whole history is what
 // the two rollups above it are for.
 const BOOSTS_SHOWN = 24;
+// The four boosted rails' GROUP BY cap, before the split on medium.
+const ROLLUP_CAP = 80;
 
 export async function onRequestGet(context) {
   const { env, params } = context;
@@ -94,12 +97,25 @@ export async function onRequestGet(context) {
   // The four queries in one round of parallelism, the same shape both other
   // pages use. Every one of them is served by idx_boosts_booster.
 
-  /* The member's recommendations (2026-10-20, Reed's ask): the homepage's
-     Recommended For You and Recommended Music, as this page's #recommended
-     section. The same call /api/v1/recommend makes, without the favorites
-     the browser alone can read. Allowed to fail: it is a rollup below the
-     fold and never costs a reader the page they came for. */
-  const recsP = recommendationsFor(env, hex, [], 20).catch((e) => { console.warn("[booster] recommendations", e?.message); return null; });
+  /* The four boosted rails' rows (2026-11-08): one GROUP BY per level over
+     the member's boosts, by sats sent, split on the medium in the renderer.
+     ROLLUP_CAP is slack for the split: a side never shows more than twenty.
+     Allowed to fail: a rail below the fold never costs the page. */
+  const rollup = (sql, cap) => env.DB.prepare(sql).bind(hex, cap).all().then((r) => r.results || []).catch((e) => { console.warn("[booster] rollup", e?.message); return []; });
+  const showsP = rollup(
+    `SELECT b.podcast_guid AS guid, p.title, p.image AS img, p.artwork AS art2, p.medium,
+            COUNT(*) AS boosts, COALESCE(SUM(b.sats), 0) AS sats
+       FROM boosts b LEFT JOIN podcasts p ON p.podcast_guid = b.podcast_guid
+      WHERE b.booster_pubkey = ? AND b.podcast_guid IS NOT NULL
+      GROUP BY b.podcast_guid ORDER BY sats DESC, boosts DESC, b.podcast_guid LIMIT ?`, ROLLUP_CAP);
+  const episodesP = rollup(
+    `SELECT b.item_guid AS guid, e.title, e.image AS img, b.podcast_guid AS show_guid,
+            p.title AS show_title, p.image AS show_img, p.artwork AS show_art2, p.medium,
+            COUNT(*) AS boosts, COALESCE(SUM(b.sats), 0) AS sats
+       FROM boosts b LEFT JOIN episodes e ON e.item_guid = b.item_guid
+       LEFT JOIN podcasts p ON p.podcast_guid = b.podcast_guid
+      WHERE b.booster_pubkey = ? AND b.item_guid IS NOT NULL
+      GROUP BY b.item_guid ORDER BY sats DESC, boosts DESC, b.item_guid LIMIT ?`, ROLLUP_CAP);
   const [prof, totals, boosts] = await Promise.all([
     // ⚠️ COLUMNS NAMED, never SELECT *. The five beyond the original set landed
     // on 2026-08-13 and are nullable at very different rates: about 54%,
@@ -184,7 +200,8 @@ export async function onRequestGet(context) {
     names,
     bioProfiles,
     ranks,
-    recs: await recsP,
+    shows: await showsP,
+    episodes: await episodesP,
   });
 
   return new Response(html, {
@@ -227,7 +244,7 @@ function toHexPubkey(s) {
 
 // ── the page ─────────────────────────────────────────────────────────────────
 
-function renderBoosterPage({ hex, npub, prof, totals, boosts, names, bioProfiles, ranks, recs = null }) {
+function renderBoosterPage({ hex, npub, prof, totals, boosts, names, bioProfiles, ranks, shows = [], episodes = [] }) {
   const realName = prof?.display_name || prof?.name || null;
   const label = realName || shortId(npub, hex);
   const pageUrl = `${SITE_ORIGIN}/booster/${encodeURIComponent(npub || hex)}`;
@@ -360,25 +377,25 @@ function renderBoosterPage({ hex, npub, prof, totals, boosts, names, bioProfiles
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v260" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v260" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v260" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v260" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v261" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v261" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v261" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v261" />
   <!-- The hero, the drawers and the boost list are the show page's, so this
        page links its stylesheet and adds only the deltas. -->
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v260" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v260" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v261" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v261" />
   <!-- The episode card, for the #episodes rollup: the same chrome
        feeds-podcasts.js paints on the homepage. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v260" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v261" />
   <!-- The boost thread inside a card's drawer, and its reply / like / repost /
        zap bar, both reached through that same card. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v260" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v260" />
-  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v260" />
-  <link rel="stylesheet" href="/assets/css/booster-page.css?v=ob-v260" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v261" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v261" />
+  <link rel="stylesheet" href="/assets/css/episode-page.css?v=ob-v261" />
+  <link rel="stylesheet" href="/assets/css/booster-page.css?v=ob-v261" />
   <!-- The recommendation rails are the homepage's (rail-tile.js); this is their stylesheet. -->
-  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v260" />
+  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v261" />
 </head>
 <body data-booster-pk="${htmlEscape(hex)}"${npub ? ` data-booster-npub="${htmlEscape(npub)}"` : ""}>
 
@@ -662,7 +679,7 @@ function renderBoosterPage({ hex, npub, prof, totals, boosts, names, bioProfiles
   ${renderHeader({ hex, npub, prof, label, realName, pic, banner, stats, ranks, totals, bioProfiles })}
 
   ${renderFavorites()}
-  ${renderRecommended(recs)}
+  ${renderBoosted(shows, episodes)}
 
   ${renderBoosts(boosts, names, {
     // "Boosts Sent" rather than "Recent Boosts", for the same reason as on
@@ -756,12 +773,12 @@ function renderBoosterPage({ hex, npub, prof, totals, boosts, names, bioProfiles
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav.js?v=ob-v260" defer></script>
-<script src="/assets/js/booster-page.js?v=ob-v260" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v261" defer></script>
+<script src="/assets/js/booster-page.js?v=ob-v261" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v260"></script>
-<script src="/assets/js/sw-register.js?v=ob-v260" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v261"></script>
+<script src="/assets/js/sw-register.js?v=ob-v261" defer></script>
 </body>
 </html>`;
 }
@@ -953,13 +970,24 @@ function renderContact({ lud16, lud06, website }) {
  * and repaints `.bs-rails` with the same function. Omitted when there is
  * nothing to recommend: an empty section would only say the member has
  * boosted too little, which the tiles above already show. */
-function renderRecommended(recs) {
-  const rails = recommendRailsHtml(recs);
-  if (!rails) return "";
-  return `<section class="show-section show-section--bare" id="recommended" data-booster-recommended>
-    <div class="bs-rails">${rails}
+/* #shows: Podcasts Boosted and Albums Boosted; #episodes: Episodes Boosted and
+   Songs Boosted (2026-11-08). Each section is omitted when its side of the
+   history is empty. booster-page.js hides both for the member on their own
+   page, where #recommended takes their place. */
+function renderBoosted(shows, episodes) {
+  const eps = (episodes || []).map((r) => ({
+    guid: r.guid, title: r.title, img: r.img, sats: r.sats, boosts: r.boosts,
+    show: { guid: r.show_guid, title: r.show_title, img: r.show_img, art2: r.show_art2, medium: r.medium },
+  }));
+  const a = boostedShowRailsHtml(shows || []);
+  const b = boostedEpisodeRailsHtml(eps);
+  return (a ? `<section class="show-section show-section--bare" id="shows" data-booster-boosted>
+    <div class="bs-rails">${a}
     </div>
-  </section>`;
+  </section>` : "") + (b ? `<section class="show-section show-section--bare" id="episodes" data-booster-boosted>
+    <div class="bs-rails">${b}
+    </div>
+  </section>` : "");
 }
 
 
@@ -1011,10 +1039,10 @@ function notFound(raw) {
   <meta name="robots" content="noindex" />
   <title>Booster not found — OnlyBoosts</title>
   <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v260" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v260" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v260" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v260" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v261" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v261" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v261" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v261" />
 </head>
 <body>
 <section class="page-header">
@@ -1032,7 +1060,7 @@ function notFound(raw) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v260" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v261" defer></script>
 </body>
 </html>`;
   return new Response(html, {
