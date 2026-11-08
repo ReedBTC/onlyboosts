@@ -19,18 +19,19 @@
  * `episode-section.js` attaches the controls and the verbs and nothing else.
  * That module is shared with the identical section on /episode/<guid>.
  */
-import { copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v262'
-import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v262'
+import { copyText, showToast } from '/assets/js/copy-npub.js?v=ob-v263'
+import { fetchProfiles } from '/assets/js/primal-profiles.js?v=ob-v263'
 import {
   initCopyNpub, initShowMore, initShare, initBackLink,
   initHashRouting, initHashSpy, initArt2, wireArt2, hydrateProfiles, initStatWindows,
-} from '/assets/js/detail-page.js?v=ob-v262'
-import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v262'
-import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v262'
-import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v262'
-import { initFavoritesSection } from '/assets/js/favorites-section.js?v=ob-v262'
-import { feedGuidsOf } from '/assets/js/favorites-ui.js?v=ob-v262'
-import { recommendRailsHtml } from '/assets/js/recommend-rails.js?v=ob-v262'
+} from '/assets/js/detail-page.js?v=ob-v263'
+import { initShowDesc } from '/assets/js/show-desc.js?v=ob-v263'
+import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v263'
+import { initBoostSection } from '/assets/js/boost-section.js?v=ob-v263'
+import { initFavoritesSection } from '/assets/js/favorites-section.js?v=ob-v263'
+import { feedGuidsOf } from '/assets/js/favorites-ui.js?v=ob-v263'
+import { recommendRailsHtml, latestRailHtml } from '/assets/js/recommend-rails.js?v=ob-v263'
+import { latestTile } from '/assets/js/rail-tile.js?v=ob-v263'
 
 const PK = document.body.dataset.boosterPk || ''
 const NPUB = document.body.dataset.boosterNpub || PK
@@ -411,7 +412,79 @@ if (boostsSection) hydrateProfiles(boostsSection)
 initFavoritesSection({
   pubkey: PK,
   root: document.querySelector('[data-booster-favorites]'),
-  onEntries: (entries, { owner } = {}) => { repaintRecommended(feedGuidsOf(entries), !!owner).catch((err) => console.warn('[booster] recommend', err)) },
+  onEntries: (entries, { owner } = {}) => {
+    const feeds = feedGuidsOf(entries)
+    repaintLatest(feeds, !!owner).catch((err) => console.warn('[booster] latest', err))
+    repaintRecommended(feeds, !!owner).catch((err) => console.warn('[booster] recommend', err))
+  },
+})
+
+// ⚠️ LATEST FROM PODCASTS YOU FOLLOW IS THE OWNER'S TOO, AND THIS IS THE LONG
+// RAIL (Reed's ask, 2026-11-08): the homepage draws ten tiles like every
+// other rail and links here; this one opens on LATEST_PAGE and its last tile
+// is View more, which asks the endpoint for a larger page (one call per
+// size, cached ten minutes at the edge) and appends what it had not shown,
+// up to the endpoint's LIMIT_MAX. #latest sits right after Favorites, ahead
+// of #recommended, the homepage's order. Removed when nothing is followed or
+// nothing came back; a visitor to another member's page never gets it.
+const LATEST_PAGE = 20
+const LATEST_MAX = 100
+let latestFeeds = []
+const latestShown = new Set()
+async function fetchLatest(feeds, limit) {
+  const resp = await fetch('/api/v1/follows/latest', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ feeds, limit }),
+  })
+  if (!resp.ok) throw new Error(`follows/latest: HTTP ${resp.status}`)
+  return resp.json()
+}
+async function repaintLatest(feeds, owner = false) {
+  if (!owner) return
+  latestFeeds = feeds
+  let section = document.querySelector('[data-booster-latest]')
+  if (!feeds.length) { section?.remove(); return }
+  const j = await fetchLatest(feeds, LATEST_PAGE)
+  if (latestFeeds !== feeds) return
+  const episodes = j.episodes || []
+  if (!episodes.length) { section?.remove(); return }
+  if (!section) {
+    section = document.createElement('section')
+    section.className = 'show-section show-section--bare'
+    section.id = 'latest'
+    section.dataset.boosterLatest = ''
+    section.innerHTML = '<div class="bs-rails"></div>'
+    const fav = document.querySelector('[data-booster-favorites]')
+    if (fav) fav.after(section); else return
+  }
+  latestShown.clear()
+  for (const e of episodes) latestShown.add(e.guid)
+  section.querySelector('.bs-rails').innerHTML = latestRailHtml(episodes, { more: episodes.length >= LATEST_PAGE })
+  wireRailArt(section)
+  if (location.hash === '#latest') section.scrollIntoView()
+}
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest?.('[data-latest-more]')
+  if (!btn || btn.disabled) return
+  const section = btn.closest('[data-booster-latest]')
+  const li = btn.closest('.rail-tile--more')
+  if (!section || !li) return
+  const want = Math.min(latestShown.size + LATEST_PAGE, LATEST_MAX)
+  btn.disabled = true
+  btn.textContent = 'Loading…'
+  try {
+    const j = await fetchLatest(latestFeeds, want)
+    const fresh = (j.episodes || []).filter((ep) => ep.guid && !latestShown.has(ep.guid))
+    for (const ep of fresh) latestShown.add(ep.guid)
+    li.insertAdjacentHTML('beforebegin', fresh.map(latestTile).join(''))
+    wireRailArt(section)
+    if (!fresh.length || want >= LATEST_MAX || (j.episodes || []).length < want) li.remove()
+    else { btn.disabled = false; btn.textContent = 'View more' }
+  } catch (err) {
+    console.warn('[booster] latest more', err)
+    btn.disabled = false
+    btn.textContent = 'Try again'
+  }
 })
 
 // ⚠️ THE RECOMMENDATIONS ARE THE MEMBER'S OWN VIEW (Reed's call, 2026-11-08):
@@ -437,8 +510,8 @@ async function repaintRecommended(favorites, owner = false) {
     section.id = 'recommended'
     section.dataset.boosterRecommended = ''
     section.innerHTML = '<div class="bs-rails"></div>'
-    const fav = document.querySelector('[data-booster-favorites]')
-    if (fav) fav.after(section); else return
+    const before = document.querySelector('[data-booster-latest]') || document.querySelector('[data-booster-favorites]')
+    if (before) before.after(section); else return
   }
   section.querySelector('.bs-rails').innerHTML = rails
   wireRailArt(section)
@@ -450,7 +523,7 @@ document.addEventListener('click', async (e) => {
   const b = e.target.closest?.('[data-opml-import]')
   if (!b) return
   e.preventDefault()
-  if (!window.OBFavorites) await import('/assets/js/favorites-ui.js?v=ob-v262').catch(() => null)
+  if (!window.OBFavorites) await import('/assets/js/favorites-ui.js?v=ob-v263').catch(() => null)
   window.OBFavorites?.importOpml?.()
 })
 

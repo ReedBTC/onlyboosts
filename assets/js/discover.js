@@ -29,14 +29,14 @@
  *    sats this week") instead of following the tile's link. One note at a
  *    time; a click elsewhere, Escape or a scroll closes it.
  */
-import { railListHtml, showTile, albumTile, episodeTile, latestTile, memberTile, langRailHtml, bare } from '/assets/js/rail-tile.js?v=ob-v262'
-import { CARROT, carrotState, HOOKS } from '/assets/js/recommend-rails.js?v=ob-v262'
-import { heroHtml, slideHtml, showSlide, episodeSlide, memberSlide } from '/assets/js/hero.js?v=ob-v262'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v262'
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v262'
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v262'
-import { becauseVerb } from '/assets/js/recommend-rails.js?v=ob-v262'
-import { languageName } from '/assets/js/lang-name.js?v=ob-v262'
+import { railListHtml, showTile, albumTile, episodeTile, latestTile, memberTile, langRailHtml, bare } from '/assets/js/rail-tile.js?v=ob-v263'
+import { CARROT, carrotState, HOOKS } from '/assets/js/recommend-rails.js?v=ob-v263'
+import { heroHtml, slideHtml, showSlide, episodeSlide, memberSlide } from '/assets/js/hero.js?v=ob-v263'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v263'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v263'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v263'
+import { becauseVerb } from '/assets/js/recommend-rails.js?v=ob-v263'
+import { languageName } from '/assets/js/lang-name.js?v=ob-v263'
 
 const TILES = 10
 
@@ -189,11 +189,11 @@ function wireHeroBoost(hero) {
     try {
       const kind = slide.dataset.kind
       if (kind === 'episode' || kind === 'song') {
-        const m = await import('/assets/js/episode-card-actions.js?v=ob-v262')
+        const m = await import('/assets/js/episode-card-actions.js?v=ob-v263')
         btn.disabled = false
         await m.onBoostClick(slide, btn)
       } else {
-        const m = await import('/assets/js/show-card-actions.js?v=ob-v262')
+        const m = await import('/assets/js/show-card-actions.js?v=ob-v263')
         btn.disabled = false
         await m.onShowBoost(slide, btn)
       }
@@ -467,13 +467,13 @@ function paintBecause(proto, entries) {
 
 /* The member's own page carries the full lists (#recommended, 2026-10-20);
    each recommendation rail's head gets the link once the rail is painted. */
-function linkFullList(section, pubkey) {
+function linkFullList(section, pubkey, hash = '#recommended') {
   const head = section?.querySelector('.rail-head')
   if (!head || !pubkey || head.querySelector('[data-rec-full]')) return
   const a = document.createElement('a')
   a.className = 'rail-more'
   a.dataset.recFull = '1'
-  a.href = `${boosterPageHref(null, pubkey)}#recommended`
+  a.href = `${boosterPageHref(null, pubkey)}${hash}`
   a.textContent = 'Your full list →'
   headExtra(head, a)
 }
@@ -563,9 +563,12 @@ async function paintRecommended(sections, pubkey, favorites = []) {
    input the dropped followed-podcasts feed was missing): the list's podcast
    feed guids to /api/v1/follows/latest, which asks Podcast Index for their
    newest episodes (D1 holds boosted episodes only). Painted for a signed-in
-   member and for an imported list alike; hidden with nothing followed. */
-const LATEST_LIMIT = 20
-async function paintLatest(sections, feeds, { local = false } = {}) {
+   member and for an imported list alike; hidden with nothing followed.
+   TEN TILES, like every other rail (Reed's call, 2026-11-08: the one rail
+   with a scroll bar looked odd); the long rail with View more is the
+   member's own page, /booster#latest, which the head links. */
+const LATEST_LIMIT = 10
+async function paintLatest(sections, feeds, { local = false, pubkey = null } = {}) {
   const section = railOf(sections, 'follows-latest')
   if (!section) return
   if (!feeds.length) { conceal(section); return }
@@ -577,7 +580,7 @@ async function paintLatest(sections, feeds, { local = false } = {}) {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ feeds, limit: LATEST_LIMIT }),
     })
     if (section.dataset.latestFor !== key) return
-    if (j.episodes?.length) { unlock(section, railListHtml(j.episodes.map(latestTile))); if (local) importedNote(section) }
+    if (j.episodes?.length) { unlock(section, railListHtml(j.episodes.map(latestTile))); if (local) importedNote(section); else linkFullList(section, pubkey, '#latest') }
     else if (j.shows) lockedCardNote(section, 'Nothing new to show just now', 'The newest episodes of the podcasts you follow could not be read from Podcast Index. Reload to try again.')
     else lockedCardNote(section, 'None of the podcasts you follow are in the index yet', 'A podcast joins the index with its first Nostr boost. Boost one of yours and its new episodes will show here.')
   } catch (e) {
@@ -640,7 +643,7 @@ async function paintPersonal() {
     }
     if (my !== personalRun) return
     paintRecommended(sections, res.pubkey, feeds)
-    paintLatest(sections, feeds)
+    paintLatest(sections, feeds, { pubkey: res.pubkey })
   }
 }
 
@@ -658,7 +661,7 @@ function onFavoritesRead(e) {
   const feeds = Array.isArray(d.feeds) ? d.feeds : []
   if (!feeds.length || feeds.join(',') === lastRecommend.feeds) return
   paintRecommended(sections, pubkey, feeds)
-  paintLatest(sections, feeds, { local: !pubkey })
+  paintLatest(sections, feeds, { local: !pubkey, pubkey })
 }
 window.addEventListener('ob:favorites-read', onFavoritesRead)
 
@@ -666,7 +669,7 @@ window.addEventListener('ob:favorites-read', onFavoritesRead)
    early click or an early paint never finds window.OBFavorites missing. The
    same module URL, so the same instance. */
 async function favoritesApi() {
-  try { await import('/assets/js/favorites-ui.js?v=ob-v262') } catch {}
+  try { await import('/assets/js/favorites-ui.js?v=ob-v263') } catch {}
   return window.OBFavorites || null
 }
 

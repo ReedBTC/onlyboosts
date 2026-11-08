@@ -4,7 +4,8 @@
  * Reed's ask: follows were the input the dropped followed-podcasts feed was
  * missing).
  *
- *   body   { feeds: [guid], limit? }        bare podcast guids, the list's feed entries
+ *   body   { feeds: [guid], limit? }        bare podcast guids, the list's feed entries;
+ *                                            limit 1..LIMIT_MAX, 20 unless asked
  *   200    { episodes: [row], shows, source: 'pi' | 'index' }
  *
  * A row is { guid, title, img, date, duration, show: { guid, title, img, art2 } },
@@ -21,6 +22,11 @@
  * PI keys, or when PI answers nothing, the index's own newest boosted episodes
  * of those shows are the answer, marked `source: 'index'`.
  *
+ * The homepage draws ten (Reed's call, 2026-11-08: the one rail with a scroll
+ * bar looked odd beside nine without) and links the owner's /booster#latest,
+ * which draws twenty and asks again with a larger `limit` on every View more,
+ * up to LIMIT_MAX; PI's `max` grows with it, under one cached call per size.
+ *
  * POST and `no-store`: a follow list is personal. Nothing is stored per member.
  */
 import { json, preflight, corsHeaders } from "../_common.js";
@@ -28,6 +34,7 @@ import { piHeaders, piGet } from "../../../_shared/podcast-index.js";
 
 export const SHOWS_MAX = 40;
 export const FEEDS_MAX = 500;
+export const LIMIT_MAX = 100;
 const PI_PARALLEL = 6;
 const PI_BYTES = 512 * 1024;
 const ID_TTL = 7 * 86400;
@@ -41,7 +48,7 @@ export async function onRequestPost({ request, env }) {
   try { body = await request.json(); } catch { return json(request, { error: "bad json" }, { status: 400, cache: 0 }); }
   if (!body || typeof body !== "object" || !Array.isArray(body.feeds)) return json(request, { error: "feeds required" }, { status: 400, cache: 0 });
   const feeds = [...new Set(body.feeds.filter((g) => typeof g === "string" && GUID_RE.test(g)))].slice(0, FEEDS_MAX);
-  const limit = Math.min(40, Math.max(1, Number.parseInt(body.limit, 10) || 20));
+  const limit = Math.min(LIMIT_MAX, Math.max(1, Number.parseInt(body.limit, 10) || 20));
   if (!env.DB) return json(request, { error: "no database" }, { status: 503, cache: 0 });
 
   const answer = (data) => new Response(JSON.stringify(data), {
@@ -109,8 +116,8 @@ async function fromPodcastIndex(shows, key, secret, limit) {
   await Promise.all(Array.from({ length: Math.min(PI_PARALLEL, queue.length) }, worker));
   if (!byFeedId.size) return [];
   const ids = [...byFeedId.keys()].join(",");
-  const max = Math.min(100, Math.max(limit * 3, 30));
-  const r = await piGet(`/episodes/byfeedid?id=${ids}&max=${max}`, headers, { timeoutMs: 8000, cacheTtl: ITEMS_TTL, maxBytes: 2 * 1024 * 1024 });
+  const max = Math.min(300, Math.max(limit * 3, 30));
+  const r = await piGet(`/episodes/byfeedid?id=${ids}&max=${max}`, headers, { timeoutMs: 8000, cacheTtl: ITEMS_TTL, maxBytes: 3 * 1024 * 1024 });
   const items = Array.isArray(r?.items) ? r.items : [];
   return items
     .filter((it) => it && typeof it === "object" && byFeedId.has(Number(it.feedId)))

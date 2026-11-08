@@ -213,7 +213,7 @@ Every section is addressable so a podcaster can share one part of their page.
 |---|---|
 | `/show` | `#episodes` `#community` `#community-shows` `#podroll` `#reverse-podroll` `#boosts` |
 | `/episode` | `#community` `#community-episodes` `#boosts` |
-| `/booster` | `#favorites` `#shows` `#episodes` `#recommended` `#boosts` — `#shows` and `#episodes` are the four boosted rails since 2026-11-08 (the drawer rollups until 2026-11-07, aliases to `#boosts` for a day); `#recommended` is the owner's alone |
+| `/booster` | `#favorites` `#latest` `#shows` `#episodes` `#recommended` `#boosts` — `#shows` and `#episodes` are the four boosted rails since 2026-11-08 (the drawer rollups until 2026-11-07, aliases to `#boosts` for a day); `#latest` (Latest From Podcasts You Follow, the long rail with View more, 2026-11-08) and `#recommended` are the owner's alone |
 
 Ids are **reused across pages on purpose** where they name the same kind of
 section, so a reader who has learned one URL has learned the others.

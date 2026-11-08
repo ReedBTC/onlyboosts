@@ -19,7 +19,7 @@
  * per-user and change as boosts arrive, so a page-lifetime cache would serve a
  * stale feed. The endpoints set their own short Cache-Control.
  */
-import { normalizeBoosts } from '/assets/js/ob-data.js?v=ob-v262'
+import { normalizeBoosts } from '/assets/js/ob-data.js?v=ob-v263'
 
 const BASE = '/api/v1/'
 

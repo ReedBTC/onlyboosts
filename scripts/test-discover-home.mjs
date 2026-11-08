@@ -626,8 +626,17 @@ console.log('\nThe recommendations and the data rails, over the real schema:')
     assert.ok(!calls.some((u) => u.includes('album-1')), 'music is never asked')
     // The homepage and the tile.
     const disc = read('assets/js/discover.js')
-    assert.ok(disc.includes("getJson('/api/v1/follows/latest'") && disc.includes('paintLatest(sections, local, { local: true })') && disc.includes('paintLatest(sections, feeds)'), 'painted for a member and for an imported list')
+    assert.ok(disc.includes("getJson('/api/v1/follows/latest'") && disc.includes('paintLatest(sections, local, { local: true })') && disc.includes('paintLatest(sections, feeds, { pubkey: res.pubkey })'), 'painted for a member and for an imported list')
     assert.ok(read('assets/js/rail-tile.js').includes('export function latestTile('))
+    // Ten on the homepage, linking the owner's long rail; View more there, up to the endpoint's cap (Reed, 2026-11-08).
+    assert.ok(disc.includes('const LATEST_LIMIT = 10') && disc.includes("linkFullList(section, pubkey, '#latest')"), 'the homepage draws ten and links /booster#latest')
+    const { LIMIT_MAX } = await import('../functions/api/v1/follows/latest.js')
+    assert.equal(LIMIT_MAX, 100)
+    assert.equal((await (await postL({ feeds: ['show-1', 'show-2'], limit: 1 })).json()).episodes.length, 1, 'limit is honoured')
+    const bp2 = read('assets/js/booster-page.js')
+    assert.ok(bp2.includes("section.id = 'latest'") && bp2.includes('const LATEST_PAGE = 20') && bp2.includes(`const LATEST_MAX = ${LIMIT_MAX}`) && bp2.includes("closest?.('[data-latest-more]')"), 'the owner\'s /booster#latest pages with View more')
+    const rr = read('assets/js/recommend-rails.js')
+    assert.ok(rr.includes('export function latestRailHtml(') && rr.includes('data-latest-more') && rr.includes("rail('follows-latest', 'Latest From Podcasts You Follow'"), 'the long rail is two-sided too')
   })
   check('the list reaches the rails: favorites-ui announces every read, the homepage and the booster page listen, the Because verb is a slot', () => {
     const ui = read('assets/js/favorites-ui.js')

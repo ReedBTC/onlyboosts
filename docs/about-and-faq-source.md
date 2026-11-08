@@ -411,7 +411,9 @@ indexed Nostr boost; nothing about a visitor is stored.
   at draw time (D1 holds boosted episodes only): one feed-id lookup per show
   cached a week, then one `episodes/byfeedid` for up to 40 shows, newest
   `newest_item_ts` first; the index's newest boosted episodes when PI is
-  absent. `POST /api/v1/follows/latest`.
+  absent. `POST /api/v1/follows/latest`. The homepage shows ten; the
+  member's own page (`/booster/<npub>#latest`) shows twenty and View more
+  asks for more, to 100.
 - **Top Podcasts From Your Follows** and **Top Songs From Your Follows**
   (2026-10-30): the Shows chart and the Songs chart over the boosts of the
   member's kind-3 contacts (the Follows scope); the member's own boosts count.

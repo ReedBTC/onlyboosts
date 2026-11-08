@@ -20,7 +20,7 @@
  * ⚠️ IMPORTS ITS SIBLING AS './rail-tile.js?v=…' like every two-sided module;
  * the Function reaches it by relative path and esbuild inlines it. No
  * Date.now(), no locale. */
-import { railListHtml, showTile, albumTile, bare, lockedRailHtml } from './rail-tile.js?v=ob-v262'
+import { railListHtml, showTile, albumTile, latestTile, bare, lockedRailHtml } from './rail-tile.js?v=ob-v263'
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
 const clip = (s, n) => (s.length > n ? s.slice(0, n - 1).trimEnd() + '…' : s)
@@ -110,6 +110,18 @@ export function carrotRailHtml(state) {
   const c = CARROT[state]
   if (!c) return ''
   return rail('personal', esc(c.h2), esc(CARROT_SUB), lockedRailHtml({ title: c.h3, text: c.p, actions: c.actions }))
+}
+
+/** Latest From Podcasts You Follow on the owner's /booster (2026-11-08,
+ *  Reed's ask: the homepage draws ten, the member's own page the long rail).
+ *  `more` appends the View more tile, the last tile of the track, which
+ *  booster-page.js answers by asking the endpoint for a larger page. */
+export const LATEST_SUB = 'The newest episodes of the podcasts on your follows list, from Podcast Index'
+export const MORE_TILE = '<li class="rail-tile rail-tile--more"><button type="button" class="rt rt-more" data-latest-more><span class="rt-media rt-media--more">View more</span></button></li>'
+export function latestRailHtml(episodes, { more = false } = {}) {
+  const tiles = (episodes || []).map(latestTile)
+  if (more && tiles.length) tiles.push(MORE_TILE)
+  return rail('follows-latest', 'Latest From Podcasts You Follow', LATEST_SUB, railListHtml(tiles))
 }
 
 function rail(key, title, sub, list) {

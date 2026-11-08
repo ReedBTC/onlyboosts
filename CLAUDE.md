@@ -460,7 +460,13 @@ was picked from is in the session memory; direction A won, with the sans.
   for the lot, cached ten minutes; at most `SHOWS_MAX` (40) shows a
   request, newest `newest_item_ts` first; the index's own newest boosted
   episodes when PI is absent or silent (`source: 'index'`). `latestTile`
-  puts the show's name under the title. A PI feed-id column on D1
+  puts the show's name under the title. **The homepage draws TEN, like every
+  other rail, and the long rail is the owner's `/booster#latest`** (Reed's
+  call the same evening: the one rail with a scroll bar looked odd): twenty
+  tiles, then a View more tile that asks for a larger page (`LIMIT_MAX`,
+  100) and appends what was not shown; `latestRailHtml` in
+  `recommend-rails.js`, `repaintLatest` in `booster-page.js`, the owner
+  alone, right after Favorites. A PI feed-id column on D1
   `podcasts` would make it one D1 query and one PI call; OB-back's, if
   wanted.
 - **The owner's `/booster` carries the homepage's hooks and carrot**
@@ -2220,7 +2226,7 @@ What a change elsewhere would break:
 - **⚠️ THE SECTION IDS ARE URLS AND THEY ARE FROZEN.** `/show`: `#episodes`
   `#community` `#community-shows` `#podroll` `#reverse-podroll` `#boosts`.
   `/episode`: `#community` `#community-episodes` `#boosts`. `/booster`:
-  `#favorites` `#recommended` (2026-10-20) `#boosts`; **`#shows` and `#episodes`
+  `#favorites` `#latest` (2026-11-08, the owner's) `#recommended` (2026-10-20) `#boosts`; **`#shows` and `#episodes`
   were its two rollups until 2026-11-07 and ARE ITS FOUR BOOSTED RAILS
   SINCE 2026-11-08** (for a day they aliased to `#boosts`; Reed's call of the 7th: the `#boosts` list
   answers both, with a By show menu and a search over the show and episode
