@@ -282,7 +282,7 @@ bot republishes each announced line as a kind 1 under this one key, with
 PodcastGuru, Castamatic, Podverse, v4vmusic-com and OnlyBoosts seen) and a
 `q` quoting its own receipt. No `client` tag, so no rule here attributed it
 until now, and its kind 0 calls itself "V4V_music_app". On the index at
-registration: 23 notes since 2026-09-04, 2,391 sats, four shows (twenty of
+registration: 23 notes since 2026-09-12, 2,391 sats, four shows (twenty of
 them Lightning Thrashes), counted as a member and never droppable; five
 Boostr_Bot and chadf-boostbot notes had been marked duplicates OF its notes,
 since an unregistered key is the donor side. Slug `libre-relay-bot`, label
@@ -294,6 +294,12 @@ tags return; the IRC line names the track's album and artist rather than the
 feed the payment reached (a Two For Tunestr boost read "Breathe EP / Wasting
 Time"), which is why a title lookup cannot fill them in. Chad's to fix; the
 registration is ready for the day it is.
+
+The full-history dry run on registration marks **5** of its notes, each
+restating a donor's own note 10–45 s away (3 Fountain, 2 BoostMeBuddy, 511
+sats, tier `app`). The three clusters it already keeps do not move: every
+note in them was relayed from v4vmusic-com, which publishes no note of its
+own, so a bot note carrying the episode stays the keeper, and libre's does.
 
 ### Chad's Relay Bots Name The Payer: `["sender", npub]` (2026-11-08)
 
