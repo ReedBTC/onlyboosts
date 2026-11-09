@@ -271,6 +271,92 @@ in the survey for standing copies (29 in 90 days) for that reason. Slug
 the full message and the sender; the node-received amount runs up to 2%
 over the donor's, 426 and 429 for 420, which is where the ±3% came from).
 
+### libre-relay-bot Publishes For Sir Libre's Node
+
+Registered 2026-11-09 at Chad's request (ReedBTC/onlyboosts PR #2, the
+section below). `f051ceb6…c1cb` is the **tenth** entry in `PUBLISHER_PUBKEYS`
+and the ninth in the site's `PUBLISHERS`. Chad's reader of the `#SirLibre`
+IRC channel, where Sir Libre's node announces each boost it receives; the
+bot republishes each announced line as a kind 1 under this one key, with
+`amount`, `t` hashtags, an `app` tag naming the listener's app (Fountain,
+PodcastGuru, Castamatic, Podverse, v4vmusic-com and OnlyBoosts seen) and a
+`q` quoting its own receipt. No `client` tag, so no rule here attributed it
+until now, and its kind 0 calls itself "V4V_music_app". On the index at
+registration: 23 notes since 2026-09-04, 2,391 sats, four shows (twenty of
+them Lightning Thrashes), counted as a member and never droppable; five
+Boostr_Bot and chadf-boostbot notes had been marked duplicates OF its notes,
+since an unregistered key is the donor side. Slug `libre-relay-bot`, label
+"Libre Relay Bot" (not `LibreRelayBot`, Sir Libre's IRC nick, which is not
+on Nostr); in `RELAY_PUBLISHERS` the same day. **Measured 2026-11-09: none of
+its 91 boost notes since 2026-10-03 carries an `i` or `k` tag**, where 25
+before that date carried both, so nothing new from it can index until the
+tags return; the IRC line names the track's album and artist rather than the
+feed the payment reached (a Two For Tunestr boost read "Breathe EP / Wasting
+Time"), which is why a title lookup cannot fill them in. Chad's to fix; the
+registration is ready for the day it is.
+
+### Chad's Relay Bots Name The Payer: `["sender", npub]` (2026-11-08)
+
+*Contributed by Chad (ChadFarrow), in answer to Reed's request of 2026-10-30.*
+Every relay bot Chad runs now writes `["sender", <npub>]` on its kind:1 boost
+note when it can say who paid, for the tier-0 named-sender pairing in
+`dedupe.py`. A bot writes it only from a source that states the payer's key,
+never from a typed sender name or an npub mentioned in the message, and leaves
+it off rather than guess.
+
+| Bot (slug) | Pubkey | Where the `sender` comes from | Live |
+|---|---|---|---|
+| candr_boost_bot (`candr-boost`) | `978bbd44…ed36` | the boostagram's `sender_npub` (any app), or BoostMeBitch/BoostMeBuddy's hex `sender_id`; else a Fountain sender (below) | 2026-11-08 15:05Z |
+| BoostAfterBoost (`boostafterboost`) | `48b9a2a9…5e80e` | a Fountain sender only: it reads the `#BowlAfterBowl` IRC announcer, whose line carries no key | 2026-11-08 15:05Z |
+| libre-relay-bot (**not registered**, no slug) | `f051ceb67c01d65e6d6168f9bb4d76222c4450e85757c93931ad2bc316cbc1cb` | a Fountain sender only: it reads the `#SirLibre` IRC announcer (below) | 2026-11-08 15:05Z |
+| chadf-boostbot (`chadf-boostbot`) | `f3bd42a9…8e65` | a key the boostagram states; else, on a boost Chad's node SENT, Chad himself (`npub177fz…aaq7`), so his PodcastGuru and Castamatic boosts carry it too | 2026-11-08 16:22Z (Helipad-to-Nostr-BoostBot #22) |
+| Boostr_Bot (`boostr-bot`), MSP_bot (`msp-2-0`) | as registered | unchanged: `sender_npub`, or a hex `sender_id` | since launch |
+
+- **libre-relay-bot is the Nostr side of `#SirLibre`.** Two things share the
+  name. `LibreRelayBot` is Sir Libre's IRC nick, which announces each boost in
+  `#SirLibre` and never touches Nostr. libre-relay-bot is Chad's reader of that
+  channel: it republishes each announced boost as a kind:1 signed by
+  `f051ceb6…`, with `amount`, `t:boost`/`boostagram`/`value4value`, `app` and
+  the NIP-73 refs, but **no `client` tag**, so no rule here has ever attributed
+  it. 37 of its notes in the 14 days to 2026-11-08 were on the three relays
+  Chad sampled. That pubkey is the one to register; the IRC nick has nothing
+  to register. *Registered 2026-11-09, slug `libre-relay-bot`; see the
+  section above. The NIP-73 refs this row describes have been absent from every
+  note since 2026-10-03, measured that day.*
+- **A Fountain sender** is the app `Fountain` with a sender of
+  `<handle>@fountain.fm`, resolved through fountain.fm's NIP-05
+  (`/.well-known/nostr.json?name=<handle>`). The app check matters: another
+  app's sender name is typed text, and a NIP-05 lookup on it could credit a
+  stranger.
+- **The npub is the key that signs the payer's own note**, which is what tier 0
+  pairs on. BoostMeBitch sends the logged-in account's key; fountain.fm's NIP-05
+  returns the key Fountain signs that listener's notes with. Checked for
+  `chadf@fountain.fm`: `f7922a0a…`, the signer of Chad's notes on
+  relay.fountain.fm.
+- **Always a bech32 `npub`, on the kind:1 only.** Never `p` or `P`, and never on
+  the bot's own kind:9734/9735.
+- **candr_boost_bot also writes its `podcast:item:guid` exactly as the
+  boostagram sent it** (trimmed, case kept) since the same deploy. Before, it
+  lowercased it, so a guid with capitals named an episode no other app named.
+
+**Duplicates removed at the source the same day,** so fewer copies reach the
+payment clusters:
+
+- **libre-relay-bot** (15:35Z): the `#SirLibre` announcer announces each payment
+  that reaches Sir Libre's node, so a boost that pays that node twice came out as
+  two identical whole lines 1–4 s apart, and each became a note (all six of
+  jimmyv's boosts on 2026-10-26). A boost line identical to one within 5 s now
+  gets no note. Identical lines about 9 s apart, a steady rhythm in the log, are
+  real repeated payments and still post.
+- **Boostr_Bot and MSP_bot** (boostbox #55, 15:35Z): v4vmusic.com adds a Boostr
+  split of its own beside a feed's, so one boost paid Boostr_Bot twice under two
+  uuids (`e89405d7…`/`e441d435…` on 2026-10-27, `8dfe0ac6…`/`7ebb4a7d…` on
+  2026-11-07). A second payment of the same boost (same app, sender id, episode,
+  position, total and message) within 2 min now gets no note.
+- **chadf-boostbot** (Helipad-to-Nostr-BoostBot #23, 16:22Z): a boost
+  whose legs fell on either side of a 2-minute bucket edge was posted twice
+  (2026-10-30 12:56Z, 407 + 13 sats for one 420-sat boost). It is now one note.
+
 ### OnlyBoosts Publishes On Behalf Of Its Own Donors
 
 Registered 2026-08-20. `3a87a19c…84d9` is the **fourth** entry in

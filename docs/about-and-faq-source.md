@@ -187,12 +187,13 @@ cost of getting it wrong is leaving a real person off a leaderboard.
 | Boostr_Bot | 6 | 611 | Publishes a note for every boost received by a value-block split naming `boostr@getalby.com`, whichever app sent it; the origin app rides an `app` tag. Live since 2026-09-10 on Chad and Reed's Podcast, an alpha by its own profile. Added 2026-09-10 on Reed's instruction |
 | BoostAfterBoost | 44 | 69,179 | candr_boost_bot's software on the Homegrown Hits / Bowl After Bowl node: a note for every boost the node receives, whichever app sent it, naming the listener and their app. Added 2026-10-29 out of the duplicate survey |
 | candr_boost_bot | 30 | 155,224 | Chad's watcher on the Chad and Reed node: publishes a note for every boost the node receives, whichever app sent it; the origin app rides an `app` tag and the body names the sender. Every note so far is to Pixel Palace (Jorfest 2026). Added 2026-10-20 after Reed saw it ranking on the Members tab |
+| libre-relay-bot | 23 | 2,391 | Chad's reader of the #SirLibre IRC channel, where Sir Libre's node announces each boost it receives: a note for every announced boost, naming the listener and their app. No note of its since 2026-10-03 carries a NIP-73 tag, so none since then is on the index. Added 2026-11-09 at Chad's request |
 | lnaddress music | 31 | 0 | Boosts sent to music feeds through a Lightning address |
 | Local Bitcoiners (show account) | ~8 over 14 days | — | Publishes for a donor to that show who produced no note themselves |
 | MSP_bot | 9 | 1,808 | Music Side Project's bot, Boostr_Bot's shape: an artist who builds their feed at musicsideproject.com adds `musicsideproject@getalby.com` as a 1% leg, and the bot publishes a note for every boost that leg receives, whichever app sent it; the origin app rides the same `app` tag. Four music shows on the index when registered, an alpha by its own profile. Added 2026-10-02 on Reed's instruction |
 | OnlyBoosts (boost bot) | part of 23 | — | Signs a note for a boost sent from this site by someone with no Nostr identity |
 
-Figures measured 2026-08-23 off `/api/v1/clients`; Boostr_Bot's off `/api/v1/boosters` on 2026-09-10, the day it went live; MSP_bot's off `/api/v1/members?q=` on 2026-10-02; candr_boost_bot's the same way on 2026-10-20.
+Figures measured 2026-08-23 off `/api/v1/clients`; Boostr_Bot's off `/api/v1/boosters` on 2026-09-10, the day it went live; MSP_bot's off `/api/v1/members?q=` on 2026-10-02; candr_boost_bot's the same way on 2026-10-20; libre-relay-bot's off `/api/v1/boosters` on 2026-11-09.
 
 **⚠️ ChadF Boost Bot is NOT one of these, since 2026-08-30, and it was listed
 first until then.** It is a node-watching bot, but the node is Chad's own and
