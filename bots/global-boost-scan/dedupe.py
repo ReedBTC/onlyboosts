@@ -705,7 +705,11 @@ def _sibling_match(conn, b, marked_by):
     best = None
     for s in sibs:
         partner_id = s["dup_of"] or marked_by.get(s["event_id"])
-        if not partner_id or _prose_key(s["message"]) != key:
+        # A twin marks the later note dup_of the earlier one, so the earlier
+        # note's sibling can point back at the earlier note itself; marking it
+        # dup_of itself hides both notes and the payment with them (2 rows on
+        # the index on 2026-11-09, 41 more the next --all would have made).
+        if not partner_id or partner_id == b["event_id"] or _prose_key(s["message"]) != key:
             continue
         gap = abs(s["created_at"] - b["created_at"])
         if best is None or gap < best[1]:
