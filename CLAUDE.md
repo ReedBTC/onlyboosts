@@ -1647,6 +1647,15 @@ Bowl After Bowl, 25,265 sats); the pass runs every incremental cycle over a
   chadf-boostbot does on every boost Chad's node sends; see "Chad's Relay
   Bots Name The Payer" in `docs/boost-clients.md`. It is excluded from the
   boards, unlike chadf-boostbot, because it relays other listeners' boosts.
+  **libre-relay-bot (`libre-relay-bot`, registered 2026-11-09 at Chad's
+  request in that PR) is Chad's reader of the #SirLibre IRC channel**, where
+  Sir Libre's node announces each boost; one key, no client tag, the sender
+  named in the body as text. 23 notes and 2,391 sats had ranked as a member
+  and kept 5 duplicates as a donor would. **Nothing it has published since
+  2026-10-03 carries a NIP-73 tag** (91 boost notes measured 2026-11-09;
+  the IRC line names the track's album and artist, not the feed paid), so no
+  new note of its indexes until Chad fixes the bot; Reed is following up with
+  him. Off the boards like candr.
 - **⚠️ ONE-TO-ONE HAS ONE EXCEPTION, ON THE RELAY SIDE.** `chadf-boostbot`
   signs one receipt and one note **per keysend leg**, so a multi-leg boost is
   2–3 identical bot notes and the claim used to block the second from the

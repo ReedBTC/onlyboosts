@@ -212,14 +212,32 @@ from nostr_utils import npub_to_hex          # noqa: E402
 # notes name no sender and have no partner to find, and stand.
 # candr-boost (candr_boost_bot, Chad's watcher on the Chad and Reed node)
 # joined 2026-10-20. It reports the full amount, so the hard key holds, and
-# names no sender, so the prose tiers do the pairing: the body restates the
-# donor's message and the `app` tag names the app, chadf-boostbot's shape.
-# Measured on registration: 2 of its first 30 notes restated a BoostMeBitch
-# note 14-17s earlier (111 sats each, tier msg+app); the other 28 came
-# through apps that publish no note (The Split Kit, v4vmusic-com, CurioCaster,
-# PodcastGuru) or had no partner within the window, and stand.
+# until 2026-11-08 15:05Z it named no sender, so the prose tiers did the
+# pairing: the body restates the donor's message and the `app` tag names the
+# app, chadf-boostbot's shape. Measured on registration: 2 of its first 30
+# notes restated a BoostMeBitch note 14-17s earlier (111 sats each, tier
+# msg+app); the other 28 came through apps that publish no note (The Split
+# Kit, v4vmusic-com, CurioCaster, PodcastGuru) or had no partner within the
+# window, and stand. Since that deploy it writes `["sender", npub]` when the
+# boostagram states the payer's key or the payer is a Fountain sender, and so
+# do boostafterboost and libre-relay-bot (Fountain senders only, off their IRC
+# announcers); tier 0 is not slug-gated, so a tagged note from any of the
+# three pairs there with no change here. The record is "Chad's Relay Bots
+# Name The Payer" in docs/boost-clients.md (Chad's PR #2).
+# libre-relay-bot (Chad's reader of the #SirLibre IRC announcer) joined
+# 2026-11-09. Unregistered, its 23 notes (2,391 sats) were the donor side: it
+# KEPT three clusters (five Boostr_Bot and chadf-boostbot notes marked dup_of
+# a libre note) and its own copies of donors' notes were never droppable. It
+# reports the full amount and restates the message, so the prose and app
+# tiers pair it. Measured on registration (the full-history dry run): 5 of its
+# notes restate a donor's note 10-45s away (3 Fountain, 2 BoostMeBuddy, 511
+# sats, tier app) and would be marked; the three clusters it keeps stay as
+# they are, every note in them relayed from v4vmusic-com, which publishes no
+# note, so a bot note with the episode is the keeper and libre's has one.
+# None of its notes since 2026-10-03 carries an `i`/`k` tag, so nothing new
+# from it indexes until Chad fixes that; the registration cleans the history.
 RELAY_PUBLISHERS = {"chadf-boostbot", "localbitcoiners", "boostr-bot", "msp-2-0",
-                    "candr-boost", "boostafterboost"}
+                    "candr-boost", "boostafterboost", "libre-relay-bot"}
 
 MSG_WINDOW = 30 * 60      # strong message corroboration: generous
 APP_WINDOW = 10 * 60      # app-identity corroboration: tight
@@ -235,6 +253,11 @@ APP_DOMAINS = {
     "bowlafterbowl": "bowlafterbowl.com",
     "v4vmusic-com":  "via v4vmusic-com",   # its own notes: no client tag, "… via v4vmusic-com 🎵 …"
 }
+# ⚠️ Since libre-relay-bot's registration (2026-11-09) every note in the index
+# carrying "via v4vmusic-com" is a relay bot's (chadf-boostbot 25, candr 11,
+# boostafterboost 6, libre 4), so that fingerprint has no non-relay note left
+# to match. Kept: a v4vmusic.com note of its own would match it the day one
+# appears.
 
 # Words both sides' templates restate about ANY boost; sharing them proves
 # nothing. Lowercase, matched against normalized words.
@@ -705,7 +728,11 @@ def _sibling_match(conn, b, marked_by):
     best = None
     for s in sibs:
         partner_id = s["dup_of"] or marked_by.get(s["event_id"])
-        if not partner_id or _prose_key(s["message"]) != key:
+        # A note that keeps a cluster finds its own absorbed sibling here, whose
+        # dup_of is the note itself; marking it dup_of itself hides both notes
+        # and the payment with them (2 rows on the index on 2026-11-09, 41
+        # more the next --all would have made).
+        if not partner_id or partner_id == b["event_id"] or _prose_key(s["message"]) != key:
             continue
         gap = abs(s["created_at"] - b["created_at"])
         if best is None or gap < best[1]:

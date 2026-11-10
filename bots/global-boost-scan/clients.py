@@ -148,6 +148,17 @@ from urllib.parse import urlparse
 # 2026-10-29 in the duplicate survey behind Reed's report: 44 notes since
 # 2026-09-12 across four shows, counted as a member and never droppable;
 # registered the same day, in RELAY_PUBLISHERS with it.
+# ⚠️ THE TENTH IS libre-relay-bot, Chad's reader of the #SirLibre IRC
+# announcer (kind 0 "V4V_music_app", website v4vmusic.com): it republishes
+# each announced boost as a kind 1 with `amount`, `app`, the boost hashtags and
+# a `q` of its own receipt, and NO `client` tag, so no rule had ever attributed
+# it and its 23 rows (2,391 sats, four shows, Lightning Thrashes 20; newest
+# 2026-10-03) sat at client_id NULL, ranked as a member. `_app_tag` reads its
+# `["app", <name>]` into `client_via` (Fountain, BoostMeBitch, BoostMeBuddy,
+# v4vmusic-com on the index). Not to be confused with `LibreRelayBot`, Sir
+# Libre's IRC nick, which is not on Nostr. Since 2026-11-08 15:05Z it writes
+# `["sender", npub]` for a Fountain sender. Registered 2026-11-09 on Chad's
+# request (PR #2) and Reed's instruction; in RELAY_PUBLISHERS the same day.
 PUBLISHER_PUBKEYS = {
     "f3bd42a91af5f3f1c40ca45ad2269464ab79996b32da78e8ed2ab91111b08e65": "chadf-boostbot",
     "d35ae076512c29b01a5b33aa764ed4db44a9d0bbd96009705f48101f6cfe76a2": "lnaddress-music",
@@ -158,6 +169,7 @@ PUBLISHER_PUBKEYS = {
     "ffff6a7af32ea2239cb71548f476eec0dd9ae56673abda536bef5c241276fc3e": "msp-2-0",
     "978bbd44d918cc998c21f63150171046ae1173bbea1b7d1c6500d82b1063ed36": "candr-boost",
     "48b9a2a96255f6b253f2fedffbeeaac1bdce5051daa546b198f800cb5535e80e": "boostafterboost",
+    "f051ceb67c01d65e6d6168f9bb4d76222c4450e85757c93931ad2bc316cbc1cb": "libre-relay-bot",
 }
 
 # Fountain links its own episode/show pages from the URL slot of each NIP-73
@@ -202,6 +214,7 @@ DISPLAY_NAMES = {
     "msp-2-0":         "MSP Bot",
     "candr-boost":     "CandR Boost Bot",
     "boostafterboost": "BoostAfterBoost",
+    "libre-relay-bot": "Libre Relay Bot",
 }
 
 # Self-identified names that are the same product under two spellings. Kept

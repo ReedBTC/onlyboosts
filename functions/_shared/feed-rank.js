@@ -76,8 +76,9 @@ const BOOSTER_RANK_KEYS = ["sats", "boosts", "shows"];
  * INCLUDED them would be a rank on a list the reader cannot scroll: every
  * member below a publisher would be one place worse here than on the wall.
  * **The two copies must stay in step.** (chadf-boostbot came off both on
- * 2026-08-30, Boostr_Bot joined both on 2026-09-10, and MSP_bot on
- * 2026-10-02; see the note on PUBLISHERS for why.) */
+ * 2026-08-30, Boostr_Bot joined both on 2026-09-10, MSP_bot on 2026-10-02,
+ * candr_boost_bot on 2026-10-20, BoostAfterBoost on 2026-10-29 and
+ * libre-relay-bot on 2026-11-09; see the note on PUBLISHERS for why.) */
 const RANK_PUBLISHERS = [
   "d35ae076512c29b01a5b33aa764ed4db44a9d0bbd96009705f48101f6cfe76a2",
   "c330881e28768381dd8bdfd274341dca0c5882c29b8642ea4bc82f7563264592",
@@ -87,6 +88,7 @@ const RANK_PUBLISHERS = [
   "ffff6a7af32ea2239cb71548f476eec0dd9ae56673abda536bef5c241276fc3e",
   "978bbd44d918cc998c21f63150171046ae1173bbea1b7d1c6500d82b1063ed36",
   "48b9a2a96255f6b253f2fedffbeeaac1bdce5051daa546b198f800cb5535e80e",
+  "f051ceb67c01d65e6d6168f9bb4d76222c4450e85757c93931ad2bc316cbc1cb",
 ];
 
 /* ⚠️ THE ONLYBOOSTS CHARTS POSITION — rank in sats + rank in boosts + rank in

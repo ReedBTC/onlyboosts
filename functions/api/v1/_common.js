@@ -267,7 +267,18 @@ export function boostRecord(r) {
  * Its notes carry `["client","MSP 2.0"]`, so the slug is `msp-2-0`. The
  * sender it names in the body ("quincy@fountain.fm boosted 500 sats →") is
  * text, never an identity. Nine notes on the index the day it was registered,
- * across four music shows. */
+ * across four music shows.
+ *
+ * ⚠️ THE NINTH IS libre-relay-bot (f051ceb6…c1cb), REGISTERED 2026-11-09 ON
+ * REED'S INSTRUCTION, at Chad's request (ReedBTC/onlyboosts PR #2). Chad's
+ * reader of the #SirLibre IRC channel, where Sir Libre's node announces each
+ * boost it receives; the bot republishes each line as a kind 1 under this one
+ * key, naming the listener and their app in the body (text, never an
+ * identity; its kind 0 calls itself "V4V_music_app"). It has no client tag,
+ * so nothing attributed it: 23 notes and 2,391 sats ranked as a member until
+ * this entry. Nothing it has published since 2026-10-03 carries a NIP-73 tag,
+ * so no new note of its indexes until Chad fixes the bot; this entry cleans
+ * up the history and is ready for the day the tags return. */
 export const PUBLISHERS = [
   "d35ae076512c29b01a5b33aa764ed4db44a9d0bbd96009705f48101f6cfe76a2", // lnaddress-music
   "c330881e28768381dd8bdfd274341dca0c5882c29b8642ea4bc82f7563264592", // Local Bitcoiners show account
@@ -277,6 +288,7 @@ export const PUBLISHERS = [
   "ffff6a7af32ea2239cb71548f476eec0dd9ae56673abda536bef5c241276fc3e", // MSP_bot
   "978bbd44d918cc998c21f63150171046ae1173bbea1b7d1c6500d82b1063ed36", // candr_boost_bot (Chad and Reed's show, 2026-10-20)
   "48b9a2a96255f6b253f2fedffbeeaac1bdce5051daa546b198f800cb5535e80e", // BoostAfterBoost (the Homegrown Hits / Bowl After Bowl node, candr's software, 2026-10-29)
+  "f051ceb67c01d65e6d6168f9bb4d76222c4450e85757c93931ad2bc316cbc1cb", // libre-relay-bot (Chad's reader of the #SirLibre IRC announcer on Sir Libre's node, 2026-11-09)
 ];
 
 /* ⚠️ BOOSTMEBITCH IS IN BOTH LISTS AND THAT IS NOT A CONTRADICTION. The app

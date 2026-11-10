@@ -232,6 +232,18 @@ check(dedupe._comment({"message": "⚡ 333 sats\n📱 via Castamatic\n\nhttps://
 check(dedupe._comment({"message": "⚡ Boost ⚡\n\nNo message\n\nericpp boosted 3333 sats → Homegrown Hits\n📻 Episode 152\n\nhttps://tardbox.com/og/boost.png"}) == "No message", "Boostr's literal No message is a comment")
 check(dedupe._comment({"message": "⚡ New boost on Local Bitcoiners! 💰 322 sats 📱 via Fountain 👤 nostr:npub1abc 💬 Thank you gentlemen"}) == "" or "Thank you gentlemen" in dedupe._comment({"message": "⚡ New boost on Local Bitcoiners! 💰 322 sats 📱 via Fountain 👤 nostr:npub1abc\n💬 Thank you gentlemen"}), "LB's 💬 comment survives on its own line")
 
+print("a keeper is never marked a duplicate of itself (2026-11-09)")
+conn = fresh([
+    chadf("f1", T0, 100, "Great episode", "Castamatic", item=ITEM),
+    chadf("f2", T0 + 5, 100, "Great episode", "Castamatic", item=ITEM),
+])
+first = dedupe.find_duplicates(conn)
+check([(b["event_id"], o["event_id"]) for b, o, *_ in first] == [("f2", "f1")], "the twin marks f2 dup_of f1")
+dedupe.apply(conn, first)
+again = pairs_of(conn)
+check("f1" not in again, "the next pass does not mark f1 through its own absorbed sibling")
+check(all(k != v[0] for k, v in again.items()), "no note is paired with itself")
+
 print("scope: a non-relay note is never the marked side")
 conn = fresh([
     note("d1", DONOR, T0, 100, "Culture comes first", "fountain"),

@@ -271,6 +271,36 @@ in the survey for standing copies (29 in 90 days) for that reason. Slug
 the full message and the sender; the node-received amount runs up to 2%
 over the donor's, 426 and 429 for 420, which is where the ±3% came from).
 
+### libre-relay-bot Publishes For Sir Libre's Node
+
+Registered 2026-11-09 at Chad's request (ReedBTC/onlyboosts PR #2, the
+section below). `f051ceb6…c1cb` is the **tenth** entry in `PUBLISHER_PUBKEYS`
+and the ninth in the site's `PUBLISHERS`. Chad's reader of the `#SirLibre`
+IRC channel, where Sir Libre's node announces each boost it receives; the
+bot republishes each announced line as a kind 1 under this one key, with
+`amount`, `t` hashtags, an `app` tag naming the listener's app (Fountain,
+PodcastGuru, Castamatic, Podverse, v4vmusic-com and OnlyBoosts seen) and a
+`q` quoting its own receipt. No `client` tag, so no rule here attributed it
+until now, and its kind 0 calls itself "V4V_music_app". On the index at
+registration: 23 notes since 2026-09-12, 2,391 sats, four shows (twenty of
+them Lightning Thrashes), counted as a member and never droppable; five
+Boostr_Bot and chadf-boostbot notes had been marked duplicates OF its notes,
+since an unregistered key is the donor side. Slug `libre-relay-bot`, label
+"Libre Relay Bot" (not `LibreRelayBot`, Sir Libre's IRC nick, which is not
+on Nostr); in `RELAY_PUBLISHERS` the same day. **Measured 2026-11-09: none of
+its 91 boost notes since 2026-10-03 carries an `i` or `k` tag**, where 25
+before that date carried both, so nothing new from it can index until the
+tags return; the IRC line names the track's album and artist rather than the
+feed the payment reached (a Two For Tunestr boost read "Breathe EP / Wasting
+Time"), which is why a title lookup cannot fill them in. Chad's to fix; the
+registration is ready for the day it is.
+
+The full-history dry run on registration marks **5** of its notes, each
+restating a donor's own note 10–45 s away (3 Fountain, 2 BoostMeBuddy, 511
+sats, tier `app`). The three clusters it already keeps do not move: every
+note in them was relayed from v4vmusic-com, which publishes no note of its
+own, so a bot note carrying the episode stays the keeper, and libre's does.
+
 ### Chad's Relay Bots Name The Payer: `["sender", npub]` (2026-11-08)
 
 *Contributed by Chad (ChadFarrow), in answer to Reed's request of 2026-10-30.*
@@ -296,7 +326,9 @@ it off rather than guess.
   the NIP-73 refs, but **no `client` tag**, so no rule here has ever attributed
   it. 37 of its notes in the 14 days to 2026-11-08 were on the three relays
   Chad sampled. That pubkey is the one to register; the IRC nick has nothing
-  to register.
+  to register. *Registered 2026-11-09, slug `libre-relay-bot`; see the
+  section above. The NIP-73 refs this row describes have been absent from every
+  note since 2026-10-03, measured that day.*
 - **A Fountain sender** is the app `Fountain` with a sender of
   `<handle>@fountain.fm`, resolved through fountain.fm's NIP-05
   (`/.well-known/nostr.json?name=<handle>`). The app check matters: another
