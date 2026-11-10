@@ -53,6 +53,11 @@ const DISPLAY = {
   // Hits / Bowl After Bowl node, registered 2026-10-29 out of the duplicate
   // survey. Its notes carry `["client","BoostAfterBoost"]`, the slug itself.
   "boostafterboost": "BoostAfterBoost",
+  // libre-relay-bot, Chad's reader of the #SirLibre IRC announcer, registered
+  // as a publisher on 2026-11-09. Its notes carry no `client` tag at all; the
+  // slug is the collector's. Reed's label, 2026-11-10: the site the boosts
+  // come from (its kind 0 is "V4V_music_app", website v4vmusic.com).
+  "libre-relay-bot": "v4vmusic.com",
   // Carried over from the Boosts feed's own map, which read the raw client tag
   // and is now deleted. No boost in the index currently classifies to this slug;
   // it costs a line and saves the label if one ever does.
