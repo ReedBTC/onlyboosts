@@ -5,12 +5,20 @@ difference: it does **not** query relays for the feed. Boost data comes from the
 collector in `bots/global-boost-scan/`, which publishes to D1 and to static JSON
 on the VPS (`relay.mynostr.app`).
 
-**How to read this file.** It is the operating manual, not the design record.
-Where a decision has its own document, this file states the rule and points
-there rather than restating the argument:
+**How to read this file.** It is the operating manual: the rules a change
+elsewhere would break, and where the reasoning lives. **It is loaded into every
+session, so keep it under 40KB**; it reached 200KB on 2026-11-11 and was cut
+back that day. A new decision goes in the doc for its subject, with at most
+one line here. Deleted reasoning is recoverable: `git log -S <symbol> -- CLAUDE.md`
+finds the paragraph that used to explain any name.
 
 | Subject | Authority |
 |---|---|
+| The pages, the chart pages, the discovery homepage, the nav, the medium split, feed loaders, vocabulary, what's built | `docs/site-structure.md` |
+| The fork, the stack, stamping, the service worker, the rendering rule, conventions, theming, site identity, bot conventions, relay sets | `docs/architecture.md` |
+| The money paths summary, @mentions, the detail pages, PC 2.0 Favorites | `docs/feature-rules.md` |
+| The exclusion list, the duplicate filter, the data feed and record shape, follows scoping, discoverability columns, artwork, profiles, author, language, `client_id`, podroll | `docs/data-pipeline.md` |
+| Every payment and publishing decision | `docs/money-paths.md` |
 | Show page design | `docs/show-pages-spec.md` |
 | Data shapes the collector publishes | `bots/global-boost-scan/DATA-API.md` |
 | The D1 consolidation (complete) | `docs/data-architecture.md` |
@@ -19,1257 +27,185 @@ there rather than restating the argument:
 | The duplicate filter (rule, tiers, measurements) | `bots/global-boost-scan/dedupe.py` docstring |
 | Two-sided modules, the cards, the first-view budget | `docs/two-sided-modules.md` |
 | The login/boost widget's styling | `docs/widget-theming.md` |
-| Every payment and publishing decision | `docs/money-paths.md` |
 | The feed bar: range, sort, rank, language, search | `docs/feeds.md` |
 | The Members tab, #40HPW, the member wall | `docs/members-tab.md` |
 | The four detail pages | `docs/detail-pages.md` |
 | Boost client attribution | `docs/boost-clients.md` |
-| PC 2.0 Favorites (kind 10333) | `docs/favorites.md` |
+| PC 2.0 Favorites (kind 10333), OPML | `docs/favorites.md` |
 | The test scripts, one row each | `docs/tests.md` |
 | Show artwork and the share cards' images | `docs/show-artwork.md` |
 | The relay sets and their measurements | `docs/relay-sets.md` |
 | @mentions in the four composers | `docs/mentions.md` |
-| What the 2026-08-23 strip deleted, and the checks for the next one | `docs/strip-removed.md` |
-| Dark mode: the grammar, the tokens that do and don't flip | `docs/dark-mode.md` |
-
-Deleted reasoning is recoverable: `git log -S <symbol> -- CLAUDE.md` finds the
-paragraph that used to explain any name in here.
-
-The last seven were **split out of this file on 2026-08-29**, verbatim, when it
-passed its size budget. Nothing was rewritten on the way across, so that same
-`git log -S` finds them too. **Two more went the same way on 2026-09-23**
-(`docs/strip-removed.md`, `docs/dark-mode.md`), each leaving a stub of the
-rules a change elsewhere would break.
+| What the 2026-08-23 strip deleted | `docs/strip-removed.md` |
+| Dark mode | `docs/dark-mode.md` |
 
 ## Pages
 
 | Path | What |
 |---|---|
-| `/` | **the discovery homepage since 2026-10-17**: rails of tiles (this week's shows, this month's albums, the #40HPW week, the personal rails, the three discovery instruments, the Because rails, the year's episodes and songs; the week's artists came off on 2026-10-21), the fact rails edge-rendered by `functions/index.js`. See **The Discovery Homepage** below |
-| `/podcasts/shows`, `/podcasts/episodes` | **the Podcast Charts** (2026-10-21): one chart per page, switched by the page head's underlined tabs, the chart box (scope, range, language, sort) under it. The bare `/podcasts` is Shows. See **The Chart Pages** below |
-| `/music/artists`, `/music/albums`, `/music/songs` | **the Music Charts**, the same shape; the bare `/music` is Artists |
-| `/boosts` | **the boost feed on its own page** (2026-10-21, Reed's call: readers treat it as their discovery feed). Global or Follows, newest first |
-| `/members` | the Top Members wall and the Boost Bots section, with the membership line |
-| `/charts`, `/charts/podcasts`, `/charts/music`, `/charts/hpw` | **the weekly boards' own page, named Charts** (2026-10-21): the week's Top 10 beside Weeks at #1 for shows and for artists, and the #40HPW week beside Proof of #40HPW, one pair per view. The bare `/charts` is Podcasts. From 2026-10-17 to 2026-10-21 `/charts` was the hash-routed feed page that was `/` before that; **every `/charts#<feed>` and `/#<feed>` address in the wild is forwarded to its page by the head scripts of `charts.html` and `index.html`**, since a server never sees a hash. All five pages are one shell, `charts.html`, routed by `functions/_shared/charts-page.js` |
-| `/show/<guid>` | one show, edge-rendered |
-| `/episode/<item-guid>` | one episode, edge-rendered |
-| `/booster/<npub>` | one person, edge-rendered. **The address is the npub**: a hex pubkey in its place 301s to the npub form (Reed's call, 2026-11-08; the homepage's full-list link had emitted hex) |
-| `/artist/<guid>` | one artist (publisher), edge-rendered — see the detail pages section |
-| `/search?q=` | the site search's results page, edge-rendered, `noindex` (2026-10-17) |
-| `/discover/<key>` | **the whole list behind a discovery rail** (2026-10-20, Reed's ask: ten tiles lived nowhere else): `new-shows`, `new-music`, `movers`, `podroll`, each a list of the charts page's show cards with one extra line saying why the card is there, rendered by `functions/discover/[key].js` from the same row fetchers `functions/index.js` exports for the rails (`newShowsRows`, `moversRows`, `podrollRows`), in the `discover.html` shell. In the sitemap. The rail headings and the ribbons' Discover columns link them |
-| `/about` | the project's own explanation of what the data is and isn't |
-| `/stats` | a coming-soon placeholder: nav + header + soon-card, `noindex`, out of the sitemap. `/boosters` was the second one and was **deleted** on 2026-08-23 — see the Stats row of the site map |
-| `/404.html` | see the ⚠️ under LB conventions |
-| `/hpw/<YYYY-MM-DD>`, `/hpw/high-scores` | one 40 HPW board as a page, edge-rendered, the address a shared week has. **⚠️ `high-scores` is a PATH, not the board's name** — that board is **Proof of #40HPW** since 2026-09-01 and the URL deliberately did not move with it. `/hpw/<key>/card` is the 720x900 portrait frame the collector screenshots for `/api/og/hpw/<key>.png`. See **The Share Cards** under the Members tab |
-| `/charts/<key>/card/<kind>` | the five chart share-card frames (`shows`/`artists` per week, `shows`/`artists`/`members` under `weeks-at-1`), 720x900, noindex; the collector's bot screenshots them. **⚠️ THE ONLYBOOSTS CHARTS PAGE THAT LIVED AT `/charts/<YYYY-MM-DD>` WAS TORN DOWN ON 2026-09-04** (Reed's call, two days after it shipped): the same boards live on the Shows and Artists feeds and the Members tab, so `/charts` and `/charts/<date>` 302 to `/#shows`. `week-charts.js` still serves the queries, behind `/api/v1/charts`. **Untitled shows are off these boards and only these** (Reed's call, 2026-09-11; `TITLED` in `week-charts.js`). See **The chart blocks on the feeds** in `docs/feeds.md` |
+| `/` | the discovery homepage: the featured carousel, then rails, fact rails edge-rendered by `functions/index.js`, personal rails in the browser (`discover.js`) |
+| `/podcasts/{shows,episodes}`, `/music/{artists,albums,songs}` | the chart pages; the bare path opens on the first view |
+| `/boosts` | the boost feed, Global or Follows |
+| `/members` | the Top Members wall and the Boost Bots |
+| `/charts`, `/charts/{podcasts,music,hpw}` | the weekly boards; `/charts/<key>/card/<kind>` are the share-card frames |
+| `/show/<guid>`, `/episode/<item-guid>`, `/booster/<npub>`, `/artist/<guid>` | the four detail pages, edge-rendered |
+| `/search?q=`, `/discover/<key>` | the results page (a list, never rails); the whole list behind a discovery rail |
+| `/hpw/<YYYY-MM-DD>`, `/hpw/high-scores` | one #40HPW board as a page; `high-scores` is a path, the board is named Proof of #40HPW |
+| `/about`, `/stats` (placeholder), `/404.html` | |
 
-`/shows` 301s to `/podcasts/shows` (`_redirects`); the `/podcasts` redirect came
-off on 2026-10-21 because the Function serves that path now. `feeds.html` and
-`boosts.html` were folded into the feed page and deleted.
+What a change elsewhere would break (reasoning in `docs/site-structure.md`):
 
-**⚠️ EVERYWHERE THIS FILE SAYS `index.html` ABOUT THE FEED BAR, THE TABS, THE
-CONTROLLER OR THE SSR MARKERS, IT MEANS `charts.html` SINCE 2026-10-17.** The
-file was moved, not rewritten; only the address changed. `test-feed-hash.mjs`
-and `test-server-render.mjs` read `charts.html` now. **AND SINCE 2026-10-21
-`charts.html` IS THE SHELL OF FIVE PAGES, NOT ONE**: the three tabs and the
-sub-row are gone, the hash router became a path router, and the sections
-below that describe the tabs, the sub-row, `TAB_OF`, `TAB_DEFAULT`,
-`ALIASES`, `HASH_OF` and the view in the hash are history kept for the
-decisions they record. **The Chart Pages** below is the current shape.
-
-## The Chart Pages
-
-**One charts page became five pages on 2026-10-21** (Reed's call: readers
-"don't get" a page with three big tabs, and the weekly boards above the
-charts were distracting from the charts themselves). The options he picked
-from are in the session memory (A2, underlined text tabs; the boards page
-named Charts).
-
-| Page | Views | What it holds |
-|---|---|---|
-| `/podcasts` | `shows`, `episodes` | the Podcast Charts, the chart box as it was |
-| `/music` | `artists`, `albums`, `songs` | the Music Charts |
-| `/boosts` | one | the boost feed, Global or Follows |
-| `/members` | none | the Top Members wall, the Boost Bots, the membership line |
-| `/charts` | `podcasts`, `music`, `hpw` | the weekly boards in three pairs, with their week pickers and share buttons |
-
-- **⚠️ ONE SHELL, `charts.html`, SERVES ALL FIVE, AND THE ROUTE IS MARKED
-  INTO IT TWICE.** `routeShell` in `functions/_shared/charts-page.js` sets
-  `body[data-page]`, `body[data-view]` and `body[data-active-feed]` (absent
-  on Members and Charts), un-hides the page's head and underlines its tab
-  (`aria-current="page"`), activates the feed's panel, and rewrites the
-  title, canonical and Open Graph pair; the inline controller re-derives
-  the same route from `location` when it runs. The five route Functions
-  (`functions/podcasts/[[path]].js`, `functions/music/[[path]].js`,
-  `functions/boosts.js`, `functions/members.js`, the bare and one-segment
-  paths of `functions/charts/[[path]].js`) each resolve a path and call
-  `renderShellPage`; an unknown view answers the 404 page. The shell ships
-  routed to `/podcasts/shows` for the no-script read.
-- **⚠️ `PAGES` IS DECLARED TWICE AND PINNED TO THE NAV'S HREFS**: in the
-  controller and in `charts-page.js`, each page's first view being what its
-  bare path opens on (Shows, Artists, the Podcasts boards). `test-feed-hash.mjs`
-  extracts the controller's and checks every feed type is a view of exactly
-  one page.
-- **A tab is a link, so switching charts is a navigation.** The controller
-  rewrites each sibling tab's href with the active feed's view, so Shows at
-  1Y opens Episodes at 1Y. Underlined text tabs (A2), Reed's pick over a
-  segmented switch and over a menu on the lid; the latter was the
-  what-dropdown the tabs replaced in August.
-- **⚠️ THE VIEW IS THE QUERY STRING: `/podcasts/shows?scope=follows&lang=de&range=1m&sort=sats`.**
-  The scope joined the three axes when the hash became a path (it was the
-  feed key's `-follows` suffix). Defaults are elided, so the bare path is
-  the default view's address. The controller normalizes the address on boot
-  only when one of its four parameters was dropped or respelled, and leaves
-  a parameter it does not own alone. `history.replaceState`, never push.
-- **⚠️ THE HASH FORWARD IS TWO IDENTICAL HEAD SCRIPTS**, in `index.html`
-  (for `/#feed`, the address until 2026-10-17) and `charts.html` (for
-  `/charts#feed`, the address until 2026-10-21), mapping every key and alias
-  the old controller resolved: `#shows` → `/podcasts/shows`, `#podcasts-global`
-  → `/podcasts/episodes`, `#members-follows` → `/boosts?scope=follows`,
-  `#boosts` → `/boosts`, the view carried. **A bare `#members` lands on
-  `/charts/hpw`**, because the Members tab opened on the #40HPW boards and
-  the #40HPW share notes link it. `test-discover-home.mjs` runs both shipped
-  scripts against every address. **Change them together.**
-- **⚠️ TWO FEEDS ARE RENDERED AT THE EDGE, EACH ON ITS OWN PAGE**: Shows on
-  `/podcasts/shows` through `<!--OB:SSR-SHOWS-->` and Albums on
-  `/music/albums` through `<!--OB:SSR-ALBUMS-->` (2026-10-21; the same
-  renderer, the music side), both all time by Chart rank, skipped when the
-  query carries a view. Episodes, Songs, Artists and Boosts hydrate in the
-  browser as they always have.
-- **The pages with no feed paint off the body**: `feeds.js` reads
-  `body[data-page]` and `body[data-view]` at boot and calls
-  `loadChartsBlock`, `loadMemberBoards` or `loadMembersWall`
-  (`renderMembersWall` in `members-board.js`, split from the boards on
-  2026-10-21). **A missing `data-active-feed` hydrates nothing**; the old
-  `|| 'episodes-global'` fallback would have painted Episodes under the
-  Members page.
-- **The nav bar is Podcasts ▾ · Music ▾ · #40HPW ▾ · Charts · Boosts.** The
-  #40HPW plain link of 2026-10-20 folded into Charts, where both its boards
-  are, and the same evening Reed renamed the third ribbon from Members to
-  #40HPW, opening `/charts/hpw` ("that's the only thing people go to that
-  members thing for"); its key is still `data-ribbon="members"`, its
-  Discover column still lists Top Members, and the footer keeps Members,
-  `/members` being a page. The overlay's and the footer's group is
-  **Browse** (it holds a Charts entry now). The ribbons' View all links: the weekly lists go to the
-  Charts page, the year and month lists to the chart pages with the range.
-- **What went with the tabs**: the masthead (the banner and tagline above
-  the tabs; the nav bar carries the brand), `pinScroll` and the `#boosts`
-  landing scroll of 2026-10-20 (nothing sits above a feed shell now),
-  `lb:members-painted`, `hashchange`, and the Rules dialog's in-page jump to
-  the bots (a real link to `/members#boost-bots`).
-
-## The Discovery Homepage
-
-**`/` is a page of rails since 2026-10-17** (Reed's project, modelled on
-Rotten Tomatoes: "the PC 2.0 version of those sites"). The mockup canvas it
-was picked from is in the session memory; direction A won, with the sans.
-
-- **⚠️ THE RAIL ORDER IS REED'S AND NOTHING A SIGNED-OUT VISITOR CANNOT SEE
-  COMES BEFORE THE FOURTH RAIL.** Top Shows This Week, Top Albums This
-  Month, the #40HPW week, THEN Podcasts Recommended For You, Music
-  Recommended For You, Top Shows From Your Follows and (2026-10-30, Reed's
-  ask) Top Songs From Your Follows, `follows-songs` (since 2026-11-08 Latest
-  From Podcasts You Follow, `follows-latest`, leads those four, behind the
-  signed-out carrot), then New and
-  Noteworthy, Movers and Podcasters Recommend, then the Because rails, then
-  the year's episodes and songs. That is the evening-of-2026-10-21 order
-  (Reed's final pass: the three discovery instruments moved up under the
-  follows rail, the Because rails slid down, and **Top Artists This Week
-  came off the page**, its renderer and fallback deleted; the Music ribbon's
-  Discover column still links `/charts/music` under that name). The two
-  recommendation rails were "Recommended For You" and "Recommended Music"
-  until the same pass, and both carry the "Your full list" link now.
-  **Since 2026-10-22 (Reed's ask, "let people scroll and scroll") three
-  LANGUAGE RAILS sit between Podcasters Recommend and the Because rails,
-  and the foot is ten WINDOW RAILS**: Episodes, Songs, Albums and Shows
-  over the week, the month and the year, the two already at the head
-  (Shows This Week, Albums This Month) not repeated, **podcasts before
-  music** (episodes, shows, then songs, albums; Reed's order); `windowRail` in
-  `functions/index.js`, trailing windows (`range=1w|1m|1y`, the window the
-  link opens), no hero slide for any but the two year rails (the same
-  subject tops all three windows). **The language rails are three SLOTS,
-  `lang-1`..`lang-3`, whose marker pair wraps the heading too and sits
-  tight against the `<section>`** (the heading names the language;
-  `langRailHtml` in `rail-tile.js` renders head and track; an empty slot
-  renders empty and `.rail:empty` hides it): `languageRails` takes the
-  podcast side's non-English languages by boosts, `en` and NULL out, the
-  first three whose year chart has `LANG_MIN_ROWS` (5; Reed's floor, set
-  the same day a three-tile Italian rail went up at 3) rows, memoized per
-  request on the `ctx` every rail now receives; `lang-1` leads a slide
-  ("#1 German Podcast This Year"). German and Spanish on 2026-10-22, the
-  third slot empty until a language reaches five. `assets/js/lang-name.js` is the two-sided subtag → English
-  name (`feed-lang.js` reads it too). The Podcasts ribbon's Discover column
-  links `/#rail-lang-1` as "Top Podcasts by Language".
-  `test-discover-home.mjs` pins the first three, the personal rails'
-  position, and the generic order.
-- **THE FEATURED CAROUSEL SITS ABOVE THE RAILS AND IS THE FIRST PLACE OF
-  EACH GENERIC RAIL, IN THE PAGE'S RAIL ORDER** (Reed's call, 2026-10-19,
-  after the heroes on Rotten Tomatoes, IMDb and Fountain's discovery tab;
-  he had turned the idea down on 2026-10-17 and asked for it two days
-  later). Nothing editorial, nothing personal: the same nine slides for
-  every visitor, so it is facts and the Function renders it. Each `RAILS`
-  entry answers `{ html, lead }`, the lead being its first row as a slide
-  spec from the two-sided `assets/js/hero.js` (`showSlide`, `episodeSlide`,
-  `artistSlide`, `memberSlide`, `EYEBROWS`), so the hero costs no chart
-  query; `buildHero` adds the one thing the rails do not carry, a
-  description by primary key (`blurb` strips and clips it), allowed to fail
-  per slide; `railOrder` reads the order off the shell; `injectHero` fills
-  `<!--OB:HERO-->`, left in place when there is nothing to show. The shape
-  is Fountain's, since the art is square: the artwork blurred as the
-  backdrop, the art at left, the eyebrow (the rail's rule), title, figures,
-  two lines of description, Open and Boost. **The Boost pill reuses the
-  cards' own handlers**: the slide carries the same data attributes a show
-  card or an episode card does and `discover.js` hands a click to the
-  exported `onShowBoost` / `onBoostClick`, loaded on first use. The rotation
-  (seven seconds, paused on hover, focus and touch, off under reduced
-  motion and off screen), the arrows, the dots and the artwork fallback are
-  `discover.js`; a rail the browser filled gets its slide added with the
-  same mappers (no description: the endpoints do not carry one). Two
-  trade-offs Reed accepted: the hero pushes the first rail down, most of a
-  phone's first screen; and slide one repeats the first tile under it. The
-  rails still start at #1. `/about#recommendations` says it is not an
-  editorial pick.
-- **A signed-out visitor with nothing imported sees ONE LOCKED RAIL, THE
-  CARROT, in place of the four personal rails** (`data-rail="personal"`,
-  "Log in or import your OPML for personalized recommendations"; Reed's
-  call, 2026-11-08, after four locked cards in a row pushed everything a
-  signed-out reader can see below them; from 2026-10-17 to then every
-  personal rail showed its own locked card, the carrot being the sense of
-  missing out on what logging in unlocks). **A personal rail is `hidden`
-  until it has something to show** (`reveal` in `discover.js`, the one
-  place a rail un-hides; the four ship `hidden` in `index.html`, so the
-  no-script read is the signed-out state): the two Follows rails for any
-  signed-in member, the two Recommended rails once the member has seeds
-  (boosted shows or list entries; a member with neither sees the Follows
-  rails alone), and for an imported list without an account each
-  Recommended side that has rows, the podcast side with a note when both
-  are empty. **AND THE CARROT STAYS UP UNTIL THE MEMBER HAS A SEED ON BOTH
-  SIDES, SAYING WHAT IS MISSING** (Reed's second ask the same day:
-  "advertising space to explain what the site is doing"): `CARROT` in
-  `discover.js` holds the states (loading; signed out; an imported list,
-  what logging in adds; no seeds; an empty list with boosts to seed from,
-  "follow or favorite", Reed's boosted-once account; no podcast seed,
-  "boost or follow a podcast"; no music seed, "favorite an album"), read
-  off the endpoint's `sides` (`sidesOf` in `recommend.js`, the seeds
-  counted per medium side) and the feeds the browser sent; **an empty
-  Recommended rail is a hook with a button, never a shrug** ("No music to
-  recommend from yet · Browse albums"); it
-  leads the personal block when nothing personal is painted and follows it
-  otherwise (`setCarrot` moves the section). The ribbons' Discover links to
-  a hidden personal rail land on it. The locked track is a grid whose
-  placeholder tiles and card share one cell, so the card sizes the track.
-  The rail head's extras (the full-list link, the imported list's Manage)
-  ride the `.rail-sub` line, never a third flex item, so the heading never
-  wraps.
-- **Every language is first class**: no language rail, no language default.
-- **Fact rails are edge-rendered, personal rails are browser-only.** Each
-  fact rail is an `<!--OB:RAIL:<key>-->` marker pair in `index.html` filled
-  by `RAILS[key]` in `functions/index.js`; a rail that fails keeps its
-  placeholder and `assets/js/discover.js` fetches the same endpoint and
-  paints it with the same two-sided `assets/js/rail-tile.js`. The #40HPW rail
-  renders the two-sided `hpw-board.js` board, not tiles.
-- **The nav bar is direction A on every page** (`partials/nav.html`): logo and
-  wordmark, the sections, the site search in the middle
-  (`assets/js/nav-search.js`, loaded by `nav.js`, asking
-  `/api/v1/search?type=all` and `/api/v1/members?q=`), the theme toggle,
-  Donate, the account control. **A pasted npub, `nostr:npub…` or 64-hex
-  pubkey is a MEMBER LOOKUP, not a search** (Reed's ask, 2026-10-22):
-  `pubkeyQuery` in `nav-search.js` and again in `functions/search.js`
-  (the two must agree) sends it to the member endpoint alone, the
-  typeahead answers the member's row (Enter opens their page) or a "not in
-  the index" line named through Primal's cache when it can be, and the
-  results page says the same instead of "Nothing matched". On a phone the links fold into the
-  hamburger's overlay and the search takes its own row. **The overlay's
-  Charts group, the inline links and the footer's Charts group name the same
-  places; change them together.**
-- **THE SECTIONS ARE RIBBONS SINCE 2026-10-20: Podcasts · Music · #40HPW
-  (Members until the evening of 2026-10-21, see The Chart Pages) each open a
-  panel under the bar, then two plain links** (Reed's call,
-  after Rotten Tomatoes' section menus). The plain links were #40HPW and
-  Boosts for one day and are **Charts and Boosts since 2026-10-21**, when
-  the boards got their own page under that name; see **The Chart Pages**. A
-  ribbon is two top-five lists (Shows This Week + Shows This Year; Albums
-  This Month + Songs This Year; #40HPW This Week + Largest Boosts This
-  Week), a **Discover** column of that side's rails minus the two listed
-  (the personal rails named, so a signed-out visitor sees what logging in
-  unlocks), and the first list's #1 at the right. Each is a `<details>` so
-  the caret opens it with no script; `assets/js/nav-ribbons.js` (loaded by
-  `nav.js` like the search) adds hover, Escape and outside-click, and
-  **fills the lists on first open from the chart endpoints**: the nav is a
-  partial on static pages too, so the lists are never edge-rendered.
-  `SOURCES` there is keyed by the partial's `data-ribbon-list` slots. The
-  Members ribbon's second list is `/api/v1/boosts?sort=sats&range=1w`, the
-  one ordering that endpoint has besides time (no cursor in it). On a phone
-  the overlay's three section rows are accordions: the row opens the page,
-  the chevron opens the Discover links. **Reed's wording rule: the boost
-  feed's link is "Boosts", never "Live"**, which means something else in
-  podcasting. **`/boosts` is the boost feed's own address since 2026-10-21**
-  (the nav's Boosts link, the footer, the ribbon); it was `/charts#boosts`,
-  an alias plus a pinned scroll, for one day, and that address forwards. The Discover
-  links to homepage rails are `/#rail-<key>`, the rails' heading ids, under
-  a `scroll-margin-top` for the sticky bar. `test-discover-home.mjs` pins
-  the bar, the slots against `SOURCES`, the Discover columns, the overlay
-  and footer in step, the forward and the alias, and the sats ordering.
-- **`--font-sans` is Outfit** (`assets/fonts/outfit.woff2`, OFL, a variable
-  file), used by the bar and the rails. The two serifs are still the display
-  and body faces everywhere else; the typography item below is still open.
-- **⚠️ THE THREE FIGURES HAVE ONE ORDER SITE-WIDE: SATS, BOOSTS, BOOSTERS**
-  (Reed's call, 2026-10-29): the chart formula's order and the detail
-  pages' stat tiles. The rail triplet, the weekly boards' triplet and
-  column head, the card stats lines and every sort menu follow it (chart
-  rank and the chronological sorts keep their places).
-- **A tile's one line is the chart triplet** (rank in sats / boosts /
-  boosters, each behind its icon since 2026-10-29: a Bitcoin sign, a speech
-  bubble, a person, `rankTripletHtml` in `rail-tile.js`; Reed's ask, the
-  words do not fit), printed "#6 / #2 / #3" (the number sign marks a
-  place, not a count) and **never wider than the artwork**: the line is
-  sized off the tile's width by its digit count (`rt-d3`..`rt-d9`,
-  container units, measured in Chromium at 96 to 180px). **Each figure is pressable** (Reed's ask,
-  2026-10-30): a click opens a small note, not the tile's link ("Ranked
-  5th in sats this week", in the rail's own window and noun; `railScope`
-  in `discover.js`, the explainer, caught in the capture phase). A new
-  ranked rail key needs an entry there or its figures explain nothing. **A MIXED RAIL'S
-  tiles carry a MEDIUM BADGE** (Podcasters Recommend, the one mixed rail
-  since 2026-10-30, when Reed split New and Noteworthy into New and
-  Noteworthy Podcasts and New and Noteworthy Music, `new-shows` and
-  `new-music`, `/discover/new-music` the second's page; Movers is the Shows
-  chart, one side, and is headed "Podcast Movers"): a light chip with an icon and the
-  word ("Podcast", "Music") in the artwork's bottom-right corner
-  (`mediumBadge`, printed only when the caller passes `medium`; the tile
-  mappers pass none). Every other rail is one side and its HEADING says
-  which: **"Podcasts", never "Shows", in the homepage's rail names and the
-  ribbons** (Top Podcasts This Week, Top Podcasts From Your Follows, #1
-  Podcast This Week; Reed's call, 2026-10-30), the two New and Noteworthy
-  rails reading "New and Noteworthy Podcasts" and "New and Noteworthy Music". The chart pages' Shows
-  view keeps its name. **Only a ranked rail prints the line**:
-  the two Recommended rails, Top Shows From Your Follows and the Because
-  rails map through `bare()` and show the title alone (Reed's call,
-  2026-10-29), and the #40HPW tile reads "34.3 HPW", no episode count.
-  New and Noteworthy's tiles print no line (the badge says the medium);
-  New and Noteworthy and Movers explain themselves in the rail head (`.rail-more--note`) rather than linking a chart (Movers has none of its own);
-  **a superlative names its population** ("more than any other show in the
-  index"; Reed, 2026-10-30: the site's figures are this index's, never the
-  world's);
-  Reed's call after seeing "7 boosters · 38.8k sats" at tile size. The #40HPW
-  rail is tiles too (face, name, "34.3 HPW", gold past the
-  goal), not the board: every rail the same shape. **A person's tile is
-  ROUND** (`person: true` → `.rail-tile--person`, Reed's call 2026-10-18: a
-  circle reads as an individual, a square as content); the two member
-  mappers set it and nothing else does.
-- **`/search?q=` is the results page, AND IT IS A LIST, NOT RAILS**
-  (`search.html` + `functions/search.js` + `assets/js/search-page.js`).
-  Reed's rule, 2026-10-18: the sideways tile rail is the HOMEPAGE's shape;
-  anything deeper (a search, the full charts, research) is a list like the
-  charts page. So every hit is the charts page's own card (show-card,
-  episode-card with the lazy drawer, publisher-card, and the Members tab's
-  wall for members), rendered at the edge through the three ranked
-  endpoints' own `q=` paths in process, so **a hit wears the chart rank it
-  holds on the unfiltered all-time chart**, and `search-page.js` attaches
-  the same verbs the feeds attach. Groups: shows, albums, episodes, songs,
-  artists, members, each linking its chart. `noindex`. Enter in the nav
-  field goes there (Reed's call: a typed query deserves every hit, not the
-  first); an arrow-key pick still goes to its row. `_shared/search-all.js`
-  is the typeahead's alone now.
-- **The foot of the page is ONE STRIP INTO THE BOOST FEED** (`.rail-cta`,
-  `/boosts` since 2026-10-21; `/charts#members` before, which forwards), not
-  boost rows. The newest twelve rows sat there from
-  the 2026-10-17 feedback round until 2026-10-18, when Reed traded them for
-  the Because rails; the whole feed with its controls is the Boosts page,
-  and the nav's Boosts link already lands on it. Ideas for a stronger
-  one-click (a Live pill in the nav bar, a ticker of the newest boost) are
-  open with Reed.
-- **The personal rails are `POST /api/v1/recommend`** (`{pubkey,
-  favorites?}` → `{seeds, podcasts, music, because}`): the member's boosted
-  shows, plus the favorites the browser hands over, are the seeds; the
-  collector's `show_similar` scores (distinct-booster cosine, top 20 per
-  show, daily full replace) are summed over them, seeds excluded, **floor:
-  reached from two seeds or two boosters shared with one** (half of all
-  pairs share exactly one booster, measured 2026-10-17). Two lists, never
-  one: the music side's overlap runs nearly three times the podcast side's.
-  **`because` is up to FIVE rails, one per seed, THE SEEDS WITH THE MOST TO
-  SHOW FIRST AND NONE UNDER FOUR TILES** (Reed's ask, 2026-10-18 for the
-  rails; 2026-10-22 for the pick: "we should pick the biggest ones", after
-  a two-tile rail beside a ten-tile one and the question why those five).
-  `becauseOf` reads the `BECAUSE_POOL` (12) most-boosted seeds with
-  neighbours over the floor, then picks greedily: the seed with the most
-  neighbours not yet shown, re-counted after every pick since a show
-  appears under one rail only, until five or until no seed has
-  `BECAUSE_MIN` (4) left. Until 2026-10-22 it was the five most-boosted
-  seeds in boost order, any size. Cloned by `discover.js` from the hidden
-  prototype section. Nothing is stored per
-  member. **A podcast whose newest episode is over 183 days old is not
-  recommended** (Reed's call, 2026-10-29; podcast side only, NULL kept),
-  off `podcasts.newest_item_ts`, the newest item's datePublished from PI episodes/byfeedid, a
-  collector column briefed to OB-back the same day; until it exists the
-  query falls back to unfiltered on "no such column". **The Because rails are deliberately NOT filtered** (Reed's call, 2026-10-30, after seeing the cut: 223 of 639 podcast-side shows at 183 days); `becauseOf` carries no date clause. **The method is public: `/about#recommendations`** states every
-  rail's rule, Reed's data-transparency call, and the three personal rails'
-  one-liners link it; `docs/about-and-faq-source.md` is the factual backing
-  and is corrected first. **Favorites ARE handed over since 2026-11-07** (Reed's report
-  that a followed show stayed recommended): `favorites-ui.js` fires
-  `ob:favorites-read` on `window` after every read and exposes
-  `OBFavorites.feeds()` / `ensureRead()`; `discover.js` re-asks the endpoint
-  with the feeds, `/booster` repaints its rails through the two-sided
-  `recommend-rails.js`; `because[].why` ('boosted' | 'follow') picks the
-  heading's verb, and **the rails say "you" on `/booster` too** (Reed's call
-  the same day, over "Because Reed boosted"). `pubkey` is optional on the
-  endpoint when `favorites` is sent (for the OPML path). **The feeds are
-  BARE guids**: a list entry's id is the whole `podcast:guid:` identifier,
-  and the first paint sent that, so nothing matched. See `docs/favorites.md`
-  item 8.
-- **Three more fact rails off the new columns**: New and Noteworthy
-  (`first_boost_ts` within 90 days and two boosters; the collector measured
-  21 such shows; **since 2026-10-30 two rails, and the podcast one adds
-  COMEBACKS**, Reed's call after it held five tiles: boosted in 90 days after
-  180+ days with no boost, one non-bot booster, the six-month dormant rule
-  applied, about 21 tiles on OB-back's measurement; `newShowsRows`, `whyNew`
-  in `functions/index.js`; music stays debuts only), Movers (this week's Shows chart against last week's to 100
-  places, climbers by places then debuts), Podcasters Recommend (podroll
-  targets by how many sources list them; an unindexed target is a figure,
-  not a link).
-- **A member's recommendations are on THEIR OWN PAGE too: `/booster/<npub>#recommended`,
-  AND SINCE 2026-11-08 FOR THE OWNER ALONE** (2026-10-20, Reed's ask: a
-  member with recommendations has a page here already; 2026-11-08, Reed's
-  call: "you" was always the member, so a visitor to another member's page
-  gets what that member boosts instead, the four boosted rails). Nothing is
-  edge-rendered for it now (`recommendationsFor` stays the endpoint's core):
-  `booster-page.js` asks `/api/v1/recommend` with the list once the
-  Favorites section has read it, for the owner only, paints the rails
-  through the two-sided `recommend-rails.js` with the homepage's hooks and
-  carrot, and hides the boosted rails for them; **from the moment the read
-  starts the owner sees the homepage's loading card in their place**
-  (`personalLoading`, off the section's `onStart`/`onFail`; Reed's ask,
-  2026-11-08), and a read that fails gives the boosted rails back. The homepage's Recommended
-  rails gain a "Your full list →" link to it once painted.
-- **⚠️ RETIRED 2026-10-21 WITH THE TABS: `pinScroll` is gone from
-  `charts.html`, since a view is a page of its own and nothing sits above a
-  feed shell any more (see The Chart Pages). Kept for the decision it
-  records.** A HASH THAT NAMES A VIEW LANDS ON THE LIST, AND A LANDING
-  SCROLL IS PINNED (`pinScroll` in the `charts.html` controller, 2026-10-20). The
-  chart blocks sit above the feed shell on Shows, Albums and Artists, so
-  `#shows?range=1y` from a "View all" link was landing on the week's board;
-  now any hash carrying a range, sort or language scrolls to the active
-  panel's `.feed-shell`, and `#boosts` to the Members tab's Boosts section.
-  The scroll is re-made on every change of the document's height for six
-  seconds (the blocks, boards, wall and bots all grow the page after the
-  first paint; a one-shot scroll drifted onto the boards) and stops at the
-  reader's first wheel, touch or key. The bare `#shows` still lands at the
-  top.
-- **Latest From Podcasts You Follow** (2026-11-08, Reed's ask: follows were
-  the input the dropped followed-podcasts feed was missing) leads the
-  personal block: `POST /api/v1/follows/latest {feeds}` takes the list's
-  podcast guids (an imported list's too), and **asks Podcast Index, since
-  D1 holds boosted episodes only**: one `byfeedurl` (or `byguid`) per show
-  for the feed id, cached a week, then ONE `episodes/byfeedid?id=a,b,c`
-  for the lot, cached ten minutes; at most `SHOWS_MAX` (40) shows a
-  request, newest `newest_item_ts` first; the index's own newest boosted
-  episodes when PI is absent or silent (`source: 'index'`). `latestTile`
-  puts the show's name under the title. **The homepage draws TEN, like every
-  other rail, and the long rail is the owner's `/booster#latest`** (Reed's
-  call the same evening: the one rail with a scroll bar looked odd): twenty
-  tiles, then a View more tile that asks for a larger page (`LIMIT_MAX`,
-  100) and appends what was not shown; `latestRailHtml` in
-  `recommend-rails.js`, `repaintLatest` in `booster-page.js`, the owner
-  alone, right after Favorites. A PI feed-id column on D1
-  `podcasts` would make it one D1 query and one PI call; OB-back's, if
-  wanted.
-- **The owner's `/booster` carries the homepage's hooks and carrot**
-  (2026-11-08): `recommendRailsHtml(recs, { owner, feeds })` renders an
-  empty side's hook and the carrot rail after the rails; the copy is one
-  table, `CARROT` / `HOOKS` in `recommend-rails.js`, which `discover.js`
-  imports. A visitor to another member's page sees the rails alone.
-- **Still to build here**: boost messages on the results page, New Music
-  and Album Movers as music-side discovery rails (the
-  Music ribbon's Discover column is three lines because the movers, new
-  and podroll instruments are podcast-side today; `newShowsRows` already
-  takes both media). Most Favorited is held: 15 lists on the whole network
-  on 2026-10-17.
-
-## Site map
-
-The nav's Explore menu and the footer carry the same three groups, in the same
-order. They are the site map, so **they're regrouped together or not at all**:
-
-| Group | Items |
-|---|---|
-| **Browse** | Podcasts `/podcasts` · Music `/music` · Members `/members` · Charts `/charts` · Boosts `/boosts` — *Feeds* until 2026-10-17, *Charts* until 2026-10-21, when every section became a page and the weekly boards took the Charts name |
-| **Stats** | Boost Stats `/stats` — coming soon |
-
-**⚠️ `/boosters` (Community) WAS THE SECOND STATS ENTRY AND THE PAGE IS DELETED,
-NOT REDIRECTED.** *Reed's call, 2026-08-23.* The Members tab now answers what it
-promised — the member lookup, the top-members wall, the #40HPW boards — so the
-placeholder pointed a reader at a promise for content that exists one tab over.
-It was `noindex`, out of the sitemap, and linked from nowhere but this menu and
-the footer, so there is nothing to redirect: no inbound links, no bookmarks, no
-search presence. **`/api/v1/boosters/<npub>` and `/booster/<npub>` are different
-paths entirely and are live** — do not confuse the plural page with either.
-| **More** (footer: *Connect*) | About · Source · Report a bug |
-
-**⚠️ BROWSE IS ONE ENTRY PER PAGE, NOT PER CHART, AND EACH BARE PATH OPENS ON
-ITS FIRST CHART** (`PAGES` in the controller and in `charts-page.js`, since
-2026-10-21; `TAB_DEFAULT` before). The paragraph that follows is the tabs-era
-reasoning and still holds. *Reed's call, 2026-08-23.* It listed all five sub-feeds,
-which was right while the homepage hid them behind a dropdown and wrong the
-moment the tabs put them on screen: the nav then restated a control the page
-carries, in a different order, using different words for the same things.
-**Those three hrefs and `TAB_DEFAULT` in the `charts.html` controller move
-together** — Podcasts opens Shows (Episodes until 2026-09-03, Reed's call with the chart blocks: the three default feeds are the charted ones), Music opens Artists (Albums until 2026-08-31, Reed's call with the Chart Positions strip), Members opens Boosts.
-
-**The Global/Follows axis is deliberately not in the nav**: it's the second
-dropdown on the page, and listing both scopes would double the group into a grid
-restating a control the page already has.
-
-| Feed | Hash | Renders |
-|---|---|---|
-| Episodes · Global | `#episodes-global` | per-episode rollup by boosts received |
-| Episodes · Follows | `#episodes-follows` | same, filtered to your kind-3 contacts |
-| Songs · Global | `#songs-global` | the same rollup, music feeds only |
-| Songs · Follows | `#songs-follows` | same, filtered to your kind-3 contacts |
-| Members · Global | `#members` | the kind-1 boost notes themselves |
-| Members · Follows | `#members-follows` | same, filtered to your kind-3 contacts |
-| Shows | `#shows` / `#shows-follows` | per-show rollup; Follows since 2026-08-31 |
-| Albums | `#albums` / `#albums-follows` | the same rollup, music feeds only |
-| Artists | `#artists` / `#artists-follows` | the publisher tier above Albums |
-
-The inline feed-bar controller in `index.html` owns the tabs, the sub-category
-row, the scope menu, which panel is on screen, and the hash, and dispatches
-`lb:feed-activate`; `assets/js/feeds.js` listens and lazily hydrates.
-
-### The Three Tabs
-
-**⚠️ RETIRED 2026-10-21. The tabs, the sub-row, `TAB_OF`, `TAB_DEFAULT`, the
-chrome box and the phone chips are gone from `charts.html`; each tab is a
-page and each sub-feed a view with an underlined text tab (see The Chart
-Pages). Kept for the decisions it records.**
-
-**Podcasts · Music · Members**, on Local Bitcoiners' `feeds.html` pattern
-(`git show lb/main:feeds.html`): a full-bleed equal-column grid, an icon over
-each label, a 3px top rule, and the selected tab **filled with its accent**
-rather than underlined. The what-dropdown they replaced hid four of five feeds
-behind a control you had to know to open, which is idea #18's whole complaint.
-
-| Tab | Sub-feeds | Why |
-|---|---|---|
-| **Podcasts** | Shows · Episodes | the not-music side of `<podcast:medium>` |
-| **Music** | Albums · Songs · Artists | the music side |
-| **Members** | *(none shown)* | the boost firehose, which takes no medium and could not go under either without becoming two things it isn't |
-
-**⚠️ THE TAB IS DERIVED FROM THE FEED KEY AND IS NOT IN THE HASH.** `TAB_OF` in
-the controller computes it, which is why nothing in the wild changed: `#shows`,
-`#episodes-global`, `#songs-follows`, `#albums`, `#members` and the two
-retired `#podcasts-*` aliases all resolve exactly as before. A `#podcasts/shows`
-scheme would have been a second address space for the same eight views.
-
-**⚠️ The active tab reads `--accent`, straight off the `body[data-active-feed]`
-mapping**; an inactive tab has no active feed to read and carries its family's
-shade. Since the ramp retired (see the Theming section) every family resolves to
-the one brand cyan, so the tracking no longer shows — the mapping is kept, and
-no token was added.
-
-**⚠️ Which sub-buttons are on screen is CSS off `body[data-active-tab]`, not
-JS** — the same call `.feed-bar-controls` makes, for the same reason. Each
-`.feed-sub-group` is pinned to its own grid column, and that explicit
-`grid-column` is what makes hiding the others safe: with auto placement plus
-`display:none`, whichever group survived would fall into column 1.
-
-**⚠️ `.feed-subs` and `.feed-tabs` must share a content box.** Both are
-three-column grids; if one takes a horizontal padding or a gap the other does
-not, every block narrows and the pair slides out from under its tab a few pixels
-at a time. `test-feed-hash.mjs` compares them per breakpoint.
-
-**⚠️ The seam under the tab row runs all the way across, including under the
-selected tab**, in `--accent-d`. Broken there, the tab and the block below it
-share a fill, touch, and merge into one slab.
-
-**The tabs and the sub-row sit in one bordered, rounded box at the track
-width (`.feed-chrome`) since 2026-09-03**, Reed's call: the masthead's and
-the sticky wrap's hairlines ran edge to edge on a wide screen. The box is the
-edge now; on a phone its sides and radius come off and only the bottom
-hairline stays.
-
-**On a phone the tabs become chips and KEEP THEIR LABELS.** LB goes icon-only
-because four tabs and four words do not fit; three do, and a reorganization that
-exists because visitors cannot tell what the site shows them must not open with
-three unlabelled glyphs.
-
-**⚠️ The page track is `--feed-track`, which is `.show-main`'s width; both read
-`--page-track` in `theme.css` since 2026-11-07 (60rem, 72rem from 1100px up,
-the homepage's width; Reed's ask: every page the same width on a desktop).**
-Three elements read it — the tabs, the sub-row and the panels (the control bar
-was the fourth until 2026-09-03, when it became the lid inside the active
-panel's shell) — so the column no longer narrows by 240px when a reader clicks
-a card through to its detail page. The masthead's logo and subtitle keep their own smaller
-measures; those are typographic, not the track.
-
-**⚠️ THE HASH IS HISTORY SINCE 2026-10-21: the view is the query string of a
-path (`/podcasts/shows?scope=follows&lang=de&range=1m&sort=sats`), the hash
-addresses are forwarded by two head scripts, and `ALIASES`, `HASH_OF` and
-`SCOPELESS`'s companions are gone from the controller.** The paragraphs that
-follow describe the 2026-08-17 to 2026-10-21 shape.
-
-**A hash may carry a view: `#shows?lang=de&range=1m&sort=sats`.** The feed key
-stays intact as the part before the `?`, so `FEEDS` and `ALIASES` look up exactly
-as they did and a retired hash still upgrades. `PARAM_FEEDS` (né `LANG_FEEDS`)
-lists the ten that have the axes; the two Boosts feeds drop the parameters and
-rewrite, the same coercion a signed-out `#episodes-follows` gets. See **The View
-In The Hash** in `docs/feeds.md` for the whole mechanism.
-
-**⚠️ `SCOPELESS` IS EMPTY SINCE 2026-08-31 AND THE BARE HASHES DID NOT BECOME
-ALIASES.** Shows, Albums and Artists gained the whose-axis with the Charts
-branch, so every feed key is `<type>-<scope>` now — and `#shows`, `#albums`
-and `#artists` are the CANONICAL hashes of the global scope through `HASH_OF`,
-the `#members` arrangement, so no link in the wild rewrites. The set itself is
-kept empty rather than deleted: `feedKey` and the scope-menu rule read it, and
-a future scopeless feed is one entry rather than a re-derivation. One
-behaviour changed with it, deliberately: picking Shows while on a Follows feed
-now lands on Shows · Follows, since the scope state applies everywhere.
-
-**Follows only exists for a signed-in npub.** Signed out, the scope menu is
-`hidden` outright, and a `#episodes-follows` deep link is coerced to Global with
-the hash rewritten to match.
-
-**Each feed's range + sort controls mount into the bar's third slot**
-(`[data-feed-controls]`), tagged `data-controls-for="<feed>"`. Which group is
-visible is **CSS off `body[data-active-feed]`**, not JS: feeds hydrate once and
-keep their controls forever, so an imperative swap is the version that can leave
-a feed you come back to showing another feed's controls, or none.
-
-**Each panel leads with one slot, shipped empty and `hidden`**: the
-`[data-feed-note]` line, filled by the renderer and hidden until it is, so a
-feed showing "sign in" or an error grows nothing. It is inside the panel
-rather than the bar, so it scrolls away with the cards it describes. **The
-`[data-feed-search]` box beside it, and the member lookup on the Members tab,
-were removed on 2026-10-17** (Reed's call): the nav bar's site search is on
-every page and `/search` is the results page, so three per-feed boxes restated
-one control. `feed-search.js` and its test went with them; the ranked
-endpoints' `q=` paths stay for the API, and the renderers' pick/query state is
-unreachable but still in place.
-
-**The note slot is on the four ranked feeds only** (`mountFeedNote` and
-`viewNote` in `feed-note.js`). Since 2026-08-31 the line is composed from the
-view itself rather than being a fixed corpus sentence: what orders the list
-("Ranked by total sats boosted"; the chart sort states its formula), plus a
-corpus clause only when the corpus deviates from all time/Global ("Counting
-only boosts from the accounts you follow"), plus `langNote`'s language
-sentence. On the chart sort it also carries an ⓘ linking to `/about#charts` —
-an anchor now in the wild, frozen like `/about#membership`. On a rollup a card
-is an **aggregate**, so the corpus clause is a claim about what was counted
-rather than about which cards survived. This is deliberately one line and no
-box; don't grow it back into the scope paragraph it replaced.
-
-### The Landing Feed
-
-**⚠️ "LANDING" MEANS THE PODCASTS PAGE'S OPENING CHART SINCE 2026-10-21**
-(`/podcasts/shows`; the charts page's opening feed from 2026-10-17), not the
-site's front door, which is the discovery homepage above. The three
-declarations below read, since 2026-10-21: `PAGES.podcasts.views[0]` in the
-controller; `is-active` on `#panel-shows` and the marker pair inside it; and
-the `SSR` table and `FEED` in `functions/_shared/charts-page.js`. `DEFAULT_TYPE`
-and `TAB_DEFAULT` are gone.
-
-**The front door opens on Shows / All time / Chart rank.** Two Reed calls:
-Shows on 2026-08-23 (Phase D, idea #18, shipping the last piece of the tabs
-work), and Chart rank on 2026-08-31, when the OnlyBoosts Charts became the
-opening sort on **every ranked feed at once** — Shows, Albums, Artists,
-Episodes and Songs, both scopes, plus the members wall. The show-level
-leaderboard is the view that answers "what is this site" to somebody who has
-never seen it; the episode feed is one press away on the sub-row above it. It
-opened on Episodes · Global from the day the feed bar existed, and on Most
-boosters from Phase D to the Charts flip.
-
-**⚠️ IT IS THREE DECLARATIONS AND THEY MOVE TOGETHER.** Any one of them alone is
-a page that contradicts itself, and `test-server-render.mjs` pins all three:
-
-| | |
-|---|---|
-| `DEFAULT_TYPE` in the `index.html` controller | what the controller resolves to when the hash names nothing |
-| `is-active` on `#panel-shows`, and the `<!--OB:SSR-SHOWS-->` markers inside it | what a reader with no JavaScript and a crawler on its first pass actually see, since the controller only hides and shows panels once it runs |
-| `FEED` in `functions/index.js` | which query was rendered into that panel, and the `sort` / `range` the client's controls open on |
-
-**`TAB_DEFAULT.podcasts` IS `'shows'` SINCE 2026-09-03**, agreeing with
-`DEFAULT_TYPE`. It stayed `'episodes'` from 2026-08-23 until then, on the
-argument that where a cold load lands and what the **Podcasts tab** opens on
-when pressed are two questions and only one had been asked; Reed asked the
-second when the chart blocks made Shows the Podcasts tab's charted feed. The
-constant is pinned to the nav's and the footer's Podcasts href (`/#shows`),
-so the three move together.
-
-**⚠️ THE OPENING SORT IS `chart` ON EVERY RANKED FEED — one key, one
-spelling.** *Reed's call, 2026-08-31.* The OnlyBoosts Charts is deliberately
-spelled `chart` on all four ranked endpoints, so the default is the first sort
-key the two rollups have ever agreed on. The history matters because the wart
-it stepped around is still live for the OPTION menus: the boosters ranking is
-spelled `count` on the episodes endpoint and `boosters` on the shows endpoint,
-and each renderer coerces the other's word to its default — that coercion now
-lands on `chart`. `shows-feed.js` opened on `boosts`, then `boosters` (Phase
-D: distinct people, because one listener boosting a show forty times is one
-vote, not forty), now `chart`; `feeds-podcasts.js` opened on `boosts`, then
-`count`, now `chart`. Breadth stays in the chart as both a component and the
-first tiebreaker, which is what made the flip a sharpening of the Phase-D
-argument rather than a reversal.
-
-**The Function renders ONE feed and it is the one on screen** — see the ⚠️ under
-the rendering rule for why, and for why `feeds-podcasts.js#adoptServerCards` is
-kept with no producer.
-
-## The medium split
-
-`<podcast:medium>` is what separates a podcast from a music release: a `music`
-feed's items are tracks on an album, not episodes of a show. Live counts
-(2026-09-01, after the deepscan recovery): **1,034 music, 714 podcast, 20 video**,
-plus a handful of radio/course/film/publisher and 10 with none — music became the
-majority when the recovered era landed. Any count or coverage figure in this file
-measured before 2026-09-01 was measured on a corpus 63% smaller.
-
-**Two renderers serve five what-options.** Episodes and Songs are one
-episode-level rollup; Shows and Albums are one show-level rollup. Each pair
-splits on the medium and differs *only* by a copy table at the top of its module.
-Adding a third medium is a third entry in those tables, not a third renderer.
-
-**Music has a third tier above the album: the publisher, which in practice is
-the ARTIST.** `<podcast:publisher>` links an album feed to its artist's own
-publisher feed; the collector resolves it from raw RSS (PI carries no publisher
-field — `bots/global-boost-scan/publishers.py` is that design record) and the
-Artists feed (`#artists`, shipped 2026-08-30) ranks them. **⚠️ THE ARTIST TIER
-COUNTS MUSIC ONLY — hard-wired server-side since 2026-08-31.** *Reed's call,
-reversing the launch decision* (the endpoint took no medium on the argument
-that the tier is ownership, the ~9 podcast-side declaring shows counting too):
-the surface says ARTIST and sits under the Music tab, so an artist's figures
-are their music's figures on every surface — the listing, the detail endpoint,
-`/artist` (whose `#shows` section was removed the same day), and the
-feed-rank chips, all on the standing `COALESCE(medium,'podcast') = 'music'`
-partition reading. An artist's podcast-side shows still live on Shows/Episodes
-and their own `/show` pages; they are simply not part of the tier. **The
-Artists feed** in `docs/feeds.md` carries the rest of the decisions.
-
-**⚠️ The split is a partition, not a narrowing.** `music` goes to Songs and
-Albums; **everything else** goes to Episodes and Shows — podcasts, the two video
-feeds, and every show the collector holds boosts for but Podcast Index can't
-identify. So Albums is never a subset of Shows under a second name. A show with
-no known medium counts as not-music: filing an unidentified feed under Albums
-would be a claim about it we can't support. The Boosts feeds take no medium and
-stay the unsplit firehose.
-
-**The medium is a property of the SHOW, so it is not on the boost record.** The
-alternative was the collector stamping one show-level fact onto 22k boosts and
-rewriting every month archive.
-
-**⚠️ The medium is a QUERY PARAMETER, not a client-side join.**
-`/api/v1/episodes` and `/api/v1/podcasts` take `medium=music` or
-`not_medium=music` and answer already split, so the browser never reconciles two
-datasets.
-
-Every feed on both sides of the split has the Global/Follows axis since
-2026-08-31. The old asymmetry (Songs had it, Albums didn't) was about the data
-source: the show-level rollup read a published aggregate computed over
-everyone. Server-side ranking retired that, and `/api/v1/podcasts` and
-`/api/v1/publishers` now take the same follows POST `/api/v1/episodes` always
-had. See the scope note in `shows-feed.js`.
-
-**⚠️ THE TWO COMMUNITY ROLLUPS WERE THE EXCEPTION AND ARE NOT ANY MORE.**
-*Reed's call, 2026-08-24.* `#community-shows` on `/show` and
-`#community-episodes` on `/episode` crossed the partition deliberately, on the
-argument that what an audience listens to *across* podcasts and music is the
-interesting half of the finding; both headings read "Shows/Albums" and
-"Episodes/Songs" and neither carried a `COPY` entry. The homepage separates the
-two, so these pages now do the same: a podcast page reads **Other Shows This
-Community Boosts** and an album page **Other Albums This Community Boosts**,
-with **Other Episodes** / **Other Songs** one level down.
-
-**The heading and the query's WHERE clause are ONE decision** — a `communityHeading`
-entry in each page's `COPY` table, and a `COALESCE(medium,'podcast')` filter in
-the show page's community CTE and in `fetchCommunityBoosts`. Change either alone
-and the section names something it isn't.
-
-**The cost was measured over 24 live pages before the change, and it is
-asymmetric**: a podcast page's rollup was **12% albums**, an album page's was
-**39% podcasts**. So the album side is where the crossover lived and where it was
-lost. If it is ever wanted back it wants a **section of its own with its own
-heading**, never this list widened again under a narrower name.
-
-**Two rollups are still deliberately unsplit, for different reasons.** The
-**podroll** is the publisher's own list, written by them, so filtering it would
-misreport what they wrote. The **booster page** was the other until 2026-11-08,
-on the argument that splitting files one person under two half-histories;
-**Reed split it that day** (Podcasts Boosted, Albums Boosted, Episodes
-Boosted, Songs Boosted, `boosted-rails.js`); its `#boosts` list is still
-unsplit and the page carries no `COPY` table. `episode-section.js`'s range
-tooltip reads "Boosted in the last N days" — one reading of `range`
-site-wide since 2026-08-31 — which also serves the booster page's unsplit
-rollup with no medium-neutral dance.
-
-## Where this code came from
-
-A hard fork of **ReedBTC/localbitcoiners** (cloned at `lb-v43`, history intact).
-Upstream is wired as the `lb` remote with pushes disabled:
-
-```
-git fetch lb
-git log lb/main --oneline          # see what's new upstream
-git cherry-pick <sha>              # pull a specific LB fix across
-git show lb/main:path/to/file.js   # read a file that was stripped here
-```
-
-Anything deleted during the strip is recoverable that way — reach for
-`git show lb/main:...` before rewriting something from scratch.
-
-Design and code are also expected to be pulled from:
-- `~/mynostr-web` — the full React Nostr client
-- `ChadFarrow/boostmebitch` (BMB) — Podcast Index proxy, wallet rails,
-  signed-out boosts via a server-side identity, live-stream zaps
-
-### What The Strip Removed
-
-**Moved verbatim to `docs/strip-removed.md` on 2026-09-23.** LB's own
-products (the Events path, the calendar card, the meetup product, ~6,600
-lines of source and 202KB off the homepage) were deleted on 2026-08-23; that
-file has the table, the calendar-card note this file got wrong for months,
-and the two checks worth reusing for any future strip. **A widget deletion
-is verified by `test-boost-modal-render.mjs` and by a declared-versus-
-referenced diff against the previous revision, never by a green build**:
-Vite builds an undeclared identifier away without a word, and this repo has
-no linter.
+- **⚠️ `charts.html` IS THE ONE SHELL OF FIVE PAGES** (Podcasts, Music, Boosts,
+  Members, Charts), routed by `functions/_shared/charts-page.js` and again by
+  the inline controller. **`PAGES` is declared in both and pinned to the nav's
+  hrefs**; `test-feed-hash.mjs` extracts the controller. The view is the query
+  string (`?scope=&lang=&range=&sort=`), defaults elided, `replaceState` only.
+- **⚠️ THE OLD HASH ADDRESSES ARE FORWARDED BY TWO IDENTICAL HEAD SCRIPTS**, in
+  `index.html` and `charts.html`. Change them together; `test-discover-home.mjs`
+  runs both.
+- **Two feeds are edge-rendered**: Shows (`<!--OB:SSR-SHOWS-->`) and Albums
+  (`<!--OB:SSR-ALBUMS-->`), all time by Chart rank. A page with no feed paints
+  off `body[data-page]`; a missing `data-active-feed` hydrates nothing.
+- **⚠️ THE HOMEPAGE RAIL ORDER IS REED'S** and nothing a signed-out visitor
+  cannot see comes before the fourth rail; `test-discover-home.mjs` pins it.
+  Signed out with nothing imported, the personal rails are one locked carrot
+  rail. A new ranked rail key needs a `railScope` entry in `discover.js`.
+- **The nav bar, the overlay and the footer name the same places; change them
+  together.** The boost feed's link is "Boosts", never "Live". Homepage rail
+  names say "Podcasts", never "Shows".
+- **⚠️ THE THREE FIGURES HAVE ONE ORDER SITE-WIDE: SATS, BOOSTS, BOOSTERS.**
+- **⚠️ THE MEDIUM SPLIT IS A PARTITION**: `music` goes to Songs, Albums and
+  Artists; everything else, unidentified shows included, to Episodes and Shows
+  (`not_medium=music`, never `medium=podcast`). It is a query parameter, never a
+  client-side join. The artist tier counts music only.
 
 ## Stack
 
 Vanilla HTML + ES modules, no build step for the site itself. Cloudflare Pages +
-Pages Functions. The one thing that *does* build is `login-widget/` (Vite +
-React), compiling to `assets/widgets/login-widget.js`:
+Pages Functions. The one thing that builds is `login-widget/` (Vite + React),
+three targets: `assets/widgets/login-widget.js`, `assets/widgets/nostr-tools.js`,
+and `functions/_shared/nostr-sign.js` (the edge signer; the Functions have no npm
+dependencies and import relative paths only).
 
 ```
 cd login-widget && npm install && npm run build
 ```
 
-**That one command has three targets**, and the third is not for the browser:
-`assets/widgets/login-widget.js` (the React widget),
-`assets/widgets/nostr-tools.js` (nostr-tools for the static pages), and
-`functions/_shared/nostr-sign.js` (**the edge signer**). The last exists because
-the Pages Functions have no npm dependencies and this repo has no root
-`package.json` — every Function imports relative paths only, which is what keeps
-"no build step for the site itself" true. Signing a Nostr event needs schnorr
-and WebCrypto has no secp256k1, so the one dependency the edge needs is vendored
-the same way the browser's copy already is. `scripts/stamp-assets.js` leaves it
-alone: its relative-import rule runs only inside `assets/js`.
+**On Reed's .2 box `npm run build` fails**; from `login-widget/` run
+`node node_modules/vite/bin/vite.js build && node node_modules/vite/bin/vite.js build --config vite.nostr-tools.config.js && node node_modules/vite/bin/vite.js build --config vite.nostr-sign.config.js`.
+**`login-widget/src/` edits change nothing until built.**
 
-Local dev: `wrangler pages dev .` (so `/api/*` Functions resolve).
+Local dev: `wrangler pages dev .`
 
-**Two scripts run before a commit that touches shared markup or assets, in this
-order:**
+**Before a commit that touches shared markup or assets, in this order:**
 
 ```
 node scripts/sync-partials.js          # nav + footer into every page
 node scripts/stamp-assets.js           # ?v=<VERSION> onto every JS/CSS reference
-node scripts/stamp-assets.js --check   # verify; non-zero exit if anything is stale
+node scripts/stamp-assets.js --check   # non-zero exit if anything is stale
 ```
 
-**Order matters.** `sync-partials` injects markup into the page files; anything
-it injects has to be stamped afterwards.
+**⚠️ Bump `VERSION` in `sw.js` on ANY asset change, then stamp.** A URL means
+exactly one version of one file; that is what closed the `ob-v53` outage (one
+stale module took down all eight feeds). Adding a named export to a shared
+module is ordinary work since then.
 
-Thirty-three test scripts, all plain `node scripts/<name>.mjs` with no runner.
-**`docs/tests.md` is the per-test reference** — one row each, saying what it
-covers and what it was confirmed red against. What follows here is only what a
-change elsewhere would break.
+**Thirty-three test scripts**, plain `node scripts/<name>.mjs`. `docs/tests.md`
+is the per-test reference; **bump the count here and that file together.** Run
+all thirty-three before a merge.
 
-**⚠️ `test-server-render.mjs` IS THE ONE THAT NEEDS AN ARGUMENT, SO IT IS THE ONE
-THAT GOES UNRUN.** Its header carries the `curl` that produces the capture; take
-a fresh one rather than reusing an old file, since it is also the size
-measurement. It asserted `cards are numbered 1..N with no gaps` — the *ordinal*
-scheme's invariant — until competition ranking shipped on 2026-08-18, and it
-would have been merged red had it not been run. **Run all thirty-three before a
-merge**, and treat this one as the guard on the ranking scheme rather than only
-on weight. *(That number has been wrong before — it lagged from twelve to twenty-eight, a
-test at a time, while the table beside it grew; it was thirty-two for an afternoon on 2026-10-17 (`test-discover-home.mjs` in) and thirty-one again by evening (`test-feed-search.mjs` out); thirty-two since 2026-10-29 (`test-session-secret.mjs` in); thirty-three since 2026-11-07 (`test-opml.mjs` in). `git log -S "before a\nmerge" -- CLAUDE.md` has every value it has held. **Bump it and `docs/tests.md`
-together.**)*
+- **⚠️ `test-server-render.mjs` NEEDS A FRESH CAPTURE** and is the one that goes
+  unrun: `curl -s 'https://onlyboosts.social/api/v1/podcasts?not_medium=music&sort=chart&range=all&limit=25' -o <file>`
+  then `node scripts/test-server-render.mjs <file>`. It guards the ranking scheme.
+- **`test-feed-hash.mjs` extracts the controller out of `charts.html`** by
+  scanning for `FEED BAR CONTROLLER` and `function <name>(`; renaming either
+  breaks it loudly, on purpose.
+- **⚠️ `test-boost-modal-render.mjs` IS A TEXT SCAN, NOT A RENDER, AND THIS REPO
+  HAS NO LINTER.** A use-before-declare in a component that renders during a
+  payment unmounts the whole widget root, and the note is never published.
+  Declare new consts and state above their first read.
+- `test-charts.mjs`'s "malformed cache entry" case flakes about one run in three;
+  rerun before blaming a change.
 
-**⚠️ AND ITS `curl` CHANGED WITH THE LANDING FEED.** It captures
-`/api/v1/podcasts?not_medium=music&sort=chart&range=all&limit=25` now (it read `sort=boosters`
-until the Charts became the opening sort on 2026-08-31), not the episodes
-query. The whole file was rewritten by Phase D, which is the honest
-measure of how big that change was: the landing feed is not a constant this test
-could have been parameterised by, since the two cards share no renderer, no state
-element and no drawer. `git show 4c22017:scripts/test-server-render.mjs` is the
-episode version if the front door ever moves back.
+## What The Service Worker Caches
 
-**⚠️ `test-feed-hash.mjs` EXTRACTS THE CONTROLLER OUT OF `index.html` and runs
-it**, because it is an inline `<script>` and cannot be imported. That is the
-whole value of it: a second copy of `normLang()` inside the test would pass
-forever while the shipped one rotted. It scans for `FEED BAR CONTROLLER` and for
-`function <name>(` with a balanced-brace walk, so **renaming those functions or
-that comment breaks the test loudly**, which is the intended failure.
-
-It exists because two bugs shipped that no unit test of the parsing could see,
-both living in the boot sequence: the language reached `lb:feed-activate` but not
-`body[data-feed-lang]`, so every shared link opened unfiltered; and it was filed
-under the feed key the hash named rather than the one `setFeed` resolved to, so a
-signed-out `#episodes-follows?lang=de` filed it against a feed that was not on
-screen. **Anything about how this page boots wants a test here, not a unit test.**
-
-`test-feed-lang.mjs` imports the real module and rewrites only its two
-version-stamped absolute imports to stubs, so the module under test is the
-shipped source.
-
-**⚠️ `test-boost-modal-render.mjs` IS A TEXT SCAN, NOT A RENDER, AND THIS REPO
-HAS NO LINTER.** It exists because a temporal dead zone reached production and
-did not look like a crash: a render error with no boundary above it unmounts the
-whole `createRoot`, so one missing line-order produced four unrelated-looking
-faults — the modal vanished mid-payment, the payment completed anyway, **no
-Nostr note was ever published**, and the page's Boost button was dead until a
-reload. Nothing anywhere said an error had been thrown. **Point the scan at any
-component that renders while a payment is in flight**, and see *Why
-`test-boost-modal-render.mjs` Is A Text Scan* in `docs/tests.md` for the whole
-account (`no-use-before-define` would catch the class in one rule; adding eslint
-to `login-widget/` is the better fix whenever anyone wants it).
-
-### Asset Stamping, And The Rule It Replaced
-
-`scripts/stamp-assets.js` appends `?v=<VERSION>` to every
-`/assets/{js,css,widgets}/…` reference, reading VERSION from `sw.js` so there is
-one source of truth.
-
-**The failure it closed:** Pages serves assets `public, max-age=14400,
-must-revalidate`, and **every module URL runs that four-hour clock on its own**.
-A reader could hold a three-hour-old `feed-controls.js` against a freshly-fetched
-renderer importing something the old copy did not export, and an unresolved named
-import is a **link-time** error, so the renderer never executed at all. All eight
-feeds went down together (`ob-v53`). Bumping `sw.js` never closed it: the service
-worker's cache is only consulted for clients it already controls, and the HTTP
-cache underneath is per-URL either way.
-
-**The fix:** a URL now means exactly one version of one file. A deploy references
-new URLs, so a stale copy is unreachable rather than merely undesirable.
-
-**So the old "never add a named export" prohibition is history.** Adding a named
-export to a shared module is ordinary work now, as is any cross-module refactor.
-Notes warning against it survive in `feed-controls.js`, `feed-note.js`,
-`show-desc.js`, `booster-link.js` and `boost-note-actions.js` as the reason each
-of those exists; they are accurate history, not live constraints.
-
-**⚠️ One rule replaces the several it displaced: bump `VERSION` in `sw.js` when
-you change any asset, then run the script.**
-
-Three details before editing the script:
-
-- **It matches only quoted references** — `href="…"`, `src="…"`, `from '…'`,
-  `import('…')`, and `sw.js`'s `PRECACHE_URLS` literals. An unanchored pattern
-  also matches comment prose, and the sentence's full stop then sits where the
-  version suffix goes, so the next run parses it as part of the version and
-  deletes it. That is a script that edits documentation a little more every time
-  it runs. `--check` is what caught it.
-- **It stamps two shapes.** The absolute reference every page uses, and a
-  **relative** `'./sibling.js?v=…'` import inside `assets/js`, which exists for
-  the modules imported from both the browser and a Pages Function.
-- **JS and CSS only.** Images and fonts are left alone deliberately: the failure
-  being closed is two *code* files disagreeing, and a stale logo is not a broken
-  page. `assets/widgets/` is stamped at the reference sites but its files are
-  never rewritten, being build artifacts.
-
-`sw.js` routes on `url.pathname`, so the query string doesn't disturb it.
-
-### What The Service Worker Caches, And How
-
-`sw.js`'s fetch handler is four routes, and **which route a URL lands in decides
-whether a returning visitor can be shown a stale answer**:
-
-| Request | Route | Cache |
-|---|---|---|
-| HTML / navigations | network-first, cached copy offline | `HTML_CACHE` |
-| `/api/` except `/api/data/` | **network-first, cached copy offline** | `API_CACHE` |
-| `/api/value`, `/api/lnurl` | network only, never cached | — |
-| `/api/data/` | stale-while-revalidate (5-minute snapshot) | `SNAPSHOT_CACHE` |
-| `/assets/widgets/` | stale-while-revalidate | `WIDGET_CACHE` |
-| everything else same-origin | stale-while-revalidate | `STATIC_CACHE` |
-
-**⚠️ The catch-all is for ASSETS, and a live endpoint that falls into it is
-served from the previous visit.** `/api/v1/*` sat there until `ob-v73`: a boost
-live in D1 took two reloads to appear, and only for returning visitors, so it
-read as intermittent. The Follows feeds never showed it because they POST and
-the handler ignores non-GET. Any new live endpoint belongs under `/api/`, where
-`isLiveAPIRequest` picks it up with no SW change; one placed anywhere else needs
-its own route before it ships.
-
-**⚠️ BUT A MONEY ENDPOINT NEEDS ONE MORE STEP, AND LANDING UNDER `/api/` IS WHAT
-HIDES IT.** That bucket is network-first **with a cached copy served when the
-network is down**, which is right for a feed and wrong for anything that moves
-sats. `isUncacheableMoneyRequest` is the opt-out and holds four:
-`/api/value`, because a stale value block pays a split the show no longer
-publishes; `/api/lnurl`, because it returns a **bolt11 invoice** and a cached
-invoice is one the donor may already have paid; `/api/boostbox`, because it
-returns a descriptor URL a podcaster's Helipad will fetch, so a cached one
-attaches **another boost's** message, amount and episode to this payment; and
-`/api/keysend`, which is the most direct of the four — it names the **node the
-sats are addressed to** and the record routing them to an account on it, so a
-stale copy pays the wrong destination outright. `/api/lnurl` shipped
-without the exclusion in `ob-v91` and was caught before deploy; the reason it
-was easy to miss is that placing it under `/api/` was the correct, documented
-thing to do. **Ask of any new endpoint not just where it routes, but whether an
-offline answer is worse than no answer.**
+HTML and `/api/` are network-first with a cached copy offline; widgets and
+static assets are stale-while-revalidate. **⚠️ A live endpoint belongs under
+`/api/`**, or a returning visitor is served the previous visit. **⚠️ A money
+endpoint needs one more step**: `isUncacheableMoneyRequest` holds `/api/value`,
+`/api/lnurl`, `/api/boostbox` and `/api/keysend`, never cached, because an
+offline answer pays a stale split, a paid invoice or the wrong node. Ask of any
+new endpoint whether an offline answer is worse than none.
 
 ## ⚠️ The Rendering Rule: The Server Renders The Facts, JavaScript Adds The Verbs
 
-**The standard every page is held to.**
+Facts (anything out of the database that is the same for every visitor) are
+server-rendered, always. Verbs (anything needing a signer, a gesture, or who is
+looking) are attached by JavaScript, always. A component never has to choose.
+If a reader could screenshot the same component on two pages and tell them
+apart, that is a bug unless the subject differs.
 
-| | |
-|---|---|
-| **Facts** | Anything out of the database that is the same for every visitor: who boosted, how many sats, which show and episode, message text, artwork, rankings, air dates. **Server-rendered, always.** |
-| **Verbs** | Anything needing a signer, a gesture, or knowledge of who is looking: reply, like, repost, zap, boost, copy, sort, filter, search, expand, seek. **Attached by JavaScript, always.** |
-
-The consequence worth internalising: **a component never has to choose between
-being server-rendered and being interactive.** A boost note is server-rendered
-*and* carries a full reply/like/repost/zap bar. Reaching for "this section has to
-be client-rendered so it can be interactive" means the split has been drawn in
-the wrong place.
-
-**What this protects**, because "works without JavaScript" overstates it:
-
-- **Search.** ~930 show pages and 2,027 episode pages are in the sitemap.
-  Googlebot runs JavaScript, but on a delayed second pass and not dependably per
-  page. Server-rendered content is indexed on the first pass.
-- **Resilience.** `ob-v53` blanked all eight feeds when one cached module didn't
-  match another. The feeds went down; the show pages did not.
-- **Speed.** Finished HTML paints once. A shell paints, fetches, then paints again.
-- **Not** readers with JavaScript disabled. That is a rounding error and was
-  never the reason.
-
-### What Must Be Identical Across Pages, And What May Differ
-
-**The test: if a reader could screenshot the same component from two pages and
-tell them apart, that is a bug** unless the subject genuinely differs.
-
-| Identical everywhere | Legitimately differs |
-|---|---|
-| A boost note: card, message, mentions, reaction bar, ⋮ menu | The **subject** (show / episode / person) |
-| A rollup drawer: the box, the lid, the range and sort controls | **Which sections exist** (a podroll is show-level; chapters are episode-level) |
-| An artwork fallback chain | **The words**, off a `COPY` table (Episode vs Track) |
-| A booster's name and face, and where they link | **Which figures are meaningful** (a booster page has no booster count) |
-
-### ⚠️ One Module, Imported From Both Sides
-
-**`docs/two-sided-modules.md` is the authority** — the mechanism, the three
-worked examples (episode card, show card, boost row), the `CARD_PARTS` table,
-the five surfaces the episode card serves, and the first-view measurements
-behind lazy drawers and the Shows landing feed.
-
-The mechanism: a Pages Function imports `../../assets/js/episode-card.js` by
-relative path and esbuild inlines it off the filesystem; the browser imports
-`/assets/js/episode-card.js?v=<VERSION>` and gets the same file. So a card
-rendered at the edge and the same card rebuilt in the browser after a re-sort
-are byte-identical **by construction**.
-
-What a change would break:
+**One module, imported from both sides** (`docs/two-sided-modules.md`): a
+Function imports `../../assets/js/x.js` and esbuild inlines it; the browser
+imports `/assets/js/x.js?v=<VERSION>`. So:
 
 - **A two-sided module imports its siblings as `'./thing.js?v=<VERSION>'`**, never
-  an absolute `/assets/js/…` — the browser resolves that and esbuild cannot.
-  Enforced by `scripts/stamp-assets.js`.
-- **Everything a two-sided module imports must itself be two-sided.**
-  `show-link.js`, `episode-link.js`, `booster-link.js`, `cover-art.js`,
-  `nostr-text.js` and `favorite-button.js` are all dependency-free, which is
-  what made this cheap.
-- **⚠️ NO `Date.now()`, NO UNPINNED LOCALE.** Three formatters were safe in a DOM
-  builder and are not safe here; at the edge the clock is the moment the response
-  was *cached*. All three are `en-US` in UTC, and `test-show-card.mjs` scans the
-  **source** for them, because the test process is already en-US in UTC and a
-  render check passes regardless.
-- **⚠️ NO SURFACE PRINTS AN EPISODE NUMBER, ANYWHERE.** *Reed's call,
-  2026-08-24.* The data is still stored and still on `/api/v1`; `itemAbbr` is gone
-  from all three `COPY` tables. `test-boost-row.mjs` pins it.
-- **⚠️ THE FUNCTION DECLARES THE CARD VARIANT AND IT TRAVELS IN THE STATE
-  ELEMENT**, so a client repaint cannot render a different card than the edge did.
-  Three knobs and only three (`CARD_PARTS`): `stats`, `layout`, `drawer`.
-- **⚠️ `functions/index.js` fetches `/` from `env.ASSETS`, never `/index.html`.**
-  Pages 308-redirects the latter and the front door answered
-  `ERR_TOO_MANY_REDIRECTS`. It shipped that way once.
-- **⚠️ ONE FEED IS SERVER-RENDERED AND IT IS THE ONE ON SCREEN.**
-  `feeds-podcasts.js#adoptServerCards` is deliberately kept with no producer — it
-  is the client half of the landing-feed decision, and what makes moving the front
-  door a change to the Function alone.
+  an absolute path, and everything it imports is two-sided too.
+- **⚠️ NO `Date.now()`, NO UNPINNED LOCALE** in a two-sided module; `en-US` in UTC.
+- **⚠️ NO SURFACE PRINTS AN EPISODE NUMBER.**
+- **The Function declares the card variant and it travels in the state element.**
+- **⚠️ `functions/index.js` fetches `/` from `env.ASSETS`, never `/index.html`**
+  (Pages 308s it into a redirect loop).
+- **⚠️ EVERY REPAINT RE-ATTACHES THE VERBS** (`wireBoostNotes(root)`).
 
-## Conventions carried over from LB — keep these
+## Conventions
 
-- **CSP meta tag on every page.** All pages share one policy so tightening
-  happens in lockstep. **`img-src` allows `data:` and `https:` and not
-  `blob:`**, so a preview of a fetched blob is a `data:` URL, never
-  `createObjectURL` (the share modal shipped a broken-image icon that way);
-  don't widen the shared policy for one preview. **`script-src` allows
-  `https://static.cloudflareinsights.com`** (2026-10-15): Cloudflare injects
-  its Web Analytics beacon into every HTML response as an external module
-  script, and the policy refused it, so analytics recorded nothing. The
-  card frame (`card-frame.js`) deliberately keeps it out; the collector's
-  screenshot bot is its only visitor.
-- **Shared nav/footer are generated.** Edit `partials/nav.html` /
-  `partials/footer.html`, then run `node scripts/sync-partials.js`. Never edit
-  the copies inside page files — they're between `NAV:START`/`NAV:END` markers
-  and get overwritten. A new page only needs the empty marker pair. **Its
-  `EDGE_PAGES` list is what keeps the Functions' nav and footer in sync**; a new
-  edge-rendered page needs an entry there.
-- **The nav's lazy-widget bootstrap is `assets/js/nav-widget-boot.js`**, not
-  inline — it wires the Donate button and the identity slot to the 1MB
-  login-widget bundle, loaded as a plain (non-defer) script at the end of `<body>`.
-- **Link pages without the `.html`.** Pages serves `/about` and 308-redirects
-  `/about.html` to it, so an in-site link with the extension costs a redirect hop.
-- **⚠️ `404.html` is what makes a missing path answer 404.** Without it in the
-  repo root, Cloudflare Pages answers **every** unmatched path with `200` and the
-  full homepage. Three consequences, the third being the one that costs an
-  afternoon: a dead link silently showed the homepage; a crawler was told every
-  dead URL was a real page duplicating `/`; and **a file that failed to deploy
-  reported a MIME error rather than a 404**, since the browser fetched HTML where
-  a module was expected and refused it under `nosniff`. Nothing in that message
-  says the file is missing.
-
-  It carries **no canonical and no Open Graph tags**, the one place the page
-  conventions are deliberately broken: it is served under whatever URL was
-  missed, so there is no single address for either to name. `follow` is kept so a
-  crawler landing here still traverses the nav back into the site map. It is
-  deliberately out of the sitemap and `noindex`. `/show/<guid>` and
-  `/episode/<guid>` answer their own misses and are unaffected.
-- **Pages Functions bound every upstream fetch**: wall-clock timeout, byte cap,
-  *and* a streamed read (`resp.text()` buffers before you can check size). See
-  `functions/api/data/[[path]].js` for the reference shape.
+- **CSP meta tag on every page, one shared policy.** `img-src` allows `data:` and
+  `https:`, not `blob:`. `script-src` allows Cloudflare's analytics beacon.
+- **Shared nav/footer are generated**: edit `partials/nav.html` /
+  `partials/footer.html`, run `sync-partials.js`; never edit the copies between
+  the markers. A new edge-rendered page needs an `EDGE_PAGES` entry. The nav
+  boot script and nav.js may contain no backtick or `${`.
+- **Link pages without `.html`.**
+- **⚠️ `404.html` is what makes a missing path answer 404**; without it Pages
+  answers every unmatched path 200 with the homepage, and a missing module
+  reports as a MIME error.
+- **Pages Functions bound every upstream fetch**: timeout, byte cap, streamed
+  read (`functions/api/data/[[path]].js` is the shape).
 - **⚠️ Every Function that exports `onRequestGet` also exports
-  `onRequestHead`** (the GET's status and headers, no body). Pages routes by
-  method, and a HEAD with no handler falls through to the static lookup and
-  answers 404 for a URL whose GET is fine; link checkers and some unfurlers
-  HEAD first. Bitten three times in two days on 2026-08-29/30 — **and the
-  rule was then found unenforced on 2026-09-07: `/show`, `/episode`,
-  `/booster`, `/` and every `/api/v1` endpoint still answered 404 to HEAD.**
-  The handler is one line now, `export const onRequestHead =
-  headOf(onRequestGet)` from `functions/_shared/head.js`, and
-  `test-head-routes.mjs` scans `functions/` for any GET without it. **The two
-  money endpoints, `/api/lnurl` and `/api/keysend`, are the allowlist on
-  purpose**: their GET asks a third party for an invoice or a node record,
-  which a link checker's HEAD must not do.
-  **⚠️ AND A PAGE FUNCTION FETCHES ITS SHELL WITH `assetGet(request, path)`
-  FROM `head.js`, NEVER WITH THE INCOMING REQUEST AS INIT** (2026-10-21):
-  that init copies the method, a HEAD fetched the shell as a HEAD, the empty
-  body made the fill throw, and thirteen chart-family routes answered 500 to
-  `curl -I` on the preview while GET was 200. The scan was green because it
-  only checks the handler exists; it now also refuses the pattern and runs
-  a HEAD through the real chart-page renderer against a method-faithful
-  asset stub.
-- **CORS origin allowlists are exact-match `Set` lookups**, never `startsWith` —
-  a prefix check lets a lookalike origin get reflected into
-  `Access-Control-Allow-Origin`.
+  `onRequestHead = headOf(onRequestGet)`**, except the money endpoints
+  `/api/lnurl` and `/api/keysend`. **A page Function fetches its shell with
+  `assetGet(request, path)`**, never with the incoming request as init.
+  `test-head-routes.mjs` enforces both.
+- **CORS allowlists are exact-match `Set` lookups**, never `startsWith`.
 - **`isSafeUrl()` before any user-supplied URL** reaches `href`/`src`.
-- **⚠️ Bump `VERSION` in `sw.js` on ANY asset change, then run
-  `scripts/stamp-assets.js`.** Not "when returning visitors need it on the first
-  navigation" — that was the old conditional rule, and it is now unconditional,
-  because the stamper reads VERSION to build every asset URL.
-- **Adding a named export to a shared module is ordinary work.** See the stamping
-  section above for why the old prohibition is retired.
+- **⚠️ `/api/data/*` upstream answers HTTP 200 for missing files**; the proxy
+  checks content-type and parses JSON, and its paths are a strict allowlist.
+- **Internal identifiers keep LB's `lb` prefix** (`window.LBLogin`,
+  `lb_nostr_session`, `lb:feed-activate`). Don't half-rename.
+- **Upstream LB is the `lb` remote, pushes disabled**: `git show lb/main:<path>`
+  before rewriting something the strip removed.
 
 ## Theming
 
-The shared stylesheets (`nav.css`, `footer.css`, `boosts-thread.css`,
-`boost-actions.css`) read their colors as CSS custom properties off `:root` and
-don't define them — every page has to supply the tokens. That supply is
-`assets/css/theme.css`: the palette, the `@font-face` rules, and the base
-`body`/`a`/`img` styles. **Link it from every page, last among the shared
-stylesheets** so a page's own inline `<style>` still wins.
+`assets/css/theme.css` supplies the tokens; link it from every page, last
+among the shared stylesheets. The grammar is **one ground, hairlines, and one
+accent**; don't introduce a surface with its own colour. Dark mode is
+`data-theme="dark"` on `<html>`; a dark override of an aliased token goes on
+`:root[data-theme="dark"]`, never `body`, and the dark block stays below the
+base `:root` block. LB's token names (`--orange`, `--navy`) are aliases;
+trust the values. `docs/dark-mode.md` has the rest.
 
-`index.html` keeps one theme block of its own — the eight per-feed accents and
-the `body[data-active-feed]` mapping. `assets/css/page.css` is the counterpart
-for the plain content pages (`.page-header`, `.soon-card`).
+**The widget wears the site's palette** (`docs/widget-theming.md`):
 
-### Dark Mode
+- **⚠️ The tokens are read, not copied, and every `var()` carries a literal
+  fallback** that mirrors the token (the test checks it).
+- **⚠️ `.lb-w` is the scope and every `createPortal` must wear it**, and still be
+  passed a container.
+- **⚠️ Every selector in the scoped reset computes to (0,0,0).**
+- **⚠️ A filled brand button is `--brand-dd`, never `--brand`** (2.50:1 fails AA).
 
-**Moved verbatim to `docs/dark-mode.md` on 2026-09-23.** The rules that
-reach outside it: `data-theme="dark"` on `<html>`, set before first paint by
-the boot script in `partials/nav.html` and toggled by `nav.js` (**neither may
-contain a backtick or `${`**; sync-partials exits nonzero); the grammar is
-**one ground, hairlines, and one accent** (Reed's call, 2026-08-27), so
-**don't re-introduce a surface with its own colour**; `--navy` flips to the
-ground, `--brand-dd`/`--brand-ddd` and `--warn`/`--danger` deliberately do
-not flip, and a new `--navy` fill or `--brand-dd` text usage needs its own
-dark-scoped rule; and **a dark override of an aliased token goes on
-`:root[data-theme="dark"]`, never on `body`**, or every alias bakes in the
-light value first. **The dark block stays below the base `:root` block in
-`theme.css`**: `test-boost-modal-render.mjs` parses the first one it finds.
-
-### The Widget Wears The Site's Palette
-
-**The login/boost widget is a fork of LB's and wore LB's dark palette until
-2026-08-21.** OnlyBoosts is light, so pressing Boost took the reader out of the
-site's visual world entirely. It is now on the site's own tokens, and it inherits
-**Dark Mode** above for free — the tokens flip on `<html>` and the widget mounts
-into that same document.
-
-**`docs/widget-theming.md` is the authority** — the scoped preflight, the two
-specificity traps, the two Tailwind shapes that fail silently, the three surface
-tokens, and the contrast measurements behind `--brand-dd`.
-
-Six rules, each of which shipped as a bug before it was written down:
-
-- **⚠️ THE TOKENS ARE READ, NOT COPIED.** Tailwind runs in the host document with
-  preflight off, so `bg-[var(--modal-bg)]` works with no config change. Never
-  hardcode a hex into JSX.
-- **⚠️ BUT EVERY `var()` CARRIES A LITERAL FALLBACK.** `assets/widgets/` files are
-  stamped at the reference site and **never rewritten**, so a new widget can meet
-  an old `theme.css` — the `ob-v53` failure class arriving through the one door the
-  stamper cannot close. An undefined custom property invalidates the whole
-  declaration, which is how the boost modal once rendered transparent mid-payment.
-  The fallbacks are **mirrors**: `test-boost-modal-render.mjs` asserts each equals
-  the token's current value, so editing the palette without re-mirroring fails.
-- **⚠️ `.lb-w` IS THE SCOPE AND EVERY `createPortal` MUST WEAR IT** — and must
-  still be passed a container. Eight of ten call sites once put the closing `</div>`
-  on the wrong side of the comma, which is valid JSX and rendered nothing.
-- **⚠️ EVERY SELECTOR IN THE SCOPED RESET MUST COMPUTE TO (0,0,0)**, `:where()`
-  around the element list included. An unwrapped `[type='button']` carries class
-  weight and silently killed every `bg-*` utility on it.
-- **⚠️ A FILLED BRAND BUTTON IS `--brand-dd`, NEVER `--brand`** — white on
-  `--brand` is 2.50:1 and fails AA — with `--brand-ddd` on hover, so contrast only
-  ever increases. `IdentityWidget`'s pill and `BoostButton` stay dark on purpose,
-  sitting on the navy nav bar rather than on a modal.
-- **⚠️ `nav-widget-boot.js`'s STATIC PLACEHOLDER AND `LoginButton`'s NAV SKIN MUST
-  MATCH TO THE PIXEL**, the React button replacing that element in place.
-
-**Known and deliberately not changed:** `boosts-thread.css` and
-`boost-actions.css` still tint hover states with `rgba(247,147,26,…)`, LB's
-bitcoin orange. Those are the site's own reaction bars, not the widget, and they
-were out of scope for the widget restyle.
-
-`assets/css/feed-cards.css` holds the **episode card and everything that hangs
-off it** — the range/sort controls, the card, the boost drawer, the inline boost
-thread, the copy toast, `.ob-stats-label` and `.feed-placeholder`. Every rule in
-it reads `--accent` / `--accent-d` / `--tint`, so a page that links it has to
-supply them.
-
-Those stylesheets were written against LB's token names (`--cream`, `--navy`,
-`--orange`, `--green-d` …). Rather than rename ~300 usages, the old names are
-kept as **aliases repointed at the OnlyBoosts palette**. Trust the values, not
-the words — `--orange` is brand cyan. New code should prefer `--brand` / `--ink`
-/ `--surface`.
-
-**⚠️ THE FEED ACCENT HAS A FOURTH STEP, `--*-accent-dd`, AND IT IS FOR TEXT.**
-Same idea as `--brand-dd`: white on `--bg-accent` measures **2.50:1** and the
-same colour as ink on cream is **2.29:1**, so anything small wearing the accent
-is illegible. The phone's tab chips read it both ways — as a fill under white
-when selected, as the label and border when not — which is where Reed saw it
-(2026-08-23). The value is the least darkening of the cyan that reaches 6:1 on
-white. `--accent-dd` is mapped beside `--accent` on every `body[data-active-feed]`
-row, and `--tab-dd` rides beside `--tab` on the tabs because CSS cannot build
-one custom property's name out of another's.
-
-**⚠️ THE DESKTOP TAB AND THE SUB-ROW STILL USE `--accent` AND STILL MEASURE
-2.50:1.** Only the phone chips were changed, which is what was asked for and
-where the type is smallest. It is the same bug at a larger size; fixing it means
-the selected tab and the block below it stop sharing a fill, which is the thing
-the seam note under **The Three Tabs** exists to protect. A decision, not an
-oversight.
-
-Brand colors are sampled from the supplied art: `--brand: #00aff0` and
-`--brand-d: #068ace`. **⚠️ THE PER-FEED ACCENT RAMP IS RETIRED.** *Reed's call,
-2026-08-27, on seeing the feeds beside dark mode:* the eight feeds sat on one
-cyan→indigo→violet ramp, the violet tail marking the music half of the medium
-split, so switching feed shifted the page wash. Every feed now wears the one
-brand-cyan family — the one Members · Global always wore, and the same accent
-the detail pages supply — in both themes. **The retirement is values-only**: the
-eight family names survive in `index.html` as aliases of `--bg-*`, the
-`body[data-active-feed]` mapping is untouched, and the dark remap touches
-`--bg-*` alone (a dark line for any other family would silently override the
-aliasing — the inline comment says so). A revival is repointing the aliases; the
-ramp's light and dark values and the reasoning that picked them are in git
-before 2026-08-27. `--accent` / `--accent-d` / `--tint` remain the only names
-the shared chrome sees.
-
-## Site identity
+## Site Identity
 
 | | |
 |---|---|
@@ -1280,1730 +216,131 @@ the shared chrome sees.
 | Bot npub | `npub182r6r8yqr4t3zxcfq4tfyfwjkg9nn525ljfmaadg72rqcsymsnvslda3ge` |
 | Bot pubkey (hex) | `3a87a19c801d57111b0905569225d2b20b39d154fc93bef5a8f2860c409b84d9` |
 
-**⚠️ THE BOT IS A SECOND IDENTITY AND THE SEPARATION IS THE POINT.** It signs
-boost notes for donors with no Nostr account (see "The Site Signs For A Booster
-Who Has No Key" in `docs/money-paths.md`), and a signing endpoint is an attack
-surface however well validated. Rotating a bot key costs a profile, one booster page and
-`BOOSTBOT_PUBKEY_HEX` in `assets/js/zap-receipt.js` (the donor's zap request is addressed to it, and
-`/api/sign-receipt` refuses one addressed anywhere else; see *The Note Quotes One Receipt* in
-`docs/money-paths.md`); rotating the
-site npub costs NIP-05, `.well-known/nostr.json`, and the `client` tag on every
-event ever published. Both names resolve from the one `.well-known/nostr.json`:
-`onlyboosts@` and `boostbot@`.
+**The bot is a second identity on purpose**: it signs notes for donors with no
+key, and a signing endpoint is an attack surface. The banner is two files:
+`onlyboosts_banner_clear.png` renders on the page, `onlyboosts_banner.png` is
+the `og:image`; change the art and both move. The domain is in `robots.txt`,
+the manifest, the sitemap, the CORS allowlist, canonical/OG tags and the
+`client` tags; change them together.
 
-**⚠️ THE BANNER IS TWO FILES AND THEY ARE NOT INTERCHANGEABLE.**
-`assets/onlyboosts_banner_clear.png` is the artwork on transparency and is what
-the masthead renders; `assets/onlyboosts_banner.png` is the same artwork
-flattened onto white and is the `og:image` on every page plus `OG_FALLBACK` on
-the four detail pages and `BANNER_PATH` in `/api/og/booster`. **Change the art
-and both files move.**
+## ⚠️ Money Paths
 
-The split is about who composites. The wordmark is brand cyan and nothing else
-(measured: 15% of the image is ink, all of it cyan), so on transparency it sits
-on whatever the page's background is — which is what makes a dark theme a
-palette change rather than a second banner. A **preview crawler** composites a
-transparent PNG onto a background it picks and never discloses, so a share card
-is the one surface where the flattened copy is the safe one. Only the clear file
-is in `PRECACHE_URLS`: the opaque one is fetched by crawlers and never by a
-browser, so precaching it spent 93KB on every install for nothing.
+Two things are both called "boost": **boosting a podcast** pays the show's own
+value split (`externalBoost.js` / `externalBoostagram.js`), and **donating to
+the site** runs the same flow with one synthetic leg to `onlyboosts@getalby.com`.
+**`docs/money-paths.md` is the authority for every payment and publishing
+decision**; read the section before touching a path.
 
-The domain appears in `robots.txt`, `manifest.webmanifest`,
-`functions/sitemap.xml.js`, the CORS allowlist in
-`functions/api/data/[[path]].js`, page canonical/OG tags, and the `client` tags
-on published events — change them together. The npub is also served for NIP-05
-from `.well-known/nostr.json`.
-
-The site subtitle is **"Podcasting 2.0 Nostr Boosts"**, in the homepage
-`<title>` and `og:title` and in `manifest.webmanifest`, which change together.
-**The masthead line under the banner stopped carrying it on 2026-09-03**
-(Reed's wording): it reads "Charts and RSS Discoverability powered by
-Podcasting 2.0 Boosts on Nostr", the linked half going to `/about`, and is a
-tagline rather than the subtitle of record. It read "Podcasting 2.0 Boosts on Nostr" until
-2026-08-24; *Nostr boost* is the term the project settled on in public, so the
-subtitle now uses it as the compound noun the vocabulary table already treats it
-as. **Show pages still use `<title> — Boosts on Nostr | OnlyBoosts`** and were
-deliberately left alone: there the phrase follows a show's name and reads as a
-description of the page rather than as the site's own label.
-
-## ⚠️ Money paths
-
-Two separate things are both called "boost":
-
-- **Boosting a podcast** — sats go to that show's own value split, parsed from
-  its RSS feed. `externalBoost.js` / `externalBoostagram.js` / `payAllLegs.js`.
-  This is the main event and it pays third parties.
-- **Donating to the site** — one leg at 100% to `RECIPIENT_LUD16`, behind the
-  nav's Donate button. **It runs the BOOST flow, not a flow of its own**:
-  `openSiteDonation` → `openExternalBoost` → `ExternalBoostModal` with a
-  synthetic one-leg bundle. See *A Donation Is The Boost Flow With One Leg* in
-  `docs/money-paths.md`.
-  `BoostModal.jsx` and `MultiLegBoostForm` were the retired LB path and were
-  **deleted on 2026-08-23**; see `docs/strip-removed.md`. `boostagram.js`
-  survives and is live — `index.jsx` imports `bolt11PaymentHash`,
-  `confirmInvoiceSettled` and `RECIPIENT_LUD16` from it.
-
-All LB payment and identity values were replaced on fork and the shipped
-`assets/widgets/login-widget.js` was rebuilt — verified zero occurrences of LB's
-address, npub, feed GUID, or host addresses. **`login-widget/` is a build
-artifact: editing `login-widget/src/` changes nothing until you run
-`npm run build`.** Verify after any change to a money path:
+**Code edits, dry runs, and read-only inspection are fine without asking.
+Confirm with Reed before running anything that signs or publishes a Nostr
+event, or that moves sats.** Published events can't be unpublished. New bots
+start with `DRY_RUN = True`. After any change to a money path, rebuild and:
 
 ```sh
 grep -c "onlyboosts@getalby.com" assets/widgets/login-widget.js   # expect >= 1
 ```
 
-`LNADDRESS_OVERRIDES` in `recipientOverrides.js` is deliberately empty. An entry
-there silently reroutes sats away from the address a show's RSS names, without
-telling donor or recipient. That was defensible on LB (Reed's own feed); here it
-would divert money from third-party shows. Only add one for a feed OnlyBoosts
-owns.
+The rules a change elsewhere would break:
 
-**It has a twin: `EXTERNAL_OVERRIDES` in `assets/js/value-block.js`, and both
-must stay empty.** They are two separate maps on two sides of the fork's strip,
-which is how the LB entry survived: `recipientOverrides.js` was emptied, then
-`8bc4cf9` restored `value-block.js` wholesale with
-`boostbot@fountain.fm → aquafox30@primal.net` still in it. It shipped, and
-rewrote Fountain's 2% leg on a live external boost before being caught on
-2026-07-27. **No leg of a third party's value block is ever rewritten, renamed,
-merged or dropped** — `applyExternalOverrides` is a documented passthrough, and
-the external boost pays exactly what the show published. If OnlyBoosts ever takes
-a cut it gets its own leg under its own name. Grep both maps after any restore
-from `lb/main`.
-
-`FEED_GUID` in `boostagram.js` is deliberately `null` — OnlyBoosts is a client,
-not a podcast, so it has no feed to claim. Inheriting LB's GUID would have
-mis-tagged every share note as a Local Bitcoiners boost and polluted LB's own
-collector, which filters on exactly that GUID.
-
-Code edits, dry runs, and read-only inspection are fine without asking.
-**Confirm with Reed before running anything that signs or publishes a Nostr
-event, or that moves sats.** Published events can't be unpublished. **New bots
-start with `DRY_RUN = True`.**
-
-### The rest of the money paths: `docs/money-paths.md`
-
-**That file is the authority for every payment and publishing decision on this
-site**, and it is long because each rule in it cost something to learn. Its
-sections, so you know when to open it:
-
-| Section | Answers |
-|---|---|
-| A Lightning Address With No CORS Headers | why `/api/lnurl` exists, and why it is a **fallback, not the route** |
-| ⚠️ A Payment We Cannot Confirm Is Not A Payment That Failed | `FAILED` vs `UNCERTAIN`, the 90s watcher, the double payment of 2026-08-19 |
-| What A Recipient's Server Says Is Shown To The Donor | `readErrorReason`, and why it is never passed through `friendlyError` |
-| Waiting Is Not The Same Event As Giving Up | `PAY_STAGES` / `CHECK_STAGES`, and why the wallet's own 45s hang must not be shortened |
-| The Share Note Reports What Settled | `paidSats`, the `amount` tag this site's own collector reads, one note per boost |
-| The Note Says One Number | **since 2026-11-11** (Reed's calls): at 90% or more landed the note goes out at the amount typed, by default, with no splits line; under 90% it says what landed, with the line. One figure in the body, the `amount` tag and the quoted receipt, and no second tag. The donor is asked only on the partial done screen. `resolveNoteFigure` in `externalBoostagram.js` is the one declaration of the floor. **An unconfirmed split counts as landed beside at least one confirmed split** (*An Unconfirmed Split Counts*, the same evening: Reed's 150-sat split timed out in the wallet, was reported as unpaid in the note, and had paid); only a FAILED split reduces the figure or prints the line, and a boost with nothing failed publishes itself after the watch |
-| One Split, Another Wallet | **since 2026-11-11**: a split that failed again on Retry gets a fresh invoice as a QR code for a different wallet. `FAILED` only, Lightning-address splits only, and **asking for it ends Retry for that split for good**; credit needs the provider's verify URL, and there is no self-attest. **It is offered only for an invoice the connected wallet declined**: a split that never got an invoice (`noInvoice`) gets no offer, and one the recipient's own limits rule out (`unpayable`; `maxSendable: 0` is a closed address, Reed's first live test) gets no Retry either |
-| A Retried Split Belongs To The Same Boost | `boostRef`: the first pass, a Retry and the other-wallet invoice carry one boost id and the total as typed; a Retry used to tell Helipad the whole boost was the one split |
-| The Login Is Not A Gate On The Wallet | no Gate 1; a session-only wallet, and why the NWC URI is never persisted |
-| The Signer Session Survives The Tab | **since 2026-10-29**: the NIP-46 client secret's at-rest copy, wrapped under a non-extractable WebCrypto key in IndexedDB, so a phone's tab eviction no longer signs the member out; and **the login modal opens behind a tap, never on page load** (`forceLogoutWithMessage`'s `openLogin`) |
-| The Boost Modal Declares What Happens To The Note | two controls, four outcomes, `boostAnonymously` vs `noteRoute` |
-| A Donation Is The Boost Flow With One Leg | the nav's Donate button, and why a donation carries no `amount` tag |
-| Getting A Boost Into Helipad | the three tiers, and why tier one is preferred |
-| The Keysend Upgrade | the wallet gate, the `fountain.fm` exclusion, the whole-or-nothing routing pair |
-| The Wallet Gate Is Behind The Boost Button | compose first, pay second; `remembered` is not `connected` |
-| The Site Signs For A Booster Who Has No Key | `/api/sign-boost`, the allowlist validator, why proof-of-payment was rejected |
-| The Note Quotes One Receipt | **`/api/sign-receipt`, since 2026-10-03**: the bot-signed kind 9735 for the sats that settled, quoted in the `q` tag AND the body because Fountain draws the ⚡ figure off the first quoted receipt and nothing else; who signs the 9734 follows who signs the note; the pre-signed note's receipt is signed and HELD until every leg paid; the boost oracle admits `q` once, under the bot's key only; **the cards do not show the reference** (2026-10-29): `stripNoteRefs` in `nostr-text.js` drops every note, nevent and naddr reference from a rendered message, on every surface, people staying chips |
-| The one boost button | `boost-button.js` is chrome, not a money path; six surfaces, six handlers |
-| The Boost Is Indexed At The Edge Before The Collector Sees It | `/api/v1/boosts/ingest`, the site's own boosts on the feeds in seconds; why the edge's row is provisional and what the collector owes `boosts_edge` |
-| The Boostagram Message Cap | 300 bytes, measured against the 1,300-byte onion over 800 episodes; why `url` became the feed URL and `boost_link` the page; the lnaddress side's `commentAllowed` sample |
-| The Feed URL Resolves Before The Guid | `/api/value` and `/api/catalogue` resolve the stored feed URL before the guid, because Podcast Index's one-feed-per-guid answer can be a dead record with a year-old value block |
-| The Value Block Comes From The RSS, And Podcast Index Is The Fallback | **`/api/value` reads the show's own feed first, since 2026-09-23**; PI's episode records keep the block each song was ingested with, and ten of Jimmy V's thirteen songs paid a stale seven-leg split. PI answers only for an unreachable feed, a feed with no block anywhere (Anchor), or an item past the 4MB cap |
-
-Six rules from it that a change elsewhere would break, so they are restated here:
-
-- **⚠️ ANONYMOUS AND PRIVATE ARE DIFFERENT ANSWERS TO DIFFERENT QUESTIONS.** An
-  anonymous boost is **still published**, by OnlyBoosts, with no npub attached —
-  that is the whole point, an anonymous booster still counts in the feeds and the
-  totals. Only the Private Boost checkbox suppresses a note. `'none'` is reachable
-  **only** through that checkbox; Anon routes to the bot. **Reed's correction,
-  2026-08-21**, after a version that let Anon suppress shipped for a few hours.
-- **⚠️ `boostAnonymously` AND `noteRoute` ARE TWO DERIVATIONS AND NEITHER MAY
-  ABSORB THE OTHER.** The first governs the boostagram's `sender_name` /
-  `sender_id`; the second governs who signs. BMB shipped that promise broken twice
-  by letting one expression carry both. **`sender_id` never rides without the
-  profile behind it.**
-- **⚠️ THERE IS NO RE-PAY PATH OUT OF `UNCERTAIN`, ANYWHERE.** Reed's call,
-  2026-08-19. `UNCERTAIN` offers only **Check again**; only `FAILED` may be
-  re-paid, and only because it means the wallet never sent it
-  (`isCleanPaymentDecline` in `utils.js`, read by all three payment paths).
-  **Since 2026-09-04 Check again also asks the WALLET** (NIP-47 lookup by
-  payment hash, `paymentLookup.js`), which is what makes a keysend leg and a
-  no-verify-URL leg checkable at all; the wallet's explicit `failed` is the
-  one thing that moves `UNCERTAIN` to `FAILED`, and it is never inferred.
-  See *The wallet is the second source of truth* in `docs/money-paths.md`.
-- **⚠️ THE NOTE'S FIGURE IS `resolveNoteFigure`'S ANSWER AND NOTHING ELSE
-  DECIDES IT** (2026-11-11). The body, the `amount` tag and the summary
-  receipt carry that one number; the splits line prints only when the figure
-  is the lesser total; the modal holds no copy of the 90% comparison. **A
-  split whose invoice has been shown for another wallet is never retried
-  from the connected one** (`canRepayLeg` reads `leg.qr`).
-- **⚠️ ONLY A FAILED SPLIT TAKES ANYTHING OFF THE NOTE** (Reed's call,
-  2026-11-11: "we better be damn sure that the thing failed if we're going
-  to mark it as failed"). An `UNCERTAIN` split counts toward the figure and
-  the split count **beside at least one confirmed split**, and never with
-  none (an offline wallet leaves every split unconfirmed). It is credited,
-  not re-paid: the rule above is untouched. The note waits on `watchSettled`,
-  not on `stillChecking`, which is false on the done phase's first render.
-- **⚠️ THE TWO OVERRIDE MAPS STAY EMPTY** — see above. That is the one rule in
-  this file that has already been violated in production.
+- **⚠️ THE TWO OVERRIDE MAPS STAY EMPTY**: `LNADDRESS_OVERRIDES` in
+  `recipientOverrides.js` and `EXTERNAL_OVERRIDES` in `assets/js/value-block.js`.
+  **No leg of a third party's value block is ever rewritten, renamed, merged or
+  dropped.** One entry already shipped once and rerouted a live boost. Grep both
+  after any restore from `lb/main`.
+- **`FEED_GUID` in `boostagram.js` is `null`**: OnlyBoosts is a client, not a podcast.
+- **⚠️ THERE IS NO RE-PAY PATH OUT OF `UNCERTAIN`, ANYWHERE.** Only `FAILED` may
+  be re-paid (`isCleanPaymentDecline`). Check again also asks the wallet by
+  payment hash; the wallet's explicit `failed` is the one thing that moves
+  `UNCERTAIN` to `FAILED`, never inferred.
+- **⚠️ THE NOTE'S FIGURE IS `resolveNoteFigure`'S ANSWER AND NOTHING ELSE DECIDES
+  IT.** At 90% landed or more the note goes out at the amount typed, with no
+  splits line; under 90% it says what landed, with the line. One figure in the
+  body, the `amount` tag and the quoted receipt; no second tag. The modal holds
+  no copy of the 90% comparison.
+- **⚠️ ONLY A FAILED SPLIT TAKES ANYTHING OFF THE NOTE.** An `UNCERTAIN` split
+  counts beside at least one confirmed split, never with none. The note waits on
+  `watchSettled`, not `stillChecking`.
+- **A failed Lightning-address split may be paid from another wallet by QR**;
+  asking for it ends Retry for that split (`canRepayLeg` reads `leg.qr`). No offer
+  on a split that never got an invoice (`noInvoice`); no Retry either on one the
+  recipient's limits rule out (`unpayable`).
+- **⚠️ ANONYMOUS AND PRIVATE ARE DIFFERENT ANSWERS.** Anon is still published,
+  by the bot, with no npub; only the Private Boost checkbox suppresses the note.
+  **`boostAnonymously` and `noteRoute` are two derivations and neither may absorb
+  the other**; `sender_id` never rides without the profile behind it.
 - **⚠️ THE ORACLE'S CAP AND THE MODAL'S ARE THE SAME NUMBER** (5,000,000 sats).
-  `SITE_SIGN_MAX_SATS` restates `MAX_AMOUNT_MSAT`; `scripts/test-sign-boost.mjs`
-  enforces the equality, and the validator is fed by the **shipped** note builder
-  so a new tag fails the test rather than production.
-
-## @Mentions: `mention-search.js`
-
-**`docs/mentions.md` is the authority.** Type `@` and a name in any of the
-four composers (the boost modal's message, the reply box, the zap message,
-the share modal's text) and a menu of people from Primal's cache opens,
-**most followed first**; a pick inserts `@label`. Built 2026-09-09, Reed's
-ask, on mynostr's shape. What a change elsewhere would break:
-
-- **⚠️ THE NOTE CARRIES `nostr:npub1…`, NEVER `@npub1…` AND NEVER THE LABEL.**
-  Reed's rule: the NIP-27 form is what Helipad and every client render as a
-  mention. The field holds `@reed`; the composer's map (`createMentionMap`)
-  holds the pubkey; **`expand()` is the note**. Every publish reads the picker
-  (`mentions.expand()`, or `expandedMessage` in the boost modal) and never the
-  field's value — a note that ships the label publishes fine and mentions
-  nobody. `test-mentions.mjs` holds each call site by text scan.
-- **⚠️ THE BOT ROUTE CARRIES NO `p` TAG, AND THE ORACLE REFUSES ONE.** The
-  note builders take `mentionPubkeys` as an opt-in defaulting to empty; the
-  boost modal passes it on the donor route alone. A zap request gets none
-  either (NIP-57 reads its one `p` as the recipient). Replies and shares tag
-  every mentioned pubkey.
-- **⚠️ THE MESSAGE CAP IS 300 BYTES OF UTF-8, MEASURED ON THE EXPANDED
-  MESSAGE** (`MAX_MESSAGE_BYTES` / `clipMessage`; it was 200 characters, BMB's
-  number, until 2026-09-09). An npub is 69 bytes and an emoji four; the boost
-  modal's counter and its `onChange` guard read the expansion in bytes, and
-  `maxLength` came off the textarea. **The boostagram's `url` is the feed URL
-  and `boost_link` the episode page**, which is what made 300 fit; see *The
-  Boostagram Message Cap* in `docs/money-paths.md` for the measurement.
-- **The lead-in runs past a space since 2026-10-03** (a display name has
-  them), to three spaces; Primal answers a spaced query with nothing, so it is
-  sent spaceless and narrowed locally, and each picker hands the trigger its
-  own map so a made mention does not re-open the menu. **The Trigger** in
-  `docs/mentions.md` has the measurements.
-- **`:)` becomes 🙂 in every composer** (Reed's ask, 2026-10-22):
-  `emoticonAt` in `mention-search.js`, run by the picker's input listener
-  and by the boost modal's `onChange`; only the emoticon just typed, on its
-  own, and nothing but `:)` / `:-)`. **The Smiley** in `docs/mentions.md`.
-- **⚠️ `mention-search.js` IMPORTS NOTHING.** The widget inlines it by
-  relative path (`../../../assets/js/`) and the site loads it stamped; a
-  `./sibling.js?v=` import is read differently by Vite and the stamper.
-  The bech32 codec is written out there for that reason, checked against
-  nostr-tools in the test.
-
-## Bot conventions
-
-- One bot per subdirectory, script named `onlyboosts_{function}.py`.
-- Shared utilities live in `bots/shared/` — import from there, never copy/paste
-  relay lists or publish helpers into individual bots.
-- State files (`state.json`, `last_seen.txt`, `published_events.json`) sit next
-  to each bot and are gitignored.
-- Prefer a clean copy of an LB `shared/` utility over importing across repos —
-  the two projects push to different remotes and must stay independently
-  cloneable.
-
-## Relay sets
-
-**A relay list is defined by the kind it carries and the audience it reaches, not
-by which relays are popular.** Every set in this repo was re-derived from that
-rule on 2026-08-12, measured against the 61 distinct boosters behind the 100 most
-recent boosts. **Re-measure before changing one**; reputation is a bad proxy.
-
-**`docs/relay-sets.md` is the authority** — the coverage table, every set and the
-file it lives in, the `NC_RELAYS` NIP-46 findings, and the floors worth knowing
-(11% of boosters have no kind 0 anywhere, 36% no kind 10002). Five things from it
-that a change elsewhere would break:
-
-- **⚠️ Reading and publishing are different jobs and take different sets.** A read
-  set answers "who HAS this event", which is measurable, and a useless member costs
-  latency on every query. A publish set answers "who will SEE this event", which
-  cannot be measured from outside. **So the read sets are cut to what the
-  measurement supports and the publish sets are deliberately generous, and a low
-  score is not an argument against a publish target.** One list doing both jobs is
-  the smell that produced the split.
-- **⚠️ `relay.damus.io` answers a WebSocket connect with HTTP 503 and must not come
-  back** — it was first in every browser-side list. *(Measured 2026-08-12; the
-  favorites work reached it fine in ~300ms on 2026-09-08, so this one wants
-  re-measuring before it is trusted either way.)* **On 2026-10-30 it opened and
-  answered nothing, which degraded every favorites read, so it is off the
-  favorites READ set** (a publish target still); see `docs/favorites.md`.
-- **⚠️ `relay.getalby.com` is NWC transport, not a relay.** Both it and `/v1` answer
-  *every* REQ with `blocked: Request rejected`, so a note published there can never
-  be read. NWC is unaffected: the wallet's relay comes from the connection string.
-- **⚠️ A relay has to accept the kind.** `purplepag.es` stores only 0/3/10002;
-  `relay.fountain.fm` refuses 30078 *and* kind 10333 with `kinds not supported`.
-  **An OK is not proof of transport** — fountain answers `OK: true` and then CLOSEs
-  the subscription. Test the read side too.
-- **⚠️ NDK dials relays this repo never names**, building a second outbox pool from
-  its own `DEFAULT_OUTBOX_RELAYS` unless `outboxRelayUrls` is passed; `ndk.js` now
-  passes it explicitly. And **`publishRelaySet()` unions `PUBLISH_RELAYS` with
-  NDK's pool** — a set built from `PUBLISH_RELAYS` alone would replace the pool and
-  silently stop publishing to the user's own NIP-65 write relays.
-
-## The exclusion list
-
-`excludes.json`, at the repo root. Anything named in it is filtered out of every
-published surface — the JSON shards, the D1 projection behind `/api/v1`, the show
-and episode pages, search, the podroll graph, and the counts on `/about`. It
-ships **empty**; it exists so a takedown request is answered by one edit.
-
-**It is at the repo root, and it is public, both on purpose.** The repo is public
-and the file is the answer to "what are you hiding, and why" — so every entry
-carries a required `reason`, and `pages_build_output_dir = "."` means it is also
-served at `onlyboosts.social/excludes.json`. Its `_readme` key is the user-facing
-documentation; JSON has no comments, so the file carries its own.
-
-**Four lists, and the medium split does not get its own.** `shows` covers albums
-and `episodes` covers songs, because an album *is* a show with
-`<podcast:medium>music`. The other two are `boosters` and `boosts`.
-
-**Nothing is deleted.** The collector keeps indexing everything; the list gates
-what is *published*. That is what makes it reversible — removing an entry
-restores the content on the next pipeline run, verified end to end.
-
-**⚠️ A guid is matched against every identity slot**, not the one its list is
-named after. Clients demonstrably sign an *item* guid into the `podcast:guid`
-tag. Measured on the live index, 52 of the 107 boosts to one episode name it in
-the show slot with no `item_guid` at all, so matching `episode` against
-`item_guid` alone would have left most of them published. These ids are opaque
-and unique, so a listed id turning up in another slot only ever means the same
-content. See `db._excluded_expr`.
-
-**A malformed file is fatal, a missing one is empty.** A file that exists and
-doesn't parse raises, and the run scripts validate it as their *first* step so
-the failure is legible rather than a traceback inside a scan. The failure mode
-being guarded is a typo'd key (`"show"` for `"shows"`) silently excluding nothing
-while everyone believes the content is gone.
-
-The collector-side mechanics — `excludes.py`, `db.apply_excludes()`,
-`db.not_excluded()`, the podroll and shard-pruning surfaces, and the D1
-re-projection queue — are documented in `bots/global-boost-scan/`. Two things to
-know from this side: **use `db.not_excluded()` rather than writing `excluded = 0`
-by hand**, so a new query is found by grep; and `onlyboosts_globalscan.py
-excludes` validates the file and reports what each entry currently hides, which
-is the check to run after an edit.
-
-**The removal path is deliberately not documented on the site.** `/about` says
-nothing about how to be excluded, and `docs/about-and-faq-source.md` is
-intentionally silent on it too. Reed's call; don't add it as a "missing piece".
-
-## The duplicate filter
-
-`bots/global-boost-scan/dedupe.py`, live since 2026-08-24, and **its docstring
-is the design record** — the rule, the evidence tiers, and the measurements
-behind every threshold. What belongs here is only what a change elsewhere
-would break.
-
-One payment can produce two notes: the donor's app publishes one, and a
-node-watching relay bot (`chadf-boostbot`) publishes another for the same
-boost. Before BMB/OB/LB spoke NIP-73 the bot's note was the only record; now
-it double-counts the boost, the sats and — different signing keys — the
-booster. The filter marks the relay copy `dup_of = <kept event_id>` and keeps
-the app's own note, which may be donor-signed, so the real member keeps the
-credit. 62 historical rows were marked on flip-on (42 BMB, 14 StableKraft, 6
-Bowl After Bowl, 25,265 sats); the pass runs every incremental cycle over a
-7-day trailing window.
-
-- **⚠️ `dup_of` IS ITS OWN COLUMN AND MUST NEVER FOLD INTO `excluded`.**
-  `apply_excludes` recomputes that flag wholesale from excludes.json on every
-  connect and would silently unmark every duplicate. `db.not_excluded()` gates
-  on both, which is how one edit reached every published surface — keep using
-  it rather than writing either flag by hand.
-- **⚠️ SATS + GUID + TIME WINDOW ALONE OVER-FILTERS, MEASURED.** 651 pairs of
-  same-amount, same-episode boosts minutes apart are distinct real payments
-  (live-show boost storms). What prevents eating them: only
-  `RELAY_PUBLISHERS`-signed notes are ever droppable, pairing is strictly
-  one-to-one, and one evidence tier must corroborate — a ≥3-distinctive-word
-  common run of the donor's own prose, or app agreement where the note's prose
-  (if any) is fully contained in the partner's. **A pair with no evidence is
-  let through, and contradicted prose blocks even a same-app match** — Reed's
-  call, 2026-08-24: a duplicate slipping through beats a real boost filtered
-  out. Don't tighten toward recall.
-- **⚠️ THE FILTER CLUSTERS A PAYMENT'S NOTES SINCE 2026-10-29; IT NO LONGER
-  PAIRS ONE RELAY NOTE WITH ONE NON-RELAY PARTNER.** *Reed's report:* Chad
-  and Reed's show had three relay bots per payment (Boostr_Bot, chadf-boostbot,
-  candr_boost_bot) and listeners on apps that publish no note, so two or
-  three bot notes stood for every boost. A relay note now joins a cluster
-  with the donor's note AND other bots' notes (one note per publisher, the
-  donor's note the keeper, else the bot note with the episode); `same sats`
-  is ±1/±3% plus the leg bots' x100 rounding; a missing episode is a
-  wildcard; what a template prints (sender name, titles as printed, a bot's
-  mentions and hashtags) is a fact, not prose. Only bot-signed notes are
-  ever marked, still. Full history on the day: 118 notes, 95,483 sats. The
-  design record is the PAYMENT CLUSTERS section of `dedupe.py`'s docstring;
-  `test_dedupe_clusters.py`. **BoostAfterBoost (`boostafterboost`, the same
-  software as candr_boost_bot on the Homegrown Hits / Bowl After Bowl node)
-  was found by the same survey and registered the same day.**
-- **⚠️ `SAME SATS` HAS ONE EXCEPTION, AND IT IS THE NAMED SENDER (tier 0,
-  2026-09-24).** `Boostr_Bot` reconstructs the amount from its own 1% leg
-  (100 for a 123-sat boost; 11 of its first 25 partnered notes disagreed), so
-  the hard key never held and Reed saw both notes counted. Its notes name the
-  donor in a `["sender", npub]` tag, and the partner note is **signed by that
-  key** — the signature is the evidence, not the tag. `_sender_match` pairs
-  such a note with the donor's own note on the same episode within
-  `APP_WINDOW`, sats ignored, nearest first; **a named donor with no note of
-  their own is let through and never falls to tiers 1–3**, since any other
-  partner is a different donor's payment. The `sender` tag is still read
-  nowhere for attribution (see the `client_id` section). Also the day the
-  registration commit (21a70b1) finally reached the collector: it had been
-  on origin since 2026-09-10 with "still to run on the collector box" in its
-  message, and the timers run this checkout. `test_dedupe_sender.py`.
-  **MSP_bot (`msp-2-0`, registered 2026-10-02) is the second bot on this
-  tier**: the same 1%-leg shape for musicsideproject.com feeds, the same
-  `sender` tag, and five of its first nine notes paired by it.
-  **candr_boost_bot (`candr-boost`, registered 2026-10-20) named no sender
-  until 2026-11-08 15:05Z**: Chad's watcher on the Chad and Reed node reports
-  the full amount, so the prose tiers paired it (2 of its first 30 notes,
-  both against BoostMeBitch, tier `msg+app`). Since then it, BoostAfterBoost
-  and libre-relay-bot write `["sender", npub]` when they know the payer, and
-  chadf-boostbot does on every boost Chad's node sends; see "Chad's Relay
-  Bots Name The Payer" in `docs/boost-clients.md`. It is excluded from the
-  boards, unlike chadf-boostbot, because it relays other listeners' boosts.
-  **libre-relay-bot (`libre-relay-bot`, registered 2026-11-09 at Chad's
-  request in that PR) is Chad's reader of the #SirLibre IRC channel**, where
-  Sir Libre's node announces each boost; one key, no client tag, the sender
-  named in the body as text. 23 notes and 2,391 sats had ranked as a member
-  and kept 5 duplicates as a donor would. **Nothing it has published since
-  2026-10-03 carries a NIP-73 tag** (91 boost notes measured 2026-11-09;
-  the IRC line names the track's album and artist, not the feed paid), so no
-  new note of its indexes until Chad fixes the bot; Reed is following up with
-  him. Off the boards like candr.
-- **⚠️ ONE-TO-ONE HAS ONE EXCEPTION, ON THE RELAY SIDE.** `chadf-boostbot`
-  signs one receipt and one note **per keysend leg**, so a multi-leg boost is
-  2–3 identical bot notes and the claim used to block the second from the
-  partner the first had matched — 7 duplicates reached D1 that way (found
-  2026-08-30). A relay note whose identical sibling (same publisher, same hard
-  key, prose equal once `nostr:`/URL tokens are stripped, ±`APP_WINDOW`) is
-  already marked is marked against the same partner, tier `sibling`. It only
-  ever attaches to a partner the tiers already matched, so it cannot reach a
-  non-relay note. **It is deliberately not a partnerless "identical siblings"
-  rule** — Reed's call, 2026-08-30: 233 real same-author identical-text pairs
-  within 300s exist, and #40HPW hours are `DISTINCT (booster, episode)` so a
-  second note never adds hours anyway. The 77 partnerless bot clusters stayed
-  until **2026-10-29, when Reed ruled on all 62 standing twin pairs** (one
-  bot, identical notes within 30s, no partner): the ones carrying a COMMENT
-  (anything the booster's app put in the message field, a gif link or "No
-  message" included) are one payment and the later note is marked `twin`;
-  the bare "⚡ 333 sats / 📱 via App" template twice is not proof and both
-  stand. 42 marked, 20 kept; `dedupe._comment` is the line, `TWIN_WINDOW`
-  30s, pinned in `test_dedupe_clusters.py`.
-- **A new republisher bot is out of scope until registered**: its pubkey in
-  `clients.py#PUBLISHER_PUBKEYS` (the member wall already forces this) and its
-  slug in `RELAY_PUBLISHERS` — relay bots only; the first-party publisher keys
-  (BMB's site account, our bot, LB's show account) are never the droppable
-  side, their note being the payment's own record. A bot whose notes carry no
-  message and no discoverable app identity slips through until a fingerprint
-  joins `APP_DOMAINS`; that is the accepted cost of never guessing.
-- **Reversal is two deletes, and D1 heals itself**: clear the row's `dup_of`
-  and its `d1_boosts_synced` marker, and the next delta re-inserts it; marking
-  rides the same `d1_reproject` queue an exclusion uses, which recounts the
-  touched show, episode and profile rows remotely.
-- `onlyboosts_globalscan.py dedupe [--days N | --all] [--dry-run]`; the last
-  full-history report is `data/dedupe-report.txt` (gitignored).
-- **The site needed no change** — it reads D1 and the shards, both corrected
-  at the source. `/about` does not yet disclose the filter;
-  `docs/about-and-faq-source.md` is where that copy starts if it ever should.
-
-## Data feed
-
-**⚠️ THE CORPUS STARTS 2024-07-01, SINCE THE DEEPSCAN RECOVERY OF 2026-09-01.**
-Fountain notes carried `i` tags with no `k` tag until ~2025-04-14, so the scan's
-`#k` filter was blind to that whole era while the events sat on
-relay.fountain.fm (which retains to late 2022). `onlyboosts_globalscan.py
-deepscan` recovered ~15k boosts by #i-per-guid and authors= walks. Detail lives
-with the collector (commit 2fa7869 and the deepscan section of the script's
-docstring).
-
-**⚠️ EVERY SCHEDULED WALK ASKS RELAYS WITH THREE FILTER SHAPES, NOT ONE, SINCE
-2026-09-03.** `#k` alone only matches a note that carries a `k` tag, and
-StableKraft and Wavlake's own app still publish `i` tags with no `k` —
-measured that day: 415 boosts since 2025-06-01 sat on the core relays unseen
-by every pass (209 linking stablekraft.app, 140 fountain.fm, 65 wavlake.com),
-found by chasing one StableKraft boost Reed noticed missing. `scan.py`'s
-`boost_filters()` adds `#i` per known show guid and `authors` per known
-booster, read from the index at the start of each run, and the incremental,
-backfill and outbox walkers all take the set — so a show or booster first seen
-through a `#k` note on one tick is covered by the k-free shapes on the next.
-The residual is a first-time booster on a show the index has never seen,
-without a `k` tag; no filter Nostr offers reaches that, and the fix is the
-client sending the tag NIP-73 specifies. **StableKraft does since
-2026-09-06** (Reed's issue, ChadFarrow/stablekraft-app#237, closed by PR
-#243): every `i` is paired with its `k`, plus `["client","StableKraft"]`,
-which `clients.py` already slugs and labels. Forward-only — kind 1 is
-immutable — so the 274 StableKraft notes from before the fix stay k-less,
-unlabelled, and reachable only through the `#i`/`authors` shapes. Its
-companion, #242/PR #245, stopped StableKraft naming an internal row id as
-`podcast:item:guid` when a track has no RSS guid; a boost to such a track
-now names the show only. Six boosts in the index (242 sats, four tracks)
-carry those unresolvable ids with no show guid beside them; nothing automatic
-heals them, but three of the four albums are shows the index knows, so a
-hand re-key to a show-level boost is possible if Reed wants it. Wavlake's own app still sends no `k` and has larger problems.
-Untagged boosts land **unlabelled** by design: the only evidence of the app
-is the URL the note links, and `clients.py`'s rule is never to guess. The window the single-shape scan had already walked was
-caught up with `backfill --force --floor 1748736000` on 2026-09-03; the scan
-docstring carries the two relay quirks the wider filter set met (per-filter
-caps make a multi-filter REQ unpageable, and two nginx fronts 429 back-to-back
-handshakes).
-
-**⚠️ A NOTE PUBLISHED MORE THAN THREE HOURS AFTER ITS OWN `created_at` IS
-INVISIBLE TO THE TICK, AND THE PUBLISHER KEYS ARE RE-READ DAILY FOR THAT
-REASON, SINCE 2026-10-02.** The tail scan's `since` is `last_incremental`
-less `INCREMENTAL_OVERLAP` on `created_at`, and the backfill is complete, so
-a relay bot that stamps the payment time and publishes from a backlog, an
-outage or a queue slips every walk: MSP_bot had **195 boosts (43,605 sats,
-back to 2026-02)** on relay.fountain.fm that nothing had read, each matched
-by the live filter set the moment it was asked, with the classifier, the
-shapes and the ticks all ruled out first. `rescan-publishers` in
-`onlyboosts_globalscan.py` walks every `PUBLISHER_PUBKEYS` key's own
-timeline back 30 days on the daily outbox run (one `authors` filter per key
-per core relay, idempotent); `--floor` is the recovery form. **The diagnostic
-order that proved it — gate, shapes, ticks, then the backfill-date check —
-is in the command's docstring and is the order to use for the next "my boost
-is missing".** A late note from a person's own app is still unread until the
-outbox sweep's `authors` shape meets it, which is the accepted residual.
-
-**⚠️ THE INCREMENTAL CYCLE (EVERY 2 MINUTES SINCE 2026-09-06, 5 BEFORE)
-PUBLISHES ONLY WHEN THE INDEX CHANGED, SINCE 2026-09-04.** `publish-due` in `onlyboosts_globalscan.py` digests every
-published column of every published table (`db.content_fingerprint`) and
-compares it with what the last full export recorded and what the last push
-shipped; `export --per-show`, `push` and the share cards run only when it says
-so, and the D1 delta runs every tick regardless — it has its own pending
-state and its own retry. Before the gate a no-change cycle cost **3m14s of
-CPU**, 11.7 CPU-hours a day, to rewrite files rsync then skipped: 135s of it
-the per-show export re-scanning the boosts table twice per show on the
-unindexable `COALESCE` guid, 48s of it `apply_aliases` doing the same once
-per alias. Both are one pass now (`export.py`'s per-show block, and the
-`IN (subquery)` note in `db.apply_aliases`); the daily outbox and podroll runs
-still export unconditionally. A quiet stretch leaves `generated_at` old while
-the data is current — it is when the shards were last built, not a liveness
-signal. The gate fails open: an exception in it is "due".
-
-**⚠️ THE SITE'S OWN BOOSTS REACH D1 AHEAD OF THE COLLECTOR, SINCE 2026-09-06.**
-*Reed's ask.* `POST /api/v1/boosts/ingest` writes a boost row, its FTS row, a
-title-only stub for an episode or show D1 has never seen, and a recount of the
-touched show and episode the moment the widget's note is acked by a relay;
-`boosts_edge` records every row it wrote. **The collector is still the source
-of truth**: its delta collides on the event id, its `INSERT OR REPLACE`
-projections overwrite the stubs and the recounts within one cycle, and two
-collector duties hang off the marker table (replace rather than ignore an
-edge-written boost; sweep one that never turned up on a relay). So **a D1 row
-no longer implies a local row** on the collector box, and anything that
-reconciles the two directions has to allow for it. The design record is *The
-Boost Is Indexed At The Edge Before The Collector Sees It* in
-`docs/money-paths.md`; `test-boost-ingest.mjs` covers the endpoint.
-
-Two stores, one model. **D1 behind `/api/v1/*` is what every feed and page
-reads.** The collector also publishes static JSON to
-`https://relay.mynostr.app/onlyboosts/`, proxied through
-`functions/api/data/[[path]].js` (`/api/data/*`); that remains a published
-dataset, but the only thing on the site still reading it is `/about`'s stat strip
-(`meta.json`).
-
-**⚠️ The upstream returns HTTP 200 for missing files.** `relay.mynostr.app`
-serves Nostr on the same origin, so an unknown path falls through to the relay
-and answers `200 text/plain "Please use a Nostr client to connect."` — not a 404.
-Never branch on status. The proxy has two load-bearing guards: it checks the
-content-type *and* parses the body as JSON before returning it. Don't "optimize"
-the parse away by streaming the body through.
-
-Path handling is a **strict allowlist**, not a passthrough — a catch-all that
-forwards whatever it's given is an SSRF hole. The published shapes are
-enumerated in `PATH_RULES`: `index.json`, `latest.json`, `boosts/YYYY-MM.json`,
-`podcasts/index.json`, `podcasts/<guid>.json`, `profiles.json`, `meta.json`.
-Directories aren't browsable — **discover filenames from the manifest**, never
-build paths by hand.
-
-Full schemas live upstream in `bots/global-boost-scan/DATA-API.md`.
-
-### Record shape and nullability
-
-```
-{ id, ts, sats, src, msg, client,
-  booster{pk,npub,name,pic}, podcast{guid,title,img,feed},
-  episode{guid,title,img,date,num,url} }
-```
-
-Almost every display field is nullable. Measured over a 1,000-row sample: `msg`
-16%, `booster.pic` 15%, `episode.title` 11%, `episode.num` 61%, `podcast.guid`
-2%. `ob-data.js#normalizeBoosts` flattens all of it so the *only* fields a caller
-may assume are `id`, `ts` and `booster.pk` — everything else is explicitly
-nullable and must have a fallback.
-
-Two shape traps:
-
-- **`episode.guid` is sometimes a URL**, not a UUID. Treat it as an opaque key.
-- **The per-show shards stringify numerics** (`"9"`, `"55987"`, `"None"`), so
-  coerce rather than trusting `typeof`.
-
-Booster names and avatars are **embedded in every record**, so there is no
-profile round-trip and nothing to repaint — first paint is final.
-
-### The two client data modules
-
-`ob-data.js` is **shape only**: `normalizeBoosts`, `toEpisodeShape`,
-`episodeApiToBoosts` and `boosterLabel` are the reason every consumer downstream
-of a fetch sees one model. Its fetching half was deleted on 2026-08-14.
-
-**⚠️ Verify per function INCLUDING internal callers before removing anything
-here.** A grep that excludes the file itself hides functions whose only caller is
-a sibling in the same module, which is what made `mediumPredicate` look live.
-
-`ob-live.js` is the D1 reader and caches nothing in-process. Two shapes:
-`followsBoostReader()` pages incrementally for the note feed;
-`getFollowsBoosts()` pulls a bounded corpus for the episodes rollup, capped by
-`MAX_EAGER_ROWS` / `MAX_EAGER_PAGES` and reporting `truncated`. That cap is about
-how many *boosts* to roll up and is unrelated to the follow set's size.
-
-Two Functions read D1 directly rather than through `ob-live.js`, because each
-needs one bounded corpus once rather than a paging reader:
-`/api/v1/episodes/<item-guid>?community=1` and
-`/api/v1/boosters/<npub>`. Both return the standard boost record shape, so both
-run through `normalizeBoosts` and everything downstream sees the one model.
-
-**⚠️ `/api/v1/boosts/follows` passes its whole author list as one bound JSON
-array, unrolled by `json_each`.** D1 imposes two limits a large `IN (...)` hits
-from opposite sides: 100 bound parameters per statement, and 100,000 bytes of
-statement text. One bind per author breaks at 99 follows; interpolating instead
-runs out around 1,480. The JSON array escapes both — the statement is a fixed
-~180 bytes however many authors there are. Verified on SQLite 3.51 that the plan
-still resolves through `idx_boosts_booster`.
-
-Cloudflare documents JSON1 but doesn't enumerate the table-valued functions, so
-the endpoint keeps an interpolated fallback if D1 rejects `json_each`. **That
-fallback is the only place SQL is built by concatenation**; it's safe because
-every value has been through `toHexPubkey` and re-tested against `HEX64`. Don't
-generalize the pattern. `MAX_AUTHORS` (10,000) is an abuse guard, not a technical
-ceiling.
-
-### Follows scoping
-
-`assets/js/follow-set.js`. `resolveFollows()` reads the signed-in pubkey from
-`localStorage.lb_nostr_session` — deliberately *not* by loading the 1MB login
-widget, since all we need is an identity, not a signer — then fetches that user's
-newest kind-3 across the static relays and unions its p-tags.
-
-**An nsec login is never persisted** (`LoginScreen.jsx` keeps the key in memory
-only), so localStorage is empty for a user who is genuinely signed in.
-`getSessionPubkey()` therefore falls back to
-`window.LBLogin?.getUser?.()?.pubkey` — read only if the bundle is *already*
-loaded; it must never load it, which is the whole reason this module exists.
-Cached 30 min, keyed by pubkey so an account switch can't serve the previous
-user's list; an empty result is never cached. Returns `signed-out` / `ok` /
-`empty` / `unavailable`. The user's own pubkey is in the set, so your own boosts
-appear in your Follows feed.
-
-**`lb:session-change` is what keeps this in sync.** `setUser` in the widget
-dispatches it whenever the *identity* changes (not on profile refreshes). Two
-listeners, both also watching `storage` for the same thing in another tab: the
-inline feed-bar controller shows/hides the scope menu and drops you back to
-Global if you sign out; `feeds.js` drops both `*-follows` keys from its `loaded`
-set and re-runs whichever is on screen.
-
-The renderers still carry a `signed-out` branch. Unreachable through the feed bar
-now, kept as a fallback.
-
-**The Episodes feeds don't use `podcasts/index.json`.** The cards are *episodes*,
-not shows, and the published index is a show-level rollup computed over everyone,
-so its counts would be wrong for a Follows audience.
-
-## Feed loaders
-
-`assets/js/feeds.js` maps every feed key in `LOADERS`; each lazy-imports its
-renderer on first view.
-
-| Feed | Module | Source |
-|---|---|---|
-| `members-global` | `boosts-feed.js` | `GET /api/v1/boosts`, cursor-paged |
-| `members-follows` | `boosts-feed.js` | `POST /api/v1/boosts/follows`, cursor-paged |
-| `episodes-global` | `feeds-podcasts.js` | `GET /api/v1/episodes?not_medium=music&include=boosts` |
-| `episodes-follows` | `feeds-podcasts.js` | the same endpoint as `POST`, body `{follows:[…]}` |
-| `songs-global` | `feeds-podcasts.js` | same, `medium=music` |
-| `songs-follows` | `feeds-podcasts.js` | same, `medium=music`, as `POST` |
-| `shows-global` | `shows-feed.js` | `GET /api/v1/podcasts?not_medium=music` |
-| `shows-follows` | `shows-feed.js` | the same endpoint as `POST`, body `{follows:[…]}` |
-| `albums-global` | `shows-feed.js` | same, `medium=music` |
-| `albums-follows` | `shows-feed.js` | same, `medium=music`, as `POST` |
-| `artists-global` | `artists-feed.js` | `GET /api/v1/publishers` — the publisher tier, music-only server-side |
-| `artists-follows` | `artists-feed.js` | the same endpoint as `POST` |
-
-**All four ranked feeds rank server-side.** They used to build a corpus in the
-browser and roll it up, which ranked over whatever shards the walk happened to
-pull: measured against the full corpus, **7 of the true all-time top 10 episodes
-were missing outright, only 20 of the true top 100 appeared, and the true #7
-painted at #128**. Songs was worse (**84 of 601** music episodes) because music
-is ~5% of a stream whose window was sized for the other 95%. **So range and sort
-are queries now, and changing either refetches.**
-
-### Range, sort, rank, language, search: `docs/feeds.md`
-
-**That file is the authority for everything the feed bar does.** Its sections:
-*Range and sort*, *Ranking, And The One Definition Of It*, *The OnlyBoosts
-Charts*, *The Language Filter*, *The Bar On A Phone*, *The View In The Hash*,
-*Search*, *The Shows feed*.
-
-What a change would break, restated here because each rule reaches outside that
-file:
-
-- **⚠️ `range` MEANS BOOST TIME, EVERYWHERE — one reading since 2026-08-31.**
-  *Reed's call*, retiring the air-date reading `/api/v1/episodes` inherited
-  from LB (it served a different purpose there, and here it made the music
-  windows structurally near-empty: 612 of 618 boosted tracks were older than
-  30 days). A row is in the 1W view because someone **boosted** it this week,
-  and a windowed card's figures — and its drawer's notes — are the window's
-  own, recomputed over the window's boosts. Air date survives as the "Latest
-  episode" SORT and as the date on the card; it is never a window again.
-- **`RANGE_DAYS` in `functions/api/v1/episodes.js` and `…/podcasts.js` and
-  `RANGE_OPTIONS` move together**, or a range button answers 400.
-- **⚠️ THE HASH CARRIES THE WHOLE VIEW: `#shows?lang=de&range=1m&sort=sats`.**
-  Language shipped alone on 2026-08-17; **range and sort joined on 2026-08-27,
-  Reed's ask**. They ride the ten `PARAM_FEEDS` (né `LANG_FEEDS`) feeds and
-  deliberately not the Members feeds, which have the controls but no shareable
-  view. **A default value is elided**, so the bare `#shows` is the default view's
-  address — and because the two endpoints spell the boosters ranking differently
-  (`count` vs `boosters`), the controller validates a sort by **shape only** and
-  the renderer coerces an unknown key.
-- **⚠️ `assets/js/rank.js` IS THE SITE'S SINGLE DEFINITION OF A RANK: standard
-  competition ranking (1-2-2-4).** Count of rows strictly ahead, plus one; ties
-  share the better place and the next distinct value skips the group. Two-sided
-  and dependency-free, so the edge and the browser number a card identically.
-  `rankLabel()` owns both forms of the tie marker — `T4` on a feed card, `T#4` in
-  a detail-page tile. Dense ranking was measured and rejected; **no denominator,
-  anywhere.**
-- **⚠️ THE ONLYBOOSTS CHARTS: `sort=chart`, ONE SPELLING ON ALL FOUR RANKED
-  ENDPOINTS, AND ITS TIEBREAK LIVES INSIDE THE WINDOW.** Rank in sats + rank in
-  boosts + rank in the breadth key (boosters; shows boosted for a member),
-  summed, lowest total first; ties break breadth → sats → boosts, the rest
-  share a `T#`. The standing is the tuple, so — alone among the sorts — the
-  tiebreak is part of the `RANK()` window, every row carries `rank`/`tied`
-  from the server, and the renderers never renumber chart rows. Computed at
-  query time deliberately (no collector precompute; Follows forces the
-  query-time path to exist). The members wall opens on it; the detail pages
-  draw its top-100 **window strip** above the stat tiles — Week · Month ·
-  Year · All time, each cell that boost-time window's chart place
-  (`chartWindows` in `feed-rank.js`), each charted cell linking to that
-  window's chart view. **Since 2026-09-03 the strip is also the tiles'
-  window selector** (Reed's ask): `feedRanks` returns `windows` (each
-  window's figures and component ranks), four rows of tiles ship with all
-  but All time `hidden`, and `initStatWindows` in `detail-page.js` swaps
-  them. The "Rank on the all-time … feed" caption is gone with it. **See *The OnlyBoosts Charts* in `docs/feeds.md`** —
-  the design record — and `test-charts.mjs`.
-- **⚠️ `competitionRanks` ASSUMES THE LIST IS ALREADY ORDERED BY THE VALUE IT
-  RANKS**, and returns confident nonsense otherwise. Every caller satisfies it by
-  construction; a new one has to check.
-- **⚠️ THE `q=` PATHS USE `RANK()`, NEVER `ROW_NUMBER()`, AND CARRY NO TIEBREAK
-  INSIDE THE WINDOW.** A searched card has to agree with the number the same card
-  carries on the unfiltered feed.
-- **⚠️ NULL LANGUAGE IS NOT ENGLISH**, and **`lang=all` is not "no filter"** — it
-  is a well-formed subtag matching zero rows, so `ob-live.js` sends the parameter
-  only when the key is not `all`. The menu is **fetched** from
-  `GET /api/v1/languages`, never declared, and is medium-aware.
-- **The per-feed search box is gone since 2026-10-17** (see the slot
-  paragraph under The Three Tabs); the two bullets after this one describe
-  the API behaviour its removal left in place, and the `onSubmit` rule is
-  history.
-- **⚠️ `onSubmit` IS WHAT FLIPS THE SEARCH BOX'S ENTER BEHAVIOUR.** Typing
-  suggests, picking filters, **Enter submits the whole query** (2026-08-27, Reed's
-  ask) — and with `onSubmit` present suggestions are **not** auto-highlighted. The
-  member lookup deliberately supplies none and keeps its old Enter (*"leave npubs
-  alone"*). `test-feed-search.mjs` drives the **shipped** `mountFeedSearch`.
-- **⚠️ A RAW SEARCH STRING IS NOT AN FTS5 QUERY.** Everything touching one goes
-  through `_common.js#ftsMatch`; passing typed text straight to MATCH answers 500
-  on any `-`, `:` or `(`.
-- **The remote search source is `/api/v1/episodes?q=`, not `/api/v1/search`**,
-  which has no medium filter and no follows scoping and would suggest rows the
-  feed cannot show.
-- **Rank retention is an ordering**: sort the range's full corpus, stamp each row
-  with its position, *then* filter to the pick. Reversing the last two steps
-  renumbers the survivor to #1, which answers a different question.
-
-### The Members Tab
-
-**⚠️ THE TAB IS THREE PAGES SINCE 2026-10-21**: the #40HPW boards are
-`/charts/hpw`, the wall and the Boost Bots are `/members`, the boost feed is
-`/boosts` (see The Chart Pages). `renderMembersBoards` paints the boards and
-`renderMembersWall` the wall and the bots, each off its page's load. The
-section below is the tab-era record; its rules about the boards, the week,
-the wall's orderings and the share cards all still hold.
-
-Three sections above the boost firehose — **#40HPW, Members, Boost Bots,
-Boosts** — all client-rendered by `assets/js/members-board.js` and hydrated on
-the tab's first activation.
-
-**⚠️ THE SECTION'S VISIBLE HEADING IS "Nostr Gang #40HPW Challenge"** (Reed's
-rename, 2026-08-27). `#40HPW` stays the feature's name in this file, in ids and
-data attributes, and in the Rules dialog's title.
-
-**`docs/members-tab.md` is the authority**: the four-section idiom and its
-shells, the #40HPW rules and every measurement behind them, the week picker, the
-member wall's four orderings (Chart rank the default since 2026-08-31), the lookup, the member search endpoint, the Boost
-Bots section, and the intro copy. Nearly every paragraph in it is a Reed call.
-
-What a change elsewhere would break:
-
-- **⚠️ THE BLOCK SITS ABOVE THE PANELS, NOT INSIDE ONE**, Members holding two
-  boosts panels (Global and Follows), and it **hydrates from both entry points** —
-  the cold load does not go through `lb:feed-activate`, so `feeds.js` re-reads
-  `body[data-active-feed]` at the end. Hooked to the listener alone, the boards
-  were an empty gap on every reload and every shared link.
-- **⚠️ THE FEED BAR IS MOVED INTO THE ACTIVE PANEL'S LID, ON EVERY FEED**,
-  `appendChild` on the live element — since 2026-09-03, Reed's ask, every
-  feed is a shell with its controls on the lid (`.feed-shell` / `.feed-lid`
-  in `index.html`), which generalizes the 2026-08-23 move that put the bar
-  beside this tab's boost list. The bar ships in the Shows panel's lid and
-  `placeFeedBar(feed)` relocates it. **A bar left in the wrong panel is the
-  failure**: an inactive panel is `hidden`, so it takes the scope menu and
-  every feed's range and sort with it. The `.members-boosts` section is the
-  heading alone now; the lid-only `.mb-shell` and the seam it had are gone.
-- **⚠️ `.mb-shell` / `.mb-lid` RESTATE `.bs-shell` / `.bs-controls`, THEY DO NOT
-  IMPORT THEM** — this page does not link `show-page.css`. 1px `--border`, 12px
-  radius, `--cream` fill, lid on `--cream-d`. **They must stay in step.**
-- **⚠️ WEEKS START MONDAY 00:00 US PACIFIC**, and the DST rule is implemented
-  **twice** — in `assets/js/pacific-week.js` and in SQL — because the two boards
-  need it at different times. They cannot share code, so `test-members-hours.mjs`
-  holds the hand-rolled rule against Node's real tzdata at both transitions, every
-  week for four years.
-- **⚠️ THE SECOND SLOT IS A STACK SINCE 2026-09-03: Proof of #40HPW ⇄ Weeks at
-  #1**, flipped by the week picker's own stepper in the board's title (Reed's
-  ask: "like how you can toggle between weeks"). Weeks at #1 is the Charts
-  page's members board (`memberOnesBoardHtml` in `chart-board.js`, rows from
-  `/api/v1/charts/members/weeks-at-1`); its share card is
-  `members-weeks-at-1` under `/api/og/charts/`, its link is `/#members`, and
-  its rows' "Last:" weeks are picker jumps. `paintStack` in
-  `members-board.js` mounts the shown board's share button on every flip.
-- **⚠️ THE PROOF BOARD IS "Proof of #40HPW" SINCE 2026-09-01 AND IT IS ONE ROW
-  PER MEMBER.** *Reed's call.* It was **High Scores**, the ten biggest
-  booster-weeks; `range=all` now returns every member who has ever cleared forty
-  hours in a week, ranked by how many such weeks they hold, carrying their best
-  one. The rename followed the data rather than a design idea: clearing forty had
-  happened **twice** when the board shipped and **twenty-three times** by
-  2026-09-01, twenty of those one member's, so a top ten by hours printed one
-  name ten times. **The entry test is `>= 40` on raw seconds, the same
-  comparison the gold row makes**, so a gold row on This Week means that member
-  is on Proof — change one and change both. **⚠️ THE URL DID NOT MOVE:**
-  `/hpw/high-scores`, `high-scores.png` and `mountShare`'s key are all still the
-  old name, which is in the wild and which the collector's card bot screenshots
-  by literal. The design record is **The all-time board** in `docs/members-tab.md`.
-- **⚠️ THE #40HPW FIGURES MOVE WITH THE WEEK RULE *AND* WITH DURATION COVERAGE.**
-  Duration coverage adds hours to **past** weeks with no board code touched.
-  Re-measure after either changes; the numbers are the whole argument for the name.
-- **⚠️ THE EPISODE COUNT ON A ROW IS EPISODES THAT CONTRIBUTED HOURS**, not
-  episodes boosted, and it reads like a bug. Don't "fix" it by widening the count —
-  the hours are summed over exactly the episodes counted.
-- **⚠️ PUBLISHER KEYS ARE EXCLUDED FROM THE LISTING AND THE BOARDS, NOT FROM THE
-  SEARCH.** `PUBLISHERS` in `functions/api/v1/_common.js` is the collector's
-  `PUBLISHER_PUBKEYS` **less `chadf-boostbot`, by design** (Reed's call,
-  2026-08-30): that bot publishes the boosts Chad sends from his own node, so
-  it is a publisher for attribution and a member for ranking. The old "34
-  donors" figure was read off a different account's display name. It stays in
-  `dedupe.py`'s `RELAY_PUBLISHERS`, where it matters more now. `?publishers=1`
-  is the exact complement of the listing. `RANK_PUBLISHERS` in
-  `functions/_shared/feed-rank.js` restates the list and moved with it.
-- **⚠️ `/about#membership` AND `/about#bots` ARE IN THE WILD** — treat them as
-  frozen the way the detail pages' section ids are.
-- **The Share Cards** (2026-08-29/30; the design record is the section of that
-  name in `docs/members-tab.md`). The week is still not in the hash:
-  **`/hpw/<YYYY-MM-DD>` and `/hpw/high-scores` are the address a shared board
-  has**, edge-rendered by `functions/hpw/[[path]].js` from `hoursBoard()`
-  (lifted out of the hours endpoint) and the **two-sided
-  `assets/js/hpw-board.js`** (`rowHtml`, `boardHtml`, `COPY`), which the tab
-  imports too. **⚠️ THE IMAGE IS A CHROMIUM SCREENSHOT TAKEN ON THE COLLECTOR
-  MACHINE, NOT RENDERED AT THE EDGE** (Reed's call over satori + resvg-wasm):
-  the bot (`bots/hpw-cards/`) loads `/hpw/<key>/card`, waits for
-  `html[data-card-ready="1"]`, captures 720x900 at 2x, and writes the PNG
-  **inside the shards tree**, which is also what saves it from a `--delete`
-  mirror run. **A board is re-rendered when its hash moves, and since
-  2026-09-07 the hash covers the rows AND `is_current`**: the frame says "In
-  progress." off that flag, and with the rows alone a week whose last boost
-  landed before Monday kept its live-week card for good (Reed saw the
-  Aug 31 week's Shows card still "In progress." days later). **Every URL the
-  bot loads carries a `_=<ms>` cache-buster and the card frames answer
-  `no-store`**, because the zone Cache Rule of 2026-09-07 would otherwise
-  hand it the previous board. **⚠️ ITS STEP IN `run-incremental.sh` CARRIES A SECOND `push`,
-  AND THAT IS NOT REDUNDANT**: the card photographs the live site and the live
-  site reads D1, so the render has to follow `d1_sync --remote-delta` — which
-  sits BELOW the routine `push`, so by then the rsync has already run. Rendering
-  above the sync instead would photograph the previous cycle's board;
-  `/api/og/hpw/<key>.png` proxies it on the booster OG route's shape
-  (`_shared/og-image.js`): name allowlist, **PNG signature checked because the
-  upstream answers 200 text for a missing file**, 900KB cap, banner fallback,
-  HEAD answered. **⚠️ THE NOTE'S IMAGE IS FROZEN AT THE MOMENT OF SHARING**:
-  the share modal (`hpw-share.js`, one icon per board, mounted by the tab and
-  by `hpw-page.js`) uploads the reader's copy of the card to Blossom under
-  their key (`LBLogin.uploadToBlossom`) and the note carries that URL, never
-  the proxy's, which moves every cycle. The note is `<message>`, `<blossom
-  url>`, `<link>`; the link is `/#members` for the live week and the week's
-  own page otherwise. The modal opens signed out (Publish becomes Log in;
-  Download image works); Publish is blocked until the upload succeeds; a
-  banner answer is refused; **`lb:session-change` is listened for on
-  `window`**, where the widget dispatches it. `.hpw-*` and `.hpw-modal*` CSS
-  live in `assets/css/hpw-board.css`, shared by both surfaces.
-  **⚠️ ROW HEIGHT ON THE CARD IS A CARD-SIZE DECISION, AND THE BUDGET IS
-  MEASURED, NOT DERIVED**: ten rows share the list box (560px), which clips —
-  a taller row **silently drops the tenth member from the card while the tab
-  still shows them**. Measured 2026-08-30: rows 49.2–50.2px, ceiling 56.0px,
-  and the ceiling moves with ANY chrome change around the list. The bot
-  refuses to publish a card with a clipped row; have it re-measure after
-  touching the card page at all.
-
-### The episode feed adapter, the card projection, and episode links
-
-All three are in `docs/feeds.md`. What a change would break:
-
-- **`ob-data.js#toEpisodeShape` adapts the data to the consumer rather than the
-  reverse.** The feed embeds metadata in every boost where `feeds-podcasts.js`
-  expects a flat boost list plus side tables. Two fields the feed doesn't carry
-  (`feed_id`/`itunes_id`, `description`/`enclosure_type`) degrade rather than block.
-- **⚠️ THE CARD'S EVENT IS A PROJECTION, NOT A VERIFIED EVENT**, built in three
-  places and carrying **no `sig`**. `handleRepost` once embedded the original only
-  when `ev.sig` was present, so every repost from this site was an unrenderable
-  bare kind-6. **When a new action is added, decide explicitly whether it needs the
-  real signed event or only the projection.**
-- **⚠️ THE ROLLUP'S SYNTHETIC SHOW GUID NEVER LEAVES THE CLIENT.**
-  `toEpisodeShape` files a boost with no show under `unknown:<item_guid>` so it
-  can group; on 2026-09-03 that key reached a **signed boost note** as
-  `podcast:guid:unknown:…`, through the card's `data-show-guid` →
-  `onBoostClick` → the widget's tag builder (the collector heals such a note
-  after the fact, `resolve_guids.py`; the note itself is permanent). Since
-  2026-09-06 `show-link.js#isSyntheticGuid` is the one test and
-  `episode-card.js#realShowGuid` applies it at every site that hands a show
-  guid outside the page: the boost primitives, the note link, and the
-  Castamatic/Podverse subscribe links. **The same day the windowed
-  `/api/v1/episodes` rollup stopped losing the show of an un-enriched
-  episode**: it selected `e.podcast_guid` and bare `pc.*` columns under the
-  GROUP BY, so an episode with no row had a null show and one placeholder
-  boost blanked the show's title; the boosts are grouped first now and the
-  show joined to the resolved guid outside the aggregate (the medium and
-  language filters moved to that outer WHERE with it). `test-episode-card.mjs`
-  and `test-charts.mjs` pin both halves.
-- **⚠️ EVERY EPISODE LINK POINTS AT `/episode/<item-guid>`, AND THE QUALIFYING
-  RULE IS THE TITLE**, not the guid. **Three copies of that one test must agree**:
-  `show-link.js#episodePageHref`, `functions/show/[guid].js#episodePageUrl`, and
-  `episode-link.js`. Each is marked in its own source.
-- **⚠️ `episodeBoostLink` OWNS THE URL WRITTEN INTO A PUBLISHED BOOST NOTE, AND IT
-  IS PERMANENT AND ABSOLUTE.** Notes published before the flip still point at BMB
-  and always will. It returns null for a show-level boost; `/show/<guid>` is **not**
-  the fallback target.
-- **Three surfaces still point at boostmebitch.com on purpose.** Two are
-  show-level, through `bmbShowUrl()` in the show Function: "See All Tracks" on
-  the ALBUM drawer, and a podroll tile for a show we have no page for. The
-  third is episode-level: the un-indexed rows of the podcast drawer's
-  catalogue, built in the browser through `episode-link.js#bmbEpisodeUrl`,
-  the one builder the boost note's BMB fallback also uses. "See All Episodes"
-  went with the catalogue on 2026-09-04.
-
-## The detail pages
-
-`/show/<guid>`, `/episode/<item-guid>`, `/booster/<npub>` and `/artist/<guid>`
-are **one page with four subjects** (the artist page joined 2026-08-30). The back link, the stat tiles, the drawers, the boost list, the
-community wall and the whole client chrome come out of two shared modules; what
-differs is the subject and which sections apply.
-
-| | `/show` | `/episode` | `/booster` |
-|---|---|---|---|
-| Hero | show art, "Boost this Show" | a **player card**: art, audio, chapters + show-notes drawers, eyebrow links the show | the person: avatar, banner, bio, lightning address |
-| Stats | show totals | that episode's | that person's |
-| Rollup | `#community-shows` | `#community-episodes` | four rails since 2026-11-08, `#shows` (Podcasts Boosted, Albums Boosted) and `#episodes` (Episodes Boosted, Songs Boosted), split on the medium at last; the owner sees `#recommended` in their place (none for a day on 2026-11-07, drawers before) |
-| Community wall | `#community` | `#community` | — |
-| Podroll | both directions | — show-level tag | — |
-| Boosts | `#boosts`, opens on 24 | `#boosts`, all of them | `#boosts`, opens on 24 |
-
-**Design of record for `/show` is `docs/show-pages-spec.md`.** What follows here
-is only what a change would break.
-
-**⚠️ The stat tiles are one row on a phone, whatever the count.** They are
-`repeat(auto-fit, minmax(7rem, 1fr))` at full width, which on a 375px phone needs
-360px for three columns against 335px of content — so `/show` and `/episode` broke
-2 + 1 and `/booster` broke 2 + 2, and the second line read as a separate row of
-figures rather than the rest of one. Under 640px the grid switches to
-`grid-auto-flow: column` over `grid-template-columns: none`, which is what makes
-it **count-agnostic**: three tiles become three equal columns and four become
-four, with no rule naming either number. The maximum today is four (sats, boosts,
-shows, episodes on `/booster`); a fifth wants looking at rather than squeezing in.
-The type scales with `clamp()` rather than stepping, and **the binding constraint
-is the LABEL, not the number** — "episodes" and "boosters" are eight characters,
-where the widest figure is five.
-
-**`/artist/<guid>` is the fourth, shipped 2026-08-30 with the Artists feed** —
-the publisher tier's landing page, structured as the album page one level up
-(Reed's spec): hero, Nostr Boost Stats tiles with the rank chip (`feedRanks`
-gained a `publisher` kind ranking on the Artists feed), **#albums** ("Albums
-with Nostr Boosts", the indexed declaring MUSIC shows by sats, the
-episode-drawer chrome — **the page's one show list since 2026-08-31**, when
-the artist tier went music-only and the launch-day `#shows` section for the
-not-music declaring shows was REMOVED, a removal rather than a rename),
-**#community-artists** ("Other Artists This Community Boosts",
-the /show community rollup one tier up — NOT medium-split, because every row
-is a publisher and there is no partition to cross), the **#community** wall,
-and **#boosts** (opens on 24, whole corpus behind
-`/api/v1/publishers/<guid>?corpus=1`, the shared boost-section machinery). No
-boost button (PI cannot resolve most publisher feeds); index-only
-throughout. Section ids `#albums` and `#community-artists` are frozen. It is
-in `EDGE_PAGES`, the sitemap, and `show-link.js#publisherPageHref` is the one
-place that decides an artist title links — the feed card reads it too.
-`scripts/test-publishers-api.mjs` executes the page's extracted SQL.
-
-**`docs/detail-pages.md` carries the rest**: the rank line in the stat tiles,
-where the shared code lives, the section ids, the hash spy, the back link, the
-drawer chrome, each page in turn, the two shared server modules,
-the `#boosts` range and sort, message search, the show filter, the community
-rollups and wall, and the sitemap.
-
-What a change elsewhere would break:
+  `test-sign-boost.mjs` enforces it, fed by the shipped note builder.
+- **The boostagram message cap is 300 bytes of UTF-8 on the expanded message.**
+  The note carries `nostr:npub1…` mentions, never the label; the bot route
+  carries no `p` tag and the oracle refuses one (`docs/mentions.md`).
+- **⚠️ THE ROLLUP'S SYNTHETIC `unknown:` SHOW GUID NEVER LEAVES THE CLIENT**;
+  `isSyntheticGuid` / `realShowGuid` guard every site that hands a guid out.
+- **`/api/value` reads the show's own RSS first, Podcast Index as fallback**, and
+  resolves the stored feed URL before the guid.
+
+## Data Rules That Reach The Site
+
+Reasoning in `docs/data-pipeline.md`.
+
+- **⚠️ THE CORPUS STARTS 2024-07-01.** D1 behind `/api/v1/*` is what every page
+  reads; the static shards remain a published dataset.
+- **Almost every display field is nullable**; only `id`, `ts` and `booster.pk` may
+  be assumed. `episode.guid` and `item_guid` are opaque keys, sometimes URLs:
+  `encodeURIComponent`d and bound, never parsed.
+- **⚠️ NULL LANGUAGE IS NOT ENGLISH, AND NULL MEDIUM IS NOT MUSIC.**
+- **⚠️ `range` MEANS BOOST TIME, EVERYWHERE.** `RANGE_DAYS` in the endpoints and
+  `RANGE_OPTIONS` move together.
+- **⚠️ `rank.js` IS THE ONE DEFINITION OF A RANK** (competition, 1-2-2-4). The
+  chart sort is `sort=chart` on all four ranked endpoints. `q=` paths use `RANK()`.
+  **A raw search string goes through `ftsMatch`**, never straight to MATCH.
+- **⚠️ `PUBLISHERS` in `_common.js` and `RANK_PUBLISHERS` in `feed-rank.js` stay in
+  step** (the collector's publisher keys less `chadf-boostbot`).
+- **⚠️ THE CHART STRIP'S LEADERBOARDS ARE CACHED IN KV** (`chartTable`); a D1 read
+  per page view cost a month's budget in a day. Check `CF_ANALYTICS_TOKEN`'s
+  numbers before guessing at a D1 cost.
+- **`excludes.json` at the repo root gates every published surface**; it is
+  public, every entry carries a `reason`, and the removal path is deliberately
+  undocumented on the site.
+- **⚠️ THE INDEX IS LOAD-BEARING FOR LOCAL BITCOINERS' PUBLISH DECISION**: a
+  dropped row in `/api/v1/boosts` is a duplicate note there. Flag such a change.
+- **The site's own boosts reach D1 at the edge** (`/api/v1/boosts/ingest`); the
+  collector stays the source of truth.
+
+## Detail Pages And Favorites
+
+Reasoning in `docs/feature-rules.md`, `docs/detail-pages.md`, `docs/favorites.md`.
 
 - **⚠️ THE SECTION IDS ARE URLS AND THEY ARE FROZEN.** `/show`: `#episodes`
   `#community` `#community-shows` `#podroll` `#reverse-podroll` `#boosts`.
   `/episode`: `#community` `#community-episodes` `#boosts`. `/booster`:
-  `#favorites` `#latest` (2026-11-08, the owner's) `#recommended` (2026-10-20) `#boosts`; **`#shows` and `#episodes`
-  were its two rollups until 2026-11-07 and ARE ITS FOUR BOOSTED RAILS
-  SINCE 2026-11-08** (for a day they aliased to `#boosts`; Reed's call of the 7th: the `#boosts` list
-  answers both, with a By show menu and a search over the show and episode
-  titles, and the recommendations became rails) and alias to `#boosts`. Ids are reused across pages on purpose where they name the
-  same kind of section. `HASH_ALIASES` holds one permanent entry on `/show`
-  (`#inverse-podroll`) and two on `/booster`, and **is the repair for a rename that already happened, not
-  a licence for the next one** — it needs the module to have run, so a rename is
-  still a dead link for anything resolving the URL without a browser.
-- **Four pieces hold those ids up, in four files**: the ids on the `<section>`
-  elements, `scroll-margin-top: 5rem` on `.show-section` (the nav is sticky at
-  64px), `revealHashTarget()`, and `initHashSpy()`.
-- **⚠️ THE HASH SPY USES `replaceState`, NEVER `pushState`.** Scrolling isn't
-  navigation, and `replaceState` fires **no `hashchange`** — which is the only thing
-  stopping the spy tripping `revealHashTarget()` and opening a drawer as a side
-  effect of scrolling past it. The two coexist on exactly that property.
-- **⚠️ EVERY DRAWER ON THE FOUR PAGES OPENS ON "Overall"** (2026-09-03,
-  Reed's ask; the key is `chart`, the label deliberately not "Chart rank"
-  inside a drawer): the chart formula over the drawer's own rows, computed by the
-  two-sided `rank.js#chartRanks` on both sides, so the Function's order and
-  the page script's first re-sort are one function. The breadth key is the
-  drawer's own (boosters; the community's boosters; episodes on `/booster`'s
-  shows). See **The community rollups** in `docs/detail-pages.md`. **⚠️ ONE
-  EXCEPTION SINCE 2026-09-04: THE PODCAST `/show` DRAWER IS THE SHOW'S WHOLE
-  CATALOGUE AND OPENS ON LATEST EPISODE.** *Reed's call.* Its summary reads
-  "Episodes"; the edge renders the indexed rows and
-  `assets/js/episode-catalogue.js` merges the rest of the show's episodes from
-  Podcast Index through `/api/catalogue` when the drawer is opened, each with a
-  Boost button (the existing `/api/value` path resolves any item guid), a title
-  linking to BMB, date and duration and **no figures**. Indexed rows wear
-  `.ep-row--indexed`. Nothing touches D1; the boost's note is what creates the
-  episode's page, on the next collector cycle. The drawer declares its opening
-  sort in `data-ep-sort`, and `COPY.podcast.catalogue` is the switch (music is
-  deliberately still the boosted list). It is a written exception to the
-  rendering rule. **The Catalogue** in `docs/show-pages-spec.md` is the design
-  record; `test-catalogue.mjs` covers the Function and the drawer markup.
-- **⚠️ THE CHART STRIP'S FOUR LEADERBOARDS ARE COMPUTED ONCE AND CACHED IN
-  KV, NOT ONCE PER PAGE VIEW — SINCE 2026-09-07, AND THE REASON WAS A BILL.**
-  `feedRanks` ran the population-wide `RANK()` query four times per render
-  with one row kept (all time + Week/Month/Year), 286k D1 rows read for the
-  all-time episode chart alone, ~590k per episode page and ~540k per booster
-  page; SEO and AI crawlers (Ahrefs, Semrush, Amazonbot, Meta) were 70% of
-  the page views, and D1 read **12 billion rows on 2026-09-04** against
-  ~150M/day before the strip shipped on 2026-08-31 — the month's included 25B
-  ran out that day and the budget alert fired. `chartTable` in
-  `feed-rank.js` now computes each (kind, medium side, window) table once,
-  keeps it in KV (`env.CHART_KV` if ever bound, else the oracle's
-  `SIGN_RATELIMIT` namespace under a `chart:` prefix), serves a stale copy
-  while refreshing behind `waitUntil`, and every page looks its subject up —
-  the all-time component chips too, so a warm render reads **no** chart rows,
-  and the ranking runs in JavaScript over the base rows (the SQL window
-  functions cost 286k rows per all-time episode table, the base 24k). **Two
-  minutes is the collector's tick**, Reed's call: a boost on the site is on
-  the strip too, so a share-card screenshot matches everything around it. `chartCacheOf(context)` is what
-  the four pages pass; with no KV (tests, local dev) it computes per call as
-  before. `test-charts.mjs` pins that the cached answer is the direct answer
-  and that a warm cache runs zero statements. **Same day, Reed blocked
-  Meta-ExternalAgent, Amazonbot, ClaudeBot and GPTBot in AI Crawl Control
-  and `robots.txt` disallows AhrefsBot, SemrushBot and MJ12bot.** The
-  read-only `CF_ANALYTICS_TOKEN` in `credentials.env` is how the per-query
-  numbers were pulled (GraphQL `d1QueriesAdaptiveGroups`); check it before
-  guessing at a D1 cost again. **⚠️ THE PAGES' `max-age=300` NEVER CACHED
-  ANYTHING AT THE EDGE.** Cloudflare caches only static file types by default
-  and ignores `Cache-Control` on HTML and JSON, so every Function response
-  answered `cf-cache-status: DYNAMIC` and every repeat hit ran the Function; a
-  zone Cache Rule marking the page and `/api/v1` paths eligible (respecting the
-  origin's own header, so the money endpoints' `no-store` still holds) is the
-  dashboard-side half, Reed's to set. (A HEAD request answers `no-store` on
-  the same paths, which is what misled the first diagnosis into blaming a
-  zone rule; check GET.)
-- **⚠️ THE RANK CHIP IS DRAWN ONLY INSIDE THE TOP 100** (`RANK_CUTOFF`), a
-  display rule and not a change to `feedRanks`. It fails quietly to no third line.
-  **`RANK_PUBLISHERS` in `feed-rank.js` restates `PUBLISHERS` from
-  `functions/api/v1/_common.js` and the two must stay in step.**
-- **⚠️ `.show-stat dd` SETS ITS TYPE WITH THE `font:` SHORTHAND**, which carries
-  the family, and `.show-stat dd.show-stat-rank` is (0,1,1) where a lone
-  `.show-stat-rank` is (0,1,0). **When a stat-tile rule looks ignored, check
-  specificity before changing values** — and the trap is re-armed inside the 640px
-  block.
-- **⚠️ EVERY REPAINT RE-ATTACHES THE VERBS.** A rebuild that replaced the boost
-  rows and stopped there produces a list of dead notes that looks correct.
-  `boost-note-actions.js#wireBoostNotes(root)` is the scoped, idempotent half;
-  `data-actions-on` stops a second bar being appended.
-- **⚠️ `/episode` REDIRECTS TO THE SHOW ON A MISS RATHER THAN 404ING**, 302 and
-  never 301. It exists because the two halves of the pipeline can disagree — a card
-  links on the boost record's title, this page renders from D1's `episodes` table.
-  **The fix belongs in the collector; this is the graceful failure meanwhile.**
-- **⚠️ DON'T ADD A CLIENT- OR EDGE-SIDE REPAIR FOR A STALE EPISODE FIELD.** The row
-  is the truth and the collector owns keeping it true, on a `checked_at` gate. A
-  repair here would mask the collector and then disagree with it.
-- **⚠️ `item_guid` IS NOT ALWAYS A UUID AND IT IS THE URL KEY** — 9% contain a
-  slash, 30 are full URLs. Only ever `encodeURIComponent`d and bound, never parsed.
-- **⚠️ WHICH ROOT EACH PAGE PASSES TO `hydrateProfiles` IS PART OF THE
-  CONTRACT**, because it removes `data-missing` on its way out, including from an
-  element whose shape it does not know how to fill. `/show` and `/episode` pass
-  nothing; **`/booster` must scope to `#boosts`**, its bio mention having a private
-  patch path.
-- **The podroll's two queries and both community rollups are allowed to fail
-  quietly.** A rollup below the fold must never cost a reader the page they came for.
-
-## Discoverability data: `show_similar`, `first_boost_ts`, `description`
-
-Three collector-side pieces for the rails homepage, built 2026-10-17 on
-OB-web's spec, all ending in D1. **`bots/global-boost-scan/similar.py` is the
-design record for the first**; the D1 shapes are commented in `d1/schema.sql`.
-
-| | |
-|---|---|
-| `show_similar` | per show with **>= 3 distinct boosters**, its **top 20** same-medium-side shows by cosine over the booster sets, `(podcast_guid, other_guid, score, shared_boosters, rank)`. Recomputed whole by `onlyboosts_globalscan.py similar` on the daily podroll run, replaced wholesale by `d1_sync.py --remote-similar`. 12,186 rows at build (454 podcast + 222 music seeds). |
-| `podcasts.first_boost_ts`, `episodes.first_boost_ts` | `MIN(created_at)` of the row's live boosts, on every projection path. Stored raw; the New and Noteworthy rail picks its window (measured: 41 shows first boosted in 30 days, 98 in 90, 3 of the 41 with three boosters). |
-| `podcasts.description` | the channel `<description>` off PI's byguid answer, HTML-stripped, via `enrich._show_from_feed`; `backfill_description.py` fills existing rows and bumps `updated_at` so the drift pass carries them. |
-| `podcasts.newest_item_ts` | the newest episode's `datePublished` off PI `episodes/byfeedid` (byguid carries no newest-item field, measured), unix seconds, podcasts only, NULL for music and when PI lists no item (2026-10-29, OB-web's spec, Reed's call: a PODCAST whose newest episode is over 183 days old is not recommended; albums never go stale). One extra PI call per podcast refresh; `backfill_newest.py` fills boosted podcasts serially; a failed lookup keeps the stored date. |
-
-What a change elsewhere would break:
-
-- **⚠️ THE RELAY-BOT PUBLISHER KEYS ARE NOT BOOSTERS IN THE SIMILARITY.** One
-  key relaying hundreds of donors reads as one person who boosted everything
-  and manufactures overlap; `similar.py` drops `PUBLISHER_PUBKEYS` less
-  `chadf-boostbot`, the complement `_common.js#PUBLISHERS` takes. Measured:
-  with the keys in, 6,627 music pairs; without, 4,354.
-- **⚠️ THE FULL TOP 20 IS STORED AND THE FLOOR IS THE EDGE'S.** Half of all
-  pairs share exactly one booster (podcast median score 0.09, music 0.24). A
-  single-seed rail floors at `shared_boosters >= 2`; the summed rail relaxes
-  it. Don't floor in the collector; it forces a resync per rail.
-- **⚠️ `podcasts_fts` AND `episodes_fts` CARRY `description` SINCE 2026-10-17,
-  AND EVERY FEED SEARCH NAMES ITS COLUMNS.** `ftsMatch(raw, cols)` emits
-  `{title author} : (…)`; `podcasts.js`, `episodes.js` and `search.js` pass
-  theirs, so a word in a show's notes does not list the episode under the
-  sats ordering as if its title matched. Only the front-door search omits the
-  list. `publishers_fts(title)` rides the publisher replace. All three are
-  `--rebuild-fts` (drop and repopulate) on the remote.
-- **⚠️ THE REMOTE STEPS RUN BEFORE THE COLLECTOR PULLS THE CODE**, in this
-  order, with the incremental timer stopped: the three `ALTER TABLE`s named
-  in `schema.sql`, `--apply-schema` (the new tables), then after the pull
-  `--rebuild-fts`, `similar` + `--remote-similar`, and a drift pass. A
-  projection naming an absent column fails the whole batch, and the delta
-  then stops reaching D1 until it is fixed.
-- **Favorites counts (kind 10333) were scoped and deliberately not built**:
-  15 lists on the publish relays, 9 with public entries, 843 of 931 entries
-  on two of them, top feed favorited by 5. A Most Favorited rail would be two
-  people's lists. The probe is in the 2026-10-17 report; re-measure before
-  building it.
-
-## Show artwork: the `art2` fallback
-
-Some feeds publish two artwork URLs, RSS `<image><url>` and `<itunes:image>`, and
-the first is sometimes dead while the second resolves. The collector publishes the
-second as **`art2`**, null when identical to `img`; `assets/js/cover-art.js` walks
-the chain on error (`episode art → show img → show art2 → glyph`). Live coverage
-is small and real: 5 of 1,287 shows.
-
-**`docs/show-artwork.md` is the authority** — the chain's rules, every wiring
-site, the `/episode` third link, the `/booster` OG route and the measurements
-behind all of it. Three rules restated here because a change elsewhere would
-break them:
-
-- **⚠️ `coverChain()` PROMOTES `http://` TO `https://` BEFORE IT FILTERS.** Every
-  page here is https, so an http image is mixed content: Chrome auto-upgrades it
-  and **blocks it outright if https fails**, never falling back to the insecure
-  copy. `httpsUrl` is exported for the two avatar render sites that do not go
-  through the chain.
-- **⚠️ The share card's TYPE follows its image, on all four detail pages.**
-  Podcast artwork is square by specification and a booster's avatar is square or
-  portrait, so artwork gets `summary`; only the 1800x600 banner fallback keeps
-  `summary_large_image`. Every page shipped the large card until 2026-08-16, which
-  sliced every cover into a horizontal band — a worse failure than sending no
-  image, because it reads as a broken picture rather than a missing one.
-- **⚠️ `og:image` stays on the primary, deliberately.** A crawler cannot run the
-  error handler, so preferring `art2` there is tempting — but `art2`'s presence
-  means the feed publishes *two different* URLs, not that the primary is dead.
-  Measured over all five shows that carry one: four primaries return 200 and one
-  404s. Preferring art2 would swap four working share cards to fix one.
-
-## Profile fallback
-
-**An identity the index doesn't have falls back to Primal's cache before it is
-allowed to render as `@npub1abc…`.** `assets/js/primal-profiles.js` owns that
-lookup (`fetchProfiles`, chunked at 100, never throws). It was extracted from
-`boosts-thread.js` — which now imports it — so the detail pages can use it without
-pulling in 156KB of thread machinery.
-
-The index stays the fast path. The collector embeds a booster's name and picture
-in every record, which is what makes first paint final; this only fills two holes:
-
-- a booster whose kind-0 was unresolved when the collector last ran;
-- **an npub mentioned inside a boost message**, who need never have boosted
-  anything and so is in no table of ours at all. This is the common case.
-
-Primal is a **cache, not a relay fan-out**: one WebSocket, one batch, ~6s timeout.
-
-Two invariants:
-
-- **It is always post-paint and best-effort.** Every surface renders complete and
-  readable from the index alone; an unreachable cache changes nothing. Never make
-  a first paint wait on it.
-- **The detail pages mark their own gaps.** The Function emits `data-pk` +
-  `data-missing="name pic"` on exactly the cards, rows and chips it couldn't fill,
-  and the client patches those and removes the attribute. Don't let the client
-  re-derive what the server already knows.
-
-**⚠️ WHICH ROOT EACH PAGE PASSES IS PART OF THE CONTRACT, because
-`hydrateProfiles` REMOVES `data-missing` on its way out — including from an
-element whose shape it does not know how to fill.** So a page with a second,
-private backfill cannot call it on `document`.
-
-| Page | Call | Covers |
-|---|---|---|
-| `/show`, `/episode` | `hydrateProfiles()` | everything; neither page has a private path |
-| `/booster` | `hydrateProfiles(#boosts)` | the boost list only |
-| `/artist` | `hydrateProfiles()` | everything — the bio is plain text with no mention chips, so there is no private path to protect |
-| any card rollup | `hydrateCardProfiles(list)` | its own cards, on approach |
-
-`/booster` is scoped because its **bio** carries a `.bs-mention` chip with its own
-patch path (`fillMention`, selecting `.bs-mention[data-pk][data-missing]`).
-Unscoped, `hydrateProfiles` matches that chip, finds none of the four class names
-it knows, fills nothing, and strips the attribute — after which the header's own
-backfill selects nothing and the bio mention never resolves. Measured in a DOM
-against the live cache: unscoped fills 16 of 16 chips and breaks the bio; scoped
-fills 8 on load and the rollup's own pass takes the rest to 0 on approach.
-
-**`/booster` had no call at all until 2026-08-16**, so the `nostr:` mentions
-inside its `#boosts` messages stayed truncated npubs forever. The hook was
-correctly emitted the whole time; nothing read it.
-
-The Boosts feed **rebuilds the card** rather than patching it, seeding
-`setCachedProfile` first so the mention chips inside the message body agree with
-the avatar above them.
-
-## Show credits: `author`
-
-`<itunes:author>`, backfilled across all 924 identified shows. Measured over the
-shipped index, counting non-empty values that aren't just the title repeated:
-**97.4% on music (454 of 466), 88.0% on podcasts (405 of 460)**. The collector's
-own scoping probe put this far lower because it judged *quality* by eye where the
-table applies the mechanical rule the site implements. **Measure off the shipped
-index, not the probe.**
-
-On a music feed `author` is the artist and is clean. On a podcast it is whoever
-the publisher named there: usually the host, sometimes a network
-(`Jupiter Broadcasting`), occasionally a tagline. So:
-
-- **Never label it "Host" or "Creator".** `Artist` on music, a softer `By` on
-  podcasts. "By Jupiter Broadcasting" is true; "Host: Jupiter Broadcasting" is not.
-- **The only filter is the title repeat** (normalize case, whitespace and a
-  leading "The"). Do not build a tagline detector: any rule sharp enough to catch
-  "Bitcoin is for Everyone" also eats real names, and a wrongly suppressed credit
-  is worse than an odd-looking one.
-- `medium` defaults to `podcast` for a feed that declares none, so an untagged
-  music feed gets `By` rather than `Artist`. A known consequence of the partition
-  rule, not a bug.
-
-It renders as `creditLine()` on `/show/<guid>`, prints nothing when empty or when
-it repeats the title (~7% of rows), and `.show-credit` has no reserved space so a
-suppressed credit costs no layout. It is also in the Shows feed search entry's
-`extra` — matched, never displayed, scoring below every title hit. Not in `sub`:
-it would push the show's own numbers off a narrow card.
-
-**Still open:** `author` is not matchable in `/api/v1/search`, which matches
-through `podcasts_fts`, declared `fts5(podcast_guid UNINDEXED, title)`. Adding it
-is a collector-side schema change plus a repopulate; a SELECT cannot do it. Also
-open: `og:title` for music becoming "<artist> — <album>".
-
-## Show language: `language`
-
-RSS channel `<language>`, off the Podcast Index feed object. It rides the
-`podcasts/byguid` call `enrich.py` already makes, so it costs **no extra
-request**. Carried by `podcasts/index.json`, the per-show shards and D1's
-`podcasts` table; `backfill_language.py` filled the existing rows.
-
-**Stored as the primary subtag, lowercased** — `en`, `de`, never `en-US`. The
-corpus describes ~21 languages in **36 distinct raw tags** (`en`, `en-us`,
-`en-US`, `en-gb`, `en-au` are one language and five menu entries, and the case
-varies by publisher). Anything not 2–3 alpha is dropped rather than stored, so a
-junk value can't become a junk filter option.
-
-**⚠️ NULL MEANS THE FEED DECLARES NONE, AND THAT IS NOT ENGLISH.** Coverage
-splits hard on the medium: **99% of podcasts (466 of 469) against 48% of music
-(232 of 485)**, because Wavlake — 198 of the 251 music misses — publishes no
-`<language>` at all. Across the index that is **594 untagged of 1,294**. So an
-untagged show is a populous, first-class state, not a gap to default away: a
-filter that folds NULL into a language turns "filter by language" into "hide half
-the Albums feed", under a claim those publishers never made. Same partition rule
-as the medium split, where the unidentified shows are why the Shows feed is
-`not_medium=music` and never `medium=podcast`.
-
-**The tail is thinner than the show counts suggest.** Boost-weighted: `en` 17,286,
-`de` 3,155 across 40 shows — essentially the whole non-English story — `es` 319,
-every other language under 50. A menu listing all 20 is mostly dead entries.
-
-`lang=` filters `GET /api/v1/podcasts` and `GET|POST /api/v1/episodes`, on all
-four query paths (all-time read, windowed GROUP BY, `q=` ranking CTE, follows
-POST). `readLang` / `langWhere` in `_common.js` are shared so both validate
-identically. Three rules:
-
-- **`lang=unknown` is how the untagged bucket is asked for.** There is
-  deliberately **no `not_lang`**: medium needs its negation because every show
-  must land in exactly one of Shows/Albums, and language has no such obligation.
-- **A full tag is normalized, not rejected** (`lang=en-US` → `en`). Nothing is
-  stored in that form, so a 400 would only trap a caller passing a value straight
-  back from a feed.
-- **Validated by shape, never against a fixed list.** The set grows the first time
-  anyone boosts a show in a new language; a whitelist would 400 it.
-
-**`GET /api/v1/languages` is the facet, and a control is built from it rather than
-a constant** — the set is data, not software. It is `medium`-aware because `de` is
-38 shows on the podcast side and 2 on the music side, and it returns the `unknown`
-row as a peer.
-
-`language` also rides `/api/v1/podcasts/<guid>`, `/api/v1/episodes/<guid>` and
-`/api/v1/search`, for consistency with the shards. **It is not in `podcasts_fts`**
-and nothing needs to *search* a language.
-
-Remote D1 got `ALTER TABLE podcasts ADD COLUMN language TEXT` out-of-band, as
-`artwork` and the profiles fields did — `CREATE TABLE IF NOT EXISTS` adds no
-column to an existing table, so `bots/global-boost-scan/d1/schema.sql` and the
-live remote are kept in step by hand. The backfill reached D1 through the
-**metadata-drift pass**: bumping `shows.updated_at` is what makes a row due.
-
-The UI shipped in `e870b93` — see **The Language Filter** in `docs/feeds.md`.
-**Still open:** the Boosts endpoints take no `lang`, so the note feeds have no
-language axis.
-
-## Who published a boost: `client_id`
-
-**`docs/boost-clients.md` is the authority** — the three signals and their
-coverage, the three measurements that shaped the rules, `SLUG_ALIASES`, the chip
-on the boost cards, and the two registered first-party publishers (OnlyBoosts'
-own bot and the Local Bitcoiners show account).
-
-A derived classification, not a field anyone published: the raw `client` column
-stays exactly as signed and is never overwritten, which is why the derivation
-lands in `client_id` / `client_via` / `client_src`. The NIP-89 `client` tag is on
-**1.3%** of the corpus; the `fountain.fm` i-tag and known publisher pubkeys cover
-the rest, and **39 boosts are left null rather than guessed**.
-
-What a change elsewhere would break:
-
-- **⚠️ THE PUBLISHER IS THE CLIENT; THE APP IT RELAYS IS NOT.** A relay bot's
-  notes name the listener's app in `client_via`, nested under the bot and **never**
-  promoted to `client_id` — those apps published nothing to Nostr. The publisher
-  pubkey is tested **first**, so a `client` tag naming a relayed app could never
-  promote it.
-- **⚠️ THE BOOSTER IS THE PUBLISHER, NOT THE DONOR.** An uppercase `["P", …]`
-  sender tag is read nowhere and must stay that way: nothing here can verify the
-  named donor authorised a note signed by a key they do not hold. If it is ever
-  surfaced it wants a `proxy_for_pubkey` column, rendered as "on behalf of …", and
-  kept out of every count.
-- **⚠️ THE CHIP NAMES THE PUBLISHER, NEVER `client_via`**, and an unattributable
-  boost gets **no chip** (`hasClientLabel` is the gate). *Reed's call, 2026-08-24.*
-- **⚠️ `assets/js/client-label.js` IS TWO-SIDED**, which is why the label table
-  lives there and `functions/api/v1/clients.js` imports it rather than declaring it.
-- **⚠️ THE BOOST DELTA IS `INSERT OR IGNORE`**, so a re-derivation reaches the
-  query layer only through `d1_sync.py --remote-clients`. Nothing else re-pushes it.
-- **⚠️ ALL FOUR DETAIL-PAGE BOOST QUERIES MUST SELECT `b.client_id`**, /artist's included. They are
-  hand-written rather than `BOOST_SELECT`, so forgetting one renders no chip at the
-  edge and a chip on every row after a re-sort. `test-boost-row.mjs` catches it.
-- **⚠️ THE `via != slug` GUARD IS LOAD-BEARING FOR OUR OWN NOTES.** Our template's
-  `📱 via onlyboosts.social` slugifies to `onlyboosts` — the slug itself — so
-  without that guard every bot note nests OnlyBoosts under OnlyBoosts. Not dead
-  defensive code.
-- **⚠️ THE INDEX IS LOAD-BEARING FOR LB's PUBLISH DECISION.** LB's bot asks
-  `/api/v1/boosts` before publishing, so a reclassification that drops rows, or a
-  stale D1 sync, makes it publish a duplicate. **Flag such a change rather than
-  shipping it quietly.** LB's daily audit files a GitHub issue carrying the event id.
-
-**Still open: `/stats`.** A "boosts by app" breakdown is what `/api/v1/clients`
-was built for and still has no surface.
-
-## PC 2.0 Favorites: `favorites-merge.js`
-
-**`docs/favorites.md` is the authority.** Chad Farrow's cross-app favorites,
-kind 10333: one replaceable event per pubkey, feed and item entries, public or
-private as a whole. **All six steps built 2026-09-08: the merge, the reader,
-the writer, the heart, the `/booster` section and the account menu rows.
-Reed's first live lists reached BoostMeBitch, and artist favorites are written
-here first (neither app renders one yet). The migration gate lifted
-2026-10-03: episode and song hearts are live, the merge is re-vendored at
-the spec's ca652a9 (31 vectors), an empty list is public by rule, and snort
-is a publish target (theforest refuses the write and is deliberately out).**
-- **⚠️ `favorites-ui.js` IS LOADED ON EVERY PAGE BY `nav.js`**, a dynamic
-  import at the end of its IIFE, lazily (no hearts, no relay read). It
-  exposes `window.OBFavorites` for the widget's Favorites row; a mode change
-  from there is a `userChose` publish cycle, never a standing setting acted
-  on. The dark-mode row presses `.nav-theme-toggle` so nav.js keeps ownership.
-- **⚠️ THE MENU'S SETTINGS FOLLOW THE ACCOUNT AS A NIP-78 EVENT** (kind 30078,
-  `d` = `onlyboosts:settings`, NIP-44 to self; BMB's own pattern):
-  `account-settings.js` pushes on change and pulls on login, newest wins
-  with the tie to the device. The theme is applied by pressing the nav
-  toggle; `favoritesMode` on the event is a stored choice, never a flip.
-- **Per-entry public/private is TABLED** (Reed, 2026-09-09): the spec is one
-  mode per list; Reed takes NIP-51's per-entry model up with Chad first, and
-  nothing goes to GitHub on it before that.
-
-- **⚠️ A HEART CLICK WAITS FOR THE REAL SIGNER AND DECIDES ADD OR REMOVE
-  AFTER THE FULL READ** (2026-10-29, Reed's report that a click did nothing):
-  the widget boots on a stub user, so `onClick` waits on the widget's
-  `isSessionReady()`; an unopened private half paints a heart UNKNOWN, not
-  off; `unchanged` gets a toast too; on reads "Favorited" on a tinted pill.
-  **A button in flight keeps its word** (2026-11-08, Reed: a press looked
-  ignored for twenty seconds): the click's own re-read ran `paintAll`,
-  which wrote "Follow" over "Saving…"; `paint` skips an `is-busy` button,
-  the pill pulses, and a list with no private content is `privateOpened`
-  on the first read so a click does not read it again.
-- **⚠️ A PODCAST SHOW IS FOLLOWED, EVERYTHING ELSE IS FAVORITED** (Reed's
-  call, 2026-11-07): the show-level button on the podcast side reads Follow /
-  Following, plus → check; episodes, albums, songs and artists keep Favorite
-  and the heart. `wordsFor` / `isFollow` in `favorite-button.js`; wording and
-  glyph only, the kind 10333 event is unchanged. The list is **Follows and
-  Favorites** on every surface that names it, **and on `/booster` it is
-  THREE DRAWERS since 2026-11-08** (Reed's call): Podcasts You Follow (the
-  OPML band), Favorite Podcast Episodes, Favorite Music (Artists / Albums /
-  Songs under the Show menu); `DRAWERS` in `favorites-section.js`. See
-  **The Heart** in `docs/favorites.md`.
-- **⚠️ OPML IMPORT ADDS AND NEVER REMOVES, A PRIVATE FEED ADDRESS NEVER
-  LEAVES THE DEVICE, AND A VISITOR WITH NO ACCOUNT CAN IMPORT** (2026-11-07,
-  Reed's asks; BMB's rules in `assets/js/opml.js`, two-sided and
-  dependency-free). `POST /api/v1/feeds/resolve` turns feed URLs into guids
-  (D1 `feed_url` first, PI `byfeedurl` for the rest, `PI_MAX` a request;
-  three states, ABSENT is never "not found"); `POST /api/v1/opml/link` reads
-  a pasted link server-side and answers outlines only; a signed-out import
-  lives in `ob_local_follows` in that browser, seeds the homepage's
-  Recommended and Because rails through the endpoint's favorites-only form,
-  and is offered to the Nostr list on login; `syncFavorites` takes a batch
-  and publishes once. Three doors: the homepage's locked cards, the account
-  menu, the owner's `/booster` band. **OPML Import And Export** in
-  `docs/favorites.md`; `test-opml.mjs`.
-- **⚠️ THE HEART SHIPS `hidden` AND `favorites-ui.js` REVEALS IT FOR A
-  SIGNED-IN MEMBER ONLY** (Reed: signed out gets nothing). `favorite-button.js`
-  is two-sided chrome on the boost-button pattern, rendered by both cards and
-  the /show and /episode Functions ahead of the boost pill. **Episode hearts
-  are revealed like show hearts since 2026-10-03**: `ITEMS_ALLOWED` and the
-  writer's `items-gated` status are gone, not flipped, because both shipped
-  apps have read and written the three-element item since 2026-09-08. The
-  catalogue drawer's un-indexed rows still carry no heart.
-
-- **⚠️ THE MERGE IS THE SPEC'S REFERENCE IMPLEMENTATION, LIFTED WITH CHAD'S
-  OK, AND THE SPEC'S OWN VECTORS RUN AGAINST IT.** Two adaptations: no
-  stand-in codec (real NIP-44 is async, so `plan` takes `readPrivate` in and
-  hands `privatePlaintext` out), and TextEncoder for Buffer. **A change the
-  vectors do not cover is a change to the spec and goes upstream first**:
-  issue #37 (a removal never propagated on a private list) went that way on
-  2026-09-08, Chad found a third case, and the module is lifted from the fix
-  (PR #38). **Vendor from main, never a PR branch**: main moved three more
-  times that day (#40, #47, #49) and the site shipped four red vectors for
-  three weeks; re-lifted at ca652a9 on 2026-10-03, 31 vectors. **An empty,
-  untagged list is public by rule** (#47) and never asks; the Public/Private
-  dialog is for a list that holds entries and cannot say which half.
-- **⚠️ ONLYBOOSTS ADOPTS THE LIST AND CLAIMS WHAT IT RENDERS**, both halves,
-  with a hydrate pass at the top of every cycle; without it an unfavorite of
-  another app's entry silently does not stick. The writer never uses NIP-04,
-  records the baseline only on a relay's `OK true`, and refuses an event the
-  signer returns under another key.
-- **⚠️ ONE FAVORITE, ONE TAG, SINCE THE SPEC'S 9b04dfe (2026-09-07):** a
-  feed is `["i", feed]`, an item is `["i", feed, item]`, an artist is a bare
-  publisher entry. **No item favorite is written until BOTH existing apps read
-  the three-element form** (stage 1 of the feed-guid migration): a reader that
-  does not know it turns an episode favorite into a favorite of the whole show.
-  **Both have since 2026-09-08 (BMB #364, StableKraft #256)**, so item
-  favorites are written and a legacy item on a list is rewritten on the next
-  publish, as vector 27 requires (2026-10-03).
-- **⚠️ `relay.fountain.fm` REFUSES THE KIND, AND ONE RELAY HELD A STALE
-  PRIVATE-MODE COPY WITH ZERO PUBLIC TAGS.** `favorites-read.js` counts per
-  relay on raw sockets, never a pool's aggregate EOSE: **trusted on a
-  QUORUM since 2026-10-30** (Reed's call): two answers, plus a 1.5s grace for
-  the rest, and a relay that opens and stays silent no longer degrades the
-  read (until then every reached relay had to answer, and one silent relay,
-  damus, broke every heart); newest wins; an untrusted read is `null`, which
-  is not an empty list. See `docs/favorites.md`.
-- **⚠️ EVERY RELAY ANOTHER APP READS THAT ACCEPTS THE KIND IS IN
-  `PUBLISH_RELAYS`.** BMB believes the newest copy it hears within 1.5s of
-  the first; primal was in its read set and not in our publish set, and a
-  favorite made on `/show` did not reach BMB until re-made (Reed's first
-  live test, 2026-09-08). Primal is in both sets now.
-
-## Not indexed: `podcast:person`
-
-`<podcast:person>` is **not** in this pipeline and deliberately isn't being added.
-The collector probed it and found ~6% coverage, confirmed against raw feeds rather
-than the API, so it is not a Podcast Index limitation: the tags genuinely aren't
-in the feeds. A credits section built on that is the near-empty block that is
-worse than nothing. Revisit only if we ever parse channel-level RSS ourselves
-*and* a wider scan changes the number.
-
-`ownerName` is also not indexed, and that is the more useful finding: every show
-carrying one **also** carries an `author`, so it never fills a blank. It is not a
-fallback. Don't re-add it.
-
-## Podroll: the collector side
-
-`<podcast:podroll>` is **not in Podcast Index**, so `podroll.py` fetches the
-show's own feed. **It is the only pass in this pipeline that touches third-party
-RSS**, and that shapes all of it.
-
-**Daily, never hourly** (`onlyboosts-podroll.timer`, 09:40 UTC). A podroll changes
-when a publisher edits their feed, never when a boost arrives.
-
-**⚠️ The timer's cadence is NOT the crawl's cadence.** `db.shows_needing_podroll`
-is age-gated by `--max-age` (default 6d), so a feed read cleanly two days ago is
-skipped however often the timer fires: on the day the cadence changed, **8 feeds
-were due against 948 in a full sweep**. The corpus still turns over about once a
-week. Don't "fix" the frequency by lowering `--max-age` to match it — that is the
-7x-bandwidth version.
-
-**A new show waits for this pass, and nothing else fills the gap.** There is no
-podroll path on the incremental tick by design.
-
-**⚠️ Politeness is load-bearing.** The first scoping sweep, 12 flat workers, drew
-429s from 137 feeds, 135 of them Wavlake. Every one would have been recorded as
-"no podroll" and the number would have looked plausible. Re-probed serially: all
-135 fetched, none had a podroll. So `probe_feeds` groups by host and goes **serial
-per host**, concurrent only across hosts. Assume any wide third-party sweep has
-this failure.
-
-Three more invariants:
-
-- **Only a clean read may rewrite a stored podroll.** A 429/timeout/truncation
-  means we failed to see the feed, not that the publisher deleted their list.
-  `http-404` is deliberately not transient: a gone feed is a real answer.
-- **Feeds are streamed and abandoned** at `</channel>` or 2MB (one indexed feed is
-  50MB). The cap was validated, not guessed: all 48 feeds that exceeded it were
-  re-downloaded in full and none carried a podroll past it.
-- **The block is regex-parsed, not XML-parsed**, because it's third-party markup
-  read from a deliberately truncated prefix. A podroll opened but never closed
-  raises `Truncated` rather than storing half a list.
-
-Coverage: 65 of 925 reachable feeds (7%), 371 edges, 221 distinct targets. Only
-~56% of cards link anywhere; 136 of 221 targets were new to the index, and the
-collector resolves those through PI `podcasts/byguid` and caches them with
-`discovered_via='podroll'`.
-
-**In D1 both directions are denormalized onto the edge** (`source_*` / `target_*`),
-because a join to `podcasts` would only resolve the half of targets that have
-boosts. It syncs as a **full replace** via `d1_sync.py --remote-podroll`, run by
-the podroll script, never on the boost delta path. Wholesale replacement is also
-what makes a *removed* recommendation actually disappear.
-
-Podroll-discovered `shows` rows have no boosts, so they appear in no export row
-and no D1 projection. The one place it leaked was `db.stats()`, whose
-`shows_enriched` used to be `COUNT(*) FROM shows`; it now asks the boosts table.
+  `#favorites` `#latest` `#recommended` `#shows` `#episodes` `#boosts`.
+  `/artist`: `#albums` `#community-artists`. So are `/about#membership`,
+  `/about#bots`, `/about#charts`, `/about#recommendations`.
+- **The hash spy uses `replaceState`, never `pushState`.**
+- **Every drawer opens on "Overall"**, except the podcast `/show` drawer, which is
+  the show's whole catalogue from Podcast Index and opens on Latest episode.
+- **⚠️ ALL FOUR DETAIL-PAGE BOOST QUERIES SELECT `b.client_id`.**
+- **`/booster` passes `#boosts` to `hydrateProfiles`**; the other pages pass nothing.
+- **`/episode` 302s to the show on a miss**; the fix for a stale episode field
+  belongs in the collector, never a repair at the edge.
+- **The heart ships `hidden`** and is revealed for a signed-in member only. A
+  podcast show is Followed; everything else is Favorited. The favorites merge is
+  the spec's reference implementation, vendored from main, never a PR branch.
 
 ## Vocabulary
 
-Every number on this site is bounded by the handful of apps that publish boost
-notes to Nostr. A reader who doesn't know that reads them as the show's real
-numbers, and the failure mode is a podcaster seeing our figure as a verdict on
-their audience.
+Every number here is bounded by the apps that publish boost notes to Nostr.
+"A Nostr boost", "a booster" (the count noun), "the Nostr Community" (a group,
+never a count), "Sats" (never qualified inline). **"Supporter" is removed from
+every user-visible string.** The qualifier is a short label at the numbers
+(`Nostr Stats:`, `Nostr Boosts:`, `Nostr Boost Stats`), never a paragraph;
+`og:description` keeps the full sentence. A superlative names the index. User-facing
+copy avoids Nostr jargon.
 
-| | |
-|---|---|
-| **A Nostr boost** | an indexed boost. Bare "boost" is fine inside a surface the scope note already covers. |
-| **A booster** | one person who sent one. The count noun everywhere: cards, hero tiles, drawer bars. |
-| **The Nostr Community** | the *set* of them. Names a group, never counts one. |
-| **Sats** | never qualified inline. `Sats (Public)` was rejected: it reads as a claim about the payment rather than the record, and invites a private counterpart we never explain. |
-| ~~Supporter~~ | **removed from every user-visible string.** It is a claim about who supports a show, and this data cannot make it: a show with 200 keysend supporters and 3 Nostr boosters would read as having 3 supporters. |
+## Bot Conventions
 
-**NIP-73 is deliberately *not* the qualifier.** It is the tag linking a note to a
-show; what actually excludes a boost from this index is that nobody published a
-note at all. A reader who learns what NIP-73 is still does not understand why
-their community is missing. The term survives in exactly one place, `/about#nip73`,
-where it is the subject.
-
-**The qualifier is carried by a short label at the point of the numbers, never a
-paragraph near them:**
-
-- `Nostr Stats:` on every rollup card (`.ob-stats-label`);
-- `Nostr Boosts:` on the Episodes/Songs boost drawer. It read
-  `Nostr Interactions:` until 2026-08-24; *Nostr boost* is the term the project
-  settled on in public and the drawer holds boosts, so the vaguer word was
-  naming the same thing twice over;
-- `Nostr Boost Stats` over the detail pages' stat tiles, with *Nostr Boost*
-  linking to `/about#keysend`.
-
-Both labels keep their colon: the booster faces and sats sit immediately to the
-right, so without it the label reads as a heading over an unexplained row of
-avatars.
-
-**The full sentence survives in exactly one place: `og:description`.** That is the
-string that travels without the page around it, into a preview card or a group
-chat where nothing else qualifies it, so **don't trim it**. It is also why
-`og:description` is not sourced from the publisher's own show description.
-
-**`.ob-scopenote` is gone** and must not come back — it was the shared
-one-sentence paragraph, and it pushed the feed below the fold to answer a question
-a browsing visitor had not asked yet. The rule is deleted from `theme.css`;
-`git show f0c5f66:assets/css/theme.css` has it.
-
-**The `/boosts` cards carry no qualifier at all**: one card is one boost, and its
-sats figure is that note's own claim rather than an aggregate.
-
-**A boost note names what it was boosted to, and both halves link** — the episode
-to `/episode/<item-guid>` and the show to `/show/<guid>`. **⚠️ Each half is
-suppressed where it is the page's own subject**: the episode on `/episode`
-(`showTarget: false`), the show on `/show` and `/episode` (`showShow` is true on
-`/booster` alone). A row must not repeat the `<h1>`.
-
-**No episode counts, anywhere.** See the section of that name in
-`docs/show-pages-spec.md`. `.show-count` now has no emitter; the rule stays in
-`show-page.css` with a note, because the shape is right for a figure that is
-complete and unqualified and this site has none.
-
-The Supporter → Community rename was a **surface rename only**. `supporterCard`,
-`renderSupporters`, `SUPPORTERS_VISIBLE`, `data-supporter-grid`, the `.sup-*`
-classes and `assets/js/supporter-wall.js` all keep their names, the same seam as
-Podcasts → Episodes below. (`assets/js/supporter-set.js` was named here too until
-2026-08-23; it was LB's supporter-TIER resolver, a different thing that happened
-to share the word, and it was deleted with the rest of the strip.)
-
-## Naming note
-
-Internal identifiers still use LB's `lb` prefix — `window.LBLogin`,
-`lb_nostr_session` in localStorage, `lb-*` CSS classes, `lb:feed-activate` events.
-Renaming is cosmetic and touches many files; it's deliberately not done. Don't
-half-rename it.
-
-### Podcasts → Episodes
-
-The episode-level feed was called **Podcasts** until Shows arrived and made the
-name ambiguous. The line drawn was **the product surface renames, the module does
-not**:
-
-| Renamed | Kept |
-|---|---|
-| the dropdown label, panel `aria-label`s | `assets/js/feeds-podcasts.js` |
-| feed keys `episodes-global` / `episodes-follows` | its `renderPodcasts` export |
-| URL hashes `#episodes-*` | its `[podcasts]` console prefixes |
-| panel ids `panel-episodes-*` | `PODCASTS` const in `feeds.js` |
-| accent tokens `--eg-*` / `--ef-*` | `podcasts/*.json` data paths (collector-owned) |
-
-A module filename isn't a URL, and renaming it costs the git history that follows
-the file. The seam is between the surface and the module, and it's a seam, not a
-gap.
-
-**⚠️ `ALIASES` in the `index.html` controller maps `#podcasts-global` and
-`#podcasts-follows` to the new keys and rewrites the hash in place, the way a 301
-would. Never remove an entry** — those links are in the wild.
-
-## What's built vs. what isn't
-
-**Working:**
-
-| | |
-|---|---|
-| `boosts-feed.js` / `feeds-podcasts.js` | the boost feeds and the episode-level rollup behind Episodes and Songs |
-| `episode-card.js` + `episode-card-actions.js` | **the** episode card, facts and verbs, shared by the edge and the browser |
-| `episode-section.js` | the card rollup on `/episode` and `/booster` |
-| `rank.js` | **the** definition of a rank, competition-style, shared by the edge and the browser |
-| `boost-list.js` + `boost-section.js` | **the** boost row and the `#boosts` range and sort, facts and verbs, shared by the edge and the browser |
-| `show-card.js` + `show-card-actions.js` | **the** show card, facts and verbs, shared by the edge and the browser |
-| `shows-feed.js` | the feed around that card, behind Shows and Albums |
-| `publisher-card.js` + `publisher-card-actions.js` | **the** artist card, facts and verbs — no edge surface yet, but built to the two-sided rules so gaining one is a Function-only change |
-| `artists-feed.js` | the feed around that card, behind Artists — the publisher tier |
-| `functions/api/v1/publishers.js` + `…/publishers/[guid].js` | the artist rollup and the per-artist album list, off the collector's publisher pass |
-| `supporter-wall.js` + `supporter-wall.css` | **the** community wall, shared by `/show`, `/episode`, `/artist` and the Members tab |
-| `members-board.js` | the Members tab: the #40HPW boards and their week picker, the wall and its four orderings (Chart rank the default), the Rules dialog |
-| `feed-controls.js` / `feed-search.js` | the range/sort chrome and the per-feed typeahead |
-| `feed-lang.js` | the language menu on the four ranked feeds, and the copy it rewrites |
-| `boosts-thread.js` / `boost-actions.js` | the content tokenizer and reply / like / repost / zap |
-| `functions/index.js` | **the discovery homepage's fact rails**, rendered at the edge (2026-10-17) |
-| `functions/_shared/charts-page.js` | **the five chart pages' shell renderer** (2026-10-21): routes `charts.html` to a page and view, renders Shows and Albums at the edge; it was the charts page's opening feed, and `functions/index.js` before the front door moved |
-| `rail-tile.js` + `discover.js` | **the** rail tile, facts and verbs, shared by the edge and the browser; the personal rails (Because ×5) and the SSR fallback |
-| `hero.js` | **the** featured carousel's slide, two-sided: the first place of each generic rail, rendered by `functions/index.js` from the rails' own rows; `discover.js` rotates it and wires its Boost to the cards' handlers |
-| `functions/search.js` + `search-page.js` | the results page: the charts page's cards in a list, each wearing its chart rank, through the ranked endpoints' `q=` paths in process |
-| `nav-search.js` + `/api/v1/search?type=all` | the nav bar's grouped typeahead: shows, episodes, artists and members |
-| `nav-ribbons.js` | the bar's three section ribbons (2026-10-20): hover and close rules, the top-five lists fetched on first open, the featured #1 |
-| `functions/{show,episode,booster,artist}/…` | the four edge-rendered detail pages |
-| `functions/charts/[[path]].js` + `_shared/week-charts.js` + **two-sided** `assets/js/chart-board.js` | the five chart share-card frames (the Charts page they came from was torn down 2026-09-04) |
-| `assets/js/charts-block.js` + `functions/api/v1/charts/[[path]].js` | **the chart boards on the Shows and Artists feeds** (2026-09-03): the week's Top 10 with the picker in its title beside Weeks at #1, from JSON; `assets/js/week-picker.js` is the picker's markup and delegate, shared with the Members tab |
-| `functions/_shared/card-frame.js` + `functions/api/og/charts/[name].js` | the one 720x900 share-card frame every card renders in, and the proxy for the chart cards' PNGs (`shows-<date>`, `artists-<date>`, `<kind>-weeks-at-1`) |
-| `functions/api/v1/*` | the D1 query API |
-| `functions/api/v1/members.js` | member search and the top-members listing, over all 2,011 |
-| `functions/api/v1/members/hours.js` | the #40HPW boards, and any past week by `week=YYYY-MM-DD` |
-| `assets/js/pacific-week.js` | **the** week rule, Mondays in US Pacific with the DST arithmetic, shared by the edge and the browser |
-| `functions/api/sign-boost.js` | the signing oracle for the boost bot, with `functions/_shared/nostr-sign.js` |
-| `login-widget/src/lib/siteSign.js` | its client half: a wallet-only boost gets a note without a key |
-| `functions/api/keysend.js` + `keysendLookup.js` | the keysend upgrade: an lnaddress leg reaches Helipad's first tier |
-| `functions/api/boostbox.js` | the BoostBox descriptor for the legs the upgrade cannot reach |
-| `login-widget/src/components/LoginButton.jsx` | **the** log-in control, one component in a nav skin and a checkout skin |
-| `functions/api/data/[[path]].js` + `ob-data.js` | the static shard proxy and the shape layer |
-| `login-widget/` | NIP-07/46/nsec login, NWC + WebLN wallets, boost modals, multi-leg value-split payments, bug reports |
-| `bots/bug-watcher/` | polls the bug relay, opens GitHub issues |
-| `bots/global-boost-scan/` | the network-wide collector |
-
-**Still to build:**
-
-1. **`/stats` (Boost Stats).** A coming-soon placeholder, and now the whole
-   Stats column of the Explore menu, so it is visible and it promises something.
-   **It has a rich ancestor upstream** and that's the thing to pull from rather
-   than starting over:
-
-   ```
-   git show lb/main:stats.html            # 38KB, the charts + view switcher
-   git show lb/main:assets/js/stats.js
-   git show lb/main:assets/js/stats-boosts.js
-   ```
-
-   It was built against LB's own sats log, so the data layer is wrong for us, but
-   the chart code, the broken-axis outlier handling and the view switcher are
-   directly relevant. `/api/v1/clients` is already built and renders nowhere,
-   which makes "boosts by app" the obvious first view.
-
-   **⚠️ `/boosters` IS NO LONGER THE SECOND HALF OF THIS ITEM.** It was deleted
-   on 2026-08-23 rather than built or redirected: the Members tab answers what
-   it promised. See the Stats row of the site map.
-
-2. **A crawlable show directory.** ~930 show pages are reachable only through the
-   sitemap and through links on other pages. See the note in
-   `functions/sitemap.xml.js`.
-
-3. **Bug relay write-policy.** `BUG_TAG` is `onlyboosts-alpha` in both
-   `login-widget/src/lib/bugReport.js` and `bots/bug-watcher/watcher.js`, but
-   `relay.mynostr.app`'s strfry write-policy plugin still has to whitelist that
-   literal string. **VPS-side — reports are silently rejected until it's made.**
-
-4. **Dead LB code — mostly gone, one layer left.** The bulk of it was deleted
-   on 2026-08-23 (`git show 75f88ef` and the commit after it); what that
-   removed and what it did not is in `docs/strip-removed.md`.
-
-   **What is left is `boostQueue.js` and `payAllLegs.js`.** `submitBoost`'s only
-   caller was `MultiLegBoostForm`, so both are now dead — but `boostQueue.js` is
-   still *imported*, by `navigationGuard.js` and `IdentityDropdown.jsx`, for the
-   in-flight tracking those two read. That tracking can no longer become
-   non-empty, so the dropdown's in-flight UI and the navigation guard are dead
-   with it. Removing them means editing two live components rather than deleting
-   files, which is why it was left. `payAllLegs.js`'s keysend classifier gap was **fixed on 2026-08-24 by fixing
-   it somewhere else**: the NIP-47 codes moved into the shared classifier, so
-   that path gets them whether or not it ever gains a caller.
-
-5. **Typography.** The brand wordmark is a bold sans; the site is still on LB's
-   Playfair Display / Source Serif 4. It reads fine, but the serif is inherited,
-   not chosen. Those two families are self-hosted in `assets/fonts/`.
-   **The widget now reads both as `--font-display` / `--font-body` tokens**, so
-   a change here reaches the modals without touching them.
-
-   A third file, `Movie Poster Personal Use.ttf` (the CHARTS wordmark link,
-   Reed's pick 2026-09-01, licensed FREE FOR PERSONAL USE ONLY), sat beside
-   them from 2026-09-01 to 2026-09-03, when Reed cut the wordmark links with
-   the Charts page they pointed at; the file, its `@font-face` and
-   `.ob-charts-link` went with them (`git log -S 'Movie Poster'`).
-
-`/about` is done. Its copy is distilled from `docs/about-and-faq-source.md` —
-**that file is the factual source of record**, so correct it there first if the
-pipeline's behaviour changes. Its **live stat strip** is four pieces that live or
-die together: the section markup in `about.html`, its TOC entry, the `.stat-*`
-rules in `page.css`, and the inline `/api/data/meta.json` fetch at the foot of the
-page. It is **best-effort by design**: it ships `hidden` and reveals itself only
-if the whole fetch-and-parse succeeds *and* `m.boosts` is truthy, so a broken
-endpoint costs a row of numbers rather than rendering em-dashes. Verified against
-all five failure modes. **`distinct_eps` is not a candidate to add** — it counts
-episodes carrying at least one indexed boost, not episodes, and reads as a claim
-about catalogues we don't have.
+One bot per subdirectory, `onlyboosts_{function}.py`; shared utilities in
+`bots/shared/`; state files beside the bot, gitignored. **A relay set is defined
+by the kind it carries and the audience it reaches**: read sets are cut to the
+measurement, publish sets are generous (`docs/relay-sets.md`).
+`relay.getalby.com` is NWC transport, not a relay.
