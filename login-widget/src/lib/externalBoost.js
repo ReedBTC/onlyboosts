@@ -125,6 +125,10 @@ function uuid4() {
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`
 }
 
+/** A boost's id, minted by the modal so a retry and a QR invoice (which are
+ *  separate calls into this file) can carry the id the first run used. */
+export const newBoostUuid = uuid4
+
 /**
  * Distribute whole sats across recipients by weight. Floors each share to a
  * whole sat (LNURL endpoints reject sub-sat amounts), then hands the leftover
@@ -420,7 +424,17 @@ export async function confirmLegSettled(leg, { deadlineMs = 0, intervalMs = 3000
   return definite
 }
 
-async function payLnaddressLeg(leg, ctx, update, timer) {
+/**
+ * Everything an lnaddress leg does BEFORE a wallet is asked to pay: the LNURL
+ * metadata, the BoostBox descriptor, the comment and the invoice. Split out of
+ * `payLnaddressLeg` on 2026-11-11 so the QR fallback (`requestLegInvoice`)
+ * asks for exactly the invoice the wallet path would have paid, descriptor
+ * included, rather than a second, slightly different one.
+ *
+ * Throws on any failure, and everything it throws is pre-payment: no wallet
+ * has seen anything by the time this returns.
+ */
+async function lnaddressInvoice(leg, ctx, timer) {
   // Prefer the modal's prefetched metadata over a fresh fetch. The modal
   // resolves every lnaddress recipient in parallel on mount, so by boost time
   // most legs already have theirs. A cache miss — or a null, which is what the
@@ -456,7 +470,11 @@ async function payLnaddressLeg(leg, ctx, update, timer) {
   console.debug('[lb] leg comment', leg.recipient?.address, { commentAllowed: allowed, descriptor: descriptorUrl || null, comment })
   const { pr, verify } = await fetchLnurlInvoice(meta.callback, msats, comment, leg.recipient.address)
   timer?.mark('invoice')
-  const paymentHash = bolt11PaymentHash(pr)
+  return { pr, verify, paymentHash: bolt11PaymentHash(pr) }
+}
+
+async function payLnaddressLeg(leg, ctx, update, timer) {
+  const { pr, verify, paymentHash } = await lnaddressInvoice(leg, ctx, timer)
   update({ verifyUrl: verify || null, paymentHash })
 
   // ⚠️ `startedAt` is stamped where the WAIT actually is: the moment the wallet
@@ -501,6 +519,61 @@ async function payLnaddressLeg(leg, ctx, update, timer) {
   // provider that returned no verify URL. It must therefore not claim that
   // checking is under way, which the previous wording did.
   return { status: STATUS.UNCERTAIN, error: 'Not confirmed yet. Don’t re-send it — it may already be on its way.' }
+}
+
+/** A pre-payment failure in the donor's words. ⚠️ A REASON FROM THE
+ *  RECIPIENT'S OWN SERVER IS USED VERBATIM AND ATTRIBUTED; see the catch in
+ *  `payExternalBoost`, which is where this lived until the QR path needed the
+ *  same sentence. */
+function legErrorDetail(e) {
+  return e?.lnurlReason
+    ? `Their Lightning provider said: ${e.lnurlReason}`
+    : friendlyError(e?.message || e)
+}
+
+/**
+ * An invoice for ONE split, to be paid by some other wallet (the QR fallback,
+ * 2026-11-11, Reed's ask: "it didn't work with my node, let me try another").
+ *
+ * ⚠️ NOTHING HERE TOUCHES A WALLET, AND THAT IS THE POINT. It needs no
+ * connected wallet, asks none to pay, and returns the bolt11 for the modal to
+ * draw. The invoice is the one the wallet path would have requested: same
+ * amount, same comment, same BoostBox descriptor (so the podcaster's Helipad
+ * reads the boost exactly as it would have), built by the same function.
+ *
+ * ⚠️ THE CALLER OWNS THE DOUBLE-PAYMENT GUARD. Once this has returned, an
+ * invoice exists that somebody may pay at any moment, so the split it was
+ * issued for must never be handed to Retry again; the modal enforces that in
+ * `canRepayLeg`. It is offered only for a split in FAILED, which is this
+ * file's standing statement that the connected wallet never sent anything.
+ *
+ * Only a lightning-address split can be invoiced. That includes one the
+ * keysend upgrade tried first: `leg.recipient` stays the published address. A
+ * value block's own node recipient has no invoice to ask for.
+ *
+ * `verifyUrl` is null when the provider offers no LUD-21 endpoint, and then
+ * nothing on this site can ever see the payment land.
+ *
+ * @returns {Promise<{invoice:string, verifyUrl:string|null, paymentHash:string|null}>}
+ */
+export async function requestLegInvoice({
+  recipient, sats, message, senderName, senderPubkey, meta, donation, lnurlCache, boost = null,
+}) {
+  if (recipient?.type !== 'lnaddress') throw new Error('This split has no Lightning address to ask for an invoice.')
+  if (!(sats > 0)) throw new Error('Nothing to pay on this split.')
+  const ctx = {
+    kind: null, wal: null, message, senderName, senderPubkey,
+    totalSats: boost?.totalSats > 0 ? boost.totalSats : sats,
+    totalWeight: boost?.totalWeight > 0 ? boost.totalWeight : (recipient.splitWeight || 1),
+    boostUuid: boost?.uuid || uuid4(),
+    meta, donation, lnurlCache,
+  }
+  try {
+    const { pr, verify, paymentHash } = await lnaddressInvoice({ recipient, index: 0, sats }, ctx, null)
+    return { invoice: pr, verifyUrl: verify || null, paymentHash: paymentHash || null }
+  } catch (e) {
+    throw new Error(legErrorDetail(e))
+  }
 }
 
 /**
@@ -630,10 +703,14 @@ async function payKeysendLeg(leg, ctx, update, timer, upgraded) {
  *                                   and no cache at all all fall through to a
  *                                   live fetch inside the leg.
  * @param {(index:number, patch:object)=>void} [p.onLeg]
+ * @param {{totalSats:number,totalWeight:number,uuid:string}} [p.boost] - the
+ *   WHOLE boost this call is part of, when the call pays only some of it. See
+ *   the note on `ctx` below.
  * @returns {Promise<{legs:Array, anyPaid:boolean, paidSats:number}>}
  */
 export async function payExternalBoost({
   recipients, totalWeight, totalSats, message, senderName, senderPubkey, meta, donation, lnurlCache, onLeg,
+  boost = null,
 }) {
   if (!wallet.isReady()) throw new Error('Connect a wallet first')
   if (!Array.isArray(recipients) || recipients.length === 0) throw new Error('No recipients to pay')
@@ -641,13 +718,29 @@ export async function payExternalBoost({
 
   const kind = wallet.getStatus().kind
   const wal = wallet.getActiveWallet()
-  const boostUuid = uuid4()
+  // ⚠️ WHAT THIS CALL PAYS AND WHAT THE BOOST IS ARE TWO THINGS ON A RETRY.
+  // The modal retries one leg by calling this with that leg alone, so
+  // `totalSats` and `totalWeight` are the leg's own (which is what
+  // `distributeSats` below needs: one recipient, all of the amount). Until
+  // 2026-11-11 those same two figures also went into the boostagram and the
+  // BoostBox descriptor, with a fresh uuid, so a retried split told the
+  // podcaster's Helipad that the whole boost was this split's amount, at
+  // 100%, unrelated to the legs that had already landed. `boost` carries the
+  // real total, the real weight sum and the first run's uuid; absent, the
+  // call IS the boost and its own figures stand.
+  const boostUuid = boost?.uuid || uuid4()
+  const boostTotalSats = boost?.totalSats > 0 ? boost.totalSats : totalSats
+  const boostTotalWeight = boost?.totalWeight > 0 ? boost.totalWeight : totalWeight
   // ⚠️ `donation` AND `totalWeight` BOTH RIDE THE CONTEXT, and both were missing
   // from the first version of the descriptor work. A parameter that is accepted
   // by the caller but never destructured here is silently `undefined` in every
   // leg: the donation skip never fired, and the declared split was unavailable
   // so it had to be re-derived from already-rounded sats.
-  const ctx = { kind, wal, message, senderName, senderPubkey, totalSats, totalWeight, boostUuid, meta, donation, lnurlCache }
+  const ctx = {
+    kind, wal, message, senderName, senderPubkey,
+    totalSats: boostTotalSats, totalWeight: boostTotalWeight, boostUuid,
+    meta, donation, lnurlCache,
+  }
 
   const legs = distributeSats(totalSats, recipients, totalWeight).map((l) => ({
     ...l, status: STATUS.PENDING, error: null, paymentHash: null, verifyUrl: null,
@@ -733,9 +826,7 @@ export async function payExternalBoost({
         // or "expired" would be reported to the donor as *their wallet*
         // declining, which is a lie about whose fault it is and sends them to
         // check the wrong thing.
-        const detail = e?.lnurlReason
-          ? `Their Lightning provider said: ${e.lnurlReason}`
-          : friendlyError(e?.message || e)
+        const detail = legErrorDetail(e)
         update(leg.paymentHash
           ? { status: STATUS.UNCERTAIN, error: detail }
           : { status: STATUS.FAILED, error: detail })

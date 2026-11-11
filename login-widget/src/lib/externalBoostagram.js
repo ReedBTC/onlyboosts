@@ -198,6 +198,44 @@ export function toWeblnRecords(boostagram, recipient) {
   return records
 }
 
+// ⚠️ THE FULL-CREDIT FLOOR, Reed's call, 2026-11-11: a boost with at least
+// this share of its sats landed may be posted at the amount the donor typed.
+// Kept as a fraction of two integers so the comparison never touches a float.
+// See "The Note Says One Number" in docs/money-paths.md.
+export const FULL_CREDIT_NUM = 9
+export const FULL_CREDIT_DEN = 10
+
+/**
+ * Which figure a boost's note carries, and whether it discloses a shortfall.
+ * Pure, so the rule the modal shows and the rule the note is built from are
+ * one function and `test-sign-boost.mjs` can hold its edges.
+ *
+ *   - `eligible`: a PARTIAL boost with at least 90% of the intended sats
+ *     settled. Never a donation (one leg, so there is no partial), never a
+ *     boost where nothing settled, never a clean one (nothing to choose);
+ *   - `full`: eligible and the booster did not pick the settled figure;
+ *   - `sats`: the note's one number, in the text, the `amount` tag and the
+ *     quoted receipt alike;
+ *   - `short`: the note prints "N of M splits paid". Only ever beside the
+ *     LESSER figure; a full-credit note says nothing about splits.
+ *
+ * `choice` is 'intended' (the default) or 'paid'. It is read only when the
+ * boost is eligible, so a stale choice cannot lift a boost under the floor.
+ */
+export function resolveNoteFigure({ paidSats, intendedSats, legsPaid, legsTotal, donation = false, choice = 'intended' }) {
+  const paid = Math.max(0, Math.floor(Number(paidSats) || 0))
+  const intended = Math.max(0, Math.floor(Number(intendedSats) || 0))
+  const eligible = !donation && paid > 0 && paid < intended
+    && paid * FULL_CREDIT_DEN >= intended * FULL_CREDIT_NUM
+  const full = eligible && choice !== 'paid'
+  return {
+    eligible,
+    full,
+    sats: full ? intended : paid,
+    short: !full && Number(legsPaid) < Number(legsTotal),
+  }
+}
+
 /**
  * Unsigned kind-1 "I boosted" note for an external episode. Uses the external
  * show's NIP-73 guid tags + the Boost Me Bitch episode URL; keeps
@@ -205,18 +243,33 @@ export function toWeblnRecords(boostagram, recipient) {
  * Nostr identity we can vouch for). Published only when the booster is signed
  * in (user-signed), after settlement confirms — the caller enforces that.
  *
- * ⚠️ `paidSats` IS WHAT ACTUALLY SETTLED, NOT WHAT THE DONOR TYPED. A boost
- * distributes across a show's value block and any leg of it can fail, so the
- * two numbers differ on every partial. Reporting the intended amount credits
- * the donor with sats no recipient received, and because OnlyBoosts indexes
- * its own notes, that number then becomes a row in this site's own dataset —
- * the `amount` tag below is exactly what the collector reads. The caller
- * recomputes this from live leg state at the moment of sharing, so a leg that
- * succeeded on retry is counted.
+ * ⚠️ `paidSats` IS THE NOTE'S ONE FIGURE, AND THE CALLER DECIDES WHICH FIGURE
+ * THAT IS. It is printed in the text and written to the `amount` tag, which is
+ * exactly what the collector and the edge ingest read, so it becomes a row in
+ * this site's own dataset. A boost distributes across a show's value block and
+ * any leg of it can fail, so what settled and what the donor typed differ on
+ * every partial. The rule since 2026-11-11 (Reed's call, after boosters said
+ * the old one was unforgiving and that the number they typed is the point of
+ * the boost):
  *
- * `legsPaid` / `legsTotal` disclose the shortfall in words. `legsTotal`
- * excludes legs allocated zero sats: a leg that was never attempted did not
- * fail, and counting it would understate the outcome.
+ *   - at least 90% of the intended sats settled: the note may carry the
+ *     INTENDED total, and then it says nothing about splits. The caller
+ *     passes the intended sats with `legsPaid === legsTotal`;
+ *   - otherwise, or when the booster picks it: the note carries what
+ *     SETTLED, with the splits line below. The caller passes the settled
+ *     sats and the real counts.
+ *
+ * One figure, in every place a figure goes, and no second tag recording the
+ * other one (Reed: other apps would see it and wonder what it is). Until that
+ * day the figure was always what settled. `resolveNoteFigure` below owns the
+ * threshold; this builder only prints what it is handed. The caller recomputes from live leg state at the moment of
+ * sharing, so a leg that succeeded on retry is counted.
+ *
+ * `legsPaid` / `legsTotal` disclose a shortfall in words, and ONLY ride a
+ * note whose figure is the lesser one: a full-credit note with "7 of 8
+ * splits paid" under it contradicts itself. `legsTotal` excludes legs
+ * allocated zero sats: a leg that was never attempted did not fail, and
+ * counting it would understate the outcome.
  */
 export function buildExternalNoteTemplate({
   paidSats, legsPaid, legsTotal, message, senderName, showTitle, episodeTitle, podcastGuid, itemGuid, bmbUrl,
@@ -252,8 +305,8 @@ export function buildExternalNoteTemplate({
   lines.push('')
   lines.push(`🎙️ ${showEp}`)
   if (bmbUrl) lines.push(bmbUrl)
-  // ⚠️ THE ONE RECEIPT THIS NOTE QUOTES: the bot-signed summary for the sats
-  // that settled (summaryReceipt.js, assets/js/zap-receipt.js). Fountain lists
+  // ⚠️ THE ONE RECEIPT THIS NOTE QUOTES: the bot-signed summary for the
+  // note's own figure (summaryReceipt.js, assets/js/zap-receipt.js). Fountain lists
   // the note off the `q` tag below and draws its ⚡ figure off THIS line, so
   // both halves are written. Never a leg's own receipt: Fountain renders the
   // first quote and nothing else, and a leg's figure is not the boost's. A

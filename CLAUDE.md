@@ -1393,6 +1393,9 @@ sections, so you know when to open it:
 | What A Recipient's Server Says Is Shown To The Donor | `readErrorReason`, and why it is never passed through `friendlyError` |
 | Waiting Is Not The Same Event As Giving Up | `PAY_STAGES` / `CHECK_STAGES`, and why the wallet's own 45s hang must not be shortened |
 | The Share Note Reports What Settled | `paidSats`, the `amount` tag this site's own collector reads, one note per boost |
+| The Note Says One Number | **since 2026-11-11** (Reed's calls): at 90% or more settled the note goes out at the amount typed, by default, with no splits line; under 90% it says what settled, with the line. One figure in the body, the `amount` tag and the quoted receipt, and no second tag. The donor is asked only on the partial done screen. `resolveNoteFigure` in `externalBoostagram.js` is the one declaration of the floor |
+| One Split, Another Wallet | **since 2026-11-11**: a split that failed again on Retry gets a fresh invoice as a QR code for a different wallet. `FAILED` only, Lightning-address splits only, and **asking for it ends Retry for that split for good**; credit needs the provider's verify URL, and there is no self-attest |
+| A Retried Split Belongs To The Same Boost | `boostRef`: the first pass, a Retry and the other-wallet invoice carry one boost id and the total as typed; a Retry used to tell Helipad the whole boost was the one split |
 | The Login Is Not A Gate On The Wallet | no Gate 1; a session-only wallet, and why the NWC URI is never persisted |
 | The Signer Session Survives The Tab | **since 2026-10-29**: the NIP-46 client secret's at-rest copy, wrapped under a non-extractable WebCrypto key in IndexedDB, so a phone's tab eviction no longer signs the member out; and **the login modal opens behind a tap, never on page load** (`forceLogoutWithMessage`'s `openLogin`) |
 | The Boost Modal Declares What Happens To The Note | two controls, four outcomes, `boostAnonymously` vs `noteRoute` |
@@ -1408,7 +1411,7 @@ sections, so you know when to open it:
 | The Feed URL Resolves Before The Guid | `/api/value` and `/api/catalogue` resolve the stored feed URL before the guid, because Podcast Index's one-feed-per-guid answer can be a dead record with a year-old value block |
 | The Value Block Comes From The RSS, And Podcast Index Is The Fallback | **`/api/value` reads the show's own feed first, since 2026-09-23**; PI's episode records keep the block each song was ingested with, and ten of Jimmy V's thirteen songs paid a stale seven-leg split. PI answers only for an unreachable feed, a feed with no block anywhere (Anchor), or an item past the 4MB cap |
 
-Five rules from it that a change elsewhere would break, so they are restated here:
+Six rules from it that a change elsewhere would break, so they are restated here:
 
 - **⚠️ ANONYMOUS AND PRIVATE ARE DIFFERENT ANSWERS TO DIFFERENT QUESTIONS.** An
   anonymous boost is **still published**, by OnlyBoosts, with no npub attached —
@@ -1430,6 +1433,12 @@ Five rules from it that a change elsewhere would break, so they are restated her
   no-verify-URL leg checkable at all; the wallet's explicit `failed` is the
   one thing that moves `UNCERTAIN` to `FAILED`, and it is never inferred.
   See *The wallet is the second source of truth* in `docs/money-paths.md`.
+- **⚠️ THE NOTE'S FIGURE IS `resolveNoteFigure`'S ANSWER AND NOTHING ELSE
+  DECIDES IT** (2026-11-11). The body, the `amount` tag and the summary
+  receipt carry that one number; the splits line prints only when the figure
+  is the settled total; the modal holds no copy of the 90% comparison. **A
+  split whose invoice has been shown for another wallet is never retried
+  from the connected one** (`canRepayLeg` reads `leg.qr`).
 - **⚠️ THE TWO OVERRIDE MAPS STAY EMPTY** — see above. That is the one rule in
   this file that has already been violated in production.
 - **⚠️ THE ORACLE'S CAP AND THE MODAL'S ARE THE SAME NUMBER** (5,000,000 sats).

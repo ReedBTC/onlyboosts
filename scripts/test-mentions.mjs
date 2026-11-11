@@ -336,7 +336,7 @@ const share = readFileSync(join(ROOT, 'assets/js/hpw-share.js'), 'utf8')
 const picker = readFileSync(join(ROOT, 'assets/js/mention-picker.js'), 'utf8')
 const component = readFileSync(join(ROOT, 'login-widget/src/components/MentionAutocomplete.jsx'), 'utf8')
 ok('the boost modal reads the EXPANDED message everywhere, and never the raw field', () => {
-  assert.equal((modal.match(/message: expandedMessage/g) || []).length, 4, 'the TLV, the note, the presign and the retry')
+  assert.equal((modal.match(/message: expandedMessage/g) || []).length, 5, 'the TLV, the note, the presign, the retry and the other-wallet invoice')
   assert.equal(modal.includes('message: message.trim()'), false)
   assert.equal(modal.includes('message.trim()'), false)
   assert.ok(modal.includes('{messageBytes}/{MAX_MESSAGE_BYTES}'), 'the counter is the wire length, in bytes')

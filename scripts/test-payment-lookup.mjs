@@ -19,9 +19,20 @@
  *     as such and LUD-21 can never produce it, WebLN (no lookup) with no
  *     verify URL is `unknown` without a single call.
  *
+ *   - requestLegInvoice (2026-11-11), the invoice the modal puts on screen as
+ *     a QR code for a split the connected wallet could not pay, with `fetch`
+ *     STUBBED for the recipient's LNURL endpoints and for /api/boostbox: the
+ *     descriptor files the split under the BOOST's own id and total, never a
+ *     one-split boost of its own; the comment the recipient is sent leads
+ *     with that descriptor; a split that pays a node, and a split of nothing,
+ *     are refused before any request; a recipient's refusal reaches the
+ *     caller as its reason.
+ *
  * Confirmed red on three mutations: `failed` inferred from a missing
  * settled_at, NOT_FOUND classified as `failed`, and the loop's deadline
- * check removed (the test then hangs, which is red enough).
+ * check removed (the test then hangs, which is red enough). And on a fourth,
+ * 2026-11-11: requestLegInvoice ignoring `boost`, which is the retried split
+ * telling Helipad it was the whole boost.
  *
  *   node scripts/test-payment-lookup.mjs
  */
@@ -29,7 +40,7 @@ import assert from 'node:assert/strict'
 import {
   classifyLookup, classifyLookupError, keysendPaymentHash, confirmViaWallet,
 } from '../login-widget/src/lib/paymentLookup.js'
-import { confirmLegSettled, legIsCheckable } from '../login-widget/src/lib/externalBoost.js'
+import { confirmLegSettled, legIsCheckable, requestLegInvoice } from '../login-widget/src/lib/externalBoost.js'
 
 let passed = 0
 async function ok(label, fn) { await fn(); passed++; console.log(`  ✓ ${label}`) }
@@ -175,6 +186,106 @@ try {
   })
 } finally {
   globalThis.fetch = realFetch
+}
+
+// ─── The other-wallet invoice (requestLegInvoice) ──────────────────────────
+// The recipient's two LNURL endpoints and the site's descriptor endpoint are
+// stubbed; everything between them is the shipped code. 21 sats is
+// `lnbc210n`, which fetchLnurlInvoice checks against the amount it asked for.
+console.log('\nrequestLegInvoice (the invoice behind the QR code)')
+const INVOICE = 'lnbc210n1p' + 'q'.repeat(60)
+const realDebug = console.debug
+console.debug = () => {}
+const seen = { descriptor: null, callback: null, urls: [] }
+let callbackAnswer = { pr: INVOICE, verify: 'https://pay.example/verify/x' }
+let metaAnswer = { callback: 'https://pay.example/cb', minSendable: 1000, maxSendable: 100000000000, commentAllowed: 300, tag: 'payRequest', metadata: '[]' }
+const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+globalThis.fetch = async (url, init) => {
+  const u = String(url)
+  seen.urls.push(u)
+  if (u === '/api/boostbox') {
+    seen.descriptor = JSON.parse(init.body)
+    return json({ url: 'https://boostbox.example/d/1' })
+  }
+  if (u === 'https://pay.example/.well-known/lnurlp/alice') return json(metaAnswer)
+  if (u.startsWith('https://pay.example/cb')) {
+    seen.callback = new URL(u).searchParams
+    return json(callbackAnswer)
+  }
+  throw new Error(`unexpected fetch: ${u}`)
+}
+const ALICE = { type: 'lnaddress', address: 'alice@pay.example', name: 'Alice', splitWeight: 2 }
+const BOOST = { uuid: '11111111-2222-4333-8444-555555555555', totalSats: 1000, totalWeight: 100 }
+const ask = (over = {}) => requestLegInvoice({
+  recipient: ALICE, sats: 21, message: 'great episode', senderName: 'Reed', senderPubkey: null,
+  meta: { showTitle: 'A Show', episodeTitle: 'An Episode', podcastGuid: 'feed-guid', itemGuid: 'item-guid' },
+  donation: false, lnurlCache: {}, boost: BOOST, ...over,
+})
+try {
+  await ok('it answers the invoice, its verify URL and (when readable) its payment hash', async () => {
+    const got = await ask()
+    assert.equal(got.invoice, INVOICE)
+    assert.equal(got.verifyUrl, 'https://pay.example/verify/x')
+    assert.ok(got.paymentHash === null || /^[0-9a-f]{64}$/.test(got.paymentHash))
+    assert.equal(seen.callback.get('amount'), '21000')
+  })
+  await ok('⚠️ the descriptor files the split under the BOOST, not as a 21-sat boost of its own', async () => {
+    seen.descriptor = null
+    await ask()
+    assert.equal(seen.descriptor.value_msat, 21000)
+    assert.equal(seen.descriptor.value_msat_total, 1000000, 'the total the donor typed')
+    assert.equal(seen.descriptor.group, BOOST.uuid, 'the id every other split of this boost carried')
+    assert.equal(seen.descriptor.split, 2, 'the declared share of 100, not 100%')
+    assert.equal(seen.descriptor.recipient_address, 'alice@pay.example')
+    assert.equal(seen.descriptor.message, 'great episode')
+    assert.equal(seen.descriptor.feed_title, 'A Show')
+    assert.equal(seen.descriptor.remote_item_guid, 'item-guid')
+  })
+  await ok('the comment the recipient is sent leads with that descriptor, then the message', async () => {
+    await ask()
+    assert.equal(seen.callback.get('comment'), 'rss::payment::boost https://boostbox.example/d/1 great episode')
+  })
+  await ok('with no boost handed in it stands alone, which is the old behaviour and no crash', async () => {
+    seen.descriptor = null
+    await ask({ boost: null })
+    assert.equal(seen.descriptor.value_msat_total, 21000)
+    assert.match(seen.descriptor.group, /^[0-9a-f-]{36}$/)
+    assert.notEqual(seen.descriptor.group, BOOST.uuid)
+  })
+  await ok('a provider with no verify URL answers null, which the modal reads as unwatchable', async () => {
+    callbackAnswer = { pr: INVOICE }
+    assert.equal((await ask()).verifyUrl, null)
+    callbackAnswer = { pr: INVOICE, verify: 'https://pay.example/verify/x' }
+  })
+  await ok('a donation carries no descriptor', async () => {
+    seen.descriptor = null
+    await ask({ donation: true })
+    assert.equal(seen.descriptor, null)
+    assert.equal(seen.callback.get('comment'), 'great episode')
+  })
+  await ok('⚠️ a split that pays a node has no invoice, and nothing is requested', async () => {
+    seen.urls.length = 0
+    await assert.rejects(ask({ recipient: { type: 'node', address: '02' + 'a'.repeat(64), name: 'Node' } }), /no Lightning address/)
+    assert.equal(seen.urls.length, 0)
+  })
+  await ok('a split of nothing is refused before any request', async () => {
+    seen.urls.length = 0
+    await assert.rejects(ask({ sats: 0 }), /Nothing to pay/)
+    assert.equal(seen.urls.length, 0)
+  })
+  await ok('⚠️ an invoice for a different amount is refused, not put on screen', async () => {
+    callbackAnswer = { pr: 'lnbc2100n1p' + 'q'.repeat(60) }
+    await assert.rejects(ask())
+    callbackAnswer = { pr: INVOICE, verify: 'https://pay.example/verify/x' }
+  })
+  await ok('a split under the recipient\'s minimum says so', async () => {
+    metaAnswer = { ...metaAnswer, minSendable: 100000 }
+    await assert.rejects(ask({ lnurlCache: {} }), /at least 100 sats/)
+    metaAnswer = { ...metaAnswer, minSendable: 1000 }
+  })
+} finally {
+  globalThis.fetch = realFetch
+  console.debug = realDebug
 }
 
 console.log(`\ntest-payment-lookup: ${passed} passed`)

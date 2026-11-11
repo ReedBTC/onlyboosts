@@ -99,6 +99,12 @@ genuinely did not land boosts again from the top, which is one deliberate act
 rather than a button that quietly risks their money. `canRepayLeg` and
 `canCheckLeg` in `ExternalBoostModal.jsx` are the split.
 
+**`FAILED` has a second exit since 2026-11-11, and it closes the first.** A
+split that failed again on Retry can be paid from another wallet by invoice;
+see *One Split, Another Wallet*. Asking for that invoice ends Retry for the
+split for good, since two wallets holding the means to pay one split is the
+double payment this section exists to prevent. `UNCERTAIN` gains nothing.
+
 **The 90-second watcher is the other half.** Waiting 4.5s inline is right, since
 the leg loop is sequential and a donor should not watch a spinner; so every
 unconfirmed lnaddress leg keeps being polled *after* the run, to a **90s**
@@ -246,6 +252,14 @@ verify URL.
 
 ### The Share Note Reports What Settled
 
+**⚠️ AMENDED 2026-11-11: THE NOTE REPORTS WHAT SETTLED, EXCEPT ABOVE A 90%
+FLOOR, WHERE IT REPORTS THE AMOUNT THE DONOR TYPED.** *The Note Says One
+Number*, the next section, is the rule and the reasoning. Everything in this
+section still holds for the mechanics: the figure is derived from live leg
+state at the moment of publishing, never declared in the form, and the screen
+names it before anything is signed. Where a paragraph below says `paidSats`,
+read "the note's figure", which is `paidSats` on every boost under the floor.
+
 A boost distributes across a value block and **any leg of it can fail**, so what
 the donor typed and what recipients received are different numbers on every
 partial. `buildExternalNoteTemplate` therefore takes `paidSats`, never the form
@@ -297,6 +311,169 @@ was the site tip, a single leg at 100% that cannot partial. It was deleted on
 publishing design on this fork** and the rule above is unconditional: the
 figures are recomputed from live leg state at the moment of publishing.
 `git show 75f88ef` has the presign-then-publish version if it is ever wanted.
+
+### The Note Says One Number
+
+`resolveNoteFigure` in `login-widget/src/lib/externalBoostagram.js`, since
+2026-11-11 (Reed's calls, from member feedback on the partial note).
+
+**The complaint.** A boost of 3,333 sats whose 1% split failed published a note
+for 3,302 sats with "7 of 8 splits paid" under it. The figure was accurate and
+members read it as a penalty: the number they chose is the point of the boost,
+and a failure at somebody else's node took it away from them. Measured on
+2026-11-11, 6 of the 24 notes this site published in the previous 60 days
+carried the splits line: 3,302 (7 of 8), 330 (2 of 3), 330 (7 of 8), 1,111
+(3 of 5), 1,100 (4 of 5) and 989 (3 of 5).
+
+**The rule.** Where at least 90% of the sats the donor typed have settled, the
+note may go out at the typed amount, and that is the default. Below 90% the
+note says what settled, as it always has.
+
+| Settled | The note's figure | The splits line |
+|---|---|---|
+| all of it | the typed amount (the two are one number) | none |
+| 90% or more, the donor keeps the default | the typed amount | **none** |
+| 90% or more, the donor picks the settled total | what settled | "7 of 8 splits paid" |
+| under 90% | what settled | "3 of 5 splits paid" |
+| nothing | no note at all | |
+
+**⚠️ ONE FIGURE, IN ALL THREE PLACES A NOTE CARRIES ONE.** The body's
+"⚡ 3,333 sats", the `amount` tag (millisats, the figure this site's collector
+and `/api/v1/boosts/ingest` count) and the summary receipt the note quotes (the
+figure Fountain draws) all carry the figure this function returns. Reed turned
+down a second tag for the settled amount: another app meeting an unfamiliar
+tag has to guess what it means, and two numbers on one boost is the confusion
+the change exists to remove. So a full-credit boost is counted in full on this
+site's charts, deliberately. The overstatement is bounded at one ninth of what
+settled, and it only arises on a boost whose donor attempted the full amount.
+
+**⚠️ THE SPLITS LINE AND THE FULL AMOUNT NEVER APPEAR TOGETHER.** A note that
+claims the whole boost and then reports a split missing contradicts itself
+(Reed's correction to the first proposal, which kept the line either way).
+`short` in the function's answer is false whenever `full` is true, and the
+modal passes `legsPaid: legsTotal` to the note builder in that case, which is
+what suppresses the line. `scripts/test-sign-boost.mjs` is red if `short`
+stops following `full`.
+
+**The floor is integer arithmetic on sats**: `paid * 10 >= intended * 9`, so
+900 of 1,000 qualifies and 899 does not, with no float to round. The intended
+total is the sum of every leg that was attempted; `distributeSats` hands the
+remainder back, so that sum is the amount typed, and a SKIPPED leg (allocated
+zero) is in neither figure. `FULL_CREDIT_NUM` and `FULL_CREDIT_DEN` are the
+only declaration of the threshold; the modal imports the function and carries
+no copy of the comparison, which the test pins by text scan.
+
+**Where the donor is asked, and where they are not.** A clean boost has one
+number and publishes itself, unchanged. A partial already stops on the done
+screen for a "Post to Nostr" press; above the floor that screen now shows two
+choices, the typed amount first and selected, the settled total second, and
+the line under them names the figure the note will carry before it is signed.
+Below the floor there is no choice to show. Nothing about the figure is asked
+in the form, which is the standing rule of the section above: the settled
+total is unknown until every leg has run and the donor has finished retrying.
+
+**What never gets full credit**: a boost where nothing settled (no note is
+offered at all), and a donation, which is one leg and so is either whole or
+absent. The function takes `donation` and refuses regardless.
+
+**The oracle needed no change.** `/api/sign-boost` validates a note's shape and
+its cap, and both shapes of note pass it: the full-credit note is the same
+note a clean boost of that amount produces. The typed amount is already bound
+by the modal's cap, which is the oracle's cap, so the figure can never exceed
+what the oracle signs. The test feeds both notes through the shipped validator.
+
+**The other records of the boost already said the typed amount.** Every
+split's boostagram carries `value_msat_total`, the whole boost as typed, so
+Helipad and any relay bot reporting the full amount showed 3,333 while the
+note said 3,302. A full-credit note agrees with them. The duplicate filter
+matches a relay bot's note to the donor's on sats within 3%, so a note that
+carries the bot's own figure is the easier case for it as well.
+
+### One Split, Another Wallet
+
+`requestLegInvoice` in `externalBoost.js`, `QrPanel` and `handleQr` in
+`ExternalBoostModal.jsx`, since 2026-11-11 (Reed's ask).
+
+A split that failed, and failed again on Retry, can be paid from a different
+wallet: the row offers "Pay this split from another wallet", which fetches a
+fresh invoice for that split alone and shows it as a QR code with a copy
+button and a `lightning:` link. The purpose is as much diagnostic as
+corrective. A donor whose second wallet also cannot pay the split has learned
+that the fault is at the recipient's end, and a donor whose second wallet
+succeeds has completed the boost.
+
+**⚠️ IT IS OFFERED OUT OF `FAILED` ONLY, NEVER OUT OF `UNCERTAIN`.** The
+standing rule is unchanged: `FAILED` means the wallet never sent the sats, so
+a second attempt cannot be a second payment. An unconfirmed split may already
+have been paid, and an invoice for it in another wallet is the double payment
+of 2026-08-19 with a QR code on it. The offer also waits for a Retry to have
+failed (`retried` on the leg), since the connected wallet is the better path
+while it still might work, and it disappears once the note has been posted.
+
+**⚠️ RETRY AND THE INVOICE ARE MUTUALLY EXCLUSIVE, PERMANENTLY, PER SPLIT.**
+Once an invoice for a split exists outside the modal, the connected wallet
+must never pay that split again, because nothing can prove the invoice was not
+paid. `canRepayLeg` is false for a leg holding a `qr`; `handleRepay` refuses
+one; `handleQr` takes `qrLockRef` before it asks for the invoice and releases
+it only if the request fails, so a Retry pressed during the fetch is refused
+too. There is no way back to Retry, by design. `test-boost-modal-render.mjs`
+pins each of those guards by text scan and is red without the `qr` test in
+`canRepayLeg`.
+
+**The invoice is the split's own, with its boost data.** `requestLegInvoice`
+runs the same LNURL exchange the pay path runs: the same amount, the same
+comment, and for a boost the same BoostBox descriptor in the comment, so the
+recipient's Helipad shows the boost with its message, episode and the total as
+typed whichever wallet pays it. It pays nothing itself. It refuses a recipient
+that is not a Lightning address, an amount of zero, and an invoice whose
+amount is not the one asked for.
+
+**Credit depends on the recipient's provider.** The modal cannot see into a
+wallet it is not connected to, so the only evidence of payment is the LUD-21
+verify URL the provider returned with the invoice. With one, the panel polls
+it for ten minutes (`QR_WATCH_MS`, every five seconds), then offers "Check for
+payment"; when it answers settled the split becomes Paid and the totals, the
+floor and the note all move with it. A payment that completes the boost before
+the note is posted publishes the note as a clean boost would. Without one
+(Primal returns none) the panel says so plainly: the sats reach the recipient
+and the note cannot count them. **There is deliberately no "I paid it"
+button**: a self-attested split is a figure the donor typed, which is the
+thing the note's number must never be. The wallet lookup is passed as `null`
+for the same reason it would be meaningless; the connected wallet did not make
+this payment.
+
+**What it cannot reach:**
+
+- **A split that pays a node directly.** A keysend has no invoice, so there is
+  nothing for another wallet to scan, and the row says so. A Lightning-address
+  split that the keysend upgrade rerouted still qualifies, since the address
+  is still there to ask (`recipient.type` stays `'lnaddress'`).
+- **A split whose provider is down.** The invoice request fails for the same
+  reason the payment did, and the row reports the provider's own words.
+- **An unconfirmed split**, for the reason above.
+- **A boost whose note is already posted.** The note is final; a split paid
+  afterwards would reach the recipient and change nothing on the record, so
+  the offer is withdrawn rather than left to mislead.
+
+Invoice expiry is not decoded; an expired invoice is refused by the paying
+wallet, and the panel's ten-minute watch is shorter than the hour most
+providers allow.
+
+### A Retried Split Belongs To The Same Boost
+
+Fixed 2026-11-11, found while building the section above. Each split's
+boostagram and BoostBox descriptor carry two facts about the whole boost: its
+id (`boost_uuid`, the descriptor's `group`) and its total as typed
+(`value_msat_total`). The first pass built them from the run's own context. A
+**Retry rebuilt them from the split alone**, so a retried 33-sat split told
+Helipad the whole boost was 33 sats, under a new id that tied it to nothing.
+
+`startPay` now records `{ uuid, totalSats, totalWeight }` in `boostRef` once
+per boost, and the first pass, every Retry and the other-wallet invoice all
+pass it down (`boost` on `payExternalBoost` and `requestLegInvoice`). A caller
+that passes none gets the old behaviour, a split standing alone, which is
+right for the one-leg donation. `test-payment-lookup.mjs` reads the descriptor
+`requestLegInvoice` posts and is red when the total is the split's own.
 
 ### The Login Is Not A Gate On The Wallet
 
@@ -1000,6 +1177,15 @@ quotes it twice over, because Fountain lists a note off the `q` tag and draws
 the figure off the body: `['q', id, hint, bot]` and a final `nostr:nevent1…`
 line (`receiptQuote`). A note with no receipt is byte-identical to the note
 before receipts existed, and the collector reads `amount`, never the quote.
+
+**The receipt names the note's figure, whichever that is** (2026-11-11). "The
+sats that settled" above was the note's figure when it was written; since *The
+Note Says One Number* a boost above the 90% floor may publish the typed
+amount, and its receipt is minted for that same amount. A receipt for 3,302
+quoted under a note for 3,333 would show the lower figure in Fountain and the
+higher one everywhere else, which is the two-number state Reed ruled out. The
+receipt was already an attestation by this site with no bolt11 behind it, so
+its standing has not changed: it says what the note says.
 
 **Who signs the request follows who signs the note.** On the donor route the
 donor signs the 9734 (one more signer prompt) and the receipt's `P` names
