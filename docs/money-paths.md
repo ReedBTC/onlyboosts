@@ -103,7 +103,20 @@ rather than a button that quietly risks their money. `canRepayLeg` and
 split that failed again on Retry can be paid from another wallet by invoice;
 see *One Split, Another Wallet*. Asking for that invoice ends Retry for the
 split for good, since two wallets holding the means to pay one split is the
-double payment this section exists to prevent. `UNCERTAIN` gains nothing.
+double payment this section exists to prevent. `UNCERTAIN` gains nothing
+there: it is never re-paid, by either route.
+
+**⚠️ AND AN UNCERTAIN SPLIT IS NOT REPORTED AS UNPAID EITHER, SINCE 2026-11-11**
+(Reed's call). The heading of this section was applied to the Retry button
+from the start and not to the note: an unconfirmed split was left off the
+note's figure and counted against it in the "N of M splits paid" line, which
+is a public statement that the split did not pay. On Reed's first boost on
+the 90% floor a 150-sat split timed out in the wallet, the note went out as
+183 of 333 sats with "4 of 5 splits paid", and his node showed the split
+paid. Beside at least one confirmed split, an unconfirmed split now counts
+toward the note's figure and its split count, and only a FAILED split takes
+anything off either. *An Unconfirmed Split Counts*, under *The Note Says One
+Number*, is the rule.
 
 **The 90-second watcher is the other half.** Waiting 4.5s inline is right, since
 the leg loop is sequential and a donor should not watch a spinner; so every
@@ -118,7 +131,10 @@ on `confirmInvoiceSettled` exist for this.
 is a *final statement*: Share is **withheld while any leg is still being
 checked**, and once the note is published every row's button **goes inert**,
 because a leg that changed afterwards could not be reflected in an event that
-cannot be edited.
+cannot be edited. Since 2026-11-11 the watch is also what the note waits for
+before it publishes itself beside an unconfirmed split, and a Retry that ends
+unconfirmed gets a watch of its own (`handleRepay`), since the done-phase
+watcher runs once.
 
 The one true negative signal is bolt11 expiry, which provably ends an invoice.
 LNURL invoices typically live an hour, far too long to hold a modal open for, so
@@ -258,7 +274,10 @@ Number*, the next section, is the rule and the reasoning. Everything in this
 section still holds for the mechanics: the figure is derived from live leg
 state at the moment of publishing, never declared in the form, and the screen
 names it before anything is signed. Where a paragraph below says `paidSats`,
-read "the note's figure", which is `paidSats` on every boost under the floor.
+read "the note's figure". **Amended again the same day: "settled" in this
+section means "not failed".** A split the wallet was handed and gave no
+answer for counts beside at least one confirmed split; see *An Unconfirmed
+Split Counts* in the next section.
 
 A boost distributes across a value block and **any leg of it can fail**, so what
 the donor typed and what recipients received are different numbers on every
@@ -329,13 +348,84 @@ carried the splits line: 3,302 (7 of 8), 330 (2 of 3), 330 (7 of 8), 1,111
 note may go out at the typed amount, and that is the default. Below 90% the
 note says what settled, as it always has.
 
-| Settled | The note's figure | The splits line |
+| Landed | The note's figure | The splits line |
 |---|---|---|
 | all of it | the typed amount (the two are one number) | none |
 | 90% or more, the donor keeps the default | the typed amount | **none** |
-| 90% or more, the donor picks the settled total | what settled | "7 of 8 splits paid" |
-| under 90% | what settled | "3 of 5 splits paid" |
-| nothing | no note at all | |
+| 90% or more, the donor picks the lesser total | what landed | "7 of 8 splits paid" |
+| under 90% | what landed | "3 of 5 splits paid" |
+| nothing confirmed | no note at all | |
+
+"Landed" is confirmed sats plus, beside at least one confirmed split, the
+sats of every split that is unconfirmed; the subsection below is that rule.
+The function returns `landedSats` and `landedLegs`, and the screen, the note
+and the floor all read those two.
+
+#### An Unconfirmed Split Counts
+
+*Reed's call, 2026-11-11, the evening the floor shipped to the preview.* His
+first real boost on it was 333 sats to a show with five splits. Four
+confirmed for 183 sats. The fifth, 150 sats, came back from the wallet as a
+timeout; the split had nothing to check against, so the screen offered
+neither Retry nor Check again, and the note was published as "183 sats" with
+"4 of 5 splits paid". His node showed the 150 sats paid. His words: "we
+better be damn sure that the thing failed if we're going to mark it as
+failed", and where it cannot be known after a wait, count it.
+
+The evidence is thin and it all points one way. Three wallet timeouts have
+been followed to the node (two splits on 2026-09-04, one on 2026-11-11) and
+all three had settled; the unconfirmed leg of 2026-08-19 settled as well. No
+unconfirmed split followed up so far was a payment that did not happen. That
+is four cases, not a rate.
+
+| A split is | Because | On the note |
+|---|---|---|
+| confirmed | the wallet returned a preimage, the recipient's server said settled, or the wallet's lookup did | counts |
+| failed | the wallet never sent it, or the wallet's lookup said `failed` | **the only state that reduces the figure or prints the splits line** |
+| unconfirmed | it was handed to the wallet and nothing answered either way | counts, beside at least one confirmed split |
+
+**⚠️ THE GUARD IS ONE CONFIRMED SPLIT.** A wallet that is offline or asleep
+leaves every split unconfirmed, and a note for that boost would put sats on
+the charts that never moved. One confirmed split is the evidence that the
+wallet was reachable and paying during this boost. With none, nothing counts
+and no note is offered, as before. The guard is deliberately not a majority
+of the splits or half of the sats: Reed's own boost had 45% of its sats on
+the one unconfirmed split, and a two-split show would fail either test on
+its larger split.
+
+**What follows from it:**
+
+- **A boost with nothing failed publishes itself at the typed amount**, once
+  the ninety-second watch has had its turn. The pre-signed note is used when
+  there is one. The donor is not asked anything, because nothing they could
+  press would change the answer: an unconfirmed split can never be retried.
+- **A split with nothing to check is released at once.** A keysend through a
+  browser-extension wallet, or a Lightning-address split whose provider
+  publishes no verify URL on such a wallet, has no watch to wait for.
+- **The watch can still find a failure.** If the wallet's lookup answers
+  `failed` during it, the split becomes FAILED, the note is held, and the
+  donor gets Retry and the choice of figure like any other partial.
+- **The screen says "Boost sent!"**, not "Boost delivered!", which stays the
+  word for a boost every split of which was seen to land. The unconfirmed
+  row is calm: a muted tick and "Sent. Your wallet has not confirmed this
+  one yet; it still counts toward your boost." The wallet's own error text
+  is the row's tooltip. Check again stays where there is something to ask.
+- **There is still no Retry on it.** The credit changed; the double-payment
+  rule did not.
+
+**⚠️ `watchSettled` IS WHAT HOLDS THE NOTE FOR THE WATCH, NOT `stillChecking`.**
+The watcher marks what it is checking in an effect, and the auto-publish
+effect runs in the same commit, so on the first render of the done phase
+`stillChecking` is false for a boost that is about to be checked. That was
+harmless while only an all-confirmed boost published itself.
+
+**The cost, stated plainly.** An unconfirmed split that did in fact not pay
+is now credited in a note that cannot be corrected, and counted on this
+site's charts. A wallet that dies after its first split has the remaining
+splits counted. Neither has been observed; the first would be found by a
+recipient's Helipad disagreeing with the note. A single-split boost, or a
+donation, that times out with nothing to check still gets no note, since
+nothing confirmed; that case is open with Reed.
 
 **⚠️ ONE FIGURE, IN ALL THREE PLACES A NOTE CARRIES ONE.** The body's
 "⚡ 3,333 sats", the `amount` tag (millisats, the figure this site's collector
@@ -355,7 +445,7 @@ modal passes `legsPaid: legsTotal` to the note builder in that case, which is
 what suppresses the line. `scripts/test-sign-boost.mjs` is red if `short`
 stops following `full`.
 
-**The floor is integer arithmetic on sats**: `paid * 10 >= intended * 9`, so
+**The floor is integer arithmetic on sats**: `landed * 10 >= intended * 9`, so
 900 of 1,000 qualifies and 899 does not, with no float to round. The intended
 total is the sum of every leg that was attempted; `distributeSats` hands the
 remainder back, so that sum is the amount typed, and a SKIPPED leg (allocated
@@ -372,8 +462,8 @@ Below the floor there is no choice to show. Nothing about the figure is asked
 in the form, which is the standing rule of the section above: the settled
 total is unknown until every leg has run and the donor has finished retrying.
 
-**What never gets full credit**: a boost where nothing settled (no note is
-offered at all), and a donation, which is one leg and so is either whole or
+**What never gets full credit**: a boost where nothing was confirmed (no note
+is offered at all), and a donation, which is one leg and so is either whole or
 absent. The function takes `donation` and refuses regardless.
 
 **The oracle needed no change.** `/api/sign-boost` validates a note's shape and

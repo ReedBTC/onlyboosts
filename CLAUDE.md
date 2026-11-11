@@ -1393,7 +1393,7 @@ sections, so you know when to open it:
 | What A Recipient's Server Says Is Shown To The Donor | `readErrorReason`, and why it is never passed through `friendlyError` |
 | Waiting Is Not The Same Event As Giving Up | `PAY_STAGES` / `CHECK_STAGES`, and why the wallet's own 45s hang must not be shortened |
 | The Share Note Reports What Settled | `paidSats`, the `amount` tag this site's own collector reads, one note per boost |
-| The Note Says One Number | **since 2026-11-11** (Reed's calls): at 90% or more settled the note goes out at the amount typed, by default, with no splits line; under 90% it says what settled, with the line. One figure in the body, the `amount` tag and the quoted receipt, and no second tag. The donor is asked only on the partial done screen. `resolveNoteFigure` in `externalBoostagram.js` is the one declaration of the floor |
+| The Note Says One Number | **since 2026-11-11** (Reed's calls): at 90% or more landed the note goes out at the amount typed, by default, with no splits line; under 90% it says what landed, with the line. One figure in the body, the `amount` tag and the quoted receipt, and no second tag. The donor is asked only on the partial done screen. `resolveNoteFigure` in `externalBoostagram.js` is the one declaration of the floor. **An unconfirmed split counts as landed beside at least one confirmed split** (*An Unconfirmed Split Counts*, the same evening: Reed's 150-sat split timed out in the wallet, was reported as unpaid in the note, and had paid); only a FAILED split reduces the figure or prints the line, and a boost with nothing failed publishes itself after the watch |
 | One Split, Another Wallet | **since 2026-11-11**: a split that failed again on Retry gets a fresh invoice as a QR code for a different wallet. `FAILED` only, Lightning-address splits only, and **asking for it ends Retry for that split for good**; credit needs the provider's verify URL, and there is no self-attest |
 | A Retried Split Belongs To The Same Boost | `boostRef`: the first pass, a Retry and the other-wallet invoice carry one boost id and the total as typed; a Retry used to tell Helipad the whole boost was the one split |
 | The Login Is Not A Gate On The Wallet | no Gate 1; a session-only wallet, and why the NWC URI is never persisted |
@@ -1436,9 +1436,16 @@ Six rules from it that a change elsewhere would break, so they are restated here
 - **⚠️ THE NOTE'S FIGURE IS `resolveNoteFigure`'S ANSWER AND NOTHING ELSE
   DECIDES IT** (2026-11-11). The body, the `amount` tag and the summary
   receipt carry that one number; the splits line prints only when the figure
-  is the settled total; the modal holds no copy of the 90% comparison. **A
+  is the lesser total; the modal holds no copy of the 90% comparison. **A
   split whose invoice has been shown for another wallet is never retried
   from the connected one** (`canRepayLeg` reads `leg.qr`).
+- **⚠️ ONLY A FAILED SPLIT TAKES ANYTHING OFF THE NOTE** (Reed's call,
+  2026-11-11: "we better be damn sure that the thing failed if we're going
+  to mark it as failed"). An `UNCERTAIN` split counts toward the figure and
+  the split count **beside at least one confirmed split**, and never with
+  none (an offline wallet leaves every split unconfirmed). It is credited,
+  not re-paid: the rule above is untouched. The note waits on `watchSettled`,
+  not on `stillChecking`, which is false on the done phase's first render.
 - **⚠️ THE TWO OVERRIDE MAPS STAY EMPTY** — see above. That is the one rule in
   this file that has already been violated in production.
 - **⚠️ THE ORACLE'S CAP AND THE MODAL'S ARE THE SAME NUMBER** (5,000,000 sats).

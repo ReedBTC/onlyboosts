@@ -210,29 +210,67 @@ export const FULL_CREDIT_DEN = 10
  * Pure, so the rule the modal shows and the rule the note is built from are
  * one function and `test-sign-boost.mjs` can hold its edges.
  *
- *   - `eligible`: a PARTIAL boost with at least 90% of the intended sats
- *     settled. Never a donation (one leg, so there is no partial), never a
- *     boost where nothing settled, never a clean one (nothing to choose);
- *   - `full`: eligible and the booster did not pick the settled figure;
+ * ⚠️ A SPLIT THE WALLET WAS HANDED AND NEVER ANSWERED FOR COUNTS AS LANDED,
+ * SINCE 2026-11-11 (Reed's call, the evening of the day the floor shipped).
+ * His first real boost on it: 333 sats over five splits, four confirmed, and
+ * the fifth (150 sats) left unconfirmed by a wallet that did not answer in
+ * time. The note went out as "183 sats, 4 of 5 splits paid". His node showed
+ * the fifth as paid. That is the second measured timeout of this kind and the
+ * second that was a settled payment (see paymentLookup.js, 2026-09-04); none
+ * measured so far was a payment that did not happen. So the published record
+ * was wrong in the one direction boosters complain about, on no evidence.
+ * His rule: "we better be damn sure that the thing failed if we're going to
+ * mark it as failed", and if still unsure after a wait, count it.
+ *
+ * Three states, then. CONFIRMED (`paidSats`, `legsPaid`): the wallet or the
+ * recipient's server said so. FAILED: the wallet said no, or never sent it;
+ * that is the only state that takes sats off the note. UNCONFIRMED
+ * (`unconfirmedSats`, `legsUnconfirmed`): sent, no answer either way; it
+ * counts.
+ *
+ * ⚠️ BUT ONLY BESIDE AT LEAST ONE CONFIRMED SPLIT. A wallet that is offline
+ * leaves EVERY split unconfirmed, and a note for that boost would index sats
+ * that never moved. One confirmed split is the evidence the wallet was alive
+ * and paying during this boost; with none, nothing counts and no note goes
+ * out, as before.
+ *
+ *   - `landedSats`, `landedLegs`: confirmed plus counted-unconfirmed. These
+ *     are what the note, the screen and the 90% floor all read;
+ *   - `eligible`: a PARTIAL boost (some split FAILED) with at least 90% of
+ *     the intended sats landed. Never a donation (one leg, so there is no
+ *     partial), never a boost where nothing confirmed, never one where
+ *     everything landed (nothing to choose);
+ *   - `full`: eligible and the booster did not pick the lesser figure;
  *   - `sats`: the note's one number, in the text, the `amount` tag and the
  *     quoted receipt alike;
- *   - `short`: the note prints "N of M splits paid". Only ever beside the
- *     LESSER figure; a full-credit note says nothing about splits.
+ *   - `short`: the note prints "N of M splits paid", N being `landedLegs`.
+ *     Only ever beside the LESSER figure; a full-credit note says nothing
+ *     about splits.
  *
  * `choice` is 'intended' (the default) or 'paid'. It is read only when the
  * boost is eligible, so a stale choice cannot lift a boost under the floor.
  */
-export function resolveNoteFigure({ paidSats, intendedSats, legsPaid, legsTotal, donation = false, choice = 'intended' }) {
-  const paid = Math.max(0, Math.floor(Number(paidSats) || 0))
-  const intended = Math.max(0, Math.floor(Number(intendedSats) || 0))
-  const eligible = !donation && paid > 0 && paid < intended
-    && paid * FULL_CREDIT_DEN >= intended * FULL_CREDIT_NUM
+export function resolveNoteFigure({
+  paidSats, intendedSats, legsPaid, legsTotal,
+  unconfirmedSats = 0, legsUnconfirmed = 0,
+  donation = false, choice = 'intended',
+}) {
+  const whole = (n) => Math.max(0, Math.floor(Number(n) || 0))
+  const paid = whole(paidSats)
+  const intended = whole(intendedSats)
+  const counts = paid > 0
+  const landedSats = paid + (counts ? whole(unconfirmedSats) : 0)
+  const landedLegs = whole(legsPaid) + (counts ? whole(legsUnconfirmed) : 0)
+  const eligible = !donation && landedSats > 0 && landedSats < intended
+    && landedSats * FULL_CREDIT_DEN >= intended * FULL_CREDIT_NUM
   const full = eligible && choice !== 'paid'
   return {
     eligible,
     full,
-    sats: full ? intended : paid,
-    short: !full && Number(legsPaid) < Number(legsTotal),
+    sats: full ? intended : landedSats,
+    short: !full && landedLegs < whole(legsTotal),
+    landedSats,
+    landedLegs,
   }
 }
 

@@ -82,7 +82,7 @@ function noteFor(args) {
   const fig = resolveNoteFigure(args)
   const t = realTemplate({
     paidSats: fig.sats,
-    legsPaid: fig.short ? args.legsPaid : args.legsTotal,
+    legsPaid: fig.short ? fig.landedLegs : args.legsTotal,
     legsTotal: args.legsTotal,
   })
   return { fig, t }
@@ -93,7 +93,7 @@ await ok('the floor is nine tenths, as two integers', () => {
 })
 await ok('7 of 8 splits with 3,302 of 3,333 landed: the note carries 3,333 and no splits line', () => {
   const { fig, t } = noteFor({ paidSats: 3302, intendedSats: 3333, legsPaid: 7, legsTotal: 8 })
-  assert.deepEqual(fig, { eligible: true, full: true, sats: 3333, short: false })
+  assert.deepEqual(fig, { eligible: true, full: true, sats: 3333, short: false, landedSats: 3302, landedLegs: 7 })
   assert.equal(amountOf(t), '3333')
   assert.match(t.content, /3,333 sats/)
   assert.equal(/splits paid/.test(t.content), false, 'a full figure beside a shortfall line is two claims')
@@ -102,7 +102,7 @@ await ok('7 of 8 splits with 3,302 of 3,333 landed: the note carries 3,333 and n
 })
 await ok('the same boost on the donor\'s choice of "paid": 3,302 with the splits line', () => {
   const { fig, t } = noteFor({ paidSats: 3302, intendedSats: 3333, legsPaid: 7, legsTotal: 8, choice: 'paid' })
-  assert.deepEqual(fig, { eligible: true, full: false, sats: 3302, short: true })
+  assert.deepEqual(fig, { eligible: true, full: false, sats: 3302, short: true, landedSats: 3302, landedLegs: 7 })
   assert.equal(amountOf(t), '3302')
   assert.match(t.content, /7 of 8 splits paid/)
   validateBoostTemplate(t)
@@ -110,7 +110,7 @@ await ok('the same boost on the donor\'s choice of "paid": 3,302 with the splits
 await ok('⚠️ under the floor there is no choice: 989 of 1,111 says 989 and 3 of 5', () => {
   for (const choice of ['intended', 'paid']) {
     const { fig, t } = noteFor({ paidSats: 989, intendedSats: 1111, legsPaid: 3, legsTotal: 5, choice })
-    assert.deepEqual(fig, { eligible: false, full: false, sats: 989, short: true })
+    assert.deepEqual(fig, { eligible: false, full: false, sats: 989, short: true, landedSats: 989, landedLegs: 3 })
     assert.equal(amountOf(t), '989')
     assert.match(t.content, /3 of 5 splits paid/)
     validateBoostTemplate(t)
@@ -125,12 +125,12 @@ await ok('the edge is exact: 900 of 1,000 qualifies, 899 does not', () => {
 })
 await ok('a clean boost has one number and nothing to choose', () => {
   const { fig, t } = noteFor({ paidSats: 2100, intendedSats: 2100, legsPaid: 4, legsTotal: 4 })
-  assert.deepEqual(fig, { eligible: false, full: false, sats: 2100, short: false })
+  assert.deepEqual(fig, { eligible: false, full: false, sats: 2100, short: false, landedSats: 2100, landedLegs: 4 })
   assert.equal(/splits paid/.test(t.content), false)
 })
 await ok('⚠️ nothing settled is never full credit, and a donation never is', () => {
   assert.deepEqual(resolveNoteFigure({ paidSats: 0, intendedSats: 1000, legsPaid: 0, legsTotal: 3 }),
-    { eligible: false, full: false, sats: 0, short: true })
+    { eligible: false, full: false, sats: 0, short: true, landedSats: 0, landedLegs: 0 })
   assert.equal(resolveNoteFigure({ paidSats: 950, intendedSats: 1000, legsPaid: 1, legsTotal: 2, donation: true }).sats, 950)
 })
 await ok('the figure can never exceed what was typed', () => {
@@ -139,18 +139,95 @@ await ok('the figure can never exceed what was typed', () => {
   assert.equal(resolveNoteFigure({ paidSats: 1200, intendedSats: 1000, legsPaid: 2, legsTotal: 2 }).sats, 1200)
   assert.equal(resolveNoteFigure({ paidSats: 1200, intendedSats: 1000, legsPaid: 2, legsTotal: 2 }).eligible, false)
 })
+
+// ─── Only a split that failed reduces the note (Reed's call, 2026-11-11) ───
+// His own test boost: 333 sats to five splits, four confirmed, and the fifth
+// (150 sats) timed out in the wallet and was on his node as paid. The note
+// went out at 183 sats with "4 of 5 splits paid". A split the wallet was
+// handed and did not answer for is unconfirmed, not unpaid; it counts toward
+// the figure and the split count. The one guard: beside at least one
+// confirmed split, since a boost with nothing confirmed is what an offline
+// wallet looks like.
+console.log('\nAn unconfirmed split is not a failed one:')
+await ok('⚠️ Reed\'s boost: 183 confirmed and 150 unconfirmed of 333 says 333 and no splits line', () => {
+  const { fig, t } = noteFor({ paidSats: 183, intendedSats: 333, legsPaid: 4, legsTotal: 5, unconfirmedSats: 150, legsUnconfirmed: 1 })
+  // Not `eligible`: nothing failed, so there is no choice to offer.
+  assert.deepEqual(fig, { eligible: false, full: false, sats: 333, short: false, landedSats: 333, landedLegs: 5 })
+  assert.equal(amountOf(t), '333')
+  assert.match(t.content, /333 sats/)
+  assert.equal(/splits paid/.test(t.content), false)
+  assert.equal(/183/.test(t.content), false)
+  validateBoostTemplate(t)
+})
+await ok('the donor\'s choice cannot subtract it either: there is no lesser figure to pick', () => {
+  const fig = resolveNoteFigure({ paidSats: 183, intendedSats: 333, legsPaid: 4, legsTotal: 5, unconfirmedSats: 150, legsUnconfirmed: 1, choice: 'paid' })
+  assert.equal(fig.sats, 333)
+  assert.equal(fig.short, false)
+})
+await ok('⚠️ with nothing confirmed, nothing counts: an offline wallet earns no figure', () => {
+  assert.deepEqual(
+    resolveNoteFigure({ paidSats: 0, intendedSats: 333, legsPaid: 0, legsTotal: 5, unconfirmedSats: 333, legsUnconfirmed: 5 }),
+    { eligible: false, full: false, sats: 0, short: true, landedSats: 0, landedLegs: 0 })
+})
+await ok('a failed split beside an unconfirmed one, above the floor: full by default, the lesser figure counts the unconfirmed', () => {
+  // 1,000 over four splits: 600 confirmed, 350 unconfirmed, 50 failed.
+  const args = { paidSats: 600, intendedSats: 1000, legsPaid: 2, legsTotal: 4, unconfirmedSats: 350, legsUnconfirmed: 1 }
+  const a = noteFor(args)
+  assert.deepEqual(a.fig, { eligible: true, full: true, sats: 1000, short: false, landedSats: 950, landedLegs: 3 })
+  assert.equal(/splits paid/.test(a.t.content), false)
+  const b = noteFor({ ...args, choice: 'paid' })
+  assert.equal(amountOf(b.t), '950')
+  assert.match(b.t.content, /3 of 4 splits paid/)
+  validateBoostTemplate(b.t)
+})
+await ok('and below it: the failed split is the only one the note counts against the boost', () => {
+  // 1,000 over four splits: 400 confirmed, 300 unconfirmed, 300 failed.
+  const { fig, t } = noteFor({ paidSats: 400, intendedSats: 1000, legsPaid: 2, legsTotal: 4, unconfirmedSats: 300, legsUnconfirmed: 1 })
+  assert.deepEqual(fig, { eligible: false, full: false, sats: 700, short: true, landedSats: 700, landedLegs: 3 })
+  assert.equal(amountOf(t), '700')
+  assert.match(t.content, /3 of 4 splits paid/)
+  validateBoostTemplate(t)
+})
+await ok('the floor is measured on what landed, unconfirmed included', () => {
+  const at = (paid, unc) => resolveNoteFigure({ paidSats: paid, intendedSats: 1000, legsPaid: 1, legsTotal: 3, unconfirmedSats: unc, legsUnconfirmed: 1 })
+  assert.equal(at(500, 400).sats, 1000)
+  assert.equal(at(500, 399).sats, 899)
+})
+await ok('junk in the unconfirmed arguments is zero, not NaN', () => {
+  const fig = resolveNoteFigure({ paidSats: 500, intendedSats: 1000, legsPaid: 1, legsTotal: 2, unconfirmedSats: 'x', legsUnconfirmed: -3 })
+  assert.equal(fig.sats, 500)
+  assert.equal(fig.landedLegs, 1)
+})
+
 await ok('⚠️ the modal builds its note from this function and nothing else', async () => {
   const { readFileSync } = await import('node:fs')
   const modal = readFileSync(new URL('../login-widget/src/components/ExternalBoostModal.jsx', import.meta.url), 'utf8')
-  assert.match(modal, /const credit = resolveNoteFigure\(\{\s*paidSats, intendedSats, legsPaid: paidCount, legsTotal: activeCount, donation, choice: noteFigure,\s*\}\)/)
+  assert.match(modal, /const credit = resolveNoteFigure\(\{\s*paidSats, intendedSats, legsPaid: paidCount, legsTotal: activeCount,\s*unconfirmedSats, legsUnconfirmed: unconfirmedCount, donation, choice: noteFigure,\s*\}\)/)
   assert.match(modal, /const noteSats = credit\.sats\b/)
   assert.match(modal, /const noteShort = credit\.short\b/)
+  assert.match(modal, /const landedSats = credit\.landedSats\b/)
+  assert.match(modal, /const landedCount = credit\.landedLegs\b/)
   // The share handler: one figure into the receipt and the template alike,
   // and the real leg counts only beside the lesser figure.
-  assert.match(modal, /const figure = \{ sats: noteSats, short: noteShort, paid: paidCount, total: activeCount \}/)
+  assert.match(modal, /const figure = \{ sats: noteSats, short: noteShort, paid: landedCount, total: activeCount \}/)
   assert.equal((modal.match(/paidSats: figure\.sats/g) || []).length, 2, 'the receipt and the note')
   assert.match(modal, /legsPaid: figure\.short \? figure\.paid : figure\.total/)
   assert.equal(/FULL_CREDIT/.test(modal), false, 'the floor lives in one file')
+})
+await ok('⚠️ the note publishes itself only after the watch, and never beside a failed split', async () => {
+  const { readFileSync } = await import('node:fs')
+  const modal = readFileSync(new URL('../login-widget/src/components/ExternalBoostModal.jsx', import.meta.url), 'utf8')
+  // `stillChecking` alone is false on the first render of the done phase, a
+  // commit before the watcher marks what it is about to check.
+  assert.match(modal, /if \(!watchSettled \|\| stillChecking \|\| paidSats <= 0\) return\s*\n\s*if \(activeCount === 0 \|\| landedCount !== activeCount\) return/)
+  assert.match(modal, /if \(pre && pre\.sats === landedSats && pre\.legs === activeCount\)/)
+  assert.match(modal, /if \(targets\.length === 0\) \{ setWatchSettled\(true\); return \}/)
+  // Retry and the other-wallet invoice stay on FAILED alone; an unconfirmed
+  // split gains credit here, never a way to be paid twice.
+  assert.match(modal, /return leg\?\.status === STATUS\.FAILED && !leg\?\.qr\n\}/)
+  const repay = modal.slice(modal.indexOf('function canRepayLeg('), modal.indexOf('function canCheckLeg('))
+  assert.ok(repay.length > 0 && repay.length < 2000, 'the retry guard was found')
+  assert.equal(/STATUS\.UNCERTAIN/.test(repay.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '')), false)
 })
 
 // ─── The typed "From" name (boost-login.md D15) ────────────────────────────
