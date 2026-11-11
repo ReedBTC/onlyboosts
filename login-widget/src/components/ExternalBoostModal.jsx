@@ -198,7 +198,13 @@ function canRepayLeg(recipient, leg) {
   // invoice may be paid at any moment from a wallet this page cannot see, so a
   // Retry beside it is two payments for one split. The `qr` field is set by
   // handleQr and nothing ever clears it.
-  return leg?.status === STATUS.FAILED && !leg?.qr
+  //
+  // ⚠️ NOR WHEN THE RECIPIENT CANNOT TAKE THE AMOUNT AT ALL (`unpayable`,
+  // 2026-11-11; see externalBoost.js#sendableLimit). That answer comes off
+  // metadata already in hand, so a Retry returned the same sentence in the
+  // same tick and the button looked dead. This narrows the rule and never
+  // widens it: FAILED is still the only status that can be re-paid.
+  return leg?.status === STATUS.FAILED && !leg?.qr && !leg?.unpayable
 }
 
 /** An unconfirmed leg can be re-checked only when there is something to check
@@ -341,8 +347,17 @@ function LegRow({ recipient, leg, onRepay, onCheck, checking, locked, onQr, qrBu
   // clear on it, so the heavier path stays out of the way until it has not.
   // A split that pays a node directly has no invoice anybody could scan, and
   // says so once rather than leaving the row with a Retry that keeps failing.
+  //
+  // ⚠️ AND ONLY WHERE THE CONNECTED WALLET DECLINED AN INVOICE IT WAS HANDED
+  // (2026-11-11, the day the offer shipped). `noInvoice` marks a split that
+  // failed before any invoice was issued: the recipient's provider refused,
+  // or could not be reached. A second wallet asking that server gets the same
+  // answer, so the button fetched, was refused, wrote the row's existing
+  // sentence back and changed nothing on screen. Reed pressed it and saw
+  // exactly that. The row says why there is no offer instead.
   const stuck = status === STATUS.FAILED && !leg?.qr && !!retried && !locked && !checking
-  const canQr = stuck && !!onQr && recipient?.type === 'lnaddress'
+  const invoiceable = recipient?.type === 'lnaddress'
+  const canQr = stuck && !!onQr && invoiceable && !leg?.noInvoice
   const spinner = (
     <svg className="animate-spin w-3.5 h-3.5 text-[var(--brand-d,#068ace)]" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -417,9 +432,23 @@ function LegRow({ recipient, leg, onRepay, onCheck, checking, locked, onQr, qrBu
           {qrBusy ? 'Getting an invoice…' : 'Pay this split from another wallet'}
         </button>
       )}
-      {stuck && !canQr && !!onQr && (
+      {/* ⚠️ A FAILED INVOICE REQUEST GETS ITS OWN LINE, NEVER THE ROW'S
+          (`qrError`, not `error`). Written over the row's sentence, a request
+          that failed for the reason already printed left the screen exactly
+          as it was. */}
+      {canQr && !qrBusy && !!leg?.qrError && (
+        <p className="mt-1 ml-6 text-[11px] leading-snug text-[var(--danger,#b3261e)]" role="status">
+          Couldn’t get an invoice for another wallet. {leg.qrError}
+        </p>
+      )}
+      {stuck && !canQr && !!onQr && !invoiceable && (
         <p className="mt-1 ml-6 text-[10px] text-[var(--muted,#5a7488)] leading-snug">
           This split pays a Lightning node directly, so there is no invoice another wallet could pay.
+        </p>
+      )}
+      {stuck && !canQr && !!onQr && invoiceable && (
+        <p className="mt-1 ml-6 text-[10px] text-[var(--muted,#5a7488)] leading-snug">
+          The recipient’s side would not issue an invoice, so another wallet would get the same answer. Your wallet was never asked to pay this split.
         </p>
       )}
       {leg?.qr && status === STATUS.FAILED && (
@@ -1287,7 +1316,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
     // clean decline is what opens the other-wallet offer on the row.
     let last = null
     let lastLeg = leg
-    updateLeg(index, { status: STATUS.PAYING, error: null })
+    updateLeg(index, { status: STATUS.PAYING, error: null, qrError: null })
     try {
       await payExternalBoost({
         boost: boostRef.current,
@@ -1376,6 +1405,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
     if (repayingRef.current.has(index) || qrLockRef.current.has(index)) return
     qrLockRef.current.add(index)
     setQrBusy((p) => ({ ...p, [index]: true }))
+    updateLeg(index, { qrError: null })
     try {
       const got = await requestLegInvoice({
         recipient,
@@ -1394,10 +1424,13 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
       // The string is about to become a QR code and a `lightning:` link, so
       // it is held to an invoice's alphabet here as well as in the fetch.
       if (!/^ln[a-z0-9]+$/i.test(got?.invoice || '')) throw new Error('That didn’t come back as a Lightning invoice.')
-      updateLeg(index, { qr: { invoice: got.invoice, verifyUrl: got.verifyUrl, paymentHash: got.paymentHash }, error: null })
+      updateLeg(index, { qr: { invoice: got.invoice, verifyUrl: got.verifyUrl, paymentHash: got.paymentHash }, error: null, qrError: null })
     } catch (e) {
       qrLockRef.current.delete(index)
-      updateLeg(index, { error: e?.message || 'Couldn’t get an invoice for this split.' })
+      // ⚠️ `qrError`, NOT `error`: the row's own sentence is the connected
+      // wallet's reason and stays; this one is drawn under the button, so a
+      // press that got nowhere always changes the screen.
+      updateLeg(index, { qrError: e?.message || 'No invoice came back.' })
     } finally {
       if (!cancelledRef.current) setQrBusy((p) => ({ ...p, [index]: false }))
     }
@@ -1453,7 +1486,11 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
   // the wallet declined, and an unconfirmed one points at the wallet.
   const repayableCount = visibleLegs.filter(({ r, leg }) => canRepayLeg(r, leg)).length
   const qrOpenCount = visibleLegs.filter(({ leg }) => leg?.status === STATUS.FAILED && !!leg?.qr).length
+  // Failed on the recipient's side with nothing the donor can press; the row
+  // carries the reason, and the line must not send them to their wallet.
+  const unpayableCount = visibleLegs.filter(({ leg }) => leg?.status === STATUS.FAILED && !leg?.qr && !!leg?.unpayable).length
   let tail
+  let onlyUnpayable = false
   // ⚠️ Calm while the watcher runs. This line is the loudest thing on the
   // screen, and a leg that is merely slow is not a shortfall yet. See
   // CHECK_STAGES.
@@ -1462,13 +1499,17 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
   else if (repayableCount > 0) tail = 'Retry any that were declined.'
   else if (qrOpenCount > 0) tail = 'Pay the open invoice below to finish it.'
   else if (unconfirmedCount > 0) tail = 'Check your wallet before sending anything again; this may already have gone through.'
+  else if (unpayableCount > 0) {
+    onlyUnpayable = true
+    tail = unpayableCount === 1 ? 'One recipient could not take the payment; the reason is below.' : 'Some recipients could not take the payment; the reasons are below.'
+  }
   else tail = 'Check your wallet for the rest.'
   // While the watcher runs the count is the confirmed one, since the splits
   // being confirmed are the subject of the sentence. Afterwards it is the
   // landed one, so the only splits the line counts against the boost are the
   // ones that failed.
   let summaryLine
-  if (paidCount === 0) summaryLine = `Nothing confirmed yet. ${tail}`
+  if (paidCount === 0) summaryLine = onlyUnpayable ? `Nothing was sent. ${tail}` : `Nothing confirmed yet. ${tail}`
   else if (stillChecking) summaryLine = `${paidCount} of ${activeCount} splits confirmed. ${tail}`
   else summaryLine = `${landedCount} of ${activeCount} splits sent. ${tail}`
 

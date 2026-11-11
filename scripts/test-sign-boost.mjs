@@ -224,7 +224,7 @@ await ok('⚠️ the note publishes itself only after the watch, and never besid
   assert.match(modal, /if \(targets\.length === 0\) \{ setWatchSettled\(true\); return \}/)
   // Retry and the other-wallet invoice stay on FAILED alone; an unconfirmed
   // split gains credit here, never a way to be paid twice.
-  assert.match(modal, /return leg\?\.status === STATUS\.FAILED && !leg\?\.qr\n\}/)
+  assert.match(modal, /return leg\?\.status === STATUS\.FAILED && !leg\?\.qr && !leg\?\.unpayable\n\}/)
   const repay = modal.slice(modal.indexOf('function canRepayLeg('), modal.indexOf('function canCheckLeg('))
   assert.ok(repay.length > 0 && repay.length < 2000, 'the retry guard was found')
   assert.equal(/STATUS\.UNCERTAIN/.test(repay.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '')), false)

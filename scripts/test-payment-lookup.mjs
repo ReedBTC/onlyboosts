@@ -34,13 +34,26 @@
  * 2026-11-11: requestLegInvoice ignoring `boost`, which is the retried split
  * telling Helipad it was the whole boost.
  *
+ *   - payExternalBoost's account of WHERE a split failed (2026-11-11), run
+ *     against a stand-in browser-extension wallet (`window.webln` with no
+ *     `keysend`, so the keysend upgrade is skipped) and the same stubbed
+ *     provider: `noInvoice` on a split that failed before any invoice was
+ *     issued, `unpayable` ('closed' | 'min' | 'max') when the recipient's
+ *     own published limits exclude the amount, neither on an invoice the
+ *     wallet was handed and declined. The modal offers Retry and the
+ *     other-wallet invoice off those two fields. Confirmed red on: each
+ *     clause of sendableLimit removed, the limit check skipped, the catch
+ *     dropping either field, the per-run reset removed, and legErrorDetail
+ *     passing a limit sentence through the 140-character clip.
+ *
  *   node scripts/test-payment-lookup.mjs
  */
 import assert from 'node:assert/strict'
 import {
   classifyLookup, classifyLookupError, keysendPaymentHash, confirmViaWallet,
 } from '../login-widget/src/lib/paymentLookup.js'
-import { confirmLegSettled, legIsCheckable, requestLegInvoice } from '../login-widget/src/lib/externalBoost.js'
+import { confirmLegSettled, legIsCheckable, requestLegInvoice, payExternalBoost } from '../login-widget/src/lib/externalBoost.js'
+import * as wallet from '../login-widget/src/lib/wallet.js'
 
 let passed = 0
 async function ok(label, fn) { await fn(); passed++; console.log(`  ✓ ${label}`) }
@@ -280,9 +293,117 @@ try {
   })
   await ok('a split under the recipient\'s minimum says so', async () => {
     metaAnswer = { ...metaAnswer, minSendable: 100000 }
-    await assert.rejects(ask({ lnurlCache: {} }), /at least 100 sats/)
+    await assert.rejects(ask({ lnurlCache: {} }), /only takes payments of 100 sats or more, and this split came to 21\./)
     metaAnswer = { ...metaAnswer, minSendable: 1000 }
   })
+
+  // ─── Where a split failed, and whether anything can change it ────────────
+  // 2026-11-11, Reed's report: a 16-sat split to an address publishing
+  // `maxSendable: 0` carried a Retry and a "Pay this split from another
+  // wallet" button, and neither did anything he could see, because both hit
+  // the same refusal off the same metadata. The modal reads two fields off
+  // the failed leg to decide what to offer; this runs the shipped
+  // payExternalBoost against a stand-in browser-extension wallet to pin what
+  // sets them. The modal's half is a text scan in test-boost-modal-render.
+  console.log('\npayExternalBoost: a split that failed before any invoice')
+  const realInfo = console.info
+  console.info = () => {}
+  const paid = []
+  let walletAnswer = async () => ({ preimage: 'a'.repeat(64) })
+  globalThis.window = {
+    webln: {
+      enable: async () => {},
+      getInfo: async () => ({ node: { alias: 'stub' } }),
+      sendPayment: async (invoice) => { paid.push(invoice); return walletAnswer(invoice) },
+    },
+  }
+  await wallet.connectWebln(null)
+  const run = async () => {
+    paid.length = 0
+    let last = null
+    await payExternalBoost({
+      recipients: [ALICE], totalWeight: 2, totalSats: 21, message: 'm', senderName: 'Reed', senderPubkey: null,
+      meta: { showTitle: 'A Show', episodeTitle: 'An Episode', podcastGuid: 'feed-guid', itemGuid: 'item-guid' },
+      donation: false, lnurlCache: {}, boost: BOOST,
+      onLeg: (_i, leg) => { last = leg },
+    })
+    return last
+  }
+  const WORKING = { ...metaAnswer }
+  try {
+    await ok('a split that pays is neither', async () => {
+      const leg = await run()
+      assert.equal(leg.status, 'paid')
+      assert.equal(leg.noInvoice, false)
+      assert.equal(leg.unpayable, null)
+      assert.equal(paid.length, 1)
+    })
+    await ok('⚠️ Reed\'s case: a maximum of zero is a closed address, and the wallet is never asked', async () => {
+      metaAnswer = { ...WORKING, minSendable: 1000, maxSendable: 0 }
+      seen.callback = null
+      const leg = await run()
+      assert.equal(leg.status, 'failed')
+      assert.equal(leg.unpayable, 'closed')
+      assert.equal(leg.noInvoice, true)
+      assert.match(leg.error, /not accepting payments right now/)
+      assert.match(leg.error, /your wallet was never asked to pay it\.$/, 'whole, not clipped at 140 characters')
+      assert.equal(/at most 0 sats/.test(leg.error), false, 'the sentence he was shown')
+      assert.equal(paid.length, 0)
+      assert.equal(seen.callback, null, 'no invoice is asked for either')
+    })
+    await ok('a maximum of zero is closed on its own, whatever the minimum says', async () => {
+      metaAnswer = { ...WORKING, minSendable: 0, maxSendable: 0 }
+      assert.equal((await run()).unpayable, 'closed')
+    })
+    await ok('a maximum under the minimum is the same closed address', async () => {
+      metaAnswer = { ...WORKING, minSendable: 5000, maxSendable: 1000 }
+      assert.equal((await run()).unpayable, 'closed')
+    })
+    await ok('an amount under a working range is `min`, over it `max`, and both name the figures', async () => {
+      metaAnswer = { ...WORKING, minSendable: 100000 }
+      let leg = await run()
+      assert.equal(leg.unpayable, 'min')
+      assert.match(leg.error, /100 sats or more, and this split came to 21\./)
+      metaAnswer = { ...WORKING, maxSendable: 10000 }
+      leg = await run()
+      assert.equal(leg.unpayable, 'max')
+      assert.match(leg.error, /at most 10 sats in one payment, and this split came to 21\./)
+      assert.equal(leg.noInvoice, true)
+      assert.equal(paid.length, 0)
+    })
+    await ok('a provider that refuses the invoice is `noInvoice` and NOT unpayable: a Retry may get one', async () => {
+      metaAnswer = { ...WORKING }
+      callbackAnswer = { status: 'ERROR', reason: 'Try again later' }
+      const leg = await run()
+      assert.equal(leg.status, 'failed')
+      assert.equal(leg.noInvoice, true)
+      assert.equal(leg.unpayable, null)
+      assert.equal(paid.length, 0)
+      callbackAnswer = { pr: INVOICE, verify: 'https://pay.example/verify/x' }
+    })
+    await ok('⚠️ a wallet that declines an invoice it was handed is neither: that is the split another wallet can pay', async () => {
+      walletAnswer = async () => { throw new Error('User rejected') }
+      const leg = await run()
+      assert.equal(leg.status, 'failed')
+      assert.equal(leg.noInvoice, false)
+      assert.equal(leg.unpayable, null)
+      assert.equal(paid.length, 1)
+      walletAnswer = async () => ({ preimage: 'a'.repeat(64) })
+    })
+    await ok('the marks describe one attempt: the next run that gets its invoice sheds them', async () => {
+      metaAnswer = { ...WORKING, maxSendable: 0 }
+      assert.equal((await run()).unpayable, 'closed')
+      metaAnswer = { ...WORKING }
+      const leg = await run()
+      assert.equal(leg.status, 'paid')
+      assert.equal(leg.noInvoice, false)
+      assert.equal(leg.unpayable, null)
+    })
+  } finally {
+    console.info = realInfo
+    metaAnswer = { ...WORKING }
+    delete globalThis.window
+  }
 } finally {
   globalThis.fetch = realFetch
   console.debug = realDebug

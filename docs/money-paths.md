@@ -538,8 +538,8 @@ this payment.
   nothing for another wallet to scan, and the row says so. A Lightning-address
   split that the keysend upgrade rerouted still qualifies, since the address
   is still there to ask (`recipient.type` stays `'lnaddress'`).
-- **A split whose provider is down.** The invoice request fails for the same
-  reason the payment did, and the row reports the provider's own words.
+- **A split that never got an invoice from the recipient's side.** See *A
+  Split The Recipient's Side Refused* below; the offer is not made.
 - **An unconfirmed split**, for the reason above.
 - **A boost whose note is already posted.** The note is final; a split paid
   afterwards would reach the recipient and change nothing on the record, so
@@ -548,6 +548,67 @@ this payment.
 Invoice expiry is not decoded; an expired invoice is refused by the paying
 wallet, and the panel's ten-minute watch is shorter than the hour most
 providers allow.
+
+#### A Split The Recipient's Side Refused
+
+Added 2026-11-11, the same day, on Reed's first live test of the offer. A
+333-sat boost to Into The Doerfel-Verse paid six of seven splits; the seventh,
+16 sats to `sirlibre@getalby.com`, showed a Retry, the sentence "This leg
+accepts at most 0 sats.", and the other-wallet button, and pressing the button
+changed nothing he could see. The cause was measured rather than inferred: that
+address publishes `"minSendable":1000,"maxSendable":0`, and its callback
+answers `{"status":"ERROR","reason":"The recipient's wallet is not properly
+configured. Please reach out to the recipient to resolve this issue."}`. No
+wallet can pay it. Retry and the other-wallet request both ran the same
+pre-payment check against the same metadata, failed the same way, and wrote the
+same sentence back over itself, which is a button that does nothing.
+
+The offer's premise is that the connected wallet was handed an invoice and
+declined it; only then can a second wallet do better. Three fields on the leg
+now carry that distinction, and the modal reads them rather than the error
+text:
+
+| Field | Set by | Means |
+|---|---|---|
+| `noInvoice` | the pay run's catch, when the leg holds no payment hash | the split failed before any invoice was issued, so the recipient's side (or the network between) is where it stopped; **the other-wallet offer is not made** (`canQr`), since a second wallet would be refused the same invoice |
+| `unpayable` | `sendableLimit`, through that catch: `'closed'`, `'min'` or `'max'` | the recipient's own published limits exclude this amount; **Retry is not offered either** (`canRepayLeg`), since no second attempt at the same amount can differ |
+| `qrError` | `handleQr`'s catch | the other-wallet invoice request itself failed; printed on its own line under the button and **never written over `error`**, which is the connected wallet's account of the payment |
+
+Both of the first two are reset at the start of every run, so they describe
+one attempt and a Retry that gets its invoice sheds them.
+
+`'closed'` is a maximum of zero or a maximum below the minimum: an address
+that takes nothing at any amount. The donor is told that the recipient's
+Lightning address is not accepting payments, that it is on the recipient's
+side, and that their wallet was never asked to pay. `'min'` and `'max'` name
+both figures (the limit and what the split came to). These sentences skip
+`friendlyError`, which clips at 140 characters. The done screen's header
+counts such splits apart from declined ones, so it no longer reads "Retry any
+that were declined" over a split with no Retry.
+
+**The split is still never dropped, merged or redistributed.** An unpayable
+split is a `FAILED` split: it comes off the note's figure through
+`resolveNoteFigure` like any other, and its share stays unsent.
+
+**One correction rode along.** A Lightning-address split that the keysend
+upgrade tried first, on an NWC wallet, is stamped with the keysend's payment
+hash before the attempt. When the wallet cleanly declined the keysend and the
+run fell back to the invoice, that hash stayed on the leg, so a refusal at the
+invoice step was filed `UNCERTAIN` (the catch reads the hash as "something was
+handed to the wallet"); since ob-v271 an unconfirmed split counts toward the
+note. The hash and verify URL are now cleared before the invoice is asked for.
+A clean decline is the wallet's statement that nothing was sent, which is what
+makes clearing it safe.
+
+**What is covered and what is not.** `test-payment-lookup.mjs` runs the shipped
+`payExternalBoost` against a stand-in browser-extension wallet and pins which
+failures set which field, including Reed's exact metadata.
+`test-boost-modal-render.mjs` pins the modal's reading of them and the hash
+clear by text scan; the stand-in wallet never stamps a keysend hash, so that
+one fix has no behavioural test. Not built: a notice before paying when a
+recipient's address is closed (the modal already holds the metadata), and
+posting the note without a press when the only failed splits are ones nothing
+can be done about.
 
 ### A Retried Split Belongs To The Same Boost
 
