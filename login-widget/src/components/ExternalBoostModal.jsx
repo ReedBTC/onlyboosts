@@ -255,7 +255,10 @@ function QrPanel({ qr, sats, locked, onSettled }) {
   settledRef.current = onSettled
   const watchable = !!qr.paymentHash && /^https:\/\//i.test(qr.verifyUrl || '')
   useEffect(() => {
-    if (!watchable) return
+    // ⚠️ NOT ONCE THE NOTE IS GOING OUT. Its figure is fixed from that
+    // moment, so a split settling afterwards would flip the row and the
+    // header beside a note that says otherwise; the offer is withdrawn instead.
+    if (!watchable || locked) return
     const ctrl = new AbortController()
     setWatching(true)
     confirmLegSettled({ paymentHash: qr.paymentHash, verifyUrl: qr.verifyUrl }, {
@@ -266,7 +269,7 @@ function QrPanel({ qr, sats, locked, onSettled }) {
       if (res === 'settled') settledRef.current?.()
     }).catch(() => { if (!ctrl.signal.aborted) setWatching(false) })
     return () => ctrl.abort()
-  }, [watchable, round, qr.paymentHash, qr.verifyUrl])
+  }, [watchable, locked, round, qr.paymentHash, qr.verifyUrl])
 
   async function copy() {
     try {
@@ -274,6 +277,14 @@ function QrPanel({ qr, sats, locked, onSettled }) {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch { /* clipboard refused; the QR and the link are still there */ }
+  }
+
+  if (locked) {
+    return (
+      <p className="mt-2 ml-6 text-[10px] text-[var(--muted,#5a7488)] leading-snug">
+        Your note is going out without this split, so this invoice is withdrawn. Don’t pay it now.
+      </p>
+    )
   }
 
   const btn = 'flex-1 py-2 px-3 rounded-lg bg-[var(--modal-field,#ffffff)] hover:bg-[var(--modal-inset,#e6f1f9)] text-[var(--ink,#0f2733)] text-xs text-center border border-[var(--modal-line,#b9d4e6)] transition-colors'
@@ -294,11 +305,7 @@ function QrPanel({ qr, sats, locked, onSettled }) {
         <button type="button" onClick={copy} className={btn}>{copied ? 'Copied' : 'Copy invoice'}</button>
         <a href={`lightning:${qr.invoice}`} className={btn}>Open in a wallet</a>
       </div>
-      {locked ? (
-        <p className="text-[10px] text-[var(--muted,#5a7488)] leading-snug">
-          Your note is already posted, so paying this now won’t change what it says.
-        </p>
-      ) : !watchable ? (
+      {!watchable ? (
         <p className="text-[10px] text-[var(--warn,#b45309)] leading-snug">
           This recipient’s provider doesn’t let us see the payment arrive, so the split will
           still count as unpaid here even after you pay it.
@@ -448,7 +455,7 @@ function LegRow({ recipient, leg, onRepay, onCheck, checking, locked, onQr, qrBu
       )}
       {stuck && !canQr && !!onQr && invoiceable && (
         <p className="mt-1 ml-6 text-[10px] text-[var(--muted,#5a7488)] leading-snug">
-          The recipient’s side would not issue an invoice, so another wallet would get the same answer. Your wallet was never asked to pay this split.
+          The recipient’s side would not issue an invoice, so another wallet would get the same answer.
         </p>
       )}
       {leg?.qr && status === STATUS.FAILED && (
@@ -697,6 +704,10 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
   const paidCount = legs.filter((l) => l?.status === STATUS.PAID).length
   const activeCount = visibleLegs.length
   const paidSats = legs.reduce((a, l) => a + (l?.status === STATUS.PAID ? (l.sats || 0) : 0), 0)
+  // The same, less any split paid from another wallet by QR (`viaQr`): only
+  // the connected wallet's own confirmations are evidence that it was alive
+  // for the splits it never answered for. See resolveNoteFigure.
+  const walletPaidSats = legs.reduce((a, l) => a + (l?.status === STATUS.PAID && !l.viaQr ? (l.sats || 0) : 0), 0)
   // The splits the wallet was handed and never answered for. Not failures:
   // see the rule's own note in externalBoostagram.js.
   const unconfirmedCount = visibleLegs.filter(({ leg }) => leg?.status === STATUS.UNCERTAIN).length
@@ -724,7 +735,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
   const intendedSats = visibleLegs.reduce((a, { leg }) => a + (leg?.sats || 0), 0)
   const credit = resolveNoteFigure({
     paidSats, intendedSats, legsPaid: paidCount, legsTotal: activeCount,
-    unconfirmedSats, legsUnconfirmed: unconfirmedCount, donation, choice: noteFigure,
+    unconfirmedSats, legsUnconfirmed: unconfirmedCount, walletPaidSats, donation, choice: noteFigure,
   })
   const fullCreditOk = credit.eligible
   const noteSats = credit.sats
@@ -946,6 +957,12 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
    * the `amount` tag take the same number, so no app reading any one of them
    * disagrees with another. See the derivation beside `paidSats`.
    */
+  // The figure as of the latest render, for handleShare's last look before it
+  // publishes: a background watch can still move a split while the signer
+  // prompt is open, and the figure frozen at the press must not outlive that.
+  const figureNowRef = useRef(null)
+  figureNowRef.current = { sats: noteSats, short: noteShort, paid: landedCount, total: activeCount }
+
   async function handleShare() {
     if (noteRoute === 'none' || shareState === 'signing' || shareState === 'shared') return
     if (paidSats <= 0) return
@@ -999,6 +1016,18 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
       const signed = noteRoute === 'bot'
         ? await signKindOneWithSite(template)
         : await signKindOneShareWithUser(template)
+      if (cancelledRef.current) return
+      // ⚠️ THE LAST LOOK. The rows are locked while this runs, but the
+      // done-phase watch is not, and a split it learned FAILED lowers the
+      // figure. A note that would now say more than landed is not published;
+      // the donor posts again on the figure the screen shows. A figure that
+      // only rose is published as signed: it under-reports, never over.
+      const now = figureNowRef.current
+      if (now && (now.sats < figure.sats || (now.short && !figure.short))) {
+        setShareError('A split changed while the note was being signed. Check the figure and post again.')
+        setShareState('error')
+        return
+      }
       const published = await publishSignedKindOne(signed)
       // ⚠️ NOT AWAITED AND NOT ON THE SHARE STATE. The note is on Nostr; this
       // only decides whether it is on the site's feeds now or after the
@@ -1302,7 +1331,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
     const leg = legs[index]
     if (!recipient || !leg) return
     if (!canRepayLeg(recipient, leg)) return
-    if (shareState === 'shared') return
+    if (shareState === 'shared' || shareState === 'signing') return
     // See repayingRef: never while a Retry of this leg is already running, and
     // never once an invoice for it is, or is about to be, in another wallet.
     if (repayingRef.current.has(index) || qrLockRef.current.has(index) || legsRef.current[index]?.qr) return
@@ -1354,9 +1383,16 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
       // turning an UNCERTAIN leg into a FAILED one hands it back a re-pay
       // button it must not have.
       const cur = legsRef.current[index]?.status
-      if (cur === STATUS.PAID || cur === STATUS.UNCERTAIN) return
-      updateLeg(index, { status: STATUS.FAILED, error: e?.message || 'Retry failed' })
-      last = STATUS.FAILED
+      if (cur === STATUS.PAID) {
+        if (!cancelledRef.current) setChecking((p) => ({ ...p, [index]: false }))
+        last = STATUS.PAID
+      } else if (cur === STATUS.UNCERTAIN) {
+        // Left unconfirmed: it gets the watch below, which clears the check.
+        last = STATUS.UNCERTAIN
+      } else {
+        updateLeg(index, { status: STATUS.FAILED, error: e?.message || 'Retry failed' })
+        last = STATUS.FAILED
+      }
     } finally {
       repayingRef.current.delete(index)
     }
@@ -1371,6 +1407,9 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
       } catch { /* learned nothing; the split stays unconfirmed */ }
       if (cancelledRef.current) return
       if (res) applyCheck(updateLeg, index, res)
+      // The wallet's explicit `failed` makes the split FAILED again, and a
+      // Retry that ends there opens the other-wallet offer like any other.
+      if (res === 'failed') setRetried((p) => ({ ...p, [index]: true }))
       setChecking((p) => ({ ...p, [index]: false }))
     }
   }
@@ -1401,7 +1440,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
     if (!recipient || !leg) return
     if (recipient.type !== 'lnaddress') return
     if (leg.status !== STATUS.FAILED || leg.qr) return
-    if (shareState === 'shared') return
+    if (shareState === 'shared' || shareState === 'signing') return
     if (repayingRef.current.has(index) || qrLockRef.current.has(index)) return
     qrLockRef.current.add(index)
     setQrBusy((p) => ({ ...p, [index]: true }))
@@ -1443,7 +1482,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
     const recipient = recipients[index]
     const leg = legs[index]
     if (!canCheckLeg(recipient, leg)) return
-    if (shareState === 'shared' || checking[index]) return
+    if (shareState === 'shared' || shareState === 'signing' || checking[index]) return
     setChecking((prev) => ({ ...prev, [index]: true }))
     try {
       const res = await confirmLegSettled(leg, { deadlineMs: RECHECK_MS, intervalMs: 3000 })
@@ -1780,12 +1819,12 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
                       onRepay={phase === 'done' ? () => handleRepay(realIndex) : null}
                       onCheck={phase === 'done' ? () => handleCheck(realIndex) : null}
                       checking={!!checking[realIndex]}
-                      locked={shareState === 'shared'}
+                      locked={shareState === 'shared' || shareState === 'signing'}
                       onQr={phase === 'done' ? () => handleQr(realIndex) : null}
                       qrBusy={!!qrBusy[realIndex]}
                       retried={!!retried[realIndex]}
                       counted={unconfirmedCounted}
-                      onQrSettled={() => updateLeg(realIndex, { status: STATUS.PAID, error: null, paymentHash: leg?.qr?.paymentHash || null, verifyUrl: leg?.qr?.verifyUrl || null })} />
+                      onQrSettled={() => updateLeg(realIndex, { status: STATUS.PAID, viaQr: true, error: null, paymentHash: leg?.qr?.paymentHash || null, verifyUrl: leg?.qr?.verifyUrl || null })} />
                   })}
                 </ul>
                 {/* The share control. Withheld until something actually paid,

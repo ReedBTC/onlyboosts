@@ -479,6 +479,21 @@ note said 3,302. A full-credit note agrees with them. The duplicate filter
 matches a relay bot's note to the donor's on sats within 3%, so a note that
 carries the bot's own figure is the easier case for it as well.
 
+**The evidence is the connected wallet's own confirmation** (the Coordinator's
+pre-merge sweep, 2026-11-12). A split paid from another wallet by QR is `PAID`
+and counts toward the figure, but it is marked `viaQr` and does not make the
+unconfirmed splits count: with the connected wallet quiet, one QR payment would
+otherwise have lifted every unconfirmed split into a full-figure note.
+`resolveNoteFigure` takes `walletPaidSats` for this; `test-sign-boost.mjs` pins
+the sequence.
+
+**Nothing moves a split while the note is being signed.** Retry, Check again and
+the other-wallet offer are locked during `signing` as well as after `shared`,
+and `handleShare` takes a last look at the figure after the signature: if a
+background watch lowered it in the meantime, the note is not published and the
+donor posts again on the figure the screen shows. A figure that only rose is
+published as signed, since it under-reports and never over.
+
 ### One Split, Another Wallet
 
 `requestLegInvoice` in `externalBoost.js`, `QrPanel` and `handleQr` in

@@ -545,10 +545,10 @@ function sendableLimit(meta, sats) {
     return fail('closed', 'This recipient’s Lightning address is not accepting payments right now, so this split was not sent. That is on their side; your wallet was never asked to pay it.')
   }
   if (min !== null && msats < min) {
-    return fail('min', `This recipient only takes payments of ${Math.ceil(min / 1000).toLocaleString()} sats or more, and this split came to ${sats.toLocaleString()}. Your wallet was never asked to pay it; a larger boost would reach them.`)
+    return fail('min', `This recipient only takes payments of ${Math.ceil(min / 1000).toLocaleString('en-US')} sats or more, and this split came to ${sats.toLocaleString('en-US')}. Your wallet was never asked to pay it; a larger boost would reach them.`)
   }
   if (max !== null && msats > max) {
-    return fail('max', `This recipient takes at most ${Math.floor(max / 1000).toLocaleString()} sats in one payment, and this split came to ${sats.toLocaleString()}. Your wallet was never asked to pay it.`)
+    return fail('max', `This recipient takes at most ${Math.floor(max / 1000).toLocaleString('en-US')} sats in one payment, and this split came to ${sats.toLocaleString('en-US')}. Your wallet was never asked to pay it.`)
   }
   return null
 }

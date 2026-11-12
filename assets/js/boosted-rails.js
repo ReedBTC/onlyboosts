@@ -14,7 +14,7 @@
  *
  * ⚠️ IMPORTS ITS SIBLING AS './rail-tile.js?v=…' like every two-sided module.
  * No Date.now(), no locale. */
-import { tileHtml, railListHtml, kSats } from './rail-tile.js?v=ob-v272'
+import { tileHtml, railListHtml, kSats } from './rail-tile.js?v=ob-v273'
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
 const isMusic = (r) => String(r?.medium || 'podcast') === 'music'

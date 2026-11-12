@@ -489,7 +489,7 @@ console.log('\nThe themed classes emit real CSS:')
   assert.match(qr, /if \(leg\.status !== STATUS\.FAILED \|\| leg\.qr\) return/,
     'an invoice for an UNCERTAIN split is the double payment of 2026-08-19 with a QR code on it')
   assert.match(qr, /if \(recipient\.type !== 'lnaddress'\) return/)
-  assert.match(qr, /if \(shareState === 'shared'\) return/)
+  assert.match(qr, /if \(shareState === 'shared' \|\| shareState === 'signing'\) return/)
   assert.match(qr, /if \(repayingRef\.current\.has\(index\) \|\| qrLockRef\.current\.has\(index\)\) return/)
   ok('the other-wallet invoice is FAILED-only, lnaddress-only, and never beside a running Retry')
 

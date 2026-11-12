@@ -258,8 +258,10 @@ The rules a change elsewhere would break:
   body, the `amount` tag and the quoted receipt; no second tag. The modal holds
   no copy of the 90% comparison.
 - **⚠️ ONLY A FAILED SPLIT TAKES ANYTHING OFF THE NOTE.** An `UNCERTAIN` split
-  counts beside at least one confirmed split, never with none. The note waits on
-  `watchSettled`, not `stillChecking`.
+  counts beside at least one split the CONNECTED wallet confirmed (a split paid
+  by QR from another wallet is not that evidence: `viaQr`, `walletPaidSats`),
+  never with none. The note waits on `watchSettled`, not `stillChecking`, and
+  nothing moves a split while the note is being signed.
 - **A failed Lightning-address split may be paid from another wallet by QR**;
   asking for it ends Retry for that split (`canRepayLeg` reads `leg.qr`). No offer
   on a split that never got an invoice (`noInvoice`); no Retry either on one the

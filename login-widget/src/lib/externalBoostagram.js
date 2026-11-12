@@ -234,6 +234,15 @@ export const FULL_CREDIT_DEN = 10
  * and paying during this boost; with none, nothing counts and no note goes
  * out, as before.
  *
+ * ⚠️ AND THE EVIDENCE IS THE CONNECTED WALLET'S OWN. A split paid from
+ * another wallet by QR is PAID and counts toward `paidSats`, but it says
+ * nothing about whether the connected wallet sent the splits it never
+ * answered for; with that wallet quiet, one QR payment would otherwise lift
+ * every unconfirmed split into the note at the full figure. The caller passes
+ * `walletPaidSats`, the PAID splits the connected wallet itself sent, and only
+ * that may make unconfirmed splits count. It defaults to `paidSats` for a
+ * caller with no QR path.
+ *
  *   - `landedSats`, `landedLegs`: confirmed plus counted-unconfirmed. These
  *     are what the note, the screen and the 90% floor all read;
  *   - `eligible`: a PARTIAL boost (some split FAILED) with at least 90% of
@@ -252,13 +261,13 @@ export const FULL_CREDIT_DEN = 10
  */
 export function resolveNoteFigure({
   paidSats, intendedSats, legsPaid, legsTotal,
-  unconfirmedSats = 0, legsUnconfirmed = 0,
+  unconfirmedSats = 0, legsUnconfirmed = 0, walletPaidSats,
   donation = false, choice = 'intended',
 }) {
   const whole = (n) => Math.max(0, Math.floor(Number(n) || 0))
   const paid = whole(paidSats)
   const intended = whole(intendedSats)
-  const counts = paid > 0
+  const counts = whole(walletPaidSats === undefined ? paidSats : walletPaidSats) > 0
   const landedSats = paid + (counts ? whole(unconfirmedSats) : 0)
   const landedLegs = whole(legsPaid) + (counts ? whole(legsUnconfirmed) : 0)
   const eligible = !donation && landedSats > 0 && landedSats < intended
@@ -323,7 +332,7 @@ export function buildExternalNoteTemplate({
   const from = sanitizeSenderName(senderName)
   const lines = [
     BOOST_BANNER_URL,
-    `⚡Just boosted ${sats.toLocaleString()} sats 📱 via onlyboosts.social`,
+    `⚡Just boosted ${sats.toLocaleString('en-US')} sats 📱 via onlyboosts.social`,
   ]
   // "splits" rather than "legs": it is the word the value-block spec and the
   // podcast apps use, and this line is read by people outside this codebase.

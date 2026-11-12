@@ -133,11 +133,35 @@ await ok('⚠️ nothing settled is never full credit, and a donation never is',
     { eligible: false, full: false, sats: 0, short: true, landedSats: 0, landedLegs: 0 })
   assert.equal(resolveNoteFigure({ paidSats: 950, intendedSats: 1000, legsPaid: 1, legsTotal: 2, donation: true }).sats, 950)
 })
-await ok('the figure can never exceed what was typed', () => {
+await ok('a paid total at or above the typed one is never a partial', () => {
   // A paid total at or above the intended one is not a partial at all.
   assert.equal(resolveNoteFigure({ paidSats: 1000, intendedSats: 1000, legsPaid: 2, legsTotal: 2 }).sats, 1000)
   assert.equal(resolveNoteFigure({ paidSats: 1200, intendedSats: 1000, legsPaid: 2, legsTotal: 2 }).sats, 1200)
   assert.equal(resolveNoteFigure({ paidSats: 1200, intendedSats: 1000, legsPaid: 2, legsTotal: 2 }).eligible, false)
+})
+
+// ⚠️ The Coordinator's sweep, 2026-11-12: split 1 failed and was paid from a
+// phone wallet by QR, splits 2-5 were never answered for by the connected
+// wallet. The QR payment is real, but it is not evidence the connected
+// wallet sent anything, so the four unconfirmed splits must not count.
+await ok('⚠️ a split paid from another wallet does not make unconfirmed splits count', () => {
+  const qrOnly = resolveNoteFigure({ paidSats: 100, walletPaidSats: 0, intendedSats: 1000, legsPaid: 1, legsTotal: 5, unconfirmedSats: 900, legsUnconfirmed: 4 })
+  assert.equal(qrOnly.landedSats, 100)
+  assert.equal(qrOnly.landedLegs, 1)
+  assert.equal(qrOnly.full, false)
+  assert.equal(qrOnly.sats, 100)
+  // One split the connected wallet itself confirmed is the evidence again.
+  const alive = resolveNoteFigure({ paidSats: 300, walletPaidSats: 200, intendedSats: 1000, legsPaid: 2, legsTotal: 5, unconfirmedSats: 700, legsUnconfirmed: 3 })
+  assert.equal(alive.landedSats, 1000)
+  // A caller that passes no walletPaidSats keeps the old reading.
+  assert.equal(resolveNoteFigure({ paidSats: 300, intendedSats: 1000, legsPaid: 2, legsTotal: 5, unconfirmedSats: 700, legsUnconfirmed: 3 }).landedSats, 1000)
+})
+await ok('⚠️ the modal hands the rule the connected wallet\'s own figure, and marks a QR payment', async () => {
+  const { readFileSync } = await import('node:fs')
+  const src = readFileSync(new URL('../login-widget/src/components/ExternalBoostModal.jsx', import.meta.url), 'utf8')
+  assert.match(src, /walletPaidSats, donation, choice: noteFigure/)
+  assert.match(src, /status: STATUS\.PAID, viaQr: true/)
+  assert.match(src, /!l\.viaQr/)
 })
 
 // ─── Only a split that failed reduces the note (Reed's call, 2026-11-11) ───
@@ -202,7 +226,7 @@ await ok('junk in the unconfirmed arguments is zero, not NaN', () => {
 await ok('⚠️ the modal builds its note from this function and nothing else', async () => {
   const { readFileSync } = await import('node:fs')
   const modal = readFileSync(new URL('../login-widget/src/components/ExternalBoostModal.jsx', import.meta.url), 'utf8')
-  assert.match(modal, /const credit = resolveNoteFigure\(\{\s*paidSats, intendedSats, legsPaid: paidCount, legsTotal: activeCount,\s*unconfirmedSats, legsUnconfirmed: unconfirmedCount, donation, choice: noteFigure,\s*\}\)/)
+  assert.match(modal, /const credit = resolveNoteFigure\(\{\s*paidSats, intendedSats, legsPaid: paidCount, legsTotal: activeCount,\s*unconfirmedSats, legsUnconfirmed: unconfirmedCount, walletPaidSats, donation, choice: noteFigure,\s*\}\)/)
   assert.match(modal, /const noteSats = credit\.sats\b/)
   assert.match(modal, /const noteShort = credit\.short\b/)
   assert.match(modal, /const landedSats = credit\.landedSats\b/)
