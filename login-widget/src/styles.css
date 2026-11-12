@@ -537,3 +537,59 @@ input[type="search"]::-webkit-search-results-decoration {
   animation: lb-skeleton-shimmer 1.4s ease-in-out infinite;
   border-radius: 6px;
 }
+
+/**
+ * The GIF picker's grid (`components/GifPicker.jsx`), 2026-11-12.
+ *
+ * These are the rules `lib/gifGrid.js` needs, from nostr.build's own
+ * gif-grid.css; that module writes the class names itself, so they are not
+ * Tailwind utilities and cannot be. Only the colours and the radius are this
+ * site's. The placeholder is `--modal-inset`, a neutral step off the ground:
+ * a transparent GIF shows it through, in either theme. The fade is FADE_MS in
+ * the module (0.35s); change them together.
+ */
+.gif-grid { position: relative; }
+.gif-tile {
+  position: absolute;
+  overflow: hidden;
+  border: 0;
+  border-radius: 8px;
+  padding: 0;
+  background: var(--modal-inset, #e6f1f9) center / cover no-repeat;
+  cursor: pointer;
+}
+/* A video's frame is up: any colour behind it bleeds through its edge. */
+.gif-tile:has(> video[data-shown]) { background-color: transparent; }
+.gif-tile img,
+.gif-tile video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+/* Safari frames an empty <img> in a light line. */
+.gif-tile img:not([src]) { display: none; }
+.gif-tile video {
+  opacity: 0;
+  transition: opacity 0.35s ease-out;
+}
+.gif-tile video[data-shown] { opacity: 1; }
+.gif-tile video[data-at-once] { transition: none; }
+/* The ring sits inside the tile, where the scroller cannot clip it. */
+.gif-tile:focus-visible { outline: none; }
+.gif-tile:focus-visible::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 3px var(--brand, #00aff0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .gif-tile video { transition: none; }
+}

@@ -91,6 +91,7 @@ sections, so you know when to open it:
 | The one boost button | `boost-button.js` is chrome, not a money path; six surfaces, six handlers |
 | The Boost Is Indexed At The Edge Before The Collector Sees It | `/api/v1/boosts/ingest`, the site's own boosts on the feeds in seconds; why the edge's row is provisional and what the collector owes `boosts_edge` |
 | The Boostagram Message Cap | 300 bytes, measured against the 1,300-byte onion over 800 episodes; why `url` became the feed URL and `boost_link` the page; the lnaddress side's `commentAllowed` sample |
+| A GIF In The Boost | the GIF is the last line of the one message string, from gifs.nostr.build by registered origin; the vendored grid, the `inert` form, the validated `imeta` tag, and the link sent whole or not at all on LNURL |
 | The Feed URL Resolves Before The Guid | `/api/value` and `/api/catalogue` resolve the stored feed URL before the guid, because Podcast Index's one-feed-per-guid answer can be a dead record with a year-old value block |
 | The Value Block Comes From The RSS, And Podcast Index Is The Fallback | **`/api/value` reads the show's own feed first, since 2026-09-23**; PI's episode records keep the block each song was ingested with, and ten of Jimmy V's thirteen songs paid a stale seven-leg split. PI answers only for an unreachable feed, a feed with no block anywhere (Anchor), or an item past the 4MB cap |
 

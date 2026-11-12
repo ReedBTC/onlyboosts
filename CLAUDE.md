@@ -276,6 +276,9 @@ The rules a change elsewhere would break:
 - **The boostagram message cap is 300 bytes of UTF-8 on the expanded message.**
   The note carries `nostr:npub1…` mentions, never the label; the bot route
   carries no `p` tag and the oracle refuses one (`docs/mentions.md`).
+- **A GIF is the last line of that one message**, from gifs.nostr.build by
+  registered origin (a new hostname is refused until added there); the oracle
+  validates its `imeta`, and `gifGrid.js` is vendored, never edited.
 - **⚠️ THE ROLLUP'S SYNTHETIC `unknown:` SHOW GUID NEVER LEAVES THE CLIENT**;
   `isSyntheticGuid` / `realShowGuid` guard every site that hands a guid out.
 - **`/api/value` reads the show's own RSS first, Podcast Index as fallback**, and

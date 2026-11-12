@@ -16,6 +16,9 @@ import { verifyEvent, getPublicKey, nip19 } from '../functions/_shared/nostr-sig
 import { buildExternalNoteTemplate, buildDonationNoteTemplate, donationHeadline, sanitizeSenderName, MAX_SENDER_NAME_CHARS, resolveNoteFigure, FULL_CREDIT_NUM, FULL_CREDIT_DEN } from '../login-widget/src/lib/externalBoostagram.js'
 import { SITE_SIGN_MAX_SATS } from '../login-widget/src/lib/siteSign.js'
 import { BOOST_BANNER_URL, DONATION_BANNER_URL, DONATION_URL } from '../login-widget/src/lib/externalBoostagram.js'
+import { buildLnurlComment } from '../login-widget/src/lib/externalBoostagram.js'
+import { GIF_URL_RE, isGifUrl, withGif, splitGif, pickedGif, sliceWholeUrls } from '../login-widget/src/lib/gif.js'
+import { readFileSync } from 'node:fs'
 
 let passed = 0
 // ⚠️ AWAITS. It used to call fn() bare, so an async assertion that failed became
@@ -672,6 +675,165 @@ await ok('a donation carries the typed name as prose and never as a tag', () => 
   assert.match(t.content, /^👤 From Reed$/m)
   assert.equal(t.tags.some((tag) => tag[0] === 'p'), false)
   assert.equal(t.tags.some((tag) => tag.includes('Reed')), false)
+})
+
+// ─── A GIF in the boost (2026-11-12) ───────────────────────────────────────
+// The picker's GIF is one link on the message's last line (gif.js#withGif).
+// The note puts it under the quoted words and describes it in one `imeta`
+// tag; the oracle admits that tag in exactly the builder's shape and only for
+// a link the note's own text carries. The item below is a search result as
+// the API returned it on 2026-11-12, less the fields nothing here reads.
+console.log('\nA GIF in the boost:')
+const GIF_ID = '7dc051d7361c238f30954c360077e1357e716b52070a753ce9829f385729ce19.gif'
+const GIF_ITEM = {
+  id: GIF_ID,
+  url: `https://gifs.nostr.build/${GIF_ID}`,
+  width: 450, height: 244, frames: 25, duration: 2.5, bytes: 1021553, format: 'gif',
+  title: 'The Mask thanking you repeatedly',
+  mp4: `https://gifs.nostr.build/mp4/orig/${GIF_ID}`,
+  previews: {
+    w240: { width: 240, height: 130, animated: `https://gifs.nostr.build/anim/w240/${GIF_ID}`, still: `https://gifs.nostr.build/still/w240/${GIF_ID}` },
+  },
+}
+const GIF = pickedGif(GIF_ITEM)
+const withIt = (over = {}) => realTemplate({ message: withGif('great episode', GIF.url), gif: GIF, ...over })
+const imetaOf = (t) => t.tags.filter((tag) => tag[0] === 'imeta')
+function swapImeta(t, fn) {
+  const copy = { ...t, tags: t.tags.map((tag) => tag.slice()) }
+  const at = copy.tags.findIndex((tag) => tag[0] === 'imeta')
+  const next = fn(copy.tags[at])
+  if (next) copy.tags[at] = next
+  return copy
+}
+
+await ok('the message and its GIF are one string, and split back apart', () => {
+  assert.equal(withGif('  hello  ', GIF.url), `hello\n${GIF.url}`)
+  assert.equal(withGif('', GIF.url), GIF.url)
+  assert.equal(withGif('hello', ''), 'hello')
+  assert.equal(withGif('hello', 'https://example.com/a.gif'), 'hello', 'only a link from the GIF library is appended')
+  assert.deepEqual(splitGif(`hello\n${GIF.url}`), { text: 'hello', gifUrl: GIF.url })
+  assert.deepEqual(splitGif(GIF.url), { text: '', gifUrl: GIF.url })
+  assert.deepEqual(splitGif(`two\nlines\n${GIF.url}`), { text: 'two\nlines', gifUrl: GIF.url })
+  // Not the last line, or not the whole of it: it is ordinary text.
+  assert.deepEqual(splitGif(`${GIF.url}\nhello`), { text: `${GIF.url}\nhello`, gifUrl: '' })
+  assert.deepEqual(splitGif(`see ${GIF.url}`), { text: `see ${GIF.url}`, gifUrl: '' })
+})
+await ok('a preview or a video address is never taken for the GIF', () => {
+  for (const u of [GIF_ITEM.mp4, GIF_ITEM.previews.w240.animated, GIF_ITEM.previews.w240.still,
+    `http://gifs.nostr.build/${GIF_ID}`, `https://gifs.nostr.build.evil.example/${GIF_ID}`,
+    `https://gifs.nostr.build/${GIF_ID}?x=1`, `https://gifs.nostr.build/${GIF_ID}#x`, 'https://gifs.nostr.build/a.png']) {
+    assert.equal(isGifUrl(u), false, u)
+    assert.equal(pickedGif({ ...GIF_ITEM, url: u }), null, u)
+  }
+  assert.equal(isGifUrl(GIF.url), true)
+  assert.equal(isGifUrl(GIF.url.replace(/\.gif$/, '.webp')), true)
+})
+await ok('the picked item keeps the link, the size, the type and the small preview', () => {
+  assert.deepEqual(GIF, {
+    url: GIF_ITEM.url, width: 450, height: 244, format: 'gif', title: 'The Mask thanking you repeatedly',
+    animated: GIF_ITEM.previews.w240.animated, still: GIF_ITEM.previews.w240.still,
+  })
+})
+await ok('the oracle’s copy of the link pattern is the widget’s', () => {
+  const src = readFileSync(new URL('../functions/api/sign-boost.js', import.meta.url), 'utf8')
+  const m = /const GIF_IMETA_URL_RE = \/\^url \((.+)\)\$\/\n/.exec(src)
+  assert.ok(m, 'GIF_IMETA_URL_RE is no longer where this test reads it')
+  assert.equal(`^${m[1]}$`, GIF_URL_RE.source)
+})
+await ok('the note carries the GIF under the quoted words, outside the quotation marks', () => {
+  const t = withIt()
+  const lines = t.content.split('\n')
+  const at = lines.indexOf('💬 "great episode"')
+  assert.notEqual(at, -1)
+  assert.equal(lines[at + 1], GIF.url)
+  assert.equal(lines[at + 2], '', 'and a blank line still parts the message from the show')
+  assert.equal(t.content.split(GIF.url).length, 2, 'once')
+  assert.equal(t.content.includes(`${GIF.url}"`), false)
+})
+await ok('and describes it in one four-item imeta tag, which the oracle signs', () => {
+  const t = withIt()
+  assert.deepEqual(imetaOf(t), [['imeta', `url ${GIF.url}`, 'm image/gif', 'dim 450x244']])
+  const v = validateBoostTemplate(t)
+  assert.deepEqual(v.tags, t.tags)
+  assert.equal(v.content, t.content)
+})
+await ok('a GIF with no words is a note with the link and no empty quotation', () => {
+  const t = withIt({ message: withGif('', GIF.url) })
+  assert.equal(t.content.includes('💬'), false)
+  assert.ok(t.content.split('\n').includes(GIF.url))
+  assert.equal(imetaOf(t).length, 1)
+  validateBoostTemplate(t)
+})
+await ok('a WebP is tagged as one', () => {
+  const url = GIF.url.replace(/\.gif$/, '.webp')
+  const g = pickedGif({ ...GIF_ITEM, url, format: 'webp' })
+  const t = withIt({ message: withGif('hi', url), gif: g })
+  assert.equal(imetaOf(t)[0][2], 'm image/webp')
+  validateBoostTemplate(t)
+})
+await ok('no tag is written for a GIF that is not the one in the message, or has no size', () => {
+  const other = { ...GIF, url: GIF.url.replace('7dc0', '0000') }
+  assert.deepEqual(imetaOf(withIt({ gif: other })), [])
+  assert.deepEqual(imetaOf(withIt({ gif: { ...GIF, width: 0 } })), [])
+  assert.deepEqual(imetaOf(withIt({ gif: null })), [])
+  assert.deepEqual(imetaOf(withIt({ message: 'great episode' })), [], 'the GIF was removed; the object alone says nothing')
+  // The link still rides as text, and the note is as valid as before.
+  validateBoostTemplate(withIt({ gif: null }))
+})
+await ok('a donation carries the GIF the same way, and validates', () => {
+  const t = donation({ message: withGif('thanks', GIF.url), gif: GIF })
+  const lines = t.content.split('\n')
+  assert.equal(lines[lines.indexOf('💬 "thanks"') + 1], GIF.url)
+  assert.deepEqual(imetaOf(t), [['imeta', `url ${GIF.url}`, 'm image/gif', 'dim 450x244']])
+  const v = validateTemplate(t)
+  assert.deepEqual(v.tags, t.tags)
+})
+rejects('two imeta tags', (() => { const t = withIt(); return { ...t, tags: [...t.tags, imetaOf(t)[0]] } })(), /invalid gif/)
+rejects('an imeta for a link the note does not show',
+  swapImeta(withIt(), (tag) => [tag[0], tag[1].replace('7dc0', '0000'), tag[2], tag[3]]), /invalid gif/)
+rejects('an imeta for a link that is only part of a line', (() => {
+  const t = withIt()
+  return { ...t, content: t.content.replace(`\n${GIF.url}\n`, `\nsee ${GIF.url} here\n`) }
+})(), /invalid gif/)
+rejects('an imeta for another host',
+  swapImeta({ ...withIt(), content: withIt().content.replace(GIF.url, 'https://example.com/a.gif') },
+    (tag) => [tag[0], 'url https://example.com/a.gif', tag[2], tag[3]]), /invalid gif/)
+rejects('an imeta for a preview address',
+  swapImeta({ ...withIt(), content: withIt().content.replace(GIF.url, GIF.animated) },
+    (tag) => [tag[0], `url ${GIF.animated}`, tag[2], tag[3]]), /invalid gif/)
+rejects('an imeta with a fifth item', swapImeta(withIt(), (tag) => [...tag, 'alt x']), /invalid/)
+rejects('an imeta with only the link', swapImeta(withIt(), (tag) => tag.slice(0, 2)), /invalid gif/)
+rejects('an imeta naming another type', swapImeta(withIt(), (tag) => [tag[0], tag[1], 'm text/html', tag[3]]), /invalid gif/)
+rejects('an imeta with a size that is not one', swapImeta(withIt(), (tag) => [tag[0], tag[1], tag[2], 'dim 0x244']), /invalid gif/)
+rejects('an imeta with its items in another order', swapImeta(withIt(), (tag) => [tag[0], tag[2], tag[1], tag[3]]), /invalid gif/)
+await ok('a donation’s imeta is held to the same rule', () => {
+  const t = donation({ message: withGif('thanks', GIF.url), gif: GIF })
+  assert.throws(() => validateTemplate(swapImeta(t, (tag) => [tag[0], tag[1].replace('7dc0', '0000'), tag[2], tag[3]])), /invalid gif/)
+  assert.throws(() => validateTemplate({ ...t, tags: [...t.tags, imetaOf(t)[0]] }), /invalid gif/)
+})
+await ok('the Lightning comment carries the GIF whole or not at all', () => {
+  const msg = withGif('great episode', GIF.url)
+  assert.equal(buildLnurlComment({ descriptorUrl: '', message: msg, commentAllowed: 255 }), msg)
+  // 13 characters of words, a line break, 93 of link: 107. One short drops the link.
+  assert.equal(msg.length, 107)
+  assert.equal(buildLnurlComment({ descriptorUrl: '', message: msg, commentAllowed: 107 }), msg)
+  assert.equal(buildLnurlComment({ descriptorUrl: '', message: msg, commentAllowed: 106 }), 'great episode')
+  assert.equal(buildLnurlComment({ descriptorUrl: '', message: msg, commentAllowed: 20 }), 'great episode')
+  assert.equal(buildLnurlComment({ descriptorUrl: '', message: GIF.url, commentAllowed: 50 }), '')
+  // Beside the receipt link: the receipt first, then as much as fits whole.
+  const box = 'https://boostbox.example/b/1'
+  const full = buildLnurlComment({ descriptorUrl: box, message: msg, commentAllowed: 255 })
+  assert.ok(full.endsWith(` ${msg}`))
+  const tight = buildLnurlComment({ descriptorUrl: box, message: msg, commentAllowed: full.length - 1 })
+  assert.equal(tight, full.slice(0, full.length - GIF.url.length - 1))
+  const none = buildLnurlComment({ descriptorUrl: box, message: GIF.url, commentAllowed: 60 })
+  assert.equal(none.includes('gifs.nostr.build'), false)
+  assert.equal(none.endsWith(' '), false)
+})
+await ok('a cut that lands outside any link is still a plain cut', () => {
+  assert.equal(sliceWholeUrls('hello world', 5), 'hello')
+  assert.equal(sliceWholeUrls(`${GIF.url} and more`, GIF.url.length + 4), `${GIF.url} and`)
+  assert.equal(sliceWholeUrls('hello', 0), '')
 })
 
 console.log(`\n${passed} assertions passed.\n`)

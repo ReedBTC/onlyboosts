@@ -18,6 +18,11 @@
   background: var(--navy);
   box-shadow: 0 2px 12px rgba(0,0,0,0.25);
 }
+/* A widget modal is open (scrollLock.js sets the mark): the bar goes under the
+ * modal's scrim, which is 70, and stays over the page's own sticky bars at 60.
+ * Without it the bar covers the top of the card whenever the page is at its
+ * top, and on a phone that is the card's header and the GIF search field. */
+html[data-lb-modal-open] #top-nav { z-index: 65; }
 .nav-inner {
   max-width: 1240px;
   margin: 0 auto;

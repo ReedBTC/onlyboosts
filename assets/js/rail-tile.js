@@ -11,11 +11,11 @@
  * rewrites the version), no clock reads, no unpinned locale, nothing from the
  * DOM. Verbs (the artwork fallback walk) are attached by discover.js.
  */
-import { coverChain } from './cover-art.js?v=ob-v274'
-import { rankLabel } from './rank.js?v=ob-v274'
-import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v274'
-import { boosterPageHref } from './booster-link.js?v=ob-v274'
-import { languageName } from './lang-name.js?v=ob-v274'
+import { coverChain } from './cover-art.js?v=ob-v275'
+import { rankLabel } from './rank.js?v=ob-v275'
+import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v275'
+import { boosterPageHref } from './booster-link.js?v=ob-v275'
+import { languageName } from './lang-name.js?v=ob-v275'
 
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => (

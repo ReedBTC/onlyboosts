@@ -15,7 +15,7 @@
 import {
   OPML_MAX_BYTES, OPML_LOOKUP_PER_RUN, OPML_FILE_ACCEPT,
   parseOpml, planOpmlImport, opmlLinkVerdict, opmlLinkName, sortOpmlAnswers,
-} from '/assets/js/opml.js?v=ob-v274'
+} from '/assets/js/opml.js?v=ob-v275'
 
 const RESOLVE_URL = '/api/v1/feeds/resolve'
 const LINK_URL = '/api/v1/opml/link'
