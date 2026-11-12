@@ -633,6 +633,10 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
   // "Posted" line reads this and never live leg state, so a split that
   // settles afterwards cannot rewrite an account of an event nobody can edit.
   const [postedFigure, setPostedFigure] = useState(null)
+  // The booster's own word that the payments their wallet never confirmed
+  // did go through; set only by the press on the done screen (`canAttest`).
+  // See resolveNoteFigure.
+  const [attested, setAttested] = useState(false)
   // Per-leg: a Retry was pressed and the leg is still FAILED (the gate on
   // the other-wallet offer), and an invoice for that offer is being fetched.
   const [retried, setRetried] = useState({})
@@ -731,11 +735,12 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
   // confirmed split. `landedSats` and `landedCount` are its answers, and
   // every line on the done screen that says how much of the boost went
   // through reads those two, never `paidSats` / `paidCount`, which stay the
-  // confirmed figures (the gate on having a note at all, and the confetti).
+  // confirmed figures (the confetti). The gate on having a note at all is
+  // `landedSats`, which is the confirmed figure until the booster attests.
   const intendedSats = visibleLegs.reduce((a, { leg }) => a + (leg?.sats || 0), 0)
   const credit = resolveNoteFigure({
     paidSats, intendedSats, legsPaid: paidCount, legsTotal: activeCount,
-    unconfirmedSats, legsUnconfirmed: unconfirmedCount, walletPaidSats, donation, choice: noteFigure,
+    unconfirmedSats, legsUnconfirmed: unconfirmedCount, walletPaidSats, attested, donation, choice: noteFigure,
   })
   const fullCreditOk = credit.eligible
   const noteSats = credit.sats
@@ -965,7 +970,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
 
   async function handleShare() {
     if (noteRoute === 'none' || shareState === 'signing' || shareState === 'shared') return
-    if (paidSats <= 0) return
+    if (landedSats <= 0) return
     const figure = { sats: noteSats, short: noteShort, paid: landedCount, total: activeCount }
     setShareState('signing')
     setShareError('')
@@ -1118,7 +1123,9 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
    * had. Beside at least one confirmed split it counts (`landedCount`), and a
    * boost with nothing failed goes out at the amount typed once the
    * ninety-second watch is over. With nothing confirmed at all the wallet may
-   * be offline, `landedCount` stays at zero, and nothing publishes.
+   * be offline, `landedCount` stays at zero, and nothing publishes; unless
+   * the booster says their wallet shows the payments (`attested`), which makes
+   * them count and brings the boost through this same effect.
    *
    * The one thing this costs is that a NIP-07 or NIP-46 signer prompt now
    * arrives without a press behind it. It is not unannounced — the donor asked
@@ -1134,7 +1141,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
   useEffect(() => {
     if (phase !== 'done' || noteRoute === 'none') return
     if (autoSharedRef.current || shareState !== 'idle') return
-    if (!watchSettled || stillChecking || paidSats <= 0) return
+    if (!watchSettled || stillChecking || landedSats <= 0) return
     if (activeCount === 0 || landedCount !== activeCount) return
     autoSharedRef.current = true
     // ⚠️ THE IDENTITY IS RE-CHECKED HERE, NOT ASSUMED. A pre-signed note claims
@@ -1518,6 +1525,20 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
   const allSent = phase === 'done' && !allPaid && watchSettled && !stillChecking
     && activeCount > 0 && landedCount === activeCount
 
+  // ⚠️ THE BOOSTER MAY VOUCH FOR WHAT THE WALLET NEVER CONFIRMED (Reed's
+  // call, 2026-11-12). Offered only where the unconfirmed splits do not
+  // already count, which is a boost with nothing the connected wallet
+  // confirmed, and only once the watch has had its turn. The press sets
+  // `attested` and nothing else: no split changes status, nothing is paid,
+  // and the note then follows the ordinary path (it publishes itself with
+  // nothing failed, and stops for the Post press beside a failed split).
+  const canAttest = phase === 'done' && noteRoute !== 'none' && watchSettled && !stillChecking
+    && !attested && unconfirmedCount > 0 && !unconfirmedCounted
+    && shareState !== 'signing' && shareState !== 'shared'
+  const attestPosts = paidCount + unconfirmedCount === activeCount
+  const attestClaim = unconfirmedCount === 1 ? 'It went through in my wallet' : `All ${unconfirmedCount} went through in my wallet`
+  const attestLabel = attestPosts ? `${attestClaim}, post my ${donation ? 'donation' : 'boost'}` : attestClaim
+
   // ⚠️ THE SUMMARY MUST NOT TELL THE DONOR TO RE-SEND A LEG WE CANNOT PROVE
   // UNPAID. It used to say "Retry any that didn't", which on an unconfirmed
   // leg was advice to pay twice. So the three states are named separately: a
@@ -1548,7 +1569,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
   // landed one, so the only splits the line counts against the boost are the
   // ones that failed.
   let summaryLine
-  if (paidCount === 0) summaryLine = onlyUnpayable ? `Nothing was sent. ${tail}` : `Nothing confirmed yet. ${tail}`
+  if (landedCount === 0) summaryLine = onlyUnpayable ? `Nothing was sent. ${tail}` : `Nothing confirmed yet. ${tail}`
   else if (stillChecking) summaryLine = `${paidCount} of ${activeCount} splits confirmed. ${tail}`
   else summaryLine = `${landedCount} of ${activeCount} splits sent. ${tail}`
 
@@ -1844,7 +1865,20 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
                     {noteRoute !== 'none' && ' The Nostr note waits for this.'}
                   </p>
                 )}
-                {phase === 'done' && noteRoute !== 'none' && paidSats > 0 && !stillChecking && (
+                {canAttest && (
+                  <div className="rounded-md border border-[var(--modal-line,#b9d4e6)] bg-[var(--modal-field,#ffffff)] p-3 space-y-2">
+                    <p className="text-[11px] text-[var(--muted,#5a7488)] leading-snug">
+                      {unconfirmedCount === 1
+                        ? 'Your wallet never confirmed this payment, so it has not been posted. Open your wallet and check: if the payment is there, you can post it.'
+                        : `Your wallet never confirmed these ${unconfirmedCount} payments, so they have not been posted. Open your wallet and check: if all ${unconfirmedCount} are there, you can post them.`}
+                    </p>
+                    <button onClick={() => setAttested(true)}
+                      className="w-full py-2 rounded-lg border border-[var(--modal-line,#b9d4e6)] text-xs font-medium text-[var(--ink,#0f2733)] hover:border-[var(--brand,#00aff0)] hover:text-[var(--brand-dd,#0a6fa8)] transition-colors">
+                      {attestLabel}
+                    </button>
+                  </div>
+                )}
+                {phase === 'done' && noteRoute !== 'none' && landedSats > 0 && !stillChecking && (
                   <div className="rounded-md border border-[var(--modal-line,#b9d4e6)] bg-[var(--modal-field,#ffffff)] p-3 space-y-2">
                     {shareState === 'shared' ? (
                       <p className="text-xs text-[var(--ok,#0b7a4b)] leading-snug">

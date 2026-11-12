@@ -243,6 +243,15 @@ export const FULL_CREDIT_DEN = 10
  * that may make unconfirmed splits count. It defaults to `paidSats` for a
  * caller with no QR path.
  *
+ * ⚠️ OR THE BOOSTER'S OWN WORD, WHERE THE WALLET GAVE NONE (Reed's call,
+ * 2026-11-12). With nothing confirmed the app cannot tell an offline wallet
+ * from one that paid and never answered (a browser-extension wallet has no
+ * way to be asked afterwards), but the booster can open their wallet and
+ * look. `attested` is their press on "It went through in my wallet": the
+ * unconfirmed splits then count exactly as they would beside a confirmed
+ * one. It is never set by anything but that press, a FAILED split still
+ * comes off the figure, and no split's status changes because of it.
+ *
  *   - `landedSats`, `landedLegs`: confirmed plus counted-unconfirmed. These
  *     are what the note, the screen and the 90% floor all read;
  *   - `eligible`: a PARTIAL boost (some split FAILED) with at least 90% of
@@ -261,13 +270,14 @@ export const FULL_CREDIT_DEN = 10
  */
 export function resolveNoteFigure({
   paidSats, intendedSats, legsPaid, legsTotal,
-  unconfirmedSats = 0, legsUnconfirmed = 0, walletPaidSats,
+  unconfirmedSats = 0, legsUnconfirmed = 0, walletPaidSats, attested = false,
   donation = false, choice = 'intended',
 }) {
   const whole = (n) => Math.max(0, Math.floor(Number(n) || 0))
   const paid = whole(paidSats)
   const intended = whole(intendedSats)
-  const counts = whole(walletPaidSats === undefined ? paidSats : walletPaidSats) > 0
+  const counts = attested === true
+    || whole(walletPaidSats === undefined ? paidSats : walletPaidSats) > 0
   const landedSats = paid + (counts ? whole(unconfirmedSats) : 0)
   const landedLegs = whole(legsPaid) + (counts ? whole(legsUnconfirmed) : 0)
   const eligible = !donation && landedSats > 0 && landedSats < intended

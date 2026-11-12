@@ -159,7 +159,7 @@ await ok('⚠️ a split paid from another wallet does not make unconfirmed spli
 await ok('⚠️ the modal hands the rule the connected wallet\'s own figure, and marks a QR payment', async () => {
   const { readFileSync } = await import('node:fs')
   const src = readFileSync(new URL('../login-widget/src/components/ExternalBoostModal.jsx', import.meta.url), 'utf8')
-  assert.match(src, /walletPaidSats, donation, choice: noteFigure/)
+  assert.match(src, /walletPaidSats, attested, donation, choice: noteFigure/)
   assert.match(src, /status: STATUS\.PAID, viaQr: true/)
   assert.match(src, /!l\.viaQr/)
 })
@@ -192,6 +192,40 @@ await ok('⚠️ with nothing confirmed, nothing counts: an offline wallet earns
   assert.deepEqual(
     resolveNoteFigure({ paidSats: 0, intendedSats: 333, legsPaid: 0, legsTotal: 5, unconfirmedSats: 333, legsUnconfirmed: 5 }),
     { eligible: false, full: false, sats: 0, short: true, landedSats: 0, landedLegs: 0 })
+})
+// ⚠️ Reed's call, 2026-11-12: where the wallet confirmed nothing, the booster
+// may look in their wallet and say the payments are there. That press is the
+// one thing besides a wallet confirmation that makes unconfirmed splits count.
+await ok('⚠️ the booster\'s own word: one unconfirmed split, attested, posts at the amount typed', () => {
+  const args = { paidSats: 0, walletPaidSats: 0, intendedSats: 333, legsPaid: 0, legsTotal: 1, unconfirmedSats: 333, legsUnconfirmed: 1 }
+  assert.equal(resolveNoteFigure(args).sats, 0)
+  const { fig, t } = noteFor({ ...args, attested: true })
+  assert.deepEqual(fig, { eligible: false, full: false, sats: 333, short: false, landedSats: 333, landedLegs: 1 })
+  assert.equal(amountOf(t), '333')
+  assert.equal(/splits paid/.test(t.content), false)
+  validateBoostTemplate(t)
+})
+await ok('⚠️ attesting never restores a FAILED split: it comes off the figure as before', () => {
+  // 1,000 over three splits: nothing confirmed, 600 unconfirmed, 400 failed.
+  const { fig, t } = noteFor({ paidSats: 0, walletPaidSats: 0, intendedSats: 1000, legsPaid: 0, legsTotal: 3, unconfirmedSats: 600, legsUnconfirmed: 2, attested: true })
+  assert.deepEqual(fig, { eligible: false, full: false, sats: 600, short: true, landedSats: 600, landedLegs: 2 })
+  assert.match(t.content, /2 of 3 splits paid/)
+})
+await ok('only a literal true attests, and a donation attested is still never "full"', () => {
+  const args = { paidSats: 0, walletPaidSats: 0, intendedSats: 500, legsPaid: 0, legsTotal: 1, unconfirmedSats: 500, legsUnconfirmed: 1 }
+  for (const junk of [1, 'true', {}, null, undefined]) assert.equal(resolveNoteFigure({ ...args, attested: junk }).sats, 0)
+  const d = resolveNoteFigure({ ...args, attested: true, donation: true })
+  assert.equal(d.sats, 500)
+  assert.equal(d.full, false)
+})
+await ok('⚠️ the modal sets `attested` from one press only, offered after the watch and never on a private boost', async () => {
+  const { readFileSync } = await import('node:fs')
+  const modal = readFileSync(new URL('../login-widget/src/components/ExternalBoostModal.jsx', import.meta.url), 'utf8')
+  assert.equal(modal.match(/setAttested\(/g).length, 1)
+  assert.match(modal, /\{canAttest && \([\s\S]{0,1400}?onClick=\{\(\) => setAttested\(true\)\}/)
+  assert.match(modal, /const canAttest = phase === 'done' && noteRoute !== 'none' && watchSettled && !stillChecking\s*\n\s*&& !attested && unconfirmedCount > 0 && !unconfirmedCounted\s*\n\s*&& shareState !== 'signing' && shareState !== 'shared'/)
+  // The press pays nothing and moves no split: UNCERTAIN stays UNCERTAIN.
+  assert.equal(/setAttested[\s\S]{0,200}STATUS\./.test(modal.match(/onClick=\{\(\) => setAttested\(true\)\}[^\n]*/)[0]), false)
 })
 await ok('a failed split beside an unconfirmed one, above the floor: full by default, the lesser figure counts the unconfirmed', () => {
   // 1,000 over four splits: 600 confirmed, 350 unconfirmed, 50 failed.
@@ -226,7 +260,7 @@ await ok('junk in the unconfirmed arguments is zero, not NaN', () => {
 await ok('⚠️ the modal builds its note from this function and nothing else', async () => {
   const { readFileSync } = await import('node:fs')
   const modal = readFileSync(new URL('../login-widget/src/components/ExternalBoostModal.jsx', import.meta.url), 'utf8')
-  assert.match(modal, /const credit = resolveNoteFigure\(\{\s*paidSats, intendedSats, legsPaid: paidCount, legsTotal: activeCount,\s*unconfirmedSats, legsUnconfirmed: unconfirmedCount, walletPaidSats, donation, choice: noteFigure,\s*\}\)/)
+  assert.match(modal, /const credit = resolveNoteFigure\(\{\s*paidSats, intendedSats, legsPaid: paidCount, legsTotal: activeCount,\s*unconfirmedSats, legsUnconfirmed: unconfirmedCount, walletPaidSats, attested, donation, choice: noteFigure,\s*\}\)/)
   assert.match(modal, /const noteSats = credit\.sats\b/)
   assert.match(modal, /const noteShort = credit\.short\b/)
   assert.match(modal, /const landedSats = credit\.landedSats\b/)
@@ -243,7 +277,7 @@ await ok('⚠️ the note publishes itself only after the watch, and never besid
   const modal = readFileSync(new URL('../login-widget/src/components/ExternalBoostModal.jsx', import.meta.url), 'utf8')
   // `stillChecking` alone is false on the first render of the done phase, a
   // commit before the watcher marks what it is about to check.
-  assert.match(modal, /if \(!watchSettled \|\| stillChecking \|\| paidSats <= 0\) return\s*\n\s*if \(activeCount === 0 \|\| landedCount !== activeCount\) return/)
+  assert.match(modal, /if \(!watchSettled \|\| stillChecking \|\| landedSats <= 0\) return\s*\n\s*if \(activeCount === 0 \|\| landedCount !== activeCount\) return/)
   assert.match(modal, /if \(pre && pre\.sats === landedSats && pre\.legs === activeCount\)/)
   assert.match(modal, /if \(targets\.length === 0\) \{ setWatchSettled\(true\); return \}/)
   // Retry and the other-wallet invoice stay on FAILED alone; an unconfirmed

@@ -463,7 +463,7 @@ in the form, which is the standing rule of the section above: the settled
 total is unknown until every leg has run and the donor has finished retrying.
 
 **What never gets full credit**: a boost where nothing was confirmed (no note
-is offered at all), and a donation, which is one leg and so is either whole or
+is offered unless the booster vouches for it, below), and a donation, which is one leg and so is either whole or
 absent. The function takes `donation` and refuses regardless.
 
 **The oracle needed no change.** `/api/sign-boost` validates a note's shape and
@@ -493,6 +493,29 @@ and `handleShare` takes a last look at the figure after the signature: if a
 background watch lowered it in the meantime, the note is not published and the
 donor posts again on the figure the screen shows. A figure that only rose is
 published as signed, since it under-reports and never over.
+
+**The booster's own word, where the wallet gave none** (Reed's call,
+2026-11-12). A boost with nothing the connected wallet confirmed got no note,
+and for a boost of one split that is every timeout. His own setup shows why
+the app cannot do better alone: the Sidecar browser extension as the wallet,
+connected onward to his Alby Hub. To this app that is a WebLN wallet, which has
+no call for asking afterwards whether a payment went through
+(`lookupPayment: null` in `wallet.js`), so a split the extension never
+answered for stays unconfirmed however long the watch runs. The booster can
+open their wallet and look. Once the watch is over, the done screen offers one
+button, "It went through in my wallet, post my boost" ("All N went through"
+for several); the press sets `attested`, which `resolveNoteFigure` reads as
+the same evidence one confirmed split would be. Nothing is paid and no split
+changes status, so the no-re-pay rule on `UNCERTAIN` is untouched; a FAILED
+split still comes off the figure; the note then takes the ordinary path
+(publishing itself with nothing failed, stopping for the Post press beside a
+failed split). It is not offered on a private boost, which has no note, nor
+where the unconfirmed splits already count. Two things were considered and
+not built the same day: a notice before paying when a recipient's address is
+closed (Reed: not worth it), and posting automatically when the only failed
+splits are ones the recipient's side refused (the booster's choice of figure
+on a partial is the transparency, and an automatic post would make it for
+them).
 
 ### One Split, Another Wallet
 

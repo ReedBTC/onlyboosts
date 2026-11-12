@@ -260,7 +260,8 @@ The rules a change elsewhere would break:
 - **⚠️ ONLY A FAILED SPLIT TAKES ANYTHING OFF THE NOTE.** An `UNCERTAIN` split
   counts beside at least one split the CONNECTED wallet confirmed (a split paid
   by QR from another wallet is not that evidence: `viaQr`, `walletPaidSats`),
-  never with none. The note waits on `watchSettled`, not `stillChecking`, and
+  never with none unless the booster presses "It went through in my wallet"
+  (`attested`, set by that press alone). The note waits on `watchSettled`, not `stillChecking`, and
   nothing moves a split while the note is being signed.
 - **A failed Lightning-address split may be paid from another wallet by QR**;
   asking for it ends Retry for that split (`canRepayLeg` reads `leg.qr`). No offer
