@@ -125,6 +125,10 @@ function uuid4() {
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`
 }
 
+/** A boost's id, minted by the modal so a retry and a QR invoice (which are
+ *  separate calls into this file) can carry the id the first run used. */
+export const newBoostUuid = uuid4
+
 /**
  * Distribute whole sats across recipients by weight. Floors each share to a
  * whole sat (LNURL endpoints reject sub-sat amounts), then hands the leftover
@@ -420,7 +424,17 @@ export async function confirmLegSettled(leg, { deadlineMs = 0, intervalMs = 3000
   return definite
 }
 
-async function payLnaddressLeg(leg, ctx, update, timer) {
+/**
+ * Everything an lnaddress leg does BEFORE a wallet is asked to pay: the LNURL
+ * metadata, the BoostBox descriptor, the comment and the invoice. Split out of
+ * `payLnaddressLeg` on 2026-11-11 so the QR fallback (`requestLegInvoice`)
+ * asks for exactly the invoice the wallet path would have paid, descriptor
+ * included, rather than a second, slightly different one.
+ *
+ * Throws on any failure, and everything it throws is pre-payment: no wallet
+ * has seen anything by the time this returns.
+ */
+async function lnaddressInvoice(leg, ctx, timer) {
   // Prefer the modal's prefetched metadata over a fresh fetch. The modal
   // resolves every lnaddress recipient in parallel on mount, so by boost time
   // most legs already have theirs. A cache miss — or a null, which is what the
@@ -430,12 +444,8 @@ async function payLnaddressLeg(leg, ctx, update, timer) {
   if (!meta) meta = await fetchLnurlMeta(leg.recipient.address)
   timer?.mark('meta')
   const msats = leg.sats * 1000
-  if (typeof meta.minSendable === 'number' && msats < meta.minSendable) {
-    throw new Error(`This leg needs at least ${Math.ceil(meta.minSendable / 1000).toLocaleString()} sats — bump the boost.`)
-  }
-  if (typeof meta.maxSendable === 'number' && msats > meta.maxSendable) {
-    throw new Error(`This leg accepts at most ${Math.floor(meta.maxSendable / 1000).toLocaleString()} sats.`)
-  }
+  const limit = sendableLimit(meta, leg.sats)
+  if (limit) throw limit
   // ⚠️ THE ONLY CHANNEL THIS LEG HAS. A keysend carries its boostagram inline in
   // the TLV and reaches Helipad's first tier; an lnaddress leg has nothing but
   // the LNURL comment, which lands in Helipad's third tier as
@@ -456,7 +466,11 @@ async function payLnaddressLeg(leg, ctx, update, timer) {
   console.debug('[lb] leg comment', leg.recipient?.address, { commentAllowed: allowed, descriptor: descriptorUrl || null, comment })
   const { pr, verify } = await fetchLnurlInvoice(meta.callback, msats, comment, leg.recipient.address)
   timer?.mark('invoice')
-  const paymentHash = bolt11PaymentHash(pr)
+  return { pr, verify, paymentHash: bolt11PaymentHash(pr) }
+}
+
+async function payLnaddressLeg(leg, ctx, update, timer) {
+  const { pr, verify, paymentHash } = await lnaddressInvoice(leg, ctx, timer)
   update({ verifyUrl: verify || null, paymentHash })
 
   // ⚠️ `startedAt` is stamped where the WAIT actually is: the moment the wallet
@@ -501,6 +515,100 @@ async function payLnaddressLeg(leg, ctx, update, timer) {
   // provider that returned no verify URL. It must therefore not claim that
   // checking is under way, which the previous wording did.
   return { status: STATUS.UNCERTAIN, error: 'Not confirmed yet. Don’t re-send it — it may already be on its way.' }
+}
+
+/**
+ * The recipient's own LNURL limits, checked before an invoice is asked for.
+ * Returns an Error to throw, or null when the amount is inside them.
+ *
+ * ⚠️ THE ERROR CARRIES `unpayable`, AND THE MODAL READS IT TO TAKE BOTH
+ * BUTTONS OFF THE ROW (2026-11-11). These three are the failures no wallet
+ * and no second attempt can change: the answer comes off metadata the modal
+ * already holds, so a Retry returns the same sentence in the same tick and a
+ * fresh invoice for another wallet is refused the same way. Reed met exactly
+ * that: a 16-sat split to an address whose provider published
+ * `maxSendable: 0` (and whose callback answered "The recipient's wallet is
+ * not properly configured"), a Retry and a "Pay this split from another
+ * wallet" button beside it, and neither doing anything he could see.
+ *
+ * `closed` is a recipient no amount reaches (a maximum of zero, or one under
+ * the minimum); `min` and `max` are an amount outside a working range. The
+ * sentences say whose side it is on, because the row's other errors are the
+ * donor's wallet talking and this one is not.
+ */
+function sendableLimit(meta, sats) {
+  const min = typeof meta?.minSendable === 'number' ? meta.minSendable : null
+  const max = typeof meta?.maxSendable === 'number' ? meta.maxSendable : null
+  const msats = sats * 1000
+  const fail = (kind, text) => Object.assign(new Error(text), { unpayable: kind })
+  if (max !== null && (max <= 0 || (min !== null && max < min))) {
+    return fail('closed', 'This recipient’s Lightning address is not accepting payments right now, so this split was not sent. That is on their side; your wallet was never asked to pay it.')
+  }
+  if (min !== null && msats < min) {
+    return fail('min', `This recipient only takes payments of ${Math.ceil(min / 1000).toLocaleString('en-US')} sats or more, and this split came to ${sats.toLocaleString('en-US')}. Your wallet was never asked to pay it; a larger boost would reach them.`)
+  }
+  if (max !== null && msats > max) {
+    return fail('max', `This recipient takes at most ${Math.floor(max / 1000).toLocaleString('en-US')} sats in one payment, and this split came to ${sats.toLocaleString('en-US')}. Your wallet was never asked to pay it.`)
+  }
+  return null
+}
+
+/** A pre-payment failure in the donor's words. ⚠️ A REASON FROM THE
+ *  RECIPIENT'S OWN SERVER IS USED VERBATIM AND ATTRIBUTED; see the catch in
+ *  `payExternalBoost`, which is where this lived until the QR path needed the
+ *  same sentence. */
+function legErrorDetail(e) {
+  // A limit sentence is this file's own and is already in the donor's words;
+  // friendlyError would clip it at 140 characters.
+  if (e?.unpayable) return e.message
+  return e?.lnurlReason
+    ? `Their Lightning provider said: ${e.lnurlReason}`
+    : friendlyError(e?.message || e)
+}
+
+/**
+ * An invoice for ONE split, to be paid by some other wallet (the QR fallback,
+ * 2026-11-11, Reed's ask: "it didn't work with my node, let me try another").
+ *
+ * ⚠️ NOTHING HERE TOUCHES A WALLET, AND THAT IS THE POINT. It needs no
+ * connected wallet, asks none to pay, and returns the bolt11 for the modal to
+ * draw. The invoice is the one the wallet path would have requested: same
+ * amount, same comment, same BoostBox descriptor (so the podcaster's Helipad
+ * reads the boost exactly as it would have), built by the same function.
+ *
+ * ⚠️ THE CALLER OWNS THE DOUBLE-PAYMENT GUARD. Once this has returned, an
+ * invoice exists that somebody may pay at any moment, so the split it was
+ * issued for must never be handed to Retry again; the modal enforces that in
+ * `canRepayLeg`. It is offered only for a split in FAILED, which is this
+ * file's standing statement that the connected wallet never sent anything.
+ *
+ * Only a lightning-address split can be invoiced. That includes one the
+ * keysend upgrade tried first: `leg.recipient` stays the published address. A
+ * value block's own node recipient has no invoice to ask for.
+ *
+ * `verifyUrl` is null when the provider offers no LUD-21 endpoint, and then
+ * nothing on this site can ever see the payment land.
+ *
+ * @returns {Promise<{invoice:string, verifyUrl:string|null, paymentHash:string|null}>}
+ */
+export async function requestLegInvoice({
+  recipient, sats, message, senderName, senderPubkey, meta, donation, lnurlCache, boost = null,
+}) {
+  if (recipient?.type !== 'lnaddress') throw new Error('This split has no Lightning address to ask for an invoice.')
+  if (!(sats > 0)) throw new Error('Nothing to pay on this split.')
+  const ctx = {
+    kind: null, wal: null, message, senderName, senderPubkey,
+    totalSats: boost?.totalSats > 0 ? boost.totalSats : sats,
+    totalWeight: boost?.totalWeight > 0 ? boost.totalWeight : (recipient.splitWeight || 1),
+    boostUuid: boost?.uuid || uuid4(),
+    meta, donation, lnurlCache,
+  }
+  try {
+    const { pr, verify, paymentHash } = await lnaddressInvoice({ recipient, index: 0, sats }, ctx, null)
+    return { invoice: pr, verifyUrl: verify || null, paymentHash: paymentHash || null }
+  } catch (e) {
+    throw new Error(legErrorDetail(e))
+  }
 }
 
 /**
@@ -630,10 +738,14 @@ async function payKeysendLeg(leg, ctx, update, timer, upgraded) {
  *                                   and no cache at all all fall through to a
  *                                   live fetch inside the leg.
  * @param {(index:number, patch:object)=>void} [p.onLeg]
+ * @param {{totalSats:number,totalWeight:number,uuid:string}} [p.boost] - the
+ *   WHOLE boost this call is part of, when the call pays only some of it. See
+ *   the note on `ctx` below.
  * @returns {Promise<{legs:Array, anyPaid:boolean, paidSats:number}>}
  */
 export async function payExternalBoost({
   recipients, totalWeight, totalSats, message, senderName, senderPubkey, meta, donation, lnurlCache, onLeg,
+  boost = null,
 }) {
   if (!wallet.isReady()) throw new Error('Connect a wallet first')
   if (!Array.isArray(recipients) || recipients.length === 0) throw new Error('No recipients to pay')
@@ -641,16 +753,36 @@ export async function payExternalBoost({
 
   const kind = wallet.getStatus().kind
   const wal = wallet.getActiveWallet()
-  const boostUuid = uuid4()
+  // ⚠️ WHAT THIS CALL PAYS AND WHAT THE BOOST IS ARE TWO THINGS ON A RETRY.
+  // The modal retries one leg by calling this with that leg alone, so
+  // `totalSats` and `totalWeight` are the leg's own (which is what
+  // `distributeSats` below needs: one recipient, all of the amount). Until
+  // 2026-11-11 those same two figures also went into the boostagram and the
+  // BoostBox descriptor, with a fresh uuid, so a retried split told the
+  // podcaster's Helipad that the whole boost was this split's amount, at
+  // 100%, unrelated to the legs that had already landed. `boost` carries the
+  // real total, the real weight sum and the first run's uuid; absent, the
+  // call IS the boost and its own figures stand.
+  const boostUuid = boost?.uuid || uuid4()
+  const boostTotalSats = boost?.totalSats > 0 ? boost.totalSats : totalSats
+  const boostTotalWeight = boost?.totalWeight > 0 ? boost.totalWeight : totalWeight
   // ⚠️ `donation` AND `totalWeight` BOTH RIDE THE CONTEXT, and both were missing
   // from the first version of the descriptor work. A parameter that is accepted
   // by the caller but never destructured here is silently `undefined` in every
   // leg: the donation skip never fired, and the declared split was unavailable
   // so it had to be re-derived from already-rounded sats.
-  const ctx = { kind, wal, message, senderName, senderPubkey, totalSats, totalWeight, boostUuid, meta, donation, lnurlCache }
+  const ctx = {
+    kind, wal, message, senderName, senderPubkey,
+    totalSats: boostTotalSats, totalWeight: boostTotalWeight, boostUuid,
+    meta, donation, lnurlCache,
+  }
 
   const legs = distributeSats(totalSats, recipients, totalWeight).map((l) => ({
     ...l, status: STATUS.PENDING, error: null, paymentHash: null, verifyUrl: null,
+    // Both describe ONE attempt and are rewritten by the catch below; a Retry
+    // builds its legs here, so a split that gets its invoice the second time
+    // sheds them.
+    noInvoice: false, unpayable: null,
   }))
 
   activeBoosts++
@@ -710,6 +842,16 @@ export async function payExternalBoost({
             `(${result.error || 'no reason given'}) → paying the invoice instead`,
           )
           leg.keysendFellBack = true
+          // ⚠️ THE KEYSEND'S HASH COMES OFF THE LEG BEFORE THE INVOICE IS
+          // ASKED FOR (2026-11-11). The catch below reads `paymentHash` as
+          // "an invoice exists and may be in flight", and the hash stamped
+          // for the keysend would answer yes for an attempt this branch has
+          // just established never left the wallet. A recipient that then
+          // refused the invoice was filed as unconfirmed, and since the same
+          // day an unconfirmed split counts toward the note. `FAILED` from
+          // the keysend is the clean decline, so there is nothing of it left
+          // to look up.
+          update({ paymentHash: null, verifyUrl: null })
           // The descriptor runs on this path, so the leg still reaches
           // Helipad's second tier rather than dropping to the bare message.
           result = await payLnaddressLeg(leg, ctx, update, timer)
@@ -733,12 +875,17 @@ export async function payExternalBoost({
         // or "expired" would be reported to the donor as *their wallet*
         // declining, which is a lie about whose fault it is and sends them to
         // check the wrong thing.
-        const detail = e?.lnurlReason
-          ? `Their Lightning provider said: ${e.lnurlReason}`
-          : friendlyError(e?.message || e)
+        const detail = legErrorDetail(e)
+        // ⚠️ `noInvoice` SAYS WHERE THE SPLIT FAILED, AND THE OTHER-WALLET
+        // OFFER READS IT (2026-11-11). No invoice was ever issued, so the
+        // refusal is the recipient's side or the network between, and a
+        // second wallet asking the same server gets the same answer. The
+        // offer is for the other failure: an invoice in hand that the
+        // connected wallet declined. `unpayable` narrows it further; see
+        // `sendableLimit`.
         update(leg.paymentHash
           ? { status: STATUS.UNCERTAIN, error: detail }
-          : { status: STATUS.FAILED, error: detail })
+          : { status: STATUS.FAILED, error: detail, noInvoice: true, unpayable: e?.unpayable || null })
       }
       const { totalMs, phases } = timer.summary()
       // Address rather than name: `name` is empty on most value blocks (the

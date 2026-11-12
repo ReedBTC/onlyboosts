@@ -1,8 +1,11 @@
 /**
  * Mint the summary receipt for a boost: the ONE kind 9735 the note quotes.
  *
- * The sender signs a kind 9734 for the sats the boost actually paid, addressed
- * to the bot's key; `/api/sign-receipt` derives and signs the 9735; this
+ * The sender signs a kind 9734 for the note's own figure, addressed to the
+ * bot's key (the sats that settled, or since 2026-11-11 the intended total
+ * when at least 90% of it did; the modal decides, see `paidSats` on
+ * `buildExternalNoteTemplate`, and the receipt never names a different
+ * number than the note that quotes it); `/api/sign-receipt` derives and signs the 9735; this
  * publishes it and hands back the quote the note builder writes. Why a receipt
  * for the total exists at all, and what it does and does not claim, is at the
  * top of `assets/js/zap-receipt.js` (shared with the oracle, which is why it

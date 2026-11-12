@@ -452,4 +452,103 @@ console.log('\nThe themed classes emit real CSS:')
   ok('the boot script has no silent fallback to the login-gated flow')
 }
 
+// ─── One split, another wallet: the guards that keep it to one payment ──────
+//
+// 2026-11-11. A failed split can be handed to a second wallet as an invoice on
+// screen. Every line pinned here is the difference between that and paying a
+// recipient twice, and none of them changes how anything looks: with one
+// removed the modal renders the same and the first sign is a donor's balance.
+// A text scan for the reason the rest of this file is one; the money tests
+// (test-payment-lookup, test-sign-boost) run the library halves for real.
+{
+  const src = readFileSync(new URL('../login-widget/src/components/ExternalBoostModal.jsx', import.meta.url), 'utf8')
+  const body = (name) => {
+    const at = src.search(new RegExp(`\\n\\s*(?:async )?function ${name}\\(`))
+    assert.notEqual(at, -1, `${name} not found — was it renamed?`)
+    const open = src.indexOf('{', src.indexOf(')', at))
+    let depth = 0
+    for (let i = open; i < src.length; i++) {
+      if (src[i] === '{') depth++
+      else if (src[i] === '}' && --depth === 0) return src.slice(open, i + 1)
+    }
+    assert.fail(`${name} has no closing brace`)
+  }
+
+  assert.match(body('canRepayLeg'), /return leg\?\.status === STATUS\.FAILED && !leg\?\.qr\b/,
+    'Retry must close for good once an invoice for the split is in another wallet')
+  ok('Retry is FAILED-only, and never beside an invoice handed to another wallet')
+  // The same day's second finding: a recipient whose own limits exclude the
+  // amount answers a Retry with the same sentence in the same tick, so the
+  // button did nothing anybody could see. It narrows the rule above.
+  assert.match(body('canRepayLeg'), /return leg\?\.status === STATUS\.FAILED && !leg\?\.qr && !leg\?\.unpayable\n/,
+    'a split the recipient cannot take at any attempt carries no Retry')
+  ok('nor on a split the recipient\'s own limits rule out')
+
+  const qr = body('handleQr')
+  assert.match(qr, /const leg = legsRef\.current\[index\]/, 'the status is read where it is now, not at the last paint')
+  assert.match(qr, /if \(leg\.status !== STATUS\.FAILED \|\| leg\.qr\) return/,
+    'an invoice for an UNCERTAIN split is the double payment of 2026-08-19 with a QR code on it')
+  assert.match(qr, /if \(recipient\.type !== 'lnaddress'\) return/)
+  assert.match(qr, /if \(shareState === 'shared' \|\| shareState === 'signing'\) return/)
+  assert.match(qr, /if \(repayingRef\.current\.has\(index\) \|\| qrLockRef\.current\.has\(index\)\) return/)
+  ok('the other-wallet invoice is FAILED-only, lnaddress-only, and never beside a running Retry')
+
+  const lockAt = qr.indexOf('qrLockRef.current.add(index)')
+  const askAt = qr.indexOf('await requestLegInvoice(')
+  assert.ok(lockAt !== -1 && askAt !== -1 && lockAt < askAt,
+    'the lock is taken BEFORE the request: a Retry pressed while the invoice is being fetched would pay beside it')
+  const release = [...qr.matchAll(/qrLockRef\.current\.delete\(index\)/g)]
+  assert.equal(release.length, 1, 'the lock is released in one place')
+  assert.ok(release[0].index > qr.indexOf('} catch (e) {'), 'and only when no invoice came back')
+  assert.match(qr, /if \(!\/\^ln\[a-z0-9\]\+\$\/i\.test\(got\?\.invoice \|\| ''\)\) throw/,
+    'what becomes a QR code and a lightning: link is held to an invoice\'s alphabet')
+  ok('the lock is taken before the request and released only on failure')
+
+  assert.match(body('handleRepay'),
+    /if \(repayingRef\.current\.has\(index\) \|\| qrLockRef\.current\.has\(index\) \|\| legsRef\.current\[index\]\?\.qr\) return/)
+  ok('a Retry refuses a split whose invoice is, or is about to be, in another wallet')
+
+  const panel = body('QrPanel')
+  assert.match(panel, /lookup: null,/, 'the connected wallet did not pay this invoice and must not be asked about it')
+  assert.match(panel, /const watchable = !!qr\.paymentHash && \/\^https:\\\/\\\/\/i\.test\(qr\.verifyUrl \|\| ''\)/)
+  assert.equal(/I paid|I.ve paid|Mark as paid/i.test(panel), false, 'the note\'s figure is evidence, not testimony')
+  ok('the payment is seen through the recipient\'s verify URL alone, and never taken on the donor\'s word')
+
+  assert.match(body('LegRow'), /const stuck = status === STATUS\.FAILED && !leg\?\.qr && !!retried && !locked && !checking/)
+  assert.match(body('LegRow'), /const invoiceable = recipient\?\.type === 'lnaddress'\n/)
+  assert.match(body('LegRow'), /const canQr = stuck && !!onQr && invoiceable && !leg\?\.noInvoice\n/,
+    'a split that never got an invoice is refused the same way for a second wallet: no offer')
+  ok('the offer follows a failed Retry, and a split that pays a node gets none')
+  ok('nor does a split the recipient\'s side never issued an invoice for')
+
+  // ⚠️ The button "didn't do anything" (Reed, 2026-11-11): the request failed
+  // for the reason already printed on the row and wrote that sentence back
+  // over itself. A failed request has its own field and its own line.
+  const qrCatch = qr.slice(qr.indexOf('} catch (e) {'), qr.indexOf('} finally {'))
+  assert.match(qrCatch, /updateLeg\(index, \{ qrError: /)
+  assert.equal(/updateLeg\(index, \{[^}]*\berror:/.test(qrCatch), false,
+    'a failed invoice request never overwrites the row\'s own reason')
+  assert.match(body('LegRow'), /canQr && !qrBusy && !!leg\?\.qrError && \(/)
+  ok('a failed invoice request is said on its own line, under the button')
+
+  // The library half: where the split failed, and whether anything can change it.
+  const lib = readFileSync(new URL('../login-widget/src/lib/externalBoost.js', import.meta.url), 'utf8')
+  assert.match(lib, /: \{ status: STATUS\.FAILED, error: detail, noInvoice: true, unpayable: e\?\.unpayable \|\| null \}\)/,
+    'the catch is the only place a split fails with no invoice issued, and it says so')
+  assert.match(lib, /status: STATUS\.PENDING, error: null, paymentHash: null, verifyUrl: null,\n[\s\S]{0,400}?noInvoice: false, unpayable: null,/,
+    'both describe one attempt; a Retry that gets its invoice sheds them')
+  const fellBack = lib.indexOf('leg.keysendFellBack = true')
+  const invoiceAfter = lib.indexOf('result = await payLnaddressLeg(leg, ctx, update, timer)', fellBack)
+  const cleared = lib.indexOf('update({ paymentHash: null, verifyUrl: null })', fellBack)
+  assert.ok(fellBack !== -1 && cleared !== -1 && invoiceAfter !== -1 && cleared < invoiceAfter,
+    'the declined keysend\'s hash is off the leg before the invoice is asked for, or a refused invoice reads as unconfirmed and counts toward the note')
+  ok('a split with no invoice is marked, per attempt, and a declined keysend leaves no hash behind')
+
+  // ⚠️ A retried split told Helipad it was the whole boost until this date:
+  // every later payment of one boost carries the first press's id and total.
+  assert.equal((src.match(/boost: boostRef\.current,/g) || []).length, 3, 'the first pass, the Retry and the other-wallet invoice')
+  assert.match(src, /boostRef\.current = \{ uuid: newBoostUuid\(\), totalSats: sats, totalWeight \}/)
+  ok('the first pass, a Retry and the other-wallet invoice all carry one boost id and one total')
+}
+
 console.log(`\n${passed} assertions passed.\n`)

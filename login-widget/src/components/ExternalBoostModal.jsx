@@ -44,8 +44,9 @@ import { lockBodyScroll, unlockBodyScroll } from '../lib/scrollLock.js'
 import { useModalTransition } from '../lib/useModalTransition.js'
 import { isSafeUrl } from '../lib/utils.js'
 import * as wallet from '../lib/wallet.js'
-import { payExternalBoost, distributeSats, STATUS, confirmLegSettled, legIsCheckable } from '../lib/externalBoost.js'
-import { buildExternalNoteTemplate, buildDonationNoteTemplate, sanitizeSenderName, MAX_MESSAGE_BYTES, utf8Bytes, MAX_SENDER_NAME_CHARS } from '../lib/externalBoostagram.js'
+import { payExternalBoost, distributeSats, STATUS, confirmLegSettled, legIsCheckable, requestLegInvoice, newBoostUuid } from '../lib/externalBoost.js'
+import { QRCodeSVG } from 'qrcode.react'
+import { buildExternalNoteTemplate, buildDonationNoteTemplate, resolveNoteFigure, sanitizeSenderName, MAX_MESSAGE_BYTES, utf8Bytes, MAX_SENDER_NAME_CHARS } from '../lib/externalBoostagram.js'
 import { signKindOneShareWithUser, publishSignedKindOne, fetchLnurlMeta, SITE_URL } from '../lib/boostagram.js'
 import { signKindOneWithSite } from '../lib/siteSign.js'
 import { mintSummaryReceipt, publishReceipt } from '../lib/summaryReceipt.js'
@@ -88,6 +89,12 @@ const WORKING = STATUS.PAYING
 // not how many times we asked.
 const WATCH_MS = 90_000
 const RECHECK_MS = 30_000
+// How long an invoice handed to ANOTHER wallet is watched for (see QrPanel).
+// The donor is finding a second wallet, opening it and scanning, so this is
+// minutes where the two above are seconds; after it the panel offers a manual
+// look, which costs nothing. Only the recipient's verify URL is polled.
+const QR_WATCH_MS = 600_000
+const QR_POLL_MS = 5000
 
 function fmtSats(n) { return Number(n || 0).toLocaleString() }
 
@@ -187,7 +194,17 @@ function checkStageText(seconds) {
  * deliberate act rather than a button that quietly risks their money.
  */
 function canRepayLeg(recipient, leg) {
-  return leg?.status === STATUS.FAILED
+  // ⚠️ AND NOT ONCE AN INVOICE FOR IT HAS BEEN HANDED TO ANOTHER WALLET. That
+  // invoice may be paid at any moment from a wallet this page cannot see, so a
+  // Retry beside it is two payments for one split. The `qr` field is set by
+  // handleQr and nothing ever clears it.
+  //
+  // ⚠️ NOR WHEN THE RECIPIENT CANNOT TAKE THE AMOUNT AT ALL (`unpayable`,
+  // 2026-11-11; see externalBoost.js#sendableLimit). That answer comes off
+  // metadata already in hand, so a Retry returned the same sentence in the
+  // same tick and the button looked dead. This narrows the rule and never
+  // widens it: FAILED is still the only status that can be re-paid.
+  return leg?.status === STATUS.FAILED && !leg?.qr && !leg?.unpayable
 }
 
 /** An unconfirmed leg can be re-checked only when there is something to check
@@ -207,11 +224,111 @@ function canCheckLeg(recipient, leg) {
 function applyCheck(updateLeg, i, res) {
   if (res === 'settled') updateLeg(i, { status: STATUS.PAID, error: null })
   else if (res === 'failed') updateLeg(i, { status: STATUS.FAILED, error: 'Your wallet reports this payment failed.' })
-  else updateLeg(i, { error: 'Still unconfirmed. Check your wallet before sending anything — this may already have gone through.' })
+  else updateLeg(i, { error: 'Still unconfirmed. Check your wallet before sending anything again; this may already have gone through.' })
+}
+
+/**
+ * One failed split's invoice, for a wallet other than the connected one.
+ *
+ * Reed's ask, 2026-11-11: a split the connected wallet cannot pay is often
+ * the wallet's fault and not the recipient's, and the donor has no way to
+ * tell which. A second wallet answers that, and pays the split.
+ *
+ * ⚠️ ONLY EVER FOR A `FAILED` LEG, the one status that means the connected
+ * wallet never sent anything. An UNCERTAIN leg may already be paid, and a
+ * second invoice for it is the double payment of 2026-08-19 with a QR code
+ * on it.
+ *
+ * ⚠️ THE PAYMENT IS SEEN THROUGH THE RECIPIENT'S VERIFY URL AND NOTHING ELSE.
+ * The connected wallet did not pay this invoice, so asking it (`lookup: null`
+ * below) could only ever answer "not found". A provider that publishes no
+ * verify URL (Primal) gives this page no way to see the sats arrive; the
+ * donor is told so before they pay, and the split stays unpaid in the note.
+ * There is deliberately no "I paid it" button: the note's figure is evidence,
+ * not testimony.
+ */
+function QrPanel({ qr, sats, locked, onSettled }) {
+  const [copied, setCopied] = useState(false)
+  const [round, setRound] = useState(0)
+  const [watching, setWatching] = useState(false)
+  const settledRef = useRef(onSettled)
+  settledRef.current = onSettled
+  const watchable = !!qr.paymentHash && /^https:\/\//i.test(qr.verifyUrl || '')
+  useEffect(() => {
+    // ⚠️ NOT ONCE THE NOTE IS GOING OUT. Its figure is fixed from that
+    // moment, so a split settling afterwards would flip the row and the
+    // header beside a note that says otherwise; the offer is withdrawn instead.
+    if (!watchable || locked) return
+    const ctrl = new AbortController()
+    setWatching(true)
+    confirmLegSettled({ paymentHash: qr.paymentHash, verifyUrl: qr.verifyUrl }, {
+      deadlineMs: round === 0 ? QR_WATCH_MS : RECHECK_MS, intervalMs: QR_POLL_MS, signal: ctrl.signal, lookup: null,
+    }).then((res) => {
+      if (ctrl.signal.aborted) return
+      setWatching(false)
+      if (res === 'settled') settledRef.current?.()
+    }).catch(() => { if (!ctrl.signal.aborted) setWatching(false) })
+    return () => ctrl.abort()
+  }, [watchable, locked, round, qr.paymentHash, qr.verifyUrl])
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(qr.invoice)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch { /* clipboard refused; the QR and the link are still there */ }
+  }
+
+  if (locked) {
+    return (
+      <p className="mt-2 ml-6 text-[10px] text-[var(--muted,#5a7488)] leading-snug">
+        Your note is going out without this split, so this invoice is withdrawn. Don’t pay it now.
+      </p>
+    )
+  }
+
+  const btn = 'flex-1 py-2 px-3 rounded-lg bg-[var(--modal-field,#ffffff)] hover:bg-[var(--modal-inset,#e6f1f9)] text-[var(--ink,#0f2733)] text-xs text-center border border-[var(--modal-line,#b9d4e6)] transition-colors'
+  return (
+    <div className="mt-2 ml-6 rounded-lg border border-[var(--modal-line,#b9d4e6)] bg-[var(--modal-inset,#e6f1f9)] p-3 space-y-2">
+      <p className="text-[11px] text-[var(--ink,#0f2733)] leading-snug">
+        Scan this with another Lightning wallet to pay this split{sats != null ? ` (${fmtSats(sats)} sats)` : ''}.
+        Retry is off for it now, so it can’t be paid twice.
+      </p>
+      <div className="flex justify-center">
+        {/* Uppercased for the QR alone: bech32 is case-insensitive and an
+            all-caps payload encodes in the denser alphanumeric mode. */}
+        <div className="p-3 bg-white rounded-lg">
+          <QRCodeSVG value={qr.invoice.toUpperCase()} size={184} />
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <button type="button" onClick={copy} className={btn}>{copied ? 'Copied' : 'Copy invoice'}</button>
+        <a href={`lightning:${qr.invoice}`} className={btn}>Open in a wallet</a>
+      </div>
+      {!watchable ? (
+        <p className="text-[10px] text-[var(--warn,#b45309)] leading-snug">
+          This recipient’s provider doesn’t let us see the payment arrive, so the split will
+          still count as unpaid here even after you pay it.
+        </p>
+      ) : watching ? (
+        <p className="text-[10px] text-[var(--muted,#5a7488)] leading-snug">
+          Watching for the payment. Pay it before you post the note and it will count.
+        </p>
+      ) : (
+        <div className="flex items-center gap-2">
+          <p className="flex-1 text-[10px] text-[var(--muted,#5a7488)] leading-snug">No payment seen yet.</p>
+          <button type="button" onClick={() => setRound((n) => n + 1)}
+            className="shrink-0 text-[11px] px-2 py-0.5 rounded-lg border border-[var(--modal-line,#b9d4e6)] bg-[var(--modal-field,#ffffff)] text-[var(--ink,#0f2733)] hover:border-[var(--brand,#00aff0)] transition-colors">
+            Check for payment
+          </button>
+        </div>
+      )}
+    </div>
+  )
 }
 
 // One per-recipient row in the progress list.
-function LegRow({ recipient, leg, onRepay, onCheck, checking, locked }) {
+function LegRow({ recipient, leg, onRepay, onCheck, checking, locked, onQr, qrBusy, retried, onQrSettled, counted }) {
   const status = leg?.status || STATUS.PENDING
   const sats = leg?.sats
   const repayable = !!onRepay && canRepayLeg(recipient, leg)
@@ -221,7 +338,33 @@ function LegRow({ recipient, leg, onRepay, onCheck, checking, locked }) {
   // CHECK_STAGES. The spinner and the label carry the row; the one escalating
   // line under the list carries the explanation, once, however many legs are
   // in flight.
-  const showError = !checking && (status === STATUS.FAILED || status === STATUS.UNCERTAIN) && !!leg?.error
+  //
+  // ⚠️ AN UNCONFIRMED SPLIT THAT COUNTS IS NOT A WARNING (Reed's call,
+  // 2026-11-11, after a split his node had paid was shown in amber and
+  // reported as unpaid in his note). The wallet did not answer in time, which
+  // is not evidence the sats stayed home; every such split measured so far
+  // had settled. So where the boost counts it (`counted`, the note rule's own
+  // answer) the row is calm: a quiet tick, one fixed line, and the wallet's
+  // words kept as the tooltip. Where nothing at all is confirmed the wallet
+  // may simply be offline, and the row keeps its warning.
+  const calm = status === STATUS.UNCERTAIN && !!counted && !checking
+  const showError = !checking && !calm && (status === STATUS.FAILED || status === STATUS.UNCERTAIN) && !!leg?.error
+  // ⚠️ THE OTHER-WALLET OFFER COMES AFTER A RETRY HAS FAILED, NOT BEFORE
+  // (Reed's framing, 2026-11-11): Retry is the cheap fix and most declines
+  // clear on it, so the heavier path stays out of the way until it has not.
+  // A split that pays a node directly has no invoice anybody could scan, and
+  // says so once rather than leaving the row with a Retry that keeps failing.
+  //
+  // ⚠️ AND ONLY WHERE THE CONNECTED WALLET DECLINED AN INVOICE IT WAS HANDED
+  // (2026-11-11, the day the offer shipped). `noInvoice` marks a split that
+  // failed before any invoice was issued: the recipient's provider refused,
+  // or could not be reached. A second wallet asking that server gets the same
+  // answer, so the button fetched, was refused, wrote the row's existing
+  // sentence back and changed nothing on screen. Reed pressed it and saw
+  // exactly that. The row says why there is no offer instead.
+  const stuck = status === STATUS.FAILED && !leg?.qr && !!retried && !locked && !checking
+  const invoiceable = recipient?.type === 'lnaddress'
+  const canQr = stuck && !!onQr && invoiceable && !leg?.noInvoice
   const spinner = (
     <svg className="animate-spin w-3.5 h-3.5 text-[var(--brand-d,#068ace)]" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -235,7 +378,11 @@ function LegRow({ recipient, leg, onRepay, onCheck, checking, locked }) {
   let icon = <span className="inline-block w-3 h-3 rounded-full bg-[var(--modal-inset,#e6f1f9)] ring-1 ring-[var(--modal-line,#b9d4e6)]" aria-hidden="true" />
   if (status === STATUS.PAID) icon = <span className="text-[var(--ok,#0b7a4b)]" aria-hidden="true">✓</span>
   else if (status === STATUS.FAILED) icon = <span className="text-[var(--danger,#b3261e)]" aria-hidden="true">✕</span>
-  else if (status === STATUS.UNCERTAIN) icon = checking ? spinner : <span className="text-[var(--warn,#b45309)]" aria-hidden="true">!</span>
+  else if (status === STATUS.UNCERTAIN) {
+    icon = checking ? spinner
+      : calm ? <span className="text-[var(--muted,#5a7488)]" aria-hidden="true">✓</span>
+        : <span className="text-[var(--warn,#b45309)]" aria-hidden="true">!</span>
+  }
   else if (status === WORKING) icon = spinner
 
   // One button slot. `locked` keeps it on screen but inert once the note has
@@ -248,7 +395,7 @@ function LegRow({ recipient, leg, onRepay, onCheck, checking, locked }) {
     action = <span className="shrink-0 text-[11px] px-2 py-0.5 text-[var(--brand-d,#068ace)]">Checking…</span>
   } else if (repayable || checkable) {
     action = (
-      <button onClick={locked ? undefined : (repayable ? onRepay : onCheck)} disabled={locked}
+      <button onClick={locked || qrBusy ? undefined : (repayable ? onRepay : onCheck)} disabled={locked || !!qrBusy}
         title={locked ? 'Your note is already published, so a change here couldn’t be reflected in it.' : undefined}
         className="shrink-0 text-[11px] px-2 py-0.5 rounded-lg border border-[var(--modal-line,#b9d4e6)] text-[var(--ink,#0f2733)] hover:border-[var(--brand,#00aff0)] hover:text-[var(--brand-dd,#0a6fa8)] disabled:opacity-40 disabled:hover:border-[var(--modal-line,#b9d4e6)] disabled:hover:text-[var(--muted,#5a7488)] disabled:cursor-not-allowed transition-colors">
         {repayable ? 'Retry' : 'Check again'}
@@ -280,6 +427,39 @@ function LegRow({ recipient, leg, onRepay, onCheck, checking, locked }) {
         <p className={`mt-1 ml-6 text-[11px] leading-snug ${status === STATUS.UNCERTAIN ? 'text-[var(--warn,#b45309)]' : 'text-[var(--danger,#b3261e)]'}`}>
           {leg.error}
         </p>
+      )}
+      {calm && (
+        <p className="mt-1 ml-6 text-[11px] leading-snug text-[var(--muted,#5a7488)]" title={leg?.error || undefined}>
+          Sent. Your wallet has not confirmed this one yet; it still counts toward your boost.
+        </p>
+      )}
+      {canQr && (
+        <button type="button" onClick={qrBusy ? undefined : onQr} disabled={!!qrBusy}
+          className="mt-1.5 ml-6 text-[11px] px-2 py-0.5 rounded-lg border border-[var(--modal-line,#b9d4e6)] text-[var(--ink,#0f2733)] hover:border-[var(--brand,#00aff0)] hover:text-[var(--brand-dd,#0a6fa8)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+          {qrBusy ? 'Getting an invoice…' : 'Pay this split from another wallet'}
+        </button>
+      )}
+      {/* ⚠️ A FAILED INVOICE REQUEST GETS ITS OWN LINE, NEVER THE ROW'S
+          (`qrError`, not `error`). Written over the row's sentence, a request
+          that failed for the reason already printed left the screen exactly
+          as it was. */}
+      {canQr && !qrBusy && !!leg?.qrError && (
+        <p className="mt-1 ml-6 text-[11px] leading-snug text-[var(--danger,#b3261e)]" role="status">
+          Couldn’t get an invoice for another wallet. {leg.qrError}
+        </p>
+      )}
+      {stuck && !canQr && !!onQr && !invoiceable && (
+        <p className="mt-1 ml-6 text-[10px] text-[var(--muted,#5a7488)] leading-snug">
+          This split pays a Lightning node directly, so there is no invoice another wallet could pay.
+        </p>
+      )}
+      {stuck && !canQr && !!onQr && invoiceable && (
+        <p className="mt-1 ml-6 text-[10px] text-[var(--muted,#5a7488)] leading-snug">
+          The recipient’s side would not issue an invoice, so another wallet would get the same answer.
+        </p>
+      )}
+      {leg?.qr && status === STATUS.FAILED && (
+        <QrPanel qr={leg.qr} sats={sats} locked={locked} onSettled={onQrSettled} />
       )}
     </li>
   )
@@ -445,6 +625,18 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
   const canShareToFeed = noteRoute === 'donor'
   const [shareState, setShareState] = useState('idle')   // 'idle' | 'signing' | 'shared' | 'error'
   const [shareError, setShareError] = useState('')
+  // Which total a PARTIAL boost's note carries, when the donor is allowed the
+  // choice (`fullCreditOk` below): the amount they typed, or what landed.
+  // The typed amount is the default, Reed's call.
+  const [noteFigure, setNoteFigure] = useState('intended')   // 'intended' | 'paid'
+  // What the note that went out actually said, frozen at the publish. The
+  // "Posted" line reads this and never live leg state, so a split that
+  // settles afterwards cannot rewrite an account of an event nobody can edit.
+  const [postedFigure, setPostedFigure] = useState(null)
+  // Per-leg: a Retry was pressed and the leg is still FAILED (the gate on
+  // the other-wallet offer), and an invoice for that offer is being fetched.
+  const [retried, setRetried] = useState({})
+  const [qrBusy, setQrBusy] = useState({})
 
   const [phase, setPhase] = useState('form')       // 'form' | 'sending' | 'done'
   const [legs, setLegs] = useState([])             // per-recipient live state (aligned to recipients)
@@ -512,6 +704,47 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
   const paidCount = legs.filter((l) => l?.status === STATUS.PAID).length
   const activeCount = visibleLegs.length
   const paidSats = legs.reduce((a, l) => a + (l?.status === STATUS.PAID ? (l.sats || 0) : 0), 0)
+  // The same, less any split paid from another wallet by QR (`viaQr`): only
+  // the connected wallet's own confirmations are evidence that it was alive
+  // for the splits it never answered for. See resolveNoteFigure.
+  const walletPaidSats = legs.reduce((a, l) => a + (l?.status === STATUS.PAID && !l.viaQr ? (l.sats || 0) : 0), 0)
+  // The splits the wallet was handed and never answered for. Not failures:
+  // see the rule's own note in externalBoostagram.js.
+  const unconfirmedCount = visibleLegs.filter(({ leg }) => leg?.status === STATUS.UNCERTAIN).length
+  const unconfirmedSats = visibleLegs.reduce((a, { leg }) => a + (leg?.status === STATUS.UNCERTAIN ? (leg.sats || 0) : 0), 0)
+  // ⚠️ THE NOTE SAYS ONE NUMBER, AND ABOVE THE FLOOR THE DONOR MAY MAKE IT THE
+  // ONE THEY TYPED (Reed's calls, 2026-11-11). `intendedSats` is every leg
+  // this boost attempted; distributeSats hands the remainder back, so it is
+  // exactly the typed amount less any skipped leg. With 90% of it landed the
+  // note may carry the whole of it, in the text, the `amount` tag and the
+  // quoted receipt alike, and then carries NO "N of M splits paid" line: a
+  // full figure beside a shortfall line is two claims. Below the floor, or on
+  // the donor's own choice, it carries what settled and the line, as it has
+  // since 2026-08-19. There is deliberately no second tag for the other
+  // number. A donation is one leg, so it can never be partial; the guard is
+  // for the reader.
+  //
+  // ⚠️ ONLY A SPLIT THAT FAILED REDUCES THE FIGURE (Reed's call, 2026-11-11,
+  // the same day: "we better be damn sure that the thing failed if we're
+  // going to mark it as failed"). An UNCERTAIN leg is handed to the rule as
+  // unconfirmed, and the rule counts it as landed beside at least one
+  // confirmed split. `landedSats` and `landedCount` are its answers, and
+  // every line on the done screen that says how much of the boost went
+  // through reads those two, never `paidSats` / `paidCount`, which stay the
+  // confirmed figures (the gate on having a note at all, and the confetti).
+  const intendedSats = visibleLegs.reduce((a, { leg }) => a + (leg?.sats || 0), 0)
+  const credit = resolveNoteFigure({
+    paidSats, intendedSats, legsPaid: paidCount, legsTotal: activeCount,
+    unconfirmedSats, legsUnconfirmed: unconfirmedCount, walletPaidSats, donation, choice: noteFigure,
+  })
+  const fullCreditOk = credit.eligible
+  const noteSats = credit.sats
+  const noteShort = credit.short
+  const landedSats = credit.landedSats
+  const landedCount = credit.landedLegs
+  // Read off the rule's answer rather than restated, so the rows and the
+  // note cannot disagree about whether an unconfirmed split counts.
+  const unconfirmedCounted = landedCount > paidCount
 
   /**
    * ⚠️ DECLARED ABOVE ITS FIRST READ, AND THAT IS THE WHOLE POINT OF WHERE IT
@@ -573,8 +806,31 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
    */
   const legsRef = useRef(legs)
   legsRef.current = legs
+  // The boost's own identity, set once when the payment starts and handed to
+  // every later request for one of its legs (a Retry, an other-wallet
+  // invoice), so the recipient's Helipad files it under the same boost at the
+  // same total. Until 2026-11-11 a Retry sent a fresh id and the LEG's amount
+  // as the total, and a podcaster saw a second, smaller boost at 100%.
+  const boostRef = useRef(null)
+  // ⚠️ ONE WAY TO PAY A SPLIT AT A TIME, HELD SYNCHRONOUSLY. State lags a
+  // click by a render, and two presses inside that render (Retry, then the
+  // other-wallet button, or the reverse) would otherwise both proceed: one
+  // payment in flight from the connected wallet and one invoice on screen for
+  // another. `repayingRef` holds a leg for the length of a Retry; `qrLockRef`
+  // holds it from the invoice request on, and for good once one is shown.
+  const repayingRef = useRef(new Set())
+  const qrLockRef = useRef(new Set())
   const [checking, setChecking] = useState({})
   const stillChecking = Object.values(checking).some(Boolean)
+  // ⚠️ TRUE ONCE THE DONE-PHASE WATCHER HAS HAD ITS TURN, and the reason it is
+  // not simply `!stillChecking`: the watcher's `setChecking` and the
+  // auto-publish effect run in the same commit, so on the first render of the
+  // done phase `stillChecking` is still false for a boost the watcher is about
+  // to check. That was harmless while only an all-confirmed boost published
+  // itself (it has nothing to watch). Now that an unconfirmed split counts,
+  // the note would go out before the ninety seconds that might confirm it or
+  // show it failed.
+  const [watchSettled, setWatchSettled] = useState(false)
 
   // Seconds since the current watch began, which is the only input the stage
   // copy needs. Keyed on `stillChecking` rather than on the checking map, so a
@@ -611,12 +867,12 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
     const targets = recipients
       .map((r, i) => ({ r, i }))
       .filter(({ r, i }) => canCheckLeg(r, legsRef.current[i]))
-    if (targets.length === 0) return
+    if (targets.length === 0) { setWatchSettled(true); return }
     const ctrl = new AbortController()
     setChecking(Object.fromEntries(targets.map(({ i }) => [i, true])))
-    for (const { i } of targets) {
+    const watches = targets.map(({ i }) => {
       const leg = legsRef.current[i]
-      confirmLegSettled(leg, {
+      return confirmLegSettled(leg, {
         deadlineMs: WATCH_MS, intervalMs: 3000, signal: ctrl.signal,
       }).then((res) => {
         if (ctrl.signal.aborted || cancelledRef.current) return
@@ -626,7 +882,11 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
         if (ctrl.signal.aborted || cancelledRef.current) return
         setChecking((prev) => ({ ...prev, [i]: false }))
       })
-    }
+    })
+    Promise.all(watches).then(() => {
+      if (ctrl.signal.aborted || cancelledRef.current) return
+      setWatchSettled(true)
+    })
     return () => ctrl.abort()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase])
@@ -690,26 +950,40 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
    * silence would leave them believing it worked. ⚠️ EITHER WAY THE SATS ARE
    * ALREADY GONE, which is why a failure offers another attempt at the NOTE
    * and never anything that resembles unwinding a payment.
+   *
+   * ⚠️ SINCE 2026-11-11 THE FIGURE IS `noteSats`, WHICH IS STILL DERIVED FROM
+   * LIVE LEG STATE: what settled, or, with 90% of the boost landed and the
+   * donor's say-so, everything the boost attempted. The receipt, the text and
+   * the `amount` tag take the same number, so no app reading any one of them
+   * disagrees with another. See the derivation beside `paidSats`.
    */
+  // The figure as of the latest render, for handleShare's last look before it
+  // publishes: a background watch can still move a split while the signer
+  // prompt is open, and the figure frozen at the press must not outlive that.
+  const figureNowRef = useRef(null)
+  figureNowRef.current = { sats: noteSats, short: noteShort, paid: landedCount, total: activeCount }
+
   async function handleShare() {
     if (noteRoute === 'none' || shareState === 'signing' || shareState === 'shared') return
     if (paidSats <= 0) return
+    const figure = { sats: noteSats, short: noteShort, paid: landedCount, total: activeCount }
     setShareState('signing')
     setShareError('')
     try {
-      // ⚠️ THE RECEIPT FIRST, FOR THE SATS THAT SETTLED, ON THE SAME ROUTE AS
+      // ⚠️ THE RECEIPT FIRST, FOR THE NOTE'S OWN FIGURE, ON THE SAME ROUTE AS
       // THE NOTE: the donor signs its 9734 where the donor signs the note, the
       // bot authors it where the bot signs the note. Published before the note
       // so the quote points at something, and null on any failure, in which
       // case the note quotes nothing (summaryReceipt.js). A donation skips it.
       const minted = donation ? null : await mintSummaryReceipt({
-        paidSats, refs: receiptRefs(), as: noteRoute === 'donor' ? 'self' : 'site', publish: true,
+        paidSats: figure.sats, refs: receiptRefs(), as: noteRoute === 'donor' ? 'self' : 'site', publish: true,
       })
       if (cancelledRef.current) return
       const template = noteTemplate({
-        paidSats,
-        legsPaid: paidCount,
-        legsTotal: activeCount,
+        paidSats: figure.sats,
+        // Equal counts are what make the builder leave the shortfall line out.
+        legsPaid: figure.short ? figure.paid : figure.total,
+        legsTotal: figure.total,
         message: expandedMessage,
         receipt: minted?.quote || null,
         // ⚠️ DONOR ROUTE ONLY. The oracle refuses `p` (see mentionTags in
@@ -742,12 +1016,25 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
       const signed = noteRoute === 'bot'
         ? await signKindOneWithSite(template)
         : await signKindOneShareWithUser(template)
+      if (cancelledRef.current) return
+      // ⚠️ THE LAST LOOK. The rows are locked while this runs, but the
+      // done-phase watch is not, and a split it learned FAILED lowers the
+      // figure. A note that would now say more than landed is not published;
+      // the donor posts again on the figure the screen shows. A figure that
+      // only rose is published as signed: it under-reports, never over.
+      const now = figureNowRef.current
+      if (now && (now.sats < figure.sats || (now.short && !figure.short))) {
+        setShareError('A split changed while the note was being signed. Check the figure and post again.')
+        setShareState('error')
+        return
+      }
       const published = await publishSignedKindOne(signed)
       // ⚠️ NOT AWAITED AND NOT ON THE SHARE STATE. The note is on Nostr; this
       // only decides whether it is on the site's feeds now or after the
       // collector's next cycle, and it never fails visibly (siteIngest.js).
       void ingestBoostNote(signed, published, episode)
       if (cancelledRef.current) return
+      setPostedFigure(figure)
       setShareState('shared')
     } catch (e) {
       console.warn('[lb] external boost share note failed', e?.message || e)
@@ -818,11 +1105,20 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
    * not having counted.
    *
    * ⚠️ IT STILL FIRES ONLY WHERE THE PRESS COULD NOT HAVE CHANGED THE ANSWER:
-   * every active leg PAID and nothing still being checked. A shortfall or an
-   * UNCERTAIN leg is exactly the state in which the donor may still retry and
-   * change what the note should say, so those get the button, and the screen
-   * says which of the two it is. That is the "reports what settled" rule with
-   * the press removed from every case where it was ceremony.
+   * no split FAILED, the watcher has had its turn and nothing is still being
+   * checked. A failed split is exactly the state in which the donor may still
+   * retry and change what the note should say, so that gets the button. That
+   * is the "reports what settled" rule with the press removed from every case
+   * where it was ceremony.
+   *
+   * ⚠️ AN UNCERTAIN LEG NO LONGER HOLDS THE NOTE BACK (Reed's call,
+   * 2026-11-11). It can never be retried from here, so the press beside it
+   * changed nothing; and holding the note, then publishing it short, told the
+   * network a split had not been paid when the donor's own node showed it
+   * had. Beside at least one confirmed split it counts (`landedCount`), and a
+   * boost with nothing failed goes out at the amount typed once the
+   * ninety-second watch is over. With nothing confirmed at all the wallet may
+   * be offline, `landedCount` stays at zero, and nothing publishes.
    *
    * The one thing this costs is that a NIP-07 or NIP-46 signer prompt now
    * arrives without a press behind it. It is not unannounced — the donor asked
@@ -838,16 +1134,17 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
   useEffect(() => {
     if (phase !== 'done' || noteRoute === 'none') return
     if (autoSharedRef.current || shareState !== 'idle') return
-    if (stillChecking || paidSats <= 0) return
-    if (activeCount === 0 || paidCount !== activeCount) return
+    if (!watchSettled || stillChecking || paidSats <= 0) return
+    if (activeCount === 0 || landedCount !== activeCount) return
     autoSharedRef.current = true
     // ⚠️ THE IDENTITY IS RE-CHECKED HERE, NOT ASSUMED. A pre-signed note claims
-    // the full typed amount with no shortfall line, which is true only if every
-    // attempted leg paid. `paidCount === activeCount` is already established
-    // above; this adds the figure itself, because a leg that paid a different
-    // amount than it was allocated would satisfy the count and not the total.
+    // the full typed amount with no shortfall line, which is true only if no
+    // attempted leg failed. `landedCount === activeCount` is already
+    // established above; this adds the figure itself, because a leg that paid
+    // a different amount than it was allocated would satisfy the count and not
+    // the total.
     const pre = presignedRef.current
-    if (pre && pre.sats === paidSats && pre.legs === activeCount) {
+    if (pre && pre.sats === landedSats && pre.legs === activeCount) {
       publishPresigned(pre)
       return
     }
@@ -856,7 +1153,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
     presignedRef.current = null
     handleShare()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, noteRoute, stillChecking, paidCount, activeCount, paidSats, shareState])
+  }, [phase, noteRoute, watchSettled, stillChecking, landedCount, activeCount, landedSats, paidSats, shareState])
 
   /**
    * ⚠️ THE WALLET GATE LIVES HERE NOW, NOT IN FRONT OF THE MODAL (D13). It ran
@@ -971,10 +1268,12 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
     // Seed one pending row per recipient so the list renders immediately.
     setLegs(recipients.map(() => ({ status: STATUS.PENDING })))
     setPhase('sending')
+    boostRef.current = { uuid: newBoostUuid(), totalSats: sats, totalWeight }
 
     let result
     try {
       result = await payExternalBoost({
+        boost: boostRef.current,
         recipients,
         totalWeight,
         totalSats: sats,
@@ -1032,11 +1331,24 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
     const leg = legs[index]
     if (!recipient || !leg) return
     if (!canRepayLeg(recipient, leg)) return
-    if (shareState === 'shared') return
-    if (!wallet.isReady()) { updateLeg(index, { status: STATUS.FAILED, error: 'Wallet not connected' }); return }
-    updateLeg(index, { status: STATUS.PAYING, error: null })
+    if (shareState === 'shared' || shareState === 'signing') return
+    // See repayingRef: never while a Retry of this leg is already running, and
+    // never once an invoice for it is, or is about to be, in another wallet.
+    if (repayingRef.current.has(index) || qrLockRef.current.has(index) || legsRef.current[index]?.qr) return
+    if (!wallet.isReady()) {
+      updateLeg(index, { status: STATUS.FAILED, error: 'Wallet not connected' })
+      setRetried((p) => ({ ...p, [index]: true }))
+      return
+    }
+    repayingRef.current.add(index)
+    // Where this attempt ended, read off the library's own reports; a second
+    // clean decline is what opens the other-wallet offer on the row.
+    let last = null
+    let lastLeg = leg
+    updateLeg(index, { status: STATUS.PAYING, error: null, qrError: null })
     try {
-      const res = await payExternalBoost({
+      await payExternalBoost({
+        boost: boostRef.current,
         recipients: [recipient],
         totalWeight: recipient.splitWeight || 1,
         totalSats: leg.sats || 0,
@@ -1052,7 +1364,17 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
         // retry re-fetches it live; one that failed at the payment reuses the
         // metadata it already had. Both are what the retry wants.
         lnurlCache,
-        onLeg: (_i, ls) => updateLeg(index, { ...ls, sats: leg.sats }),
+        onLeg: (_i, ls) => {
+          last = ls?.status || last
+          lastLeg = { ...lastLeg, ...ls, sats: leg.sats }
+          updateLeg(index, { ...ls, sats: leg.sats })
+          // ⚠️ IN THE SAME TICK AS THE STATUS, so the two land in one render.
+          // An unconfirmed split counts toward the note now, and a Retry that
+          // ends unconfirmed can be the last thing the note was waiting on;
+          // marked a moment later, the note would go out before the watch
+          // below had started.
+          if (ls?.status === STATUS.UNCERTAIN) setChecking((p) => ({ ...p, [index]: true }))
+        },
       })
     } catch (e) {
       // ⚠️ Never downgrade a leg that already reported in. payExternalBoost
@@ -1061,8 +1383,95 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
       // turning an UNCERTAIN leg into a FAILED one hands it back a re-pay
       // button it must not have.
       const cur = legsRef.current[index]?.status
-      if (cur === STATUS.PAID || cur === STATUS.UNCERTAIN) return
-      updateLeg(index, { status: STATUS.FAILED, error: e?.message || 'Retry failed' })
+      if (cur === STATUS.PAID) {
+        if (!cancelledRef.current) setChecking((p) => ({ ...p, [index]: false }))
+        last = STATUS.PAID
+      } else if (cur === STATUS.UNCERTAIN) {
+        // Left unconfirmed: it gets the watch below, which clears the check.
+        last = STATUS.UNCERTAIN
+      } else {
+        updateLeg(index, { status: STATUS.FAILED, error: e?.message || 'Retry failed' })
+        last = STATUS.FAILED
+      }
+    } finally {
+      repayingRef.current.delete(index)
+    }
+    if (last === STATUS.FAILED && !cancelledRef.current) setRetried((p) => ({ ...p, [index]: true }))
+    // A retried split that the wallet did not answer for gets the watch the
+    // first pass's splits get (the done-phase effect runs once, on the phase).
+    // It looks and never pays; a split with nothing to ask is released at once.
+    if (last === STATUS.UNCERTAIN && !cancelledRef.current) {
+      let res = null
+      try {
+        if (legIsCheckable(lastLeg)) res = await confirmLegSettled(lastLeg, { deadlineMs: WATCH_MS, intervalMs: 3000 })
+      } catch { /* learned nothing; the split stays unconfirmed */ }
+      if (cancelledRef.current) return
+      if (res) applyCheck(updateLeg, index, res)
+      // The wallet's explicit `failed` makes the split FAILED again, and a
+      // Retry that ends there opens the other-wallet offer like any other.
+      if (res === 'failed') setRetried((p) => ({ ...p, [index]: true }))
+      setChecking((p) => ({ ...p, [index]: false }))
+    }
+  }
+
+  /**
+   * Ask a failed split's recipient for a fresh invoice and put it on screen
+   * for another wallet (QrPanel). Pays nothing itself.
+   *
+   * ⚠️ `FAILED` ONLY, the same line Retry is held to and for the same reason:
+   * it is the one status that says the connected wallet sent nothing. The
+   * status is read off `legsRef`, not the render's `legs`, so a leg that
+   * moved since the last paint is judged on where it is now.
+   *
+   * ⚠️ FROM HERE ON THE LEG CAN NEVER BE RETRIED. The lock is taken before
+   * the request and released only if no invoice came back; once one is on
+   * screen `leg.qr` closes `canRepayLeg` for good, because the page cannot
+   * know whether a wallet it has never seen has paid it.
+   *
+   * The invoice is built by the same code a first attempt uses, with the
+   * boost's own id and total (`boostRef`), so the recipient's Helipad gets
+   * the message and files the split under the boost it belongs to. A split
+   * that reached keysend on the first pass is asked for an invoice here: a
+   * keysend has no invoice, and the address is still the recipient's own.
+   */
+  async function handleQr(index) {
+    const recipient = recipients[index]
+    const leg = legsRef.current[index]
+    if (!recipient || !leg) return
+    if (recipient.type !== 'lnaddress') return
+    if (leg.status !== STATUS.FAILED || leg.qr) return
+    if (shareState === 'shared' || shareState === 'signing') return
+    if (repayingRef.current.has(index) || qrLockRef.current.has(index)) return
+    qrLockRef.current.add(index)
+    setQrBusy((p) => ({ ...p, [index]: true }))
+    updateLeg(index, { qrError: null })
+    try {
+      const got = await requestLegInvoice({
+        recipient,
+        sats: leg.sats || 0,
+        message: expandedMessage,
+        senderName: wireSenderName,
+        senderPubkey: wireSenderPubkey,
+        meta: {
+          showTitle: episode?.showTitle, episodeTitle: episode?.episodeTitle,
+          podcastGuid: episode?.podcastGuid, itemGuid: episode?.itemGuid, feedUrl: episode?.feedUrl, boostLink: episode?.bmbUrl,
+        },
+        donation,
+        lnurlCache,
+        boost: boostRef.current,
+      })
+      // The string is about to become a QR code and a `lightning:` link, so
+      // it is held to an invoice's alphabet here as well as in the fetch.
+      if (!/^ln[a-z0-9]+$/i.test(got?.invoice || '')) throw new Error('That didn’t come back as a Lightning invoice.')
+      updateLeg(index, { qr: { invoice: got.invoice, verifyUrl: got.verifyUrl, paymentHash: got.paymentHash }, error: null, qrError: null })
+    } catch (e) {
+      qrLockRef.current.delete(index)
+      // ⚠️ `qrError`, NOT `error`: the row's own sentence is the connected
+      // wallet's reason and stays; this one is drawn under the button, so a
+      // press that got nowhere always changes the screen.
+      updateLeg(index, { qrError: e?.message || 'No invoice came back.' })
+    } finally {
+      if (!cancelledRef.current) setQrBusy((p) => ({ ...p, [index]: false }))
     }
   }
 
@@ -1073,7 +1482,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
     const recipient = recipients[index]
     const leg = legs[index]
     if (!canCheckLeg(recipient, leg)) return
-    if (shareState === 'shared' || checking[index]) return
+    if (shareState === 'shared' || shareState === 'signing' || checking[index]) return
     setChecking((prev) => ({ ...prev, [index]: true }))
     try {
       const res = await confirmLegSettled(leg, { deadlineMs: RECHECK_MS, intervalMs: 3000 })
@@ -1103,6 +1512,11 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
       }
   const headerTitle = copy.header
   const allPaid = phase === 'done' && activeCount > 0 && paidCount === activeCount
+  // Nothing failed, and what is not confirmed counts: a success, said as one
+  // (see the calm row in LegRow). "Sent" rather than "delivered", because
+  // delivered is the word for a boost every split of which was seen to land.
+  const allSent = phase === 'done' && !allPaid && watchSettled && !stillChecking
+    && activeCount > 0 && landedCount === activeCount
 
   // ⚠️ THE SUMMARY MUST NOT TELL THE DONOR TO RE-SEND A LEG WE CANNOT PROVE
   // UNPAID. It used to say "Retry any that didn't", which on an unconfirmed
@@ -1110,19 +1524,33 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
   // leg still being checked is not a shortfall yet, a re-payable leg is one
   // the wallet declined, and an unconfirmed one points at the wallet.
   const repayableCount = visibleLegs.filter(({ r, leg }) => canRepayLeg(r, leg)).length
-  const unconfirmedCount = visibleLegs.filter(({ leg }) => leg?.status === STATUS.UNCERTAIN).length
+  const qrOpenCount = visibleLegs.filter(({ leg }) => leg?.status === STATUS.FAILED && !!leg?.qr).length
+  // Failed on the recipient's side with nothing the donor can press; the row
+  // carries the reason, and the line must not send them to their wallet.
+  const unpayableCount = visibleLegs.filter(({ leg }) => leg?.status === STATUS.FAILED && !leg?.qr && !!leg?.unpayable).length
   let tail
+  let onlyUnpayable = false
   // ⚠️ Calm while the watcher runs. This line is the loudest thing on the
   // screen, and a leg that is merely slow is not a shortfall yet. See
   // CHECK_STAGES.
   const checkingCount = Object.values(checking).filter(Boolean).length
   if (stillChecking) tail = checkingCount === 1 ? 'Still confirming the last one.' : 'Still confirming the rest.'
   else if (repayableCount > 0) tail = 'Retry any that were declined.'
-  else if (unconfirmedCount > 0) tail = 'The rest are unconfirmed — check your wallet rather than re-sending.'
+  else if (qrOpenCount > 0) tail = 'Pay the open invoice below to finish it.'
+  else if (unconfirmedCount > 0) tail = 'Check your wallet before sending anything again; this may already have gone through.'
+  else if (unpayableCount > 0) {
+    onlyUnpayable = true
+    tail = unpayableCount === 1 ? 'One recipient could not take the payment; the reason is below.' : 'Some recipients could not take the payment; the reasons are below.'
+  }
   else tail = 'Check your wallet for the rest.'
-  const summaryLine = paidCount > 0
-    ? `${paidCount} of ${activeCount} legs sent. ${tail}`
-    : `Nothing confirmed yet. ${tail}`
+  // While the watcher runs the count is the confirmed one, since the splits
+  // being confirmed are the subject of the sentence. Afterwards it is the
+  // landed one, so the only splits the line counts against the boost are the
+  // ones that failed.
+  let summaryLine
+  if (paidCount === 0) summaryLine = onlyUnpayable ? `Nothing was sent. ${tail}` : `Nothing confirmed yet. ${tail}`
+  else if (stillChecking) summaryLine = `${paidCount} of ${activeCount} splits confirmed. ${tail}`
+  else summaryLine = `${landedCount} of ${activeCount} splits sent. ${tail}`
 
   return (
     <>
@@ -1371,7 +1799,8 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
                   <p className="text-[11px] text-[var(--muted,#5a7488)] leading-snug">{payNote}</p>
                 )}
                 {allPaid && <p className="text-base font-semibold text-[var(--ok,#0b7a4b)]">⚡ Boost delivered!</p>}
-                {phase === 'done' && !allPaid && (
+                {allSent && <p className="text-base font-semibold text-[var(--ok,#0b7a4b)]">⚡ Boost sent!</p>}
+                {phase === 'done' && !allPaid && !allSent && (
                   <p className={`text-sm font-semibold ${stillChecking ? 'text-[var(--brand-d,#068ace)]' : 'text-[var(--warn,#b45309)]'}`}>
                     {summaryLine}
                   </p>
@@ -1390,7 +1819,12 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
                       onRepay={phase === 'done' ? () => handleRepay(realIndex) : null}
                       onCheck={phase === 'done' ? () => handleCheck(realIndex) : null}
                       checking={!!checking[realIndex]}
-                      locked={shareState === 'shared'} />
+                      locked={shareState === 'shared' || shareState === 'signing'}
+                      onQr={phase === 'done' ? () => handleQr(realIndex) : null}
+                      qrBusy={!!qrBusy[realIndex]}
+                      retried={!!retried[realIndex]}
+                      counted={unconfirmedCounted}
+                      onQrSettled={() => updateLeg(realIndex, { status: STATUS.PAID, viaQr: true, error: null, paymentHash: leg?.qr?.paymentHash || null, verifyUrl: leg?.qr?.verifyUrl || null })} />
                   })}
                 </ul>
                 {/* The share control. Withheld until something actually paid,
@@ -1407,7 +1841,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
                 {phase === 'done' && stillChecking && (
                   <p className="text-[11px] text-[var(--muted,#5a7488)] leading-snug">
                     {checkStageText(checkSeconds)}
-                    {noteRoute !== 'none' && ' The Nostr note waits for this, so it reports what actually landed.'}
+                    {noteRoute !== 'none' && ' The Nostr note waits for this.'}
                   </p>
                 )}
                 {phase === 'done' && noteRoute !== 'none' && paidSats > 0 && !stillChecking && (
@@ -1415,8 +1849,8 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
                     {shareState === 'shared' ? (
                       <p className="text-xs text-[var(--ok,#0b7a4b)] leading-snug">
                         {noteRoute === 'bot'
-                          ? `\u2713 Posted to Nostr by OnlyBoosts${paidCount < activeCount ? ` (${fmtSats(paidSats)} sats, ${paidCount} of ${activeCount} splits)` : ''}.`
-                          : `\u2713 Posted to your feed${paidCount < activeCount ? ` (${fmtSats(paidSats)} sats, ${paidCount} of ${activeCount} splits)` : ''}.`}
+                          ? `\u2713 Posted to Nostr by OnlyBoosts${postedFigure?.short ? ` (${fmtSats(postedFigure.sats)} sats, ${postedFigure.paid} of ${postedFigure.total} splits)` : ''}.`
+                          : `\u2713 Posted to your feed${postedFigure?.short ? ` (${fmtSats(postedFigure.sats)} sats, ${postedFigure.paid} of ${postedFigure.total} splits)` : ''}.`}
                         {noteRoute === 'bot' && (
                           <span className="block text-[10px] text-[var(--muted,#5a7488)] mt-1">
                             Your boost is in the OnlyBoosts feeds and totals.
@@ -1461,26 +1895,53 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
                           </span>
                         </p>
                         {/* ⚠️ WHY IT IS ASKING AT ALL, ON EITHER ROUTE. A clean
-                            boost publishes itself, so reaching this branch means
-                            a leg fell short or went unconfirmed — exactly the
-                            state in which a retry would change what the note
-                            should say. Saying so is what makes the button read
-                            as a decision rather than a step appearing at
-                            random, which is the whole reason the press was
-                            removed from the clean case. */}
+                            boost publishes itself, and so does one whose only
+                            open splits are unconfirmed, so reaching this branch
+                            means a split FAILED: exactly the state in which a
+                            retry would change what the note should say. Saying
+                            so is what makes the button read as a decision
+                            rather than a step appearing at random, which is the
+                            whole reason the press was removed from the clean
+                            case. */}
                         {shareState !== 'error' && (
                           <p className="text-[10px] text-[var(--warn,#b45309)] leading-snug">
-                            Waiting on you because not every split landed. Retry what you can first;
-                            the note reports whatever has settled when you press.
+                            {fullCreditOk
+                              ? 'Waiting on you because not every split landed. Most of your boost did, so the note can go out at the full amount. Retry what you can first.'
+                              : 'Waiting on you because not every split landed. Retry what you can first; the note reports whatever has gone through when you press.'}
                           </p>
+                        )}
+                        {/* ⚠️ THE ONE PLACE THE DONOR IS ASKED WHICH NUMBER, and
+                            only above the 90% floor (Reed's calls, 2026-11-11).
+                            A clean boost has one number and never reaches this
+                            branch; below the floor the note says what settled.
+                            The typed amount leads and is the default. */}
+                        {fullCreditOk && (
+                          <div role="radiogroup" aria-label="Amount on the note" className="grid grid-cols-2 gap-2">
+                            {[
+                              { key: 'intended', sats: intendedSats, sub: 'Your full boost. Nearly all of it landed, so it counts in full.' },
+                              { key: 'paid', sats: landedSats, sub: `What has landed so far, shown as ${landedCount} of ${activeCount} splits paid.` },
+                            ].map((o) => {
+                              const on = noteFigure === o.key
+                              return (
+                                <button key={o.key} type="button" role="radio" aria-checked={on}
+                                  onClick={() => setNoteFigure(o.key)} disabled={shareState === 'signing'}
+                                  className={`text-left rounded-lg border px-2.5 py-2 transition-colors ${on
+                                    ? 'border-[var(--brand-dd,#0a6fa8)] bg-[var(--modal-inset,#e6f1f9)]'
+                                    : 'border-[var(--modal-line,#b9d4e6)] bg-[var(--modal-field,#ffffff)] hover:border-[var(--brand,#00aff0)]'}`}>
+                                  <span className="block text-xs font-medium tabular-nums text-[var(--ink,#0f2733)]">{fmtSats(o.sats)} sats</span>
+                                  <span className="block text-[10px] text-[var(--muted,#5a7488)] leading-snug mt-0.5">{o.sub}</span>
+                                </button>
+                              )
+                            })}
+                          </div>
                         )}
                         {/* Naming the figure the note will carry, before it is
                             signed. On a partial the number is not the one the
                             donor typed, and finding that out by reading their
                             own published note is the wrong order. */}
                         <p className="text-[10px] text-[var(--muted,#5a7488)] leading-snug">
-                          The note will say <span className="tabular-nums text-[var(--muted,#5a7488)]">{fmtSats(paidSats)} sats</span>
-                          {paidCount < activeCount && <> and <span className="text-[var(--muted,#5a7488)]">{paidCount} of {activeCount} splits paid</span></>}
+                          The note will say <span className="tabular-nums text-[var(--muted,#5a7488)]">{fmtSats(noteSats)} sats</span>
+                          {noteShort && <> and <span className="text-[var(--muted,#5a7488)]">{landedCount} of {activeCount} splits paid</span></>}
                           {noteRoute === 'bot' && <>, from <span className="text-[var(--muted,#5a7488)]">{typedName || DEFAULT_SENDER_NAME}</span></>}.
                         </p>
                         {/* ⚠️ A FAILED SIGN IS NOT A FAILED BOOST, and the copy
