@@ -24,7 +24,7 @@ Anything deleted during the strip is recoverable that way — reach for
 `git show lb/main:...` before rewriting something from scratch.
 
 Design and code are also expected to be pulled from:
-- `~/mynostr-web` — the full React Nostr client
+- `~/sites/mynostr-web` — the full React Nostr client
 - `ChadFarrow/boostmebitch` (BMB) — Podcast Index proxy, wallet rails,
   signed-out boosts via a server-side identity, live-stream zaps
 
