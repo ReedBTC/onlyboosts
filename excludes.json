@@ -64,6 +64,708 @@
       "reason": "Misclassified, same cause and same fix as 54485346 above: a 1597-sat boost (donor intent 1776 sats) to Chad and Reeds Podcast, paged at truefans.fm, that LB's ungated BOLT11 host path claimed as a Local Bitcoiners boost.",
       "added": "2026-09-10",
       "source": "Reported by Reed on 2026-09-10 after both notes appeared on the Local Bitcoiners profile; diagnosed against LB's boost_formatter.py and the truefans.fm boost page."
+    },
+    {
+      "id": "ef2a575e27341e1c899e68d39b7f66ba7c21c3e4b35a578df7b5581a24d564c9",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 11:37:28 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "172e54832acb1b898d622ebb093176d2a28c2fda17c213d1e3c892bcec83f26f",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 11:37:30 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "35adf18b821b674028a38fcad8c57903fa07821731e10e8c31fb6edb4fbf1c96",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 11:37:31 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "489708d567de9bd20cf6d9b06e331725e06574f6265e378a334d62c1969481dc",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 11:37:32 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "3ff375b0455957bf3e726842fc2180fcf33355588fe436e21a9fef24136f8ca3",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 11:37:33 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "3876ce07af41b3e6de10114862b55c017d45601e723423bef973ed0f528bec07",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 11:37:35 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "3e977ae5cd4c1eefb394120b2ba1b3dda69fc080a86e4ffa052a32c62e475004",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 11:37:37 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "7b351aa7cba215324a2047873e92f50b3180b16178ec09dd240857e8f3fb42d0",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 11:37:38 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "982a5bf97ada9a6b259c2aa263c72fb28ba3041527795eb793560ea789853542",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 11:37:39 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "027d00e2174c3c248637c06407f8f8f437741e88712149387fa9c72806da090e",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 11:37:40 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "03c1816eef6596a665c11d86644605945785fa106c8c5e74bbe417716675b348",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 11:37:41 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "4db7e2f231149c8152cc859e1d6c590eb8fa69cae9c62b5803d870671679688c",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 11:37:42 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "f99cd4c0800ac30064a8d9ca6bcd3cb63423348ba39043f27a19abd2a0f7fcce",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 11:37:43 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "b3df7a11a9751d3c4e2d56e699298a525f0c4c5b208c77522bab5c7cb06589d2",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 12:23:16 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "02df8ce943e0b1bacebacc8e921d3a4652de22593855f46b675eb18a6908db9b",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 12:23:18 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "f06e835c7d2011b464768e243db217d5aeb9855ba8eeb30cfe467c075b748489",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 12:23:19 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "a1eb23f8b48f140f5fb364ed8f0bfa3ff2ffef5c702ff1feabdcb33372af2264",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 12:23:20 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "dd08f81590fb4ef84004be28d7ee9ebe422eae090941ef298499ff3d4b31bde8",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 12:23:21 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "e22c035622f629b417f7b6b2bbe3f5eb111d99fc79e1b6571866613a2158de9b",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 12:23:23 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "f45ab44343b6719c5cf6d96d39d2d749d9574293cce65934eeba180aa4741364",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 12:23:25 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "667f88f15fea99695436ed5078c3e2645d1cfa2cc6c7e87ccf11342858723e70",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 12:23:26 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "5354f9276668fc2c852d71390754c8dd5f0b317f124d3d70250867230a23877e",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 12:23:27 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "d469d21603f9443542e6401bdabeac13d311374606d107e0a3662d33a7e22038",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 12:23:28 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "9f634fcb8d1e299407c147d0d0a283155baf85ced303ee98959c90139abf3479",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 12:23:29 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "e9b6e27d2639f33a3739acc119dfb79919a42b23f54f6916fced75591c0d6bdf",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 12:23:30 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "19e20b0af27b362b773a64c4908eb05cd5703c36d35f20918deab462c00be274",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 12:23:31 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "852a02e62475a480c8f862e703093608e2a727a4527690c31443f1ddbb82c766",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 12:37:50 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "24df9c39c404792208a2e6d36dc2c04a8f293f03b6157dc2cfdddd95ec2e3f3d",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 12:37:52 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "100e43aa25b7ff5447cd1d00764ba4a4afede54fb50e051f1923fceea0a42f73",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 12:37:53 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "b8058647463172d30b180582deeef8b3bbde076c759375612e7c76fa911bee8d",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 12:37:54 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "0d3d4dd9119e14d88c3017bfb3e460127eefabff07ace0869928847daf98d124",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 12:37:55 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "26a65c914c927cc362c5fc28f67a4ab084b10c1b07388de85377101580d44df1",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 12:37:57 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "655ede23c65b9c2105a9e1908bec8805fe7856415c1c0c69eace018977a493e4",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 12:37:58 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "b3c38e867c828e34c9acf4ff75da106697800646b3174ddad265327d6f01d450",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 12:38:00 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "d69a517c9a917ea8081af9e7d63f9f4f9296fab3dfef12de57a7c534cee75cfe",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 12:38:01 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "613837faf0c929afd59f96db2b3ca2c8e2495b8d79200fe70581faaede6d4082",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 12:38:02 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "b9063b4b09836dc1f905cf84666cd86a951f2cc9da6a5f5059e8aaacfa04c716",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 12:38:03 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "87aebf8ba20475ba681f9fbc15fc6d190bed730d05620dff6f134c6b49a1dd09",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 12:38:04 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "af84e287c6b28a4d04085eaf0aa13c394ceb12dfe316a103d56d4677697016c8",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 12:38:05 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "eadfdd5df44397d463df8aabbe74df268569e8da117239c9b4c5dd4a4f433b75",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 13:03:55 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "5b4e8a7322b7f9a0edb4a3fd6a6e501810eed1cd56eb86e9baa683c150e70735",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 13:03:58 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "735732d4ceff7694720a0c2e842a6c2e88e748485e5e2a0d2d7970b3e72f869d",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 13:03:59 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "d8e6a1063bd5d585a53f1f331024bba61198b7abf5c71eda065bb43c76f8268b",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 13:04:00 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "2d121f0ccb503ef61e306c10d86859017c6ac0a95c5bd48c73bbb50908b47e14",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 13:04:01 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "17b4b7b8f13e7f468cf8406f86165b1e3f12e923e13f5c24275eaf5db5864cfe",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 13:04:03 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "ac4efb618650167b515e1deb177629d9351fa0260366d10af2f1c78e789041ae",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 13:04:05 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "181fbcf98491f46c23c224d1b6a372aceed5f1c4e14e6e434bdb7a5d06f8fa00",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 13:04:06 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "46a37012776db4fb37d41dfec3afc7c87385467a73ec51ae1f74971a20994d2e",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 13:04:07 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "96849f91c75c84e3f83e5bfd9e472c855d6d0bbf81bb772733fcbbb743c2c9fe",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 13:04:08 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "446fe6be1a327cc6c5cb9521d7c60a6d8a0729e09bc04a6654d53e9fdbe920f5",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 13:04:09 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "85018d6524c2bfa6947f8d3811747462d42121f29e9ec40ae781608edd725810",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 13:04:10 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "95934eab2d34bd10de9376d9cb9ea3e9b201bd501e6c0c43df21267e686f83bc",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 13:04:11 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "6bf6561d8eae95896da9c73c524ce33afd32885925512c85007edfe1e0890104",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 13:18:53 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "a1a11984635dcba829f4223bd1ebada29aa2486c4b811fa09a0527a2f6b34e17",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 13:18:58 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "57449136697510e95ab8ba857910fe822970b625fff37acd6dfd5fce6223fe8c",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 13:18:59 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "4f3113d41125fa4227a01cd56a1efc02cba3ed2c3a6aef2bb39211f7fdaa65e8",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 13:19:01 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "a30804a1be65eace61cd518e9b92d4b0ebfcb3c03080a57e2a86109741f5f5da",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 13:19:02 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "6add0a4bd66de6a0b21e8293f1a0013dea436be3368231da684864828284450a",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 13:19:06 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "158df3121f8cdbcbeee6eed825e680cd58e914617376b6eac6aff39a02a55d83",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 13:19:08 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "6475a3dd7dde7a580b27226c0b9079122cbd995dea5962d6c46a5975d5113fa2",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 13:19:10 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "a34664483abe01d65909b6b8495d348c6d172b30a2aed0b5d5de2e4046545737",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 13:19:11 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "df9ce1579094e3d8b9af499b4037c9458c79bb469f99b490220a69251b6d791d",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 13:19:15 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "e6279443d6327db0dbb76547634fa7d18e80f99ec28a1a268226f2df90a4eab7",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 13:19:20 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "7ab9c3cddc4c4b37258c854b48de9aa7c0576a9d795d4a2c91194c45bf56214a",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 13:19:24 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "07505b4d435b6dc0b2cbcf5bc739d13fde495b7c751a9c9d31bee09dfd435945",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 13:19:28 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "e36b58fadc66dc86221331c145f01b7ca86d785a3234c665cab78a2300cdd6a3",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 13:59:14 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "7d14cdfd4e7c4e64ce151504387064426d0a8da11ed64e61c2ca5dc75476d0e7",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 13:59:18 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "c3374b8b88f4f4511e61031d6cf933ed81069ba420e0856d089606585fd82a61",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 13:59:23 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "a1c933d99942c26260b5e53e7e5e06183d1f09a287543d113c9f5c15b1d3d904",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 13:59:27 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "37a7c478d560703d9572809c9b74e1818f812250083b7f23d021e456af03945b",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 13:59:32 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "bd31b1d0a335538d5cbadce9e851436ebeeadeb79ec222bbfddb67f9be6c81cc",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 13:59:36 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "23be47cf0e1615d92acf33c70bcf90ad6caacf2d2ca61a4c5568da001276a2ab",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 13:59:40 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "a26793427ff4635ad6e93953398bdbee8d7a3b938beb7aaa9d1ac0a3fa0dc08e",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 13:59:45 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "97ee7ed77d506a034979d94d94b22f874559740e0b3c1b7e63d67c63ec6a97c7",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 13:59:49 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "13b503685d61f7252e0f0dbb335dbf36b63de1eeb4cee2462e45eeda79712c7a",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 13:59:54 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "72d64f173e0267a7599448c6683d9486285c6a83229bcb4d7af6e72e8930e93e",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 13:59:58 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "d7d3a89c925762b765b6e3eb30a3643660166f7c97c2a3304e4c441da9743ae9",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 14:00:02 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "54df2a5fe564b662cc74e26b5a29232b00e63010862f03c7a638299a9366bcb1",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 14:00:07 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "c72ae52dfcfbacb45c90acdbc52438c46af901b1c4ef0f3ce98b2acc4f8bfcb2",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 14:44:22 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "5df72403f1e57fb711b58cecea44bbc80ffa6f8ebe4d6d42f624b20cd36c6a9c",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 14:44:29 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "39322e019754af74d84506a3bdd72277d3ba43a7acf167be5ecae7bad04d5fa1",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 14:44:33 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "728708989c3f822558f12b675e13a9c65ba4239e3469d0e4dc6f3fb528a50471",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 14:44:38 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "8e7f9fb852e4738eb3327d8b8fc1a2ae2bb540faaf2be03c1bb9cc12267b2084",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 14:44:42 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "30da6120e1dde6023d135888652c17bc6f52d8d30443d88bffda778214306c7f",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 14:44:46 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "bd7f1e48ac5f6acbb91cd35007ce1790528e73cc91ccb4d4a9c25543e7e168bf",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 14:44:51 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "bf273ffdbcfd99d93ac2a7022400f8bd20adf0c8f5b3e1140d895b265b8f6e64",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 14:44:55 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "41a475b1de0a85d2629114e47420649a556ac230da56214739470f42245d2dd8",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 14:45:00 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "8858bc5bc182380b6de712fe6db9e31fafe722452da05d39f4acb013ed2c18e8",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 14:45:04 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "d1ea479cca548fc11d75c03fa89e118b7984bf12400f94fa0053891feb1ff158",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 14:45:08 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "0355180d06492c669aebe5143818c0f0d44642d3259b0f48d42673b216e63bce",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 14:45:13 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "a26de0763dfe2a52c3513763201240b6e4d073329577299ba6b722b480369056",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 14:45:17 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "20bb661b2610a18900d7b75387cbc0e86d0bfb68cda2aaa8ba231f20b13d352e",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 14:46:06 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "51bef07bdabc9e4fb3a9b6881e496ebabc8833fe869bf9bd62eb8184c127fb4c",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 14:46:10 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "839b0b245aee45844e455b847d30187ac6f99f3cb75eaf1379a71882fe9087e7",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 14:46:15 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "5cfdee25b86634e6538201d39e6261f0683e905fc635acc3c39700a70e995a5b",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 14:46:19 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "8ac3f1a49d8c9f46b854dc1843f3beb80b58b0502300128257b9ef1bc6118270",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 14:46:24 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "ef10f7c91d3a3beb032b96f2a2bc27b5a1de70461ae01d546b8f6e4e35072537",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 14:46:28 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "15820f79c5a521017f54ba08454243a28786756c3c46d1604f425707354d513c",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 14:46:33 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "b50fd114142fb1301ad08cb04ee93086020888400d8183fcc857f1c56be94dc0",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 14:46:37 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "370de0673b890125dabc7547a311813f8b81e5d4fcfdca59072960de98fafbac",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 14:46:41 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "bf08527bd9e401d890cc66c59cb185f52ffbbdeb95e12c014a098ab2989103d5",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 14:46:46 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "b2f29706d5b8265cf1595d6c9fafed04cd93c8602ba649f6276cf682e9060155",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 14:46:50 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "6d2fb27018194ff00039ba6fc4040b5b8e9d22dc6e8b96caf15297e4505cda04",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 14:46:55 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "758e830f164d32547d19326693a97d3e45f9e190dd4ab52c7a8c29f03adfc3ac",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 14:46:59 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "b4f83e408ca3337adb7ae4a5ddcb7c13e3ba9a550db35d7de59b26446b4efcad",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 16:51:18 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "d9c02bd62c5057fed694ad2c8888d60eb008106a3c914fb20a30616513744a95",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 16:51:22 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "1dfdaff96b602ca01a00671851a30d3f46316c624e55164019ccd8592ce2e2b1",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 16:51:27 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "be68eaa7988da0ffed90c52d51e8bc4da03f35cbdfe4d62b935fa4e7d90bcff9",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 16:51:31 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "018bc69da7251f6efb89b4b96a5682ce34504e10e885f613174f806c745b3fe0",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 16:51:35 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "1c1c1bbf5bbfacb6f07c8d1f7dc3fbb95bdca994315304b762d02ca9ad015246",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 16:51:40 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "ba8a75e0faef29c0e8ce2cb41e270274e678bc35da35c9983919e8bb67fa754e",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 16:51:44 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "07029a318e98c3cf055c857789c89b00a8f2af317d8dc4ad61558fed9f548cfd",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 16:51:49 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "2a41f7049ddc33b03546e85f961839867ca8f8dcb559002723a61c7bca0ac4b9",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 16:51:53 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "4db6b6f40fcadeaa27867f495f23099999c66a3526c0a0fa57fa891908140012",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 16:51:57 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "8539ed7a5d2fc1ca176cac8e5abaa83debc169a4825498ee265c27a9f0cf27d2",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 16:52:02 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "273d10d3a5815d68f50e9ce945dcf5227e430714c9a949053961974489a99ca0",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 16:52:06 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
+    },
+    {
+      "id": "5995975f8a0914d1a2985b8e61ac9f9ee38029e09d3da22f3102ada1c0163cd2",
+      "reason": "Test data, not a payment: one of 117 boost notes that a Boost Me Bitch end-to-end test published to public relays on 2026-11-17 between 11:37 and 16:52 UTC (this one at 16:52:11 UTC), each signed by a one-time key. No sats were sent; 36 of the 117 claimed 9,999,999,999 sats. A deletion request is not possible because the keys were not kept.",
+      "added": "2026-11-17",
+      "source": "Reported by Chad Farrow on 2026-11-17 with the full list of event ids: https://gist.github.com/ChadFarrow/ea6fb45601de795dd9771c564483cb92"
     }
   ]
 }
