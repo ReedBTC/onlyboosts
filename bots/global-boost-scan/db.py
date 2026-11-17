@@ -21,6 +21,7 @@ if str(Path(__file__).resolve().parent) not in sys.path:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import excludes as excludes_mod
+from classify import MAX_BOOST_SATS
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS boosts (
@@ -48,8 +49,9 @@ CREATE TABLE IF NOT EXISTS boosts (
     r_urls          TEXT,          -- JSON array
     raw_json        TEXT,          -- full signed event, for anything we didn't model
     excluded        INTEGER NOT NULL DEFAULT 0
-                                   -- 1 = on the exclusion list; still indexed here,
-                                   -- never published. Materialized from excluded_ids
+                                   -- 1 = on the exclusion list, or over
+                                   -- classify.MAX_BOOST_SATS and not in screen_allow;
+                                   -- still indexed here, never published. Materialized
                                    -- by apply_excludes(); see excludes.py.
 );
 CREATE INDEX IF NOT EXISTS idx_boosts_created  ON boosts(created_at);
@@ -248,6 +250,17 @@ CREATE TABLE IF NOT EXISTS excluded_ids (
     PRIMARY KEY (kind, id)
 );
 
+-- Boosts over classify.MAX_BOOST_SATS that are published anyway, by hand, with
+-- `onlyboosts_globalscan.py screened --allow <event id> "<reason>"`. Here rather
+-- than in excludes.json because that file is the public, hand-edited takedown
+-- list and this is the opposite: an exception to a rule the collector applies.
+-- Lifts the cap only; an excludes.json entry still hides the row.
+CREATE TABLE IF NOT EXISTS screen_allow (
+    event_id  TEXT PRIMARY KEY,
+    reason    TEXT NOT NULL,
+    added     TEXT NOT NULL      -- YYYY-MM-DD
+);
+
 -- Rows D1 has to be told about out of band. The projection is upsert-only and
 -- driven by NEW boosts, so a row that must DISAPPEAR (excluded) or be RECOUNTED
 -- (its show/episode lost boosts to an exclusion) has no other way to reach it.
@@ -364,7 +377,12 @@ def not_excluded(alias="b"):
 
 
 def _excluded_expr(alias="b"):
-    """1 when this boost is on the list, by any of the ways of naming it.
+    """1 when this boost is on the list, by any of the ways of naming it, or
+    claims more than classify.MAX_BOOST_SATS and has no screen_allow row.
+
+    The cap rides this predicate so that an over-cap boost is withheld by the same
+    flag, the same D1 re-projection and the same filters as a listed one, and an
+    allow takes effect the way removing a list entry does.
 
     A guid is matched against EVERY identity slot, not the one its list is named
     after, and that is load-bearing rather than sloppy. Two reasons:
@@ -392,7 +410,10 @@ def _excluded_expr(alias="b"):
                     AND x.id IN ({p}podcast_guid, {eg}, {p}item_guid)))
            OR EXISTS (SELECT 1 FROM shows s
                       JOIN excluded_ids x ON x.kind='show_feed' AND x.id = s.feed_url
-                      WHERE s.podcast_guid = {eg}))"""
+                      WHERE s.podcast_guid = {eg})
+           OR ({p}sats > {int(MAX_BOOST_SATS)}
+               AND NOT EXISTS (SELECT 1 FROM screen_allow a
+                               WHERE a.event_id = {p}event_id)))"""
 
 
 def show_excluded(guid_col, feed_col=None):

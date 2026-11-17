@@ -56,12 +56,12 @@ import similar                                                  # noqa: E402
 import podroll                                                  # noqa: E402
 import publishers as publishers_mod                             # noqa: E402
 import resolve_guids                                            # noqa: E402
-from classify import classify_boost, decode_note_or_nevent, _QUOTE_RE  # noqa: E402
+from classify import classify_boost, decode_note_or_nevent, _QUOTE_RE, MAX_BOOST_SATS  # noqa: E402
 from relays import CORE_RELAYS, PROFILE_RELAYS, RECEIPT_RELAYS, expand_via_outbox, reachable_from_here  # noqa: E402
 from scan import (scan_relay_backward, scan_relay_incremental,   # noqa: E402
                   fetch_events_by_ids, boost_filters, _walk, REQ_PAUSE)
 from collector_common import RelayTimeout, query_relay          # noqa: E402
-from nostr_utils import load_config                             # noqa: E402
+from nostr_utils import load_config, hex_to_npub, npub_to_hex   # noqa: E402
 
 DB_PATH = str(HERE / "data" / "onlyboosts.db")
 SHARDS_DIR = HERE / "data" / "shards"   # the tree `push` ships; the publish gate stamps only this one
@@ -1659,9 +1659,132 @@ def cmd_excludes(args):
         print(f"           reason: {e['reason']}"
               + (f"  [added {e['added']}]" if e["added"] else "")
               + (f"  [via {e['source']}]" if e["source"] else ""))
+    capped = conn.execute(
+        "SELECT COUNT(*) FROM boosts b WHERE b.sats > ? AND NOT EXISTS "
+        "(SELECT 1 FROM screen_allow a WHERE a.event_id = b.event_id)",
+        (MAX_BOOST_SATS,)).fetchone()[0]
+    print(f"  cap      over {MAX_BOOST_SATS:,} sats{'':<30} {capped:>5} boost(s)"
+          "  (see `screened`)")
     print(f"\n{total} of {conn.execute('SELECT COUNT(*) FROM boosts').fetchone()[0]} "
           f"indexed boosts are withheld from every published surface.")
     print("Nothing is deleted: removing an entry republishes it on the next run.")
+
+
+def _screen_reasons(conn, rows):
+    """Every reason each row is withheld, in words. Mirrors db._excluded_expr plus
+    dup_of, so the answer to "why isn't my boost up" comes from the filter itself."""
+    ids = {}
+    for r in conn.execute("SELECT kind, id, reason FROM excluded_ids"):
+        ids.setdefault(r["kind"], {})[r["id"]] = r["reason"]
+    feeds = ids.get("show_feed", {})
+    allowed = {r["event_id"]: r["reason"]
+               for r in conn.execute("SELECT event_id, reason FROM screen_allow")}
+    out = {}
+    for r in rows:
+        why = []
+        if r["event_id"] in ids.get("boost", {}):
+            why.append(f"excludes.json boost: {ids['boost'][r['event_id']]}")
+        if r["booster_pubkey"] in ids.get("booster", {}):
+            why.append(f"excludes.json booster: {ids['booster'][r['booster_pubkey']]}")
+        for slot in dict.fromkeys((r["podcast_guid"], r["eff_guid"], r["item_guid"])):
+            for kind in ("show", "episode"):
+                if slot and slot in ids.get(kind, {}):
+                    why.append(f"excludes.json {kind}: {ids[kind][slot]}")
+        if r["feed_url"] and r["feed_url"] in feeds:
+            why.append(f"excludes.json show feed: {feeds[r['feed_url']]}")
+        if (r["sats"] or 0) > MAX_BOOST_SATS:
+            if r["event_id"] in allowed:
+                why.append(f"over the {MAX_BOOST_SATS:,}-sat cap, ALLOWED: "
+                           f"{allowed[r['event_id']]}")
+            else:
+                why.append(f"over the {MAX_BOOST_SATS:,}-sat cap")
+        if r["dup_of"]:
+            why.append(f"duplicate note; counted once, as {r['dup_of']}")
+        out[r["event_id"]] = why
+    return out
+
+
+def cmd_screened(args):
+    """Every indexed boost that is not published, one line each, with why.
+
+    The one place to answer "why didn't my boost show up". Three mechanisms hide
+    an indexed boost: an excludes.json entry, the MAX_BOOST_SATS cap, and the
+    duplicate filter; this reads all three. A boost that is not in the index at
+    all was never read or never classified as a boost, and `--id` says so.
+
+    `--allow <event id> "<reason>"` publishes one over-cap boost anyway, and
+    `--unallow <event id>` withdraws that. Both re-project on the spot; D1 follows
+    on the next tick. An excludes.json entry is restored by editing that file.
+    """
+    conn = db.connect(DB_PATH, check_same_thread=False)
+    if args.allow or args.unallow:
+        eid = (args.allow or args.unallow).strip().lower()
+        row = conn.execute("SELECT sats FROM boosts WHERE event_id=?", (eid,)).fetchone()
+        if not row:
+            sys.exit(f"[error] {eid} is not in the index")
+        if args.allow:
+            if (row["sats"] or 0) <= MAX_BOOST_SATS:
+                sys.exit(f"[error] {eid} claims {row['sats']} sats; the cap does not "
+                         "hold it, so there is nothing to allow")
+            if not args.reason:
+                sys.exit("[error] --allow needs a reason, as an excludes.json entry does")
+            conn.execute("INSERT OR REPLACE INTO screen_allow (event_id, reason, added) "
+                         "VALUES (?, ?, date('now'))", (eid, args.reason))
+        else:
+            conn.execute("DELETE FROM screen_allow WHERE event_id=?", (eid,))
+        conn.commit()
+        moved = db.apply_excludes(conn)
+        print(f"{'allowed' if args.allow else 'un-allowed'} {eid}; "
+              f"{moved} row(s) changed state (D1 follows on the next tick)")
+        if args.allow and conn.execute("SELECT excluded FROM boosts WHERE event_id=?",
+                                       (eid,)).fetchone()[0]:
+            print("  still withheld: an excludes.json entry also names it "
+                  "(see `screened --id`)")
+        return
+
+    where, params = ["(b.excluded = 1 OR b.dup_of IS NOT NULL OR b.sats > ?)"], [MAX_BOOST_SATS]
+    if args.id:
+        where.append("b.event_id = ?")
+        params.append(args.id.strip().lower())
+    if args.booster:
+        pk = args.booster.strip()
+        where.append("b.booster_pubkey = ?")
+        params.append(npub_to_hex(pk) if pk.startswith("npub1") else pk.lower())
+    if args.show:
+        where.append(f"{db.effective_guid('b')} = ?")
+        params.append(args.show.strip())
+    if not (args.id or args.booster or args.show or args.all):
+        where.append("b.created_at >= ?")
+        params.append(int(time.time()) - args.days * 86400)
+    if args.no_dups:
+        where.append("NOT (b.dup_of IS NOT NULL AND b.excluded = 0)")
+    eg = db.effective_guid("b")
+    rows = conn.execute(f"""
+        SELECT b.event_id, b.booster_pubkey, b.booster_npub, b.created_at, b.sats,
+               b.podcast_guid, b.item_guid, b.dup_of, {eg} AS eff_guid,
+               s.title AS show_title, s.feed_url
+        FROM boosts b LEFT JOIN shows s ON s.podcast_guid = {eg}
+        WHERE {' AND '.join(where)} ORDER BY b.created_at DESC""", params).fetchall()
+
+    if args.id and not rows:
+        hit = conn.execute("SELECT 1 FROM boosts WHERE event_id=?",
+                           (args.id.strip().lower(),)).fetchone()
+        print("published: in the index and on every surface" if hit else
+              "not in the index: the scan never read it, or the classifier did not "
+              "take it for a boost (no podcast i-tag, or no t/amount/zap-receipt)")
+        return
+    reasons = _screen_reasons(conn, rows)
+    for r in rows:
+        when = time.strftime("%Y-%m-%d %H:%M", time.gmtime(r["created_at"]))
+        npub = r["booster_npub"] or hex_to_npub(r["booster_pubkey"])
+        show = r["show_title"] or r["eff_guid"] or "(no show)"
+        print(f"{when}Z  {r['event_id']}\n"
+              f"    {npub}  {r['sats'] or 0:,} sats  {show[:60]}")
+        for w in reasons[r["event_id"]]:
+            print(f"    · {w}")
+    scope = ("" if (args.id or args.booster or args.show or args.all)
+             else f" in the last {args.days} days (--all for everything)")
+    print(f"\n{len(rows)} boost(s){scope}.")
 
 
 def cmd_stats(args):
@@ -1828,6 +1951,23 @@ def main():
     xc = sub.add_parser("excludes",
                         help="validate excludes.json and report what each entry hides")
     xc.set_defaults(func=cmd_excludes)
+
+    sc = sub.add_parser("screened",
+                        help="list every indexed boost that is not published, with why; "
+                             "--allow restores one over the sats cap")
+    sc.add_argument("--id", help="one boost by event id")
+    sc.add_argument("--booster", help="one booster, npub or hex")
+    sc.add_argument("--show", help="one show, by podcast guid")
+    sc.add_argument("--days", type=int, default=30,
+                    help="trailing window when no subject is named (default 30)")
+    sc.add_argument("--all", action="store_true", help="full history")
+    sc.add_argument("--no-dups", action="store_true",
+                    help="leave out duplicate notes (their payment is counted once)")
+    sc.add_argument("--allow", metavar="EVENT_ID",
+                    help="publish this over-cap boost anyway (needs a reason)")
+    sc.add_argument("--unallow", metavar="EVENT_ID", help="withdraw an --allow")
+    sc.add_argument("reason", nargs="?", help="with --allow: why it is real")
+    sc.set_defaults(func=cmd_screened)
 
     rc = sub.add_parser("reclassify-clients",
                         help="re-derive which app published each boost (clients.py)")

@@ -51,6 +51,19 @@ by hand**, so a new query is found by grep; and `onlyboosts_globalscan.py
 excludes` validates the file and reports what each entry currently hides, which
 is the check to run after an edit.
 
+**One boost may claim at most 5,000,000 sats** (`classify.MAX_BOOST_SATS`, the
+boost modal's and the signing oracle's figure). A note claiming more is indexed
+with its claimed amount and withheld through the same `excluded` flag, so it
+counts in no total, chart, leaderboard or feed; it is never clamped to the cap.
+It is not an `excludes.json` entry: the file stays the hand-edited public list,
+and the cap is a rule the collector applies. `onlyboosts_globalscan.py screened`
+is the one place that lists every indexed boost not published, with its reason
+(an `excludes.json` entry, the cap, or a duplicate note); `--booster <npub>` and
+`--id <event id>` answer "why didn't my boost show up", including "not in the
+index". `screened --allow <event id> "<reason>"` publishes a real over-cap boost
+(the `screen_allow` table, in the collector's database), and D1 follows on the
+next tick.
+
 **The removal path is deliberately not documented on the site.** `/about` says
 nothing about how to be excluded, and `docs/about-and-faq-source.md` is
 intentionally silent on it too. Reed's call; don't add it as a "missing piece".

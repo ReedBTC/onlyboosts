@@ -24,6 +24,14 @@ import clients
 INCLUDE_SHOW_LEVEL = True        # keep boosts that only name the show, no episode
 EXCLUDE_FEED_GUIDS = frozenset() # feed guids to drop (empty = keep everything)
 
+# The most one boost may claim and still count, in sats; the boost modal's and
+# the signing oracle's cap. A note claiming more is classified and indexed like
+# any other, then withheld from every published surface exactly as an
+# excludes.json entry is (db._excluded_expr). It is never clamped: a withheld row
+# counts nothing. `screened` lists every such row with its reason, and
+# `screened --allow <event id>` restores one.
+MAX_BOOST_SATS = 5_000_000
+
 _BECH32_CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
 _QUOTE_RE = re.compile(
     r'(?:nostr:)?(?<!\w)(note1[02-9ac-hj-np-z]+|nevent1[02-9ac-hj-np-z]+)',
