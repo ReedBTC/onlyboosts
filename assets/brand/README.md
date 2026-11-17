@@ -6,7 +6,7 @@ Logo concepts kept for possible use. **Nothing on the site references these file
 
 A bright blue tile (`#00aff0`, the site's `--brand`) with a white outlined speech bubble and the three
 Podcasting 2.0 broadcast arcs centred inside it. Chosen by Reed on 2026-11-17 from a contact sheet of
-fifteen concepts, pending feedback from a small group.
+twelve concepts, pending feedback from a small group.
 
 | File | Use |
 |---|---|
