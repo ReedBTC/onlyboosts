@@ -40,6 +40,9 @@ import { readFileSync, readdirSync } from 'node:fs'
 // these takes the widget root down mid-payment.
 const TARGETS = [
   ['login-widget/src/components/ExternalBoostModal.jsx', 'export default function ExternalBoostModal'],
+  // Not in flight, but mounted inside the same root with a typed message and
+  // an amount behind it: a crash here loses the form.
+  ['login-widget/src/components/GifPicker.jsx', 'export default function GifPicker'],
 ]
 
 let passed = 0

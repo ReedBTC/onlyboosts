@@ -32,6 +32,7 @@ const TLV_BOOSTAGRAM = 7629169  // Podcasting 2.0 TLV record for the boostagram 
  * an emoji at the edge is dropped whole rather than left as a broken byte.
  */
 import { receiptQuote } from '../../../assets/js/zap-receipt.js'
+import { splitGif, gifImetaTag, sliceWholeUrls } from './gif.js'
 
 export const MAX_MESSAGE_BYTES = 300
 const _enc = new TextEncoder()
@@ -243,6 +244,15 @@ export const FULL_CREDIT_DEN = 10
  * that may make unconfirmed splits count. It defaults to `paidSats` for a
  * caller with no QR path.
  *
+ * ⚠️ OR THE BOOSTER'S OWN WORD, WHERE THE WALLET GAVE NONE (Reed's call,
+ * 2026-11-12). With nothing confirmed the app cannot tell an offline wallet
+ * from one that paid and never answered (a browser-extension wallet has no
+ * way to be asked afterwards), but the booster can open their wallet and
+ * look. `attested` is their press on "It went through in my wallet": the
+ * unconfirmed splits then count exactly as they would beside a confirmed
+ * one. It is never set by anything but that press, a FAILED split still
+ * comes off the figure, and no split's status changes because of it.
+ *
  *   - `landedSats`, `landedLegs`: confirmed plus counted-unconfirmed. These
  *     are what the note, the screen and the 90% floor all read;
  *   - `eligible`: a PARTIAL boost (some split FAILED) with at least 90% of
@@ -261,13 +271,14 @@ export const FULL_CREDIT_DEN = 10
  */
 export function resolveNoteFigure({
   paidSats, intendedSats, legsPaid, legsTotal,
-  unconfirmedSats = 0, legsUnconfirmed = 0, walletPaidSats,
+  unconfirmedSats = 0, legsUnconfirmed = 0, walletPaidSats, attested = false,
   donation = false, choice = 'intended',
 }) {
   const whole = (n) => Math.max(0, Math.floor(Number(n) || 0))
   const paid = whole(paidSats)
   const intended = whole(intendedSats)
-  const counts = whole(walletPaidSats === undefined ? paidSats : walletPaidSats) > 0
+  const counts = attested === true
+    || whole(walletPaidSats === undefined ? paidSats : walletPaidSats) > 0
   const landedSats = paid + (counts ? whole(unconfirmedSats) : 0)
   const landedLegs = whole(legsPaid) + (counts ? whole(legsUnconfirmed) : 0)
   const eligible = !donation && landedSats > 0 && landedSats < intended
@@ -320,12 +331,15 @@ export function resolveNoteFigure({
  */
 export function buildExternalNoteTemplate({
   paidSats, legsPaid, legsTotal, message, senderName, showTitle, episodeTitle, podcastGuid, itemGuid, bmbUrl,
-  mentionPubkeys = [], receipt = null,
+  mentionPubkeys = [], receipt = null, gif = null,
 }) {
   const sats = Number(paidSats) || 0
   const paid = Number(legsPaid) || 0
   const total = Number(legsTotal) || 0
-  const msg = (message || '').trim()
+  // A picked GIF arrives as the message's last line (gif.js#withGif). It goes
+  // on a line of its own under the quoted words, never inside the quotation
+  // marks, where a client's link parser would take the closing mark with it.
+  const { text: msg, gifUrl } = splitGif(message)
   const showEp = episodeTitle
     ? `${showTitle || 'a podcast'} • ${episodeTitle}`
     : (showTitle || 'a podcast')
@@ -349,6 +363,7 @@ export function buildExternalNoteTemplate({
   // themselves in the third person.
   if (from) lines.push(`👤 From ${from}`)
   if (msg) lines.push(`💬 "${clipMessage(msg)}"`)
+  if (gifUrl) lines.push(gifUrl)
   lines.push('')
   lines.push(`🎙️ ${showEp}`)
   if (bmbUrl) lines.push(bmbUrl)
@@ -379,6 +394,8 @@ export function buildExternalNoteTemplate({
   if (itemGuid) { tags.push(['i', `podcast:item:guid:${itemGuid}`]); tags.push(['k', 'podcast:item:guid']) }
   tags.push(['amount', String(Math.round(sats * 1000))])
   if (quote) tags.push(quote.tag)
+  const imeta = gifImetaTag(gif, gifUrl)
+  if (imeta) tags.push(imeta)
   for (const t of mentionTags(mentionPubkeys)) tags.push(t)
 
   return { kind: 1, created_at: Math.floor(Date.now() / 1000), content: lines.join('\n'), tags }
@@ -437,9 +454,9 @@ function mentionTags(pubkeys) {
  * three things this note must not have — so a donation cannot be signed by the
  * bot through the boost path. See `validateDonationTemplate` there.
  */
-export function buildDonationNoteTemplate({ paidSats, message, senderName, mentionPubkeys = [] }) {
+export function buildDonationNoteTemplate({ paidSats, message, senderName, mentionPubkeys = [], gif = null }) {
   const sats = Number(paidSats) || 0
-  const msg = (message || '').trim()
+  const { text: msg, gifUrl } = splitGif(message)   // as in the boost note
   const from = sanitizeSenderName(senderName)
   const lines = [
     DONATION_BANNER_URL,
@@ -450,6 +467,7 @@ export function buildDonationNoteTemplate({ paidSats, message, senderName, menti
   // from the donor.
   if (from) lines.push(`👤 From ${from}`)
   if (msg) lines.push(`💬 "${clipMessage(msg)}"`)
+  if (gifUrl) lines.push(gifUrl)
   lines.push('')
   lines.push(DONATION_URL)
 
@@ -463,6 +481,8 @@ export function buildDonationNoteTemplate({ paidSats, message, senderName, menti
     ['client', 'onlyboosts.social'],
     ['r', DONATION_URL],
   ]
+  const imeta = gifImetaTag(gif, gifUrl)
+  if (imeta) tags.push(imeta)
   for (const t of mentionTags(mentionPubkeys)) tags.push(t)   // donor route only; see mentionTags
 
   return { kind: 1, created_at: Math.floor(Date.now() / 1000), content: lines.join('\n'), tags }
@@ -503,6 +523,10 @@ export function donationHeadline(sats) {
  * So: if the descriptor does not fit whole, it is dropped and the message takes
  * the full allowance. If it fits, the message takes whatever is left.
  *
+ * ⚠️ A LINK IN THE MESSAGE IS HELD TO THE SAME RULE (2026-11-12, when the GIF
+ * picker made a link the message's last line): `sliceWholeUrls` drops a link
+ * the cut would land in rather than shortening it. The words before it stay.
+ *
  * ⚠️ AND A MISSING DESCRIPTOR IS NEVER FATAL. `/api/boostbox` fails closed on an
  * unconfigured key, a timeout or an upstream refusal, and every one of those
  * arrives here as an empty `descriptorUrl`. The leg still pays and the
@@ -514,16 +538,17 @@ export function buildLnurlComment({ descriptorUrl, message, commentAllowed }) {
   if (allowed <= 0) return ''
   const msg = clipMessage((message || '').trim())
   const url = (descriptorUrl || '').trim()
-  if (!url) return msg.slice(0, allowed)
+  if (!url) return sliceWholeUrls(msg, allowed)
 
   const descriptor = `rss::payment::boost ${url}`
   // Not merely "too long to be useful": a partial URL is an active harm,
   // because the recipient's tooling will try to fetch it.
-  if (descriptor.length > allowed) return msg.slice(0, allowed)
+  if (descriptor.length > allowed) return sliceWholeUrls(msg, allowed)
   if (!msg) return descriptor
 
   // One space between them, so the remaining budget is what is left after it.
   const remaining = allowed - descriptor.length - 1
   if (remaining <= 0) return descriptor
-  return `${descriptor} ${msg.slice(0, remaining)}`
+  const rest = sliceWholeUrls(msg, remaining)
+  return rest ? `${descriptor} ${rest}` : descriptor
 }

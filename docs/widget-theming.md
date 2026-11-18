@@ -185,3 +185,13 @@ alone.
 `boost-actions.css` still tint hover states with `rgba(247,147,26,…)`, LB's
 bitcoin orange. Those are the site's own reaction bars, not the widget, and they
 were out of scope for the widget restyle.
+
+**The nav steps under an open modal (2026-11-12).** The page's sticky bar is
+`z-index: 100` and the widget's modals start at 70, so the bar used to sit on
+top of the scrim; with the body pinned by `scrollLock.js` it stays wherever
+the scroll left it, and at the top of a page on a phone it covered the card's
+header (and the GIF picker's search field, which is what forced the fix).
+`lockBodyScroll` now sets `data-lb-modal-open` on `<html>` and `nav.css` drops
+the bar to 65 on that mark: under the scrim at 70, over the page's own sticky
+bars at 60. Every modal that takes the scroll lock gets it; the account
+dropdown takes no lock and is unaffected.

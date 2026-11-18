@@ -260,7 +260,8 @@ The rules a change elsewhere would break:
 - **⚠️ ONLY A FAILED SPLIT TAKES ANYTHING OFF THE NOTE.** An `UNCERTAIN` split
   counts beside at least one split the CONNECTED wallet confirmed (a split paid
   by QR from another wallet is not that evidence: `viaQr`, `walletPaidSats`),
-  never with none. The note waits on `watchSettled`, not `stillChecking`, and
+  never with none unless the booster presses "It went through in my wallet"
+  (`attested`, set by that press alone). The note waits on `watchSettled`, not `stillChecking`, and
   nothing moves a split while the note is being signed.
 - **A failed Lightning-address split may be paid from another wallet by QR**;
   asking for it ends Retry for that split (`canRepayLeg` reads `leg.qr`). No offer
@@ -275,6 +276,9 @@ The rules a change elsewhere would break:
 - **The boostagram message cap is 300 bytes of UTF-8 on the expanded message.**
   The note carries `nostr:npub1…` mentions, never the label; the bot route
   carries no `p` tag and the oracle refuses one (`docs/mentions.md`).
+- **A GIF is the last line of that one message**, from gifs.nostr.build by
+  registered origin (a new hostname is refused until added there); the oracle
+  validates its `imeta`, and `gifGrid.js` is vendored, never edited.
 - **⚠️ THE ROLLUP'S SYNTHETIC `unknown:` SHOW GUID NEVER LEAVES THE CLIENT**;
   `isSyntheticGuid` / `realShowGuid` guard every site that hands a guid out.
 - **`/api/value` reads the show's own RSS first, Podcast Index as fallback**, and

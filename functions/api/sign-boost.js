@@ -100,9 +100,10 @@ const DONATION_BANNER_URL = 'https://i.nostr.build/QoXlTuDurz3b4EqNefAzoC.png'
 const DONATION_LINE_RE = /^⚡Just donated ([0-9](?:[0-9,]{0,14})) sats to OnlyBoosts 📱 via onlyboosts\.social$/
 
 // The complete tag vocabulary of `buildDonationNoteTemplate`. Narrower than the
-// boost allowlist by three entries, and every omission is load-bearing:
-// `amount`, `i` and `k` are the markers that would file this as a boost.
-const DONATION_ALLOWED_TAGS = new Set(['t', 'client', 'r'])
+// boost allowlist, and every omission is load-bearing: `amount`, `i` and `k`
+// are the markers that would file this as a boost, and `q` quotes a receipt a
+// donation never mints. `imeta` is the picked GIF's (see `checkGifImeta`).
+const DONATION_ALLOWED_TAGS = new Set(['t', 'client', 'r', 'imeta'])
 
 // ⚠️ RESTATED FROM `BOOST_TOPIC_TAGS` IN `bots/global-boost-scan/classify.py`.
 // Any one of these on a note makes this site's own collector treat it as a
@@ -125,8 +126,20 @@ const DONATION_URL = 'https://onlyboosts.social/'
 // stranger's event as the receipt for a boost. The ingest endpoint reuses the
 // validator without a key and checks the shape alone; it indexes a note's
 // `amount`, never its quote.
-const ALLOWED_TAGS = new Set(['i', 'k', 'r', 't', 'client', 'amount', 'q'])
+//
+// `imeta` joined on 2026-11-12 with the GIF picker, and it is admitted for one
+// thing only: describing a gifs.nostr.build GIF the note's own text links.
+// `checkGifImeta` holds the whole rule.
+const ALLOWED_TAGS = new Set(['i', 'k', 'r', 't', 'client', 'amount', 'q', 'imeta'])
 const HEX64 = /^[0-9a-f]{64}$/
+
+// ⚠️ RESTATED FROM `GIF_URL_RE` IN `login-widget/src/lib/gif.js` (a Function
+// imports nothing from the widget). The host, one path segment, `.gif` or
+// `.webp`: every `url` the search API returned in 1,200 sampled results, and
+// nothing else. `scripts/test-sign-boost.mjs` holds the two copies together.
+const GIF_IMETA_URL_RE = /^url (https:\/\/gifs\.nostr\.build\/[A-Za-z0-9][A-Za-z0-9._-]{0,199}\.(?:gif|webp))$/
+const GIF_IMETA_TYPES = new Set(['m image/gif', 'm image/webp'])
+const GIF_IMETA_DIM_RE = /^dim [1-9][0-9]{0,4}x[1-9][0-9]{0,4}$/
 
 // ⚠️ `e` AND `p` ARE REFUSED BY OMISSION, AND THAT IS THE POINT OF THE
 // ALLOWLIST. Our template emits neither. With an `e` tag a note signed by this
@@ -236,6 +249,31 @@ function checkTagShape(rawTags, allowed) {
   return rawTags
 }
 
+/**
+ * The NIP-92 `imeta` tag of a GIF picked in the boost modal: at most one, in
+ * exactly the shape `gifImetaTag` writes (the link, the type, the size).
+ *
+ * ⚠️ IT DESCRIBES A LINK THE NOTE ALREADY SHOWS, AND ONLY THAT. A client lays
+ * a picture out from `imeta`, so an `imeta` naming a URL the text does not
+ * carry, or any host but the GIF library's, would be a way to have the bot
+ * attach media to a note that the reader of its text never sees named. So the
+ * URL must match the library's pattern AND stand as a whole line of the
+ * content. The content itself was never restricted and is not now; a note
+ * with the link and no tag is as valid as it was before.
+ *
+ * Shared by both families for the reason `checkTagShape` is.
+ */
+function checkGifImeta(tags, content) {
+  const metas = tags.filter((tag) => tag[0] === 'imeta')
+  if (metas.length > 1) throw new Error('invalid gif')
+  for (const tag of metas) {
+    if (tag.length !== 4) throw new Error('invalid gif')
+    const m = GIF_IMETA_URL_RE.exec(tag[1])
+    if (!m || !GIF_IMETA_TYPES.has(tag[2]) || !GIF_IMETA_DIM_RE.test(tag[3])) throw new Error('invalid gif')
+    if (!content.split('\n').includes(m[1])) throw new Error('invalid gif')
+  }
+}
+
 /** ±5 minutes, shared by both families. A note dated outside this window is
  *  either a clock problem or an attempt to place it somewhere else in the
  *  timeline.
@@ -286,6 +324,8 @@ export function validateBoostTemplate(body, { skewSecs, sitePubkey } = {}) {
     if (q[2] !== '' && !/^wss:\/\//.test(q[2])) throw new Error('invalid quote')
     if (sitePubkey && q[3] !== sitePubkey) throw new Error('unsupported quote')
   }
+
+  checkGifImeta(tags, body.content)
 
   // ⚠️ Exactly one `amount`, and it is the figure this index will read off the
   // published note. Two of them would let a caller decide which one the
@@ -373,6 +413,8 @@ export function validateDonationTemplate(body) {
     if (tag[0] === 'r' && tag[1] !== DONATION_URL) throw new Error('unsupported url')
     if (tag[0] === 'client' && tag[1] !== CLIENT_TAG) throw new Error('unsupported client')
   }
+
+  checkGifImeta(tags, body.content)
 
   const createdAt = checkCreatedAt(body.created_at)
 

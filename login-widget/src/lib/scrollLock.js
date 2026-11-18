@@ -39,6 +39,10 @@ export function lockBodyScroll() {
   body.style.top = `-${saved.scrollY}px`
   body.style.width = '100%'
   body.style.overflow = 'hidden'
+  // The page's sticky nav outranks every modal (100 against 70), and with the
+  // body pinned it sits wherever the scroll left it: at the top of a page it
+  // covers the top of the card. nav.css steps it under the scrim on this mark.
+  document.documentElement.setAttribute('data-lb-modal-open', '')
 }
 
 export function unlockBodyScroll() {
@@ -47,6 +51,7 @@ export function unlockBodyScroll() {
   if (lockCount > 0) return
   if (!saved) return
   const body = document.body
+  document.documentElement.removeAttribute('data-lb-modal-open')
   body.style.position = saved.position
   body.style.top = saved.top
   body.style.width = saved.width

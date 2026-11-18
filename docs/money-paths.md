@@ -463,7 +463,7 @@ in the form, which is the standing rule of the section above: the settled
 total is unknown until every leg has run and the donor has finished retrying.
 
 **What never gets full credit**: a boost where nothing was confirmed (no note
-is offered at all), and a donation, which is one leg and so is either whole or
+is offered unless the booster vouches for it, below), and a donation, which is one leg and so is either whole or
 absent. The function takes `donation` and refuses regardless.
 
 **The oracle needed no change.** `/api/sign-boost` validates a note's shape and
@@ -493,6 +493,29 @@ and `handleShare` takes a last look at the figure after the signature: if a
 background watch lowered it in the meantime, the note is not published and the
 donor posts again on the figure the screen shows. A figure that only rose is
 published as signed, since it under-reports and never over.
+
+**The booster's own word, where the wallet gave none** (Reed's call,
+2026-11-12). A boost with nothing the connected wallet confirmed got no note,
+and for a boost of one split that is every timeout. His own setup shows why
+the app cannot do better alone: the Sidecar browser extension as the wallet,
+connected onward to his Alby Hub. To this app that is a WebLN wallet, which has
+no call for asking afterwards whether a payment went through
+(`lookupPayment: null` in `wallet.js`), so a split the extension never
+answered for stays unconfirmed however long the watch runs. The booster can
+open their wallet and look. Once the watch is over, the done screen offers one
+button, "It went through in my wallet, post my boost" ("All N went through"
+for several); the press sets `attested`, which `resolveNoteFigure` reads as
+the same evidence one confirmed split would be. Nothing is paid and no split
+changes status, so the no-re-pay rule on `UNCERTAIN` is untouched; a FAILED
+split still comes off the figure; the note then takes the ordinary path
+(publishing itself with nothing failed, stopping for the Post press beside a
+failed split). It is not offered on a private boost, which has no note, nor
+where the unconfirmed splits already count. Two things were considered and
+not built the same day: a notice before paying when a recipient's address is
+closed (Reed: not worth it), and posting automatically when the only failed
+splits are ones the recipient's side refused (the booster's choice of figure
+on a partial is the transparency, and an automatic post would make it for
+them).
 
 ### One Split, Another Wallet
 
@@ -1581,6 +1604,93 @@ per character at p95 and 3 at the max; an emoji is four bytes and a mention
 is 69. `clipMessage` drops a character that would straddle the edge rather
 than leaving a broken byte, and the modal's counter shows the byte count.
 `scripts/test-mentions.mjs` pins all of it.
+
+### A GIF In The Boost
+
+**Since 2026-11-12 the composer has a GIF button, and the GIF is the last line
+of the message.** `withGif` in `login-widget/src/lib/gif.js` joins the words
+and the link into one string, and that one string is what the boostagram TLV,
+the LNURL comment, the note and the 300-byte counter all read. There is no
+second field anywhere, so a GIF costs what its link weighs: 93 bytes for 87%
+of 1,200 sampled items, 105 for 12%, 106 at the most, plus one for the line
+break when there are words. A pick that would pass 300 is declined with the
+count, and the message is left as typed.
+
+**The source is gifs.nostr.build**, the search API nostr.build runs for Nostr
+clients. BoostMeBitch uses GIPHY through its own server; nostr.build was
+chosen because the files are already where Nostr clients load media from, the
+API needs no key in the browser, and it carries no tracking parameters. The
+client is registered as `onlyboosts` under Reed's account. **The API
+identifies a caller by its `Origin` and nothing else**: the browser calls
+`/api/v1/search` with a plain `fetch` and no headers. An origin that is not
+registered answers 403 with no CORS headers, which the page sees as a network
+error and the picker reports as "GIFs are unavailable right now." A new
+hostname (a custom domain, a preview pattern) has to be added to the client at
+gifs.nostr.build before the picker works there; `http://localhost` works
+unregistered. Never send an `Authorization` header from the page and never put
+an API key in the bundle; both are nostr.build's rules.
+
+**Attribution is a condition of use.** "GIFs from nostr.build", linked, stays
+visible in the picker.
+
+**The grid is nostr.build's own module, vendored.** `gifGrid.js` is their
+`gif-grid.js` byte for byte under a header naming the source and the date;
+do not edit it, replace it. It plays `mp4` previews in a small pool of
+`<video>` elements (an animated `<img>` per tile stalls a phone), sends one
+request per query and never aborts one. `GifPicker.jsx` is the state machine
+around it: a 300 ms pause after typing, no search on a single Latin letter,
+Enter searches at once and reaches nothing outside the picker, Escape closes,
+one pick per opening. There is no trending endpoint, so the picker opens on
+eight starter words and runs the first.
+
+**⚠️ `gif-grid` is written in the React `className`, not left to the module.**
+The module adds the class itself; React rewrites the whole attribute the first
+time the grid's opacity changes, the class goes, and every tile is placed
+against the picker instead of the grid, over the search field. This shipped to
+a local browser once and was only visible on the second search.
+
+**The picker is an overlay inside the card, and the form behind it is
+`inert`.** It is not a second modal and it holds no scroll lock of its own. A
+throw while the grid is being built is caught and reported as unavailable,
+because a render crash here would unmount the widget root with a typed message
+and an amount behind it.
+
+**In the note the link has its own line, outside the quotation marks**, under
+the `💬` line (or in its place when there are no words). A client that draws
+media draws a link on its own line; inside the quotes it would be followed by
+a `"` and several clients would not. `splitGif` takes the last line off the
+message when it is wholly a GIF link, and only then. The note also carries one
+NIP-92 tag, `['imeta', 'url …', 'm image/gif', 'dim WxH']`, four items because
+the oracle's `MAX_TAG_ITEMS` is four.
+
+**The oracle validates the tag rather than allowing it.** `imeta` is in both
+allowlists in `functions/api/sign-boost.js`, and `checkGifImeta` refuses
+anything but: at most one tag, exactly four items, a URL on
+`gifs.nostr.build` ending `.gif` or `.webp`, a type of `image/gif` or
+`image/webp`, a `dim` of two numbers, and the URL present as a whole line of
+the content. The bot will therefore not sign a tag pointing anywhere else, nor
+one for a picture the note does not show. `/api/v1/boosts/ingest` reuses the
+same validators, which is why the allowlist had to change at all: without it a
+booster's own signed GIF note would be refused at the edge and wait for the
+collector. The pattern in the oracle and the pattern in the widget are the
+same expression, and `test-sign-boost.mjs` compares their sources.
+
+**A link is sent whole or not at all on the LNURL path.** `commentAllowed` is
+the recipient's number (Alby 255, Primal and Strike 200, Minibits 100), and a
+cut through a link leaves the recipient a dead one. `sliceWholeUrls` drops a
+link the cut would land in, from its first character. The keysend path needs
+nothing: the GIF is inside the 300 bytes the onion was measured for.
+
+**What is not built.** nostr.build's guide suggests a Report action where
+people see GIFs they did not choose, and a suggest combobox on the field;
+neither is here. The site's own feed draws the GIF because `renderMessage`
+already draws any image link on its own line, and `stripBoilerplate` leaves it
+alone; that was run against a built note, not assumed.
+
+**The duplicate filter reads the GIF line as part of the comment.** Two
+notes from one publisher key with the same words and the same GIF inside
+`TWIN_WINDOW` are twins, as two with the same words always were; a GIF with
+no words now counts as a comment where the bare template did not.
 
 ### The Feed URL Resolves Before The Guid
 

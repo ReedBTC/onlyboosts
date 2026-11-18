@@ -47,6 +47,8 @@ import * as wallet from '../lib/wallet.js'
 import { payExternalBoost, distributeSats, STATUS, confirmLegSettled, legIsCheckable, requestLegInvoice, newBoostUuid } from '../lib/externalBoost.js'
 import { QRCodeSVG } from 'qrcode.react'
 import { buildExternalNoteTemplate, buildDonationNoteTemplate, resolveNoteFigure, sanitizeSenderName, MAX_MESSAGE_BYTES, utf8Bytes, MAX_SENDER_NAME_CHARS } from '../lib/externalBoostagram.js'
+import { withGif } from '../lib/gif.js'
+import GifPicker from './GifPicker.jsx'
 import { signKindOneShareWithUser, publishSignedKindOne, fetchLnurlMeta, SITE_URL } from '../lib/boostagram.js'
 import { signKindOneWithSite } from '../lib/siteSign.js'
 import { mintSummaryReceipt, publishReceipt } from '../lib/summaryReceipt.js'
@@ -498,7 +500,24 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
   const messageRef = useRef(null)
   const [caret, setCaret] = useState(0)
   const [mentionNotice, setMentionNotice] = useState('')
-  const expandedMessage = useMemo(() => mentionMapRef.current.expand(message).trim(), [message])
+  /**
+   * The GIF picked for this boost (`GifPicker.jsx`, 2026-11-12), or null.
+   *
+   * ⚠️ IT IS PART OF THE MESSAGE, NOT A FIELD BESIDE IT. `withGif` puts its
+   * link on a line of its own after the words, and that one string is still
+   * the only form anything below reads. So the show's app receives the link in
+   * the boostagram, the note is built from the same text, and the link counts
+   * toward the 300 bytes like every other character: a pick that does not fit
+   * is declined, and nothing is shortened to make room for it. The object is
+   * kept only for the preview under the field and the note's `imeta` tag.
+   */
+  const [gif, setGif] = useState(null)
+  const [gifOpen, setGifOpen] = useState(false)
+  const gifButtonRef = useRef(null)
+  const expandedMessage = useMemo(() => withGif(mentionMapRef.current.expand(message), gif?.url), [message, gif])
+  // What the link costs out of the cap: its own bytes, and the line break
+  // when there are words above it.
+  const gifBytes = useMemo(() => (gif ? utf8Bytes(expandedMessage) - utf8Bytes(withGif(mentionMapRef.current.expand(message), '')) : 0), [expandedMessage, message, gif])
   const messageBytes = useMemo(() => utf8Bytes(expandedMessage), [expandedMessage])
   const mentionPubkeys = useMemo(() => mentionedPubkeys(expandedMessage), [expandedMessage])
   function onMessageChange(e) {
@@ -513,7 +532,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
       requestAnimationFrame(() => messageRef.current?.setSelectionRange(at, at))
     }
     setCaret(at)
-    if (next.length < message.length || utf8Bytes(mentionMapRef.current.expand(next).trim()) <= MAX_MESSAGE_BYTES) {
+    if (next.length < message.length || utf8Bytes(withGif(mentionMapRef.current.expand(next), gif?.url)) <= MAX_MESSAGE_BYTES) {
       setMessage(next)
       setMentionNotice('')
     }
@@ -523,7 +542,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
     const map = mentionMapRef.current
     const label = map.label(profile)
     const { text, caret: nextCaret } = insertMention(message, range, label)
-    if (utf8Bytes(map.expand(text).trim()) > MAX_MESSAGE_BYTES) {
+    if (utf8Bytes(withGif(map.expand(text), gif?.url)) > MAX_MESSAGE_BYTES) {
       // `nostr:` + a 63-character npub, which is what the wire carries.
       setMentionNotice(`No room for @${label}: a mention takes 69 of the ${MAX_MESSAGE_BYTES}.`)
       return
@@ -535,7 +554,24 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
       const ta = messageRef.current
       if (ta) { ta.focus(); ta.setSelectionRange(nextCaret, nextCaret) }
     })
-  }, [message])
+  }, [message, gif])
+  // Focus goes back to the button the picker was opened from, on a pick and
+  // on a cancel alike; the form under the picker is inert until then.
+  function closeGifPicker() {
+    setGifOpen(false)
+    requestAnimationFrame(() => gifButtonRef.current?.focus())
+  }
+  function onGifPick(picked) {
+    const words = mentionMapRef.current.expand(message)
+    const whole = utf8Bytes(withGif(words, picked.url))
+    if (whole > MAX_MESSAGE_BYTES) {
+      setMentionNotice(`No room for that GIF: its link takes ${whole - utf8Bytes(withGif(words, ''))} of the ${MAX_MESSAGE_BYTES}. Shorten the message and pick it again.`)
+    } else {
+      setGif(picked)
+      setMentionNotice('')
+    }
+    closeGifPicker()
+  }
   const [anonymous, setAnonymous] = useState(false)
   // The signed-out identity route: a name, or nothing. Held raw so the field
   // behaves like a field; every read of it goes through `typedName`.
@@ -633,6 +669,10 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
   // "Posted" line reads this and never live leg state, so a split that
   // settles afterwards cannot rewrite an account of an event nobody can edit.
   const [postedFigure, setPostedFigure] = useState(null)
+  // The booster's own word that the payments their wallet never confirmed
+  // did go through; set only by the press on the done screen (`canAttest`).
+  // See resolveNoteFigure.
+  const [attested, setAttested] = useState(false)
   // Per-leg: a Retry was pressed and the leg is still FAILED (the gate on
   // the other-wallet offer), and an invoice for that offer is being fetched.
   const [retried, setRetried] = useState({})
@@ -731,11 +771,12 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
   // confirmed split. `landedSats` and `landedCount` are its answers, and
   // every line on the done screen that says how much of the boost went
   // through reads those two, never `paidSats` / `paidCount`, which stay the
-  // confirmed figures (the gate on having a note at all, and the confetti).
+  // confirmed figures (the confetti). The gate on having a note at all is
+  // `landedSats`, which is the confirmed figure until the booster attests.
   const intendedSats = visibleLegs.reduce((a, { leg }) => a + (leg?.sats || 0), 0)
   const credit = resolveNoteFigure({
     paidSats, intendedSats, legsPaid: paidCount, legsTotal: activeCount,
-    unconfirmedSats, legsUnconfirmed: unconfirmedCount, walletPaidSats, donation, choice: noteFigure,
+    unconfirmedSats, legsUnconfirmed: unconfirmedCount, walletPaidSats, attested, donation, choice: noteFigure,
   })
   const fullCreditOk = credit.eligible
   const noteSats = credit.sats
@@ -927,9 +968,12 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
   function noteTemplate(args) {
     if (donation) {
       const { paidSats, message: msg, senderName, mentionPubkeys: mentioned } = args
-      return buildDonationNoteTemplate({ paidSats, message: msg, senderName, mentionPubkeys: mentioned })
+      return buildDonationNoteTemplate({ paidSats, message: msg, senderName, mentionPubkeys: mentioned, gif })
     }
-    return buildExternalNoteTemplate(args)
+    // `gif` is added here, once, rather than at each call: the link is already
+    // in every caller's `message`, and this is only what the `imeta` tag says
+    // about it.
+    return buildExternalNoteTemplate({ ...args, gif })
   }
 
   /**
@@ -965,7 +1009,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
 
   async function handleShare() {
     if (noteRoute === 'none' || shareState === 'signing' || shareState === 'shared') return
-    if (paidSats <= 0) return
+    if (landedSats <= 0) return
     const figure = { sats: noteSats, short: noteShort, paid: landedCount, total: activeCount }
     setShareState('signing')
     setShareError('')
@@ -1118,7 +1162,9 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
    * had. Beside at least one confirmed split it counts (`landedCount`), and a
    * boost with nothing failed goes out at the amount typed once the
    * ninety-second watch is over. With nothing confirmed at all the wallet may
-   * be offline, `landedCount` stays at zero, and nothing publishes.
+   * be offline, `landedCount` stays at zero, and nothing publishes; unless
+   * the booster says their wallet shows the payments (`attested`), which makes
+   * them count and brings the boost through this same effect.
    *
    * The one thing this costs is that a NIP-07 or NIP-46 signer prompt now
    * arrives without a press behind it. It is not unannounced — the donor asked
@@ -1134,7 +1180,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
   useEffect(() => {
     if (phase !== 'done' || noteRoute === 'none') return
     if (autoSharedRef.current || shareState !== 'idle') return
-    if (!watchSettled || stillChecking || paidSats <= 0) return
+    if (!watchSettled || stillChecking || landedSats <= 0) return
     if (activeCount === 0 || landedCount !== activeCount) return
     autoSharedRef.current = true
     // ⚠️ THE IDENTITY IS RE-CHECKED HERE, NOT ASSUMED. A pre-signed note claims
@@ -1511,12 +1557,29 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
         noteHint: '',
       }
   const headerTitle = copy.header
+  // The picker belongs to the form and to nothing after it: once a payment
+  // starts the message is spent, and the card must never sit inert under it.
+  const pickingGif = gifOpen && hasValue && phase === 'form'
   const allPaid = phase === 'done' && activeCount > 0 && paidCount === activeCount
   // Nothing failed, and what is not confirmed counts: a success, said as one
   // (see the calm row in LegRow). "Sent" rather than "delivered", because
   // delivered is the word for a boost every split of which was seen to land.
   const allSent = phase === 'done' && !allPaid && watchSettled && !stillChecking
     && activeCount > 0 && landedCount === activeCount
+
+  // ⚠️ THE BOOSTER MAY VOUCH FOR WHAT THE WALLET NEVER CONFIRMED (Reed's
+  // call, 2026-11-12). Offered only where the unconfirmed splits do not
+  // already count, which is a boost with nothing the connected wallet
+  // confirmed, and only once the watch has had its turn. The press sets
+  // `attested` and nothing else: no split changes status, nothing is paid,
+  // and the note then follows the ordinary path (it publishes itself with
+  // nothing failed, and stops for the Post press beside a failed split).
+  const canAttest = phase === 'done' && noteRoute !== 'none' && watchSettled && !stillChecking
+    && !attested && unconfirmedCount > 0 && !unconfirmedCounted
+    && shareState !== 'signing' && shareState !== 'shared'
+  const attestPosts = paidCount + unconfirmedCount === activeCount
+  const attestClaim = unconfirmedCount === 1 ? 'It went through in my wallet' : `All ${unconfirmedCount} went through in my wallet`
+  const attestLabel = attestPosts ? `${attestClaim}, post my ${donation ? 'donation' : 'boost'}` : attestClaim
 
   // ⚠️ THE SUMMARY MUST NOT TELL THE DONOR TO RE-SEND A LEG WE CANNOT PROVE
   // UNPAID. It used to say "Retry any that didn't", which on an unconfirmed
@@ -1548,7 +1611,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
   // landed one, so the only splits the line counts against the boost are the
   // ones that failed.
   let summaryLine
-  if (paidCount === 0) summaryLine = onlyUnpayable ? `Nothing was sent. ${tail}` : `Nothing confirmed yet. ${tail}`
+  if (landedCount === 0) summaryLine = onlyUnpayable ? `Nothing was sent. ${tail}` : `Nothing confirmed yet. ${tail}`
   else if (stillChecking) summaryLine = `${paidCount} of ${activeCount} splits confirmed. ${tail}`
   else summaryLine = `${landedCount} of ${activeCount} splits sent. ${tail}`
 
@@ -1556,13 +1619,17 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
     <>
       <div className={`fixed inset-0 bg-[var(--scrim,rgba(11,58,82,0.55))] z-[70] transition-opacity duration-200 ${visible ? 'opacity-100' : 'opacity-0'}`} aria-hidden="true" />
       <div className="fixed inset-0 z-[71] flex items-center justify-center p-3 sm:p-4 overflow-hidden" role="dialog" aria-label={headerTitle}>
-        <div className={`relative bg-[var(--modal-bg,#f4fafd)] border border-[var(--modal-line,#b9d4e6)] rounded-lg w-full max-w-lg max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2rem)] flex flex-col shadow-[0_24px_60px_-12px_rgba(11,58,82,0.28),0_0_0_1px_rgba(11,58,82,0.06)] transition-[opacity,transform] duration-200 ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}>
-          <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-[var(--modal-line,#b9d4e6)] shrink-0">
+        <div className={`relative bg-[var(--modal-bg,#f4fafd)] border border-[var(--modal-line,#b9d4e6)] rounded-lg w-full max-w-lg max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2rem)] flex flex-col shadow-[0_24px_60px_-12px_rgba(11,58,82,0.28),0_0_0_1px_rgba(11,58,82,0.06)] transition-[opacity,transform] duration-200 ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'} ${pickingGif ? 'min-h-[min(36rem,calc(100dvh-1.5rem))]' : ''}`}>
+          {/* `inert` on the two halves of the form while the GIF picker lies
+              over them: nothing under it takes a tab stop, a tap or a screen
+              reader's cursor. An empty string, because React 18 drops a
+              boolean on an attribute it does not know. */}
+          <div inert={pickingGif ? '' : undefined} className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-[var(--modal-line,#b9d4e6)] shrink-0">
             <h2 className="text-base font-semibold text-[var(--ink,#0f2733)] font-[family-name:var(--font-display,'Playfair_Display',Georgia,serif)]">{headerTitle}</h2>
             <button onClick={guardedClose} className="text-[var(--muted,#5a7488)] hover:text-[var(--ink,#0f2733)] transition-colors text-lg leading-none" aria-label="Close">✕</button>
           </div>
 
-          <div className="px-4 sm:px-6 py-5 space-y-4 flex-1 min-h-0 overflow-y-auto">
+          <div inert={pickingGif ? '' : undefined} className="px-4 sm:px-6 py-5 space-y-4 flex-1 min-h-0 overflow-y-auto">
             {copy.subject && (
               <div className="text-xs text-[var(--muted,#5a7488)] leading-snug">
                 <span className="font-semibold text-[var(--ink,#0f2733)]">{copy.subject}</span>
@@ -1719,9 +1786,27 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
                     <MentionAutocomplete textareaRef={messageRef} value={message} caret={caret} onPick={onMentionPick} isPicked={isMentionPicked} />
                   </div>
                   <div className="mt-1 flex items-baseline justify-between gap-3">
-                    <p className="text-[10px] text-[var(--muted,#5a7488)] leading-snug" aria-live="polite">{mentionNotice}</p>
+                    <div className="min-w-0 flex items-baseline gap-2">
+                      <button ref={gifButtonRef} type="button" onClick={() => setGifOpen(true)} aria-label={gif ? 'Change the GIF' : 'Add a GIF'}
+                        className="shrink-0 px-2 py-0.5 rounded-md border border-[var(--modal-line,#b9d4e6)] text-[11px] font-semibold tracking-wide text-[var(--muted,#5a7488)] hover:text-[var(--ink,#0f2733)] hover:border-[var(--brand,#00aff0)] transition-colors">GIF</button>
+                      <p className="text-[10px] text-[var(--muted,#5a7488)] leading-snug" aria-live="polite">{mentionNotice}</p>
+                    </div>
                     <p className="text-[10px] text-[var(--muted,#5a7488)] text-right shrink-0">{messageBytes}/{MAX_MESSAGE_BYTES}</p>
                   </div>
+                  {/* One animated <img>, the small preview and never the
+                      original file (often megabytes). The grid's rule against
+                      animated images is about hundreds of them. */}
+                  {gif && (
+                    <div className="mt-2 flex items-center gap-3">
+                      <img src={gif.animated || gif.still || gif.url} alt={gif.title || 'The GIF you picked'}
+                        className="h-20 w-auto max-w-[9rem] rounded-lg object-cover bg-[var(--modal-inset,#e6f1f9)]" />
+                      <div className="min-w-0 text-[11px] text-[var(--muted,#5a7488)] leading-snug">
+                        <p>The GIF is sent as a link at the end of your message and takes {gifBytes} of the {MAX_MESSAGE_BYTES}.</p>
+                        <button type="button" onClick={() => { setGif(null); setMentionNotice('') }}
+                          className="mt-1 underline text-[var(--brand-d,#068ace)] hover:text-[var(--ink,#0f2733)]">Remove the GIF</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* ⚠️ THE LABEL CARRIES ITS OWN SCOPE, and a bare "Boost
@@ -1844,7 +1929,20 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
                     {noteRoute !== 'none' && ' The Nostr note waits for this.'}
                   </p>
                 )}
-                {phase === 'done' && noteRoute !== 'none' && paidSats > 0 && !stillChecking && (
+                {canAttest && (
+                  <div className="rounded-md border border-[var(--modal-line,#b9d4e6)] bg-[var(--modal-field,#ffffff)] p-3 space-y-2">
+                    <p className="text-[11px] text-[var(--muted,#5a7488)] leading-snug">
+                      {unconfirmedCount === 1
+                        ? 'Your wallet never confirmed this payment, so it has not been posted. Open your wallet and check: if the payment is there, you can post it.'
+                        : `Your wallet never confirmed these ${unconfirmedCount} payments, so they have not been posted. Open your wallet and check: if all ${unconfirmedCount} are there, you can post them.`}
+                    </p>
+                    <button onClick={() => setAttested(true)}
+                      className="w-full py-2 rounded-lg border border-[var(--modal-line,#b9d4e6)] text-xs font-medium text-[var(--ink,#0f2733)] hover:border-[var(--brand,#00aff0)] hover:text-[var(--brand-dd,#0a6fa8)] transition-colors">
+                      {attestLabel}
+                    </button>
+                  </div>
+                )}
+                {phase === 'done' && noteRoute !== 'none' && landedSats > 0 && !stillChecking && (
                   <div className="rounded-md border border-[var(--modal-line,#b9d4e6)] bg-[var(--modal-field,#ffffff)] p-3 space-y-2">
                     {shareState === 'shared' ? (
                       <p className="text-xs text-[var(--ok,#0b7a4b)] leading-snug">
@@ -1981,6 +2079,7 @@ export default function ExternalBoostModal({ user, onClose, onRequestSignIn, onR
           {confirmLeave && progressActive && (
             <ConfirmLeaveOverlay paid={paidCount} total={activeCount || recipients.length} onStay={() => setConfirmLeave(false)} onLeave={requestClose} />
           )}
+          {pickingGif && <GifPicker onPick={onGifPick} onClose={closeGifPicker} />}
         </div>
       </div>
     </>
