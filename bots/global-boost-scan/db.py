@@ -1675,6 +1675,97 @@ def apply_aliases(conn):
     return len(to_change)
 
 
+# ── songs boosted off a playlist ──────────────────────────────────────────────
+# A playlist (podcast:medium `musicL`, and any other `*L` list medium) owns no
+# items: each entry is a remoteItem naming the song's own feed and item guid. A
+# client playing one signs the boost with the PLAYLIST's guid, or with none at
+# all, and either way the boost credited the wrong show, or no show: the medium
+# split read `musicL` as not-music and every chart missed it (2026-11-19, 21 of
+# Reed's BoostMeBuddy boosts). resolve_guids.credit_playlist_songs moves each
+# onto the song's feed through `canonical_guid`, per boost and never as a
+# `guid_aliases` row, because one playlist guid points at a different feed on
+# every boost. The as-signed `podcast_guid` is left alone, so which playlist a
+# boost came through stays on the row.
+LIST_MEDIUM_GLOB = "*L"
+PLAYLIST_RETRY = 24 * 60 * 60     # a playlist gains songs weekly; the PI cooldown is a week
+
+
+def playlist_credit_candidates(conn):
+    """Boosts to credit to the song: no canonical guid yet, an item guid, and a
+    show slot that is empty or names a list feed the item does not sit on.
+
+    A named feed that is NOT a list is deliberately out of scope, even when the
+    item turns out to live elsewhere: that is a moved or mirrored feed, or a
+    value-time split, and it belongs to the alias rungs, not this one."""
+    return conn.execute(
+        f"""SELECT b.event_id, b.podcast_guid, b.item_guid, b.raw_json,
+                   s.feed_url AS list_feed_url
+           FROM boosts b
+           LEFT JOIN shows s ON s.podcast_guid = b.podcast_guid
+           WHERE b.canonical_guid IS NULL AND b.item_guid IS NOT NULL
+             AND {not_excluded('b')}
+             AND (b.podcast_guid IS NULL OR s.medium GLOB ?)
+             AND NOT EXISTS (SELECT 1 FROM episodes e
+                             WHERE e.item_guid = b.item_guid
+                               AND e.podcast_guid = b.podcast_guid)""",
+        (LIST_MEDIUM_GLOB,)).fetchall()
+
+
+def item_owner_guids(conn, item_guid):
+    """The feeds an already-enriched item sits on, list feeds left out."""
+    return [r[0] for r in conn.execute(
+        """SELECT DISTINCT e.podcast_guid FROM episodes e
+           LEFT JOIN shows s ON s.podcast_guid = e.podcast_guid
+           WHERE e.item_guid = ? AND e.podcast_guid IS NOT NULL
+             AND COALESCE(s.medium, '') NOT GLOB ?""",
+        (item_guid, LIST_MEDIUM_GLOB)).fetchall()]
+
+
+def is_list_feed(conn, guid):
+    return conn.execute("SELECT 1 FROM shows WHERE podcast_guid=? AND medium GLOB ?",
+                        (guid, LIST_MEDIUM_GLOB)).fetchone() is not None
+
+
+def playlists_cooling(conn):
+    """List feeds fetched inside PLAYLIST_RETRY that left a boost unplaced."""
+    return {r[0] for r in conn.execute(
+        "SELECT id FROM enrich_failed WHERE kind='playlist' AND last_try >= ?",
+        (int(time.time()) - PLAYLIST_RETRY,)).fetchall()}
+
+
+def credit_boosts(conn, moves):
+    """Set canonical_guid on each (event_id, as_signed_guid, song_guid) and queue
+    what D1 has to redo, the way apply_aliases does: the boost is un-synced and
+    queued for reprojection (the delta's insert is OR IGNORE, so un-syncing alone
+    leaves it under the old show), and the old show is recounted, which deletes
+    its row once nothing is left on it. Returns the rows actually moved.
+
+    The item's episode-enrichment failure is forgotten too: it was recorded
+    against the playlist's feed, whose raw RSS holds no items, and would
+    otherwise hold the song's first real lookup back a week."""
+    moved = []
+    for event_id, old, new in moves:
+        cur = conn.execute("UPDATE boosts SET canonical_guid=? "
+                           "WHERE event_id=? AND canonical_guid IS NULL", (new, event_id))
+        if cur.rowcount:
+            moved.append((event_id, old))
+    if not moved:
+        return 0
+    conn.execute(
+        f"""DELETE FROM enrich_failed WHERE kind='episode' AND id IN
+            (SELECT item_guid FROM boosts WHERE event_id IN ({','.join('?' * len(moved))}))""",
+        [e for e, _ in moved])
+    if _has_table(conn, "d1_boosts_synced"):
+        conn.executemany("DELETE FROM d1_boosts_synced WHERE event_id=?",
+                         [(e,) for e, _ in moved])
+    if _has_table(conn, "d1_reproject"):
+        conn.executemany("INSERT OR IGNORE INTO d1_reproject (kind, id) VALUES (?, ?)",
+                         [("boost", e) for e, _ in moved]
+                         + [("podcast", g) for g in {o for _, o in moved if o}])
+    conn.commit()
+    return len(moved)
+
+
 def enrichment_gap_size(conn):
     """How many boosted item_guids still have no `episodes` row.
 

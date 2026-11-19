@@ -24,6 +24,9 @@ Resolution strategies, cheapest first:
   • curated        freeform slugs, from data/guid_aliases.json (hand-maintained;
                    these have no reliable anchor in the event, so a human decides).
 
+Then one per-boost pass, which is not an alias (see credit_playlist_songs): a song
+boosted off a playlist is credited to the song's own feed.
+
 Read-only against Podcast Index; writes only the local index. Never signs/pays.
 The as-signed podcast_guid on each boost is left untouched — only canonical_guid
 is derived — so the stored row stays faithful to the signed event.
@@ -168,4 +171,126 @@ def resolve_all(conn, key, secret, log=print):
     if by_method:
         log("  aliases by method: " + ", ".join(f"{m}={n}" for m, n in sorted(by_method.items())))
     log(f"Resolve done: {new} new alias(es), {rekeyed} boost row(s) re-keyed.")
+    credit_playlist_songs(conn, log=log)
     return new, rekeyed
+
+
+# ── songs boosted off a playlist ──────────────────────────────────────────────
+_REMOTE_ITEM_RE = re.compile(r"<([a-zA-Z0-9]+:)?remoteItem\b([^>]*?)/?>", re.I)
+_ATTR_RE = re.compile(r'([\w:]+)\s*=\s*"([^"]*)"')
+
+
+def parse_playlist(xml):
+    """{item_guid: feed_guid} off a list feed's item-level remoteItems. One without
+    an itemGuid (the channel's publisher link, a whole-feed entry) places no song;
+    an item guid listed under two different feeds places none either."""
+    out, clash = {}, set()
+    for _prefix, attrs in _REMOTE_ITEM_RE.findall(xml or ""):
+        a = {k.split(":")[-1].lower(): v.strip() for k, v in _ATTR_RE.findall(attrs)}
+        ig, fg = a.get("itemguid"), a.get("feedguid")
+        if not (ig and is_uuid(fg)):
+            continue
+        if out.get(ig, fg) != fg:
+            clash.add(ig)
+        out[ig] = fg
+    for ig in clash:
+        del out[ig]
+    return out
+
+
+def _note_feed_guids(raw_json):
+    """Every podcast:guid i-tag on the signed note, in order, deduplicated."""
+    try:
+        tags = json.loads(raw_json or "{}").get("tags", [])
+    except ValueError:
+        return []
+    out = []
+    for t in tags:
+        if len(t) >= 2 and t[0] == "i" and isinstance(t[1], str) \
+                and t[1].startswith("podcast:guid:"):
+            g = t[1][len("podcast:guid:"):]
+            if g not in out:
+                out.append(g)
+    return out
+
+
+def place_song(conn, row, playlist_map):
+    """(song_feed_guid, method) for one candidate, or None.
+
+    Cheapest-and-surest first:
+      • playlist-feed  the named playlist's own remoteItem for this item guid. It
+                       is what the listener was playing, so it decides even an
+                       item we have never enriched.
+      • episode-row    the one non-list feed our episodes table has this item on.
+                       The only rung for a note naming no feed at all (BoostMeBuddy's
+                       "Top 100 Songs on OnlyBoosts" signs the item guid alone).
+      • note-tag       the one other podcast:guid on the note that is not a list.
+                       BoostMeBuddy puts the song's feed first and the playlist last,
+                       which is why classify's last-tag-wins filed it under the list;
+                       MSP 2.0 and others put the song LAST on a value-time split,
+                       so the order itself means nothing and is never read.
+    """
+    item, named = row["item_guid"], row["podcast_guid"]
+    hit = playlist_map.get(item)
+    if hit and hit != named:
+        return hit, "playlist-feed"
+    owners = db.item_owner_guids(conn, item)
+    if len(owners) == 1 and owners[0] != named:
+        return owners[0], "episode-row"
+    if named:
+        others = [g for g in _note_feed_guids(row["raw_json"])
+                  if g != named and is_uuid(g) and not db.is_list_feed(conn, g)]
+        if len(others) == 1:
+            return others[0], "note-tag"
+    return None
+
+
+def credit_playlist_songs(conn, log=print, fetch=None, dry_run=False):
+    """Credit every song boosted off a playlist to the song's own feed. Per boost,
+    through `canonical_guid`, never a `guid_aliases` row: one playlist guid names a
+    different song feed on every boost. A placed boost is never revisited (the
+    candidate query wants canonical_guid NULL); an unplaced one is asked again each
+    tick on the local rungs, and its playlist is re-fetched only after
+    db.PLAYLIST_RETRY, so a stuck item costs nothing and a newly added song on a
+    playlist with nothing stuck is placed on its first tick.
+
+    Returns {"credited", "unplaced", "by_method", "moves"}."""
+    fetch = fetch or enrich.fetch_feed
+    rows = db.playlist_credit_candidates(conn)
+    result = {"credited": 0, "unplaced": 0, "by_method": {}, "moves": []}
+    if not rows:
+        return result
+    cooling = db.playlists_cooling(conn)
+    maps, fetched, stuck = {}, set(), set()
+    moves = []
+    for r in rows:
+        named, url = r["podcast_guid"], r["list_feed_url"]
+        if named and named not in maps:
+            maps[named] = {}
+            if url and named not in cooling:
+                maps[named] = parse_playlist(fetch(url))
+                fetched.add(named)
+        placed = place_song(conn, r, maps.get(named, {}))
+        if not placed:
+            result["unplaced"] += 1
+            if named in fetched:
+                stuck.add(named)
+            continue
+        song, method = placed
+        moves.append((r["event_id"], named, song))
+        result["by_method"][method] = result["by_method"].get(method, 0) + 1
+    result["moves"] = moves
+    if dry_run:
+        result["credited"] = len(moves)
+    else:
+        result["credited"] = db.credit_boosts(conn, moves)
+        if stuck:
+            db.mark_enrich_failed(conn, "playlist", sorted(stuck))
+    if moves or fetched:      # an idle tick with the same unplaced pile says nothing
+        by = ", ".join(f"{m}={n}" for m, n in sorted(result["by_method"].items()))
+        log(f"Playlist credit: {result['credited']} boost(s) credited to the song's own feed"
+            + (f" ({by})" if by else "")
+            + f", {result['unplaced']} still unplaced"
+            + (f", {len(fetched)} playlist feed(s) read" if fetched else "")
+            + (" [dry run]" if dry_run else ""))
+    return result

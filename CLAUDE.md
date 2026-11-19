@@ -309,6 +309,8 @@ Reasoning in `docs/data-pipeline.md`.
   undocumented on the site.
 - **⚠️ THE INDEX IS LOAD-BEARING FOR LOCAL BITCOINERS' PUBLISH DECISION**: a
   dropped row in `/api/v1/boosts` is a duplicate note there. Flag such a change.
+- **A song boosted off a playlist is credited to the song's feed**, per boost through
+  `canonical_guid`, never an alias; the as-signed playlist guid stays on the row.
 - **The site's own boosts reach D1 at the edge** (`/api/v1/boosts/ingest`); the
   collector stays the source of truth.
 

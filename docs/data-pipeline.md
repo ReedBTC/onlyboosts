@@ -655,6 +655,56 @@ What a change elsewhere would break:
 **Still open: `/stats`.** A "boosts by app" breakdown is what `/api/v1/clients`
 was built for and still has no surface.
 
+## Songs Boosted Off A Playlist
+
+A playlist feed (`podcast:medium` `musicL`, or any other `*L` list medium) owns no
+items. Each entry is a `podcast:remoteItem` naming the song's own `feedGuid` and
+`itemGuid`. A client playing one signs the boost with the **playlist's** guid, or
+with no `podcast:guid` at all, and until 2026-11-19 the boost was filed under
+the playlist or under no show. Either way the medium split never saw it as
+music and no chart counted it. 21 of Reed's BoostMeBuddy boosts were the case
+that surfaced it.
+
+`resolve_guids.credit_playlist_songs` runs at the end of `resolve-guids` on every
+tick and sets `canonical_guid` on each such boost to the song's feed. Three rungs,
+surest first:
+
+1. **`playlist-feed`**: the named playlist's own remoteItem for the item guid. It
+   places a song we have never enriched.
+2. **`episode-row`**: the one non-list feed our `episodes` table has the item on.
+   This is the only rung for a note with no `podcast:guid` (BoostMeBuddy's "Top 100
+   Songs on OnlyBoosts" signs the item guid alone).
+3. **`note-tag`**: the one other non-list `podcast:guid` on the note. Tag order is
+   never read: BoostMeBuddy puts the song first and the playlist last, while a
+   value-time split from MSP 2.0 or Boostr_Bot puts the podcast first and the song
+   last. That is why classify's last-tag-wins is right for one and wrong for the
+   other, and why the fix is here rather than in classify.
+
+What a change elsewhere would break:
+
+- **⚠️ PER BOOST, NEVER A `guid_aliases` ROW.** One playlist guid points at a
+  different song feed on every boost. `apply_aliases` joins on the as-signed guid,
+  so it never overwrites a credited row (`test_playlist_credit.py` checks it).
+- **⚠️ ONLY A LIST FEED, OR NO FEED, IS IN SCOPE.** A boost naming an ordinary feed
+  whose item turns out to live elsewhere is a moved or mirrored feed; it belongs to
+  the alias rungs. Measured on 2026-11-19 there are 37 such podcast boosts, and
+  this pass leaves them alone on purpose.
+- **The as-signed `podcast_guid` stays on the row**, so which playlist a boost came
+  through is still there for whatever playlist support becomes.
+- **D1 is told the way `apply_aliases` tells it**: the boost is un-synced and queued
+  for reprojection, and the playlist's row is recounted, which deletes it once
+  nothing is left on it. The item's `enrich_failed` row is cleared too, because it
+  was recorded against the playlist's feed, whose raw RSS holds no items.
+- A playlist that leaves a boost unplaced is not re-read for `PLAYLIST_RETRY` (a
+  day); a placed boost is never revisited.
+
+The first run, on 2026-11-19, credited 250 boosts: 230 by `episode-row` (171 music,
+59 podcast item-only notes, which this also fixes) and 20 by `playlist-feed` (four onto a
+song feed we had no show row for yet, which the next `enrich` fetches). Of
+those, 21 were Reed's and 19 were ChadF's. 234 stay unplaced, almost all item-only
+notes whose item no feed we know carries; `episode-row` places each one on the
+first tick after its episode is enriched.
+
 ## Not indexed: `podcast:person`
 
 `<podcast:person>` is **not** in this pipeline and deliberately isn't being added.
