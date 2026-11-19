@@ -40,7 +40,20 @@
     "which parses this file and reports exactly what each entry currently hides."
   ],
 
-  "shows": [],
+  "shows": [
+    {
+      "guid": "9fe51a32-e08d-5ab7-9540-22a25c6bc2bf",
+      "reason": "Test feed, never meant to be indexed: ChadF's LNURL Testing Podcast (github.com/ChadFarrow/lnurl-test-feed), used to test LNURL and BoostBox payments from podcast apps. Its boosts are test payments, not listening.",
+      "added": "2026-11-19",
+      "source": "Reed's call on 2026-11-19. Found while auditing playlist boosts; it is the feed that prompted this list on 2026-08-05, which shipped empty and never named it."
+    },
+    {
+      "guid": "lnurl-test-feed",
+      "reason": "The same LNURL Testing Podcast under a phantom guid: StableKraft and other test notes signed the feed's repo name into the podcast:guid tag (their tags carry the feed's own RSS URL), so the entry above does not reach them.",
+      "added": "2026-11-19",
+      "source": "Reed's call on 2026-11-19. Found while auditing playlist boosts; it is the feed that prompted this list on 2026-08-05, which shipped empty and never named it."
+    }
+  ],
 
   "episodes": [],
 
