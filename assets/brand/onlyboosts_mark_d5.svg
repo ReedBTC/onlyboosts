@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
   <title>OnlyBoosts</title>
   <rect x="2" y="2" width="60" height="60" rx="14" fill="#00aff0"/>
-  <path d="M20 13 H44 A8 8 0 0 1 52 21 V35 A8 8 0 0 1 44 43 H30.8 L18.8 51 V43 H20 A8 8 0 0 1 12 35 V21 A8 8 0 0 1 20 13 Z" fill="none" stroke="#ffffff" stroke-width="3.6" stroke-linejoin="round"/>
+  <path d="M20 13 H44 A8 8 0 0 1 52 21 V35 A8 8 0 0 1 44 43 H30.8 L20 51 V43 A8 8 0 0 1 12 35 V21 A8 8 0 0 1 20 13 Z" fill="none" stroke="#ffffff" stroke-width="3.6" stroke-linejoin="round"/>
   <circle cx="24.83" cy="35.17" r="3.2" fill="#ffffff"/>
   <path d="M25.72 28.83A6.4 6.4 0 0 1 31.17 34.28M26.39 24.08A11.2 11.2 0 0 1 35.92 33.61M27.06 19.33A16 16 0 0 1 40.67 32.94" fill="none" stroke="#ffffff" stroke-width="3.4" stroke-linecap="round"/>
 </svg>

@@ -23,6 +23,8 @@ shot() { # svg-or-html  width height out  [bg]
 # The site's own marks keep their filenames, so every page, the manifest and the widget pick them up.
 shot $B/onlyboosts_pfp_d5.svg      1400 1400 assets/onlyboosts_pfp.png
 shot $B/onlyboosts_favicon_d5.svg   256  256 assets/onlyboosts_favicon.png
+# The rounded-tile mark at the app-icon sizes (assets/brand/README.md).
+for n in 32 180 192 512; do shot $B/onlyboosts_mark_d5.svg $n $n $B/onlyboosts_mark_d5_$n.png; done
 # Nostr kind 0 pictures (Reed sets them himself).
 shot $B/onlyboosts_pfp_d5.svg      1024 1024 $B/nostr_pfp_onlyboosts.png
 shot $B/onlyboosts_bot_pfp_d5.svg  1024 1024 $B/nostr_pfp_boostbot.png
