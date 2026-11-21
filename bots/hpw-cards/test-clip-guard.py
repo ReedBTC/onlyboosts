@@ -11,7 +11,7 @@ while the real one rotted.
 It also prints, per card, what the site's CLAUDE.md calls the budget: the list
 box's height, the row heights the page actually laid out, and the ceiling
 (room / rows) a row may grow to before the last one falls out. The ceiling is
-per card KIND — the shows/artists cards carry a column head and a rank triplet
+per card KIND — the shows/songs/artists cards carry a column head and a rank triplet
 the members cards do not — and it moves with ANY chrome change around the
 list, so re-run this after touching a card page and paste the numbers into the
 README rather than deriving them.
@@ -39,7 +39,7 @@ def live_keys():
         print(f"  (no hpw week: {e})")
     try:
         ws = bot.week_date(bot.chart_week("shows")["week_start"])
-        keys += [f"shows-{ws}", f"artists-{ws}"]
+        keys += [f"{k}-{ws}" for k in bot.CHART_WEEK_KINDS]
         keys += [f"{k}-{bot.WEEKS_AT_1}" for k in bot.CHART_ONES_KINDS]
     except Exception as e:
         print(f"  (no chart boards at {ORIGIN}: {e})")
