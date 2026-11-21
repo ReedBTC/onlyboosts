@@ -63,6 +63,12 @@ const DISPLAY = {
   // it costs a line and saves the label if one ever does.
   "truefans": "TrueFans",
   "helipad": "Helipad",
+  // Web boost clients with no label until the Charts of 2026 named them
+  // (2026-11-21); each publishes its own client tag.
+  "boostmebuddy": "BoostMeBuddy",
+  "bullishboosts": "Bullish Boosts",
+  "nostrwall": "NostrWall",
+  "candr-space": "candr.space",
 };
 
 /** A client slug → its display name. An unknown slug is returned unchanged. */

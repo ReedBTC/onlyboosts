@@ -786,28 +786,28 @@ console.log('\nThe recommendations and the data rails, over the real schema:')
   })
 }
 
-console.log('\nThe nav bar: three ribbons, then Charts and Boosts as plain links (2026-10-21):')
+console.log('\nThe nav bar: four ribbons (Charts became one 2026-11-21), then Boosts as a plain link:')
 {
   const nav = read('partials/nav.html')
   const foot = read('partials/footer.html')
   const links = nav.slice(nav.indexOf('<nav class="nav-links"'), nav.indexOf('</nav>'))
-  check('the bar is Podcasts, Music and #40HPW as ribbons, then Charts and Boosts', () => {
-    assert.deepStrictEqual([...links.matchAll(/<details class="nav-ribbon" data-ribbon="([a-z]+)"/g)].map((m) => m[1]), ['podcasts', 'music', 'members'])
-    assert.ok(links.includes('<a href="/charts">Charts</a>') && links.includes('<a href="/boosts">Boosts</a>'))
+  check('the bar is Podcasts, Music, #40HPW and Charts as ribbons, then Boosts', () => {
+    assert.deepStrictEqual([...links.matchAll(/<details class="nav-ribbon" data-ribbon="([a-z]+)"/g)].map((m) => m[1]), ['podcasts', 'music', 'members', 'charts'])
+    assert.ok(links.includes('<summary><a href="/charts">Charts</a>') && links.includes('<a href="/boosts">Boosts</a>'))
     assert.ok(!/^\s*<a href="\/charts\/hpw">#40HPW<\/a>/m.test(links), 'the #40HPW plain link of 2026-10-20 is gone; #40HPW is the third ribbon')
     assert.ok(links.includes('<summary><a href="/charts/hpw">#40HPW</a>'), 'the third ribbon is named #40HPW and opens the boards (Reed, 2026-10-21)')
     assert.ok(!links.includes('<summary><a href="/members">'), 'no ribbon is named Members any more')
-    for (const [ribbon, href] of [['podcasts', '/podcasts'], ['music', '/music'], ['members', '/charts/hpw']]) {
+    for (const [ribbon, href] of [['podcasts', '/podcasts'], ['music', '/music'], ['members', '/charts/hpw'], ['charts', '/charts']]) {
       assert.ok(links.includes(`data-ribbon="${ribbon}">\n        <summary><a href="${href}">`), `${ribbon} opens ${href}`)
     }
   })
   check('each ribbon is two list slots nav-ribbons.js can fill, a Discover column and a featured block', () => {
     const slots = [...links.matchAll(/data-ribbon-list="([a-z-]+)"/g)].map((m) => m[1])
-    assert.deepStrictEqual(slots, ['shows-week', 'shows-year', 'albums-month', 'songs-year', 'hpw-week', 'boosts-week'])
+    assert.deepStrictEqual(slots, ['shows-week', 'shows-year', 'albums-month', 'songs-year', 'hpw-week', 'boosts-week', 'songs-week', 'shows-week'])
     const src = read('assets/js/nav-ribbons.js')
     for (const k of slots) assert.ok(src.includes(`'${k}': {`), `nav-ribbons.js has a source for ${k}`)
     assert.strictEqual((links.match(/<h4>Discover<\/h4>/g) || []).length, 3)
-    assert.deepStrictEqual([...links.matchAll(/data-ribbon-feat="([a-z-]+)"/g)].map((m) => m[1]), ['shows-week', 'albums-month', 'hpw-week'])
+    assert.deepStrictEqual([...links.matchAll(/data-ribbon-feat="([a-z-]+)"/g)].map((m) => m[1]), ['shows-week', 'albums-month', 'hpw-week', 'songs-week'])
   })
   check("the Podcasts ribbon's Discover column is the rails not already in its lists, plus the personal ones", () => {
     const pod = links.slice(links.indexOf('data-ribbon="podcasts"'), links.indexOf('data-ribbon="music"'))
@@ -816,7 +816,7 @@ console.log('\nThe nav bar: three ribbons, then Charts and Boosts as plain links
     assert.ok(!disc.includes('Shows Chart') && !disc.includes('Top Podcasts This Week'))
   })
   check('the #40HPW ribbon lists #40HPW and the largest boosts, and its Discover is the three Reed named (Top Members still among them)', () => {
-    const mem = links.slice(links.indexOf('data-ribbon="members"'))
+    const mem = links.slice(links.indexOf('data-ribbon="members"'), links.indexOf('data-ribbon="charts"'))
     assert.ok(mem.includes('<h4>#40HPW This Week') && mem.includes('<h4>Largest Boosts This Week'))
     const disc = mem.slice(mem.indexOf('<h4>Discover</h4>'), mem.indexOf('nav-ribbon-feat'))
     assert.deepStrictEqual([...disc.matchAll(/>([^<]+)<\/a>/g)].map((m) => m[1]), ['#40HPW Challenge', 'Top Members', 'Boost Feed'])
@@ -828,7 +828,7 @@ console.log('\nThe nav bar: three ribbons, then Charts and Boosts as plain links
   })
   check('the overlay and the footer name the same places', () => {
     const overlay = nav.slice(nav.indexOf('nav-explore-sections'), nav.indexOf('nav-explore-group">\n            <h4>Stats'))
-    assert.strictEqual((overlay.match(/<details class="nav-explore-acc">/g) || []).length, 3)
+    assert.strictEqual((overlay.match(/<details class="nav-explore-acc">/g) || []).length, 4)
     assert.ok(overlay.includes('<summary><a href="/charts/hpw"><span aria-hidden="true">👥</span> #40HPW</a>'), "the overlay's third row is #40HPW like the ribbon")
     for (const h of ['/podcasts', '/music', '/members', '/charts', '/boosts']) assert.ok(overlay.includes(`href="${h}"`) && foot.includes(`href="${h}"`), h)
     assert.ok(overlay.includes('<h4>Browse</h4>') && foot.includes('<h3>Browse</h3>'), 'the group is Browse: it holds a Charts entry now')

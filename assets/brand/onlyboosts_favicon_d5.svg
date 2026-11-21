@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
   <title>OnlyBoosts</title>
   <!-- The small cut: a thicker outline and two arcs, so the mark survives 16 to 32 pixels. -->
-  <rect width="64" height="64" fill="#00aff0"/>
-  <g transform="translate(32 32) scale(1.12) translate(-32 -32)">
+  <rect width="64" height="64" rx="14" fill="#00aff0"/>
+  <g transform="translate(32 32) scale(1.04) translate(-32 -32)">
     <path d="M20 13 H44 A8 8 0 0 1 52 21 V35 A8 8 0 0 1 44 43 H30.8 L20 51 V43 A8 8 0 0 1 12 35 V21 A8 8 0 0 1 20 13 Z" fill="none" stroke="#ffffff" stroke-width="5" stroke-linejoin="round"/>
     <circle cx="24.83" cy="35.17" r="4" fill="#ffffff"/>
     <path d="M26.01 26.75A8.5 8.5 0 0 1 33.25 33.99M26.92 20.32A15 15 0 0 1 39.68 33.08" fill="none" stroke="#ffffff" stroke-width="4.6" stroke-linecap="round"/>

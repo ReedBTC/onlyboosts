@@ -21,9 +21,9 @@
  * links is the cards' rule (show-link.js, booster-link.js), so a row the
  * rule declines is printed without a link rather than with a dead one.
  */
-import { showPageHref, episodePageHref } from '/assets/js/show-link.js?v=ob-v277'
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v277'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v277'
+import { showPageHref, episodePageHref } from '/assets/js/show-link.js?v=ob-v278'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v278'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v278'
 
 const HOVER_OPEN_MS = 120
 const HOVER_CLOSE_MS = 220
@@ -47,6 +47,12 @@ const SOURCES = {
   'shows-week': {
     url: '/api/v1/charts/shows?limit=5', rows: (d) => d.rows,
     item: (r) => ({ title: r.title, href: showPageHref(r.guid), fig: boosters(r.booster_count), img: r.image, art2: r.artwork, glyph: '🎙' }),
+  },
+  /* The week's Top Songs, the Charts ribbon's first list (2026-11-21): the
+     song, its artist, the album's art when the song has none. */
+  'songs-week': {
+    url: '/api/v1/charts/songs?limit=5', rows: (d) => d.rows,
+    item: (r) => ({ title: r.title, sub: r.p_author || r.p_title, href: episodePageHref(r.guid, r.title), fig: boosters(r.booster_count), img: r.image || r.p_image, art2: r.artwork, glyph: '🎵' }),
   },
   'shows-year': {
     url: '/api/v1/podcasts?not_medium=music&sort=chart&range=1y&limit=5', rows: (d) => d.podcasts,

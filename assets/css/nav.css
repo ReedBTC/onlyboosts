@@ -36,7 +36,8 @@ html[data-lb-modal-open] #top-nav { z-index: 65; }
   flex-shrink: 0;
   width: 38px;
   height: 38px;
-  border-radius: 50%;
+  /* The D5 tile's own corner (rx 14 of 64), not a circle (Reed, 2026-11-21). */
+  border-radius: 22%;
   overflow: hidden;
 }
 .nav-logo img { width: 100%; height: 100%; object-fit: cover; display: block; }

@@ -29,13 +29,13 @@
 // is computed over the whole week's corpus (peers_* from week-charts.js),
 // never over the visible ten.
 
-import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v277';
-import { httpsUrl } from './cover-art.js?v=ob-v277';
-import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v277';
-import { boosterPageHref } from './booster-link.js?v=ob-v277';
-import { rankLabel, competitionRanks } from './rank.js?v=ob-v277';
-import { weekDateString } from './pacific-week.js?v=ob-v277';
-import { initials } from './hpw-board.js?v=ob-v277';
+import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v278';
+import { httpsUrl } from './cover-art.js?v=ob-v278';
+import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v278';
+import { boosterPageHref } from './booster-link.js?v=ob-v278';
+import { rankLabel, competitionRanks } from './rank.js?v=ob-v278';
+import { weekDateString } from './pacific-week.js?v=ob-v278';
+import { initials } from './hpw-board.js?v=ob-v278';
 
 const esc = htmlEscape;
 
@@ -122,7 +122,7 @@ function who(kind, r, subline, extra = "") {
 function droveHtml(r) {
   const title = (r.top_ep_title || "").trim();
   if (!r.top_ep_guid || !title) return "";
-  return `<span class="cb-sub cb-drove">Top episode: ` +
+  return `<span class="cb-sub cb-drove">Top Episode: ` +
     `<a href="${esc(episodePageHref(r.top_ep_guid, title))}">${esc(title)}</a></span>`;
 }
 
@@ -132,7 +132,9 @@ function droveHtml(r) {
  * column head's order: sats / boosts / boosters, the chart formula's own
  * (Reed's call, 2026-10-29: one order for the three figures site-wide). */
 export function weekRowHtml(kind, r, { card = false } = {}) {
-  const w = who(kind, r, undefined, !card && kind === "shows" ? droveHtml(r) : "");
+  /* A podcast's board row names the show and its top episode, no host credit
+   * (Reed, 2026-11-21); the card keeps the credit, its only sub-line. */
+  const w = !card && kind === "shows" ? who(kind, r, "", droveHtml(r)) : who(kind, r);
   /* `#2`, or `T#9` when the component place is shared — the detail tiles'
    * chip form (feed-rank.js), and the site's own line: a bare numeral belongs
    * to a position in the visible list, where these are standings in three

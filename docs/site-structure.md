@@ -255,7 +255,13 @@ was picked from is in the session memory; direction A won, with the sans.
   panel under the bar, then two plain links** (Reed's call,
   after Rotten Tomatoes' section menus). The plain links were #40HPW and
   Boosts for one day and are **Charts and Boosts since 2026-10-21**, when
-  the boards got their own page under that name; see **The Chart Pages**. A
+  the boards got their own page under that name; see **The Chart Pages**.
+  **Charts became the fourth ribbon on 2026-11-21** (Reed: the weekly and
+  year boards one gesture from anywhere): Top Songs This Week + Top Podcasts
+  This Week, a Charts column (The Charts of 2026 first, then the four weekly
+  boards; Top Artists is `/charts/music#artists`), the #1 song at the right;
+  the overlay's Charts row became an accordion with the same links. Boosts
+  is the one plain link. A
   ribbon is two top-five lists (Shows This Week + Shows This Year; Albums
   This Month + Songs This Year; #40HPW This Week + Largest Boosts This
   Week), a **Discover** column of that side's rails minus the two listed
