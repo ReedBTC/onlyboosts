@@ -39,7 +39,7 @@
  * when this module first runs).
  */
 // Identity, for keeping the Follows feeds in sync with who's signed in.
-import { getSessionPubkey, clearFollowCache } from '/assets/js/follow-set.js?v=ob-v275'
+import { getSessionPubkey, clearFollowCache } from '/assets/js/follow-set.js?v=ob-v276'
 
 // ── DOM state helpers ────────────────────────────────────────────────
 
@@ -104,10 +104,10 @@ async function hydrate(panelId, mod, scope, medium, view) {
 }
 
 // ── Lazy per-feed dispatch ───────────────────────────────────────────
-const BOOSTS = '/assets/js/boosts-feed.js?v=ob-v275'
-const PODCASTS = '/assets/js/feeds-podcasts.js?v=ob-v275'
-const SHOWS = '/assets/js/shows-feed.js?v=ob-v275'
-const ARTISTS = '/assets/js/artists-feed.js?v=ob-v275'
+const BOOSTS = '/assets/js/boosts-feed.js?v=ob-v276'
+const PODCASTS = '/assets/js/feeds-podcasts.js?v=ob-v276'
+const SHOWS = '/assets/js/shows-feed.js?v=ob-v276'
+const ARTISTS = '/assets/js/artists-feed.js?v=ob-v276'
 // Each module's entry point, by module. Named rather than sniffed out of the
 // path, so adding a feed is one line here instead of another branch.
 const RENDERERS = {
@@ -171,7 +171,7 @@ function loadMemberBoards() {
   const root = document.querySelector('[data-hpw-boards]')
   if (!root) return
   boardsWired = true
-  import('/assets/js/members-board.js?v=ob-v275')
+  import('/assets/js/members-board.js?v=ob-v276')
     .then((m) => m.renderMembersBoards(root))
     .catch((err) => {
       console.warn('[feeds] member boards failed to load', err)
@@ -183,7 +183,7 @@ function loadMembersWall() {
   if (wallWired) return
   if (!document.querySelector('[data-members-wall]')) return
   wallWired = true
-  import('/assets/js/members-board.js?v=ob-v275')
+  import('/assets/js/members-board.js?v=ob-v276')
     .then((m) => m.renderMembersWall())
     .catch((err) => {
       console.warn('[feeds] members wall failed to load', err)
@@ -193,14 +193,14 @@ function loadMembersWall() {
 
 /* The chart blocks (charts-block.js): the week's Top 10 beside Weeks at #1,
  * one per kind. Keyed by the Charts page's view. */
-const CHART_VIEWS = { podcasts: 'shows', music: 'artists' }
+const CHART_VIEWS = { podcasts: ['shows'], music: ['songs', 'artists'] }
 const chartsWired = new Set()
 function loadChartsBlock(kind) {
   if (!kind || chartsWired.has(kind)) return
   const root = document.querySelector(`[data-charts-block="${kind}"]`)
   if (!root) return
   chartsWired.add(kind)
-  import('/assets/js/charts-block.js?v=ob-v275')
+  import('/assets/js/charts-block.js?v=ob-v276')
     .then((m) => m.renderChartsBlock(root, kind))
     .catch((err) => {
       console.warn('[feeds] chart block failed to load', err)
@@ -210,7 +210,7 @@ function loadChartsBlock(kind) {
 function loadPageSections(page, view) {
   if (page === 'charts') {
     if (view === 'hpw') loadMemberBoards()
-    else loadChartsBlock(CHART_VIEWS[view])
+    else for (const kind of CHART_VIEWS[view] || []) loadChartsBlock(kind)
   } else if (page === 'members') {
     loadMembersWall()
   }

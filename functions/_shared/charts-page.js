@@ -67,7 +67,7 @@ const META = {
   "boosts/members": { title: "Boosts", path: "/boosts", desc: "Every Podcasting 2.0 boost published to Nostr, as it was sent, newest first: read the boostagrams globally or from who you follow, and boost back with Lightning." },
   "members/": { title: "Members", path: "/members", desc: "The members of OnlyBoosts: everyone who has boosted a podcast or musician and shared the boost with their Nostr identity, ranked, and the bots that publish boosts for apps that do not." },
   "charts/podcasts": { title: "Charts: Podcasts", path: "/charts/podcasts", desc: "This week's Top 10 podcasts by Nostr boosts, every past week, and the shows that have held #1 the longest." },
-  "charts/music": { title: "Charts: Music", path: "/charts/music", desc: "This week's Top 10 artists by Nostr boosts, every past week, and the artists that have held #1 the longest." },
+  "charts/music": { title: "Charts: Music", path: "/charts/music", desc: "This week's Top 10 songs and artists by Nostr boosts, every past week, and the songs and artists that have held #1 the longest." },
   "charts/hpw": { title: "Charts: #40HPW Challenge", path: "/charts/hpw", desc: "The Nostr Gang #40HPW Challenge: who has shared boosts for forty hours of podcasts this week, every past week, and Proof of #40HPW." },
 };
 

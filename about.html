@@ -48,12 +48,12 @@
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v275" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v275" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v276" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v276" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v275" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v275" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v276" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v276" />
 </head>
 <body>
 
@@ -564,6 +564,7 @@
         <p>Summing ranks rather than raw figures keeps any single axis from dominating: one enormous boost moves a show&rsquo;s sats rank by one position, not by the size of the payment. The approach has long prior art; sailing&rsquo;s Low Point System and cross-country team scoring are both rank sums.</p>
         <p>Each component uses standard competition ranking, in which tied rows share the better place and the next distinct value skips past the group. Ties in the chart total are broken by boosters first, then sats, then boosts; rows still tied after that share their place, marked with a <code>T</code>.</p>
         <p>The chart is computed over exactly the view on screen. The time range, the language filter and the Global or Follows scope select the corpus, and every component rank is recalculated inside it, so a show&rsquo;s position in a 30-day chart is independent of its all-time standing. Positions are comparable only within one view; the underlying score is relative to its corpus and is not a stable quantity across views or across weeks.</p>
+        <p>The <a href="/charts">Charts page</a> applies the same formula to fixed periods. Each week&rsquo;s Top 10 podcasts, songs and artists cover Monday 00:00 to Sunday night, US Pacific; under each podcast is the episode with the most boosters that week. The <a href="/charts/2026">Charts of 2026</a> are the Top 33 songs, artists, podcasts and boosters over the 52 chart weeks from Monday, December 29, 2025 to Sunday, December 27, 2026. Boosters are ranked by the member formula above, and the accounts that publish boosts on behalf of others are left off that list.</p>
         <p>The components behind every position are printed on the row itself, so any placement can be checked by hand against the three figures it summarizes. As with every number on this site, the inputs are indexed Nostr boosts and nothing else; see <a href="#limits">Limitations and Disclaimers</a>.</p>
       </section>
 
@@ -876,15 +877,15 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v275"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v276"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v275" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v276" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v275" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v276" defer></script>
 
-<script src="/assets/js/nav.js?v=ob-v275" defer></script>
+<script src="/assets/js/nav.js?v=ob-v276" defer></script>
 
 </body>
 </html>

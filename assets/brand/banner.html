@@ -1,0 +1,13 @@
+<!doctype html>
+<!-- The 1800x600 banner: the D5 tile beside the wordmark. scripts/render-brand.sh renders it
+     twice, transparent (onlyboosts_banner_clear.png) and on white (onlyboosts_banner.png). -->
+<html><head><meta charset="utf-8"><style>
+  :root{--ground:transparent}
+  html,body{margin:0;width:1800px;height:600px;background:var(--ground);overflow:hidden}
+  .row{position:absolute;left:0;top:0;width:1800px;height:600px;display:flex;align-items:center;justify-content:center;gap:56px}
+  .tile{width:330px;height:330px;display:block}
+  .word{width:1262px;height:275px;display:block}
+</style></head><body><div class="row">
+  <img class="tile" src="onlyboosts_mark_d5.svg" alt="">
+  <img class="word" src="wordmark_clear.png" alt="">
+</div></body></html>

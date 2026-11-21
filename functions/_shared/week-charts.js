@@ -173,7 +173,46 @@ export async function weeklyChart(env, kind, ws, we, limit = 10) {
     ORDER BY rank, guid
     LIMIT ?`;
   const { results } = await env.DB.prepare(sql).bind(ws, we, limit).all();
-  return results.map((r) => ({ ...r, tied: r.peers > 1 }));
+  const rows = results.map((r) => ({ ...r, tied: r.peers > 1 }));
+  if (kind === "shows" && rows.length) await attachTopEpisodes(env, rows, ws, we);
+  return rows;
+}
+
+/** The episode that drove each show's week (Reed's ask, 2026-11-21): within
+ *  [ws, we), the show's episode with the most boosters, then sats, then
+ *  boosts, the chart's own tiebreak order. Sets `top_ep_guid` and
+ *  `top_ep_title` on each row, or leaves them unset for a show whose week was
+ *  boosted only at the show level. One query for the whole board; a guid list
+ *  of at most 50 (the endpoint's limit cap) plus two bounds stays under D1's
+ *  100 bound parameters. A failure costs the line, never the board. */
+export async function attachTopEpisodes(env, rows, ws, we) {
+  const guids = rows.map((r) => r.guid).filter(Boolean);
+  if (!guids.length) return;
+  const sql = `
+    WITH per AS (
+      SELECT b.podcast_guid AS show, b.item_guid AS item,
+             ROW_NUMBER() OVER (PARTITION BY b.podcast_guid
+                                ORDER BY COUNT(DISTINCT b.booster_pubkey) DESC,
+                                         COALESCE(SUM(b.sats),0) DESC, COUNT(*) DESC, b.item_guid) AS rn
+      FROM boosts b
+      WHERE b.podcast_guid IN (${guids.map(() => "?").join(",")})
+        AND b.item_guid IS NOT NULL
+        AND b.created_at >= ? AND b.created_at < ?
+      GROUP BY b.podcast_guid, b.item_guid
+    )
+    SELECT per.show, per.item, e.title
+    FROM per LEFT JOIN episodes e ON e.item_guid = per.item
+    WHERE per.rn = 1`;
+  try {
+    const { results } = await env.DB.prepare(sql).bind(...guids, ws, we).all();
+    const by = new Map(results.map((x) => [x.show, x]));
+    for (const r of rows) {
+      const hit = by.get(r.guid);
+      if (hit && hit.title) { r.top_ep_guid = hit.item; r.top_ep_title = hit.title; }
+    }
+  } catch (err) {
+    console.warn("[week-charts] top episodes failed", err);
+  }
 }
 
 /** Who has finished #1 the most weeks, over every completed week before

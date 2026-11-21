@@ -2,8 +2,10 @@
 //
 //   /charts/<YYYY-MM-DD>/card/shows      that week's Shows Top 10 (chart rule)
 //   /charts/<YYYY-MM-DD>/card/artists    that week's Artists Top 10
+//   /charts/<YYYY-MM-DD>/card/songs      that week's Songs Top 10 (2026-11-21)
 //   /charts/weeks-at-1/card/shows        Shows: Weeks at #1 (completed weeks)
 //   /charts/weeks-at-1/card/artists      Artists: Weeks at #1
+//   /charts/weeks-at-1/card/songs        Songs: Weeks at #1
 //   /charts/weeks-at-1/card/members      Members: Weeks at #1 on the 40 HPW board
 //
 // Each is the board in the fixed 720x900 frame (functions/_shared/card-frame.js)
@@ -35,13 +37,14 @@ import { weekBoard, onesBoard } from "../api/v1/charts/[[path]].js";
 import { competitionRanks } from "../../assets/js/rank.js";
 import { cardHtml } from "../_shared/card-frame.js";
 import { renderShellPage, resolveRoute } from "../_shared/charts-page.js";
+import { renderYearPage, isChartYear } from "../_shared/year-page.js";
 
 const ROWS = 10;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 // The card frames' kinds. The members' WEEKLY card is /hpw/<date>/card; only
 // their Weeks at #1 board is a chart card.
-const WEEK_CARD_KINDS = new Set(["shows", "artists"]);
-const ONES_CARD_KINDS = new Set(["shows", "artists", "members"]);
+const WEEK_CARD_KINDS = new Set(["shows", "artists", "songs"]);
+const ONES_CARD_KINDS = new Set(["shows", "artists", "songs", "members"]);
 // ⚠️ A PATH SEGMENT IN THE WILD: the collector's bot screenshots the literal,
 // on the /hpw/high-scores rule. It does not move.
 export const ONES_KEY = "weeks-at-1";
@@ -49,7 +52,7 @@ export const ONES_KEY = "weeks-at-1";
 // the week picker that reaches every past week.
 const HOME = "/charts/podcasts";
 
-export async function onRequestGet({ request, env, params }) {
+export async function onRequestGet({ request, env, params, waitUntil }) {
   let segs = params.path;
   if (segs == null) segs = [];
   if (!Array.isArray(segs)) segs = [segs];
@@ -66,6 +69,8 @@ export async function onRequestGet({ request, env, params }) {
      script. Anything else that is not a card frame is the old dated
      page's address, or garbage under it, and lands on the boards. */
   if (segs.length === 0) return renderShellPage({ request, env }, resolveRoute("charts"));
+  /* /charts/<year>: the year's Top 33s (2026-11-21), its own shell. */
+  if (segs.length === 1 && isChartYear(segs[0])) return renderYearPage({ request, env, waitUntil }, segs[0]);
   if (segs.length === 1) {
     const route = resolveRoute("charts", segs[0]);
     if (route) return renderShellPage({ request, env }, route);
@@ -160,9 +165,9 @@ function unavailable() {
    the stepper's .hpw-nav grammar, the members board is .hpw-* rows in a
    .cb-board shell. Written here so scripts/stamp-assets.js sees an href it
    can restamp. */
-const CARD_LINKS = `  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v275" />
-  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v275" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v275" />`;
+const CARD_LINKS = `  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v276" />
+  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v276" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v276" />`;
 
 /* The rows sized to the frame. ⚠️ MEASURED BY THE BOT, 2026-09-03: the weekly
    cards' list box is 296.9 → 829 (the column head costs 27.4px), ceiling
@@ -190,7 +195,7 @@ const CARD_CSS = `
 
 /* The footer names the Charts page view the board lives on (2026-10-21; the
    feed tab before that), which is the share note's link. */
-const TAB_OF = { shows: "/charts/podcasts", artists: "/charts/music", members: "/charts/hpw" };
+const TAB_OF = { shows: "/charts/podcasts", artists: "/charts/music", songs: "/charts/music", members: "/charts/hpw" };
 
 export function renderWeekCard({ kind, ws, isCurrent, rows }) {
   const heading = COPY.sections[kind].heading;
@@ -198,7 +203,7 @@ export function renderWeekCard({ kind, ws, isCurrent, rows }) {
     board: `${kind}-week`,
     title: `Week of ${weekLabel(ws)}`,
     sub: isCurrent ? `In progress. ${weekSpan(ws)}.` : `${weekSpan(ws)}.`,
-    rows: rows.map((r) => weekRowHtml(kind, r)),
+    rows: rows.map((r) => weekRowHtml(kind, r, { card: true })),
     empty: isCurrent ? COPY.emptyLive : COPY.emptyPast,
     colhead: true,
     card: true,

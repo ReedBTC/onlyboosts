@@ -9,8 +9,9 @@
 // /charts page's own — so a board on the tab, on the page and in a screenshot
 // is one computation.
 //
-//   kind   shows | artists for the weekly board; shows | artists | members for
-//          weeks-at-1. The members' WEEKLY board is the 40 HPW board and lives
+//   kind   shows | artists | songs for the weekly board; shows | artists | songs |
+//          members for weeks-at-1. Songs joined on 2026-11-21 (Reed's call: the
+//          OnlyBoosts podcast counts down the week's Top 10 songs). The members' WEEKLY board is the 40 HPW board and lives
 //          at /api/v1/members/hours, which this deliberately does not restate.
 //   week   any date; resolved to the Pacific Monday of the week containing
 //          it, a future or unparseable week to the live one, the hours
@@ -28,8 +29,8 @@ import { pacificWeekStart, nextWeek, weekStartFromDate } from "../../../../asset
 import { weeklyChart, weeksAtNumberOne, hpwWeeksAtNumberOne } from "../../../_shared/week-charts.js";
 
 import { headOf } from "../../../_shared/head.js";
-const WEEKLY_KINDS = new Set(["shows", "artists"]);
-const ONES_KINDS = new Set(["shows", "artists", "members"]);
+const WEEKLY_KINDS = new Set(["shows", "artists", "songs"]);
+const ONES_KINDS = new Set(["shows", "artists", "songs", "members"]);
 
 export async function onRequestOptions({ request }) { return preflight(request); }
 

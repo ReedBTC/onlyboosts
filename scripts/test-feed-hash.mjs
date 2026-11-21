@@ -399,8 +399,8 @@ console.log('\nThe shell ships one head per page and the Shows panel active:')
   {
     const wrap = html.slice(html.indexOf('<div class="charts-page" data-charts-page>'), html.indexOf('<div class="members-page" data-members-page>'))
     const inside = (re) => [...wrap.matchAll(re)].length
-    eq('both board blocks sit INSIDE the Charts page wrapper', [inside(/data-charts-block="shows"/g), inside(/data-charts-block="artists"/g), inside(/<section[^>]*data-hpw>/g)], [1, 1, 1])
-    eq('and nowhere else in the shell', [...html.matchAll(/<section[^>]*data-charts-block="/g)].length, 2)
+    eq('every board block sits INSIDE the Charts page wrapper', [inside(/data-charts-block="shows"/g), inside(/data-charts-block="songs"/g), inside(/data-charts-block="artists"/g), inside(/<section[^>]*data-hpw>/g)], [1, 1, 1, 1])
+    eq('and nowhere else in the shell', [...html.matchAll(/<section[^>]*data-charts-block="/g)].length, 3)
     const wall = html.slice(html.indexOf('<div class="members-page" data-members-page>'))
     eq('the wall and the bots sit inside the Members page wrapper', [/data-members-wall/.test(wall), /data-members-bots/.test(wall)], [true, true])
   }
@@ -420,7 +420,7 @@ console.log('\nBoth hydration entry points are wired:')
   eq('the cold load reads the feed off the body', afterListener.includes("document.body.dataset.activeFeed || ''"), true)
   eq('⚠️ and no longer falls back to episodes: a page with no feed must hydrate nothing', afterListener.includes("|| 'episodes-global'"), false)
   eq('the cold load paints the Charts and Members pages off the body', afterListener.includes('loadPageSections(document.body.dataset.page, document.body.dataset.view)'), true)
-  for (const [what, call] of [['the Podcasts boards', "loadChartsBlock(CHART_VIEWS[view])"], ['the #40HPW boards', 'loadMemberBoards()'], ['the wall', 'loadMembersWall()']]) {
+  for (const [what, call] of [['the Podcasts and Music boards', 'for (const kind of CHART_VIEWS[view] || []) loadChartsBlock(kind)'], ['the #40HPW boards', 'loadMemberBoards()'], ['the wall', 'loadMembersWall()']]) {
     eq(`loadPageSections reaches ${what}`, feeds.slice(feeds.indexOf('function loadPageSections')).includes(call), true)
   }
   const board = readFileSync(join(ROOT, 'assets/js/members-board.js'), 'utf8')

@@ -290,6 +290,18 @@ tiebreak chain is reordered, and it was confirmed red on four mutations (the
 tuple tiebreak removed, the chain flipped in members.js and in feed-rank.js,
 and `peers` counted post-filter).
 
+
+**The weekly boards since 2026-11-21.** The Charts page carries three weekly
+Top 10s: Podcasts (`shows`), and on the Music view Songs above Artists. Songs
+came back for the OnlyBoosts podcast, which counts the week's Top 10 songs
+down; `songs` joined `WEEKLY_KINDS`, `ONES_KINDS`, the card frames and the og
+name allowlist together, and the collector's card bot must learn the kind
+before a Songs share carries its own image (until then the share modal gets
+the banner fallback and refuses it as the board). Each podcast row on a weekly
+or year board carries the week's (or year's) **top episode**: the one with the
+most boosters, then sats, then boosts (`attachTopEpisodes` in
+`week-charts.js`); the 720x900 card frames leave it off, since their rows are
+measured to the pixel.
 #### The Charts Page
 
 **⚠️ TORN DOWN ON 2026-09-04**, Reed's call, two days after it shipped

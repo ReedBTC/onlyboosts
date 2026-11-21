@@ -47,7 +47,8 @@ finds the paragraph that used to explain any name.
 | `/podcasts/{shows,episodes}`, `/music/{artists,albums,songs}` | the chart pages; the bare path opens on the first view |
 | `/boosts` | the boost feed, Global or Follows |
 | `/members` | the Top Members wall and the Boost Bots |
-| `/charts`, `/charts/{podcasts,music,hpw}` | the weekly boards; `/charts/<key>/card/<kind>` are the share-card frames |
+| `/charts`, `/charts/{podcasts,music,hpw}` | the weekly boards (Music: Songs, then Artists); `/charts/<key>/card/<kind>` are the share-card frames |
+| `/charts/2026` | the year's Top 33 Songs, Artists, Podcasts and Boosters under "2026 in Numbers"; `charts-year.html` shell, `functions/_shared/year-{charts,page}.js`; live and edge-cached, not yet frozen |
 | `/show/<guid>`, `/episode/<item-guid>`, `/booster/<npub>`, `/artist/<guid>` | the four detail pages, edge-rendered |
 | `/search?q=`, `/discover/<key>` | the results page (a list, never rails); the whole list behind a discovery rail |
 | `/hpw/<YYYY-MM-DD>`, `/hpw/high-scores` | one #40HPW board as a page; `high-scores` is a path, the board is named Proof of #40HPW |
