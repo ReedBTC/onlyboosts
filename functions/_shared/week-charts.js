@@ -80,8 +80,14 @@ const LEVELS = {
   }),
   episode: (music) => ({
     key: "b.item_guid",
+    /* feed_guid … duration (2026-11-21) let the podcast's song segment play
+     * a row without a second join through /api/v1/boosts; the value block
+     * is not in D1 and stays /api/value's. feed_guid is the credited feed,
+     * the playlist rule's canonical_guid, never an alias. */
     select: `e.title AS title, e.image AS image, pc.image AS p_image, pc.artwork AS artwork,
-             NULL AS author, pc.title AS p_title`,
+             NULL AS author, pc.title AS p_title, pc.author AS p_author,
+             b.podcast_guid AS feed_guid, pc.feed_url AS feed_url,
+             e.enclosure_url AS enclosure_url, e.duration AS duration`,
     from: `FROM boosts b
            LEFT JOIN episodes e  ON e.item_guid     = b.item_guid
            LEFT JOIN podcasts pc ON pc.podcast_guid = b.podcast_guid`,
