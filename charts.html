@@ -78,20 +78,20 @@
 
   <!-- Shared note / card styles (.note-card, .embed-note) — the boosts
        feeds render through the same kind-1 card as boosts-thread.js. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v286" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v287" />
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v286" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v287" />
   <!-- The episode card and its drawer, extracted from the inline block below
        when /episode/<guid> pages needed the same cards. See the file header. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v286" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v286" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v287" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v287" />
   <!-- The 40 HPW boards on the Members tab; shared with the /hpw/<week> pages. -->
-  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v286" />
+  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v287" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. Must stay last
        among the stylesheets so the inline block below still wins. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v286" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v287" />
 
   <style>
     :root {
@@ -454,6 +454,12 @@
     .mb-section .show-section-head,
     [data-members-wall-head],
     .mb-section-head { margin-bottom: 1.1rem; }
+    /* The weekly boards' way to the full charts (Reed, 2026-11-22): on the
+       heading's own line, right of it, never a sub-line under it. */
+    .charts-page .mb-section-head:has(.mb-full) { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.25rem 1rem; }
+    .mb-full { font-family: var(--font-sans); font-size: 0.88rem; font-weight: 600; color: var(--brand-dd); text-decoration: none; white-space: nowrap; }
+    .mb-full:hover { text-decoration: underline; }
+    :root[data-theme="dark"] .mb-full { color: var(--brand-d); }
     /* The lifted heading arrives in either of renderSupporters' two shapes — a
        `.show-section-head` wrapper on a populated wall, a bare <h2> on the
        empty one — so the type is set on the host's h2 whichever landed. */
@@ -896,12 +902,12 @@
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
     }
   </style>
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v286" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v286" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v287" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v287" />
   <!-- The chart boards on the Shows and Artists feeds (charts-block.js) wear
        the Charts page's .cb-* grammar; hpw-board.css above dresses their
        week picker and the members' Weeks at #1 rows. -->
-  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v286" />
+  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v287" />
 </head>
 <body data-page="podcasts" data-view="shows" data-active-feed="shows-global">
 
@@ -1077,6 +1083,7 @@
             <a href="/#rail-recommended">Podcasts Recommended For You</a>
             <a href="/#rail-follows">Top Podcasts From Your Follows</a>
             <a href="/#rail-because">Because You Boosted</a>
+            <a class="nav-full" href="/podcasts">See the Full Podcast Charts <span aria-hidden="true">→</span></a>
           </div>
           <div class="nav-ribbon-feat" data-ribbon-feat="shows-week" hidden>
             <span class="nav-ribbon-eyebrow">#1 Podcast This Week</span>
@@ -1104,6 +1111,7 @@
             <a href="/#rail-recommended-music">Music Recommended For You</a>
             <a href="/#rail-follows-songs">Top Songs From Your Follows</a>
             <a href="/#rail-because">Because You Boosted</a>
+            <a class="nav-full" href="/music">See the Full Music Charts <span aria-hidden="true">→</span></a>
           </div>
           <div class="nav-ribbon-feat" data-ribbon-feat="albums-month" hidden>
             <span class="nav-ribbon-eyebrow">#1 Album This Month</span>
@@ -1159,6 +1167,8 @@
             <a href="/charts#podcasts">Top Podcasts Weekly Chart</a>
             <a href="/charts#artists">Top Artists Weekly Chart</a>
             <a href="/charts#hpw">#40HPW Weekly Chart</a>
+            <a class="nav-full" href="/podcasts">See the Full Podcast Charts <span aria-hidden="true">→</span></a>
+            <a class="nav-full" href="/music">See the Full Music Charts <span aria-hidden="true">→</span></a>
           </div>
           <div class="nav-ribbon-feat" data-ribbon-feat="songs-week" hidden>
             <span class="nav-ribbon-eyebrow">#1 Song This Week</span>
@@ -1294,6 +1304,7 @@
       <section class="mb-section charts-block" id="podcasts" data-charts-block="shows" aria-label="OnlyBoosts Podcast Charts">
       <div class="mb-section-head">
         <h2>OnlyBoosts Podcast Charts</h2>
+        <a class="mb-full" href="/podcasts/shows">See the Full Podcast Charts <span aria-hidden="true">→</span></a>
       </div>
       <div class="hpw-boards" data-charts-boards></div>
     </section>
@@ -1303,6 +1314,7 @@
       <section class="mb-section charts-block" id="songs" data-charts-block="songs" aria-label="OnlyBoosts Song Charts">
       <div class="mb-section-head">
         <h2>OnlyBoosts Song Charts</h2>
+        <a class="mb-full" href="/music/songs">See the Full Song Charts <span aria-hidden="true">→</span></a>
       </div>
       <div class="hpw-boards" data-charts-boards></div>
     </section>
@@ -1310,6 +1322,7 @@
       <section class="mb-section charts-block" id="artists" data-charts-block="artists" aria-label="OnlyBoosts Artist Charts">
       <div class="mb-section-head">
         <h2>OnlyBoosts Artist Charts</h2>
+        <a class="mb-full" href="/music/artists">See the Full Artist Charts <span aria-hidden="true">→</span></a>
       </div>
       <div class="hpw-boards" data-charts-boards></div>
     </section>
@@ -2199,17 +2212,17 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v286"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v287"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v286" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v287" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v286" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v287" defer></script>
 
 <!-- Feed hydration — lazily loads the active feed on first view. -->
-<script type="module" src="/assets/js/feeds.js?v=ob-v286"></script>
-<script src="/assets/js/nav.js?v=ob-v286" defer></script>
+<script type="module" src="/assets/js/feeds.js?v=ob-v287"></script>
+<script src="/assets/js/nav.js?v=ob-v287" defer></script>
 
 </body>
 </html>

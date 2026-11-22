@@ -160,6 +160,12 @@ details.nav-ribbon { position: static; }
 }
 .nav-ribbon-discover a:hover { color: var(--brand-dd); }
 :root[data-theme="dark"] .nav-ribbon-discover a:hover { color: var(--brand-d); }
+/* The ribbons' way to the full charts (2026-11-22): the Discover column's
+   last line, set apart by a hairline and the accent. */
+.nav-ribbon-discover a.nav-full { margin-top: 0.35rem; padding-top: 0.45rem; border-top: 1px solid var(--border); font-weight: 700; color: var(--brand-dd); }
+.nav-ribbon-discover a.nav-full + a.nav-full { margin-top: 0; padding-top: 0.2rem; border-top: 0; }
+:root[data-theme="dark"] .nav-ribbon-discover a.nav-full { color: var(--brand-d); }
+.nav-ribbon-discover a.nav-full:hover { text-decoration: underline; }
 /* The year's charts, dressed for the year's end (Reed, 2026-11-22): gold
    text with a slow shimmer, a twinkling star and a gold "New" pill, in the
    Charts ribbon and the overlay's Charts accordion. Gold is #40HPW's
