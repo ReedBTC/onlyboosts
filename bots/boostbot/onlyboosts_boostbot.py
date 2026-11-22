@@ -60,7 +60,7 @@ import coverage  # noqa: E402
 import feed as feedmod  # noqa: E402
 
 # ── convention: a new bot does not publish until Reed flips it ───────────────
-DRY_RUN = True
+DRY_RUN = False
 
 CREDENTIALS_FILE = Path.home() / ".config/nostr-bots/credentials.env"
 # A copy of the site's BOOSTBOT_NSEC (a Cloudflare secret today). Reed adds it;
