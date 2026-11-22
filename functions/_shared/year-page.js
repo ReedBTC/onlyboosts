@@ -96,6 +96,7 @@ function statCards(d) {
 /* ── Boosts by Month ────────────────────────────────────────────────────── */
 
 const W = 720;
+const MIN_APP_ROW = 5;
 
 function monthsChart(d) {
   /* The chart year's months only (Reed, 2026-11-22); the site-wide line
@@ -157,66 +158,131 @@ function appsChart(d) {
       `<li><span class="ya-sw ya-other"></span>Every other app <strong>${fmt(a.other)}</strong> (${pctLabel(pct(a.other, a.total))})</li>` +
       (rest ? `<li><span class="ya-sw ya-rest"></span>Boost bots and unattributed <strong>${fmt(rest)}</strong> (${pctLabel(pct(rest, a.total))})</li>` : "") +
     `</ul>`;
+  /* The ranked list stops at apps with MIN_APP_ROW boosts in the year
+   * (Reed, 2026-11-22: "cut off after StableKraft"); the smaller ones stay in
+   * the split bar's total. */
   const top = a.rows[0]?.boosts || 1;
-  const rows = a.rows.map((r) =>
+  const rows = a.rows.filter((r) => r.boosts >= MIN_APP_ROW).map((r) =>
     `<li><span class="ya-name">${esc(clientLabel(r.slug))}</span>` +
     `<span class="ya-bar"><span style="width:${Math.max(1.5, (100 * r.boosts) / top).toFixed(1)}%"></span></span>` +
     `<span class="ya-n" title="${esc(`${fmt(r.sats)} sats from ${fmt(r.boosters)} booster${r.boosters === 1 ? "" : "s"}`)}">${fmt(r.boosts)}</span></li>`).join("");
 
-  // Monthly boosts from the other apps, over the index, as bars.
-  const ms = d.stats.months;
-  const H = 150, L = 46, R = 12, T = 10, B = 26;
-  const max = niceMax(Math.max(1, ...ms.map((m) => m.apps)));
-  const bw = (W - L - R) / ms.length;
-  const y = (v) => T + (H - T - B) * (1 - v / max);
-  const bars = [];
-  for (const f of [0, 1]) bars.push(`<line class="yc-grid" x1="${L}" x2="${W - R}" y1="${y(max * f).toFixed(1)}" y2="${y(max * f).toFixed(1)}"/><text class="yc-axis" x="${L - 6}" y="${(y(max * f) + 4).toFixed(1)}" text-anchor="end">${short(max * f)}</text>`);
-  ms.forEach((m, i) => {
-    const h = (H - T - B) * (m.apps / max);
-    const tip = `${monthName(m.month, true)}: ${fmt(m.apps)} boosts from other apps, ${pctLabel(pct(m.apps, m.boosts))} of the month`;
-    bars.push(`<rect class="yc-bar${m.month.startsWith(`${d.year}-`) ? "" : " yc-bar--past"}" x="${(L + i * bw + 1).toFixed(1)}" y="${(H - B - h).toFixed(1)}" width="${Math.max(1, bw - 2).toFixed(1)}" height="${h.toFixed(1)}"><title>${esc(tip)}</title></rect>`);
-    const mm = m.month.slice(5);
-    if (mm === "01") bars.push(`<text class="yc-axis" x="${(L + i * bw).toFixed(1)}" y="${H - 8}">${m.month.slice(0, 4)}</text>`);
+  // The year's other-app boosts by chart week (2026-11-22).
+  const g = weekFrame(d, 150, 12, Math.max(1, ...d.stats.weeks.map((w) => w.apps)), short);
+  d.stats.weeks.forEach((w, i) => {
+    const tip = `Week of ${pacificDate(w.start, { month: "short", day: "numeric" })}${g.live(i) ? " (in progress)" : ""}: ${fmt(w.apps)} boosts from other apps, ${pctLabel(pct(w.apps, w.boosts))} of the week`;
+    g.parts.push(g.bar(i, w.apps, tip));
   });
 
   return figure("Fountain and Every Other App",
     `Fountain publishes most Nostr boosts; these are the ${esc(d.year)} boosts by the app they were sent from. An app here is a website or app a person boosts from; a boost bot that republishes other people's boosts is not one.`,
     split +
     `<h3 class="yc-sub">Every Other App in ${esc(d.year)}</h3><ul class="ya-rows">${rows || `<li class="ya-none">None yet.</li>`}</ul>` +
-    `<h3 class="yc-sub">Boosts From Other Apps by Month</h3><div class="yc-scroll"><svg class="yc-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Boosts from apps other than Fountain, by month">${bars.join("")}</svg></div>`,
+    `<h3 class="yc-sub">Boosts From Other Apps by Week</h3><div class="yc-scroll"><svg class="yc-svg" viewBox="0 0 ${W} ${g.H}" role="img" aria-label="Boosts from apps other than Fountain, by week of ${esc(d.year)}">${g.parts.join("")}</svg></div>`,
     "");
 }
 
+/* ── The weekly bar frame ────────────────────────────────────────────────
+ * The year's 52 chart weeks across, a zero and a top gridline, a month tick
+ * off each week's Thursday (which names the month most of the week is in),
+ * and `bar(i, v, tip)` for one week; the week in progress is faded. Shared
+ * by the other-apps bars and the #40HPW bars, so the two line up. */
+function weekFrame(d, H, T, top, label = String) {
+  const ws = d.stats.weeks;
+  const L = 34, R = 12, B = 26, slots = Math.max(52, ws.length);
+  const max = top <= 4 ? Math.max(2, top) : niceMax(top);
+  const bw = (W - L - R) / slots;
+  const y = (v) => T + (H - T - B) * (1 - v / max);
+  const x = (i) => L + i * bw;
+  const live = (i) => d.open && i === ws.length - 1;
+  const parts = [];
+  for (const v of [0, max]) parts.push(`<line class="yc-grid" x1="${L}" x2="${W - R}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}"/><text class="yc-axis" x="${L - 6}" y="${(y(v) + 4).toFixed(1)}" text-anchor="end">${label(v)}</text>`);
+  let lastMonth = -1;
+  ws.forEach((w, i) => {
+    const m = Number(pacificDate(w.start + 3 * 86400, { month: "numeric" })) - 1;
+    if (m !== lastMonth) { parts.push(`<text class="yc-axis" x="${x(i).toFixed(1)}" y="${H - 8}">${MON[m]}</text>`); lastMonth = m; }
+  });
+  const bar = (i, v, tip) => {
+    const h = (H - T - B) * (v / max);
+    return `<rect class="yc-bar${live(i) ? " yc-bar--live" : ""}" x="${(x(i) + 1).toFixed(1)}" y="${(H - B - h).toFixed(1)}" width="${Math.max(1, bw - 2).toFixed(1)}" height="${h.toFixed(1)}"><title>${esc(tip)}</title></rect>`;
+  };
+  return { H, T, B, L, R, bw, max, x, y, live, parts, bar };
+}
+
 /* ── #40HPW Finishers by Week ───────────────────────────────────────────── */
+
+/* The #40HPW board went live on the evening of Sunday 2026-08-23 (the merge
+ * of the homepage branch, 39e546a2, 20:56 EDT), the last hours of the chart
+ * week of Aug 17; the week of Aug 24 is the first it was live for. */
+const HPW_LAUNCH = Date.UTC(2026, 7, 24, 0, 56, 44) / 1000;
+
+/* The launch, drawn as a marker annotation (Reed, 2026-11-22: "the red
+ * marker, hand-drawn arrow and circle"): a dashed rule at the launch week, a
+ * loose ring around the finishes since, and an arrow from a note giving the
+ * before-and-after counts. The roughness is an SVG displacement filter on
+ * the strokes only; the type stays crisp. Static geometry, no randomness, so
+ * every render of a given week is byte-identical. */
+function launchMark(g, ws) {
+  const li = ws.findIndex((w) => w.start > HPW_LAUNCH);
+  if (li < 12) return "";
+  const lx = g.x(li);
+  let last = li;
+  ws.forEach((w, i) => { if (i >= li && w.hpw) last = i; });
+  const peak = Math.max(1, ...ws.slice(li).map((w) => w.hpw));
+  const before = ws.slice(0, li).reduce((t, w) => t + w.hpw, 0);
+  const since = ws.slice(li).reduce((t, w) => t + w.hpw, 0);
+  const n = (k) => `${k} forty-hour week${k === 1 ? "" : "s"}`;
+
+  // The ring: an ellipse round the bars since launch, drawn as one stroke
+  // that overshoots its start, the way a marker circle does.
+  const x0 = lx - 6, x1 = g.x(last + 1) + 6;
+  // An ellipse holds a box's corners at about 1.3 times its half-sides.
+  const top = g.y(peak) - 12, bot = g.y(0) + 4;
+  const rx = ((x1 - x0) / 2) * 1.3, ry = Math.min(((bot - top) / 2) * 1.25, (g.H - 6) / 2);
+  const cx = (x0 + x1) / 2, cy = Math.min(Math.max((top + bot) / 2, ry + 3), g.H - ry - 3);
+  const tilt = -0.06, pts = [];
+  for (let k = 0; k <= 64; k++) {
+    const t = -2.2 + (k / 64) * (2 * Math.PI + 0.55);
+    const grow = 1 + 0.06 * (k / 64) + 0.025 * Math.sin(3 * t + 0.8);
+    const ex = rx * grow * Math.cos(t), ey = ry * grow * Math.sin(t);
+    pts.push(`${(cx + ex * Math.cos(tilt) - ey * Math.sin(tilt)).toFixed(1)} ${(cy + ex * Math.sin(tilt) + ey * Math.cos(tilt)).toFixed(1)}`);
+  }
+  const ring = `<path class="yh-ink" d="M${pts.join(" L")}"/>`;
+
+  // The note, upper left of the rule, and an arrow curving down into the ring.
+  const nx = cx - rx - 26, ny = 14;
+  const ax0 = nx - 10, ay0 = ny + 36, ax1 = cx - rx * 0.97, ay1 = cy + ry * 0.12;
+  const c1x = ax0 - 6, c1y = ay1 - 4, c2x = ax1 - 46, c2y = ay1 + 16;
+  const ang = Math.atan2(ay1 - c2y, ax1 - c2x), hl = 10;
+  const head = [0.5, -0.5].map((o) => `M${(ax1 - hl * Math.cos(ang + o)).toFixed(1)} ${(ay1 - hl * Math.sin(ang + o)).toFixed(1)} L${ax1.toFixed(1)} ${ay1.toFixed(1)}`).join(" ");
+  const arrow = `<path class="yh-ink" d="M${ax0.toFixed(1)} ${ay0.toFixed(1)} C${c1x.toFixed(1)} ${c1y.toFixed(1)} ${c2x.toFixed(1)} ${c2y.toFixed(1)} ${ax1.toFixed(1)} ${ay1.toFixed(1)} ${head}"/>`;
+
+  return `<defs><filter id="yh-rough" x="-5%" y="-5%" width="110%" height="110%">` +
+      `<feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="4"/>` +
+      `<feDisplacementMap in="SourceGraphic" scale="3.2"/></filter></defs>` +
+    `<line class="yh-rule" x1="${lx.toFixed(1)}" x2="${lx.toFixed(1)}" y1="${g.T - 4}" y2="${g.y(0).toFixed(1)}"/>` +
+    `<g class="yh-mark" filter="url(#yh-rough)">${ring}${arrow}</g>` +
+    `<g class="yh-note" transform="rotate(-3 ${nx.toFixed(1)} ${ny.toFixed(1)})">` +
+      `<text class="yh-note-h" x="${nx.toFixed(1)}" y="${(ny + 8).toFixed(1)}" text-anchor="end">#40HPW goes live, Aug 23</text>` +
+      `<text class="yh-note-s" x="${nx.toFixed(1)}" y="${(ny + 24).toFixed(1)}" text-anchor="end">${esc(`Before: ${n(before)} in ${li} weeks. Since: ${since} in ${ws.length - li} weeks.`)}</text>` +
+    `</g>`;
+}
 
 function hpwChart(d) {
   const s = d.stats;
   const ws = s.weeks;
   if (!ws.length) return "";
-  const H = 170, L = 30, R = 12, T = 12, B = 26;
-  const max = Math.max(2, ...ws.map((w) => w.hpw));
-  const slots = 52;
-  const bw = (W - L - R) / slots;
-  const y = (v) => T + (H - T - B) * (1 - v / max);
-  const parts = [];
-  for (const v of [0, max]) parts.push(`<line class="yc-grid" x1="${L}" x2="${W - R}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}"/><text class="yc-axis" x="${L - 6}" y="${(y(v) + 4).toFixed(1)}" text-anchor="end">${v}</text>`);
-  let lastMonth = -1;
+  const g = weekFrame(d, 240, 74, Math.max(...ws.map((w) => w.hpw)));
+  const mark = launchMark(g, ws);
   ws.forEach((w, i) => {
-    const h = (H - T - B) * (w.hpw / max);
-    const live = d.open && i === ws.length - 1;
-    const date = pacificDate(w.start, { month: "short", day: "numeric" });
-    const tip = `Week of ${date}${live ? " (in progress)" : ""}: ${w.hpw} member${w.hpw === 1 ? "" : "s"} at 40 hours or more`;
-    const xx = L + i * bw;
-    parts.push(`<rect class="yc-bar${live ? " yc-bar--live" : ""}" x="${(xx + 1).toFixed(1)}" y="${(H - B - h).toFixed(1)}" width="${Math.max(1, bw - 2).toFixed(1)}" height="${Math.max(h, w.hpw ? 0 : 0).toFixed(1)}"><title>${esc(tip)}</title></rect>`);
-    if (w.hpw) parts.push(`<text class="yc-val" x="${(xx + bw / 2).toFixed(1)}" y="${(H - B - h - 3).toFixed(1)}" text-anchor="middle">${w.hpw}</text>`);
-    // Month ticks off the week's Thursday, which names the month most of the week is in.
-    const m = Number(pacificDate(w.start + 3 * 86400, { month: "numeric" })) - 1;
-    if (m !== lastMonth) { parts.push(`<text class="yc-axis" x="${xx.toFixed(1)}" y="${H - 8}">${MON[m]}</text>`); lastMonth = m; }
+    const tip = `Week of ${pacificDate(w.start, { month: "short", day: "numeric" })}${g.live(i) ? " (in progress)" : ""}: ${w.hpw} member${w.hpw === 1 ? "" : "s"} at 40 hours or more`;
+    g.parts.push(g.bar(i, w.hpw, tip));
+    if (w.hpw) g.parts.push(`<text class="yc-val" x="${(g.x(i) + g.bw / 2).toFixed(1)}" y="${(g.y(w.hpw) - 3).toFixed(1)}" text-anchor="middle">${w.hpw}</text>`);
   });
   return figure("#40HPW Finishers by Week",
     `How many members reached 40 hours of boosted listening in each chart week of ${esc(d.year)}, by the #40HPW Challenge's own count.`,
     `<p class="yh-head"><strong>${fmt(s.hpw.members)}</strong> member${s.hpw.members === 1 ? "" : "s"} reached 40 hours at least once; <strong>${fmt(s.hpw.weeks)}</strong> forty-hour weeks in all. <a href="/hpw/high-scores">Proof of #40HPW</a></p>` +
-    `<div class="yc-scroll"><svg class="yc-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="#40HPW finishers by week">${parts.join("")}</svg></div>`,
+    `<div class="yc-scroll"><svg class="yc-svg" viewBox="0 0 ${W} ${g.H}" role="img" aria-label="#40HPW finishers by week">${g.parts.join("")}${mark}</svg></div>`,
     "");
 }
 

@@ -86,7 +86,7 @@ const LEVELS = {
      * the playlist rule's canonical_guid, never an alias. */
     select: `e.title AS title, e.image AS image, pc.image AS p_image, pc.artwork AS artwork,
              NULL AS author, pc.title AS p_title, pc.author AS p_author,
-             b.podcast_guid AS feed_guid, pc.feed_url AS feed_url,
+             pc.publisher_guid AS p_publisher, b.podcast_guid AS feed_guid, pc.feed_url AS feed_url,
              e.enclosure_url AS enclosure_url, e.duration AS duration`,
     from: `FROM boosts b
            LEFT JOIN episodes e  ON e.item_guid     = b.item_guid

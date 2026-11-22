@@ -31,12 +31,12 @@
   <link rel="apple-touch-icon" href="/assets/onlyboosts_pfp.png" />
 
   <link rel="preload" href="/assets/fonts/outfit.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v279" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v279" />
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v279" />
-  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v279" />
-  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v279" />
-  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v279" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v280" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v280" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v280" />
+  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v280" />
+  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v280" />
+  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v280" />
   <style>
     /* The year page (functions/_shared/year-page.js): the boards two across
        on a wide screen, one on a phone, and the numbers line above them. */
@@ -80,6 +80,11 @@
     .yc-bar { fill: var(--brand); }
     .yc-bar--past { fill: var(--brand); opacity: 0.45; }
     .yc-bar--live { opacity: 0.5; }
+    /* The #40HPW launch, in marker red (launchMark in year-page.js). */
+    .yh-ink { fill: none; stroke: var(--danger); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; opacity: 0.9; }
+    .yh-rule { stroke: var(--danger); stroke-width: 1.2; stroke-dasharray: 3 4; opacity: 0.7; }
+    .yh-note-h { font-family: var(--font-sans); font-size: 14px; font-weight: 700; fill: var(--danger); }
+    .yh-note-s { font-family: var(--font-sans); font-size: 11.5px; fill: var(--ink); }
 
     .ya-split { display: flex; height: 18px; border-radius: 9px; overflow: hidden; background: var(--border); }
     .ya-seg { display: block; min-width: 3px; }
@@ -97,7 +102,7 @@
     .yh-head { margin: 0 0 0.6rem; font-size: 0.95rem; color: var(--ink); }
     @media (max-width: 560px) { .ya-rows li { grid-template-columns: 7rem minmax(0, 1fr) 3rem; } }
   </style>
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v279" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v280" />
 </head>
 <body>
 
@@ -483,10 +488,10 @@
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav-widget-boot.js?v=ob-v279"></script>
-<script src="/assets/js/sw-register.js?v=ob-v279" defer></script>
-<script src="/assets/widgets/pwa-install.js?v=ob-v279" defer></script>
-<script src="/assets/js/nav.js?v=ob-v279" defer></script>
-<script type="module" src="/assets/js/search-page.js?v=ob-v279"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v280"></script>
+<script src="/assets/js/sw-register.js?v=ob-v280" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v280" defer></script>
+<script src="/assets/js/nav.js?v=ob-v280" defer></script>
+<script type="module" src="/assets/js/search-page.js?v=ob-v280"></script>
 </body>
 </html>

@@ -53,7 +53,8 @@ const bucketOf = (ws) => Math.floor((ws + pacificOffset(ws) - MONDAY_EPOCH) / WE
 /** The figures and series the year page draws, beyond the boards:
  *  - months: every Pacific calendar month of the index up to `ye` (the whole
  *    site's history, so the year is read against the one before it);
- *  - weeks: the year's chart weeks, boosts and #40HPW finishers per week;
+ *  - weeks: the year's chart weeks, boosts, other-app boosts and #40HPW
+ *    finishers per week;
  *  - apps: the year's boosts by client, Fountain and the APP_CLIENTS;
  *  - facts: the stat cards' single figures. */
 export async function yearStats(env, ys, ye) {
@@ -68,8 +69,9 @@ export async function yearStats(env, ys, ye) {
        FROM boosts WHERE created_at < ?
       GROUP BY m ORDER BY m`).bind(...APP_CLIENTS, ye).all();
   const weeksQ = env.DB.prepare(
-    `SELECT ${WK("created_at")} AS wk, COUNT(*) AS boosts, COALESCE(SUM(sats),0) AS sats
-       FROM boosts WHERE created_at >= ? AND created_at < ? GROUP BY wk`).bind(ys, ye).all();
+    `SELECT ${WK("created_at")} AS wk, COUNT(*) AS boosts, COALESCE(SUM(sats),0) AS sats,
+            SUM(CASE WHEN client_id IN (${apps}) THEN 1 ELSE 0 END) AS apps
+       FROM boosts WHERE created_at >= ? AND created_at < ? GROUP BY wk`).bind(...APP_CLIENTS, ys, ye).all();
   const clientsQ = env.DB.prepare(
     `SELECT COALESCE(client_id,'') AS slug, COUNT(*) AS boosts, COALESCE(SUM(sats),0) AS sats,
             COUNT(DISTINCT booster_pubkey) AS boosters
@@ -113,7 +115,7 @@ export async function yearStats(env, ys, ye) {
   const series = [];
   for (let w = ys; w < ye; w = nextWeek(w)) {
     const k = bucketOf(w), r = byWk.get(k);
-    series.push({ start: w, boosts: Number(r?.boosts || 0), sats: Number(r?.sats || 0), hpw: hpwByWk.get(k) || 0 });
+    series.push({ start: w, boosts: Number(r?.boosts || 0), sats: Number(r?.sats || 0), apps: Number(r?.apps || 0), hpw: hpwByWk.get(k) || 0 });
   }
 
   const appSet = new Set(APP_CLIENTS);

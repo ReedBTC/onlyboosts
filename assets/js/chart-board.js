@@ -29,13 +29,13 @@
 // is computed over the whole week's corpus (peers_* from week-charts.js),
 // never over the visible ten.
 
-import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v279';
-import { httpsUrl } from './cover-art.js?v=ob-v279';
-import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v279';
-import { boosterPageHref } from './booster-link.js?v=ob-v279';
-import { rankLabel, competitionRanks } from './rank.js?v=ob-v279';
-import { weekDateString } from './pacific-week.js?v=ob-v279';
-import { initials } from './hpw-board.js?v=ob-v279';
+import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v280';
+import { httpsUrl } from './cover-art.js?v=ob-v280';
+import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v280';
+import { boosterPageHref } from './booster-link.js?v=ob-v280';
+import { rankLabel, competitionRanks } from './rank.js?v=ob-v280';
+import { weekDateString } from './pacific-week.js?v=ob-v280';
+import { initials } from './hpw-board.js?v=ob-v280';
 
 const esc = htmlEscape;
 
@@ -65,13 +65,17 @@ const fmt = (n) => Number(n || 0).toLocaleString("en-US");
 
 /* A song's credit line, "Artist · Album" (Reed, 2026-11-22), the album
  * alone when the feed names no artist, and the artist alone when the album
- * repeats it (a single released under the artist's own name). */
-function songCredit(r) {
+ * repeats it (a single released under the artist's own name). Each half is a
+ * quiet link (the Top Episode line's): the artist to /artist when the feed
+ * names its publisher, the album to /show by the credited feed. */
+function songCreditHtml(r) {
   const artist = (r.p_author || "").trim();
   const album = (r.p_title || "").trim();
-  if (!artist) return album || null;
-  if (!album || album.toLowerCase() === artist.toLowerCase()) return artist;
-  return `${artist} · ${album}`;
+  const link = (text, href) => href ? `<a href="${esc(href)}">${esc(text)}</a>` : esc(text);
+  const a = artist ? link(artist, publisherPageHref(r.p_publisher)) : "";
+  const b = album ? link(album, showPageHref(r.feed_guid)) : "";
+  const line = !a ? b : !b || album.toLowerCase() === artist.toLowerCase() ? a : `${a} · ${b}`;
+  return line ? `<span class="cb-sub cb-drove">${line}</span>` : "";
 }
 
 /* Title + href per kind. The linking rules are show-link.js's, restated only
@@ -83,7 +87,7 @@ function subject(kind, r) {
     return {
       title: title || (kind === "songs" ? "Untitled track" : "Untitled episode"),
       href: episodePageHref(r.guid, title),
-      sub: kind === "songs" ? songCredit(r) : (r.p_title || "").trim() || null,
+      sub: (r.p_title || "").trim() || null,
       glyph: kind === "songs" ? "🎵" : "🎙",
     };
   }
@@ -149,6 +153,7 @@ export function weekRowHtml(kind, r, { card = false } = {}) {
    * from attachTopSongs. */
   const w = !card && kind === "shows" ? who(kind, r, "", droveHtml(r))
     : !card && kind === "artists" ? who(kind, r, "", droveHtml(r, "Top Song"))
+    : kind === "songs" ? who(kind, r, songCreditHtml(r))
     : who(kind, r);
   /* `#2`, or `T#9` when the component place is shared — the detail tiles'
    * chip form (feed-rank.js), and the site's own line: a bare numeral belongs
