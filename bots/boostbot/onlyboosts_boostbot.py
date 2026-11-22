@@ -235,7 +235,7 @@ def _pending_or_drop(tx, now, why):
     return "unrouted", f"{why}; given up after 24h"
 
 
-def classify(tx, config, feeds, now):
+def classify(tx, config, feeds, now, excludes=None):
     """("boost", info) | ("defer", why) | ("unrouted", why) | (None, None) not a boost."""
     desc = tx.get("description") or ""
     ph = tx.get("paymentHash") or ""
@@ -328,7 +328,48 @@ def classify(tx, config, feeds, now):
         # The duplicate check: a donor's app may file its note under the song.
         "item_guids": {g for g in (b["item_guid"], (split or {}).get("item_guid")) if g},
     }
+    why = excluded_why(info, b, excludes) if excludes is not None else None
+    if why:
+        return "unrouted", why
     return "boost", info
+
+
+# ── the exclusion list ───────────────────────────────────────────────────────
+EXCLUDES_FILE = HERE.parents[1] / "excludes.json"
+
+
+def load_excludes(path=None):
+    """The site's exclusion list as match sets. Like the collector, a file that
+    will not parse stops the run: publishing what was meant to be hidden is the
+    failure this list exists to prevent."""
+    doc = json.loads(Path(path or EXCLUDES_FILE).read_text())
+    guids, feeds, pubkeys = set(), set(), set()
+    for e in doc.get("shows", []) + doc.get("episodes", []):
+        if e.get("guid"):
+            guids.add(e["guid"])
+        if e.get("feed"):
+            feeds.add(e["feed"])
+    for e in doc.get("boosters", []):
+        pk = e.get("pubkey") or (npub_to_hex(e["npub"]) if e.get("npub") else None)
+        if pk:
+            pubkeys.add(pk)
+    return {"guids": guids, "feeds": feeds, "pubkeys": pubkeys}
+
+
+def excluded_why(info, b, excludes):
+    """Why this boost names something on the exclusion list, or None. A guid
+    is matched against every guid slot, as the collector matches it."""
+    slots = {info["feed_guid"], info["episode_guid"], b.get("feed_guid"),
+             b.get("remote_feed_guid"), b.get("remote_item_guid"),
+             (info["split"] or {}).get("feed_guid"), (info["split"] or {}).get("item_guid")}
+    hit = (slots - {None}) & excludes["guids"]
+    if hit:
+        return f"excluded: {sorted(hit)[0]} is on the exclusion list"
+    if b.get("feed_url") and b["feed_url"] in excludes["feeds"]:
+        return f"excluded: feed {b['feed_url']} is on the exclusion list"
+    if info["sender_pubkey_hex"] and info["sender_pubkey_hex"] in excludes["pubkeys"]:
+        return "excluded: the sender is on the exclusion list"
+    return None
 
 
 # ── the note: OB Boostbot's shape ────────────────────────────────────────────
@@ -360,7 +401,8 @@ def note_text(info):
     elif info["our_sats"] >= MIN_UNVERIFIED_SATS:
         lines.append(f"⚡Just boosted {info['our_sats']:,} sats{via}")
     else:
-        lines.append(f"⚡Just boosted{via}")
+        # No figure to print: "Just boosted via X" without one reads as a typo.
+        lines.append(f"⚡Boosted via {info['app_name']}" if info["app_name"] else "⚡Boosted")
     sender = _sender_line(info)
     if sender:
         lines.append(f"👤 From {sender}")
@@ -451,10 +493,15 @@ def main():
     if not cands:
         return 0
 
+    try:
+        excludes = load_excludes()
+    except (OSError, ValueError) as e:
+        log(f"[error] cannot read the exclusion list {EXCLUDES_FILE}: {e} — refusing to run")
+        return 1
     feeds = {}
     classified = []
     for tx in cands:
-        kind, info = classify(tx, config, feeds, now)
+        kind, info = classify(tx, config, feeds, now, excludes)
         if kind in ("defer", "unrouted"):
             log(f"[{kind}] {(tx.get('paymentHash') or '')[:12]}... {info}")
         classified.append((tx, kind, info))

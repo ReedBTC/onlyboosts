@@ -48,9 +48,10 @@ notes no relay has accepted yet), `state_deferred.json`, `last_seen.txt`,
 | Decision | When | Note |
 |---|---|---|
 | skip | another note covers the boost (the index, or the relays at the last look) | none |
+| excluded | the show, episode, song or sender is on the site's `excludes.json` (any guid slot, as the collector matches) | none; a list that will not parse stops the run |
 | hold | too early to tell (20 min, 60 if the donor is known) | none yet |
 | claim | nobody covered it, amount verified | with `t` tags and `amount`: the index counts it |
-| untagged | nobody covered it, amount not verified | for readers only; no index counts it. The figure is what landed, and is omitted at 5 sats or less (Reed) |
+| untagged | nobody covered it, amount not verified | for readers only; no index counts it. The figure is what landed; at 5 sats or less the line reads "⚡Boosted via <app>" (Reed) |
 
 **Our own key is evidence.** The site's edge signer publishes as OB Boostbot too,
 and that note is the payment's note; LB's copy excluded its own key, which here

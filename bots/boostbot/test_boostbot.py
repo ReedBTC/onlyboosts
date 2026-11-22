@@ -151,7 +151,7 @@ kind, info = cls(fountain_tx("c" * 64, 1000, 1_000_000, 300.0, "g3"))
 check(kind == "boost" and not info["amount_verified"], f"100% landing during a song does not verify ({info['amount_why']})")
 check("1,000 sats" in bot.note_text(info), "unverified and over 5 sats: the figure that landed")
 kind, info = cls(fountain_tx("c2" * 32, 1000, 5_000, 100.0, "g3b"))
-check(not info["amount_verified"] and bot.note_text(info).split("\n")[1] == "⚡Just boosted 📱 via Fountain",
+check(not info["amount_verified"] and bot.note_text(info).split("\n")[1] == "⚡Boosted via Fountain",
       "unverified and 5 sats or less: no figure (Reed)")
 
 kind, why = cls(fountain_tx("d" * 64, 1000, 10_000, 300.0, "g4", feed_guid=OTHER))
@@ -258,6 +258,24 @@ check(publish_with([["OK", "ID", False, "blocked"]], [["NOTICE", "hi"], ["OK", "
 check(publish_with([["OK", "ID", False, "blocked"]], [["OK", "ID", False, "rate-limited"]]) is None,
       "OK carrying false from every relay is not published")
 check(publish_with([["OK", "someone-else", True, ""]] * 5) is None, "an OK for another event id does not count")
+
+print("exclusion list")
+boostagram.fetch_descriptor = lambda url, timeout=None: DESCRIPTORS.get(url)
+bot.DEFERRED.clear()
+ex = {"guids": {EP}, "feeds": set(), "pubkeys": set()}
+kind, why = bot.classify(fountain_tx("e" * 64, 1000, 10_000, 300.0, "g1"), {}, {}, NOW, ex)
+check(kind == "unrouted" and why.startswith("excluded:"), f"an excluded episode is never published ({why})")
+ex = {"guids": {SONG1[1]}, "feeds": set(), "pubkeys": set()}
+kind, why = bot.classify(fountain_tx("f" * 64, 1000, 10_000, 300.0, "g1"), {}, {}, NOW, ex)
+check(kind == "unrouted", "a guid on the list matches any slot, the song playing included")
+kind, _ = bot.classify(fountain_tx("9" * 64, 1000, 10_000, 300.0, "g1"), {}, {}, NOW,
+                       {"guids": {"someone-else"}, "feeds": set(), "pubkeys": set()})
+check(kind == "boost", "a list naming other things lets the boost through")
+real = bot.load_excludes()
+check(isinstance(real["guids"], set) and real["guids"], "the repo's excludes.json parses and names guids")
+_tiny = dict(info, amount_verified=False, our_sats=1, app_name="BoostMeBitch")
+check(bot.note_text(_tiny).split("\n")[1] == "⚡Boosted via BoostMeBitch", "no figure: Boosted via the app")
+check(bot.note_text(dict(_tiny, app_name=None)).split("\n")[1] == "⚡Boosted", "no figure and no app: Boosted")
 
 if failures:
     print(f"\n{len(failures)} failure(s)")
