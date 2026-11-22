@@ -29,13 +29,13 @@
 // is computed over the whole week's corpus (peers_* from week-charts.js),
 // never over the visible ten.
 
-import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v280';
-import { httpsUrl } from './cover-art.js?v=ob-v280';
-import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v280';
-import { boosterPageHref } from './booster-link.js?v=ob-v280';
-import { rankLabel, competitionRanks } from './rank.js?v=ob-v280';
-import { weekDateString } from './pacific-week.js?v=ob-v280';
-import { initials } from './hpw-board.js?v=ob-v280';
+import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v281';
+import { httpsUrl } from './cover-art.js?v=ob-v281';
+import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v281';
+import { boosterPageHref } from './booster-link.js?v=ob-v281';
+import { rankLabel, competitionRanks } from './rank.js?v=ob-v281';
+import { weekDateString } from './pacific-week.js?v=ob-v281';
+import { initials } from './hpw-board.js?v=ob-v281';
 
 const esc = htmlEscape;
 
@@ -266,6 +266,21 @@ export function memberOnesBoardHtml(ones, { weekHref = null, titleHtml = null, c
  * face and name, and the members chart's own triplet, rank in sats / boosts /
  * shows (the Members wall's sort=chart rule), in the weekly rows' place. */
 export function memberChartRowHtml(m) {
+  const { face, whoM } = memberFaceName(m);
+  const c = (rank, peers) => `${Number(peers) > 1 ? "T" : ""}#${rank}`;
+  return `<li class="hpw-row">` +
+    `<span class="hpw-pos">${esc(rankLabel(m.rank, m.tied))}</span>` +
+    face +
+    `<span class="hpw-who">${whoM}<span class="cb-sub">${fmt(m.sats)} sats · ${fmt(m.boosts)} boosts · ${fmt(m.shows)} shows</span></span>` +
+    `<span class="cb-ranks" title="Rank in sats / boosts / shows">` +
+      `${esc(c(m.r_sats, m.peers_sats))}/${esc(c(m.r_boosts, m.peers_boosts))}/${esc(c(m.r_shows, m.peers_shows))}` +
+    `</span>` +
+    `</li>`;
+}
+
+/* A member's face and linked name, the member rows' own: the year page's
+ * #40HPW finisher rows use it too. */
+export function memberFaceName(m) {
   const href = boosterPageHref(m.npub, m.pk);
   const name = m.dname || m.name || (m.npub ? m.npub.slice(0, 12) + "…" : (m.pk || "").slice(0, 12) + "…");
   const upgraded = httpsUrl(m.pic);
@@ -276,15 +291,7 @@ export function memberChartRowHtml(m) {
   const whoM = href
     ? `<a class="hpw-name" href="${esc(href)}">${esc(name)}</a>`
     : `<span class="hpw-name">${esc(name)}</span>`;
-  const c = (rank, peers) => `${Number(peers) > 1 ? "T" : ""}#${rank}`;
-  return `<li class="hpw-row">` +
-    `<span class="hpw-pos">${esc(rankLabel(m.rank, m.tied))}</span>` +
-    face +
-    `<span class="hpw-who">${whoM}<span class="cb-sub">${fmt(m.sats)} sats · ${fmt(m.boosts)} boosts · ${fmt(m.shows)} shows</span></span>` +
-    `<span class="cb-ranks" title="Rank in sats / boosts / shows">` +
-      `${esc(c(m.r_sats, m.peers_sats))}/${esc(c(m.r_boosts, m.peers_boosts))}/${esc(c(m.r_shows, m.peers_shows))}` +
-    `</span>` +
-    `</li>`;
+  return { face, whoM };
 }
 
 /* memberSectionHtml — the page's Members pair — went with the page too; the

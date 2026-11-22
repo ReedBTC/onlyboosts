@@ -113,9 +113,42 @@ export async function yearStats(env, ys, ye) {
     finishers.add(r.pk);
   }
   const series = [];
+  const slotOf = new Map();
   for (let w = ys; w < ye; w = nextWeek(w)) {
     const k = bucketOf(w), r = byWk.get(k);
+    slotOf.set(k, series.length);
     series.push({ start: w, boosts: Number(r?.boosts || 0), sats: Number(r?.sats || 0), apps: Number(r?.apps || 0), hpw: hpwByWk.get(k) || 0 });
+  }
+
+  /* Who finished, and which weeks (Reed, 2026-11-22): one row per member,
+   * most forty-hour weeks first, then the most recent finish. The names and
+   * faces are one more read, bound to at most 90 keys (D1's 100-parameter
+   * ceiling); a failure costs the faces, never the list. */
+  const byPk = new Map();
+  for (const r of hpw.results) {
+    const slot = slotOf.get(Number(r.wk));
+    if (slot === undefined) continue;
+    if (!byPk.has(r.pk)) byPk.set(r.pk, { pk: r.pk, weeks: [] });
+    byPk.get(r.pk).weeks.push(slot);
+  }
+  const finisherRows = [...byPk.values()]
+    .map((m) => ({ ...m, weeks: m.weeks.sort((a, b) => a - b) }))
+    .sort((a, b) => b.weeks.length - a.weeks.length || b.weeks[b.weeks.length - 1] - a.weeks[a.weeks.length - 1] || a.pk.localeCompare(b.pk))
+    .slice(0, 90);
+  if (finisherRows.length) {
+    try {
+      const { results } = await env.DB.prepare(
+        `SELECT b.booster_pubkey AS pk, MAX(b.booster_npub) AS npub,
+                MAX(p.name) AS name, MAX(p.display_name) AS dname, MAX(p.picture) AS pic
+           FROM boosts b LEFT JOIN profiles p ON p.pubkey = b.booster_pubkey
+          WHERE b.booster_pubkey IN (${finisherRows.map(() => "?").join(",")})
+            AND b.created_at >= ? AND b.created_at < ?
+          GROUP BY b.booster_pubkey`).bind(...finisherRows.map((m) => m.pk), ys, ye).all();
+      const prof = new Map(results.map((r) => [r.pk, r]));
+      for (const m of finisherRows) Object.assign(m, prof.get(m.pk) || {});
+    } catch (err) {
+      console.warn("[year-charts] finisher profiles failed", err);
+    }
   }
 
   const appSet = new Set(APP_CLIENTS);
@@ -136,7 +169,7 @@ export async function yearStats(env, ys, ye) {
     })),
     weeks: series,
     apps: { total, fountain, other: appBoosts, rows: appRows },
-    hpw: { members: finishers.size, weeks: hpw.results.length },
+    hpw: { members: finishers.size, weeks: hpw.results.length, finishers: finisherRows },
     reach: { podcasts: Number(reach?.podcasts || 0), songs: Number(reach?.songs || 0), artists: Number(reach?.artists || 0) },
     newBoosters: Number(fresh?.n || 0),
   };

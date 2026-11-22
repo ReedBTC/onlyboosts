@@ -20,7 +20,7 @@
 // exists to avoid; the year moves slowly enough that ten minutes is nothing.
 
 import { yearBoards, YEARS, TOP_N } from "./year-charts.js";
-import { boardHtml, weekRowHtml, memberChartRowHtml } from "../../assets/js/chart-board.js";
+import { boardHtml, weekRowHtml, memberChartRowHtml, memberFaceName } from "../../assets/js/chart-board.js";
 import { clientLabel } from "../../assets/js/client-label.js";
 import { assetGet } from "./head.js";
 
@@ -239,7 +239,7 @@ function launchMark(g, ws) {
   // An ellipse holds a box's corners at about 1.3 times its half-sides.
   const top = g.y(peak) - 12, bot = g.y(0) + 4;
   const rx = ((x1 - x0) / 2) * 1.3, ry = Math.min(((bot - top) / 2) * 1.25, (g.H - 6) / 2);
-  const cx = (x0 + x1) / 2, cy = Math.min(Math.max((top + bot) / 2, ry + 3), g.H - ry - 3);
+  const cx = Math.min((x0 + x1) / 2, W - 5 - rx * 1.09), cy = Math.min(Math.max((top + bot) / 2, ry + 3), g.H - ry - 3);
   const tilt = -0.06, pts = [];
   for (let k = 0; k <= 64; k++) {
     const t = -2.2 + (k / 64) * (2 * Math.PI + 0.55);
@@ -268,6 +268,39 @@ function launchMark(g, ws) {
     `</g>`;
 }
 
+/* Who finished #40HPW in the year, and which weeks (Reed, 2026-11-22): a
+ * member row each, most forty-hour weeks first, with a strip of the year's 52
+ * chart weeks under the name, a filled cell per week finished. The strip
+ * shares the bars' weeks below it, and carries the launch as a red tick. */
+function finishersHtml(d) {
+  const ws = d.stats.weeks;
+  const rows = d.stats.hpw.finishers || [];
+  if (!rows.length) return "";
+  const slots = Math.max(52, ws.length), cw = 6;
+  const li = ws.findIndex((w) => w.start > HPW_LAUNCH);
+  let rank = 0, prev = -1;
+  const out = rows.map((m, i) => {
+    const n = m.weeks.length;
+    if (n !== prev) { rank = i + 1; prev = n; }
+    const tied = rows.filter((r) => r.weeks.length === n).length > 1;
+    const done = new Set(m.weeks);
+    const cells = [];
+    for (let k = 0; k < slots; k++) {
+      const cls = done.has(k) ? "yf-cell yf-cell--on" : k >= ws.length ? "yf-cell yf-cell--future" : "yf-cell";
+      const tip = done.has(k) ? `<title>${esc(`Week of ${pacificDate(ws[k].start, { month: "short", day: "numeric" })}`)}</title>` : "";
+      cells.push(`<rect class="${cls}" x="${k * cw}" y="0" width="${cw - 1}" height="8" rx="1">${tip}</rect>`);
+    }
+    if (li >= 12) cells.push(`<line class="yf-launch" x1="${li * cw - 0.5}" x2="${li * cw - 0.5}" y1="-1" y2="9"/>`);
+    const { face, whoM } = memberFaceName(m);
+    return `<li class="hpw-row">` +
+      `<span class="hpw-pos">${tied ? "T" : ""}${rank}</span>` + face +
+      `<span class="hpw-who">${whoM}<svg class="yf-strip" viewBox="0 -1 ${slots * cw} 10" role="img" aria-label="${esc(`${n} forty-hour week${n === 1 ? "" : "s"} in ${d.year}`)}">${cells.join("")}</svg></span>` +
+      `<span class="yf-n"><strong>${n}</strong> week${n === 1 ? "" : "s"}</span>` +
+      `</li>`;
+  }).join("");
+  return `<h3 class="yc-sub">Members Who Hit 40 Hours</h3><ul class="hpw-list yf-list">${out}</ul>`;
+}
+
 function hpwChart(d) {
   const s = d.stats;
   const ws = s.weeks;
@@ -279,10 +312,11 @@ function hpwChart(d) {
     g.parts.push(g.bar(i, w.hpw, tip));
     if (w.hpw) g.parts.push(`<text class="yc-val" x="${(g.x(i) + g.bw / 2).toFixed(1)}" y="${(g.y(w.hpw) - 3).toFixed(1)}" text-anchor="middle">${w.hpw}</text>`);
   });
-  return figure("#40HPW Finishers by Week",
-    `How many members reached 40 hours of boosted listening in each chart week of ${esc(d.year)}, by the #40HPW Challenge's own count.`,
+  return figure(`#40HPW in ${d.year}`,
+    `Members who reached 40 hours of boosted listening in a chart week of ${esc(d.year)}, by the #40HPW Challenge's own count.`,
     `<p class="yh-head"><strong>${fmt(s.hpw.members)}</strong> member${s.hpw.members === 1 ? "" : "s"} reached 40 hours at least once; <strong>${fmt(s.hpw.weeks)}</strong> forty-hour weeks in all. <a href="/hpw/high-scores">Proof of #40HPW</a></p>` +
-    `<div class="yc-scroll"><svg class="yc-svg" viewBox="0 0 ${W} ${g.H}" role="img" aria-label="#40HPW finishers by week">${g.parts.join("")}${mark}</svg></div>`,
+    finishersHtml(d) +
+    `<h3 class="yc-sub">Finishers by Week</h3><div class="yc-scroll"><svg class="yc-svg" viewBox="0 0 ${W} ${g.H}" role="img" aria-label="#40HPW finishers by week">${g.parts.join("")}${mark}</svg></div>`,
     "");
 }
 
