@@ -12,13 +12,13 @@
   "categories": ["news", "social", "entertainment"],
   "icons": [
     {
-      "src": "/assets/onlyboosts_pfp.png",
+      "src": "/assets/onlyboosts_pfp.png?v=d5",
       "sizes": "1400x1400",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/assets/onlyboosts_favicon.png",
+      "src": "/assets/onlyboosts_favicon.png?v=d5",
       "sizes": "256x256",
       "type": "image/png",
       "purpose": "any"

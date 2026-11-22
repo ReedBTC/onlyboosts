@@ -500,11 +500,11 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
   <title>${htmlEscape(ogTitle)}</title>
   <meta name="description" content="${htmlEscape(ogDesc)}" />
   <link rel="canonical" href="${htmlEscape(pageUrl)}" />
-  <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
+  <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png?v=d5" />
 
   <link rel="manifest" href="/manifest.webmanifest" />
   <meta name="theme-color" content="#00aff0" />
-  <link rel="apple-touch-icon" href="/assets/onlyboosts_pfp.png" />
+  <link rel="apple-touch-icon" href="/assets/onlyboosts_pfp.png?v=d5" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -541,20 +541,20 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v285" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v285" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v285" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v285" />
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v285" />
-  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v285" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v285" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v286" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v286" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v286" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v286" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v286" />
+  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v286" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v286" />
   <!-- The boost note card and its reaction bar. Added when the boost list at
        the foot of this page became the same .note-card the homepage Boosts
        feed paints; this page linked neither before, which is why show-page.css
        restates .nostr-mention. That restatement is now redundant rather than
        load-bearing, and is left in place rather than removed in the same pass. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v285" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v285" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v286" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v286" />
 </head>
 <body data-show-guid="${htmlEscape(show.podcast_guid)}">
 
@@ -973,12 +973,12 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
 
 <script type="application/json" id="show-boost-payload">${jsonForScript(boostPayload)}</script>
 
-<script src="/assets/js/nav.js?v=ob-v285" defer></script>
-<script src="/assets/js/show-page.js?v=ob-v285" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v286" defer></script>
+<script src="/assets/js/show-page.js?v=ob-v286" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v285"></script>
-<script src="/assets/js/sw-register.js?v=ob-v285" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v286"></script>
+<script src="/assets/js/sw-register.js?v=ob-v286" defer></script>
 </body>
 </html>`;
 }
@@ -1537,11 +1537,11 @@ function notFound(guid) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex" />
   <title>Show not found — OnlyBoosts</title>
-  <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v285" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v285" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v285" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v285" />
+  <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png?v=d5" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v286" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v286" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v286" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v286" />
 </head>
 <body>
 <section class="page-header">
@@ -1560,7 +1560,7 @@ function notFound(guid) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v285" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v286" defer></script>
 </body>
 </html>`;
   return new Response(html, {
