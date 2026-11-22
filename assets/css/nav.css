@@ -36,7 +36,8 @@ html[data-lb-modal-open] #top-nav { z-index: 65; }
   flex-shrink: 0;
   width: 38px;
   height: 38px;
-  border-radius: 50%;
+  /* The D5 tile's own corner (rx 14 of 64), not a circle (Reed, 2026-11-21). */
+  border-radius: 22%;
   overflow: hidden;
 }
 .nav-logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -159,6 +160,43 @@ details.nav-ribbon { position: static; }
 }
 .nav-ribbon-discover a:hover { color: var(--brand-dd); }
 :root[data-theme="dark"] .nav-ribbon-discover a:hover { color: var(--brand-d); }
+/* The ribbons' way to the full charts (2026-11-22): the Discover column's
+   last line, set apart by a hairline and the accent. */
+.nav-ribbon-discover a.nav-full { margin-top: 0.35rem; padding-top: 0.45rem; border-top: 1px solid var(--border); font-weight: 700; color: var(--brand-dd); }
+.nav-ribbon-discover a.nav-full + a.nav-full { margin-top: 0; padding-top: 0.2rem; border-top: 0; }
+:root[data-theme="dark"] .nav-ribbon-discover a.nav-full { color: var(--brand-d); }
+.nav-ribbon-discover a.nav-full:hover { text-decoration: underline; }
+/* The year's charts, dressed for the year's end (Reed, 2026-11-22): gold
+   text with a slow shimmer, a twinkling star and a gold "New" pill, in the
+   Charts ribbon and the overlay's Charts accordion. Gold is #40HPW's
+   established gold (#c69620, hpw-board.css), the one exception to the
+   single accent; take this off with the link's class once January is in. */
+.nav-2026 { --g1: #8a6410; --g2: #d9a92b; --g3: #8a6410; }
+:root[data-theme="dark"] .nav-2026, .nav-explore-sub .nav-2026 { --g1: #e0b23a; --g2: #fff1c4; --g3: #e0b23a; }
+.nav-ribbon-discover a.nav-2026, .nav-explore-sub a.nav-2026 {
+  display: flex; align-items: center; gap: 0.35rem; font-weight: 700; overflow: visible;
+}
+.nav-2026-text {
+  background: linear-gradient(100deg, var(--g1) 30%, var(--g2) 50%, var(--g3) 70%);
+  background-size: 250% 100%; background-position: 100% 0;
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: nav-2026-shimmer 4s ease-in-out infinite;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.nav-2026-star { color: var(--g1); font-size: 0.8em; animation: nav-2026-twinkle 2s ease-in-out infinite; }
+.nav-2026-new {
+  flex: none; font-size: 0.6rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
+  color: #2a1d00; background: linear-gradient(135deg, #f6d36b, #c69620);
+  border-radius: 999px; padding: 0.12rem 0.45rem; line-height: 1.2;
+  box-shadow: 0 0 0 1px rgba(198,150,32,0.35), 0 0 10px rgba(246,211,107,0.35);
+}
+.nav-ribbon-discover a.nav-2026:hover .nav-2026-text, .nav-explore-sub a.nav-2026:hover .nav-2026-text { text-decoration: underline; text-decoration-color: var(--g1); }
+@keyframes nav-2026-shimmer { 0%, 35% { background-position: 100% 0; } 75%, 100% { background-position: 0 0; } }
+@keyframes nav-2026-twinkle { 0%, 100% { opacity: 1; transform: scale(1) rotate(0); } 50% { opacity: 0.55; transform: scale(0.75) rotate(20deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .nav-2026-text, .nav-2026-star { animation: none; }
+  .nav-2026-text { background-position: 50% 0; }
+}
 .nav-ribbon-feat { display: grid; gap: 0.35rem; justify-items: start; width: 150px; }
 .nav-ribbon-feat[hidden] { display: none; }
 .nav-ribbon-eyebrow { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--brand-dd); }
@@ -362,6 +400,15 @@ details.nav-ribbon { position: static; }
   padding: 0.55rem 0;
 }
 .nav-explore-group a span { width: 1.2rem; text-align: center; flex-shrink: 0; }
+/* The 2026 link's star, text and pill are spans too; the icon width above
+   squeezed each to 1.2rem on phones (Reed's screenshot, 2026-11-22). */
+.nav-explore-group a.nav-2026 span { width: auto; }
+/* The overlay's Podcasts and Music rows open on their full charts (Reed,
+   2026-11-22: "I just want it to say somewhere so people know there is a
+   full chart"), first in the list there, the ribbons' accent. */
+.nav-explore-sub a.nav-full { font-weight: 700; color: #4fd1ff; }
+.nav-explore-group a.nav-full span { width: auto; }
+.nav-explore-group a.nav-2026 .nav-2026-text { flex-shrink: 1; min-width: 0; }
 .nav-explore-group a:hover { color: var(--brand); }
 /* The overlay's section rows are accordions (2026-10-20, Rotten Tomatoes'
    app): the row's link opens the section, the chevron opens that side's

@@ -2,8 +2,10 @@
 //
 //   /charts/<YYYY-MM-DD>/card/shows      that week's Shows Top 10 (chart rule)
 //   /charts/<YYYY-MM-DD>/card/artists    that week's Artists Top 10
+//   /charts/<YYYY-MM-DD>/card/songs      that week's Songs Top 10 (2026-11-21)
 //   /charts/weeks-at-1/card/shows        Shows: Weeks at #1 (completed weeks)
 //   /charts/weeks-at-1/card/artists      Artists: Weeks at #1
+//   /charts/weeks-at-1/card/songs        Songs: Weeks at #1
 //   /charts/weeks-at-1/card/members      Members: Weeks at #1 on the 40 HPW board
 //
 // Each is the board in the fixed 720x900 frame (functions/_shared/card-frame.js)
@@ -13,18 +15,11 @@
 // 302s to its Monday keeping /card/<kind>; a future date to the live week; a
 // week before the index, or an unknown kind, is a 404.
 //
-// ⚠️ THE ONLYBOOSTS CHARTS PAGE THAT LIVED HERE IS GONE (torn down 2026-09-04,
-// Reed's call, two days after it shipped). The same boards live on the
-// homepage now — the Shows and Artists feeds carry the weekly Top 10 with the
-// week picker beside Weeks at #1 (assets/js/charts-block.js), and the Members
-// tab stacks its Weeks at #1 behind Proof of #40HPW — so the page had become
-// a second copy of three things one tab over, and the CHARTS wordmark links
-// that pointed at it went with it. `/charts` and `/charts/<date>` 302 to the
-// Shows feed, since the page's URL was linked from the site for two days;
-// the card routes are unchanged because the bot's contract names them. The
-// page's renderer (sectionHtml, the stepper, the masthead) is in git before
-// this commit; the queries it used are still functions/_shared/week-charts.js,
-// serving /api/v1/charts.
+// Beside the frames, this Function routes the pages: the bare /charts is the
+// Weekly Charts (one page since 2026-11-22, every board at its #section),
+// /charts/<year> the year's Top 33s, and the old view paths, dated weeks and
+// anything else forward to /charts (see onRequestGet). The dated weekly page
+// that lived here from 2026-09-02 to 2026-09-04 is in git history.
 //
 // ⚠️ THE WEEK IS THE 40 HPW WEEK: Monday 00:00 US Pacific, cut by
 // assets/js/pacific-week.js. The ranking is sort=chart and nothing else.
@@ -35,41 +30,44 @@ import { weekBoard, onesBoard } from "../api/v1/charts/[[path]].js";
 import { competitionRanks } from "../../assets/js/rank.js";
 import { cardHtml } from "../_shared/card-frame.js";
 import { renderShellPage, resolveRoute } from "../_shared/charts-page.js";
+import { renderYearPage, isChartYear } from "../_shared/year-page.js";
 
 const ROWS = 10;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 // The card frames' kinds. The members' WEEKLY card is /hpw/<date>/card; only
 // their Weeks at #1 board is a chart card.
-const WEEK_CARD_KINDS = new Set(["shows", "artists"]);
-const ONES_CARD_KINDS = new Set(["shows", "artists", "members"]);
+const WEEK_CARD_KINDS = new Set(["shows", "artists", "songs"]);
+const ONES_CARD_KINDS = new Set(["shows", "artists", "songs", "members"]);
 // ⚠️ A PATH SEGMENT IN THE WILD: the collector's bot screenshots the literal,
 // on the /hpw/high-scores rule. It does not move.
 export const ONES_KEY = "weeks-at-1";
-// Where a dated /charts/<date> URL lands: the Podcasts boards, which carry
-// the week picker that reaches every past week.
-const HOME = "/charts/podcasts";
+// Where a dated /charts/<date> URL lands: the weekly boards, which carry
+// the week pickers that reach every past week.
+const HOME = "/charts";
+/* ⚠️ THE THREE VIEW PATHS OF 2026-10-21 ARE IN THE WILD (share notes, the
+ * #40HPW posts, the nav of every cached page). Since 2026-11-22 the boards
+ * are one page (Reed's call: one weekly charts page, each board at its own
+ * #address to share), so each path forwards to its section. */
+export const VIEW_ANCHOR = { podcasts: "/charts#podcasts", music: "/charts#songs", hpw: "/charts#hpw" };
 
-export async function onRequestGet({ request, env, params }) {
+export async function onRequestGet({ request, env, params, waitUntil }) {
   let segs = params.path;
   if (segs == null) segs = [];
   if (!Array.isArray(segs)) segs = [segs];
   segs = segs.filter((s) => s !== "");
 
-  /* THE BARE /charts AND /charts/<view> ARE THE CHARTS PAGE SINCE 2026-10-21:
-     the weekly boards in three pairs (Podcasts, Music, #40HPW), one pair per
-     view, in the shell every chart page shares (_shared/charts-page.js).
-     Reed's call: the boards are a different thing from the live charts
-     they sat above, and a Month and a Year can join the Week here. The
-     bare path opens on Podcasts. The name stayed: /charts was the
-     hash-routed feed page from 2026-10-17 to 2026-10-21 (the homepage
-     before that), and its hash addresses are forwarded by the shell's head
-     script. Anything else that is not a card frame is the old dated
-     page's address, or garbage under it, and lands on the boards. */
+  /* THE BARE /charts IS THE WEEKLY CHARTS PAGE: the Podcasts, Songs,
+     Artists and #40HPW boards on one page since 2026-11-22, each at its own
+     #section (Reed: "one weekly charts page ... with its own hashtag
+     address, so you can still share the address"); three views of one shell
+     from 2026-10-21, the hash-routed feed page from 2026-10-17 before that.
+     Its shell is the one every chart page shares (_shared/charts-page.js).
+     Anything else that is not a card frame is an old address, or garbage
+     under one, and lands on the boards. */
   if (segs.length === 0) return renderShellPage({ request, env }, resolveRoute("charts"));
-  if (segs.length === 1) {
-    const route = resolveRoute("charts", segs[0]);
-    if (route) return renderShellPage({ request, env }, route);
-  }
+  /* /charts/<year>: the year's Top 33s (2026-11-21), its own shell. */
+  if (segs.length === 1 && isChartYear(segs[0])) return renderYearPage({ request, env, waitUntil }, segs[0]);
+  if (segs.length === 1 && VIEW_ANCHOR[segs[0]]) return redirect(request, VIEW_ANCHOR[segs[0]], 86400);
   const card = segs.length === 3 && segs[1] === "card";
   if (!card) return redirect(request, HOME, 60);
   const key = segs[0];
@@ -160,9 +158,9 @@ function unavailable() {
    the stepper's .hpw-nav grammar, the members board is .hpw-* rows in a
    .cb-board shell. Written here so scripts/stamp-assets.js sees an href it
    can restamp. */
-const CARD_LINKS = `  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v275" />
-  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v275" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v275" />`;
+const CARD_LINKS = `  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v290" />
+  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v290" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v290" />`;
 
 /* The rows sized to the frame. ⚠️ MEASURED BY THE BOT, 2026-09-03: the weekly
    cards' list box is 296.9 → 829 (the column head costs 27.4px), ceiling
@@ -188,9 +186,10 @@ const CARD_CSS = `
     .card .hpw-week, .card .hpw-week-jump { font-size: 0.62rem; }
     .card .hpw-hours { font-size: 1.05rem; }`;
 
-/* The footer names the Charts page view the board lives on (2026-10-21; the
-   feed tab before that), which is the share note's link. */
-const TAB_OF = { shows: "/charts/podcasts", artists: "/charts/music", members: "/charts/hpw" };
+/* The footer names the board's section of the Charts page (its #address
+   since 2026-11-22, its view 2026-10-21, the feed tab before that), which is
+   the share note's link. */
+const TAB_OF = { shows: "/charts#podcasts", artists: "/charts#artists", songs: "/charts#songs", members: "/charts#hpw" };
 
 export function renderWeekCard({ kind, ws, isCurrent, rows }) {
   const heading = COPY.sections[kind].heading;
@@ -198,7 +197,7 @@ export function renderWeekCard({ kind, ws, isCurrent, rows }) {
     board: `${kind}-week`,
     title: `Week of ${weekLabel(ws)}`,
     sub: isCurrent ? `In progress. ${weekSpan(ws)}.` : `${weekSpan(ws)}.`,
-    rows: rows.map((r) => weekRowHtml(kind, r)),
+    rows: rows.map((r) => weekRowHtml(kind, r, { card: true })),
     empty: isCurrent ? COPY.emptyLive : COPY.emptyPast,
     colhead: true,
     card: true,

@@ -500,11 +500,11 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
   <title>${htmlEscape(ogTitle)}</title>
   <meta name="description" content="${htmlEscape(ogDesc)}" />
   <link rel="canonical" href="${htmlEscape(pageUrl)}" />
-  <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
+  <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png?v=d5" />
 
   <link rel="manifest" href="/manifest.webmanifest" />
   <meta name="theme-color" content="#00aff0" />
-  <link rel="apple-touch-icon" href="/assets/onlyboosts_pfp.png" />
+  <link rel="apple-touch-icon" href="/assets/onlyboosts_pfp.png?v=d5" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -541,20 +541,20 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v275" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v275" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v275" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v275" />
-  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v275" />
-  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v275" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v275" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v290" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v290" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v290" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v290" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v290" />
+  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v290" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v290" />
   <!-- The boost note card and its reaction bar. Added when the boost list at
        the foot of this page became the same .note-card the homepage Boosts
        feed paints; this page linked neither before, which is why show-page.css
        restates .nostr-mention. That restatement is now redundant rather than
        load-bearing, and is left in place rather than removed in the same pass. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v275" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v275" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v290" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v290" />
 </head>
 <body data-show-guid="${htmlEscape(show.podcast_guid)}">
 
@@ -580,13 +580,13 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
      script; /assets/js/nav-ribbons.js adds hover, Escape, outside-click and
      fills the lists from the chart endpoints the first time a ribbon opens
      (the lists are data and the nav is a partial on every page, static ones
-     included, so they are never rendered at the edge). Charts and Boosts are
-     plain links (2026-10-21): the weekly boards' own page, where the #40HPW
+     included, so they are never rendered at the edge). Boosts is a plain link
+     and Charts was one until it got its own ribbon on 2026-11-21 (2026-10-21): the weekly boards' own page, where the #40HPW
      link of 2026-10-20 landed once the boards moved there, and the boost
      feed's own page, the two places people kept asking for. Every section
      is a PAGE since 2026-10-21 (/podcasts, /music, /members, /charts,
      /boosts); the hash-routed charts page is forwarded. THE THIRD RIBBON IS
-     NAMED #40HPW AND OPENS /charts/hpw SINCE 2026-10-21 (Reed's call: the
+     NAMED #40HPW AND OPENS /charts#hpw SINCE 2026-11-22, /charts/hpw FROM 2026-10-21 (Reed's call: the
      challenge is what people open that ribbon for, and its board is the
      ribbon's first list); it was Members for one day. Its key stays
      data-ribbon="members", its Discover column still carries Top Members,
@@ -643,7 +643,8 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
             <details class="nav-explore-acc">
               <summary><a href="/podcasts"><span aria-hidden="true">🎙</span> Podcasts</a><span class="nav-explore-chev" aria-hidden="true">⌄</span></summary>
               <div class="nav-explore-sub">
-                <a href="/charts/podcasts">Top Podcasts This Week</a>
+                <a class="nav-full" href="/podcasts">See the Full Podcast Charts <span aria-hidden="true">→</span></a>
+                <a href="/charts#podcasts">Top Podcasts Weekly Chart</a>
                 <a href="/podcasts/shows?range=1y">Top Podcasts This Year</a>
                 <a href="/podcasts/episodes?range=1y">Top Episodes This Year</a>
                 <a href="/discover/new-shows">New and Noteworthy</a>
@@ -659,9 +660,10 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
             <details class="nav-explore-acc">
               <summary><a href="/music"><span aria-hidden="true">🎵</span> Music</a><span class="nav-explore-chev" aria-hidden="true">⌄</span></summary>
               <div class="nav-explore-sub">
+                <a class="nav-full" href="/music">See the Full Music Charts <span aria-hidden="true">→</span></a>
                 <a href="/music/albums?range=1m">Top Albums This Month</a>
                 <a href="/music/songs?range=1y">Top Songs This Year</a>
-                <a href="/charts/music">Top Artists This Week</a>
+                <a href="/charts#artists">Top Artists Weekly Chart</a>
                 <a href="/discover/new-music">New and Noteworthy</a>
                 <a href="/#rail-recommended-music">Music Recommended For You</a>
                 <a href="/#rail-follows-songs">Top Songs From Your Follows</a>
@@ -669,14 +671,23 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
               </div>
             </details>
             <details class="nav-explore-acc">
-              <summary><a href="/charts/hpw"><span aria-hidden="true">👥</span> #40HPW</a><span class="nav-explore-chev" aria-hidden="true">⌄</span></summary>
+              <summary><a href="/charts#hpw"><span aria-hidden="true">👥</span> #40HPW</a><span class="nav-explore-chev" aria-hidden="true">⌄</span></summary>
               <div class="nav-explore-sub">
-                <a href="/charts/hpw">#40HPW Challenge</a>
+                <a href="/charts#hpw">#40HPW Challenge</a>
                 <a href="/members">Top Members</a>
                 <a href="/boosts">Boost Feed</a>
               </div>
             </details>
-            <a href="/charts"><span aria-hidden="true">📈</span> Charts</a>
+            <details class="nav-explore-acc">
+              <summary><a href="/charts"><span aria-hidden="true">📈</span> Charts</a><span class="nav-explore-chev" aria-hidden="true">⌄</span></summary>
+              <div class="nav-explore-sub">
+                <a class="nav-2026" href="/charts/2026"><span class="nav-2026-star" aria-hidden="true">✦</span><span class="nav-2026-text">The Charts of 2026</span><span class="nav-2026-new">New</span></a>
+                <a href="/charts#songs">Top Songs Weekly Chart</a>
+                <a href="/charts#podcasts">Top Podcasts Weekly Chart</a>
+                <a href="/charts#artists">Top Artists Weekly Chart</a>
+                <a href="/charts#hpw">#40HPW Weekly Chart</a>
+              </div>
+            </details>
             <a href="/boosts"><span aria-hidden="true">⚡</span> Boosts</a>
           </div>
           <!-- Stats: the aggregate view over the same data. A coming-soon
@@ -703,7 +714,7 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
         <summary><a href="/podcasts">Podcasts</a><span class="nav-ribbon-caret" aria-hidden="true">▾</span></summary>
         <div class="nav-ribbon-panel">
           <div class="nav-ribbon-col">
-            <h4>Top Podcasts This Week <a href="/charts/podcasts">View all</a></h4>
+            <h4>Top Podcasts This Week <a href="/charts#podcasts">View all</a></h4>
             <ol class="nav-ribbon-list" data-ribbon-list="shows-week"></ol>
           </div>
           <div class="nav-ribbon-col">
@@ -721,6 +732,7 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
             <a href="/#rail-recommended">Podcasts Recommended For You</a>
             <a href="/#rail-follows">Top Podcasts From Your Follows</a>
             <a href="/#rail-because">Because You Boosted</a>
+            <a class="nav-full" href="/podcasts">See the Full Podcast Charts <span aria-hidden="true">→</span></a>
           </div>
           <div class="nav-ribbon-feat" data-ribbon-feat="shows-week" hidden>
             <span class="nav-ribbon-eyebrow">#1 Podcast This Week</span>
@@ -743,11 +755,12 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
           </div>
           <div class="nav-ribbon-col nav-ribbon-discover">
             <h4>Discover</h4>
-            <a href="/charts/music">Top Artists This Week</a>
+            <a href="/charts#artists">Top Artists Weekly Chart</a>
             <a href="/discover/new-music">New and Noteworthy</a>
             <a href="/#rail-recommended-music">Music Recommended For You</a>
             <a href="/#rail-follows-songs">Top Songs From Your Follows</a>
             <a href="/#rail-because">Because You Boosted</a>
+            <a class="nav-full" href="/music">See the Full Music Charts <span aria-hidden="true">→</span></a>
           </div>
           <div class="nav-ribbon-feat" data-ribbon-feat="albums-month" hidden>
             <span class="nav-ribbon-eyebrow">#1 Album This Month</span>
@@ -758,10 +771,10 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
         </div>
       </details>
       <details class="nav-ribbon" data-ribbon="members">
-        <summary><a href="/charts/hpw">#40HPW</a><span class="nav-ribbon-caret" aria-hidden="true">▾</span></summary>
+        <summary><a href="/charts#hpw">#40HPW</a><span class="nav-ribbon-caret" aria-hidden="true">▾</span></summary>
         <div class="nav-ribbon-panel">
           <div class="nav-ribbon-col">
-            <h4>#40HPW This Week <a href="/charts/hpw">View all</a></h4>
+            <h4>#40HPW This Week <a href="/charts#hpw">View all</a></h4>
             <ol class="nav-ribbon-list" data-ribbon-list="hpw-week"></ol>
           </div>
           <div class="nav-ribbon-col">
@@ -770,7 +783,7 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
           </div>
           <div class="nav-ribbon-col nav-ribbon-discover">
             <h4>Discover</h4>
-            <a href="/charts/hpw">#40HPW Challenge</a>
+            <a href="/charts#hpw">#40HPW Challenge</a>
             <a href="/members">Top Members</a>
             <a href="/boosts">Boost Feed</a>
           </div>
@@ -782,7 +795,38 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
           </div>
         </div>
       </details>
-      <a href="/charts">Charts</a>
+      <!-- The Charts ribbon (Reed, 2026-11-21): the weekly boards and the
+           year's, one gesture from anywhere. Top Songs This Week first, the
+           board the podcast counts down. -->
+      <details class="nav-ribbon" data-ribbon="charts">
+        <summary><a href="/charts">Charts</a><span class="nav-ribbon-caret" aria-hidden="true">▾</span></summary>
+        <div class="nav-ribbon-panel">
+          <div class="nav-ribbon-col">
+            <h4>Top Songs This Week <a href="/charts#songs">View all</a></h4>
+            <ol class="nav-ribbon-list" data-ribbon-list="songs-week"></ol>
+          </div>
+          <div class="nav-ribbon-col">
+            <h4>Top Podcasts This Week <a href="/charts#podcasts">View all</a></h4>
+            <ol class="nav-ribbon-list" data-ribbon-list="shows-week"></ol>
+          </div>
+          <div class="nav-ribbon-col nav-ribbon-discover">
+            <h4>Charts</h4>
+            <a class="nav-2026" href="/charts/2026"><span class="nav-2026-star" aria-hidden="true">✦</span><span class="nav-2026-text">The Charts of 2026</span><span class="nav-2026-new">New</span></a>
+            <a href="/charts#songs">Top Songs Weekly Chart</a>
+            <a href="/charts#podcasts">Top Podcasts Weekly Chart</a>
+            <a href="/charts#artists">Top Artists Weekly Chart</a>
+            <a href="/charts#hpw">#40HPW Weekly Chart</a>
+            <a class="nav-full" href="/podcasts">See the Full Podcast Charts <span aria-hidden="true">→</span></a>
+            <a class="nav-full" href="/music">See the Full Music Charts <span aria-hidden="true">→</span></a>
+          </div>
+          <div class="nav-ribbon-feat" data-ribbon-feat="songs-week" hidden>
+            <span class="nav-ribbon-eyebrow">#1 Song This Week</span>
+            <a class="nav-ribbon-feat-art" data-ribbon-feat-art href="#"></a>
+            <a class="nav-ribbon-feat-title" data-ribbon-feat-title href="#"></a>
+            <span class="nav-ribbon-feat-line" data-ribbon-feat-line></span>
+          </div>
+        </div>
+      </details>
       <a href="/boosts">Boosts</a>
     </nav>
     <!-- The site search. nav-search.js turns typing into a grouped menu
@@ -935,12 +979,12 @@ function renderShowPage({ show, episodes, supporters, boosts, community, podroll
 
 <script type="application/json" id="show-boost-payload">${jsonForScript(boostPayload)}</script>
 
-<script src="/assets/js/nav.js?v=ob-v275" defer></script>
-<script src="/assets/js/show-page.js?v=ob-v275" type="module"></script>
+<script src="/assets/js/nav.js?v=ob-v290" defer></script>
+<script src="/assets/js/show-page.js?v=ob-v290" type="module"></script>
 <!-- Lazy widget bootstrap. Plain (non-defer) script at the end of body, as on
      every page — see CLAUDE.md. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v275"></script>
-<script src="/assets/js/sw-register.js?v=ob-v275" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v290"></script>
+<script src="/assets/js/sw-register.js?v=ob-v290" defer></script>
 </body>
 </html>`;
 }
@@ -1499,11 +1543,11 @@ function notFound(guid) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex" />
   <title>Show not found — OnlyBoosts</title>
-  <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v275" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v275" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v275" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v275" />
+  <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png?v=d5" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v290" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v290" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v290" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v290" />
 </head>
 <body>
 <section class="page-header">
@@ -1522,7 +1566,7 @@ function notFound(guid) {
     </div>
   </div>
 </main>
-<script src="/assets/js/sw-register.js?v=ob-v275" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v290" defer></script>
 </body>
 </html>`;
   return new Response(html, {

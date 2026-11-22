@@ -20,9 +20,12 @@
   (function () {
     var m = /^#(shows|albums|artists|episodes|songs|members|podcasts|boosts)(?:-(global|follows))?(?:\?(.*))?$/.exec(location.hash || '');
     if (!m) return;
+    /* /charts#podcasts, #songs and #artists are the weekly boards' own
+       sections since 2026-11-22, so a bare one there is not forwarded. */
+    if (/^\/charts\/?$/.test(location.pathname) && !m[2] && !m[3] && /^(podcasts|songs|artists)$/.test(m[1])) return;
     var PATH = { shows: '/podcasts/shows', episodes: '/podcasts/episodes', podcasts: '/podcasts/episodes',
       albums: '/music/albums', artists: '/music/artists', songs: '/music/songs', boosts: '/boosts',
-      members: m[2] ? '/boosts' : '/charts/hpw' };
+      members: m[2] ? '/boosts' : '/charts#hpw' };
     var q = m[3] ? m[3].split('&').filter(Boolean) : [];
     if (m[2] === 'follows') q.unshift('scope=follows');
     location.replace(PATH[m[1]] + (q.length ? '?' + q.join('&') : ''));
@@ -48,12 +51,12 @@
   <title>OnlyBoosts Charts — Podcasting 2.0 Nostr Boosts</title>
   <meta name="description" content="An index of the Podcasting 2.0 boosts published to Nostr. Read the boostagrams as they are sent, globally or filtered to who you follow, and boost back with Lightning." />
   <link rel="canonical" href="https://onlyboosts.social/charts" />
-  <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
+  <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png?v=d5" />
 
   <!-- PWA -->
   <link rel="manifest" href="/manifest.webmanifest" />
   <meta name="theme-color" content="#00aff0" />
-  <link rel="apple-touch-icon" href="/assets/onlyboosts_pfp.png" />
+  <link rel="apple-touch-icon" href="/assets/onlyboosts_pfp.png?v=d5" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -75,20 +78,20 @@
 
   <!-- Shared note / card styles (.note-card, .embed-note) — the boosts
        feeds render through the same kind-1 card as boosts-thread.js. -->
-  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v275" />
+  <link rel="stylesheet" href="/assets/css/boosts-thread.css?v=ob-v290" />
   <!-- Action bar, toast, and zap-modal styles for the cards' reply /
        like / repost / zap buttons (renderer reuses boost-actions.js). -->
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v275" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v290" />
   <!-- The episode card and its drawer, extracted from the inline block below
        when /episode/<guid> pages needed the same cards. See the file header. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v275" />
-  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v275" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v290" />
+  <link rel="stylesheet" href="/assets/css/supporter-wall.css?v=ob-v290" />
   <!-- The 40 HPW boards on the Members tab; shared with the /hpw/<week> pages. -->
-  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v275" />
+  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v290" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. Must stay last
        among the stylesheets so the inline block below still wins. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v275" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v290" />
 
   <style>
     :root {
@@ -365,8 +368,8 @@
     /* ══ THE PAGES WITH NO FEED ══ (2026-10-21)
        The Charts page is the three board pairs (the Podcasts and Music
        blocks that sat above the Shows and Artists feeds from 2026-09-03 to
-       2026-10-21, and the #40HPW section that led the Members tab), one on
-       screen per view; the Members page is the wall and the bots. Which is
+       2026-10-21, and the #40HPW section that led the Members tab), all on
+       one page since 2026-11-22; the Members page is the wall and the bots. Which is
        on screen is CSS off body[data-page] and body[data-view], the same
        call the feed panels make off is-active. The boards are painted by
        charts-block.js and members-board.js on the page's load (feeds.js),
@@ -374,10 +377,9 @@
     .charts-page, .members-page { display: none; }
     body[data-page="charts"] .charts-page,
     body[data-page="members"] .members-page { display: block; }
-    .charts-page > .charts-block, .charts-page > [data-hpw] { display: none; }
-    body[data-view="podcasts"] .charts-block[data-charts-block="shows"],
-    body[data-view="music"]    .charts-block[data-charts-block="artists"],
-    body[data-view="hpw"]      .charts-page > [data-hpw] { display: block; }
+    /* Every board on the one page since 2026-11-22; each section's id is its
+       address, landing under the sticky bar. */
+    .charts-page > [id] { scroll-margin-top: 5rem; }
     /* The stacked all-time boards on the Members tab (Proof of #40HPW ⇄ Weeks
        at #1) sit in one grid cell; `display: grid` is what stretches the shown
        board to the row, as a bare board in the cell would. */
@@ -452,6 +454,12 @@
     .mb-section .show-section-head,
     [data-members-wall-head],
     .mb-section-head { margin-bottom: 1.1rem; }
+    /* The weekly boards' way to the full charts (Reed, 2026-11-22): on the
+       heading's own line, right of it, never a sub-line under it. */
+    .charts-page .mb-section-head:has(.mb-full) { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.25rem 1rem; }
+    .mb-full { font-family: var(--font-sans); font-size: 0.88rem; font-weight: 600; color: var(--brand-dd); text-decoration: none; white-space: nowrap; }
+    .mb-full:hover { text-decoration: underline; }
+    :root[data-theme="dark"] .mb-full { color: var(--brand-d); }
     /* The lifted heading arrives in either of renderSupporters' two shapes — a
        `.show-section-head` wrapper on a populated wall, a bare <h2> on the
        empty one — so the type is set on the host's h2 whichever landed. */
@@ -894,12 +902,12 @@
       .pcast-details { margin-left: 2.1rem; padding-left: 0.7rem; }
     }
   </style>
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v275" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v275" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v290" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v290" />
   <!-- The chart boards on the Shows and Artists feeds (charts-block.js) wear
        the Charts page's .cb-* grammar; hpw-board.css above dresses their
        week picker and the members' Weeks at #1 rows. -->
-  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v275" />
+  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v290" />
 </head>
 <body data-page="podcasts" data-view="shows" data-active-feed="shows-global">
 
@@ -925,13 +933,13 @@
      script; /assets/js/nav-ribbons.js adds hover, Escape, outside-click and
      fills the lists from the chart endpoints the first time a ribbon opens
      (the lists are data and the nav is a partial on every page, static ones
-     included, so they are never rendered at the edge). Charts and Boosts are
-     plain links (2026-10-21): the weekly boards' own page, where the #40HPW
+     included, so they are never rendered at the edge). Boosts is a plain link
+     and Charts was one until it got its own ribbon on 2026-11-21 (2026-10-21): the weekly boards' own page, where the #40HPW
      link of 2026-10-20 landed once the boards moved there, and the boost
      feed's own page, the two places people kept asking for. Every section
      is a PAGE since 2026-10-21 (/podcasts, /music, /members, /charts,
      /boosts); the hash-routed charts page is forwarded. THE THIRD RIBBON IS
-     NAMED #40HPW AND OPENS /charts/hpw SINCE 2026-10-21 (Reed's call: the
+     NAMED #40HPW AND OPENS /charts#hpw SINCE 2026-11-22, /charts/hpw FROM 2026-10-21 (Reed's call: the
      challenge is what people open that ribbon for, and its board is the
      ribbon's first list); it was Members for one day. Its key stays
      data-ribbon="members", its Discover column still carries Top Members,
@@ -988,7 +996,8 @@
             <details class="nav-explore-acc">
               <summary><a href="/podcasts"><span aria-hidden="true">🎙</span> Podcasts</a><span class="nav-explore-chev" aria-hidden="true">⌄</span></summary>
               <div class="nav-explore-sub">
-                <a href="/charts/podcasts">Top Podcasts This Week</a>
+                <a class="nav-full" href="/podcasts">See the Full Podcast Charts <span aria-hidden="true">→</span></a>
+                <a href="/charts#podcasts">Top Podcasts Weekly Chart</a>
                 <a href="/podcasts/shows?range=1y">Top Podcasts This Year</a>
                 <a href="/podcasts/episodes?range=1y">Top Episodes This Year</a>
                 <a href="/discover/new-shows">New and Noteworthy</a>
@@ -1004,9 +1013,10 @@
             <details class="nav-explore-acc">
               <summary><a href="/music"><span aria-hidden="true">🎵</span> Music</a><span class="nav-explore-chev" aria-hidden="true">⌄</span></summary>
               <div class="nav-explore-sub">
+                <a class="nav-full" href="/music">See the Full Music Charts <span aria-hidden="true">→</span></a>
                 <a href="/music/albums?range=1m">Top Albums This Month</a>
                 <a href="/music/songs?range=1y">Top Songs This Year</a>
-                <a href="/charts/music">Top Artists This Week</a>
+                <a href="/charts#artists">Top Artists Weekly Chart</a>
                 <a href="/discover/new-music">New and Noteworthy</a>
                 <a href="/#rail-recommended-music">Music Recommended For You</a>
                 <a href="/#rail-follows-songs">Top Songs From Your Follows</a>
@@ -1014,14 +1024,23 @@
               </div>
             </details>
             <details class="nav-explore-acc">
-              <summary><a href="/charts/hpw"><span aria-hidden="true">👥</span> #40HPW</a><span class="nav-explore-chev" aria-hidden="true">⌄</span></summary>
+              <summary><a href="/charts#hpw"><span aria-hidden="true">👥</span> #40HPW</a><span class="nav-explore-chev" aria-hidden="true">⌄</span></summary>
               <div class="nav-explore-sub">
-                <a href="/charts/hpw">#40HPW Challenge</a>
+                <a href="/charts#hpw">#40HPW Challenge</a>
                 <a href="/members">Top Members</a>
                 <a href="/boosts">Boost Feed</a>
               </div>
             </details>
-            <a href="/charts"><span aria-hidden="true">📈</span> Charts</a>
+            <details class="nav-explore-acc">
+              <summary><a href="/charts"><span aria-hidden="true">📈</span> Charts</a><span class="nav-explore-chev" aria-hidden="true">⌄</span></summary>
+              <div class="nav-explore-sub">
+                <a class="nav-2026" href="/charts/2026"><span class="nav-2026-star" aria-hidden="true">✦</span><span class="nav-2026-text">The Charts of 2026</span><span class="nav-2026-new">New</span></a>
+                <a href="/charts#songs">Top Songs Weekly Chart</a>
+                <a href="/charts#podcasts">Top Podcasts Weekly Chart</a>
+                <a href="/charts#artists">Top Artists Weekly Chart</a>
+                <a href="/charts#hpw">#40HPW Weekly Chart</a>
+              </div>
+            </details>
             <a href="/boosts"><span aria-hidden="true">⚡</span> Boosts</a>
           </div>
           <!-- Stats: the aggregate view over the same data. A coming-soon
@@ -1048,7 +1067,7 @@
         <summary><a href="/podcasts">Podcasts</a><span class="nav-ribbon-caret" aria-hidden="true">▾</span></summary>
         <div class="nav-ribbon-panel">
           <div class="nav-ribbon-col">
-            <h4>Top Podcasts This Week <a href="/charts/podcasts">View all</a></h4>
+            <h4>Top Podcasts This Week <a href="/charts#podcasts">View all</a></h4>
             <ol class="nav-ribbon-list" data-ribbon-list="shows-week"></ol>
           </div>
           <div class="nav-ribbon-col">
@@ -1066,6 +1085,7 @@
             <a href="/#rail-recommended">Podcasts Recommended For You</a>
             <a href="/#rail-follows">Top Podcasts From Your Follows</a>
             <a href="/#rail-because">Because You Boosted</a>
+            <a class="nav-full" href="/podcasts">See the Full Podcast Charts <span aria-hidden="true">→</span></a>
           </div>
           <div class="nav-ribbon-feat" data-ribbon-feat="shows-week" hidden>
             <span class="nav-ribbon-eyebrow">#1 Podcast This Week</span>
@@ -1088,11 +1108,12 @@
           </div>
           <div class="nav-ribbon-col nav-ribbon-discover">
             <h4>Discover</h4>
-            <a href="/charts/music">Top Artists This Week</a>
+            <a href="/charts#artists">Top Artists Weekly Chart</a>
             <a href="/discover/new-music">New and Noteworthy</a>
             <a href="/#rail-recommended-music">Music Recommended For You</a>
             <a href="/#rail-follows-songs">Top Songs From Your Follows</a>
             <a href="/#rail-because">Because You Boosted</a>
+            <a class="nav-full" href="/music">See the Full Music Charts <span aria-hidden="true">→</span></a>
           </div>
           <div class="nav-ribbon-feat" data-ribbon-feat="albums-month" hidden>
             <span class="nav-ribbon-eyebrow">#1 Album This Month</span>
@@ -1103,10 +1124,10 @@
         </div>
       </details>
       <details class="nav-ribbon" data-ribbon="members">
-        <summary><a href="/charts/hpw">#40HPW</a><span class="nav-ribbon-caret" aria-hidden="true">▾</span></summary>
+        <summary><a href="/charts#hpw">#40HPW</a><span class="nav-ribbon-caret" aria-hidden="true">▾</span></summary>
         <div class="nav-ribbon-panel">
           <div class="nav-ribbon-col">
-            <h4>#40HPW This Week <a href="/charts/hpw">View all</a></h4>
+            <h4>#40HPW This Week <a href="/charts#hpw">View all</a></h4>
             <ol class="nav-ribbon-list" data-ribbon-list="hpw-week"></ol>
           </div>
           <div class="nav-ribbon-col">
@@ -1115,7 +1136,7 @@
           </div>
           <div class="nav-ribbon-col nav-ribbon-discover">
             <h4>Discover</h4>
-            <a href="/charts/hpw">#40HPW Challenge</a>
+            <a href="/charts#hpw">#40HPW Challenge</a>
             <a href="/members">Top Members</a>
             <a href="/boosts">Boost Feed</a>
           </div>
@@ -1127,7 +1148,38 @@
           </div>
         </div>
       </details>
-      <a href="/charts">Charts</a>
+      <!-- The Charts ribbon (Reed, 2026-11-21): the weekly boards and the
+           year's, one gesture from anywhere. Top Songs This Week first, the
+           board the podcast counts down. -->
+      <details class="nav-ribbon" data-ribbon="charts">
+        <summary><a href="/charts">Charts</a><span class="nav-ribbon-caret" aria-hidden="true">▾</span></summary>
+        <div class="nav-ribbon-panel">
+          <div class="nav-ribbon-col">
+            <h4>Top Songs This Week <a href="/charts#songs">View all</a></h4>
+            <ol class="nav-ribbon-list" data-ribbon-list="songs-week"></ol>
+          </div>
+          <div class="nav-ribbon-col">
+            <h4>Top Podcasts This Week <a href="/charts#podcasts">View all</a></h4>
+            <ol class="nav-ribbon-list" data-ribbon-list="shows-week"></ol>
+          </div>
+          <div class="nav-ribbon-col nav-ribbon-discover">
+            <h4>Charts</h4>
+            <a class="nav-2026" href="/charts/2026"><span class="nav-2026-star" aria-hidden="true">✦</span><span class="nav-2026-text">The Charts of 2026</span><span class="nav-2026-new">New</span></a>
+            <a href="/charts#songs">Top Songs Weekly Chart</a>
+            <a href="/charts#podcasts">Top Podcasts Weekly Chart</a>
+            <a href="/charts#artists">Top Artists Weekly Chart</a>
+            <a href="/charts#hpw">#40HPW Weekly Chart</a>
+            <a class="nav-full" href="/podcasts">See the Full Podcast Charts <span aria-hidden="true">→</span></a>
+            <a class="nav-full" href="/music">See the Full Music Charts <span aria-hidden="true">→</span></a>
+          </div>
+          <div class="nav-ribbon-feat" data-ribbon-feat="songs-week" hidden>
+            <span class="nav-ribbon-eyebrow">#1 Song This Week</span>
+            <a class="nav-ribbon-feat-art" data-ribbon-feat-art href="#"></a>
+            <a class="nav-ribbon-feat-title" data-ribbon-feat-title href="#"></a>
+            <span class="nav-ribbon-feat-line" data-ribbon-feat-line></span>
+          </div>
+        </div>
+      </details>
       <a href="/boosts">Boosts</a>
     </nav>
     <!-- The site search. nav-search.js turns typing into a grouped menu
@@ -1195,7 +1247,7 @@
          /charts open on; PAGES in the controller and the nav's hrefs agree. -->
     <header class="page-head" data-page-head="podcasts" hidden>
       <h1>Podcast Charts</h1>
-      <p class="page-head-sub">Every podcast and episode with a boost on Nostr, ranked. The weekly Top 10s are on the <a href="/charts">Charts</a>.</p>
+      <p class="page-head-sub">Every podcast and episode with a boost on Nostr, ranked. The weekly Top 10s are on the <a href="/charts#podcasts">Weekly Charts</a>.</p>
       <nav class="page-tabs" aria-label="Podcast charts">
         <a href="/podcasts/shows" data-view="shows">Shows</a>
         <a href="/podcasts/episodes" data-view="episodes">Episodes</a>
@@ -1203,7 +1255,7 @@
     </header>
     <header class="page-head" data-page-head="music" hidden>
       <h1>Music Charts</h1>
-      <p class="page-head-sub">Every artist, album and song with a boost on Nostr, ranked. The weekly Top 10s are on the <a href="/charts/music">Charts</a>.</p>
+      <p class="page-head-sub">Every artist, album and song with a boost on Nostr, ranked. The weekly Top 10s are on the <a href="/charts#songs">Weekly Charts</a>.</p>
       <nav class="page-tabs" aria-label="Music charts">
         <a href="/music/artists" data-view="artists">Artists</a>
         <a href="/music/albums" data-view="albums">Albums</a>
@@ -1225,18 +1277,22 @@
       </p>
     </header>
     <header class="page-head" data-page-head="charts" hidden>
-      <h1>Charts</h1>
-      <p class="page-head-sub">Each week&rsquo;s Top 10, who has held #1 the longest, and the #40HPW Challenge. Weeks start Monday, US Pacific.</p>
-      <nav class="page-tabs" aria-label="Charts">
-        <a href="/charts/podcasts" data-view="podcasts">Podcasts</a>
-        <a href="/charts/music" data-view="music">Music</a>
-        <a href="/charts/hpw" data-view="hpw">#40HPW</a>
+      <h1>Weekly Charts</h1>
+      <p class="page-head-sub">Each week&rsquo;s Top 10, who has held #1 the longest, and the #40HPW Challenge; every past week is a click back. <a href="/charts/2026">The Top 33 of 2026</a>.</p>
+      <!-- ⚠️ JUMP LINKS, NOT TABS (2026-11-22): the four boards are one page,
+           each at a #section that is its shareable address. No data-view, so
+           the controller's tab rewrite leaves them alone. -->
+      <nav class="page-tabs charts-jump" aria-label="Weekly charts">
+        <a href="#podcasts">Podcasts</a>
+        <a href="#songs">Songs</a>
+        <a href="#artists">Artists</a>
+        <a href="#hpw">#40HPW</a>
       </nav>
     </header>
 
     <!-- ══ THE CHARTS PAGE ══ (2026-10-21)
-         The three board pairs, one on screen per view (CSS off
-         body[data-view]). The Podcasts and Music blocks sat above the Shows
+         The board pairs, all on one page since 2026-11-22 (one on screen
+         per view from 2026-10-21), each section's id its address. The Podcasts and Music blocks sat above the Shows
          and Artists feeds from 2026-09-03; the #40HPW section led the
          Members tab from 2026-08-23. Reed's call: the weekly boards are a
          different thing from the live charts under them and were
@@ -1247,16 +1303,28 @@
          ⚠️ NO SUB-LINE UNDER THE BOARD HEADINGS. Reed, 2026-09-03: the charts
          speak for themselves; the formula's ⓘ is on the board's column head. -->
     <div class="charts-page" data-charts-page>
-      <section class="mb-section charts-block" data-charts-block="shows" aria-label="OnlyBoosts Podcast Charts">
+      <section class="mb-section charts-block" id="podcasts" data-charts-block="shows" aria-label="OnlyBoosts Podcast Charts">
       <div class="mb-section-head">
         <h2>OnlyBoosts Podcast Charts</h2>
+        <a class="mb-full" href="/podcasts/shows">See the Full Podcast Charts <span aria-hidden="true">→</span></a>
       </div>
       <div class="hpw-boards" data-charts-boards></div>
     </section>
 
-      <section class="mb-section charts-block" data-charts-block="artists" aria-label="OnlyBoosts Music Charts">
+      <!-- Songs lead the Music view (2026-11-21, Reed's call: the OnlyBoosts
+           podcast counts down the week's Top 10 songs), Artists under them. -->
+      <section class="mb-section charts-block" id="songs" data-charts-block="songs" aria-label="OnlyBoosts Song Charts">
       <div class="mb-section-head">
-        <h2>OnlyBoosts Music Charts</h2>
+        <h2>OnlyBoosts Song Charts</h2>
+        <a class="mb-full" href="/music/songs">See the Full Song Charts <span aria-hidden="true">→</span></a>
+      </div>
+      <div class="hpw-boards" data-charts-boards></div>
+    </section>
+
+      <section class="mb-section charts-block" id="artists" data-charts-block="artists" aria-label="OnlyBoosts Artist Charts">
+      <div class="mb-section-head">
+        <h2>OnlyBoosts Artist Charts</h2>
+        <a class="mb-full" href="/music/artists">See the Full Artist Charts <span aria-hidden="true">→</span></a>
       </div>
       <div class="hpw-boards" data-charts-boards></div>
     </section>
@@ -1265,7 +1333,7 @@
            the boards said the same thing twice at two sizes; the mechanics moved
            behind Rules, where a reader who wants them can have all of them and a
            reader who does not is not charged two paragraphs for the boards. -->
-      <section class="mb-section hpw" data-hpw>
+      <section class="mb-section hpw" id="hpw" data-hpw>
         <div class="mb-section-head">
           <h2>Nostr Gang #40HPW Challenge</h2>
           <!-- ⚠️ RULES SITS IN THE SUB-LINE, NOT UNDER THE BOARDS. Reed's call,
@@ -1752,8 +1820,8 @@
   /* ── The pages, and the views each one has ──
      ⚠️ THE FIRST VIEW IS WHAT THE BARE PATH OPENS ON, and it is pinned to
      the nav's hrefs (partials/nav.html, the footer): /podcasts opens Shows
-     (Reed, 2026-09-03), /music opens Artists (2026-08-31), /charts opens
-     the Podcasts boards. A page whose views are feed types (`feed: true`)
+     (Reed, 2026-09-03), /music opens Artists (2026-08-31). /charts has no
+     views since 2026-11-22: one page, each board a #section. A page whose views are feed types (`feed: true`)
      activates that feed's panel; Members and Charts carry no feed and
      feeds.js paints their sections off body[data-page] instead. */
   const PAGES = {
@@ -1761,7 +1829,7 @@
     music:    { views: ['artists', 'albums', 'songs'], feed: true },
     boosts:   { views: ['members'], feed: true },
     members:  { views: [], feed: false },
-    charts:   { views: ['podcasts', 'music', 'hpw'], feed: false },
+    charts:   { views: [], feed: false },
   };
   const DEFAULT_PAGE = 'podcasts';
   /* ── The view in the query string ──
@@ -2146,17 +2214,17 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v275"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v290"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v275" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v290" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v275" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v290" defer></script>
 
 <!-- Feed hydration — lazily loads the active feed on first view. -->
-<script type="module" src="/assets/js/feeds.js?v=ob-v275"></script>
-<script src="/assets/js/nav.js?v=ob-v275" defer></script>
+<script type="module" src="/assets/js/feeds.js?v=ob-v290"></script>
+<script src="/assets/js/nav.js?v=ob-v290" defer></script>
 
 </body>
 </html>

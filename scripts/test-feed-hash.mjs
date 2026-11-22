@@ -201,13 +201,13 @@ eq('the bare /music opens on Artists (2026-08-31)', parsePath('/music'), { page:
 eq('/music/songs', parsePath('/music/songs'), { page: 'music', view: 'songs' })
 eq('/boosts is the members feed', parsePath('/boosts'), { page: 'boosts', view: 'members' })
 eq('/members has no view', parsePath('/members'), { page: 'members', view: '' })
-eq('the bare /charts opens on the Podcasts boards', parsePath('/charts'), { page: 'charts', view: 'podcasts' })
-eq('/charts/hpw', parsePath('/charts/hpw'), { page: 'charts', view: 'hpw' })
+eq('/charts is one page with no view (2026-11-22)', parsePath('/charts'), { page: 'charts', view: '' })
+eq('an old /charts/hpw has no view either (the server forwards it to /charts#hpw)', parsePath('/charts/hpw'), { page: 'charts', view: '' })
 eq('an unknown view is the page\'s first', parsePath('/music/videos'), { page: 'music', view: 'artists' })
 eq('a trailing slash is nothing', parsePath('/podcasts/episodes/'), { page: 'podcasts', view: 'episodes' })
 eq('an unknown page is the default page', parsePath('/elsewhere'), { page: 'podcasts', view: 'shows' })
 eq('every page\'s first view is what its nav href opens', Object.fromEntries(Object.entries(PAGES).map(([k, v]) => [k, v.views[0] || ''])),
-  { podcasts: 'shows', music: 'artists', boosts: 'members', members: '', charts: 'podcasts' })
+  { podcasts: 'shows', music: 'artists', boosts: 'members', members: '', charts: '' })
 eq('every feed type is a view of exactly one page', Object.values(FEEDS).map((f) => f.type).filter((t, i, a) => a.indexOf(t) === i).sort(),
   Object.values(PAGES).filter((p) => p.feed).flatMap((p) => p.views).sort())
 
@@ -277,9 +277,9 @@ eq('the range and sort ride the attributes too', [r.body.dataset.feedRange, r.bo
 eq('and the address is left as shared', r.url(), '/podcasts/shows?range=1m&sort=sats')
 r = boot('/music/albums')
 eq('a bare path means empty view attributes', [r.body.dataset.feedLang, r.body.dataset.feedRange, r.body.dataset.feedSort], ['', '', ''])
-eq('the bare /podcasts is Shows, the bare /music is Artists, the bare /charts is the Podcasts boards',
+eq('the bare /podcasts is Shows, the bare /music is Artists, /charts has no view',
   [boot('/podcasts').body.dataset.activeFeed, boot('/music').body.dataset.activeFeed, boot('/charts').body.dataset.view],
-  ['shows-global', 'artists-global', 'podcasts'])
+  ['shows-global', 'artists-global', ''])
 {
   const b = boot('/music/albums?lang=en')
   const act = b.events.find((e) => e.type === 'lb:feed-activate')
@@ -326,8 +326,8 @@ eq('/members shows its head, activates no feed and takes data-active-feed OFF th
   [r.head(), 'activeFeed' in r.body.dataset, r.body.dataset.page], [['members'], false, 'members'])
 eq('  and dispatches no activation', r.events.filter((e) => e.type === 'lb:feed-activate').length, 0)
 eq('  and hides every panel', r.activePanels(), [])
-r = boot('/charts/music')
-eq('/charts/music shows the Charts head with Music current', [r.head(), r.current(), r.body.dataset.view], [['charts'], ['music'], 'music'])
+r = boot('/charts')
+eq('/charts shows the Charts head, its jump links never marked current', [r.head(), r.current(), r.body.dataset.view], [['charts'], [], ''])
 eq('  and no feed', 'activeFeed' in r.body.dataset, false)
 r = boot('/charts/hpw?range=1y')
 eq('a query on a board page is left alone', r.url(), '/charts/hpw?range=1y')
@@ -399,8 +399,8 @@ console.log('\nThe shell ships one head per page and the Shows panel active:')
   {
     const wrap = html.slice(html.indexOf('<div class="charts-page" data-charts-page>'), html.indexOf('<div class="members-page" data-members-page>'))
     const inside = (re) => [...wrap.matchAll(re)].length
-    eq('both board blocks sit INSIDE the Charts page wrapper', [inside(/data-charts-block="shows"/g), inside(/data-charts-block="artists"/g), inside(/<section[^>]*data-hpw>/g)], [1, 1, 1])
-    eq('and nowhere else in the shell', [...html.matchAll(/<section[^>]*data-charts-block="/g)].length, 2)
+    eq('every board block sits INSIDE the Charts page wrapper', [inside(/data-charts-block="shows"/g), inside(/data-charts-block="songs"/g), inside(/data-charts-block="artists"/g), inside(/<section[^>]*data-hpw>/g)], [1, 1, 1, 1])
+    eq('and nowhere else in the shell', [...html.matchAll(/<section[^>]*data-charts-block="/g)].length, 3)
     const wall = html.slice(html.indexOf('<div class="members-page" data-members-page>'))
     eq('the wall and the bots sit inside the Members page wrapper', [/data-members-wall/.test(wall), /data-members-bots/.test(wall)], [true, true])
   }
@@ -420,7 +420,7 @@ console.log('\nBoth hydration entry points are wired:')
   eq('the cold load reads the feed off the body', afterListener.includes("document.body.dataset.activeFeed || ''"), true)
   eq('⚠️ and no longer falls back to episodes: a page with no feed must hydrate nothing', afterListener.includes("|| 'episodes-global'"), false)
   eq('the cold load paints the Charts and Members pages off the body', afterListener.includes('loadPageSections(document.body.dataset.page, document.body.dataset.view)'), true)
-  for (const [what, call] of [['the Podcasts boards', "loadChartsBlock(CHART_VIEWS[view])"], ['the #40HPW boards', 'loadMemberBoards()'], ['the wall', 'loadMembersWall()']]) {
+  for (const [what, call] of [['every chart block', 'CHART_KINDS.map(loadChartsBlock)'], ['the #40HPW boards', 'loadMemberBoards()'], ['the wall', 'loadMembersWall()']]) {
     eq(`loadPageSections reaches ${what}`, feeds.slice(feeds.indexOf('function loadPageSections')).includes(call), true)
   }
   const board = readFileSync(join(ROOT, 'assets/js/members-board.js'), 'utf8')

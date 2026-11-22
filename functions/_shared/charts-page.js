@@ -4,7 +4,7 @@
 //   /music/artists · /music/albums · /music/songs   the Music Charts
 //   /boosts                                       the boost feed
 //   /members                                      the wall and the bots
-//   /charts/podcasts · /charts/music · /charts/hpw   the weekly boards
+//   /charts                                          the weekly boards, one page (2026-11-22)
 //
 // Reed's call, 2026-10-21: the charts page (/charts, hash-routed, the
 // homepage until 2026-10-17) was three tabs over one page and "people don't
@@ -54,7 +54,7 @@ export const PAGES = {
   music: { views: ["artists", "albums", "songs"], feed: true },
   boosts: { views: ["members"], feed: true },
   members: { views: [], feed: false },
-  charts: { views: ["podcasts", "music", "hpw"], feed: false },
+  charts: { views: [], feed: false },
 };
 
 /* The words each page wears: its <title>, canonical path and description. */
@@ -66,9 +66,7 @@ const META = {
   "music/songs": { title: "Music Charts: Songs", path: "/music/songs", desc: "Every song with a boost on Nostr, ranked by the OnlyBoosts Charts: all time or this week, month or year." },
   "boosts/members": { title: "Boosts", path: "/boosts", desc: "Every Podcasting 2.0 boost published to Nostr, as it was sent, newest first: read the boostagrams globally or from who you follow, and boost back with Lightning." },
   "members/": { title: "Members", path: "/members", desc: "The members of OnlyBoosts: everyone who has boosted a podcast or musician and shared the boost with their Nostr identity, ranked, and the bots that publish boosts for apps that do not." },
-  "charts/podcasts": { title: "Charts: Podcasts", path: "/charts/podcasts", desc: "This week's Top 10 podcasts by Nostr boosts, every past week, and the shows that have held #1 the longest." },
-  "charts/music": { title: "Charts: Music", path: "/charts/music", desc: "This week's Top 10 artists by Nostr boosts, every past week, and the artists that have held #1 the longest." },
-  "charts/hpw": { title: "Charts: #40HPW Challenge", path: "/charts/hpw", desc: "The Nostr Gang #40HPW Challenge: who has shared boosts for forty hours of podcasts this week, every past week, and Proof of #40HPW." },
+  "charts/": { title: "Weekly Charts", path: "/charts", desc: "The OnlyBoosts weekly charts: the Top 10 podcasts, songs and artists by Nostr boosts and the #40HPW Challenge, this week and every past week, and who has held #1 the longest." },
 };
 
 /* The opening feed each edge-rendered panel adopts, and it must match the

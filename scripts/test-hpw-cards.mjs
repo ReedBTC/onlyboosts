@@ -93,8 +93,8 @@ const shareSrc = readFileSync(join(ROOT, 'assets/js/hpw-share.js'), 'utf8')
 const shareDir = mkdtempSync(join(tmpdir(), 'hpw-share-'))
 writeFileSync(join(shareDir, 'hpw-share.mjs'), shareSrc)
 const share = await import(join(shareDir, 'hpw-share.mjs'))
-await check('the live week links /charts/hpw (2026-10-21; /#members before); a past week and High Scores link their own page', () => {
-  assert.equal(share.shareLink('2026-08-24', true), 'https://onlyboosts.social/charts/hpw')
+await check('the live week links /charts#hpw (2026-11-22; /charts/hpw from 2026-10-21, /#members before); a past week and High Scores link their own page', () => {
+  assert.equal(share.shareLink('2026-08-24', true), 'https://onlyboosts.social/charts#hpw')
   assert.equal(share.shareLink('2026-08-17', false), 'https://onlyboosts.social/hpw/2026-08-17')
   assert.equal(share.shareLink('high-scores', false), 'https://onlyboosts.social/hpw/high-scores')
 })
@@ -252,7 +252,7 @@ await check('the card: a portrait frame, no nav, noindex, the ready signal, the 
   assert.match(cardHtml, /setAttribute\('data-card-ready', '1'\)/)
   const expect = board.rowHtml({ pk: 'a'.repeat(64), npub: null, name: 'Alice 🐱 <x>', pic: 'https://x.example/a.png', seconds: 41 * 3600, episodes: 1, week_start: null }, 0, 40)
   assert.ok(cardHtml.includes(expect))
-  assert.match(cardHtml, /<footer class="card-foot">onlyboosts\.social\/charts\/hpw<\/footer>/)
+  assert.match(cardHtml, /<footer class="card-foot">onlyboosts\.social\/charts#hpw<\/footer>/)
   // The list the collector's clip guard measures, since the chart cards joined (2026-09-03).
   assert.match(cardHtml, /<ol class="hpw-list" data-card-list>/)
   assert.doesNotMatch(pageHtml, /data-card-list/)

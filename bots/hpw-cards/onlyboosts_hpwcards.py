@@ -5,9 +5,9 @@ Two families of board, one contract:
 
   hpw     the Nostr Gang #40HPW boards — one per week, plus Proof of #40HPW
           (the all-time board; `high-scores` is its filename, not its name)
-  charts  the OnlyBoosts Charts boards (since 2026-09-03) — the week's Shows
-          and Artists Top 10 on the chart rule, and the three Weeks at #1
-          boards (shows, artists, members)
+  charts  the OnlyBoosts Charts boards (since 2026-09-03) — the week's Shows,
+          Songs and Artists Top 10 on the chart rule, and the four Weeks at #1
+          boards (shows, songs, artists, members); Songs since 2026-11-21
 
 A share card is a REAL SCREENSHOT of the site's own card page, taken with
 Playwright's Chromium here, not an image drawn from the data a second time.
@@ -27,8 +27,10 @@ run prunes what is not in the local tree, and these are in it.
   bots/global-boost-scan/data/shards/hpw/high-scores.png         the all-time board
   bots/global-boost-scan/data/shards/hpw/index.json              the manifest
   bots/global-boost-scan/data/shards/charts/shows-<YYYY-MM-DD>.png    the week's Shows Top 10
+  bots/global-boost-scan/data/shards/charts/songs-<YYYY-MM-DD>.png    the week's Songs Top 10
   bots/global-boost-scan/data/shards/charts/artists-<YYYY-MM-DD>.png  the week's Artists Top 10
   bots/global-boost-scan/data/shards/charts/shows-weeks-at-1.png      Shows: Weeks at #1
+  bots/global-boost-scan/data/shards/charts/songs-weeks-at-1.png      Songs: Weeks at #1
   bots/global-boost-scan/data/shards/charts/artists-weeks-at-1.png    Artists: Weeks at #1
   bots/global-boost-scan/data/shards/charts/members-weeks-at-1.png    Members: Weeks at #1
   bots/global-boost-scan/data/shards/charts/index.json                the manifest
@@ -139,12 +141,17 @@ HIGH_SCORES = "high-scores"
 # ⚠️ A PATH SEGMENT IN THE WILD once rendered — the site's ONES_KEY, and the
 # bot screenshots the literal, so it does not move (the /hpw/high-scores rule).
 WEEKS_AT_1 = "weeks-at-1"
-CHART_WEEK_KINDS = ("shows", "artists")
-CHART_ONES_KINDS = ("shows", "artists", "members")
+CHART_WEEK_KINDS = ("shows", "songs", "artists")
+CHART_ONES_KINDS = ("shows", "songs", "artists", "members")
+# A kind the deployed site may not serve yet. Its 404 skips that kind's cards
+# only; a 404 on any other kind still skips the family, as before. Songs came
+# back on 2026-11-21, and this box can pull the bot before Pages has deployed
+# the endpoint; without this, that window would drop the Shows and Artists cards too.
+CHART_OPTIONAL_KINDS = frozenset({"songs"})
 
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-CHART_WEEK_RE = re.compile(r"^(shows|artists)-(\d{4}-\d{2}-\d{2})$")
-CHART_ONES_RE = re.compile(r"^(shows|artists|members)-weeks-at-1$")
+CHART_WEEK_RE = re.compile(r"^(shows|songs|artists)-(\d{4}-\d{2}-\d{2})$")
+CHART_ONES_RE = re.compile(r"^(shows|songs|artists|members)-weeks-at-1$")
 
 # ── stand-in, until the card page is deployed ────────────────────────────────
 # `/hpw/<date>/card` and `/hpw/high-scores/card` 404'd before 2026-08-30. The
@@ -197,6 +204,16 @@ def chart_week(kind, week=None):
 
 def chart_ones(kind):
     return api(f"/api/v1/charts/{kind}/{WEEKS_AT_1}")
+
+
+def optional_chart(kind, fetch):
+    """fetch(), or None when `kind` is optional and the site answers 404."""
+    try:
+        return fetch()
+    except urllib.error.HTTPError as e:
+        if e.code == 404 and kind in CHART_OPTIONAL_KINDS:
+            return None
+        raise
 
 
 def board_hash(envelope, field):
@@ -280,13 +297,21 @@ def iter_weeks(limit=None):
 def iter_chart_weeks(limit=None):
     """The chart weeks: (date, {kind: envelope}) newest first.
 
-    Stepped through the Shows endpoint; the Artists board for the same week is
-    fetched by the week's own Monday date, which resolves to itself.
+    Stepped through the Shows endpoint; the other kinds' boards for the same
+    week are fetched by the week's own Monday date, which resolves to itself.
+    An optional kind the site does not serve is absent from the dict.
     """
+    missing = set()
     for date, shows in walk_weeks(lambda week: chart_week("shows", week=week), limit=limit):
         envs = {"shows": shows}
         for kind in CHART_WEEK_KINDS[1:]:
-            env = chart_week(kind, week=date)
+            if kind in missing:
+                continue
+            env = optional_chart(kind, lambda: chart_week(kind, week=date))
+            if env is None:
+                log(f"[warn] charts/{kind} answered HTTP 404 — {kind} cards skipped this run")
+                missing.add(kind)
+                continue
             got = env.get("week_start")
             if got and week_date(got) != date:
                 # The two endpoints share one week rule, so this cannot happen
@@ -526,11 +551,18 @@ def hpw_targets(args):
 
 def chart_targets(args):
     """[(key, source_hash, is_history)] for the charts family."""
-    targets = [(f"{kind}-{WEEKS_AT_1}", rows_hash(chart_ones(kind)), False) for kind in CHART_ONES_KINDS]
+    targets = []
+    for kind in CHART_ONES_KINDS:
+        env = optional_chart(kind, lambda: chart_ones(kind))
+        if env is None:
+            log(f"[warn] charts/{kind}/{WEEKS_AT_1} answered HTTP 404 — card skipped this run")
+            continue
+        targets.append((f"{kind}-{WEEKS_AT_1}", rows_hash(env), False))
     limit = None if args.all else RECENT_WEEKS
     for i, (date, envs) in enumerate(iter_chart_weeks(limit=limit)):
         for kind in CHART_WEEK_KINDS:
-            targets.append((f"{kind}-{date}", rows_hash(envs[kind]), i > 0))
+            if kind in envs:
+                targets.append((f"{kind}-{date}", rows_hash(envs[kind]), i > 0))
     return targets
 
 
@@ -565,7 +597,7 @@ def main():
     ap.add_argument("--standin", action="store_true",
                     help="hpw only: screenshot /#members instead of the card page")
     ap.add_argument("--only", help="render just these keys (comma-separated): a YYYY-MM-DD, "
-                                   "high-scores, shows-<date>, artists-<date>, <kind>-weeks-at-1")
+                                   "high-scores, shows-<date>, songs-<date>, artists-<date>, <kind>-weeks-at-1")
     args = ap.parse_args()
 
     dry = DRY_RUN or args.dry_run

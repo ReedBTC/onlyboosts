@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Pragmatic baseline CSP, carried over from localbitcoiners. Every
+       page shares the same policy intentionally so future tightening
+       happens in lockstep. -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    script-src 'self' 'unsafe-inline' 'unsafe-eval' https://static.cloudflareinsights.com;
+    style-src 'self' 'unsafe-inline';
+    img-src 'self' data: https:;
+    font-src 'self' data:;
+    connect-src 'self' https: wss:;
+    media-src 'self' https:;
+    base-uri 'self';
+    form-action 'self';
+    object-src 'none';
+  " />
+
+  <title>Charts of the Year — OnlyBoosts</title>
+  <meta name="description" content="The OnlyBoosts Charts of the year: the Top 33 songs, artists, podcasts and boosters by Nostr boosts, and the year in numbers." />
+  <link rel="canonical" href="https://onlyboosts.social/charts-year" />
+  <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png?v=d5" />
+
+  <!-- PWA -->
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#00aff0" />
+  <link rel="apple-touch-icon" href="/assets/onlyboosts_pfp.png?v=d5" />
+
+  <link rel="preload" href="/assets/fonts/outfit.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v290" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v290" />
+  <link rel="stylesheet" href="/assets/css/show-page.css?v=ob-v290" />
+  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v290" />
+  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v290" />
+  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v290" />
+  <style>
+    /* The year page (functions/_shared/year-page.js): the boards two across
+       on a wide screen, one on a phone, and the numbers line above them. */
+    /* Two boards across on a desktop, one on a phone (Reed, 2026-11-21). */
+    .year-boards { margin-top: 1.5rem; grid-template-columns: minmax(0, 1fr); }
+    @media (min-width: 760px) { .year-boards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+    /* The stat cards: one sideways row, the homepage rails' gesture. */
+    .ys-cards { list-style: none; margin: 1rem 0 0; padding: 0 0 0.4rem; display: grid; grid-auto-flow: column;
+      grid-auto-columns: minmax(10.5rem, 1fr); gap: 0.75rem; overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: thin; }
+    /* Five cards and a sliver of the sixth, so the row reads as one that scrolls. */
+    @media (min-width: 900px) { .ys-cards { grid-auto-columns: calc((100% - 5 * 0.75rem) / 5.35); } }
+    .ys-card { scroll-snap-align: start; background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+      padding: 0.9rem 0.95rem 0.85rem; display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
+    .ys-fig { font-family: var(--font-sans); font-weight: 700; font-size: clamp(1.25rem, 4.6vw, 1.65rem); line-height: 1.1; color: var(--brand-dd); font-variant-numeric: tabular-nums; }
+    :root[data-theme="dark"] .ys-fig { color: var(--brand); }
+    .ys-label { font-family: var(--font-sans); font-weight: 600; font-size: 0.92rem; color: var(--ink); }
+    .ys-note { font-size: 0.82rem; color: var(--muted); line-height: 1.3; }
+
+    /* The graphs. */
+    .yc-fig { margin-top: 1.75rem; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1rem 1.1rem 1.1rem; }
+    .yc-fig h2 { font-family: var(--font-sans); font-size: 1.15rem; margin: 0 0 0.25rem; color: var(--ink); }
+    .yc-lead { margin: 0 0 0.75rem; font-size: 0.9rem; color: var(--muted); }
+    .yc-sub { font-family: var(--font-sans); font-size: 0.95rem; margin: 1.1rem 0 0.5rem; color: var(--ink); }
+    .yc-svg { display: block; width: 100%; height: auto; overflow: visible; }
+    /* A phone scrolls a graph sideways rather than shrinking its labels to nothing. */
+    /* One drawing per width (dualSvg in year-page.js): the 720-unit one on a
+       wide screen, the 360-unit one on a phone, never a sideways scroll. */
+    .yc-graph .yc-narrow { display: none; }
+    @media (max-width: 600px) {
+      .yc-graph .yc-wide { display: none; }
+      .yc-graph .yc-narrow { display: block; }
+    }
+    .yc-svg text { font-family: var(--font-sans); }
+    .yc-axis { font-size: 11px; fill: var(--muted); }
+    .yc-axis--minor { opacity: 0.7; }
+    .yc-val { font-size: 10px; fill: var(--muted); }
+    .yc-grid { stroke: var(--border); stroke-width: 1; }
+    .yc-seg { stroke-width: 2.5; stroke-linecap: round; }
+    .yc-seg.yc-up { stroke: var(--ok); }
+    .yc-seg.yc-down { stroke: var(--danger); }
+    .yc-dot { stroke: var(--surface); stroke-width: 1.5; }
+    .yc-dot.yc-up { fill: var(--ok); }
+    .yc-dot.yc-down { fill: var(--danger); }
+    .yc-dot.yc-flat { fill: var(--muted); }
+    .yc-dot.yc-partial { fill: var(--surface); stroke: var(--muted); stroke-width: 2; }
+    .yc-bar { fill: var(--brand); }
+    .yc-bar--past { fill: var(--brand); opacity: 0.45; }
+    .yc-bar--live { opacity: 0.5; }
+    /* #40HPW finisher rows (finishersHtml): a 52-week strip under each name. */
+    .yf-list { margin: 0.25rem 0 0.5rem; }
+    .yf-strip { display: block; width: 100%; max-width: 360px; height: auto; margin-top: 4px; }
+    .yf-cell { fill: var(--border); }
+    .yf-cell--on { fill: var(--brand); }
+    .yf-cell--future { fill: none; stroke: var(--border); stroke-width: 0.6; }
+    .yf-launch { stroke: var(--danger); stroke-width: 1.2; }
+    .yf-n { flex: none; font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .yf-n strong { font-size: 0.95rem; color: var(--accent-d); }
+    /* The #40HPW launch, in marker red (launchMark in year-page.js). */
+    .yh-ink { fill: none; stroke: var(--danger); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; opacity: 0.9; }
+    .yh-rule { stroke: var(--danger); stroke-width: 1.2; stroke-dasharray: 3 4; opacity: 0.7; }
+    .yh-note-h { font-family: var(--font-sans); font-size: 14px; font-weight: 700; fill: var(--danger); }
+    .yh-note-s { font-family: var(--font-sans); font-size: 11.5px; fill: var(--ink); }
+
+    .ya-split { display: flex; height: 18px; border-radius: 9px; overflow: hidden; background: var(--border); }
+    .ya-seg { display: block; min-width: 3px; }
+    .ya-fountain { background: var(--muted); }
+    .ya-other { background: var(--brand); }
+    .ya-rest { background: var(--border); }
+    .ya-key { list-style: none; margin: 0.6rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.35rem 1.2rem; font-size: 0.88rem; color: var(--ink); }
+    .ya-sw { display: inline-block; width: 0.75rem; height: 0.75rem; border-radius: 3px; margin-right: 0.4rem; vertical-align: -0.05rem; }
+    .ya-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; }
+    .ya-rows li { display: grid; grid-template-columns: 9rem minmax(0, 1fr) 3.5rem; gap: 0.6rem; align-items: center; font-size: 0.9rem; }
+    .ya-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
+    .ya-bar { height: 10px; background: var(--cream-d); border-radius: 5px; overflow: hidden; }
+    .ya-bar span { display: block; height: 100%; background: var(--brand); border-radius: 5px; }
+    .ya-n { text-align: right; font-variant-numeric: tabular-nums; color: var(--ink); }
+    .yh-head { margin: 0 0 0.6rem; font-size: 0.95rem; color: var(--ink); }
+    @media (max-width: 560px) { .ya-rows li { grid-template-columns: 7rem minmax(0, 1fr) 3rem; } }
+  </style>
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v290" />
+</head>
+<body>
+
+<!-- NAV:START (generated by scripts/sync-partials.js — edit the partial) -->
+<!-- ══════════════════════════════ NAV ══════════════════════════════
+     SHARED NAV — single source of truth. Do NOT edit the copies inside the
+     page files; edit THIS file, then run scripts/sync-partials.js to
+     push it into every page (between the NAV:START / NAV:END markers).
+     Styles live in /assets/css/nav.css; behavior in /assets/js/nav.js and
+     /assets/js/nav-search.js.
+
+     THE BAR, SINCE 2026-10-17 (Reed's pick, direction A of the discovery
+     homepage mockups): logo and wordmark, the sections, the site search in
+     the middle, then the theme toggle, Donate and the account control. On a
+     phone the links fold into the hamburger's overlay (the Explore menu,
+     which is also the site map the footer mirrors) and the search drops to
+     its own full-width row under the bar.
+
+     THE RIBBONS, SINCE 2026-10-20 (Reed's call, after Rotten Tomatoes' section
+     menus): Podcasts, Music and #40HPW each open a ribbon under the bar with
+     two top-five lists, a Discover column of that side's rails, and the first
+     list's #1 at the right. Each ribbon is a <details>, so it opens with no
+     script; /assets/js/nav-ribbons.js adds hover, Escape, outside-click and
+     fills the lists from the chart endpoints the first time a ribbon opens
+     (the lists are data and the nav is a partial on every page, static ones
+     included, so they are never rendered at the edge). Boosts is a plain link
+     and Charts was one until it got its own ribbon on 2026-11-21 (2026-10-21): the weekly boards' own page, where the #40HPW
+     link of 2026-10-20 landed once the boards moved there, and the boost
+     feed's own page, the two places people kept asking for. Every section
+     is a PAGE since 2026-10-21 (/podcasts, /music, /members, /charts,
+     /boosts); the hash-routed charts page is forwarded. THE THIRD RIBBON IS
+     NAMED #40HPW AND OPENS /charts#hpw SINCE 2026-11-22, /charts/hpw FROM 2026-10-21 (Reed's call: the
+     challenge is what people open that ribbon for, and its board is the
+     ribbon's first list); it was Members for one day. Its key stays
+     data-ribbon="members", its Discover column still carries Top Members,
+     and the footer keeps the Members entry, /members being a page. The desktop links,
+     the overlay's groups and the footer's Browse group name the same
+     places; change them together.
+     ⚠️ A RIBBON'S LIST SLOT IS data-ribbon-list="<key>" AND THE KEYS ARE
+     nav-ribbons.js's SOURCES. The Discover links are static. -->
+<!-- Theme boot. Runs before the nav (the first visible element) is parsed,
+     so a returning dark-mode visitor never sees a light flash. The choice is
+     per-browser (localStorage key ob-theme); absence means light, which is what
+     every visitor saw before the toggle existed. The toggle itself is wired
+     in nav.js; this only replays the stored choice.
+     ⚠️ No backticks or dollar-brace in this file — sync-partials.js injects
+     it into the edge Functions inside a template literal and exits nonzero
+     if either appears. -->
+<script>
+(function () {
+  try {
+    if (localStorage.getItem('ob-theme') === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+  } catch (e) { /* storage blocked — the light default stands */ }
+})();
+</script>
+<header id="top-nav">
+  <div class="nav-inner">
+    <!-- The site map behind one trigger: a hamburger and a full-screen
+         overlay on a phone, hidden on a desktop where the links are inline.
+         The Feeds group mirrors the footer's; they are regrouped together
+         or not at all. -->
+    <details class="nav-explore">
+      <summary aria-label="Open the site menu">
+        <span class="nav-explore-glyph" aria-hidden="true">☰</span>
+      </summary>
+      <div class="nav-explore-panel">
+        <div class="nav-explore-head">
+          <span>OnlyBoosts</span>
+          <button type="button" class="nav-explore-close" aria-label="Close menu">✕</button>
+        </div>
+        <a class="nav-explore-home" href="/"><span aria-hidden="true">🏠</span> Home</a>
+        <div class="nav-explore-groups">
+          <!-- ⚠️ ONE ENTRY PER PAGE. Each section is a page since 2026-10-21
+               and its bare path opens on its first chart (PAGES in
+               charts.html's controller): /podcasts on Shows (Reed, 2026-09-03),
+               /music on Artists (2026-08-31), /charts on the Podcasts boards.
+               The Global vs Follows axis stays absent: it is a control on the page. -->
+          <!-- The three sections are accordions on a phone (Rotten Tomatoes'
+               app pattern, Reed's pick 2026-10-20): the row itself opens the
+               section's page; the chevron opens that side's Discover links,
+               the same links the desktop ribbon's Discover column carries. -->
+          <div class="nav-explore-group nav-explore-sections">
+            <h4>Browse</h4>
+            <details class="nav-explore-acc">
+              <summary><a href="/podcasts"><span aria-hidden="true">🎙</span> Podcasts</a><span class="nav-explore-chev" aria-hidden="true">⌄</span></summary>
+              <div class="nav-explore-sub">
+                <a class="nav-full" href="/podcasts">See the Full Podcast Charts <span aria-hidden="true">→</span></a>
+                <a href="/charts#podcasts">Top Podcasts Weekly Chart</a>
+                <a href="/podcasts/shows?range=1y">Top Podcasts This Year</a>
+                <a href="/podcasts/episodes?range=1y">Top Episodes This Year</a>
+                <a href="/discover/new-shows">New and Noteworthy</a>
+                <a href="/discover/movers">Movers This Week</a>
+                <a href="/discover/podroll">Podcasters Recommend</a>
+                <a href="/#rail-lang-1">Top Podcasts by Language</a>
+                <a href="/#rail-follows-latest">Latest From Podcasts You Follow</a>
+                <a href="/#rail-recommended">Podcasts Recommended For You</a>
+                <a href="/#rail-follows">Top Podcasts From Your Follows</a>
+                <a href="/#rail-because">Because You Boosted</a>
+              </div>
+            </details>
+            <details class="nav-explore-acc">
+              <summary><a href="/music"><span aria-hidden="true">🎵</span> Music</a><span class="nav-explore-chev" aria-hidden="true">⌄</span></summary>
+              <div class="nav-explore-sub">
+                <a class="nav-full" href="/music">See the Full Music Charts <span aria-hidden="true">→</span></a>
+                <a href="/music/albums?range=1m">Top Albums This Month</a>
+                <a href="/music/songs?range=1y">Top Songs This Year</a>
+                <a href="/charts#artists">Top Artists Weekly Chart</a>
+                <a href="/discover/new-music">New and Noteworthy</a>
+                <a href="/#rail-recommended-music">Music Recommended For You</a>
+                <a href="/#rail-follows-songs">Top Songs From Your Follows</a>
+                <a href="/#rail-because">Because You Boosted</a>
+              </div>
+            </details>
+            <details class="nav-explore-acc">
+              <summary><a href="/charts#hpw"><span aria-hidden="true">👥</span> #40HPW</a><span class="nav-explore-chev" aria-hidden="true">⌄</span></summary>
+              <div class="nav-explore-sub">
+                <a href="/charts#hpw">#40HPW Challenge</a>
+                <a href="/members">Top Members</a>
+                <a href="/boosts">Boost Feed</a>
+              </div>
+            </details>
+            <details class="nav-explore-acc">
+              <summary><a href="/charts"><span aria-hidden="true">📈</span> Charts</a><span class="nav-explore-chev" aria-hidden="true">⌄</span></summary>
+              <div class="nav-explore-sub">
+                <a class="nav-2026" href="/charts/2026"><span class="nav-2026-star" aria-hidden="true">✦</span><span class="nav-2026-text">The Charts of 2026</span><span class="nav-2026-new">New</span></a>
+                <a href="/charts#songs">Top Songs Weekly Chart</a>
+                <a href="/charts#podcasts">Top Podcasts Weekly Chart</a>
+                <a href="/charts#artists">Top Artists Weekly Chart</a>
+                <a href="/charts#hpw">#40HPW Weekly Chart</a>
+              </div>
+            </details>
+            <a href="/boosts"><span aria-hidden="true">⚡</span> Boosts</a>
+          </div>
+          <!-- Stats: the aggregate view over the same data. A coming-soon
+               page for now (noindex, out of the sitemap). -->
+          <div class="nav-explore-group">
+            <h4>Stats</h4>
+            <a href="/stats"><span aria-hidden="true">📊</span> Boost Stats</a>
+          </div>
+          <div class="nav-explore-group">
+            <h4>More</h4>
+            <a href="/about"><span aria-hidden="true">ℹ️</span> About</a>
+            <a href="https://github.com/ReedBTC/onlyboosts" target="_blank" rel="noopener"><span aria-hidden="true">💻</span> Source</a>
+            <a href="#" data-lb-bug-trigger><span aria-hidden="true">🐞</span> Report a bug</a>
+          </div>
+        </div>
+      </div>
+    </details>
+    <a class="nav-logo" href="/" aria-label="OnlyBoosts home">
+      <img src="/assets/onlyboosts_pfp.png" alt="" />
+    </a>
+    <a class="nav-site-name" href="/">OnlyBoosts</a>
+    <nav class="nav-links" aria-label="Main navigation">
+      <details class="nav-ribbon" data-ribbon="podcasts">
+        <summary><a href="/podcasts">Podcasts</a><span class="nav-ribbon-caret" aria-hidden="true">▾</span></summary>
+        <div class="nav-ribbon-panel">
+          <div class="nav-ribbon-col">
+            <h4>Top Podcasts This Week <a href="/charts#podcasts">View all</a></h4>
+            <ol class="nav-ribbon-list" data-ribbon-list="shows-week"></ol>
+          </div>
+          <div class="nav-ribbon-col">
+            <h4>Top Podcasts This Year <a href="/podcasts/shows?range=1y">View all</a></h4>
+            <ol class="nav-ribbon-list" data-ribbon-list="shows-year"></ol>
+          </div>
+          <div class="nav-ribbon-col nav-ribbon-discover">
+            <h4>Discover</h4>
+            <a href="/podcasts/episodes?range=1y">Top Episodes This Year</a>
+            <a href="/discover/new-shows">New and Noteworthy</a>
+            <a href="/discover/movers">Movers This Week</a>
+            <a href="/discover/podroll">Podcasters Recommend</a>
+            <a href="/#rail-lang-1">Top Podcasts by Language</a>
+            <a href="/#rail-follows-latest">Latest From Podcasts You Follow</a>
+            <a href="/#rail-recommended">Podcasts Recommended For You</a>
+            <a href="/#rail-follows">Top Podcasts From Your Follows</a>
+            <a href="/#rail-because">Because You Boosted</a>
+            <a class="nav-full" href="/podcasts">See the Full Podcast Charts <span aria-hidden="true">→</span></a>
+          </div>
+          <div class="nav-ribbon-feat" data-ribbon-feat="shows-week" hidden>
+            <span class="nav-ribbon-eyebrow">#1 Podcast This Week</span>
+            <a class="nav-ribbon-feat-art" data-ribbon-feat-art href="#"></a>
+            <a class="nav-ribbon-feat-title" data-ribbon-feat-title href="#"></a>
+            <span class="nav-ribbon-feat-line" data-ribbon-feat-line></span>
+          </div>
+        </div>
+      </details>
+      <details class="nav-ribbon" data-ribbon="music">
+        <summary><a href="/music">Music</a><span class="nav-ribbon-caret" aria-hidden="true">▾</span></summary>
+        <div class="nav-ribbon-panel">
+          <div class="nav-ribbon-col">
+            <h4>Top Albums This Month <a href="/music/albums?range=1m">View all</a></h4>
+            <ol class="nav-ribbon-list" data-ribbon-list="albums-month"></ol>
+          </div>
+          <div class="nav-ribbon-col">
+            <h4>Top Songs This Year <a href="/music/songs?range=1y">View all</a></h4>
+            <ol class="nav-ribbon-list" data-ribbon-list="songs-year"></ol>
+          </div>
+          <div class="nav-ribbon-col nav-ribbon-discover">
+            <h4>Discover</h4>
+            <a href="/charts#artists">Top Artists Weekly Chart</a>
+            <a href="/discover/new-music">New and Noteworthy</a>
+            <a href="/#rail-recommended-music">Music Recommended For You</a>
+            <a href="/#rail-follows-songs">Top Songs From Your Follows</a>
+            <a href="/#rail-because">Because You Boosted</a>
+            <a class="nav-full" href="/music">See the Full Music Charts <span aria-hidden="true">→</span></a>
+          </div>
+          <div class="nav-ribbon-feat" data-ribbon-feat="albums-month" hidden>
+            <span class="nav-ribbon-eyebrow">#1 Album This Month</span>
+            <a class="nav-ribbon-feat-art" data-ribbon-feat-art href="#"></a>
+            <a class="nav-ribbon-feat-title" data-ribbon-feat-title href="#"></a>
+            <span class="nav-ribbon-feat-line" data-ribbon-feat-line></span>
+          </div>
+        </div>
+      </details>
+      <details class="nav-ribbon" data-ribbon="members">
+        <summary><a href="/charts#hpw">#40HPW</a><span class="nav-ribbon-caret" aria-hidden="true">▾</span></summary>
+        <div class="nav-ribbon-panel">
+          <div class="nav-ribbon-col">
+            <h4>#40HPW This Week <a href="/charts#hpw">View all</a></h4>
+            <ol class="nav-ribbon-list" data-ribbon-list="hpw-week"></ol>
+          </div>
+          <div class="nav-ribbon-col">
+            <h4>Largest Boosts This Week <a href="/boosts">View all</a></h4>
+            <ol class="nav-ribbon-list" data-ribbon-list="boosts-week"></ol>
+          </div>
+          <div class="nav-ribbon-col nav-ribbon-discover">
+            <h4>Discover</h4>
+            <a href="/charts#hpw">#40HPW Challenge</a>
+            <a href="/members">Top Members</a>
+            <a href="/boosts">Boost Feed</a>
+          </div>
+          <div class="nav-ribbon-feat" data-ribbon-feat="hpw-week" hidden>
+            <span class="nav-ribbon-eyebrow">Leading #40HPW This Week</span>
+            <a class="nav-ribbon-feat-art" data-ribbon-feat-art href="#"></a>
+            <a class="nav-ribbon-feat-title" data-ribbon-feat-title href="#"></a>
+            <span class="nav-ribbon-feat-line" data-ribbon-feat-line></span>
+          </div>
+        </div>
+      </details>
+      <!-- The Charts ribbon (Reed, 2026-11-21): the weekly boards and the
+           year's, one gesture from anywhere. Top Songs This Week first, the
+           board the podcast counts down. -->
+      <details class="nav-ribbon" data-ribbon="charts">
+        <summary><a href="/charts">Charts</a><span class="nav-ribbon-caret" aria-hidden="true">▾</span></summary>
+        <div class="nav-ribbon-panel">
+          <div class="nav-ribbon-col">
+            <h4>Top Songs This Week <a href="/charts#songs">View all</a></h4>
+            <ol class="nav-ribbon-list" data-ribbon-list="songs-week"></ol>
+          </div>
+          <div class="nav-ribbon-col">
+            <h4>Top Podcasts This Week <a href="/charts#podcasts">View all</a></h4>
+            <ol class="nav-ribbon-list" data-ribbon-list="shows-week"></ol>
+          </div>
+          <div class="nav-ribbon-col nav-ribbon-discover">
+            <h4>Charts</h4>
+            <a class="nav-2026" href="/charts/2026"><span class="nav-2026-star" aria-hidden="true">✦</span><span class="nav-2026-text">The Charts of 2026</span><span class="nav-2026-new">New</span></a>
+            <a href="/charts#songs">Top Songs Weekly Chart</a>
+            <a href="/charts#podcasts">Top Podcasts Weekly Chart</a>
+            <a href="/charts#artists">Top Artists Weekly Chart</a>
+            <a href="/charts#hpw">#40HPW Weekly Chart</a>
+            <a class="nav-full" href="/podcasts">See the Full Podcast Charts <span aria-hidden="true">→</span></a>
+            <a class="nav-full" href="/music">See the Full Music Charts <span aria-hidden="true">→</span></a>
+          </div>
+          <div class="nav-ribbon-feat" data-ribbon-feat="songs-week" hidden>
+            <span class="nav-ribbon-eyebrow">#1 Song This Week</span>
+            <a class="nav-ribbon-feat-art" data-ribbon-feat-art href="#"></a>
+            <a class="nav-ribbon-feat-title" data-ribbon-feat-title href="#"></a>
+            <span class="nav-ribbon-feat-line" data-ribbon-feat-line></span>
+          </div>
+        </div>
+      </details>
+      <a href="/boosts">Boosts</a>
+    </nav>
+    <!-- The site search. nav-search.js turns typing into a grouped menu
+         (shows, episodes, artists, members); Enter, or the form with no
+         script, lands on /search?q=, the full results page. -->
+    <form class="nav-search" role="search" action="/search" method="get" data-nav-search autocomplete="off">
+      <svg class="nav-search-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+      <label class="nav-sr-only" for="nav-search-q">Search OnlyBoosts</label>
+      <input id="nav-search-q" type="search" name="q" placeholder="Search shows, episodes, artists, members" autocomplete="off" spellcheck="false" />
+      <div class="nav-search-menu" role="listbox" aria-label="Search results" hidden></div>
+    </form>
+    <!-- Dark-mode toggle. Shows the theme you would SWITCH TO (moon in
+         light, sun in dark); nav.js owns the click, the storage write and
+         the aria-label, and keeps other open tabs in step via the storage event. -->
+    <button type="button" class="nav-theme-toggle" aria-label="Switch to dark mode" title="Switch to dark mode">
+      <span class="ntt-moon" aria-hidden="true">🌙</span>
+      <span class="ntt-sun" aria-hidden="true">☀️</span>
+    </button>
+    <div id="lb-boost-slot" aria-label="Donate">
+      <button
+        type="button"
+        class="lb-boost-placeholder"
+        data-lb-boost-trigger="show"
+        aria-label="Donate to OnlyBoosts"
+      >
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path fill-rule="evenodd" d="M14.615 1.595a.75.75 0 0 1 .359.852L12.982 9.75h7.268a.75.75 0 0 1 .548 1.262l-10.5 11.25a.75.75 0 0 1-1.272-.71l1.992-7.302H3.75a.75.75 0 0 1-.548-1.262l10.5-11.25a.75.75 0 0 1 .913-.143Z" clip-rule="evenodd"/>
+        </svg>
+        <span class="lb-label-long">Donate</span>
+        <span class="lb-label-short">Donate</span>
+      </button>
+    </div>
+    <div id="lb-identity-slot" aria-label="Account">
+      <!-- Static placeholder swapped out by IdentityWidget once the
+           bundle loads. Picks shimmer vs sign-in based on whether a
+           saved session exists; populated by inline script below. -->
+    </div>
+  </div>
+</header>
+<!-- NAV:END -->
+
+<!-- functions/search.js fills the marker pair with the grouped results for
+     ?q= (shows, albums, episodes, songs, artists, members), every hit the
+     CHARTS PAGE'S OWN CARD in a list (Reed's call, 2026-10-18: the tile rail
+     is the homepage's shape; a search is a list), and puts the query back in
+     the nav's search field. .show-main is the charts page's track width and
+     supplies the --accent tokens the card chrome reads. With no query, or no
+     script at the edge, the page says what it is for. -->
+<!-- functions/_shared/year-page.js fills the marker pair with the year's
+     boards for /charts/<year>. Served bare at /charts-year, it only says what
+     it is for. -->
+<main class="show-main search-page" id="year">
+  <!--OB:YEAR-->
+  <h1>Charts of the Year</h1>
+  <p class="search-lead">The OnlyBoosts Charts of <a href="/charts/2026">2026</a>.</p>
+  <!--/OB:YEAR-->
+</main>
+
+<!-- FOOTER:START (generated by scripts/sync-partials.js — edit the partial) -->
+<!-- ══════════════════════════════ FOOTER ══════════════════════════════
+     SHARED FOOTER — single source of truth. Do NOT edit the copies inside
+     the page files; edit THIS file, then run scripts/sync-partials.js
+     to push it into every page (between FOOTER:START / FOOTER:END markers).
+     Styles live in /assets/css/footer.css. -->
+<footer id="site-footer">
+  <div class="footer-top">
+
+    <div class="footer-col footer-about">
+      <h3>OnlyBoosts</h3>
+      <p>A Nostr client for only podcast boosts. Every Podcasting 2.0 boostagram published to Nostr, cached and indexed for stats by episode, show and booster. Sort, filter, search, view all or just see boosts from your follows on Nostr.</p>
+    </div>
+
+    <!-- Same two groups as the nav's Explore menu, in the same order — the
+         footer is the nav's site map repeated, so they're regrouped together
+         or not at all. -->
+    <div class="footer-col">
+      <!-- ⚠️ ONE ENTRY PER PAGE, and it mirrors the nav's Explore menu exactly.
+           The two are the site map and are regrouped together or not at all;
+           each section is a page since 2026-10-21 and its bare path opens on
+           its first chart. See partials/nav.html. -->
+      <h3>Browse</h3>
+      <ul>
+        <li><a href="/podcasts">🎙 Podcasts</a></li>
+        <li><a href="/music">🎵 Music</a></li>
+        <li><a href="/members">👥 Members</a></li>
+        <li><a href="/charts">📈 Charts</a></li>
+        <li><a href="/boosts">⚡ Boosts</a></li>
+      </ul>
+    </div>
+
+    <div class="footer-col">
+      <h3>Stats</h3>
+      <ul>
+        <li><a href="/stats">📊 Boost Stats</a></li>
+      </ul>
+    </div>
+
+    <div class="footer-col">
+      <h3>Connect</h3>
+      <ul>
+        <li><a href="/about">ℹ️ About</a></li>
+        <li><a href="https://github.com/ReedBTC/onlyboosts" target="_blank" rel="noopener">💻 Site Source</a></li>
+        <li><a href="#" data-lb-bug-trigger">🐞 Report a bug</a></li>
+      </ul>
+    </div>
+
+  </div>
+  <div class="footer-bottom">
+    <p class="footer-made">
+      Made with <span role="img" aria-label="love">💜</span> by
+      <a class="footer-maker" href="https://njump.me/npub1xgyjasdztryl9sg6nfdm2wcj0j3qjs03sq7a0an32pg0lr5l6yaqxhgu7s" target="_blank" rel="noopener">
+        <img src="/assets/reed_pfp.png" alt="" width="24" height="24" loading="lazy" />
+        Reed
+      </a>
+    </p>
+  </div>
+</footer>
+<!-- FOOTER:END -->
+
+<script src="/assets/js/nav-widget-boot.js?v=ob-v290"></script>
+<script src="/assets/js/sw-register.js?v=ob-v290" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v290" defer></script>
+<script src="/assets/js/nav.js?v=ob-v290" defer></script>
+<script type="module" src="/assets/js/search-page.js?v=ob-v290"></script>
+</body>
+</html>

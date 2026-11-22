@@ -21,7 +21,7 @@ import { fetchCard } from "../hpw/[name].js";
 
 export const UPSTREAM_BASE = "https://relay.mynostr.app/onlyboosts/charts/";
 // The five shapes the collector writes. Literal kinds, never a wildcard.
-export const NAME_RE = /^((shows|artists)-(\d{4}-\d{2}-\d{2})|(shows|artists|members)-weeks-at-1)\.png$/;
+export const NAME_RE = /^((shows|artists|songs)-(\d{4}-\d{2}-\d{2})|(shows|artists|songs|members)-weeks-at-1)\.png$/;
 
 export async function onRequestGet({ request, env, params }) {
   let name = params.name;

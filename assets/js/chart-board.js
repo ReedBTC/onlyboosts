@@ -29,13 +29,13 @@
 // is computed over the whole week's corpus (peers_* from week-charts.js),
 // never over the visible ten.
 
-import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v275';
-import { httpsUrl } from './cover-art.js?v=ob-v275';
-import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v275';
-import { boosterPageHref } from './booster-link.js?v=ob-v275';
-import { rankLabel, competitionRanks } from './rank.js?v=ob-v275';
-import { weekDateString } from './pacific-week.js?v=ob-v275';
-import { initials } from './hpw-board.js?v=ob-v275';
+import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v290';
+import { httpsUrl } from './cover-art.js?v=ob-v290';
+import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v290';
+import { boosterPageHref } from './booster-link.js?v=ob-v290';
+import { rankLabel, competitionRanks } from './rank.js?v=ob-v290';
+import { weekDateString } from './pacific-week.js?v=ob-v290';
+import { initials } from './hpw-board.js?v=ob-v290';
 
 const esc = htmlEscape;
 
@@ -62,6 +62,21 @@ export function weekSpan(ws) {
 }
 
 const fmt = (n) => Number(n || 0).toLocaleString("en-US");
+
+/* A song's credit line, "Artist · Album" (Reed, 2026-11-22), the album
+ * alone when the feed names no artist, and the artist alone when the album
+ * repeats it (a single released under the artist's own name). Each half is a
+ * quiet link (the Top Episode line's): the artist to /artist when the feed
+ * names its publisher, the album to /show by the credited feed. */
+function songCreditHtml(r) {
+  const artist = (r.p_author || "").trim();
+  const album = (r.p_title || "").trim();
+  const link = (text, href) => href ? `<a href="${esc(href)}">${esc(text)}</a>` : esc(text);
+  const a = artist ? link(artist, publisherPageHref(r.p_publisher)) : "";
+  const b = album ? link(album, showPageHref(r.feed_guid)) : "";
+  const line = !a ? b : !b || album.toLowerCase() === artist.toLowerCase() ? a : `${a} · ${b}`;
+  return line ? `<span class="cb-sub cb-drove">${line}</span>` : "";
+}
 
 /* Title + href per kind. The linking rules are show-link.js's, restated only
  * in WHICH function each kind calls; the title checks are the callers' duty
@@ -103,13 +118,27 @@ function art(r, glyph) {
     : `<span class="cb-art cb-art--none" aria-hidden="true">${glyph}</span>`;
 }
 
-function who(kind, r, subline) {
+function who(kind, r, subline, extra = "") {
   const s = subject(kind, r);
   const name = s.href
     ? `<a class="cb-name" href="${esc(s.href)}">${esc(s.title)}</a>`
     : `<span class="cb-name">${esc(s.title)}</span>`;
   const sub = subline !== undefined ? subline : (s.sub ? `<span class="cb-sub">${esc(s.sub)}</span>` : "");
-  return { html: `<span class="cb-who">${name}${sub}</span>`, glyph: s.glyph };
+  return { html: `<span class="cb-who">${name}${sub}${extra}</span>`, glyph: s.glyph };
+}
+
+/* ⚠️ THE EPISODE THAT DROVE A SHOW'S WEEK (Reed's ask, 2026-11-21): under each
+ * show on the weekly Podcasts board, the one episode with the most boosters
+ * that week (then sats, then boosts: the chart's own tiebreak order), from
+ * `top_ep_guid` / `top_ep_title` on the row (week-charts.js). A show boosted
+ * only at the show level has none, and the line is simply absent. The card
+ * frames leave it off (`card`): their rows are measured to the pixel against
+ * the 720x900 frame, and a second sub-line costs the tenth show. */
+function droveHtml(r, label = "Top Episode") {
+  const title = (r.top_ep_title || "").trim();
+  if (!r.top_ep_guid || !title) return "";
+  return `<span class="cb-sub cb-drove">${esc(label)}: ` +
+    `<a href="${esc(episodePageHref(r.top_ep_guid, title))}">${esc(title)}</a></span>`;
 }
 
 /* One weekly-chart row. The position is the SERVER's rank and tie flag — a
@@ -117,8 +146,15 @@ function who(kind, r, subline) {
  * section) — and the triplet is the row's standing in each component, in the
  * column head's order: sats / boosts / boosters, the chart formula's own
  * (Reed's call, 2026-10-29: one order for the three figures site-wide). */
-export function weekRowHtml(kind, r) {
-  const w = who(kind, r);
+export function weekRowHtml(kind, r, { card = false } = {}) {
+  /* A podcast's board row names the show and its top episode, no host credit
+   * (Reed, 2026-11-21); the card keeps the credit, its only sub-line. */
+  /* An artist's row names its top song the same way (2026-11-22),
+   * from attachTopSongs. */
+  const w = !card && kind === "shows" ? who(kind, r, "", droveHtml(r))
+    : !card && kind === "artists" ? who(kind, r, "", droveHtml(r, "Top Song"))
+    : kind === "songs" ? who(kind, r, songCreditHtml(r))
+    : who(kind, r);
   /* `#2`, or `T#9` when the component place is shared — the detail tiles'
    * chip form (feed-rank.js), and the site's own line: a bare numeral belongs
    * to a position in the visible list, where these are standings in three
@@ -129,7 +165,7 @@ export function weekRowHtml(kind, r) {
     `<span class="cb-pos">${esc(rankLabel(r.rank, r.tied))}</span>` +
     art(r, w.glyph) +
     w.html +
-    `<span class="cb-ranks" title="This week's rank in sats / boosts / boosters">` +
+    `<span class="cb-ranks" title="Rank in sats / boosts / boosters">` +
       `${esc(c(r.r_sats, r.peers_sats))}/${esc(c(r.r_boosts, r.peers_boosts))}/${esc(c(r.r_boosters, r.peers_boosters))}` +
     `</span>` +
     `</li>`;
@@ -166,15 +202,15 @@ export function onesRowHtml(kind, r, rk, { weekHref = null } = {}) {
  * tab's weekly board passes the second, and only because its title IS the
  * week picker (hpw-board.js's rule). `card` marks the list for the
  * collector's clip guard (`data-card-list`); only a card frame passes it. */
-export function boardHtml({ title, titleHtml, sub, rows, empty, board, colhead = false, card = false }) {
+export function boardHtml({ title, titleHtml, sub, rows, empty, board, colhead = false, card = false, colheadLabel = "sats/boosts/boosters", list = "cb-list" }) {
   const body = rows.length
-    ? `<ol class="cb-list"${card ? " data-card-list" : ""}>${rows.join("")}</ol>`
+    ? `<ol class="${esc(list)}"${card ? " data-card-list" : ""}>${rows.join("")}</ol>`
     : `<p class="cb-empty">${esc(empty)}</p>`;
   /* "rank in" is what stops the triplet reading as counts (`8/8/7` lies
    * without it); the ⓘ is the feed note's own explainer link, same target,
    * same new-tab call — a reader mid-browse gets the formula beside the
    * board, not over it. */
-  const head = `<div class="cb-colhead">rank in sats/boosts/boosters ` +
+  const head = `<div class="cb-colhead">rank in ${esc(colheadLabel)} ` +
     `<a class="cb-colhead-info" href="/about#charts" target="_blank" rel="noopener"` +
     ` title="How the OnlyBoosts Charts work" aria-label="How the OnlyBoosts Charts work">ⓘ</a></div>`;
   return `<section class="cb-board"${board ? ` data-cb-board="${esc(board)}"` : ""}>` +
@@ -226,6 +262,38 @@ export function memberOnesBoardHtml(ones, { weekHref = null, titleHtml = null, c
     `</section>`;
 }
 
+/* One booster on a year board (/charts/<year>, 2026-11-21): the member row's
+ * face and name, and the members chart's own triplet, rank in sats / boosts /
+ * shows (the Members wall's sort=chart rule), in the weekly rows' place. */
+export function memberChartRowHtml(m) {
+  const { face, whoM } = memberFaceName(m);
+  const c = (rank, peers) => `${Number(peers) > 1 ? "T" : ""}#${rank}`;
+  return `<li class="hpw-row">` +
+    `<span class="hpw-pos">${esc(rankLabel(m.rank, m.tied))}</span>` +
+    face +
+    `<span class="hpw-who">${whoM}<span class="cb-sub">${fmt(m.sats)} sats · ${fmt(m.boosts)} boosts · ${fmt(m.shows)} shows</span></span>` +
+    `<span class="cb-ranks" title="Rank in sats / boosts / shows">` +
+      `${esc(c(m.r_sats, m.peers_sats))}/${esc(c(m.r_boosts, m.peers_boosts))}/${esc(c(m.r_shows, m.peers_shows))}` +
+    `</span>` +
+    `</li>`;
+}
+
+/* A member's face and linked name, the member rows' own: the year page's
+ * #40HPW finisher rows use it too. */
+export function memberFaceName(m) {
+  const href = boosterPageHref(m.npub, m.pk);
+  const name = m.dname || m.name || (m.npub ? m.npub.slice(0, 12) + "…" : (m.pk || "").slice(0, 12) + "…");
+  const upgraded = httpsUrl(m.pic);
+  const pic = upgraded && isSafeUrl(upgraded) ? upgraded : null;
+  const face = pic
+    ? `<img class="hpw-face" src="${esc(pic)}" alt="" loading="lazy" referrerpolicy="no-referrer" />`
+    : `<span class="hpw-face hpw-face--none" aria-hidden="true">${esc(initials(m.name, m.pk))}</span>`;
+  const whoM = href
+    ? `<a class="hpw-name" href="${esc(href)}">${esc(name)}</a>`
+    : `<span class="hpw-name">${esc(name)}</span>`;
+  return { face, whoM };
+}
+
 /* memberSectionHtml — the page's Members pair — went with the page too; the
  * tab paints the weekly 40 HPW board itself and stacks memberOnesBoardHtml
  * behind Proof of #40HPW. */
@@ -235,16 +303,16 @@ export function memberOnesBoardHtml(ones, { weekHref = null, titleHtml = null, c
  * themselves say what each figure is at the point of the number, the
  * vocabulary rule's short-label form.
  *
- * ⚠️ ONLY SHOWS, ARTISTS AND MEMBERS ARE ON THE PAGE — Reed's call,
- * 2026-08-31, the day it shipped with five: the episode-level charts are too
- * sparse to be interesting yet. week-charts.js still serves all five kinds
- * (the machinery is generic and tested), so restoring one is a COPY entry
- * and a PAGE_KINDS element, not new queries. */
+ * ⚠️ SHOWS, ARTISTS, SONGS AND MEMBERS ARE ON THE PAGE. Reed cut the
+ * episode-level charts on 2026-08-31 as too sparse, and brought Songs back on
+ * 2026-11-21 for the OnlyBoosts podcast, which counts down the week's Top 10
+ * songs. Episodes and Albums stay off; week-charts.js still serves all five. */
 export const COPY = {
   eyebrow: "OnlyBoosts Charts",
   sections: {
     shows: { heading: "Shows", onesSub: "Most weeks finishing #1 on the weekly Shows chart. Completed weeks only." },
     artists: { heading: "Artists", onesSub: "Most weeks finishing #1 on the weekly Artists chart. Completed weeks only." },
+    songs: { heading: "Songs", onesSub: "Most weeks finishing #1 on the weekly Songs chart. Completed weeks only." },
     members: { heading: "Members", onesSub: "Most weeks finishing #1 on the weekly 40 HPW board. Completed weeks only." },
   },
   emptyLive: "No Nostr boosts yet this week.",

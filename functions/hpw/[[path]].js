@@ -138,7 +138,7 @@ function unavailable() {
     eyebrow: "503",
     h1: "The board is unavailable",
     lead: "The index did not answer. Try again in a moment.",
-    body: `<div class="soon-card"><p><a href="/charts/hpw">Back to the #40HPW boards</a></p></div>`,
+    body: `<div class="soon-card"><p><a href="/charts#hpw">Back to the #40HPW boards</a></p></div>`,
     noindex: true,
   }), { status: 503, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
 }
@@ -149,7 +149,7 @@ function notFound() {
     eyebrow: "404",
     h1: "Week not found",
     lead: "The boards are addressed by a week's Monday, as /hpw/YYYY-MM-DD, or as /hpw/high-scores.",
-    body: `<div class="soon-card"><p><a href="/charts/hpw">The #40HPW boards on the Charts page</a></p></div>`,
+    body: `<div class="soon-card"><p><a href="/charts#hpw">The #40HPW boards on the Charts page</a></p></div>`,
     noindex: true,
   }), { status: 404, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=300" } });
 }
@@ -262,7 +262,7 @@ export function renderPage(view) {
     body,
     canonical: pageUrl,
     og: { title: d.ogTitle, description: d.lead, image, url: pageUrl },
-    scripts: `<script src="/assets/js/hpw-page.js?v=ob-v275" type="module"></script>`,
+    scripts: `<script src="/assets/js/hpw-page.js?v=ob-v290" type="module"></script>`,
     extraCss: `
     /* The tab supplies the accent family off body[data-active-feed]; this page
        has no active feed and supplies the brand, as .show-main does. */
@@ -299,9 +299,9 @@ export function renderCard(view) {
     kicker: COPY.challenge,
     kickerSub: COPY.intro,
     board,
-    footer: "onlyboosts.social/charts/hpw",
-    links: `  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v275" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v275" />`,
+    footer: "onlyboosts.social/charts#hpw",
+    links: `  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v290" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v290" />`,
     css: `
     .card .hpw-board { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0.7rem 1.1rem 0.6rem; }
     .card .hpw-title { margin-bottom: 0.4rem; flex: none; font-size: 1.1rem; }
@@ -347,11 +347,11 @@ function shell({ title, eyebrow, h1, lead, body, canonical = null, og = null, sc
   ${noindex ? `<meta name="robots" content="noindex" />` : ""}
   ${og ? `<meta name="description" content="${htmlEscape(og.description)}" />` : ""}
   ${canonical ? `<link rel="canonical" href="${htmlEscape(canonical)}" />` : ""}
-  <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png" />
+  <link rel="icon" type="image/png" href="/assets/onlyboosts_favicon.png?v=d5" />
 
   <link rel="manifest" href="/manifest.webmanifest" />
   <meta name="theme-color" content="#00aff0" />
-  <link rel="apple-touch-icon" href="/assets/onlyboosts_pfp.png" />
+  <link rel="apple-touch-icon" href="/assets/onlyboosts_pfp.png?v=d5" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -377,16 +377,16 @@ ${og ? `
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v275" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v275" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v290" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v290" />
   <!-- feed-cards.css for the share pill and its menu; boost-actions.css for
        the composer behind Post to Nostr. Both are the same chrome the tab
        already has. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v275" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v275" />
-  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v275" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v275" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v275" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v290" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v290" />
+  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v290" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v290" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v290" />
   ${extraCss ? `<style>${extraCss}\n  </style>` : ""}
 </head>
 <body>
@@ -413,13 +413,13 @@ ${og ? `
      script; /assets/js/nav-ribbons.js adds hover, Escape, outside-click and
      fills the lists from the chart endpoints the first time a ribbon opens
      (the lists are data and the nav is a partial on every page, static ones
-     included, so they are never rendered at the edge). Charts and Boosts are
-     plain links (2026-10-21): the weekly boards' own page, where the #40HPW
+     included, so they are never rendered at the edge). Boosts is a plain link
+     and Charts was one until it got its own ribbon on 2026-11-21 (2026-10-21): the weekly boards' own page, where the #40HPW
      link of 2026-10-20 landed once the boards moved there, and the boost
      feed's own page, the two places people kept asking for. Every section
      is a PAGE since 2026-10-21 (/podcasts, /music, /members, /charts,
      /boosts); the hash-routed charts page is forwarded. THE THIRD RIBBON IS
-     NAMED #40HPW AND OPENS /charts/hpw SINCE 2026-10-21 (Reed's call: the
+     NAMED #40HPW AND OPENS /charts#hpw SINCE 2026-11-22, /charts/hpw FROM 2026-10-21 (Reed's call: the
      challenge is what people open that ribbon for, and its board is the
      ribbon's first list); it was Members for one day. Its key stays
      data-ribbon="members", its Discover column still carries Top Members,
@@ -476,7 +476,8 @@ ${og ? `
             <details class="nav-explore-acc">
               <summary><a href="/podcasts"><span aria-hidden="true">🎙</span> Podcasts</a><span class="nav-explore-chev" aria-hidden="true">⌄</span></summary>
               <div class="nav-explore-sub">
-                <a href="/charts/podcasts">Top Podcasts This Week</a>
+                <a class="nav-full" href="/podcasts">See the Full Podcast Charts <span aria-hidden="true">→</span></a>
+                <a href="/charts#podcasts">Top Podcasts Weekly Chart</a>
                 <a href="/podcasts/shows?range=1y">Top Podcasts This Year</a>
                 <a href="/podcasts/episodes?range=1y">Top Episodes This Year</a>
                 <a href="/discover/new-shows">New and Noteworthy</a>
@@ -492,9 +493,10 @@ ${og ? `
             <details class="nav-explore-acc">
               <summary><a href="/music"><span aria-hidden="true">🎵</span> Music</a><span class="nav-explore-chev" aria-hidden="true">⌄</span></summary>
               <div class="nav-explore-sub">
+                <a class="nav-full" href="/music">See the Full Music Charts <span aria-hidden="true">→</span></a>
                 <a href="/music/albums?range=1m">Top Albums This Month</a>
                 <a href="/music/songs?range=1y">Top Songs This Year</a>
-                <a href="/charts/music">Top Artists This Week</a>
+                <a href="/charts#artists">Top Artists Weekly Chart</a>
                 <a href="/discover/new-music">New and Noteworthy</a>
                 <a href="/#rail-recommended-music">Music Recommended For You</a>
                 <a href="/#rail-follows-songs">Top Songs From Your Follows</a>
@@ -502,14 +504,23 @@ ${og ? `
               </div>
             </details>
             <details class="nav-explore-acc">
-              <summary><a href="/charts/hpw"><span aria-hidden="true">👥</span> #40HPW</a><span class="nav-explore-chev" aria-hidden="true">⌄</span></summary>
+              <summary><a href="/charts#hpw"><span aria-hidden="true">👥</span> #40HPW</a><span class="nav-explore-chev" aria-hidden="true">⌄</span></summary>
               <div class="nav-explore-sub">
-                <a href="/charts/hpw">#40HPW Challenge</a>
+                <a href="/charts#hpw">#40HPW Challenge</a>
                 <a href="/members">Top Members</a>
                 <a href="/boosts">Boost Feed</a>
               </div>
             </details>
-            <a href="/charts"><span aria-hidden="true">📈</span> Charts</a>
+            <details class="nav-explore-acc">
+              <summary><a href="/charts"><span aria-hidden="true">📈</span> Charts</a><span class="nav-explore-chev" aria-hidden="true">⌄</span></summary>
+              <div class="nav-explore-sub">
+                <a class="nav-2026" href="/charts/2026"><span class="nav-2026-star" aria-hidden="true">✦</span><span class="nav-2026-text">The Charts of 2026</span><span class="nav-2026-new">New</span></a>
+                <a href="/charts#songs">Top Songs Weekly Chart</a>
+                <a href="/charts#podcasts">Top Podcasts Weekly Chart</a>
+                <a href="/charts#artists">Top Artists Weekly Chart</a>
+                <a href="/charts#hpw">#40HPW Weekly Chart</a>
+              </div>
+            </details>
             <a href="/boosts"><span aria-hidden="true">⚡</span> Boosts</a>
           </div>
           <!-- Stats: the aggregate view over the same data. A coming-soon
@@ -536,7 +547,7 @@ ${og ? `
         <summary><a href="/podcasts">Podcasts</a><span class="nav-ribbon-caret" aria-hidden="true">▾</span></summary>
         <div class="nav-ribbon-panel">
           <div class="nav-ribbon-col">
-            <h4>Top Podcasts This Week <a href="/charts/podcasts">View all</a></h4>
+            <h4>Top Podcasts This Week <a href="/charts#podcasts">View all</a></h4>
             <ol class="nav-ribbon-list" data-ribbon-list="shows-week"></ol>
           </div>
           <div class="nav-ribbon-col">
@@ -554,6 +565,7 @@ ${og ? `
             <a href="/#rail-recommended">Podcasts Recommended For You</a>
             <a href="/#rail-follows">Top Podcasts From Your Follows</a>
             <a href="/#rail-because">Because You Boosted</a>
+            <a class="nav-full" href="/podcasts">See the Full Podcast Charts <span aria-hidden="true">→</span></a>
           </div>
           <div class="nav-ribbon-feat" data-ribbon-feat="shows-week" hidden>
             <span class="nav-ribbon-eyebrow">#1 Podcast This Week</span>
@@ -576,11 +588,12 @@ ${og ? `
           </div>
           <div class="nav-ribbon-col nav-ribbon-discover">
             <h4>Discover</h4>
-            <a href="/charts/music">Top Artists This Week</a>
+            <a href="/charts#artists">Top Artists Weekly Chart</a>
             <a href="/discover/new-music">New and Noteworthy</a>
             <a href="/#rail-recommended-music">Music Recommended For You</a>
             <a href="/#rail-follows-songs">Top Songs From Your Follows</a>
             <a href="/#rail-because">Because You Boosted</a>
+            <a class="nav-full" href="/music">See the Full Music Charts <span aria-hidden="true">→</span></a>
           </div>
           <div class="nav-ribbon-feat" data-ribbon-feat="albums-month" hidden>
             <span class="nav-ribbon-eyebrow">#1 Album This Month</span>
@@ -591,10 +604,10 @@ ${og ? `
         </div>
       </details>
       <details class="nav-ribbon" data-ribbon="members">
-        <summary><a href="/charts/hpw">#40HPW</a><span class="nav-ribbon-caret" aria-hidden="true">▾</span></summary>
+        <summary><a href="/charts#hpw">#40HPW</a><span class="nav-ribbon-caret" aria-hidden="true">▾</span></summary>
         <div class="nav-ribbon-panel">
           <div class="nav-ribbon-col">
-            <h4>#40HPW This Week <a href="/charts/hpw">View all</a></h4>
+            <h4>#40HPW This Week <a href="/charts#hpw">View all</a></h4>
             <ol class="nav-ribbon-list" data-ribbon-list="hpw-week"></ol>
           </div>
           <div class="nav-ribbon-col">
@@ -603,7 +616,7 @@ ${og ? `
           </div>
           <div class="nav-ribbon-col nav-ribbon-discover">
             <h4>Discover</h4>
-            <a href="/charts/hpw">#40HPW Challenge</a>
+            <a href="/charts#hpw">#40HPW Challenge</a>
             <a href="/members">Top Members</a>
             <a href="/boosts">Boost Feed</a>
           </div>
@@ -615,7 +628,38 @@ ${og ? `
           </div>
         </div>
       </details>
-      <a href="/charts">Charts</a>
+      <!-- The Charts ribbon (Reed, 2026-11-21): the weekly boards and the
+           year's, one gesture from anywhere. Top Songs This Week first, the
+           board the podcast counts down. -->
+      <details class="nav-ribbon" data-ribbon="charts">
+        <summary><a href="/charts">Charts</a><span class="nav-ribbon-caret" aria-hidden="true">▾</span></summary>
+        <div class="nav-ribbon-panel">
+          <div class="nav-ribbon-col">
+            <h4>Top Songs This Week <a href="/charts#songs">View all</a></h4>
+            <ol class="nav-ribbon-list" data-ribbon-list="songs-week"></ol>
+          </div>
+          <div class="nav-ribbon-col">
+            <h4>Top Podcasts This Week <a href="/charts#podcasts">View all</a></h4>
+            <ol class="nav-ribbon-list" data-ribbon-list="shows-week"></ol>
+          </div>
+          <div class="nav-ribbon-col nav-ribbon-discover">
+            <h4>Charts</h4>
+            <a class="nav-2026" href="/charts/2026"><span class="nav-2026-star" aria-hidden="true">✦</span><span class="nav-2026-text">The Charts of 2026</span><span class="nav-2026-new">New</span></a>
+            <a href="/charts#songs">Top Songs Weekly Chart</a>
+            <a href="/charts#podcasts">Top Podcasts Weekly Chart</a>
+            <a href="/charts#artists">Top Artists Weekly Chart</a>
+            <a href="/charts#hpw">#40HPW Weekly Chart</a>
+            <a class="nav-full" href="/podcasts">See the Full Podcast Charts <span aria-hidden="true">→</span></a>
+            <a class="nav-full" href="/music">See the Full Music Charts <span aria-hidden="true">→</span></a>
+          </div>
+          <div class="nav-ribbon-feat" data-ribbon-feat="songs-week" hidden>
+            <span class="nav-ribbon-eyebrow">#1 Song This Week</span>
+            <a class="nav-ribbon-feat-art" data-ribbon-feat-art href="#"></a>
+            <a class="nav-ribbon-feat-title" data-ribbon-feat-title href="#"></a>
+            <span class="nav-ribbon-feat-line" data-ribbon-feat-line></span>
+          </div>
+        </div>
+      </details>
       <a href="/boosts">Boosts</a>
     </nav>
     <!-- The site search. nav-search.js turns typing into a grouped menu
@@ -730,10 +774,10 @@ ${body}
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav.js?v=ob-v275" defer></script>
+<script src="/assets/js/nav.js?v=ob-v290" defer></script>
 ${scripts}
-<script src="/assets/js/nav-widget-boot.js?v=ob-v275"></script>
-<script src="/assets/js/sw-register.js?v=ob-v275" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v290"></script>
+<script src="/assets/js/sw-register.js?v=ob-v290" defer></script>
 </body>
 </html>`;
 }

@@ -80,8 +80,14 @@ const LEVELS = {
   }),
   episode: (music) => ({
     key: "b.item_guid",
+    /* feed_guid … duration (2026-11-21) let the podcast's song segment play
+     * a row without a second join through /api/v1/boosts; the value block
+     * is not in D1 and stays /api/value's. feed_guid is the credited feed,
+     * the playlist rule's canonical_guid, never an alias. */
     select: `e.title AS title, e.image AS image, pc.image AS p_image, pc.artwork AS artwork,
-             NULL AS author, pc.title AS p_title`,
+             NULL AS author, pc.title AS p_title, pc.author AS p_author,
+             pc.publisher_guid AS p_publisher, b.podcast_guid AS feed_guid, pc.feed_url AS feed_url,
+             e.enclosure_url AS enclosure_url, e.duration AS duration`,
     from: `FROM boosts b
            LEFT JOIN episodes e  ON e.item_guid     = b.item_guid
            LEFT JOIN podcasts pc ON pc.podcast_guid = b.podcast_guid`,
@@ -173,7 +179,88 @@ export async function weeklyChart(env, kind, ws, we, limit = 10) {
     ORDER BY rank, guid
     LIMIT ?`;
   const { results } = await env.DB.prepare(sql).bind(ws, we, limit).all();
-  return results.map((r) => ({ ...r, tied: r.peers > 1 }));
+  const rows = results.map((r) => ({ ...r, tied: r.peers > 1 }));
+  /* The second line's query binds one guid per row, so a board past 50 rows
+   * (the homepage's 100-row read) would overrun D1's 100 bound parameters;
+   * those callers never print the line. */
+  if (rows.length && rows.length <= 50) {
+    if (kind === "shows") await attachTopEpisodes(env, rows, ws, we);
+    else if (kind === "artists") await attachTopSongs(env, rows, ws, we);
+  }
+  return rows;
+}
+
+/** The episode that drove each show's week (Reed's ask, 2026-11-21): within
+ *  [ws, we), the show's episode with the most boosters, then sats, then
+ *  boosts, the chart's own tiebreak order. Sets `top_ep_guid` and
+ *  `top_ep_title` on each row, or leaves them unset for a show whose week was
+ *  boosted only at the show level. One query for the whole board; a guid list
+ *  of at most 50 (the endpoint's limit cap) plus two bounds stays under D1's
+ *  100 bound parameters. A failure costs the line, never the board. */
+export async function attachTopEpisodes(env, rows, ws, we) {
+  const guids = rows.map((r) => r.guid).filter(Boolean);
+  if (!guids.length) return;
+  const sql = `
+    WITH per AS (
+      SELECT b.podcast_guid AS show, b.item_guid AS item,
+             ROW_NUMBER() OVER (PARTITION BY b.podcast_guid
+                                ORDER BY COUNT(DISTINCT b.booster_pubkey) DESC,
+                                         COALESCE(SUM(b.sats),0) DESC, COUNT(*) DESC, b.item_guid) AS rn
+      FROM boosts b
+      WHERE b.podcast_guid IN (${guids.map(() => "?").join(",")})
+        AND b.item_guid IS NOT NULL
+        AND b.created_at >= ? AND b.created_at < ?
+      GROUP BY b.podcast_guid, b.item_guid
+    )
+    SELECT per.show, per.item, e.title
+    FROM per LEFT JOIN episodes e ON e.item_guid = per.item
+    WHERE per.rn = 1`;
+  try {
+    const { results } = await env.DB.prepare(sql).bind(...guids, ws, we).all();
+    const by = new Map(results.map((x) => [x.show, x]));
+    for (const r of rows) {
+      const hit = by.get(r.guid);
+      if (hit && hit.title) { r.top_ep_guid = hit.item; r.top_ep_title = hit.title; }
+    }
+  } catch (err) {
+    console.warn("[week-charts] top episodes failed", err);
+  }
+}
+
+/** The artist's song of the period (Reed's ask, 2026-11-22): the
+ *  attachTopEpisodes rule one tier up, over the artist's music feeds. Sets
+ *  the same `top_ep_guid` / `top_ep_title`, which the board prints as
+ *  "Top Song:". A failure costs the line, never the board. */
+export async function attachTopSongs(env, rows, ws, we) {
+  const guids = rows.map((r) => r.guid).filter(Boolean);
+  if (!guids.length) return;
+  const sql = `
+    WITH per AS (
+      SELECT pc.publisher_guid AS pub, b.item_guid AS item,
+             ROW_NUMBER() OVER (PARTITION BY pc.publisher_guid
+                                ORDER BY COUNT(DISTINCT b.booster_pubkey) DESC,
+                                         COALESCE(SUM(b.sats),0) DESC, COUNT(*) DESC, b.item_guid) AS rn
+      FROM boosts b
+      JOIN podcasts pc ON pc.podcast_guid = b.podcast_guid
+      WHERE pc.publisher_guid IN (${guids.map(() => "?").join(",")})
+        AND ${MUSIC(true)}
+        AND b.item_guid IS NOT NULL
+        AND b.created_at >= ? AND b.created_at < ?
+      GROUP BY pc.publisher_guid, b.item_guid
+    )
+    SELECT per.pub, per.item, e.title
+    FROM per LEFT JOIN episodes e ON e.item_guid = per.item
+    WHERE per.rn = 1`;
+  try {
+    const { results } = await env.DB.prepare(sql).bind(...guids, ws, we).all();
+    const by = new Map(results.map((x) => [x.pub, x]));
+    for (const r of rows) {
+      const hit = by.get(r.guid);
+      if (hit && hit.title) { r.top_ep_guid = hit.item; r.top_ep_title = hit.title; }
+    }
+  } catch (err) {
+    console.warn("[week-charts] top songs failed", err);
+  }
 }
 
 /** Who has finished #1 the most weeks, over every completed week before

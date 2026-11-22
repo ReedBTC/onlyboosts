@@ -17,7 +17,7 @@ elsewhere would break and points here for the reasoning.
 | `/music/artists`, `/music/albums`, `/music/songs` | **the Music Charts**, the same shape; the bare `/music` is Artists |
 | `/boosts` | **the boost feed on its own page** (2026-10-21, Reed's call: readers treat it as their discovery feed). Global or Follows, newest first |
 | `/members` | the Top Members wall and the Boost Bots section, with the membership line |
-| `/charts`, `/charts/podcasts`, `/charts/music`, `/charts/hpw` | **the weekly boards' own page, named Charts** (2026-10-21): the week's Top 10 beside Weeks at #1 for shows and for artists, and the #40HPW week beside Proof of #40HPW, one pair per view. The bare `/charts` is Podcasts. From 2026-10-17 to 2026-10-21 `/charts` was the hash-routed feed page that was `/` before that; **every `/charts#<feed>` and `/#<feed>` address in the wild is forwarded to its page by the head scripts of `charts.html` and `index.html`**, since a server never sees a hash. All five pages are one shell, `charts.html`, routed by `functions/_shared/charts-page.js` |
+| `/charts` | **the weekly boards' own page, Weekly Charts, ONE PAGE SINCE 2026-11-22** (Reed: "one weekly charts page ... with its own hashtag address, so you can still share the address"): Podcasts, Songs, Artists and #40HPW stacked, each at `#podcasts`, `#songs`, `#artists`, `#hpw`, under jump links that are not tabs (no `data-view`, so the controller leaves them alone); `PAGES.charts.views` is empty in both declarations. The old view paths 302 to their sections (`VIEW_ANCHOR` in `functions/charts/[[path]].js`), and both head scripts skip a bare `#podcasts`/`#songs`/`#artists` on `/charts` (a four-day feed address from October, now the section). The boards paint in the browser after the anchor jump, so `loadPageSections` scrolls back to the section once they are in, unless the reader has scrolled. The nav names them "Top Songs Weekly Chart" and so on, so readers know past weeks are there. From 2026-10-21 to 2026-11-22 it was three views, the week's Top 10 beside Weeks at #1 for shows and for artists, and the #40HPW week beside Proof of #40HPW, one pair per view. The bare `/charts` is Podcasts. From 2026-10-17 to 2026-10-21 `/charts` was the hash-routed feed page that was `/` before that; **every `/charts#<feed>` and `/#<feed>` address in the wild is forwarded to its page by the head scripts of `charts.html` and `index.html`**, since a server never sees a hash. All five pages are one shell, `charts.html`, routed by `functions/_shared/charts-page.js` |
 | `/show/<guid>` | one show, edge-rendered |
 | `/episode/<item-guid>` | one episode, edge-rendered |
 | `/booster/<npub>` | one person, edge-rendered. **The address is the npub**: a hex pubkey in its place 301s to the npub form (Reed's call, 2026-11-08; the homepage's full-list link had emitted hex) |
@@ -28,6 +28,7 @@ elsewhere would break and points here for the reasoning.
 | `/stats` | a coming-soon placeholder: nav + header + soon-card, `noindex`, out of the sitemap. `/boosters` was the second one and was **deleted** on 2026-08-23 — see the Stats row of the site map |
 | `/404.html` | see the ⚠️ under LB conventions |
 | `/hpw/<YYYY-MM-DD>`, `/hpw/high-scores` | one 40 HPW board as a page, edge-rendered, the address a shared week has. **⚠️ `high-scores` is a PATH, not the board's name** — that board is **Proof of #40HPW** since 2026-09-01 and the URL deliberately did not move with it. `/hpw/<key>/card` is the 720x900 portrait frame the collector screenshots for `/api/og/hpw/<key>.png`. See **The Share Cards** under the Members tab |
+| `/charts/<year>` | **the year's Top 33s** (2026-11-21, Reed's decisions of 2026-11-17/18): Songs, Artists, Podcasts and Boosters, headed "OnlyBoosts 2026 Charts" with only the how-the-charts-work link under it (Reed, 2026-11-22); stat cards, Boosts by Month (the chart year's months only; the month in progress a hollow point with no segment into it; a site-wide version belongs on the stats page), and the apps and #40HPW graphs. The apps list stops at 5 boosts in the year (`MIN_APP_ROW`); other-app boosts and #40HPW finishers are by chart week (`weekFrame`), and the #40HPW graph marks the board's launch (`HPW_LAUNCH`, 2026-08-23) with a hand-drawn ring and arrow (`launchMark`). Above those bars, the members who finished (`finishersHtml`): one row each, most forty-hour weeks first, a 52-week strip under the name. Second lines: a song is "Artist · Album", each half a link (/artist by `p_publisher`, /show by `feed_guid`), an artist names its Top Song (`attachTopSongs`, also on the weekly Artists board), a podcast its Top Episode, a booster its sats · boosts · shows. A chart year is 52 Pacific chart weeks (`YEAR_WEEKS` in `functions/_shared/year-charts.js`; 2026 is Monday 2025-12-29 to Sunday 2026-12-27), so it cuts the same boosts as the weekly boards. Songs, artists and podcasts are `weeklyChart` over the year's bounds; boosters are the Members wall's chart rule with the publisher keys off. Rendered by `functions/_shared/year-page.js` into the `charts-year.html` shell, edge-cached ten minutes. **⚠️ Live until the year closes and NOT yet frozen**: the published year list must be a snapshot, which is open work before 2026-12-28 |
 | `/charts/<key>/card/<kind>` | the five chart share-card frames (`shows`/`artists` per week, `shows`/`artists`/`members` under `weeks-at-1`), 720x900, noindex; the collector's bot screenshots them. **⚠️ THE ONLYBOOSTS CHARTS PAGE THAT LIVED AT `/charts/<YYYY-MM-DD>` WAS TORN DOWN ON 2026-09-04** (Reed's call, two days after it shipped): the same boards live on the Shows and Artists feeds and the Members tab, so `/charts` and `/charts/<date>` 302 to `/#shows`. `week-charts.js` still serves the queries, behind `/api/v1/charts`. **Untitled shows are off these boards and only these** (Reed's call, 2026-09-11; `TITLED` in `week-charts.js`). See **The chart blocks on the feeds** in `docs/feeds.md` |
 
 `/shows` 301s to `/podcasts/shows` (`_redirects`); the `/podcasts` redirect came
@@ -58,7 +59,7 @@ named Charts).
 | `/music` | `artists`, `albums`, `songs` | the Music Charts |
 | `/boosts` | one | the boost feed, Global or Follows |
 | `/members` | none | the Top Members wall, the Boost Bots, the membership line |
-| `/charts` | `podcasts`, `music`, `hpw` | the weekly boards in three pairs, with their week pickers and share buttons |
+| `/charts` | none (2026-11-22; `podcasts`, `music`, `hpw` before) | the weekly boards, all four on one page, with their week pickers and share buttons |
 
 - **⚠️ ONE SHELL, `charts.html`, SERVES ALL FIVE, AND THE ROUTE IS MARKED
   INTO IT TWICE.** `routeShell` in `functions/_shared/charts-page.js` sets
@@ -254,7 +255,13 @@ was picked from is in the session memory; direction A won, with the sans.
   panel under the bar, then two plain links** (Reed's call,
   after Rotten Tomatoes' section menus). The plain links were #40HPW and
   Boosts for one day and are **Charts and Boosts since 2026-10-21**, when
-  the boards got their own page under that name; see **The Chart Pages**. A
+  the boards got their own page under that name; see **The Chart Pages**.
+  **Charts became the fourth ribbon on 2026-11-21** (Reed: the weekly and
+  year boards one gesture from anywhere): Top Songs This Week + Top Podcasts
+  This Week, a Charts column (The Charts of 2026 first, then the four weekly
+  boards; Top Artists is `/charts/music#artists`), the #1 song at the right;
+  the overlay's Charts row became an accordion with the same links. Boosts
+  is the one plain link. A
   ribbon is two top-five lists (Shows This Week + Shows This Year; Albums
   This Month + Songs This Year; #40HPW This Week + Largest Boosts This
   Week), a **Discover** column of that side's rails minus the two listed
