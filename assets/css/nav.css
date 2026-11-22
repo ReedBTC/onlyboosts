@@ -403,6 +403,11 @@ details.nav-ribbon { position: static; }
 /* The 2026 link's star, text and pill are spans too; the icon width above
    squeezed each to 1.2rem on phones (Reed's screenshot, 2026-11-22). */
 .nav-explore-group a.nav-2026 span { width: auto; }
+/* The overlay's Podcasts and Music rows open on their full charts (Reed,
+   2026-11-22: "I just want it to say somewhere so people know there is a
+   full chart"), first in the list there, the ribbons' accent. */
+.nav-explore-sub a.nav-full { font-weight: 700; color: #4fd1ff; }
+.nav-explore-group a.nav-full span { width: auto; }
 .nav-explore-group a.nav-2026 .nav-2026-text { flex-shrink: 1; min-width: 0; }
 .nav-explore-group a:hover { color: var(--brand); }
 /* The overlay's section rows are accordions (2026-10-20, Rotten Tomatoes'

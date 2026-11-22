@@ -49,12 +49,12 @@
        style covers all needed weights. -->
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v289" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v289" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v290" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v290" />
   <!-- Palette + base type. Every page links this; it's where the tokens
        the shared stylesheets read off :root are defined. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v289" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v289" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v290" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v290" />
 </head>
 <body>
 
@@ -143,6 +143,7 @@
             <details class="nav-explore-acc">
               <summary><a href="/podcasts"><span aria-hidden="true">🎙</span> Podcasts</a><span class="nav-explore-chev" aria-hidden="true">⌄</span></summary>
               <div class="nav-explore-sub">
+                <a class="nav-full" href="/podcasts">See the Full Podcast Charts <span aria-hidden="true">→</span></a>
                 <a href="/charts#podcasts">Top Podcasts Weekly Chart</a>
                 <a href="/podcasts/shows?range=1y">Top Podcasts This Year</a>
                 <a href="/podcasts/episodes?range=1y">Top Episodes This Year</a>
@@ -159,6 +160,7 @@
             <details class="nav-explore-acc">
               <summary><a href="/music"><span aria-hidden="true">🎵</span> Music</a><span class="nav-explore-chev" aria-hidden="true">⌄</span></summary>
               <div class="nav-explore-sub">
+                <a class="nav-full" href="/music">See the Full Music Charts <span aria-hidden="true">→</span></a>
                 <a href="/music/albums?range=1m">Top Albums This Month</a>
                 <a href="/music/songs?range=1y">Top Songs This Year</a>
                 <a href="/charts#artists">Top Artists Weekly Chart</a>
@@ -453,14 +455,14 @@
      Wires the nav's Donate button + identity slot to the ~1MB bundle,
      which stays unloaded until a session restore or a click needs it.
      Shared by every page — see assets/js/nav-widget-boot.js. -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v289"></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v290"></script>
 
 <!-- PWA service worker -->
-<script src="/assets/js/sw-register.js?v=ob-v289" defer></script>
+<script src="/assets/js/sw-register.js?v=ob-v290" defer></script>
 
 <!-- PWA install affordance -->
-<script src="/assets/widgets/pwa-install.js?v=ob-v289" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v290" defer></script>
 
-<script src="/assets/js/nav.js?v=ob-v289" defer></script>
+<script src="/assets/js/nav.js?v=ob-v290" defer></script>
 </body>
 </html>

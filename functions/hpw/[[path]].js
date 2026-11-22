@@ -262,7 +262,7 @@ export function renderPage(view) {
     body,
     canonical: pageUrl,
     og: { title: d.ogTitle, description: d.lead, image, url: pageUrl },
-    scripts: `<script src="/assets/js/hpw-page.js?v=ob-v289" type="module"></script>`,
+    scripts: `<script src="/assets/js/hpw-page.js?v=ob-v290" type="module"></script>`,
     extraCss: `
     /* The tab supplies the accent family off body[data-active-feed]; this page
        has no active feed and supplies the brand, as .show-main does. */
@@ -300,8 +300,8 @@ export function renderCard(view) {
     kickerSub: COPY.intro,
     board,
     footer: "onlyboosts.social/charts#hpw",
-    links: `  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v289" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v289" />`,
+    links: `  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v290" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v290" />`,
     css: `
     .card .hpw-board { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0.7rem 1.1rem 0.6rem; }
     .card .hpw-title { margin-bottom: 0.4rem; flex: none; font-size: 1.1rem; }
@@ -377,16 +377,16 @@ ${og ? `
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/source-serif-4.woff2" crossorigin />
   <link rel="preload" as="font" type="font/woff2" href="/assets/fonts/playfair-display.woff2" crossorigin />
 
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v289" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v289" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v290" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v290" />
   <!-- feed-cards.css for the share pill and its menu; boost-actions.css for
        the composer behind Post to Nostr. Both are the same chrome the tab
        already has. -->
-  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v289" />
-  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v289" />
-  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v289" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v289" />
-  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v289" />
+  <link rel="stylesheet" href="/assets/css/feed-cards.css?v=ob-v290" />
+  <link rel="stylesheet" href="/assets/css/boost-actions.css?v=ob-v290" />
+  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v290" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v290" />
+  <link rel="stylesheet" href="/assets/css/page.css?v=ob-v290" />
   ${extraCss ? `<style>${extraCss}\n  </style>` : ""}
 </head>
 <body>
@@ -476,6 +476,7 @@ ${og ? `
             <details class="nav-explore-acc">
               <summary><a href="/podcasts"><span aria-hidden="true">🎙</span> Podcasts</a><span class="nav-explore-chev" aria-hidden="true">⌄</span></summary>
               <div class="nav-explore-sub">
+                <a class="nav-full" href="/podcasts">See the Full Podcast Charts <span aria-hidden="true">→</span></a>
                 <a href="/charts#podcasts">Top Podcasts Weekly Chart</a>
                 <a href="/podcasts/shows?range=1y">Top Podcasts This Year</a>
                 <a href="/podcasts/episodes?range=1y">Top Episodes This Year</a>
@@ -492,6 +493,7 @@ ${og ? `
             <details class="nav-explore-acc">
               <summary><a href="/music"><span aria-hidden="true">🎵</span> Music</a><span class="nav-explore-chev" aria-hidden="true">⌄</span></summary>
               <div class="nav-explore-sub">
+                <a class="nav-full" href="/music">See the Full Music Charts <span aria-hidden="true">→</span></a>
                 <a href="/music/albums?range=1m">Top Albums This Month</a>
                 <a href="/music/songs?range=1y">Top Songs This Year</a>
                 <a href="/charts#artists">Top Artists Weekly Chart</a>
@@ -772,10 +774,10 @@ ${body}
 </footer>
 <!-- FOOTER:END -->
 
-<script src="/assets/js/nav.js?v=ob-v289" defer></script>
+<script src="/assets/js/nav.js?v=ob-v290" defer></script>
 ${scripts}
-<script src="/assets/js/nav-widget-boot.js?v=ob-v289"></script>
-<script src="/assets/js/sw-register.js?v=ob-v289" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v290"></script>
+<script src="/assets/js/sw-register.js?v=ob-v290" defer></script>
 </body>
 </html>`;
 }
