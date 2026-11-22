@@ -435,7 +435,9 @@ def main():
         try:
             txs = fetch_transactions(config, last_seen)
         except Exception as e:
-            log(f"[error] could not reach the hub: {e}")
+            hint = (" (the hub comes back locked after an LND restart; it answers 401 until unlocked)"
+                    if getattr(getattr(e, "response", None), "status_code", None) == 401 else "")
+            log(f"[error] could not reach the hub: {e}{hint}")
             return 1
 
     now = int(time.time())

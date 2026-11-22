@@ -73,8 +73,10 @@ same `created_at`: the same event id, never a second note.
 1. Reed copies the site's `BOOSTBOT_NSEC` into `~/.config/nostr-bots/credentials.env`
    as `NSEC_ONLYBOOSTS_BOT`. The bot refuses any key whose pubkey is not OB
    Boostbot's.
-2. After the StartOS 0.4 migration, `ALBY_HUB_URL` in credentials; then a dry run
-   against the real hub.
+2. A dry run against the real hub. Since StartOS 0.4 (2026-11-22) the hub is
+   `https://custom-gnats.local:51818`. Restarting LND restarts the hub, which comes
+   back locked: every read answers 401 until Reed unlocks it, and that is not a
+   rotated token. The bot exits without advancing `last_seen`, so nothing is lost.
 3. Reed's go: `DRY_RUN = False` and a timer. Boostr comes out of the Social Hour's
    value block the same day.
 
