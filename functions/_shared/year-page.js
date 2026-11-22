@@ -380,7 +380,11 @@ export function yearHtml(d) {
 
 export async function renderYearPage({ request, env, waitUntil }, year) {
   const cache = caches.default;
-  const key = new Request(new URL(request.url).toString(), { method: "GET" });
+  /* Keyed by the deploy too, so a new deploy never serves the last one's
+   * HTML with its old ?v= stamps for the rest of the ten minutes. */
+  const keyUrl = new URL(request.url);
+  if (env.CF_PAGES_COMMIT_SHA) keyUrl.searchParams.set("__deploy", env.CF_PAGES_COMMIT_SHA);
+  const key = new Request(keyUrl.toString(), { method: "GET" });
   const hit = await cache.match(key).catch(() => null);
   if (hit) return hit;
 

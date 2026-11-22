@@ -15,18 +15,11 @@
 // 302s to its Monday keeping /card/<kind>; a future date to the live week; a
 // week before the index, or an unknown kind, is a 404.
 //
-// ⚠️ THE ONLYBOOSTS CHARTS PAGE THAT LIVED HERE IS GONE (torn down 2026-09-04,
-// Reed's call, two days after it shipped). The same boards live on the
-// homepage now — the Shows and Artists feeds carry the weekly Top 10 with the
-// week picker beside Weeks at #1 (assets/js/charts-block.js), and the Members
-// tab stacks its Weeks at #1 behind Proof of #40HPW — so the page had become
-// a second copy of three things one tab over, and the CHARTS wordmark links
-// that pointed at it went with it. `/charts` and `/charts/<date>` 302 to the
-// Shows feed, since the page's URL was linked from the site for two days;
-// the card routes are unchanged because the bot's contract names them. The
-// page's renderer (sectionHtml, the stepper, the masthead) is in git before
-// this commit; the queries it used are still functions/_shared/week-charts.js,
-// serving /api/v1/charts.
+// Beside the frames, this Function routes the pages: the bare /charts is the
+// Weekly Charts (one page since 2026-11-22, every board at its #section),
+// /charts/<year> the year's Top 33s, and the old view paths, dated weeks and
+// anything else forward to /charts (see onRequestGet). The dated weekly page
+// that lived here from 2026-09-02 to 2026-09-04 is in git history.
 //
 // ⚠️ THE WEEK IS THE 40 HPW WEEK: Monday 00:00 US Pacific, cut by
 // assets/js/pacific-week.js. The ranking is sort=chart and nothing else.
@@ -165,9 +158,9 @@ function unavailable() {
    the stepper's .hpw-nav grammar, the members board is .hpw-* rows in a
    .cb-board shell. Written here so scripts/stamp-assets.js sees an href it
    can restamp. */
-const CARD_LINKS = `  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v288" />
-  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v288" />
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v288" />`;
+const CARD_LINKS = `  <link rel="stylesheet" href="/assets/css/hpw-board.css?v=ob-v289" />
+  <link rel="stylesheet" href="/assets/css/chart-board.css?v=ob-v289" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v289" />`;
 
 /* The rows sized to the frame. ⚠️ MEASURED BY THE BOT, 2026-09-03: the weekly
    cards' list box is 296.9 → 829 (the column head costs 27.4px), ceiling
