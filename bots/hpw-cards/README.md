@@ -6,7 +6,7 @@ or a share modal. Two families, one contract:
 | Family | Boards |
 |---|---|
 | **hpw** | the Nostr Gang #40HPW boards: one card per week, plus the all-time board, Proof of #40HPW |
-| **charts** (since 2026-09-03) | the OnlyBoosts Charts boards: the week's Shows and Artists Top 10 on the chart rule, and the three Weeks at #1 boards (shows, artists, members) |
+| **charts** (since 2026-09-03) | the OnlyBoosts Charts boards: the week's Shows, Songs and Artists Top 10 on the chart rule, and the four Weeks at #1 boards (shows, songs, artists, members); Songs since 2026-11-21 |
 
 The directory keeps its first name; the bot renders both.
 
@@ -36,8 +36,10 @@ a `--delete` mirror run does not prune them:
 ../global-boost-scan/data/shards/hpw/high-scores.png               the all-time board
 ../global-boost-scan/data/shards/hpw/index.json                    the manifest
 ../global-boost-scan/data/shards/charts/shows-<YYYY-MM-DD>.png     the week's Shows Top 10
+../global-boost-scan/data/shards/charts/songs-<YYYY-MM-DD>.png     the week's Songs Top 10
 ../global-boost-scan/data/shards/charts/artists-<YYYY-MM-DD>.png   the week's Artists Top 10
 ../global-boost-scan/data/shards/charts/shows-weeks-at-1.png       Shows: Weeks at #1
+../global-boost-scan/data/shards/charts/songs-weeks-at-1.png       Songs: Weeks at #1
 ../global-boost-scan/data/shards/charts/artists-weeks-at-1.png     Artists: Weeks at #1
 ../global-boost-scan/data/shards/charts/members-weeks-at-1.png     Members: Weeks at #1
 ../global-boost-scan/data/shards/charts/index.json                 the manifest
@@ -97,8 +99,11 @@ same three-day probe `prevWeek()` uses, evaluated server-side, and it costs
 nothing: every week stepped over is one whose members had to be fetched anyway.
 `/api/v1/charts/<kind>?week=` resolves a date exactly as the hours endpoint
 does, so the chart weeks step with the same probe, through the Shows endpoint;
-the Artists board for each week is fetched by the week's own Monday, and the
-bot refuses to continue if the two endpoints ever disagree about a week.
+the Songs and Artists boards for each week are fetched by the week's own
+Monday, and the bot refuses to continue if the endpoints ever disagree about a
+week. Songs is in `CHART_OPTIONAL_KINDS`: a 404 on it skips the Songs cards
+only, because this box can pull the bot before Pages has deployed the endpoint;
+a 404 on any other kind still skips the whole charts family.
 
 Verified against production: 99 weeks back to 2024-10-07, every one a Monday,
 every step exactly 7 calendar days, across all four DST transitions in the
@@ -147,7 +152,7 @@ it **~810MB**, plus the fonts apt pulls in.
 | `--live` | write into the shards tree and `state.json` |
 | `--all` | every week back to `first_week` (~99 hpw weeks, ~114 chart weeks × 2 kinds today), not the recent window |
 | `--force` | re-render even where the hash matches |
-| `--only K[,K…]` | named boards: `YYYY-MM-DD`, `high-scores`, `shows-<date>`, `artists-<date>`, `shows-weeks-at-1`, `artists-weeks-at-1`, `members-weeks-at-1` |
+| `--only K[,K…]` | named boards: `YYYY-MM-DD`, `high-scores`, `shows-<date>`, `songs-<date>`, `artists-<date>`, `shows-weeks-at-1`, `songs-weeks-at-1`, `artists-weeks-at-1`, `members-weeks-at-1` |
 | `--standin` | hpw only: screenshot `/#members` instead of the card page — see below |
 
 `--all` needs `HPW_TIMEOUT=0` to escape the wrapper's 90s bound (or, since the
@@ -192,14 +197,18 @@ after touching a card page:
 .venv/bin/python test-clip-guard.py https://<branch>.onlyboosts.pages.dev
 ```
 
-Measured 2026-09-03 on the `misc-updates` preview, 720x900 at scale 1
+Measured 2026-11-21 on the `charts-2026` preview, 720x900 at scale 1
 (layout is identical at scale 2):
 
 | Card | List box | Room | Rows | Ceiling | Headroom |
 |---|---|---|---|---|---|
 | hpw week, Proof of #40HPW | 269.5 → 829 | 560px | 49.2–50.2px | **56.0px** | 5.8px |
-| shows / artists / members weeks-at-1 | 269.5 → 829 | 560px | 49.2–50.2px | **56.0px** | 5.8px |
-| shows / artists weekly | 296.9 → 829 | 532.6px | 49.2–50.2px | **53.3px** | 3.1px |
+| members weeks-at-1 | 269.5 → 829 | 560px | 49.2–50.2px | **56.0px** | 5.8px |
+| shows / songs / artists weeks-at-1 | 269.5 → 829 | 560px | 50.3–51.3px | **56.0px** | 4.7px |
+| shows / songs / artists weekly | 296.9 → 829 | 532.6px | 49.2–50.2px | **53.3px** | 3.1px |
+
+The shows/artists weeks-at-1 rows grew 1.1px between 2026-09-03 and this
+measurement; Songs matches them exactly.
 
 The weekly chart cards are the tight ones: the `rank in sats/boosts/boosters`
 column head costs 27.4px of the list box and the rank triplet does not make the
