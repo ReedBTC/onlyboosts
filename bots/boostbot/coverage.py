@@ -1,5 +1,8 @@
 """Has somebody else's note for this boost already been published?
 
+OB Boostbot publishes only the boosts nobody else did (Reed, 2026-11-22: "the
+ones that people don't share"), so "skip" here means publish nothing at all.
+
 Ported from Local Bitcoiners' bots/shared/onlyboosts_coverage.py at 9ed7fc1,
 where the reasoning lives in full; LB keeps its own copy (LB-back's call,
 2026-11-22). The rule is the same: publish untagged when another note covers
@@ -27,6 +30,11 @@ What differs from LB's copy, and why:
     titles; Social Hour titles are not numbered that way, and a number read
     out of a song title would call one boost two.
   * No website receipt short-circuit. That is LB's own site.
+  * Our own key IS evidence. OB Boostbot also signs the site's boosts at the
+    edge (/api/sign-boost), and that note is the payment's note; LB excluded
+    its own key, which here would publish a second note for every site boost
+    that pays onlyboosts@getalby.com. The box bot's own notes are kept out of
+    the way by its payment-hash state, not by their author.
 """
 import json
 import re
@@ -265,7 +273,15 @@ def verify_before_claim(info, scope, relays=None, query_relay=None, fetch=fetch_
 
 
 def decide(info, records, now_ts, scope, consumed=None):
-    """("skip" | "claim" | "hold", reason). `records` None means the API was down."""
+    """(decision, reason). `records` None means the API was down.
+
+      skip      another note covers this boost: publish nothing
+      hold      too early to tell: publish nothing yet, ask again next run
+      claim     nobody covered it and the amount is verified: publish WITH the
+                payment evidence (t tags, amount), so the index counts it
+      untagged  nobody covered it but the amount is unverified: publish the
+                note for readers, without evidence, so no index counts it
+    """
     settled = _ts(info.get("settled_at"))
     if settled is None:
         return "skip", "no parseable settledAt"
@@ -274,18 +290,18 @@ def decide(info, records, now_ts, scope, consumed=None):
     if records is None:
         if age < hold_window:
             return "hold", "OnlyBoosts API unreachable — retrying next tick"
-        return "skip", "OnlyBoosts API unreachable past the hold window"
+        return "untagged", "OnlyBoosts API unreachable past the hold window — never claimed blind"
     match, how = find_match(records, info, settled, scope, consumed)
     if match:
         if consumed is not None:
             consumed.add(match["id"])
         who = ((match.get("client_app") or {}).get("id") or match.get("client") or "unknown client")
         return "skip", f"already indexed via {who} (matched on {how}, {match['id'][:12]}...)"
-    if not info.get("amount_verified"):
-        # A claim publishes an amount tag; one we could not verify is not ours
-        # to publish into an index.
-        return "skip", "amount not verified — publishing untagged"
     if age < hold_window:
         return "hold", (f"not indexed yet, {int(age / 60)} min old — waiting up to "
                         f"{int(hold_window / 60)} min for the donor's note")
+    if not info.get("amount_verified"):
+        # A claim publishes an amount tag; one we could not verify is not ours
+        # to publish into an index.
+        return "untagged", f"no note after {int(age // 60)} min, amount not verified"
     return "claim", f"no note indexed after {int(age // 60)} min"

@@ -70,8 +70,8 @@ bots/.claude/
 bots/**/.venv/
 bots/hpw-cards/preview/
 
-# --- social-hour-boosts: what a dry run would have published, one JSON per note.
-bots/social-hour-boosts/dry-run/
+# --- boostbot: what a dry run would have published, one JSON per note.
+bots/boostbot/dry-run/
 
 # --- Node ---
 node_modules/
