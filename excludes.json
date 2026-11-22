@@ -55,7 +55,14 @@
     }
   ],
 
-  "episodes": [],
+  "episodes": [
+    {
+      "guid": "ec173b97-3e1f-4323-bc7a-130bc5d94050",
+      "reason": "Test episode, never meant to be published: OB-000 Practice Run (Draft, Do Not Publish) of The OnlyBoosts Social Hour, pushed to the feed to test boosting. Its boost is a test payment, not listening.",
+      "added": "2026-11-22",
+      "source": "Reed's call on 2026-11-22."
+    }
+  ],
 
   "boosters": [],
 
