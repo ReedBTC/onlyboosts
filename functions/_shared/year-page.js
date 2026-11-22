@@ -95,10 +95,25 @@ function statCards(d) {
 
 /* ── Boosts by Month ────────────────────────────────────────────────────── */
 
-const W = 720;
+/* ⚠️ EVERY GRAPH IS DRAWN TWICE, AT TWO WIDTHS (Reed, 2026-11-22: a phone
+ * must see the whole graph without scrolling). One SVG drawn 720 units wide
+ * and shrunk to a phone would set its 11-unit type at 5px, so the phone gets
+ * its own 360-unit drawing with the same type sizes, and CSS shows one of the
+ * two (.yc-wide / .yc-narrow, charts-year.html). The drawing code reads the
+ * width from `W`, which dualSvg sets for each pass and restores after. */
+let W = 720;
+const NARROW = 360;
+function dualSvg(draw) {
+  const pass = (w, cls) => {
+    W = w;
+    try { return draw().replace('<svg class="yc-svg"', `<svg class="yc-svg ${cls}"`); } finally { W = 720; }
+  };
+  const wide = pass(720, "yc-wide");
+  return wide ? `<div class="yc-graph">${wide}${pass(NARROW, "yc-narrow")}</div>` : "";
+}
 const MIN_APP_ROW = 5;
 
-function monthsChart(d) {
+function monthsSvg(d) {
   /* The chart year's months only (Reed, 2026-11-22); the site-wide line
    * belongs on the stats page. Each month's colour is against the month
    * before it, so January is read against the prior December, which is in
@@ -138,9 +153,12 @@ function monthsChart(d) {
     parts.push(`<circle class="yc-dot yc-${dir}${partial ? " yc-partial" : ""}" cx="${x(i).toFixed(1)}" cy="${y(m.boosts).toFixed(1)}" r="4"><title>${esc(tip)}</title></circle>`);
   });
 
-  return figure("Boosts by Month", "",
-    `<div class="yc-scroll"><svg class="yc-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Boosts by month, ${esc(d.year)}">${parts.join("")}</svg></div>`,
-    "");
+  return `<svg class="yc-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Boosts by month, ${esc(d.year)}">${parts.join("")}</svg>`;
+}
+
+function monthsChart(d) {
+  const graph = dualSvg(() => monthsSvg(d));
+  return graph ? figure("Boosts by Month", "", graph, "") : "";
 }
 
 /* ── Fountain and Every Other App ───────────────────────────────────────── */
@@ -168,17 +186,20 @@ function appsChart(d) {
     `<span class="ya-n" title="${esc(`${fmt(r.sats)} sats from ${fmt(r.boosters)} booster${r.boosters === 1 ? "" : "s"}`)}">${fmt(r.boosts)}</span></li>`).join("");
 
   // The year's other-app boosts by chart week (2026-11-22).
-  const g = weekFrame(d, 150, 12, Math.max(1, ...d.stats.weeks.map((w) => w.apps)), short);
-  d.stats.weeks.forEach((w, i) => {
-    const tip = `Week of ${pacificDate(w.start, { month: "short", day: "numeric" })}${g.live(i) ? " (in progress)" : ""}: ${fmt(w.apps)} boosts from other apps, ${pctLabel(pct(w.apps, w.boosts))} of the week`;
-    g.parts.push(g.bar(i, w.apps, tip));
+  const weekly = dualSvg(() => {
+    const g = weekFrame(d, 150, 12, Math.max(1, ...d.stats.weeks.map((w) => w.apps)), short);
+    d.stats.weeks.forEach((w, i) => {
+      const tip = `Week of ${pacificDate(w.start, { month: "short", day: "numeric" })}${g.live(i) ? " (in progress)" : ""}: ${fmt(w.apps)} boosts from other apps, ${pctLabel(pct(w.apps, w.boosts))} of the week`;
+      g.parts.push(g.bar(i, w.apps, tip));
+    });
+    return `<svg class="yc-svg" viewBox="0 0 ${W} ${g.H}" role="img" aria-label="Boosts from apps other than Fountain, by week of ${esc(d.year)}">${g.parts.join("")}</svg>`;
   });
 
   return figure("Fountain and Every Other App",
     `Fountain publishes most Nostr boosts; these are the ${esc(d.year)} boosts by the app they were sent from. An app here is a website or app a person boosts from; a boost bot that republishes other people's boosts is not one.`,
     split +
     `<h3 class="yc-sub">Every Other App in ${esc(d.year)}</h3><ul class="ya-rows">${rows || `<li class="ya-none">None yet.</li>`}</ul>` +
-    `<h3 class="yc-sub">Boosts From Other Apps by Week</h3><div class="yc-scroll"><svg class="yc-svg" viewBox="0 0 ${W} ${g.H}" role="img" aria-label="Boosts from apps other than Fountain, by week of ${esc(d.year)}">${g.parts.join("")}</svg></div>`,
+    `<h3 class="yc-sub">Boosts From Other Apps by Week</h3>${weekly}`,
     "");
 }
 
@@ -200,7 +221,8 @@ function weekFrame(d, H, T, top, label = String) {
   let lastMonth = -1;
   ws.forEach((w, i) => {
     const m = Number(pacificDate(w.start + 3 * 86400, { month: "numeric" })) - 1;
-    if (m !== lastMonth) { parts.push(`<text class="yc-axis" x="${x(i).toFixed(1)}" y="${H - 8}">${MON[m]}</text>`); lastMonth = m; }
+    // On the narrow drawing every other month, Jan, Mar, May …, or they collide.
+    if (m !== lastMonth) { if (W >= 500 || m % 2 === 0) parts.push(`<text class="yc-axis" x="${x(i).toFixed(1)}" y="${H - 8}">${MON[m]}</text>`); lastMonth = m; }
   });
   const bar = (i, v, tip) => {
     const h = (H - T - B) * (v / max);
@@ -250,21 +272,25 @@ function launchMark(g, ws) {
   const ring = `<path class="yh-ink" d="M${pts.join(" L")}"/>`;
 
   // The note, upper left of the rule, and an arrow curving down into the ring.
-  const nx = cx - rx - 26, ny = 14;
-  const ax0 = nx - 10, ay0 = ny + 36, ax1 = cx - rx * 0.97, ay1 = cy + ry * 0.12;
+  const nx = cx - rx - (W < 500 ? 8 : 26), ny = 14;
+  const narrow = W < 500;
+  const ax0 = nx - 10, ay0 = ny + (narrow ? 48 : 36), ax1 = cx - rx * 0.97, ay1 = cy + ry * 0.12;
   const c1x = ax0 - 6, c1y = ay1 - 4, c2x = ax1 - 46, c2y = ay1 + 16;
   const ang = Math.atan2(ay1 - c2y, ax1 - c2x), hl = 10;
   const head = [0.5, -0.5].map((o) => `M${(ax1 - hl * Math.cos(ang + o)).toFixed(1)} ${(ay1 - hl * Math.sin(ang + o)).toFixed(1)} L${ax1.toFixed(1)} ${ay1.toFixed(1)}`).join(" ");
   const arrow = `<path class="yh-ink" d="M${ax0.toFixed(1)} ${ay0.toFixed(1)} C${c1x.toFixed(1)} ${c1y.toFixed(1)} ${c2x.toFixed(1)} ${c2y.toFixed(1)} ${ax1.toFixed(1)} ${ay1.toFixed(1)} ${head}"/>`;
 
-  return `<defs><filter id="yh-rough" x="-5%" y="-5%" width="110%" height="110%">` +
+  return `<defs><filter id="yh-rough-${W}" x="-5%" y="-5%" width="110%" height="110%">` +
       `<feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="4"/>` +
       `<feDisplacementMap in="SourceGraphic" scale="3.2"/></filter></defs>` +
     `<line class="yh-rule" x1="${lx.toFixed(1)}" x2="${lx.toFixed(1)}" y1="${g.T - 4}" y2="${g.y(0).toFixed(1)}"/>` +
-    `<g class="yh-mark" filter="url(#yh-rough)">${ring}${arrow}</g>` +
+    `<g class="yh-mark" filter="url(#yh-rough-${W})">${ring}${arrow}</g>` +
     `<g class="yh-note" transform="rotate(-3 ${nx.toFixed(1)} ${ny.toFixed(1)})">` +
       `<text class="yh-note-h" x="${nx.toFixed(1)}" y="${(ny + 8).toFixed(1)}" text-anchor="end">#40HPW goes live, Aug 23</text>` +
-      `<text class="yh-note-s" x="${nx.toFixed(1)}" y="${(ny + 24).toFixed(1)}" text-anchor="end">${esc(`Before: ${n(before)} in ${li} weeks. Since: ${since} in ${ws.length - li} weeks.`)}</text>` +
+      (narrow
+        ? `<text class="yh-note-s" x="${nx.toFixed(1)}" y="${(ny + 23).toFixed(1)}" text-anchor="end">${esc(`Before: ${before} in ${li} weeks.`)}</text>` +
+          `<text class="yh-note-s" x="${nx.toFixed(1)}" y="${(ny + 37).toFixed(1)}" text-anchor="end">${esc(`Since: ${since} in ${ws.length - li} weeks.`)}</text>`
+        : `<text class="yh-note-s" x="${nx.toFixed(1)}" y="${(ny + 24).toFixed(1)}" text-anchor="end">${esc(`Before: ${n(before)} in ${li} weeks. Since: ${since} in ${ws.length - li} weeks.`)}</text>`) +
     `</g>`;
 }
 
@@ -305,18 +331,22 @@ function hpwChart(d) {
   const s = d.stats;
   const ws = s.weeks;
   if (!ws.length) return "";
-  const g = weekFrame(d, 240, 74, Math.max(...ws.map((w) => w.hpw)));
-  const mark = launchMark(g, ws);
-  ws.forEach((w, i) => {
-    const tip = `Week of ${pacificDate(w.start, { month: "short", day: "numeric" })}${g.live(i) ? " (in progress)" : ""}: ${w.hpw} member${w.hpw === 1 ? "" : "s"} at 40 hours or more`;
-    g.parts.push(g.bar(i, w.hpw, tip));
-    if (w.hpw) g.parts.push(`<text class="yc-val" x="${(g.x(i) + g.bw / 2).toFixed(1)}" y="${(g.y(w.hpw) - 3).toFixed(1)}" text-anchor="middle">${w.hpw}</text>`);
+  const weekly = dualSvg(() => {
+    const g = weekFrame(d, 240, 74, Math.max(...ws.map((w) => w.hpw)));
+    const mark = launchMark(g, ws);
+    ws.forEach((w, i) => {
+      const tip = `Week of ${pacificDate(w.start, { month: "short", day: "numeric" })}${g.live(i) ? " (in progress)" : ""}: ${w.hpw} member${w.hpw === 1 ? "" : "s"} at 40 hours or more`;
+      g.parts.push(g.bar(i, w.hpw, tip));
+      // The narrow bars are too thin to carry a figure; the hover title has it.
+      if (w.hpw && W >= 500) g.parts.push(`<text class="yc-val" x="${(g.x(i) + g.bw / 2).toFixed(1)}" y="${(g.y(w.hpw) - 3).toFixed(1)}" text-anchor="middle">${w.hpw}</text>`);
+    });
+    return `<svg class="yc-svg" viewBox="0 0 ${W} ${g.H}" role="img" aria-label="#40HPW finishers by week">${g.parts.join("")}${mark}</svg>`;
   });
   return figure(`#40HPW in ${d.year}`,
     `Members who reached 40 hours of boosted listening in a chart week of ${esc(d.year)}, by the #40HPW Challenge's own count.`,
     `<p class="yh-head"><strong>${fmt(s.hpw.members)}</strong> member${s.hpw.members === 1 ? "" : "s"} reached 40 hours at least once; <strong>${fmt(s.hpw.weeks)}</strong> forty-hour weeks in all. <a href="/hpw/high-scores">Proof of #40HPW</a></p>` +
     finishersHtml(d) +
-    `<h3 class="yc-sub">Finishers by Week</h3><div class="yc-scroll"><svg class="yc-svg" viewBox="0 0 ${W} ${g.H}" role="img" aria-label="#40HPW finishers by week">${g.parts.join("")}${mark}</svg></div>`,
+    `<h3 class="yc-sub">Finishers by Week</h3>${weekly}`,
     "");
 }
 

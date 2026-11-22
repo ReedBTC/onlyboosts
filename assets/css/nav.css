@@ -400,6 +400,10 @@ details.nav-ribbon { position: static; }
   padding: 0.55rem 0;
 }
 .nav-explore-group a span { width: 1.2rem; text-align: center; flex-shrink: 0; }
+/* The 2026 link's star, text and pill are spans too; the icon width above
+   squeezed each to 1.2rem on phones (Reed's screenshot, 2026-11-22). */
+.nav-explore-group a.nav-2026 span { width: auto; }
+.nav-explore-group a.nav-2026 .nav-2026-text { flex-shrink: 1; min-width: 0; }
 .nav-explore-group a:hover { color: var(--brand); }
 /* The overlay's section rows are accordions (2026-10-20, Rotten Tomatoes'
    app): the row's link opens the section, the chevron opens that side's
