@@ -73,9 +73,7 @@ const STATIC_URLS = [
   { loc: "/music/songs", changefreq: "hourly", priority: "0.8" },
   { loc: "/boosts", changefreq: "hourly", priority: "0.8" },
   { loc: "/members", changefreq: "daily", priority: "0.7" },
-  { loc: "/charts/podcasts", changefreq: "daily", priority: "0.8" },
-  { loc: "/charts/music", changefreq: "daily", priority: "0.7" },
-  { loc: "/charts/hpw", changefreq: "daily", priority: "0.7" },
+  { loc: "/charts", changefreq: "daily", priority: "0.8" },
   { loc: "/charts/2026", changefreq: "daily", priority: "0.7" },
   // The three discovery lists (2026-10-20): the homepage's rails in full.
   { loc: "/discover/new-shows", changefreq: "daily", priority: "0.7" },

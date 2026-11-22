@@ -47,7 +47,7 @@ finds the paragraph that used to explain any name.
 | `/podcasts/{shows,episodes}`, `/music/{artists,albums,songs}` | the chart pages; the bare path opens on the first view |
 | `/boosts` | the boost feed, Global or Follows |
 | `/members` | the Top Members wall and the Boost Bots |
-| `/charts`, `/charts/{podcasts,music,hpw}` | the weekly boards (Music: Songs, then Artists); `/charts/<key>/card/<kind>` are the share-card frames |
+| `/charts` | the weekly boards, one page since 2026-11-22: `#podcasts`, `#songs`, `#artists`, `#hpw`, each section's id its shareable address; the old `/charts/{podcasts,music,hpw}` 302 to those, and the shells' hash forward leaves those bare hashes alone on `/charts`. `/charts/<key>/card/<kind>` are the share-card frames |
 | `/charts/2026` | "OnlyBoosts 2026 Charts": the year's Top 33 Songs, Artists, Podcasts and Boosters, stat cards, and inline-SVG graphs (the year's boosts by month, Fountain and other apps, #40HPW finishers); `charts-year.html` shell, `functions/_shared/year-{charts,page}.js`; live and edge-cached, not yet frozen. An "app" there is `APP_CLIENTS`, Reed's rule: a place with an interface, never a bot |
 | `/show/<guid>`, `/episode/<item-guid>`, `/booster/<npub>`, `/artist/<guid>` | the four detail pages, edge-rendered |
 | `/search?q=`, `/discover/<key>` | the results page (a list, never rails); the whole list behind a discovery rail |

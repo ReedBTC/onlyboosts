@@ -34,9 +34,9 @@
  * settings on this device only, silently. Reads happen on login, which is
  * also when the widget is guaranteed to be here.
  */
-import { readNewestEvent, readWriteRelays, relaySet } from '/assets/js/favorites-read.js?v=ob-v282'
-import { publishEvent, widgetDeps, loadMode, saveMode, PUBLISH_RELAYS } from '/assets/js/favorites-sync.js?v=ob-v282'
-import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v282'
+import { readNewestEvent, readWriteRelays, relaySet } from '/assets/js/favorites-read.js?v=ob-v283'
+import { publishEvent, widgetDeps, loadMode, saveMode, PUBLISH_RELAYS } from '/assets/js/favorites-sync.js?v=ob-v283'
+import { getSessionPubkey } from '/assets/js/follow-set.js?v=ob-v283'
 
 export const SETTINGS_KIND = 30078
 export const SETTINGS_D_TAG = 'onlyboosts:settings'

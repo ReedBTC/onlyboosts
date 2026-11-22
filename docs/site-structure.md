@@ -17,7 +17,7 @@ elsewhere would break and points here for the reasoning.
 | `/music/artists`, `/music/albums`, `/music/songs` | **the Music Charts**, the same shape; the bare `/music` is Artists |
 | `/boosts` | **the boost feed on its own page** (2026-10-21, Reed's call: readers treat it as their discovery feed). Global or Follows, newest first |
 | `/members` | the Top Members wall and the Boost Bots section, with the membership line |
-| `/charts`, `/charts/podcasts`, `/charts/music`, `/charts/hpw` | **the weekly boards' own page, named Charts** (2026-10-21): the week's Top 10 beside Weeks at #1 for shows and for artists, and the #40HPW week beside Proof of #40HPW, one pair per view. The bare `/charts` is Podcasts. From 2026-10-17 to 2026-10-21 `/charts` was the hash-routed feed page that was `/` before that; **every `/charts#<feed>` and `/#<feed>` address in the wild is forwarded to its page by the head scripts of `charts.html` and `index.html`**, since a server never sees a hash. All five pages are one shell, `charts.html`, routed by `functions/_shared/charts-page.js` |
+| `/charts` | **the weekly boards' own page, Weekly Charts, ONE PAGE SINCE 2026-11-22** (Reed: "one weekly charts page ... with its own hashtag address, so you can still share the address"): Podcasts, Songs, Artists and #40HPW stacked, each at `#podcasts`, `#songs`, `#artists`, `#hpw`, under jump links that are not tabs (no `data-view`, so the controller leaves them alone); `PAGES.charts.views` is empty in both declarations. The old view paths 302 to their sections (`VIEW_ANCHOR` in `functions/charts/[[path]].js`), and both head scripts skip a bare `#podcasts`/`#songs`/`#artists` on `/charts` (a four-day feed address from October, now the section). The boards paint in the browser after the anchor jump, so `loadPageSections` scrolls back to the section once they are in, unless the reader has scrolled. The nav names them "Top Songs Weekly Chart" and so on, so readers know past weeks are there. From 2026-10-21 to 2026-11-22 it was three views, the week's Top 10 beside Weeks at #1 for shows and for artists, and the #40HPW week beside Proof of #40HPW, one pair per view. The bare `/charts` is Podcasts. From 2026-10-17 to 2026-10-21 `/charts` was the hash-routed feed page that was `/` before that; **every `/charts#<feed>` and `/#<feed>` address in the wild is forwarded to its page by the head scripts of `charts.html` and `index.html`**, since a server never sees a hash. All five pages are one shell, `charts.html`, routed by `functions/_shared/charts-page.js` |
 | `/show/<guid>` | one show, edge-rendered |
 | `/episode/<item-guid>` | one episode, edge-rendered |
 | `/booster/<npub>` | one person, edge-rendered. **The address is the npub**: a hex pubkey in its place 301s to the npub form (Reed's call, 2026-11-08; the homepage's full-list link had emitted hex) |
@@ -59,7 +59,7 @@ named Charts).
 | `/music` | `artists`, `albums`, `songs` | the Music Charts |
 | `/boosts` | one | the boost feed, Global or Follows |
 | `/members` | none | the Top Members wall, the Boost Bots, the membership line |
-| `/charts` | `podcasts`, `music`, `hpw` | the weekly boards in three pairs, with their week pickers and share buttons |
+| `/charts` | none (2026-11-22; `podcasts`, `music`, `hpw` before) | the weekly boards, all four on one page, with their week pickers and share buttons |
 
 - **⚠️ ONE SHELL, `charts.html`, SERVES ALL FIVE, AND THE ROUTE IS MARKED
   INTO IT TWICE.** `routeShell` in `functions/_shared/charts-page.js` sets

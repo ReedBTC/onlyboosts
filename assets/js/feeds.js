@@ -39,7 +39,7 @@
  * when this module first runs).
  */
 // Identity, for keeping the Follows feeds in sync with who's signed in.
-import { getSessionPubkey, clearFollowCache } from '/assets/js/follow-set.js?v=ob-v282'
+import { getSessionPubkey, clearFollowCache } from '/assets/js/follow-set.js?v=ob-v283'
 
 // ── DOM state helpers ────────────────────────────────────────────────
 
@@ -104,10 +104,10 @@ async function hydrate(panelId, mod, scope, medium, view) {
 }
 
 // ── Lazy per-feed dispatch ───────────────────────────────────────────
-const BOOSTS = '/assets/js/boosts-feed.js?v=ob-v282'
-const PODCASTS = '/assets/js/feeds-podcasts.js?v=ob-v282'
-const SHOWS = '/assets/js/shows-feed.js?v=ob-v282'
-const ARTISTS = '/assets/js/artists-feed.js?v=ob-v282'
+const BOOSTS = '/assets/js/boosts-feed.js?v=ob-v283'
+const PODCASTS = '/assets/js/feeds-podcasts.js?v=ob-v283'
+const SHOWS = '/assets/js/shows-feed.js?v=ob-v283'
+const ARTISTS = '/assets/js/artists-feed.js?v=ob-v283'
 // Each module's entry point, by module. Named rather than sniffed out of the
 // path, so adding a feed is one line here instead of another branch.
 const RENDERERS = {
@@ -158,8 +158,8 @@ function viewFromBody() {
 }
 
 /* ── The two pages with no feed ── (2026-10-21)
- * The Charts page (/charts/podcasts, /charts/music, /charts/hpw) is the
- * three board pairs, and the Members page (/members) is the wall and the
+ * The Charts page (/charts, one page since 2026-11-22) is the four board
+ * pairs, and the Members page (/members) is the wall and the
  * bots. Neither activates a feed, so they are painted off body[data-page]
  * and body[data-view] at boot rather than off lb:feed-activate. Each loader
  * is idempotent, never awaited and never allowed to throw: a board that
@@ -171,7 +171,7 @@ function loadMemberBoards() {
   const root = document.querySelector('[data-hpw-boards]')
   if (!root) return
   boardsWired = true
-  import('/assets/js/members-board.js?v=ob-v282')
+  return import('/assets/js/members-board.js?v=ob-v283')
     .then((m) => m.renderMembersBoards(root))
     .catch((err) => {
       console.warn('[feeds] member boards failed to load', err)
@@ -183,7 +183,7 @@ function loadMembersWall() {
   if (wallWired) return
   if (!document.querySelector('[data-members-wall]')) return
   wallWired = true
-  import('/assets/js/members-board.js?v=ob-v282')
+  import('/assets/js/members-board.js?v=ob-v283')
     .then((m) => m.renderMembersWall())
     .catch((err) => {
       console.warn('[feeds] members wall failed to load', err)
@@ -192,15 +192,15 @@ function loadMembersWall() {
 }
 
 /* The chart blocks (charts-block.js): the week's Top 10 beside Weeks at #1,
- * one per kind. Keyed by the Charts page's view. */
-const CHART_VIEWS = { podcasts: ['shows'], music: ['songs', 'artists'] }
+ * one per kind, every kind on the one Charts page. */
+const CHART_KINDS = ['shows', 'songs', 'artists']
 const chartsWired = new Set()
 function loadChartsBlock(kind) {
   if (!kind || chartsWired.has(kind)) return
   const root = document.querySelector(`[data-charts-block="${kind}"]`)
   if (!root) return
   chartsWired.add(kind)
-  import('/assets/js/charts-block.js?v=ob-v282')
+  return import('/assets/js/charts-block.js?v=ob-v283')
     .then((m) => m.renderChartsBlock(root, kind))
     .catch((err) => {
       console.warn('[feeds] chart block failed to load', err)
@@ -209,8 +209,18 @@ function loadChartsBlock(kind) {
 }
 function loadPageSections(page, view) {
   if (page === 'charts') {
-    if (view === 'hpw') loadMemberBoards()
-    else for (const kind of CHART_VIEWS[view] || []) loadChartsBlock(kind)
+    /* ⚠️ THE BOARDS FILL AFTER THE BROWSER HAS JUMPED TO THE #SECTION, and
+     * every board above it grows the page under the reader, so the section
+     * is scrolled back into view once they are all in, unless the reader has
+     * moved the page themselves in the meantime. */
+    let moved = false
+    const mark = () => { moved = true }
+    for (const ev of ['wheel', 'touchmove', 'keydown', 'mousedown']) addEventListener(ev, mark, { once: true, passive: true })
+    Promise.allSettled([...CHART_KINDS.map(loadChartsBlock), loadMemberBoards()]).then(() => {
+      const id = decodeURIComponent((location.hash || '').slice(1))
+      const el = id && document.getElementById(id)
+      if (el && !moved) requestAnimationFrame(() => el.scrollIntoView())
+    })
   } else if (page === 'members') {
     loadMembersWall()
   }

@@ -81,9 +81,9 @@ console.log('\nThe legacy hash forward covers every feed address, on / and on /c
     const o = src.indexOf('<script>', a), c = src.indexOf('</script>', o)
     assert.ok(a > 0 && o > a && c > o, `${name} carries the forward`)
     const body = src.slice(o + 8, c)
-    return (hash) => {
+    return (hash, path = "/") => {
       let to = null
-      new Function('location', body)({ hash, replace: (u) => { to = u } })
+      new Function('location', body)({ hash, pathname: path, replace: (u) => { to = u } })
       return to
     }
   }
@@ -98,7 +98,7 @@ console.log('\nThe legacy hash forward covers every feed address, on / and on /c
     '#albums': '/music/albums', '#albums-follows': '/music/albums?scope=follows',
     '#artists': '/music/artists', '#artists-global': '/music/artists', '#artists-follows': '/music/artists?scope=follows',
     '#songs-global': '/music/songs', '#songs-follows': '/music/songs?scope=follows',
-    '#members': '/charts/hpw', '#members-global': '/boosts', '#members-follows': '/boosts?scope=follows',
+    '#members': '/charts#hpw', '#members-global': '/boosts', '#members-follows': '/boosts?scope=follows',
     '#boosts': '/boosts', '#boosts-global': '/boosts', '#boosts-follows': '/boosts?scope=follows',
     '#shows?lang=de&range=1m&sort=sats': '/podcasts/shows?lang=de&range=1m&sort=sats',
     '#episodes-follows?range=1y': '/podcasts/episodes?scope=follows&range=1y',
@@ -110,6 +110,12 @@ console.log('\nThe legacy hash forward covers every feed address, on / and on /c
     })
     check(`${name}: a section id or nothing does not forward`, () => {
       for (const h of ['#discover', '#rail-shows-week', '#top', '', '#shows-x-y', '#showsx', '#recommended']) assert.equal(f(h), null, h || '(empty)')
+    })
+    check(`${name}: on /charts, the weekly boards' sections stay put (2026-11-22)`, () => {
+      for (const h of ['#podcasts', '#songs', '#artists', '#hpw']) for (const p of ['/charts', '/charts/']) assert.equal(f(h, p), null, p + h)
+      assert.equal(f('#songs-follows', '/charts'), '/music/songs?scope=follows')
+      assert.equal(f('#shows', '/charts'), '/podcasts/shows')
+      assert.equal(f('#songs', '/'), '/music/songs')
     })
   }
   check('the controller resolves every feed type the forward names', () => {
@@ -135,7 +141,10 @@ console.log('\nNo site file still links a feed as /#… or /charts#…:')
     const bad = []
     for (const p of files) {
       const s = readFileSync(p, 'utf8')
-      if (/["'`(]\/(charts)?#(shows|albums|artists|episodes|songs|members|podcasts|boosts)/.test(s)) bad.push(p.slice(ROOT.length))
+      /* /charts#podcasts, #songs, #artists and #hpw are the weekly boards'
+         own sections since 2026-11-22, not feed addresses. */
+      if (/["'`(]\/#(shows|albums|artists|episodes|songs|members|podcasts|boosts)/.test(s) ||
+          /["'`(]\/charts#(shows|albums|episodes|members|boosts|(artists|songs|podcasts)-)/.test(s)) bad.push(p.slice(ROOT.length))
     }
     assert.deepEqual(bad, [])
   })
@@ -795,9 +804,9 @@ console.log('\nThe nav bar: four ribbons (Charts became one 2026-11-21), then Bo
     assert.deepStrictEqual([...links.matchAll(/<details class="nav-ribbon" data-ribbon="([a-z]+)"/g)].map((m) => m[1]), ['podcasts', 'music', 'members', 'charts'])
     assert.ok(links.includes('<summary><a href="/charts">Charts</a>') && links.includes('<a href="/boosts">Boosts</a>'))
     assert.ok(!/^\s*<a href="\/charts\/hpw">#40HPW<\/a>/m.test(links), 'the #40HPW plain link of 2026-10-20 is gone; #40HPW is the third ribbon')
-    assert.ok(links.includes('<summary><a href="/charts/hpw">#40HPW</a>'), 'the third ribbon is named #40HPW and opens the boards (Reed, 2026-10-21)')
+    assert.ok(links.includes('<summary><a href="/charts#hpw">#40HPW</a>'), 'the third ribbon is named #40HPW and opens the boards (Reed, 2026-10-21; its section since 2026-11-22)')
     assert.ok(!links.includes('<summary><a href="/members">'), 'no ribbon is named Members any more')
-    for (const [ribbon, href] of [['podcasts', '/podcasts'], ['music', '/music'], ['members', '/charts/hpw'], ['charts', '/charts']]) {
+    for (const [ribbon, href] of [['podcasts', '/podcasts'], ['music', '/music'], ['members', '/charts#hpw'], ['charts', '/charts']]) {
       assert.ok(links.includes(`data-ribbon="${ribbon}">\n        <summary><a href="${href}">`), `${ribbon} opens ${href}`)
     }
   })
@@ -820,7 +829,7 @@ console.log('\nThe nav bar: four ribbons (Charts became one 2026-11-21), then Bo
     assert.ok(mem.includes('<h4>#40HPW This Week') && mem.includes('<h4>Largest Boosts This Week'))
     const disc = mem.slice(mem.indexOf('<h4>Discover</h4>'), mem.indexOf('nav-ribbon-feat'))
     assert.deepStrictEqual([...disc.matchAll(/>([^<]+)<\/a>/g)].map((m) => m[1]), ['#40HPW Challenge', 'Top Members', 'Boost Feed'])
-    assert.deepStrictEqual([...disc.matchAll(/href="([^"]+)"/g)].map((m) => m[1]), ['/charts/hpw', '/members', '/boosts'])
+    assert.deepStrictEqual([...disc.matchAll(/href="([^"]+)"/g)].map((m) => m[1]), ['/charts#hpw', '/members', '/boosts'])
     assert.ok(!mem.includes('Live'), 'Live means something else in podcasting')
   })
   check("every Discover link lands on a homepage rail id or a charts view, and the rail ids exist", () => {
@@ -829,7 +838,7 @@ console.log('\nThe nav bar: four ribbons (Charts became one 2026-11-21), then Bo
   check('the overlay and the footer name the same places', () => {
     const overlay = nav.slice(nav.indexOf('nav-explore-sections'), nav.indexOf('nav-explore-group">\n            <h4>Stats'))
     assert.strictEqual((overlay.match(/<details class="nav-explore-acc">/g) || []).length, 4)
-    assert.ok(overlay.includes('<summary><a href="/charts/hpw"><span aria-hidden="true">👥</span> #40HPW</a>'), "the overlay's third row is #40HPW like the ribbon")
+    assert.ok(overlay.includes('<summary><a href="/charts#hpw"><span aria-hidden="true">👥</span> #40HPW</a>'), "the overlay's third row is #40HPW like the ribbon")
     for (const h of ['/podcasts', '/music', '/members', '/charts', '/boosts']) assert.ok(overlay.includes(`href="${h}"`) && foot.includes(`href="${h}"`), h)
     assert.ok(overlay.includes('<h4>Browse</h4>') && foot.includes('<h3>Browse</h3>'), 'the group is Browse: it holds a Charts entry now')
   })
