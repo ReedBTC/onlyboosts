@@ -1,5 +1,5 @@
 // /charts/<year>: the year's Top 33 Songs, Artists, Podcasts and Boosters
-// under a "<year> in Numbers" line (2026-11-21). Edge-rendered into the
+// (2026-11-21), headed "OnlyBoosts <year> Charts". Edge-rendered into the
 // charts-year.html shell between <!--OB:YEAR--> markers; facts only, so the
 // page ships no script of its own beyond the shell's nav.
 //
@@ -34,7 +34,6 @@ function esc(s) {
 }
 const fmt = (n) => Number(n || 0).toLocaleString("en-US");
 const pacificDate = (unix, opts) => new Date(unix * 1000).toLocaleDateString("en-US", { timeZone: "America/Los_Angeles", ...opts });
-const LONG = { weekday: "long", month: "long", day: "numeric", year: "numeric" };
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const MONTH = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const monthName = (ym, long = false) => {
@@ -99,65 +98,48 @@ function statCards(d) {
 const W = 720;
 
 function monthsChart(d) {
-  const ms = d.stats.months;
-  if (ms.length < 2) return "";
-  const H = 230, L = 46, R = 12, T = 14, B = 30;
+  /* The chart year's months only (Reed, 2026-11-22); the site-wide line
+   * belongs on the stats page. Each month's colour is against the month
+   * before it, so January is read against the prior December, which is in
+   * `months` but not drawn. The month in progress is a hollow point with no
+   * segment into it: a part month is never compared whole. */
+  const all = d.stats.months;
   const cur = d.open ? pacificDate(d.through, { year: "numeric", month: "2-digit" }).replace(/(\d+)\/(\d+)/, "$2-$1") : null;
+  const first = all.findIndex((m) => m.month.startsWith(`${d.year}-`));
+  if (first < 0) return "";
+  const ms = all.slice(first).filter((m) => m.month.startsWith(`${d.year}-`));
+  const H = 210, L = 46, R = 16, T = 14, B = 28;
   const max = niceMax(Math.max(...ms.map((m) => m.boosts)));
-  const x = (i) => L + (i * (W - L - R)) / (ms.length - 1);
+  const span = Math.max(ms.length - 1, 1);
+  const x = (i) => L + 8 + (i * (W - L - R - 16)) / span;
   const y = (v) => T + (H - T - B) * (1 - v / max);
   const parts = [];
-  // The chart year's months, shaded.
-  const yi = ms.map((m, i) => (m.month.startsWith(`${d.year}-`) ? i : -1)).filter((i) => i >= 0);
-  if (yi.length) {
-    const a = x(yi[0]) - (yi[0] ? (x(1) - x(0)) / 2 : 0), b = Math.min(W - R, x(yi[yi.length - 1]) + (x(1) - x(0)) / 2);
-    parts.push(`<rect class="yc-band" x="${a.toFixed(1)}" y="${T}" width="${(b - a).toFixed(1)}" height="${H - T - B}"/>`);
-    parts.push(`<text class="yc-band-label" x="${(a + 6).toFixed(1)}" y="${T + 14}">${esc(d.year)}</text>`);
-  }
   for (const f of [0, 0.5, 1]) {
     const v = max * f;
     parts.push(`<line class="yc-grid" x1="${L}" x2="${W - R}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}"/>`);
     parts.push(`<text class="yc-axis" x="${L - 6}" y="${(y(v) + 4).toFixed(1)}" text-anchor="end">${short(v)}</text>`);
   }
   ms.forEach((m, i) => {
-    const [yy, mm] = m.month.split("-");
-    if (mm === "01" || i === 0) parts.push(`<text class="yc-axis" x="${x(i).toFixed(1)}" y="${H - 10}" text-anchor="${i === 0 ? "start" : "middle"}">${mm === "01" ? yy : MON[Number(mm) - 1] + " " + yy}</text>`);
-    else if (mm === "07") parts.push(`<text class="yc-axis yc-axis--minor" x="${x(i).toFixed(1)}" y="${H - 10}" text-anchor="middle">Jul</text>`);
+    parts.push(`<text class="yc-axis" x="${x(i).toFixed(1)}" y="${H - 8}" text-anchor="middle">${MON[Number(m.month.slice(5)) - 1]}</text>`);
   });
   for (let i = 1; i < ms.length; i++) {
-    const partial = ms[i].month === cur;
-    const dir = partial ? "flat" : ms[i].boosts >= ms[i - 1].boosts ? "up" : "down";
-    parts.push(`<line class="yc-seg yc-${dir}${partial ? " yc-partial" : ""}" x1="${x(i - 1).toFixed(1)}" y1="${y(ms[i - 1].boosts).toFixed(1)}" x2="${x(i).toFixed(1)}" y2="${y(ms[i].boosts).toFixed(1)}"/>`);
+    if (ms[i].month === cur) continue;
+    const dir = ms[i].boosts >= ms[i - 1].boosts ? "up" : "down";
+    parts.push(`<line class="yc-seg yc-${dir}" x1="${x(i - 1).toFixed(1)}" y1="${y(ms[i - 1].boosts).toFixed(1)}" x2="${x(i).toFixed(1)}" y2="${y(ms[i].boosts).toFixed(1)}"/>`);
   }
   ms.forEach((m, i) => {
     const partial = m.month === cur;
-    const prev = ms[i - 1];
+    const prev = all[first + i - 1];
     const change = prev && prev.boosts ? ((m.boosts - prev.boosts) / prev.boosts) * 100 : null;
-    const dir = i === 0 ? "flat" : partial ? "flat" : m.boosts >= prev.boosts ? "up" : "down";
+    const dir = !prev || partial ? "flat" : m.boosts >= prev.boosts ? "up" : "down";
     const tip = `${monthName(m.month, true)}${partial ? " so far" : ""}: ${fmt(m.boosts)} boosts, ${fmt(m.sats)} sats, ${fmt(m.boosters)} boosters` +
       (change !== null && !partial ? `; ${change >= 0 ? "up" : "down"} ${Math.abs(Math.round(change))}% on ${MONTH[Number(prev.month.slice(5)) - 1]}` : "");
     parts.push(`<circle class="yc-dot yc-${dir}${partial ? " yc-partial" : ""}" cx="${x(i).toFixed(1)}" cy="${y(m.boosts).toFixed(1)}" r="4"><title>${esc(tip)}</title></circle>`);
   });
 
-  // The sentence under it: the year so far against the same months a year
-  // earlier, closed months only, so a part month is never compared whole.
-  const done = ms.filter((m) => m.month !== cur);
-  const thisYear = done.filter((m) => m.month.startsWith(`${d.year}-`));
-  const lastYear = thisYear.map((m) => done.find((p) => p.month === `${d.year - 1}-${m.month.slice(5)}`)).filter(Boolean);
-  let line = "";
-  if (thisYear.length && lastYear.length === thisYear.length) {
-    const a = thisYear.reduce((t, m) => t + m.boosts, 0), b = lastYear.reduce((t, m) => t + m.boosts, 0);
-    const span = thisYear.length === 1 ? MONTH[Number(thisYear[0].month.slice(5)) - 1] : `${MON[Number(thisYear[0].month.slice(5)) - 1]} to ${MON[Number(thisYear[thisYear.length - 1].month.slice(5)) - 1]}`;
-    const ch = b ? ((a - b) / b) * 100 : 0;
-    line = `${span} ${d.year}: ${fmt(a)} boosts, ${ch >= 0 ? "up" : "down"} ${Math.abs(Math.round(ch))}% on the same months of ${d.year - 1} (${fmt(b)}).`;
-  }
-  const best = done.reduce((a, m) => (m.boosts > (a?.boosts ?? -1) ? m : a), null);
-  if (best) line += ` The busiest month in the index is ${monthName(best.month, true)}, with ${fmt(best.boosts)} boosts.`;
-
-  return figure("Boosts by Month",
-    `Every Nostr boost in the index by month since ${monthName(ms[0].month, true)}, US Pacific. A green point is up on the month before; a red one is down.${cur ? " The hollow point is this month so far." : ""}`,
-    `<div class="yc-scroll"><svg class="yc-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Boosts by month">${parts.join("")}</svg></div>`,
-    line ? `<p class="yc-foot">${esc(line.trim())}</p>` : "");
+  return figure("Boosts by Month", "",
+    `<div class="yc-scroll"><svg class="yc-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Boosts by month, ${esc(d.year)}">${parts.join("")}</svg></div>`,
+    "");
 }
 
 /* ── Fountain and Every Other App ───────────────────────────────────────── */
@@ -239,7 +221,7 @@ function hpwChart(d) {
 }
 
 function figure(title, lead, body, foot) {
-  return `<section class="yc-fig"><h2>${esc(title)}</h2><p class="yc-lead">${lead}</p>${body}${foot}</section>`;
+  return `<section class="yc-fig"><h2>${esc(title)}</h2>${lead ? `<p class="yc-lead">${lead}</p>` : ""}${body}${foot}</section>`;
 }
 
 export function yearHtml(d) {
@@ -249,17 +231,8 @@ export function yearHtml(d) {
     board: `year-${key}`, title, sub: `Top ${TOP_N}`, empty, colhead: true,
     rows: rows.map((r) => weekRowHtml(key, r)),
   });
-  // The year's last day is the Sunday before `end`; six days after the last
-  // Monday, which holds whichever DST offset is in force (the weekSpan rule).
-  const lastDay = d.end - 86400 + 3600;
-  const span = `${pacificDate(d.start, LONG)} to ${pacificDate(lastDay, LONG)}`;
-  const status = d.open
-    ? `The year is in progress; these lists run through ${pacificDate(d.through, { month: "long", day: "numeric", year: "numeric" })} and will change until it closes.`
-    : "The year is complete.";
-  return `<h1>The OnlyBoosts Charts of ${y}</h1>
-    <p class="year-numbers"><strong>${y} in Numbers:</strong>
-      <span>${fmt(d.numbers.sats)} Sats</span> · <span>${fmt(d.numbers.boosts)} Boosts</span> · <span>${fmt(d.numbers.boosters)} Boosters</span></p>
-    <p class="search-lead">The Top ${TOP_N} of the year on the OnlyBoosts Charts, over every Nostr boost sent in the 52 chart weeks from ${esc(span)}, US Pacific. ${esc(status)} <a href="/about#charts">How the charts work.</a></p>
+  return `<h1>OnlyBoosts ${y} Charts</h1>
+    <p class="search-lead"><a href="/about#charts">How the charts work.</a></p>
     ${statCards(d)}
     ${d.stats ? monthsChart(d) : ""}
     <div class="hpw-boards year-boards">
@@ -293,7 +266,7 @@ export async function renderYearPage({ request, env, waitUntil }, year) {
       html = html.slice(0, start) + yearHtml(data) + html.slice(end + CLOSE.length);
       cacheable = true;
     }
-    html = html.replace("<title>Charts of the Year — OnlyBoosts</title>", `<title>The OnlyBoosts Charts of ${esc(year)} — OnlyBoosts</title>`)
+    html = html.replace("<title>Charts of the Year — OnlyBoosts</title>", `<title>OnlyBoosts ${esc(year)} Charts — OnlyBoosts</title>`)
       .replace(`<link rel="canonical" href="${SITE}/charts-year" />`, `<link rel="canonical" href="${SITE}/charts/${esc(year)}" />`);
   } catch (err) {
     console.error("[year] boards failed", year, err);

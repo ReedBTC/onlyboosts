@@ -29,13 +29,13 @@
 // is computed over the whole week's corpus (peers_* from week-charts.js),
 // never over the visible ten.
 
-import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v278';
-import { httpsUrl } from './cover-art.js?v=ob-v278';
-import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v278';
-import { boosterPageHref } from './booster-link.js?v=ob-v278';
-import { rankLabel, competitionRanks } from './rank.js?v=ob-v278';
-import { weekDateString } from './pacific-week.js?v=ob-v278';
-import { initials } from './hpw-board.js?v=ob-v278';
+import { htmlEscape, isSafeUrl } from './nostr-text.js?v=ob-v279';
+import { httpsUrl } from './cover-art.js?v=ob-v279';
+import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v279';
+import { boosterPageHref } from './booster-link.js?v=ob-v279';
+import { rankLabel, competitionRanks } from './rank.js?v=ob-v279';
+import { weekDateString } from './pacific-week.js?v=ob-v279';
+import { initials } from './hpw-board.js?v=ob-v279';
 
 const esc = htmlEscape;
 
@@ -63,6 +63,17 @@ export function weekSpan(ws) {
 
 const fmt = (n) => Number(n || 0).toLocaleString("en-US");
 
+/* A song's credit line, "Artist · Album" (Reed, 2026-11-22), the album
+ * alone when the feed names no artist, and the artist alone when the album
+ * repeats it (a single released under the artist's own name). */
+function songCredit(r) {
+  const artist = (r.p_author || "").trim();
+  const album = (r.p_title || "").trim();
+  if (!artist) return album || null;
+  if (!album || album.toLowerCase() === artist.toLowerCase()) return artist;
+  return `${artist} · ${album}`;
+}
+
 /* Title + href per kind. The linking rules are show-link.js's, restated only
  * in WHICH function each kind calls; the title checks are the callers' duty
  * there and are made here. */
@@ -72,7 +83,7 @@ function subject(kind, r) {
     return {
       title: title || (kind === "songs" ? "Untitled track" : "Untitled episode"),
       href: episodePageHref(r.guid, title),
-      sub: (r.p_title || "").trim() || null,
+      sub: kind === "songs" ? songCredit(r) : (r.p_title || "").trim() || null,
       glyph: kind === "songs" ? "🎵" : "🎙",
     };
   }
@@ -119,10 +130,10 @@ function who(kind, r, subline, extra = "") {
  * only at the show level has none, and the line is simply absent. The card
  * frames leave it off (`card`): their rows are measured to the pixel against
  * the 720x900 frame, and a second sub-line costs the tenth show. */
-function droveHtml(r) {
+function droveHtml(r, label = "Top Episode") {
   const title = (r.top_ep_title || "").trim();
   if (!r.top_ep_guid || !title) return "";
-  return `<span class="cb-sub cb-drove">Top Episode: ` +
+  return `<span class="cb-sub cb-drove">${esc(label)}: ` +
     `<a href="${esc(episodePageHref(r.top_ep_guid, title))}">${esc(title)}</a></span>`;
 }
 
@@ -134,7 +145,11 @@ function droveHtml(r) {
 export function weekRowHtml(kind, r, { card = false } = {}) {
   /* A podcast's board row names the show and its top episode, no host credit
    * (Reed, 2026-11-21); the card keeps the credit, its only sub-line. */
-  const w = !card && kind === "shows" ? who(kind, r, "", droveHtml(r)) : who(kind, r);
+  /* An artist's row names its top song the same way (2026-11-22),
+   * from attachTopSongs. */
+  const w = !card && kind === "shows" ? who(kind, r, "", droveHtml(r))
+    : !card && kind === "artists" ? who(kind, r, "", droveHtml(r, "Top Song"))
+    : who(kind, r);
   /* `#2`, or `T#9` when the component place is shared — the detail tiles'
    * chip form (feed-rank.js), and the site's own line: a bare numeral belongs
    * to a position in the visible list, where these are standings in three
@@ -260,7 +275,7 @@ export function memberChartRowHtml(m) {
   return `<li class="hpw-row">` +
     `<span class="hpw-pos">${esc(rankLabel(m.rank, m.tied))}</span>` +
     face +
-    `<span class="hpw-who">${whoM}</span>` +
+    `<span class="hpw-who">${whoM}<span class="cb-sub">${fmt(m.sats)} sats · ${fmt(m.boosts)} boosts · ${fmt(m.shows)} shows</span></span>` +
     `<span class="cb-ranks" title="Rank in sats / boosts / shows">` +
       `${esc(c(m.r_sats, m.peers_sats))}/${esc(c(m.r_boosts, m.peers_boosts))}/${esc(c(m.r_shows, m.peers_shows))}` +
     `</span>` +
