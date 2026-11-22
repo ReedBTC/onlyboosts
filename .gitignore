@@ -70,6 +70,9 @@ bots/.claude/
 bots/**/.venv/
 bots/hpw-cards/preview/
 
+# --- boostbot: what a dry run would have published, one JSON per note.
+bots/boostbot/dry-run/
+
 # --- Node ---
 node_modules/
 
