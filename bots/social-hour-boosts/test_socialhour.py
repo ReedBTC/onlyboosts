@@ -142,6 +142,20 @@ kind, info = bot.classify(ks, FEED, NOW)
 check(kind == "boost" and info["amount_verified"] and info["total_sats"] == 21, "keysend in talk verifies")
 check(info["sender_npub"] is None and "👤 Listener" in bot.note_text(info, None), "a name without a key shows as the name")
 
+print("feed gate")
+F_ID = dict(FEED, pi_id=7700001)
+def gate(**bg):
+    base = {"action": "boost", "valueMsatTotal": 21000, "episode_guid": EP, "ts": 50}
+    base.update(bg)
+    return bot.classify(dict(ks, boostagram=base), F_ID, NOW)
+check(gate(feedID=7700001, url=bot.FEED_URL)[0] == "boost", "keysend with feed id and url, no guid: ours")
+check(gate(url=bot.FEED_URL.replace("https://", "http://") + "/")[0] == "boost", "the url is normalised")
+check(gate(feedID=7700001, url="https://other.test/feed.xml")[0] == "unrouted", "one contradicting signal is decisive")
+check(gate(guid=SHOW, feedID=99)[0] == "unrouted", "a wrong feed id beside the right guid is not ours")
+check(gate(podcast="The OnlyBoosts Social Hour")[0] == "unrouted", "a title alone is not a signal")
+check(bot.classify(dict(ks, boostagram={"action": "boost", "valueMsatTotal": 21000, "feedID": 123}), FEED, NOW)[0]
+      == "unrouted", "a feed id cannot confirm before Podcast Index knows the show")
+
 print("coverage")
 _, info = bot.classify(fountain_tx("1" * 64, 1000, 10_000, 300.0, "g5"), FEED, NOW)
 scope = {"guids": [SHOW, SONG1[0], SONG2_FEED], "show_pubkey": "ff" * 32}
@@ -162,12 +176,56 @@ calls = []
 coverage.verify_before_claim(info, scope, fetch=lambda since, guids: calls.append(guids) or [])
 check(calls == [scope["guids"]], "the last-look re-check uses the same scope, not a default")
 
+def capped(url, t):
+    return {"boosts": [{"id": url + str(len(url))}], "next_cursor": "more"}
+try:
+    coverage.fetch_indexed(0, ["busy-artist"], get=capped)
+    check(False, "a page cap that is reached raises")
+except coverage.CoverageUnavailable:
+    check(True, "a page cap that is reached raises (unknown, never absence)")
+full = [{"id": str(i), "pubkey": "bb" * 32, "tags": [], "content": ""} for i in range(coverage.RELAY_LIMIT)]
+ev, why = coverage.relay_note_for(info, SETTLED_TS, scope, ["wss://r.test"], lambda r, f: full)
+check(ev is not None and "limit" in why, "a relay answer at its limit vetoes the claim")
+check(coverage.verify_before_claim(info, scope, ["wss://r.test"], lambda r, f: full,
+                                   fetch=lambda s, g: [])[0] is False, "and the last look does not claim")
+
 print("one note per boost")
 DESCRIPTORS.clear()
 t1 = fountain_tx("2" * 64, 1000, 10_000, 300.0, "same-group")
 t2 = fountain_tx("3" * 64, 1000, 10_000, 300.0, "same-group")
 check(bot.classify(t1, FEED, NOW)[1]["group"] == bot.classify(t2, FEED, NOW)[1]["group"] == "same-group",
       "two legs of one boost share a group id")
+
+print("a note counts as published only when a relay accepts it")
+import json as _json
+import nostr_utils
+from pynostr.key import PrivateKey
+
+
+class FakeWS:
+    def __init__(self, answers):
+        self.answers, self.sent = answers, None
+    def send(self, m):
+        self.sent = _json.loads(m)[1]["id"]
+    def recv(self):
+        a = self.answers.pop(0)
+        return _json.dumps([x if x != "ID" else self.sent for x in a])
+    def close(self):
+        pass
+
+
+def publish_with(*per_relay):
+    conns = iter(per_relay)
+    nostr_utils.websocket.create_connection = lambda relay, timeout=10: FakeWS(list(next(conns)))
+    return nostr_utils.publish_to_nostr("t", PrivateKey().bech32(), relays=[f"wss://r{i}.test" for i in range(len(per_relay))],
+                                        created_at=1795300000)
+
+
+check(publish_with([["OK", "ID", False, "blocked"]], [["NOTICE", "hi"], ["OK", "ID", True, ""]]) is not None,
+      "a NOTICE before the OK is read past; one acceptance is enough")
+check(publish_with([["OK", "ID", False, "blocked"]], [["OK", "ID", False, "rate-limited"]]) is None,
+      "OK carrying false from every relay is not published")
+check(publish_with([["OK", "someone-else", True, ""]] * 5) is None, "an OK for another event id does not count")
 
 if failures:
     print(f"\n{len(failures)} failure(s)")

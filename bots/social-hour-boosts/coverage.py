@@ -17,9 +17,12 @@ What differs from LB's copy, and why:
   * A boost made during a song can be filed under the SONG. A donor's app may
     tag its note with the remote item, and the indexer files a note by its
     tags, so a search under the show's guid alone would miss it and we would
-    claim a boost already counted. `scope["guids"]` is the show plus every song
-    feed in the episode, and a note naming either the episode or the song
-    playing is the same boost.
+    claim a boost already counted. `scope["guids"]` is the show plus the feed
+    of the song playing at THIS boost, never every song in the episode: an
+    artist's feed takes boosts from all over the network, and a wider search
+    is a longer page that can truncate (LB-back's review, 2026-11-22).
+  * A truncated answer is an unknown answer. An index page cap or a relay
+    limit that is reached raises or vetoes; it is never read as "nothing".
   * Episodes are compared by guid only. LB also compared "Ep N" read out of
     titles; Social Hour titles are not numbered that way, and a number read
     out of a song title would call one boost two.
@@ -42,6 +45,7 @@ _NO_MESSAGE = {"", "undefined"}
 HOLD_WINDOW_SEC = 1200
 HOLD_WINDOW_IDENTIFIED_SEC = 3600
 QUERY_PAD_SEC = 1800
+RELAY_LIMIT = 500
 PAGE_LIMIT = 100
 MAX_PAGES = 5
 _EVIDENCE_TOPIC_TAGS = {"boost", "boostagram", "value4value"}
@@ -97,6 +101,9 @@ def fetch_indexed(since_ts, guids, timeout=20, get=_get):
                 cursor = data.get("next_cursor")
                 if not cursor or not batch:
                     break
+            else:
+                raise CoverageUnavailable(
+                    f"{guid}: more than {MAX_PAGES * PAGE_LIMIT} boosts in the window — truncated")
     except (urllib.error.URLError, TimeoutError, ValueError, OSError) as e:
         raise CoverageUnavailable(str(e)) from e
     return records
@@ -115,7 +122,11 @@ def _record_item(r):
 
 def find_match(records, info, settled, scope, consumed=None):
     """(record, tier) for the indexed note that represents this payment, or
-    (None, None). Tiers strongest first: npub, sats+message, message, sats."""
+    (None, None). Tiers strongest first: npub, sats+message, message, sats.
+
+    `consumed` lives for one run. A later boost can take a record that belonged
+    to an earlier boost held this run; next run the held one may match it again
+    and skip too. That is a missed claim, the safe direction (LB-back)."""
     consumed = consumed if consumed is not None else set()
     npub = info.get("sender_npub")
     total_sats = info.get("total_sats") if info.get("amount_verified") else None
@@ -190,7 +201,7 @@ def relay_note_for(info, settled, scope, relays, query_relay):
     """A boost note for this payment already on the relays, or (None, None)."""
     filt = {"kinds": [1], "#i": [f"podcast:guid:{g}" for g in scope["guids"]],
             "since": int(settled - MATCH_WINDOW_SEC),
-            "until": int(settled + MATCH_WINDOW_SEC), "limit": 200}
+            "until": int(settled + MATCH_WINDOW_SEC), "limit": RELAY_LIMIT}
     npub_hex = info.get("sender_pubkey_hex")
     total_sats = info.get("total_sats") if info.get("amount_verified") else None
     message = info.get("message")
@@ -201,6 +212,9 @@ def relay_note_for(info, settled, scope, relays, query_relay):
             events = query_relay(relay, filt) or []
         except Exception:
             continue                      # a dead relay is not evidence of absence
+        if len(events) >= RELAY_LIMIT:
+            # The note we are looking for may be past the limit.
+            return {"id": "truncated"}, f"{relay} returned its limit of {RELAY_LIMIT}; cannot rule a note out"
         for ev in events:
             if own and ev.get("pubkey") == own:
                 continue

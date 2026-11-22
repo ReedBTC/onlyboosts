@@ -27,9 +27,11 @@ names from Podcast Index), `dry-run/`.
 
 - **The feed is the source of the splits**, not `splits-final.json`. The feed is
   what the listener's app paid against.
-- **A boost is the show's only when its boostagram names the show's
-  `podcast:guid`.** `onlyboosts@getalby.com` also receives site donations and song
-  splits, so the wallet alone does not establish it. A BOLT11 boost carries the
+- **A boost is the show's only when its boostagram positively names the show**
+  (its `podcast:guid`, its Podcast Index feed id, or its feed URL) **and nothing in
+  it names another feed.** Many keysend apps send a feed id and URL with no guid;
+  a title is never a signal. `onlyboosts@getalby.com` also receives site donations
+  and song splits, so the wallet alone does not establish it. A BOLT11 boost carries the
   boostagram behind its memo URL (`x-rss-payment`, the Helipad convention; Fountain
   serves it on every `?payment=` link, measured 2026-11-22). One without a readable
   descriptor is retried for 24 hours and then dropped, never published on a guess.
@@ -46,8 +48,20 @@ OnlyBoosts credits the song, as it does a song boosted off a playlist. That
 behaviour is the loop's order rather than a written rule; it should be made one in
 the collector before this bot goes live. `SONG_CREDIT = False` tags the show only.
 
-The duplicate check searches the show's guid **and every song feed in the
-episode**, because a donor's app may file its own note under the song.
+The duplicate check searches the show's guid **and the feed of the song playing at
+that boost**, because a donor's app may file its own note under the song. Not every
+song in the episode: an artist's feed takes boosts from everywhere, and a longer
+answer can truncate. **A truncated answer is an unknown one**: an index page cap or
+a relay limit that is reached means no claim.
+
+## Publishing
+
+A note is recorded as published only when a relay answered `OK` true for its id
+(`publish_to_nostr` in `../shared/nostr_utils.py` returns None otherwise, since
+2026-11-22). The signed note is saved to `state_pending.json` before it is sent,
+and one no relay accepted is re-sent next run with the same `created_at`: the
+same event id, so a relay that did take it the first time sees a duplicate, not
+a second note.
 
 ## Before Going Live
 

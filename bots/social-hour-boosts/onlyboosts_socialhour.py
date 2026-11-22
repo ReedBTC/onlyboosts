@@ -18,16 +18,20 @@ WHAT KEEPS IT CORRECT
     Social Hour wallet's app id counts, and an empty WALLET_APP_IDS publishes
     nothing. onlyboosts@getalby.com also receives site donations and song
     splits, so the wallet alone is not enough either:
-  * The feed gate. A boost is the show's only when its boostagram names the
-    show's podcast:guid, read from the published feed on every run. A BOLT11
-    boost whose descriptor cannot be read is never published on a guess.
+  * The feed gate. A boost is the show's only when its boostagram positively
+    names the show (its podcast:guid, its Podcast Index feed id, or its feed
+    URL) and nothing in it names another feed. Many keysend apps send a feed id
+    and URL but no guid. A BOLT11 boost whose descriptor cannot be read is
+    never published on a guess.
   * The amount check. The total an app reports is believed only when the sats
     that actually landed match the show's share of it at the moment played
     (100% while the hosts talk, 100 - remotePercentage during a song). An
     unverified total is never published as a claim; the note then states what
     the show received.
   * One note per boost. Dedupe on payment hash and on the boost's group id,
-    recorded after every publish.
+    recorded after every publish. A note is recorded as published only when a
+    relay accepted it; one no relay accepted is re-sent next run with the SAME
+    created_at, so it is the same event id and cannot become a second note.
 """
 import argparse
 import fcntl
@@ -60,6 +64,9 @@ NSEC_FIELD = "NSEC_SOCIAL_HOUR"          # Reed adds it; agents read the name on
 PUBLISHED_FILE = HERE / "state_published.json"
 LAST_SEEN_FILE = HERE / "last_seen.txt"
 SONGS_FILE = HERE / "state_songs.json"
+PENDING_FILE = HERE / "state_pending.json"     # signed-but-unconfirmed notes, by payment hash
+DEFERRED_FILE = HERE / "state_deferred.json"   # BOLT11 boosts waiting on a descriptor
+FEEDID_FILE = HERE / "state_feedid.json"
 LOCK_FILE = HERE / "socialhour.lock"
 DRY_RUN_DIR = HERE / "dry-run"
 
@@ -82,6 +89,7 @@ MAX_PAGES = 60
 # A BOLT11 boost whose descriptor will not load is retried this long, then
 # recorded as unrouted and never published.
 DESCRIPTOR_RETRY_SEC = 24 * 3600
+DESCRIPTOR_BACKOFF_SEC = 1800
 AMOUNT_TOLERANCE_MSAT = 2000             # per-leg rounding, observed in Fountain legs
 AMOUNT_TOLERANCE_FRAC = 0.05
 PI_BASE = "https://api.podcastindex.org/api/1.0"
@@ -177,6 +185,53 @@ def _valid_npub(npub):
     return npub if npub and npub_to_hex(npub) else None
 
 
+def _norm_url(u):
+    u = (u or "").strip().lower()
+    u = re.sub(r"^https?://", "", u)
+    return u.rstrip("/")
+
+
+def feed_verdict(b, feed):
+    """("ours" | "other", why). Each signal the boostagram carries either names
+    the show or contradicts it; one contradiction is decisive, and at least one
+    positive signal is required. A title is never a signal: two shows can share
+    one. `feed["pi_id"]` is None until Podcast Index knows the show, and then a
+    feed id can neither confirm nor contradict."""
+    checks = []
+    if b["feed_guid"]:
+        checks.append(("guid", b["feed_guid"] == feed["guid"], b["feed_guid"]))
+    if b["feed_id"] and feed.get("pi_id"):
+        checks.append(("feed id", str(b["feed_id"]) == str(feed["pi_id"]), b["feed_id"]))
+    if b["feed_url"]:
+        checks.append(("feed url", _norm_url(b["feed_url"]) == _norm_url(FEED_URL), b["feed_url"]))
+    bad = [c for c in checks if not c[1]]
+    if bad:
+        return "other", "boostagram names another feed (" + ", ".join(f"{n} {v}" for n, _, v in bad) + ")"
+    if not checks:
+        return "other", (f"boostagram carries no guid, usable feed id or url "
+                         f"(feed id {b['feed_id'] or '-'}, title {b['feed_title'] or '-'})")
+    return "ours", "names the show by " + ", ".join(n for n, _, _ in checks)
+
+
+def show_pi_id(feed, config):
+    """The show's Podcast Index feed id, cached once found; None until PI has it."""
+    cached = load_json(FEEDID_FILE, {})
+    if cached.get(feed["guid"]):
+        return cached[feed["guid"]]
+    try:
+        fid = ((_pi_get("podcasts/byguid", {"guid": feed["guid"]}, config) or {}).get("feed") or {}).get("id")
+    except Exception as e:
+        log(f"[warn] Podcast Index feed id lookup failed: {e}")
+        return None
+    if fid:
+        cached[feed["guid"]] = fid
+        save_json(FEEDID_FILE, cached)
+    return fid
+
+
+DEFERRED = {}    # payment hash -> next time to ask for its descriptor (loaded in main)
+
+
 def classify(tx, feed, now):
     """("boost", info) | ("defer", why) | ("unrouted", why) | (None, None) not a boost."""
     desc = tx.get("description") or ""
@@ -185,8 +240,10 @@ def classify(tx, feed, now):
     if memo:
         if memo["action"] != "boost":
             return None, None                         # streams are not published
-        raw = boostagram.fetch_descriptor(memo["url"])
+        raw = None if DEFERRED.get(ph, 0) > now else boostagram.fetch_descriptor(memo["url"])
         if raw is None:
+            if DEFERRED.get(ph, 0) <= now:
+                DEFERRED[ph] = now + DESCRIPTOR_BACKOFF_SEC
             age = _age(tx.get("settledAt"), now)
             if age is not None and age < DESCRIPTOR_RETRY_SEC:
                 return "defer", f"boost URL {memo['url'][:60]} returned no x-rss-payment header"
@@ -201,9 +258,9 @@ def classify(tx, feed, now):
     if b["action"] and b["action"] != "boost":
         return None, None
 
-    if not feed["guid"] or b["feed_guid"] != feed["guid"]:
-        return "unrouted", (f"boostagram names feed {b['feed_guid'] or b['feed_title'] or '?'}, "
-                            f"not the Social Hour ({feed['guid']})")
+    verdict, why = feed_verdict(b, feed)
+    if verdict != "ours":
+        return "unrouted", why
 
     item = feed["items"].get(b["item_guid"]) if b["item_guid"] else None
     split = None
@@ -366,7 +423,9 @@ def main():
     if not feed["guid"]:
         log("[abort] the feed carries no podcast:guid — publishing nothing")
         return 1
-    log(f"{'DRY-RUN — ' if dry else ''}{feed['title']} ({feed['guid']}), "
+    feed["pi_id"] = show_pi_id(feed, config)
+    DEFERRED.update(load_json(DEFERRED_FILE, {}))
+    log(f"{'DRY-RUN — ' if dry else ''}{feed['title']} ({feed['guid']}, PI {feed['pi_id'] or 'not indexed'}), "
         f"{len(feed['items'])} episode(s), wallet app(s) {sorted(app_ids)}")
 
     published = load_json(PUBLISHED_FILE, {})
@@ -412,19 +471,29 @@ def main():
             log(f"[{kind}] {ph}... {info}")
         boosts.append((tx, kind, info))
 
-    scope_guids = [feed["guid"]]
-    for item in feed["items"].values():
-        for g in feedmod.song_guids(item):
-            if g not in scope_guids:
-                scope_guids.append(g)
-    scope = {"guids": scope_guids, "show_pubkey": show_pubkey}
+    # One index query per guid per run, shared by every boost that needs it.
+    # Each boost is scoped to the show plus the song playing at that boost.
     oldest = boostagram.settled_ts(cands[0].get("settledAt")) or now
-    try:
-        indexed = coverage.fetch_indexed(oldest - coverage.QUERY_PAD_SEC, scope_guids)
-        log(f"[coverage] {len(indexed)} indexed boost(s) across {len(scope_guids)} guid(s)")
-    except coverage.CoverageUnavailable as e:
-        indexed = None
-        log(f"[coverage] OnlyBoosts unreachable ({e}) — nothing is claimed this run")
+    by_guid = {}
+
+    def indexed_for(guids):
+        out, seen = [], set()
+        for g in guids:
+            if g not in by_guid:
+                try:
+                    by_guid[g] = coverage.fetch_indexed(oldest - coverage.QUERY_PAD_SEC, [g])
+                except coverage.CoverageUnavailable as e:
+                    by_guid[g] = None
+                    log(f"[coverage] {g}: {e} — boosts that need it are not claimed this run")
+            if by_guid[g] is None:
+                return None
+            for r in by_guid[g]:
+                if r.get("id") not in seen:
+                    seen.add(r.get("id"))
+                    out.append(r)
+        return out
+
+    pending = load_json(PENDING_FILE, {})
 
     consumed, newest, blocked = set(), last_seen, False
     for tx, kind, info in boosts:
@@ -447,7 +516,10 @@ def main():
                 newest = settled
             continue
 
-        decision, why = coverage.decide(info, indexed, now, scope, consumed)
+        split = info["split"] or {}
+        scope = {"guids": [feed["guid"]] + ([split["feed_guid"]] if split.get("feed_guid") else []),
+                 "show_pubkey": show_pubkey}
+        decision, why = coverage.decide(info, indexed_for(scope["guids"]), now, scope, consumed)
         if decision == "hold":
             log(f"[hold] {ph[:12]}... — {why}")
             blocked = True
@@ -465,16 +537,27 @@ def main():
         log(f"  [{info['channel']} | {ph[:16]}... | amount: {info['amount_why']}]")
         log(f"  [decision: {decision} — {why}]")
 
+        if ph in pending:
+            # Signed and sent before, accepted by no relay we heard from. Send the
+            # identical event: same text, tags and created_at, so the same id.
+            text, tags, created_at = pending[ph]["text"], pending[ph]["tags"], pending[ph]["created_at"]
+            log(f"  [resend] {ph[:12]}... as first signed (created_at {created_at})")
+        else:
+            created_at = int(time.time())
         if dry:
             log(f"  [dry-run] → {write_preview(text, tags, show_pubkey, ph[:12])}")
             if info["group"]:
                 groups[info["group"]] = ph        # in memory only: a dry run records nothing
         else:
-            event_id = publish_to_nostr(text, nsec, extra_tags=tags)
+            pending[ph] = {"text": text, "tags": tags, "created_at": created_at}
+            save_json(PENDING_FILE, pending)               # before the send, not after
+            event_id = publish_to_nostr(text, nsec, extra_tags=tags, created_at=created_at)
             if not event_id:
-                log(f"  [error] publish failed for {ph[:12]}...; retrying next run")
+                log(f"  [error] no relay accepted {ph[:12]}...; the same event is re-sent next run")
                 blocked = True
                 continue
+            pending.pop(ph, None)
+            save_json(PENDING_FILE, pending)
             published[ph] = {"event_id": event_id, "settled_at": settled,
                              "group": info["group"], "decision": decision}
             if info["group"]:
@@ -484,6 +567,8 @@ def main():
             newest = settled
 
     save_json(SONGS_FILE, songs)
+    if not dry:
+        save_json(DEFERRED_FILE, {k: v for k, v in DEFERRED.items() if k not in published})
     if not dry and newest and newest != last_seen:
         LAST_SEEN_FILE.write_text(newest)
         log(f"last_seen → {newest}")

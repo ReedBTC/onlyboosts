@@ -465,18 +465,31 @@ def publish_to_nostr(note_text, nsec, reply_to_event_id=None, relays=None, extra
 
         msg = json.dumps(["EVENT", event])
 
+        # Accepted means an ["OK", <this id>, true, ...] for THIS event. A relay
+        # may answer with a NOTICE or AUTH first, and an OK can carry false (a
+        # rejection), so neither the first message nor the word OK is enough.
+        # Returns None when no relay accepted: the caller must not record the
+        # note as published (LB-back's review, 2026-11-22).
+        accepted = 0
         for relay in relays:
             try:
                 ws = websocket.create_connection(relay, timeout=10)
                 ws.send(msg)
-                result = ws.recv()
+                ok, why = False, "no OK"
+                for _ in range(5):
+                    parsed = json.loads(ws.recv())
+                    if parsed and parsed[0] == "OK" and len(parsed) >= 3 and parsed[1] == event_id:
+                        ok, why = parsed[2] is True, (parsed[3] if len(parsed) > 3 else "")
+                        break
                 ws.close()
-                parsed = json.loads(result)
-                status = "✓" if parsed[0] == "OK" else "✗"
-                print(f"    {status} {relay.split('/')[2]}")
+                accepted += ok
+                print(f"    {'✓' if ok else '✗'} {relay.split('/')[2]}{'' if ok else f': {why}'}")
             except Exception as e:
                 print(f"    ✗ {relay.split('/')[2]}: {e}")
 
+        if not accepted:
+            print(f"  [error] no relay accepted {event_id[:12]}...")
+            return None
         return event_id
 
     except Exception as e:
