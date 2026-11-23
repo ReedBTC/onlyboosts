@@ -26,11 +26,11 @@
  * episode or song), which read the show off the slide's own data attributes
  * exactly as they read a card's. Those attribute names are their contract.
  */
-import { coverChain } from './cover-art.js?v=ob-v291'
-import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v291'
-import { boosterPageHref } from './booster-link.js?v=ob-v291'
-import { episodeBoostLink } from './episode-link.js?v=ob-v291'
-import { statsLine, rankTripletHtml } from './rail-tile.js?v=ob-v291'
+import { coverChain } from './cover-art.js?v=ob-v293'
+import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v293'
+import { boosterPageHref } from './booster-link.js?v=ob-v293'
+import { episodeBoostLink } from './episode-link.js?v=ob-v293'
+import { statsLine, rankTripletHtml } from './rail-tile.js?v=ob-v293'
 
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => (
@@ -51,7 +51,7 @@ export const EYEBROWS = {
   'artists-week': '#1 Artist This Week',
   'new-shows': 'New and Noteworthy Podcast',
   'new-music': 'New and Noteworthy Music',
-  'movers': 'Biggest Climber This Week',
+  'movers': 'Biggest Climber of the Last Week',
   'podroll': 'Most Recommended by Podcasters',
 }
 

@@ -29,15 +29,15 @@
  *    sats this week") instead of following the tile's link. One note at a
  *    time; a click elsewhere, Escape or a scroll closes it.
  */
-import { railListHtml, showTile, albumTile, episodeTile, artistTile, chartSongTile, latestTile, memberTile, langRailHtml, bare } from '/assets/js/rail-tile.js?v=ob-v291'
-import { CARROT, carrotState, HOOKS } from '/assets/js/recommend-rails.js?v=ob-v291'
-import { heroHtml, slideHtml, showSlide, episodeSlide, memberSlide } from '/assets/js/hero.js?v=ob-v291'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v291'
-import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v291'
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v291'
-import { npubEncode } from '/assets/js/mention-search.js?v=ob-v291'
-import { becauseVerb } from '/assets/js/recommend-rails.js?v=ob-v291'
-import { languageName } from '/assets/js/lang-name.js?v=ob-v291'
+import { railListHtml, showTile, albumTile, episodeTile, artistTile, chartSongTile, latestTile, memberTile, langRailHtml, bare } from '/assets/js/rail-tile.js?v=ob-v293'
+import { CARROT, carrotState, HOOKS } from '/assets/js/recommend-rails.js?v=ob-v293'
+import { heroHtml, slideHtml, showSlide, episodeSlide, memberSlide } from '/assets/js/hero.js?v=ob-v293'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v293'
+import { resolveFollows } from '/assets/js/follow-set.js?v=ob-v293'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v293'
+import { npubEncode } from '/assets/js/mention-search.js?v=ob-v293'
+import { becauseVerb } from '/assets/js/recommend-rails.js?v=ob-v293'
+import { languageName } from '/assets/js/lang-name.js?v=ob-v293'
 
 const TILES = 10
 
@@ -196,11 +196,11 @@ function wireHeroBoost(hero) {
     try {
       const kind = slide.dataset.kind
       if (kind === 'episode' || kind === 'song') {
-        const m = await import('/assets/js/episode-card-actions.js?v=ob-v291')
+        const m = await import('/assets/js/episode-card-actions.js?v=ob-v293')
         btn.disabled = false
         await m.onBoostClick(slide, btn)
       } else {
-        const m = await import('/assets/js/show-card-actions.js?v=ob-v291')
+        const m = await import('/assets/js/show-card-actions.js?v=ob-v293')
         btn.disabled = false
         await m.onShowBoost(slide, btn)
       }
@@ -678,7 +678,7 @@ window.addEventListener('ob:favorites-read', onFavoritesRead)
    early click or an early paint never finds window.OBFavorites missing. The
    same module URL, so the same instance. */
 async function favoritesApi() {
-  try { await import('/assets/js/favorites-ui.js?v=ob-v291') } catch {}
+  try { await import('/assets/js/favorites-ui.js?v=ob-v293') } catch {}
   return window.OBFavorites || null
 }
 
@@ -723,9 +723,9 @@ const WINDOW = {
 }
 function railScope(key, el) {
   /* Movers' hero slide prints the show's place on this week's chart. */
-  const chart = { 'chart-shows': 'podcast', 'chart-songs': 'song', 'chart-artists': 'artist', movers: 'podcast' }[key]
+  const chart = { 'chart-shows': 'podcast', 'chart-songs': 'song', 'chart-artists': 'artist' }[key]
   if (chart) return { noun: chart, when: 'this week', span: 'since Monday, US Pacific time' }
-  if (key === 'shows-week' || key === 'songs-week') return { noun: key === 'shows-week' ? 'podcast' : 'song', when: 'in the last week', span: 'the last 7 days' }
+  if (key === 'shows-week' || key === 'songs-week' || key === 'movers') return { noun: key === 'songs-week' ? 'song' : 'podcast', when: 'in the last week', span: 'the last 7 days' }
   if (/^lang-\d$/.test(key)) {
     const lang = document.querySelector(`[data-rail="${key}"] h2[data-lang]`)?.dataset.lang
     return { noun: `${lang ? languageName(lang) + ' ' : ''}podcast`, when: WINDOW.year[0], span: WINDOW.year[1] }

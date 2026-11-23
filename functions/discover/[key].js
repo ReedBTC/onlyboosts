@@ -67,15 +67,15 @@ export const PAGES = {
     }),
   },
   "movers": {
-    title: "Podcast Movers This Week",
-    lead: "This week's Shows chart against last week's, to 100 places: the biggest climbs first, then the shows that are on the chart this week and were not last week. The rank is the show's place on this week's chart.",
+    title: "Podcast Movers of the Last Week",
+    lead: "The last 7 days' Shows chart against the 7 days before them, to 100 places: the biggest climbs first, then the shows in the top 100 of the last 7 days that were not in the 7 days before. The rank is the show's place over the last 7 days.",
     rows: (env) => moversRows(env, 100),
     cards: ({ picks, was }) => ({
       records: picks.map(({ r }) => record(r)),
       rankOf: (s, i) => rankLabel(picks[i].r.rank, !!picks[i].r.tied),
       noteOf: (s, i) => picks[i].climb != null
-        ? `Up ${picks[i].climb} place${picks[i].climb === 1 ? "" : "s"} · #${was.get(picks[i].r.guid)} last week`
-        : "New on the chart this week",
+        ? `Up ${picks[i].climb} place${picks[i].climb === 1 ? "" : "s"} · now #${picks[i].r.rank}`
+        : "New entry in the last 7 days",
     }),
   },
   "podroll": {
