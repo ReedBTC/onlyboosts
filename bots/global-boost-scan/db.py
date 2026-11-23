@@ -1845,7 +1845,8 @@ def split_credit_candidates(conn, retry_before):
     prefilter (70ms over the whole table, measured 2026-11-23); split_credit
     counts distinct guids itself."""
     return conn.execute(
-        f"""SELECT b.event_id, b.sats, b.raw_json,
+        f"""SELECT b.event_id, b.sats, b.raw_json, b.item_guid,
+                   {effective_guid('b')} AS credited_guid,
                    c.pct AS had_pct, c.method AS had_method
             FROM boosts b
             LEFT JOIN boost_credits c ON c.event_id = b.event_id AND c.role = 'host'

@@ -300,6 +300,14 @@ def credit_splits(conn, log=print, fetch=None, dry_run=False, now=None):
                 decided[r["event_id"]] = place(idx, feeds, items, shows, sorted(more))
     for r in rows:
         p, why = decided[r["event_id"]]
+        if p and r["credited_guid"]:
+            # The side the boosts row already credits keeps the feed it is counted
+            # under today. One song can sit on two feed rows (a single listed
+            # twice), and a credit naming the other would move its page's only
+            # boost off it.
+            for side in ("track", "host"):
+                if p[f"{side}_item"] == r["item_guid"]:
+                    p[f"{side}_feed"] = r["credited_guid"]
         if p and any(x in idx.excluded for x in
                      (p["host_feed"], p["host_item"], p["track_feed"], p["track_item"])):
             p, why = None, "excluded"
