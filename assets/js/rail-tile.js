@@ -11,11 +11,11 @@
  * rewrites the version), no clock reads, no unpinned locale, nothing from the
  * DOM. Verbs (the artwork fallback walk) are attached by discover.js.
  */
-import { coverChain } from './cover-art.js?v=ob-v290'
-import { rankLabel } from './rank.js?v=ob-v290'
-import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v290'
-import { boosterPageHref } from './booster-link.js?v=ob-v290'
-import { languageName } from './lang-name.js?v=ob-v290'
+import { coverChain } from './cover-art.js?v=ob-v291'
+import { rankLabel } from './rank.js?v=ob-v291'
+import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v291'
+import { boosterPageHref } from './booster-link.js?v=ob-v291'
+import { languageName } from './lang-name.js?v=ob-v291'
 
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => (
@@ -199,6 +199,12 @@ export function episodeTile(r, i, glyph = '🎙') {
     ...subOf(r, r.show?.title || statsLine({ boosters: r.boosters, sats: r.sats })),
     img: r.img || r.show?.img, art2: r.show?.art2, glyph,
   })
+}
+/** A song row off the weekly chart (functions/_shared/week-charts.js: the
+ *  episode level, so `guid` is the item guid, `p_title` the album and
+ *  `p_image` its cover) as the episode tile, the triplet carried over. */
+export function chartSongTile(r, i) {
+  return episodeTile({ ...r, img: r.image || r.p_image, show: { title: r.p_title, img: r.p_image, art2: r.artwork } }, i, '🎵')
 }
 /** An episode of a followed podcast, for Latest From Podcasts You Follow
  *  (2026-11-08): no place applies, so the show's name sits under the title.

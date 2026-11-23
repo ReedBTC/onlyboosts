@@ -71,14 +71,14 @@
   <meta name="twitter:card" content="summary_large_image" />
 
   <link rel="preload" href="/assets/fonts/outfit.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v290" />
-  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v290" />
+  <link rel="stylesheet" href="/assets/css/nav.css?v=ob-v291" />
+  <link rel="stylesheet" href="/assets/css/footer.css?v=ob-v291" />
   <!-- The boost rows at the foot are the detail pages' rows and wear their
        sheets: the card, the thread chrome and the reaction bar. -->
-  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v290" />
+  <link rel="stylesheet" href="/assets/css/discover.css?v=ob-v291" />
   <!-- theme.css last among the shared sheets: the palette, the fonts, and
        the base body/a/img rules every shared stylesheet reads off :root. -->
-  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v290" />
+  <link rel="stylesheet" href="/assets/css/theme.css?v=ob-v291" />
 </head>
 <body>
 
@@ -408,7 +408,11 @@
      page; Top Artists This Week came off ("we got a lot of stuff here").
      Since 2026-10-22 three language rails sit between Podcasters Recommend
      and the Because rails, and the foot is the window rails: episodes,
-     songs, albums and shows over the week, the month and the year. -->
+     songs, albums and shows over the week, the month and the year. Since
+     2026-11-23 (Reed's order) the page opens on the last 7 days' podcasts
+     and songs, then the three weekly charts and #40HPW; Top Albums This
+     Month sits above New and Noteworthy, and Top Songs This Week moved up
+     to be the second rail. -->
 <main class="discover" id="discover">
 
   <!-- THE FEATURED CAROUSEL (Reed's call, 2026-10-19): one slide per generic
@@ -420,18 +424,42 @@
 
   <section class="rail" data-rail="shows-week" aria-labelledby="rail-shows-week">
     <div class="rail-head">
-      <h2 id="rail-shows-week"><a href="/charts/podcasts">Top Podcasts This Week</a></h2>
-      <a class="rail-more" href="/charts/podcasts">View the chart →</a>
+      <h2 id="rail-shows-week"><a href="/podcasts/shows?range=1w">Top Podcasts of the Last Week</a></h2>
+      <a class="rail-more" href="/podcasts/shows?range=1w">View the chart →</a>
     </div>
-    <div class="rail-track"><!--OB:RAIL:shows-week--><p class="rail-placeholder">Loading this week's chart…</p><!--/OB:RAIL:shows-week--></div>
+    <div class="rail-track"><!--OB:RAIL:shows-week--><p class="rail-placeholder">Loading the last week's podcasts…</p><!--/OB:RAIL:shows-week--></div>
   </section>
 
-  <section class="rail" data-rail="albums-month" aria-labelledby="rail-albums-month">
+  <section class="rail" data-rail="songs-week" aria-labelledby="rail-songs-week">
     <div class="rail-head">
-      <h2 id="rail-albums-month"><a href="/music/albums?range=1m">Top Albums This Month</a></h2>
-      <a class="rail-more" href="/music/albums?range=1m">View the chart →</a>
+      <h2 id="rail-songs-week"><a href="/music/songs?range=1w">Top Songs of the Last Week</a></h2>
+      <a class="rail-more" href="/music/songs?range=1w">View the chart →</a>
     </div>
-    <div class="rail-track"><!--OB:RAIL:albums-month--><p class="rail-placeholder">Loading this month's albums…</p><!--/OB:RAIL:albums-month--></div>
+    <div class="rail-track"><!--OB:RAIL:songs-week--><p class="rail-placeholder">Loading the last week's songs…</p><!--/OB:RAIL:songs-week--></div>
+  </section>
+
+  <section class="rail" data-rail="chart-shows" aria-labelledby="rail-chart-shows">
+    <div class="rail-head">
+      <h2 id="rail-chart-shows"><a href="/charts#podcasts">OnlyBoosts Weekly Podcast Chart</a></h2>
+      <a class="rail-more" href="/charts#podcasts">See the weekly charts →</a>
+    </div>
+    <div class="rail-track"><!--OB:RAIL:chart-shows--><p class="rail-placeholder">Loading this week's chart…</p><!--/OB:RAIL:chart-shows--></div>
+  </section>
+
+  <section class="rail" data-rail="chart-songs" aria-labelledby="rail-chart-songs">
+    <div class="rail-head">
+      <h2 id="rail-chart-songs"><a href="/charts#songs">OnlyBoosts Weekly Song Chart</a></h2>
+      <a class="rail-more" href="/charts#songs">See the weekly charts →</a>
+    </div>
+    <div class="rail-track"><!--OB:RAIL:chart-songs--><p class="rail-placeholder">Loading this week's chart…</p><!--/OB:RAIL:chart-songs--></div>
+  </section>
+
+  <section class="rail" data-rail="chart-artists" aria-labelledby="rail-chart-artists">
+    <div class="rail-head">
+      <h2 id="rail-chart-artists"><a href="/charts#artists">OnlyBoosts Weekly Artist Chart</a></h2>
+      <a class="rail-more" href="/charts#artists">See the weekly charts →</a>
+    </div>
+    <div class="rail-track"><!--OB:RAIL:chart-artists--><p class="rail-placeholder">Loading this week's chart…</p><!--/OB:RAIL:chart-artists--></div>
   </section>
 
   <section class="rail" data-rail="hpw-week" aria-labelledby="rail-hpw-week">
@@ -630,6 +658,14 @@
     </div>
   </section>
 
+  <section class="rail" data-rail="albums-month" aria-labelledby="rail-albums-month">
+    <div class="rail-head">
+      <h2 id="rail-albums-month"><a href="/music/albums?range=1m">Top Albums This Month</a></h2>
+      <a class="rail-more" href="/music/albums?range=1m">View the chart →</a>
+    </div>
+    <div class="rail-track"><!--OB:RAIL:albums-month--><p class="rail-placeholder">Loading this month's albums…</p><!--/OB:RAIL:albums-month--></div>
+  </section>
+
   <section class="rail" data-rail="new-shows" aria-labelledby="rail-new-shows">
     <div class="rail-head">
       <h2 id="rail-new-shows"><a href="/discover/new-shows">New and Noteworthy Podcasts</a></h2>
@@ -732,14 +768,6 @@
       <a class="rail-more" href="/podcasts/shows?range=1y">View the chart →</a>
     </div>
     <div class="rail-track"><!--OB:RAIL:shows-year--><p class="rail-placeholder">Loading this year's shows…</p><!--/OB:RAIL:shows-year--></div>
-  </section>
-
-  <section class="rail" data-rail="songs-week" aria-labelledby="rail-songs-week">
-    <div class="rail-head">
-      <h2 id="rail-songs-week"><a href="/music/songs?range=1w">Top Songs This Week</a></h2>
-      <a class="rail-more" href="/music/songs?range=1w">View the chart →</a>
-    </div>
-    <div class="rail-track"><!--OB:RAIL:songs-week--><p class="rail-placeholder">Loading this week's songs…</p><!--/OB:RAIL:songs-week--></div>
   </section>
 
   <section class="rail" data-rail="songs-month" aria-labelledby="rail-songs-month">
@@ -850,12 +878,12 @@
 <!-- FOOTER:END -->
 
 <!-- Lazy widget bootstrap (Donate + identity slot) -->
-<script src="/assets/js/nav-widget-boot.js?v=ob-v290"></script>
-<script src="/assets/js/sw-register.js?v=ob-v290" defer></script>
-<script src="/assets/widgets/pwa-install.js?v=ob-v290" defer></script>
-<script src="/assets/js/nav.js?v=ob-v290" defer></script>
+<script src="/assets/js/nav-widget-boot.js?v=ob-v291"></script>
+<script src="/assets/js/sw-register.js?v=ob-v291" defer></script>
+<script src="/assets/widgets/pwa-install.js?v=ob-v291" defer></script>
+<script src="/assets/js/nav.js?v=ob-v291" defer></script>
 <!-- The verbs: artwork fallback, the rails the edge could not fill, and the
      personal rails for a signed-in member. -->
-<script type="module" src="/assets/js/discover.js?v=ob-v290"></script>
+<script type="module" src="/assets/js/discover.js?v=ob-v291"></script>
 </body>
 </html>
