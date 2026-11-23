@@ -1,9 +1,9 @@
 // GET / — THE DISCOVERY HOMEPAGE, its fact rails rendered at the edge.
 //
 // Since 2026-10-17 (Reed's call, the Rotten Tomatoes model): the front door
-// is a page of rails — this week's top shows, this month's top albums, the
-// #40HPW week, then the personal rails, then the year's episodes and songs
-// and the week's artists. The feed experience that was `/` is `/charts` now
+// is a page of rails. Since 2026-11-23 it opens on the last 7 days' top
+// podcasts and songs, then the three weekly charts (podcasts, songs,
+// artists) and the #40HPW week, then the personal rails. The feed experience that was `/` is `/charts` now
 // (functions/_shared/charts-page.js) and every hash it had forwards there.
 //
 // ⚠️ THE PAGE IS STILL index.html. This Function does not build a homepage;
@@ -60,7 +60,7 @@ import { pacificWeekStart, prevWeek, nextWeek } from "../assets/js/pacific-week.
 import { readParams as podcastParams, globalPodcasts } from "./api/v1/podcasts.js";
 import { readParams as episodeParams, globalEpisodes } from "./api/v1/episodes.js";
 import { hoursBoard } from "./api/v1/members/hours.js";
-import { railListHtml, tileHtml, showTile, albumTile, episodeTile, memberTile, langRailHtml } from "../assets/js/rail-tile.js";
+import { railListHtml, tileHtml, showTile, albumTile, episodeTile, artistTile, chartSongTile, memberTile, langRailHtml } from "../assets/js/rail-tile.js";
 import { languageName } from "../assets/js/lang-name.js";
 import { showPageHref } from "../assets/js/show-link.js";
 import { heroHtml, showSlide, episodeSlide, memberSlide, EYEBROWS } from "../assets/js/hero.js";
@@ -271,12 +271,36 @@ async function langRail(env, ctx, n) {
   return rail(langRailHtml(n, one.lang, one.rows), lead);
 }
 
+/* ── The weekly chart rails: the Pacific week's Top 10, the boards /charts
+   shows, no hero slide (the two last-week rails above them lead it). ──── */
+const CHART_RAILS = {
+  "chart-shows":   { kind: "shows",   tile: showTile,      empty: "No podcasts boosted yet this week." },
+  "chart-songs":   { kind: "songs",   tile: chartSongTile, empty: "No songs boosted yet this week." },
+  "chart-artists": { kind: "artists", tile: artistTile,    empty: "No artists boosted yet this week." },
+};
+async function chartRail(env, key) {
+  const c = CHART_RAILS[key];
+  const { body } = await weekBoard(env, { kind: c.kind, limit: TILES });
+  return rail(railListHtml(body.rows.map(c.tile), { empty: c.empty }), null);
+}
+
 export const RAILS = {
+  /* THE FIRST TWO RAILS ARE THE LAST 7 DAYS, not the Pacific week (Reed's
+     call, 2026-11-23): on a Monday morning the week's chart has two rows or
+     none, and the page should not open on an empty rail. */
   "shows-week": async (env) => {
-    const { body } = await weekBoard(env, { kind: "shows", limit: TILES });
-    return rail(railListHtml(body.rows.map(showTile), { empty: "No shows boosted yet this week." }),
-      body.rows[0] && showSlide("shows-week", body.rows[0], { medium: "podcast" }));
+    const rows = await rankedPodcasts(env, `not_medium=music&sort=chart&range=1w&limit=${TILES}`);
+    return rail(railListHtml(rows.map(showTile), { empty: "No podcasts boosted in the last week." }),
+      rows[0] && showSlide("shows-week", rows[0], { medium: "podcast" }));
   },
+  "songs-week": async (env) => {
+    const rows = await rankedEpisodes(env, `medium=music&sort=chart&range=1w&limit=${TILES}`);
+    return rail(railListHtml(rows.map((r, i) => episodeTile(r, i, "🎵")), { empty: "No songs boosted in the last week." }),
+      rows[0] && episodeSlide("songs-week", rows[0]));
+  },
+  "chart-shows":   (env) => chartRail(env, "chart-shows"),
+  "chart-songs":   (env) => chartRail(env, "chart-songs"),
+  "chart-artists": (env) => chartRail(env, "chart-artists"),
   "albums-month": async (env) => {
     const rows = await rankedPodcasts(env, `medium=music&sort=chart&range=1m&limit=${TILES}`);
     return rail(railListHtml(rows.map(albumTile), { empty: "No albums boosted yet this month." }),
@@ -302,7 +326,6 @@ export const RAILS = {
   /* The rest of the window rails: no hero slide (see the header). */
   "episodes-week":  (env) => windowRail(env, "episodes", "1w"),
   "episodes-month": (env) => windowRail(env, "episodes", "1m"),
-  "songs-week":     (env) => windowRail(env, "songs", "1w"),
   "songs-month":    (env) => windowRail(env, "songs", "1m"),
   "albums-week":    (env) => windowRail(env, "albums", "1w"),
   "albums-year":    (env) => windowRail(env, "albums", "1y"),

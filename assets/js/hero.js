@@ -26,11 +26,11 @@
  * episode or song), which read the show off the slide's own data attributes
  * exactly as they read a card's. Those attribute names are their contract.
  */
-import { coverChain } from './cover-art.js?v=ob-v290'
-import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v290'
-import { boosterPageHref } from './booster-link.js?v=ob-v290'
-import { episodeBoostLink } from './episode-link.js?v=ob-v290'
-import { statsLine, rankTripletHtml } from './rail-tile.js?v=ob-v290'
+import { coverChain } from './cover-art.js?v=ob-v291'
+import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v291'
+import { boosterPageHref } from './booster-link.js?v=ob-v291'
+import { episodeBoostLink } from './episode-link.js?v=ob-v291'
+import { statsLine, rankTripletHtml } from './rail-tile.js?v=ob-v291'
 
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => (
@@ -42,7 +42,8 @@ function attr(name, v) { return v ? ` ${name}="${esc(v)}"` : '' }
 /** The eyebrow over each slide: the rail's rule in five words. Keyed by the
  *  rail so the edge and the browser print the same line for the same rail. */
 export const EYEBROWS = {
-  'shows-week': '#1 Podcast This Week',
+  'shows-week': '#1 Podcast of the Last Week',
+  'songs-week': '#1 Song of the Last Week',
   'albums-month': '#1 Album This Month',
   'hpw-week': 'Leading the #40HPW Challenge This Week',
   'episodes-year': '#1 Episode This Year',

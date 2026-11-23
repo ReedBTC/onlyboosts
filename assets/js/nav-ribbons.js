@@ -21,9 +21,9 @@
  * links is the cards' rule (show-link.js, booster-link.js), so a row the
  * rule declines is printed without a link rather than with a dead one.
  */
-import { showPageHref, episodePageHref } from '/assets/js/show-link.js?v=ob-v290'
-import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v290'
-import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v290'
+import { showPageHref, episodePageHref } from '/assets/js/show-link.js?v=ob-v291'
+import { boosterPageHref } from '/assets/js/booster-link.js?v=ob-v291'
+import { coverChain, wireCoverFallback } from '/assets/js/cover-art.js?v=ob-v291'
 
 const HOVER_OPEN_MS = 120
 const HOVER_CLOSE_MS = 220

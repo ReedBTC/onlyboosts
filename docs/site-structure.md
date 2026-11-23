@@ -132,6 +132,15 @@ named Charts).
 Rotten Tomatoes: "the PC 2.0 version of those sites"). The mockup canvas it
 was picked from is in the session memory; direction A won, with the sans.
 
+- **THE HEAD SINCE 2026-11-23 (Reed's order)**: Top Podcasts of the Last
+  Week (`shows-week`, trailing 7 days, no longer the Pacific week) and Top
+  Songs of the Last Week (`songs-week`, moved up from the foot), both
+  leading a hero slide; then the three weekly charts, `chart-shows`,
+  `chart-songs`, `chart-artists` ("OnlyBoosts Weekly Podcast Chart" and so
+  on, the `/charts` boards, no slide), then #40HPW. The reason: on a Monday
+  morning the Pacific week has two rows or none, and the page must not open
+  on an empty rail. Top Albums This Month moved down to sit above New and
+  Noteworthy. The paragraph below is the order before that change.
 - **⚠️ THE RAIL ORDER IS REED'S AND NOTHING A SIGNED-OUT VISITOR CANNOT SEE
   COMES BEFORE THE FOURTH RAIL.** Top Shows This Week, Top Albums This
   Month, the #40HPW week, THEN Podcasts Recommended For You, Music
