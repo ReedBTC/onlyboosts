@@ -352,15 +352,15 @@ export const RAILS = {
     const top = picks[0];
     return rail(railListHtml(picks.map(({ r, climb }) => tileHtml({
       rank: r.rank, tied: !!r.tied, href: showPageHref(r.guid), title: r.title,
-      sub: climb != null ? `▲ ${climb} · was #${was.get(r.guid)}` : "New entry",
-      subTitle: climb != null ? "Places climbed since the 7 days before" : "Not in the top 100 of the 7 days before",
+      sub: climb != null ? `▲ ${climb} · now #${r.rank}` : "New entry",
+      subTitle: climb != null ? "Places climbed since the 7 days before, and its place now" : "Not in the top 100 of the 7 days before",
       img: r.image, art2: r.artwork, glyph: "🎙",
     })), { empty: "Nothing has moved in the last week." }),
       top && showSlide("movers", top.r, {
         medium: "podcast",
         eyebrow: top.climb != null ? EYEBROWS.movers : "New in the Top 100 of the Last Week",
         line: top.climb != null
-          ? `Up ${top.climb} place${top.climb === 1 ? "" : "s"} to #${top.r.rank}, from #${was.get(top.r.guid)} the 7 days before`
+          ? `Up ${top.climb} place${top.climb === 1 ? "" : "s"} to #${top.r.rank} in the last week`
           : `#${top.r.rank} in the last week, not in the top 100 of the 7 days before`,
       }));
   },

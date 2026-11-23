@@ -74,7 +74,7 @@ export const PAGES = {
       records: picks.map(({ r }) => record(r)),
       rankOf: (s, i) => rankLabel(picks[i].r.rank, !!picks[i].r.tied),
       noteOf: (s, i) => picks[i].climb != null
-        ? `Up ${picks[i].climb} place${picks[i].climb === 1 ? "" : "s"} · #${was.get(picks[i].r.guid)} the 7 days before`
+        ? `Up ${picks[i].climb} place${picks[i].climb === 1 ? "" : "s"} · now #${picks[i].r.rank}`
         : "New entry in the last 7 days",
     }),
   },
