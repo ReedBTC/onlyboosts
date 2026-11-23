@@ -36,6 +36,7 @@
 // resolution.
 
 import { piHeaders, piGet } from "../_shared/podcast-index.js";
+import { assetGet } from "../_shared/head.js";
 
 // PI's ceiling for one episodes call. `max` is the only lever the endpoint
 // offers, so this is also the most any reader can be shown.
@@ -138,6 +139,31 @@ export function projectCatalogue(items) {
   return out;
 }
 
+// ⚠️ EXCLUDES.JSON GATES THIS LIST TOO (2026-11-23). The catalogue is PI's
+// list, not D1's, so the collector's exclusion never reaches it: OB-000, a
+// practice episode listed in excludes.json on 2026-11-22, stayed in The
+// OnlyBoosts Social Hour's drawer while every D1 surface hid it. The public
+// file is read from the site's own assets, and a guid in ANY list is dropped,
+// because the ids are opaque and clients sign item guids into the show slot
+// (docs/data-pipeline.md, "The exclusion list"). A file that cannot be read
+// excludes nothing here: the drawer is additive, and the collector's run
+// scripts are where a malformed file fails loudly.
+export async function excludedGuids(env, request) {
+  const out = new Set();
+  if (!env?.ASSETS?.fetch) return out;
+  try {
+    const r = await env.ASSETS.fetch(assetGet(request, "/excludes.json"));
+    if (!r.ok) return out;
+    const data = await r.json();
+    for (const list of ["shows", "episodes"]) {
+      for (const e of Array.isArray(data?.[list]) ? data[list] : []) {
+        if (typeof e?.guid === "string" && e.guid) out.add(e.guid);
+      }
+    }
+  } catch { /* unreadable: nothing excluded here */ }
+  return out;
+}
+
 // PI's episodes/bypodcastguid is one call and the usual path. A show PI keys
 // only by feed id (older records) answers with nothing there, so the fallback
 // is the route /api/value takes: resolve the feed id, then episodes/byfeedid.
@@ -207,7 +233,8 @@ export async function onRequestGet({ request, env }) {
   const items = await fetchItems(headers, podcastGuid, feedUrl);
   if (!items) return empty(request, "podcast index unavailable");
 
-  const episodes = projectCatalogue(items);
+  const excluded = await excludedGuids(env, request);
+  const episodes = projectCatalogue(items).filter((ep) => !excluded.has(ep.guid));
   return new Response(JSON.stringify({ episodes, truncated: items.length >= PI_EPISODE_MAX }), {
     headers: headersFor(request, { "Cache-Control": CACHE_OK }),
   });

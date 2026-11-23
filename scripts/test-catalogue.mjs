@@ -124,6 +124,27 @@ const item = (guid, datePublished, extra = {}) => ({ guid, title: `Ep ${guid}`, 
   assert.ok(!calls[0].includes('fulltext'), 'no fulltext: descriptions are dropped anyway and the body would be 8x')
 }
 
+// ⚠️ EXCLUDES.JSON GATES THE CATALOGUE (2026-11-23, OB-000): a guid in any
+// list is dropped; an unreadable file, or no ASSETS binding, drops nothing.
+{
+  const assets = (body, ok = true) => ({
+    fetch: async (r) => {
+      assert.equal(new URL(r.url).pathname, '/excludes.json')
+      return new Response(typeof body === 'string' ? body : JSON.stringify(body), { status: ok ? 200 : 404 })
+    },
+  })
+  const pi = { '/episodes/bypodcastguid': { items: [item('keep', 300), item('ob-000', 200), item('as-show', 100)] } }
+  stub(pi)
+  let r = await onRequestGet({ request: req('?podcastGuid=abc'), env: { ...env, ASSETS: assets({ shows: [{ guid: 'as-show' }], episodes: [{ guid: 'ob-000', reason: 'x' }] }) } })
+  assert.deepEqual((await r.json()).episodes.map((e) => e.guid), ['keep'])
+  stub(pi)
+  r = await onRequestGet({ request: req('?podcastGuid=abc'), env: { ...env, ASSETS: assets('{not json') } })
+  assert.deepEqual((await r.json()).episodes.map((e) => e.guid), ['keep', 'ob-000', 'as-show'])
+  stub(pi)
+  r = await onRequestGet({ request: req('?podcastGuid=abc'), env: { ...env, ASSETS: assets({}, false) } })
+  assert.equal((await r.json()).episodes.length, 3)
+}
+
 // ⚠️ THE STORED FEED URL RESOLVES FIRST (2026-09-06, Stacker News Live): the
 // guid lookups name a dead record frozen at #186; byfeedurl names the live
 // one. With a feed URL, the guid is never consulted when the URL answers.
