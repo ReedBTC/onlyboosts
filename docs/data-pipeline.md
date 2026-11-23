@@ -726,6 +726,12 @@ episode, the sats divided by the window's `remotePercentage`. Reed's design,
 - **Left alone**: a "song" on no known feed (7, among them a 42,000-sat Bowl
   After Bowl boost whose second item is `440`), two music items, two tracks in
   one window, and a host with no host item.
+- **D1's totals count through the credits** (`db.credited_rows()`): a split
+  boost is one row per credited side at the credit's sats, every other boost one
+  row as before; `podcasts` / `episodes` `total_sats`, `boost_count` (distinct
+  boosts) and `booster_count` read it, so a credit-only song or host episode gets
+  its own row. The corpus total is unchanged. The edge's windowed charts mirror
+  the same SQL. The JSON shards still count `boosts` rows.
 - A placed percentage is final; an unknown one is re-read weekly and a find
   rewrites both rows. A boost that becomes excluded or a duplicate loses its
   credits, in D1 through the reproject queue's `credit` kind. The D1 table

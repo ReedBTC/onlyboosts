@@ -159,6 +159,30 @@ with tempfile.TemporaryDirectory() as tmp:
           "a credited song with no episodes row gets one from its feed")
     check(ALBUM2 in db.guids_needing_show(conn), "a credited feed with no shows row is queued for enrich")
 
+    print("totals count through the credits")
+    q = db.reproject_queue(conn)
+    check({("podcast", HOST), ("podcast", ALBUM), ("episode", EP), ("episode", SONG)} <=
+          {(k, i) for k, ids in q.items() for i in ids}, "both sides of every credit are queued for a recount")
+    d1 = sqlite3.connect(":memory:")
+    d1.executescript(open(os.path.join(HERE, "d1", "schema.sql")).read())
+    for g in (HOST, ALBUM, LIVE):
+        d1.executescript("\n".join(d1_sync._podcast_upsert_sql(conn, g)))
+    for i in (EP, SONG, SONG_NEW, LIVE_EP):
+        d1.executescript("\n".join(d1_sync._episode_upsert_sql(conn, i)))
+    pod = dict(d1.execute("SELECT podcast_guid, total_sats FROM podcasts"))
+    ep = {r[0]: r[1:] for r in d1.execute("SELECT item_guid, total_sats, boost_count, booster_count FROM episodes")}
+    # HOST: bmb 100 + chadf 33 + new 5 + 100's 0 + tag 0 + ev_440 42000 (untouched) + ev_one/ev_mm are ALBUM's
+    check(pod[HOST] == 100 + 33 + 5 + 0 + 0 + 42000, f"host show: its shares plus the boost left alone ({pod[HOST]})")
+    check(pod[ALBUM] == 900 + 300 + 95 + 2222 + 777 + 100 + 100, f"song's feed: its shares ({pod[ALBUM]})")
+    check(pod[LIVE] == 0, f"live host: listed at 0 sats ({pod[LIVE]})")
+    check(ep[EP] == (100 + 33 + 5 + 42000, 4, 1), f"host episode: shares, boosts counted once each ({ep[EP]})")
+    check(ep[SONG_NEW][:2] == (95, 1), f"a song only a credit names now has a row ({ep.get(SONG_NEW)})")
+    total = conn.execute(f"SELECT SUM(sats) FROM boosts b WHERE {db.not_excluded('b')}").fetchone()[0]
+    check(conn.execute(f"SELECT SUM(sats) FROM {db.credited_rows()}").fetchone()[0] == total,
+          "the corpus total is unchanged: credits redistribute, never add")
+    check(db.queue_credit_recount_once(conn) == 0, "the one-time recount ran on the live pass, not again")
+    check(db.get_meta(conn, db.CREDIT_AGGREGATES_KEY), "and is recorded, so it never runs twice")
+
     print("the next tick is a no-op")
     fetches.clear()
     res = sc.credit_splits(conn, log=lambda m: None, fetch=fetch, now=NOW + 120)
