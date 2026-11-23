@@ -56,6 +56,7 @@ import similar                                                  # noqa: E402
 import podroll                                                  # noqa: E402
 import publishers as publishers_mod                             # noqa: E402
 import resolve_guids                                            # noqa: E402
+import split_credit                                            # noqa: E402
 from classify import classify_boost, decode_note_or_nevent, _QUOTE_RE, MAX_BOOST_SATS  # noqa: E402
 from relays import CORE_RELAYS, PROFILE_RELAYS, RECEIPT_RELAYS, expand_via_outbox, reachable_from_here  # noqa: E402
 from scan import (scan_relay_backward, scan_relay_incremental,   # noqa: E402
@@ -1622,6 +1623,25 @@ def cmd_dedupe(args):
         conn.close()
 
 
+def cmd_split_credit(args):
+    """Credit each boost made during a value-time split to the song AND the host
+    episode, the sats divided by the window's remotePercentage — see
+    split_credit.py. Runs after dedupe (a duplicate gets no credit) and before
+    enrich (so a credited feed with no shows row is looked up the same cycle).
+    `--db` points a dry run at a copy of the index."""
+    conn = db.connect(args.db or DB_PATH)
+    try:
+        res = split_credit.credit_splits(conn, log=lambda m: print(m, flush=True),
+                                         dry_run=args.dry_run)
+        if args.dry_run:
+            print(f"[dry run] would place {res['placed']} ({res['by_method']}), "
+                  f"{res['pct_unknown']} with no percentage, rewrite {res['rewritten']}, "
+                  f"leave {res['unplaced']} ({res['reasons']}), prune {res['pruned']}, "
+                  f"add {res['episodes']} episode row(s); {res['feeds_read']} feed(s) read")
+    finally:
+        conn.close()
+
+
 def cmd_excludes(args):
     """Validate excludes.json and report what each entry currently hides.
 
@@ -1947,6 +1967,12 @@ def main():
     dd.add_argument("--all", action="store_true", help="full history")
     dd.add_argument("--dry-run", action="store_true")
     dd.set_defaults(func=cmd_dedupe)
+
+    sc = sub.add_parser("split-credit",
+                        help="credit value-time-split boosts to song and host (split_credit.py)")
+    sc.add_argument("--dry-run", action="store_true")
+    sc.add_argument("--db", help="index to run against (default: the live one)")
+    sc.set_defaults(func=cmd_split_credit)
 
     xc = sub.add_parser("excludes",
                         help="validate excludes.json and report what each entry hides")

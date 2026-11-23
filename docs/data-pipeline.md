@@ -705,6 +705,32 @@ those, 21 were Reed's and 19 were ChadF's. 234 stay unplaced, almost all item-on
 notes whose item no feed we know carries; `episode-row` places each one on the
 first tick after its episode is enriched.
 
+## Songs Played Inside An Episode: `boost_credits`
+
+A boost made while a host episode was playing someone else's song (a
+`<podcast:valueTimeSplit>` window) is credited to both: the song and the host
+episode, the sats divided by the window's `remotePercentage`. Reed's design,
+2026-11-23. `split_credit.py` is the authority; this is the summary.
+
+- **The `boosts` row is never changed.** Its `podcast_guid` / `item_guid` may name
+  either side (the host on 45 of 300 placements, measured 2026-11-23), and
+  `/api/v1/boosts` is what Local Bitcoiners' publisher reads. The credit lives in
+  `boost_credits`, two rows per placed boost (`role` 'track' and 'host'), and a
+  reader counts a split boost through those rows.
+- **The shares add up to the boost's sats exactly** (largest remainder over two).
+  `pct` is the track's share as the host feed wrote it, 0-100.
+- **`method` says how the host was told apart**: `rss` (the host's own window,
+  220 boosts), or inferred with `pct` NULL: `medium` (47, mostly live items whose
+  split never reached the feed) and `tag` (33, host episodes trimmed off their
+  feed). With `pct` NULL the track row carries every sat and the host row 0.
+- **Left alone**: a "song" on no known feed (7, among them a 42,000-sat Bowl
+  After Bowl boost whose second item is `440`), two music items, two tracks in
+  one window, and a host with no host item.
+- A placed percentage is final; an unknown one is re-read weekly and a find
+  rewrites both rows. A boost that becomes excluded or a duplicate loses its
+  credits, in D1 through the reproject queue's `credit` kind. The D1 table
+  creates itself on its first push, in a batch of its own after the boost delta.
+
 ## Not indexed: `podcast:person`
 
 `<podcast:person>` is **not** in this pipeline and deliberately isn't being added.

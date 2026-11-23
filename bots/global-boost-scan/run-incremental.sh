@@ -22,6 +22,7 @@ echo "=== $(date -u +%FT%TZ) OnlyBoosts incremental cycle ==="
 "$PY" "$BOT" incremental          # new boosts since last run → SQLite
 "$PY" "$BOT" resolve-guids        # canonicalize phantom guids (feed ids / item guids / slugs)
 "$PY" "$BOT" dedupe               # mark relay-bot notes duplicating another app's note (7d window)
+"$PY" "$BOT" split-credit         # value-time splits: credit song and host episode (split_credit.py)
 "$PY" "$BOT" enrich               # fill metadata/profiles for anything new
 "$PY" "$BOT" durations            # derive durations for boosted episodes with none (#40HPW evenness; capped per tick)
 # ── publish: export → push → cards → push, ONLY WHEN THE INDEX CHANGED ────────
