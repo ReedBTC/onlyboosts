@@ -56,7 +56,6 @@
 // so this is a handful of queries per colo per two minutes, not per visitor.
 import { weekBoard } from "./api/v1/charts/[[path]].js";
 import { weeklyChart } from "./_shared/week-charts.js";
-import { pacificWeekStart, prevWeek, nextWeek } from "../assets/js/pacific-week.js";
 import { readParams as podcastParams, globalPodcasts } from "./api/v1/podcasts.js";
 import { readParams as episodeParams, globalEpisodes } from "./api/v1/episodes.js";
 import { hoursBoard } from "./api/v1/members/hours.js";
@@ -181,12 +180,15 @@ export function whyNew(r) {
 /** MOVERS: this week's Shows chart against last week's, to 100 places:
  *  climbers by places climbed, then this week's debuts in chart order.
  *  Answers the picks and last week's places. */
+/* MOVERS compares the LAST 7 DAYS against the 7 days before them (Reed's
+   call, 2026-11-23), not the Pacific week against the last one: on a Monday
+   morning the week's chart has nothing to move. */
+const DAY = 86400;
 export async function moversRows(env, limit) {
-  const live = pacificWeekStart(Math.floor(Date.now() / 1000));
-  const last = prevWeek(live);
+  const t = Math.floor(Date.now() / 1000);
   const [now, before] = await Promise.all([
-    weeklyChart(env, "shows", live, nextWeek(live), 100),
-    weeklyChart(env, "shows", last, live, 100),
+    weeklyChart(env, "shows", t - 7 * DAY, t, 100),
+    weeklyChart(env, "shows", t - 14 * DAY, t - 7 * DAY, 100),
   ]);
   const was = new Map(before.map((r) => [r.guid, r.rank]));
   const climbers = now.filter((r) => was.has(r.guid) && was.get(r.guid) > r.rank)
@@ -350,16 +352,16 @@ export const RAILS = {
     const top = picks[0];
     return rail(railListHtml(picks.map(({ r, climb }) => tileHtml({
       rank: r.rank, tied: !!r.tied, href: showPageHref(r.guid), title: r.title,
-      sub: climb != null ? `▲ ${climb} · was #${was.get(r.guid)}` : "New this week",
-      subTitle: climb != null ? "Places climbed since last week's chart" : "Not on last week's chart",
+      sub: climb != null ? `▲ ${climb} · was #${was.get(r.guid)}` : "New entry",
+      subTitle: climb != null ? "Places climbed since the 7 days before" : "Not in the top 100 of the 7 days before",
       img: r.image, art2: r.artwork, glyph: "🎙",
-    })), { empty: "Nothing has moved yet this week." }),
+    })), { empty: "Nothing has moved in the last week." }),
       top && showSlide("movers", top.r, {
         medium: "podcast",
-        eyebrow: top.climb != null ? EYEBROWS.movers : "New on the Chart This Week",
+        eyebrow: top.climb != null ? EYEBROWS.movers : "New in the Top 100 of the Last Week",
         line: top.climb != null
-          ? `Up ${top.climb} place${top.climb === 1 ? "" : "s"} to #${top.r.rank}, from #${was.get(top.r.guid)} last week`
-          : `#${top.r.rank} this week, not on last week's chart`,
+          ? `Up ${top.climb} place${top.climb === 1 ? "" : "s"} to #${top.r.rank}, from #${was.get(top.r.guid)} the 7 days before`
+          : `#${top.r.rank} in the last week, not in the top 100 of the 7 days before`,
       }));
   },
   /* PODCASTERS RECOMMEND: the shows most often listed on other shows'
