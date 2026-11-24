@@ -3,7 +3,7 @@
  *
  * It replaces the browser's own audio controls with a bar of ours, because the
  * native control cannot draw anything on its seek line: the bar carries a tick
- * at every chapter and a shaded stretch for every song the episode plays (its
+ * where every chapter and every song begins (the songs are its
  * <podcast:valueTimeSplit> windows), and a line above the seek bar naming what
  * is on now, with the song's heart.
  *
@@ -64,6 +64,22 @@ export function chapterAt(chapters, t) {
   return hit
 }
 
+/* A chapter that starts with a song (within this many seconds) is the same
+ * moment named twice: many music shows write a chapter per song as well as
+ * the window. The song row is kept, since it carries the song's identity and
+ * its heart, and the chapter is dropped. Only a chapter is ever dropped, never
+ * a song, and the match is a tolerance rather than equality because chapter
+ * files and windows round differently (BMB's rule, its check:vts). */
+export const SAME_START_SECS = 2
+
+export function chaptersBesideSongs(chapters, songs) {
+  const starts = (songs || []).map((s) => Number(s.start) || 0)
+  return (chapters || []).filter((c) => {
+    const t = Number(c.start) || 0
+    return !starts.some((st) => Math.abs(st - t) <= SAME_START_SECS)
+  })
+}
+
 function el(tag, cls, text) {
   const n = document.createElement(tag)
   if (cls) n.className = cls
@@ -117,7 +133,6 @@ export function mountPlayer(audio, { itemGuid, duration = null } = {}) {
   now.append(nowText, nowHeart)
 
   const track = el('div', 'obp-track')
-  const songLayer = el('div', 'obp-songs')
   const fill = el('div', 'obp-fill')
   const ticks = el('div', 'obp-ticks')
   const range = el('input', 'obp-range')
@@ -127,7 +142,7 @@ export function mountPlayer(audio, { itemGuid, duration = null } = {}) {
   range.step = '1'
   range.value = '0'
   range.setAttribute('aria-label', 'Seek')
-  track.append(songLayer, fill, ticks, range)
+  track.append(fill, ticks, range)
 
   const times = el('div', 'obp-times')
   const cur = el('span', 'obp-cur', '0:00')
@@ -165,7 +180,7 @@ export function mountPlayer(audio, { itemGuid, duration = null } = {}) {
   let lastKey = ''
   function paintNow(t) {
     const song = songAt(songs, t)
-    const chap = chapterAt(chapters, t)
+    const chap = chapterAt(chaptersBesideSongs(chapters, songs), t)
     const key = song ? 's:' + song.itemGuid + song.start : chap ? 'c:' + chap.start : ''
     if (key === lastKey) return
     lastKey = key
@@ -197,22 +212,21 @@ export function mountPlayer(audio, { itemGuid, duration = null } = {}) {
   function paintMarkers() {
     const L = length()
     ticks.replaceChildren()
-    songLayer.replaceChildren()
     if (!L) return
-    for (const c of chapters) {
-      if (c.start <= 0 || c.start >= L) continue
+    // One kind of mark for both: a tick where a chapter or a song begins.
+    // Songs are not shaded along their length (Reed, 2026-11-24: a coloured
+    // stretch reads as something unexplained); the now-playing line says
+    // which song it is.
+    const marks = [
+      ...chaptersBesideSongs(chapters, songs).map((c) => ({ t: c.start, label: c.title })),
+      ...songs.map((s) => ({ t: s.start, label: '♪ ' + (s.title || 'A song') })),
+    ].sort((a, b) => a.t - b.t)
+    for (const m of marks) {
+      if (m.t <= 0 || m.t >= L) continue
       const tk = el('span', 'obp-tick')
-      tk.style.left = (c.start / L * 100).toFixed(3) + '%'
-      tk.title = c.title
+      tk.style.left = (m.t / L * 100).toFixed(3) + '%'
+      tk.title = m.label
       ticks.appendChild(tk)
-    }
-    for (const s of songs) {
-      if (s.start >= L) continue
-      const seg = el('span', 'obp-song')
-      seg.style.left = (s.start / L * 100).toFixed(3) + '%'
-      seg.style.width = (Math.min(s.duration, L - s.start) / L * 100).toFixed(3) + '%'
-      seg.title = s.title || 'A song'
-      songLayer.appendChild(seg)
     }
   }
 

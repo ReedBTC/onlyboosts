@@ -452,8 +452,7 @@ queued behind `loadedmetadata`.
 Built 2026-11-24 at Reed's request: the bar under the `/episode` hero is
 `assets/js/player.js`, which takes the controls off the page's own `<audio>`
 (the no-JavaScript reading) and drives it. Play, back 15, forward 30, speed,
-and a seek line carrying a tick at every chapter and a shaded stretch for
-every song.
+and a seek line carrying a tick wherever a chapter or a song begins.
 
 - **The songs are the episode's `<podcast:valueTimeSplit>` windows**, read from
   the show's RSS by `/api/episode-songs` (`functions/_shared/time-splits.js`) and
@@ -466,6 +465,12 @@ every song.
   the other (BMB's rule: they overlap on some shows, and the covering window
   names the wrong song). The heart is the ordinary episode heart for the song's
   own feed and item, a sibling of the seek button.
+- **A chapter that starts within 2 seconds of a song is dropped**, since many
+  music shows write a chapter per song too and the list showed each song twice
+  (Reed, 2026-11-24). Only a chapter is ever dropped, never a song.
+- **The seek line has ticks only**, one where each chapter or song begins. The
+  first build shaded each song's stretch in the brand colour; Reed: it reads as
+  something unexplained.
 - **⚠️ IT DOCKS, IT DOES NOT FOLLOW.** Once playing, the bar fixes itself to the
   bottom of the window while its place is scrolled out of view, and returns
   when it comes back. It does not survive a navigation: every link is a full

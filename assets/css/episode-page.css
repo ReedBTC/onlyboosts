@@ -54,8 +54,8 @@
 /* ── The player bar (assets/js/player.js) ─────────────────────────────────
    The native control above is the no-JavaScript reading; with JavaScript it is
    hidden and this bar drives the same element. One ground, one hairline, the
-   brand as the only colour: the fill, the song stretches at a tint of it, and
-   the chapter ticks as hairlines across the line. */
+   brand as the only colour, on the fill; a tick across the line wherever a
+   chapter or a song begins. */
 .obp {
   display: flex;
   align-items: center;
@@ -100,20 +100,13 @@
   position: relative;
   height: 1.1rem;
 }
-/* The line itself, the songs on it, the fill and the ticks are all drawn in
-   the middle 6px of the track; the range input over them is the control. */
-.obp-track::before, .obp-songs, .obp-fill, .obp-ticks {
+/* The line itself, the fill and the ticks are all drawn in the middle 6px
+   of the track; the range input over them is the control. */
+.obp-track::before, .obp-fill, .obp-ticks {
   position: absolute; left: 0; top: 50%; height: 6px; margin-top: -3px;
   border-radius: 3px; pointer-events: none;
 }
 .obp-track::before { content: ""; right: 0; background: var(--cream); }
-.obp-songs { right: 0; }
-.obp-song {
-  position: absolute; top: 0; bottom: 0;
-  /* The brand at low strength: a token, not a new colour. */
-  background: var(--brand); opacity: 0.32;
-  border-left: 1px solid var(--white);
-}
 .obp-fill { background: var(--brand); opacity: 0.85; }
 .obp-ticks { right: 0; overflow: visible; }
 .obp-tick {
