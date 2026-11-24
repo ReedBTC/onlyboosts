@@ -168,6 +168,8 @@ html.obp-docked body { padding-bottom: 8.5rem; }
    row spreads instead. */
 @media (max-width: 370px) {
   .obp-controls { display: flex; justify-content: space-between; }
+  .obp-transport { gap: 0.2rem; }
+  .obp .obp-skip, .obp .obp-chap, .obp .obp-rate { min-width: 2rem; padding: 0 0.15rem; font-size: 0.72rem; }
 }
 
 /* A song row in the chapters drawer: the seek button and, beside it, the
