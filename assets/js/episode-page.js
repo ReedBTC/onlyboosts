@@ -22,22 +22,22 @@
  * That module is shared with the structurally identical section on
  * /booster/<npub>.
  */
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v296'
-import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v296'
-import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v296'
-import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v296'
-import { initEpisodeSection } from '/assets/js/episode-section.js?v=ob-v296'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v298'
+import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v298'
+import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v298'
+import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v298'
+import { initEpisodeSection } from '/assets/js/episode-section.js?v=ob-v298'
 import {
   initCopyNpub, initShowMore, initShare, initBackLink,
   initHashRouting, initHashSpy, initArt2, hydrateProfiles, initStatWindows,
-} from '/assets/js/detail-page.js?v=ob-v296'
+} from '/assets/js/detail-page.js?v=ob-v298'
 // The reaction bar and ⋮ on the server-rendered boost notes at the foot of
 // this page. The community cards above them carry their own, through the feed
 // renderer they are built by.
-import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v296'
-import { initBoostSection, BOOST_SORTS } from '/assets/js/boost-section.js?v=ob-v296'
-import { mountPlayer } from '/assets/js/player.js?v=ob-v296'
-import { favoriteButtonHtml } from '/assets/js/favorite-button.js?v=ob-v296'
+import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v298'
+import { initBoostSection, BOOST_SORTS } from '/assets/js/boost-section.js?v=ob-v298'
+import { mountPlayer, chaptersBesideSongs } from '/assets/js/player.js?v=ob-v298'
+import { favoriteButtonHtml } from '/assets/js/favorite-button.js?v=ob-v298'
 
 const VALUE_API = '/api/value'
 
@@ -343,8 +343,10 @@ function paintContents(chapters, songs) {
   // hidden and the page is the page it was before.
   if (!drawer || !list || !player || (!chs.length && !sgs.length)) return
 
+  // A chapter that starts with a song is that song named twice; the song row
+  // stays (it carries the heart) and the chapter goes. See player.js.
   const rows = [
-    ...chs.map((c) => ({ kind: 'chapter', start: Math.max(0, Math.floor(Number(c.start) || 0)), c })),
+    ...chaptersBesideSongs(chs, sgs).map((c) => ({ kind: 'chapter', start: Math.max(0, Math.floor(Number(c.start) || 0)), c })),
     ...sgs.map((s) => ({ kind: 'song', start: Math.max(0, Math.floor(Number(s.start) || 0)), s })),
   ].sort((a, b) => a.start - b.start || (a.kind === 'chapter' ? -1 : 1))
 
@@ -373,7 +375,8 @@ function paintContents(chapters, songs) {
   // The drawer is named for what it holds.
   const summary = drawer.querySelector('summary')
   const label = summary && [...summary.childNodes].find((n) => n.nodeType === 3)
-  if (label) label.textContent = chs.length && sgs.length ? 'Chapters and Songs' : sgs.length ? 'Songs' : 'Chapters'
+  const keptChapters = chaptersBesideSongs(chs, sgs).length
+  if (label) label.textContent = keptChapters && sgs.length ? 'Chapters and Songs' : sgs.length ? 'Songs' : 'Chapters'
   drawer.hidden = false
 
   // The rows covering the playhead, tracked as it advances: the chapter it is

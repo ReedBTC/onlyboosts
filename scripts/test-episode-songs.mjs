@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { findItem, readTimeSplits } from '../functions/_shared/time-splits.js'
 import { onRequestGet, onRequestHead } from '../functions/api/episode-songs.js'
-import { songAt, chapterAt, fmtTime } from '../assets/js/player.js'
+import { songAt, chapterAt, fmtTime, chaptersBesideSongs } from '../assets/js/player.js'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 let failed = 0, passed = 0
@@ -139,6 +139,13 @@ console.log('\nThe player’s lookups:')
     assert.equal(chapterAt(chs, 59)?.title, 'Intro')
     assert.equal(chapterAt(chs, 59.8)?.title, 'Talk')
   })
+  await check('⚠️ a chapter starting with a song is that song named twice: the chapter goes', () => {
+    const cs = [{ start: 0, title: 'Welcome' }, { start: 340, title: 'The Doerfels-Take Me Away' }, { start: 774, title: 'How the Charts Work' }]
+    const ss = [{ start: 341.5, duration: 200, itemGuid: 'x' }]
+    assert.deepEqual(chaptersBesideSongs(cs, ss).map((c) => c.title), ['Welcome', 'How the Charts Work'])
+  })
+  await check('a chapter further than the tolerance from every song stays', () =>
+    assert.equal(chaptersBesideSongs([{ start: 300, title: 'Talk' }], [{ start: 303, duration: 10 }]).length, 1))
   await check('times read m:ss under an hour and h:mm:ss past it', () => {
     assert.equal(fmtTime(75), '1:15')
     assert.equal(fmtTime(3725), '1:02:05')

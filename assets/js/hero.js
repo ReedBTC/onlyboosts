@@ -26,11 +26,11 @@
  * episode or song), which read the show off the slide's own data attributes
  * exactly as they read a card's. Those attribute names are their contract.
  */
-import { coverChain } from './cover-art.js?v=ob-v296'
-import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v296'
-import { boosterPageHref } from './booster-link.js?v=ob-v296'
-import { episodeBoostLink } from './episode-link.js?v=ob-v296'
-import { statsLine, rankTripletHtml } from './rail-tile.js?v=ob-v296'
+import { coverChain } from './cover-art.js?v=ob-v298'
+import { showPageHref, episodePageHref, publisherPageHref } from './show-link.js?v=ob-v298'
+import { boosterPageHref } from './booster-link.js?v=ob-v298'
+import { episodeBoostLink } from './episode-link.js?v=ob-v298'
+import { statsLine, rankTripletHtml } from './rail-tile.js?v=ob-v298'
 
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => (
