@@ -186,7 +186,7 @@ export function mountPlayer(audio, { itemGuid, duration = null } = {}) {
     lastKey = key
     nowHeart.replaceChildren()
     if (song) {
-      nowText.textContent = '♪ ' + (song.title || 'A song') + (song.artist || song.album ? ' · ' + (song.artist || song.album) : '')
+      nowText.textContent = '♪ ' + (song.title || 'A song') + (song.artist ? ' - ' + song.artist : '')
       const h = songHeart(song)
       if (h) nowHeart.appendChild(h)
     } else if (chap) {

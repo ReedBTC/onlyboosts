@@ -9,7 +9,8 @@
 //
 // WHO NAMES A SONG, surest first: our own index (D1 knows the title, the
 // album and its art for every song anyone boosted), then Podcast Index's
-// episode record, asked by item guid and the album's feed guid. A song
+// episode record, asked by item guid and the album's feed guid, and its
+// feed record for the artist (an episode record names no author). A song
 // neither knows still comes back, with its window and no title, so the
 // player can mark it; the client renders it as "A song".
 //
@@ -130,6 +131,26 @@ export async function onRequestGet({ request, env }) {
       if (!s.album && typeof ep.feedTitle === "string") s.album = ep.feedTitle;
       if (!s.image) s.image = ep.image || ep.feedImage || null;
     });
+  }
+
+  // The artist is the album feed's author, which an episode record does not
+  // carry: ask Podcast Index for each album still missing one, once per album.
+  const noArtist = [...new Set(named.filter((s) => !s.artist).map((s) => s.feedGuid))].slice(0, PI_LOOKUPS_MAX);
+  if (noArtist.length && env.PODCAST_INDEX_KEY && env.PODCAST_INDEX_SECRET) {
+    const h = await piHeaders(env.PODCAST_INDEX_KEY, env.PODCAST_INDEX_SECRET, "OnlyBoosts-Songs/1.0");
+    const feeds = await mapLimit(noArtist, PI_CONCURRENCY, async (g) => {
+      const r = await piGet(`/podcasts/byguid?guid=${encodeURIComponent(g)}`, h);
+      const f = r?.feed;
+      return f && typeof f === "object" && !Array.isArray(f) ? f : null;
+    });
+    const byGuid = new Map(noArtist.map((g, i) => [g, feeds[i]]));
+    for (const s of named) {
+      const f = byGuid.get(s.feedGuid);
+      if (!f) continue;
+      if (!s.artist && typeof f.author === "string" && f.author.trim()) s.artist = f.author.trim();
+      if (!s.album && typeof f.title === "string" && f.title.trim()) s.album = f.title.trim();
+      if (!s.image) s.image = f.artwork || f.image || null;
+    }
   }
 
   return answer({ songs: named, inline }, 3600);

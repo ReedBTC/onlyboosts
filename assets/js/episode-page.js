@@ -22,22 +22,22 @@
  * That module is shared with the structurally identical section on
  * /booster/<npub>.
  */
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v300'
-import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v300'
-import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v300'
-import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v300'
-import { initEpisodeSection } from '/assets/js/episode-section.js?v=ob-v300'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v302'
+import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v302'
+import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v302'
+import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v302'
+import { initEpisodeSection } from '/assets/js/episode-section.js?v=ob-v302'
 import {
   initCopyNpub, initShowMore, initShare, initBackLink,
   initHashRouting, initHashSpy, initArt2, hydrateProfiles, initStatWindows,
-} from '/assets/js/detail-page.js?v=ob-v300'
+} from '/assets/js/detail-page.js?v=ob-v302'
 // The reaction bar and ⋮ on the server-rendered boost notes at the foot of
 // this page. The community cards above them carry their own, through the feed
 // renderer they are built by.
-import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v300'
-import { initBoostSection, BOOST_SORTS } from '/assets/js/boost-section.js?v=ob-v300'
-import { mountPlayer, chaptersBesideSongs } from '/assets/js/player.js?v=ob-v300'
-import { favoriteButtonHtml } from '/assets/js/favorite-button.js?v=ob-v300'
+import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v302'
+import { initBoostSection, BOOST_SORTS } from '/assets/js/boost-section.js?v=ob-v302'
+import { mountPlayer, chaptersBesideSongs } from '/assets/js/player.js?v=ob-v302'
+import { favoriteButtonHtml } from '/assets/js/favorite-button.js?v=ob-v302'
 
 const VALUE_API = '/api/value'
 
@@ -362,7 +362,9 @@ function paintContents(chapters, songs) {
       chapterBtns.set(r.c, btn)
     } else {
       li.className = 'ep-chapter ep-song'
-      const who = r.s.artist || r.s.album || ''
+      // The artist or nothing: an album title after the dash reads as the
+      // artist's name ("Distant - Kiss Up - EP").
+      const who = r.s.artist || ''
       const btn = rowButton(r.start, '♪ ' + (r.s.title || 'A song'), who)
       li.appendChild(btn)
       const heart = songHeartNode(r.s)
