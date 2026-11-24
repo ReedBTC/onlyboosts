@@ -22,22 +22,22 @@
  * That module is shared with the structurally identical section on
  * /booster/<npub>.
  */
-import { showToast } from '/assets/js/copy-npub.js?v=ob-v307'
-import { fromApiValue, applyExternalOverrides } from '/assets/js/value-block.js?v=ob-v307'
-import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v307'
-import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v307'
-import { initEpisodeSection } from '/assets/js/episode-section.js?v=ob-v307'
+import { showToast } from '/assets/js/copy-npub.js?v=ob-v308'
+import { fromApiValue, applyExternalOverrides, combineTimeSplit } from '/assets/js/value-block.js?v=ob-v308'
+import { ensureLoginWidget } from '/assets/js/widget-loader.js?v=ob-v308'
+import { episodeBoostLink } from '/assets/js/episode-link.js?v=ob-v308'
+import { initEpisodeSection } from '/assets/js/episode-section.js?v=ob-v308'
 import {
   initCopyNpub, initShowMore, initShare, initBackLink,
   initHashRouting, initHashSpy, initArt2, hydrateProfiles, initStatWindows,
-} from '/assets/js/detail-page.js?v=ob-v307'
+} from '/assets/js/detail-page.js?v=ob-v308'
 // The reaction bar and ⋮ on the server-rendered boost notes at the foot of
 // this page. The community cards above them carry their own, through the feed
 // renderer they are built by.
-import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v307'
-import { initBoostSection, BOOST_SORTS } from '/assets/js/boost-section.js?v=ob-v307'
-import { mountPlayer, chaptersBesideSongs } from '/assets/js/player.js?v=ob-v307'
-import { favoriteButtonHtml } from '/assets/js/favorite-button.js?v=ob-v307'
+import { initBoostNoteActions } from '/assets/js/boost-note-actions.js?v=ob-v308'
+import { initBoostSection, BOOST_SORTS } from '/assets/js/boost-section.js?v=ob-v308'
+import { mountPlayer, chaptersBesideSongs } from '/assets/js/player.js?v=ob-v308'
+import { favoriteButtonHtml } from '/assets/js/favorite-button.js?v=ob-v308'
 
 const VALUE_API = '/api/value'
 
@@ -88,12 +88,13 @@ initArt2('.show-art img[data-art2]', 'div', 'show-art-blank')
  * /api/value falls back to the feed-level block server-side when an episode has
  * none of its own, which is what makes an episode of a boostable show boostable.
  */
-async function resolveValue(target, itemGuid) {
+async function resolveValue(target, itemGuid, { at = null } = {}) {
   if (!target) return null
   const qs = new URLSearchParams()
   if (target.guid) qs.set('podcastGuid', target.guid)
   if (target.feed) qs.set('feedUrl', target.feed)
   if (itemGuid) qs.set('guid', itemGuid)
+  if (at != null) qs.set('at', String(at))
   if (![...qs.keys()].length) return null
 
   let data = null
@@ -113,10 +114,47 @@ async function resolveValue(target, itemGuid) {
   const recipients = applyExternalOverrides(parsed.recipients)
   const totalWeight = recipients.reduce((a, r) => a + (r.splitWeight || 0), 0)
   if (!recipients.length || totalWeight <= 0) return null
-  return { recipients, totalWeight }
+  return { recipients, totalWeight, timeSplit: data?.timeSplit || null }
 }
 
-async function openBoost(bundle, { target, itemGuid, episodeTitle }) {
+/* ⚠️ THE SONG IS READ ONCE, AT THE PRESS, AND HELD (BMB's rule). The boost
+ * screen can stay open for minutes while the episode plays on, and the song
+ * named on it, the splits it pays and the note it publishes must all be the
+ * song that was on when Boost was pressed.
+ *
+ * A position of zero is "not playing" (`started`), never "the first window":
+ * a window authored at 0:00 would otherwise claim every boost made before
+ * anyone pressed play. Paused partway through still counts.
+ *
+ * Returns { bundle, song, ts }: `song` is null and `bundle` the show's alone
+ * whenever the song cannot be paid (no window covers the moment, or its own
+ * value block does not resolve). That fallback is today's boost, unchanged. */
+async function resolveBoostAtPress() {
+  const st = window.LBPlayer?.state?.()
+  const ts = st?.started && st.itemGuid === EPISODE.itemGuid ? Math.floor(st.positionSec) : null
+  const host = await resolveValue(EPISODE, EPISODE.itemGuid, { at: ts })
+  if (!host || host.error) return { bundle: host, song: null, ts }
+  const ws = host.timeSplit
+  if (!ws) return { bundle: host, song: null, ts }
+
+  const songBundle = await resolveValue(
+    { guid: ws.feedGuid, feed: ws.feedUrl || null }, ws.itemGuid)
+  const combined = songBundle && !songBundle.error ? combineTimeSplit(host, songBundle, ws.pct) : null
+  if (!combined) {
+    console.info('[episode] the song playing has no payable value block; the boost pays the show alone')
+    return { bundle: host, song: null, ts }
+  }
+  // The title and artist are the player's, for the screen and the note's
+  // text; the guids and the percentage are the feed's, from this press.
+  const named = (st?.song && st.song.itemGuid === ws.itemGuid) ? st.song : null
+  const song = {
+    feedGuid: ws.feedGuid, itemGuid: ws.itemGuid, pct: ws.pct,
+    title: named?.title || '', artist: named?.artist || '',
+  }
+  return { bundle: combined, song, ts }
+}
+
+async function openBoost(bundle, { target, itemGuid, episodeTitle, song = null, ts = null }) {
   await ensureLoginWidget()
   if (!window.LBLogin?.openExternalBoost) {
     showToast('Boost is unavailable right now.', true)
@@ -148,6 +186,10 @@ async function openBoost(bundle, { target, itemGuid, episodeTitle }) {
         feedId: null,
       }) || '',
       feedUrl: target?.feed || '',   // the boostagram's `url` (bLIP-10)
+      // The song on when Boost was pressed, and the seconds into the episode.
+      // Absent, the boost is the show's alone, exactly as before.
+      ...(song ? { song } : {}),
+      ...(ts != null ? { ts } : {}),
     },
     recipientsBundle: bundle,
   })
@@ -179,7 +221,7 @@ async function initBoosting() {
     btn.disabled = true
     btn.textContent = 'Loading…'
     try {
-      const bundle = await resolveValue(EPISODE, EPISODE.itemGuid)
+      const { bundle, song, ts } = await resolveBoostAtPress()
       if (!bundle) { showToast('This episode has no value block to boost.', true); return }
       if (bundle.error) { showToast('Couldn’t load boost splits — please try again in a moment.', true); return }
       btn.textContent = 'Opening…'
@@ -187,6 +229,7 @@ async function initBoosting() {
         target: EPISODE,
         itemGuid: EPISODE.itemGuid,
         episodeTitle: EPISODE.episodeTitle,
+        song, ts,
       })
     } catch (err) {
       console.warn('[episode] boost failed', err)

@@ -111,9 +111,9 @@ exactly one version of one file; that is what closed the `ob-v53` outage (one
 stale module took down all eight feeds). Adding a named export to a shared
 module is ordinary work since then.
 
-**Thirty-five test scripts**, plain `node scripts/<name>.mjs`. `docs/tests.md`
+**Thirty-six test scripts**, plain `node scripts/<name>.mjs`. `docs/tests.md`
 is the per-test reference; **bump the count here and that file together.** Run
-all thirty-five before a merge.
+all thirty-six before a merge.
 
 - **⚠️ `test-server-render.mjs` NEEDS A FRESH CAPTURE** and is the one that goes
   unrun: `curl -s 'https://onlyboosts.social/api/v1/podcasts?not_medium=music&sort=chart&range=all&limit=25' -o <file>`
@@ -284,6 +284,10 @@ The rules a change elsewhere would break:
   `isSyntheticGuid` / `realShowGuid` guard every site that hands a guid out.
 - **`/api/value` reads the show's own RSS first, Podcast Index as fallback**, and
   resolves the stored feed URL before the guid.
+- **⚠️ A BOOST ON `/episode` DURING A SONG PAYS THE SONG**: the window at the press
+  (`/api/value?at=`), the song's block at its percentage and the show's at the rest
+  (`combineTimeSplit`), the song in the note only if a song split landed
+  (`docs/money-paths.md`).
 
 ## Data Rules That Reach The Site
 

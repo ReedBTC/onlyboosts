@@ -146,17 +146,23 @@ export function randomPreimageHex() {
  * @param {string} [p.boostLink]   - the episode's page here, or Boost Me Bitch → `boost_link`
  * @param {string} [p.recipientName]
  * @param {string} [p.boostUuid]
+ * @param {number} [p.ts]             - seconds into the episode at the press, when it was playing
+ * @param {string} [p.remoteFeedGuid] - the song playing then (a value time split), its feed
+ * @param {string} [p.remoteItemGuid] - and its item
  */
 export function buildBoostagram({
   legMsats, totalMsats, message, senderName, senderPubkey,
   showTitle, episodeTitle, podcastGuid, itemGuid, feedUrl, boostLink, recipientName, boostUuid,
+  ts = null, remoteFeedGuid = null, remoteItemGuid = null,
 }) {
   const b = {
     action: 'boost',
     app_name: APP_NAME,
     value_msat: legMsats,
     value_msat_total: totalMsats,
-    ts: 0,
+    // bLIP-10: the position in the episode. Zero, as it always was, unless the
+    // /episode player was playing when Boost was pressed.
+    ts: Number.isFinite(ts) && ts > 0 ? Math.floor(ts) : 0,
   }
   const msg = (message || '').trim()
   if (msg) b.message = clipMessage(msg)
@@ -177,6 +183,14 @@ export function buildBoostagram({
   if (boostLink) b.boost_link = boostLink
   if (recipientName) b.name = recipientName
   if (boostUuid) b.uuid = boostUuid
+  // bLIP-10's two fields for a boost made during a value time split: the song
+  // the window names. On every leg of the boost, the song's and the show's,
+  // since they describe the moment rather than the recipient; the show's own
+  // `guid` / `episode_guid` above stay the show's.
+  if (remoteFeedGuid && remoteItemGuid) {
+    b.remote_feed_guid = remoteFeedGuid
+    b.remote_item_guid = remoteItemGuid
+  }
   return b
 }
 
@@ -331,7 +345,7 @@ export function resolveNoteFigure({
  */
 export function buildExternalNoteTemplate({
   paidSats, legsPaid, legsTotal, message, senderName, showTitle, episodeTitle, podcastGuid, itemGuid, bmbUrl,
-  mentionPubkeys = [], receipt = null, gif = null,
+  mentionPubkeys = [], receipt = null, gif = null, song = null,
 }) {
   const sats = Number(paidSats) || 0
   const paid = Number(legsPaid) || 0
@@ -366,6 +380,11 @@ export function buildExternalNoteTemplate({
   if (gifUrl) lines.push(gifUrl)
   lines.push('')
   lines.push(`🎙️ ${showEp}`)
+  // ⚠️ THE SONG IS NAMED ONLY WHEN THE CALLER SAYS A SONG SPLIT LANDED, and
+  // the caller decides that from live leg state (BMB's rule). A note naming a
+  // song that was never paid would credit it with sats it did not get.
+  const songPair = song && song.feedGuid && song.itemGuid && song.itemGuid !== itemGuid
+  if (songPair && song.title) lines.push(`🎵 ${song.title}${song.artist ? ` - ${song.artist}` : ''}`)
   if (bmbUrl) lines.push(bmbUrl)
   // ⚠️ THE ONE RECEIPT THIS NOTE QUOTES: the bot-signed summary for the
   // note's own figure (summaryReceipt.js, assets/js/zap-receipt.js). Fountain lists
@@ -392,6 +411,16 @@ export function buildExternalNoteTemplate({
   if (bmbUrl) tags.push(['r', bmbUrl])
   if (podcastGuid) { tags.push(['i', `podcast:guid:${podcastGuid}`]); tags.push(['k', 'podcast:guid']) }
   if (itemGuid) { tags.push(['i', `podcast:item:guid:${itemGuid}`]); tags.push(['k', 'podcast:item:guid']) }
+  // ⚠️ THE SONG'S PAIR GOES LAST, AND THERE ARE NEVER MORE THAN TWO ITEMS.
+  // The collector (split_credit) credits a note naming exactly two distinct
+  // items by finding one in the other's feed's time splits, and both it and
+  // the edge ingest file the boost under the LAST pair: the song, as they do
+  // Boost Me Bitch's. The host's share is its boost_credits row. Same shape
+  // as BMB's notes, host first.
+  if (songPair && podcastGuid && itemGuid) {
+    tags.push(['i', `podcast:guid:${song.feedGuid}`])
+    tags.push(['i', `podcast:item:guid:${song.itemGuid}`])
+  }
   tags.push(['amount', String(Math.round(sats * 1000))])
   if (quote) tags.push(quote.tag)
   const imeta = gifImetaTag(gif, gifUrl)
